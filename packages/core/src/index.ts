@@ -72,3 +72,28 @@ export {
   type Resolution,
   type WikiLookup,
 } from './markdown'
+
+// Local index (Plan 04)
+export {
+  openIndex,
+  applyIndexedNote,
+  removeFromIndex,
+  clearIndex,
+  hashContent,
+  buildIndexedNote,
+  indexNote,
+  rebuildIndex,
+  reconcileIndex,
+  getBacklinks,
+  getNote,
+  getNotesByTag,
+  searchNotes,
+  getIndexedHashes,
+  resolveWikiTarget,
+  type IndexedNote,
+  type IndexedLink,
+  type IndexedAlias,
+  type Backlink,
+  type NoteRow,
+  type SearchHit,
+} from './indexing'

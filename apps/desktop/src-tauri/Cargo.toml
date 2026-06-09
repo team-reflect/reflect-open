@@ -28,4 +28,5 @@ tempfile = "3.27.0"
 trash = "5.2.6"
 dirs = "6.0.0"
 tauri-plugin-dialog = "2.7.1"
+rusqlite_migration = "2.6.0"
 

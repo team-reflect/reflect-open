@@ -18,6 +18,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(fs::GraphState::default())
+        .manage(db::IndexState::default())
         .invoke_handler(tauri::generate_handler![
             app_version,
             fs::graph_open,
@@ -29,6 +30,11 @@ pub fn run() {
             fs::list_files,
             recents::recent_graphs,
             recents::forget_recent,
+            db::index_open,
+            db::index_apply,
+            db::index_remove,
+            db::index_clear,
+            db::db_query,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -67,5 +67,13 @@ impl From<std::io::Error> for AppError {
     }
 }
 
+impl From<rusqlite::Error> for AppError {
+    fn from(err: rusqlite::Error) -> Self {
+        Self::Io {
+            message: err.to_string(),
+        }
+    }
+}
+
 /// Result alias for command and helper functions.
 pub type AppResult<T> = Result<T, AppError>;

@@ -36,6 +36,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify generated DB types are current
+        run: |
+          pnpm --filter @reflect/db db:codegen
+          git diff --exit-code packages/db/src/schema.gen.ts \
+            || (echo "::error::schema.gen.ts is stale — run 'pnpm --filter @reflect/db db:codegen' and commit the result." && exit 1)
+
       - name: Lint (oxlint)
         run: pnpm lint
 

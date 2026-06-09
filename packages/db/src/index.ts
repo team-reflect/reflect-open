@@ -1,14 +1,12 @@
 /**
- * `@reflect/db` — Kysely schema, generated types, and the IPC query-builder
- * dialect for the local SQLite projection.
+ * `@reflect/db` — the Kysely schema + the IPC query-builder dialect for the local
+ * SQLite projection (Plan 04). SQLite runs in Rust; this package gives the
+ * frontend typed, Kysely-built reads that execute over the `db_query` command.
+ * Writes go through `@reflect/core`'s `index_*` command bindings.
  *
- * Fully wired in Plan 04 (local index). For now this package only declares the
- * database shape so dependents can compile against a stable type; the table
- * interfaces are added alongside the indexer.
+ * The table/view types in `Database` are generated from the Rust migrations
+ * (`pnpm --filter @reflect/db db:codegen`); `schema.gen.ts` is the output.
  */
-
-/** The local SQLite projection. Tables are introduced in Plan 04. */
-export interface Database {
-  // Populated in Plan 04: notes, note_text, links, backlinks, tags, aliases, …
-  [table: string]: never
-}
+export { db, createDb } from './db'
+export { IpcDialect } from './dialect'
+export type { Database } from './schema'

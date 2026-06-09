@@ -1,0 +1,88 @@
+import { invoke } from '@tauri-apps/api/core'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { getBacklinks, resolveWikiTarget, searchNotes } from './queries'
+import { indexNote, rebuildIndex } from './indexer'
+
+// Mock the Tauri bridge so both core's `call` and @reflect/db's dialect resolve
+// against an in-test fake — exercises the pipeline + the Kysely→db_query bridge.
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
+const mockInvoke = vi.mocked(invoke)
+
+beforeEach(() => {
+  mockInvoke.mockReset()
+  mockInvoke.mockImplementation(async (command, args) => {
+    const sql = String((args as { sql?: string } | undefined)?.sql ?? '')
+    switch (command) {
+      case 'note_read':
+        return '# Hello\n\n[[World]]'
+      case 'list_files':
+        return [{ path: 'notes/a.md', size: 1, modifiedMs: 5 }]
+      case 'index_apply':
+      case 'index_clear':
+      case 'index_remove':
+        return null
+      case 'db_query':
+        if (sql.includes('search_fts')) return [{ path: 'notes/a.md', title: 'A' }]
+        if (sql.includes('backlinks')) {
+          return [{ source_path: 'notes/b.md', target_raw: 'A', alias: null, pos_from: 0, pos_to: 3 }]
+        }
+        if (sql.includes('"notes"') && sql.includes('title_key')) {
+          return [{ path: 'notes/a.md' }]
+        }
+        return []
+      default:
+        return null
+    }
+  })
+})
+
+describe('indexNote', () => {
+  it('reads, parses, and applies a built index payload', async () => {
+    await indexNote('notes/a.md', { mtime: 5 })
+    const apply = mockInvoke.mock.calls.find(([cmd]) => cmd === 'index_apply')
+    expect(apply).toBeDefined()
+    const note = (apply![1] as { note: Record<string, unknown> }).note
+    expect(note.path).toBe('notes/a.md')
+    expect(note.title).toBe('Hello')
+    expect(note.fileHash).toMatch(/^[0-9a-f]{64}$/)
+    expect((note.links as { targetKey: string }[]).map((l) => l.targetKey)).toContain('world')
+  })
+})
+
+describe('rebuildIndex', () => {
+  it('clears, lists, then applies every file', async () => {
+    await rebuildIndex()
+    const commands = mockInvoke.mock.calls.map(([cmd]) => cmd)
+    expect(commands[0]).toBe('index_clear')
+    expect(commands).toContain('list_files')
+    expect(commands.filter((c) => c === 'index_apply')).toHaveLength(1)
+  })
+})
+
+describe('Kysely → db_query bridge', () => {
+  it('searchNotes compiles an FTS MATCH query', async () => {
+    const hits = await searchNotes('hello')
+    const query = mockInvoke.mock.calls.find(([cmd]) => cmd === 'db_query')
+    const sql = (query![1] as { sql: string }).sql
+    expect(sql).toContain('search_fts')
+    expect(sql.toLowerCase()).toContain('match')
+    expect(hits).toEqual([{ path: 'notes/a.md', title: 'A' }])
+  })
+
+  it('searchNotes returns [] for a blank query without touching the DB', async () => {
+    const before = mockInvoke.mock.calls.length
+    expect(await searchNotes('   ')).toEqual([])
+    expect(mockInvoke.mock.calls.length).toBe(before)
+  })
+
+  it('getBacklinks maps snake_case rows back to camelCase', async () => {
+    const backlinks = await getBacklinks('notes/a.md')
+    expect(backlinks).toEqual([
+      { sourcePath: 'notes/b.md', targetRaw: 'A', alias: null, posFrom: 0, posTo: 3 },
+    ])
+  })
+
+  it('resolveWikiTarget resolves a title match to a note ref', async () => {
+    expect(await resolveWikiTarget('World')).toEqual({ kind: 'resolved', ref: 'notes/a.md' })
+  })
+})

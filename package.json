@@ -16,5 +16,8 @@
     "oxlint": "^1.69.0",
     "turbo": "^2",
     "typescript": "~5.8.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["better-sqlite3", "esbuild"]
   }
 }
