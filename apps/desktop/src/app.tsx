@@ -14,7 +14,10 @@ export function App(): ReactElement {
 
   // Quit-time persistence: flush dirty note buffers before the webview dies
   // (window close, ⌘Q, reload) — unmount effects don't run on those paths.
-  useEffect(() => installQuitFlush(), [])
+  // installQuitFlush returns its teardown, which the effect returns as cleanup.
+  useEffect(() => {
+    return installQuitFlush()
+  }, [])
 
   if (status === 'ready' && graph) {
     return <GraphWorkspace graph={graph} />
