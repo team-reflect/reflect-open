@@ -10,7 +10,7 @@ export {
   type IndexedLink,
   type IndexedAlias,
 } from './indexed-note'
-export { indexNote, rebuildIndex, reconcileIndex } from './indexer'
+export { indexNote, rebuildIndex, reconcileIndex, type IndexPassOptions } from './indexer'
 export {
   getBacklinks,
   getNote,
