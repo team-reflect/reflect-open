@@ -35,6 +35,7 @@ first-party (owned by the team) and MIT-licensed, so there is no copyleft constr
 | Chrome extension framework | WXT | 11 |
 | CLI framework | `cac` | 14 |
 | CLI SQLite read | `node:sqlite` (built-in, Node 22+) | 14 |
+| Auto-update (JS API + relaunch) | `@tauri-apps/plugin-updater` + `@tauri-apps/plugin-process` | 15 |
 
 ## Rust crates (additions by plan)
 
@@ -51,6 +52,7 @@ first-party (owned by the team) and MIT-licensed, so there is no copyleft constr
 | Git (commits, merge, conflicts) | `git2` (libgit2) | 12 |
 | Local embeddings | `fastembed` | 09 |
 | Image processing (screenshot downscale) | `image` | 11 |
+| Auto-update | `tauri-plugin-updater` | 15 |
 
 ## Notes & caveats
 
@@ -62,6 +64,8 @@ first-party (owned by the team) and MIT-licensed, so there is no copyleft constr
   fallback if not.
 - **`fastembed` (Plan 09)** uses ONNX Runtime, which ships a dylib that must be signed for
   notarization (Plan 15). `candle` (pure Rust, no dylib) was the alternative, not chosen.
-- **Release (Plan 15):** manual updates + manual license audit for now — no auto-updater
-  plugin and no automated license/dependency scanning yet.
+- **Auto-update (Plan 15):** first-class via the official Tauri updater plugin
+  (`tauri-plugin-updater` + `@tauri-apps/plugin-updater`), updater-signed payloads,
+  `latest.json` + artifacts hosted on **GitHub Releases** (static — not a Reflect-hosted
+  API). License/dependency scanning stays **manual** for now.
 - **Routing (Plan 06)** stays dependency-free: a small typed `Route` union + history stack.
