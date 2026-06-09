@@ -128,4 +128,20 @@ describe('createGraphIndex', () => {
   it('stop() before any sync resolves immediately', async () => {
     await expect(createGraphIndex().stop()).resolves.toBeUndefined()
   })
+
+  it('calling sync() twice without stop() aborts the first pass', () => {
+    const signals: AbortSignal[] = []
+    mockReconcile.mockImplementation((options) => {
+      signals.push(options.signal!)
+      return new Promise(() => {}) // never settles
+    })
+
+    const index = createGraphIndex()
+    index.sync(1, () => false)
+    index.sync(2, () => false)
+
+    expect(signals).toHaveLength(2)
+    expect(signals[0].aborted).toBe(true) // superseded pass is aborted
+    expect(signals[1].aborted).toBe(false) // newest pass stays active
+  })
 })

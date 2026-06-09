@@ -84,6 +84,9 @@ export function createGraphIndex(options: GraphIndexOptions = {}): GraphIndex {
   }
 
   function sync(generation: number | null, isStale: () => boolean): void {
+    // Abort any in-flight pass so calling sync() twice without an intervening
+    // stop() can't leave an orphaned, un-abortable reconcile running.
+    abort?.abort()
     // Tear down the previous graph's live subscription unconditionally, so a
     // failed/absent open can't leave it bound to a different graph.
     live.unlisten?.()

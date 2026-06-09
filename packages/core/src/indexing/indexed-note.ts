@@ -14,6 +14,7 @@ import { foldKey, normalizeWikiTarget, type ParsedNote } from '../markdown'
  * other, and {@link indexedNoteSchema} is the contract a drift test can assert.
  */
 
+/** One outbound link occurrence (wiki or markdown), with its source span. */
 export const indexedLinkSchema = z.object({
   kind: z.enum(['wiki', 'md']),
   targetRaw: z.string(),
@@ -25,12 +26,14 @@ export const indexedLinkSchema = z.object({
 })
 export type IndexedLink = z.infer<typeof indexedLinkSchema>
 
+/** A frontmatter alias plus its `foldKey`-normalized match key. */
 export const indexedAliasSchema = z.object({
   alias: z.string(),
   aliasKey: z.string(),
 })
 export type IndexedAlias = z.infer<typeof indexedAliasSchema>
 
+/** The full per-note write payload `index_apply` upserts (keys pre-folded). */
 export const indexedNoteSchema = z.object({
   path: z.string(),
   id: z.string().nullable(),
