@@ -38,9 +38,10 @@ function base64Of(buffer: ArrayBuffer): string {
  * these per day in the daily stream.
  */
 export function NotePane({ path }: NotePaneProps): ReactElement {
-  const document = useNoteDocument(path)
   const { graph } = useGraph()
   const graphRoot = graph?.root ?? null
+  const generation = graph?.generation ?? null
+  const document = useNoteDocument(path, generation)
 
   const resolveUrl = useCallback(
     (src: string): string | null => {
@@ -55,15 +56,18 @@ export function NotePane({ path }: NotePaneProps): ReactElement {
     [graphRoot],
   )
 
-  const saveImage = useCallback(async (file: File): Promise<string | null> => {
-    const extension = EXTENSION_BY_MIME[file.type]
-    if (!extension) {
-      return null
-    }
-    const target = assetPath(`pasted-${Date.now()}.${extension}`)
-    await writeAsset(target, base64Of(await file.arrayBuffer()))
-    return target
-  }, [])
+  const saveImage = useCallback(
+    async (file: File): Promise<string | null> => {
+      const extension = EXTENSION_BY_MIME[file.type]
+      if (!extension || generation === null) {
+        return null
+      }
+      const target = assetPath(`pasted-${Date.now()}.${extension}`)
+      await writeAsset(target, base64Of(await file.arrayBuffer()), generation)
+      return target
+    },
+    [generation],
+  )
 
   const images = useMemo<ImageOptions>(() => ({ resolveUrl, saveImage }), [resolveUrl, saveImage])
 

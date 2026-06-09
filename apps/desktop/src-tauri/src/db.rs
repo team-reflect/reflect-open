@@ -311,6 +311,7 @@ pub fn index_open(graph: State<GraphState>, index: State<IndexState>) -> AppResu
         .0
         .lock()
         .map_err(|_| AppError::io("graph state lock poisoned"))?
+        .root
         .clone()
         .ok_or_else(AppError::no_graph)?;
     let mut state = lock_state(&index)?;

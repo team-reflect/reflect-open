@@ -73,7 +73,7 @@ export function GraphWorkspace({ graph }: GraphWorkspaceProps) {
       } catch (err) {
         if (isAppError(err) && err.kind === 'notFound') {
           try {
-            await writeNote(WELCOME_PATH, WELCOME_NOTE)
+            await writeNote(WELCOME_PATH, WELCOME_NOTE, graph.generation)
           } catch {
             // fall through — NotePane surfaces the open error
           }
@@ -90,7 +90,7 @@ export function GraphWorkspace({ graph }: GraphWorkspaceProps) {
     return () => {
       active = false
     }
-  }, [graph.root])
+  }, [graph.root, graph.generation])
 
   const toggleTheme = useCallback((): void => {
     setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')

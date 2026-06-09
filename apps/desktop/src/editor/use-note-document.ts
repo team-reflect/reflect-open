@@ -46,7 +46,13 @@ export interface NoteDocument {
   loadTheirs: () => void
 }
 
-export function useNoteDocument(path: string | null): NoteDocument {
+/**
+ * @param path graph-relative path of the open note
+ * @param generation the open graph's session generation (`GraphInfo.generation`);
+ *   pins every write to that graph — Rust rejects a write whose generation is
+ *   stale, so a flush racing a graph switch can't land in the new graph.
+ */
+export function useNoteDocument(path: string | null, generation: number | null): NoteDocument {
   const [status, setStatus] = useState<NoteDocumentStatus>('loading')
   const [initialContent, setInitialContent] = useState('')
   const [isProtected, setIsProtected] = useState(false)
@@ -95,28 +101,40 @@ export function useNoteDocument(path: string | null): NoteDocument {
     // A parked conflict pauses all saves: writing the buffer before the user
     // chooses Keep mine / Load theirs would clobber the external change and
     // defeat the non-destructive flow.
-    if (!path || !dirtyRef.current || protectedRef.current || conflictRef.current !== null) {
+    if (
+      !path ||
+      generation === null ||
+      !dirtyRef.current ||
+      protectedRef.current ||
+      conflictRef.current !== null
+    ) {
       return
     }
     const savedPath = path
+    // Snapshot at enqueue: if the note switches before the queued step runs,
+    // this is the previous note's final flush and the shared refs no longer
+    // describe it — the snapshot is what must be persisted.
+    const enqueuedContent = bufferRef.current
     saveChain.current = saveChain.current
       .then(async () => {
-        // Re-check at execution time and snapshot the buffer *now*: a queued
-        // step can run behind a slow prior write, during which the user may
-        // have reverted (dirty again false) or kept typing — writing the
-        // enqueue-time snapshot would put disk behind what they see.
-        if (
-          !dirtyRef.current ||
-          protectedRef.current ||
-          conflictRef.current !== null ||
-          pathRef.current !== savedPath
-        ) {
-          return
+        let content: string
+        if (pathRef.current === savedPath) {
+          // Same note: re-check at execution time and take the freshest buffer —
+          // a queued step can run behind a slow prior write, during which the
+          // user may have reverted or kept typing.
+          if (!dirtyRef.current || protectedRef.current || conflictRef.current !== null) {
+            return
+          }
+          content = bufferRef.current
+        } else {
+          // The note switched after enqueue: persist the final flush snapshot to
+          // the old path. (If the *graph* also switched, the stale generation
+          // makes Rust reject this write loudly instead of cross-writing.)
+          content = enqueuedContent
         }
-        const content = bufferRef.current
         inFlightWriteRef.current = content
         try {
-          await writeNote(savedPath, content)
+          await writeNote(savedPath, content, generation)
           markClean(content, savedPath)
           setError(null) // a previous save failure is resolved by this success
         } finally {
@@ -124,9 +142,10 @@ export function useNoteDocument(path: string | null): NoteDocument {
         }
       })
       .catch((err) => {
+        console.error('failed to save note:', err)
         setError(messageOf(err))
       })
-  }, [path, markClean])
+  }, [path, generation, markClean])
 
   const scheduleSave = useCallback(() => {
     if (saveTimer.current !== null) {

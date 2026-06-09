@@ -12,6 +12,12 @@ export const graphInfoSchema = z.object({
    * syncs via GitHub only and a cloud-synced graph risks index corruption.
    */
   cloudSync: z.string().nullable(),
+  /**
+   * Open-session generation, bumped by Rust on every graph open. Mutating file
+   * commands echo it back and are rejected when stale, so a write enqueued for
+   * one graph can never land in another graph's same-named file.
+   */
+  generation: z.number(),
 })
 export type GraphInfo = z.infer<typeof graphInfoSchema>
 

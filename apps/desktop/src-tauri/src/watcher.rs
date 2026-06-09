@@ -86,6 +86,7 @@ pub fn watch_start(
         .0
         .lock()
         .map_err(|_| AppError::io("graph state lock poisoned"))?
+        .root
         .clone()
         .ok_or_else(AppError::no_graph)?;
 

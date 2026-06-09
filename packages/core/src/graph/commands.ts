@@ -27,27 +27,35 @@ export async function readNote(path: string): Promise<string> {
   return call('note_read', { path }, z.string())
 }
 
-/** Atomically write a note's markdown by graph-relative path. */
-export async function writeNote(path: string, contents: string): Promise<void> {
-  await call('note_write', { path, contents }, voidSchema)
+/**
+ * Atomically write a note's markdown by graph-relative path. `generation` (from
+ * `GraphInfo`) pins the write to the graph it was issued for — Rust rejects it
+ * if the graph switched in between.
+ */
+export async function writeNote(path: string, contents: string, generation: number): Promise<void> {
+  await call('note_write', { path, contents, generation }, voidSchema)
 }
 
 /**
  * Atomically write a binary asset (pasted/dropped image) by graph-relative
  * path. `contentsBase64` is the file's bytes, base64-encoded for the JSON IPC.
  */
-export async function writeAsset(path: string, contentsBase64: string): Promise<void> {
-  await call('asset_write', { path, contentsBase64 }, voidSchema)
+export async function writeAsset(
+  path: string,
+  contentsBase64: string,
+  generation: number,
+): Promise<void> {
+  await call('asset_write', { path, contentsBase64, generation }, voidSchema)
 }
 
-/** Move/rename a note within the graph. */
-export async function moveNote(from: string, to: string): Promise<void> {
-  await call('note_move', { from, to }, voidSchema)
+/** Move/rename a note within the graph (pinned to `generation`). */
+export async function moveNote(from: string, to: string, generation: number): Promise<void> {
+  await call('note_move', { from, to, generation }, voidSchema)
 }
 
-/** Send a note to the OS trash (recoverable). */
-export async function deleteNote(path: string): Promise<void> {
-  await call('note_delete', { path }, voidSchema)
+/** Send a note to the OS trash (recoverable; pinned to `generation`). */
+export async function deleteNote(path: string, generation: number): Promise<void> {
+  await call('note_delete', { path, generation }, voidSchema)
 }
 
 /** List markdown notes under `daily/` and `notes/`. */

@@ -23,9 +23,20 @@ const TOP_LEVEL_DIRS: [&str; 4] = ["daily", "notes", "assets", REFLECT_DIR];
 /// Directories scanned by `list_files` for markdown notes.
 const NOTE_DIRS: [&str; 2] = ["daily", "notes"];
 
-/// Tauri-managed state holding the currently open graph root (absolute path).
+/// The open graph root plus a monotonic generation, kept **under one lock** so
+/// they swap atomically (the same pattern as the index's `IndexState`, Plan 04b).
+/// Mutating commands carry the generation they were issued for and are rejected
+/// when it's stale — so a write enqueued for one graph can never land in another
+/// graph's same-named file after a switch swaps the root.
 #[derive(Default)]
-pub struct GraphState(pub Mutex<Option<PathBuf>>);
+pub struct GraphInner {
+    pub generation: u64,
+    pub root: Option<PathBuf>,
+}
+
+/// Tauri-managed state holding the currently open graph (root + generation).
+#[derive(Default)]
+pub struct GraphState(pub Mutex<GraphInner>);
 
 /// Identity of an open graph, returned to the frontend.
 #[derive(Serialize)]
@@ -39,6 +50,8 @@ pub struct GraphInfo {
     /// or `None`. A `Some(_)` means the UI should warn — Reflect syncs via
     /// GitHub only and a cloud-synced graph risks index corruption (Plan 12/04).
     pub cloud_sync: Option<String>,
+    /// Open-session generation; mutating file commands must echo it back.
+    pub generation: u64,
 }
 
 /// Metadata for a file inside the graph.
@@ -197,7 +210,7 @@ fn collect_markdown(root: &Path, dir: &str, out: &mut Vec<FileMeta>) -> AppResul
     Ok(())
 }
 
-fn graph_info(root: &Path) -> GraphInfo {
+fn graph_info(root: &Path, generation: u64) -> GraphInfo {
     let name = root
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
@@ -206,13 +219,20 @@ fn graph_info(root: &Path) -> GraphInfo {
         root: root.to_string_lossy().into_owned(),
         name,
         cloud_sync: crate::recents::detect_cloud_sync(root).map(str::to_string),
+        generation,
     }
 }
 
-/// Set the active root, record it in recents, and return its info.
+/// Set the active root (bumping the generation atomically), record it in
+/// recents, and return its info.
 fn activate(state: &State<GraphState>, root: &Path) -> AppResult<GraphInfo> {
-    let info = graph_info(root);
-    set_root(state, root)?;
+    let generation = {
+        let mut inner = lock_graph(state)?;
+        inner.generation += 1;
+        inner.root = Some(root.to_path_buf());
+        inner.generation
+    };
+    let info = graph_info(root, generation);
     // Recents is a convenience cache: a failure to persist it must not fail the
     // open (which would leave Rust treating the graph as open while the command
     // returns an error, out of sync with the UI). Best-effort, log and move on.
@@ -222,22 +242,34 @@ fn activate(state: &State<GraphState>, root: &Path) -> AppResult<GraphInfo> {
     Ok(info)
 }
 
-fn current_root(state: &State<GraphState>) -> AppResult<PathBuf> {
+fn lock_graph<'a>(
+    state: &'a State<GraphState>,
+) -> AppResult<std::sync::MutexGuard<'a, GraphInner>> {
     state
         .0
         .lock()
-        .map_err(|_| AppError::io("graph state lock poisoned"))?
+        .map_err(|_| AppError::io("graph state lock poisoned"))
+}
+
+fn current_root(state: &State<GraphState>) -> AppResult<PathBuf> {
+    lock_graph(state)?
+        .root
         .clone()
         .ok_or_else(AppError::no_graph)
 }
 
-fn set_root(state: &State<GraphState>, root: &Path) -> AppResult<()> {
-    let mut guard = state
-        .0
-        .lock()
-        .map_err(|_| AppError::io("graph state lock poisoned"))?;
-    *guard = Some(root.to_path_buf());
-    Ok(())
+/// The current root, verified against the generation a mutating command was
+/// issued for. A stale generation means the graph was switched after the
+/// command was enqueued — the mutation must be rejected (loudly), or it would
+/// land in the *new* graph's same-named file.
+fn root_for_generation(state: &State<GraphState>, generation: u64) -> AppResult<PathBuf> {
+    let inner = lock_graph(state)?;
+    if inner.generation != generation {
+        return Err(AppError::io(
+            "the graph changed since this write was issued; dropping it",
+        ));
+    }
+    inner.root.clone().ok_or_else(AppError::no_graph)
 }
 
 // ---- commands --------------------------------------------------------------
@@ -290,10 +322,16 @@ pub fn note_read(path: String, state: State<GraphState>) -> AppResult<String> {
     Ok(fs::read_to_string(resolve(&root, &path)?)?)
 }
 
-/// Atomically write a note's markdown by graph-relative path.
+/// Atomically write a note's markdown by graph-relative path. `generation` pins
+/// the write to the graph it was issued for (see `root_for_generation`).
 #[tauri::command]
-pub fn note_write(path: String, contents: String, state: State<GraphState>) -> AppResult<()> {
-    let root = current_root(&state)?;
+pub fn note_write(
+    path: String,
+    contents: String,
+    generation: u64,
+    state: State<GraphState>,
+) -> AppResult<()> {
+    let root = root_for_generation(&state, generation)?;
     atomic_write(&resolve(&root, &path)?, &contents)
 }
 
@@ -304,20 +342,26 @@ pub fn note_write(path: String, contents: String, state: State<GraphState>) -> A
 pub fn asset_write(
     path: String,
     contents_base64: String,
+    generation: u64,
     state: State<GraphState>,
 ) -> AppResult<()> {
     use base64::Engine;
-    let root = current_root(&state)?;
+    let root = root_for_generation(&state, generation)?;
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(contents_base64.as_bytes())
         .map_err(|err| AppError::io(format!("invalid base64 asset payload: {err}")))?;
     atomic_write_bytes(&resolve(&root, &path)?, &bytes)
 }
 
-/// Move/rename a note within the graph.
+/// Move/rename a note within the graph (pinned to `generation`).
 #[tauri::command]
-pub fn note_move(from: String, to: String, state: State<GraphState>) -> AppResult<()> {
-    let root = current_root(&state)?;
+pub fn note_move(
+    from: String,
+    to: String,
+    generation: u64,
+    state: State<GraphState>,
+) -> AppResult<()> {
+    let root = root_for_generation(&state, generation)?;
     let to_abs = resolve(&root, &to)?;
     if let Some(parent) = to_abs.parent() {
         fs::create_dir_all(parent)?;
@@ -326,10 +370,11 @@ pub fn note_move(from: String, to: String, state: State<GraphState>) -> AppResul
     Ok(())
 }
 
-/// Send a note to the OS trash (recoverable), not a hard delete.
+/// Send a note to the OS trash (recoverable), not a hard delete (pinned to
+/// `generation`).
 #[tauri::command]
-pub fn note_delete(path: String, state: State<GraphState>) -> AppResult<()> {
-    let root = current_root(&state)?;
+pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> AppResult<()> {
+    let root = root_for_generation(&state, generation)?;
     trash::delete(resolve(&root, &path)?).map_err(|err| AppError::io(err.to_string()))?;
     Ok(())
 }

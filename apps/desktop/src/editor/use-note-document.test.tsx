@@ -53,7 +53,7 @@ beforeEach(() => {
 })
 
 async function readyHook() {
-  const hook = renderHook(() => useNoteDocument('notes/a.md'))
+  const hook = renderHook(() => useNoteDocument('notes/a.md', 1))
   await waitFor(() => expect(hook.result.current.status).toBe('ready'))
   return hook
 }
@@ -68,7 +68,7 @@ describe('useNoteDocument', () => {
   it('debounces edits into an atomic write and clears dirty', async () => {
     vi.useFakeTimers()
     try {
-      const hook = renderHook(() => useNoteDocument('notes/a.md'))
+      const hook = renderHook(() => useNoteDocument('notes/a.md', 1))
       await act(() => vi.advanceTimersByTimeAsync(0))
       expect(hook.result.current.status).toBe('ready')
 
@@ -131,7 +131,7 @@ describe('useNoteDocument', () => {
     try {
       // meowdown's converter loses task-list text — the guard must catch it.
       disk = '- [ ] buy milk\n- [x] done\n'
-      const hook = renderHook(() => useNoteDocument('notes/tasks.md'))
+      const hook = renderHook(() => useNoteDocument('notes/tasks.md', 1))
       await act(() => vi.advanceTimersByTimeAsync(0))
       expect(hook.result.current.status).toBe('ready')
       expect(hook.result.current.protected).toBe(true)
@@ -148,7 +148,7 @@ describe('useNoteDocument', () => {
   it('an external reload never dirties the buffer, even when serialization normalizes', async () => {
     vi.useFakeTimers()
     try {
-      const hook = renderHook(() => useNoteDocument('notes/a.md'))
+      const hook = renderHook(() => useNoteDocument('notes/a.md', 1))
       await act(() => vi.advanceTimersByTimeAsync(0))
 
       // The editor's change handler fires synchronously inside setMarkdown and
@@ -181,7 +181,7 @@ describe('useNoteDocument', () => {
   it('pauses saves while a conflict is parked (no clobbering theirs)', async () => {
     vi.useFakeTimers()
     try {
-      const hook = renderHook(() => useNoteDocument('notes/a.md'))
+      const hook = renderHook(() => useNoteDocument('notes/a.md', 1))
       await act(() => vi.advanceTimersByTimeAsync(0))
 
       // An edit schedules a save, then an external change parks a conflict
@@ -226,7 +226,7 @@ describe('useNoteDocument', () => {
         return null
       })
 
-      const hook = renderHook(() => useNoteDocument('notes/a.md'))
+      const hook = renderHook(() => useNoteDocument('notes/a.md', 1))
       await act(() => vi.advanceTimersByTimeAsync(0))
 
       act(() => hook.result.current.onEditorChange('# Saved\n'))
@@ -272,7 +272,7 @@ describe('useNoteDocument', () => {
         return null
       })
 
-      const hook = renderHook(() => useNoteDocument('notes/a.md'))
+      const hook = renderHook(() => useNoteDocument('notes/a.md', 1))
       await act(() => vi.advanceTimersByTimeAsync(0))
 
       act(() => hook.result.current.onEditorChange('# A\n'))
@@ -315,7 +315,7 @@ describe('useNoteDocument', () => {
         return null
       })
 
-      const hook = renderHook(() => useNoteDocument('notes/a.md'))
+      const hook = renderHook(() => useNoteDocument('notes/a.md', 1))
       await act(() => vi.advanceTimersByTimeAsync(0))
 
       act(() => hook.result.current.onEditorChange('# Edited\n'))
@@ -328,6 +328,40 @@ describe('useNoteDocument', () => {
       await act(() => vi.advanceTimersByTimeAsync(1000))
       expect(hook.result.current.error).toBeNull()
       expect(writes).toEqual(['# Edited again\n'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('flushes the previous note when the path switches (final-flush snapshot)', async () => {
+    vi.useFakeTimers()
+    try {
+      const written: Array<{ path: string; contents: string }> = []
+      mockInvoke.mockImplementation(async (command, args) => {
+        if (command === 'note_read') {
+          return disk
+        }
+        if (command === 'note_write') {
+          const { path, contents } = args as { path: string; contents: string }
+          written.push({ path, contents })
+          return null
+        }
+        return null
+      })
+
+      const hook = renderHook(({ path }) => useNoteDocument(path, 1), {
+        initialProps: { path: 'notes/a.md' },
+      })
+      await act(() => vi.advanceTimersByTimeAsync(0))
+
+      // Dirty edit, then switch notes before the debounce fires: the unmount
+      // flush must persist the OLD note's buffer to the OLD path.
+      act(() => hook.result.current.onEditorChange('# Unsaved on A\n'))
+      hook.rerender({ path: 'notes/b.md' })
+      await act(() => vi.advanceTimersByTimeAsync(2000))
+
+      expect(written).toContainEqual({ path: 'notes/a.md', contents: '# Unsaved on A\n' })
+      expect(written.some((write) => write.path === 'notes/b.md')).toBe(false)
     } finally {
       vi.useRealTimers()
     }
