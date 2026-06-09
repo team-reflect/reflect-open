@@ -230,8 +230,7 @@ fn stale_generation_writes_are_dropped_end_to_end() {
         .expect("stale remove returns Ok");
     assert_eq!(count("after stale remove"), Value::from(1)); // also dropped
 
-    super::index_apply(note("notes/b.md", "B", vec![]), fresh, app.state())
-        .expect("fresh apply");
+    super::index_apply(note("notes/b.md", "B", vec![]), fresh, app.state()).expect("fresh apply");
     assert_eq!(count("after fresh apply"), Value::from(2));
 }
 

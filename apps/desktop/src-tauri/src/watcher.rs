@@ -92,10 +92,7 @@ pub fn watch_start(
         tracing::error!(?err, "graph state lock poisoned by an earlier panic");
         AppError::io("graph state lock poisoned")
     })?;
-    let root = graph_guard
-        .root
-        .clone()
-        .ok_or_else(AppError::no_graph)?;
+    let root = graph_guard.root.clone().ok_or_else(AppError::no_graph)?;
 
     // Drop any previous watcher first: if installing the new one fails we're then
     // left with no watcher, rather than the previous graph's still driving
