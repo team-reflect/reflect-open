@@ -198,7 +198,11 @@ export function useNoteDocument(path: string | null): NoteDocument {
         return
       }
       setInitialContent(content)
-      editorRef.current?.setMarkdown(content)
+      // While protected there is no live editor mounted (the pane shows the
+      // read-only view), and lossy content must never enter one regardless.
+      if (!lossy) {
+        editorRef.current?.setMarkdown(content)
+      }
     },
     [markClean],
   )

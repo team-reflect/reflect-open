@@ -63,5 +63,7 @@ describe('heading toggles', () => {
     expect(runBinding(stateWithSelection('hello', 2, 2), 'Mod-1')).toBe('# hello')
     expect(runBinding(stateWithSelection('# hello', 2, 2), 'Mod-1')).toBe('hello')
     expect(runBinding(stateWithSelection('# hello', 2, 2), 'Mod-2')).toBe('## hello')
+    expect(runBinding(stateWithSelection('hello', 2, 2), 'Mod-3')).toBe('### hello')
+    expect(runBinding(stateWithSelection('### hello', 2, 2), 'Mod-3')).toBe('hello')
   })
 })
