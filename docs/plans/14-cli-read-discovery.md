@@ -26,11 +26,13 @@ desktop app's watcher (Plan 04).
 ## Architecture: a TS CLI that reuses the core
 
 Per [Architecture & Conventions](architecture-conventions.md) the business logic is
-TypeScript in `@reflect/core` — so the CLI is a **Node TS app at `apps/cli`** that imports
-the same core getters + markdown layer, **not** a separate Rust binary. It does not need
-the Rust process: it opens `.reflect/index.sqlite` **read-only** itself (e.g.
-`better-sqlite3` + the Kysely dialect; FTS5 is compiled into SQLite for lexical search),
-and uses the `@reflect/core` markdown layer for file-only operations.
+TypeScript in `@reflect/core` — so the CLI is a **Node TS app at `apps/cli`** (`cac` for
+the command framework) that imports the same core getters + markdown layer, **not** a
+separate Rust binary. It does not need the Rust process: it opens `.reflect/index.sqlite`
+**read-only** via Node's built-in **`node:sqlite`** (zero native dependency) + the Kysely
+dialect, and uses the `@reflect/core` markdown layer for file-only operations.
+**Verify** FTS5 is present in `node:sqlite`'s bundled SQLite before relying on `search`;
+`better-sqlite3` is the fallback if not. See [Libraries](libraries.md).
 
 ## Steps
 

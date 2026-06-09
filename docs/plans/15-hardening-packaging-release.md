@@ -11,7 +11,7 @@ docs, and a release pipeline. This is **M5.**
 
 **In:** onboarding/first-run, keyboard-map completeness + discoverability, accessibility,
 performance budgets, error/repair UX, privacy review, signing/notarization, MIT licensing
-+ public docs, CI, release/auto-update.
++ public docs, CI, manual release (no auto-updater first wave).
 **Out:** mobile release (planned, separate track), Windows/Android (later), publishing/
 tasks/audio (deferred features).
 
@@ -57,22 +57,15 @@ tasks/audio (deferred features).
 8. **Licensing & open-source readiness.** MIT `LICENSE`; per-file headers where
    appropriate; `README` (what/why/install/build), `CONTRIBUTING`, architecture overview
    linking these plans; ensure no proprietary assets/keys are committed. Write as if the
-   code is public and will be critiqued — it will be.
-   - **Resolve the meowdown GPL-3.0 conflict (release gate).** The editor
-     (`@meowdown/core`/`@meowdown/react`, Plan 05) is **GPL-3.0-only**; bundling it makes
-     the distributed app a combined GPL-3.0 work, incompatible with an MIT core. Pick one
-     before public release and update licensing accordingly: (a) **relicense Reflect's
-     distributable under GPL-3.0** (legally clean; abandons the MIT-core principle as
-     stated); (b) **obtain a more permissive grant / dual-license from the author**
-     (ocavue/prosekit — likely the same team), keeping the MIT core; (c) **isolate meowdown
-     behind a boundary** sufficient for "mere aggregation" (hard to argue for a core
-     editor — legal review required); or (d) **swap the editor** (e.g. the prior
-     CodeMirror-6 live-preview option, MIT-compatible). Run a license-compatibility scan
-     in CI (step 9) so a GPL/AGPL/proprietary dependency can never slip into an MIT build.
+   code is public and will be critiqued — it will be. **The whole stack is MIT-compatible:**
+   meowdown is first-party MIT, and the chosen libraries ([Libraries](libraries.md)) are
+   permissive. License/dependency scanning is **manual** for now (a periodic audit; no
+   automated CI gate yet — revisit if the dep tree grows).
 
 9. **CI + release.** GitHub Actions: typecheck, lint (oxlint adherence config), tests,
    Rust build, Tauri bundle, and a release workflow producing a signed, notarized DMG +
-   the CLI. Wire Tauri auto-update for subsequent releases.
+   the CLI. **Updates are manual for first release** — users download new builds; no
+   auto-updater plugin yet (add `tauri-plugin-updater` later if warranted).
 
 10. **Definition-of-success walkthrough.** Manually verify the product-vision success
     list end-to-end (below) as the release checklist.

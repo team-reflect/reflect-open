@@ -13,6 +13,9 @@ the GitHub token; AI only for the *deferred* conflict-resolution path).
 and conflict policy live in `@reflect/core` (`actions/sync`). See
 [Architecture & Conventions](architecture-conventions.md).
 
+**Libraries:** `git2` (libgit2), `keyring` (GitHub token) — Rust; `diff` (jsdiff) for
+conflict diffs — TS. See [Libraries](libraries.md).
+
 ## Why GitHub-only (and why not iCloud / Dropbox / Drive)
 
 File-sync providers move *bytes*, not *intent*, so they can't give Reflect safe sync

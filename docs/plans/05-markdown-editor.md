@@ -32,14 +32,13 @@ ProseMirror rich editor:
 - Because syntax is never discarded, `docToMarkdown(doc)` is **near-lossless** — which
   resolves the round-trip concern that would otherwise push us to a source-buffer editor.
 
-This supersedes the earlier CodeMirror-6 recommendation. (The two callouts to verify
-remain: round-trip fidelity vs Plan 03, and meowdown's early maturity — see Risks.)
+This supersedes the earlier CodeMirror-6 recommendation. Round-trip fidelity is now
+verified (the Plan 01 spike — [docs/spikes/meowdown-wiki-links.md](spikes/meowdown-wiki-links.md));
+the remaining watch-item is meowdown's early maturity (see Risks).
 
-> **License flag:** `@meowdown/core` and `@meowdown/react` are **GPL-3.0-only**. Bundling
-> them makes the distributed app a combined work subject to GPL-3.0, which conflicts with
-> the "MIT open-source core" principle. This must be resolved (relicense Reflect core,
-> obtain a more permissive grant from the author, or isolate the component). Tracked in
-> [Plan 15](15-hardening-packaging-release.md) and flagged for a product decision.
+> **License:** meowdown is **first-party** (owned by the team) and MIT-licensed, so it fits
+> the MIT-core principle with no copyleft constraint. (Earlier drafts flagged GPL-3.0; that
+> is resolved.)
 
 ## meowdown API surface (what we build against)
 
@@ -137,7 +136,8 @@ they are Reflect's organizing primitive.
 - **Reflect owns three editor extensions:** wiki-links, images, task checkboxes.
 - **One central keymap registry** owns all shortcuts app-wide.
 - **The editor writes files + fires reindex; it never blocks on the index.**
-- **GPL-3.0 dependency is an open licensing decision** (Plan 15).
+- **Libraries:** meowdown (`@meowdown/react`/`core`) + ProseKit + `@lezer/markdown`,
+  first-party MIT (installed in Plan 01). See [Libraries](libraries.md).
 
 ## Acceptance criteria
 
@@ -153,15 +153,14 @@ they are Reflect's organizing primitive.
 
 ## Risks
 
-- **Round-trip normalization** in `docToMarkdown` (e.g. list bullet style, emphasis
-  markers, table whitespace) producing noisy diffs for sync (Plan 12). Mitigate: gate
-  with Plan 03's round-trip corpus against `docToMarkdown`; for programmatic edits to
-  *closed* notes, prefer Plan 03 splice edits over re-serializing.
-- **meowdown maturity (v0.2.0, empty README, missing nodes).** Pin the version; vendor a
-  patch path; budget time to write/ upstream wiki-link, image, and checkbox extensions;
-  track ProseKit `0.x` breaking changes.
-- **GPL-3.0 licensing** vs MIT core — highest-level risk; resolve before public release
-  (Plan 15). 
+- **Round-trip normalization** in `docToMarkdown` — **confirmed** by the Plan 01 spike:
+  inline content (incl. wiki-links) is byte-identical, but lists serialize "loose" (a blank
+  line between items). Mitigate: add a tight-list serializer option or normalize-on-import,
+  and gate with the round-trip corpus; for edits to *closed* notes, prefer Plan 03 splice
+  edits over re-serializing.
+- **meowdown maturity (v0.2.0, empty README, missing nodes).** We own the editor (first-
+  party) so we can extend/upstream directly, but it's pre-1.0: pin versions, budget time
+  for the wiki-link/image/checkbox extensions, and track ProseKit `0.x` churn.
 - **Uncontrolled-component ergonomics** (stale content on navigation). Mitigate with the
   single imperative `setContent` path + per-day `key` in the stream.
 - **Autosave vs watcher feedback loops.** Mitigate by tagging app-originated writes.

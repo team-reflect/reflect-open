@@ -28,6 +28,7 @@ before the editor, and the editor lands before search/AI.
 > **Read first:** [Architecture & Conventions](architecture-conventions.md) — the
 > cross-cutting decisions (Turborepo monorepo, **TS `core` / Rust primitives**, the
 > per-domain **actions** pattern, full Kysely discipline) that every plan below assumes.
+> Chosen libraries (TS + Rust) per step are recorded in [Libraries](libraries.md).
 
 ## The plans
 
@@ -86,10 +87,11 @@ demonstrable.
 The highest-severity risks surfaced reviewing this plan, with where they're handled:
 
 1. **meowdown is the core bet and is early (v0.2.0, no wiki-links).** The whole product
-   rides a pre-1.0 editor we must extend with `[[ ]]`. Mitigation: a **go/no-go wiki-link
-   spike in Plan 01** before Plans 06–10 depend on it; CodeMirror-6 live-preview remains
-   the fallback (Plans 05, 15). *Also a licensing risk: meowdown is GPL-3.0 vs the MIT-core
-   goal — unresolved (Plans 05, 15).*
+   rides a pre-1.0 editor we must extend with `[[ ]]`. **Gate passed:** the Plan 01
+   wiki-link spike confirmed lossless `[[ ]]` round-trips + a clean extension path
+   ([docs/spikes/meowdown-wiki-links.md](spikes/meowdown-wiki-links.md)). Residual: it's
+   pre-1.0 (we own the extension code, pin versions); CodeMirror-6 live-preview stays the
+   documented fallback. *Licensing is resolved — meowdown is first-party MIT.*
 2. **A graph inside a cloud-sync folder corrupts the index and fights GitHub.** Remote
    sync is **GitHub-only** (file-sync providers are unsupported by design — Plan 12); but a
    user may still *place* their graph in iCloud/Dropbox, which can replace the SQLite
@@ -119,12 +121,9 @@ they are not re-litigated per phase:
 - **Portable data + export from day one.** Backup must be free, via **GitHub only**;
   file-sync providers (iCloud/Dropbox/Drive) are unsupported for sync by design.
 - **No Electron, no web app, Mac-first.** Tauri shell; iOS/Windows later.
-- **MIT open-source core.** Write as if the code is public and will be critiqued.
-  ⚠️ **Open conflict:** the chosen editor [meowdown](https://github.com/prosekit/meowdown)
-  is **GPL-3.0-only**. Bundling it makes the app a combined GPL-3.0 work, incompatible
-  with an MIT core. Needs a product decision (relicense core / obtain a permissive grant /
-  isolate the component). See [Plan 05](05-markdown-editor.md) and
-  [Plan 15](15-hardening-packaging-release.md).
+- **MIT open-source core.** Write as if the code is public and will be critiqued. The
+  editor [meowdown](https://github.com/prosekit/meowdown) is **first-party** (owned by the
+  team) and MIT-licensed, so the MIT core holds with no copyleft constraint.
 
 ## Explicitly deferred (NOT first wave)
 

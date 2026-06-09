@@ -13,6 +13,9 @@ keychain (introduced here, reused by Plan 12).
 (`assertCloudAllowed`); keychain is a Rust primitive. See
 [Architecture & Conventions](architecture-conventions.md).
 
+**Libraries:** Vercel AI SDK (`ai` + `@ai-sdk/openai`/…), `diff` (jsdiff, patchsets),
+`keyring` (Rust, BYOK keys). See [Libraries](libraries.md).
+
 ## Scope
 
 **In:** provider config (BYOK, OpenAI-first), keychain secrets, context assembly from

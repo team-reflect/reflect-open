@@ -8,6 +8,9 @@ fully reconstructable from files.
 **Unlocks:** Plan 06 (daily lookup), 07 (backlinks), 08 (lexical search), 09 (chunks),
 10 (AI retrieval), 14 (CLI).
 
+**Libraries:** `rusqlite` (bundled, FTS5) + `notify` + `notify-debouncer-full` +
+`blake3` (Rust); `kysely` (TS query builder). See [Libraries](libraries.md).
+
 ## Scope
 
 **In:** where SQLite runs, Kysely wiring, schema/projections, FTS5, the indexing

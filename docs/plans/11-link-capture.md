@@ -12,6 +12,9 @@ keychain + privacy).
 enrichment, and privacy checks go through `apps/desktop` + `@reflect/core`
 (`actions/capture`). See [Architecture & Conventions](architecture-conventions.md).
 
+**Libraries:** WXT (Chrome extension framework, TS), `image` (Rust, screenshot
+downscale). See [Libraries](libraries.md).
+
 ## Scope
 
 **In:** Chrome extension (capture active URL, title, selection/highlights, screenshot),

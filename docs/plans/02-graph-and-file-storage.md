@@ -11,6 +11,10 @@ the durable source of truth. Everything else reads and writes through this contr
 primitives; the `notes`/`graph` **setters** that orchestrate writes + reindex live in
 `@reflect/core`. See [Architecture & Conventions](architecture-conventions.md).
 
+**Libraries:** `tempfile` (atomic write), `trash` (delete-to-OS-trash), `dirs`
+(OS app-config) — Rust; `ulid` (Rust) / `ulidx` (TS) for note IDs. See
+[Libraries](libraries.md).
+
 ## Scope
 
 **In:** graph directory contract, graph open/create/recent, atomic file read/write/

@@ -7,6 +7,9 @@ navigation commands, and command execution — the primary recall + navigation e
 **Unlocks:** results usable as AI context (Plan 10), CLI search (Plan 14), and the
 command registry that deep links/CLI reuse later.
 
+**Libraries:** `cmdk` (⌘K palette) + shadcn/ui; FTS via `rusqlite` (Plan 04). See
+[Libraries](libraries.md).
+
 ## Scope
 
 **In:** `⌘K` palette, FTS over titles/body, title/fuzzy match, backlink-aware filters,

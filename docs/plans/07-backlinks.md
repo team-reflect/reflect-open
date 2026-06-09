@@ -9,6 +9,9 @@ tables), Plan 05 (editor `[[` hook), Plan 06 (date links).
 **Unlocks:** richer AI context (Plan 10), and the associative recall the product is built
 on.
 
+**Libraries:** ProseKit `defineAutocomplete` (the `[[` trigger, installed) + shadcn/ui
+popover for the suggestion menu. See [Libraries](libraries.md).
+
 ## Scope
 
 **In:** `[[` autocomplete, create-note-from-unresolved-link, incoming-backlinks panel,

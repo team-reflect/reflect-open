@@ -8,6 +8,9 @@ edits made outside Reflect.
 **Unlocks:** Plan 04 (index reads parsed structure), 05 (editor renders it), 07
 (backlinks), 13 (import/export).
 
+**Libraries:** `@lezer/markdown` + `@lezer/common` (the one parser, shared with the
+editor), `yaml` (eemeli — tolerant frontmatter). See [Libraries](libraries.md).
+
 ## Scope
 
 **In:** parser choice, AST shape, frontmatter parse/merge, wiki-link + tag + heading +

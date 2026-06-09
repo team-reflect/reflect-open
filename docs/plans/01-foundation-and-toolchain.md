@@ -45,8 +45,7 @@ skeleton, a Tauri shell sanity check.
    - `react-hook-form` for any forms (preferences, provider keys later).
    - `clsx` + `tailwind-merge` (shadcn `cn` helper).
    - `@meowdown/react` + `@meowdown/core` (the editor, Plan 05) and their ProseKit/Lezer
-     peers. **Note: GPL-3.0-only** — record the licensing decision (Plan 00 / Plan 15)
-     before relying on it for a public build; safe to spike with meanwhile.
+     peers. First-party and MIT — no licensing constraint.
 
 4. **Path aliases.** Configure `@/` → `apps/desktop/src/` in `tsconfig.json`
    (`paths`) and `vite.config.ts` (`resolve.alias`). In-app imports use `@/`;

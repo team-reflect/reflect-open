@@ -8,6 +8,9 @@ model. This completes **M1 — the first genuinely usable build.**
 **Unlocks:** Plan 07 (date links resolve here), 08 (date navigation commands), 11
 (capture appends here).
 
+**Libraries:** a **custom typed router** (no dependency), `date-fns` (dates/timezones),
+`@tanstack/react-virtual` (daily stream). See [Libraries](libraries.md).
+
 ## Scope
 
 **In:** open-to-today, daily file create-on-demand, chronological navigation (prev/next/

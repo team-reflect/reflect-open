@@ -11,6 +11,9 @@ retrieval to search and AI.
 chunking, the `retrieve()` API, and ranking live in `@reflect/core` (`actions/embeddings`,
 `actions/search`). See [Architecture & Conventions](architecture-conventions.md).
 
+**Libraries:** `fastembed` (Rust, local embeddings) + `sqlite-vec` (vectors). See
+[Libraries](libraries.md).
+
 ## Scope
 
 **In:** local embedding runtime in Rust, sentence-aware chunking, `sqlite-vec` storage,
