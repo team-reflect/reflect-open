@@ -8,7 +8,7 @@
 
 use std::fs;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -116,23 +116,32 @@ pub fn forget_recent(root: String) -> AppResult<()> {
 /// Heuristic: which file-sync provider, if any, is `path` inside? Pure
 /// (unit-tested). A `Some(_)` result means the UI should warn (Plan 12 / Plan 04).
 pub fn detect_cloud_sync(path: &Path) -> Option<&'static str> {
-    let lower = path.to_string_lossy();
-    if lower.contains("Mobile Documents")
-        || lower.contains("com~apple~CloudDocs")
-        || lower.contains("iCloud Drive")
-    {
+    // Match whole path *components*, not raw substrings, so look-alike folder
+    // names (e.g. "My Driveway", "Dropbox Backups") don't false-positive.
+    let parts: Vec<&str> = path
+        .components()
+        .filter_map(|component| match component {
+            Component::Normal(os) => os.to_str(),
+            _ => None,
+        })
+        .collect();
+    let has = |name: &str| parts.contains(&name);
+
+    if has("Mobile Documents") || has("com~apple~CloudDocs") || has("iCloud Drive") {
         Some("icloud")
-    } else if lower.contains("/Dropbox/")
-        || lower.ends_with("/Dropbox")
-        || lower.contains("\\Dropbox\\")
-    {
+    } else if has("Dropbox") {
         Some("dropbox")
-    } else if lower.contains("Google Drive")
-        || lower.contains("GoogleDrive")
-        || lower.contains("My Drive")
+    } else if has("My Drive")
+        || has("Google Drive")
+        || parts.iter().any(|part| part.starts_with("GoogleDrive-"))
     {
+        // macOS CloudStorage uses a `GoogleDrive-<account>` component.
         Some("googleDrive")
-    } else if lower.contains("OneDrive") {
+    } else if parts
+        .iter()
+        .any(|part| *part == "OneDrive" || part.starts_with("OneDrive -"))
+    {
+        // Business OneDrive uses `OneDrive - <Org>`.
         Some("oneDrive")
     } else {
         None
@@ -212,6 +221,19 @@ mod tests {
             )),
             Some("googleDrive")
         );
+        assert_eq!(
+            detect_cloud_sync(Path::new("/Users/x/OneDrive - Acme/Graph")),
+            Some("oneDrive")
+        );
         assert_eq!(detect_cloud_sync(Path::new("/Users/x/Notes/Graph")), None);
+        // Substring look-alikes must NOT be misclassified.
+        assert_eq!(
+            detect_cloud_sync(Path::new("/Users/x/My Driveway/Graph")),
+            None
+        );
+        assert_eq!(
+            detect_cloud_sync(Path::new("/Users/x/Dropbox Backups/Graph")),
+            None
+        );
     }
 }
