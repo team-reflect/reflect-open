@@ -12,8 +12,11 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@lezer/common": "^1.5.2",
+    "@lezer/markdown": "^1.6.4",
     "@reflect/db": "workspace:*",
     "@tauri-apps/api": "^2",
+    "yaml": "^2.9.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {

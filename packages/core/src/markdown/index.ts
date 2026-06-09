@@ -1,0 +1,35 @@
+/**
+ * `@reflect/core` markdown document model (Plan 03) — the one canonical
+ * parse/extract/edit layer over `@lezer/markdown` + `yaml`, shared by the
+ * indexer (Plan 04), editor (Plan 05), backlinks (Plan 07), and CLI (Plan 14).
+ */
+export {
+  frontmatterSchema,
+  PARSED_NOTE_VERSION,
+  type Frontmatter,
+  type Span,
+  type WikiLink,
+  type MarkdownLink,
+  type Heading,
+  type AssetRef,
+  type ParsedNote,
+} from './model'
+export {
+  splitFrontmatter,
+  parseFrontmatter,
+  upsertFrontmatter,
+  type FrontmatterSplit,
+  type ParsedFrontmatter,
+} from './frontmatter'
+export { parseBody, reflectMarkdownParser, wikiLinkExtension } from './grammar'
+export { parseNote } from './extract'
+export { appendUnderHeading, renameWikiLink } from './edit'
+export {
+  normalizeWikiTarget,
+  resolved,
+  resolveWikiLink,
+  unresolved,
+  type NormalizedTarget,
+  type Resolution,
+  type WikiLookup,
+} from './resolve'

@@ -1,0 +1,76 @@
+import { describe, expect, it } from 'vitest'
+import { parseNote } from './extract'
+
+const parse = (source: string, path = 'notes/test.md') => parseNote({ path, source })
+
+describe('parseNote — wiki links', () => {
+  it('extracts plain, aliased, and date targets with positions', () => {
+    const note = parse('See [[Charlotte]] and [[Project X|the project]] on [[2026-06-09]].')
+    expect(note.wikiLinks.map((w) => ({ target: w.target, alias: w.alias }))).toEqual([
+      { target: 'Charlotte', alias: undefined },
+      { target: 'Project X', alias: 'the project' },
+      { target: '2026-06-09', alias: undefined },
+    ])
+    const first = note.wikiLinks[0]
+    expect(note.text.slice(0)).toContain('Charlotte')
+    expect(first.from).toBe('See '.length)
+    expect(first.to).toBe('See [[Charlotte]]'.length)
+  })
+
+  it('does not match wiki links inside code spans or empty brackets', () => {
+    const note = parse('Code `[[NotALink]]` stays literal, and [[]] is ignored.')
+    expect(note.wikiLinks).toEqual([])
+  })
+
+  it('does not let a wiki link span a line break', () => {
+    const note = parse('[[broken\nlink]]')
+    expect(note.wikiLinks).toEqual([])
+  })
+})
+
+describe('parseNote — headings & title', () => {
+  it('extracts ATX headings with level and slug', () => {
+    const note = parse('# Title\n\n## A Section!\n\nbody')
+    expect(note.headings).toEqual([
+      expect.objectContaining({ level: 1, text: 'Title', slug: 'title' }),
+      expect.objectContaining({ level: 2, text: 'A Section!', slug: 'a-section' }),
+    ])
+  })
+
+  it('derives title from frontmatter, else first H1, else filename/date', () => {
+    expect(parse('---\ntitle: From FM\n---\n# Ignored').title).toBe('From FM')
+    expect(parse('# The H1\n\nbody').title).toBe('The H1')
+    expect(parse('no heading', 'notes/charlotte-maccaw.md').title).toBe('charlotte-maccaw')
+    expect(parse('no heading', 'daily/2026-06-09.md').title).toBe('2026-06-09')
+  })
+})
+
+describe('parseNote — links, assets, tags, text', () => {
+  it('separates external links (with domain) from asset references', () => {
+    const note = parse('[site](https://example.com/x) and ![pic](assets/photo.png)')
+    expect(note.links).toEqual([
+      expect.objectContaining({ href: 'https://example.com/x', text: 'site', domain: 'example.com' }),
+    ])
+    expect(note.assets).toEqual([expect.objectContaining({ path: 'assets/photo.png' })])
+  })
+
+  it('extracts body #tags only, deduped case-insensitively', () => {
+    const note = parse('#alpha and #Alpha and #beta/sub, but not #123 or a#b')
+    expect(note.tags).toEqual(['alpha', 'beta/sub'])
+  })
+
+  it('ignores a frontmatter tags key as a tag source', () => {
+    const note = parse('---\ntags: [fromfm]\n---\nbody #real')
+    expect(note.tags).toEqual(['real'])
+  })
+
+  it('produces collapsed plain text (markup stripped, wiki target+alias kept)', () => {
+    const note = parse('# Hi\n\nSome **bold** text with [[Link|alias]].')
+    expect(note.text).toBe('Hi Some bold text with Link alias.')
+  })
+
+  it('keeps #tags inside fenced code out of the tag list', () => {
+    const note = parse('real #tag\n\n```\nnot #acode tag\n```')
+    expect(note.tags).toEqual(['tag'])
+  })
+})
