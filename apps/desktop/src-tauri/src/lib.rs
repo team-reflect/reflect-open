@@ -2,6 +2,7 @@ mod db;
 mod error;
 mod fs;
 mod recents;
+mod watcher;
 
 /// Returns the desktop application version from Cargo metadata.
 ///
@@ -19,6 +20,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(fs::GraphState::default())
         .manage(db::IndexState::default())
+        .manage(watcher::WatcherState::default())
         .invoke_handler(tauri::generate_handler![
             app_version,
             fs::graph_open,
@@ -35,6 +37,8 @@ pub fn run() {
             db::index_remove,
             db::index_clear,
             db::db_query,
+            watcher::watch_start,
+            watcher::watch_stop,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

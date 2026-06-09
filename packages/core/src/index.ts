@@ -79,6 +79,10 @@ export {
   applyIndexedNote,
   removeFromIndex,
   clearIndex,
+  watchStart,
+  watchStop,
+  subscribeIndexChanges,
+  applyIndexChanges,
   hashContent,
   buildIndexedNote,
   indexNote,
@@ -96,4 +100,5 @@ export {
   type Backlink,
   type NoteRow,
   type SearchHit,
+  type FileChange,
 } from './indexing'

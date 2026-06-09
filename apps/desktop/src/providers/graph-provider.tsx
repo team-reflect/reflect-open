@@ -16,7 +16,10 @@ import {
   openIndex,
   reconcileIndex,
   recentGraphs,
+  subscribeIndexChanges,
   toAppError,
+  watchStart,
+  watchStop,
   type GraphInfo,
   type RecentGraph,
 } from '@reflect/core'
@@ -65,6 +68,8 @@ export function GraphProvider({ children }: { children: ReactNode }) {
   // switch can stop the prior pass before the Rust index connection is swapped.
   const indexAbort = useRef<AbortController | null>(null)
   const reconcileDone = useRef<Promise<void>>(Promise.resolve())
+  // Unlistens the live `index:changed` subscription for the previous graph.
+  const indexUnlisten = useRef<(() => void) | null>(null)
 
   const loadRecents = useCallback(
     async (options?: { surfaceErrors?: boolean }): Promise<RecentGraph[]> => {
@@ -107,10 +112,9 @@ export function GraphProvider({ children }: { children: ReactNode }) {
           await reconcileDone.current.catch(() => {})
           // Open the index *before* 'ready' so reads can't hit the previous
           // graph's index. Best-effort: an index failure doesn't block editing.
-          let indexReady = false
+          let generation: number | null = null
           try {
-            await openIndex()
-            indexReady = true
+            generation = await openIndex()
           } catch (err) {
             console.error('index open failed:', messageOf(err))
           }
@@ -119,12 +123,47 @@ export function GraphProvider({ children }: { children: ReactNode }) {
           }
           setGraph(info)
           setStatus('ready')
-          if (indexReady) {
+          // Tear down the previous graph's live subscription unconditionally, so
+          // a failed openIndex can't leave it attached to a different graph.
+          indexUnlisten.current?.()
+          indexUnlisten.current = null
+
+          if (generation === null) {
+            // No index for this graph — stop any watcher from the previous one.
+            void watchStop().catch(() => {})
+          } else {
+            // Index sync, sequenced so the passes never write concurrently:
+            // reconcile the whole graph first, then subscribe (listener up), then
+            // start the Rust watcher (which replaces any previous one). reconcile
+            // is abortable; seq checks bail if a newer open supersedes us.
             const controller = new AbortController()
             indexAbort.current = controller
-            reconcileDone.current = reconcileIndex({ signal: controller.signal }).catch((err) => {
-              console.error('index reconcile failed:', messageOf(err))
-            })
+            reconcileDone.current = (async () => {
+              let unlisten: (() => void) | null = null
+              try {
+                await reconcileIndex({ generation, signal: controller.signal })
+                if (seq !== openSeq.current) {
+                  return
+                }
+                unlisten = await subscribeIndexChanges(generation)
+                if (seq !== openSeq.current) {
+                  return
+                }
+                await watchStart()
+                if (seq !== openSeq.current) {
+                  return
+                }
+                indexUnlisten.current?.()
+                indexUnlisten.current = unlisten
+                unlisten = null // ownership transferred to the ref
+              } catch (err) {
+                console.error('index sync failed:', messageOf(err))
+              } finally {
+                // Tear down a subscription that was created but never bound
+                // (superseded, or a later step threw) so listeners can't leak.
+                unlisten?.()
+              }
+            })()
           }
         } catch (err) {
           if (seq !== openSeq.current) {
