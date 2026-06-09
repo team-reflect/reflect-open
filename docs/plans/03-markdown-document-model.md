@@ -124,7 +124,8 @@ the canonical model. (Even that can be done from the Lezer tree if we prefer zer
 ## Risks
 
 - **Wiki-links aren't CommonMark.** A naive regex breaks inside code spans/fences.
-  Mitigate with a real micromark extension that respects code contexts.
+  Mitigate with the canonical `@lezer/markdown` inline extension (shared by editor +
+  indexer) whose tokenization respects code contexts — not a second parser.
 - **Round-trip drift** from the serializer normalizing markdown. Mitigate by preferring
   source-position-aware splice edits over full re-serialization where possible, and by
   the property test gate.

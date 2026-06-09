@@ -39,14 +39,17 @@ V1 called a Reflect-hosted `link-description-api`. V2 must not. Instead:
   no exposed local port. A small native-messaging host binary (bundled with the app)
   relays the capture to the running desktop app (local IPC).
 - **Fallback: loopback HTTP** on `127.0.0.1` if screenshot payload size / streaming /
-  packaging make native messaging awkward.
+  packaging make native messaging awkward. If used, it **must authenticate**: a
+  per-session token (minted by the desktop app, handed to the extension on pairing),
+  short TTL, plus strict `Origin`/sender checks — so a random local process can't inject
+  spoofed captures. Reject unauthenticated requests.
 - **Not** a `reflect://` deep link (too limited for screenshots/structured payloads/
   retries) except as a URL-only last resort, and **never** a Reflect-hosted relay.
   Choose in a short spike (reuses Plan 01's spike discipline).
 
 ## Steps
 
-1. **Chrome extension** (`extension/`, MV3): action button + `⌘⇧P` (or `⌘⇧K` if reserved)
+1. **Chrome extension** (`apps/extension`, MV3): action button + `⌘⇧P` (or `⌘⇧K` if reserved)
    to capture the active tab's URL, title, user-selected text/highlights, and a
    screenshot (`captureVisibleTab`). Minimal UI: confirm + optional note. No keys, no AI.
 

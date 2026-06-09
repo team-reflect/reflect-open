@@ -72,7 +72,7 @@ demonstrable.
 
 ## Dependency graph (abridged)
 
-```
+```text
 01 ─┬─ 02 ─┬─ 03 ─┬─ 04 ─┬─ 05 ─ 06 ─┬─ 07 ─┬─ 08 ─ 09 ─ 10
     │      │      │      │           │      │
     │      │      │      └───────────┴──────┘  (index feeds backlinks + search)
@@ -89,7 +89,7 @@ The highest-severity risks surfaced reviewing this plan, with where they're hand
 1. **meowdown is the core bet and is early (v0.2.0, no wiki-links).** The whole product
    rides a pre-1.0 editor we must extend with `[[ ]]`. **Gate passed:** the Plan 01
    wiki-link spike confirmed lossless `[[ ]]` round-trips + a clean extension path
-   ([docs/spikes/meowdown-wiki-links.md](spikes/meowdown-wiki-links.md)). Residual: it's
+   ([docs/spikes/meowdown-wiki-links.md](../spikes/meowdown-wiki-links.md)). Residual: it's
    pre-1.0 (we own the extension code, pin versions); CodeMirror-6 live-preview stays the
    documented fallback. *Licensing is resolved — meowdown is first-party MIT.*
 2. **A graph inside a cloud-sync folder corrupts the index and fights GitHub.** Remote

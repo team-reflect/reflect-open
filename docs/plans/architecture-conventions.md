@@ -1,7 +1,7 @@
 # Architecture & Conventions
 
-Cross-cutting conventions for the whole codebase, adapted from
-[`~/repos/picardo`](https://github.com/) (a separate app with battle-tested structure).
+Cross-cutting conventions for the whole codebase, adapted from `~/repos/picardo` (a
+separate first-party app with battle-tested structure).
 These four decisions were made deliberately and apply to **every** plan; individual
 phase plans reference this doc rather than restating it.
 
@@ -19,7 +19,7 @@ Turborepo + pnpm workspaces, `@reflect/*` package names, `tsc -b` project refere
 minimum set of packages and add `apps/cli` / `apps/extension` when their phases land —
 not as empty stubs up front.
 
-```
+```text
 reflect-open/
 ├── apps/
 │   ├── desktop/          # Tauri app — src/ (React) + src-tauri/ (Rust primitives)

@@ -107,7 +107,8 @@ reviewable suggestions, agentic multi-step tools (later), audio (deferred).
 ## Key decisions / contracts
 
 - **BYOK, direct-to-provider, OpenAI-first**; no hosted AI. Keys in OS keychain only.
-- **`private: true` is enforced twice** (retrieval + provider call site).
+- **`private: true` is enforced at two structural points** (retrieval filtering + the
+  `CloudContext` construction gate), not an ad-hoc call-site check.
 - **All AI edits are reviewable patchsets, checkpointed before apply**; high-risk
   requires review.
 - **Context is visible**; grounded answers cite local notes.

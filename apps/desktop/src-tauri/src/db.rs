@@ -18,11 +18,18 @@ fn register_sqlite_vec() {
     VEC_INIT.call_once(|| {
         // SAFETY: registering a statically-linked SQLite extension entry point
         // before opening connections — the documented sqlite-vec pattern.
-        unsafe {
+        let rc = unsafe {
             rusqlite::ffi::sqlite3_auto_extension(Some(std::mem::transmute(
                 sqlite_vec::sqlite3_vec_init as *const (),
-            )));
-        }
+            )))
+        };
+        // Fail fast: if registration didn't return SQLITE_OK, every later
+        // connection would silently lack vec_* support.
+        assert_eq!(
+            rc,
+            rusqlite::ffi::SQLITE_OK,
+            "failed to register the sqlite-vec auto-extension (code {rc})"
+        );
     });
 }
 

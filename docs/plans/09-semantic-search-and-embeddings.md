@@ -33,7 +33,7 @@ embedding execution should leave the WebView for performance.
   "semantic search unavailable" state on unsupported devices.
 - **Storage:** `sqlite-vec` virtual tables in the same `.reflect/index.sqlite` (loaded in
   Rust alongside FTS5, Plan 04).
-- **The recorded embedding model/runtime per vector** so the index can be rebuilt when the
+- **Record the embedding model/runtime per vector** so the index can be rebuilt when the
   model changes.
 
 ## Schema additions (additive to Plan 04)

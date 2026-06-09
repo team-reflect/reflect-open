@@ -7,7 +7,7 @@ decision (see [Plan 04 alternatives](../plans/04-local-index-sqlite.md)).
 
 **Verdict: GO — both work.** `cargo test` is green:
 
-```
+```text
 test db::tests::fts5_is_compiled_in ... ok
 test db::tests::sqlite_vec_loads_and_runs_knn ... ok
 ```

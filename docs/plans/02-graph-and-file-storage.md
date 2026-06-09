@@ -28,7 +28,7 @@ and paths, not meaning.
 A **graph** is a user-chosen folder — Reflect's name for the note workspace. Default
 layout:
 
-```
+```text
 <graph>/
 ├── daily/YYYY-MM-DD.md      # daily notes; date derivable from path
 ├── notes/<slug>.md          # regular notes; readable filenames

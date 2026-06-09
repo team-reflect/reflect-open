@@ -7,9 +7,9 @@ decision changes now (fallback: CodeMirror-6 live-preview).
 
 **Verdict: GO (technical gate passed).** Fidelity is free, the extension path is clear,
 and an autocomplete primitive exists. The remaining work (chip rendering + `[[`
-autocomplete UI) is normal Plan 05/07 effort, not a feasibility risk. Two caveats to carry:
-the **GPL-3.0 licensing** question (unresolved, Plans 00/15) and a **loose-list
-normalization** in the serializer.
+autocomplete UI) is normal Plan 05/07 effort, not a feasibility risk. One caveat to carry:
+a **loose-list normalization** in the serializer. (Licensing is settled — meowdown is
+first-party MIT.)
 
 What's verified here is headless (build, types, round-trip). The subjective "does it feel
 good" check needs the GUI — run `pnpm tauri dev` (or `pnpm --filter @reflect/desktop dev`
@@ -61,8 +61,8 @@ in a browser) to try the editor mounted in `app.tsx`.
 
 ## Risks / caveats to carry forward
 
-- **GPL-3.0** (`@meowdown/*`) vs the MIT-core goal — unresolved product decision
-  (Plans 00, 05, 15). This spike treats the dependency as **provisional**.
+- **Licensing: resolved.** meowdown is first-party (team-owned) and MIT-licensed — fits the
+  MIT core with no copyleft constraint.
 - **Maturity:** v0.2.0, empty README, no extra-extension API → we own a custom editor
   component (and likely upstream PRs). Pin versions; watch ProseKit `0.x` churn.
 - **Bundle size** from ProseMirror/ProseKit; revisit with code-splitting.
@@ -71,9 +71,8 @@ in a browser) to try the editor mounted in `app.tsx`.
 
 ## Recommended next actions
 
-- Proceed with meowdown for Plans 05–07 (GO), pending the GPL decision.
+- Proceed with meowdown for Plans 05–07 (GO).
 - Plan 05: custom editor component (`union` + `defineWikiLink`), tight-list serializer,
   images + task-checkbox extensions.
 - Plan 07: `[[` autocomplete UI on `defineAutocomplete`, backed by the index.
-- Keep CodeMirror-6 live-preview as the documented fallback if the GUI feel disappoints or
-  GPL blocks distribution.
+- Keep CodeMirror-6 live-preview as the documented fallback if the GUI feel disappoints.

@@ -139,6 +139,6 @@ skeleton, a Tauri shell sanity check.
 ## Risks
 
 - **shadcn + Tailwind v4 + DS token collisions.** Mitigate by choosing one token source
-  early (step 4) and a token-mapping test.
+  early (step 5) and a token-mapping test.
 - **Tauri building-block gaps** (extension loading, keychain). The spike (step 7) exists
   to find these before they cost a phase.
