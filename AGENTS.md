@@ -66,8 +66,17 @@ reflect-open/
 ├── dist/                   # Vite build output (frontendDist in tauri.conf.json)
 ├── public/                 # Static assets served by Vite
 ├── docs/                   # Product/architecture docs (Reflect V2)
-└── design-system/          # Design tokens, components, and UI guidelines
+└── design-system/          # Design tokens, components, and UI guidelines (see design-system/readme.md)
 ```
+
+**Design system**
+
+All UI work should follow the Reflect design system documented in [`design-system/readme.md`](design-system/readme.md). Key resources:
+
+- `design-system/tokens/` — CSS custom properties for color, typography, spacing, and motion
+- `design-system/components/` — reusable React primitives (Button, Input, Badge, etc.)
+- `design-system/guidelines/` — color, type, spacing, and brand specimens
+- `design-system/styles.css` — global entry point that imports all tokens
 
 **Frontend ↔ Rust bridge**
 
