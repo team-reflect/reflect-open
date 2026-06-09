@@ -12,6 +12,25 @@ const EXTENSION_BY_MIME: Record<string, string> = {
   'image/svg+xml': 'svg',
 }
 
+/**
+ * True for a graph-relative `assets/…` path with no traversal segments. The
+ * Rust shell already guards every *write* against traversal; this guards
+ * *display* resolution so a crafted `assets/../…` reference in note markdown is
+ * never handed to the asset protocol (defense in depth).
+ */
+function isSafeAssetSource(sourcePath: string): boolean {
+  if (!sourcePath.startsWith('assets/') || sourcePath.includes('\\')) {
+    return false
+  }
+  return sourcePath
+    .split('/')
+    .every((segment, index) =>
+      index === 0
+        ? segment === 'assets'
+        : segment.length > 0 && segment !== '.' && segment !== '..',
+    )
+}
+
 function base64Of(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer)
   let binary = ''
@@ -50,7 +69,7 @@ export function useImagePersistence(
       if (/^https?:\/\//.test(src)) {
         return src
       }
-      if (graphRoot && src.startsWith('assets/')) {
+      if (graphRoot && isSafeAssetSource(src)) {
         return convertFileSrc(`${graphRoot}/${src}`)
       }
       return null
@@ -64,7 +83,11 @@ export function useImagePersistence(
       if (!extension || generation === null) {
         return null
       }
-      const target = assetPath(`pasted-${Date.now()}.${extension}`)
+      // Timestamp + random suffix: two pastes can land in the same millisecond
+      // (e.g. a multi-file drop), and a bare Date.now() name would collide.
+      const target = assetPath(
+        `pasted-${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${extension}`,
+      )
       await writeAsset(target, base64Of(await file.arrayBuffer()), generation)
       setSaveError(null)
       return target

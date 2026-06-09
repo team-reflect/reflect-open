@@ -25,7 +25,7 @@ the [product vision](docs/reflect-v2-product-vision.md) for the full picture.
 A pnpm/Turborepo monorepo with one load-bearing rule: **TypeScript owns policy,
 Rust owns capabilities.**
 
-```
+```text
 reflect-open/
 ├── apps/desktop/          # The Tauri app
 │   ├── src/               # React UI: providers, components, the editor
