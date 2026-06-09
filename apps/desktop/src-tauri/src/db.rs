@@ -6,11 +6,19 @@
 //! that both extensions are available in the Tauri Rust process.
 #![allow(dead_code)] // wired into commands in Plan 04
 
+use std::ffi::{c_char, c_int};
 use std::sync::Once;
 
+use rusqlite::ffi::{sqlite3, sqlite3_api_routines};
 use rusqlite::Connection;
 
 static VEC_INIT: Once = Once::new();
+
+/// The SQLite auto-extension entry-point signature. sqlite-vec and rusqlite each
+/// link their own copy of the C types, so we transmute `sqlite3_vec_init` into
+/// rusqlite's matching function-pointer type.
+type AutoExtensionFn =
+    unsafe extern "C" fn(*mut sqlite3, *mut *mut c_char, *const sqlite3_api_routines) -> c_int;
 
 /// Registers the sqlite-vec extension once per process, so every connection
 /// opened afterwards exposes the `vec0` virtual table and `vec_*` functions.
@@ -19,8 +27,11 @@ fn register_sqlite_vec() {
         // SAFETY: registering a statically-linked SQLite extension entry point
         // before opening connections — the documented sqlite-vec pattern.
         let rc = unsafe {
-            rusqlite::ffi::sqlite3_auto_extension(Some(std::mem::transmute(
-                sqlite_vec::sqlite3_vec_init as *const (),
+            rusqlite::ffi::sqlite3_auto_extension(Some(std::mem::transmute::<
+                *const (),
+                AutoExtensionFn,
+            >(
+                sqlite_vec::sqlite3_vec_init as *const ()
             )))
         };
         // Fail fast: if registration didn't return SQLITE_OK, every later
@@ -54,9 +65,11 @@ mod tests {
         )
         .expect("fts5 create/insert");
         let hits: i64 = conn
-            .query_row("SELECT count(*) FROM fts WHERE fts MATCH 'quick'", [], |row| {
-                row.get(0)
-            })
+            .query_row(
+                "SELECT count(*) FROM fts WHERE fts MATCH 'quick'",
+                [],
+                |row| row.get(0),
+            )
             .expect("fts5 match");
         assert_eq!(hits, 1);
     }

@@ -9,10 +9,11 @@
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "lint": "turbo run lint",
+    "lint": "oxlint apps packages",
     "tauri": "pnpm --filter @reflect/desktop tauri"
   },
   "devDependencies": {
+    "oxlint": "^1.69.0",
     "turbo": "^2",
     "typescript": "~5.8.3"
   }
