@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { isTauri } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import {
   forgetRecent,
@@ -56,38 +57,57 @@ export function GraphProvider({ children }: { children: ReactNode }) {
   // so overlapping opens (double-click, StrictMode remount) can't finish out of
   // order and leave us on a graph the user didn't pick last.
   const openSeq = useRef(0)
+  // Serializes backend opens (see `openRecent`).
+  const openChain = useRef<Promise<unknown>>(Promise.resolve())
 
   const loadRecents = useCallback(async (): Promise<RecentGraph[]> => {
+    if (!isTauri()) {
+      return [] // browser dev — there's no backend store to read.
+    }
     try {
       const list = await recentGraphs()
       setRecents(list)
       return list
-    } catch {
-      // Not running inside Tauri (e.g. browser dev), or no store yet.
+    } catch (err) {
+      // A real failure (e.g. a corrupt recent-graphs.json, which Rust reports as
+      // an error rather than an empty list) should surface, not vanish.
+      setError(messageOf(err))
       return []
     }
   }, [])
 
   const openRecent = useCallback(
-    async (root: string): Promise<void> => {
+    (root: string): Promise<void> => {
       const seq = ++openSeq.current
       setStatus('opening')
       setError(null)
-      try {
-        const info = await openGraph(root)
-        if (seq !== openSeq.current) {
-          return // superseded by a newer open
+      const run = async (): Promise<void> => {
+        try {
+          const info = await openGraph(root)
+          if (seq !== openSeq.current) {
+            return // superseded by a newer open
+          }
+          setGraph(info)
+          setStatus('ready')
+        } catch (err) {
+          if (seq !== openSeq.current) {
+            return
+          }
+          setError(messageOf(err))
+          setStatus('choosing')
         }
-        setGraph(info)
-        setStatus('ready')
-      } catch (err) {
-        if (seq !== openSeq.current) {
-          return
+        if (seq === openSeq.current) {
+          await loadRecents()
         }
-        setError(messageOf(err))
-        setStatus('choosing')
       }
-      await loadRecents()
+      // `graph_open` mutates Rust's GraphState (`set_root`), so overlapping opens
+      // could otherwise have a slow older call land *after* a newer one and leave
+      // the backend on a different graph than the UI. Serialize them: running
+      // one-at-a-time in request order makes the last-requested open the last to
+      // touch GraphState, matching the `openSeq`-pinned UI.
+      const next = openChain.current.then(run, run)
+      openChain.current = next
+      return next
     },
     [loadRecents],
   )
