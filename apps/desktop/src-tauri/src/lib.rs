@@ -1,3 +1,5 @@
+mod db;
+
 /// Returns the desktop application version from Cargo metadata.
 ///
 /// The canonical round-trip example for the IPC boundary: the frontend reaches
