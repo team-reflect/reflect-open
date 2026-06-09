@@ -148,6 +148,61 @@ export function useNoteDocument(path: string | null): NoteDocument {
     editorRef.current = handle
   }, [])
 
+  /** True while the path-load effect's read is in flight. */
+  const loadingRef = useRef(false)
+  /** A watcher event arrived during the load; replay reconciliation after it. */
+  const missedChangeRef = useRef(false)
+
+  /**
+   * Re-read the note and reconcile the buffer with what's on disk (the
+   * external-change path). Guarded by `pathRef`, so a slow read can't apply
+   * across a note switch.
+   */
+  const reconcileFromDisk = useCallback(
+    async (forPath: string): Promise<void> => {
+      let content: string
+      try {
+        content = await readNote(forPath)
+      } catch {
+        return // deleted/unreadable between event and read; nothing to reconcile
+      }
+      if (
+        pathRef.current !== forPath ||
+        content === diskRef.current ||
+        content === inFlightWriteRef.current
+      ) {
+        return // stale, or an echo of our own (possibly still-settling) save
+      }
+      if (dirtyRef.current) {
+        // Never clobber unsaved edits — park the external content and pause
+        // the save pipeline (cancel any pending debounce) until the user
+        // chooses; a save landing now would overwrite "theirs" first.
+        if (saveTimer.current !== null) {
+          clearTimeout(saveTimer.current)
+          saveTimer.current = null
+        }
+        conflictRef.current = content
+        setConflict(content)
+        return
+      }
+      bufferRef.current = content
+      markClean(content, forPath)
+      // Re-gate: the external edit may have introduced (or removed) syntax the
+      // editor can't round-trip. Remount via initialContent when protection
+      // flips; otherwise reload the live editor in place.
+      const lossy = checkRoundTrip(content) === 'lossy'
+      if (lossy !== protectedRef.current) {
+        protectedRef.current = lossy
+        setIsProtected(lossy)
+        setInitialContent(content)
+        return
+      }
+      setInitialContent(content)
+      editorRef.current?.setMarkdown(content)
+    },
+    [markClean],
+  )
+
   // Load the note when the path changes.
   useEffect(() => {
     if (!path) {
@@ -158,6 +213,8 @@ export function useNoteDocument(path: string | null): NoteDocument {
     conflictRef.current = null
     setConflict(null)
     setError(null)
+    loadingRef.current = true
+    missedChangeRef.current = false
     void (async () => {
       try {
         const content = await readNote(path)
@@ -178,12 +235,23 @@ export function useNoteDocument(path: string | null): NoteDocument {
           setError(messageOf(err))
           setStatus('error')
         }
+      } finally {
+        if (active) {
+          loadingRef.current = false
+          // A change event during the load was deferred (reconciling mid-load
+          // could be overwritten by this load's older read committing later);
+          // replay it now against the committed state.
+          if (missedChangeRef.current) {
+            missedChangeRef.current = false
+            void reconcileFromDisk(path)
+          }
+        }
       }
     })()
     return () => {
       active = false
     }
-  }, [path])
+  }, [path, reconcileFromDisk])
 
   // External-change reconciliation via the watcher (Plan 04b events).
   useEffect(() => {
@@ -196,43 +264,11 @@ export function useNoteDocument(path: string | null): NoteDocument {
       if (!active || !changes.some((change) => change.path === path && change.kind === 'upsert')) {
         return
       }
-      void (async () => {
-        let content: string
-        try {
-          content = await readNote(path)
-        } catch {
-          return // deleted/unreadable between event and read; nothing to reconcile
-        }
-        if (!active || content === diskRef.current || content === inFlightWriteRef.current) {
-          return // echo of our own (possibly still-settling) save — ignore
-        }
-        if (dirtyRef.current) {
-          // Never clobber unsaved edits — park the external content and pause
-          // the save pipeline (cancel any pending debounce) until the user
-          // chooses; a save landing now would overwrite "theirs" first.
-          if (saveTimer.current !== null) {
-            clearTimeout(saveTimer.current)
-            saveTimer.current = null
-          }
-          conflictRef.current = content
-          setConflict(content)
-          return
-        }
-        bufferRef.current = content
-        markClean(content, path)
-        // Re-gate: the external edit may have introduced (or removed) syntax the
-        // editor can't round-trip. Remount via initialContent when protection
-        // flips; otherwise reload the live editor in place.
-        const lossy = checkRoundTrip(content) === 'lossy'
-        if (lossy !== protectedRef.current) {
-          protectedRef.current = lossy
-          setIsProtected(lossy)
-          setInitialContent(content)
-          return
-        }
-        setInitialContent(content)
-        editorRef.current?.setMarkdown(content)
-      })()
+      if (loadingRef.current) {
+        missedChangeRef.current = true // deferred; replayed when the load commits
+        return
+      }
+      void reconcileFromDisk(path)
     }).then((fn) => {
       if (active) {
         unlisten = fn
@@ -244,7 +280,7 @@ export function useNoteDocument(path: string | null): NoteDocument {
       active = false
       unlisten?.()
     }
-  }, [path, markClean])
+  }, [path, reconcileFromDisk])
 
   // Flush pending edits on blur and on unmount/path change.
   useEffect(() => {
