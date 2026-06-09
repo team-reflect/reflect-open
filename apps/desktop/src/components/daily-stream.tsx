@@ -52,6 +52,10 @@ export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
   useEffect(() => {
     const restored = savedScroll()
     if (restored !== null) {
+      // A restored arrival also cancels any focus still pending from a prior
+      // navigation the user backed out of before that day's editor mounted —
+      // the day would otherwise steal focus when its row scrolls into view.
+      focusPending.current = null
       virtualizer.scrollToOffset(restored)
       return
     }
