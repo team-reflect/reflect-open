@@ -1,0 +1,23 @@
+{
+  "name": "@reflect/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@reflect/db": "workspace:*",
+    "@tauri-apps/api": "^2",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.8.3",
+    "vitest": "^3"
+  }
+}

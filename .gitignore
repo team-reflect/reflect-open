@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Monorepo / build caches
+.turbo
+*.tsbuildinfo
+
+# Reflect graph index + local state (rebuildable projection; never committed)
+.reflect/

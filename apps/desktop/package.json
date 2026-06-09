@@ -1,0 +1,41 @@
+{
+  "name": "@reflect/desktop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@reflect/core": "workspace:*",
+    "@reflect/db": "workspace:*",
+    "@reflect/design-system": "workspace:*",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.17.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-hook-form": "^7.78.0",
+    "tailwind-merge": "^3.6.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "@tauri-apps/cli": "^2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "jsdom": "^29.1.1",
+    "tailwindcss": "^4.3.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4",
+    "vitest": "^3"
+  }
+}

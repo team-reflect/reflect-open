@@ -1,0 +1,15 @@
+/* Design-system tokens + fonts (the single source of truth for theme), then
+   Tailwind v4. The DS sets :root / .dark CSS variables that utilities and
+   components read; keep Tailwind layered on top so shadcn and the DS agree. */
+@import '@reflect/design-system/styles.css';
+@import 'tailwindcss';
+
+/* Tailwind v4 dark variant keyed to the design-system `.dark` scope set by the
+   ThemeProvider on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+html,
+body,
+#root {
+  height: 100%;
+}

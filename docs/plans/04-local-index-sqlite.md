@@ -152,6 +152,10 @@ Mirror the indexing-strategy projection table list:
    path, so a *real* external edit racing our write is still caught). Emit a Tauri event so
    the UI can refresh.
 
+   Engineer comment: is it simpler that we don't keep a track of files we've edited, and
+   instead have this watcher as the sole path for re-indexing? i.e. user edits note, markdown
+   updated, watcher notified, search re-indexed (debounced).
+
 5. **Full rebuild + repair.** `index_rebuild()` wipes derived tables and re-scans the
    graph. Triggers: first open, schema-version bump, "repair" action, embedding-model
    change (Plan 09). Preserve non-rebuildable local state (UI prefs, last-opened) — store
@@ -165,28 +169,6 @@ Mirror the indexing-strategy projection table list:
    on disk → watcher reindexes only it. Delete the DB → full rebuild reproduces identical
    projections (the "rebuildable" guarantee). Our own autosave must **not** trigger a
    reindex (echo-suppression test).
-
-## Cloud-synced graphs — index safety (qualifies the in-graph decision)
-
-Reflect's remote sync is **GitHub-only** (Plan 12); file-sync providers are unsupported by
-design. But a user can still *place* their graph folder inside **iCloud Drive / Dropbox /
-Google Drive**, and **a live SQLite DB inside a file-sync folder is a corruption hazard** —
-the sync daemon can replace the `.sqlite`/`-wal`/`-shm` files mid-write, and it doesn't
-honor `.gitignore` (that only affects the GitHub path). This is a *placement* hazard, not a
-sync feature. So:
-
-- **Exclude `.reflect/` from cloud sync, best-effort per provider** — e.g. set the macOS
-  "evict from iCloud" / `com.apple.fileprovider.ignore` behavior, append `.nosync` where
-  applicable, drop a Dropbox `.dropboxignore`/use selective-sync guidance. Always set the
-  `NSURLIsExcludedFromBackupKey`-style exclusion on `.reflect/`.
-- **Detect when the graph root is inside a known cloud-sync location** (path heuristics +
-  provider markers). When detected and exclusion can't be guaranteed, **relocate the index
-  to the OS app-data dir keyed by graph path** (the rejected sub-decision, used here only
-  as a safety escape hatch) and tell the user why. The graph stays self-contained for
-  notes/assets; only the rebuildable index moves.
-- Either way, run SQLite in **WAL with `synchronous=NORMAL`**, and treat the DB as
-  disposable (rebuild on corruption). This is a real risk the "keep it in the graph"
-  decision must carry — flag it in onboarding (Plan 15) when a cloud-synced graph is picked.
 
 ## Key decisions / contracts
 
