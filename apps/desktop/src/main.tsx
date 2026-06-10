@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { App } from '@/app'
+import { WindowDragRegion } from '@/components/window-drag-region'
 import { queryClient } from '@/lib/query-client'
 import { registerAppCommands } from '@/lib/commands/app-commands'
 import { installTauriBridge } from '@/lib/tauri-bridge'
@@ -24,6 +25,7 @@ createRoot(rootElement).render(
       <SettingsProvider>
         <ThemeProvider>
           <GraphProvider>
+            <WindowDragRegion />
             <App />
           </GraphProvider>
         </ThemeProvider>

@@ -5,6 +5,8 @@ import { keybindingFor } from '@/lib/commands/app-commands'
 import { runCommand } from '@/lib/commands/registry'
 import type { CommandContext } from '@/lib/commands/types'
 import { formatBindingLabel } from '@/lib/keybindings'
+import { hasMacosTitleBarOverlay } from '@/lib/window-chrome'
+import { cn } from '@/lib/utils'
 import { useRouter } from '@/routing/router'
 import { GraphFooter } from './graph-footer'
 import { SidebarItem } from './sidebar-item'
@@ -28,7 +30,14 @@ const SIDEBAR_TOGGLE_BINDING = keybindingFor('sidebar.toggle')
 export function Sidebar({ graph, context }: SidebarProps): ReactElement {
   const { route } = useRouter()
   return (
-    <div className="flex h-full min-h-0 flex-col px-3 pt-2.5 pb-3">
+    <div
+      className={cn(
+        'flex h-full min-h-0 flex-col px-3 pb-3',
+        // With the overlaid macOS title bar, the traffic lights and the
+        // WindowDragRegion strip own the top 28px — start content below them.
+        hasMacosTitleBarOverlay ? 'pt-7' : 'pt-2.5',
+      )}
+    >
       <div className="flex items-center justify-end pb-1.5">
         <button
           type="button"

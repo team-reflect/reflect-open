@@ -4,6 +4,8 @@ import { keybindingFor } from '@/lib/commands/app-commands'
 import { formatBindingLabel } from '@/lib/keybindings'
 import { addDaysIso, formatDayLabel } from '@/lib/dates'
 import { useToday } from '@/lib/use-today'
+import { cn } from '@/lib/utils'
+import { hasMacosTitleBarOverlay } from '@/lib/window-chrome'
 import { useRouter } from '@/routing/router'
 import { DayBacklinks } from './day-backlinks'
 import { DayCalendar } from './day-calendar'
@@ -32,7 +34,14 @@ export function DailyContextSidebar({ date }: DailyContextSidebarProps): ReactEl
   const isToday = date === today
 
   return (
-    <div className="flex flex-col px-2 py-2 text-text">
+    <div
+      className={cn(
+        'flex flex-col px-2 pb-2 text-text',
+        // The day-navigation buttons must clear the WindowDragRegion strip
+        // when the macOS title bar is overlaid.
+        hasMacosTitleBarOverlay ? 'pt-7' : 'pt-2',
+      )}
+    >
       <header className="border-b border-black/5 px-1 pb-2 dark:border-white/5">
         <div className="flex items-center justify-between gap-1">
           <button
