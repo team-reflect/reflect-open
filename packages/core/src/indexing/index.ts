@@ -33,6 +33,7 @@ export {
 } from './indexed-note'
 export { indexNote, rebuildIndex, reconcileIndex, type IndexPassOptions } from './indexer'
 export {
+  dailyDatesInRange,
   getBacklinks,
   getBacklinksWithContext,
   getLinkSources,

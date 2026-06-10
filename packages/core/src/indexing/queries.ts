@@ -184,6 +184,23 @@ export async function getNote(path: string): Promise<NoteRow | undefined> {
   return row ? { ...row, isPrivate: row.isPrivate !== 0 } : undefined
 }
 
+/**
+ * ISO dates within `[start, end]` (inclusive) that have an indexed daily note,
+ * ascending. Daily files are created lazily on first write, so an indexed row
+ * means the day has real content — this powers the calendar's day markers.
+ */
+export async function dailyDatesInRange(start: string, end: string): Promise<string[]> {
+  const rows = await db
+    .selectFrom('notes')
+    .where('dailyDate', 'is not', null)
+    .where('dailyDate', '>=', start)
+    .where('dailyDate', '<=', end)
+    .select('dailyDate')
+    .orderBy('dailyDate')
+    .execute()
+  return rows.flatMap((row) => (row.dailyDate === null ? [] : [row.dailyDate]))
+}
+
 /** Graph-relative paths of every note carrying `tag`, ordered by path. */
 export async function getNotesByTag(tag: string): Promise<string[]> {
   const rows = await db

@@ -140,6 +140,7 @@ export {
   indexNote,
   rebuildIndex,
   reconcileIndex,
+  dailyDatesInRange,
   getBacklinks,
   getBacklinksWithContext,
   getLinkSources,
