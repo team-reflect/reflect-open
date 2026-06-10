@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { EmbedStatus } from '@reflect/core'
 import type { Route } from '@/routing/route'
 import { resetOperations } from '@/lib/operations'
 import type { CommandContext } from './types'
 
 const randomNotePath = vi.hoisted(() => vi.fn())
 const rebuildIndex = vi.hoisted(() => vi.fn())
-const embedStatus = vi.hoisted(() => vi.fn(async () => ({ status: 'uninitialized' })))
+const embedStatus = vi.hoisted(() =>
+  vi.fn<() => Promise<EmbedStatus>>(async () => ({ status: 'uninitialized' })),
+)
 const ensureEmbeddingsVisibly = vi.hoisted(() => vi.fn(async () => ({ status: 'ready', model: 'm' })))
 const setSemanticEnabled = vi.hoisted(() => vi.fn())
 const backfillEmbeddingsVisibly = vi.hoisted(() => vi.fn(async () => 'completed'))
