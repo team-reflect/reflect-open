@@ -2,6 +2,7 @@ import { useCallback, useEffect, type ReactElement } from 'react'
 import type { GraphInfo } from '@reflect/core'
 import { AppShell } from '@/components/app-shell'
 import { CommandPalette } from '@/components/command-palette/command-palette'
+import { EmbeddingsSync } from '@/components/embeddings-sync'
 import { PaletteProvider, usePalette } from '@/components/command-palette/palette-provider'
 import { DailyStream } from '@/components/daily-stream'
 import { NotePane } from '@/components/note-pane'
@@ -102,6 +103,7 @@ function WorkspaceContent({ graph }: GraphWorkspaceProps): ReactElement {
 
         <OperationsStatus />
         <CommandPalette context={commandContext} />
+        <EmbeddingsSync />
       </div>
     </AppShell>
   )

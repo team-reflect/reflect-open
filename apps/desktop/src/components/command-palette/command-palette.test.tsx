@@ -15,6 +15,11 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   suggestWikiTargets,
   searchWithFilters,
 }))
+vi.mock('@/lib/use-embed-status', () => ({
+  // The model is absent in these tests: the palette is exactly the lexical
+  // surface it was before Plan 09 (hybrid mode is additive).
+  useEmbedStatus: () => ({ status: 'uninitialized' }),
+}))
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', cloudSync: null, generation: 1 } }),
 }))

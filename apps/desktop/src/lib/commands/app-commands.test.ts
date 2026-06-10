@@ -5,6 +5,13 @@ import type { CommandContext } from './types'
 
 const randomNotePath = vi.hoisted(() => vi.fn())
 const rebuildIndex = vi.hoisted(() => vi.fn())
+const ensureEmbeddingsVisibly = vi.hoisted(() => vi.fn(async () => ({ status: 'ready', model: 'm' })))
+const setSemanticEnabled = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/semantic', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/semantic')>()),
+  ensureEmbeddingsVisibly,
+  setSemanticEnabled,
+}))
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   randomNotePath,
@@ -69,6 +76,13 @@ describe('app commands', () => {
     randomNotePath.mockResolvedValueOnce(null)
     await command('note.random').run(context)
     expect(navigated).toHaveLength(1) // unchanged
+  })
+
+  it('semantic.enable persists the opt-in and loads the model visibly', async () => {
+    const { context } = fakeContext()
+    await command('semantic.enable').run(context)
+    expect(setSemanticEnabled).toHaveBeenCalledWith(true)
+    expect(ensureEmbeddingsVisibly).toHaveBeenCalled()
   })
 
   it('index.rebuild runs at the open generation and reports as an operation', async () => {

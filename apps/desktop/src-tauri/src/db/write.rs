@@ -124,7 +124,10 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
 /// cascades to every child table; `search_fts` (a virtual table, no FK) is
 /// cleared explicitly. `index_meta` is intentionally preserved across a rebuild.
 pub(super) fn clear_index(conn: &Connection) -> AppResult<()> {
-    conn.execute_batch("DELETE FROM notes; DELETE FROM search_fts;")?;
+    conn.execute_batch(
+        "DELETE FROM notes; DELETE FROM search_fts;
+         DELETE FROM embedding_vectors; DELETE FROM embedding_chunks;",
+    )?;
     Ok(())
 }
 

@@ -46,6 +46,12 @@ impl AppError {
         }
     }
 
+    pub fn parse(message: impl Into<String>) -> Self {
+        Self::Parse {
+            message: message.into(),
+        }
+    }
+
     pub fn no_graph() -> Self {
         Self::NoGraph {
             message: "No graph is open".into(),

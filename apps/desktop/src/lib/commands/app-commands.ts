@@ -1,6 +1,7 @@
 import { notePath, randomNotePath, rebuildIndex } from '@reflect/core'
 import { ulid } from 'ulidx'
 import { startOperation } from '@/lib/operations'
+import { ensureEmbeddingsVisibly, setSemanticEnabled } from '@/lib/semantic'
 import { registerCommands } from './registry'
 import type { AppCommand } from './types'
 
@@ -62,6 +63,19 @@ const APP_COMMANDS: AppCommand[] = [
     title: 'Toggle theme',
     keywords: ['dark', 'light', 'appearance'],
     run: (context) => context.toggleTheme(),
+  },
+  {
+    id: 'semantic.enable',
+    title: 'Enable semantic search',
+    keywords: ['embeddings', 'ai', 'similar', 'model'],
+    // Downloads the local model (~90MB) — deliberately a command, never
+    // automatic: the first network fetch is the user's call. EmbeddingsSync
+    // reacts to `ready` with the backfill, and the persisted flag makes
+    // later launches load from cache without asking again.
+    run: async () => {
+      setSemanticEnabled(true)
+      await ensureEmbeddingsVisibly()
+    },
   },
   {
     id: 'index.rebuild',

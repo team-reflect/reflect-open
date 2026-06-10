@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, type ReactElement } from 'react'
 import { isDaily, resolveWikiTarget } from '@reflect/core'
 import { BacklinksPanel } from '@/components/backlinks-panel'
+import { RelatedNotes } from '@/components/related-notes'
 import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor'
 import { useImagePersistence } from '@/editor/use-image-persistence'
 import { useNoteDocument } from '@/editor/use-note-document'
@@ -214,6 +215,7 @@ export function NotePane({
       </NoteEditor>
 
       <BacklinksPanel path={path} />
+      <RelatedNotes path={path} />
     </div>
   )
 }
