@@ -32,6 +32,24 @@ export interface RetrieveOptions {
 
 const KNN_CANDIDATES = 24
 
+/**
+ * Neighbors farther than this cosine distance are noise, not "similar notes":
+ * KNN always fills the candidate list with the nearest chunks however
+ * unrelated they are (worst in small graphs). 0.7 is the old app's tuned
+ * cutoff for the same model family, carried over for parity.
+ */
+const MAX_RELATED_COSINE_DISTANCE = 0.7
+
+/**
+ * Cosine distance recovered from a vec0 L2 distance. The `embedding_vectors`
+ * table uses vec0's default L2 metric, but the MiniLM vectors fastembed
+ * produces are unit-normalized, so `l2² = 2 − 2·cos_sim` makes the conversion
+ * `cos_dist = l2²/2` — exact, not an approximation.
+ */
+export function cosineDistanceFromUnitL2(l2Distance: number): number {
+  return (l2Distance * l2Distance) / 2
+}
+
 interface ChunkHitRow {
   path: string
   title: string
@@ -173,7 +191,9 @@ export async function retrieve(query: string, options?: RetrieveOptions): Promis
  * chunk vector — no re-embedding, no pane-provided seed text: the embedding
  * sync keeps chunks current on every save, and the index invalidation scope
  * refetches consumers, so freshness is automatic. Returns [] when the note
- * has no vectors yet (model never enabled, or not yet embedded).
+ * has no vectors yet (model never enabled, or not yet embedded). Candidates
+ * past {@link MAX_RELATED_COSINE_DISTANCE} are dropped rather than padded in,
+ * so a sparse graph shows few (or no) neighbors instead of wrong ones.
  */
 export async function relatedNotes(path: string, limit = 6): Promise<RetrievalHit[]> {
   const seed = await sql<{ vec: string }>`
@@ -199,6 +219,9 @@ export async function relatedNotes(path: string, limit = 6): Promise<RetrievalHi
   `.execute(db)
   const byNote = new Map<string, RetrievalHit>()
   for (const row of result.rows) {
+    if (cosineDistanceFromUnitL2(row.distance) > MAX_RELATED_COSINE_DISTANCE) {
+      continue
+    }
     if (row.path !== path && !byNote.has(row.path)) {
       byNote.set(row.path, {
         path: row.path,

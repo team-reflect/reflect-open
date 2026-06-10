@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import { RouterProvider, useRouter } from '@/routing/router'
-import { DayBacklinks } from './day-backlinks'
+import { BacklinksSection } from './backlinks-section'
 
 const getBacklinksWithContext = vi.hoisted(() => vi.fn())
 vi.mock('@reflect/core', async (importOriginal) => ({
@@ -21,12 +21,12 @@ function RouteProbe(): ReactNode {
   return <output data-testid="route">{JSON.stringify(route)}</output>
 }
 
-function renderBacklinks(date: string) {
+function renderBacklinks(path: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={client}>
       <RouterProvider>
-        <DayBacklinks date={date} />
+        <BacklinksSection path={path} emptyLabel="No notes link to this day yet." />
         <RouteProbe />
       </RouterProvider>
     </QueryClientProvider>,
@@ -38,24 +38,24 @@ beforeEach(() => {
   getBacklinksWithContext.mockReset().mockResolvedValue([])
 })
 
-describe('DayBacklinks', () => {
+describe('BacklinksSection', () => {
   it('shows a loading line while the query is in flight', () => {
     getBacklinksWithContext.mockImplementation(() => new Promise(() => {}))
-    const view = renderBacklinks('2026-06-09')
+    const view = renderBacklinks('daily/2026-06-09.md')
     expect(view.getByText('Loading…')).toBeDefined()
     view.unmount()
   })
 
   it('announces an alert when the query fails', async () => {
     getBacklinksWithContext.mockRejectedValue(new Error('index unavailable'))
-    const view = renderBacklinks('2026-06-09')
+    const view = renderBacklinks('daily/2026-06-09.md')
     const alert = await view.findByRole('alert')
     expect(alert.textContent).toBe('Couldn’t load backlinks.')
     view.unmount()
   })
 
-  it('shows a quiet empty state when nothing links to the day', async () => {
-    const view = renderBacklinks('2026-06-09')
+  it('shows the host-provided quiet empty state when nothing links here', async () => {
+    const view = renderBacklinks('daily/2026-06-09.md')
     await view.findByText('No notes link to this day yet.')
     expect(getBacklinksWithContext).toHaveBeenCalledWith('daily/2026-06-09.md')
     view.unmount()
@@ -76,7 +76,7 @@ describe('DayBacklinks', () => {
         posFrom: 90,
       },
     ])
-    const view = renderBacklinks('2026-06-09')
+    const view = renderBacklinks('daily/2026-06-09.md')
     await view.findByText('review on [[2026-06-09]]')
     expect(view.getAllByText('Standup')).toHaveLength(2)
     expect(view.getByText('follow-up from [[2026-06-09]]')).toBeDefined()
@@ -98,7 +98,7 @@ describe('DayBacklinks', () => {
         posFrom: 7,
       },
     ])
-    const view = renderBacklinks('2026-06-09')
+    const view = renderBacklinks('daily/2026-06-09.md')
 
     await userEvent.click(await view.findByText('June 1st, 2026'))
     expect(view.getByTestId('route').textContent).toContain('"kind":"daily"')

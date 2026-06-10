@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fuseRanked, type RetrievalHit } from './retrieve'
+import { cosineDistanceFromUnitL2, fuseRanked, type RetrievalHit } from './retrieve'
 
 function hit(path: string, overrides?: Partial<RetrievalHit>): RetrievalHit {
   return {
@@ -39,5 +39,19 @@ describe('fuseRanked (reciprocal rank fusion)', () => {
   it('keeps the private flag through fusion', () => {
     const fused = fuseRanked([[hit('p', { isPrivate: true })]], 5)
     expect(fused[0].isPrivate).toBe(true)
+  })
+})
+
+describe('cosineDistanceFromUnitL2', () => {
+  it('maps identical unit vectors (l2 = 0) to cosine distance 0', () => {
+    expect(cosineDistanceFromUnitL2(0)).toBe(0)
+  })
+
+  it('maps orthogonal unit vectors (l2 = √2) to cosine distance 1', () => {
+    expect(cosineDistanceFromUnitL2(Math.SQRT2)).toBeCloseTo(1)
+  })
+
+  it('maps opposite unit vectors (l2 = 2) to cosine distance 2', () => {
+    expect(cosineDistanceFromUnitL2(2)).toBe(2)
   })
 })

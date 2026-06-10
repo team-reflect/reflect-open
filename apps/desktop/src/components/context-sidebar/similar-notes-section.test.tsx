@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import { RouterProvider, useRouter } from '@/routing/router'
-import { DayRelatedNotes } from './day-related-notes'
+import { SimilarNotesSection } from './similar-notes-section'
 
 const relatedNotes = vi.hoisted(() => vi.fn())
 vi.mock('@reflect/core', async (importOriginal) => ({
@@ -21,12 +21,12 @@ function RouteProbe(): ReactNode {
   return <output data-testid="route">{JSON.stringify(route)}</output>
 }
 
-function renderRelated(date: string, probe: boolean = true) {
+function renderSimilar(path: string, probe: boolean = true) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={client}>
       <RouterProvider>
-        <DayRelatedNotes date={date} />
+        <SimilarNotesSection path={path} />
         {probe ? <RouteProbe /> : null}
       </RouterProvider>
     </QueryClientProvider>,
@@ -38,15 +38,15 @@ beforeEach(() => {
   relatedNotes.mockReset().mockResolvedValue([])
 })
 
-describe('DayRelatedNotes', () => {
-  it('renders nothing at all when the day has no semantic neighbors', async () => {
-    const view = renderRelated('2026-06-09', false)
+describe('SimilarNotesSection', () => {
+  it('renders nothing at all when the note has no semantic neighbors', async () => {
+    const view = renderSimilar('daily/2026-06-09.md', false)
     await waitFor(() => expect(relatedNotes).toHaveBeenCalledWith('daily/2026-06-09.md'))
     expect(view.container.firstChild).toBeNull()
     view.unmount()
   })
 
-  it('renders the Related section with one row per neighbor', async () => {
+  it('renders the Similar notes section with one row per neighbor', async () => {
     relatedNotes.mockResolvedValue([
       {
         path: 'notes/rust.md',
@@ -65,9 +65,9 @@ describe('DayRelatedNotes', () => {
         isPrivate: false,
       },
     ])
-    const view = renderRelated('2026-06-09')
+    const view = renderSimilar('notes/languages.md')
     await view.findByText('Rust')
-    expect(view.getByText('Related')).toBeDefined()
+    expect(view.getByText('Similar notes')).toBeDefined()
     expect(view.getByText('borrow checker notes')).toBeDefined()
     expect(view.getByText('Zig')).toBeDefined()
     expect(view.getByText('comptime experiments')).toBeDefined()
@@ -85,7 +85,7 @@ describe('DayRelatedNotes', () => {
         isPrivate: false,
       },
     ])
-    const view = renderRelated('2026-06-09')
+    const view = renderSimilar('daily/2026-06-09.md')
     await userEvent.click(await view.findByText('Gardening'))
     expect(view.getByTestId('route').textContent).toContain('"kind":"note"')
     expect(view.getByTestId('route').textContent).toContain('notes/gardening.md')

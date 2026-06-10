@@ -1,14 +1,15 @@
 import type { ReactElement } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { dailyPath } from '@reflect/core'
+import { BacklinksSection } from '@/components/context-sidebar/backlinks-section'
+import { SidebarSection } from '@/components/context-sidebar/sidebar-section'
+import { SimilarNotesSection } from '@/components/context-sidebar/similar-notes-section'
 import { keybindingFor } from '@/lib/commands/app-commands'
 import { formatBindingLabel } from '@/lib/keybindings'
 import { addDaysIso, formatDayLabel } from '@/lib/dates'
 import { useToday } from '@/lib/use-today'
 import { useRouter } from '@/routing/router'
-import { DayBacklinks } from './day-backlinks'
 import { DayCalendar } from './day-calendar'
-import { DayRelatedNotes } from './day-related-notes'
-import { SidebarSection } from './sidebar-section'
 
 interface DailyContextSidebarProps {
   /** The day the sidebar describes — a validated ISO date from the route. */
@@ -78,8 +79,8 @@ export function DailyContextSidebar({ date }: DailyContextSidebarProps): ReactEl
       <SidebarSection storageKey="calendar" title="Calendar">
         <DayCalendar selectedDate={date} today={today} />
       </SidebarSection>
-      <DayBacklinks date={date} />
-      <DayRelatedNotes date={date} />
+      <BacklinksSection path={dailyPath(date)} emptyLabel="No notes link to this day yet." />
+      <SimilarNotesSection path={dailyPath(date)} />
     </div>
   )
 }

@@ -49,7 +49,7 @@ describe('RelatedNotes', () => {
   it('renders nothing when the note has no vectors (or nothing relates)', async () => {
     relatedNotes.mockResolvedValue([]) // model never enabled / not yet embedded
     const view = renderRelated('notes/a.md')
-    await waitFor(() => expect(view.queryByText('Related')).toBeNull())
+    await waitFor(() => expect(view.queryByText('Similar notes')).toBeNull())
     view.unmount()
   })
 })

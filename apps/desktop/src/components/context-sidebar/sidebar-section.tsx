@@ -10,7 +10,7 @@ interface SidebarSectionProps {
   children: ReactNode
 }
 
-const STORAGE_PREFIX = 'reflect.daily-sidebar.'
+const STORAGE_PREFIX = 'reflect.context-sidebar.'
 
 function readOpenState(storageKey: string): boolean {
   return window.sessionStorage.getItem(STORAGE_PREFIX + storageKey) !== 'closed'
@@ -20,7 +20,7 @@ function readOpenState(storageKey: string): boolean {
  * One collapsible sidebar section (the old app's `SidebarItem` shape): a
  * header row with a disclosure chevron, open by default, open/closed state
  * persisted per section for the session so a collapsed section stays
- * collapsed while navigating between days.
+ * collapsed while navigating between days and notes.
  */
 export function SidebarSection({
   storageKey,

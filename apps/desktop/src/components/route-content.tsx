@@ -30,7 +30,7 @@ export function RouteContent(): ReactElement {
       return (
         <ScrollRestored className="h-full overflow-auto px-6 py-8">
           <div className="mx-auto w-full max-w-2xl">
-            <NotePane path={route.path} lazy autoFocus />
+            <NotePane path={route.path} lazy autoFocus contextInSidebar />
           </div>
         </ScrollRestored>
       )

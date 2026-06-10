@@ -37,8 +37,8 @@ export function RelatedNotes({ path }: RelatedNotesProps): ReactElement | null {
 
   return (
     <NoteLinkList
-      ariaLabel="Related notes"
-      heading="Related"
+      ariaLabel="Similar notes"
+      heading="Similar notes"
       items={related.map((hit) => ({
         key: hit.path,
         title: hit.title,
