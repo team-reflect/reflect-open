@@ -3,6 +3,8 @@
    components read; keep Tailwind layered on top so shadcn and the DS agree. */
 @import '@reflect/design-system/styles.css';
 @import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
 /* Tailwind v4 dark variant keyed to the design-system `.dark` scope set by the
    ThemeProvider on <html>. */
@@ -40,6 +42,48 @@
   --shadow-sm: var(--ds-shadow-sm);
   --shadow-md: var(--ds-shadow-md);
   --shadow-pop: var(--ds-shadow-pop);
+
+  /* shadcn semantic tokens (added by `shadcn init`, values rewired below in
+     :root to reference DS tokens). Note `--color-accent` above stays the DS
+     brand color — shadcn components that want the subtle hover wash use
+     `bg-surface-hover` instead (adjusted per component under ui/). */
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+
+  /* shadcn's classic radius scale off the DS house radius (0.5rem): with that
+     base these formulas reproduce Tailwind's default scale exactly, so
+     existing rounded-* usage doesn't shift. 2xl+ keep Tailwind defaults. */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
 /* The DS shadow tokens share Tailwind's `--shadow-*` theme namespace, so a
@@ -52,6 +96,43 @@
   --ds-shadow-sm: var(--shadow-sm);
   --ds-shadow-md: var(--shadow-md);
   --ds-shadow-pop: var(--shadow-pop);
+}
+
+/* shadcn semantic tokens, bridged onto the DS tokens so both vocabularies
+   describe one theme and `.dark` / `.reflect-space` keep working untouched.
+   `--accent`, `--border`, `--destructive`, and `--radius` are NOT redefined
+   here — the DS already owns those names (and `--accent` is the brand color,
+   not shadcn's hover wash; see the @theme note above). Chart colors have no
+   DS equivalent and keep the generated neutral ramp. */
+:root {
+  --background: var(--surface-app);
+  --foreground: var(--text);
+  --card: var(--surface);
+  --card-foreground: var(--text);
+  --popover: var(--surface);
+  --popover-foreground: var(--text);
+  --primary: var(--accent);
+  --primary-foreground: var(--text-on-brand);
+  --secondary: var(--accent-soft);
+  --secondary-foreground: var(--accent-soft-text);
+  --muted: var(--surface-sunken);
+  --muted-foreground: var(--text-muted);
+  --accent-foreground: var(--text-on-brand);
+  --input: var(--border-strong);
+  --ring: var(--focus-ring);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: var(--surface-sunken);
+  --sidebar-foreground: var(--text);
+  --sidebar-primary: var(--accent);
+  --sidebar-primary-foreground: var(--text-on-brand);
+  --sidebar-accent: var(--surface-hover);
+  --sidebar-accent-foreground: var(--text);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--focus-ring);
 }
 
 html,
@@ -229,6 +310,14 @@ body,
   color: var(--text-muted);
 }
 
+/* ---- shadcn inputs (components/ui/) -------------------------------------
+   shadcn form controls carry their own focus-visible ring (border + ring
+   utilities), so the global outline above would stack a second ring on top.
+   Its rule is unlayered, so a Tailwind utility can't opt out — do it here. */
+:where([data-slot='input'], [data-slot='textarea'], [cmdk-input]):focus-visible {
+  outline: none;
+}
+
 /* ---- ⌘K palette (Plan 08) ---------------------------------------------- */
 .reflect-palette {
   overflow: hidden;
@@ -272,4 +361,18 @@ body,
   text-align: center;
   font-size: 0.875rem;
   color: var(--text-muted);
+}
+
+/* No shadcn `.dark` block: every bridged token above resolves through a DS
+   variable, so the DS `.dark` scope re-themes shadcn components for free. */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
 }

@@ -1,6 +1,14 @@
 import { useState, type ReactElement } from 'react'
-import { foldTag, type NoteTagFacet } from '@reflect/core'
+import { foldTag, isTagName, type NoteTagFacet } from '@reflect/core'
 import { ChevronDown } from 'lucide-react'
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 
 interface CustomFilterMenuProps {
@@ -12,75 +20,52 @@ interface CustomFilterMenuProps {
 }
 
 /**
- * The filter group's last segment: a disclosure listing every tag that isn't
- * pinned in settings (the original app's "Custom" dropdown). Same no-portal
- * idiom as the graph switcher — a fixed backdrop handles click-outside.
- * Renders nothing when there are no custom tags to offer.
+ * The filter group's last segment: a combobox (shadcn's Popover + Command
+ * pairing) listing every tag that isn't pinned in settings, the original
+ * app's "Custom" dropdown. The search input doubles as free entry — typing
+ * any valid tag name offers a "Filter by #tag" item, so the filter isn't
+ * limited to tags the facet query happened to return.
  */
 export function CustomFilterMenu({
   facets,
   activeTag,
   onSelect,
-}: CustomFilterMenuProps): ReactElement | null {
+}: CustomFilterMenuProps): ReactElement {
   const [open, setOpen] = useState(false)
-
-  if (facets.length === 0 && activeTag === null) {
-    return null
-  }
+  const [query, setQuery] = useState('')
 
   const choose = (tag: string): void => {
     setOpen(false)
+    setQuery('')
     onSelect(tag)
   }
 
+  // Accept "#book" as readily as "book" — the UI renders tags hash-prefixed,
+  // so people type them that way too.
+  const typed = query.trim().replace(/^#/, '')
+  const typedKey = foldTag(typed)
+  const listed = facets.some((facet) => foldTag(facet.tag) === typedKey)
+  const offerTyped = typed !== '' && !listed && isTagName(typed)
+
+  let emptyMessage = 'No matching tags.'
+  if (typed === '') {
+    emptyMessage = 'Type a tag to filter by.'
+  } else if (!isTagName(typed)) {
+    emptyMessage = 'Not a valid tag name.'
+  }
+
   return (
-    <div
-      className="relative"
-      onKeyDown={(event) => {
-        if (event.key === 'Escape' && open) {
-          event.stopPropagation()
-          setOpen(false)
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next)
+        if (!next) {
+          setQuery('')
         }
       }}
     >
-      {open ? (
-        <>
-          <button
-            type="button"
-            aria-label="Close tag menu"
-            tabIndex={-1}
-            onClick={() => setOpen(false)}
-            className="fixed inset-0 z-20 cursor-default"
-          />
-          <div
-            role="menu"
-            aria-label="Filter by another tag"
-            className="absolute right-0 top-full z-30 mt-1.5 max-h-72 w-52 overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-pop"
-          >
-            {facets.map((facet) => (
-              <button
-                key={foldTag(facet.tag)}
-                type="button"
-                role="menuitem"
-                onClick={() => choose(facet.tag)}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-text-secondary hover:bg-surface-hover hover:text-text"
-              >
-                <span className="min-w-0 flex-1 truncate text-left">#{facet.tag}</span>
-                <span className="shrink-0 text-xs tabular-nums text-text-muted">
-                  {facet.count}
-                </span>
-              </button>
-            ))}
-          </div>
-        </>
-      ) : null}
-
-      <button
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
+      <PopoverTrigger
         aria-pressed={activeTag !== null}
-        onClick={() => setOpen((current) => !current)}
         className={cn(
           'flex h-full items-center gap-1 px-3 py-1.5 text-[13px] font-medium transition-colors duration-100',
           activeTag !== null
@@ -90,7 +75,40 @@ export function CustomFilterMenu({
       >
         {activeTag !== null ? `#${activeTag}` : 'Custom'}
         <ChevronDown aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
-      </button>
-    </div>
+      </PopoverTrigger>
+      <PopoverContent align="end" sideOffset={6} className="w-56 p-0">
+        <Command label="Filter by another tag">
+          <CommandInput
+            value={query}
+            onValueChange={setQuery}
+            placeholder="Filter by any tag…"
+          />
+          <CommandList>
+            {/* A force-mounted item never counts as a match, so cmdk would
+                show the empty state right above it — render one or the other. */}
+            {offerTyped ? null : <CommandEmpty>{emptyMessage}</CommandEmpty>}
+            {facets.map((facet) => (
+              <CommandItem
+                key={foldTag(facet.tag)}
+                value={facet.tag}
+                keywords={[`#${facet.tag}`]}
+                data-checked={activeTag !== null && foldTag(activeTag) === foldTag(facet.tag)}
+                onSelect={() => choose(facet.tag)}
+              >
+                <span className="min-w-0 flex-1 truncate">#{facet.tag}</span>
+                <span className="shrink-0 text-xs tabular-nums text-text-muted">
+                  {facet.count}
+                </span>
+              </CommandItem>
+            ))}
+            {offerTyped ? (
+              <CommandItem forceMount value={`custom:${typed}`} onSelect={() => choose(typed)}>
+                <span className="min-w-0 flex-1 truncate">Filter by #{typed}</span>
+              </CommandItem>
+            ) : null}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   )
 }

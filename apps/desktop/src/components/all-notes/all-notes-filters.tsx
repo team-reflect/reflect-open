@@ -14,9 +14,9 @@ interface AllNotesFiltersProps {
 
 /**
  * The All Notes filter bar: an All tab, one tab per pinned tag (the
- * `allNotesFilterTags` setting), and a Custom menu offering every remaining
- * tag. Tag matching is case-insensitive throughout, same as the `#tag`
- * search token.
+ * `allNotesFilterTags` setting), and a Custom combobox offering every
+ * remaining tag plus free entry of any tag name. Tag matching is
+ * case-insensitive throughout, same as the `#tag` search token.
  */
 export function AllNotesFilters({ tag, facets, onSelect }: AllNotesFiltersProps): ReactElement {
   const { settings } = useSettings()

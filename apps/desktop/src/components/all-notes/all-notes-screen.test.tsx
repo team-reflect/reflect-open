@@ -40,6 +40,7 @@ class ResizeObserverStub {
 }
 globalThis.ResizeObserver ??= ResizeObserverStub as unknown as typeof ResizeObserver
 Element.prototype.scrollTo ??= () => {}
+Element.prototype.scrollIntoView ??= () => {} // cmdk scrolls the selected item
 Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
   configurable: true,
   get: () => 1024,
@@ -236,17 +237,17 @@ describe('AllNotesScreen', () => {
     view.unmount()
   })
 
-  it('offers unpinned tags in the Custom menu and shows the chosen one', async () => {
+  it('offers unpinned tags in the Custom combobox and shows the chosen one', async () => {
     const view = renderScreen()
 
-    // `book` is pinned, so the menu offers only `travel` (with its count).
+    // `book` is pinned, so the combobox offers only `travel` (with its count).
     fireEvent.click(await view.findByRole('button', { name: 'Custom' }))
-    const menu = view.getByRole('menu', { name: 'Filter by another tag' })
-    expect(menu.textContent).toContain('#travel')
-    expect(menu.textContent).toContain('2')
-    expect(menu.textContent).not.toContain('#book')
+    const listbox = await view.findByRole('listbox')
+    expect(listbox.textContent).toContain('#travel')
+    expect(listbox.textContent).toContain('2')
+    expect(listbox.textContent).not.toContain('#book')
 
-    fireEvent.click(view.getByRole('menuitem', { name: /#travel/ }))
+    fireEvent.click(view.getByRole('option', { name: /#travel/ }))
 
     expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: 'travel' })
     await view.findByText('Tokyo Gâteau')
@@ -255,6 +256,45 @@ describe('AllNotesScreen', () => {
     await waitFor(() =>
       expect(view.getByRole('button', { name: /#travel/, expanded: false })).toBeDefined(),
     )
+    view.unmount()
+  })
+
+  it('filters by an arbitrary typed tag from the Custom combobox', async () => {
+    const view = renderScreen()
+    await view.findByText('Health Stacked')
+
+    fireEvent.click(view.getByRole('button', { name: 'Custom' }))
+    const input = await view.findByPlaceholderText('Filter by any tag…')
+
+    // An exact existing tag isn't duplicated as a "Filter by" item.
+    fireEvent.change(input, { target: { value: 'travel' } })
+    expect(view.queryByRole('option', { name: /Filter by/ })).toBeNull()
+
+    // A leading `#` is accepted, and the tag need not exist in the index.
+    fireEvent.change(input, { target: { value: '#zettel' } })
+    fireEvent.click(await view.findByRole('option', { name: 'Filter by #zettel' }))
+
+    expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: 'zettel' })
+    await view.findByText('No notes tagged #zettel.')
+    view.unmount()
+  })
+
+  it('matches facets case-insensitively in the Custom combobox', async () => {
+    const view = renderScreen()
+    await view.findByText('Health Stacked')
+
+    fireEvent.click(view.getByRole('button', { name: 'Custom' }))
+    const input = await view.findByPlaceholderText('Filter by any tag…')
+    fireEvent.change(input, { target: { value: 'TRAVEL' } })
+
+    // cmdk's default filter (command-score) folds case like `foldTag` does,
+    // so a differently-cased query keeps the existing facet reachable instead
+    // of dead-ending with a hidden list and a suppressed "Filter by" offer.
+    expect(await view.findByRole('option', { name: /#travel/ })).toBeDefined()
+    expect(view.queryByRole('option', { name: /Filter by/ })).toBeNull()
+
+    fireEvent.click(view.getByRole('option', { name: /#travel/ }))
+    expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: 'travel' })
     view.unmount()
   })
 })
