@@ -3,6 +3,12 @@ import { hasBridge, readNote, subscribeFileChanges, writeNote } from '@reflect/c
 import { registerFlush } from './flush-registry'
 import type { NoteEditorHandle } from './note-editor'
 import {
+  createRenameCoordinator,
+  type RenameCoordinator,
+  type RenameProgress,
+} from './rename-coordinator'
+import { registerSession } from './session-registry'
+import {
   createNoteSession,
   INITIAL_NOTE_SNAPSHOT,
   type NoteSession,
@@ -18,6 +24,8 @@ import { checkRoundTrip } from './roundtrip'
  */
 
 export interface NoteDocument extends NoteSessionSnapshot {
+  /** Live progress of a rename's link rewrite (Plan 07b), `null` when idle. */
+  renameProgress: { done: number; total: number } | null
   /** Wire to the editor: every document change enters the pipeline here. */
   onEditorChange: (markdown: string) => void
   /** Wire to the editor's imperative handle (reload/conflict application). */
@@ -35,6 +43,12 @@ export interface NoteDocumentOptions {
    * day never litters the graph; writing does.
    */
   createIfMissing?: boolean
+  /**
+   * Auto-rewrite inbound `[[links]]` when this note's settled title changes
+   * (Plan 07b). Off for daily notes — their date labels are stream chrome,
+   * not content.
+   */
+  trackRenames?: boolean
 }
 
 /**
@@ -49,9 +63,14 @@ export function useNoteDocument(
   options?: NoteDocumentOptions,
 ): NoteDocument {
   const createIfMissing = options?.createIfMissing ?? false
+  const trackRenames = options?.trackRenames ?? false
   const [snapshot, setSnapshot] = useState<NoteSessionSnapshot>(INITIAL_NOTE_SNAPSHOT)
+  const [renameProgress, setRenameProgress] = useState<RenameProgress | null>(null)
   const editorRef = useRef<NoteEditorHandle | null>(null)
   const sessionRef = useRef<NoteSession | null>(null)
+  const coordinatorRef = useRef<RenameCoordinator | null>(null)
+  /** Mirrors the snapshot's conflict for non-reactive checks (rename gating). */
+  const conflictRef = useRef<string | null>(null)
 
   // Writes read the generation at write time, not at session creation, so the
   // session must NOT be keyed on `generation`: reopening the *same* graph bumps
@@ -69,6 +88,26 @@ export function useNoteDocument(
     if (!path) {
       return
     }
+    // The auto-rename lifecycle (Plan 07b) is owned by the coordinator — the
+    // tracker, the rewrite chain, and alias placement live there, bound to
+    // *this* effect's session, never to a ref another note could repoint.
+    // Progress is gated on this effect being live: a rewrite finishing after
+    // a note switch must not paint its status over the newly opened note.
+    let paneLive = true
+    const coordinator = trackRenames
+      ? createRenameCoordinator({
+          path,
+          generation: () => generationRef.current,
+          canFire: () => conflictRef.current === null,
+          onProgress: (progress) => {
+            if (paneLive) {
+              setRenameProgress(progress)
+            }
+          },
+        })
+      : null
+    coordinatorRef.current = coordinator
+
     const session = createNoteSession({
       path,
       io: {
@@ -84,21 +123,44 @@ export function useNoteDocument(
           : null,
       },
       classify: checkRoundTrip,
-      onSnapshot: setSnapshot,
+      onSnapshot: (snapshot) => {
+        conflictRef.current = snapshot.conflict
+        setSnapshot(snapshot)
+      },
       applyContent: (markdown) => editorRef.current?.setMarkdown(markdown),
+      onContent: coordinator ? coordinator.content : undefined,
       createIfMissing,
     })
+    coordinator?.bind(session)
     sessionRef.current = session
+    const unregisterSession = registerSession(session)
     session.load()
     return () => {
       if (sessionRef.current === session) {
         sessionRef.current = null
       }
+      if (coordinatorRef.current === coordinator) {
+        coordinatorRef.current = null
+      }
+      paneLive = false
+      setRenameProgress(null) // the next note must not inherit this one's status
+      unregisterSession()
       // Disposal flushes pending edits to the session's own path — the
       // path-switch "final flush" lives here, not in cross-note bookkeeping.
+      // The flush's landed save reaches the tracker via onContent('saved');
+      // settle after it so a just-edited title still renames on the way out
+      // (the closed coordinator writes its alias to disk).
+      coordinator?.close()
+      const settled = session.flush()
       session.dispose()
+      if (coordinator) {
+        void settled.then(() => {
+          coordinator.settle()
+          coordinator.dispose()
+        })
+      }
     }
-  }, [path, canWrite, createIfMissing])
+  }, [path, canWrite, createIfMissing, trackRenames])
 
   // External-change reconciliation via the watcher (Plan 04b events).
   useEffect(() => {
@@ -133,9 +195,26 @@ export function useNoteDocument(
     if (!path) {
       return
     }
-    const flush = (): void => void sessionRef.current?.flush()
+    const flush = (): void => {
+      // Capture the pair at event time: reading the refs again after the
+      // flush promise resolves could observe a *different* note's session/
+      // coordinator if navigation switched panes mid-flush — settling that
+      // one early would fire its renames without quiet period or blur.
+      const session = sessionRef.current
+      const coordinator = coordinatorRef.current
+      // Blur is a settle point for title renames — but only after the flushed
+      // save lands, so the tracker has seen the final title.
+      void session?.flush().then(() => coordinator?.settle())
+    }
     const unregister = registerFlush(async () => {
-      await sessionRef.current?.flush()
+      const session = sessionRef.current
+      const coordinator = coordinatorRef.current
+      await session?.flush()
+      // Quit teardown is a settle point too: a pending title change must
+      // rewrite its links before the webview dies — settle (synchronously
+      // appends the rewrite to the chain), then wait for the writes to land.
+      coordinator?.settle()
+      await coordinator?.settled()
     })
     window.addEventListener('blur', flush)
     return () => {
@@ -160,5 +239,5 @@ export function useNoteDocument(
     sessionRef.current?.loadTheirs()
   }, [])
 
-  return { ...snapshot, onEditorChange, bindEditor, keepMine, loadTheirs }
+  return { ...snapshot, renameProgress, onEditorChange, bindEditor, keepMine, loadTheirs }
 }

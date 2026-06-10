@@ -12,6 +12,8 @@ import type { RoundTripFidelity } from './roundtrip'
 interface Harness {
   snapshots: NoteSessionSnapshot[]
   writes: Array<{ path: string; contents: string }>
+  applied: string[]
+  contents: Array<{ content: string; origin: string }>
   setDisk: (contents: string) => void
   session: ReturnType<typeof createNoteSession>
 }
@@ -19,10 +21,13 @@ interface Harness {
 function harness(options?: {
   write?: false
   classify?: (markdown: string) => RoundTripFidelity
+  disk?: string
 }): Harness {
   const snapshots: NoteSessionSnapshot[] = []
   const writes: Array<{ path: string; contents: string }> = []
-  let disk = '# Hello\n'
+  const applied: string[] = []
+  const contents: Array<{ content: string; origin: string }> = []
+  let disk = options?.disk ?? '# Hello\n'
   const session = createNoteSession({
     path: 'notes/a.md',
     io: {
@@ -37,12 +42,19 @@ function harness(options?: {
     },
     classify: options?.classify ?? (() => 'exact'),
     onSnapshot: (snapshot) => snapshots.push(snapshot),
-    applyContent: () => {},
+    applyContent: (markdown) => {
+      applied.push(markdown)
+    },
+    onContent: (content, origin) => {
+      contents.push({ content, origin })
+    },
     saveDebounceMs: 10,
   })
   return {
     snapshots,
     writes,
+    applied,
+    contents,
     setDisk: (contents) => {
       disk = contents
     },
@@ -136,5 +148,114 @@ describe('createNoteSession', () => {
     await settled()
     expect(snapshots.at(-1)?.protected).toBe(true)
     expect(snapshots.at(-1)?.initialContent).toBe('- [ ] now has tasks\n')
+  })
+})
+
+describe('frontmatter ownership (Plan 07b)', () => {
+  const FM = '---\naliases:\n  - Old\n---\n'
+
+  it('the editor sees only the body; classification gates on the body', async () => {
+    // A joined round-trip would classify lossy (meowdown mangles ---) — the
+    // session must split first, or every frontmatter note opens read-only.
+    const h = harness({
+      disk: `${FM}# Hello\n`,
+      classify: (markdown) => (markdown.includes('---') ? 'lossy' : 'exact'),
+    })
+    h.session.load()
+    await vi.runAllTimersAsync()
+    const ready = h.snapshots.at(-1)
+    expect(ready?.status).toBe('ready')
+    expect(ready?.protected).toBe(false)
+    expect(ready?.initialContent).toBe('# Hello\n')
+  })
+
+  it('a protected note shows the full file, frontmatter included', async () => {
+    const h = harness({
+      disk: `${FM}- [ ] lossy body\n`,
+      classify: (markdown) => (markdown.includes('- [ ]') ? 'lossy' : 'exact'),
+    })
+    h.session.load()
+    await vi.runAllTimersAsync()
+    const ready = h.snapshots.at(-1)
+    expect(ready?.protected).toBe(true)
+    // The read-only view's job is honest display of a file we refuse to
+    // touch — hiding the frontmatter would misrepresent it.
+    expect(ready?.initialContent).toBe(`${FM}- [ ] lossy body\n`)
+  })
+
+  it('saves rejoin the exact header bytes around the edited body', async () => {
+    const h = harness({ disk: `${FM}# Hello\n` })
+    h.session.load()
+    await vi.runAllTimersAsync()
+    h.session.editorChanged('# Hello edited\n')
+    await vi.runAllTimersAsync()
+    expect(h.writes.at(-1)?.contents).toBe(`${FM}# Hello edited\n`)
+    expect(h.snapshots.at(-1)?.dirty).toBe(false)
+  })
+
+  it('updateFrontmatter patches the header and saves without touching the editor', async () => {
+    const h = harness({ disk: '# Hello\n' })
+    h.session.load()
+    await vi.runAllTimersAsync()
+    h.session.updateFrontmatter({ aliases: ['Old Title'] })
+    await vi.runAllTimersAsync()
+    const written = h.writes.at(-1)?.contents ?? ''
+    expect(written).toContain('aliases:')
+    expect(written).toContain('Old Title')
+    expect(written.endsWith('# Hello\n')).toBe(true)
+    expect(h.applied).toEqual([]) // the editor was never reloaded
+  })
+
+  it('an external frontmatter-only change adopts cleanly without a conflict', async () => {
+    const h = harness({ disk: `${FM}# Hello\n` })
+    h.session.load()
+    await vi.runAllTimersAsync()
+    h.setDisk(`---\naliases:\n  - Newer\n---\n# Hello\n`)
+    h.session.externalChanged()
+    await vi.runAllTimersAsync()
+    expect(h.snapshots.at(-1)?.conflict).toBeNull()
+    // Next save preserves the adopted header.
+    h.session.editorChanged('# Hello!\n')
+    await vi.runAllTimersAsync()
+    expect(h.writes.at(-1)?.contents).toBe('---\naliases:\n  - Newer\n---\n# Hello!\n')
+  })
+
+  it('a frontmatter patch under a parked conflict lands with "keep mine"', async () => {
+    // The rename coordinator's alias can arrive while a conflict is parked:
+    // it rides the in-memory header (saves are paused, not dropped) and
+    // persists when the user keeps their version. "Load theirs" discarding
+    // it is the user explicitly choosing external content over the rename's
+    // consequences — a disk write here would clobber the protected "theirs".
+    const h = harness()
+    h.session.load()
+    await vi.runAllTimersAsync()
+    h.session.editorChanged('# Mine\n') // dirty
+    h.setDisk('# Theirs\n')
+    h.session.externalChanged()
+    await vi.runAllTimersAsync()
+    expect(h.snapshots.at(-1)?.conflict).toBe('# Theirs\n')
+
+    expect(h.session.updateFrontmatter({ aliases: ['Old Title'] })).toBe(true)
+    await vi.runAllTimersAsync()
+    expect(h.writes).toEqual([]) // paused, not written under the conflict
+
+    h.session.keepMine()
+    await vi.runAllTimersAsync()
+    const written = h.writes.at(-1)?.contents ?? ''
+    expect(written).toContain('Old Title') // the alias survived the conflict
+    expect(written).toContain('# Mine')
+  })
+
+  it('onContent reports full joined content with the right origins', async () => {
+    const h = harness({ disk: `${FM}# Hello\n` })
+    h.session.load()
+    await vi.runAllTimersAsync()
+    h.session.editorChanged('# Renamed\n')
+    await vi.runAllTimersAsync()
+    h.setDisk(`${FM}# External\n`)
+    h.session.externalChanged()
+    await vi.runAllTimersAsync()
+    expect(h.contents.map((c) => c.origin)).toEqual(['load', 'saved', 'external'])
+    expect(h.contents[1].content).toBe(`${FM}# Renamed\n`)
   })
 })

@@ -83,6 +83,18 @@ export async function getBacklinksWithContext(path: string): Promise<BacklinkCon
   })
 }
 
+/** Distinct source paths of links whose folded target key is `targetKey`. */
+export async function getLinkSources(targetKey: string): Promise<string[]> {
+  const rows = await db
+    .selectFrom('links')
+    .where('targetKey', '=', targetKey)
+    .select('sourcePath')
+    .distinct()
+    .orderBy('sourcePath')
+    .execute()
+  return rows.map((row) => row.sourcePath)
+}
+
 /** Escape `%`/`_`/`\` so user text can't act as LIKE wildcards. */
 function likeContains(key: string): string {
   return `%${key.replaceAll(/[\\%_]/g, (match) => `\\${match}`)}%`

@@ -35,6 +35,7 @@ export { indexNote, rebuildIndex, reconcileIndex, type IndexPassOptions } from '
 export {
   getBacklinks,
   getBacklinksWithContext,
+  getLinkSources,
   getNote,
   getNotesByTag,
   searchNotes,
@@ -48,3 +49,10 @@ export {
 } from './queries'
 export { rankWikiSuggestions, type WikiSuggestion } from './suggest'
 export { lineSnippet } from './snippet'
+export {
+  rewriteLinksForTitleChange,
+  nextAliases,
+  type RenameIo,
+  type TitleRenameRewriteOptions,
+  type TitleRenameRewriteResult,
+} from './rename'

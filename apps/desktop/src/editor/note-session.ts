@@ -1,4 +1,4 @@
-import { isAppError } from '@reflect/core'
+import { isAppError, splitFrontmatter, upsertFrontmatter } from '@reflect/core'
 import type { RoundTripFidelity } from './roundtrip'
 
 /**
@@ -18,6 +18,14 @@ import type { RoundTripFidelity } from './roundtrip'
  * last saved) and ignore it. A real external change reloads a clean buffer
  * imperatively, and **never clobbers a dirty one** — it parks as `conflict` for
  * the user to resolve.
+ *
+ * **Frontmatter is the session's, not the editor's** (Plan 07b): meowdown
+ * mangles a `---` block (it reads as thematic breaks/setext), so the editor
+ * sees only the body — the session splits every disk read, keeps the exact
+ * header bytes aside, and rejoins them on every write. This is also what makes
+ * frontmatter notes editable at all (a joined round-trip classifies lossy),
+ * and gives metadata writes ({@link NoteSession.updateFrontmatter}) a channel
+ * that never disturbs the editor view.
  */
 
 const DEFAULT_SAVE_DEBOUNCE_MS = 800
@@ -27,7 +35,12 @@ export type NoteSessionStatus = 'loading' | 'ready' | 'error'
 /** The observable document state, emitted to `onSnapshot` whenever it changes. */
 export interface NoteSessionSnapshot {
   status: NoteSessionStatus
-  /** Markdown to seed the editor with once `status` is `ready`. */
+  /**
+   * Markdown to seed the editor with once `status` is `ready` — the body
+   * (the editor never sees frontmatter). While `protected` it is the **full**
+   * file instead: the read-only view's job is honest display of a file we
+   * refuse to touch, frontmatter included.
+   */
   initialContent: string
   /**
    * True when the editor cannot faithfully round-trip this note (a converter
@@ -63,6 +76,9 @@ export interface NoteSessionIo {
   write: ((path: string, contents: string) => Promise<void>) | null
 }
 
+/** Why {@link NoteSessionOptions.onContent} fired. */
+export type NoteContentOrigin = 'load' | 'external' | 'saved'
+
 export interface NoteSessionOptions {
   /** Graph-relative path of the note this session owns. */
   path: string
@@ -71,6 +87,13 @@ export interface NoteSessionOptions {
   classify: (markdown: string) => RoundTripFidelity
   /** Receives every state change. Not called after `dispose()`. */
   onSnapshot: (snapshot: NoteSessionSnapshot) => void
+  /**
+   * Receives the full document (frontmatter + body) whenever it transitions
+   * to a known-on-disk state: the initial load, an adopted external change
+   * (including "load theirs"), or a landed save. `saved` is the only
+   * user-driven origin — the title-rename tracker (Plan 07b) keys off it.
+   */
+  onContent?: (content: string, origin: NoteContentOrigin) => void
   /**
    * Push content into the live editor (external reload / "load theirs"). The
    * editor's change handler may fire synchronously during this call; the
@@ -108,13 +131,29 @@ export interface NoteSession {
   keepMine: () => void
   /** Resolve a conflict by loading the external content (discards the buffer). */
   loadTheirs: () => void
+  /** The full current document (frontmatter + buffer), as a save would write it. */
+  content: () => string
+  /**
+   * Patch frontmatter keys (e.g. `aliases`, Plan 07b) without touching the
+   * editor: the header is updated in place and saved through the normal
+   * pipeline. Returns false (and does nothing) while protected, not ready,
+   * or disposed — callers with a fallback path (the rename coordinator's
+   * direct disk write) branch on it.
+   */
+  updateFrontmatter: (patch: Record<string, unknown>) => boolean
   /** Flush pending edits and detach: no further snapshots are emitted. */
   dispose: () => void
 }
 
+/** Exact frontmatter bytes (may be empty) and the body that follows them. */
+function splitDoc(content: string): { header: string; body: string } {
+  const { body, bodyOffset } = splitFrontmatter(content)
+  return { header: content.slice(0, bodyOffset), body }
+}
+
 /** Create the document session for one note. See the module doc for semantics. */
 export function createNoteSession(options: NoteSessionOptions): NoteSession {
-  const { path, io, classify, onSnapshot, applyContent } = options
+  const { path, io, classify, onSnapshot, applyContent, onContent } = options
   const createIfMissing = options.createIfMissing ?? false
   const saveDebounceMs = options.saveDebounceMs ?? DEFAULT_SAVE_DEBOUNCE_MS
 
@@ -127,9 +166,11 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   let error: string | null = null
 
   // Pipeline state (never surfaces).
-  /** The buffer as of the last editor change. */
+  /** The **body** as of the last editor change (the editor never sees frontmatter). */
   let buffer = ''
-  /** The content most recently read from or written to disk. */
+  /** The exact frontmatter bytes (with delimiters), `''` when none. */
+  let header = ''
+  /** The full content most recently read from or written to disk. */
   let disk = ''
   let saveTimer: ReturnType<typeof setTimeout> | null = null
   /** Serializes writes so a flush can't interleave with a debounced save. */
@@ -195,14 +236,15 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
         if (!dirty || isProtected || conflict !== null) {
           return
         }
-        const content = buffer
+        const content = header + buffer
         inFlightWrite = content
         try {
           await write(path, content)
           disk = content
-          dirty = buffer !== content
+          dirty = header + buffer !== content
           error = null // a previous save failure is resolved by this success
           emit()
+          onContent?.(content, 'saved')
         } finally {
           inFlightWrite = null
         }
@@ -251,7 +293,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
       return
     }
     buffer = markdown
-    dirty = markdown !== disk
+    dirty = header + markdown !== disk
     emit()
     if (dirty) {
       scheduleSave()
@@ -272,22 +314,25 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
 
   /** Adopt `content` as the new clean document state, re-gating protection. */
   function adoptCleanContent(content: string): void {
-    buffer = content
+    const doc = splitDoc(content)
+    header = doc.header
+    buffer = doc.body
     disk = content
     dirty = false
     // Re-gate: the content may have introduced (or removed) syntax the editor
     // can't round-trip. When protection flips the pane remounts via
     // initialContent; otherwise reload the live editor in place.
-    const lossy = classify(content) === 'lossy'
+    const lossy = classify(doc.body) === 'lossy'
     const flipped = lossy !== isProtected
     isProtected = lossy
-    initialContent = content
+    initialContent = lossy ? content : doc.body
     emit()
     // While protected there is no live editor mounted (the pane shows the
     // read-only view), and lossy content must never enter one regardless.
     if (!flipped && !lossy) {
-      applyToEditor(content)
+      applyToEditor(doc.body)
     }
+    onContent?.(content, 'external')
   }
 
   /**
@@ -341,14 +386,17 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
         if (disposed) {
           return
         }
-        buffer = content
+        const doc = splitDoc(content)
+        header = doc.header
+        buffer = doc.body
         disk = content
         dirty = false
         // The data-loss gate: a note the editor can't reproduce opens read-only.
-        isProtected = classify(content) === 'lossy'
-        initialContent = content
+        isProtected = classify(doc.body) === 'lossy'
+        initialContent = isProtected ? content : doc.body
         status = 'ready'
         emit()
+        onContent?.(content, 'load')
       } catch (cause) {
         if (!disposed) {
           error = messageOf(cause)
@@ -399,6 +447,19 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     adoptCleanContent(content)
   }
 
+  function updateFrontmatter(patch: Record<string, unknown>): boolean {
+    if (disposed || isProtected || status !== 'ready') {
+      return false
+    }
+    header = splitDoc(upsertFrontmatter(header + buffer, patch)).header
+    dirty = header + buffer !== disk
+    emit()
+    if (dirty) {
+      scheduleSave()
+    }
+    return true
+  }
+
   function dispose(): void {
     // Flush first: the queued save step reads the (now frozen) buffer, so
     // pending edits persist to this session's path even after the UI moves on.
@@ -406,7 +467,18 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     disposed = true
   }
 
-  return { path, load, editorChanged, externalChanged, flush, keepMine, loadTheirs, dispose }
+  return {
+    path,
+    load,
+    editorChanged,
+    externalChanged,
+    flush,
+    keepMine,
+    loadTheirs,
+    content: () => header + buffer,
+    updateFrontmatter,
+    dispose,
+  }
 }
 
 function messageOf(error: unknown): string {

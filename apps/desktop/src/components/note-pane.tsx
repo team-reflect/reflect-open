@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, type ReactElement } from 'react'
-import { resolveWikiTarget } from '@reflect/core'
+import { isDaily, resolveWikiTarget } from '@reflect/core'
 import { BacklinksPanel } from '@/components/backlinks-panel'
 import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor'
 import { useImagePersistence } from '@/editor/use-image-persistence'
@@ -40,7 +40,12 @@ export function NotePane({
   const { navigate } = useRouter()
   const graphRoot = graph?.root ?? null
   const generation = graph?.generation ?? null
-  const document = useNoteDocument(path, generation, { createIfMissing: lazy })
+  const document = useNoteDocument(path, generation, {
+    createIfMissing: lazy,
+    // Daily notes are excluded from rename tracking: their date labels are
+    // stream chrome, not content (decided 2026-06-09).
+    trackRenames: !isDaily(path),
+  })
   const { options: images, saveError: imageSaveError } = useImagePersistence(
     graphRoot,
     generation,
@@ -186,6 +191,16 @@ export function NotePane({
           >
             Load theirs
           </button>
+        </div>
+      ) : null}
+
+      {document.renameProgress !== null ? (
+        <div
+          role="status"
+          className="mb-4 rounded-md border border-black/10 bg-black/5 px-3 py-2 text-xs text-[color:var(--text-muted)] dark:border-white/10 dark:bg-white/5"
+        >
+          Updating links to this note… {document.renameProgress.done}/
+          {document.renameProgress.total}
         </div>
       ) : null}
 

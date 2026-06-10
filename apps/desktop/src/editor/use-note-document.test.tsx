@@ -116,6 +116,419 @@ describe('useNoteDocument', () => {
     expect(writes.length).toBe(writesAfterUnmount)
   })
 
+  it('a settled title change rewrites inbound links and records the alias (Plan 07b)', async () => {
+    vi.useFakeTimers()
+    try {
+      const files: Record<string, string> = {
+        'notes/a.md': '# Old Title\n',
+        'notes/src.md': 'see [[Old Title]]\n',
+      }
+      mockInvoke.mockImplementation(async (command, args) => {
+        if (command === 'note_read') {
+          return files[(args as { path: string }).path]
+        }
+        if (command === 'note_write') {
+          const { path: writePath, contents } = args as { path: string; contents: string }
+          files[writePath] = contents
+          return null
+        }
+        if (command === 'db_query') {
+          const sql = String((args as { sql: string }).sql)
+          if (sql.includes('"links"')) {
+            return [{ source_path: 'notes/src.md' }] // the one inbound source
+          }
+          return [] // resolver lookups: unresolved → no collision
+        }
+        return null
+      })
+
+      const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      await act(() => vi.advanceTimersByTimeAsync(0))
+      expect(hook.result.current.status).toBe('ready')
+
+      act(() => hook.result.current.onEditorChange('# New Title\n'))
+      await act(() => vi.advanceTimersByTimeAsync(1000)) // the rename save lands
+
+      // Blur is a settle point: the rewrite fires without waiting out the
+      // quiet period, then the alias lands through the normal save pipeline.
+      act(() => {
+        window.dispatchEvent(new Event('blur'))
+      })
+      await act(() => vi.runAllTimersAsync())
+
+      expect(files['notes/src.md']).toBe('see [[New Title]]\n')
+      expect(files['notes/a.md']).toContain('aliases:')
+      expect(files['notes/a.md']).toContain('Old Title')
+      expect(files['notes/a.md'].endsWith('# New Title\n')).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a rename settled by pane teardown still rewrites links and lands the alias', async () => {
+    vi.useFakeTimers()
+    try {
+      const files: Record<string, string> = {
+        'notes/a.md': '# Old Title\n',
+        'notes/src.md': 'see [[Old Title]]\n',
+      }
+      mockInvoke.mockImplementation(async (command, args) => {
+        if (command === 'note_read') {
+          return files[(args as { path: string }).path]
+        }
+        if (command === 'note_write') {
+          const { path: writePath, contents } = args as { path: string; contents: string }
+          files[writePath] = contents
+          return null
+        }
+        if (command === 'db_query') {
+          const sql = String((args as { sql: string }).sql)
+          return sql.includes('"links"') ? [{ source_path: 'notes/src.md' }] : []
+        }
+        return null
+      })
+
+      const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      await act(() => vi.advanceTimersByTimeAsync(0))
+      act(() => hook.result.current.onEditorChange('# New Title\n'))
+      await act(() => vi.advanceTimersByTimeAsync(1000)) // save lands, quiet timer armed
+
+      hook.unmount() // teardown settles the tracker — the session is disposed
+      await act(() => vi.runAllTimersAsync())
+
+      expect(files['notes/src.md']).toBe('see [[New Title]]\n')
+      // The alias can't go through the disposed session — it lands on disk.
+      expect(files['notes/a.md']).toContain('aliases:')
+      expect(files['notes/a.md']).toContain('Old Title')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a rename settling after a note switch never touches the new note', async () => {
+    vi.useFakeTimers()
+    try {
+      const files: Record<string, string> = {
+        'notes/a.md': '# Old Title\n',
+        'notes/b.md': '# Note B\n',
+        'notes/src.md': 'see [[Old Title]]\n',
+      }
+      mockInvoke.mockImplementation(async (command, args) => {
+        if (command === 'note_read') {
+          return files[(args as { path: string }).path]
+        }
+        if (command === 'note_write') {
+          const { path: writePath, contents } = args as { path: string; contents: string }
+          files[writePath] = contents
+          return null
+        }
+        if (command === 'db_query') {
+          const sql = String((args as { sql: string }).sql)
+          return sql.includes('"links"') ? [{ source_path: 'notes/src.md' }] : []
+        }
+        return null
+      })
+
+      // Note A: edit the title, save lands, rename pending.
+      const paneA = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      await act(() => vi.advanceTimersByTimeAsync(0))
+      act(() => paneA.result.current.onEditorChange('# New Title\n'))
+      await act(() => vi.advanceTimersByTimeAsync(1000))
+      paneA.unmount() // teardown settles A's rename asynchronously
+
+      // Note B mounts immediately — the rename must not be able to see it.
+      const paneB = renderHook(() => useNoteDocument('notes/b.md', 1, { trackRenames: true }))
+      await act(() => vi.runAllTimersAsync())
+
+      // A's still-running rewrite must not paint progress into B's pane.
+      expect(paneB.result.current.renameProgress).toBeNull()
+      expect(files['notes/src.md']).toBe('see [[New Title]]\n')
+      expect(files['notes/a.md']).toContain('aliases:') // alias on A, via disk
+      expect(files['notes/b.md']).toBe('# Note B\n') // B untouched
+      paneB.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a title collision skips both the rewrite and the alias', async () => {
+    vi.useFakeTimers()
+    try {
+      const files: Record<string, string> = {
+        'notes/a.md': '# Old Title\n',
+        'notes/src.md': 'see [[Old Title]]\n',
+      }
+      mockInvoke.mockImplementation(async (command, args) => {
+        if (command === 'note_read') {
+          return files[(args as { path: string }).path]
+        }
+        if (command === 'note_write') {
+          const { path: writePath, contents } = args as { path: string; contents: string }
+          files[writePath] = contents
+          return null
+        }
+        if (command === 'db_query') {
+          const sql = String((args as { sql: string }).sql)
+          if (sql.includes('"links"')) {
+            return [{ source_path: 'notes/src.md' }]
+          }
+          if (sql.includes('title_key')) {
+            return [{ path: 'notes/other-owner.md' }] // another note owns "Old Title"
+          }
+          return []
+        }
+        return null
+      })
+
+      const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      await act(() => vi.advanceTimersByTimeAsync(0))
+      act(() => hook.result.current.onEditorChange('# New Title\n'))
+      await act(() => vi.advanceTimersByTimeAsync(1000))
+      act(() => {
+        window.dispatchEvent(new Event('blur'))
+      })
+      await act(() => vi.runAllTimersAsync())
+
+      // Links keep resolving to their deliberate target; no competing alias.
+      expect(files['notes/src.md']).toBe('see [[Old Title]]\n')
+      expect(files['notes/a.md']).toBe('# New Title\n')
+      hook.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a failed rewrite still records the alias (the resolve safety net)', async () => {
+    vi.useFakeTimers()
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const files: Record<string, string> = {
+        'notes/a.md': '# Old Title\n',
+        'notes/src.md': 'see [[Old Title]]\n',
+      }
+      mockInvoke.mockImplementation(async (command, args) => {
+        if (command === 'note_read') {
+          return files[(args as { path: string }).path]
+        }
+        if (command === 'note_write') {
+          const { path: writePath, contents } = args as { path: string; contents: string }
+          files[writePath] = contents
+          return null
+        }
+        if (command === 'db_query') {
+          const sql = String((args as { sql: string }).sql)
+          if (sql.includes('"links"')) {
+            throw new Error('index unavailable') // the rewrite cannot run
+          }
+          return []
+        }
+        return null
+      })
+
+      const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      await act(() => vi.advanceTimersByTimeAsync(0))
+      act(() => hook.result.current.onEditorChange('# New Title\n'))
+      await act(() => vi.advanceTimersByTimeAsync(1000))
+      act(() => {
+        window.dispatchEvent(new Event('blur'))
+      })
+      await act(() => vi.runAllTimersAsync())
+
+      // The rewrite failed, the baseline has advanced — the alias is what
+      // keeps [[Old Title]] resolving here, so it must land regardless.
+      expect(files['notes/src.md']).toBe('see [[Old Title]]\n')
+      expect(files['notes/a.md']).toContain('aliases:')
+      expect(files['notes/a.md']).toContain('Old Title')
+      hook.unmount()
+    } finally {
+      errorSpy.mockRestore()
+      vi.useRealTimers()
+    }
+  })
+
+  it('a lazy note\u2019s first heading never fires a rename', async () => {
+    vi.useFakeTimers()
+    try {
+      const files: Record<string, string> = {
+        'notes/src.md': 'unrelated\n',
+      }
+      const linkQueries: string[] = []
+      mockInvoke.mockImplementation(async (command, args) => {
+        if (command === 'note_read') {
+          const content = files[(args as { path: string }).path]
+          if (content === undefined) {
+            throw { kind: 'notFound', message: 'missing' }
+          }
+          return content
+        }
+        if (command === 'note_write') {
+          const { path: writePath, contents } = args as { path: string; contents: string }
+          files[writePath] = contents
+          return null
+        }
+        if (command === 'db_query') {
+          const sql = String((args as { sql: string }).sql)
+          if (sql.includes('"links"')) {
+            linkQueries.push(sql)
+          }
+          return []
+        }
+        return null
+      })
+
+      const hook = renderHook(() =>
+        useNoteDocument('notes/01arz3ndekt.md', 1, {
+          createIfMissing: true,
+          trackRenames: true,
+        }),
+      )
+      await act(() => vi.advanceTimersByTimeAsync(0))
+      expect(hook.result.current.status).toBe('ready')
+
+      act(() => hook.result.current.onEditorChange('# Brand New Note\n'))
+      await act(() => vi.advanceTimersByTimeAsync(1000))
+      act(() => {
+        window.dispatchEvent(new Event('blur'))
+      })
+      await act(() => vi.runAllTimersAsync())
+
+      // Titling an untitled note is a birth: no rewrite ran, no alias landed.
+      expect(linkQueries).toEqual([])
+      expect(files['notes/01arz3ndekt.md']).toBe('# Brand New Note\n')
+      hook.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('alias placement preserves aliases gained while the rewrite ran', async () => {
+    vi.useFakeTimers()
+    try {
+      const files: Record<string, string> = {
+        'notes/a.md': '# Old Title\n',
+        'notes/src.md': 'see [[Old Title]]\n',
+      }
+      mockInvoke.mockImplementation(async (command, args) => {
+        if (command === 'note_read') {
+          return files[(args as { path: string }).path]
+        }
+        if (command === 'note_write') {
+          const { path: writePath, contents } = args as { path: string; contents: string }
+          files[writePath] = contents
+          return null
+        }
+        if (command === 'db_query') {
+          const sql = String((args as { sql: string }).sql)
+          return sql.includes('"links"') ? [{ source_path: 'notes/src.md' }] : []
+        }
+        return null
+      })
+
+      const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      await act(() => vi.advanceTimersByTimeAsync(0))
+      act(() => hook.result.current.onEditorChange('# New Title\n'))
+      await act(() => vi.advanceTimersByTimeAsync(1000))
+
+      hook.unmount() // teardown settle → the alias lands via the disk path
+      // An external writer adds an alias before the chain's placement read —
+      // the settle-time snapshot doesn't know about it.
+      files['notes/a.md'] = '---\naliases:\n  - Keeper\n---\n# New Title\n'
+      await act(() => vi.runAllTimersAsync())
+
+      expect(files['notes/a.md']).toContain('Keeper') // concurrently-gained, kept
+      expect(files['notes/a.md']).toContain('Old Title') // the rename's alias
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a teardown rename routes its alias through a reopened dirty session', async () => {
+    vi.useFakeTimers()
+    try {
+      const files: Record<string, string> = {
+        'notes/a.md': '# Old Title\n',
+        'notes/src.md': 'see [[Old Title]]\n',
+      }
+      mockInvoke.mockImplementation(async (command, args) => {
+        if (command === 'note_read') {
+          return files[(args as { path: string }).path]
+        }
+        if (command === 'note_write') {
+          const { path: writePath, contents } = args as { path: string; contents: string }
+          files[writePath] = contents
+          return null
+        }
+        if (command === 'db_query') {
+          const sql = String((args as { sql: string }).sql)
+          return sql.includes('"links"') ? [{ source_path: 'notes/src.md' }] : []
+        }
+        return null
+      })
+
+      const paneA = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      await act(() => vi.advanceTimersByTimeAsync(0))
+      act(() => paneA.result.current.onEditorChange('# New Title\n'))
+      await act(() => vi.advanceTimersByTimeAsync(1000))
+      paneA.unmount() // settles the rename; its chain runs on
+
+      // The same note is reopened immediately and edited before the chain's
+      // alias placement runs.
+      const paneA2 = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      await act(() => vi.advanceTimersByTimeAsync(0))
+      act(() => paneA2.result.current.onEditorChange('# New Title\n\nfresh edit\n'))
+      await act(() => vi.runAllTimersAsync())
+
+      // The alias went through the live session — no conflict from our own
+      // background write, and the user's edit and the alias both persist.
+      expect(paneA2.result.current.conflict).toBeNull()
+      expect(files['notes/a.md']).toContain('aliases:')
+      expect(files['notes/a.md']).toContain('Old Title')
+      expect(files['notes/a.md']).toContain('fresh edit')
+      paneA2.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('quit-time flushAllNotes settles a pending rename before resolving', async () => {
+    vi.useFakeTimers()
+    try {
+      const files: Record<string, string> = {
+        'notes/a.md': '# Old Title\n',
+        'notes/src.md': 'see [[Old Title]]\n',
+      }
+      mockInvoke.mockImplementation(async (command, args) => {
+        if (command === 'note_read') {
+          return files[(args as { path: string }).path]
+        }
+        if (command === 'note_write') {
+          const { path: writePath, contents } = args as { path: string; contents: string }
+          files[writePath] = contents
+          return null
+        }
+        if (command === 'db_query') {
+          const sql = String((args as { sql: string }).sql)
+          return sql.includes('"links"') ? [{ source_path: 'notes/src.md' }] : []
+        }
+        return null
+      })
+
+      const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      await act(() => vi.advanceTimersByTimeAsync(0))
+      act(() => hook.result.current.onEditorChange('# New Title\n'))
+      await act(() => vi.advanceTimersByTimeAsync(1000)) // save lands, quiet timer armed
+
+      // ⌘Q: the registry flush must settle the rename and await its writes.
+      await act(() => flushAllNotes())
+
+      expect(files['notes/src.md']).toBe('see [[New Title]]\n')
+      expect(files['notes/a.md']).toContain('aliases:')
+      hook.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('ignores the watcher echo of its own save', async () => {
     const { result } = await readyHook()
     const editor = fakeEditor()

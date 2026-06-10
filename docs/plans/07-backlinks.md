@@ -27,7 +27,7 @@ link UX (create-from-unresolved largely subsumes the failure case).
 
 ## Delivery split (decided 2026-06-09)
 
-- **07a — linking while writing** (steps 1–3 + the TanStack Query adoption):
+- **07a — linking while writing** *(delivered 2026-06-09, PR #13)* (steps 1–3 + the TanStack Query adoption):
   `[[` autocomplete (ProseKit autocomplete popover; suggestions ranked in
   `@reflect/core` over titles + aliases + dailies, exact < prefix < substring,
   recency tie-break; a full `YYYY-MM-DD` query always offers that daily — files
@@ -39,7 +39,11 @@ link UX (create-from-unresolved largely subsumes the failure case).
   backlinks panel under **both regular notes and stream days** (decided), with
   source title + line snippet, reads via TanStack Query invalidated by the
   index lifecycle's post-apply hook (initial reconcile + each watcher batch).
-- **07b — rename with automatic rewrite** (steps 4–5): title changes on
+- **07b — rename with automatic rewrite** (steps 4–5; includes the
+  session-owns-frontmatter editor fix — meowdown mangles `---` blocks, so the
+  session splits every disk read, the editor sees body only, and saves rejoin
+  the exact header bytes; this is what makes frontmatter notes editable and
+  gives alias writes a channel that never disturbs the editor view): title changes on
   non-daily notes **auto-update** inbound `[[links]]` (decided — no
   confirmation prompt), triggered on *settled* titles (navigate-away / blur /
   quiet period), never per keystroke — intermediate typing states must not
@@ -47,6 +51,13 @@ link UX (create-from-unresolved largely subsumes the failure case).
   intermediate aliases pruned; daily notes excluded (their date labels are
   stream chrome, not content). Filenames stay put in the first wave — the
   title lives in content, and `note_move` filename-sync can join later.
+  Two recorded edges: a note with an explicit frontmatter `title:` cannot be
+  renamed from the editor yet (the heading isn't its title — `title:` is
+  authoritative and the editor doesn't edit frontmatter; a title field editor
+  is a later surface), and a rename pending while a conflict is parked stays
+  pending until the conflict resolves ("keep mine" re-arms it, "load theirs"
+  cancels it) — rewriting the graph for a title the user may discard would
+  strand every rewritten link.
 
 ## Steps
 
@@ -82,6 +93,9 @@ link UX (create-from-unresolved largely subsumes the failure case).
 6. **Resolution everywhere.** Centralize link resolution (Plan 03 rules) so the editor,
    backlinks panel, search, and AI context all agree on what `[[X]]` points to.
    Case-insensitive title/alias match; ambiguous matches surface a disambiguation choice.
+   *(First wave: collisions resolve deterministically — same note every time, by path
+   order — and the autocomplete lists all candidates; the click-side disambiguation
+   picker is deferred to Plan 08, whose command-palette UI makes it nearly free.)*
 
 7. **Tests.** Autocomplete ranking; create-from-unresolved; backlink rows after edits;
    rename rewrites N referencing notes and adds the alias; case-insensitive + alias
@@ -114,8 +128,15 @@ link UX (create-from-unresolved largely subsumes the failure case).
 ## Risks
 
 - **Rename rewrite correctness** (links in code blocks, partial matches, ambiguous
-  titles). Mitigate: AST-based edits only (Plan 03), skip code contexts, require
-  disambiguation for collisions, batch + checkpoint.
+  titles). Mitigate: AST-based edits only (Plan 03), skip code contexts, and the
+  07b **collision guard**: when the old title already belongs to a different
+  note, the rewrite *and* the alias are skipped — existing links keep resolving
+  to their deliberate target (deterministic first wave; the interactive picker
+  is deferred to Plan 08, see step 6). Batch + checkpoint ties into Plan 12.
+  *(Accepted edge: the guard reads the index, which lags the watcher debounce —
+  a note created with the old title inside that sub-second window can be
+  missed. Resolution stays deterministic; the late-created note wins future
+  resolutions.)*
 - **Autocomplete latency** on large graphs. Mitigate with an indexed prefix query +
   in-memory recent-notes cache.
 - **External renames** (file moved in Finder/Obsidian). The watcher (Plan 04) must treat
