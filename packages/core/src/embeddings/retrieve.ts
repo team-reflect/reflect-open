@@ -1,6 +1,7 @@
 import { sql } from 'kysely'
 import { db } from '../indexing/db'
-import { searchNotesRanked } from '../indexing/search'
+import { searchWithFilters } from '../indexing/filtered-search'
+import type { ParsedSearchQuery } from '../indexing/filter-query'
 import { embedTexts } from './commands'
 
 /**
@@ -71,7 +72,22 @@ async function semanticHits(query: string, limit: number): Promise<RetrievalHit[
 }
 
 async function lexicalHits(query: string, limit: number): Promise<RetrievalHit[]> {
-  const hits = await searchNotesRanked(query, limit)
+  // Deliberately UNPARSED: retrieve() receives raw text (often from AI
+  // callers, Plan 10) where palette filter tokens like "is:daily" inside a
+  // sentence must stay literal search terms, not become constraints.
+  const plain: ParsedSearchQuery = {
+    text: query,
+    filters: {
+      tags: [],
+      dailyOnly: false,
+      linksTo: null,
+      linkedFrom: null,
+      updatedAfterMs: null,
+      updatedBeforeMs: null,
+    },
+    filtered: false,
+  }
+  const hits = await searchWithFilters(plain, limit)
   if (hits.length === 0) {
     return []
   }
@@ -89,7 +105,7 @@ async function lexicalHits(query: string, limit: number): Promise<RetrievalHit[]
     path: hit.path,
     title: hit.title,
     score: 1 / (1 + index), // FTS rank order; raw bm25 scores are not exposed
-    snippet: hit.snippet,
+    snippet: hit.snippet ?? '',
     heading: null,
     isPrivate: privateByPath.get(hit.path) ?? false,
   }))

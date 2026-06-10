@@ -98,6 +98,20 @@ const APP_COMMANDS: AppCommand[] = [
   },
 ]
 
-registerCommands(APP_COMMANDS)
+let registered = false
+
+/**
+ * Register the first-wave commands. Called explicitly from `main.tsx` (and by
+ * tests) — registration as an import side effect couples behavior to module
+ * graph order, which is exactly the kind of spooky action a registry invites.
+ * Idempotent: hosts and tests can call it without coordinating.
+ */
+export function registerAppCommands(): void {
+  if (registered) {
+    return
+  }
+  registered = true
+  registerCommands(APP_COMMANDS)
+}
 
 export { APP_COMMANDS }

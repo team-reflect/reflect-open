@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import { PaletteProvider, usePalette } from '@/components/command-palette/palette-provider'
 import { listRegisteredBindings } from '@/editor/keymap'
+import { registerAppCommands } from '@/lib/commands/app-commands'
 import { useAppShortcuts } from './app-shortcuts'
 import { RouterProvider, useRouter } from './router'
 
@@ -12,6 +13,8 @@ vi.mock('@/providers/graph-provider', () => ({
 vi.mock('@/providers/theme-provider', () => ({
   useTheme: () => ({ theme: 'light', resolvedTheme: 'light', setTheme: vi.fn() }),
 }))
+
+registerAppCommands() // production does this in main.tsx
 
 function shortcutsHook() {
   return renderHook(

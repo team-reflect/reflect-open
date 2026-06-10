@@ -8,12 +8,12 @@ import { CommandPalette } from './command-palette'
 import { PaletteProvider, usePalette } from './palette-provider'
 
 const suggestWikiTargets = vi.hoisted(() => vi.fn())
-const searchNotesRanked = vi.hoisted(() => vi.fn())
+const searchWithFilters = vi.hoisted(() => vi.fn())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
   suggestWikiTargets,
-  searchNotesRanked,
+  searchWithFilters,
 }))
 vi.mock('@/lib/use-embed-status', () => ({
   // The model is absent in these tests: the palette is exactly the lexical
@@ -23,8 +23,9 @@ vi.mock('@/lib/use-embed-status', () => ({
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', cloudSync: null, generation: 1 } }),
 }))
-// Import after the core mock so registration sees the mocked module graph.
-await import('@/lib/commands/app-commands')
+// Register after the core mock is installed so commands see the mocked graph.
+const { registerAppCommands } = await import('@/lib/commands/app-commands')
+registerAppCommands()
 
 // RTL auto-cleanup isn't wired globally in this project: without this, a
 // previous test's still-mounted palette leaks into the next test's
@@ -91,7 +92,7 @@ describe('CommandPalette', () => {
     const pending = new Promise((resolve) => {
       release = resolve
     })
-    searchNotesRanked.mockImplementation(() => pending)
+    searchWithFilters.mockImplementation(() => pending)
     const { view } = renderPalette('rust')
     await waitFor(() => expect(suggestWikiTargets).toHaveBeenCalled())
     expect(view.queryByText('No results')).toBeNull() // body hits still in flight
@@ -118,8 +119,8 @@ describe('CommandPalette', () => {
 
   it('a typed query shows ranked notes with highlighted snippets and Enter opens the top hit', async () => {
     suggestWikiTargets.mockResolvedValue([])
-    searchNotesRanked.mockResolvedValue([
-      { path: 'notes/rust.md', title: 'Rust Notes', snippet: 'about rust things' },
+    searchWithFilters.mockResolvedValue([
+      { path: 'notes/rust.md', title: 'Rust Notes', snippet: 'about rust things', dailyDate: null },
     ])
     const { view, navigate } = renderPalette('rust')
     await view.findByText('Rust Notes')
@@ -133,10 +134,33 @@ describe('CommandPalette', () => {
 
   it('> filters to commands and Enter runs the selection', async () => {
     suggestWikiTargets.mockResolvedValue([])
-    searchNotesRanked.mockResolvedValue([])
+    searchWithFilters.mockResolvedValue([])
     const { view } = renderPalette('> toggle theme')
     await view.findByText('Toggle theme')
     expect(view.queryByText('Notes')).toBeNull()
+  })
+
+  it('filter tokens run the constrained search and render its rows', async () => {
+    suggestWikiTargets.mockClear()
+    suggestWikiTargets.mockResolvedValue([])
+    searchWithFilters.mockResolvedValue([
+      { path: 'daily/2026-06-08.md', title: '2026-06-08', dailyDate: '2026-06-08', snippet: null },
+      { path: 'notes/w.md', title: 'Work log', dailyDate: null, snippet: null },
+    ])
+    const { view, navigate } = renderPalette('#work is:daily')
+    await view.findByText('Work log')
+    expect(view.getByText('Monday, June 8')).toBeDefined() // dailies keep labels
+    expect(searchWithFilters).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filtered: true,
+        filters: expect.objectContaining({ tags: ['work'], dailyOnly: true }),
+      }),
+    )
+
+    await userEvent.keyboard('{Enter}')
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith({ kind: 'daily', date: '2026-06-08' }),
+    )
   })
 
   it('a daily suggestion renders its day label and opens the daily route', async () => {
@@ -149,7 +173,7 @@ describe('CommandPalette', () => {
         date: '2026-06-09',
       },
     ])
-    searchNotesRanked.mockResolvedValue([])
+    searchWithFilters.mockResolvedValue([])
     const { view, navigate } = renderPalette('2026-06-09')
     await view.findByText('Tuesday, June 9')
 

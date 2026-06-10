@@ -57,10 +57,24 @@ banner. Keeps 08a purely about search + palette.
   5. **Result model:** one ranked list with sections (Notes / Dailies /
      Commands); Enter navigates via the route model or runs the command.
      Debounced input, small caps, index-only.
-- **08b — filters:** typed filter tokens parsed from the query (`#tag`,
-  `is:daily`, `links:Note`, `linked-from:Note`, `updated:>YYYY-MM-DD`) →
-  a small composable constraint builder over Kysely; each token round-trip
-  tested. Chips UI can follow the grammar later.
+- **08b — filters** *(delivered 2026-06-09, stacked on 08a)*: typed filter
+  tokens parsed from the query (`#tag`, `is:daily`, `links:Note` /
+  `links:"Multi Word"`, `linked-from:Note`, `updated:>YYYY-MM-DD`, `<`, or
+  bare for that day — local-time, against `mtime` epoch ms) → composable
+  predicates over the notes projection (EXISTS subqueries against `tags` and
+  the `backlinks` view; link targets resolve through the shared resolver, and
+  an unresolvable target matches nothing rather than silently ignoring the
+  filter). Free text constrains + ranks through FTS as in 08a; without text,
+  results order by recency — a filtered recall feed. A malformed token
+  (impossible date, empty value) stays search text, so typing never hides
+  results behind a half-formed filter. Chips UI can follow the grammar later.
+
+**`updated:` semantics note (accepted 2026-06-09):** the filter compares file
+`mtime`, which Reflect's own background writes also touch — a rename rewrite
+updates every source file it edits, so `updated:D` can include notes the
+*system* wrote that day, not just the user. Accepted for the first wave; the
+durable fix is content-authored timestamps (frontmatter or index-tracked),
+which can join when an editing-history feature needs them anyway.
 
 **Tokenizer note:** `search_fts` was created with the default `unicode61`
 tokenizer. If recall on code identifiers/CJK proves poor, switching (e.g. to

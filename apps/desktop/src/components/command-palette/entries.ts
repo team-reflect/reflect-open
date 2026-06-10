@@ -1,12 +1,12 @@
-import { dailyPath } from '@reflect/core'
+import { dailyPath, parseSearchQuery } from '@reflect/core'
 import type { AppCommand } from '@/lib/commands/types'
-import type { RankedSearchHit, WikiSuggestion } from '@reflect/core'
+import type { FilteredSearchHit, WikiSuggestion } from '@reflect/core'
 
 /**
  * Pure assembly of the palette's sections (Plan 08): merges title suggestions
- * (exact < prefix < substring, from the index), FTS body hits, and matching
+ * (exact < prefix < substring, from the index), search hits, and matching
  * commands into the sectioned result model. Factored from the component so the
- * ranking/dedupe/`>`-prefix rules are unit-testable.
+ * ranking/dedupe/`>`-prefix/filter-mode rules are unit-testable.
  */
 
 export interface NoteEntry {
@@ -14,7 +14,7 @@ export interface NoteEntry {
   title: string
   /** Set for daily notes (render the day label). */
   date: string | null
-  /** Body snippet with highlight markers (FTS hits only). */
+  /** Body snippet with highlight markers (search hits only). */
   snippet: string | null
 }
 
@@ -38,20 +38,30 @@ function matchesCommand(command: AppCommand, query: string): boolean {
 
 export function buildPaletteSections(options: {
   query: string
-  /** The query the suggestion/hit arrays actually answer (the deferred value). */
+  /** The query the data arrays actually answer (the deferred value). */
   dataQuery: string
   suggestions: WikiSuggestion[]
-  hits: RankedSearchHit[]
+  /** The one search path's results (filters may be empty — Plan 08b). */
+  hits: FilteredSearchHit[]
+  /** True when the data query carried filter tokens (describes `hits`). */
+  filtered: boolean
   commands: AppCommand[]
 }): PaletteSections {
-  const { commands } = options
+  const { commands, filtered } = options
   const query = options.query.trim()
+  // The **live** query decides the palette's mode; the deferred data only
+  // fills it. Deciding mode from the deferred value would hold the palette in
+  // constrained mode (no command rows, the previous filter's notes) after the
+  // user deletes the filter tokens, until deferral catches up.
+  const liveFiltered = query !== '' && parseSearchQuery(query).filtered
   // The index queries are keyed on a *deferred* value that can lag the live
-  // input. A just-cleared input must show the recall feed, never the previous
-  // search's data — a momentarily empty list beats a momentarily wrong one.
+  // input. Data answering a different query *kind* (cleared input, or filter
+  // tokens just added/removed) must not show — a momentarily empty list beats
+  // a momentarily wrong one.
   const dataStale = options.dataQuery.trim() !== query
+  const modeStale = filtered !== liveFiltered
   const suggestions = query === '' && dataStale ? [] : options.suggestions
-  const hits = query === '' && dataStale ? [] : options.hits
+  const hits = (query === '' && dataStale) || (dataStale && modeStale) ? [] : options.hits
 
   if (query.startsWith('>')) {
     const commandQuery = query.slice(1).trim()
@@ -62,7 +72,22 @@ export function buildPaletteSections(options: {
     }
   }
 
-  // Title matches lead (they're what jump-to-note wants), FTS body hits fill
+  if (liveFiltered) {
+    // Filter tokens are a search mode: the constraint result IS the list —
+    // no title-suggestion merge, no command rows.
+    return {
+      commandsOnly: false,
+      notes: hits.slice(0, NOTE_CAP).map((hit) => ({
+        path: hit.path,
+        title: hit.title,
+        date: hit.dailyDate,
+        snippet: hit.snippet,
+      })),
+      commands: [],
+    }
+  }
+
+  // Title matches lead (they're what jump-to-note wants), search hits fill
   // the rest; one row per note, the stronger (title) form wins.
   const notes: NoteEntry[] = []
   const seen = new Set<string>()
@@ -88,7 +113,7 @@ export function buildPaletteSections(options: {
   for (const hit of bodyHits) {
     if (!seen.has(hit.path)) {
       seen.add(hit.path)
-      notes.push({ path: hit.path, title: hit.title, date: null, snippet: hit.snippet })
+      notes.push({ path: hit.path, title: hit.title, date: hit.dailyDate, snippet: hit.snippet })
     }
   }
 

@@ -49,15 +49,15 @@ export {
 } from './queries'
 export { rankWikiSuggestions, type WikiSuggestion } from './suggest'
 export {
-  searchNotesRanked,
   parseHighlights,
   randomNotePath,
   HIGHLIGHT_START,
   HIGHLIGHT_END,
-  type RankedSearchHit,
   type HighlightSegment,
 } from './search'
 export { lineSnippet } from './snippet'
+export { parseSearchQuery, type ParsedSearchQuery, type SearchFilters } from './filter-query'
+export { searchWithFilters, type FilteredSearchHit } from './filtered-search'
 export {
   rewriteLinksForTitleChange,
   nextAliases,

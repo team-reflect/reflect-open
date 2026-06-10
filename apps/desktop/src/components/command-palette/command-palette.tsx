@@ -1,22 +1,13 @@
-import { useDeferredValue, useMemo, type ReactElement } from 'react'
+import { type ReactElement } from 'react'
 import { Command } from 'cmdk'
-import { useQuery } from '@tanstack/react-query'
-import {
-  hasBridge,
-  parseHighlights,
-  retrieve,
-  searchNotesRanked,
-  suggestWikiTargets,
-} from '@reflect/core'
-import { listCommands, runCommand } from '@/lib/commands/registry'
+import { parseHighlights } from '@reflect/core'
+import { runCommand } from '@/lib/commands/registry'
 import type { CommandContext } from '@/lib/commands/types'
 import { formatDayLabel } from '@/lib/dates'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
-import { useEmbedStatus } from '@/lib/use-embed-status'
-import { useGraph } from '@/providers/graph-provider'
 import { routeForPath } from '@/routing/route'
-import { buildPaletteSections, type NoteEntry } from './entries'
+import { type NoteEntry } from './entries'
 import { usePalette } from './palette-provider'
+import { usePaletteResults } from './use-palette-results'
 
 /**
  * The ⌘K palette (Plan 08): one keyboard surface for find / navigate / do.
@@ -48,58 +39,7 @@ function Snippet({ snippet }: { snippet: string }): ReactElement {
 
 export function CommandPalette({ context }: CommandPaletteProps): ReactElement | null {
   const { open, query, setQuery, closePalette } = usePalette()
-  const { graph } = useGraph()
-  // Hybrid by default once the model is ready (decided): semantic results
-  // blend in via RRF with no toggle; without the model this is exactly the
-  // lexical search it was before.
-  const embed = useEmbedStatus()
-  const hybrid = embed.status === 'ready'
-
-  // Defer the query the index sees: fast typing coalesces (the plan's
-  // debounce) while the input itself stays perfectly responsive.
-  const trimmed = useDeferredValue(query.trim())
-  const searching = open && hasBridge() && graph !== null && !trimmed.startsWith('>')
-  const {
-    data: suggestions,
-    isLoading: suggestionsLoading,
-    isError: suggestionsError,
-  } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'palette-suggest', trimmed],
-    queryFn: () => suggestWikiTargets(trimmed, 8),
-    enabled: searching,
-  })
-  const { data: hits, isLoading: hitsLoading, isError: hitsError } = useQuery({
-    queryKey: [
-      INDEX_QUERY_SCOPE,
-      graph?.root,
-      'palette-search',
-      hybrid ? 'hybrid' : 'lexical',
-      trimmed,
-    ],
-    queryFn: () => (hybrid ? retrieve(trimmed, { mode: 'hybrid' }) : searchNotesRanked(trimmed)),
-    enabled: searching && trimmed !== '',
-  })
-  // "No results" must mean the index answered **the live query**: both
-  // fetches settled (isLoading, not isPending — a disabled query is forever
-  // pending) *and* the deferred value has caught up. Opening pre-filled, the
-  // deferred value can settle on the stale previous query first; that state
-  // is "still answering", not "empty".
-  const resultsSettled = !suggestionsLoading && !hitsLoading && trimmed === query.trim()
-  // An errored query is "settled" to TanStack but not an answer — showing
-  // "No results" for a failed index read would be a lie.
-  const searchFailed = suggestionsError || hitsError
-
-  const sections = useMemo(
-    () =>
-      buildPaletteSections({
-        query,
-        dataQuery: trimmed,
-        suggestions: suggestions ?? [],
-        hits: hits ?? [],
-        commands: listCommands(),
-      }),
-    [query, trimmed, suggestions, hits],
-  )
+  const { sections, resultsSettled, searchFailed } = usePaletteResults(open, query)
 
   if (!open) {
     return null
