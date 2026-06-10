@@ -56,6 +56,7 @@ function renderPalette(query: string, context?: Partial<CommandContext>) {
     back: vi.fn(),
     forward: vi.fn(),
     toggleTheme: vi.fn(),
+    toggleSidebar: vi.fn(),
     generation: () => 1,
     openPalette: vi.fn(),
     ...context,
@@ -138,6 +139,16 @@ describe('CommandPalette', () => {
     const { view } = renderPalette('> toggle theme')
     await view.findByText('Toggle theme')
     expect(view.queryByText('Notes')).toBeNull()
+  })
+
+  it('bound commands show keycap hints (jsdom is non-Apple: Ctrl)', async () => {
+    suggestWikiTargets.mockResolvedValue([])
+    searchWithFilters.mockResolvedValue([])
+    const { view } = renderPalette('> go to today')
+    const row = await view.findByText('Go to today')
+    const item = row.closest('[cmdk-item]')
+    expect(item?.textContent).toContain('Ctrl')
+    expect(item?.textContent).toContain('D')
   })
 
   it('filter tokens run the constrained search and render its rows', async () => {

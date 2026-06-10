@@ -75,9 +75,11 @@ export {
 export {
   settingsSchema,
   editorMarkdownSyntaxSchema,
+  themePreferenceSchema,
   DEFAULT_SETTINGS,
   type Settings,
   type EditorMarkdownSyntax,
+  type ThemePreference,
 } from './settings/schema'
 export { loadSettings, saveSettings } from './settings/commands'
 

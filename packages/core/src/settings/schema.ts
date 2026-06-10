@@ -23,9 +23,18 @@ export const editorMarkdownSyntaxSchema = z.enum(['focus', 'show']).catch('focus
 
 export type EditorMarkdownSyntax = z.infer<typeof editorMarkdownSyntaxSchema>
 
+/**
+ * The app color theme. `system` (the default) follows the OS preference;
+ * `light`/`dark` pin it. Persisted here so the choice survives relaunch.
+ */
+export const themePreferenceSchema = z.enum(['system', 'light', 'dark']).catch('system')
+
+export type ThemePreference = z.infer<typeof themePreferenceSchema>
+
 export const settingsSchema = z
   .object({
     editorMarkdownSyntax: editorMarkdownSyntaxSchema,
+    theme: themePreferenceSchema,
   })
   .passthrough()
 

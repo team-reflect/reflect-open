@@ -1,14 +1,18 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
   useState,
+  type ReactElement,
   type ReactNode,
 } from 'react'
+import type { ThemePreference } from '@reflect/core'
+import { useSettings } from '@/providers/settings-provider'
 
 /** User-selectable theme; `system` follows the OS preference. */
-export type Theme = 'light' | 'dark' | 'system'
+export type Theme = ThemePreference
 
 /** The concrete theme actually applied to the document. */
 export type ResolvedTheme = 'light' | 'dark'
@@ -29,19 +33,17 @@ function getSystemTheme(): ResolvedTheme {
 
 interface ThemeProviderProps {
   children: ReactNode
-  defaultTheme?: Theme
 }
 
 /**
  * Provides the app theme and applies it by toggling the design-system `.dark`
- * scope on the document root. Defaults to following the OS and reacts to live
- * OS changes.
+ * scope on the document root. The preference lives in the settings document
+ * (the `theme` key), so a choice made anywhere — settings screen, palette
+ * command — persists across launches; `system` reacts to live OS changes.
  */
-export function ThemeProvider({
-  children,
-  defaultTheme = 'system',
-}: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(defaultTheme)
+export function ThemeProvider({ children }: ThemeProviderProps): ReactElement {
+  const { settings, updateSettings } = useSettings()
+  const theme = settings.theme
   const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(getSystemTheme)
 
   useEffect(() => {
@@ -61,9 +63,14 @@ export function ThemeProvider({
     root.style.colorScheme = resolvedTheme
   }, [resolvedTheme])
 
+  const setTheme = useCallback(
+    (next: Theme) => updateSettings({ theme: next }),
+    [updateSettings],
+  )
+
   const value = useMemo<ThemeContextValue>(
     () => ({ theme, resolvedTheme, setTheme }),
-    [theme, resolvedTheme],
+    [theme, resolvedTheme, setTheme],
   )
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>

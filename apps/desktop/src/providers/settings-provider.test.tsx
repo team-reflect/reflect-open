@@ -118,7 +118,7 @@ describe('SettingsProvider', () => {
     expect(result.current.settings.editorMarkdownSyntax).toBe('show')
     // The persisted document keeps unknown keys (newer-version settings survive).
     await waitFor(() =>
-      expect(saved).toEqual([{ editorMarkdownSyntax: 'show', futureKey: true }]),
+      expect(saved).toEqual([{ editorMarkdownSyntax: 'show', theme: 'system', futureKey: true }]),
     )
   })
 
@@ -142,7 +142,7 @@ describe('SettingsProvider', () => {
     // The load result must not clobber the update, and the deferred flush
     // persists the update merged over the *loaded* document.
     await waitFor(() =>
-      expect(saved).toEqual([{ editorMarkdownSyntax: 'show', futureKey: true }]),
+      expect(saved).toEqual([{ editorMarkdownSyntax: 'show', theme: 'system', futureKey: true }]),
     )
     expect(result.current.settings.editorMarkdownSyntax).toBe('show')
   })
@@ -159,7 +159,9 @@ describe('SettingsProvider', () => {
     act(() => {
       releaseLoad()
     })
-    await waitFor(() => expect(saved).toEqual([{ editorMarkdownSyntax: 'focus' }]))
+    await waitFor(() =>
+      expect(saved).toEqual([{ editorMarkdownSyntax: 'focus', theme: 'system' }]),
+    )
     expect(result.current.settings.editorMarkdownSyntax).toBe('focus')
   })
 
@@ -202,7 +204,9 @@ describe('SettingsProvider', () => {
     act(() => {
       result.current.updateSettings({ editorMarkdownSyntax: 'show' })
     })
-    await waitFor(() => expect(saved).toEqual([{ editorMarkdownSyntax: 'show' }]))
+    await waitFor(() =>
+      expect(saved).toEqual([{ editorMarkdownSyntax: 'show', theme: 'system' }]),
+    )
   })
 
   it('the quit flush persists changes a failed save left unconfirmed', async () => {
@@ -223,7 +227,7 @@ describe('SettingsProvider', () => {
     await act(async () => {
       await flushSettings()
     })
-    expect(saved).toEqual([{ editorMarkdownSyntax: 'show' }])
+    expect(saved).toEqual([{ editorMarkdownSyntax: 'show', theme: 'system' }])
   })
 
   it('surfaces a failed load and keeps changes session-only', async () => {

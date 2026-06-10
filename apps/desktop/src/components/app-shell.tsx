@@ -2,38 +2,46 @@ import { type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 interface AppShellProps {
-  /** Left navigation rail content. */
-  rail?: ReactNode
-  /** Right context sidebar content (the AI copilot lands here in Plan 10). */
+  /** The workspace sidebar; omit to render the note pane edge-to-edge. */
   sidebar?: ReactNode
+  /** Right context panel (the AI copilot lands here in Plan 10). */
+  context?: ReactNode
   /** The center note pane. */
   children: ReactNode
   className?: string
 }
 
 /**
- * The three-region application frame: a left navigation rail, the center note
- * pane, and an optional right context sidebar. Layout and focus regions only —
- * no business logic. Keyboard navigation between regions is wired in Plan 06.
+ * The application frame, in the original app's shape: a sunken sidebar beside
+ * the raised note pane, no header bar — the document is the chrome. Layout
+ * and landmark regions only; what fills the slots (and whether the sidebar
+ * shows at all) is the workspace's business.
  */
-export function AppShell({ rail, sidebar, children, className }: AppShellProps) {
+export function AppShell({ sidebar, context, children, className }: AppShellProps) {
   return (
-    <div className={cn('flex h-screen w-screen overflow-hidden', className)}>
-      <nav
-        aria-label="Primary"
-        className="flex w-14 shrink-0 flex-col items-center gap-2 border-r border-black/10 py-3 dark:border-white/10"
-      >
-        {rail}
-      </nav>
-
-      <main className="min-w-0 flex-1 overflow-auto">{children}</main>
-
+    <div
+      className={cn(
+        'flex h-screen w-screen overflow-hidden bg-[var(--surface-app)] text-[color:var(--text)]',
+        className,
+      )}
+    >
       {sidebar ? (
         <aside
-          aria-label="Context"
-          className="hidden w-80 shrink-0 overflow-auto border-l border-black/10 lg:block dark:border-white/10"
+          aria-label="Workspace"
+          className="flex w-[var(--sidebar-width)] shrink-0 flex-col overflow-hidden border-r border-[var(--border)] bg-[var(--surface-sunken)]"
         >
           {sidebar}
+        </aside>
+      ) : null}
+
+      <main className="min-w-0 flex-1 overflow-auto bg-[var(--surface)]">{children}</main>
+
+      {context ? (
+        <aside
+          aria-label="Context"
+          className="hidden w-80 shrink-0 overflow-auto border-l border-[var(--border)] bg-[var(--surface-sunken)] lg:block"
+        >
+          {context}
         </aside>
       ) : null}
     </div>

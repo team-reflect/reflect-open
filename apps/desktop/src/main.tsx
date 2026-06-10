@@ -20,14 +20,14 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <SettingsProvider>
+    <QueryClientProvider client={queryClient}>
+      <SettingsProvider>
+        <ThemeProvider>
           <GraphProvider>
             <App />
           </GraphProvider>
-        </SettingsProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
+        </ThemeProvider>
+      </SettingsProvider>
+    </QueryClientProvider>
   </StrictMode>,
 )

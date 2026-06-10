@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { PaletteProvider, usePalette } from '@/components/command-palette/palette-provider'
 import { listRegisteredBindings } from '@/editor/keymap'
 import { registerAppCommands } from '@/lib/commands/app-commands'
+import { SidebarProvider } from '@/providers/sidebar-provider'
 import { useAppShortcuts } from './app-shortcuts'
 import { RouterProvider, useRouter } from './router'
 
@@ -25,7 +26,9 @@ function shortcutsHook() {
     {
       wrapper: ({ children }: { children: ReactNode }) => (
         <RouterProvider>
-          <PaletteProvider>{children}</PaletteProvider>
+          <PaletteProvider>
+            <SidebarProvider>{children}</SidebarProvider>
+          </PaletteProvider>
         </RouterProvider>
       ),
     },

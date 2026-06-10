@@ -74,8 +74,32 @@ describe('SettingsScreen', () => {
 
     fireEvent.click(radio(/^show/i))
 
-    await waitFor(() => expect(saved).toEqual([{ editorMarkdownSyntax: 'show' }]))
+    await waitFor(() =>
+      expect(saved).toEqual([{ editorMarkdownSyntax: 'show', theme: 'system' }]),
+    )
     expect(radio(/^show/i).checked).toBe(true)
     expect(radio(/^focus/i).checked).toBe(false)
+  })
+
+  it('reflects the persisted theme and persists a new choice', async () => {
+    stored = { theme: 'dark' }
+    renderScreen()
+    await waitFor(() => expect(radio(/^dark/i).checked).toBe(true))
+
+    fireEvent.click(radio(/^light/i))
+
+    expect(radio(/^light/i).checked).toBe(true)
+    await waitFor(() =>
+      expect(saved).toEqual([{ editorMarkdownSyntax: 'focus', theme: 'light' }]),
+    )
+  })
+
+  it('lists registered shortcuts from both keymap scopes', () => {
+    renderScreen()
+    // App scope (command titles) and editor scope (binding descriptions).
+    expect(screen.getByText('Toggle sidebar')).toBeTruthy()
+    expect(screen.getByText('Go to today')).toBeTruthy()
+    expect(screen.getByText('Bold')).toBeTruthy()
+    expect(screen.getByText('Heading 1')).toBeTruthy()
   })
 })

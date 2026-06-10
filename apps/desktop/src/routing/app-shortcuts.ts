@@ -5,6 +5,7 @@ import { APP_COMMANDS } from '@/lib/commands/app-commands'
 import { runCommand } from '@/lib/commands/registry'
 import type { CommandContext } from '@/lib/commands/types'
 import { useGraph } from '@/providers/graph-provider'
+import { useSidebar } from '@/providers/sidebar-provider'
 import { useTheme } from '@/providers/theme-provider'
 import { useRouter } from './router'
 
@@ -41,6 +42,7 @@ export function useAppShortcuts(): CommandContext {
   const { resolvedTheme, setTheme } = useTheme()
   const { graph } = useGraph()
   const { openPalette, open: paletteOpen } = usePalette()
+  const { toggleSidebar } = useSidebar()
 
   // The palette is modal: app shortcuts must not navigate behind its overlay.
   // A ref keeps the listener stable across open/close renders.
@@ -58,10 +60,11 @@ export function useAppShortcuts(): CommandContext {
       back,
       forward,
       toggleTheme: () => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark'),
+      toggleSidebar,
       generation: () => generationRef.current,
       openPalette,
     }),
-    [navigate, back, forward, resolvedTheme, setTheme, openPalette],
+    [navigate, back, forward, resolvedTheme, setTheme, openPalette, toggleSidebar],
   )
 
   useEffect(() => {

@@ -14,44 +14,55 @@ body,
   height: 100%;
 }
 
+/* One keyboard-focus treatment everywhere. Zero-specificity (`:where`) so any
+   component rule below — the editor's `outline: none`, the palette input —
+   can still opt out. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
 /* ---- Editor (Plan 05) ------------------------------------------------------
    meowdown ships structural CSS only; visibility of markdown syntax and all
-   theming is ours. Its MarkMode plugin sets `data-mark-mode` on the editor root
-   and, in `focus` mode, adds `.show` to syntax spans near the caret. Our
-   wiki-link decorations follow the same contract (`.md-wiki-mark` + `.show`). */
+   theming is ours. ProseKit mounts the ProseMirror view *on* our
+   `.reflect-editor` div (it is the `.ProseMirror` root, not an ancestor of
+   one), so root-level rules target `.reflect-editor` itself. Meowdown's
+   MarkMode plugin sets `data-mark-mode` on that same root and, in `focus`
+   mode, adds `.show` to syntax spans near the caret. Our wiki-link decorations
+   follow the same contract (`.md-wiki-mark` + `.show`). */
 
-.reflect-editor .ProseMirror {
-  outline: none;
+.reflect-editor {
+  outline: none; /* the caret is the focus treatment */
   font-family: var(--font-reading, var(--font-sans));
   line-height: var(--leading-relaxed, 1.7);
   color: var(--text);
   caret-color: var(--accent);
 }
 
-.reflect-editor .ProseMirror h1,
-.reflect-editor .ProseMirror h2,
-.reflect-editor .ProseMirror h3 {
+.reflect-editor h1,
+.reflect-editor h2,
+.reflect-editor h3 {
   font-weight: 650;
   letter-spacing: var(--tracking-snug, -0.01em);
   margin: 1.25em 0 0.4em;
 }
-.reflect-editor .ProseMirror h1 { font-size: var(--text-2xl, 1.5rem); }
-.reflect-editor .ProseMirror h2 { font-size: var(--text-xl, 1.25rem); }
-.reflect-editor .ProseMirror h3 { font-size: var(--text-lg, 1.125rem); }
-.reflect-editor .ProseMirror h1:first-child { margin-top: 0; }
+.reflect-editor h1 { font-size: var(--text-2xl, 1.5rem); }
+.reflect-editor h2 { font-size: var(--text-xl, 1.25rem); }
+.reflect-editor h3 { font-size: var(--text-lg, 1.125rem); }
+.reflect-editor h1:first-child { margin-top: 0; }
 
-.reflect-editor .ProseMirror p {
+.reflect-editor p {
   margin: 0.4em 0;
 }
 
-.reflect-editor .ProseMirror blockquote {
+.reflect-editor blockquote {
   border-left: 2px solid var(--accent-soft, var(--border));
   color: var(--text-secondary);
   margin: 0.6em 0;
   padding-left: 1em;
 }
 
-.reflect-editor .ProseMirror code {
+.reflect-editor code {
   font-family: var(--font-mono, monospace);
   font-size: 0.9em;
   background: var(--surface-sunken, rgb(0 0 0 / 5%));
@@ -59,7 +70,7 @@ body,
   padding: 0.1em 0.3em;
 }
 
-.reflect-editor .ProseMirror pre {
+.reflect-editor pre {
   font-family: var(--font-mono, monospace);
   font-size: 0.875em;
   background: var(--surface-sunken, rgb(0 0 0 / 5%));
@@ -67,7 +78,7 @@ body,
   margin: 0.6em 0;
   padding: 0.75em 1em;
 }
-.reflect-editor .ProseMirror pre code {
+.reflect-editor pre code {
   background: none;
   padding: 0;
 }
@@ -80,9 +91,8 @@ body,
 .reflect-editor .md-wiki-mark {
   color: var(--text-muted);
 }
-.reflect-editor [data-mark-mode='hide'] :is(.md-mark, .md-link-uri, .md-wiki-mark),
-.reflect-editor
-  [data-mark-mode='focus']
+.reflect-editor[data-mark-mode='hide'] :is(.md-mark, .md-link-uri, .md-wiki-mark),
+.reflect-editor[data-mark-mode='focus']
   :is(.md-mark, .md-link-uri, .md-wiki-mark):not(.show) {
   display: none;
 }
@@ -181,7 +191,7 @@ body,
   border-bottom: 1px solid var(--border, rgb(0 0 0 / 10%));
   background: transparent;
   font-size: 0.9375rem;
-  outline: none;
+  outline: none; /* the modal frame is the focus treatment */
 }
 .reflect-palette-list {
   max-height: 20rem;

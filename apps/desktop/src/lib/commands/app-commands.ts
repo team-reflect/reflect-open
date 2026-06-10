@@ -69,6 +69,13 @@ const APP_COMMANDS: AppCommand[] = [
     run: (context) => context.toggleTheme(),
   },
   {
+    id: 'sidebar.toggle',
+    title: 'Toggle sidebar',
+    keywords: ['collapse', 'expand', 'navigation', 'focus'],
+    keybinding: 'Mod-\\',
+    run: (context) => context.toggleSidebar(),
+  },
+  {
     id: 'settings.open',
     title: 'Open settings',
     keywords: ['preferences', 'config', 'options'],

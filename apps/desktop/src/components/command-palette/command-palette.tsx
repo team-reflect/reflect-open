@@ -1,10 +1,14 @@
 import { type ReactElement } from 'react'
 import { Command } from 'cmdk'
 import { parseHighlights } from '@reflect/core'
+import { CalendarDays, FileText } from 'lucide-react'
+import { Kbd } from '@/components/kbd'
+import { ShortcutKeys } from '@/components/shortcut-keys'
 import { runCommand } from '@/lib/commands/registry'
 import type { CommandContext } from '@/lib/commands/types'
 import { formatDayLabel } from '@/lib/dates'
 import { routeForPath } from '@/routing/route'
+import { commandIcon } from './command-icons'
 import { type NoteEntry } from './entries'
 import { usePalette } from './palette-provider'
 import { usePaletteResults } from './use-palette-results'
@@ -95,39 +99,77 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
                 heading={query.trim() === '' ? 'Recent' : 'Notes'}
                 className="reflect-palette-group"
               >
-                {sections.notes.map((entry) => (
-                  <Command.Item
-                    key={entry.path}
-                    value={entry.path}
-                    onSelect={() => openNote(entry)}
-                    className="reflect-palette-item"
-                  >
-                    <span className="block truncate text-sm">
-                      {entry.date !== null ? formatDayLabel(entry.date) : entry.title}
-                    </span>
-                    {entry.snippet !== null ? <Snippet snippet={entry.snippet} /> : null}
-                  </Command.Item>
-                ))}
+                {sections.notes.map((entry) => {
+                  const Icon = entry.date !== null ? CalendarDays : FileText
+                  return (
+                    <Command.Item
+                      key={entry.path}
+                      value={entry.path}
+                      onSelect={() => openNote(entry)}
+                      className="reflect-palette-item"
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <Icon
+                          aria-hidden
+                          strokeWidth={1.75}
+                          className="size-4 shrink-0 text-[color:var(--text-muted)]"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm">
+                            {entry.date !== null ? formatDayLabel(entry.date) : entry.title}
+                          </span>
+                          {entry.snippet !== null ? <Snippet snippet={entry.snippet} /> : null}
+                        </span>
+                      </span>
+                    </Command.Item>
+                  )
+                })}
               </Command.Group>
             ) : null}
             {sections.commands.length > 0 ? (
               <Command.Group heading="Commands" className="reflect-palette-group">
-                {sections.commands.map((command) => (
-                  <Command.Item
-                    key={command.id}
-                    value={`command:${command.id}`}
-                    onSelect={() => {
-                      closePalette()
-                      void runCommand(command.id, context)
-                    }}
-                    className="reflect-palette-item"
-                  >
-                    <span className="block truncate text-sm">{command.title}</span>
-                  </Command.Item>
-                ))}
+                {sections.commands.map((command) => {
+                  const Icon = commandIcon(command.id)
+                  return (
+                    <Command.Item
+                      key={command.id}
+                      value={`command:${command.id}`}
+                      onSelect={() => {
+                        closePalette()
+                        void runCommand(command.id, context)
+                      }}
+                      className="reflect-palette-item"
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <Icon
+                          aria-hidden
+                          strokeWidth={1.75}
+                          className="size-4 shrink-0 text-[color:var(--text-muted)]"
+                        />
+                        <span className="min-w-0 flex-1 truncate text-sm">{command.title}</span>
+                        {command.keybinding ? <ShortcutKeys binding={command.keybinding} /> : null}
+                      </span>
+                    </Command.Item>
+                  )
+                })}
               </Command.Group>
             ) : null}
           </Command.List>
+          <div
+            aria-hidden
+            className="flex items-center gap-4 border-t border-[var(--border)] px-3.5 py-2 text-[11px] text-[color:var(--text-muted)]"
+          >
+            <span className="flex items-center gap-1.5">
+              <Kbd>↑</Kbd>
+              <Kbd>↓</Kbd> Navigate
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Kbd>↩</Kbd> Open
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Kbd>esc</Kbd> Close
+            </span>
+          </div>
         </Command>
       </div>
     </div>

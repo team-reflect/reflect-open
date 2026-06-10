@@ -12,6 +12,8 @@ export interface CommandContext {
   back: () => void
   forward: () => void
   toggleTheme: () => void
+  /** Collapse/expand the workspace sidebar. */
+  toggleSidebar: () => void
   /**
    * The open **index session** generation (`index_open`), or null when none —
    * what index/embedding commands echo. File writes (`note_write`) take

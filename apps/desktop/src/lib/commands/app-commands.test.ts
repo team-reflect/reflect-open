@@ -43,6 +43,7 @@ function fakeContext(overrides?: Partial<CommandContext>) {
     back: vi.fn(),
     forward: vi.fn(),
     toggleTheme: vi.fn(),
+    toggleSidebar: vi.fn(),
     generation: () => 7,
     openPalette: vi.fn(),
     ...overrides,

@@ -102,6 +102,16 @@ function toggleHeading(level: number): Command {
   }
 }
 
+/** Display descriptions for the editor-scope bindings (the shortcuts UI). */
+export const EDITOR_BINDING_DESCRIPTIONS: Record<string, string> = {
+  'Mod-b': 'Bold',
+  'Mod-i': 'Italic',
+  'Mod-e': 'Inline code',
+  'Mod-1': 'Heading 1',
+  'Mod-2': 'Heading 2',
+  'Mod-3': 'Heading 3',
+}
+
 /** Reflect's editor-scope bindings — registered once, collision-checked. */
 export const EDITOR_BINDINGS: Record<string, Command> = registerKeymap('editor', {
   'Mod-b': toggleInlineMarker('**'),
