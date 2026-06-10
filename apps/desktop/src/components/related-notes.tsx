@@ -14,17 +14,15 @@ interface RelatedNotesProps {
  * deferred from Plan 07): the payoff surface for local embeddings. Seeded by
  * the note's own **stored** chunk vectors, so freshness rides the embedding
  * sync + index invalidation (saves re-embed → scope invalidates → refetch) —
- * no pane-provided seed text to go stale. Renders nothing when the note has
- * no vectors yet (model never enabled, not yet embedded) or nothing relates.
- * Query errors are deliberately as quiet as emptiness — unlike backlinks,
- * a failing semantic leg means an optional feature is unavailable, not that
- * the index is broken.
+ * no pane-provided seed text to go stale. Renders nothing when semantic
+ * search is disabled, when the note has no vectors yet (not yet embedded), or
+ * when nothing relates. Query errors are deliberately as quiet as emptiness —
+ * unlike backlinks, a failing semantic leg means an optional feature is
+ * unavailable, not that the index is broken.
  */
 export function RelatedNotes({ path }: RelatedNotesProps): ReactElement | null {
   const { navigate } = useRouter()
-  const { data } = useSimilarNotes(path)
-
-  const related = data ?? []
+  const related = useSimilarNotes(path)
   if (related.length === 0) {
     return null
   }

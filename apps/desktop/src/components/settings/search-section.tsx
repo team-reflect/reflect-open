@@ -20,28 +20,22 @@ export function SearchSection(): ReactElement {
 
   let control: ReactNode
   if (!settings.semanticSearchEnabled) {
+    // Disabling takes effect immediately — every semantic consumer gates on
+    // the setting, so the still-loaded model just idles. No caveat needed.
     control = (
-      <div>
-        <button
-          type="button"
-          onClick={() => {
-            updateSettings({ semanticSearchEnabled: true })
-            // EmbeddingsSync loads an untouched runtime; a `failed` one only
-            // retries on an explicit action like this.
-            void retryFailedEmbeddings()
-          }}
-          className="inline-flex items-center gap-1.5 rounded-md bg-accent px-2.5 py-1.5 text-xs font-medium text-text-on-brand shadow-sm transition-colors duration-100 hover:bg-accent-hover"
-        >
-          <Sparkles aria-hidden strokeWidth={1.75} className="size-3.5" />
-          Enable semantic search
-        </button>
-        {status.status === 'ready' ? (
-          <p className="mt-2 text-xs text-text-muted">
-            The model is still loaded for this session; disabling takes full effect on the next
-            launch.
-          </p>
-        ) : null}
-      </div>
+      <button
+        type="button"
+        onClick={() => {
+          updateSettings({ semanticSearchEnabled: true })
+          // EmbeddingsSync loads an untouched runtime; a `failed` one only
+          // retries on an explicit action like this.
+          void retryFailedEmbeddings()
+        }}
+        className="inline-flex items-center gap-1.5 rounded-md bg-accent px-2.5 py-1.5 text-xs font-medium text-text-on-brand shadow-sm transition-colors duration-100 hover:bg-accent-hover"
+      >
+        <Sparkles aria-hidden strokeWidth={1.75} className="size-3.5" />
+        Enable semantic search
+      </button>
     )
   } else if (status.status === 'ready') {
     control = (

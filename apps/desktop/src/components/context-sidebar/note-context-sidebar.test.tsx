@@ -17,6 +17,12 @@ vi.mock('@reflect/core', async (importOriginal) => ({
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', cloudSync: null, generation: 1 } }),
 }))
+vi.mock('@/providers/settings-provider', () => ({
+  useSettings: () => ({
+    settings: { semanticSearchEnabled: true },
+    updateSettings: () => {},
+  }),
+}))
 
 function RouteProbe(): ReactNode {
   const { route } = useRouter()

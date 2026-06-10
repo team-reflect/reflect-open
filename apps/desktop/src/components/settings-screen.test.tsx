@@ -147,6 +147,10 @@ describe('SettingsScreen', () => {
       ]),
     )
     expect(screen.getByRole('button', { name: /enable semantic search/i })).toBeTruthy()
+    // Disabling is immediate — every semantic consumer gates on the setting,
+    // so there is no "takes effect on the next launch" caveat to show even
+    // while the runtime still reports `ready`.
+    expect(screen.queryByText(/next launch/i)).toBeNull()
   })
 
   it('re-enabling after a failed load retries the download', async () => {

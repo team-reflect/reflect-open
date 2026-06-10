@@ -11,7 +11,7 @@ import { useSettings } from '@/providers/settings-provider'
 
 /**
  * Keeps embeddings in sync with the graph (Plan 09). Renders nothing; mounted
- * once per workspace. Three jobs, all gated on the runtime being `ready`:
+ * once per workspace. Three jobs:
  *
  * - load the model whenever `semanticSearchEnabled` is on and the runtime is
  *   untouched — at launch for users who opted in earlier (the cache makes
@@ -21,6 +21,11 @@ import { useSettings } from '@/providers/settings-provider'
  *   this cheap when nothing changed);
  * - follow the watcher: changed notes re-embed, deleted notes drop vectors.
  *   Work is serialized on one queue so passes can't interleave.
+ *
+ * Backfill and watcher work need the runtime `ready` *and* the setting on:
+ * disabling semantic search pauses embedding work immediately (the loaded
+ * model just idles for the rest of the session), and re-enabling catches up
+ * via the cheap hash-skip backfill.
  */
 export function EmbeddingsSync(): null {
   const { graph, indexGeneration } = useGraph()
@@ -54,8 +59,11 @@ export function EmbeddingsSync(): null {
   }, [enabled, status.status])
 
   // One backfill per (graph, model) once ready, then live watcher follow-up.
+  // `enabled` is part of the gate so a mid-session disable tears this down:
+  // pending queue items see `active` go false and skip, and the watcher
+  // unsubscribes.
   useEffect(() => {
-    if (!ready || generation === null || root === null || modelId === null) {
+    if (!enabled || !ready || generation === null || root === null || modelId === null) {
       return
     }
     let active = true
@@ -106,7 +114,7 @@ export function EmbeddingsSync(): null {
       active = false
       unlisten?.()
     }
-  }, [ready, generation, root, modelId])
+  }, [enabled, ready, generation, root, modelId])
 
   return null
 }

@@ -19,6 +19,12 @@ vi.mock('@reflect/core', async (importOriginal) => ({
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', cloudSync: false, generation: 1 } }),
 }))
+vi.mock('@/providers/settings-provider', () => ({
+  useSettings: () => ({
+    settings: { semanticSearchEnabled: true },
+    updateSettings: () => {},
+  }),
+}))
 
 function RouteProbe(): ReactNode {
   const { route } = useRouter()
@@ -120,10 +126,10 @@ describe('DailyContextSidebar calendar', () => {
 })
 
 describe('DailyContextSidebar related notes', () => {
-  it('renders no Related section without results', async () => {
+  it('renders no Similar notes section without results', async () => {
     const view = renderSidebar('2026-06-09')
     await waitFor(() => expect(relatedNotes).toHaveBeenCalledWith('daily/2026-06-09.md'))
-    expect(view.queryByText('Related')).toBeNull()
+    expect(view.queryByText('Similar notes')).toBeNull()
     view.unmount()
   })
 
@@ -135,11 +141,12 @@ describe('DailyContextSidebar related notes', () => {
         score: 0.9,
         snippet: 'borrow checker notes',
         heading: null,
+        isPrivate: false,
       },
     ])
     const view = renderSidebar('2026-06-09')
     await view.findByText('Rust')
-    expect(view.getByText('Related')).toBeDefined()
+    expect(view.getByText('Similar notes')).toBeDefined()
     await userEvent.click(view.getByText('Rust'))
     expect(view.getByTestId('route').textContent).toContain('notes/rust.md')
     view.unmount()

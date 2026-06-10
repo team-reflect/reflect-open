@@ -15,6 +15,13 @@ vi.mock('@reflect/core', async (importOriginal) => ({
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', cloudSync: null, generation: 1 } }),
 }))
+const semanticSetting = vi.hoisted(() => ({ enabled: true }))
+vi.mock('@/providers/settings-provider', () => ({
+  useSettings: () => ({
+    settings: { semanticSearchEnabled: semanticSetting.enabled },
+    updateSettings: () => {},
+  }),
+}))
 
 function RouteProbe(): ReactNode {
   const { route } = useRouter()
@@ -35,6 +42,7 @@ function renderSimilar(path: string, probe: boolean = true) {
 
 beforeEach(() => {
   window.sessionStorage.clear()
+  semanticSetting.enabled = true
   relatedNotes.mockReset().mockResolvedValue([])
 })
 
@@ -42,6 +50,26 @@ describe('SimilarNotesSection', () => {
   it('renders nothing at all when the note has no semantic neighbors', async () => {
     const view = renderSimilar('daily/2026-06-09.md', false)
     await waitFor(() => expect(relatedNotes).toHaveBeenCalledWith('daily/2026-06-09.md'))
+    expect(view.container.firstChild).toBeNull()
+    view.unmount()
+  })
+
+  it('neither queries nor renders while semantic search is disabled', async () => {
+    semanticSetting.enabled = false
+    relatedNotes.mockResolvedValue([
+      {
+        path: 'notes/rust.md',
+        title: 'Rust',
+        score: 0.9,
+        snippet: 'borrow checker notes',
+        heading: null,
+        isPrivate: false,
+      },
+    ])
+    const view = renderSimilar('notes/languages.md', false)
+    // Give a would-be fetch a tick to fire before asserting it never did.
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(relatedNotes).not.toHaveBeenCalled()
     expect(view.container.firstChild).toBeNull()
     view.unmount()
   })

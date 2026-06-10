@@ -22,9 +22,7 @@ interface SimilarNotesSectionProps {
  */
 export function SimilarNotesSection({ path }: SimilarNotesSectionProps): ReactElement | null {
   const { navigate } = useRouter()
-  const { data } = useSimilarNotes(path)
-
-  const related = data ?? []
+  const related = useSimilarNotes(path)
   if (related.length === 0) {
     return null
   }

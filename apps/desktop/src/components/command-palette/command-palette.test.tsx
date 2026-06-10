@@ -1,7 +1,7 @@
 import { cleanup, render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useEffect } from 'react'
 import type { CommandContext } from '@/lib/commands/types'
 import { CommandPalette } from './command-palette'
@@ -9,16 +9,30 @@ import { PaletteProvider, usePalette } from './palette-provider'
 
 const suggestWikiTargets = vi.hoisted(() => vi.fn())
 const searchWithFilters = vi.hoisted(() => vi.fn())
+const retrieve = vi.hoisted(() => vi.fn())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
   suggestWikiTargets,
   searchWithFilters,
+  retrieve,
 }))
+// The model is absent by default: the palette is exactly the lexical surface
+// it was before Plan 09 (hybrid mode is additive). The gating tests flip both
+// halves of the hybrid opt-in.
+const embedReady = vi.hoisted(() => ({ value: false }))
 vi.mock('@/lib/use-embed-status', () => ({
-  // The model is absent in these tests: the palette is exactly the lexical
-  // surface it was before Plan 09 (hybrid mode is additive).
-  useEmbedStatus: () => ({ status: 'uninitialized' }),
+  useEmbedStatus: () =>
+    embedReady.value
+      ? { status: 'ready', model: 'all-MiniLM-L6-v2' }
+      : { status: 'uninitialized' },
+}))
+const semanticSetting = vi.hoisted(() => ({ enabled: false }))
+vi.mock('@/providers/settings-provider', () => ({
+  useSettings: () => ({
+    settings: { semanticSearchEnabled: semanticSetting.enabled },
+    updateSettings: () => {},
+  }),
 }))
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', cloudSync: null, generation: 1 } }),
@@ -31,6 +45,11 @@ registerAppCommands()
 // previous test's still-mounted palette leaks into the next test's
 // document.body queries (e.g. its settled "No results").
 afterEach(cleanup)
+
+beforeEach(() => {
+  embedReady.value = false
+  semanticSetting.enabled = false
+})
 
 // cmdk scrolls the selected item into view and observes list size; jsdom has
 // no layout, so both get inert stubs.
@@ -174,6 +193,37 @@ describe('CommandPalette', () => {
     await waitFor(() =>
       expect(navigate).toHaveBeenCalledWith({ kind: 'daily', date: '2026-06-08' }),
     )
+  })
+
+  it('stays lexical when the model is ready but semantic search is disabled', async () => {
+    embedReady.value = true
+    semanticSetting.enabled = false
+    suggestWikiTargets.mockResolvedValue([])
+    searchWithFilters.mockClear().mockResolvedValue([])
+    retrieve.mockClear()
+    renderPalette('rust')
+    // Disabling must bite immediately, even while the model is still loaded.
+    await waitFor(() => expect(searchWithFilters).toHaveBeenCalled())
+    expect(retrieve).not.toHaveBeenCalled()
+  })
+
+  it('blends semantic hits once enabled and the model is ready', async () => {
+    embedReady.value = true
+    semanticSetting.enabled = true
+    suggestWikiTargets.mockResolvedValue([])
+    retrieve.mockClear().mockResolvedValue([
+      {
+        path: 'notes/rust.md',
+        title: 'Rust Notes',
+        score: 0.9,
+        snippet: 'borrow checker notes',
+        heading: null,
+        isPrivate: false,
+      },
+    ])
+    const { view } = renderPalette('rust')
+    await view.findByText('Rust Notes')
+    expect(retrieve).toHaveBeenCalledWith('rust', { mode: 'hybrid' })
   })
 
   it('a daily suggestion renders its day label and opens the daily route', async () => {
