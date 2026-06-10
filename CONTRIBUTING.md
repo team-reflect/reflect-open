@@ -55,6 +55,17 @@ cargo test        # from apps/desktop/src-tauri, if you touched Rust
   rebuildable cache. Never make the index durable.
 - No Reflect-hosted APIs, no Electron, secrets only in the OS keychain.
 
+## Guides
+
+Step-by-step walkthroughs for the most common kinds of change:
+
+- [Adding a native command](docs/contributing/adding-a-command.md) — the full
+  Rust → bridge → zod → React path, with conventions and a checklist.
+- [Adding a user setting](docs/contributing/adding-a-setting.md) — schema key,
+  defaults-by-construction, the settings screen. (No Rust involved.)
+- [Editor architecture](docs/contributing/editor-architecture.md) — the
+  session/adapter split, the save loop, and where new editor code goes.
+
 ## "Plan NN" in comments?
 
 Numbered plans in [docs/plans/](docs/plans/) are the implementation roadmap;

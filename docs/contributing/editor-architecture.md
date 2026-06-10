@@ -1,0 +1,116 @@
+# Editor architecture
+
+A map of `apps/desktop/src/editor/` for contributors. The design docs are
+Plans 05/05b (editor + fidelity), 06 (daily notes), and 07/07b (backlinks,
+renames); this is the orientation layer those plans don't give you.
+
+## The layers
+
+```
+NotePane / DailyStream                  components — composition only
+  ├─ useNoteDocument()                  React adapter (use-note-document.ts)
+  │    └─ createNoteSession()           pure document state machine (note-session.ts)
+  │         └─ readNote / writeNote     @reflect/core typed commands
+  ├─ useWikiLinkNavigation()            [[link]] click → route / create
+  ├─ useImagePersistence()              paste/drop → assets/ write
+  └─ <NoteEditor>                       meowdown + our extensions (note-editor.tsx)
+```
+
+The load-bearing split is **session vs. adapter**: `note-session.ts` owns every
+save/conflict/protection rule as a pure state machine — no React, no editor, no
+IPC (file access is injected) — and `use-note-document.ts` only wires it to
+React state, the `@reflect/core` commands, the watcher stream, and the editor's
+imperative handle. Tests drive the session directly with fake IO
+(`note-session.test.ts`); if you're changing *what happens*, you're almost
+certainly in the session, and your test belongs there too.
+
+`NoteEditor` is **uncontrolled**: `initialContent` is read once, and showing
+different content goes through the imperative `NoteEditorHandle` (or a remount
+via `key`), never a prop change. Edits flow out through `onEditorChange`; the
+session pushes content back in through `applyContent` and recognizes the
+editor's synchronous re-entrant change event so a programmatic reload is never
+mistaken for a user edit.
+
+## The save loop
+
+```
+keystroke → session.editorChanged() → debounce (800ms) → atomic write
+  → file watcher event → core reindex (the ONLY incremental index path)
+  → the same event returns to the session → recognized as our echo → ignored
+```
+
+Saving never triggers indexing directly: our own write flows
+file → watcher → index like any external change, so there is one reindex path
+to reason about (Plan 04b). On every change event the session re-reads the
+file and compares by content: a match against what it last wrote (or a
+still-settling in-flight write) is our own echo and is ignored.
+
+Invariants the loop maintains:
+
+- **External changes never clobber a dirty buffer.** A clean buffer reloads
+  imperatively; a dirty one parks the external content as a `conflict` for the
+  user ("keep mine" rewrites the file, "load theirs" discards the buffer).
+- **Writes are generation-pinned.** Every write carries the open graph's
+  generation (read at write time, not captured at session creation); Rust
+  rejects stale ones, so a flush racing a graph switch fails loudly instead of
+  landing in the wrong graph.
+- **Frontmatter belongs to the session, not the editor.** meowdown mangles a
+  `---` block, so the session splits every disk read, keeps the exact header
+  bytes aside, and rejoins them on every write. The editor only ever sees the
+  body; metadata writes go through `session.updateFrontmatter()` without
+  disturbing the view.
+- **Round-trip fidelity gates editability** (`roundtrip.ts`). Before the save
+  pipeline may rewrite a note, the editor must prove it can reproduce it; a
+  converter gap (e.g. task lists today) opens the note as a `protected`
+  read-only view rather than silently rewriting the file minus what the editor
+  couldn't model.
+
+## Work that outlives a pane
+
+React unmount effects never run on the quit paths (window close, ⌘Q), and some
+editor work must survive pane teardown. Two pieces live outside React:
+
+- **`open-documents.ts`** — the app-global registry of live sessions. Quit
+  teardown (`flushOpenDocuments`) flushes every buffer and awaits settle-time
+  work before the webview dies; the rename coordinator uses `openSession(path)`
+  to discover whether a note is open (possibly *reopened* in a new pane) and
+  route through its live session instead of racing the disk.
+- **`rename-coordinator.ts` + `title-rename.ts`** — the auto-rename flow
+  (Plan 07b). The tracker watches the session's `onContent` stream and fires
+  only on *settled* titles (quiet timer, or a settle point: blur/teardown/quit)
+  — never per keystroke, so intermediate titles don't spray junk rewrites
+  across the graph. The coordinator serializes the graph-wide link rewrite and
+  records the old title as an alias, reporting progress through the global
+  operations store — a rename is app-level background work, not pane state.
+
+## File map
+
+| File | Owns |
+|---|---|
+| `note-session.ts` | save pipeline, conflicts, protection, frontmatter — the rules |
+| `use-note-document.ts` | React adapter: session ↔ state/commands/watcher/editor |
+| `note-editor.tsx` | meowdown composition + our extensions; imperative handle |
+| `roundtrip.ts` | fidelity classification (`exact` / `normalizing` / `lossy`) |
+| `open-documents.ts` | app-global live-session registry; quit flush |
+| `title-rename.ts` | settled-title detection (pure, timer-driven) |
+| `rename-coordinator.ts` | rename lifecycle: rewrite chain + alias placement |
+| `wiki-links.ts` | `[[…]]` chips as view decorations over literal text |
+| `wiki-autocomplete.tsx` / `-entries.ts` | `[[` popover; pure row assembly |
+| `use-wiki-link-navigation.ts` | chip click → resolve → navigate or create |
+| `images.ts` / `use-image-persistence.ts` | image widgets; paste/drop → `assets/` |
+| `keymap.ts` | central shortcut registry (rejects duplicate bindings) |
+
+## Where new code goes
+
+- **A new save/reload/conflict behavior** → `note-session.ts`, with a direct
+  test. If you need React state for it, expose it on the snapshot and let the
+  adapter stay dumb.
+- **A new editor feature** (decoration, input rule) → its own module composed
+  in `note-editor.tsx`. Keep markdown *literal* in the document and render via
+  decorations — that's what keeps serialization byte-identical (see
+  `wiki-links.ts` for the full rationale). Shortcuts go through `keymap.ts`.
+- **Markdown grammar** (what counts as a wiki link, an image, a heading) →
+  `packages/core/src/markdown/`, never the editor: the editor and the indexer
+  share one grammar so chips and index links can't drift.
+- **Pane-level wiring** → a focused hook next to the existing ones, composed
+  in `note-pane.tsx`; components stay composition-only.
