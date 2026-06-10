@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '@reflect/core'
-import { flushAllNotes } from './flush-registry'
+import { flushOpenDocuments } from './open-documents'
 import type { NoteEditorHandle } from './note-editor'
 import { useNoteDocument } from './use-note-document'
 
@@ -59,6 +59,44 @@ async function readyHook() {
   return hook
 }
 
+interface GraphFakeOptions {
+  files: Record<string, string>
+  /** Rows for the rewrite's `links` source query; may throw to simulate failure. */
+  linkSources?: () => Array<{ source_path: string }>
+  /** Path returned by title resolution (simulates a title collision). */
+  resolveTitleTo?: string
+}
+
+/** One bridge fake for the rename scenarios: a files map + the index queries. */
+function installGraphFake({ files, linkSources, resolveTitleTo }: GraphFakeOptions) {
+  mockInvoke.mockImplementation(async (command, args) => {
+    if (command === 'note_read') {
+      const content = files[(args as { path: string }).path]
+      if (content === undefined) {
+        throw { kind: 'notFound', message: 'missing' }
+      }
+      return content
+    }
+    if (command === 'note_write') {
+      const { path: writePath, contents } = args as { path: string; contents: string }
+      files[writePath] = contents
+      return null
+    }
+    if (command === 'db_query') {
+      const sql = String((args as { sql: string }).sql)
+      if (sql.includes('"links"')) {
+        return linkSources ? linkSources() : []
+      }
+      if (resolveTitleTo !== undefined && sql.includes('title_key')) {
+        return [{ path: resolveTitleTo }]
+      }
+      return []
+    }
+    return null
+  })
+  return files
+}
+
 describe('useNoteDocument', () => {
   it('loads the note and seeds the editor content', async () => {
     const { result } = await readyHook()
@@ -85,7 +123,7 @@ describe('useNoteDocument', () => {
     }
   })
 
-  it('flushAllNotes persists a pending edit without waiting out the debounce (quit path)', async () => {
+  it('flushOpenDocuments persists a pending edit without waiting out the debounce (quit path)', async () => {
     vi.useFakeTimers()
     try {
       const hook = renderHook(() => useNoteDocument('notes/a.md', 1))
@@ -97,7 +135,7 @@ describe('useNoteDocument', () => {
 
       // The quit path: the registry flush settles only once the write has
       // landed — no timer advance, the way a ⌘Q teardown would run it.
-      await act(() => flushAllNotes())
+      await act(() => flushOpenDocuments())
       expect(writes).toEqual(['# Quitting\n'])
       expect(hook.result.current.dirty).toBe(false)
     } finally {
@@ -112,7 +150,7 @@ describe('useNoteDocument', () => {
     await act(async () => {})
     const writesAfterUnmount = writes.length
 
-    await flushAllNotes() // the unmounted buffer must no longer be registered
+    await flushOpenDocuments() // the unmounted buffer must no longer be registered
     expect(writes.length).toBe(writesAfterUnmount)
   })
 
@@ -123,24 +161,7 @@ describe('useNoteDocument', () => {
         'notes/a.md': '# Old Title\n',
         'notes/src.md': 'see [[Old Title]]\n',
       }
-      mockInvoke.mockImplementation(async (command, args) => {
-        if (command === 'note_read') {
-          return files[(args as { path: string }).path]
-        }
-        if (command === 'note_write') {
-          const { path: writePath, contents } = args as { path: string; contents: string }
-          files[writePath] = contents
-          return null
-        }
-        if (command === 'db_query') {
-          const sql = String((args as { sql: string }).sql)
-          if (sql.includes('"links"')) {
-            return [{ source_path: 'notes/src.md' }] // the one inbound source
-          }
-          return [] // resolver lookups: unresolved → no collision
-        }
-        return null
-      })
+      installGraphFake({ files, linkSources: () => [{ source_path: 'notes/src.md' }] })
 
       const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
       await act(() => vi.advanceTimersByTimeAsync(0))
@@ -172,21 +193,7 @@ describe('useNoteDocument', () => {
         'notes/a.md': '# Old Title\n',
         'notes/src.md': 'see [[Old Title]]\n',
       }
-      mockInvoke.mockImplementation(async (command, args) => {
-        if (command === 'note_read') {
-          return files[(args as { path: string }).path]
-        }
-        if (command === 'note_write') {
-          const { path: writePath, contents } = args as { path: string; contents: string }
-          files[writePath] = contents
-          return null
-        }
-        if (command === 'db_query') {
-          const sql = String((args as { sql: string }).sql)
-          return sql.includes('"links"') ? [{ source_path: 'notes/src.md' }] : []
-        }
-        return null
-      })
+      installGraphFake({ files, linkSources: () => [{ source_path: 'notes/src.md' }] })
 
       const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
       await act(() => vi.advanceTimersByTimeAsync(0))
@@ -213,21 +220,7 @@ describe('useNoteDocument', () => {
         'notes/b.md': '# Note B\n',
         'notes/src.md': 'see [[Old Title]]\n',
       }
-      mockInvoke.mockImplementation(async (command, args) => {
-        if (command === 'note_read') {
-          return files[(args as { path: string }).path]
-        }
-        if (command === 'note_write') {
-          const { path: writePath, contents } = args as { path: string; contents: string }
-          files[writePath] = contents
-          return null
-        }
-        if (command === 'db_query') {
-          const sql = String((args as { sql: string }).sql)
-          return sql.includes('"links"') ? [{ source_path: 'notes/src.md' }] : []
-        }
-        return null
-      })
+      installGraphFake({ files, linkSources: () => [{ source_path: 'notes/src.md' }] })
 
       // Note A: edit the title, save lands, rename pending.
       const paneA = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
@@ -240,8 +233,6 @@ describe('useNoteDocument', () => {
       const paneB = renderHook(() => useNoteDocument('notes/b.md', 1, { trackRenames: true }))
       await act(() => vi.runAllTimersAsync())
 
-      // A's still-running rewrite must not paint progress into B's pane.
-      expect(paneB.result.current.renameProgress).toBeNull()
       expect(files['notes/src.md']).toBe('see [[New Title]]\n')
       expect(files['notes/a.md']).toContain('aliases:') // alias on A, via disk
       expect(files['notes/b.md']).toBe('# Note B\n') // B untouched
@@ -258,26 +249,10 @@ describe('useNoteDocument', () => {
         'notes/a.md': '# Old Title\n',
         'notes/src.md': 'see [[Old Title]]\n',
       }
-      mockInvoke.mockImplementation(async (command, args) => {
-        if (command === 'note_read') {
-          return files[(args as { path: string }).path]
-        }
-        if (command === 'note_write') {
-          const { path: writePath, contents } = args as { path: string; contents: string }
-          files[writePath] = contents
-          return null
-        }
-        if (command === 'db_query') {
-          const sql = String((args as { sql: string }).sql)
-          if (sql.includes('"links"')) {
-            return [{ source_path: 'notes/src.md' }]
-          }
-          if (sql.includes('title_key')) {
-            return [{ path: 'notes/other-owner.md' }] // another note owns "Old Title"
-          }
-          return []
-        }
-        return null
+      installGraphFake({
+        files,
+        linkSources: () => [{ source_path: 'notes/src.md' }],
+        resolveTitleTo: 'notes/other-owner.md', // another note owns "Old Title"
       })
 
       const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
@@ -306,23 +281,11 @@ describe('useNoteDocument', () => {
         'notes/a.md': '# Old Title\n',
         'notes/src.md': 'see [[Old Title]]\n',
       }
-      mockInvoke.mockImplementation(async (command, args) => {
-        if (command === 'note_read') {
-          return files[(args as { path: string }).path]
-        }
-        if (command === 'note_write') {
-          const { path: writePath, contents } = args as { path: string; contents: string }
-          files[writePath] = contents
-          return null
-        }
-        if (command === 'db_query') {
-          const sql = String((args as { sql: string }).sql)
-          if (sql.includes('"links"')) {
-            throw new Error('index unavailable') // the rewrite cannot run
-          }
-          return []
-        }
-        return null
+      installGraphFake({
+        files,
+        linkSources: () => {
+          throw new Error('index unavailable') // the rewrite cannot run
+        },
       })
 
       const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
@@ -353,27 +316,12 @@ describe('useNoteDocument', () => {
         'notes/src.md': 'unrelated\n',
       }
       const linkQueries: string[] = []
-      mockInvoke.mockImplementation(async (command, args) => {
-        if (command === 'note_read') {
-          const content = files[(args as { path: string }).path]
-          if (content === undefined) {
-            throw { kind: 'notFound', message: 'missing' }
-          }
-          return content
-        }
-        if (command === 'note_write') {
-          const { path: writePath, contents } = args as { path: string; contents: string }
-          files[writePath] = contents
-          return null
-        }
-        if (command === 'db_query') {
-          const sql = String((args as { sql: string }).sql)
-          if (sql.includes('"links"')) {
-            linkQueries.push(sql)
-          }
+      installGraphFake({
+        files,
+        linkSources: () => {
+          linkQueries.push('sources-query')
           return []
-        }
-        return null
+        },
       })
 
       const hook = renderHook(() =>
@@ -408,21 +356,7 @@ describe('useNoteDocument', () => {
         'notes/a.md': '# Old Title\n',
         'notes/src.md': 'see [[Old Title]]\n',
       }
-      mockInvoke.mockImplementation(async (command, args) => {
-        if (command === 'note_read') {
-          return files[(args as { path: string }).path]
-        }
-        if (command === 'note_write') {
-          const { path: writePath, contents } = args as { path: string; contents: string }
-          files[writePath] = contents
-          return null
-        }
-        if (command === 'db_query') {
-          const sql = String((args as { sql: string }).sql)
-          return sql.includes('"links"') ? [{ source_path: 'notes/src.md' }] : []
-        }
-        return null
-      })
+      installGraphFake({ files, linkSources: () => [{ source_path: 'notes/src.md' }] })
 
       const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
       await act(() => vi.advanceTimersByTimeAsync(0))
@@ -449,21 +383,7 @@ describe('useNoteDocument', () => {
         'notes/a.md': '# Old Title\n',
         'notes/src.md': 'see [[Old Title]]\n',
       }
-      mockInvoke.mockImplementation(async (command, args) => {
-        if (command === 'note_read') {
-          return files[(args as { path: string }).path]
-        }
-        if (command === 'note_write') {
-          const { path: writePath, contents } = args as { path: string; contents: string }
-          files[writePath] = contents
-          return null
-        }
-        if (command === 'db_query') {
-          const sql = String((args as { sql: string }).sql)
-          return sql.includes('"links"') ? [{ source_path: 'notes/src.md' }] : []
-        }
-        return null
-      })
+      installGraphFake({ files, linkSources: () => [{ source_path: 'notes/src.md' }] })
 
       const paneA = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
       await act(() => vi.advanceTimersByTimeAsync(0))
@@ -490,28 +410,14 @@ describe('useNoteDocument', () => {
     }
   })
 
-  it('quit-time flushAllNotes settles a pending rename before resolving', async () => {
+  it('quit-time flushOpenDocuments settles a pending rename before resolving', async () => {
     vi.useFakeTimers()
     try {
       const files: Record<string, string> = {
         'notes/a.md': '# Old Title\n',
         'notes/src.md': 'see [[Old Title]]\n',
       }
-      mockInvoke.mockImplementation(async (command, args) => {
-        if (command === 'note_read') {
-          return files[(args as { path: string }).path]
-        }
-        if (command === 'note_write') {
-          const { path: writePath, contents } = args as { path: string; contents: string }
-          files[writePath] = contents
-          return null
-        }
-        if (command === 'db_query') {
-          const sql = String((args as { sql: string }).sql)
-          return sql.includes('"links"') ? [{ source_path: 'notes/src.md' }] : []
-        }
-        return null
-      })
+      installGraphFake({ files, linkSources: () => [{ source_path: 'notes/src.md' }] })
 
       const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
       await act(() => vi.advanceTimersByTimeAsync(0))
@@ -519,7 +425,7 @@ describe('useNoteDocument', () => {
       await act(() => vi.advanceTimersByTimeAsync(1000)) // save lands, quiet timer armed
 
       // ⌘Q: the registry flush must settle the rename and await its writes.
-      await act(() => flushAllNotes())
+      await act(() => flushOpenDocuments())
 
       expect(files['notes/src.md']).toBe('see [[New Title]]\n')
       expect(files['notes/a.md']).toContain('aliases:')

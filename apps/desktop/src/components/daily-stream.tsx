@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { dailyPath } from '@reflect/core'
 import { NotePane } from '@/components/note-pane'
 import { formatDayLabel, todayIso } from '@/lib/dates'
+import { useToday } from '@/lib/use-today'
 import { createDayWindow, dateAtIndex, indexOfDate } from '@/lib/day-window'
 import { useRouter } from '@/routing/router'
 
@@ -24,11 +25,12 @@ export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
   const { arrivalSeq, entryId, saveScrollState, savedScroll } = useRouter()
   const scrollRef = useRef<HTMLDivElement | null>(null)
   // The window anchors at today-on-mount and stays stable for the view's life.
-  const [window] = useState(() => createDayWindow(todayIso()))
-  const today = todayIso()
+  // (`dayWindow`, not `window` — shadowing the DOM global here was a footgun.)
+  const [dayWindow] = useState(() => createDayWindow(todayIso()))
+  const today = useToday()
 
   const virtualizer = useVirtualizer({
-    count: window.count,
+    count: dayWindow.count,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 220,
     overscan: 2,
@@ -70,8 +72,8 @@ export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
     }
     const target = targetDateRef.current
     focusPending.current = target
-    virtualizer.scrollToIndex(indexOfDate(window, target), { align: 'start' })
-  }, [arrivalSeq, entryId, window, virtualizer, savedScroll])
+    virtualizer.scrollToIndex(indexOfDate(dayWindow, target), { align: 'start' })
+  }, [arrivalSeq, entryId, dayWindow, virtualizer, savedScroll])
 
   return (
     <div
@@ -91,7 +93,7 @@ export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
         style={{ height: virtualizer.getTotalSize() }}
       >
         {virtualizer.getVirtualItems().map((item) => {
-          const date = dateAtIndex(window, item.index)
+          const date = dateAtIndex(dayWindow, item.index)
           const isToday = date === today
           const autoFocus = focusPending.current === date
           return (

@@ -4,7 +4,9 @@ import { AppShell } from '@/components/app-shell'
 import { DailyStream } from '@/components/daily-stream'
 import { NotePane } from '@/components/note-pane'
 import { useAppVersion } from '@/hooks/use-app-version'
-import { isIsoDate, todayIso } from '@/lib/dates'
+import { isIsoDate } from '@/lib/dates'
+import { useToday } from '@/lib/use-today'
+import { OperationsStatus } from '@/components/operations-status'
 import { useGraph } from '@/providers/graph-provider'
 import { useTheme } from '@/providers/theme-provider'
 import { useAppShortcuts } from '@/routing/app-shortcuts'
@@ -93,21 +95,24 @@ function WorkspaceContent({ graph }: GraphWorkspaceProps): ReactElement {
         <div className="min-h-0 flex-1">
           <RouteContent />
         </div>
+
+        <OperationsStatus />
       </div>
     </AppShell>
   )
 }
 
-/** Route → view. `today` resolves the date at render so midnight rolls over. */
+/** Route → view. `today` tracks the live clock — midnight re-renders it. */
 function RouteContent(): ReactElement {
   const { route } = useRouter()
+  const today = useToday()
   switch (route.kind) {
     case 'today':
-      return <DailyStream targetDate={todayIso()} />
+      return <DailyStream targetDate={today} />
     case 'daily':
       // A malformed date (impossible calendar day) anchors to today instead of
       // letting dailyPath throw mid-render.
-      return <DailyStream targetDate={isIsoDate(route.date) ? route.date : todayIso()} />
+      return <DailyStream targetDate={isIsoDate(route.date) ? route.date : today} />
     case 'note':
       return (
         <ScrollRestored className="h-full overflow-auto px-6 py-8">
