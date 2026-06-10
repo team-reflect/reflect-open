@@ -12,6 +12,9 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   hasBridge: () => true,
   getBacklinksWithContext,
 }))
+vi.mock('@/providers/graph-provider', () => ({
+  useGraph: () => ({ graph: { root: '/g', name: 'g', cloudSync: false, generation: 1 } }),
+}))
 
 function RouteProbe(): ReactNode {
   const { route } = useRouter()

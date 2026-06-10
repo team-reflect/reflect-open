@@ -45,4 +45,11 @@ describe('buildAutocompleteEntries', () => {
   it('offers nothing for a blank query', () => {
     expect(buildAutocompleteEntries('  ', [])).toEqual([])
   })
+
+  it('never offers create from unsettled (in-flight) suggestions', () => {
+    // The visible list belongs to the previous query while fetching — a match
+    // for the current text may be about to arrive.
+    const entries = buildAutocompleteEntries('Roadmap', [], { offerCreate: false })
+    expect(entries).toEqual([])
+  })
 })

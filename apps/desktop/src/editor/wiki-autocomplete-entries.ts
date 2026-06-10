@@ -11,16 +11,26 @@ export type AutocompleteEntry =
   | { kind: 'suggestion'; suggestion: WikiSuggestion }
   | { kind: 'create'; title: string }
 
+export interface EntryOptions {
+  /**
+   * Whether a Create row may be offered at all — false while suggestions for
+   * the current query are still in flight (the visible list belongs to a
+   * previous query, so "nothing matches" can't be concluded yet).
+   */
+  offerCreate: boolean
+}
+
 export function buildAutocompleteEntries(
   query: string,
   suggestions: WikiSuggestion[],
+  options: EntryOptions = { offerCreate: true },
 ): AutocompleteEntry[] {
   const entries: AutocompleteEntry[] = suggestions.map((suggestion) => ({
     kind: 'suggestion',
     suggestion,
   }))
   const title = query.trim()
-  if (title === '') {
+  if (title === '' || !options.offerCreate) {
     return entries
   }
   const key = foldKey(title)

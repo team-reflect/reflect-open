@@ -11,6 +11,7 @@ import {
 import { hasBridge, suggestWikiTargets } from '@reflect/core'
 import { formatDayLabel } from '@/lib/dates'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { useGraph } from '@/providers/graph-provider'
 import { buildAutocompleteEntries } from './wiki-autocomplete-entries'
 
 /**
@@ -36,18 +37,26 @@ interface WikiAutocompleteProps {
 
 export function WikiAutocomplete({ onCreate }: WikiAutocompleteProps): ReactElement {
   const editor = useEditor()
+  const { graph } = useGraph()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
 
-  const { data } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, 'wiki-suggest', query],
+  // The graph root is part of the key: a graph switch must never surface the
+  // previous graph's cached suggestions (the cache outlives the remount).
+  const { data, isFetching } = useQuery({
+    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'wiki-suggest', query],
     queryFn: () => suggestWikiTargets(query),
-    enabled: open && hasBridge(),
+    enabled: open && hasBridge() && graph !== null,
     // Keep the previous list while the next keystroke's query is in flight —
     // an empty flash per keypress reads as flicker.
     placeholderData: keepPreviousData,
   })
-  const entries = buildAutocompleteEntries(query, data ?? [])
+  // Offer Create only from settled results for *this* query: while fetching,
+  // `data` is the previous query's list (or empty), and a quick Enter could
+  // create a duplicate of a note the in-flight results would have matched.
+  const entries = buildAutocompleteEntries(query, data ?? [], {
+    offerCreate: !isFetching && data !== undefined,
+  })
 
   const insertLink = (target: string): void => {
     const view = editor.view
