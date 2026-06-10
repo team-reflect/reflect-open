@@ -75,7 +75,11 @@ export function buildPaletteSections(options: {
       })
     }
   }
-  for (const hit of hits) {
+  // The empty palette is the recall feed: suggestions only. The FTS query is
+  // keyed on a *deferred* value that can lag a just-cleared input — without
+  // this gate the previous search's body hits would leak into the feed.
+  const bodyHits = query === '' ? [] : hits
+  for (const hit of bodyHits) {
     if (!seen.has(hit.path)) {
       seen.add(hit.path)
       notes.push({ path: hit.path, title: hit.title, date: null, snippet: hit.snippet })

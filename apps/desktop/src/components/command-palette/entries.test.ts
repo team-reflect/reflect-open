@@ -27,6 +27,18 @@ describe('buildPaletteSections', () => {
     expect(sections.commandsOnly).toBe(false)
   })
 
+  it('an empty query ignores lagging FTS hits (recall feed only)', () => {
+    // The deferred index query can still hold the previous search's results
+    // when the input is cleared — they must not leak into the recall feed.
+    const sections = buildPaletteSections({
+      query: '',
+      suggestions: [],
+      hits: [hit('notes/stale.md', 'Stale Hit')],
+      commands: [],
+    })
+    expect(sections.notes).toEqual([])
+  })
+
   it('title matches lead and FTS hits dedupe behind them', () => {
     const sections = buildPaletteSections({
       query: 'alpha',
