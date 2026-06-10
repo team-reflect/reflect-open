@@ -1,5 +1,6 @@
 import {
   getLinkSources,
+  isAppError,
   nextAliases,
   parseNote,
   readNote,
@@ -8,8 +9,9 @@ import {
   upsertFrontmatter,
   writeNote,
 } from '@reflect/core'
-import type { NoteContentOrigin, NoteSession } from './note-session'
-import { liveSession } from './session-registry'
+import type { NoteContentOrigin } from './note-session'
+import { openSession } from './open-documents'
+import { startOperation } from '@/lib/operations'
 import { createTitleRenameTracker } from './title-rename'
 import type { TitleRename } from './title-rename'
 
@@ -18,14 +20,11 @@ import type { TitleRename } from './title-rename'
  * the serialized rewrite chain, and where the old-title alias lands. Extracted
  * from `useNoteDocument` for the same reason the session was — lifecycle
  * coupling (pane teardown, quit, note switches) belongs to an owned object,
- * not to effect-closure flags; the rename path never touches a React ref, so
- * it cannot observe another note's session no matter when it resolves.
+ * not to effect-closure flags. The rename path holds no React ref and no
+ * session of its own: session liveness comes from the open-documents service
+ * at placement time, and status surfaces through the global operations store —
+ * a rename is app-level background work, not pane state.
  */
-
-export interface RenameProgress {
-  done: number
-  total: number
-}
 
 export interface RenameCoordinatorOptions {
   /** Graph-relative path of the (possibly renamed) note. */
@@ -37,28 +36,27 @@ export interface RenameCoordinatorOptions {
    * content the title came from; "keep mine" re-arms, "load theirs" cancels).
    */
   canFire: () => boolean
-  /** Rewrite progress for the pane; `null` when idle. */
-  onProgress: (progress: RenameProgress | null) => void
 }
 
 export interface RenameCoordinator {
-  /** Bind the owning session; aliases route through it while the pane is open. */
-  bind(session: NoteSession): void
   /** Wire into the session's `onContent` stream (load/external/saved). */
   content(content: string, origin: NoteContentOrigin): void
   /** A settle point (blur, teardown, quit): fire any pending rename now. */
   settle(): void
   /** Resolves once settled renames' writes have landed (quit awaits this). */
   settled(): Promise<void>
-  /** Pane teardown: alias placement switches to direct disk writes. */
-  close(): void
   dispose(): void
 }
 
+function messageOf(error: unknown): string {
+  if (isAppError(error)) {
+    return error.message
+  }
+  return error instanceof Error ? error.message : String(error)
+}
+
 export function createRenameCoordinator(options: RenameCoordinatorOptions): RenameCoordinator {
-  const { path, generation, canFire, onProgress } = options
-  let session: NoteSession | null = null
-  let paneClosed = false
+  const { path, generation, canFire } = options
   /** Serializes rewrites — a second settle waits for the first. */
   let chain: Promise<void> = Promise.resolve()
 
@@ -79,6 +77,8 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
         )
         return
       }
+      const operation = startOperation(`Renaming "${rename.from}" → "${rename.to}"`)
+      let failure: string | null = null
       try {
         let collision = false
         try {
@@ -92,7 +92,7 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
               write: (forPath, contents) => writeNote(forPath, contents, gen),
               resolve: resolveWikiTarget,
             },
-            onProgress: (done, total) => onProgress({ done, total }),
+            onProgress: operation.progress,
           })
           collision = result.collision
         } catch (cause) {
@@ -100,6 +100,7 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
           // baseline has already advanced (re-arming would re-fire with a
           // stale `from` after further edits), so the alias is the safety
           // net that keeps every un-rewritten link resolving to this note.
+          failure = messageOf(cause)
           console.error('rename link rewrite failed:', cause)
         }
         if (collision) {
@@ -115,12 +116,12 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
         // rename): replacing from it would drop concurrently-gained entries.
         const aliasesOf = (source: string): string[] =>
           parseNote({ path, source }).frontmatter.aliases
-        // Route through a session whenever one is open: the bound one while
-        // this pane lives, or a *reopened* pane's live session afterwards —
-        // a direct disk write under a reopened dirty buffer would park a
-        // conflict caused by our own background work, and "keep mine" would
-        // silently drop the alias.
-        const owner = !paneClosed && session !== null ? session : liveSession(path)
+        // Route through the live session whenever the note is open — in this
+        // pane or a *reopened* one (the open-documents service is the one
+        // liveness signal). A direct disk write under a reopened dirty buffer
+        // would park a conflict caused by our own background work, and
+        // "keep mine" would silently drop the alias.
+        const owner = openSession(path)
         let placed = false
         if (owner !== null) {
           // Read and patch in the same tick (no await between): atomic against
@@ -149,9 +150,14 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
           }
         }
       } catch (cause) {
+        failure = messageOf(cause)
         console.error('rename alias placement failed:', cause)
       } finally {
-        onProgress(null)
+        if (failure !== null) {
+          operation.fail(`Rename "${rename.from}" → "${rename.to}": ${failure}`)
+        } else {
+          operation.done()
+        }
       }
     })
   }
@@ -159,9 +165,6 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
   const tracker = createTitleRenameTracker({ path, onRename: runRename, canFire })
 
   return {
-    bind(owner: NoteSession): void {
-      session = owner
-    },
     content(content: string, origin: NoteContentOrigin): void {
       if (origin === 'saved') {
         tracker.saved(content)
@@ -174,10 +177,6 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
     },
     settled(): Promise<void> {
       return chain
-    },
-    close(): void {
-      paneClosed = true
-      session = null
     },
     dispose(): void {
       tracker.dispose()

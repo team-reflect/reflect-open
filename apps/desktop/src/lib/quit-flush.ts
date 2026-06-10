@@ -1,6 +1,6 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { confirmQuit, hasBridge, subscribeQuitRequested } from '@reflect/core'
-import { flushAllNotes } from '@/editor/flush-registry'
+import { flushOpenDocuments } from '@/editor/open-documents'
 
 /**
  * Quit-time persistence: the webview never dies with dirty note buffers still
@@ -36,18 +36,18 @@ export function installQuitFlush(): () => void {
 
   void getCurrentWindow()
     .onCloseRequested(async () => {
-      await flushAllNotes()
+      await flushOpenDocuments()
     })
     .then(track)
 
   void subscribeQuitRequested(() => {
-    void flushAllNotes().finally(() => {
+    void flushOpenDocuments().finally(() => {
       void confirmQuit()
     })
   }).then(track)
 
   const onBeforeUnload = (): void => {
-    void flushAllNotes()
+    void flushOpenDocuments()
   }
   window.addEventListener('beforeunload', onBeforeUnload)
   track(() => window.removeEventListener('beforeunload', onBeforeUnload))

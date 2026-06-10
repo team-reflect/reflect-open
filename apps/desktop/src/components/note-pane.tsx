@@ -194,16 +194,6 @@ export function NotePane({
         </div>
       ) : null}
 
-      {document.renameProgress !== null ? (
-        <div
-          role="status"
-          className="mb-4 rounded-md border border-black/10 bg-black/5 px-3 py-2 text-xs text-[color:var(--text-muted)] dark:border-white/10 dark:bg-white/5"
-        >
-          Updating links to this note… {document.renameProgress.done}/
-          {document.renameProgress.total}
-        </div>
-      ) : null}
-
       {document.dirty ? (
         <span
           aria-label="Unsaved changes"
