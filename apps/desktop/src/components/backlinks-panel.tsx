@@ -1,9 +1,6 @@
 import type { ReactElement } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { getBacklinksWithContext, hasBridge } from '@reflect/core'
 import { NoteLinkList } from '@/components/note-link-list'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
-import { useGraph } from '@/providers/graph-provider'
+import { useBacklinks } from '@/lib/use-backlinks'
 import { routeForPath } from '@/routing/route'
 import { useRouter } from '@/routing/router'
 
@@ -21,15 +18,7 @@ interface BacklinksPanelProps {
 
 export function BacklinksPanel({ path }: BacklinksPanelProps): ReactElement | null {
   const { navigate } = useRouter()
-  const { graph } = useGraph()
-  // The graph root is part of the key: index rows belong to one graph, and a
-  // graph switch must never serve the previous graph's cached rows (the cache
-  // outlives the workspace remount; invalidation alone lags the reconcile).
-  const { data } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'backlinks', path],
-    queryFn: () => getBacklinksWithContext(path),
-    enabled: hasBridge() && graph !== null,
-  })
+  const { data } = useBacklinks(path)
 
   if (!data || data.length === 0) {
     return null

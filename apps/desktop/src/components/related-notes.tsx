@@ -1,9 +1,6 @@
 import type { ReactElement } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { hasBridge, relatedNotes } from '@reflect/core'
 import { NoteLinkList } from '@/components/note-link-list'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
-import { useGraph } from '@/providers/graph-provider'
+import { useSimilarNotes } from '@/lib/use-similar-notes'
 import { routeForPath } from '@/routing/route'
 import { useRouter } from '@/routing/router'
 
@@ -19,16 +16,13 @@ interface RelatedNotesProps {
  * sync + index invalidation (saves re-embed → scope invalidates → refetch) —
  * no pane-provided seed text to go stale. Renders nothing when the note has
  * no vectors yet (model never enabled, not yet embedded) or nothing relates.
+ * Query errors are deliberately as quiet as emptiness — unlike backlinks,
+ * a failing semantic leg means an optional feature is unavailable, not that
+ * the index is broken.
  */
 export function RelatedNotes({ path }: RelatedNotesProps): ReactElement | null {
   const { navigate } = useRouter()
-  const { graph } = useGraph()
-
-  const { data } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'related', path],
-    queryFn: () => relatedNotes(path),
-    enabled: hasBridge() && graph !== null,
-  })
+  const { data } = useSimilarNotes(path)
 
   const related = data ?? []
   if (related.length === 0) {

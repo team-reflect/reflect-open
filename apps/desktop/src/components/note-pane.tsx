@@ -131,6 +131,7 @@ export function NotePane({
         <ProtectedNoteView content={document.initialContent} />
         <div className={contextInSidebar ? 'lg:hidden' : undefined}>
           <BacklinksPanel path={path} />
+          <RelatedNotes path={path} />
         </div>
       </div>
     )
