@@ -10,6 +10,8 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "lint": "oxlint apps packages",
+    "lint:fix": "oxlint --fix apps packages",
+    "check": "pnpm typecheck && pnpm lint",
     "tauri": "pnpm --filter @reflect/desktop tauri"
   },
   "devDependencies": {
