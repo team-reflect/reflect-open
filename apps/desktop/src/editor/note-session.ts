@@ -35,7 +35,12 @@ export type NoteSessionStatus = 'loading' | 'ready' | 'error'
 /** The observable document state, emitted to `onSnapshot` whenever it changes. */
 export interface NoteSessionSnapshot {
   status: NoteSessionStatus
-  /** Markdown to seed the editor with once `status` is `ready`. */
+  /**
+   * Markdown to seed the editor with once `status` is `ready` — the body
+   * (the editor never sees frontmatter). While `protected` it is the **full**
+   * file instead: the read-only view's job is honest display of a file we
+   * refuse to touch, frontmatter included.
+   */
   initialContent: string
   /**
    * True when the editor cannot faithfully round-trip this note (a converter
@@ -316,7 +321,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     const lossy = classify(doc.body) === 'lossy'
     const flipped = lossy !== isProtected
     isProtected = lossy
-    initialContent = doc.body
+    initialContent = lossy ? content : doc.body
     emit()
     // While protected there is no live editor mounted (the pane shows the
     // read-only view), and lossy content must never enter one regardless.
@@ -384,7 +389,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
         dirty = false
         // The data-loss gate: a note the editor can't reproduce opens read-only.
         isProtected = classify(doc.body) === 'lossy'
-        initialContent = doc.body
+        initialContent = isProtected ? content : doc.body
         status = 'ready'
         emit()
         onContent?.(content, 'load')

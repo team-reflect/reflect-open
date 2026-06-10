@@ -169,6 +169,20 @@ describe('frontmatter ownership (Plan 07b)', () => {
     expect(ready?.initialContent).toBe('# Hello\n')
   })
 
+  it('a protected note shows the full file, frontmatter included', async () => {
+    const h = harness({
+      disk: `${FM}- [ ] lossy body\n`,
+      classify: (markdown) => (markdown.includes('- [ ]') ? 'lossy' : 'exact'),
+    })
+    h.session.load()
+    await vi.runAllTimersAsync()
+    const ready = h.snapshots.at(-1)
+    expect(ready?.protected).toBe(true)
+    // The read-only view's job is honest display of a file we refuse to
+    // touch — hiding the frontmatter would misrepresent it.
+    expect(ready?.initialContent).toBe(`${FM}- [ ] lossy body\n`)
+  })
+
   it('saves rejoin the exact header bytes around the edited body', async () => {
     const h = harness({ disk: `${FM}# Hello\n` })
     h.session.load()
