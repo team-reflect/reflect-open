@@ -11,6 +11,7 @@ import { useNoteDocument } from '@/editor/use-note-document'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
 import { WikiAutocomplete } from '@/editor/wiki-autocomplete'
 import { createNoteWithTitle } from '@/lib/create-note'
+import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
 
@@ -23,6 +24,12 @@ interface NotePaneProps {
   autoFocus?: boolean
   /** Called once the autofocus actually happened (the editor mounted). */
   onAutoFocused?: () => void
+  /**
+   * Extra classes for the pane root in every state (loading, error,
+   * protected, editing). The note route uses this to make the pane a
+   * stretching flex column so the editor can fill the viewport.
+   */
+  className?: string
   /**
    * Extra classes for the editable area (e.g. the daily stream's per-day
    * `min-h-*`). Applied to the contenteditable root, so the reserved space
@@ -60,6 +67,7 @@ export function NotePane({
   lazy = false,
   autoFocus = false,
   onAutoFocused,
+  className,
   editorClassName,
   contextInSidebar = false,
 }: NotePaneProps): ReactElement {
@@ -122,13 +130,13 @@ export function NotePane({
 
   if (document.status === 'loading') {
     return (
-      <div className="px-1 py-2 text-sm text-text-muted">Loading note…</div>
+      <div className={cn('px-1 py-2 text-sm text-text-muted', className)}>Loading note…</div>
     )
   }
 
   if (document.status === 'error') {
     return (
-      <div role="alert" className="px-1 py-2 text-sm text-red-500">
+      <div role="alert" className={cn('px-1 py-2 text-sm text-red-500', className)}>
         Couldn’t open {path}: {document.error}
       </div>
     )
@@ -136,7 +144,7 @@ export function NotePane({
 
   if (document.protected) {
     return (
-      <div>
+      <div className={className}>
         <ProtectedNoteView content={document.initialContent} />
         <BacklinksPanel path={path} />
         <div className={contextInSidebar ? 'lg:hidden' : undefined}>
@@ -147,7 +155,7 @@ export function NotePane({
   }
 
   return (
-    <div className="relative" aria-label={`Editing ${path}`}>
+    <div className={cn('relative', className)} aria-label={`Editing ${path}`}>
       {document.error !== null ? (
         <InlineAlert tone="error" className="mb-4">
           Saving failed: {document.error}. Your edits are kept in the editor and the next

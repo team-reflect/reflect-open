@@ -28,10 +28,21 @@ export function RouteContent(): ReactElement {
       // is a real calendar day by the time it reaches a view.
       return <DailyStream targetDate={route.date} />
     case 'note':
+      // The vertical padding lives on the inner column (not the scroll
+      // container) so `min-h-full` fills the viewport exactly; the flex chain
+      // stretches the editor over any leftover space, making the whole note
+      // body click-to-focus.
       return (
-        <ScrollRestored className="h-full overflow-auto px-6 py-8">
-          <div className="mx-auto w-full max-w-2xl">
-            <NotePane path={route.path} lazy autoFocus contextInSidebar />
+        <ScrollRestored className="h-full overflow-auto px-6">
+          <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col py-8">
+            <NotePane
+              path={route.path}
+              lazy
+              autoFocus
+              contextInSidebar
+              className="flex grow flex-col"
+              editorClassName="grow"
+            />
           </div>
         </ScrollRestored>
       )
