@@ -113,9 +113,14 @@ function WorkspaceContent({ graph }: GraphWorkspaceProps): ReactElement {
  */
 function SearchRoute({ query, today }: { query: string; today: string }): ReactElement {
   const { openPalette } = usePalette()
+  const { arrivalSeq, entryId } = useRouter()
+  // Keyed on the *arrival*, not just the value (the daily stream's lesson):
+  // re-navigating to the same search route bumps arrivalSeq without a remount,
+  // and back/forward changes entryId without bumping arrivalSeq — both are
+  // arrivals, and arriving on search opens the palette (decided).
   useEffect(() => {
     openPalette(query)
-  }, [query, openPalette])
+  }, [query, arrivalSeq, entryId, openPalette])
   return <DailyStream targetDate={today} />
 }
 
