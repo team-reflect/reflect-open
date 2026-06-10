@@ -60,6 +60,7 @@ function renderPalette(query: string, context?: Partial<CommandContext>) {
     toggleSidebar: vi.fn(),
     generation: () => 1,
     openPalette: vi.fn(),
+    enableSemanticSearch: vi.fn(),
     ...context,
   }
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })

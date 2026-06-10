@@ -14,6 +14,12 @@ vi.mock('@/providers/graph-provider', () => ({
 vi.mock('@/providers/theme-provider', () => ({
   useTheme: () => ({ theme: 'light', resolvedTheme: 'light', setTheme: vi.fn() }),
 }))
+vi.mock('@/providers/settings-provider', () => ({
+  useSettings: () => ({
+    settings: { editorMarkdownSyntax: 'focus', semanticSearchEnabled: false, theme: 'system' },
+    updateSettings: vi.fn(),
+  }),
+}))
 
 registerAppCommands() // production does this in main.tsx
 

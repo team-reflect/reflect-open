@@ -75,6 +75,7 @@ export {
 export {
   settingsSchema,
   editorMarkdownSyntaxSchema,
+  semanticSearchEnabledSchema,
   themePreferenceSchema,
   DEFAULT_SETTINGS,
   type Settings,

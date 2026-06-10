@@ -4018,6 +4018,7 @@ dependencies = [
  "base64 0.22.1",
  "dirs",
  "fastembed",
+ "hf-hub",
  "notify",
  "notify-debouncer-full",
  "rusqlite",

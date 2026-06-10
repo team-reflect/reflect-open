@@ -4,9 +4,13 @@
 //! "unavailable" state (the same recoverable contract as sqlite-vec): semantic
 //! search is strictly additive, so nothing here may ever take the app down.
 
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
+use hf_hub::api::sync::ApiBuilder;
+use hf_hub::api::Progress;
+use hf_hub::Cache;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -16,17 +20,49 @@ use crate::error::{AppError, AppResult};
 /// an embedding rebuild (`index_meta.embeddingModel` comparison in TS).
 pub const MODEL_ID: &str = "all-MiniLM-L6-v2";
 
+/// The hf-hub repo and files fastembed resolves for `AllMiniLML6V2`. Mirrored
+/// here so the pre-download (the progress-reporting path) fills the exact
+/// cache `try_new` reads. If fastembed ever changes its file set, the only
+/// cost is that it downloads the difference itself — without progress.
+const MODEL_REPO: &str = "Qdrant/all-MiniLM-L6-v2-onnx";
+const MODEL_FILES: [&str; 5] = [
+    "model.onnx",
+    "tokenizer.json",
+    "config.json",
+    "special_tokens_map.json",
+    "tokenizer_config.json",
+];
+
 #[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase", tag = "status")]
+#[serde(
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    tag = "status"
+)]
 pub enum EmbedStatus {
     /// No model loaded yet; `embed_ensure` will download/load it.
     Uninitialized,
-    /// Download/load in progress (first run downloads ~90MB).
-    Loading,
+    /// Download/load in progress (first run downloads ~90MB). The byte
+    /// counters are only present on the progress events an active download
+    /// emits — a status poll, or the load of an already-cached model, carries
+    /// no totals to report.
+    Loading {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        downloaded_bytes: Option<u64>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        total_bytes: Option<u64>,
+    },
     /// `embed_texts` is ready; `model` is recorded per vector (rebuild key).
     Ready { model: String },
     /// Load failed; semantic search is unavailable (lexical still works).
     Failed { message: String },
+}
+
+fn loading_status() -> EmbedStatus {
+    EmbedStatus::Loading {
+        downloaded_bytes: None,
+        total_bytes: None,
+    }
 }
 
 #[derive(Default)]
@@ -56,7 +92,7 @@ fn lock_state<'a>(
 fn status_of(runtime: &Runtime) -> EmbedStatus {
     match runtime {
         Runtime::Uninitialized => EmbedStatus::Uninitialized,
-        Runtime::Loading => EmbedStatus::Loading,
+        Runtime::Loading => loading_status(),
         Runtime::Ready(_) => EmbedStatus::Ready {
             model: MODEL_ID.to_string(),
         },
@@ -68,6 +104,117 @@ fn status_of(runtime: &Runtime) -> EmbedStatus {
 
 fn emit_status(app: &AppHandle, status: &EmbedStatus) {
     let _ = app.emit("embed:status", status);
+}
+
+/// How many newly-downloaded bytes accumulate between progress events — about
+/// ninety events for the full model, comfortably few for the IPC channel yet
+/// smooth enough for a progress bar.
+const PROGRESS_EMIT_STEP: u64 = 1024 * 1024;
+
+struct DownloadState {
+    app: AppHandle,
+    downloaded: u64,
+    total: u64,
+    emitted: u64,
+}
+
+impl DownloadState {
+    fn emit(&mut self) {
+        self.emitted = self.downloaded;
+        emit_status(
+            &self.app,
+            &EmbedStatus::Loading {
+                downloaded_bytes: Some(self.downloaded),
+                total_bytes: Some(self.total),
+            },
+        );
+    }
+}
+
+/// Cumulative byte progress across the whole file set, surfaced as
+/// `embed:status` events. hf-hub takes the reporter by value per file, so the
+/// shared tally lives behind an `Arc` and each download gets a clone.
+#[derive(Clone)]
+struct DownloadProgress(Arc<Mutex<DownloadState>>);
+
+impl DownloadProgress {
+    fn new(app: AppHandle, total: u64) -> Self {
+        let mut state = DownloadState {
+            app,
+            downloaded: 0,
+            total,
+            emitted: 0,
+        };
+        // Surface the total before the first chunk lands, so the bar starts
+        // at a real 0% instead of indeterminate.
+        state.emit();
+        Self(Arc::new(Mutex::new(state)))
+    }
+}
+
+impl Progress for DownloadProgress {
+    fn init(&mut self, _size: usize, _filename: &str) {}
+
+    fn update(&mut self, size: usize) {
+        let Ok(mut state) = self.0.lock() else {
+            return;
+        };
+        state.downloaded += size as u64;
+        if state.downloaded - state.emitted >= PROGRESS_EMIT_STEP || state.downloaded >= state.total
+        {
+            state.emit();
+        }
+    }
+
+    fn finish(&mut self) {}
+}
+
+/// Fetch whatever model files are missing from the cache, with byte progress.
+/// fastembed downloads these itself inside `try_new`, but silently; fetching
+/// them first through the same hf-hub cache gives the UI a real progress bar
+/// and leaves `try_new` a pure cache hit. Mirrors fastembed's resolution —
+/// env overrides included — so both sides agree on location and endpoint.
+fn download_model_files(app: &AppHandle, cache_dir: &Path) -> Result<(), String> {
+    let cache_dir = std::env::var("HF_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| cache_dir.to_path_buf());
+    let endpoint =
+        std::env::var("HF_ENDPOINT").unwrap_or_else(|_| "https://huggingface.co".to_string());
+
+    let cached = Cache::new(cache_dir.clone()).model(MODEL_REPO.to_string());
+    let missing: Vec<&str> = MODEL_FILES
+        .iter()
+        .copied()
+        .filter(|file| cached.get(file).is_none())
+        .collect();
+    if missing.is_empty() {
+        return Ok(());
+    }
+
+    let api = ApiBuilder::new()
+        .with_cache_dir(cache_dir)
+        .with_endpoint(endpoint)
+        .build()
+        .map_err(|err| format!("hf-hub api: {err}"))?;
+    let repo = api.model(MODEL_REPO.to_string());
+
+    // Size every missing file up front (HEAD-weight requests, ~nothing next
+    // to the 90MB body) so the bar tracks one stable total instead of
+    // restarting per file.
+    let mut total: u64 = 0;
+    for file in &missing {
+        total += api
+            .metadata(&repo.url(file))
+            .map_err(|err| format!("sizing {file}: {err}"))?
+            .size() as u64;
+    }
+
+    let progress = DownloadProgress::new(app.clone(), total);
+    for file in missing {
+        repo.download_with_progress(file, progress.clone())
+            .map_err(|err| format!("downloading {file}: {err}"))?;
+    }
+    Ok(())
 }
 
 /// Current runtime status (poll on startup; live changes arrive on
@@ -100,13 +247,15 @@ pub async fn embed_ensure(app: AppHandle, state: State<'_, EmbedState>) -> AppRe
             }
         }
     }
-    emit_status(&app, &EmbedStatus::Loading);
+    emit_status(&app, &loading_status());
 
     // From here every path — success, load failure, even a panicked blocking
     // task — must land the state in Ready or Failed: an early `?` would wedge
     // the runtime in Loading forever (later ensures return early on Loading).
+    let app_for_progress = app.clone();
     let loaded: Result<TextEmbedding, String> =
         match tauri::async_runtime::spawn_blocking(move || {
+            download_model_files(&app_for_progress, &cache_dir)?;
             TextEmbedding::try_new(
                 InitOptions::new(EmbeddingModel::AllMiniLML6V2).with_cache_dir(cache_dir),
             )

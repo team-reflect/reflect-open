@@ -51,6 +51,7 @@ function renderSidebar(overrides?: Partial<CommandContext>) {
     toggleSidebar: vi.fn(),
     generation: () => 1,
     openPalette,
+    enableSemanticSearch: vi.fn(),
     ...overrides,
   }
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })

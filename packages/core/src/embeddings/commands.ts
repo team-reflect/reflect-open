@@ -6,7 +6,13 @@ import { call } from '../ipc/invoke'
 
 export const embedStatusSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('uninitialized') }),
-  z.object({ status: z.literal('loading') }),
+  z.object({
+    status: z.literal('loading'),
+    /** Bytes fetched so far; only present on an active download's events. */
+    downloadedBytes: z.number().int().nonnegative().optional(),
+    /** Bytes the download will fetch in total; present alongside the above. */
+    totalBytes: z.number().int().nonnegative().optional(),
+  }),
   z.object({ status: z.literal('ready'), model: z.string() }),
   z.object({ status: z.literal('failed'), message: z.string() }),
 ])

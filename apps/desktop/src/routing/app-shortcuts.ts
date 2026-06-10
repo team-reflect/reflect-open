@@ -3,8 +3,10 @@ import { usePalette } from '@/components/command-palette/palette-provider'
 import { registerKeymap } from '@/editor/keymap'
 import { APP_COMMANDS } from '@/lib/commands/app-commands'
 import { runCommand } from '@/lib/commands/registry'
+import { retryFailedEmbeddings } from '@/lib/semantic'
 import type { CommandContext } from '@/lib/commands/types'
 import { useGraph } from '@/providers/graph-provider'
+import { useSettings } from '@/providers/settings-provider'
 import { useSidebar } from '@/providers/sidebar-provider'
 import { useTheme } from '@/providers/theme-provider'
 import { useRouter } from './router'
@@ -43,6 +45,7 @@ export function useAppShortcuts(): CommandContext {
   const { graph } = useGraph()
   const { openPalette, open: paletteOpen } = usePalette()
   const { toggleSidebar } = useSidebar()
+  const { updateSettings } = useSettings()
 
   // The palette is modal: app shortcuts must not navigate behind its overlay.
   // A ref keeps the listener stable across open/close renders.
@@ -66,8 +69,14 @@ export function useAppShortcuts(): CommandContext {
       toggleSidebar,
       generation: () => generationRef.current,
       openPalette,
+      enableSemanticSearch: () => {
+        updateSettings({ semanticSearchEnabled: true })
+        // EmbeddingsSync loads an untouched runtime; a `failed` one only
+        // retries on an explicit action like this command.
+        void retryFailedEmbeddings()
+      },
     }),
-    [navigate, back, forward, resolvedTheme, setTheme, openPalette, toggleSidebar],
+    [navigate, back, forward, resolvedTheme, setTheme, openPalette, toggleSidebar, updateSettings],
   )
 
   useEffect(() => {

@@ -1,16 +1,22 @@
 import { useEffect, useRef } from 'react'
 import { embedNote, embedRemove, subscribeFileChanges } from '@reflect/core'
-import { backfillEmbeddingsVisibly, ensureEmbeddingsVisibly, semanticEnabled } from '@/lib/semantic'
+import {
+  backfillEmbeddingsVisibly,
+  consumeLegacySemanticOptIn,
+  ensureEmbeddingsVisibly,
+} from '@/lib/semantic'
 import { useEmbedStatus } from '@/lib/use-embed-status'
 import { useGraph } from '@/providers/graph-provider'
+import { useSettings } from '@/providers/settings-provider'
 
 /**
  * Keeps embeddings in sync with the graph (Plan 09). Renders nothing; mounted
  * once per workspace. Three jobs, all gated on the runtime being `ready`:
  *
- * - auto-load the model on launch when semantic search was previously enabled
- *   (the cache makes this instant; the first download only ever happens via
- *   the explicit `semantic.enable` command);
+ * - load the model whenever `semanticSearchEnabled` is on and the runtime is
+ *   untouched — at launch for users who opted in earlier (the cache makes
+ *   that instant) and the moment the setting flips on (the one place the
+ *   first download starts);
  * - run one incremental backfill per graph-open once `ready` (hash-skip makes
  *   this cheap when nothing changed);
  * - follow the watcher: changed notes re-embed, deleted notes drop vectors.
@@ -18,6 +24,7 @@ import { useGraph } from '@/providers/graph-provider'
  */
 export function EmbeddingsSync(): null {
   const { graph, indexGeneration } = useGraph()
+  const { settings, updateSettings } = useSettings()
   const status = useEmbedStatus()
   const queue = useRef<Promise<void>>(Promise.resolve())
 
@@ -25,15 +32,26 @@ export function EmbeddingsSync(): null {
   // the file-write generation in GraphInfo — the counters are independent.
   const generation = indexGeneration
   const root = graph?.root ?? null
+  const enabled = settings.semanticSearchEnabled
   const ready = status.status === 'ready'
   const modelId = status.status === 'ready' ? status.model : null
 
-  // Auto-load on launch for users who opted in earlier.
+  // The opt-in predates the settings document (it lived in localStorage);
+  // carry it over once so those users keep semantic search across the move.
   useEffect(() => {
-    if (status.status === 'uninitialized' && semanticEnabled()) {
+    if (consumeLegacySemanticOptIn()) {
+      updateSettings({ semanticSearchEnabled: true })
+    }
+  }, [updateSettings])
+
+  // Load while enabled and untouched. Deliberately not retried on `failed`:
+  // an automatic loop would hammer a broken download — recovery rides the
+  // explicit enable/retry actions instead (see retryFailedEmbeddings).
+  useEffect(() => {
+    if (enabled && status.status === 'uninitialized') {
       void ensureEmbeddingsVisibly()
     }
-  }, [status.status])
+  }, [enabled, status.status])
 
   // One backfill per (graph, model) once ready, then live watcher follow-up.
   useEffect(() => {
