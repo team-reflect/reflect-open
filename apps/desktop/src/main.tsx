@@ -6,6 +6,7 @@ import { queryClient } from '@/lib/query-client'
 import { registerAppCommands } from '@/lib/commands/app-commands'
 import { installTauriBridge } from '@/lib/tauri-bridge'
 import { GraphProvider } from '@/providers/graph-provider'
+import { SettingsProvider } from '@/providers/settings-provider'
 import { ThemeProvider } from '@/providers/theme-provider'
 import '@/styles/index.css'
 
@@ -21,9 +22,11 @@ createRoot(rootElement).render(
   <StrictMode>
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <GraphProvider>
-          <App />
-        </GraphProvider>
+        <SettingsProvider>
+          <GraphProvider>
+            <App />
+          </GraphProvider>
+        </SettingsProvider>
       </QueryClientProvider>
     </ThemeProvider>
   </StrictMode>,

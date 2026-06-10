@@ -15,6 +15,7 @@ export type Route =
   | { kind: 'daily'; date: string }
   | { kind: 'note'; path: string }
   | { kind: 'search'; query: string }
+  | { kind: 'settings' }
 
 /** Structural route equality (used to avoid pushing no-op history entries). */
 export function routesEqual(a: Route, b: Route): boolean {
@@ -23,6 +24,7 @@ export function routesEqual(a: Route, b: Route): boolean {
   }
   switch (a.kind) {
     case 'today':
+    case 'settings':
       return true
     case 'daily':
       return a.date === (b as Extract<Route, { kind: 'daily' }>).date

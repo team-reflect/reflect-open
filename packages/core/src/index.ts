@@ -49,6 +49,16 @@ export {
   forgetRecent,
 } from './graph/commands'
 
+// User settings (config-dir JSON document; Rust persists, this layer validates)
+export {
+  settingsSchema,
+  editorMarkModeSchema,
+  DEFAULT_SETTINGS,
+  type Settings,
+  type EditorMarkMode,
+} from './settings/schema'
+export { loadSettings, saveSettings } from './settings/commands'
+
 // Markdown document model (Plan 03)
 export {
   frontmatterSchema,

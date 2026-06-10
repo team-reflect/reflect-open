@@ -64,6 +64,13 @@ const APP_COMMANDS: AppCommand[] = [
     run: (context) => context.toggleTheme(),
   },
   {
+    id: 'settings.open',
+    title: 'Open settings',
+    keywords: ['preferences', 'config', 'options'],
+    keybinding: 'Mod-,',
+    run: (context) => context.navigate({ kind: 'settings' }),
+  },
+  {
     id: 'index.rebuild',
     title: 'Rebuild search index',
     keywords: ['reindex', 'refresh'],

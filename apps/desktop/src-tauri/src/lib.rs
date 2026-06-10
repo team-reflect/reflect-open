@@ -5,13 +5,15 @@
 //! composition* — a command here never encodes product rules beyond the
 //! primitive it exposes. Each module wires one capability:
 //! [`fs`] (graph file IO), [`db`] (SQLite index), [`watcher`] (file events),
-//! [`recents`] (recent-graphs store), [`error`] (the shared error contract).
+//! [`recents`] (recent-graphs store), [`settings`] (user settings store),
+//! [`error`] (the shared error contract).
 
 mod db;
 mod error;
 mod fs;
 mod quit;
 mod recents;
+mod settings;
 mod watcher;
 
 use tauri::{Emitter, Manager};
@@ -55,6 +57,8 @@ pub fn run() {
             fs::list_files,
             recents::recent_graphs,
             recents::forget_recent,
+            settings::settings_load,
+            settings::settings_save,
             db::index_open,
             db::index_apply,
             db::index_apply_batch,

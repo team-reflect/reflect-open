@@ -1,10 +1,12 @@
 import { useCallback, useEffect, type ReactElement } from 'react'
 import type { GraphInfo } from '@reflect/core'
+import { Settings } from 'lucide-react'
 import { AppShell } from '@/components/app-shell'
 import { CommandPalette } from '@/components/command-palette/command-palette'
 import { PaletteProvider, usePalette } from '@/components/command-palette/palette-provider'
 import { DailyStream } from '@/components/daily-stream'
 import { NotePane } from '@/components/note-pane'
+import { SettingsScreen } from '@/components/settings-screen'
 import { useAppVersion } from '@/hooks/use-app-version'
 import { isIsoDate } from '@/lib/dates'
 import { useToday } from '@/lib/use-today'
@@ -45,6 +47,7 @@ export function GraphWorkspace({ graph }: GraphWorkspaceProps): ReactElement {
 function WorkspaceContent({ graph }: GraphWorkspaceProps): ReactElement {
   const { resolvedTheme, setTheme } = useTheme()
   const { indexing } = useGraph()
+  const { navigate } = useRouter()
   const version = useAppVersion()
   const commandContext = useAppShortcuts()
 
@@ -84,6 +87,15 @@ function WorkspaceContent({ graph }: GraphWorkspaceProps): ReactElement {
               className="rounded-md border border-black/10 px-2.5 py-1 text-xs font-medium dark:border-white/10"
             >
               {resolvedTheme === 'dark' ? 'Light' : 'Dark'} mode
+            </button>
+            <button
+              type="button"
+              aria-label="Open settings"
+              title="Settings (⌘,)"
+              onClick={() => navigate({ kind: 'settings' })}
+              className="rounded-md border border-black/10 p-1.5 text-[color:var(--text-secondary)] dark:border-white/10"
+            >
+              <Settings aria-hidden className="size-3.5" />
             </button>
           </div>
         </header>
@@ -145,5 +157,13 @@ function RouteContent(): ReactElement {
       )
     case 'search':
       return <SearchRoute query={route.query} today={today} />
+    case 'settings':
+      return (
+        <ScrollRestored className="h-full overflow-auto px-6 py-8">
+          <div className="mx-auto w-full max-w-2xl">
+            <SettingsScreen />
+          </div>
+        </ScrollRestored>
+      )
   }
 }

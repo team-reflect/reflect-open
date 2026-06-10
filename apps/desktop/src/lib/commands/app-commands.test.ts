@@ -51,6 +51,12 @@ describe('app commands', () => {
     expect(context.toggleTheme).toHaveBeenCalled()
   })
 
+  it('settings.open navigates to the settings screen', async () => {
+    const { context, navigated } = fakeContext()
+    await command('settings.open').run(context)
+    expect(navigated).toEqual([{ kind: 'settings' }])
+  })
+
   it('note.new navigates to a fresh lazy ULID note path', async () => {
     const { context, navigated } = fakeContext()
     await command('note.new').run(context)
