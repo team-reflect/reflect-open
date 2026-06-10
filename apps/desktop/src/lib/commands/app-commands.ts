@@ -1,6 +1,11 @@
-import { notePath, randomNotePath, rebuildIndex } from '@reflect/core'
+import { embedStatus, notePath, randomNotePath, rebuildIndex } from '@reflect/core'
 import { ulid } from 'ulidx'
 import { startOperation } from '@/lib/operations'
+import {
+  backfillEmbeddingsVisibly,
+  ensureEmbeddingsVisibly,
+  setSemanticEnabled,
+} from '@/lib/semantic'
 import { registerCommands } from './registry'
 import type { AppCommand } from './types'
 
@@ -71,6 +76,19 @@ const APP_COMMANDS: AppCommand[] = [
     run: (context) => context.navigate({ kind: 'settings' }),
   },
   {
+    id: 'semantic.enable',
+    title: 'Enable semantic search',
+    keywords: ['embeddings', 'ai', 'similar', 'model'],
+    // Downloads the local model (~90MB) — deliberately a command, never
+    // automatic: the first network fetch is the user's call. EmbeddingsSync
+    // reacts to `ready` with the backfill, and the persisted flag makes
+    // later launches load from cache without asking again.
+    run: async () => {
+      setSemanticEnabled(true)
+      await ensureEmbeddingsVisibly()
+    },
+  },
+  {
     id: 'index.rebuild',
     title: 'Rebuild search index',
     keywords: ['reindex', 'refresh'],
@@ -86,6 +104,14 @@ const APP_COMMANDS: AppCommand[] = [
         operation.done()
       } catch (cause) {
         operation.fail(cause instanceof Error ? cause.message : String(cause))
+        return
+      }
+      // index_clear wiped the embedding tables with everything else — rebuild
+      // them too, or semantic search stays silently empty until some other
+      // trigger re-embeds.
+      const embed = await embedStatus()
+      if (embed.status === 'ready') {
+        await backfillEmbeddingsVisibly({ generation, modelId: embed.model })
       }
     },
   },

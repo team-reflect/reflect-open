@@ -17,9 +17,10 @@ use crate::error::{AppError, AppResult};
 
 /// Ordered schema migrations, loaded from `migrations/*.sql`.
 static MIGRATIONS: LazyLock<Migrations<'static>> = LazyLock::new(|| {
-    Migrations::new(vec![M::up(include_str!(
-        "../../migrations/0001_initial.sql"
-    ))])
+    Migrations::new(vec![
+        M::up(include_str!("../../migrations/0001_initial.sql")),
+        M::up(include_str!("../../migrations/0002_embeddings.sql")),
+    ])
 });
 
 /// Result of the one-time sqlite-vec registration; the error message is cached so
@@ -85,6 +86,12 @@ pub(super) fn open_index_at(root: &Path) -> AppResult<Connection> {
 }
 
 #[cfg(test)]
-pub(super) fn validate_migrations() -> Result<(), rusqlite_migration::Error> {
-    MIGRATIONS.validate()
+pub(super) fn validate_migrations() -> AppResult<()> {
+    // Validation replays the migrations on its own connection; vec0 must be
+    // registered first (the auto-extension is process-global but not innate —
+    // without this the test is order-dependent on whoever registers first).
+    register_sqlite_vec()?;
+    MIGRATIONS
+        .validate()
+        .map_err(|err| AppError::io(format!("invalid migration set: {err}")))
 }

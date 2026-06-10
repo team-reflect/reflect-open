@@ -15,6 +15,28 @@ export { setBridge, hasBridge, type IpcBridge, type Unlisten } from './ipc/bridg
 export { call } from './ipc/invoke'
 export { getAppVersion } from './ipc/commands'
 export { confirmQuit, subscribeQuitRequested } from './app/quit'
+
+// Embeddings & retrieval (Plan 09)
+export { chunkNote, type NoteChunk } from './embeddings/chunk'
+export {
+  embedStatus,
+  embedEnsure,
+  embedTexts,
+  embedApply,
+  embedRemove,
+  subscribeEmbedStatus,
+  embedStatusSchema,
+  type EmbedStatus,
+  type EmbedChunkPayload,
+} from './embeddings/commands'
+export { embedNote, backfillEmbeddings } from './embeddings/pipeline'
+export {
+  retrieve,
+  relatedNotes,
+  fuseRanked,
+  type RetrievalHit,
+  type RetrieveOptions,
+} from './embeddings/retrieve'
 export { appErrorSchema, isAppError, toAppError, type AppError } from './errors'
 
 // Graph & file storage (Plan 02)

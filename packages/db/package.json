@@ -19,6 +19,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "better-sqlite3": "^12.10.0",
     "kysely-codegen": "^0.20.0",
+    "sqlite-vec": "^0.1.9",
     "typescript": "~5.8.3",
     "vitest": "^3"
   }

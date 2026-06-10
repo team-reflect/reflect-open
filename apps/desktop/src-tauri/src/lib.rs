@@ -9,6 +9,7 @@
 //! [`error`] (the shared error contract).
 
 mod db;
+mod embed;
 mod error;
 mod fs;
 mod quit;
@@ -45,6 +46,7 @@ pub fn run() {
         .manage(db::IndexState::default())
         .manage(watcher::WatcherState::default())
         .manage(quit::QuitState::default())
+        .manage(embed::EmbedState::default())
         .invoke_handler(tauri::generate_handler![
             app_version,
             fs::graph_open,
@@ -65,6 +67,11 @@ pub fn run() {
             db::index_remove,
             db::index_clear,
             db::db_query,
+            db::embed_apply,
+            db::embed_remove,
+            embed::embed_status,
+            embed::embed_ensure,
+            embed::embed_texts,
             watcher::watch_start,
             watcher::watch_stop,
             quit::quit_confirm,

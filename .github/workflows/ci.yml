@@ -87,6 +87,28 @@ jobs:
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: apps/desktop/src-tauri
+          # A failed clippy/test run still compiled the dependency tree; save it
+          # so the next push doesn't pay the cold-build cost again.
+          cache-on-failure: true
+
+      # ort-sys (fastembed → ort) downloads prebuilt ONNX Runtime binaries at
+      # build time and extracts them to ~/.cache/ort.pyke.io — outside target/,
+      # so rust-cache never captures them and every run re-downloads. The build
+      # script skips the download when the extracted dir is already present.
+      # Entries are content-addressed (dfbin/<target>/<hash>), so restoring a
+      # stale cache after an ort upgrade is safe — it just downloads anew.
+      - name: Cache ONNX Runtime binaries
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ~/.cache/ort.pyke.io
+          key: ort-bin-${{ runner.os }}-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ort-bin-${{ runner.os }}-
+
+      # Without this, actions/cache warns at save time on builds that never
+      # trigger the ort download (the path wouldn't exist).
+      - name: Ensure ort cache dir exists
+        run: mkdir -p ~/.cache/ort.pyke.io
 
       - name: Format check
         run: cargo fmt --all -- --check

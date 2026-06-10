@@ -28,6 +28,14 @@ interface GraphContextValue {
   status: GraphStatus
   graph: GraphInfo | null
   recents: RecentGraph[]
+  /**
+   * The open **index session** generation (from `index_open`) — distinct from
+   * `graph.generation` (the file-write generation): the two counters are
+   * independent in Rust. Index-gated commands (`index_*`, `embed_*`,
+   * `db_query` writes via the pipelines) must echo THIS one; `note_write`
+   * and friends take `graph.generation`. Null when the index failed to open.
+   */
+  indexGeneration: number | null
   /** True while the background index reconcile is running (Plan 06b). */
   indexing: boolean
   error: string | null
@@ -57,6 +65,7 @@ export function GraphProvider({ children }: { children: ReactNode }) {
   const [graph, setGraph] = useState<GraphInfo | null>(null)
   const [recents, setRecents] = useState<RecentGraph[]>([])
   const [indexing, setIndexing] = useState(false)
+  const [indexGeneration, setIndexGeneration] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Monotonic open token: only the most recent open may commit `graph`/`status`,
   // so overlapping opens (double-click, StrictMode remount) can't finish out of
@@ -120,6 +129,7 @@ export function GraphProvider({ children }: { children: ReactNode }) {
             return
           }
           setGraph(info)
+          setIndexGeneration(generation)
           setStatus('ready')
           // Background-sync the index (reconcile → subscribe → watch), bailing if
           // a newer open supersedes this one.
@@ -196,8 +206,18 @@ export function GraphProvider({ children }: { children: ReactNode }) {
   )
 
   const value = useMemo<GraphContextValue>(
-    () => ({ status, graph, recents, indexing, error, pickAndOpen, openRecent, forget }),
-    [status, graph, recents, indexing, error, pickAndOpen, openRecent, forget],
+    () => ({
+      status,
+      graph,
+      recents,
+      indexGeneration,
+      indexing,
+      error,
+      pickAndOpen,
+      openRecent,
+      forget,
+    }),
+    [status, graph, recents, indexGeneration, indexing, error, pickAndOpen, openRecent, forget],
   )
 
   return <GraphContext.Provider value={value}>{children}</GraphContext.Provider>

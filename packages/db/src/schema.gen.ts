@@ -30,6 +30,17 @@ export interface Backlinks {
   targetRaw: string | null;
 }
 
+export interface EmbeddingChunks {
+  contentHash: string;
+  heading: string | null;
+  id: Generated<number | null>;
+  modelId: string;
+  notePath: string;
+  posFrom: number;
+  posTo: number;
+  text: string;
+}
+
 export interface IndexMeta {
   key: string;
   value: string;
@@ -82,6 +93,7 @@ export interface DB {
   aliases: Aliases;
   assets: Assets;
   backlinks: Backlinks;
+  embeddingChunks: EmbeddingChunks;
   indexMeta: IndexMeta;
   links: Links;
   noteKeys: NoteKeys;

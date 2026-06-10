@@ -14,6 +14,37 @@ chunking, the `retrieve()` API, and ranking live in `@reflect/core` (`actions/em
 **Libraries:** `fastembed` (Rust, local embeddings) + `sqlite-vec` (vectors). See
 [Libraries](libraries.md).
 
+## Delivery (decided 2026-06-09)
+
+Both halves ship together on one branch, commits sequenced runtime-first so the
+native risk is reviewable in isolation:
+
+- **09a — embedding runtime + vector store:** `fastembed` **in-process,
+  off-thread** (decided — sidecar isolation only if crashes materialize) with
+  **all-MiniLM-L6-v2** (384-dim, ~90MB, decided), downloaded on demand into app
+  data with status surfaced through the operations store; the same
+  recoverable-init contract as sqlite-vec (failure = "semantic unavailable",
+  never a crash). Migration 0002 adds `embedding_chunks` + the `vec0` vector
+  table + `index_meta.embeddingModel`; vector writes are generation-pinned
+  commands, vector KNN reads go through the ordinary read-only `db_query`
+  (sqlite-vec accepts JSON-text vectors, so no bespoke read command).
+- **09b — chunking, retrieval, hybrid search, related notes:** sentence-aware
+  chunker in core (pure); incremental hash-diff embedding pass riding the
+  post-index-apply hook (TS orchestration per conventions — Rust stays
+  primitives); one `retrieve()` with **reciprocal rank fusion** for hybrid
+  (deterministic, no tuned weights); **⌘K goes hybrid by default with no
+  toggle** (decided — exact lexical matches keep top billing through RRF, and
+  the surface degrades invisibly to lexical-only without the model); and the
+  **related-notes panel** (decided — the Plan 07 "suggested backlinks"
+  deferral lands here) under the backlinks panel, seeded by the note's own
+  content, self-excluded, hidden when unavailable.
+
+**Recorded consequences:** `fastembed` pulls ONNX Runtime — its dylib must be
+code-signed at notarization time (Plan 15), and model-dependent Rust tests are
+gated behind an ignored integration flag (unit tests use a fake embedder).
+kysely-codegen replays migrations through better-sqlite3, so the codegen script
+loads the `sqlite-vec` npm extension to create the `vec0` table.
+
 ## Scope
 
 **In:** local embedding runtime in Rust, sentence-aware chunking, `sqlite-vec` storage,
@@ -76,8 +107,10 @@ embedding execution should leave the WebView for performance.
    ```
    Vector search → dedupe chunks back to notes → optionally blend with FTS (hybrid).
 
-5. **Search integration.** Add a semantic/hybrid toggle to the `⌘K` surface (Plan 08):
-   "meat dishes" finds recipe notes lacking those exact words. Same UI, additive ranking.
+5. **Search integration.** Blend semantic hits into the `⌘K` surface (Plan 08) — hybrid
+   by default with **no toggle** (decided, see Delivery): "meat dishes" finds recipe
+   notes lacking those exact words. Same UI, additive ranking; lexical-only when the
+   model is unavailable.
 
 6. **Privacy contract.** `private: true` notes may stay in the **local** lexical + vector
    indexes (local recall is fine), but retrieval used for cloud AI (Plan 10) must exclude

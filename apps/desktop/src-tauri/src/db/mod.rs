@@ -9,6 +9,7 @@
 //! ([`query`]) that executes the SQL the frontend builds with Kysely. The DB is
 //! a cache: deleting it loses nothing durable.
 
+mod embed_write;
 mod migrations;
 mod query;
 #[cfg(test)]
@@ -24,6 +25,7 @@ use tauri::State;
 use crate::error::{AppError, AppResult};
 use crate::fs::GraphState;
 
+pub use embed_write::EmbeddedChunk;
 pub use write::IndexedNote;
 
 /// The open index connection plus its monotonic generation, kept **under one
@@ -122,14 +124,24 @@ pub fn index_apply_batch(
 }
 
 /// Remove a note (e.g. deleted on disk) from the index (no-op if stale).
+/// This is the *genuine deletion* entry point, so embedding rows go too —
+/// `apply_note`'s internal remove must NOT do this (it runs on every upsert
+/// and would destroy the chunk hash-skip).
 #[tauri::command]
 pub fn index_remove(path: String, generation: u64, index: State<IndexState>) -> AppResult<()> {
-    let state = lock_state(&index)?;
+    let mut state = lock_state(&index)?;
     if state.generation != generation {
         return Ok(());
     }
-    let conn = state.conn.as_ref().ok_or_else(AppError::no_graph)?;
-    write::remove_note(conn, &path)
+    let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
+    // One transaction: a half-removed note (row gone, chunks left) would let
+    // a later note at the same path surface stale chunk text in semantic
+    // search until a re-embed.
+    let tx = conn.transaction()?;
+    write::remove_note(&tx, &path)?;
+    embed_write::remove_chunks(&tx, &path)?;
+    tx.commit()?;
+    Ok(())
 }
 
 /// Wipe all derived tables (the TS layer then re-applies every note; no-op if stale).
@@ -141,6 +153,41 @@ pub fn index_clear(generation: u64, index: State<IndexState>) -> AppResult<()> {
     }
     let conn = state.conn.as_ref().ok_or_else(AppError::no_graph)?;
     write::clear_index(conn)
+}
+
+/// Replace a note's embedding chunk set (diff applied in one transaction;
+/// no-op if stale). Unchanged chunks keep their vectors — the hash-skip.
+#[tauri::command]
+pub fn embed_apply(
+    path: String,
+    chunks: Vec<EmbeddedChunk>,
+    generation: u64,
+    index: State<IndexState>,
+) -> AppResult<()> {
+    let mut state = lock_state(&index)?;
+    if state.generation != generation {
+        return Ok(());
+    }
+    let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
+    let tx = conn.transaction()?;
+    embed_write::apply_chunks(&tx, &path, &chunks)?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// Drop a deleted note's chunks + vectors (no-op if stale).
+#[tauri::command]
+pub fn embed_remove(path: String, generation: u64, index: State<IndexState>) -> AppResult<()> {
+    let mut state = lock_state(&index)?;
+    if state.generation != generation {
+        return Ok(());
+    }
+    let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
+    // Two DELETEs (vectors, then rows): atomic, mirroring embed_apply.
+    let tx = conn.transaction()?;
+    embed_write::remove_chunks(&tx, &path)?;
+    tx.commit()?;
+    Ok(())
 }
 
 /// Execute a read query (compiled by Kysely on the frontend) and return rows.

@@ -5,12 +5,15 @@
 use rusqlite::Connection;
 use serde_json::Value;
 
+use super::embed_write::{apply_chunks, remove_chunks, EmbeddedChunk};
 use super::migrations::{migrate, open_in_memory, open_index_at, validate_migrations};
 use super::query::run_query;
 use super::write::{apply_note, clear_index, IndexedLink, IndexedNote};
 
 fn migrated() -> Connection {
-    let mut conn = Connection::open_in_memory().expect("open");
+    // Registers sqlite-vec before migrating — the 0002 migration creates a
+    // vec0 table, so a raw rusqlite open would fail with "no such module".
+    let mut conn = open_in_memory().expect("open");
     conn.execute_batch("PRAGMA foreign_keys=ON;").expect("fk");
     migrate(&mut conn).expect("migrate");
     conn
@@ -53,7 +56,7 @@ fn migrations_are_valid_and_idempotent() {
     let version: i64 = conn
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 1); // one applied migration
+    assert_eq!(version, 2); // applied migrations (0001 + 0002)
     migrate(&mut conn).expect("re-running to_latest is a no-op");
 }
 
@@ -168,7 +171,7 @@ fn open_index_at_creates_migrates_and_reopens() {
     let version: i64 = conn
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 1);
+    assert_eq!(version, 2);
     let journal: String = conn
         .query_row("PRAGMA journal_mode", [], |row| row.get(0))
         .unwrap();
@@ -277,4 +280,228 @@ fn sqlite_vec_loads_and_runs_knn() {
         )
         .expect("vec0 knn");
     assert_eq!(nearest, 1);
+}
+
+// ---- embeddings (Plan 09) ---------------------------------------------------
+
+fn chunk(hash: &str, vector: Option<Vec<f32>>) -> EmbeddedChunk {
+    EmbeddedChunk {
+        heading: None,
+        pos_from: 0,
+        pos_to: 10,
+        text: format!("text {hash}"),
+        content_hash: hash.to_string(),
+        model_id: "all-MiniLM-L6-v2".to_string(),
+        vector,
+    }
+}
+
+fn vec384(fill: f32) -> Vec<f32> {
+    vec![fill; 384]
+}
+
+/// Chunks only exist for indexed notes (apply_chunks guards on the row).
+fn index_note(conn: &Connection, path: &str) {
+    apply_note(conn, &note(path, "T", vec![])).unwrap();
+}
+
+fn chunk_rows(conn: &Connection) -> Vec<(String, String)> {
+    conn.prepare("SELECT note_path, content_hash FROM embedding_chunks ORDER BY id")
+        .unwrap()
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap()
+}
+
+fn vector_count(conn: &Connection) -> i64 {
+    conn.query_row("SELECT count(*) FROM embedding_vectors", [], |row| {
+        row.get(0)
+    })
+    .unwrap()
+}
+
+#[test]
+fn apply_chunks_inserts_new_and_drops_stale_with_their_vectors() {
+    let conn = migrated();
+    index_note(&conn, "notes/a.md");
+    apply_chunks(
+        &conn,
+        "notes/a.md",
+        &[
+            chunk("h1", Some(vec384(0.1))),
+            chunk("h2", Some(vec384(0.2))),
+        ],
+    )
+    .unwrap();
+    assert_eq!(vector_count(&conn), 2);
+
+    // h2 survives unembedded (hash-skip); h3 is new; h1 is gone.
+    apply_chunks(
+        &conn,
+        "notes/a.md",
+        &[chunk("h2", None), chunk("h3", Some(vec384(0.3)))],
+    )
+    .unwrap();
+    assert_eq!(
+        chunk_rows(&conn),
+        vec![
+            ("notes/a.md".to_string(), "h2".to_string()),
+            ("notes/a.md".to_string(), "h3".to_string()),
+        ]
+    );
+    assert_eq!(vector_count(&conn), 2);
+}
+
+#[test]
+fn unchanged_chunks_keep_vectors_but_refresh_positions() {
+    let conn = migrated();
+    index_note(&conn, "notes/a.md");
+    apply_chunks(&conn, "notes/a.md", &[chunk("h1", Some(vec384(0.5)))]).unwrap();
+    let mut moved = chunk("h1", None);
+    moved.pos_from = 100;
+    moved.pos_to = 140;
+    apply_chunks(&conn, "notes/a.md", &[moved]).unwrap();
+    let (from, to): (i64, i64) = conn
+        .query_row(
+            "SELECT pos_from, pos_to FROM embedding_chunks WHERE content_hash = 'h1'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!((from, to), (100, 140));
+    assert_eq!(vector_count(&conn), 1);
+}
+
+#[test]
+fn an_unchanged_chunk_without_a_stored_row_is_a_loud_error() {
+    let conn = migrated();
+    index_note(&conn, "notes/a.md");
+    let result = apply_chunks(&conn, "notes/a.md", &[chunk("missing", None)]);
+    assert!(result.is_err());
+}
+
+#[test]
+fn remove_chunks_drops_rows_and_vectors_for_one_note_only() {
+    let conn = migrated();
+    index_note(&conn, "notes/a.md");
+    index_note(&conn, "notes/b.md");
+    apply_chunks(&conn, "notes/a.md", &[chunk("a1", Some(vec384(0.1)))]).unwrap();
+    apply_chunks(&conn, "notes/b.md", &[chunk("b1", Some(vec384(0.2)))]).unwrap();
+    remove_chunks(&conn, "notes/a.md").unwrap();
+    assert_eq!(
+        chunk_rows(&conn),
+        vec![("notes/b.md".to_string(), "b1".to_string())]
+    );
+    assert_eq!(vector_count(&conn), 1);
+}
+
+#[test]
+fn clear_index_wipes_embeddings_too() {
+    let conn = migrated();
+    index_note(&conn, "notes/a.md");
+    apply_chunks(&conn, "notes/a.md", &[chunk("a1", Some(vec384(0.1)))]).unwrap();
+    clear_index(&conn).unwrap();
+    assert_eq!(chunk_rows(&conn), vec![]);
+    assert_eq!(vector_count(&conn), 0);
+}
+
+#[test]
+fn knn_query_returns_nearest_chunk_first() {
+    let conn = migrated();
+    index_note(&conn, "notes/near.md");
+    index_note(&conn, "notes/far.md");
+    let mut near = vec384(0.0);
+    near[0] = 1.0;
+    let mut far = vec384(0.0);
+    far[1] = 1.0;
+    apply_chunks(&conn, "notes/near.md", &[chunk("n", Some(near))]).unwrap();
+    apply_chunks(&conn, "notes/far.md", &[chunk("f", Some(far))]).unwrap();
+
+    let mut probe = vec![0.0f32; 384];
+    probe[0] = 0.9;
+    let probe_json = format!(
+        "[{}]",
+        probe
+            .iter()
+            .map(|v| v.to_string())
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    // The same shape the frontend uses through read-only db_query.
+    let rows = run_query(
+        &conn,
+        "SELECT c.note_path FROM embedding_vectors v
+         JOIN embedding_chunks c ON c.id = v.rowid
+         WHERE v.embedding MATCH ?1 AND k = 2
+         ORDER BY v.distance",
+        &[Value::String(probe_json)],
+    )
+    .unwrap();
+    let first = rows[0].get("note_path").unwrap().as_str().unwrap();
+    assert_eq!(first, "notes/near.md");
+}
+
+#[test]
+fn reindexing_a_note_keeps_its_chunks_but_true_deletion_drops_them() {
+    let mut conn = migrated();
+    apply_note(&conn, &note("notes/a.md", "Alpha", vec![])).unwrap();
+    apply_chunks(&conn, "notes/a.md", &[chunk("a1", Some(vec384(0.1)))]).unwrap();
+
+    // Upsert path: apply_note re-creates the note row — chunks must survive
+    // (the hash-skip depends on it).
+    apply_note(&conn, &note("notes/a.md", "Alpha edited", vec![])).unwrap();
+    assert_eq!(chunk_rows(&conn).len(), 1);
+    assert_eq!(vector_count(&conn), 1);
+
+    // Genuine deletion (the index_remove command shape): everything goes.
+    let tx = conn.transaction().unwrap();
+    super::write::remove_note(&tx, "notes/a.md").unwrap();
+    super::embed_write::remove_chunks(&tx, "notes/a.md").unwrap();
+    tx.commit().unwrap();
+    assert_eq!(chunk_rows(&conn), vec![]);
+    assert_eq!(vector_count(&conn), 0);
+}
+
+#[test]
+fn stored_vectors_round_trip_through_vec_to_json() {
+    // relatedNotes (TS) seeds KNN with `vec_to_json(embedding)` via db_query;
+    // pin the function name + shape against the real extension.
+    let conn = migrated();
+    index_note(&conn, "notes/a.md");
+    apply_chunks(&conn, "notes/a.md", &[chunk("a1", Some(vec384(0.25)))]).unwrap();
+    let rows = run_query(
+        &conn,
+        "SELECT vec_to_json(v.embedding) AS vec
+         FROM embedding_chunks c JOIN embedding_vectors v ON v.rowid = c.id
+         WHERE c.note_path = ?1 ORDER BY c.pos_from LIMIT 1",
+        &[Value::String("notes/a.md".to_string())],
+    )
+    .unwrap();
+    let vec = rows[0].get("vec").unwrap().as_str().unwrap();
+    assert!(vec.starts_with('['));
+    // And the JSON form is MATCH-able right back (the second relatedNotes query).
+    let knn = run_query(
+        &conn,
+        "SELECT c.note_path FROM embedding_vectors v
+         JOIN embedding_chunks c ON c.id = v.rowid
+         WHERE v.embedding MATCH ?1 AND k = 1 ORDER BY v.distance",
+        &[Value::String(vec.to_string())],
+    )
+    .unwrap();
+    assert_eq!(
+        knn[0].get("note_path").unwrap().as_str().unwrap(),
+        "notes/a.md"
+    );
+}
+
+#[test]
+fn apply_chunks_for_an_unindexed_path_is_a_cleaning_no_op() {
+    // The embed pipeline can race index_remove: a late embed_apply for a
+    // deleted note must not reinsert vectors for a dead path.
+    let conn = migrated();
+    let result = apply_chunks(&conn, "notes/gone.md", &[chunk("g1", Some(vec384(0.1)))]);
+    assert!(result.is_ok());
+    assert_eq!(chunk_rows(&conn), vec![]);
+    assert_eq!(vector_count(&conn), 0);
 }

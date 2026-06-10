@@ -12,7 +12,11 @@ export interface CommandContext {
   back: () => void
   forward: () => void
   toggleTheme: () => void
-  /** The open graph's generation, or null when none (commands no-op then). */
+  /**
+   * The open **index session** generation (`index_open`), or null when none —
+   * what index/embedding commands echo. File writes (`note_write`) take
+   * `graph.generation` instead; no current command needs that one.
+   */
   generation: () => number | null
   /** Open the ⌘K palette (optionally pre-filled). */
   openPalette: (query?: string) => void
