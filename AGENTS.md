@@ -29,9 +29,10 @@ Drawn from the product docs — read these for deeper context:
 
 1. Make your changes
 2. Run typecheck (`pnpm typecheck`)
-3. Run specific tests for your changes (`pnpm test --run path/to/test`)
+3. Run lint (`pnpm lint`) — fix any errors; `pnpm lint:fix` auto-fixes where possible
+4. Run specific tests for your changes (`pnpm test --run path/to/test`)
 
-You don't need to bother linting because this will be done in a GitHub Action.
+`pnpm check` runs typecheck + lint together. Run it before declaring any work done.
 
 ### Running tests
 
