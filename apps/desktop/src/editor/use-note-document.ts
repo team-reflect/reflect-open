@@ -8,6 +8,7 @@ import {
   resolveWikiTarget,
   rewriteLinksForTitleChange,
   subscribeFileChanges,
+  upsertFrontmatter,
   writeNote,
 } from '@reflect/core'
 import { registerFlush } from './flush-registry'
@@ -96,9 +97,15 @@ export function useNoteDocument(
       return
     }
     // The rename rewrite (Plan 07b): rewrite inbound links across the graph,
-    // then record the old title as an alias on this note — through the
-    // session's frontmatter channel, so the editor view never churns. Runs
-    // serialized; every write carries the generation (stale → loud rejection).
+    // then record the old title as an alias on this note. Runs serialized;
+    // every write carries the generation (stale → loud rejection). The alias
+    // is bound to *this* effect's session — never the ref, which can already
+    // point at a different note's session by the time the rewrite finishes —
+    // and lands via its frontmatter channel while the pane is open (the
+    // editor view never churns), or via a direct disk write after teardown
+    // (no editor left to disturb; a reopened pane reconciles it like any
+    // external change).
+    let paneClosed = false
     const runRename = (rename: TitleRename): void => {
       renameChain.current = renameChain.current.then(async () => {
         const generation = generationRef.current
@@ -123,7 +130,18 @@ export function useNoteDocument(
             rename,
           )
           if (aliases !== null) {
-            sessionRef.current?.updateFrontmatter({ aliases })
+            if (!paneClosed) {
+              session.updateFrontmatter({ aliases })
+              // Flush rather than ride the debounce: a settle is exactly the
+              // moment to persist, and quit-time teardown awaits this chain.
+              await session.flush()
+            } else {
+              const content = await readNote(path)
+              const patched = upsertFrontmatter(content, { aliases })
+              if (patched !== content) {
+                await writeNote(path, patched, generation)
+              }
+            }
           }
         } catch (cause) {
           console.error('rename link rewrite failed:', cause)
@@ -176,6 +194,7 @@ export function useNoteDocument(
       // path-switch "final flush" lives here, not in cross-note bookkeeping.
       // The flush's landed save reaches the tracker via onContent('saved');
       // settle after it so a just-edited title still renames on the way out.
+      paneClosed = true // a rename firing from here writes its alias to disk
       const settled = session.flush()
       session.dispose()
       if (tracker) {
@@ -228,6 +247,11 @@ export function useNoteDocument(
     }
     const unregister = registerFlush(async () => {
       await sessionRef.current?.flush()
+      // Quit teardown is a settle point too: a pending title change must
+      // rewrite its links before the webview dies — settle (synchronously
+      // appends the rewrite to the chain), then wait for the writes to land.
+      trackerRef.current?.settle()
+      await renameChain.current
     })
     window.addEventListener('blur', flush)
     return () => {
