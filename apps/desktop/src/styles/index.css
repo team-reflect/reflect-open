@@ -187,6 +187,10 @@ body,
    The popup is a prosekit custom element (positioned by its positioner); all
    visual treatment is ours. Items carry `data-highlighted` while traversed. */
 .reflect-autocomplete {
+  /* Custom elements default to display:inline; an inline box fragments around
+     block children, painting stray border/corner artifacts above and below the
+     list and ignoring min-width/max-height/overflow. */
+  display: block;
   z-index: 50;
   min-width: 16rem;
   max-width: 24rem;
