@@ -20,6 +20,7 @@ import { ProseKit, useExtension } from '@prosekit/react'
 import '@meowdown/core/style.css'
 import { defineImages, type ImageOptions } from './images'
 import { defineReflectKeymap } from './keymap'
+import { selectFirstHeadingText } from './title-selection'
 import { defineWikiLinks } from './wiki-links'
 
 /**
@@ -40,6 +41,11 @@ export interface NoteEditorHandle {
   /** Serialize the current document to markdown. */
   getMarkdown(): string
   focus(): void
+  /**
+   * Focus with the first heading's text selected, so typing replaces it (the
+   * seeded-"Untitled" new-note flow). Plain focus when there is no heading.
+   */
+  selectTitle(): void
 }
 
 interface NoteEditorProps {
@@ -135,6 +141,10 @@ export function NoteEditor({
       },
       getMarkdown: () => docToMarkdown(editor.state.doc),
       focus: () => editor.focus(),
+      selectTitle: () => {
+        editor.focus()
+        editor.exec(selectFirstHeadingText)
+      },
     }),
     [editor],
   )

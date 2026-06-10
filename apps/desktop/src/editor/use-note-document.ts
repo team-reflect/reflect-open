@@ -42,6 +42,12 @@ export interface NoteDocumentOptions {
    * not content.
    */
   trackRenames?: boolean
+  /**
+   * Markdown to seed a missing note's buffer with (the new-note title
+   * template). Requires `createIfMissing`; see `NoteSessionOptions.missingSeed`
+   * for the lazy-contract semantics.
+   */
+  missingSeed?: string
 }
 
 /**
@@ -57,6 +63,7 @@ export function useNoteDocument(
 ): NoteDocument {
   const createIfMissing = options?.createIfMissing ?? false
   const trackRenames = options?.trackRenames ?? false
+  const missingSeed = options?.missingSeed
   const [snapshot, setSnapshot] = useState<NoteSessionSnapshot>(INITIAL_NOTE_SNAPSHOT)
   const editorRef = useRef<NoteEditorHandle | null>(null)
   const sessionRef = useRef<NoteSession | null>(null)
@@ -115,6 +122,7 @@ export function useNoteDocument(
       applyContent: (markdown) => editorRef.current?.setMarkdown(markdown),
       onContent: coordinator ? coordinator.content : undefined,
       createIfMissing,
+      missingSeed,
     })
     sessionRef.current = session
     // One registration covers everything app-global teardown needs: the
@@ -149,7 +157,7 @@ export function useNoteDocument(
         })
       }
     }
-  }, [path, canWrite, createIfMissing, trackRenames])
+  }, [path, canWrite, createIfMissing, trackRenames, missingSeed])
 
   // External-change reconciliation via the watcher (Plan 04b events).
   useEffect(() => {

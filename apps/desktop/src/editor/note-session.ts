@@ -50,6 +50,11 @@ export interface NoteSessionSnapshot {
   protected: boolean
   /** True while the buffer has changes not yet written to disk. */
   dirty: boolean
+  /**
+   * True when the initial load found no file (the lazy-create contract): the
+   * note exists only as this buffer until the first save lands.
+   */
+  missing: boolean
   /** External content waiting on the user's choice (set only when dirty). */
   conflict: string | null
   error: string | null
@@ -61,6 +66,7 @@ export const INITIAL_NOTE_SNAPSHOT: NoteSessionSnapshot = {
   initialContent: '',
   protected: false,
   dirty: false,
+  missing: false,
   conflict: null,
   error: null,
 }
@@ -108,6 +114,15 @@ export interface NoteSessionOptions {
    * a no-op rather than silently emptying the editor.
    */
   createIfMissing?: boolean
+  /**
+   * Markdown to seed a **missing** note's buffer with (only meaningful with
+   * `createIfMissing`) — the new-note title template. The seed is adopted as
+   * the clean dirty-comparison baseline, so opening still writes nothing: the
+   * file is created only once the user edits, lazy contract intact. The
+   * rename tracker baselines on the real (empty) disk content, so the first
+   * authored title stays a birth, not a rename.
+   */
+  missingSeed?: string
   saveDebounceMs?: number
 }
 
@@ -155,6 +170,7 @@ function splitDoc(content: string): { header: string; body: string } {
 export function createNoteSession(options: NoteSessionOptions): NoteSession {
   const { path, io, classify, onSnapshot, applyContent, onContent } = options
   const createIfMissing = options.createIfMissing ?? false
+  const missingSeed = options.missingSeed
   const saveDebounceMs = options.saveDebounceMs ?? DEFAULT_SAVE_DEBOUNCE_MS
 
   // Snapshot state (surfaces via onSnapshot).
@@ -162,6 +178,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   let initialContent = ''
   let isProtected = false
   let dirty = false
+  let missing = false
   let conflict: string | null = null
   let error: string | null = null
 
@@ -201,6 +218,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
       initialContent,
       protected: isProtected,
       dirty,
+      missing,
       conflict,
       error,
     }
@@ -210,6 +228,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
       lastEmitted.initialContent === next.initialContent &&
       lastEmitted.protected === next.protected &&
       lastEmitted.dirty === next.dirty &&
+      lastEmitted.missing === next.missing &&
       lastEmitted.conflict === next.conflict &&
       lastEmitted.error === next.error
     ) {
@@ -242,6 +261,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
           await write(path, content)
           disk = content
           dirty = header + buffer !== content
+          missing = false // the landed write created the file if it was missing
           error = null // a previous save failure is resolved by this success
           emit()
           onContent?.(content, 'saved')
@@ -319,6 +339,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     buffer = doc.body
     disk = content
     dirty = false
+    missing = false // external content means the file exists on disk now
     // Re-gate: the content may have introduced (or removed) syntax the editor
     // can't round-trip. When protection flips the pane remounts via
     // initialContent; otherwise reload the live editor in place.
@@ -362,12 +383,12 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   }
 
   /** The initial read; with `createIfMissing`, a missing file is an empty note. */
-  async function readInitial(): Promise<string> {
+  async function readInitial(): Promise<{ content: string; fileMissing: boolean }> {
     try {
-      return await io.read(path)
+      return { content: await io.read(path), fileMissing: false }
     } catch (cause) {
       if (createIfMissing && isAppError(cause) && cause.kind === 'notFound') {
-        return '' // lazy note: starts empty, created by the first save
+        return { content: '', fileMissing: true } // lazy note: created by the first save
       }
       throw cause
     }
@@ -382,20 +403,27 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     emit()
     void (async () => {
       try {
-        const content = await readInitial()
+        const { content, fileMissing } = await readInitial()
         if (disposed) {
           return
         }
-        const doc = splitDoc(content)
+        // A missing note adopts the seed as its clean baseline: the editor
+        // shows the template, but disk-comparison sees no difference, so
+        // nothing is written until a real edit (the lazy no-litter contract).
+        const adopted = fileMissing && missingSeed !== undefined ? missingSeed : content
+        const doc = splitDoc(adopted)
         header = doc.header
         buffer = doc.body
-        disk = content
+        disk = adopted
         dirty = false
+        missing = fileMissing
         // The data-loss gate: a note the editor can't reproduce opens read-only.
         isProtected = classify(doc.body) === 'lossy'
-        initialContent = isProtected ? content : doc.body
+        initialContent = isProtected ? adopted : doc.body
         status = 'ready'
         emit()
+        // The real disk content, not the seed: the rename tracker must
+        // baseline untitled so the first authored title is a birth.
         onContent?.(content, 'load')
       } catch (cause) {
         if (!disposed) {

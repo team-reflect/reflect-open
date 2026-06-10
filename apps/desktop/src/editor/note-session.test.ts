@@ -21,17 +21,25 @@ interface Harness {
 function harness(options?: {
   write?: false
   classify?: (markdown: string) => RoundTripFidelity
-  disk?: string
+  /** `null` simulates a missing file: reads throw the notFound AppError. */
+  disk?: string | null
+  createIfMissing?: boolean
+  missingSeed?: string
 }): Harness {
   const snapshots: NoteSessionSnapshot[] = []
   const writes: Array<{ path: string; contents: string }> = []
   const applied: string[] = []
   const contents: Array<{ content: string; origin: string }> = []
-  let disk = options?.disk ?? '# Hello\n'
+  let disk = options?.disk === undefined ? '# Hello\n' : options.disk
   const session = createNoteSession({
     path: 'notes/a.md',
     io: {
-      read: async () => disk,
+      read: async () => {
+        if (disk === null) {
+          throw { kind: 'notFound', message: 'missing' } // AppError shape
+        }
+        return disk
+      },
       write:
         options?.write === false
           ? null
@@ -48,6 +56,8 @@ function harness(options?: {
     onContent: (content, origin) => {
       contents.push({ content, origin })
     },
+    createIfMissing: options?.createIfMissing,
+    missingSeed: options?.missingSeed,
     saveDebounceMs: 10,
   })
   return {
@@ -257,5 +267,96 @@ describe('frontmatter ownership (Plan 07b)', () => {
     await vi.runAllTimersAsync()
     expect(h.contents.map((c) => c.origin)).toEqual(['load', 'saved', 'external'])
     expect(h.contents[1].content).toBe(`${FM}# Renamed\n`)
+  })
+})
+
+describe('missing-note seed (new ordinary notes)', () => {
+  const SEED = '# Untitled\n'
+
+  it('a missing note opens ready with the seed, marked missing, and writes nothing', async () => {
+    const h = harness({ disk: null, createIfMissing: true, missingSeed: SEED })
+    h.session.load()
+    await settled()
+
+    const ready = h.snapshots.at(-1)
+    expect(ready?.status).toBe('ready')
+    expect(ready?.missing).toBe(true)
+    expect(ready?.initialContent).toBe(SEED)
+    expect(ready?.dirty).toBe(false)
+    expect(h.writes).toEqual([]) // opening never litters the graph
+    // The rename tracker baselines on the real (empty) disk content, so the
+    // first authored title is a birth, not a rename from "Untitled".
+    expect(h.contents).toEqual([{ content: '', origin: 'load' }])
+  })
+
+  it('the editor echoing the seed back stays clean — no file is created', async () => {
+    const h = harness({ disk: null, createIfMissing: true, missingSeed: SEED })
+    h.session.load()
+    await settled()
+
+    // Mount-time serialization: the editor reports the document it was seeded
+    // with. That is not a user edit and must not reach disk.
+    h.session.editorChanged(SEED)
+    await h.session.flush()
+    await settled()
+
+    expect(h.writes).toEqual([])
+    expect(h.snapshots.at(-1)?.dirty).toBe(false)
+  })
+
+  it('a real edit creates the file with the full content and clears missing', async () => {
+    const h = harness({ disk: null, createIfMissing: true, missingSeed: SEED })
+    h.session.load()
+    await settled()
+
+    h.session.editorChanged('# My Note\n\nFirst line.\n')
+    await settled()
+
+    expect(h.writes).toEqual([
+      { path: 'notes/a.md', contents: '# My Note\n\nFirst line.\n' },
+    ])
+    expect(h.snapshots.at(-1)?.missing).toBe(false)
+    expect(h.snapshots.at(-1)?.dirty).toBe(false)
+  })
+
+  it('a missing note without a seed opens empty (the lazy daily contract)', async () => {
+    const h = harness({ disk: null, createIfMissing: true })
+    h.session.load()
+    await settled()
+
+    const ready = h.snapshots.at(-1)
+    expect(ready?.status).toBe('ready')
+    expect(ready?.missing).toBe(true)
+    expect(ready?.initialContent).toBe('')
+    expect(h.writes).toEqual([])
+  })
+
+  it('an existing file ignores the seed entirely', async () => {
+    const h = harness({ disk: '# Hello\n', createIfMissing: true, missingSeed: SEED })
+    h.session.load()
+    await settled()
+
+    const ready = h.snapshots.at(-1)
+    expect(ready?.missing).toBe(false)
+    expect(ready?.initialContent).toBe('# Hello\n')
+    expect(h.contents).toEqual([{ content: '# Hello\n', origin: 'load' }])
+  })
+
+  it('an external write while the seed is showing adopts cleanly and clears missing', async () => {
+    // Another device/process creates the file while the seeded buffer is open
+    // and untouched: not a conflict — the buffer was never dirty.
+    const h = harness({ disk: null, createIfMissing: true, missingSeed: SEED })
+    h.session.load()
+    await settled()
+
+    h.setDisk('# Created elsewhere\n')
+    h.session.externalChanged()
+    await settled()
+
+    const ready = h.snapshots.at(-1)
+    expect(ready?.conflict).toBeNull()
+    expect(ready?.missing).toBe(false)
+    expect(h.applied).toEqual(['# Created elsewhere\n'])
+    expect(h.writes).toEqual([])
   })
 })

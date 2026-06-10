@@ -24,6 +24,9 @@ interface NotePaneProps {
   onAutoFocused?: () => void
 }
 
+/** The seeded title for a brand-new (missing) ordinary note. */
+const UNTITLED_SEED = '# Untitled\n'
+
 /**
  * One open note: the editor bound to its on-disk document via the Plan 05 save
  * pipeline (debounced atomic writes, watcher-driven external reload, and a
@@ -43,11 +46,17 @@ export function NotePane({
   const { settings } = useSettings()
   const graphRoot = graph?.root ?? null
   const generation = graph?.generation ?? null
+  const dailyNote = isDaily(path)
   const document = useNoteDocument(path, generation, {
     createIfMissing: lazy,
     // Daily notes are excluded from rename tracking: their date labels are
     // stream chrome, not content (decided 2026-06-09).
-    trackRenames: !isDaily(path),
+    trackRenames: !dailyNote,
+    // A missing ordinary note opens as a titled template (old Reflect's
+    // new-note flow): the seed only reaches disk if the user edits, and the
+    // title is selected on focus so typing names the note. Daily notes stay
+    // unseeded — the date is their identity.
+    missingSeed: lazy && !dailyNote ? UNTITLED_SEED : undefined,
   })
   const { options: images, saveError: imageSaveError } = useImagePersistence(
     graphRoot,
@@ -107,11 +116,23 @@ export function NotePane({
   )
 
   const bindEditor = document.bindEditor
+  // Read through a ref so the callback's identity never changes with the
+  // snapshot — React re-invokes a changed callback ref (null, then handle),
+  // which would re-focus an editor the user is already typing in.
+  const missingRef = useRef(false)
+  missingRef.current = document.missing
   const handleRef = useCallback(
     (handle: NoteEditorHandle | null) => {
       bindEditor(handle)
       if (handle && autoFocus) {
-        handle.focus()
+        // A seeded new note focuses with "Untitled" selected so typing names
+        // it; selectTitle falls back to a plain focus when there's no heading
+        // (e.g. a lazy daily note).
+        if (missingRef.current) {
+          handle.selectTitle()
+        } else {
+          handle.focus()
+        }
         onAutoFocused?.()
       }
     },
