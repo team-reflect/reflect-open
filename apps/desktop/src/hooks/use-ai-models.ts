@@ -2,11 +2,11 @@ import { useCallback } from 'react'
 import {
   aiKeySecretName,
   apiKeyHint,
+  defaultAiModel,
   deleteSecret,
   setSecret,
   withAiModelAdded,
   withAiModelRemoved,
-  withDefaultAiModel,
   type AiModelConfig,
   type AiProviderId,
   type AppError,
@@ -15,9 +15,9 @@ import { useSettings } from '@/providers/settings-provider'
 
 /**
  * The configured-AI-models surface (Plan 10): one hook owning the pairing of
- * the settings document (provider, model, key hint, default flag) with the OS
- * keychain (the key itself). Components never touch the secret commands
- * directly, so the "settings entry ⇄ keychain entry" invariant has one owner.
+ * the settings document (entries + default id) with the OS keychain (the key
+ * itself). Components never touch the secret commands directly, so the
+ * "settings entry ⇄ keychain entry" invariant has one owner.
  */
 
 /** What the add-model dialog collects; the key goes to the keychain only. */
@@ -30,6 +30,8 @@ export interface NewAiModel {
 
 interface UseAiModelsValue {
   models: AiModelConfig[]
+  /** The entry AI features use by default (null only when the list is empty). */
+  defaultModel: AiModelConfig | null
   /**
    * Store the key in the keychain, then add the settings entry. Rejects (and
    * adds nothing) if the keychain write fails — so an entry can never point
@@ -47,12 +49,13 @@ interface UseAiModelsValue {
 export function useAiModels(): UseAiModelsValue {
   const { settings, updateSettingsWith, whenSettingsLoaded } = useSettings()
   const models = settings.aiModels
+  const defaultModel = defaultAiModel({ models, defaultModelId: settings.defaultAiModelId })
 
-  // Every write goes through `updateSettingsWith` so the list is rebuilt from
-  // the settings as they are when the update applies — not from this render's
-  // snapshot. The keychain awaits make these genuinely concurrent: a second
-  // add/remove can land mid-flight, and a snapshot-based write would clobber
-  // it (or resurrect an entry whose key was already deleted).
+  // Every write goes through `updateSettingsWith` so the state is rebuilt
+  // from the settings as they are when the update applies — not from this
+  // render's snapshot. The keychain awaits make these genuinely concurrent:
+  // a second add/remove can land mid-flight, and a snapshot-based write
+  // would clobber it (or resurrect an entry whose key was already deleted).
 
   const addModel = useCallback(
     async (draft: NewAiModel): Promise<void> => {
@@ -71,15 +74,14 @@ export function useAiModels(): UseAiModelsValue {
       }
       const id = crypto.randomUUID()
       await setSecret(aiKeySecretName(id), draft.apiKey)
-      updateSettingsWith((current) => ({
-        aiModels: withAiModelAdded(current.aiModels, {
-          id,
-          provider: draft.provider,
-          model: draft.model,
-          keyHint: apiKeyHint(draft.apiKey),
-          isDefault: draft.isDefault,
-        }),
-      }))
+      updateSettingsWith((current) => {
+        const next = withAiModelAdded(
+          { models: current.aiModels, defaultModelId: current.defaultAiModelId },
+          { id, provider: draft.provider, model: draft.model, keyHint: apiKeyHint(draft.apiKey) },
+          draft.isDefault,
+        )
+        return { aiModels: next.models, defaultAiModelId: next.defaultModelId }
+      })
     },
     [whenSettingsLoaded, updateSettingsWith],
   )
@@ -93,17 +95,23 @@ export function useAiModels(): UseAiModelsValue {
       // keyring API can't enumerate entries, so it could never be swept.
       // The settings write itself is retried by the provider on failure.
       await deleteSecret(aiKeySecretName(id))
-      updateSettingsWith((current) => ({ aiModels: withAiModelRemoved(current.aiModels, id) }))
+      updateSettingsWith((current) => {
+        const next = withAiModelRemoved(
+          { models: current.aiModels, defaultModelId: current.defaultAiModelId },
+          id,
+        )
+        return { aiModels: next.models, defaultAiModelId: next.defaultModelId }
+      })
     },
     [updateSettingsWith],
   )
 
   const makeDefault = useCallback(
     (id: string): void => {
-      updateSettingsWith((current) => ({ aiModels: withDefaultAiModel(current.aiModels, id) }))
+      updateSettingsWith(() => ({ defaultAiModelId: id }))
     },
     [updateSettingsWith],
   )
 
-  return { models, addModel, removeModel, makeDefault }
+  return { models, defaultModel, addModel, removeModel, makeDefault }
 }

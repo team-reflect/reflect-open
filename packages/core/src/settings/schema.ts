@@ -40,20 +40,28 @@ export const aiProviderIdSchema = z.enum(['openai', 'anthropic', 'google'])
 export type AiProviderId = z.infer<typeof aiProviderIdSchema>
 
 /**
- * One configured AI model: a provider, the chosen model id, and whether it is
- * the app-wide default. The API key itself lives in the OS keychain (addressed
- * by `id` — see `aiKeySecretName`) and **never** in this document; `keyHint`
- * keeps only the key's trailing characters so the settings UI can identify it.
+ * One configured AI model: a provider and the chosen model id. The API key
+ * itself lives in the OS keychain (addressed by `id` — see `aiKeySecretName`)
+ * and **never** in this document; `keyHint` keeps only the key's trailing
+ * characters so the settings UI can identify it. Which entry is the app-wide
+ * default is a sibling scalar (`defaultAiModelId`), not a per-entry flag, so
+ * "at most one default" holds by construction.
  */
 export const aiModelConfigSchema = z.object({
   id: z.string().min(1),
   provider: aiProviderIdSchema,
   model: z.string().min(1),
   keyHint: z.string().catch(''),
-  isDefault: z.boolean().catch(false),
 })
 
 export type AiModelConfig = z.infer<typeof aiModelConfigSchema>
+
+/**
+ * The `aiModels` entry AI features use by default. A dangling or null id is
+ * legal (hand-edits, removed entries) — readers resolve it through
+ * `defaultAiModel`, which falls back to the first entry.
+ */
+export const defaultAiModelIdSchema = z.string().nullable().catch(null)
 
 /**
  * The configured AI models. Resilience is per entry, not per list: a corrupt
@@ -75,6 +83,7 @@ export const settingsSchema = z
     editorMarkdownSyntax: editorMarkdownSyntaxSchema,
     theme: themePreferenceSchema,
     aiModels: aiModelsSchema,
+    defaultAiModelId: defaultAiModelIdSchema,
   })
   .passthrough()
 

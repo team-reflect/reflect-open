@@ -79,6 +79,7 @@ export {
   aiProviderIdSchema,
   aiModelConfigSchema,
   aiModelsSchema,
+  defaultAiModelIdSchema,
   DEFAULT_SETTINGS,
   type Settings,
   type EditorMarkdownSyntax,
@@ -102,9 +103,10 @@ export {
   apiKeyHint,
   withAiModelAdded,
   withAiModelRemoved,
-  withDefaultAiModel,
   defaultAiModel,
+  type AiModelsState,
 } from './ai/models'
+export { validateApiKey, type ApiKeyValidation } from './ai/validate-key'
 
 // Markdown document model (Plan 03)
 export {

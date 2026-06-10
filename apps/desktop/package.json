@@ -27,6 +27,7 @@
     "@tanstack/react-virtual": "^3.14.2",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-http": "^2.5.9",
     "@tauri-apps/plugin-opener": "^2",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

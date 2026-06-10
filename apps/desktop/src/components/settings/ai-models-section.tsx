@@ -12,7 +12,7 @@ import { SettingsSection } from './section'
  * app-wide default and only the key's trailing characters.
  */
 export function AiModelsSection(): ReactElement {
-  const { models, addModel, removeModel, makeDefault } = useAiModels()
+  const { models, defaultModel, addModel, removeModel, makeDefault } = useAiModels()
   const [adding, setAdding] = useState(false)
 
   return (
@@ -27,6 +27,7 @@ export function AiModelsSection(): ReactElement {
           <AiModelRow
             key={config.id}
             config={config}
+            isDefault={config.id === defaultModel?.id}
             onMakeDefault={makeDefault}
             onRemove={removeModel}
           />

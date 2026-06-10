@@ -5,6 +5,8 @@ import { startOperation } from '@/lib/operations'
 
 interface AiModelRowProps {
   config: AiModelConfig
+  /** Whether this entry is the (resolved) app-wide default. */
+  isDefault: boolean
   /** Make this entry the app-wide default. */
   onMakeDefault: (id: string) => void
   /** Remove the entry and its keychain secret; rejects on failure. */
@@ -16,7 +18,12 @@ interface AiModelRowProps {
  * key's trailing characters, and the default/remove controls. The row owns
  * its own removal (including surfacing a keychain failure as an operation).
  */
-export function AiModelRow({ config, onMakeDefault, onRemove }: AiModelRowProps): ReactElement {
+export function AiModelRow({
+  config,
+  isDefault,
+  onMakeDefault,
+  onRemove,
+}: AiModelRowProps): ReactElement {
   const providerLabel = aiProvider(config.provider).label
   const modelLabel = aiModelLabel(config.provider, config.model)
   const name = `${providerLabel} — ${modelLabel}`
@@ -36,7 +43,7 @@ export function AiModelRow({ config, onMakeDefault, onRemove }: AiModelRowProps)
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        {config.isDefault ? (
+        {isDefault ? (
           <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-soft-text">
             Default
           </span>

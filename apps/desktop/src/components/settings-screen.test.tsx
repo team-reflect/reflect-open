@@ -75,7 +75,7 @@ describe('SettingsScreen', () => {
     fireEvent.click(radio(/^show/i))
 
     await waitFor(() =>
-      expect(saved).toEqual([{ editorMarkdownSyntax: 'show', theme: 'system', aiModels: [] }]),
+      expect(saved).toEqual([{ editorMarkdownSyntax: 'show', theme: 'system', aiModels: [], defaultAiModelId: null }]),
     )
     expect(radio(/^show/i).checked).toBe(true)
     expect(radio(/^focus/i).checked).toBe(false)
@@ -90,7 +90,7 @@ describe('SettingsScreen', () => {
 
     expect(radio(/^light/i).checked).toBe(true)
     await waitFor(() =>
-      expect(saved).toEqual([{ editorMarkdownSyntax: 'focus', theme: 'light', aiModels: [] }]),
+      expect(saved).toEqual([{ editorMarkdownSyntax: 'focus', theme: 'light', aiModels: [], defaultAiModelId: null }]),
     )
   })
 

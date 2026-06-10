@@ -7,10 +7,12 @@ describe('settingsSchema', () => {
       editorMarkdownSyntax: 'focus',
       theme: 'system',
       aiModels: [],
+      defaultAiModelId: null,
     })
     expect(DEFAULT_SETTINGS.editorMarkdownSyntax).toBe('focus')
     expect(DEFAULT_SETTINGS.theme).toBe('system')
     expect(DEFAULT_SETTINGS.aiModels).toEqual([])
+    expect(DEFAULT_SETTINGS.defaultAiModelId).toBeNull()
   })
 
   it('accepts valid values', () => {
@@ -34,6 +36,7 @@ describe('settingsSchema', () => {
       editorMarkdownSyntax: 'show',
       theme: 'system',
       aiModels: [],
+      defaultAiModelId: null,
       futureKey: true,
     })
   })
@@ -44,7 +47,6 @@ describe('settingsSchema', () => {
       provider: 'anthropic',
       model: 'claude-opus-4-8',
       keyHint: 'wxyz1',
-      isDefault: true,
     }
 
     it('passes valid entries through', () => {
@@ -54,7 +56,7 @@ describe('settingsSchema', () => {
     it('defaults the per-entry display fields', () => {
       const entry = { id: 'abc', provider: 'openai', model: 'gpt-5.1' }
       expect(settingsSchema.parse({ aiModels: [entry] }).aiModels).toEqual([
-        { ...entry, keyHint: '', isDefault: false },
+        { ...entry, keyHint: '' },
       ])
     })
 
@@ -68,6 +70,14 @@ describe('settingsSchema', () => {
     it('degrades a non-array value to the empty list', () => {
       expect(settingsSchema.parse({ aiModels: 'nope' }).aiModels).toEqual([])
       expect(settingsSchema.parse({ aiModels: { id: 'x' } }).aiModels).toEqual([])
+    })
+  })
+
+  describe('defaultAiModelId', () => {
+    it('passes a string id through and defaults invalid values to null', () => {
+      expect(settingsSchema.parse({ defaultAiModelId: 'abc' }).defaultAiModelId).toBe('abc')
+      expect(settingsSchema.parse({ defaultAiModelId: null }).defaultAiModelId).toBeNull()
+      expect(settingsSchema.parse({ defaultAiModelId: 42 }).defaultAiModelId).toBeNull()
     })
   })
 })

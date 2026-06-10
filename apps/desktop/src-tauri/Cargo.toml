@@ -40,6 +40,7 @@ keyring = { version = "3", features = [
   "windows-native",
   "sync-secret-service",
 ] }
+tauri-plugin-http = "2.5.9"
 
 [dev-dependencies]
 tauri = { version = "2", features = ["test"] }

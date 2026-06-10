@@ -118,7 +118,7 @@ describe('SettingsProvider', () => {
     expect(result.current.settings.editorMarkdownSyntax).toBe('show')
     // The persisted document keeps unknown keys (newer-version settings survive).
     await waitFor(() =>
-      expect(saved).toEqual([{ editorMarkdownSyntax: 'show', theme: 'system', aiModels: [], futureKey: true }]),
+      expect(saved).toEqual([{ editorMarkdownSyntax: 'show', theme: 'system', aiModels: [], defaultAiModelId: null, futureKey: true }]),
     )
   })
 
@@ -142,7 +142,7 @@ describe('SettingsProvider', () => {
     // The load result must not clobber the update, and the deferred flush
     // persists the update merged over the *loaded* document.
     await waitFor(() =>
-      expect(saved).toEqual([{ editorMarkdownSyntax: 'show', theme: 'system', aiModels: [], futureKey: true }]),
+      expect(saved).toEqual([{ editorMarkdownSyntax: 'show', theme: 'system', aiModels: [], defaultAiModelId: null, futureKey: true }]),
     )
     expect(result.current.settings.editorMarkdownSyntax).toBe('show')
   })
@@ -160,7 +160,7 @@ describe('SettingsProvider', () => {
       releaseLoad()
     })
     await waitFor(() =>
-      expect(saved).toEqual([{ editorMarkdownSyntax: 'focus', theme: 'system', aiModels: [] }]),
+      expect(saved).toEqual([{ editorMarkdownSyntax: 'focus', theme: 'system', aiModels: [], defaultAiModelId: null }]),
     )
     expect(result.current.settings.editorMarkdownSyntax).toBe('focus')
   })
@@ -168,8 +168,8 @@ describe('SettingsProvider', () => {
   it('updateSettingsWith builds each patch from the latest settings, not the closure', async () => {
     stored = {
       aiModels: [
-        { id: 'a', provider: 'openai', model: 'gpt-5.1', keyHint: '11111', isDefault: true },
-        { id: 'b', provider: 'openai', model: 'gpt-5', keyHint: '22222', isDefault: false },
+        { id: 'a', provider: 'openai', model: 'gpt-5.1', keyHint: '11111' },
+        { id: 'b', provider: 'openai', model: 'gpt-5', keyHint: '22222' },
       ],
     }
     const { result } = renderHook(() => useSettings(), { wrapper })
@@ -195,14 +195,12 @@ describe('SettingsProvider', () => {
       provider: 'openai',
       model: 'gpt-5.1',
       keyHint: '11111',
-      isDefault: true,
     }
     const added: AiModelConfig = {
       id: 'b',
       provider: 'anthropic',
       model: 'claude-opus-4-8',
       keyHint: '22222',
-      isDefault: false,
     }
     stored = { aiModels: [persisted] }
     gateLoad = true
@@ -233,7 +231,6 @@ describe('SettingsProvider', () => {
       provider: 'anthropic',
       model: 'claude-opus-4-8',
       keyHint: '22222',
-      isDefault: true,
     }
     failLoad = true
     const { result } = renderHook(() => useSettings(), { wrapper })
@@ -308,7 +305,7 @@ describe('SettingsProvider', () => {
       result.current.updateSettings({ editorMarkdownSyntax: 'show' })
     })
     await waitFor(() =>
-      expect(saved).toEqual([{ editorMarkdownSyntax: 'show', theme: 'system', aiModels: [] }]),
+      expect(saved).toEqual([{ editorMarkdownSyntax: 'show', theme: 'system', aiModels: [], defaultAiModelId: null }]),
     )
   })
 
@@ -330,7 +327,7 @@ describe('SettingsProvider', () => {
     await act(async () => {
       await flushSettings()
     })
-    expect(saved).toEqual([{ editorMarkdownSyntax: 'show', theme: 'system', aiModels: [] }])
+    expect(saved).toEqual([{ editorMarkdownSyntax: 'show', theme: 'system', aiModels: [], defaultAiModelId: null }])
   })
 
   it('surfaces a failed load and keeps changes session-only', async () => {
