@@ -55,18 +55,27 @@ export function SettingsProvider({ children }: SettingsProviderProps): ReactElem
   // updates in one tick must compound, not overwrite) and re-synced on render.
   const settingsRef = useRef(settings)
   settingsRef.current = settings
+  // Monotonic update counter, so a stale re-apply (below) can recognize itself.
+  const updateSeq = useRef(0)
 
   const updateSettings = useCallback(
     (patch: Partial<Settings>) => {
+      const seq = ++updateSeq.current
       const next: Settings = { ...settingsRef.current, ...patch }
       settingsRef.current = next
       queryClient.setQueryData(SETTINGS_QUERY_KEY, next)
       // An update racing the initial load must win. Cancelling reverts the
       // in-flight fetch *asynchronously* — which would clobber the value just
-      // applied — so it is re-applied once the cancellation has settled.
-      void queryClient
-        .cancelQueries({ queryKey: SETTINGS_QUERY_KEY })
-        .then(() => queryClient.setQueryData(SETTINGS_QUERY_KEY, next))
+      // applied — so it is re-applied once the cancellation has settled. Only
+      // the latest update may re-apply: cancellation promises aren't
+      // guaranteed to settle in call order (a later cancel can find nothing
+      // in flight and resolve sooner), so an unguarded older callback could
+      // overwrite a newer value.
+      void queryClient.cancelQueries({ queryKey: SETTINGS_QUERY_KEY }).then(() => {
+        if (updateSeq.current === seq) {
+          queryClient.setQueryData(SETTINGS_QUERY_KEY, next)
+        }
+      })
       persistQueue.current = persistQueue.current
         .then(() => saveSettings(next))
         .catch((error: unknown) => {

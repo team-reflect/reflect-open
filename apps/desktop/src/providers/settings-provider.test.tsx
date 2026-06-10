@@ -127,6 +127,33 @@ describe('SettingsProvider', () => {
     await waitFor(() => expect(result.current.settings.editorMarkMode).toBe('show'))
   })
 
+  it('compounding updates racing the initial load settle on the last one', async () => {
+    // Two updates while settings_load is in flight: their cancellation
+    // callbacks settle in *reverse* order (the second cancel finds nothing in
+    // flight), so an unguarded stale re-apply would resurrect the first value.
+    stored = { editorMarkMode: 'focus' }
+    gateLoad = true
+    const { result } = renderHook(() => useSettings(), { wrapper })
+
+    act(() => {
+      result.current.updateSettings({ editorMarkMode: 'show' })
+      result.current.updateSettings({ editorMarkMode: 'focus' })
+    })
+    act(() => {
+      releaseLoad()
+    })
+    await waitFor(() =>
+      expect(saved).toEqual([{ editorMarkMode: 'show' }, { editorMarkMode: 'focus' }]),
+    )
+    await waitFor(() => expect(result.current.settings.editorMarkMode).toBe('focus'))
+    // Let every queued cancellation callback drain, then re-check: a stale
+    // re-apply would flip the value back to 'show' here.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(result.current.settings.editorMarkMode).toBe('focus')
+  })
+
   it('keeps the applied value when the save fails', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {
