@@ -37,7 +37,7 @@ export {
   type RetrievalHit,
   type RetrieveOptions,
 } from './embeddings/retrieve'
-export { appErrorSchema, isAppError, toAppError, type AppError } from './errors'
+export { appErrorSchema, errorMessage, isAppError, toAppError, type AppError } from './errors'
 
 // Graph & file storage (Plan 02)
 export {

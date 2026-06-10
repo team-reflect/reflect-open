@@ -1,6 +1,6 @@
 import {
+  errorMessage,
   getLinkSources,
-  isAppError,
   nextAliases,
   parseNote,
   readNote,
@@ -48,13 +48,6 @@ export interface RenameCoordinator {
   dispose(): void
 }
 
-function messageOf(error: unknown): string {
-  if (isAppError(error)) {
-    return error.message
-  }
-  return error instanceof Error ? error.message : String(error)
-}
-
 export function createRenameCoordinator(options: RenameCoordinatorOptions): RenameCoordinator {
   const { path, generation, canFire } = options
   /** Serializes rewrites — a second settle waits for the first. */
@@ -100,7 +93,7 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
           // baseline has already advanced (re-arming would re-fire with a
           // stale `from` after further edits), so the alias is the safety
           // net that keeps every un-rewritten link resolving to this note.
-          failure = messageOf(cause)
+          failure = errorMessage(cause)
           console.error('rename link rewrite failed:', cause)
         }
         if (collision) {
@@ -150,7 +143,7 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
           }
         }
       } catch (cause) {
-        failure = messageOf(cause)
+        failure = errorMessage(cause)
         console.error('rename alias placement failed:', cause)
       } finally {
         if (failure !== null) {

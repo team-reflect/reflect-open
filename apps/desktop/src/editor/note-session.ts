@@ -1,4 +1,4 @@
-import { isAppError, splitFrontmatter, upsertFrontmatter } from '@reflect/core'
+import { errorMessage, isAppError, splitFrontmatter, upsertFrontmatter } from '@reflect/core'
 import type { RoundTripFidelity } from './roundtrip'
 
 /**
@@ -251,7 +251,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
       })
       .catch((cause) => {
         console.error('failed to save note:', cause)
-        error = messageOf(cause)
+        error = errorMessage(cause)
         emit()
       })
   }
@@ -399,7 +399,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
         onContent?.(content, 'load')
       } catch (cause) {
         if (!disposed) {
-          error = messageOf(cause)
+          error = errorMessage(cause)
           status = 'error'
           emit()
         }
@@ -479,11 +479,4 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     updateFrontmatter,
     dispose,
   }
-}
-
-function messageOf(error: unknown): string {
-  if (isAppError(error)) {
-    return error.message
-  }
-  return error instanceof Error ? error.message : String(error)
 }

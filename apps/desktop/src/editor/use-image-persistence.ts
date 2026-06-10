@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { convertFileSrc } from '@tauri-apps/api/core'
-import { assetPath, toAppError, writeAsset } from '@reflect/core'
+import { assetPath, errorMessage, writeAsset } from '@reflect/core'
 import type { ImageOptions } from './images'
 
 /** Asset file extension for each image MIME type the editor accepts on paste/drop. */
@@ -96,7 +96,7 @@ export function useImagePersistence(
   )
 
   const onSaveError = useCallback((error: unknown) => {
-    setSaveError(toAppError(error).message)
+    setSaveError(errorMessage(error))
   }, [])
 
   const options = useMemo<ImageOptions>(

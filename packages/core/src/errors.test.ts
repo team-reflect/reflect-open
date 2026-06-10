@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isAppError, toAppError } from './errors'
+import { errorMessage, isAppError, toAppError } from './errors'
 
 describe('isAppError', () => {
   it('accepts every contract kind', () => {
@@ -47,5 +47,17 @@ describe('toAppError', () => {
   it('coerces null and undefined without throwing', () => {
     expect(toAppError(null)).toEqual({ kind: 'unknown', message: 'null' })
     expect(toAppError(undefined).kind).toBe('unknown')
+  })
+})
+
+describe('errorMessage', () => {
+  it('uses the command error message when well-formed', () => {
+    expect(errorMessage({ kind: 'io', message: 'disk full' })).toBe('disk full')
+  })
+
+  it('normalizes Errors, strings, and arbitrary objects', () => {
+    expect(errorMessage(new Error('boom'))).toBe('boom')
+    expect(errorMessage('plain failure')).toBe('plain failure')
+    expect(errorMessage({ code: 7 })).toBe('{"code":7}')
   })
 })
