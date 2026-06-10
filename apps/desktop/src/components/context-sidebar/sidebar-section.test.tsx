@@ -31,7 +31,7 @@ describe('SidebarSection', () => {
     await userEvent.click(header)
     expect(header.getAttribute('aria-expanded')).toBe('false')
     expect(view.queryByText('section body')).toBeNull()
-    expect(window.sessionStorage.getItem('reflect.daily-sidebar.probe')).toBe('closed')
+    expect(window.sessionStorage.getItem('reflect.context-sidebar.probe')).toBe('closed')
     view.unmount()
   })
 
@@ -49,7 +49,7 @@ describe('SidebarSection', () => {
   })
 
   it('persists reopening so the next mount starts open again', async () => {
-    window.sessionStorage.setItem('reflect.daily-sidebar.probe', 'closed')
+    window.sessionStorage.setItem('reflect.context-sidebar.probe', 'closed')
     const view = renderSection()
     const header = view.getByRole('button', { name: /Probe/ })
     expect(header.getAttribute('aria-expanded')).toBe('false')
@@ -57,7 +57,7 @@ describe('SidebarSection', () => {
     await userEvent.click(header)
     expect(header.getAttribute('aria-expanded')).toBe('true')
     expect(view.getByText('section body')).toBeDefined()
-    expect(window.sessionStorage.getItem('reflect.daily-sidebar.probe')).toBe('open')
+    expect(window.sessionStorage.getItem('reflect.context-sidebar.probe')).toBe('open')
     view.unmount()
 
     const remounted = renderSection()
