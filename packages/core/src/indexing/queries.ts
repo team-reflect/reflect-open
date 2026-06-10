@@ -62,13 +62,15 @@ export async function getBacklinksWithContext(path: string): Promise<BacklinkCon
     .execute()
 
   const contents = new Map<string, string | null>()
-  for (const sourcePath of new Set(rows.map((row) => row.sourcePath))) {
-    try {
-      contents.set(sourcePath, await readNote(sourcePath))
-    } catch {
-      contents.set(sourcePath, null)
-    }
-  }
+  await Promise.all(
+    [...new Set(rows.map((row) => row.sourcePath))].map(async (sourcePath) => {
+      try {
+        contents.set(sourcePath, await readNote(sourcePath))
+      } catch {
+        contents.set(sourcePath, null)
+      }
+    }),
+  )
 
   return rows.map((row) => {
     const content = contents.get(row.sourcePath)

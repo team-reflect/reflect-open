@@ -24,6 +24,12 @@ describe('lineSnippet', () => {
     expect(snippet.endsWith('…')).toBe(true)
   })
 
+  it('keeps the link visible on long indented lines', () => {
+    const content = `${' '.repeat(120)}[[Target]] ${'x'.repeat(240)}`
+    const snippet = lineSnippet(content, content.indexOf('[[Target]]'), 80)
+    expect(snippet).toContain('[[Target]]')
+  })
+
   it('clamps an out-of-range position instead of throwing', () => {
     expect(lineSnippet('only line', 999)).toBe('only line')
     expect(lineSnippet('', 5)).toBe('')

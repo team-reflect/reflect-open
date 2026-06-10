@@ -13,7 +13,12 @@ import { useRouter } from '@/routing/router'
  * note, kept fresh by the index invalidation hook (no polling). Renders
  * nothing when the note has no inbound links.
  */
-export function BacklinksPanel({ path }: { path: string }): ReactElement | null {
+interface BacklinksPanelProps {
+  /** Graph-relative path of the note whose inbound links to show. */
+  path: string
+}
+
+export function BacklinksPanel({ path }: BacklinksPanelProps): ReactElement | null {
   const { navigate } = useRouter()
   const { graph } = useGraph()
   // The graph root is part of the key: index rows belong to one graph, and a

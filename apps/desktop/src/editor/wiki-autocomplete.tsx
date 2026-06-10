@@ -28,9 +28,9 @@ const WIKI_TRIGGER = /\[\[([^[\]]*)$/u
 
 interface WikiAutocompleteProps {
   /**
-   * Create the typed note on the create row (create-from-unresolved). The
-   * link text is inserted afterwards either way — a failed create leaves an
-   * unresolved link, which clicking creates later.
+   * Create the typed note on the create row (create-from-unresolved). Runs in
+   * the background after the link text is inserted — a failed create leaves
+   * an unresolved link, which clicking creates later.
    */
   onCreate?: (title: string) => Promise<void>
 }
@@ -106,14 +106,13 @@ export function WikiAutocomplete({ onCreate }: WikiAutocompleteProps): ReactElem
                 value="__create__"
                 className="reflect-autocomplete-item"
                 onSelect={() => {
-                  void (async () => {
-                    try {
-                      await onCreate?.(entry.title)
-                    } catch (err) {
-                      console.error('create-from-autocomplete failed:', err)
-                    }
-                    insertLink(entry.title)
-                  })()
+                  // Insert first, at the cursor the user committed at — a slow
+                  // create must not race cursor movement (and the link is valid
+                  // before the file exists; clicking would create it anyway).
+                  insertLink(entry.title)
+                  void Promise.resolve(onCreate?.(entry.title)).catch((err: unknown) => {
+                    console.error('create-from-autocomplete failed:', err)
+                  })
                 }}
               >
                 <span className="reflect-autocomplete-title">Create “{entry.title}”</span>

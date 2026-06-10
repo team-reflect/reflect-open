@@ -13,13 +13,16 @@ export function lineSnippet(content: string, pos: number, maxLength = DEFAULT_MA
   const lineStart = content.lastIndexOf('\n', Math.max(0, at - 1)) + 1
   const lineEndRaw = content.indexOf('\n', at)
   const lineEnd = lineEndRaw === -1 ? content.length : lineEndRaw
-  const line = content.slice(lineStart, lineEnd).trim()
+  const rawLine = content.slice(lineStart, lineEnd)
+  const line = rawLine.trim()
   if (line.length <= maxLength) {
     return line
   }
-  // Window around the link's position within the line so the link text — the
-  // reason this line is shown at all — stays visible.
-  const posInLine = at - lineStart
+  // Window around the link's position within the *trimmed* line — the trim
+  // shifted offsets by the leading whitespace, and on a long indented line an
+  // unadjusted position could window the link right out of the snippet.
+  const startTrim = rawLine.length - rawLine.trimStart().length
+  const posInLine = Math.max(0, Math.min(at - lineStart - startTrim, line.length))
   const half = Math.floor(maxLength / 2)
   const from = Math.max(0, Math.min(posInLine - half, line.length - maxLength))
   const to = from + maxLength
