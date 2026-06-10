@@ -1,7 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import type { GraphInfo } from '@reflect/core'
 import { Check, ChevronsUpDown, FolderOpen } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
 
 /**
@@ -102,15 +101,14 @@ export function GraphFooter({ graph }: { graph: GraphInfo }): ReactElement {
           <span className="block truncate text-[13px] font-medium text-text">
             {graph.name}
           </span>
-          <span
-            role={indexing ? 'status' : undefined}
-            className={cn(
-              'block truncate text-[11px] text-text-muted',
-              indexing && 'motion-safe:animate-pulse',
-            )}
-          >
-            {indexing ? 'Indexing…' : graph.root}
-          </span>
+          {indexing ? (
+            <span
+              role="status"
+              className="block truncate text-[11px] text-text-muted motion-safe:animate-pulse"
+            >
+              Indexing…
+            </span>
+          ) : null}
         </span>
         <ChevronsUpDown
           aria-hidden
