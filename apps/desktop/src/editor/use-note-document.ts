@@ -77,6 +77,8 @@ export function useNoteDocument(
   const editorRef = useRef<NoteEditorHandle | null>(null)
   const sessionRef = useRef<NoteSession | null>(null)
   const trackerRef = useRef<TitleRenameTracker | null>(null)
+  /** Mirrors the snapshot's conflict for non-reactive checks (rename gating). */
+  const conflictRef = useRef<string | null>(null)
   /** Serializes rename rewrites — a second settle must wait for the first. */
   const renameChain = useRef<Promise<void>>(Promise.resolve())
 
@@ -150,7 +152,17 @@ export function useNoteDocument(
         }
       })
     }
-    const tracker = trackRenames ? createTitleRenameTracker({ path, onRename: runRename }) : null
+    const tracker = trackRenames
+      ? createTitleRenameTracker({
+          path,
+          onRename: runRename,
+          // A parked conflict contests this very content — rewriting the graph
+          // for a title the user may be about to discard ("load theirs") would
+          // strand every rewritten link. Blocked renames stay pending: "keep
+          // mine" saves and re-arms; "load theirs" re-baselines and clears.
+          canFire: () => conflictRef.current === null,
+        })
+      : null
     trackerRef.current = tracker
 
     const session = createNoteSession({
@@ -168,7 +180,10 @@ export function useNoteDocument(
           : null,
       },
       classify: checkRoundTrip,
-      onSnapshot: setSnapshot,
+      onSnapshot: (snapshot) => {
+        conflictRef.current = snapshot.conflict
+        setSnapshot(snapshot)
+      },
       applyContent: (markdown) => editorRef.current?.setMarkdown(markdown),
       onContent: tracker
         ? (content, origin) => {

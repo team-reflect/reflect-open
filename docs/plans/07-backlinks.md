@@ -51,6 +51,13 @@ link UX (create-from-unresolved largely subsumes the failure case).
   intermediate aliases pruned; daily notes excluded (their date labels are
   stream chrome, not content). Filenames stay put in the first wave — the
   title lives in content, and `note_move` filename-sync can join later.
+  Two recorded edges: a note with an explicit frontmatter `title:` cannot be
+  renamed from the editor yet (the heading isn't its title — `title:` is
+  authoritative and the editor doesn't edit frontmatter; a title field editor
+  is a later surface), and a rename pending while a conflict is parked stays
+  pending until the conflict resolves ("keep mine" re-arms it, "load theirs"
+  cancels it) — rewriting the graph for a title the user may discard would
+  strand every rewritten link.
 
 ## Steps
 

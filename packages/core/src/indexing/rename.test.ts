@@ -54,6 +54,17 @@ describe('rewriteLinksForTitleChange', () => {
     expect(writes).toEqual({})
   })
 
+  it('never rewrites link-shaped text inside code contexts', async () => {
+    const { io, writes } = fakeIo({
+      'notes/code.md':
+        'Real: [[Old]]\n\n```\n[[Old]] in a fence\n```\n\nAnd `[[Old]] inline`.\n',
+    })
+    await rewriteLinksForTitleChange({ path: 'notes/t.md', from: 'Old', to: 'New', io })
+    expect(writes['notes/code.md']).toBe(
+      'Real: [[New]]\n\n```\n[[Old]] in a fence\n```\n\nAnd `[[Old]] inline`.\n',
+    )
+  })
+
   it('leaves links alone when the old title belongs to a different note now', async () => {
     const { io, writes } = fakeIo(
       { 'notes/a.md': '[[Old Title]]\n' },
