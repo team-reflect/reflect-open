@@ -101,22 +101,29 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
           // then silently re-points links to us if it's ever deleted.
           return
         }
-        const aliases = nextAliases(
-          parseNote({ path, source: rename.content }).frontmatter.aliases,
-          rename,
-        )
-        if (aliases !== null) {
-          if (!paneClosed && session !== null) {
-            // Through the owning session's frontmatter channel — the editor
-            // view never churns — and flushed rather than riding the debounce:
-            // a settle is exactly the moment to persist, and quit-time
-            // teardown awaits this chain.
+        // Compute against the note's *current* aliases at placement time —
+        // `aliases` replaces the whole key, and the settle-time snapshot can
+        // be stale (an external edit adopted mid-rewrite, a racing chained
+        // rename): replacing from it would drop concurrently-gained entries.
+        const aliasesOf = (source: string): string[] =>
+          parseNote({ path, source }).frontmatter.aliases
+        if (!paneClosed && session !== null) {
+          // Read and patch in the same tick (no await between): atomic against
+          // the session. Through its frontmatter channel — the editor view
+          // never churns — and flushed rather than riding the debounce: a
+          // settle is exactly the moment to persist, and quit-time teardown
+          // awaits this chain.
+          const aliases = nextAliases(aliasesOf(session.content()), rename)
+          if (aliases !== null) {
             session.updateFrontmatter({ aliases })
             await session.flush()
-          } else {
-            // Pane gone: write directly to disk. No editor left to disturb;
-            // a reopened pane reconciles it like any external change.
-            const content = await readNote(path)
+          }
+        } else {
+          // Pane gone: write directly to disk. No editor left to disturb;
+          // a reopened pane reconciles it like any external change.
+          const content = await readNote(path)
+          const aliases = nextAliases(aliasesOf(content), rename)
+          if (aliases !== null) {
             const patched = upsertFrontmatter(content, { aliases })
             if (patched !== content) {
               await writeNote(path, patched, gen)

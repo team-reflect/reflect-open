@@ -131,6 +131,8 @@ export interface NoteSession {
   keepMine: () => void
   /** Resolve a conflict by loading the external content (discards the buffer). */
   loadTheirs: () => void
+  /** The full current document (frontmatter + buffer), as a save would write it. */
+  content: () => string
   /**
    * Patch frontmatter keys (e.g. `aliases`, Plan 07b) without touching the
    * editor: the header is updated in place and saved through the normal
@@ -470,6 +472,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     flush,
     keepMine,
     loadTheirs,
+    content: () => header + buffer,
     updateFrontmatter,
     dispose,
   }
