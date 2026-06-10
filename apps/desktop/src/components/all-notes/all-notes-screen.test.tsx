@@ -278,4 +278,23 @@ describe('AllNotesScreen', () => {
     await view.findByText('No notes tagged #zettel.')
     view.unmount()
   })
+
+  it('matches facets case-insensitively in the Custom combobox', async () => {
+    const view = renderScreen()
+    await view.findByText('Health Stacked')
+
+    fireEvent.click(view.getByRole('button', { name: 'Custom' }))
+    const input = await view.findByPlaceholderText('Filter by any tag…')
+    fireEvent.change(input, { target: { value: 'TRAVEL' } })
+
+    // cmdk's default filter (command-score) folds case like `foldTag` does,
+    // so a differently-cased query keeps the existing facet reachable instead
+    // of dead-ending with a hidden list and a suppressed "Filter by" offer.
+    expect(await view.findByRole('option', { name: /#travel/ })).toBeDefined()
+    expect(view.queryByRole('option', { name: /Filter by/ })).toBeNull()
+
+    fireEvent.click(view.getByRole('option', { name: /#travel/ }))
+    expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: 'travel' })
+    view.unmount()
+  })
 })
