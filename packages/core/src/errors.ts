@@ -48,3 +48,12 @@ export function toAppError(value: unknown): AppError {
   }
   return { kind: 'unknown', message }
 }
+
+/**
+ * The display message for any thrown/rejected value — {@link toAppError}'s
+ * normalization, as a string. The standard way to render a caught `unknown`
+ * to the user (or a log line) without `[object Object]` surprises.
+ */
+export function errorMessage(value: unknown): string {
+  return toAppError(value).message
+}

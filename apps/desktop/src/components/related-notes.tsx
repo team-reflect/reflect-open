@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { hasBridge, relatedNotes } from '@reflect/core'
+import { NoteLinkList } from '@/components/note-link-list'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 import { routeForPath } from '@/routing/route'
@@ -35,31 +36,16 @@ export function RelatedNotes({ path }: RelatedNotesProps): ReactElement | null {
   }
 
   return (
-    <section
-      aria-label="Related notes"
-      className="mt-6 border-t border-black/5 pt-3 dark:border-white/5"
-    >
-      <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-[color:var(--text-muted)]">
-        Related
-      </h3>
-      <ul className="space-y-0.5">
-        {related.map((hit) => (
-          <li key={hit.path}>
-            <button
-              type="button"
-              onClick={() => navigate(routeForPath(hit.path))}
-              className="w-full rounded px-2 py-1 text-left hover:bg-black/5 dark:hover:bg-white/5"
-            >
-              <span className="block truncate text-sm font-medium">{hit.title}</span>
-              {hit.snippet !== '' ? (
-                <span className="block truncate text-xs text-[color:var(--text-muted)]">
-                  {hit.snippet}
-                </span>
-              ) : null}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <NoteLinkList
+      ariaLabel="Related notes"
+      heading="Related"
+      items={related.map((hit) => ({
+        key: hit.path,
+        title: hit.title,
+        snippet: hit.snippet,
+        path: hit.path,
+      }))}
+      onOpen={(target) => navigate(routeForPath(target))}
+    />
   )
 }

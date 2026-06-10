@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getBacklinksWithContext, hasBridge } from '@reflect/core'
+import { NoteLinkList } from '@/components/note-link-list'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 import { routeForPath } from '@/routing/route'
@@ -35,31 +36,16 @@ export function BacklinksPanel({ path }: BacklinksPanelProps): ReactElement | nu
   }
 
   return (
-    <section
-      aria-label="Backlinks"
-      className="mt-6 border-t border-black/5 pt-3 dark:border-white/5"
-    >
-      <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-[color:var(--text-muted)]">
-        Linked from
-      </h3>
-      <ul className="space-y-0.5">
-        {data.map((backlink) => (
-          <li key={`${backlink.sourcePath}:${backlink.posFrom}`}>
-            <button
-              type="button"
-              onClick={() => navigate(routeForPath(backlink.sourcePath))}
-              className="w-full rounded px-2 py-1 text-left hover:bg-black/5 dark:hover:bg-white/5"
-            >
-              <span className="block text-sm font-medium">{backlink.sourceTitle}</span>
-              {backlink.snippet !== '' ? (
-                <span className="block truncate text-xs text-[color:var(--text-muted)]">
-                  {backlink.snippet}
-                </span>
-              ) : null}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <NoteLinkList
+      ariaLabel="Backlinks"
+      heading="Linked from"
+      items={data.map((backlink) => ({
+        key: `${backlink.sourcePath}:${backlink.posFrom}`,
+        title: backlink.sourceTitle,
+        snippet: backlink.snippet,
+        path: backlink.sourcePath,
+      }))}
+      onOpen={(target) => navigate(routeForPath(target))}
+    />
   )
 }

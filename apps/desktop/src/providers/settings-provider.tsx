@@ -15,7 +15,7 @@ import {
   hasBridge,
   loadSettings,
   saveSettings,
-  toAppError,
+  errorMessage,
   type Settings,
 } from '@reflect/core'
 import { startOperation } from '@/lib/operations'
@@ -78,7 +78,7 @@ export function SettingsProvider({ children }: SettingsProviderProps): ReactElem
   useEffect(() => {
     if (loadError && !loadErrorSurfaced.current) {
       loadErrorSurfaced.current = true
-      startOperation('Loading settings').fail(toAppError(loadError).message)
+      startOperation('Loading settings').fail(errorMessage(loadError))
     }
   }, [loadError])
 
@@ -116,7 +116,7 @@ export function SettingsProvider({ children }: SettingsProviderProps): ReactElem
         // The in-memory value stays applied and `lastPersisted` still points
         // at the confirmed disk document, so the difference is retried later.
         // The failure is product status, not console noise.
-        startOperation('Saving settings').fail(toAppError(error).message)
+        startOperation('Saving settings').fail(errorMessage(error))
       })
     return persistQueue.current
   }, [])

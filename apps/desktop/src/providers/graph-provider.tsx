@@ -10,11 +10,11 @@ import {
 } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
 import {
+  errorMessage,
   forgetRecent,
   hasBridge,
   openGraph,
   recentGraphs,
-  toAppError,
   type GraphInfo,
   type RecentGraph,
 } from '@reflect/core'
@@ -49,12 +49,6 @@ interface GraphContextValue {
 
 const GraphContext = createContext<GraphContextValue | null>(null)
 
-function messageOf(error: unknown): string {
-  // `toAppError` already normalizes Errors/strings/objects safely, so unknown
-  // throws never render as `[object Object]`.
-  return toAppError(error).message
-}
-
 /**
  * Owns the active graph and the open/choose flow. On mount it auto-opens the
  * most-recent graph (so the app reopens where you left off) and otherwise shows
@@ -77,7 +71,7 @@ export function GraphProvider({ children }: { children: ReactNode }) {
   // a graph switch can stop the prior pass before the Rust connection is swapped.
   const indexRef = useRef(
     createGraphIndex({
-      onError: (stage, err) => console.error(`index ${stage} failed:`, messageOf(err)),
+      onError: (stage, err) => console.error(`index ${stage} failed:`, errorMessage(err)),
       onProgress: (progress) => setIndexing(progress === 'reconciling'),
       onApplied: invalidateIndexQueries,
     }),
@@ -98,7 +92,7 @@ export function GraphProvider({ children }: { children: ReactNode }) {
         // primary load. As a post-open refresh it must not clobber an open error
         // or set one on a screen (the workspace) that never shows it.
         if (options?.surfaceErrors) {
-          setError(messageOf(err))
+          setError(errorMessage(err))
         }
         return []
       }
@@ -138,7 +132,7 @@ export function GraphProvider({ children }: { children: ReactNode }) {
           if (seq !== openSeq.current) {
             return
           }
-          setError(messageOf(err))
+          setError(errorMessage(err))
           setStatus('choosing')
         }
         if (seq === openSeq.current) {
@@ -185,7 +179,7 @@ export function GraphProvider({ children }: { children: ReactNode }) {
       })
       selected = typeof result === 'string' ? result : null
     } catch (err) {
-      setError(messageOf(err))
+      setError(errorMessage(err))
       return
     }
     if (selected) {

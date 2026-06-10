@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { hasBridge, readNote, subscribeFileChanges, writeNote } from '@reflect/core'
+import { readNote, writeNote, type FileChange } from '@reflect/core'
+import { useFileChanges } from '@/lib/use-file-changes'
 import type { NoteEditorHandle } from './note-editor'
 import { registerOpenDocument } from './open-documents'
 import { createRenameCoordinator, type RenameCoordinator } from './rename-coordinator'
@@ -160,29 +161,15 @@ export function useNoteDocument(
   }, [path, canWrite, createIfMissing, trackRenames, missingSeed])
 
   // External-change reconciliation via the watcher (Plan 04b events).
-  useEffect(() => {
-    if (!path || !hasBridge()) {
-      return
-    }
-    let active = true
-    let unlisten: (() => void) | null = null
-    void subscribeFileChanges((changes) => {
-      if (!active || !changes.some((change) => change.path === path && change.kind === 'upsert')) {
-        return
+  const onFileChanges = useCallback(
+    (changes: FileChange[]) => {
+      if (changes.some((change) => change.path === path && change.kind === 'upsert')) {
+        sessionRef.current?.externalChanged()
       }
-      sessionRef.current?.externalChanged()
-    }).then((fn) => {
-      if (active) {
-        unlisten = fn
-      } else {
-        fn()
-      }
-    })
-    return () => {
-      active = false
-      unlisten?.()
-    }
-  }, [path])
+    },
+    [path],
+  )
+  useFileChanges(path ? onFileChanges : null)
 
   // Flush pending edits when the window loses focus, and register with the
   // app-global registry so quit-time teardown (window close, ⌘Q — paths where
