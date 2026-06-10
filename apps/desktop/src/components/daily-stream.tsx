@@ -123,7 +123,7 @@ export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
                   lazy
                   autoFocus={autoFocus}
                   onAutoFocused={consumeFocus}
-                  editorClassName={isPast ? 'min-h-[200px]' : 'min-h-[60vh]'}
+                  editorClassName={isPast ? 'min-h-[100px]' : 'min-h-[60vh]'}
                 />
               </section>
             </div>
