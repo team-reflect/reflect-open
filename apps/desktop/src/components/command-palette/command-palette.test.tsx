@@ -141,6 +141,16 @@ describe('CommandPalette', () => {
     expect(view.queryByText('Notes')).toBeNull()
   })
 
+  it('bound commands show keycap hints (jsdom is non-Apple: Ctrl)', async () => {
+    suggestWikiTargets.mockResolvedValue([])
+    searchWithFilters.mockResolvedValue([])
+    const { view } = renderPalette('> go to today')
+    const row = await view.findByText('Go to today')
+    const item = row.closest('[cmdk-item]')
+    expect(item?.textContent).toContain('Ctrl')
+    expect(item?.textContent).toContain('D')
+  })
+
   it('filter tokens run the constrained search and render its rows', async () => {
     suggestWikiTargets.mockClear()
     suggestWikiTargets.mockResolvedValue([])

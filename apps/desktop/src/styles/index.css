@@ -14,6 +14,14 @@ body,
   height: 100%;
 }
 
+/* One keyboard-focus treatment everywhere. Zero-specificity (`:where`) so any
+   component rule below — the editor's `outline: none`, the palette input —
+   can still opt out. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
 /* ---- Editor (Plan 05) ------------------------------------------------------
    meowdown ships structural CSS only; visibility of markdown syntax and all
    theming is ours. Its MarkMode plugin sets `data-mark-mode` on the editor root
@@ -181,7 +189,7 @@ body,
   border-bottom: 1px solid var(--border, rgb(0 0 0 / 10%));
   background: transparent;
   font-size: 0.9375rem;
-  outline: none;
+  outline: none; /* the modal frame is the focus treatment */
 }
 .reflect-palette-list {
   max-height: 20rem;
