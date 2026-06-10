@@ -1,4 +1,4 @@
-import { embedStatus, notePath, randomNotePath, rebuildIndex } from '@reflect/core'
+import { embedStatus, errorMessage, notePath, randomNotePath, rebuildIndex } from '@reflect/core'
 import { ulid } from 'ulidx'
 import { todayIso } from '@/lib/dates'
 import { toggleNotePinned } from '@/lib/note-pin'
@@ -68,7 +68,13 @@ const APP_COMMANDS: AppCommand[] = [
       if (generation === null || path === null) {
         return
       }
-      await toggleNotePinned(path, generation)
+      try {
+        await toggleNotePinned(path, generation)
+      } catch (cause) {
+        // runCommand has no error channel of its own — an unreported failure
+        // here would be a silent ⌘O. Surface it like other background work.
+        startOperation('Pinning note').fail(errorMessage(cause))
+      }
     },
   },
   {

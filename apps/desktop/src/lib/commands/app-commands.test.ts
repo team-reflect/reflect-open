@@ -123,6 +123,18 @@ describe('app commands', () => {
     expect(toggleNotePinned).toHaveBeenCalledWith('daily/2026-06-09.md', 7)
   })
 
+  it('note.togglePin reports a failed toggle as an operation, never an unhandled throw', async () => {
+    try {
+      toggleNotePinned.mockClear()
+      toggleNotePinned.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
+      const { context } = fakeContext({ route: () => ({ kind: 'note', path: 'notes/a.md' }) })
+      // runCommand has no error channel — the command must absorb and report.
+      await expect(command('note.togglePin').run(context)).resolves.toBeUndefined()
+    } finally {
+      resetOperations()
+    }
+  })
+
   it('note.togglePin no-ops on note-less routes and without a graph', async () => {
     toggleNotePinned.mockClear()
     const { context } = fakeContext({ route: () => ({ kind: 'settings' }) })

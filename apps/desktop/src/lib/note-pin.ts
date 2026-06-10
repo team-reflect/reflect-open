@@ -1,4 +1,4 @@
-import { parseNote, readNote, upsertFrontmatter, writeNote } from '@reflect/core'
+import { isAppError, parseNote, readNote, upsertFrontmatter, writeNote } from '@reflect/core'
 import { openSession } from '@/editor/open-documents'
 
 /**
@@ -39,10 +39,28 @@ export async function toggleNotePinned(path: string, generation: number): Promis
       return pinned
     }
   }
-  const content = await readNote(path)
+  const content = await readNoteOrEmpty(path)
   const pinned = !parseNote({ path, source: content }).frontmatter.pinned
   await applyPinnedToDisk(path, pinned, generation, content)
   return pinned
+}
+
+/**
+ * The note's content, where a missing file reads as an empty note — the lazy
+ * contract: dailies (and ⌘N notes) are valid pin targets before their file
+ * exists, and the pin write is what creates the file. Covers the gap where the
+ * pane's session exists but can't take patches yet (still loading) — its
+ * post-load reconcile then adopts our write like any external change.
+ */
+async function readNoteOrEmpty(path: string): Promise<string> {
+  try {
+    return await readNote(path)
+  } catch (cause) {
+    if (isAppError(cause) && cause.kind === 'notFound') {
+      return ''
+    }
+    throw cause
+  }
 }
 
 /**

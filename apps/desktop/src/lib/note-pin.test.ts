@@ -73,6 +73,24 @@ describe('toggleNotePinned', () => {
     expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\npinned: true\n---\n# A\n', 3)
   })
 
+  it('pins a not-yet-created note by creating its file (the lazy contract)', async () => {
+    // ⌘O on a fresh daily whose pane session is still loading: the session
+    // can't take the patch and the file doesn't exist — a missing note reads
+    // as empty, and the pin write is what creates it.
+    const { session } = fakeSession('', { canPatch: false })
+    openSession.mockReturnValue(session)
+    readNote.mockRejectedValue({ kind: 'notFound', message: 'no such note' })
+    await expect(toggleNotePinned('daily/2026-06-10.md', 3)).resolves.toBe(true)
+    expect(writeNote).toHaveBeenCalledWith('daily/2026-06-10.md', '---\npinned: true\n---\n', 3)
+  })
+
+  it('still surfaces non-notFound read failures', async () => {
+    openSession.mockReturnValue(null)
+    readNote.mockRejectedValue({ kind: 'io', message: 'disk on fire' })
+    await expect(toggleNotePinned('notes/a.md', 3)).rejects.toMatchObject({ kind: 'io' })
+    expect(writeNote).not.toHaveBeenCalled()
+  })
+
   it('under a parked conflict, also patches disk so the pin is indexed now', async () => {
     // The session's saves are paused (flush is a no-op) — the in-memory patch
     // alone would leave the sidebar stale and "load theirs" would drop the pin.
