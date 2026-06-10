@@ -27,6 +27,7 @@ export {
   subscribeEmbedStatus,
   embedStatusSchema,
   type EmbedStatus,
+  type EmbedProgress,
   type EmbedChunkPayload,
 } from './embeddings/commands'
 export { embedNote, backfillEmbeddings } from './embeddings/pipeline'

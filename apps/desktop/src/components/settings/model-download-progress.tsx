@@ -1,10 +1,9 @@
 import type { ReactElement } from 'react'
+import type { EmbedProgress } from '@reflect/core'
 
 interface ModelDownloadProgressProps {
-  /** Bytes fetched so far, when an active download has reported them. */
-  downloadedBytes?: number
-  /** Bytes the download will fetch in total, reported alongside the above. */
-  totalBytes?: number
+  /** Byte counts from an active download, once the runtime has reported them. */
+  progress?: EmbedProgress
 }
 
 function formatMegabytes(bytes: number): string {
@@ -14,20 +13,17 @@ function formatMegabytes(bytes: number): string {
 /**
  * The embedding-model download as a progress bar: determinate while the
  * runtime reports byte counts, an indeterminate shimmer in the unmeasured
- * moments around them (before the first progress event, and the model-load
+ * moments around them (before the download starts, and the model-load
  * phase after the last byte lands).
  */
-export function ModelDownloadProgress({
-  downloadedBytes,
-  totalBytes,
-}: ModelDownloadProgressProps): ReactElement {
+export function ModelDownloadProgress({ progress }: ModelDownloadProgressProps): ReactElement {
   const fraction =
-    downloadedBytes !== undefined && totalBytes !== undefined && totalBytes > 0
-      ? Math.min(downloadedBytes / totalBytes, 1)
+    progress !== undefined && progress.total > 0
+      ? Math.min(progress.downloaded / progress.total, 1)
       : null
   const label =
-    downloadedBytes !== undefined && totalBytes !== undefined && fraction !== null && fraction < 1
-      ? `Downloading the model — ${formatMegabytes(downloadedBytes)} of ${formatMegabytes(totalBytes)}`
+    progress !== undefined && fraction !== null && fraction < 1
+      ? `Downloading the model — ${formatMegabytes(progress.downloaded)} of ${formatMegabytes(progress.total)}`
       : 'Preparing the model…'
 
   return (

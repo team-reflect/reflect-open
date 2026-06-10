@@ -33,6 +33,16 @@ const MODEL_FILES: [&str; 5] = [
     "tokenizer_config.json",
 ];
 
+/// Byte counts for an active model download. Absent until the download
+/// starts (cache probing, or a cached model that skips downloading); after
+/// the last byte it stays at 100% through the model-load phase.
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ByteProgress {
+    pub downloaded: u64,
+    pub total: u64,
+}
+
 #[derive(Clone, Serialize)]
 #[serde(
     rename_all = "camelCase",
@@ -42,15 +52,12 @@ const MODEL_FILES: [&str; 5] = [
 pub enum EmbedStatus {
     /// No model loaded yet; `embed_ensure` will download/load it.
     Uninitialized,
-    /// Download/load in progress (first run downloads ~90MB). The byte
-    /// counters are only present on the progress events an active download
-    /// emits — a status poll, or the load of an already-cached model, carries
-    /// no totals to report.
+    /// Download/load in progress (first run downloads ~90MB). The runtime
+    /// keeps the latest byte counts, so polls and `embed:status` events
+    /// report the same progress.
     Loading {
         #[serde(skip_serializing_if = "Option::is_none")]
-        downloaded_bytes: Option<u64>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        total_bytes: Option<u64>,
+        progress: Option<ByteProgress>,
     },
     /// `embed_texts` is ready; `model` is recorded per vector (rebuild key).
     Ready { model: String },
@@ -58,18 +65,13 @@ pub enum EmbedStatus {
     Failed { message: String },
 }
 
-fn loading_status() -> EmbedStatus {
-    EmbedStatus::Loading {
-        downloaded_bytes: None,
-        total_bytes: None,
-    }
-}
-
 #[derive(Default)]
 enum Runtime {
     #[default]
     Uninitialized,
-    Loading,
+    Loading {
+        progress: Option<ByteProgress>,
+    },
     // fastembed's `embed` takes `&mut self`, so the model sits behind its own
     // Mutex — embed calls serialize, which batching makes irrelevant.
     Ready(Arc<Mutex<TextEmbedding>>),
@@ -92,7 +94,9 @@ fn lock_state<'a>(
 fn status_of(runtime: &Runtime) -> EmbedStatus {
     match runtime {
         Runtime::Uninitialized => EmbedStatus::Uninitialized,
-        Runtime::Loading => loading_status(),
+        Runtime::Loading { progress } => EmbedStatus::Loading {
+            progress: *progress,
+        },
         Runtime::Ready(_) => EmbedStatus::Ready {
             model: MODEL_ID.to_string(),
         },
@@ -104,6 +108,22 @@ fn status_of(runtime: &Runtime) -> EmbedStatus {
 
 fn emit_status(app: &AppHandle, status: &EmbedStatus) {
     let _ = app.emit("embed:status", status);
+}
+
+/// Record download progress on the runtime state, so an `embed_status` poll
+/// (e.g. a UI surface mounted mid-download) reports the same bytes as the
+/// `embed:status` events. Only an in-flight load is updated — by the time a
+/// stale progress callback could land, the state owns a terminal status.
+fn store_progress(app: &AppHandle, progress: ByteProgress) {
+    let state = app.state::<EmbedState>();
+    let Ok(mut runtime) = state.0.lock() else {
+        return;
+    };
+    if matches!(*runtime, Runtime::Loading { .. }) {
+        *runtime = Runtime::Loading {
+            progress: Some(progress),
+        };
+    }
 }
 
 /// How many newly-downloaded bytes accumulate between progress events — about
@@ -121,11 +141,15 @@ struct DownloadState {
 impl DownloadState {
     fn emit(&mut self) {
         self.emitted = self.downloaded;
+        let progress = ByteProgress {
+            downloaded: self.downloaded,
+            total: self.total,
+        };
+        store_progress(&self.app, progress);
         emit_status(
             &self.app,
             &EmbedStatus::Loading {
-                downloaded_bytes: Some(self.downloaded),
-                total_bytes: Some(self.total),
+                progress: Some(progress),
             },
         );
     }
@@ -241,13 +265,13 @@ pub async fn embed_ensure(app: AppHandle, state: State<'_, EmbedState>) -> AppRe
     {
         let mut runtime = lock_state(&state)?;
         match &*runtime {
-            Runtime::Ready(_) | Runtime::Loading => return Ok(status_of(&runtime)),
+            Runtime::Ready(_) | Runtime::Loading { .. } => return Ok(status_of(&runtime)),
             Runtime::Uninitialized | Runtime::Failed(_) => {
-                *runtime = Runtime::Loading;
+                *runtime = Runtime::Loading { progress: None };
             }
         }
     }
-    emit_status(&app, &loading_status());
+    emit_status(&app, &EmbedStatus::Loading { progress: None });
 
     // From here every path — success, load failure, even a panicked blocking
     // task — must land the state in Ready or Failed: an early `?` would wedge

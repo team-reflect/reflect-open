@@ -124,7 +124,7 @@ describe('SettingsScreen', () => {
 
   it('shows byte-level progress while the model downloads', async () => {
     stored = { semanticSearchEnabled: true }
-    embedStatus = { status: 'loading', downloadedBytes: 45_000_000, totalBytes: 90_000_000 }
+    embedStatus = { status: 'loading', progress: { downloaded: 45_000_000, total: 90_000_000 } }
     renderScreen()
 
     const bar = await screen.findByRole('progressbar', { name: /model download/i })

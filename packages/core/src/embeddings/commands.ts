@@ -4,14 +4,20 @@ import { call } from '../ipc/invoke'
 
 /** Typed bindings for the Rust embedding runtime + vector writes (Plan 09). */
 
+/** Byte counts for an active model download; absent until it starts. */
+export const embedProgressSchema = z.object({
+  /** Bytes fetched so far. */
+  downloaded: z.number().int().nonnegative(),
+  /** Bytes the download will fetch in total. */
+  total: z.number().int().nonnegative(),
+})
+export type EmbedProgress = z.infer<typeof embedProgressSchema>
+
 export const embedStatusSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('uninitialized') }),
   z.object({
     status: z.literal('loading'),
-    /** Bytes fetched so far; only present on an active download's events. */
-    downloadedBytes: z.number().int().nonnegative().optional(),
-    /** Bytes the download will fetch in total; present alongside the above. */
-    totalBytes: z.number().int().nonnegative().optional(),
+    progress: embedProgressSchema.optional(),
   }),
   z.object({ status: z.literal('ready'), model: z.string() }),
   z.object({ status: z.literal('failed'), message: z.string() }),

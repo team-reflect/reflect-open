@@ -84,10 +84,7 @@ export function SearchSection(): ReactElement {
   } else {
     // `loading`, or the `uninitialized` beat before EmbeddingsSync reacts.
     control = (
-      <ModelDownloadProgress
-        downloadedBytes={status.status === 'loading' ? status.downloadedBytes : undefined}
-        totalBytes={status.status === 'loading' ? status.totalBytes : undefined}
-      />
+      <ModelDownloadProgress progress={status.status === 'loading' ? status.progress : undefined} />
     )
   }
 
