@@ -15,7 +15,9 @@ interface AppShellProps {
  * The application frame, in the original app's shape: a sunken sidebar beside
  * the raised note pane, no header bar — the document is the chrome. Layout
  * and landmark regions only; what fills the slots (and whether the sidebar
- * shows at all) is the workspace's business.
+ * shows at all) is the workspace's business. The frame never scrolls: every
+ * route mounts its own scroll container, so the center region clips instead
+ * of growing a second scrollbar around a route's own.
  */
 export function AppShell({ sidebar, context, children, className }: AppShellProps): ReactElement {
   return (
@@ -34,7 +36,7 @@ export function AppShell({ sidebar, context, children, className }: AppShellProp
         </aside>
       ) : null}
 
-      <main className="min-w-0 flex-1 overflow-auto bg-surface">{children}</main>
+      <main className="min-w-0 flex-1 overflow-hidden bg-surface">{children}</main>
 
       {context ? (
         <aside

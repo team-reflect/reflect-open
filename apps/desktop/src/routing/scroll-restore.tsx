@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactElement, type ReactNode } from 'react'
+import { cn } from '@/lib/utils'
 import { useRouter } from './router'
 
 interface ScrollRestoredProps {
@@ -11,6 +12,11 @@ interface ScrollRestoredProps {
  * it reports its offset as the user scrolls and restores the saved offset when
  * a history entry is revisited via back/forward. The daily stream does the same
  * through its virtualizer; this is for plain views (note, search).
+ *
+ * The container is positioned (`relative`) so absolutely-positioned
+ * descendants — `sr-only` controls especially — resolve against it and scroll
+ * with the content. Without it they escape to the workspace column at their
+ * static offsets, overflowing the frame into a second scrollbar.
  */
 export function ScrollRestored({ className, children }: ScrollRestoredProps): ReactElement {
   const { entryId, saveScrollState, savedScroll } = useRouter()
@@ -28,7 +34,7 @@ export function ScrollRestored({ className, children }: ScrollRestoredProps): Re
   return (
     <div
       ref={ref}
-      className={className}
+      className={cn(className, 'relative')}
       onScroll={(event) => saveScrollState(event.currentTarget.scrollTop)}
     >
       {children}
