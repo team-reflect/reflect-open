@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
 import { setBridge } from '@reflect/core'
 import { resetOperations, useOperations } from '@/lib/operations'
+import { flushSettings } from '@/lib/settings-flush'
 import { SETTINGS_QUERY_KEY, SettingsProvider, useSettings } from './settings-provider'
 
 /**
@@ -16,6 +17,7 @@ import { SETTINGS_QUERY_KEY, SettingsProvider, useSettings } from './settings-pr
 let stored: Record<string, unknown>
 let saved: unknown[]
 let failSaves: boolean
+let failLoad: boolean
 /** When set, `settings_load` blocks until {@link releaseLoad} is called. */
 let pendingLoad: (() => void) | null
 let gateLoad: boolean
@@ -28,12 +30,16 @@ function releaseLoad(): void {
 function installFakeBridge(): void {
   saved = []
   failSaves = false
+  failLoad = false
   gateLoad = false
   pendingLoad = null
   setBridge({
     invoke: async (command, args) => {
       switch (command) {
         case 'settings_load':
+          if (failLoad) {
+            throw { kind: 'io', message: 'corrupt store' }
+          }
           if (gateLoad) {
             await new Promise<void>((resolve) => {
               pendingLoad = resolve
@@ -174,5 +180,73 @@ describe('SettingsProvider', () => {
       ]),
     )
     expect(result.current.settings.editorMarkdownSyntax).toBe('show')
+  })
+
+  it('retries an unconfirmed save on the next update, even to the same value', async () => {
+    const { result } = renderHook(
+      () => ({ ...useSettings(), operations: useOperations() }),
+      { wrapper },
+    )
+    await loadSettled()
+
+    failSaves = true
+    act(() => {
+      result.current.updateSettings({ editorMarkdownSyntax: 'show' })
+    })
+    await waitFor(() => expect(result.current.operations).toHaveLength(1))
+    expect(saved).toEqual([])
+
+    // Disk recovered; re-applying the same value must re-attempt the write —
+    // `lastPersisted` only advances on a *confirmed* save.
+    failSaves = false
+    act(() => {
+      result.current.updateSettings({ editorMarkdownSyntax: 'show' })
+    })
+    await waitFor(() => expect(saved).toEqual([{ editorMarkdownSyntax: 'show' }]))
+  })
+
+  it('the quit flush persists changes a failed save left unconfirmed', async () => {
+    const { result } = renderHook(
+      () => ({ ...useSettings(), operations: useOperations() }),
+      { wrapper },
+    )
+    await loadSettled()
+
+    failSaves = true
+    act(() => {
+      result.current.updateSettings({ editorMarkdownSyntax: 'show' })
+    })
+    await waitFor(() => expect(result.current.operations).toHaveLength(1))
+    expect(saved).toEqual([])
+
+    failSaves = false
+    await act(async () => {
+      await flushSettings()
+    })
+    expect(saved).toEqual([{ editorMarkdownSyntax: 'show' }])
+  })
+
+  it('surfaces a failed load and keeps changes session-only', async () => {
+    failLoad = true
+    const { result } = renderHook(
+      () => ({ ...useSettings(), operations: useOperations() }),
+      { wrapper },
+    )
+    await waitFor(() =>
+      expect(result.current.operations).toMatchObject([
+        { label: 'Loading settings', status: 'failed', error: 'corrupt store' },
+      ]),
+    )
+
+    // Changes still apply for the session, but nothing may be written over a
+    // store that couldn't be read — a defaults-built save could wipe it.
+    act(() => {
+      result.current.updateSettings({ editorMarkdownSyntax: 'show' })
+    })
+    expect(result.current.settings.editorMarkdownSyntax).toBe('show')
+    await act(async () => {
+      await flushSettings()
+    })
+    expect(saved).toEqual([])
   })
 })

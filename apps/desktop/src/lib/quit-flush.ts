@@ -1,10 +1,12 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { confirmQuit, hasBridge, subscribeQuitRequested } from '@reflect/core'
 import { flushOpenDocuments } from '@/editor/open-documents'
+import { flushSettings } from '@/lib/settings-flush'
 
 /**
  * Quit-time persistence: the webview never dies with dirty note buffers still
- * inside their save debounce. Three exits, three hooks:
+ * inside their save debounce — or with settings writes still in their queue.
+ * Three exits, three hooks:
  *
  * - **Window close** (red button, ⌘W): registering a JS `onCloseRequested`
  *   listener defers the close until the handler returns, so the flush is
@@ -36,18 +38,19 @@ export function installQuitFlush(): () => void {
 
   void getCurrentWindow()
     .onCloseRequested(async () => {
-      await flushOpenDocuments()
+      await Promise.all([flushOpenDocuments(), flushSettings()])
     })
     .then(track)
 
   void subscribeQuitRequested(() => {
-    void flushOpenDocuments().finally(() => {
+    void Promise.allSettled([flushOpenDocuments(), flushSettings()]).then(() => {
       void confirmQuit()
     })
   }).then(track)
 
   const onBeforeUnload = (): void => {
     void flushOpenDocuments()
+    void flushSettings()
   }
   window.addEventListener('beforeunload', onBeforeUnload)
   track(() => window.removeEventListener('beforeunload', onBeforeUnload))

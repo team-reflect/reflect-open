@@ -19,6 +19,7 @@ import {
   type Settings,
 } from '@reflect/core'
 import { startOperation } from '@/lib/operations'
+import { setSettingsFlusher } from '@/lib/settings-flush'
 
 /**
  * App-wide user settings (config-dir JSON, not graph state), applied instantly.
@@ -52,7 +53,7 @@ interface SettingsProviderProps {
 }
 
 export function SettingsProvider({ children }: SettingsProviderProps): ReactElement {
-  const { data: loaded } = useQuery({
+  const { data: loaded, error: loadError } = useQuery({
     queryKey: SETTINGS_QUERY_KEY,
     queryFn: loadSettings,
     enabled: hasBridge(),
@@ -70,32 +71,66 @@ export function SettingsProvider({ children }: SettingsProviderProps): ReactElem
     setOverrides((current) => ({ ...current, ...patch }))
   }, [])
 
+  // A corrupt store fails the load *by design* (Rust errors rather than
+  // reading empty, so a later save can't wipe the real document). Changes
+  // then apply for the session only — surface that state, don't hide it.
+  const loadErrorSurfaced = useRef(false)
+  useEffect(() => {
+    if (loadError && !loadErrorSurfaced.current) {
+      loadErrorSurfaced.current = true
+      startOperation('Loading settings').fail(toAppError(loadError).message)
+    }
+  }, [loadError])
+
   // Persistence trails hydration. Nothing is written before the disk document
   // has been read — a save built from defaults would drop passthrough keys a
   // newer app version wrote — and the full merged document is saved so those
-  // keys survive. An update made mid-load is simply flushed when the load
-  // lands. Writes are chained so they reach disk in apply order.
+  // keys survive. `lastPersisted` is the last document *confirmed* on disk
+  // (hydration, or a successful save): a failed write leaves it untouched, so
+  // the next change or the quit flush retries the difference. Writes are
+  // chained so they reach disk in apply order.
   const persistQueue = useRef<Promise<void>>(Promise.resolve())
   const lastPersisted = useRef<Settings | null>(null)
-  useEffect(() => {
-    if (loaded === undefined) {
-      return
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
+  const loadedRef = useRef(loaded)
+  loadedRef.current = loaded
+
+  const persistIfChanged = useCallback((): Promise<void> => {
+    const disk = loadedRef.current
+    if (disk === undefined) {
+      return persistQueue.current // never write over an unread store
     }
-    const onDisk = lastPersisted.current ?? loaded
-    if (sameDocument(settings, onDisk)) {
-      lastPersisted.current = onDisk
-      return
+    const target = settingsRef.current
+    const confirmed = lastPersisted.current ?? disk
+    if (sameDocument(target, confirmed)) {
+      lastPersisted.current = confirmed
+      return persistQueue.current
     }
-    lastPersisted.current = settings
     persistQueue.current = persistQueue.current
-      .then(() => saveSettings(settings))
+      .then(() => saveSettings(target))
+      .then(() => {
+        lastPersisted.current = target
+      })
       .catch((error: unknown) => {
-        // The in-memory value stays applied; the next successful save (or
-        // relaunch) reconciles. The failure is product status, not console
-        // noise — surface it where backgrounded errors live.
+        // The in-memory value stays applied and `lastPersisted` still points
+        // at the confirmed disk document, so the difference is retried later.
+        // The failure is product status, not console noise.
         startOperation('Saving settings').fail(toAppError(error).message)
       })
-  }, [loaded, settings])
+    return persistQueue.current
+  }, [])
+
+  useEffect(() => {
+    void persistIfChanged()
+  }, [loaded, settings, persistIfChanged])
+
+  // Quit-time persistence (window close, ⌘Q, reload): installQuitFlush drains
+  // this provider's queue — and retries anything unconfirmed — before exit.
+  useEffect(() => {
+    setSettingsFlusher(persistIfChanged)
+    return () => setSettingsFlusher(null)
+  }, [persistIfChanged])
 
   const value = useMemo<SettingsContextValue>(
     () => ({ settings, updateSettings }),
