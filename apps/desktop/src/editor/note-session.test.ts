@@ -220,6 +220,32 @@ describe('frontmatter ownership (Plan 07b)', () => {
     expect(h.writes.at(-1)?.contents).toBe('---\naliases:\n  - Newer\n---\n# Hello!\n')
   })
 
+  it('a frontmatter patch under a parked conflict lands with "keep mine"', async () => {
+    // The rename coordinator's alias can arrive while a conflict is parked:
+    // it rides the in-memory header (saves are paused, not dropped) and
+    // persists when the user keeps their version. "Load theirs" discarding
+    // it is the user explicitly choosing external content over the rename's
+    // consequences — a disk write here would clobber the protected "theirs".
+    const h = harness()
+    h.session.load()
+    await vi.runAllTimersAsync()
+    h.session.editorChanged('# Mine\n') // dirty
+    h.setDisk('# Theirs\n')
+    h.session.externalChanged()
+    await vi.runAllTimersAsync()
+    expect(h.snapshots.at(-1)?.conflict).toBe('# Theirs\n')
+
+    expect(h.session.updateFrontmatter({ aliases: ['Old Title'] })).toBe(true)
+    await vi.runAllTimersAsync()
+    expect(h.writes).toEqual([]) // paused, not written under the conflict
+
+    h.session.keepMine()
+    await vi.runAllTimersAsync()
+    const written = h.writes.at(-1)?.contents ?? ''
+    expect(written).toContain('Old Title') // the alias survived the conflict
+    expect(written).toContain('# Mine')
+  })
+
   it('onContent reports full joined content with the right origins', async () => {
     const h = harness({ disk: `${FM}# Hello\n` })
     h.session.load()
