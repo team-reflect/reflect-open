@@ -34,7 +34,11 @@ const MODEL_FILES: [&str; 5] = [
 ];
 
 #[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "status")]
+#[serde(
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    tag = "status"
+)]
 pub enum EmbedStatus {
     /// No model loaded yet; `embed_ensure` will download/load it.
     Uninitialized,
