@@ -62,6 +62,19 @@ function renderPalette(query: string, context?: Partial<CommandContext>) {
 }
 
 describe('CommandPalette', () => {
+  it('never shows "No results" while the recall feed is still loading', async () => {
+    let release!: (value: never[]) => void
+    suggestWikiTargets.mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve
+      }),
+    )
+    const { view } = renderPalette('')
+    expect(view.queryByText('No results')).toBeNull() // loading ≠ empty
+    release([])
+    await waitFor(() => expect(view.queryByText('No results')).not.toBeNull())
+  })
+
   it('empty query shows the recent-notes recall feed', async () => {
     suggestWikiTargets.mockResolvedValue([
       { target: 'Recent One', path: 'notes/r1.md', title: 'Recent One', alias: null, date: null },

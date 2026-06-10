@@ -52,7 +52,7 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
   // debounce) while the input itself stays perfectly responsive.
   const trimmed = useDeferredValue(query.trim())
   const searching = open && hasBridge() && graph !== null && !trimmed.startsWith('>')
-  const { data: suggestions } = useQuery({
+  const { data: suggestions, isLoading: suggestionsLoading } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'palette-suggest', trimmed],
     queryFn: () => suggestWikiTargets(trimmed, 8),
     enabled: searching,
@@ -116,7 +116,12 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
             className="reflect-palette-input"
           />
           <Command.List className="reflect-palette-list">
-            <Command.Empty className="reflect-palette-empty">No results</Command.Empty>
+            {/* "No results" must mean the index answered, not "still loading" —
+                the recall feed otherwise flashes a false empty on open.
+                (isLoading, not isPending: a disabled query is forever pending.) */}
+            {suggestionsLoading ? null : (
+              <Command.Empty className="reflect-palette-empty">No results</Command.Empty>
+            )}
             {sections.notes.length > 0 ? (
               <Command.Group
                 heading={query.trim() === '' ? 'Recent' : 'Notes'}
