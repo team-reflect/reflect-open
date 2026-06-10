@@ -78,11 +78,42 @@ function createLoadSettle(): LoadSettle {
   return { promise, resolve }
 }
 
-/** Shallow own-key equality — settings documents are flat JSON objects. */
+/**
+ * One settings value equals another: identity, or element-wise for arrays —
+ * documents are flat JSON, so arrays are the only non-primitive values
+ * (`allNotesFilterTags`; `aiModels` holds plain config objects, compared as
+ * JSON below). Reference equality alone would make an equal-but-rebuilt array
+ * (a re-parse — `aiModels`' transform rebuilds its array on every parse — or
+ * a no-op update) read as a change and trigger spurious saves.
+ */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) {
+    return true
+  }
+  return (
+    Array.isArray(a) &&
+    Array.isArray(b) &&
+    a.length === b.length &&
+    a.every((item, index) => sameItem(item, b[index]))
+  )
+}
+
+/** One array element equals another: identity for scalars, JSON for objects. */
+function sameItem(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) {
+    return true
+  }
+  if (typeof a === 'object' && a !== null && typeof b === 'object' && b !== null) {
+    return JSON.stringify(a) === JSON.stringify(b)
+  }
+  return false
+}
+
+/** Own-key equality over the flat settings document. */
 function sameDocument(a: Settings, b: Settings): boolean {
   const aKeys = Object.keys(a)
   const bKeys = Object.keys(b)
-  return aKeys.length === bKeys.length && aKeys.every((key) => Object.is(a[key], b[key]))
+  return aKeys.length === bKeys.length && aKeys.every((key) => sameValue(a[key], b[key]))
 }
 
 interface SettingsProviderProps {

@@ -7,12 +7,14 @@ describe('settingsSchema', () => {
       editorMarkdownSyntax: 'focus',
       semanticSearchEnabled: false,
       theme: 'system',
+      allNotesFilterTags: ['book', 'link', 'person'],
       aiModels: [],
       defaultAiModelId: null,
     })
     expect(DEFAULT_SETTINGS.editorMarkdownSyntax).toBe('focus')
     expect(DEFAULT_SETTINGS.semanticSearchEnabled).toBe(false)
     expect(DEFAULT_SETTINGS.theme).toBe('system')
+    expect(DEFAULT_SETTINGS.allNotesFilterTags).toEqual(['book', 'link', 'person'])
     expect(DEFAULT_SETTINGS.aiModels).toEqual([])
     expect(DEFAULT_SETTINGS.defaultAiModelId).toBeNull()
   })
@@ -25,6 +27,10 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ theme: 'system' }).theme).toBe('system')
     expect(settingsSchema.parse({ semanticSearchEnabled: true }).semanticSearchEnabled).toBe(true)
     expect(settingsSchema.parse({ semanticSearchEnabled: false }).semanticSearchEnabled).toBe(false)
+    expect(
+      settingsSchema.parse({ allNotesFilterTags: ['meeting'] }).allNotesFilterTags,
+    ).toEqual(['meeting'])
+    expect(settingsSchema.parse({ allNotesFilterTags: [] }).allNotesFilterTags).toEqual([])
   })
 
   it('degrades an invalid value to its default instead of failing the load', () => {
@@ -34,6 +40,16 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ theme: 7 }).theme).toBe('system')
     expect(settingsSchema.parse({ semanticSearchEnabled: 'yes' }).semanticSearchEnabled).toBe(false)
     expect(settingsSchema.parse({ semanticSearchEnabled: 1 }).semanticSearchEnabled).toBe(false)
+    expect(settingsSchema.parse({ allNotesFilterTags: 'book' }).allNotesFilterTags).toEqual([
+      'book',
+      'link',
+      'person',
+    ])
+    expect(settingsSchema.parse({ allNotesFilterTags: [7] }).allNotesFilterTags).toEqual([
+      'book',
+      'link',
+      'person',
+    ])
   })
 
   it('preserves unknown keys so newer-version settings survive a round trip', () => {
@@ -42,6 +58,7 @@ describe('settingsSchema', () => {
       editorMarkdownSyntax: 'show',
       semanticSearchEnabled: false,
       theme: 'system',
+      allNotesFilterTags: ['book', 'link', 'person'],
       aiModels: [],
       defaultAiModelId: null,
       futureKey: true,

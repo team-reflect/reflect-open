@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@reflect/core', () => ({
   openIndex: vi.fn(),
-  reconcileIndex: vi.fn(),
+  syncIndex: vi.fn(),
   subscribeIndexChanges: vi.fn(),
   watchStart: vi.fn(),
   watchStop: vi.fn(),
@@ -10,7 +10,7 @@ vi.mock('@reflect/core', () => ({
 
 import {
   openIndex,
-  reconcileIndex,
+  syncIndex,
   subscribeIndexChanges,
   watchStart,
   watchStop,
@@ -18,14 +18,16 @@ import {
 import { createGraphIndex } from './graph-index'
 
 const mockOpen = vi.mocked(openIndex)
-const mockReconcile = vi.mocked(reconcileIndex)
+// syncIndex (hash reconcile, or a version-bump rebuild — core decides) is the
+// one sync entry point the lifecycle calls.
+const mockSync = vi.mocked(syncIndex)
 const mockSubscribe = vi.mocked(subscribeIndexChanges)
 const mockWatchStart = vi.mocked(watchStart)
 const mockWatchStop = vi.mocked(watchStop)
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockReconcile.mockResolvedValue(undefined)
+  mockSync.mockResolvedValue(undefined)
   mockSubscribe.mockResolvedValue(() => {})
   mockWatchStart.mockResolvedValue(undefined)
   mockWatchStop.mockResolvedValue(undefined)
@@ -49,7 +51,7 @@ describe('createGraphIndex', () => {
     index.sync(null, () => false)
     await index.stop()
     expect(mockWatchStop).toHaveBeenCalledTimes(1)
-    expect(mockReconcile).not.toHaveBeenCalled()
+    expect(mockSync).not.toHaveBeenCalled()
   })
 
   it('sync(generation) reconciles, then subscribes, then starts the watcher', async () => {
@@ -60,13 +62,13 @@ describe('createGraphIndex', () => {
     index.sync(5, () => false)
     await index.stop()
 
-    expect(mockReconcile).toHaveBeenCalledWith({ generation: 5, signal: expect.any(AbortSignal) })
+    expect(mockSync).toHaveBeenCalledWith({ generation: 5, signal: expect.any(AbortSignal) })
     expect(mockSubscribe).toHaveBeenCalledWith(5, onApplied)
     // The initial reconcile is itself an index change: invalidate once there.
     expect(onApplied).toHaveBeenCalledTimes(1)
     expect(mockWatchStart).toHaveBeenCalledTimes(1)
     // Sequenced: reconcile → subscribe → watchStart.
-    expect(mockReconcile.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(mockSync.mock.invocationCallOrder[0]).toBeLessThan(
       mockSubscribe.mock.invocationCallOrder[0],
     )
     expect(mockSubscribe.mock.invocationCallOrder[0]).toBeLessThan(
@@ -89,7 +91,7 @@ describe('createGraphIndex', () => {
 
   it('reports idle (not live) when the sync pass fails un-superseded', async () => {
     const onProgress = vi.fn()
-    mockReconcile.mockRejectedValue(new Error('boom'))
+    mockSync.mockRejectedValue(new Error('boom'))
     const index = createGraphIndex({ onProgress })
     index.sync(5, () => false)
     await index.stop()
@@ -100,7 +102,7 @@ describe('createGraphIndex', () => {
     const index = createGraphIndex()
     index.sync(5, () => true) // stale immediately after reconcile
     await index.stop()
-    expect(mockReconcile).toHaveBeenCalledTimes(1)
+    expect(mockSync).toHaveBeenCalledTimes(1)
     expect(mockSubscribe).not.toHaveBeenCalled()
     expect(mockWatchStart).not.toHaveBeenCalled()
   })
@@ -121,7 +123,7 @@ describe('createGraphIndex', () => {
 
   it('reports a sync failure but stop() still settles', async () => {
     const onError = vi.fn()
-    mockReconcile.mockRejectedValue(new Error('reconcile boom'))
+    mockSync.mockRejectedValue(new Error('reconcile boom'))
     const index = createGraphIndex({ onError })
     index.sync(5, () => false)
     await index.stop()
@@ -131,7 +133,7 @@ describe('createGraphIndex', () => {
   it('stop() aborts the running reconcile and waits for it to settle', async () => {
     let captured: AbortSignal | undefined
     let settle: () => void = () => {}
-    mockReconcile.mockImplementation((options) => {
+    mockSync.mockImplementation((options) => {
       captured = options.signal
       return new Promise<void>((resolve) => {
         settle = resolve

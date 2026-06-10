@@ -1,4 +1,4 @@
-import { addDays, format, isValid, parse } from 'date-fns'
+import { addDays, format, isSameDay, isSameWeek, isValid, parse } from 'date-fns'
 
 /**
  * The one date module (Plan 06). Daily notes are keyed by **local** calendar
@@ -35,4 +35,20 @@ export function addDaysIso(date: string, days: number): string {
 /** Human label for an ISO date, e.g. `Tuesday, June 9`. */
 export function formatDayLabel(date: string): string {
   return format(parseIsoDate(date), 'EEEE, MMMM d')
+}
+
+/**
+ * Compact recency label for list rows (the original app's Updated column):
+ * the time for today (`8:22pm`), the weekday within the current week (`Mon`),
+ * the short date otherwise (`6/3/2026`). `now` is injectable for tests.
+ */
+export function formatRecencyLabel(epochMs: number, now: Date = new Date()): string {
+  const date = new Date(epochMs)
+  if (isSameDay(date, now)) {
+    return format(date, 'h:mmaaa')
+  }
+  if (isSameWeek(date, now)) {
+    return format(date, 'EEE')
+  }
+  return format(date, 'M/d/yyyy')
 }

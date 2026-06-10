@@ -32,6 +32,17 @@ export const themePreferenceSchema = z.enum(['system', 'light', 'dark']).catch('
 export type ThemePreference = z.infer<typeof themePreferenceSchema>
 
 /**
+ * Tags pinned as one-click filters on the All Notes screen, in display order.
+ * The defaults mirror the original app's built-in filter tabs (book/link/
+ * person); the screen offers every other tag through its Custom menu, so an
+ * empty list still filters fine. Matching is case-insensitive at the query —
+ * entries here keep whatever casing the user typed.
+ */
+export const allNotesFilterTagsSchema = z.array(z.string()).catch(['book', 'link', 'person'])
+
+export type AllNotesFilterTags = z.infer<typeof allNotesFilterTagsSchema>
+
+/**
  * Whether semantic search is on. Off by default — turning it on downloads the
  * ~90MB embedding model, and that first network fetch is the user's call
  * (Plan 09). Later launches load the cached model because this flag is set.
@@ -90,6 +101,7 @@ export const settingsSchema = z
     editorMarkdownSyntax: editorMarkdownSyntaxSchema,
     semanticSearchEnabled: semanticSearchEnabledSchema,
     theme: themePreferenceSchema,
+    allNotesFilterTags: allNotesFilterTagsSchema,
     aiModels: aiModelsSchema,
     defaultAiModelId: defaultAiModelIdSchema,
   })

@@ -4,7 +4,7 @@ import { todayIso } from '@/lib/dates'
 import { toggleNotePinned } from '@/lib/note-pin'
 import { startOperation } from '@/lib/operations'
 import { backfillEmbeddingsVisibly } from '@/lib/semantic'
-import { notePathForRoute } from '@/routing/route'
+import { notePathForRoute, type Route } from '@/routing/route'
 import { registerCommands } from './registry'
 import type { AppCommand } from './types'
 
@@ -13,6 +13,15 @@ import type { AppCommand } from './types'
  * switch that used to live in `app-shortcuts.ts` — the binding and the
  * behavior are one definition now.
  */
+
+/**
+ * A fresh note route; the file itself is created lazily on the first keystroke
+ * (the same contract as daily notes). Shared by ⌘N and the All Notes screen's
+ * New note button so "what a new note is" stays one definition.
+ */
+export function newNoteRoute(): Route {
+  return { kind: 'note', path: notePath(ulid().toLowerCase()) }
+}
 
 const APP_COMMANDS: AppCommand[] = [
   {
@@ -23,13 +32,17 @@ const APP_COMMANDS: AppCommand[] = [
     run: (context) => context.navigate({ kind: 'today' }),
   },
   {
+    id: 'nav.allNotes',
+    title: 'All notes',
+    keywords: ['notes', 'list', 'browse', 'library'],
+    run: (context) => context.navigate({ kind: 'allNotes', tag: null }),
+  },
+  {
     id: 'note.new',
     title: 'New note',
     keywords: ['create'],
     keybinding: 'Mod-n',
-    // A fresh note path; the file itself is created lazily on the first
-    // keystroke (the same contract as daily notes).
-    run: (context) => context.navigate({ kind: 'note', path: notePath(ulid().toLowerCase()) }),
+    run: (context) => context.navigate(newNoteRoute()),
   },
   {
     id: 'history.back',

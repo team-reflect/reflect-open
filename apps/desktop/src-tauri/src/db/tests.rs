@@ -8,7 +8,7 @@ use serde_json::Value;
 use super::embed_write::{apply_chunks, remove_chunks, EmbeddedChunk};
 use super::migrations::{migrate, migrate_to, open_in_memory, open_index_at, validate_migrations};
 use super::query::run_query;
-use super::write::{apply_note, clear_index, IndexedLink, IndexedNote};
+use super::write::{apply_note, clear_index, IndexedLink, IndexedNote, IndexedTag};
 
 fn migrated() -> Connection {
     // Registers sqlite-vec before migrating — the 0002 migration creates a
@@ -32,6 +32,7 @@ fn note(path: &str, title: &str, links: Vec<IndexedLink>) -> IndexedNote {
         file_hash: "h".to_string(),
         mtime: 0,
         text: format!("{title} body"),
+        preview: "body".to_string(),
         links,
         tags: vec![],
         aliases: vec![],
@@ -58,8 +59,29 @@ fn migrations_are_valid_and_idempotent() {
     let version: i64 = conn
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 4); // applied migrations (0001 + 0002 + 0003 + 0004)
+    assert_eq!(version, 5); // applied migrations (0001 through 0005)
     migrate(&mut conn).expect("re-running to_latest is a no-op");
+}
+
+#[test]
+fn preview_and_tag_keys_round_trip() {
+    let conn = migrated();
+    let mut tagged = note("notes/a.md", "A", vec![]);
+    tagged.preview = "first body line".to_string();
+    tagged.tags = vec![IndexedTag {
+        tag: "Café".to_string(),
+        tag_key: "café".to_string(),
+    }];
+    apply_note(&conn, &tagged).unwrap();
+
+    let notes = run_query(&conn, "SELECT preview FROM notes", &[]).unwrap();
+    assert_eq!(notes[0]["preview"], Value::from("first body line"));
+
+    // Display casing and the TS-folded key are stored side by side — matching
+    // happens on tag_key (SQLite's lower() couldn't fold the É).
+    let tags = run_query(&conn, "SELECT tag, tag_key FROM tags", &[]).unwrap();
+    assert_eq!(tags[0]["tag"], Value::from("Café"));
+    assert_eq!(tags[0]["tag_key"], Value::from("café"));
 }
 
 #[test]
@@ -224,7 +246,7 @@ fn open_index_at_creates_migrates_and_reopens() {
     let version: i64 = conn
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 4);
+    assert_eq!(version, 5);
     let journal: String = conn
         .query_row("PRAGMA journal_mode", [], |row| row.get(0))
         .unwrap();
@@ -288,6 +310,25 @@ fn stale_generation_writes_are_dropped_end_to_end() {
 
     super::index_apply(note("notes/b.md", "B", vec![]), fresh, app.state()).expect("fresh apply");
     assert_eq!(count("after fresh apply"), Value::from(2));
+
+    // index_meta_set rides the same gate: stale stamps vanish, fresh ones land
+    // (and upsert — the projection-version stamp is written after every rebuild).
+    let meta = |label: &str| -> Vec<serde_json::Map<String, Value>> {
+        super::db_query(
+            "SELECT value FROM index_meta WHERE key = 'k'".to_string(),
+            vec![],
+            app.state(),
+        )
+        .unwrap_or_else(|err| panic!("{label}: {err:?}"))
+    };
+    super::index_meta_set("k".to_string(), "stale".to_string(), stale, app.state())
+        .expect("stale meta set returns Ok");
+    assert!(meta("after stale meta set").is_empty());
+    super::index_meta_set("k".to_string(), "v1".to_string(), fresh, app.state())
+        .expect("fresh meta set");
+    super::index_meta_set("k".to_string(), "v2".to_string(), fresh, app.state())
+        .expect("meta upsert");
+    assert_eq!(meta("after meta upsert")[0]["value"], Value::from("v2"));
 }
 
 #[test]

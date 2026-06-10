@@ -55,13 +55,16 @@ export async function searchWithFilters(
     .select(['notes.path', 'notes.title', 'notes.dailyDate'])
     .limit(limit)
 
+  // `filters.tags` are folded keys (filter-query) matched against the stored
+  // `tag_key` — folded in JS at index time, since SQLite's lower() is
+  // ASCII-only and would miss non-ASCII casings.
   for (const tag of filters.tags) {
     query = query.where(({ exists, selectFrom }) =>
       exists(
         selectFrom('tags')
           .select(sql<number>`1`.as('one'))
           .whereRef('tags.notePath', '=', 'notes.path')
-          .where(sql<string>`lower(tags.tag)`, '=', tag),
+          .where('tags.tagKey', '=', tag),
       ),
     )
   }

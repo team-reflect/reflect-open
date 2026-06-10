@@ -70,6 +70,7 @@ export interface Notes {
   mtime: Generated<number>;
   path: string;
   pinnedOrder: number | null;
+  preview: Generated<string>;
   title: string;
   titleKey: string;
   updatedAt: Generated<number>;
@@ -89,6 +90,7 @@ export interface SearchFts {
 export interface Tags {
   notePath: string;
   tag: string;
+  tagKey: Generated<string>;
 }
 
 export interface DB {

@@ -139,6 +139,8 @@ describe('DailyContextSidebar related notes', () => {
     ])
     const view = renderSidebar('2026-06-09')
     await view.findByText('Rust')
+    // The daily sidebar wires SimilarNotesSection (note-context-sidebar's
+    // tests pin the same title).
     expect(view.getByText('Similar notes')).toBeDefined()
     await userEvent.click(view.getByText('Rust'))
     expect(view.getByTestId('route').textContent).toContain('notes/rust.md')

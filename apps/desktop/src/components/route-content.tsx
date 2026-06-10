@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import { AllNotesScreen } from '@/components/all-notes/all-notes-screen'
 import { DailyStream } from '@/components/daily-stream'
 import { NotePane } from '@/components/note-pane'
 import { SearchRoute } from '@/components/search-route'
@@ -34,6 +35,10 @@ export function RouteContent(): ReactElement {
           </div>
         </ScrollRestored>
       )
+    case 'allNotes':
+      // Owns its scroll container (virtualized table + fixed header), so no
+      // ScrollRestored wrapper — same shape as the daily stream.
+      return <AllNotesScreen tag={route.tag} />
     case 'search':
       return <SearchRoute query={route.query} today={today} />
     case 'settings':

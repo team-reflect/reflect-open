@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseNote } from './extract'
+import { isTagName, parseNote } from './extract'
 
 function parse(source: string, path = 'notes/test.md') {
   return parseNote({ path, source })
@@ -44,6 +44,23 @@ describe('parseNote — headings & title', () => {
     expect(parse('# The H1\n\nbody').title).toBe('The H1')
     expect(parse('no heading', 'notes/charlotte-maccaw.md').title).toBe('charlotte-maccaw')
     expect(parse('no heading', 'daily/2026-06-09.md').title).toBe('2026-06-09')
+  })
+})
+
+describe('isTagName', () => {
+  it('accepts names the #tag grammar can produce', () => {
+    expect(isTagName('book')).toBe(true)
+    expect(isTagName('project/reflect')).toBe(true)
+    expect(isTagName('v2_plan-b')).toBe(true)
+    expect(isTagName('café')).toBe(true)
+  })
+
+  it('rejects names the indexer can never produce', () => {
+    expect(isTagName('')).toBe(false)
+    expect(isTagName('my tag')).toBe(false)
+    expect(isTagName('123abc')).toBe(false)
+    expect(isTagName('#book')).toBe(false)
+    expect(isTagName('-dash')).toBe(false)
   })
 })
 

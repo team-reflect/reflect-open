@@ -84,7 +84,14 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'show', semanticSearchEnabled: false, theme: 'system', aiModels: [], defaultAiModelId: null },
+        {
+          editorMarkdownSyntax: 'show',
+          semanticSearchEnabled: false,
+          theme: 'system',
+          allNotesFilterTags: ['book', 'link', 'person'],
+          aiModels: [],
+          defaultAiModelId: null,
+        },
       ]),
     )
     expect(radio(/^show/i).checked).toBe(true)
@@ -101,7 +108,90 @@ describe('SettingsScreen', () => {
     expect(radio(/^light/i).checked).toBe(true)
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'focus', semanticSearchEnabled: false, theme: 'light', aiModels: [], defaultAiModelId: null },
+        {
+          editorMarkdownSyntax: 'focus',
+          semanticSearchEnabled: false,
+          theme: 'light',
+          allNotesFilterTags: ['book', 'link', 'person'],
+          aiModels: [],
+          defaultAiModelId: null,
+        },
+      ]),
+    )
+  })
+
+  it('adds an All Notes filter tag, normalized, and persists it', async () => {
+    renderScreen()
+    const input = screen.getByLabelText('Add filter tag')
+
+    fireEvent.change(input, { target: { value: ' #Meeting ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    expect(screen.getByText('#meeting')).toBeTruthy()
+    await waitFor(() =>
+      expect(saved).toEqual([
+        {
+          editorMarkdownSyntax: 'focus',
+          semanticSearchEnabled: false,
+          theme: 'system',
+          allNotesFilterTags: ['book', 'link', 'person', 'meeting'],
+          aiModels: [],
+          defaultAiModelId: null,
+        },
+      ]),
+    )
+  })
+
+  it('rejects a tag name outside the #tag grammar with an inline error', async () => {
+    renderScreen()
+    const input = screen.getByLabelText('Add filter tag')
+    if (!(input instanceof HTMLInputElement)) {
+      throw new Error('expected an <input>')
+    }
+
+    fireEvent.change(input, { target: { value: 'my tag' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    expect(screen.getByRole('alert').textContent).toContain(`"my tag" can't be a tag`)
+    // The draft stays put for fixing, and nothing reaches the store.
+    expect(input.value).toBe('my tag')
+    await waitFor(() => expect(saved).toEqual([]))
+  })
+
+  it('ignores adding a duplicate filter tag', async () => {
+    stored = { allNotesFilterTags: ['book'] }
+    renderScreen()
+    // Defaults render before the disk document lands — wait for hydration
+    // (the stored list has no `person`) so the click edits the loaded list.
+    await waitFor(() => expect(screen.queryByText('#person')).toBeNull())
+    expect(screen.getByText('#book')).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText('Add filter tag'), { target: { value: 'BOOK' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    await waitFor(() => expect(saved).toEqual([]))
+  })
+
+  it('removes a filter tag and persists the rest', async () => {
+    stored = { allNotesFilterTags: ['book', 'person'] }
+    renderScreen()
+    // Wait for hydration (the stored list has no `link`), not just defaults.
+    await waitFor(() => expect(screen.queryByText('#link')).toBeNull())
+    expect(screen.getByText('#book')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove book' }))
+
+    expect(screen.queryByText('#book')).toBeNull()
+    await waitFor(() =>
+      expect(saved).toEqual([
+        {
+          editorMarkdownSyntax: 'focus',
+          semanticSearchEnabled: false,
+          theme: 'system',
+          allNotesFilterTags: ['person'],
+          aiModels: [],
+          defaultAiModelId: null,
+        },
       ]),
     )
   })
@@ -114,7 +204,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'focus', semanticSearchEnabled: true, theme: 'system', aiModels: [], defaultAiModelId: null },
+        { editorMarkdownSyntax: 'focus', semanticSearchEnabled: true, theme: 'system', allNotesFilterTags: ['book', 'link', 'person'], aiModels: [], defaultAiModelId: null },
       ]),
     )
     // The control flips to the loading state (EmbeddingsSync owns the actual
@@ -143,7 +233,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'focus', semanticSearchEnabled: false, theme: 'system', aiModels: [], defaultAiModelId: null },
+        { editorMarkdownSyntax: 'focus', semanticSearchEnabled: false, theme: 'system', allNotesFilterTags: ['book', 'link', 'person'], aiModels: [], defaultAiModelId: null },
       ]),
     )
     expect(screen.getByRole('button', { name: /enable semantic search/i })).toBeTruthy()
@@ -162,7 +252,7 @@ describe('SettingsScreen', () => {
     await waitFor(() => expect(invoked).toContain('embed_ensure'))
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'focus', semanticSearchEnabled: true, theme: 'system', aiModels: [], defaultAiModelId: null },
+        { editorMarkdownSyntax: 'focus', semanticSearchEnabled: true, theme: 'system', allNotesFilterTags: ['book', 'link', 'person'], aiModels: [], defaultAiModelId: null },
       ]),
     )
   })
@@ -181,7 +271,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'focus', semanticSearchEnabled: false, theme: 'system', aiModels: [], defaultAiModelId: null },
+        { editorMarkdownSyntax: 'focus', semanticSearchEnabled: false, theme: 'system', allNotesFilterTags: ['book', 'link', 'person'], aiModels: [], defaultAiModelId: null },
       ]),
     )
     expect(screen.getByRole('button', { name: /enable semantic search/i })).toBeTruthy()

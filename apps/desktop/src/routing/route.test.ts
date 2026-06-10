@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { notePathForRoute, routeForPath } from './route'
+import { notePathForRoute, routeForPath, routesEqual } from './route'
 
 describe('routeForPath', () => {
   it('routes real daily paths to the daily view', () => {
@@ -19,6 +19,19 @@ describe('routeForPath', () => {
   })
 })
 
+describe('routesEqual', () => {
+  it('compares allNotes routes by their tag filter', () => {
+    expect(routesEqual({ kind: 'allNotes', tag: null }, { kind: 'allNotes', tag: null })).toBe(true)
+    expect(routesEqual({ kind: 'allNotes', tag: 'book' }, { kind: 'allNotes', tag: 'book' })).toBe(
+      true,
+    )
+    expect(routesEqual({ kind: 'allNotes', tag: 'book' }, { kind: 'allNotes', tag: null })).toBe(
+      false,
+    )
+    expect(routesEqual({ kind: 'allNotes', tag: null }, { kind: 'today' })).toBe(false)
+  })
+})
+
 describe('notePathForRoute', () => {
   const TODAY = '2026-06-10'
 
@@ -33,5 +46,6 @@ describe('notePathForRoute', () => {
   it('is null on screens that edit no note', () => {
     expect(notePathForRoute({ kind: 'search', query: 'x' }, TODAY)).toBeNull()
     expect(notePathForRoute({ kind: 'settings' }, TODAY)).toBeNull()
+    expect(notePathForRoute({ kind: 'allNotes', tag: null }, TODAY)).toBeNull()
   })
 })

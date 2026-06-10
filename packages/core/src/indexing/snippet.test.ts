@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { lineSnippet } from './snippet'
+import { lineSnippet, previewSnippet } from './snippet'
 
 describe('lineSnippet', () => {
   it('returns the whole line containing the position', () => {
@@ -33,5 +33,48 @@ describe('lineSnippet', () => {
   it('clamps an out-of-range position instead of throwing', () => {
     expect(lineSnippet('only line', 999)).toBe('only line')
     expect(lineSnippet('', 5)).toBe('')
+  })
+})
+
+describe('previewSnippet', () => {
+  // The indexer's plain text is whitespace-collapsed (`buildPlainText`), so
+  // realistic input is one long line that opens with the note's title.
+  it('drops the leading title from collapsed plain text', () => {
+    expect(previewSnippet('Roadmap Ship the alpha in June. More.', 'Roadmap')).toBe(
+      'Ship the alpha in June. More.',
+    )
+  })
+
+  it('keeps text that does not open with the title (untitled notes)', () => {
+    expect(previewSnippet('Just a thought. Second thought.', 'ulid-derived')).toBe(
+      'Just a thought. Second thought.',
+    )
+  })
+
+  it('only strips the title at a word boundary, never a mere prefix', () => {
+    expect(previewSnippet('Healthy habits compound.', 'Health')).toBe(
+      'Healthy habits compound.',
+    )
+  })
+
+  it('keeps a repeated title beyond the leading occurrence', () => {
+    expect(previewSnippet('Echo Echo', 'Echo')).toBe('Echo')
+  })
+
+  it('collapses raw multi-line input the same way the indexer does', () => {
+    expect(previewSnippet('Title\n\n   \n\tbody at last', 'Title')).toBe('body at last')
+    expect(previewSnippet('A  title\nwith   gaps', 'A title')).toBe('with gaps')
+  })
+
+  it('truncates long text with an ellipsis', () => {
+    const long = 'x'.repeat(200)
+    const snippet = previewSnippet(long, 'Title', 50)
+    expect(snippet).toBe(`${'x'.repeat(50)}…`)
+  })
+
+  it('returns empty for empty or title-only text', () => {
+    expect(previewSnippet('', 'Title')).toBe('')
+    expect(previewSnippet('Title', 'Title')).toBe('')
+    expect(previewSnippet('Title\n', 'Title')).toBe('')
   })
 })

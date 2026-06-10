@@ -71,6 +71,7 @@ pub fn run() {
             db::index_apply_batch,
             db::index_remove,
             db::index_clear,
+            db::index_meta_set,
             db::db_query,
             db::embed_apply,
             db::embed_remove,

@@ -72,7 +72,7 @@ vi.mock('@/providers/graph-provider', () => ({
 }))
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({
-    settings: { editorMarkdownSyntax: 'always' },
+    settings: { editorMarkdownSyntax: 'always', allNotesFilterTags: ['book', 'link', 'person'] },
     updateSettings: async () => {},
   }),
 }))
@@ -212,6 +212,18 @@ describe('RouteContent', () => {
   it('renders the settings screen for the settings route', () => {
     const view = renderRoute({ kind: 'settings' })
     expect(view.getByTestId('settings-screen')).toBeDefined()
+    view.unmount()
+  })
+
+  it('renders the All Notes screen for the allNotes route, not the stream', async () => {
+    const view = renderRoute({ kind: 'allNotes', tag: null })
+    expect(view.getByLabelText('All notes')).toBeDefined()
+    expect(view.queryByTestId('daily-stream')).toBeNull()
+    // The pinned filter tabs come from settings; the table header renders
+    // once the (empty) index query settles.
+    expect(view.getByRole('button', { name: '#book' })).toBeDefined()
+    await view.findByText('Subject')
+    expect(view.getByText('No notes yet.')).toBeDefined()
     view.unmount()
   })
 

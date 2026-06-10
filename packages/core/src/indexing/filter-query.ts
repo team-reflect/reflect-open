@@ -17,9 +17,10 @@
  * A malformed token (impossible date, empty value) stays search text — typing
  * never makes results vanish behind a filter the user didn't form yet.
  */
+import { foldTag } from '../markdown'
 
 export interface SearchFilters {
-  /** Lower-cased tag names (tags match case-insensitively). */
+  /** Folded tag keys ({@link foldTag} — tags match case-insensitively). */
   tags: string[]
   dailyOnly: boolean
   pinnedOnly: boolean
@@ -115,7 +116,7 @@ export function parseSearchQuery(query: string): ParsedSearchQuery {
     const lower = token.toLowerCase()
 
     if (TAG_TOKEN_RE.test(token)) {
-      filters.tags.push(token.slice(1).toLowerCase())
+      filters.tags.push(foldTag(token.slice(1)))
       filtered = true
       continue
     }

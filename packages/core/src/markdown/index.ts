@@ -24,7 +24,7 @@ export {
   type ParsedFrontmatter,
 } from './frontmatter'
 export { parseBody, reflectMarkdownParser, wikiLinkExtension } from './grammar'
-export { parseNote } from './extract'
+export { parseNote, isTagName } from './extract'
 export {
   scanInlineWikiLinks,
   scanInlineImages,
@@ -32,7 +32,7 @@ export {
   type InlineImage,
 } from './scan'
 export { appendUnderHeading, renameWikiLink } from './edit'
-export { foldKey } from './keys'
+export { foldKey, foldTag } from './keys'
 export {
   normalizeWikiTarget,
   resolved,

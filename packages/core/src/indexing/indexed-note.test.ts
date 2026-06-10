@@ -26,7 +26,7 @@ describe('buildIndexedNote', () => {
       { alias: 'PJX', aliasKey: 'pjx' },
       { alias: 'Proj X', aliasKey: 'proj x' },
     ])
-    expect(indexed.tags).toEqual(['status'])
+    expect(indexed.tags).toEqual([{ tag: 'status', tagKey: 'status' }])
 
     const wiki = indexed.links.filter((link) => link.kind === 'wiki')
     expect(
@@ -39,6 +39,16 @@ describe('buildIndexedNote', () => {
       true,
     )
     expect(indexed.assets).toEqual(['assets/p.png'])
+  })
+
+  it('derives the list preview and folded tag keys at index time', () => {
+    const indexed = buildIndexedNote(
+      parseNote({ path: 'notes/p.md', source: '# Plans\n\nFirst body line. #CAFÉ' }),
+      { fileHash: 'h', mtime: 0 },
+    )
+    expect(indexed.preview).toBe('First body line. #CAFÉ')
+    // Folding is Unicode-aware — exactly what SQLite's ASCII-only lower() misses.
+    expect(indexed.tags).toEqual([{ tag: 'CAFÉ', tagKey: 'café' }])
   })
 
   it('marks daily notes with their date and carries no id', () => {

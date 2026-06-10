@@ -1,10 +1,16 @@
 import { isAppError } from '../errors'
 import { listFiles, readNote } from '../graph/commands'
 import { parseNote } from '../markdown'
-import { applyIndexedNote, applyIndexedNotes, clearIndex, removeFromIndex } from './commands'
+import {
+  applyIndexedNote,
+  applyIndexedNotes,
+  clearIndex,
+  removeFromIndex,
+  setIndexMeta,
+} from './commands'
 import { hashContent } from './hash'
-import { buildIndexedNote, type IndexedNote } from './indexed-note'
-import { getIndexedHashes } from './queries'
+import { buildIndexedNote, PROJECTION_VERSION, type IndexedNote } from './indexed-note'
+import { getIndexedHashes, getIndexMeta } from './queries'
 
 /**
  * The indexing pipeline (Plan 04): read (Plan 02) → parse/extract in TS
@@ -24,6 +30,13 @@ import { getIndexedHashes } from './queries'
  * transaction/round-trip count far below one-per-note.
  */
 const REBUILD_BATCH_SIZE = 256
+
+/**
+ * The `index_meta` key holding the {@link PROJECTION_VERSION} the stored rows
+ * were built with. Stamped after every full rebuild; `index_clear` preserves
+ * `index_meta`, and the stamp is rewritten once the rebuild completes.
+ */
+export const PROJECTION_VERSION_KEY = 'projection_version'
 
 /** Read, parse, and (re)index a single note for the given index generation. */
 export async function indexNote(
@@ -73,6 +86,27 @@ export async function rebuildIndex(options: IndexPassOptions): Promise<void> {
     }
   }
   await applyIndexedNotes(batch, generation)
+  // The rows now match the current projection — stamp it so `syncIndex` can
+  // reconcile cheaply from here on. A superseded pass stamps into a stale
+  // generation, which Rust drops: the next open then rebuilds again, which is
+  // the safe direction to fail in.
+  await setIndexMeta(PROJECTION_VERSION_KEY, String(PROJECTION_VERSION), generation)
+}
+
+/**
+ * The open-path sync: hash-reconcile when the stored rows were built by the
+ * current {@link PROJECTION_VERSION}, full rebuild when they weren't (an older
+ * app wrote them, or the index has never been stamped). Reconcile compares
+ * content hashes only, so it can never refresh rows whose *derivation* changed
+ * — without this gate, columns added by a migration would keep their defaults
+ * forever on unchanged files.
+ */
+export async function syncIndex(options: IndexPassOptions): Promise<void> {
+  const stamped = await getIndexMeta(PROJECTION_VERSION_KEY)
+  if (stamped === String(PROJECTION_VERSION)) {
+    return reconcileIndex(options)
+  }
+  return rebuildIndex(options)
 }
 
 /**

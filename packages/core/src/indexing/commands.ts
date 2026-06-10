@@ -43,6 +43,19 @@ export async function clearIndex(generation: number): Promise<void> {
   await call('index_clear', { generation }, voidSchema)
 }
 
+/**
+ * Upsert one `index_meta` key (for `generation`; a stale stamp is dropped).
+ * Bookkeeping the TS policy layer owns — e.g. the projection-version stamp a
+ * rebuild leaves behind. Reads go through the ordinary Kysely `db_query` path.
+ */
+export async function setIndexMeta(
+  key: string,
+  value: string,
+  generation: number,
+): Promise<void> {
+  await call('index_meta_set', { key, value, generation }, voidSchema)
+}
+
 /** Start (or restart) the filesystem watcher for the active graph (Plan 04b). */
 export async function watchStart(): Promise<void> {
   await call('watch_start', {}, voidSchema)

@@ -6,6 +6,7 @@
  */
 
 const DEFAULT_MAX_LENGTH = 160
+const PREVIEW_MAX_LENGTH = 120
 
 /** The single line of `content` containing `pos`, windowed to `maxLength`. */
 export function lineSnippet(content: string, pos: number, maxLength = DEFAULT_MAX_LENGTH): string {
@@ -29,4 +30,32 @@ export function lineSnippet(content: string, pos: number, maxLength = DEFAULT_MA
   const prefix = from > 0 ? '…' : ''
   const suffix = to < line.length ? '…' : ''
   return `${prefix}${line.slice(from, to).trim()}${suffix}`
+}
+
+/**
+ * A list-row preview of a note from the index's plain text. `buildPlainText`
+ * collapses all whitespace to single spaces — there are no lines to split on —
+ * so the preview is the collapsed text with the title dropped when it leads it
+ * (heading *text* survives the markup cuts, so most notes open with their own
+ * title — pure noise next to a Subject column). The strip is whole-word: a
+ * title that is merely a prefix of the first word (`Health` / `Healthy…`)
+ * stays put. Raw multi-line input is collapsed the same way first, so the
+ * function is total over both the stored text and any fresher source.
+ */
+export function previewSnippet(
+  text: string,
+  title: string,
+  maxLength = PREVIEW_MAX_LENGTH,
+): string {
+  const collapsed = text.replace(/\s+/g, ' ').trim()
+  const foldedTitle = title.replace(/\s+/g, ' ').trim()
+  let body = collapsed
+  if (foldedTitle !== '') {
+    if (body === foldedTitle) {
+      body = ''
+    } else if (body.startsWith(`${foldedTitle} `)) {
+      body = body.slice(foldedTitle.length + 1)
+    }
+  }
+  return body.length <= maxLength ? body : `${body.slice(0, maxLength).trimEnd()}…`
 }

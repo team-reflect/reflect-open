@@ -18,7 +18,7 @@ mod write;
 
 use std::sync::{Mutex, MutexGuard};
 
-use rusqlite::Connection;
+use rusqlite::{params, Connection};
 use serde_json::{Map, Value};
 use tauri::State;
 
@@ -141,6 +141,30 @@ pub fn index_remove(path: String, generation: u64, index: State<IndexState>) -> 
     write::remove_note(&tx, &path)?;
     embed_write::remove_chunks(&tx, &path)?;
     tx.commit()?;
+    Ok(())
+}
+
+/// Upsert one `index_meta` key (no-op if stale). The table is bookkeeping the
+/// TS policy layer owns — e.g. `syncIndex` stamps the projection version after
+/// a rebuild — and `index_clear` deliberately preserves it, so a marker can
+/// outlive the rows it describes. Reads go through the ordinary `db_query`.
+#[tauri::command]
+pub fn index_meta_set(
+    key: String,
+    value: String,
+    generation: u64,
+    index: State<IndexState>,
+) -> AppResult<()> {
+    let state = lock_state(&index)?;
+    if state.generation != generation {
+        return Ok(());
+    }
+    let conn = state.conn.as_ref().ok_or_else(AppError::no_graph)?;
+    conn.prepare_cached(
+        "INSERT INTO index_meta(key, value) VALUES(?1, ?2)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+    )?
+    .execute(params![key, value])?;
     Ok(())
 }
 

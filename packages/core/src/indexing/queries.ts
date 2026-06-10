@@ -1,7 +1,7 @@
 import type { Database } from '@reflect/db'
 import { sql, type Selectable } from 'kysely'
 import { readNote } from '../graph/commands'
-import { normalizeWikiTarget, resolveWikiLinkAsync, type Resolution } from '../markdown'
+import { foldTag, normalizeWikiTarget, resolveWikiLinkAsync, type Resolution } from '../markdown'
 import { db } from './db'
 import { buildFtsMatch } from './search-query'
 import { lineSnippet } from './snippet'
@@ -226,15 +226,25 @@ export async function dailyDatesInRange(start: string, end: string): Promise<str
   return rows.flatMap((row) => (row.dailyDate === null ? [] : [row.dailyDate]))
 }
 
-/** Graph-relative paths of every note carrying `tag`, ordered by path. */
+/** Graph-relative paths of every note carrying `tag` (case-insensitive), ordered by path. */
 export async function getNotesByTag(tag: string): Promise<string[]> {
   const rows = await db
     .selectFrom('tags')
-    .where('tag', '=', tag)
+    .where('tagKey', '=', foldTag(tag))
     .select('notePath')
     .orderBy('notePath')
     .execute()
   return rows.map((row) => row.notePath)
+}
+
+/** One `index_meta` value, or `null` when the key has never been written. */
+export async function getIndexMeta(key: string): Promise<string | null> {
+  const row = await db
+    .selectFrom('indexMeta')
+    .where('key', '=', key)
+    .select('value')
+    .executeTakeFirst()
+  return row?.value ?? null
 }
 
 /** A full-text search result: the note's path and title. */

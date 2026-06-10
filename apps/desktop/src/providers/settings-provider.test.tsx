@@ -106,6 +106,39 @@ describe('SettingsProvider', () => {
     expect(result.current.settings.editorMarkdownSyntax).toBe('focus')
   })
 
+  it('an equal-but-rebuilt array value does not trigger a save', async () => {
+    stored = { allNotesFilterTags: ['book', 'person'] }
+    const { result } = renderHook(() => useSettings(), { wrapper })
+    await loadSettled()
+
+    // Same value, new instance — a consumer writing back what it read must
+    // not count as a change (reference equality would).
+    act(() => {
+      result.current.updateSettings({ allNotesFilterTags: ['book', 'person'] })
+    })
+    await act(async () => {
+      await flushSettings()
+    })
+    expect(saved).toEqual([])
+
+    // A genuinely changed array still persists.
+    act(() => {
+      result.current.updateSettings({ allNotesFilterTags: ['book'] })
+    })
+    await waitFor(() =>
+      expect(saved).toEqual([
+        {
+          editorMarkdownSyntax: 'focus',
+          semanticSearchEnabled: false,
+          theme: 'system',
+          allNotesFilterTags: ['book'],
+          aiModels: [],
+          defaultAiModelId: null,
+        },
+      ]),
+    )
+  })
+
   it('applies an update instantly and persists the full document', async () => {
     stored = { editorMarkdownSyntax: 'focus', futureKey: true }
     const { result } = renderHook(() => useSettings(), { wrapper })
@@ -123,6 +156,7 @@ describe('SettingsProvider', () => {
           editorMarkdownSyntax: 'show',
           semanticSearchEnabled: false,
           theme: 'system',
+          allNotesFilterTags: ['book', 'link', 'person'],
           aiModels: [],
           defaultAiModelId: null,
           futureKey: true,
@@ -156,6 +190,7 @@ describe('SettingsProvider', () => {
           editorMarkdownSyntax: 'show',
           semanticSearchEnabled: false,
           theme: 'system',
+          allNotesFilterTags: ['book', 'link', 'person'],
           aiModels: [],
           defaultAiModelId: null,
           futureKey: true,
@@ -179,7 +214,14 @@ describe('SettingsProvider', () => {
     })
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'focus', semanticSearchEnabled: false, theme: 'system', aiModels: [], defaultAiModelId: null },
+        {
+          editorMarkdownSyntax: 'focus',
+          semanticSearchEnabled: false,
+          theme: 'system',
+          allNotesFilterTags: ['book', 'link', 'person'],
+          aiModels: [],
+          defaultAiModelId: null,
+        },
       ]),
     )
     expect(result.current.settings.editorMarkdownSyntax).toBe('focus')
@@ -326,7 +368,14 @@ describe('SettingsProvider', () => {
     })
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'show', semanticSearchEnabled: false, theme: 'system', aiModels: [], defaultAiModelId: null },
+        {
+          editorMarkdownSyntax: 'show',
+          semanticSearchEnabled: false,
+          theme: 'system',
+          allNotesFilterTags: ['book', 'link', 'person'],
+          aiModels: [],
+          defaultAiModelId: null,
+        },
       ]),
     )
   })
@@ -350,7 +399,14 @@ describe('SettingsProvider', () => {
       await flushSettings()
     })
     expect(saved).toEqual([
-      { editorMarkdownSyntax: 'show', semanticSearchEnabled: false, theme: 'system', aiModels: [], defaultAiModelId: null },
+      {
+        editorMarkdownSyntax: 'show',
+        semanticSearchEnabled: false,
+        theme: 'system',
+        allNotesFilterTags: ['book', 'link', 'person'],
+        aiModels: [],
+        defaultAiModelId: null,
+      },
     ])
   })
 

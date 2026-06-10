@@ -1,7 +1,7 @@
 import {
   openIndex,
-  reconcileIndex,
   subscribeIndexChanges,
+  syncIndex,
   watchStart,
   watchStop,
 } from '@reflect/core'
@@ -37,12 +37,14 @@ export interface GraphIndex {
    */
   open: () => Promise<number | null>
   /**
-   * Background-sync the open index at `generation`: reconcile the whole graph,
-   * then subscribe to live `index:changed` events, then start the Rust watcher —
-   * sequenced so the passes never write concurrently. `isStale` is checked
-   * between steps and bails when a newer open supersedes this one. When
-   * `generation` is `null` (open failed / no index), any previous watcher is
-   * stopped instead. Call only after the graph row is committed.
+   * Background-sync the open index at `generation`: sync the whole graph
+   * (hash reconcile, or a full rebuild when the stored projection version is
+   * stale — `syncIndex` decides), then subscribe to live `index:changed`
+   * events, then start the Rust watcher — sequenced so the passes never write
+   * concurrently. `isStale` is checked between steps and bails when a newer
+   * open supersedes this one. When `generation` is `null` (open failed / no
+   * index), any previous watcher is stopped instead. Call only after the graph
+   * row is committed.
    */
   sync: (generation: number | null, isStale: () => boolean) => void
 }
@@ -118,7 +120,7 @@ export function createGraphIndex(options: GraphIndexOptions = {}): GraphIndex {
       // later step threw) is torn down in `finally` so listeners can't leak.
       let pending: (() => void) | null = null
       try {
-        await reconcileIndex({ generation, signal: controller.signal })
+        await syncIndex({ generation, signal: controller.signal })
         if (isStale()) {
           return
         }

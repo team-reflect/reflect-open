@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '../ipc/bridge'
 import { getBacklinks, resolveWikiTarget, searchNotes } from './queries'
-import { indexNote, rebuildIndex } from './indexer'
+import { PROJECTION_VERSION } from './indexed-note'
+import { indexNote, rebuildIndex, syncIndex, PROJECTION_VERSION_KEY } from './indexer'
 import { applyIndexChanges } from './live'
 
 // Install a fake bridge so both core's `call` and the Kysely runner resolve
@@ -9,7 +10,11 @@ import { applyIndexChanges } from './live'
 const mockInvoke = vi.fn<(command: string, args: Record<string, unknown>) => Promise<unknown>>()
 setBridge({ invoke: mockInvoke, listen: async () => () => {} })
 
+/** What the stored `index_meta` projection stamp reads back as, per test. */
+let metaRows: Array<{ value: string }>
+
 beforeEach(() => {
+  metaRows = []
   mockInvoke.mockReset()
   mockInvoke.mockImplementation(async (command, args) => {
     const sql = String(args.sql ?? '')
@@ -22,8 +27,10 @@ beforeEach(() => {
       case 'index_apply_batch':
       case 'index_clear':
       case 'index_remove':
+      case 'index_meta_set':
         return null
       case 'db_query':
+        if (sql.includes('index_meta')) return metaRows
         if (sql.includes('search_fts')) return [{ path: 'notes/a.md', title: 'A' }]
         if (sql.includes('backlinks')) {
           return [{ source_path: 'notes/b.md', target_raw: 'A', alias: null, pos_from: 0, pos_to: 3 }]
@@ -53,7 +60,7 @@ describe('indexNote', () => {
 })
 
 describe('rebuildIndex', () => {
-  it('clears, lists, then applies every file in one batch', async () => {
+  it('clears, lists, applies every file in one batch, then stamps the projection version', async () => {
     await rebuildIndex({ generation: 1 })
     const commands = mockInvoke.mock.calls.map(([cmd]) => cmd)
     expect(commands[0]).toBe('index_clear')
@@ -63,6 +70,37 @@ describe('rebuildIndex', () => {
     const notes = (batch![1] as { notes: { path: string }[] }).notes
     expect(notes.map((note) => note.path)).toEqual(['notes/a.md'])
     expect(commands).not.toContain('index_apply') // batched, not one-by-one
+    // The stamp lets the next open reconcile instead of rebuilding again.
+    const stamp = mockInvoke.mock.calls.find(([cmd]) => cmd === 'index_meta_set')
+    expect(stamp![1]).toMatchObject({
+      key: PROJECTION_VERSION_KEY,
+      value: String(PROJECTION_VERSION),
+      generation: 1,
+    })
+  })
+})
+
+describe('syncIndex', () => {
+  it('reconciles (no wipe) when the stored projection version is current', async () => {
+    metaRows = [{ value: String(PROJECTION_VERSION) }]
+    await syncIndex({ generation: 2 })
+    const commands = mockInvoke.mock.calls.map(([cmd]) => cmd)
+    expect(commands).toContain('list_files')
+    expect(commands).not.toContain('index_clear')
+    expect(commands).not.toContain('index_meta_set')
+  })
+
+  it('rebuilds and stamps when the index predates the current projection', async () => {
+    metaRows = [] // never stamped (or written by an older app)
+    await syncIndex({ generation: 3 })
+    const commands = mockInvoke.mock.calls.map(([cmd]) => cmd)
+    expect(commands).toContain('index_clear')
+    const stamp = mockInvoke.mock.calls.find(([cmd]) => cmd === 'index_meta_set')
+    expect(stamp![1]).toMatchObject({
+      key: PROJECTION_VERSION_KEY,
+      value: String(PROJECTION_VERSION),
+      generation: 3,
+    })
   })
 })
 

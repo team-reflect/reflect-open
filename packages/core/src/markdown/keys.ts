@@ -12,3 +12,15 @@
 export function foldKey(value: string): string {
   return value.trim().toLowerCase()
 }
+
+/**
+ * Case-fold a tag name to its match key (`#Book` ≡ `#book`). The one
+ * definition of tag folding, shared by the indexer (`tags.tag_key`), the
+ * search filter grammar, and every UI surface that compares or dedupes tags.
+ * Folding happens here, in Unicode-aware JS, and the folded key is *stored* —
+ * SQLite's `lower()` is ASCII-only, so folding in SQL would split `#Café`
+ * from `#café`. (No trim: the tag grammar already excludes whitespace.)
+ */
+export function foldTag(value: string): string {
+  return value.toLowerCase()
+}

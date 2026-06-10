@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import type { GraphInfo } from '@reflect/core'
-import { CalendarDays, PanelLeftClose, Settings, SquarePen } from 'lucide-react'
+import { CalendarDays, Files, PanelLeftClose, Settings, SquarePen } from 'lucide-react'
 import { keybindingFor } from '@/lib/commands/app-commands'
 import { runCommand } from '@/lib/commands/registry'
 import type { CommandContext } from '@/lib/commands/types'
@@ -64,6 +64,13 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
           binding={keybindingFor('nav.today') ?? undefined}
           active={route.kind === 'today' || route.kind === 'daily'}
           onClick={() => void runCommand('nav.today', context)}
+        />
+        <SidebarItem
+          icon={Files}
+          label="All notes"
+          binding={keybindingFor('nav.allNotes') ?? undefined}
+          active={route.kind === 'allNotes'}
+          onClick={() => void runCommand('nav.allNotes', context)}
         />
         <SidebarItem
           icon={SquarePen}
