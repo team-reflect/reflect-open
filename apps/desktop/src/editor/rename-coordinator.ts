@@ -72,7 +72,7 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
         return
       }
       try {
-        await rewriteLinksForTitleChange({
+        const result = await rewriteLinksForTitleChange({
           path,
           from: rename.from,
           to: rename.to,
@@ -84,6 +84,13 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
           },
           onProgress: (done, total) => onProgress({ done, total }),
         })
+        if (result.collision) {
+          // The old title belongs to a different note now: links were left
+          // resolving there, and claiming it as *our* alias would plant a
+          // competing key — one that never wins while the other note exists,
+          // then silently re-points links to us if it's ever deleted.
+          return
+        }
         const aliases = nextAliases(
           parseNote({ path, source: rename.content }).frontmatter.aliases,
           rename,
