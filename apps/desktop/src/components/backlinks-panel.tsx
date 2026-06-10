@@ -79,7 +79,10 @@ export function BacklinksPanel({ path }: BacklinksPanelProps): ReactElement | nu
       <div className="mt-5">
         {groups.map((group, index) => (
           <BacklinkSourceGroup
-            key={group.path}
+            // Scoped to the open note: the pane is reused across navigation,
+            // and a source shared by two notes must not carry its peeked or
+            // collapsed state from one note's panel to the other's.
+            key={`${path}:${group.path}`}
             source={group}
             first={index === 0}
             expanded={expanded}

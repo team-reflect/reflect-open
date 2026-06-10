@@ -123,6 +123,36 @@ describe('BacklinksPanel', () => {
     reopened.unmount()
   })
 
+  it('resets a collapsed group when navigating to another note with the same source', async () => {
+    getBacklinksWithContext.mockResolvedValue([
+      {
+        sourcePath: 'notes/shared.md',
+        sourceTitle: 'Shared Source',
+        snippet: 'links [[A]] and [[B]]',
+        posFrom: 5,
+      },
+    ])
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const panelFor = (path: string) => (
+      <QueryClientProvider client={client}>
+        <RouterProvider>
+          <BacklinksPanel path={path} />
+        </RouterProvider>
+      </QueryClientProvider>
+    )
+    const view = render(panelFor('notes/a.md'))
+
+    await view.findByText('links [[A]] and [[B]]')
+    await userEvent.click(
+      view.getByRole('button', { name: 'Collapse references from Shared Source' }),
+    )
+    expect(view.queryByText('links [[A]] and [[B]]')).toBeNull()
+
+    view.rerender(panelFor('notes/b.md'))
+    await view.findByText('links [[A]] and [[B]]')
+    view.unmount()
+  })
+
   it('keeps simultaneously mounted panels in sync (one per day in the stream)', async () => {
     getBacklinksWithContext.mockResolvedValue([
       {
