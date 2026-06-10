@@ -240,6 +240,8 @@ describe('useNoteDocument', () => {
       const paneB = renderHook(() => useNoteDocument('notes/b.md', 1, { trackRenames: true }))
       await act(() => vi.runAllTimersAsync())
 
+      // A's still-running rewrite must not paint progress into B's pane.
+      expect(paneB.result.current.renameProgress).toBeNull()
       expect(files['notes/src.md']).toBe('see [[New Title]]\n')
       expect(files['notes/a.md']).toContain('aliases:') // alias on A, via disk
       expect(files['notes/b.md']).toBe('# Note B\n') // B untouched

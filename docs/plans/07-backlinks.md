@@ -128,12 +128,15 @@ link UX (create-from-unresolved largely subsumes the failure case).
 ## Risks
 
 - **Rename rewrite correctness** (links in code blocks, partial matches, ambiguous
-  titles). Mitigate: AST-based edits only (Plan 03), skip code contexts, require
-  disambiguation for collisions, batch + checkpoint. *(Accepted edge, 07b: the
-  collision guard reads the index, which lags the watcher debounce — a note
-  created with the old title inside that sub-second window can be missed.
-  Resolution stays deterministic and the old-title alias still lands, so links
-  keep resolving; the late-created note wins future resolutions.)*
+  titles). Mitigate: AST-based edits only (Plan 03), skip code contexts, and the
+  07b **collision guard**: when the old title already belongs to a different
+  note, the rewrite *and* the alias are skipped — existing links keep resolving
+  to their deliberate target (deterministic first wave; the interactive picker
+  is deferred to Plan 08, see step 6). Batch + checkpoint ties into Plan 12.
+  *(Accepted edge: the guard reads the index, which lags the watcher debounce —
+  a note created with the old title inside that sub-second window can be
+  missed. Resolution stays deterministic; the late-created note wins future
+  resolutions.)*
 - **Autocomplete latency** on large graphs. Mitigate with an indexed prefix query +
   in-memory recent-notes cache.
 - **External renames** (file moved in Finder/Obsidian). The watcher (Plan 04) must treat
