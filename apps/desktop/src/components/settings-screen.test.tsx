@@ -125,6 +125,22 @@ describe('SettingsScreen', () => {
     )
   })
 
+  it('rejects a tag name outside the #tag grammar with an inline error', async () => {
+    renderScreen()
+    const input = screen.getByLabelText('Add filter tag')
+    if (!(input instanceof HTMLInputElement)) {
+      throw new Error('expected an <input>')
+    }
+
+    fireEvent.change(input, { target: { value: 'my tag' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    expect(screen.getByRole('alert').textContent).toContain(`"my tag" can't be a tag`)
+    // The draft stays put for fixing, and nothing reaches the store.
+    expect(input.value).toBe('my tag')
+    await waitFor(() => expect(saved).toEqual([]))
+  })
+
   it('ignores adding a duplicate filter tag', async () => {
     stored = { allNotesFilterTags: ['book'] }
     renderScreen()

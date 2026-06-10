@@ -1,4 +1,5 @@
 import { useState, type ReactElement } from 'react'
+import { isTagName } from '@reflect/core'
 import { X } from 'lucide-react'
 import { useSettings } from '@/providers/settings-provider'
 import { SettingsField } from './field'
@@ -21,12 +22,25 @@ function normalizeTagInput(value: string): string {
 export function AllNotesSection(): ReactElement {
   const { settings, updateSettings } = useSettings()
   const [draft, setDraft] = useState('')
+  const [draftError, setDraftError] = useState<string | null>(null)
   const tags = settings.allNotesFilterTags
 
   const addTag = (): void => {
     const tag = normalizeTagInput(draft)
+    if (tag === '') {
+      return
+    }
+    // The indexer can never produce a name outside the `#tag` grammar, so a
+    // pin that fails it would be a forever-empty filter — reject it here,
+    // keeping the draft so the user can fix it.
+    if (!isTagName(tag)) {
+      setDraftError(
+        `"${tag}" can't be a tag — tags start with a letter and use letters, numbers, /, _ or -.`,
+      )
+      return
+    }
     setDraft('')
-    if (tag === '' || tags.some((existing) => existing.toLowerCase() === tag)) {
+    if (tags.some((existing) => existing.toLowerCase() === tag)) {
       return
     }
     updateSettings({ allNotesFilterTags: [...tags, tag] })
@@ -75,8 +89,12 @@ export function AllNotesSection(): ReactElement {
           <input
             type="text"
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => {
+              setDraft(event.target.value)
+              setDraftError(null)
+            }}
             aria-label="Add filter tag"
+            aria-invalid={draftError !== null}
             placeholder="Add a tag (e.g. book)"
             className="w-full max-w-60 rounded-[7px] border border-border-strong bg-input-bg px-2.5 py-1.5 text-sm text-text shadow-input placeholder:text-text-muted"
           />
@@ -87,6 +105,11 @@ export function AllNotesSection(): ReactElement {
             Add
           </button>
         </form>
+        {draftError !== null ? (
+          <p role="alert" className="mt-2 text-xs text-destructive">
+            {draftError}
+          </p>
+        ) : null}
       </SettingsField>
     </SettingsSection>
   )

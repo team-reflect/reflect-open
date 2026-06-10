@@ -1,4 +1,5 @@
-import { sql } from 'kysely'
+import { sql, type Expression, type ExpressionBuilder, type SqlBool } from 'kysely'
+import type { Database } from '@reflect/db'
 import { db } from './db'
 import { previewSnippet } from './snippet'
 
@@ -6,7 +7,8 @@ import { previewSnippet } from './snippet'
  * The All Notes list: every non-daily note, newest first, optionally narrowed
  * to one tag. Daily notes are excluded by design — the stream is their home —
  * which mirrors the original app's notes list (`isDaily = 0` there,
- * `daily_date IS NULL` here).
+ * `daily_date IS NULL` here). Uncapped: the screen virtualizes, and neither
+ * query carries a per-row parameter, so list size has no SQL ceiling.
  */
 
 /** One row of the All Notes list. */
@@ -24,18 +26,32 @@ export interface NoteListEntry {
 export interface NoteListOptions {
   /** Only notes carrying this tag (case-insensitive). `null` lists all. */
   tag?: string | null
-  limit?: number
 }
 
-const DEFAULT_LIMIT = 500
 // Enough of the plain text to find the first body line under any sane title,
 // without shipping whole notes over IPC for every row.
 const SNIPPET_SOURCE_CHARS = 600
 
+/**
+ * EXISTS predicate: the candidate `notes` row carries `tag`, case-insensitive
+ * (the same collation as the `#tag` search token). Shared by the note and
+ * per-note-tag queries so the two can't disagree about what "filtered" means.
+ */
+function noteCarriesTag(tag: string) {
+  const folded = tag.toLowerCase()
+  return (eb: ExpressionBuilder<Database, 'notes'>): Expression<SqlBool> =>
+    eb.exists(
+      eb
+        .selectFrom('tags')
+        .select(sql<number>`1`.as('one'))
+        .whereRef('tags.notePath', '=', 'notes.path')
+        .where(sql<string>`lower(tags.tag)`, '=', folded),
+    )
+}
+
 /** Non-daily notes for the All Notes screen, most recently edited first. */
 export async function listNotes(options: NoteListOptions = {}): Promise<NoteListEntry[]> {
   const tag = options.tag ?? null
-  const limit = options.limit ?? DEFAULT_LIMIT
 
   let query = db
     .selectFrom('notes')
@@ -49,17 +65,8 @@ export async function listNotes(options: NoteListOptions = {}): Promise<NoteList
     ])
     .orderBy('notes.mtime', 'desc')
     .orderBy('notes.path')
-    .limit(limit)
-
   if (tag !== null) {
-    query = query.where(({ exists, selectFrom }) =>
-      exists(
-        selectFrom('tags')
-          .select(sql<number>`1`.as('one'))
-          .whereRef('tags.notePath', '=', 'notes.path')
-          .where(sql<string>`lower(tags.tag)`, '=', tag.toLowerCase()),
-      ),
-    )
+    query = query.where(noteCarriesTag(tag))
   }
 
   const rows = await query.execute()
@@ -67,16 +74,19 @@ export async function listNotes(options: NoteListOptions = {}): Promise<NoteList
     return []
   }
 
-  const tagRows = await db
+  // Tags for the same note set, via the same predicates — a join rather than a
+  // `note_path IN (…)` list, which would put a per-row parameter between the
+  // list and SQLite's bound-parameter ceiling.
+  let tagQuery = db
     .selectFrom('tags')
-    .where(
-      'notePath',
-      'in',
-      rows.map((row) => row.path),
-    )
-    .select(['notePath', 'tag'])
-    .orderBy('tag')
-    .execute()
+    .innerJoin('notes', 'notes.path', 'tags.notePath')
+    .where('notes.dailyDate', 'is', null)
+    .select(['tags.notePath', 'tags.tag'])
+    .orderBy('tags.tag')
+  if (tag !== null) {
+    tagQuery = tagQuery.where(noteCarriesTag(tag))
+  }
+  const tagRows = await tagQuery.execute()
   const tagsByPath = new Map<string, string[]>()
   for (const row of tagRows) {
     const tags = tagsByPath.get(row.notePath)

@@ -22,7 +22,7 @@ export {
   type ParsedFrontmatter,
 } from './frontmatter'
 export { parseBody, reflectMarkdownParser, wikiLinkExtension } from './grammar'
-export { parseNote } from './extract'
+export { parseNote, isTagName } from './extract'
 export {
   scanInlineWikiLinks,
   scanInlineImages,

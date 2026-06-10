@@ -106,6 +106,7 @@ export {
   scanInlineWikiLinks,
   scanInlineImages,
   foldKey,
+  isTagName,
   normalizeWikiTarget,
   type Frontmatter,
   type Span,

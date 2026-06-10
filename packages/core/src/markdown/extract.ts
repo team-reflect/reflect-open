@@ -24,6 +24,18 @@ import type {
 
 // A `#tag`: boundary, a leading letter, then tag chars. Excludes `##`, `#123`, `a#b`.
 const TAG_RE = /(^|\s)#(\p{L}[\p{L}\p{N}/_-]*)/gu
+// The name grammar alone (no `#`, anchored) — the single source for "could
+// this string ever be a tag?" checks (e.g. settings' pinned filter tags).
+const TAG_NAME_RE = /^\p{L}[\p{L}\p{N}/_-]*$/u
+
+/**
+ * Is `value` a possible tag name (the `#tag` grammar without the `#`)? A name
+ * this rejects — spaces, leading digit, empty — can never be produced by the
+ * indexer, so a filter built on it would match nothing, forever.
+ */
+export function isTagName(value: string): boolean {
+  return TAG_NAME_RE.test(value)
+}
 // Inner of a wiki link, for plain-text rendering.
 const WIKI_INNER_RE = /\[\[([^\]\n]*)\]\]/g
 

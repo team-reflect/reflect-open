@@ -33,30 +33,29 @@ export function lineSnippet(content: string, pos: number, maxLength = DEFAULT_MA
 }
 
 /**
- * A list-row preview of a note: the first body line of its plain text,
- * skipping the title when it leads the text (the indexer's plain-text
- * rendering keeps heading *text*, so a note's first line usually repeats its
- * title — pure noise next to a Subject column). A later line that happens to
- * equal the title is kept: only the leading occurrence is the title.
+ * A list-row preview of a note from the index's plain text. `buildPlainText`
+ * collapses all whitespace to single spaces — there are no lines to split on —
+ * so the preview is the collapsed text with the title dropped when it leads it
+ * (heading *text* survives the markup cuts, so most notes open with their own
+ * title — pure noise next to a Subject column). The strip is whole-word: a
+ * title that is merely a prefix of the first word (`Health` / `Healthy…`)
+ * stays put. Raw multi-line input is collapsed the same way first, so the
+ * function is total over both the stored text and any fresher source.
  */
 export function previewSnippet(
   text: string,
   title: string,
   maxLength = PREVIEW_MAX_LENGTH,
 ): string {
-  let pastTitle = false
-  for (const rawLine of text.split('\n')) {
-    const line = rawLine.trim()
-    if (line === '') {
-      continue
+  const collapsed = text.replace(/\s+/g, ' ').trim()
+  const foldedTitle = title.replace(/\s+/g, ' ').trim()
+  let body = collapsed
+  if (foldedTitle !== '') {
+    if (body === foldedTitle) {
+      body = ''
+    } else if (body.startsWith(`${foldedTitle} `)) {
+      body = body.slice(foldedTitle.length + 1)
     }
-    if (!pastTitle) {
-      pastTitle = true
-      if (line === title.trim()) {
-        continue
-      }
-    }
-    return line.length <= maxLength ? line : `${line.slice(0, maxLength).trimEnd()}…`
   }
-  return ''
+  return body.length <= maxLength ? body : `${body.slice(0, maxLength).trimEnd()}…`
 }

@@ -23,7 +23,8 @@ describe('listNotes', () => {
           path: 'notes/health.md',
           title: 'Health Stacked',
           mtime: 2000,
-          text_head: 'Health Stacked\nShop your health goals.\n',
+          // The indexer's plain text is whitespace-collapsed: one long line.
+          text_head: 'Health Stacked Shop your health goals.',
         },
         {
           path: 'notes/tokyo.md',
@@ -62,22 +63,37 @@ describe('listNotes', () => {
     expect(sql).toContain('"daily_date" is null')
     expect(sql).toContain('order by "notes"."mtime" desc')
     expect(sql).not.toContain('exists')
+    // Uncapped: the screen virtualizes instead.
+    expect(sql).not.toContain('limit')
 
+    // The tag fetch joins the same note predicates — never a `note_path IN`
+    // list, whose per-row parameter would hit SQLite's bound-parameter
+    // ceiling on large graphs.
     const [, tagArgs] = mockInvoke.mock.calls[1]
-    expect(String(tagArgs.sql)).toContain('"note_path" in')
-    expect(tagArgs.params).toEqual(['notes/health.md', 'notes/tokyo.md'])
+    const tagSql = String(tagArgs.sql)
+    expect(tagSql).toContain('inner join "notes"')
+    expect(tagSql).toContain('"daily_date" is null')
+    expect(tagSql).not.toContain(' in (')
+    expect(tagArgs.params).toEqual([])
   })
 
-  it('narrows to one tag case-insensitively via an EXISTS subquery', async () => {
-    mockInvoke.mockResolvedValue([])
+  it('narrows both queries to one tag case-insensitively via an EXISTS subquery', async () => {
+    mockInvoke
+      .mockResolvedValueOnce([
+        { path: 'notes/health.md', title: 'Health Stacked', mtime: 2000, text_head: null },
+      ])
+      .mockResolvedValueOnce([])
 
     await listNotes({ tag: 'Book' })
 
-    const [, args] = mockInvoke.mock.calls[0]
-    const sql = String(args.sql)
-    expect(sql).toContain('exists')
-    expect(sql).toContain('lower(tags.tag)')
-    expect(args.params).toEqual(expect.arrayContaining(['book']))
+    expect(mockInvoke).toHaveBeenCalledTimes(2)
+    for (const call of mockInvoke.mock.calls) {
+      const [, args] = call
+      const sql = String(args.sql)
+      expect(sql).toContain('exists')
+      expect(sql).toContain('lower(tags.tag)')
+      expect(args.params).toContain('book')
+    }
   })
 
   it('skips the tag fetch entirely when no notes match', async () => {

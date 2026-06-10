@@ -36,13 +36,9 @@ export function RouteContent(): ReactElement {
         </ScrollRestored>
       )
     case 'allNotes':
-      return (
-        <ScrollRestored className="h-full overflow-auto px-6 py-8">
-          <div className="mx-auto w-full max-w-5xl">
-            <AllNotesScreen tag={route.tag} />
-          </div>
-        </ScrollRestored>
-      )
+      // Owns its scroll container (virtualized table + fixed header), so no
+      // ScrollRestored wrapper — same shape as the daily stream.
+      return <AllNotesScreen tag={route.tag} />
     case 'search':
       return <SearchRoute query={route.query} today={today} />
     case 'settings':

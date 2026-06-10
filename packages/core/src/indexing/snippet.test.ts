@@ -37,27 +37,36 @@ describe('lineSnippet', () => {
 })
 
 describe('previewSnippet', () => {
-  it('skips a leading title line and returns the first body line', () => {
-    expect(previewSnippet('Roadmap\n\nShip the alpha in June.\nMore.', 'Roadmap')).toBe(
-      'Ship the alpha in June.',
+  // The indexer's plain text is whitespace-collapsed (`buildPlainText`), so
+  // realistic input is one long line that opens with the note's title.
+  it('drops the leading title from collapsed plain text', () => {
+    expect(previewSnippet('Roadmap Ship the alpha in June. More.', 'Roadmap')).toBe(
+      'Ship the alpha in June. More.',
     )
   })
 
-  it('returns the first line when it is not the title (untitled notes)', () => {
-    expect(previewSnippet('Just a thought.\nSecond line.', 'ulid-derived')).toBe(
-      'Just a thought.',
+  it('keeps text that does not open with the title (untitled notes)', () => {
+    expect(previewSnippet('Just a thought. Second thought.', 'ulid-derived')).toBe(
+      'Just a thought. Second thought.',
     )
   })
 
-  it('keeps a later body line that happens to equal the title', () => {
-    expect(previewSnippet('Echo\nEcho', 'Echo')).toBe('Echo')
+  it('only strips the title at a word boundary, never a mere prefix', () => {
+    expect(previewSnippet('Healthy habits compound.', 'Health')).toBe(
+      'Healthy habits compound.',
+    )
   })
 
-  it('skips blank and whitespace-only lines', () => {
+  it('keeps a repeated title beyond the leading occurrence', () => {
+    expect(previewSnippet('Echo Echo', 'Echo')).toBe('Echo')
+  })
+
+  it('collapses raw multi-line input the same way the indexer does', () => {
     expect(previewSnippet('Title\n\n   \n\tbody at last', 'Title')).toBe('body at last')
+    expect(previewSnippet('A  title\nwith   gaps', 'A title')).toBe('with gaps')
   })
 
-  it('truncates a long first line with an ellipsis', () => {
+  it('truncates long text with an ellipsis', () => {
     const long = 'x'.repeat(200)
     const snippet = previewSnippet(long, 'Title', 50)
     expect(snippet).toBe(`${'x'.repeat(50)}…`)
@@ -65,6 +74,7 @@ describe('previewSnippet', () => {
 
   it('returns empty for empty or title-only text', () => {
     expect(previewSnippet('', 'Title')).toBe('')
+    expect(previewSnippet('Title', 'Title')).toBe('')
     expect(previewSnippet('Title\n', 'Title')).toBe('')
   })
 })

@@ -106,6 +106,32 @@ describe('SettingsProvider', () => {
     expect(result.current.settings.editorMarkdownSyntax).toBe('focus')
   })
 
+  it('an equal-but-rebuilt array value does not trigger a save', async () => {
+    stored = { allNotesFilterTags: ['book', 'person'] }
+    const { result } = renderHook(() => useSettings(), { wrapper })
+    await loadSettled()
+
+    // Same value, new instance — a consumer writing back what it read must
+    // not count as a change (reference equality would).
+    act(() => {
+      result.current.updateSettings({ allNotesFilterTags: ['book', 'person'] })
+    })
+    await act(async () => {
+      await flushSettings()
+    })
+    expect(saved).toEqual([])
+
+    // A genuinely changed array still persists.
+    act(() => {
+      result.current.updateSettings({ allNotesFilterTags: ['book'] })
+    })
+    await waitFor(() =>
+      expect(saved).toEqual([
+        { editorMarkdownSyntax: 'focus', theme: 'system', allNotesFilterTags: ['book'] },
+      ]),
+    )
+  })
+
   it('applies an update instantly and persists the full document', async () => {
     stored = { editorMarkdownSyntax: 'focus', futureKey: true }
     const { result } = renderHook(() => useSettings(), { wrapper })

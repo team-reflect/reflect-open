@@ -41,11 +41,29 @@ interface SettingsContextValue {
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
 
-/** Shallow own-key equality — settings documents are flat JSON objects. */
+/**
+ * One settings value equals another: identity, or element-wise for arrays —
+ * documents are flat JSON, so arrays of scalars are the only non-primitive
+ * values. Reference equality alone would make an equal-but-rebuilt array
+ * (a re-parse, a no-op update) read as a change and trigger spurious saves.
+ */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) {
+    return true
+  }
+  return (
+    Array.isArray(a) &&
+    Array.isArray(b) &&
+    a.length === b.length &&
+    a.every((item, index) => Object.is(item, b[index]))
+  )
+}
+
+/** Own-key equality over the flat settings document. */
 function sameDocument(a: Settings, b: Settings): boolean {
   const aKeys = Object.keys(a)
   const bKeys = Object.keys(b)
-  return aKeys.length === bKeys.length && aKeys.every((key) => Object.is(a[key], b[key]))
+  return aKeys.length === bKeys.length && aKeys.every((key) => sameValue(a[key], b[key]))
 }
 
 interface SettingsProviderProps {

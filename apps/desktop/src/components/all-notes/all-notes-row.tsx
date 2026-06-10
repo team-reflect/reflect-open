@@ -18,24 +18,22 @@ interface AllNotesRowProps {
 /** One note in the All Notes table; the whole row opens the note. */
 export function AllNotesRow({ note, onOpen }: AllNotesRowProps): ReactElement {
   return (
-    <li>
-      <button
-        type="button"
-        onClick={() => onOpen(note.path)}
-        className={cn(
-          ALL_NOTES_GRID,
-          'w-full px-3 py-3 text-left transition-colors duration-100 hover:bg-surface-hover',
-        )}
-      >
-        <span className="truncate text-sm font-medium text-text">{note.title}</span>
-        <span className="truncate text-[13px] text-text-muted">{note.snippet}</span>
-        <span className="truncate text-[13px] text-text-muted">
-          {note.tags.map((tag) => `#${tag}`).join(' ')}
-        </span>
-        <span className="text-right text-[13px] tabular-nums text-text-muted">
-          {formatRecencyLabel(note.mtime)}
-        </span>
-      </button>
-    </li>
+    <button
+      type="button"
+      onClick={() => onOpen(note.path)}
+      className={cn(
+        ALL_NOTES_GRID,
+        'w-full px-3 py-3 text-left transition-colors duration-100 hover:bg-surface-hover',
+      )}
+    >
+      <span className="truncate text-sm font-medium text-text">{note.title}</span>
+      <span className="truncate text-[13px] text-text-muted">{note.snippet}</span>
+      <span className="truncate text-[13px] text-text-muted">
+        {note.tags.map((tag) => `#${tag}`).join(' ')}
+      </span>
+      <span className="text-right text-[13px] tabular-nums text-text-muted">
+        {formatRecencyLabel(note.mtime)}
+      </span>
+    </button>
   )
 }
