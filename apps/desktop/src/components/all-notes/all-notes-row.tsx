@@ -2,6 +2,7 @@ import type { ReactElement } from 'react'
 import type { NoteListEntry } from '@reflect/core'
 import { formatRecencyLabel } from '@/lib/dates'
 import { cn } from '@/lib/utils'
+import { useSettings } from '@/providers/settings-provider'
 
 /**
  * The shared column template (Subject · Snippet · Tags · Updated) — the header
@@ -17,6 +18,7 @@ interface AllNotesRowProps {
 
 /** One note in the All Notes table; the whole row opens the note. */
 export function AllNotesRow({ note, onOpen }: AllNotesRowProps): ReactElement {
+  const { settings } = useSettings()
   return (
     <button
       type="button"
@@ -32,7 +34,7 @@ export function AllNotesRow({ note, onOpen }: AllNotesRowProps): ReactElement {
         {note.tags.map((tag) => `#${tag}`).join(' ')}
       </span>
       <span className="text-right text-[13px] tabular-nums text-text-muted">
-        {formatRecencyLabel(note.mtime)}
+        {formatRecencyLabel(note.mtime, settings)}
       </span>
     </button>
   )

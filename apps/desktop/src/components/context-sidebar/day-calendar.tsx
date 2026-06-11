@@ -106,7 +106,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
                   <td key={cell.date} className="p-0">
                     <button
                       type="button"
-                      aria-label={formatDayLabel(cell.date)}
+                      aria-label={formatDayLabel(cell.date, settings.dateFormat)}
                       aria-current={isToday ? 'date' : undefined}
                       aria-pressed={isSelected}
                       onClick={() => navigate({ kind: 'daily', date: cell.date })}

@@ -30,7 +30,7 @@ vi.mock('@/lib/use-embed-status', () => ({
 const semanticSetting = vi.hoisted(() => ({ enabled: false }))
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({
-    settings: { semanticSearchEnabled: semanticSetting.enabled },
+    settings: { semanticSearchEnabled: semanticSetting.enabled, dateFormat: 'mdy' },
     updateSettings: () => {},
   }),
 }))

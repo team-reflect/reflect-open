@@ -7,6 +7,7 @@ import { ShortcutKeys } from '@/components/shortcut-keys'
 import { runCommand } from '@/lib/commands/registry'
 import type { CommandContext } from '@/lib/commands/types'
 import { formatDayLabel } from '@/lib/dates'
+import { useSettings } from '@/providers/settings-provider'
 import { routeForPath } from '@/routing/route'
 import { commandIcon } from './command-icons'
 import { type NoteEntry } from './entries'
@@ -43,6 +44,7 @@ function Snippet({ snippet }: { snippet: string }): ReactElement {
 
 export function CommandPalette({ context }: CommandPaletteProps): ReactElement | null {
   const { open, query, setQuery, closePalette } = usePalette()
+  const { settings } = useSettings()
   const { sections, resultsSettled, searchFailed } = usePaletteResults(open, query)
 
   if (!open) {
@@ -116,7 +118,9 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
                         />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm">
-                            {entry.date !== null ? formatDayLabel(entry.date) : entry.title}
+                            {entry.date !== null
+                              ? formatDayLabel(entry.date, settings.dateFormat)
+                              : entry.title}
                           </span>
                           {entry.snippet !== null ? <Snippet snippet={entry.snippet} /> : null}
                         </span>

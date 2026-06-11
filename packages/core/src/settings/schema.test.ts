@@ -8,6 +8,8 @@ describe('settingsSchema', () => {
       editorSpellCheck: true,
       semanticSearchEnabled: false,
       theme: 'system',
+      timeFormat: '12h',
+      dateFormat: 'mdy',
       weekStartDay: 'monday',
       allNotesFilterTags: ['book', 'link', 'person'],
       aiModels: [],
@@ -17,6 +19,8 @@ describe('settingsSchema', () => {
     expect(DEFAULT_SETTINGS.editorSpellCheck).toBe(true)
     expect(DEFAULT_SETTINGS.semanticSearchEnabled).toBe(false)
     expect(DEFAULT_SETTINGS.theme).toBe('system')
+    expect(DEFAULT_SETTINGS.timeFormat).toBe('12h')
+    expect(DEFAULT_SETTINGS.dateFormat).toBe('mdy')
     expect(DEFAULT_SETTINGS.weekStartDay).toBe('monday')
     expect(DEFAULT_SETTINGS.allNotesFilterTags).toEqual(['book', 'link', 'person'])
     expect(DEFAULT_SETTINGS.aiModels).toEqual([])
@@ -31,6 +35,10 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ theme: 'dark' }).theme).toBe('dark')
     expect(settingsSchema.parse({ theme: 'light' }).theme).toBe('light')
     expect(settingsSchema.parse({ theme: 'system' }).theme).toBe('system')
+    expect(settingsSchema.parse({ timeFormat: '24h' }).timeFormat).toBe('24h')
+    expect(settingsSchema.parse({ timeFormat: '12h' }).timeFormat).toBe('12h')
+    expect(settingsSchema.parse({ dateFormat: 'dmy' }).dateFormat).toBe('dmy')
+    expect(settingsSchema.parse({ dateFormat: 'mdy' }).dateFormat).toBe('mdy')
     expect(settingsSchema.parse({ weekStartDay: 'monday' }).weekStartDay).toBe('monday')
     expect(settingsSchema.parse({ weekStartDay: 'sunday' }).weekStartDay).toBe('sunday')
     expect(settingsSchema.parse({ semanticSearchEnabled: true }).semanticSearchEnabled).toBe(true)
@@ -48,6 +56,10 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ editorSpellCheck: 0 }).editorSpellCheck).toBe(true)
     expect(settingsSchema.parse({ theme: 'sepia' }).theme).toBe('system')
     expect(settingsSchema.parse({ theme: 7 }).theme).toBe('system')
+    expect(settingsSchema.parse({ timeFormat: '36h' }).timeFormat).toBe('12h')
+    expect(settingsSchema.parse({ timeFormat: 24 }).timeFormat).toBe('12h')
+    expect(settingsSchema.parse({ dateFormat: 'ymd' }).dateFormat).toBe('mdy')
+    expect(settingsSchema.parse({ dateFormat: 10 }).dateFormat).toBe('mdy')
     expect(settingsSchema.parse({ weekStartDay: 'saturday' }).weekStartDay).toBe('monday')
     expect(settingsSchema.parse({ weekStartDay: 42 }).weekStartDay).toBe('monday')
     expect(settingsSchema.parse({ semanticSearchEnabled: 'yes' }).semanticSearchEnabled).toBe(false)
@@ -71,6 +83,8 @@ describe('settingsSchema', () => {
       editorSpellCheck: true,
       semanticSearchEnabled: false,
       theme: 'system',
+      timeFormat: '12h',
+      dateFormat: 'mdy',
       weekStartDay: 'monday',
       allNotesFilterTags: ['book', 'link', 'person'],
       aiModels: [],

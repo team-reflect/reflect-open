@@ -11,6 +11,7 @@ import { addDaysIso, formatDayLabel } from '@/lib/dates'
 import { useToday } from '@/lib/use-today'
 import { cn } from '@/lib/utils'
 import { hasMacosTitleBarOverlay } from '@/lib/window-chrome'
+import { useSettings } from '@/providers/settings-provider'
 import { useRouter } from '@/routing/router'
 
 interface DailyContextSidebarProps {
@@ -32,6 +33,7 @@ const TODAY_HINT = TODAY_KEYBINDING !== null ? formatBindingLabel(TODAY_KEYBINDI
  */
 export function DailyContextSidebar({ date }: DailyContextSidebarProps): ReactElement {
   const { navigate } = useRouter()
+  const { settings } = useSettings()
   const today = useToday()
   const isToday = date === today
 
@@ -55,7 +57,7 @@ export function DailyContextSidebar({ date }: DailyContextSidebarProps): ReactEl
             <ChevronLeft aria-hidden className="size-4" />
           </button>
           <h2 className="min-w-0 truncate text-sm font-semibold">
-            {formatDayLabel(date)}
+            {formatDayLabel(date, settings.dateFormat)}
           </h2>
           <button
             type="button"

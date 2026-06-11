@@ -12,6 +12,7 @@ import { hasBridge, suggestWikiTargets } from '@reflect/core'
 import { formatDayLabel } from '@/lib/dates'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
+import { useSettings } from '@/providers/settings-provider'
 import { buildAutocompleteEntries } from './wiki-autocomplete-entries'
 
 /**
@@ -38,6 +39,7 @@ interface WikiAutocompleteProps {
 export function WikiAutocomplete({ onCreate }: WikiAutocompleteProps): ReactElement {
   const editor = useEditor()
   const { graph } = useGraph()
+  const { settings } = useSettings()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
 
@@ -84,7 +86,7 @@ export function WikiAutocomplete({ onCreate }: WikiAutocompleteProps): ReactElem
               >
                 <span className="reflect-autocomplete-title">
                   {entry.suggestion.date !== null
-                    ? formatDayLabel(entry.suggestion.date)
+                    ? formatDayLabel(entry.suggestion.date, settings.dateFormat)
                     : entry.suggestion.title}
                 </span>
                 {entry.suggestion.alias !== null ? (
