@@ -65,27 +65,40 @@ Otherwise tauri-build fails with `resource path binaries/reflect-<triple> doesn'
 
 ### Repo layout
 
-Reflect is a **Tauri 2** desktop/mobile app: a React + TypeScript frontend bundled by Vite, embedded in a Rust native shell.
+Reflect is a **Turborepo + pnpm monorepo** around a **Tauri 2** desktop/mobile app: a
+React + TypeScript frontend bundled by Vite, embedded in a Rust native shell. The Rust
+crates form a single **Cargo workspace** rooted at the repository root.
 
 ```
 reflect-open/
-├── src/                    # Frontend (React + TypeScript)
-│   ├── main.tsx            # React entry point
-│   └── App.tsx             # Root component; calls Rust via @tauri-apps/api
-├── src-tauri/              # Tauri native shell (Rust)
-│   ├── src/
-│   │   ├── lib.rs          # App setup, #[tauri::command] handlers, plugins
-│   │   └── main.rs         # Desktop entry point (calls lib::run)
-│   ├── tauri.conf.json     # Tauri config: build hooks, windows, bundle targets (incl. iOS)
-│   ├── Cargo.toml          # Rust crate + Tauri plugin dependencies
-│   ├── capabilities/       # Tauri 2 permission grants (e.g. default.json)
-│   ├── icons/              # App icons for desktop/mobile bundles
-│   ├── gen/                # Generated schemas + platform projects (do not hand-edit)
-│   └── ios.project.yml     # iOS XcodeGen template
-├── dist/                   # Vite build output (frontendDist in tauri.conf.json)
-├── public/                 # Static assets served by Vite
-├── docs/                   # Product/architecture docs (Reflect V2)
-└── design-system/          # Design tokens, components, and UI guidelines (see design-system/readme.md)
+├── apps/
+│   ├── desktop/            # @reflect/desktop — the Tauri 2 app
+│   │   ├── src/            # React frontend (main.tsx, app.tsx, components/, editor/,
+│   │   │                   #   hooks/, providers/, routing/); calls Rust via @tauri-apps/api
+│   │   ├── src-tauri/      # Tauri native shell (Rust crate `reflect-open`)
+│   │   │   ├── src/        # lib.rs (#[tauri::command] handlers, plugins), db/, fs/,
+│   │   │   │               #   watcher.rs, embed.rs, recents.rs, secrets.rs, settings.rs
+│   │   │   ├── tauri.conf.json          # build hooks, windows, bundle targets (incl. iOS)
+│   │   │   ├── tauri.<platform>.conf.json  # desktop overlays: bundle the reflect CLI sidecar
+│   │   │   ├── capabilities/            # Tauri 2 permission grants (e.g. default.json)
+│   │   │   ├── icons/                   # App icons for desktop/mobile bundles
+│   │   │   ├── gen/                     # Generated schemas + platform projects (no hand-edits)
+│   │   │   └── ios.project.yml          # iOS XcodeGen template
+│   │   ├── scripts/        # build-sidecar.mjs (stages the reflect CLI for bundling)
+│   │   ├── dist/           # Vite build output (frontendDist in tauri.conf.json)
+│   │   └── public/         # Static assets served by Vite
+│   └── cli/                # `reflect` — self-contained Rust read/discovery CLI (see docs/cli.md)
+├── packages/
+│   ├── core/               # @reflect/core — ALL TS business logic (markdown/, indexing/,
+│   │                       #   graph/, embeddings/, ai/, settings/, ipc/)
+│   └── db/                 # @reflect/db — generated Kysely schema + the IPC dialect
+├── crates/
+│   └── index-schema/       # Shared SQLite migrations for <graph>/.reflect/index.sqlite
+│                           #   (one schema for the desktop writer + CLI reader)
+├── design-system/          # Design tokens, components, and UI guidelines (see design-system/readme.md)
+├── docs/                   # Product/architecture docs + docs/plans/ (Reflect V2)
+├── Cargo.toml              # Root Cargo workspace (reflect-open, reflect-cli, reflect-index-schema)
+└── turbo.json, pnpm-workspace.yaml
 ```
 
 **Design system**
@@ -99,17 +112,17 @@ All UI work should follow the Reflect design system documented in [`design-syste
 
 **Frontend ↔ Rust bridge**
 
-- Define commands in `src-tauri/src/lib.rs` with `#[tauri::command]` and register them in `invoke_handler`.
+- Define commands in `apps/desktop/src-tauri/src/` (registered in `lib.rs`'s `invoke_handler`) with `#[tauri::command]`.
 - Call commands from the frontend with `invoke` from `@tauri-apps/api/core`.
-- Add Tauri plugins in `Cargo.toml` (Rust) and grant permissions in `src-tauri/capabilities/`.
+- Add Tauri plugins in `apps/desktop/src-tauri/Cargo.toml` (Rust) and grant permissions in `apps/desktop/src-tauri/capabilities/`.
 
-**Common commands**
+**Common commands** (run from the repo root)
 
 ```bash
-pnpm dev              # Vite dev server only (http://localhost:1420)
-pnpm tauri dev        # Full Tauri app with hot reload
-pnpm build            # Typecheck + Vite production build → dist/
-pnpm tauri build      # Build native app bundle (desktop and/or mobile targets)
+pnpm dev              # turbo dev across packages (Vite on http://localhost:1420)
+pnpm tauri dev        # Full Tauri app with hot reload (stages the CLI sidecar first)
+pnpm build            # turbo build pipeline → apps/desktop/dist/
+pnpm tauri build      # Native app bundle, incl. the reflect CLI sidecar
 ```
 
 # Code Conventions
