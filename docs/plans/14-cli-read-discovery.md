@@ -139,9 +139,14 @@ command can revisit this later.
 - **Staleness detection** (drives the `search` warning): walk `daily/`+`notes/` `.md`
   files and compare against `notes` rows — a file missing from the index, an indexed path
   missing on disk, or (for mtime mismatches only) a SHA-256 content hash ≠ `file_hash`
-  marks the index stale. Hashing only mtime-mismatched files keeps the check cheap; this
-  reproduces the TS reconcile semantics exactly (lowercase-hex SHA-256,
-  `packages/core/src/indexing/hash.ts`).
+  marks the index stale. The hash matches the indexer's (lowercase-hex SHA-256,
+  `packages/core/src/indexing/hash.ts`), but the mtime gate is deliberately **cheaper
+  than the desktop's `reconcileIndex`**, which reads and hashes every file on open. This
+  check runs on every `search` invocation, so hashing whole graphs each time is too slow;
+  the accepted cost is that an external edit that *preserves* a file's mtime goes
+  unwarned (the desktop reconcile still catches it). Acceptable for an advisory warning —
+  the gate exists because the reverse case (sync providers rewriting mtimes without
+  content changes) must not produce false stale warnings, which the hash confirm handles.
 
 ## Commands
 
