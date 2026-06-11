@@ -2,6 +2,7 @@ import { render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { NoteActionsSection } from './note-actions-section'
 
 const getPinnedNotes = vi.hoisted(() => vi.fn())
@@ -28,9 +29,11 @@ vi.mock('@/providers/graph-provider', () => ({
 function renderSection(path: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
-    <QueryClientProvider client={client}>
-      <NoteActionsSection path={path} />
-    </QueryClientProvider>,
+    <TooltipProvider>
+      <QueryClientProvider client={client}>
+        <NoteActionsSection path={path} />
+      </QueryClientProvider>
+    </TooltipProvider>,
   )
 }
 

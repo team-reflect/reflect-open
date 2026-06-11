@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { RouterProvider, useRouter } from '@/routing/router'
 import { NoteContextSidebar } from './note-context-sidebar'
 
@@ -30,12 +31,14 @@ function RouteProbe(): ReactNode {
 function renderSidebar(path: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
-    <QueryClientProvider client={client}>
-      <RouterProvider>
-        <NoteContextSidebar path={path} />
-        <RouteProbe />
-      </RouterProvider>
-    </QueryClientProvider>,
+    <TooltipProvider>
+      <QueryClientProvider client={client}>
+        <RouterProvider>
+          <NoteContextSidebar path={path} />
+          <RouteProbe />
+        </RouterProvider>
+      </QueryClientProvider>
+    </TooltipProvider>,
   )
 }
 

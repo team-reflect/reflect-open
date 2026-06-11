@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { formatDayLabel } from '@/lib/dates'
 import { monthLabel, monthOf } from '@/lib/month-grid'
 import { RouterProvider, useRouter } from '@/routing/router'
@@ -34,12 +35,14 @@ function RouteProbe(): ReactNode {
 function renderSidebar(date: string) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
-    <QueryClientProvider client={client}>
-      <RouterProvider>
-        <DailyContextSidebar date={date} />
-        <RouteProbe />
-      </RouterProvider>
-    </QueryClientProvider>,
+    <TooltipProvider>
+      <QueryClientProvider client={client}>
+        <RouterProvider>
+          <DailyContextSidebar date={date} />
+          <RouteProbe />
+        </RouterProvider>
+      </QueryClientProvider>
+    </TooltipProvider>,
   )
 }
 
@@ -87,14 +90,16 @@ describe('DailyContextSidebar calendar', () => {
     const view = renderSidebar('2026-06-09')
     expect(view.getByText(monthLabel('2026-06'))).toBeDefined()
     view.rerender(
-      <QueryClientProvider
-        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-      >
-        <RouterProvider>
-          <DailyContextSidebar date="2026-09-01" />
-          <RouteProbe />
-        </RouterProvider>
-      </QueryClientProvider>,
+      <TooltipProvider>
+        <QueryClientProvider
+          client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+        >
+          <RouterProvider>
+            <DailyContextSidebar date="2026-09-01" />
+            <RouteProbe />
+          </RouterProvider>
+        </QueryClientProvider>
+      </TooltipProvider>,
     )
     expect(view.getByText(monthLabel('2026-09'))).toBeDefined()
     view.unmount()

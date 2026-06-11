@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GraphInfo, PinnedNote } from '@reflect/core'
 import type { CommandContext } from '@/lib/commands/types'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { RouterProvider } from '@/routing/router'
 
 const getPinnedNotes = vi.hoisted(() => vi.fn<() => Promise<PinnedNote[]>>(async () => []))
@@ -60,11 +61,13 @@ function renderSidebar(overrides?: Partial<CommandContext>) {
   }
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const view = render(
-    <QueryClientProvider client={client}>
-      <RouterProvider>
-        <Sidebar graph={GRAPH} context={context} />
-      </RouterProvider>
-    </QueryClientProvider>,
+    <TooltipProvider>
+      <QueryClientProvider client={client}>
+        <RouterProvider>
+          <Sidebar graph={GRAPH} context={context} />
+        </RouterProvider>
+      </QueryClientProvider>
+    </TooltipProvider>,
   )
   return { view, navigate, openPalette, context }
 }
