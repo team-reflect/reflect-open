@@ -1,0 +1,17 @@
+[package]
+name = "reflect-index-schema"
+version = "0.1.0"
+description = "Shared schema + migrations for the graph's SQLite index projection"
+edition = "2021"
+
+[features]
+# The vec0 virtual tables (Plan 09 embeddings) need the sqlite-vec extension,
+# so everything that creates or migrates the schema is gated behind `vec`.
+# Read-only consumers (the CLI runtime) disable it and use only the constants.
+default = ["vec"]
+vec = ["dep:sqlite-vec"]
+
+[dependencies]
+rusqlite = { workspace = true }
+rusqlite_migration = { workspace = true }
+sqlite-vec = { workspace = true, optional = true }

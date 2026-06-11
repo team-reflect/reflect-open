@@ -20,15 +20,14 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-opener = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-rusqlite = { version = "0.40.1", features = ["bundled"] }
-sqlite-vec = "0.1.9"
-tempfile = "3.27.0"
+serde = { workspace = true }
+serde_json = { workspace = true }
+rusqlite = { workspace = true }
+reflect-index-schema = { path = "../../../crates/index-schema" }
+tempfile = { workspace = true }
 trash = "5.2.6"
 dirs = "6.0.0"
 tauri-plugin-dialog = "2.7.1"
-rusqlite_migration = "2.6.0"
 notify = "8.2.0"
 notify-debouncer-full = "0.7.0"
 base64 = "0.22.1"
