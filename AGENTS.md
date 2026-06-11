@@ -45,6 +45,24 @@ Local unit tests:
 pnpm test --run path/to/test
 ```
 
+Rust tests (the Cargo workspace: desktop shell, `reflect` CLI, index-schema crate):
+
+```bash
+# Prefer per-crate runs; cargo test --workspace also works
+cargo test -p reflect-cli
+cargo test -p reflect-open
+```
+
+**Before any cargo build/check/test that compiles the desktop crate** (including
+`--workspace` commands and clippy), the CLI sidecar must be staged once per checkout:
+
+```bash
+pnpm --filter @reflect/desktop sidecar
+```
+
+Otherwise tauri-build fails with `resource path binaries/reflect-<triple> doesn't exist`
+(`pnpm tauri dev`/`build` stage it automatically; details in [docs/cli.md](docs/cli.md)).
+
 ### Repo layout
 
 Reflect is a **Tauri 2** desktop/mobile app: a React + TypeScript frontend bundled by Vite, embedded in a Rust native shell.
