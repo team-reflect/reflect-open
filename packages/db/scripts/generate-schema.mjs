@@ -19,7 +19,7 @@ import * as sqliteVec from 'sqlite-vec'
 const require = createRequire(import.meta.url)
 const here = dirname(fileURLToPath(import.meta.url))
 const packageRoot = join(here, '..')
-const migrationsDir = join(here, '..', '..', '..', 'apps', 'desktop', 'src-tauri', 'migrations')
+const migrationsDir = join(here, '..', '..', '..', 'crates', 'index-schema', 'migrations')
 const outFile = join(packageRoot, 'src', 'schema.gen.ts')
 
 const tmp = mkdtempSync(join(tmpdir(), 'reflect-codegen-'))

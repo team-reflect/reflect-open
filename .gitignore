@@ -25,6 +25,7 @@ dist-ssr
 
 # Monorepo / build caches
 .turbo
+/target
 *.tsbuildinfo
 
 # Reflect graph index + local state (rebuildable projection; never committed)
