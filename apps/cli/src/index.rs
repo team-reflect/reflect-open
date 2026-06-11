@@ -2,9 +2,12 @@
 //!
 //! The CLI never writes: connections open `SQLITE_OPEN_READ_ONLY` with
 //! `query_only` belt-and-braces and a busy timeout to coexist with the desktop
-//! writer (the DB is WAL). Staleness reproduces the TS reconcile semantics —
-//! mtime as the cheap gate, content SHA-256 as the truth (sync providers
-//! rewrite mtimes).
+//! writer (the DB is WAL). Staleness uses the indexer's content SHA-256 as the
+//! truth (sync providers rewrite mtimes, so an mtime mismatch alone must not
+//! flag), gated on mtime divergence for speed. The gate is deliberately
+//! cheaper than the desktop's `reconcileIndex`, which hashes every file on
+//! open: this check runs per `search` invocation, and the accepted cost is
+//! that an external edit preserving a file's mtime goes unwarned.
 
 use std::collections::HashMap;
 use std::path::Path;
