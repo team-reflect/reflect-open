@@ -37,6 +37,15 @@ describe('ShortcutKeys', () => {
     view.unmount()
   })
 
+  it('groups all keys inside a single pill, V1-style', () => {
+    isApplePlatform.mockReturnValue(true)
+    const view = render(<ShortcutKeys binding="Mod-Shift-Enter" />)
+    const pills = view.container.querySelectorAll(':scope > span')
+    expect(pills).toHaveLength(1)
+    expect(pills[0]?.querySelectorAll('kbd')).toHaveLength(3)
+    view.unmount()
+  })
+
   it('ghost mode renders the keys as plain joined text, not keycaps', () => {
     isApplePlatform.mockReturnValue(true)
     const view = render(<ShortcutKeys binding="Mod-k" ghost />)
