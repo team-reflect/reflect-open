@@ -1,5 +1,6 @@
 import { type ReactElement } from 'react'
 import { Folder, FolderPlus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { useGraph } from '@/providers/graph-provider'
 
 /**
@@ -19,14 +20,14 @@ export function GraphChooser(): ReactElement {
           </p>
         </div>
 
-        <button
+        <Button
           type="button"
+          className="w-full"
           onClick={() => void pickAndOpen()}
-          className="flex w-full items-center justify-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-text-on-brand shadow-sm transition-colors duration-100 hover:bg-accent-hover"
         >
-          <FolderPlus aria-hidden strokeWidth={1.75} className="size-4" />
+          <FolderPlus aria-hidden strokeWidth={1.75} />
           Open graph…
-        </button>
+        </Button>
 
         {error ? (
           <p role="alert" className="text-center text-sm text-destructive">
@@ -64,14 +65,16 @@ export function GraphChooser(): ReactElement {
                       </span>
                     </span>
                   </button>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="xs"
                     onClick={() => void forget(recent.root)}
                     aria-label={`Forget ${recent.name}`}
-                    className="shrink-0 rounded text-xs text-text-muted opacity-0 transition-opacity duration-100 group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100 hover:text-text-secondary"
+                    className="shrink-0 text-text-muted opacity-0 transition-opacity duration-100 hover:text-text-secondary group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100"
                   >
                     Forget
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>

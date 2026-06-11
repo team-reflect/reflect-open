@@ -1,9 +1,7 @@
 import {
   useEffect,
-  useRef,
   useState,
   type ChangeEvent,
-  type KeyboardEvent,
   type ReactElement,
 } from 'react'
 import { useForm } from 'react-hook-form'
@@ -14,6 +12,15 @@ import {
   validateApiKey,
   type AiProviderId,
 } from '@reflect/core'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { InlineAlert } from '@/components/inline-alert'
 import { providerFetch } from '@/lib/provider-fetch'
 import type { NewAiModel } from '@/hooks/use-ai-models'
@@ -32,7 +39,7 @@ interface AddAiModelForm {
 }
 
 const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
-const FIELD_CONTROL_CLASS =
+const SELECT_CLASS =
   'w-full rounded-md border border-border bg-bg px-2.5 py-1.5 text-sm text-text ' +
   'focus:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring'
 
@@ -59,10 +66,12 @@ export function AddAiModelDialog({ onAdd, onClose }: AddAiModelDialogProps): Rea
   // Set when the provider couldn't be reached to verify the key; the next
   // submit then saves without verification (the button says so).
   const [unverified, setUnverified] = useState(false)
-  const dialogRef = useRef<HTMLDivElement | null>(null)
 
-  // Modal focus contract: focus returns to the opener when the dialog closes
-  // (the trap itself is in the keydown handler below).
+  // The dialog is conditionally mounted by its parent (not kept alive with
+  // open=false), so Radix's Presence/onCloseAutoFocus path is bypassed when
+  // Cancel or a successful submit calls onClose() directly.  Capturing focus
+  // here and restoring it in the cleanup ensures the opener always gets focus
+  // back regardless of which close path runs.
   useEffect(() => {
     const opener = document.activeElement
     return () => {
@@ -101,59 +110,17 @@ export function AddAiModelDialog({ onAdd, onClose }: AddAiModelDialogProps): Rea
     }
   })
 
-  const handleDialogKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      onClose()
-      return
-    }
-    if (event.key !== 'Tab') {
-      return
-    }
-    // Keyboard-native product: Tab must cycle within the modal, not escape
-    // into the settings page behind it.
-    const container = dialogRef.current
-    if (!container) {
-      return
-    }
-    const focusable = container.querySelectorAll<HTMLElement>('select, input, button')
-    if (focusable.length === 0) {
-      return
-    }
-    const first = focusable[0]
-    const last = focusable[focusable.length - 1]
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault()
-      last.focus()
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault()
-      first.focus()
-    }
-  }
-
   return (
-    <div
-      className="fixed inset-0 z-40 flex items-start justify-center bg-black/20 pt-[18vh]"
-      onPointerDown={onClose}
-      data-testid="add-ai-model-overlay"
-    >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Add AI model"
-        className="w-full max-w-sm rounded-lg border border-border bg-surface p-4 shadow-lg"
-        onPointerDown={(event) => {
-          event.stopPropagation() // clicks inside must not close
-        }}
-        onKeyDown={handleDialogKeyDown}
-      >
-        <h2 className="text-sm font-semibold text-text">Add AI model</h2>
-        <p className="mt-0.5 text-xs text-text-muted">
-          The API key is stored in your OS keychain, never in your graph.
-        </p>
+    <Dialog open onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
+      <DialogContent showCloseButton={false} className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Add AI model</DialogTitle>
+          <DialogDescription>
+            The API key is stored in your OS keychain, never in your graph.
+          </DialogDescription>
+        </DialogHeader>
         <form
-          className="mt-3 flex flex-col gap-3"
+          className="flex flex-col gap-3"
           onSubmit={(event) => {
             void submit(event)
           }}
@@ -161,11 +128,9 @@ export function AddAiModelDialog({ onAdd, onClose }: AddAiModelDialogProps): Rea
           <label className="flex flex-col gap-1">
             <span className={FIELD_LABEL_CLASS}>Provider</span>
             <select
-              autoFocus
-              className={FIELD_CONTROL_CLASS}
+              className={SELECT_CLASS}
               {...register('provider', {
                 onChange: (event: ChangeEvent<HTMLSelectElement>) => {
-                  // Each provider has its own model list; reset to its first.
                   const next = aiProvider(event.target.value as AiProviderId)
                   setValue('model', next.models[0].id)
                   setUnverified(false)
@@ -182,7 +147,7 @@ export function AddAiModelDialog({ onAdd, onClose }: AddAiModelDialogProps): Rea
 
           <label className="flex flex-col gap-1">
             <span className={FIELD_LABEL_CLASS}>Model</span>
-            <select className={FIELD_CONTROL_CLASS} {...register('model')}>
+            <select className={SELECT_CLASS} {...register('model')}>
               {provider.models.map((model) => (
                 <option key={model.id} value={model.id}>
                   {model.label}
@@ -193,12 +158,11 @@ export function AddAiModelDialog({ onAdd, onClose }: AddAiModelDialogProps): Rea
 
           <label className="flex flex-col gap-1">
             <span className={FIELD_LABEL_CLASS}>API key</span>
-            <input
+            <Input
               type="password"
               placeholder={provider.keyPlaceholder}
               autoComplete="off"
               spellCheck={false}
-              className={FIELD_CONTROL_CLASS}
               {...register('apiKey', {
                 validate: (value) => value.trim().length > 0 || 'Enter an API key.',
                 onChange: () => {
@@ -221,29 +185,21 @@ export function AddAiModelDialog({ onAdd, onClose }: AddAiModelDialogProps): Rea
           {submitError !== null ? <InlineAlert tone="error">{submitError}</InlineAlert> : null}
           {unverified ? (
             <InlineAlert tone="warning">
-              Couldn’t reach {provider.label} to verify the key. Submit again to save it
+              Couldn't reach {provider.label} to verify the key. Submit again to save it
               unverified.
             </InlineAlert>
           ) : null}
 
-          <div className="mt-1 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-md border border-border px-3 py-1.5 text-[13px] font-medium text-text-secondary transition-colors duration-100 hover:bg-surface-hover"
-            >
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={onClose}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={formState.isSubmitting}
-              className="rounded-md bg-accent px-3 py-1.5 text-[13px] font-medium text-text-on-brand shadow-sm transition-colors duration-100 hover:bg-accent-hover disabled:opacity-50"
-            >
+            </Button>
+            <Button type="submit" size="sm" disabled={formState.isSubmitting}>
               {unverified ? 'Save anyway' : 'Add model'}
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

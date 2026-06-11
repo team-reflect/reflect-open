@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 import { Trash2 } from 'lucide-react'
 import { aiModelLabel, aiProvider, errorMessage, type AiModelConfig } from '@reflect/core'
+import { Button } from '@/components/ui/button'
 import { startOperation } from '@/lib/operations'
 
 interface AiModelRowProps {
@@ -48,22 +49,26 @@ export function AiModelRow({
             Default
           </span>
         ) : (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="xs"
             onClick={() => onMakeDefault(config.id)}
-            className="rounded-md px-2 py-0.5 text-xs text-text-secondary transition-colors duration-100 hover:bg-surface-hover hover:text-text"
+            className="text-text-secondary hover:bg-surface-hover hover:text-text"
           >
             Make default
-          </button>
+          </Button>
         )}
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-sm"
           aria-label={`Remove ${name}`}
           onClick={remove}
-          className="rounded-md p-1.5 text-text-muted transition-colors duration-100 hover:bg-surface-hover hover:text-text"
+          className="text-text-muted hover:bg-surface-hover hover:text-text"
         >
-          <Trash2 aria-hidden strokeWidth={1.75} className="size-4" />
-        </button>
+          <Trash2 aria-hidden strokeWidth={1.75} />
+        </Button>
       </div>
     </div>
   )
