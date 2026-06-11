@@ -23,7 +23,7 @@ not as empty stubs up front.
 reflect-open/
 ├── apps/
 │   ├── desktop/          # Tauri app — src/ (React) + src-tauri/ (Rust primitives)
-│   ├── cli/              # Node TS CLI (Plan 14) — reuses @reflect/core; added at Plan 14
+│   ├── cli/              # Rust CLI (Plan 14) — self-contained `reflect` binary; added at Plan 14
 │   └── extension/        # Chrome MV3 capture extension (Plan 11) — added at Plan 11
 ├── packages/
 │   ├── core/             # ALL TS business logic: actions/<domain>/, the markdown layer
@@ -56,8 +56,10 @@ Reflect has no server. The boundary runs between **TypeScript business logic** a
 
 Rust owns *capabilities*; TypeScript owns *policy and composition*. A Rust command never
 encodes product rules beyond the primitive it exposes (e.g. the watcher emits events; it
-doesn't decide what to reindex — a core action does). This keeps the same logic reusable
-by `apps/cli` without going through the Rust process.
+doesn't decide what to reindex — a core action does). One deliberate exception: the CLI
+(Plan 14) is a self-contained Rust binary that re-implements the small read-side contract
+rather than reusing `@reflect/core` — see Plan 14 for the rationale and parity-test
+guardrails.
 
 ## 3. The actions pattern, reframed for local-first
 
@@ -167,9 +169,11 @@ deliberately don't have.
   actions core live in `@reflect/core`.
 - **Plan 04** keeps SQLite in Rust (primitive); **getters** live in `core`; Kysely
   discipline above applies.
-- **Plan 14 (CLI)** becomes a **Node TS app** in `apps/cli` that reuses `@reflect/core`
-  getters + the markdown layer and opens `.reflect/index.sqlite` read-only — it does **not**
-  need the Rust process.
+- **Plan 14 (CLI)** is a **self-contained Rust binary** (`apps/cli`, bin `reflect`) that
+  reads the markdown files and opens `.reflect/index.sqlite` read-only itself — no Node
+  runtime, no running desktop app. It deliberately duplicates the thin read-side contract
+  (paths, fold keys, frontmatter, hashes) under parity tests; bundled with the app as a
+  Tauri sidecar. (Supersedes the earlier Node-TS-CLI decision; rationale in Plan 14.)
 - **Plans 02, 09, 10, 12** follow the primitive/policy split in §2 (Rust does FS/embed/git/
   keychain; core does orchestration, retrieval, AI, and conflict policy).
 - **Plan 11 (extension)** lives in `apps/extension`; all durable writes/AI go through

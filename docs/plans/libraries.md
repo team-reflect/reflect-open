@@ -35,8 +35,6 @@ first-party (owned by the team) and MIT-licensed, so there is no copyleft constr
 | Export — ZIP | `fflate` (client-side) | 13 |
 | Export — HTML | reuse the editor: `markdownToDoc` → ProseMirror `DOMSerializer` (no remark) | 13 |
 | Chrome extension framework | WXT | 11 |
-| CLI framework | `cac` | 14 |
-| CLI SQLite read | `node:sqlite` (built-in, Node 22+) | 14 |
 | Auto-update (JS API + relaunch) | `@tauri-apps/plugin-updater` + `@tauri-apps/plugin-process` | 15 |
 
 ## Rust crates (additions by plan)
@@ -54,6 +52,11 @@ first-party (owned by the team) and MIT-licensed, so there is no copyleft constr
 | Git (commits, merge, conflicts) | `git2` (libgit2) | 12 |
 | Local embeddings | `fastembed` | 09 |
 | Image processing (screenshot downscale) | `image` | 11 |
+| CLI framework (derive) | `clap` v4 | 14 |
+| CLI local "today" (tz/DST-correct) | `jiff` | 14 |
+| CLI content hashes (match TS SHA-256) | `sha2` | 14 |
+| CLI frontmatter reads (tolerant YAML) | `saphyr` | 14 |
+| CLI first-H1 title fallback | `pulldown-cmark` | 14 |
 | Auto-update | `tauri-plugin-updater` | 15 |
 
 ## Notes & caveats
@@ -61,9 +64,10 @@ first-party (owned by the team) and MIT-licensed, so there is no copyleft constr
 - **Export is fully client-side (TS):** `fflate` for zipping; HTML rendered by reusing the
   editor's ProseMirror schema + `DOMSerializer` (no remark, reuses libraries we already
   ship). Rust just persists the produced bytes to a chosen path.
-- **`node:sqlite` (Plan 14)** is still experimental in Node — verify FTS5 is available in
-  the runtime's bundled SQLite before relying on `reflect search`; `better-sqlite3` is the
-  fallback if not.
+- **The CLI (Plan 14) is a Rust binary** (superseding the earlier `cac` + `node:sqlite`
+  Node-CLI choice): rusqlite `bundled` gives the same SQLite + FTS5 as the desktop app via
+  one workspace lockfile, and the binary ships as a Tauri sidecar. `saphyr` is chosen for
+  read-only frontmatter because `serde_yaml` is unmaintained.
 - **`fastembed` (Plan 09)** uses ONNX Runtime, which ships a dylib that must be signed for
   notarization (Plan 15). `candle` (pure Rust, no dylib) was the alternative, not chosen.
 - **Auto-update (Plan 15):** first-class via the official Tauri updater plugin
