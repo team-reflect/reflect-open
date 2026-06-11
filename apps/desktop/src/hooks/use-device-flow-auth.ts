@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { errorMessage, runDeviceFlow } from '@reflect/core'
 import { providerFetch } from '@/lib/provider-fetch'
 
@@ -13,10 +12,12 @@ export interface DeviceFlowAuth {
   busy: boolean
   error: string | null
   /**
-   * Run the device flow: GitHub issues a code (surfaced via `view` and
-   * auto-opened in the browser), then polling waits for the user to enter
-   * it. Resolves `true` once the credential is stored in the keychain,
-   * `false` on failure (the error is in `error`) or unmount.
+   * Run the device flow: GitHub issues a code (surfaced via `view`), then
+   * polling waits for the user to enter it. The browser is *not* opened
+   * here — the surface does that after the user has the code in hand, so
+   * the page asking for the code never steals focus from the code itself.
+   * Resolves `true` once the credential is stored in the keychain, `false`
+   * on failure (the error is in `error`) or unmount.
    */
   signIn: () => Promise<boolean>
 }
@@ -55,9 +56,6 @@ export function useDeviceFlowAuth(): DeviceFlowAuth {
         signal: abortRef.current?.signal,
         onCode: (code) => {
           setView({ view: 'code', userCode: code.userCode, verificationUri: code.verificationUri })
-          void openUrl(code.verificationUri).catch(() => {
-            // The URI is shown in the dialog; failing to auto-open is cosmetic.
-          })
         },
       })
       return auth !== null

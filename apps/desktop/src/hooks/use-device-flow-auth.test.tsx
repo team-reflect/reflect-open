@@ -1,10 +1,8 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { runDeviceFlow, ReflectError, type GithubAuth } from '@reflect/core'
 import { useDeviceFlowAuth } from './use-device-flow-auth'
 
-vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl: vi.fn(async () => {}) }))
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   runDeviceFlow: vi.fn(),
@@ -19,7 +17,9 @@ afterEach(() => {
 })
 
 describe('useDeviceFlowAuth', () => {
-  it('surfaces the user code, opens the browser, and resolves true on success', async () => {
+  it('surfaces the user code and resolves true on success', async () => {
+    // No browser side effects here: the surface opens GitHub only after the
+    // user has the code (copy first, then hand off).
     mockFlow.mockImplementation(async (options) => {
       options.onCode({ userCode: 'ABCD-1234', verificationUri: 'https://github.com/login/device' })
       return AUTH
@@ -37,7 +37,6 @@ describe('useDeviceFlowAuth', () => {
       userCode: 'ABCD-1234',
       verificationUri: 'https://github.com/login/device',
     })
-    expect(vi.mocked(openUrl)).toHaveBeenCalledWith('https://github.com/login/device')
     expect(result.current.busy).toBe(false)
     expect(result.current.error).toBeNull()
   })

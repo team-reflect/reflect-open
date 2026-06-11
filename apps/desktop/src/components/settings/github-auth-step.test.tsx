@@ -1,17 +1,26 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { setBridge } from '@reflect/core'
+import { runDeviceFlow, setBridge } from '@reflect/core'
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { GithubAuthStep } from './github-auth-step'
 
 // The Reflect GitHub App is registered, so the device flow leads and the PAT
-// path sits behind a "use a personal access token instead" toggle — these
-// tests exercise the PAT path through that toggle. The keychain is the
-// bridge fake; GET /user (instant token validation) goes through the mocked
-// Tauri HTTP plugin.
+// path sits behind a "use a personal access token instead" toggle. The
+// keychain is the bridge fake; GET /user (instant token validation) goes
+// through the mocked Tauri HTTP plugin. The device-flow tests stub core's
+// runDeviceFlow (polling policy is unit-tested in core) to drive the
+// code-handoff view.
 
 vi.mock('@tauri-apps/plugin-http', () => ({ fetch: vi.fn() }))
+vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl: vi.fn(async () => {}) }))
+vi.mock('@reflect/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@reflect/core')>()),
+  runDeviceFlow: vi.fn(),
+}))
 const httpFetch = vi.mocked(tauriFetch)
+const openedUrls = vi.mocked(openUrl)
+const mockFlow = vi.mocked(runDeviceFlow)
 
 /** Switch the step from the device-flow lead to PAT entry. */
 async function switchToPat(): Promise<void> {
@@ -21,10 +30,29 @@ async function switchToPat(): Promise<void> {
   await screen.findByLabelText('Personal access token')
 }
 
+/** Render with no stored credential and a flow that stays at the code view. */
+async function renderCodeView(): Promise<void> {
+  fakeKeychain()
+  mockFlow.mockImplementation(async (options) => {
+    options.onCode({ userCode: 'ABCD-1234', verificationUri: 'https://github.com/login/device' })
+    return new Promise(() => {}) // polling stays in flight
+  })
+  render(<GithubAuthStep onAuthed={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Sign in with GitHub' }))
+  await screen.findByText('ABCD-1234')
+}
+
+function stubClipboard(writeText: (text: string) => Promise<void>): void {
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+}
+
 afterEach(() => {
   cleanup()
   setBridge(null)
   httpFetch.mockReset()
+  openedUrls.mockClear() // clear calls, keep the resolving implementation
+  mockFlow.mockReset()
+  Reflect.deleteProperty(navigator, 'clipboard')
 })
 
 function fakeKeychain(initial: Record<string, string> = {}) {
@@ -177,5 +205,44 @@ describe('GithubAuthStep', () => {
     )
     await new Promise((resolve) => setTimeout(resolve, 0)) // flush the probe's chain
     expect(onAuthed).toHaveBeenCalledTimes(1)
+  })
+
+  it('copies the code to the clipboard before opening GitHub', async () => {
+    const writeText = vi.fn(async () => {})
+    stubClipboard(writeText)
+    await renderCodeView()
+
+    // GitHub's page asks for the code immediately, so the browser must not
+    // open (and steal focus from the visible code) until it's in hand.
+    expect(openedUrls).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy code and open GitHub' }))
+
+    await waitFor(() =>
+      expect(openedUrls).toHaveBeenCalledWith('https://github.com/login/device'),
+    )
+    expect(writeText).toHaveBeenCalledWith('ABCD-1234')
+    expect(writeText.mock.invocationCallOrder[0]).toBeLessThan(
+      openedUrls.mock.invocationCallOrder[0],
+    )
+    expect(await screen.findByText(/code copied/i)).toBeTruthy()
+  })
+
+  it('holds the GitHub handoff when the clipboard is unavailable', async () => {
+    stubClipboard(async () => {
+      throw new Error('denied')
+    })
+    await renderCodeView()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy code and open GitHub' }))
+
+    // The user is told to copy by hand first; only then does GitHub open.
+    expect(await screen.findByText(/select the code above/i)).toBeTruthy()
+    expect(openedUrls).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open GitHub' }))
+    await waitFor(() =>
+      expect(openedUrls).toHaveBeenCalledWith('https://github.com/login/device'),
+    )
   })
 })
