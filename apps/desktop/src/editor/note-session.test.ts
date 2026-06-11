@@ -241,6 +241,21 @@ describe('frontmatter ownership (Plan 07b)', () => {
     expect(h.applied).toEqual([]) // the editor was never reloaded
   })
 
+  it('marking private writes the flag; un-marking removes the key, not `private: false`', async () => {
+    const h = harness({ disk: '# Hello\n' })
+    h.session.load()
+    await vi.runAllTimersAsync()
+    h.session.updateFrontmatter({ private: true })
+    await vi.runAllTimersAsync()
+    expect(h.writes.at(-1)?.contents).toBe('---\nprivate: true\n---\n# Hello\n')
+
+    h.session.updateFrontmatter({ private: false })
+    await vi.runAllTimersAsync()
+    // Same contract as the pin: not-private is the absence of the flag.
+    expect(h.writes.at(-1)?.contents).toBe('# Hello\n')
+    expect(h.applied).toEqual([]) // the editor was never reloaded
+  })
+
   it('an external frontmatter-only change adopts cleanly without a conflict', async () => {
     const h = harness({ disk: `${FM}# Hello\n` })
     h.session.load()
