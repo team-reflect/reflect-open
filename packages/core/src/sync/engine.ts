@@ -138,6 +138,14 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       return running
     }
     running = (async () => {
+      // This cycle commits everything dirty so far — a pending debounce pass
+      // (e.g. queued before a launch/focus/manual sync) would only duplicate
+      // it with a no-op commit and a redundant network push.
+      if (timer !== null) {
+        clearTimeout(timer)
+        timer = null
+      }
+      deadline = null
       emit({ state: 'syncing' })
       try {
         await cycle(mode)
@@ -147,7 +155,6 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
           emit(statusForError(error))
         }
       } finally {
-        deadline = null
         running = null
         if (rerun && !stopped) {
           rerun = false

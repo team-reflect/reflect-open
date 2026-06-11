@@ -312,6 +312,27 @@ describe('createSyncEngine', () => {
     engine.stop()
   })
 
+  it('a full sync cancels a pending debounced pass instead of double-running', async () => {
+    const calls = fakeGit(defaultResponses)
+    const engine = createSyncEngine({
+      generation: 1,
+      getToken: async () => 'tok',
+      idleMs: 100,
+    })
+
+    engine.noteChanged() // schedules a debounced pass…
+    await engine.syncNow() // …which this full cycle already covers
+    await vi.runAllTimersAsync()
+
+    expect(commandsOf(calls)).toEqual([
+      'git_commit_all',
+      'git_fetch',
+      'git_merge_remote',
+      'git_push',
+    ])
+    engine.stop()
+  })
+
   it('stop() cancels pending work', async () => {
     const calls = fakeGit(defaultResponses)
     const engine = createSyncEngine({ generation: 1, getToken: async () => 'tok', idleMs: 10 })
