@@ -1,13 +1,9 @@
-import {
-  useEffect,
-  useState,
-  type ChangeEvent,
-  type ReactElement,
-} from 'react'
+import { useEffect, useState, type ReactElement } from 'react'
 import { useForm } from 'react-hook-form'
 import {
   AI_PROVIDERS,
   aiProvider,
+  aiProviderIdSchema,
   errorMessage,
   validateApiKey,
   type AiProviderId,
@@ -21,6 +17,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { InlineAlert } from '@/components/inline-alert'
 import { providerFetch } from '@/lib/provider-fetch'
 import type { NewAiModel } from '@/hooks/use-ai-models'
@@ -39,9 +42,6 @@ interface AddAiModelForm {
 }
 
 const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
-const SELECT_CLASS =
-  'w-full rounded-md border border-border bg-bg px-2.5 py-1.5 text-sm text-text ' +
-  'focus:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring'
 
 /**
  * The "Add AI model" modal: pick a provider, pick one of its models, paste an
@@ -125,36 +125,48 @@ export function AddAiModelDialog({ onAdd, onClose }: AddAiModelDialogProps): Rea
             void submit(event)
           }}
         >
-          <label className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1">
             <span className={FIELD_LABEL_CLASS}>Provider</span>
-            <select
-              className={SELECT_CLASS}
-              {...register('provider', {
-                onChange: (event: ChangeEvent<HTMLSelectElement>) => {
-                  const next = aiProvider(event.target.value as AiProviderId)
-                  setValue('model', next.models[0].id)
-                  setUnverified(false)
-                },
-              })}
+            <Select
+              value={provider.id}
+              onValueChange={(value) => {
+                const next = aiProvider(aiProviderIdSchema.parse(value))
+                setValue('provider', next.id)
+                setValue('model', next.models[0].id)
+                setUnverified(false)
+              }}
             >
-              {AI_PROVIDERS.map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>
-                  {candidate.label}
-                </option>
-              ))}
-            </select>
-          </label>
+              <SelectTrigger aria-label="Provider" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {AI_PROVIDERS.map((candidate) => (
+                  <SelectItem key={candidate.id} value={candidate.id}>
+                    {candidate.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-          <label className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1">
             <span className={FIELD_LABEL_CLASS}>Model</span>
-            <select className={SELECT_CLASS} {...register('model')}>
-              {provider.models.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.label}
-                </option>
-              ))}
-            </select>
-          </label>
+            <Select
+              value={watch('model')}
+              onValueChange={(value) => setValue('model', value)}
+            >
+              <SelectTrigger aria-label="Model" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {provider.models.map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    {model.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <label className="flex flex-col gap-1">
             <span className={FIELD_LABEL_CLASS}>API key</span>
