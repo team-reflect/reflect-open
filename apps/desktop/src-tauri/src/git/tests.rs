@@ -175,6 +175,24 @@ fn push_and_fetch_round_trip() {
 }
 
 #[test]
+fn first_sync_against_an_empty_remote_pushes() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "# A\n");
+    commit_all(root, "first", MAX_FILE_BYTES).unwrap();
+
+    // The engine's launch cycle is commit → fetch → merge → push. A brand-new
+    // backup repo has no remote branch yet; that must not error the cycle
+    // before the push that creates it (PR #96 review).
+    let delta = fetch(root, None).unwrap();
+    assert_eq!(delta.behind, 0);
+    assert!(delta.ahead >= 1, "local commits count as ahead: {delta:?}");
+    let merged = merge_remote(root).unwrap();
+    assert!(matches!(merged.kind, MergeKind::UpToDate), "{merged:?}");
+    assert!(push(root, None).unwrap().pushed);
+}
+
+#[test]
 fn non_fast_forward_push_is_rejected_as_data() {
     let fixture = fixture();
     let root_a = &fixture.graph_a;

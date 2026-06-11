@@ -125,6 +125,12 @@ export function ConnectGithubDialog({
         setError(result.status === 'denied' ? 'GitHub sign-in was denied.' : 'The code expired — try again.')
         return
       }
+      // The deadline passed while GitHub still reported the code as pending —
+      // don't leave the dialog stuck on "Waiting for GitHub…".
+      if (!pollAbort.current) {
+        setStep({ step: 'auth' })
+        setError('The code expired — try again.')
+      }
     } catch (caught: unknown) {
       setStep({ step: 'auth' })
       setError(errorMessage(caught))

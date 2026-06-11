@@ -16,7 +16,7 @@ use git2::build::CheckoutBuilder;
 use git2::{Index, IndexEntry, MergeOptions, Repository};
 use serde::Serialize;
 
-use crate::error::{AppError, AppResult};
+use crate::error::AppResult;
 
 use super::repo::{current_branch, ensure_clean_state, open_existing, signature};
 
@@ -64,9 +64,16 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
     let repo = open_existing(root)?;
     ensure_clean_state(&repo)?;
     let branch = current_branch(&repo)?;
-    let remote_oid = repo
-        .refname_to_id(&format!("refs/remotes/origin/{branch}"))
-        .map_err(|_| AppError::not_found("nothing fetched to merge (no remote branch)"))?;
+    let Ok(remote_oid) = repo.refname_to_id(&format!("refs/remotes/origin/{branch}")) else {
+        // A brand-new (empty) backup repo has no remote branch until the
+        // first push creates it. Nothing to merge is success, not an error —
+        // the launch cycle (commit → fetch → merge → push) must fall through
+        // to that push.
+        return Ok(MergeOutcome {
+            kind: MergeKind::UpToDate,
+            conflicted_paths: Vec::new(),
+        });
+    };
     let annotated = repo.find_annotated_commit(remote_oid)?;
     let (analysis, _) = repo.merge_analysis(&[&annotated])?;
 
