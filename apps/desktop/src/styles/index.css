@@ -164,6 +164,23 @@ body {
   overscroll-behavior: none;
 }
 
+/* Native desktop apps don't allow selecting arbitrary UI chrome; the WebView
+   default (user-select: auto) makes every label and sidebar item feel like a
+   webpage. Disable globally and opt in only where selection is meaningful. */
+* {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+[contenteditable],
+.reflect-editor,
+.reflect-protected-note {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 /* One keyboard-focus treatment everywhere. Zero-specificity (`:where`) so any
    component rule below — the editor's `outline: none`, the palette input —
    can still opt out. */
