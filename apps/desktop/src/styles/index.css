@@ -166,19 +166,23 @@ body {
 
 /* Native desktop apps don't allow selecting arbitrary UI chrome; the WebView
    default (user-select: auto) makes every label and sidebar item feel like a
-   webpage. Disable globally and opt in only where selection is meaningful. */
-* {
-  -webkit-user-select: none;
-  user-select: none;
-}
+   webpage. Disable globally and opt in only where selection is meaningful.
+   Placed in @layer base so Tailwind's select-* utilities (select-text,
+   select-all, select-none) in @layer utilities can override per-element. */
+@layer base {
+  * {
+    -webkit-user-select: none;
+    user-select: none;
+  }
 
-input,
-textarea,
-[contenteditable],
-.reflect-editor,
-.reflect-protected-note {
-  -webkit-user-select: text;
-  user-select: text;
+  input,
+  textarea,
+  [contenteditable],
+  .reflect-editor,
+  .reflect-protected-note {
+    -webkit-user-select: text;
+    user-select: text;
+  }
 }
 
 /* One keyboard-focus treatment everywhere. Zero-specificity (`:where`) so any
