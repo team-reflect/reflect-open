@@ -8,9 +8,10 @@ import { SettingsField } from './field'
 /**
  * The recovery lever for the local index: a one-click full rebuild from the
  * markdown files (the same action as the palette's "Rebuild search index").
- * Progress and failures surface through the operations status UI; the button
- * itself only holds the in-flight state so a second click can't start an
- * overlapping rebuild.
+ * Progress and failures surface through the operations status UI. The local
+ * in-flight state only drives the label and disabled treatment —
+ * rebuildIndexVisibly itself coalesces overlapping requests, including races
+ * with the palette command.
  */
 export function RebuildIndexField(): ReactElement {
   const { indexGeneration } = useGraph()

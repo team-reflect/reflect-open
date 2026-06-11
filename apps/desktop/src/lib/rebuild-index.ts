@@ -3,6 +3,8 @@ import { startOperation } from '@/lib/operations'
 import { invalidateIndexQueries } from '@/lib/query-client'
 import { backfillEmbeddingsVisibly } from '@/lib/semantic'
 
+let inFlight: { generation: number; promise: Promise<void> } | null = null
+
 /**
  * Full index rebuild with user-visible status: wipe and re-derive the SQLite
  * projection from the markdown files, refresh the query caches, and re-embed
@@ -10,8 +12,27 @@ import { backfillEmbeddingsVisibly } from '@/lib/semantic'
  * the settings page's Rebuild index button so the whole recipe stays one
  * definition. The index is a rebuildable cache — a full rebuild is always
  * safe and never touches the notes themselves.
+ *
+ * Requests coalesce while a rebuild runs: a second call at the same
+ * generation (a double-click, or the palette and the settings button racing)
+ * returns the in-flight pass instead of starting an overlapping wipe. A call
+ * at a *different* generation starts fresh — the graph changed, and Rust's
+ * generation gate drops the superseded pass's writes anyway.
  */
-export async function rebuildIndexVisibly(generation: number): Promise<void> {
+export function rebuildIndexVisibly(generation: number): Promise<void> {
+  if (inFlight !== null && inFlight.generation === generation) {
+    return inFlight.promise
+  }
+  const promise = runRebuild(generation).finally(() => {
+    if (inFlight !== null && inFlight.promise === promise) {
+      inFlight = null
+    }
+  })
+  inFlight = { generation, promise }
+  return promise
+}
+
+async function runRebuild(generation: number): Promise<void> {
   const operation = startOperation('Rebuilding search index')
   try {
     await rebuildIndex({ generation })
