@@ -154,6 +154,16 @@ body,
   height: 100%;
 }
 
+/* The app frame (AppShell) never scrolls — every route mounts its own scroll
+   container — so the document scroller must never engage. Without this,
+   reaching an inner pane's scroll boundary chains the gesture up to <body>
+   and WKWebView elastically bounces the entire window (macOS rubber-banding). */
+html,
+body {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 /* One keyboard-focus treatment everywhere. Zero-specificity (`:where`) so any
    component rule below — the editor's `outline: none`, the palette input —
    can still opt out. */

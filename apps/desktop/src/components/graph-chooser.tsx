@@ -11,8 +11,11 @@ export function GraphChooser(): ReactElement {
   const { recents, error, pickAndOpen, openRecent, forget } = useGraph()
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-surface-app p-8">
-      <div className="w-full max-w-sm space-y-6">
+    <div className="flex h-screen w-screen overflow-auto bg-surface-app p-8">
+      {/* Auto margins (not items-center) so the card centers when it fits but
+          scrolls from the top when the recents list outgrows the viewport —
+          flex centering would clip the overflowing top edge. */}
+      <div className="m-auto w-full max-w-sm space-y-6">
         <div className="space-y-1 text-center">
           <h1 className="text-xl font-semibold text-text">Open a graph</h1>
           <p className="text-sm text-text-secondary">
