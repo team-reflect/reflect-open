@@ -1,0 +1,4 @@
+---
+aliases: nope
+---
+# Bad Aliases

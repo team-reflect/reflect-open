@@ -12,7 +12,8 @@
     "lint": "oxlint apps packages",
     "lint:fix": "oxlint --fix apps packages",
     "check": "pnpm typecheck && pnpm lint",
-    "tauri": "pnpm --filter @reflect/desktop tauri"
+    "tauri": "pnpm --filter @reflect/desktop tauri",
+    "release:macos": "pnpm --filter @reflect/desktop release:macos"
   },
   "devDependencies": {
     "oxlint": "^1.69.0",

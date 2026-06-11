@@ -29,6 +29,13 @@ interface DailyStreamProps {
 const STREAM_GUTTER = 'reflect-stream-gutter'
 
 /**
+ * The size guess for unmounted rows — also the unit for the mount-time anchor
+ * offset, so `initialOffset` lands exactly where `scrollToIndex` would before
+ * any row has been measured.
+ */
+export const ESTIMATED_DAY_HEIGHT = 220
+
+/**
  * Compensate the scroll position whenever a row **above** the viewport changes
  * size, unconditionally. Days mount as a short loading placeholder and grow
  * when their note arrives, so every load above the anchor would otherwise push
@@ -63,12 +70,29 @@ export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
   const today = useToday()
   const { settings } = useSettings()
 
+  // targetDate is read at arrival time, not reacted to: on the `today` route
+  // it drifts when local midnight passes (`todayIso()` per render), and that
+  // drift is not a navigation — re-running the anchor effect then would
+  // misread the entry's continuously-saved offset as a back/forward restore.
+  // The next real arrival (⌘D, a link) reads the fresh value and anchors to
+  // the new today.
+  const targetDateRef = useRef(targetDate)
+  targetDateRef.current = targetDate
+
   const virtualizer = useVirtualizer({
     count: dayWindow.count,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => 220,
+    estimateSize: () => ESTIMATED_DAY_HEIGHT,
     overscan: 2,
     paddingEnd: 240,
+    // The mount-time anchor. The virtualizer applies this to the scroll
+    // element inside its own layout effect — before first paint — so the
+    // stream never paints the top of the window and then visibly lurches
+    // down to the target day (the anchor effect below runs post-paint). A
+    // remount of an entry the user navigated back to restores its saved
+    // offset the same jump-free way.
+    initialOffset: () =>
+      savedScroll() ?? indexOfDate(dayWindow, targetDateRef.current) * ESTIMATED_DAY_HEIGHT,
   })
   // An instance field, not an option — reassigning every render is idempotent.
   virtualizer.shouldAdjustScrollPositionOnItemSizeChange = adjustScrollForResizeAboveViewport
@@ -83,19 +107,14 @@ export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
     focusPending.current = null
   }, [])
 
-  // targetDate is read at arrival time, not reacted to: on the `today` route
-  // it drifts when local midnight passes (`todayIso()` per render), and that
-  // drift is not a navigation — re-running the effect then would misread the
-  // entry's continuously-saved offset as a back/forward restore. The next real
-  // arrival (⌘D, a link) reads the fresh value and anchors to the new today.
-  const targetDateRef = useRef(targetDate)
-  targetDateRef.current = targetDate
-
   // Re-anchor on every explicit arrival (`arrivalSeq` bumps even when ⌘D is
   // pressed while already on today — the router clears the entry's saved
   // offset for that case; `entryId` covers back/forward between entries whose
   // routes resolve to the same day). A back/forward-restored entry carries its
-  // offset; a fresh navigation anchors to the target day.
+  // offset; a fresh navigation anchors to the target day. On mount this lands
+  // where `initialOffset` already put the viewport — but `scrollToIndex` also
+  // installs the virtualizer's index-pinning reconcile, which keeps the target
+  // day at the viewport top while the surrounding rows measure in.
   useEffect(() => {
     const restored = savedScroll()
     if (restored !== null) {

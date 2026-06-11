@@ -49,7 +49,7 @@ export function BacklinkSourceGroup({
         <button
           type="button"
           onClick={() => onOpen(source.path)}
-          className="min-w-0 cursor-pointer truncate text-left text-sm text-accent"
+          className="min-w-0 cursor-pointer truncate text-left text-xs text-accent"
         >
           {source.title}
         </button>
@@ -73,7 +73,7 @@ export function BacklinkSourceGroup({
       {expanded ? (
         <div className="mt-1 space-y-1">
           {source.snippets.map((snippet) => (
-            <p key={snippet.key} className="select-text text-sm text-text">
+            <p key={snippet.key} className="select-text text-xs text-text">
               {snippet.text}
             </p>
           ))}

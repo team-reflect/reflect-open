@@ -240,6 +240,23 @@ body {
   letter-spacing: var(--tracking-snug, -0.01em);
 }
 
+/* NotePane's loading placeholder: hold the editor's reserved space silently,
+   revealing the hint text only when a load is genuinely slow. Local note
+   reads resolve in milliseconds, and "Loading note…" flashing on every
+   daily-stream row reads as flicker while the stream anchors. Opacity only —
+   the placeholder must keep its layout size either way. */
+.reflect-note-loading {
+  opacity: 0;
+  animation: reflect-note-loading-reveal var(--duration-slow, 300ms)
+    var(--ease-standard, ease) 400ms forwards;
+}
+
+@keyframes reflect-note-loading-reveal {
+  to {
+    opacity: 1;
+  }
+}
+
 .reflect-editor p {
   margin: 0.4em 0;
 }

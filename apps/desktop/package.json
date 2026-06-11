@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "sidecar": "node scripts/build-sidecar.mjs",
+    "release:macos": "node scripts/release-macos.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "tauri": "tauri"

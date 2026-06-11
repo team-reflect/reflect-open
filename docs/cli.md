@@ -140,8 +140,11 @@ work around it by reading graph files directly unless the user asked for that.
 - The CLI deliberately duplicates a thin read-side contract from
   `@reflect/core` (path conventions, fold keys, frontmatter coercions, title
   derivation, SHA-256 hashing, FTS match syntax). Each Rust module names its
-  TS counterpart and carries parity tests with shared expected values — keep
-  both sides in lockstep, and don't grow the surface.
+  TS counterpart, and the contract is pinned by the shared parity corpus in
+  [`fixtures/parity/`](../fixtures/parity/README.md): TS generates
+  `expected.json` from the real core pipeline, the Rust tests assert against
+  it, so neither side can change without the other following in the same PR.
+  Don't grow the surface.
 - The sidecar is staged by `apps/desktop/scripts/build-sidecar.mjs` into
   `apps/desktop/src-tauri/binaries/` (gitignored), which Tauri's
   `bundle.externalBin` (desktop platform overlay configs) picks up. tauri-build

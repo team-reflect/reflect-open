@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "reflect-open",
+  "productName": "Reflect",
   "version": "0.1.0",
-  "identifier": "com.alex.reflect-open",
+  "identifier": "app.reflect.desktop",
   "build": {
     "beforeDevCommand": "pnpm sidecar && pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "reflect-open",
+        "title": "Reflect",
         "width": 1300,
         "height": 650,
         "titleBarStyle": "Overlay",

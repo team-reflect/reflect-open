@@ -1,0 +1,3 @@
+# Fixture bytes are the contract — never let git rewrite line endings
+# (crlf.md deliberately carries \r\n).
+*.md -text
