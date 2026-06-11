@@ -175,6 +175,25 @@ describe('getGithubToken', () => {
     expect(await getGithubToken(fetchFn, () => 2_000)).toBeNull()
   })
 
+  it('refreshes with the client id that obtained the token', async () => {
+    fakeKeychain({
+      'github-auth': JSON.stringify({
+        kind: 'app',
+        accessToken: 'ghu_old',
+        refreshToken: 'ghr_live',
+        expiresAt: 1_000,
+        clientId: 'fork-app',
+      }),
+    })
+    const bodies: Array<Record<string, unknown>> = []
+    const fetchFn = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>)
+      return jsonResponse({ access_token: 'ghu_new', refresh_token: 'ghr_new', expires_in: 28800 })
+    })
+    await getGithubToken(fetchFn, () => 2_000)
+    expect(bodies[0].client_id).toBe('fork-app')
+  })
+
   it('surfaces a transient refresh failure as retryable, not as disconnected', async () => {
     fakeKeychain({
       'github-auth': JSON.stringify({
@@ -262,6 +281,21 @@ describe('runDeviceFlow', () => {
       kind: 'pat',
       token: 'ghp_done',
     })
+  })
+
+  it('persists a non-default client id with app credentials', async () => {
+    const store = fakeKeychain()
+    await runDeviceFlow({
+      clientId: 'test-app',
+      fetchFn: scriptedFetch([
+        { access_token: 'ghu_t', refresh_token: 'ghr_r', expires_in: 28800 },
+      ]),
+      onCode: () => {},
+      sleep: async () => {},
+      now: () => 0,
+    })
+    const saved = JSON.parse(store.get('github-auth') ?? '{}') as { clientId?: string }
+    expect(saved.clientId).toBe('test-app')
   })
 
   it('throws an auth error when the user denies', async () => {

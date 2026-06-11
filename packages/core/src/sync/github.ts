@@ -43,6 +43,12 @@ export const githubAuthSchema = z.discriminatedUnion('kind', [
     refreshToken: z.string(),
     /** Epoch ms when `accessToken` expires. */
     expiresAt: z.number(),
+    /**
+     * The client id that obtained the token, when it wasn't the built-in
+     * {@link GITHUB_APP_CLIENT_ID} (e.g. an OSS fork's own app). Refreshes
+     * must use the same id the token was minted with.
+     */
+    clientId: z.string().optional(),
   }),
 ])
 export type GithubAuth = z.infer<typeof githubAuthSchema>
@@ -165,7 +171,7 @@ export async function deviceFlowPoll(
   if (parsed.access_token === undefined) {
     throw new Error('GitHub device flow returned neither a token nor an error')
   }
-  return { status: 'authorized', auth: toAuth(parsed.access_token, parsed, now()) }
+  return { status: 'authorized', auth: toAuth(parsed.access_token, parsed, now(), clientId) }
 }
 
 export interface RunDeviceFlowOptions {
@@ -232,6 +238,7 @@ function toAuth(
   accessToken: string,
   parsed: { refresh_token?: string; expires_in?: number },
   nowMs: number,
+  clientId: string = GITHUB_APP_CLIENT_ID,
 ): GithubAuth {
   // Apps with expiring user tokens return a refresh pair; apps with expiry
   // disabled return a plain long-lived token (same handling as a PAT).
@@ -241,6 +248,9 @@ function toAuth(
       accessToken,
       refreshToken: parsed.refresh_token,
       expiresAt: nowMs + parsed.expires_in * 1000,
+      // Persist a non-default id with the credential: the refresh must use
+      // the same client the token was minted with.
+      clientId: clientId === GITHUB_APP_CLIENT_ID ? undefined : clientId,
     }
   }
   return { kind: 'pat', token: accessToken }
@@ -258,11 +268,14 @@ export async function refreshGithubAuth(
   fetchFn: FetchFn = fetch,
   now: () => number = Date.now,
 ): Promise<GithubAuth | null> {
+  // Refresh against the client that minted the token (a fork's own app id
+  // is persisted with the credential; ours is the built-in default).
+  const clientId = auth.clientId ?? GITHUB_APP_CLIENT_ID
   const response = await fetchFn('https://github.com/login/oauth/access_token', {
     method: 'POST',
     headers: JSON_HEADERS,
     body: JSON.stringify({
-      client_id: GITHUB_APP_CLIENT_ID,
+      client_id: clientId,
       grant_type: 'refresh_token',
       refresh_token: auth.refreshToken,
     }),
@@ -272,7 +285,7 @@ export async function refreshGithubAuth(
   }
   const parsed = tokenResponseSchema.parse(await response.json())
   if (parsed.access_token !== undefined) {
-    return toAuth(parsed.access_token, parsed, now())
+    return toAuth(parsed.access_token, parsed, now(), clientId)
   }
   if (parsed.error === 'bad_refresh_token') {
     return null

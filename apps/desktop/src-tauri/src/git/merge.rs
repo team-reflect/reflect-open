@@ -328,11 +328,46 @@ fn write_blob(repo: &Repository, root: &Path, rel: &str, id: git2::Oid) -> AppRe
 }
 
 /// `assets/img.png` → `assets/img (conflict).png`; no extension → appended.
+/// Splits on the basename only — a dot in a *directory* name (`assets.v1/x`)
+/// must not relocate the copy out of the file's directory.
 fn conflict_copy_path(rel: &str) -> String {
-    match rel.rsplit_once('.') {
-        Some((stem, ext)) if !stem.is_empty() && !stem.ends_with('/') => {
-            format!("{stem} (conflict).{ext}")
-        }
-        _ => format!("{rel} (conflict)"),
+    let (dir, file) = match rel.rsplit_once('/') {
+        Some((dir, file)) => (Some(dir), file),
+        None => (None, rel),
+    };
+    let renamed = match file.rsplit_once('.') {
+        Some((stem, ext)) if !stem.is_empty() => format!("{stem} (conflict).{ext}"),
+        _ => format!("{file} (conflict)"),
+    };
+    match dir {
+        Some(dir) => format!("{dir}/{renamed}"),
+        None => renamed,
+    }
+}
+
+#[cfg(test)]
+mod path_tests {
+    use super::conflict_copy_path;
+
+    #[test]
+    fn conflict_copies_stay_in_their_directory() {
+        assert_eq!(
+            conflict_copy_path("assets/img.png"),
+            "assets/img (conflict).png"
+        );
+        assert_eq!(
+            conflict_copy_path("assets.v1/img"),
+            "assets.v1/img (conflict)"
+        );
+        assert_eq!(
+            conflict_copy_path("assets.v1/img.png"),
+            "assets.v1/img (conflict).png"
+        );
+        assert_eq!(conflict_copy_path("topfile.bin"), "topfile (conflict).bin");
+        assert_eq!(conflict_copy_path("noext"), "noext (conflict)");
+        assert_eq!(
+            conflict_copy_path("assets/.hidden"),
+            "assets/.hidden (conflict)"
+        );
     }
 }

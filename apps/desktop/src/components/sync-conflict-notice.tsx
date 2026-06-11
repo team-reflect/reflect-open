@@ -58,20 +58,26 @@ export function SyncConflictNotice({ path, className }: SyncConflictNoticeProps)
     }
     setBusy(true)
     setError(null)
+    let wrote = false
     try {
       const source = await readNote(path)
       const resolved = resolveConflictMarkers(source, keep)
       await writeNote(path, resolved, writeGeneration)
+      wrote = true
       if (indexGeneration !== null) {
         await indexNote(path, { generation: indexGeneration, content: resolved })
       }
-      // Reload the open (protected) session from disk — it round-trips again
-      // now, so it reopens editable — and refresh index-backed views.
-      emitFileChanges([{ path, kind: 'upsert' }])
-      invalidateIndexQueries()
     } catch (caught: unknown) {
       setError(errorMessage(caught))
     } finally {
+      if (wrote) {
+        // The file changed on disk even if the reindex step failed (the
+        // watcher will redo that) — reload the open (protected) session,
+        // which round-trips again now and reopens editable, and refresh
+        // index-backed views.
+        emitFileChanges([{ path, kind: 'upsert' }])
+        invalidateIndexQueries()
+      }
       setBusy(false)
     }
   }

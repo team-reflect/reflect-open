@@ -240,7 +240,10 @@ export function createBackupController(options: BackupControllerOptions): Backup
     connectNewRepo: async (name) => {
       const token = await requireToken()
       const repo = await createGithubRepo(token, name, { isPrivate: true, fetchFn: providerFetch })
-      const [owner, repoName] = repo.fullName.split('/')
+      const [owner, repoName, ...rest] = repo.fullName.split('/')
+      if (owner === undefined || repoName === undefined || rest.length > 0) {
+        throw new ReflectError('parse', `unexpected repository name from GitHub: ${repo.fullName}`)
+      }
       // Align with the account's default branch for new repos so the first
       // push creates the branch GitHub already considers the default.
       await connectRemote(githubRemoteUrl({ owner, name: repoName }), repo.defaultBranch)

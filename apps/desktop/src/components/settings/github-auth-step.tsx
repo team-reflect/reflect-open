@@ -88,8 +88,14 @@ export function GithubAuthStep({ onAuthed }: GithubAuthStepProps): ReactElement 
       return
     }
     setError(null)
-    await saveGithubAuth({ kind: 'pat', token })
-    onAuthed()
+    try {
+      await saveGithubAuth({ kind: 'pat', token })
+      onAuthed()
+    } catch (caught: unknown) {
+      // Keychain writes can fail (locked keychain, denied access) — surface
+      // it here instead of an unhandled rejection.
+      setError(errorMessage(caught))
+    }
   }
 
   return (
