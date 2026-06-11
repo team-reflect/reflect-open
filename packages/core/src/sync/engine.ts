@@ -27,27 +27,56 @@ import {
  *   runs — teardown/disconnect must not keep pushing with a stale token).
  */
 
-/** The product states. `offline` = unreachable remote, changes queued locally. */
-export interface SyncStatus {
-  state: 'idle' | 'syncing' | 'offline' | 'error'
-  /** Human-readable detail for `offline`/`error`. */
-  message?: string
-  /** What kind of error (drives the UI affordance: reconnect vs. show). */
-  errorKind?: 'auth' | 'rejected' | 'other'
+/**
+ * Why an `error` status happened, which drives the UI affordance:
+ * `auth` = credential rejected or refresh lapsed (offer reconnect);
+ * `rejected` = the remote refused the push for a non-divergence reason, e.g.
+ * push protection (show the message — retrying won't help until the user
+ * acts); `other` = anything else (retried implicitly on the next cycle).
+ */
+export type SyncErrorKind = 'auth' | 'rejected' | 'other'
+
+/**
+ * The product states, as a discriminated union — `{ state: 'idle',
+ * errorKind: … }` is unrepresentable. `offline` means the remote was
+ * unreachable; changes stay committed locally and the next cycle (online
+ * event, focus, or edit) retries.
+ */
+export type SyncStatus =
+  | { state: 'idle' }
+  | { state: 'syncing' }
+  | { state: 'offline'; message: string }
+  | { state: 'error'; errorKind: SyncErrorKind; message: string }
+
+/** Narrows to the `error` arm — the one state that needs user attention. */
+export function isSyncError(status: SyncStatus): status is Extract<SyncStatus, { state: 'error' }> {
+  return status.state === 'error'
 }
 
 export interface SyncEngineOptions {
-  /** The graph generation every git command is pinned to. */
+  /**
+   * The open graph's generation (see `root_for_generation` on the Rust
+   * side): every git command this engine issues is pinned to it, so a
+   * command that lands after the user switches graphs fails instead of
+   * touching the wrong repository. The engine never refreshes it — the
+   * owner (the backup controller) builds a new engine per graph session.
+   */
   generation: number
   /** Resolves the remote credential; `null` = none connected (auth error). */
   getToken: () => Promise<string | null>
+  /**
+   * Observes every product-state transition. Called synchronously; never
+   * called again after `stop()`.
+   */
   onStatus?: (status: SyncStatus) => void
   /** Surfaced when the size guardrail withholds files from backup. */
   onLargeFilesSkipped?: (files: SkippedFile[]) => void
   /**
    * Files a pull's merge changed on disk. The caller reindexes them directly:
    * pull-applied writes must reach the index even when the file watcher isn't
-   * up yet (the launch pull can race the watcher start).
+   * up yet (the launch pull can race the watcher start). Called synchronously
+   * mid-cycle and not awaited — kick off async work, don't block on it. A
+   * throw here fails the cycle and surfaces as an `error` status.
    */
   onRemoteChanges?: (changes: ChangedFile[]) => void
   /** Quiet period after the last edit before a backup commit. */
@@ -81,6 +110,13 @@ const MAX_PUSH_ATTEMPTS = 3
 /** A push the remote refused for a non-divergence reason (e.g. push protection). */
 class PushRejectedError extends Error {}
 
+/**
+ * Build a sync engine for one graph session. The engine starts idle and does
+ * nothing until `noteChanged()` (debounced commit→push) or `syncNow()` (full
+ * commit→pull/merge→push) is called; all output flows through the
+ * {@link SyncEngineOptions} callbacks. `stop()` is terminal — build a new
+ * engine to resume.
+ */
 export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   const idleMs = options.idleMs ?? DEFAULT_IDLE_MS
   const maxWaitMs = options.maxWaitMs ?? DEFAULT_MAX_WAIT_MS

@@ -479,6 +479,152 @@ fn binary_conflict_keeps_both_copies() {
 }
 
 #[test]
+fn detached_head_is_a_typed_error_not_a_panic() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+    write(root, "notes/a.md", "# A\n");
+    commit_all(root, "base", MAX_FILE_BYTES).unwrap();
+    {
+        let repo = Repository::open(root).unwrap();
+        let oid = repo.head().unwrap().target().unwrap();
+        repo.set_head_detached(oid).unwrap();
+    }
+
+    let err = merge_remote(root).unwrap_err();
+    let crate::error::AppError::Io { message } = err else {
+        panic!("expected an Io error, got {err:?}");
+    };
+    assert!(message.contains("detached HEAD"), "{message}");
+    assert!(matches!(
+        push(root, None).unwrap_err(),
+        crate::error::AppError::Io { .. }
+    ));
+}
+
+#[test]
+fn merging_into_an_unborn_repo_adopts_the_remote_history() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/a.md", "# A\n");
+    commit_all(root_a, "seed", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    // A fresh graph with no commits yet (unborn HEAD) connects to an existing
+    // backup; the merge must adopt the remote history, not error on the
+    // missing local branch.
+    let root = fixture._dir.path().join("fresh");
+    scaffold_graph(&root);
+    setup(&root, Some(fixture.remote_url.clone()), None).unwrap();
+    fetch(&root, None).unwrap();
+
+    let merged = merge_remote(&root).unwrap();
+    assert!(matches!(merged.kind, MergeKind::FastForward), "{merged:?}");
+    assert_eq!(read(&root, "notes/a.md"), "# A\n");
+    let upsert = merged
+        .changed_files
+        .iter()
+        .find(|change| change.path == "notes/a.md")
+        .expect("the adopted file is reported for reindexing");
+    assert!(upsert.modified_ms.is_some(), "{merged:?}");
+    assert!(head_tree_paths(&root).contains(&"notes/a.md".to_string()));
+}
+
+#[test]
+fn rename_rename_conflict_keeps_both_names_and_confirms_the_removal() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(
+        root_a,
+        "notes/orig.md",
+        "# Original\n\nshared content that travels with the rename\n",
+    );
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    fs::rename(
+        root_b.join("notes/orig.md"),
+        root_b.join("notes/renamed-b.md"),
+    )
+    .unwrap();
+    commit_all(&root_b, "b rename", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    fs::rename(
+        root_a.join("notes/orig.md"),
+        root_a.join("notes/renamed-a.md"),
+    )
+    .unwrap();
+    commit_all(root_a, "a rename", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+
+    // Rename detection turns this into three conflict groups: ours-only
+    // (renamed-a), theirs-only (renamed-b), and ancestor-only (orig — gone on
+    // both sides). The last one must be cleared from the index or the merge
+    // tree could not be written at all.
+    let merged = merge_remote(root_a).unwrap();
+    assert!(
+        matches!(merged.kind, MergeKind::MergedWithConflicts),
+        "{merged:?}"
+    );
+
+    let paths = head_tree_paths(root_a);
+    assert!(
+        paths.contains(&"notes/renamed-a.md".to_string()),
+        "{paths:?}"
+    );
+    assert!(
+        paths.contains(&"notes/renamed-b.md".to_string()),
+        "{paths:?}"
+    );
+    assert!(!paths.contains(&"notes/orig.md".to_string()), "{paths:?}");
+    let repo = Repository::open(root_a).unwrap();
+    assert_eq!(repo.state(), git2::RepositoryState::Clean);
+}
+
+#[cfg(unix)]
+#[test]
+fn failed_merge_completion_still_clears_the_merge_state() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/keep.md", "# Keep\n\noriginal\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/keep.md", "# Keep\n\nedited on b\n");
+    commit_all(&root_b, "b edit", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    fs::remove_file(root_a.join("notes/keep.md")).unwrap();
+    commit_all(root_a, "a delete", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+
+    // Make restoring the surviving edit fail mid-completion: the notes
+    // directory refuses new files, so write_blob cannot recreate keep.md.
+    let notes_dir = root_a.join("notes");
+    fs::set_permissions(&notes_dir, fs::Permissions::from_mode(0o555)).unwrap();
+    let result = merge_remote(root_a);
+    fs::set_permissions(&notes_dir, fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(result.is_err(), "{result:?}");
+
+    // The contract: a failed merge never wedges the repo mid-merge…
+    let repo = Repository::open(root_a).unwrap();
+    assert_eq!(repo.state(), git2::RepositoryState::Clean);
+    drop(repo);
+
+    // …and the next cycle recovers on its own.
+    let merged = merge_remote(root_a).unwrap();
+    assert!(
+        matches!(merged.kind, MergeKind::MergedWithConflicts),
+        "{merged:?}"
+    );
+    assert_eq!(read(root_a, "notes/keep.md"), "# Keep\n\nedited on b\n");
+}
+
+#[test]
 fn fetch_without_remote_is_a_typed_error() {
     let dir = tempdir().unwrap();
     let root = dir.path().join("graph");

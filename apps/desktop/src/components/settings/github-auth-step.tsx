@@ -1,38 +1,29 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react'
+import { useEffect, useState, type ReactElement } from 'react'
 import { openUrl } from '@tauri-apps/plugin-opener'
-import {
-  errorMessage,
-  isDeviceFlowConfigured,
-  loadGithubAuth,
-  runDeviceFlow,
-  saveGithubAuth,
-} from '@reflect/core'
+import { isDeviceFlowConfigured, loadGithubAuth, saveGithubAuth } from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { providerFetch } from '@/lib/provider-fetch'
+import { useAsyncAction } from '@/hooks/use-async-action'
+import { useDeviceFlowAuth } from '@/hooks/use-device-flow-auth'
 
 interface GithubAuthStepProps {
   /** Fired once a credential is stored (or one already was). */
   onAuthed: () => void
 }
 
-type View = { view: 'choose' } | { view: 'device'; userCode: string; verificationUri: string }
-
 const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
 
 /**
  * The shared "sign in to GitHub" step (connect + restore dialogs): the guided
  * device flow when the GitHub App is registered, fine-grained-PAT entry
- * otherwise. The polling loop itself is core's `runDeviceFlow` — this
- * component only renders its states and aborts it on unmount.
+ * otherwise. All the machinery lives in hooks ({@link useDeviceFlowAuth},
+ * {@link useAsyncAction}) — this component only renders their states.
  */
 export function GithubAuthStep({ onAuthed }: GithubAuthStepProps): ReactElement {
-  const [view, setView] = useState<View>({ view: 'choose' })
+  const deviceFlow = useDeviceFlowAuth()
+  const pat = useAsyncAction()
   const [patValue, setPatValue] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const abortRef = useRef(new AbortController())
 
   // Already signed in (e.g. connecting a second graph) → skip the step.
   useEffect(() => {
@@ -49,60 +40,34 @@ export function GithubAuthStep({ onAuthed }: GithubAuthStepProps): ReactElement 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => {
-    const abort = abortRef.current
-    return () => {
-      abort.abort() // closing the dialog stops the device-flow polling
-    }
-  }, [])
-
-  async function signInWithDeviceFlow(): Promise<void> {
-    setError(null)
-    setBusy(true)
-    try {
-      const auth = await runDeviceFlow({
-        fetchFn: providerFetch,
-        signal: abortRef.current.signal,
-        onCode: (code) => {
-          setView({ view: 'device', userCode: code.userCode, verificationUri: code.verificationUri })
-          void openUrl(code.verificationUri).catch(() => {
-            // The URI is shown in the dialog; failing to auto-open is cosmetic.
-          })
-        },
-      })
-      if (auth !== null) {
-        onAuthed()
-      }
-    } catch (caught: unknown) {
-      setView({ view: 'choose' })
-      setError(errorMessage(caught))
-    } finally {
-      setBusy(false)
+  async function signIn(): Promise<void> {
+    if (await deviceFlow.signIn()) {
+      onAuthed()
     }
   }
 
   async function savePat(): Promise<void> {
     const token = patValue.trim()
     if (token.length === 0) {
-      setError('Paste a token first.')
+      pat.setError('Paste a token first.')
       return
     }
-    setError(null)
-    try {
+    // Keychain writes can fail (locked keychain, denied access) — the action
+    // envelope surfaces it inline instead of an unhandled rejection.
+    await pat.run(async () => {
       await saveGithubAuth({ kind: 'pat', token })
       onAuthed()
-    } catch (caught: unknown) {
-      // Keychain writes can fail (locked keychain, denied access) — surface
-      // it here instead of an unhandled rejection.
-      setError(errorMessage(caught))
-    }
+    })
   }
+
+  const error = deviceFlow.error ?? pat.error
+  const flowView = deviceFlow.view
 
   return (
     <div className="flex flex-col gap-3">
-      {view.view === 'choose' ? (
+      {flowView.view === 'idle' ? (
         isDeviceFlowConfigured() ? (
-          <Button onClick={() => void signInWithDeviceFlow()} disabled={busy} size="sm">
+          <Button onClick={() => void signIn()} disabled={deviceFlow.busy} size="sm">
             Sign in with GitHub
           </Button>
         ) : (
@@ -123,7 +88,7 @@ export function GithubAuthStep({ onAuthed }: GithubAuthStepProps): ReactElement 
                 placeholder="github_pat_…"
               />
             </label>
-            <Button onClick={() => void savePat()} disabled={busy} size="sm">
+            <Button onClick={() => void savePat()} disabled={pat.pending} size="sm">
               Save token
             </Button>
           </>
@@ -135,14 +100,14 @@ export function GithubAuthStep({ onAuthed }: GithubAuthStepProps): ReactElement 
             <button
               type="button"
               className="underline"
-              onClick={() => void openUrl(view.verificationUri)}
+              onClick={() => void openUrl(flowView.verificationUri)}
             >
-              {view.verificationUri}
+              {flowView.verificationUri}
             </button>
             :
           </p>
           <p className="text-center font-mono text-xl tracking-[0.3em] text-text">
-            {view.userCode}
+            {flowView.userCode}
           </p>
           <p className="text-center text-xs text-text-muted">Waiting for GitHub…</p>
         </div>

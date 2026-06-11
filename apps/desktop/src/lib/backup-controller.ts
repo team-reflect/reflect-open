@@ -151,7 +151,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
     }
     setState({ phase: 'loading' })
     try {
-      const [status, auth] = await Promise.all([gitStatus(), loadGithubAuth()])
+      const [status, auth] = await Promise.all([gitStatus(generation), loadGithubAuth()])
       if (disposed) {
         return
       }

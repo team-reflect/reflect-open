@@ -7,8 +7,13 @@
 //! callback (never embedded in the URL, so never on disk).
 //!
 //! All operations run on blocking threads (network fetches/pushes take
-//! seconds) and are generation-gated like file writes: a command issued for
-//! one graph must never act on another after a switch.
+//! seconds) and are **generation-gated** like file writes: every command takes
+//! the `generation` the frontend received when its graph was opened and
+//! resolves the root through `crate::fs::root_for_generation`, which fails
+//! when the active graph's generation has since moved (the user switched
+//! graphs after the command was issued). A stale command errors loudly instead
+//! of acting on the new graph, so commands never interleave across graphs.
+//! The one exception is `git_clone`, which runs before any graph is open.
 
 mod commit;
 mod merge;
@@ -44,7 +49,9 @@ pub struct GitStatus {
     /// Commits ahead/behind the last-fetched remote branch (no network).
     pub ahead: usize,
     pub behind: usize,
-    /// A merge/rebase the user started outside Reflect is in progress.
+    /// The repository state is not `Clean` — a merge/rebase the user started
+    /// outside Reflect (e.g. via the git CLI) is in progress. Sync refuses to
+    /// run until it is finished or aborted.
     pub in_progress: bool,
 }
 
@@ -120,8 +127,8 @@ where
 
 /// Snapshot the backup repository (cheap, no network).
 #[tauri::command]
-pub async fn git_status(state: State<'_, GraphState>) -> AppResult<GitStatus> {
-    let root = crate::fs::current_root(&state)?;
+pub async fn git_status(generation: u64, state: State<'_, GraphState>) -> AppResult<GitStatus> {
+    let root = crate::fs::root_for_generation(&state, generation)?;
     run_blocking(move || status(&root)).await
 }
 

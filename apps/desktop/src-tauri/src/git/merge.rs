@@ -8,6 +8,16 @@
 //! file, and the raw versions stay recoverable from history (the merge commit
 //! has both parents). The indexer (Plan 12 core) detects the markers and flags
 //! the note `Needs review`.
+//!
+//! The markers are standard Git, with product labels instead of branch names:
+//!
+//! ```text
+//! <<<<<<< this device
+//! the local version
+//! =======
+//! the other device's version
+//! >>>>>>> other device
+//! ```
 
 use std::fs;
 use std::path::Path;
@@ -65,6 +75,8 @@ pub struct MergeOutcome {
     /// Every file this merge changed on disk. The sync layer reindexes these
     /// directly — pulls must not depend on the file watcher being up (on
     /// launch it may not be yet) to keep the index in step with the notes.
+    /// Deletions carry `modified_ms: None`; upserts carry the written file's
+    /// real mtime.
     pub changed_files: Vec<ChangedFile>,
 }
 
@@ -278,34 +290,10 @@ fn resolve_conflicts(repo: &Repository, root: &Path, index: &mut Index) -> AppRe
     for conflict in conflicts {
         match (conflict.our, conflict.their) {
             (Some(our), Some(their)) => {
-                let binary =
-                    repo.find_blob(our.id)?.is_binary() || repo.find_blob(their.id)?.is_binary();
-                if binary {
-                    write_blob(repo, root, &our.path, our.id)?;
-                    let copy = conflict_copy_path(&their.path);
-                    write_blob(repo, root, &copy, their.id)?;
-                    index.add_path(Path::new(&our.path))?;
-                    index.add_path(Path::new(&copy))?;
-                    conflicted_paths.push(our.path);
-                    conflicted_paths.push(copy);
-                } else {
-                    // The merge checkout wrote the marker file; staging the
-                    // working copy clears the conflict entries.
-                    index.add_path(Path::new(&our.path))?;
-                    conflicted_paths.push(our.path);
-                }
+                conflicted_paths.extend(resolve_both_edited(repo, root, index, our, their)?);
             }
-            (Some(our), None) => {
-                // The other device deleted a note we edited: keep the edit.
-                write_blob(repo, root, &our.path, our.id)?;
-                index.add_path(Path::new(&our.path))?;
-                conflicted_paths.push(our.path);
-            }
-            (None, Some(their)) => {
-                // We deleted a note the other device edited: keep the edit.
-                write_blob(repo, root, &their.path, their.id)?;
-                index.add_path(Path::new(&their.path))?;
-                conflicted_paths.push(their.path);
+            (Some(edited), None) | (None, Some(edited)) => {
+                conflicted_paths.push(resolve_edit_vs_delete(repo, root, index, edited)?);
             }
             (None, None) => {
                 if let Some(ancestor) = conflict.ancestor {
@@ -315,6 +303,44 @@ fn resolve_conflicts(repo: &Repository, root: &Path, index: &mut Index) -> AppRe
         }
     }
     Ok(conflicted_paths)
+}
+
+/// Both sides changed the file. Text: the merge checkout already wrote the
+/// labeled marker file, so staging the working copy clears the conflict
+/// entries. Binary: markers would corrupt the bytes — keep ours in place and
+/// write the other device's version alongside (`name (conflict).ext`).
+fn resolve_both_edited(
+    repo: &Repository,
+    root: &Path,
+    index: &mut Index,
+    our: ConflictSide,
+    their: ConflictSide,
+) -> AppResult<Vec<String>> {
+    let binary = repo.find_blob(our.id)?.is_binary() || repo.find_blob(their.id)?.is_binary();
+    if !binary {
+        index.add_path(Path::new(&our.path))?;
+        return Ok(vec![our.path]);
+    }
+    write_blob(repo, root, &our.path, our.id)?;
+    let copy = conflict_copy_path(&their.path);
+    write_blob(repo, root, &copy, their.id)?;
+    index.add_path(Path::new(&our.path))?;
+    index.add_path(Path::new(&copy))?;
+    Ok(vec![our.path, copy])
+}
+
+/// One side edited what the other deleted (either direction): restore and
+/// stage the edited version — sync must never silently delete a note someone
+/// touched. The user removes it again if the deletion was intentional.
+fn resolve_edit_vs_delete(
+    repo: &Repository,
+    root: &Path,
+    index: &mut Index,
+    edited: ConflictSide,
+) -> AppResult<String> {
+    write_blob(repo, root, &edited.path, edited.id)?;
+    index.add_path(Path::new(&edited.path))?;
+    Ok(edited.path)
 }
 
 fn write_blob(repo: &Repository, root: &Path, rel: &str, id: git2::Oid) -> AppResult<()> {

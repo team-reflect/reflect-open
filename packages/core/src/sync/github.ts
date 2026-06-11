@@ -104,6 +104,37 @@ const tokenResponseSchema = z.object({
 
 const JSON_HEADERS = { Accept: 'application/json', 'Content-Type': 'application/json' }
 
+/**
+ * Read and validate a JSON response body. A body that isn't JSON at all (an
+ * HTML error page from a proxy or an overloaded GitHub) means the request
+ * never got a real protocol answer — `network`, so it stays retryable and is
+ * never mistaken for a dead credential. A JSON body the schema rejects is an
+ * API contract change — `parse`.
+ */
+async function readJson<Schema extends z.ZodType>(
+  response: Response,
+  schema: Schema,
+  what: string,
+): Promise<z.infer<Schema>> {
+  let body: unknown
+  try {
+    body = await response.json()
+  } catch {
+    throw new ReflectError(
+      'network',
+      `${what}: GitHub returned an unreadable response (${response.status})`,
+    )
+  }
+  const parsed = schema.safeParse(body)
+  if (!parsed.success) {
+    throw new ReflectError(
+      'parse',
+      `${what}: GitHub returned an unexpected response shape (${response.status})`,
+    )
+  }
+  return parsed.data
+}
+
 /** Begin the device flow: returns the code to show + where the user enters it. */
 export async function deviceFlowStart(
   fetchFn: FetchFn = fetch,
@@ -118,9 +149,9 @@ export async function deviceFlowStart(
     body: JSON.stringify({ client_id: clientId }),
   })
   if (!response.ok) {
-    throw new Error(`GitHub device flow start failed (${response.status})`)
+    throw new ReflectError('network', `GitHub device flow start failed (${response.status})`)
   }
-  const parsed = deviceStartResponseSchema.parse(await response.json())
+  const parsed = await readJson(response, deviceStartResponseSchema, 'device flow start')
   return {
     deviceCode: parsed.device_code,
     userCode: parsed.user_code,
@@ -153,7 +184,12 @@ export async function deviceFlowPoll(
       grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
     }),
   })
-  const parsed = tokenResponseSchema.parse(await response.json())
+  if (!response.ok) {
+    // The device-flow protocol answers on 200 (errors are JSON fields); a
+    // real non-OK status is GitHub itself failing, not a protocol reply.
+    throw new ReflectError('network', `GitHub device flow poll failed (${response.status})`)
+  }
+  const parsed = await readJson(response, tokenResponseSchema, 'device flow poll')
   switch (parsed.error) {
     case 'authorization_pending':
       return { status: 'pending' }
@@ -166,10 +202,10 @@ export async function deviceFlowPoll(
     case undefined:
       break
     default:
-      throw new Error(`GitHub device flow failed: ${parsed.error}`)
+      throw new ReflectError('auth', `GitHub device flow failed (${parsed.error})`)
   }
   if (parsed.access_token === undefined) {
-    throw new Error('GitHub device flow returned neither a token nor an error')
+    throw new ReflectError('parse', 'GitHub device flow returned neither a token nor an error')
   }
   return { status: 'authorized', auth: toAuth(parsed.access_token, parsed, now(), clientId) }
 }
@@ -283,7 +319,7 @@ export async function refreshGithubAuth(
   if (!response.ok) {
     throw new ReflectError('network', `GitHub token refresh failed (${response.status}); will retry`)
   }
-  const parsed = tokenResponseSchema.parse(await response.json())
+  const parsed = await readJson(response, tokenResponseSchema, 'token refresh')
   if (parsed.access_token !== undefined) {
     return toAuth(parsed.access_token, parsed, now(), clientId)
   }
@@ -403,7 +439,7 @@ export async function createGithubRepo(
     const body = await response.text()
     throw new ReflectError('io', `creating the repo failed (${response.status}): ${body}`)
   }
-  return toRepo(repoResponseSchema.parse(await response.json()))
+  return toRepo(await readJson(response, repoResponseSchema, 'repo creation'))
 }
 
 /** Look up a repo (visibility check before connecting); `null` when missing. */
@@ -424,5 +460,5 @@ export async function getGithubRepo(
   if (!response.ok) {
     throw new ReflectError('io', `looking up the repo failed (${response.status})`)
   }
-  return toRepo(repoResponseSchema.parse(await response.json()))
+  return toRepo(await readJson(response, repoResponseSchema, 'repo lookup'))
 }

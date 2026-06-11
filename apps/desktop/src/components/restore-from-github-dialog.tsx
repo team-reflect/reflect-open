@@ -1,17 +1,19 @@
-import { useState, type KeyboardEvent, type ReactElement } from 'react'
+import { useEffect, useState, type ReactElement } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
-import {
-  errorMessage,
-  getGithubToken,
-  githubRemoteUrl,
-  gitClone,
-  ReflectError,
-} from '@reflect/core'
+import { getGithubToken, githubRemoteUrl, gitClone, ReflectError } from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert'
 import { GithubAuthStep } from '@/components/settings/github-auth-step'
-import { parseRepoInput } from '@/components/settings/connect-github-dialog'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { useAsyncAction } from '@/hooks/use-async-action'
+import { parseRepoInput } from '@/lib/github-repos'
 import { providerFetch } from '@/lib/provider-fetch'
 import { useGraph } from '@/providers/graph-provider'
 
@@ -31,11 +33,24 @@ const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
  */
 export function RestoreFromGithubDialog({ onClose }: RestoreFromGithubDialogProps): ReactElement {
   const { openRecent } = useGraph()
+  const action = useAsyncAction()
   const [step, setStep] = useState<'auth' | 'repo'>('auth')
   const [repoInput, setRepoInput] = useState('')
   const [destination, setDestination] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+
+  // The dialog is conditionally mounted by its parent (not kept alive with
+  // open=false), so Radix's Presence/onCloseAutoFocus path is bypassed when a
+  // successful restore calls onClose() directly. Capturing focus here and
+  // restoring it in the cleanup ensures the opener always gets focus back
+  // regardless of which close path runs.
+  useEffect(() => {
+    const opener = document.activeElement
+    return () => {
+      if (opener instanceof HTMLElement) {
+        opener.focus()
+      }
+    }
+  }, [])
 
   async function pickDestination(): Promise<void> {
     const picked = await open({ directory: true, multiple: false, title: 'Restore into folder' })
@@ -45,18 +60,16 @@ export function RestoreFromGithubDialog({ onClose }: RestoreFromGithubDialogProp
   }
 
   async function restore(): Promise<void> {
-    setError(null)
     const ref = parseRepoInput(repoInput)
     if (ref === null) {
-      setError('Enter the repository as owner/name or a GitHub URL.')
+      action.setError('Enter the repository as owner/name or a GitHub URL.')
       return
     }
     if (destination === null) {
-      setError('Choose a folder to restore into.')
+      action.setError('Choose a folder to restore into.')
       return
     }
-    setBusy(true)
-    try {
+    await action.run(async () => {
       const token = await getGithubToken(providerFetch)
       if (token === null) {
         throw new ReflectError('auth', 'Sign in to GitHub first')
@@ -65,46 +78,30 @@ export function RestoreFromGithubDialog({ onClose }: RestoreFromGithubDialogProp
       await gitClone(githubRemoteUrl(ref), target, token)
       await openRecent(target) // opens the clone as a graph; the index rebuilds
       onClose()
-    } catch (caught: unknown) {
-      setError(errorMessage(caught))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const handleDialogKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      onClose()
-    }
+    })
   }
 
   return (
-    <div
-      className="fixed inset-0 z-40 flex items-start justify-center bg-black/20 pt-[18vh]"
-      onPointerDown={onClose}
+    <Dialog
+      open
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          onClose()
+        }
+      }}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Restore from GitHub"
-        className="w-full max-w-sm rounded-lg border border-border bg-surface p-4 shadow-lg"
-        onPointerDown={(event) => {
-          event.stopPropagation()
-        }}
-        onKeyDown={handleDialogKeyDown}
-      >
-        <h2 className="text-sm font-semibold text-text">Restore from GitHub</h2>
-        <p className="mt-0.5 text-xs text-text-muted">
-          Download a graph you backed up from another device.
-        </p>
+      <DialogContent showCloseButton={false} className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Restore from GitHub</DialogTitle>
+          <DialogDescription>
+            Download a graph you backed up from another device.
+          </DialogDescription>
+        </DialogHeader>
 
         {step === 'auth' ? (
-          <div className="mt-3">
-            <GithubAuthStep onAuthed={() => setStep('repo')} />
-          </div>
+          <GithubAuthStep onAuthed={() => setStep('repo')} />
         ) : (
-          <div className="mt-3 flex flex-col gap-3">
+          <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1">
               <span className={FIELD_LABEL_CLASS}>Backup repository</span>
               <Input
@@ -122,13 +119,13 @@ export function RestoreFromGithubDialog({ onClose }: RestoreFromGithubDialogProp
                 {destination ?? 'No folder chosen'}
               </span>
             </div>
-            <Button onClick={() => void restore()} disabled={busy} size="sm">
-              {busy ? 'Restoring…' : 'Restore'}
+            <Button onClick={() => void restore()} disabled={action.pending} size="sm">
+              {action.pending ? 'Restoring…' : 'Restore'}
             </Button>
-            {error !== null ? <InlineAlert tone="error">{error}</InlineAlert> : null}
+            {action.error !== null ? <InlineAlert tone="error">{action.error}</InlineAlert> : null}
           </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

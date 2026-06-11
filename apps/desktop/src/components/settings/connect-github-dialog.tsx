@@ -1,26 +1,24 @@
-import { useState, type KeyboardEvent, type ReactElement } from 'react'
-import { errorMessage, parseGithubRemote, type GithubRepoRef } from '@reflect/core'
+import { useEffect, useState, type ReactElement } from 'react'
+import { type GithubRepoRef } from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert'
 import { GithubAuthStep } from '@/components/settings/github-auth-step'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { useAsyncAction } from '@/hooks/use-async-action'
+import { parseRepoInput } from '@/lib/github-repos'
 import { useSync } from '@/providers/sync-provider'
 
 interface ConnectGithubDialogProps {
   /** A suggested name for a newly created backup repo (from the graph name). */
   suggestedRepoName: string
   onClose: () => void
-}
-
-/** Parse "owner/name" or a full GitHub URL into a repo ref. */
-export function parseRepoInput(input: string): GithubRepoRef | null {
-  const trimmed = input.trim()
-  const fromUrl = parseGithubRemote(trimmed)
-  if (fromUrl !== null) {
-    return fromUrl
-  }
-  const match = /^([\w.-]+)\/([\w.-]+)$/.exec(trimmed)
-  return match === null ? null : { owner: match[1], name: match[2] }
 }
 
 /**
@@ -35,37 +33,52 @@ export function ConnectGithubDialog({
   onClose,
 }: ConnectGithubDialogProps): ReactElement {
   const { connectNewRepo, connectExistingRepo } = useSync()
+  const action = useAsyncAction()
   const [step, setStep] = useState<'auth' | 'repo'>('auth')
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
 
   const [mode, setMode] = useState<'create' | 'existing'>('create')
   const [repoName, setRepoName] = useState(suggestedRepoName)
   const [existingRepo, setExistingRepo] = useState('')
   const [publicConfirm, setPublicConfirm] = useState<GithubRepoRef | null>(null)
 
+  // The dialog is conditionally mounted by its parent (not kept alive with
+  // open=false), so Radix's Presence/onCloseAutoFocus path is bypassed when a
+  // successful connect calls onClose() directly. Capturing focus here and
+  // restoring it in the cleanup ensures the opener always gets focus back
+  // regardless of which close path runs.
+  useEffect(() => {
+    const opener = document.activeElement
+    return () => {
+      if (opener instanceof HTMLElement) {
+        opener.focus()
+      }
+    }
+  }, [])
+
   async function connect(allowPublic = false): Promise<void> {
-    setError(null)
-    setBusy(true)
-    try {
-      if (mode === 'create') {
-        const name = repoName.trim()
-        if (name.length === 0) {
-          setError('Name the new repository.')
-          return
-        }
+    if (mode === 'create') {
+      const name = repoName.trim()
+      if (name.length === 0) {
+        action.setError('Name the new repository.')
+        return
+      }
+      await action.run(async () => {
         await connectNewRepo(name)
         onClose()
-        return
-      }
-      const ref = publicConfirm ?? parseRepoInput(existingRepo)
-      if (ref === null) {
-        setError('Enter the repository as owner/name or a GitHub URL.')
-        return
-      }
+      })
+      return
+    }
+    const ref = publicConfirm ?? parseRepoInput(existingRepo)
+    if (ref === null) {
+      action.setError('Enter the repository as owner/name or a GitHub URL.')
+      return
+    }
+    await action.run(async () => {
       const result = await connectExistingRepo(ref, { allowPublic })
       if (result === 'notFound') {
-        setError('That repository was not found (check the name and the token’s repo access).')
+        action.setError(
+          'That repository was not found (check the name and the token’s repo access).',
+        )
         return
       }
       if (result === 'needsPublicConfirm') {
@@ -73,43 +86,30 @@ export function ConnectGithubDialog({
         return
       }
       onClose()
-    } catch (caught: unknown) {
-      setError(errorMessage(caught))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const handleDialogKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      onClose()
-    }
+    })
   }
 
   return (
-    <div
-      className="fixed inset-0 z-40 flex items-start justify-center bg-black/20 pt-[18vh]"
-      onPointerDown={onClose}
+    <Dialog
+      open
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          onClose()
+        }
+      }}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Connect GitHub"
-        className="w-full max-w-sm rounded-lg border border-border bg-surface p-4 shadow-lg"
-        onPointerDown={(event) => {
-          event.stopPropagation()
-        }}
-        onKeyDown={handleDialogKeyDown}
-      >
-        <h2 className="text-sm font-semibold text-text">Connect GitHub</h2>
+      <DialogContent showCloseButton={false} className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Connect GitHub</DialogTitle>
+          <DialogDescription>
+            Back up this graph to a GitHub repository of your own.
+          </DialogDescription>
+        </DialogHeader>
 
         {step === 'auth' ? (
-          <div className="mt-3">
-            <GithubAuthStep onAuthed={() => setStep('repo')} />
-          </div>
+          <GithubAuthStep onAuthed={() => setStep('repo')} />
         ) : (
-          <div className="mt-3 flex flex-col gap-3">
+          <div className="flex flex-col gap-3">
             {publicConfirm === null ? (
               <>
                 <div className="flex flex-col gap-2">
@@ -149,8 +149,8 @@ export function ConnectGithubDialog({
                     />
                   ) : null}
                 </div>
-                <Button onClick={() => void connect()} disabled={busy} size="sm">
-                  {busy ? 'Connecting…' : 'Connect'}
+                <Button onClick={() => void connect()} disabled={action.pending} size="sm">
+                  {action.pending ? 'Connecting…' : 'Connect'}
                 </Button>
               </>
             ) : (
@@ -170,17 +170,17 @@ export function ConnectGithubDialog({
                     variant="destructive"
                     size="sm"
                     onClick={() => void connect(true)}
-                    disabled={busy}
+                    disabled={action.pending}
                   >
                     Back up to a public repo
                   </Button>
                 </div>
               </>
             )}
-            {error !== null ? <InlineAlert tone="error">{error}</InlineAlert> : null}
+            {action.error !== null ? <InlineAlert tone="error">{action.error}</InlineAlert> : null}
           </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

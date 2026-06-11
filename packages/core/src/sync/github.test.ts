@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '../ipc/bridge'
 import {
+  createGithubRepo,
   deviceFlowPoll,
-  runDeviceFlow,
+  getGithubRepo,
   getGithubToken,
   githubRemoteUrl,
   loadGithubAuth,
   parseGithubRemote,
+  runDeviceFlow,
 } from './github'
 
 afterEach(() => {
@@ -111,6 +113,73 @@ describe('deviceFlowPoll', () => {
       status: 'authorized',
       auth: { kind: 'pat', token: 'ghu_token' },
     })
+  })
+
+  it('maps a non-OK status to a retryable network error', async () => {
+    const fetchFn = vi.fn(async () => new Response('Bad Gateway', { status: 502 }))
+    await expect(deviceFlowPoll('device-code', fetchFn)).rejects.toMatchObject({
+      kind: 'network',
+    })
+  })
+
+  it('maps a 200 with a non-JSON body (proxy error page) to a network error', async () => {
+    const fetchFn = vi.fn(async () => new Response('<html>oops</html>', { status: 200 }))
+    await expect(deviceFlowPoll('device-code', fetchFn)).rejects.toMatchObject({
+      kind: 'network',
+    })
+  })
+
+  it('maps an unexpected OAuth error to an auth error', async () => {
+    const fetchFn = vi.fn(async () => jsonResponse({ error: 'incorrect_device_code' }))
+    await expect(deviceFlowPoll('device-code', fetchFn)).rejects.toMatchObject({
+      kind: 'auth',
+    })
+  })
+})
+
+describe('createGithubRepo', () => {
+  const REPO_RESPONSE = {
+    full_name: 'alex/notes-backup',
+    private: true,
+    default_branch: 'main',
+    html_url: 'https://github.com/alex/notes-backup',
+  }
+
+  it('creates a private repo and normalizes the response', async () => {
+    const bodies: Array<Record<string, unknown>> = []
+    const fetchFn = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>)
+      return jsonResponse(REPO_RESPONSE, 201)
+    })
+    const repo = await createGithubRepo('tok', 'notes-backup', { fetchFn })
+    expect(bodies[0]).toMatchObject({ name: 'notes-backup', private: true })
+    expect(repo).toEqual({
+      fullName: 'alex/notes-backup',
+      isPrivate: true,
+      defaultBranch: 'main',
+      htmlUrl: 'https://github.com/alex/notes-backup',
+    })
+  })
+
+  it('maps a rejected token to an auth error', async () => {
+    const fetchFn = vi.fn(async () => jsonResponse({ message: 'Bad credentials' }, 401))
+    await expect(createGithubRepo('tok', 'notes-backup', { fetchFn })).rejects.toMatchObject({
+      kind: 'auth',
+    })
+  })
+})
+
+describe('getGithubRepo', () => {
+  const REF = { owner: 'alex', name: 'notes-backup' }
+
+  it('returns null for a missing repo (the connect dialog explains, not throws)', async () => {
+    const fetchFn = vi.fn(async () => jsonResponse({ message: 'Not Found' }, 404))
+    expect(await getGithubRepo('tok', REF, fetchFn)).toBeNull()
+  })
+
+  it('maps a rejected token to an auth error', async () => {
+    const fetchFn = vi.fn(async () => jsonResponse({ message: 'Bad credentials' }, 403))
+    await expect(getGithubRepo('tok', REF, fetchFn)).rejects.toMatchObject({ kind: 'auth' })
   })
 })
 

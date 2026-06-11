@@ -30,11 +30,18 @@ pub struct RemoteDelta {
 #[serde(rename_all = "camelCase")]
 pub struct PushOutcome {
     pub pushed: bool,
+    /// The remote moved past us (another device pushed first): the caller
+    /// pulls, merges, and retries. Auth/network failures are `AppError`s,
+    /// never this.
     pub non_fast_forward: bool,
     pub rejection_message: Option<String>,
 }
 
-fn with_credentials(callbacks: &mut RemoteCallbacks<'_>, token: Option<String>) {
+/// `RemoteCallbacks` pre-wired with the token credential handler — the one
+/// configuration fetch, clone, and push all share. Callers layer their own
+/// callbacks (push status, sideband) on top.
+fn callbacks_with_credentials<'cb>(token: Option<String>) -> RemoteCallbacks<'cb> {
+    let mut callbacks = RemoteCallbacks::new();
     callbacks.credentials(move |_url, _username, allowed| {
         if !allowed.contains(CredentialType::USER_PASS_PLAINTEXT) {
             return Err(git2::Error::from_str(
@@ -48,6 +55,7 @@ fn with_credentials(callbacks: &mut RemoteCallbacks<'_>, token: Option<String>) 
             )),
         }
     });
+    callbacks
 }
 
 fn origin(repo: &Repository) -> AppResult<git2::Remote<'_>> {
@@ -61,10 +69,8 @@ pub(super) fn fetch(root: &Path, token: Option<String>) -> AppResult<RemoteDelta
     let repo = open_existing(root)?;
     {
         let mut remote = origin(&repo)?;
-        let mut callbacks = RemoteCallbacks::new();
-        with_credentials(&mut callbacks, token);
         let mut opts = FetchOptions::new();
-        opts.remote_callbacks(callbacks);
+        opts.remote_callbacks(callbacks_with_credentials(token));
         remote.fetch(&[] as &[&str], Some(&mut opts), None)?;
     }
     local_delta(&repo)
@@ -108,10 +114,8 @@ fn count_commits(repo: &Repository, from: git2::Oid) -> AppResult<usize> {
 /// non-empty existing directory, which is exactly the safety we want — a
 /// restore must never write into a folder that already has content.
 pub(super) fn clone(url: &str, target: &Path, token: Option<String>) -> AppResult<()> {
-    let mut callbacks = RemoteCallbacks::new();
-    with_credentials(&mut callbacks, token);
     let mut fetch_options = FetchOptions::new();
-    fetch_options.remote_callbacks(callbacks);
+    fetch_options.remote_callbacks(callbacks_with_credentials(token));
     git2::build::RepoBuilder::new()
         .fetch_options(fetch_options)
         .clone(url, target)?;
@@ -129,8 +133,7 @@ pub(super) fn push(root: &Path, token: Option<String>) -> AppResult<PushOutcome>
     let rejection: RefCell<Option<String>> = RefCell::new(None);
     let sideband: RefCell<String> = RefCell::new(String::new());
     let result = {
-        let mut callbacks = RemoteCallbacks::new();
-        with_credentials(&mut callbacks, token);
+        let mut callbacks = callbacks_with_credentials(token);
         callbacks.push_update_reference(|_refname, status| {
             if let Some(message) = status {
                 *rejection.borrow_mut() = Some(message.to_string());

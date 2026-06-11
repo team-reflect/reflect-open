@@ -1,9 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { setBridge, type GraphInfo } from '@reflect/core'
+import { setBridge, subscribeFileChanges, type FileChange, type GraphInfo } from '@reflect/core'
+import { fetch as tauriFetch } from '@tauri-apps/plugin-http'
 import { createBackupController, type BackupState } from './backup-controller'
+
+// providerFetch routes GitHub API calls through the Tauri HTTP plugin
+// whenever a bridge is set — which it is in every test here.
+vi.mock('@tauri-apps/plugin-http', () => ({ fetch: vi.fn() }))
+const httpFetch = vi.mocked(tauriFetch)
 
 afterEach(() => {
   setBridge(null)
+  httpFetch.mockReset()
 })
 
 const GRAPH: GraphInfo = { root: '/g', name: 'G', cloudSync: null, generation: 3 }
@@ -12,16 +19,27 @@ const AUTH = JSON.stringify({ kind: 'pat', token: 'ghp_abc' })
 const CLEAN_COMMIT = { committed: false, sha: null, ahead: 0, skippedLargeFiles: [] }
 const UP_TO_DATE = { kind: 'upToDate', conflictedPaths: [], changedFiles: [] }
 
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
 interface FakeOptions {
   auth?: string | null
   /** Hold the listen promise until `release()` (the teardown-race window). */
   gateListen?: boolean
   failStatus?: boolean
+  /** Scripted `git_merge_remote` outcome (defaults to up-to-date). */
+  mergeOutcome?: unknown
 }
 
 /** Bridge fake with a mutable repo status, recording every command. */
 function fakeBridge(options: FakeOptions = {}) {
   const calls: string[] = []
+  const invocations: Array<{ command: string; args: Record<string, unknown> }> = []
+  let auth = options.auth === undefined ? AUTH : options.auth
   const status = {
     initialized: true,
     branch: 'main',
@@ -32,22 +50,29 @@ function fakeBridge(options: FakeOptions = {}) {
   }
   let releaseListen: (() => void) | null = null
   setBridge({
-    invoke: async (command) => {
+    invoke: async (command, args) => {
       calls.push(command)
+      invocations.push({ command, args })
       switch (command) {
         case 'git_status':
           if (options.failStatus === true) {
             throw { kind: 'io', message: 'broken repo' }
           }
           return status
+        case 'git_setup':
+          status.remoteUrl = typeof args.remoteUrl === 'string' ? args.remoteUrl : null
+          return status
         case 'secret_get':
-          return options.auth === undefined ? AUTH : options.auth
+          return auth
+        case 'secret_delete':
+          auth = null
+          return null
         case 'git_commit_all':
           return CLEAN_COMMIT
         case 'git_fetch':
           return { ahead: 0, behind: 0 }
         case 'git_merge_remote':
-          return UP_TO_DATE
+          return options.mergeOutcome ?? UP_TO_DATE
         case 'git_push':
           return { pushed: true, nonFastForward: false, rejectionMessage: null }
         case 'git_disconnect':
@@ -66,7 +91,7 @@ function fakeBridge(options: FakeOptions = {}) {
       return () => {}
     },
   })
-  return { calls, status, releaseListen: () => releaseListen?.() }
+  return { calls, invocations, status, releaseListen: () => releaseListen?.() }
 }
 
 function trackStates(controller: ReturnType<typeof createBackupController>): BackupState[] {
@@ -139,5 +164,136 @@ describe('createBackupController', () => {
     expect(calls).not.toContain('git_commit_all')
     controller.dispose()
     errorSpy.mockRestore()
+  })
+
+  it('connectNewRepo creates a private repo and connects to its default branch', async () => {
+    const { invocations } = fakeBridge()
+    const requests: Array<Record<string, unknown>> = []
+    httpFetch.mockImplementation(async (_input, init) => {
+      requests.push(JSON.parse(String(init?.body)) as Record<string, unknown>)
+      return jsonResponse(
+        {
+          full_name: 'alex/g-backup',
+          private: true,
+          default_branch: 'main',
+          html_url: 'https://github.com/alex/g-backup',
+        },
+        201,
+      )
+    })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+
+    await controller.connectNewRepo('g-backup')
+
+    expect(requests[0]).toMatchObject({ name: 'g-backup', private: true })
+    const setup = invocations.find(({ command }) => command === 'git_setup')
+    expect(setup?.args).toMatchObject({
+      remoteUrl: 'https://github.com/alex/g-backup.git',
+      branch: 'main',
+      generation: 3,
+    })
+    expect(controller.getState()).toMatchObject({
+      phase: 'connected',
+      repo: { owner: 'alex', name: 'g-backup' },
+    })
+    controller.dispose()
+  })
+
+  it('connectExistingRepo reports a missing repo without touching the graph', async () => {
+    const { calls } = fakeBridge()
+    httpFetch.mockImplementation(async () => jsonResponse({ message: 'Not Found' }, 404))
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+
+    expect(await controller.connectExistingRepo({ owner: 'alex', name: 'gone' })).toBe('notFound')
+    expect(calls).not.toContain('git_setup')
+    controller.dispose()
+  })
+
+  it('connectExistingRepo demands explicit consent before a public repo', async () => {
+    const { calls, invocations } = fakeBridge()
+    // A fresh Response per call — a body is single-read.
+    httpFetch.mockImplementation(async () =>
+      jsonResponse({
+        full_name: 'alex/public-notes',
+        private: false,
+        default_branch: 'master',
+        html_url: 'https://github.com/alex/public-notes',
+      }),
+    )
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    const ref = { owner: 'alex', name: 'public-notes' }
+
+    expect(await controller.connectExistingRepo(ref)).toBe('needsPublicConfirm')
+    expect(calls).not.toContain('git_setup')
+
+    expect(await controller.connectExistingRepo(ref, { allowPublic: true })).toBe('connected')
+    const setup = invocations.find(({ command }) => command === 'git_setup')
+    // The repo's default branch is where the existing backup history lives.
+    expect(setup?.args).toMatchObject({ branch: 'master' })
+    controller.dispose()
+  })
+
+  it('signOut clears the machine credential and lands on disconnected', async () => {
+    const { calls } = fakeBridge()
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    expect(controller.getState()).toMatchObject({ phase: 'connected' })
+
+    await controller.signOut()
+
+    expect(calls).toContain('secret_delete')
+    expect(controller.getState()).toEqual({ phase: 'disconnected' })
+    controller.dispose()
+  })
+
+  it('window focus and online events trigger a sync — until dispose', async () => {
+    const { calls } = fakeBridge()
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(calls.filter((command) => command === 'git_commit_all')).toHaveLength(1)
+    })
+
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => {
+      expect(calls.filter((command) => command === 'git_commit_all')).toHaveLength(2)
+    })
+    window.dispatchEvent(new Event('online'))
+    await vi.waitFor(() => {
+      expect(calls.filter((command) => command === 'git_commit_all')).toHaveLength(3)
+    })
+
+    controller.dispose()
+    window.dispatchEvent(new Event('focus'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(calls.filter((command) => command === 'git_commit_all')).toHaveLength(3)
+  })
+
+  it('fans a pull’s indexable writes to the local file-changes channel', async () => {
+    fakeBridge({
+      mergeOutcome: {
+        kind: 'merged',
+        conflictedPaths: [],
+        changedFiles: [
+          { path: 'notes/from-b.md', kind: 'upsert', modifiedMs: 123 },
+          { path: 'daily/2026-06-11.md', kind: 'remove' },
+          { path: 'assets/photo.png', kind: 'upsert', modifiedMs: 456 }, // not indexable
+        ],
+      },
+    })
+    const batches: FileChange[][] = []
+    const unlisten = await subscribeFileChanges((changes) => batches.push(changes))
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: null })
+    await controller.start()
+
+    await vi.waitFor(() => {
+      expect(batches).toHaveLength(1)
+    })
+    expect(batches[0]).toEqual([
+      { path: 'notes/from-b.md', kind: 'upsert', modifiedMs: 123 },
+      { path: 'daily/2026-06-11.md', kind: 'remove' },
+    ])
+    controller.dispose()
+    unlisten()
   })
 })

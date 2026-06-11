@@ -3,18 +3,20 @@
 use std::cell::RefCell;
 use std::path::Path;
 
-use git2::IndexAddOption;
+use git2::{Index, IndexAddOption};
 use serde::Serialize;
 
 use crate::error::AppResult;
 
 use super::repo::{ensure_clean_state, open_existing, signature};
 
-/// A file excluded from backup because it exceeds the size guardrail.
+/// A file whose *changes* were withheld from staging because it is at/above
+/// the size guardrail. Oversized-but-unchanged files are not reported — their
+/// old version is already in the backup.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SkippedFile {
-    /// Graph-relative path, forward-slashed.
+    /// Graph-relative path (forward-slashed) of the withheld file.
     pub path: String,
     pub size: u64,
 }
@@ -33,12 +35,10 @@ pub struct CommitOutcome {
     pub skipped_large_files: Vec<SkippedFile>,
 }
 
-/// Stage every change under the graph (adds, edits, deletes — `.gitignore`
-/// respected) and commit. Files at/above `max_file_bytes` are left unstaged
-/// and reported: GitHub rejects >100 MB files and the rejection fails the
-/// *whole* push, so one oversized video must not break backup for everything
-/// else. Skips the commit entirely when nothing changed, which is what makes
-/// the sync loop safe — pull-applied writes match HEAD and produce no-ops.
+/// Stage every change under the graph and commit. Returns `committed: false`
+/// when the staged tree already matches HEAD — the sync engine uses that
+/// (with `ahead`) to skip the network entirely, which is what makes the loop
+/// safe: pull-applied writes match HEAD and produce no-ops.
 pub(super) fn commit_all(
     root: &Path,
     message: &str,
@@ -48,6 +48,52 @@ pub(super) fn commit_all(
     ensure_clean_state(&repo)?;
 
     let mut index = repo.index()?;
+    let skipped = add_all_with_size_guard(&mut index, root, max_file_bytes)?;
+
+    let parent = repo.head().ok().and_then(|head| head.peel_to_commit().ok());
+    if parent.is_none() && index.is_empty() {
+        return Ok(CommitOutcome {
+            committed: false,
+            sha: None,
+            ahead: ahead_of_remote(&repo),
+            skipped_large_files: skipped,
+        });
+    }
+
+    let tree_id = index.write_tree()?;
+    if let Some(parent) = &parent {
+        if parent.tree_id() == tree_id {
+            return Ok(CommitOutcome {
+                committed: false,
+                sha: None,
+                ahead: ahead_of_remote(&repo),
+                skipped_large_files: skipped,
+            });
+        }
+    }
+
+    let tree = repo.find_tree(tree_id)?;
+    let sig = signature(&repo)?;
+    let parents: Vec<&git2::Commit> = parent.iter().collect();
+    let oid = repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &parents)?;
+    Ok(CommitOutcome {
+        committed: true,
+        sha: Some(oid.to_string()),
+        ahead: ahead_of_remote(&repo),
+        skipped_large_files: skipped,
+    })
+}
+
+/// Stage every change (adds, edits, deletes — `.gitignore` respected) into
+/// `index` and write it, withholding files at/above `max_file_bytes`: GitHub
+/// rejects >100 MB files and the rejection fails the *whole* push, so one
+/// oversized video must not break backup for everything else. Returns the
+/// files whose changes were withheld.
+fn add_all_with_size_guard(
+    index: &mut Index,
+    root: &Path,
+    max_file_bytes: u64,
+) -> AppResult<Vec<SkippedFile>> {
     // Size + mtime already in the index, so the guard can tell "oversized and
     // unchanged" (skip silently — its old version is already backed up) from
     // "oversized changes being withheld" (skip and report). Size alone would
@@ -96,39 +142,7 @@ pub(super) fn commit_all(
     // tracked files that have since grown past the guardrail).
     index.update_all(["*"], Some(&mut size_guard))?;
     index.write()?;
-
-    let parent = repo.head().ok().and_then(|head| head.peel_to_commit().ok());
-    if parent.is_none() && index.is_empty() {
-        return Ok(CommitOutcome {
-            committed: false,
-            sha: None,
-            ahead: ahead_of_remote(&repo),
-            skipped_large_files: skipped.into_inner(),
-        });
-    }
-
-    let tree_id = index.write_tree()?;
-    if let Some(parent) = &parent {
-        if parent.tree_id() == tree_id {
-            return Ok(CommitOutcome {
-                committed: false,
-                sha: None,
-                ahead: ahead_of_remote(&repo),
-                skipped_large_files: skipped.into_inner(),
-            });
-        }
-    }
-
-    let tree = repo.find_tree(tree_id)?;
-    let sig = signature(&repo)?;
-    let parents: Vec<&git2::Commit> = parent.iter().collect();
-    let oid = repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &parents)?;
-    Ok(CommitOutcome {
-        committed: true,
-        sha: Some(oid.to_string()),
-        ahead: ahead_of_remote(&repo),
-        skipped_large_files: skipped.into_inner(),
-    })
+    Ok(skipped.into_inner())
 }
 
 /// Ahead-count vs the last-fetched remote branch. When it can't be computed

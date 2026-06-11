@@ -27,7 +27,9 @@ export const skippedFileSchema = z.object({
 export type SkippedFile = z.infer<typeof skippedFileSchema>
 
 export const commitOutcomeSchema = z.object({
+  /** False when the tree already matched HEAD — nothing new to back up. */
   committed: z.boolean(),
+  /** The new commit, or `null` when `committed` is false. */
   sha: z.string().nullable(),
   /** Unpushed local commits (vs the last fetch) — the engine's skip-push gate. */
   ahead: z.number(),
@@ -35,6 +37,11 @@ export const commitOutcomeSchema = z.object({
 })
 export type CommitOutcome = z.infer<typeof commitOutcomeSchema>
 
+/**
+ * Where the current branch stands relative to the just-fetched remote branch:
+ * `ahead` = local commits the remote lacks (a push is due), `behind` = remote
+ * commits not yet merged locally (a merge is due).
+ */
 export const remoteDeltaSchema = z.object({
   ahead: z.number(),
   behind: z.number(),
@@ -70,8 +77,8 @@ export const pushOutcomeSchema = z.object({
 export type PushOutcome = z.infer<typeof pushOutcomeSchema>
 
 /** Snapshot the backup repository (cheap, no network). */
-export async function gitStatus(): Promise<GitStatus> {
-  return call('git_status', {}, gitStatusSchema)
+export async function gitStatus(generation: number): Promise<GitStatus> {
+  return call('git_status', { generation }, gitStatusSchema)
 }
 
 /**

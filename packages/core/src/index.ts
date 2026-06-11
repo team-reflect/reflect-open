@@ -155,6 +155,7 @@ export {
   createGithubRepo,
   getGithubRepo,
   createSyncEngine,
+  isSyncError,
   type GitStatus,
   type CommitOutcome,
   type MergeOutcome,
@@ -168,6 +169,7 @@ export {
   type GithubRepo,
   type SyncEngine,
   type SyncEngineOptions,
+  type SyncErrorKind,
   type SyncStatus,
 } from './sync'
 

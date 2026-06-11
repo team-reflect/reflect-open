@@ -89,7 +89,8 @@ pub(super) fn signature(repo: &Repository) -> AppResult<Signature<'static>> {
 
 /// Make sure `.reflect/` is ignored even in adopted repos whose `.gitignore`
 /// predates Reflect. The graph bootstrap (Plan 02) already writes one, but a
-/// user pointing Reflect at an existing repo may have their own.
+/// user pointing Reflect at an existing repo may have their own. Idempotent:
+/// an existing `.reflect` entry (any common spelling) is left alone.
 pub(super) fn ensure_reflect_ignored(root: &Path) -> AppResult<()> {
     let path = root.join(".gitignore");
     let existing = fs::read_to_string(&path).unwrap_or_default();

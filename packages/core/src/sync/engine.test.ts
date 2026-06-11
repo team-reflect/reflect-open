@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '../ipc/bridge'
-import { createSyncEngine, type SyncStatus } from './engine'
+import { createSyncEngine, isSyncError, type SyncStatus } from './engine'
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -232,8 +232,11 @@ describe('createSyncEngine', () => {
     await vi.runAllTimersAsync()
 
     const last = statuses.at(-1)
-    expect(last).toMatchObject({ state: 'error', errorKind: 'rejected' })
-    expect(last?.message).toContain('GH013')
+    if (last === undefined || !isSyncError(last)) {
+      throw new Error(`expected an error status, got ${JSON.stringify(last)}`)
+    }
+    expect(last.errorKind).toBe('rejected')
+    expect(last.message).toContain('GH013')
     engine.stop()
   })
 
@@ -469,6 +472,91 @@ describe('createSyncEngine', () => {
     await vi.runAllTimersAsync()
 
     expect(calls).toHaveLength(0)
+  })
+
+  it('passes a missing credential through as a null token (Rust owns the failure)', async () => {
+    // The engine has no null-token special case on purpose: only the remote
+    // knows whether it needs auth. A push refused for a missing credential
+    // must still land on the reconnect affordance.
+    const calls = fakeGit((command) => {
+      if (command === 'git_push') {
+        throw { kind: 'auth', message: 'authentication required' }
+      }
+      return defaultResponses(command)
+    })
+    const statuses: SyncStatus[] = []
+    const engine = createSyncEngine({
+      generation: 1,
+      getToken: async () => null,
+      onStatus: (status) => statuses.push(status),
+      idleMs: 10,
+    })
+
+    engine.noteChanged()
+    await vi.runAllTimersAsync()
+
+    const push = calls.find((call) => call.command === 'git_push')
+    expect(push?.args.token).toBeNull()
+    expect(statuses.at(-1)).toMatchObject({ state: 'error', errorKind: 'auth' })
+    engine.stop()
+  })
+
+  it('ignores edits arriving after stop() — the abort is sticky', async () => {
+    const calls = fakeGit(defaultResponses)
+    const statuses: SyncStatus[] = []
+    const engine = createSyncEngine({
+      generation: 1,
+      getToken: async () => 'tok',
+      onStatus: (status) => statuses.push(status),
+      idleMs: 10,
+    })
+
+    engine.stop()
+    engine.noteChanged()
+    await engine.syncNow()
+    await vi.runAllTimersAsync()
+
+    expect(calls).toHaveLength(0)
+    expect(statuses).toHaveLength(0)
+  })
+
+  it('serializes concurrent syncNow calls into one cycle plus one follow-up', async () => {
+    const pushGates: Array<(value: unknown) => void> = []
+    const calls = fakeGit((command) => {
+      if (command === 'git_push') {
+        return new Promise((resolve) => {
+          pushGates.push(resolve)
+        })
+      }
+      return defaultResponses(command)
+    })
+    const engine = createSyncEngine({ generation: 1, getToken: async () => 'tok' })
+
+    const first = engine.syncNow()
+    const second = engine.syncNow()
+    const third = engine.syncNow()
+    await vi.runAllTimersAsync()
+    // Only the first cycle has started; the others coalesced, not interleaved.
+    expect(commandsOf(calls)).toEqual(['git_commit_all', 'git_fetch', 'git_merge_remote', 'git_push'])
+
+    pushGates.shift()?.(PUSHED)
+    await vi.runAllTimersAsync()
+    pushGates.shift()?.(PUSHED)
+    await vi.runAllTimersAsync()
+    await Promise.all([first, second, third])
+
+    // The two queued requests collapsed into a single full follow-up cycle.
+    expect(commandsOf(calls)).toEqual([
+      'git_commit_all',
+      'git_fetch',
+      'git_merge_remote',
+      'git_push',
+      'git_commit_all',
+      'git_fetch',
+      'git_merge_remote',
+      'git_push',
+    ])
+    engine.stop()
   })
 
   it('stop() mid-cycle issues no further commands and emits no further status', async () => {

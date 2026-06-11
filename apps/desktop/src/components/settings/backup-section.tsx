@@ -1,10 +1,12 @@
 import { useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { errorMessage, getConflictedNotes, hasBridge } from '@reflect/core'
+import { getConflictedNotes, hasBridge } from '@reflect/core'
 import { ConnectGithubDialog } from '@/components/settings/connect-github-dialog'
 import { SettingsField } from '@/components/settings/field'
 import { SettingsSection } from '@/components/settings/section'
 import { Button } from '@/components/ui/button'
+import { useAsyncAction } from '@/hooks/use-async-action'
+import { suggestRepoName } from '@/lib/github-repos'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 import { useSync, type BackupState } from '@/providers/sync-provider'
@@ -17,11 +19,11 @@ function statusLine(backup: Extract<BackupState, { phase: 'connected' }>): strin
     case 'syncing':
       return 'Backing up…'
     case 'offline':
-      return backup.status.message ?? 'Waiting for a connection'
+      return backup.status.message
     case 'error':
       return backup.status.errorKind === 'auth'
         ? 'Backup failed — reconnect GitHub'
-        : `Backup failed: ${backup.status.message ?? 'unknown error'}`
+        : `Backup failed: ${backup.status.message}`
   }
 }
 
@@ -35,7 +37,7 @@ export function BackupSection(): ReactElement {
   const { backup, disconnectGraph, signOut, backUpNow } = useSync()
   const { graph } = useGraph()
   const [connectOpen, setConnectOpen] = useState(false)
-  const [actionError, setActionError] = useState<string | null>(null)
+  const action = useAsyncAction()
 
   const conflicted = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, 'conflicted-notes', graph?.root],
@@ -48,15 +50,6 @@ export function BackupSection(): ReactElement {
     backup.phase === 'connected'
       ? (backup.repo !== null ? `${backup.repo.owner}/${backup.repo.name}` : backup.remoteUrl)
       : null
-
-  async function runAction(action: () => Promise<void>): Promise<void> {
-    setActionError(null)
-    try {
-      await action()
-    } catch (caught: unknown) {
-      setActionError(errorMessage(caught))
-    }
-  }
 
   return (
     <SettingsSection id="backup">
@@ -95,8 +88,8 @@ export function BackupSection(): ReactElement {
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={backup.status.state === 'syncing'}
-                  onClick={() => void runAction(backUpNow)}
+                  disabled={backup.status.state === 'syncing' || action.pending}
+                  onClick={() => void action.run(backUpNow)}
                 >
                   Back up now
                 </Button>
@@ -104,7 +97,7 @@ export function BackupSection(): ReactElement {
                   variant="ghost"
                   size="sm"
                   title="This graph stops backing up; its history and your GitHub sign-in stay"
-                  onClick={() => void runAction(disconnectGraph)}
+                  onClick={() => void action.run(disconnectGraph)}
                 >
                   Stop backing up
                 </Button>
@@ -112,7 +105,7 @@ export function BackupSection(): ReactElement {
                   variant="ghost"
                   size="sm"
                   title="Removes the GitHub token from this machine — every connected graph stops backing up"
-                  onClick={() => void runAction(signOut)}
+                  onClick={() => void action.run(signOut)}
                 >
                   Sign out of GitHub
                 </Button>
@@ -120,8 +113,8 @@ export function BackupSection(): ReactElement {
             </>
           ) : null}
 
-          {actionError !== null ? (
-            <p className="text-xs text-red-700 dark:text-red-300">{actionError}</p>
+          {action.error !== null ? (
+            <p className="text-xs text-red-700 dark:text-red-300">{action.error}</p>
           ) : null}
         </div>
       </SettingsField>
@@ -133,13 +126,4 @@ export function BackupSection(): ReactElement {
       ) : null}
     </SettingsSection>
   )
-}
-
-/** "Alex Notes" → "alex-notes-backup"; fallback when the graph name is odd. */
-function suggestRepoName(graphName: string | undefined): string {
-  const slug = (graphName ?? '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-  return slug.length > 0 ? `${slug}-backup` : 'reflect-backup'
 }

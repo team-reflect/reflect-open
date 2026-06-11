@@ -53,7 +53,9 @@ export {
 } from './github'
 export {
   createSyncEngine,
+  isSyncError,
   type SyncEngine,
   type SyncEngineOptions,
+  type SyncErrorKind,
   type SyncStatus,
 } from './engine'
