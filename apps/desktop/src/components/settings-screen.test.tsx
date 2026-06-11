@@ -1,10 +1,18 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge, type EmbedStatus } from '@reflect/core'
 import { formatFullDate } from '@/lib/dates'
+import { resetOperations } from '@/lib/operations'
 import { SettingsProvider } from '@/providers/settings-provider'
 import { SettingsScreen } from './settings-screen'
+
+// The rebuild-index field reads the open index generation from the graph
+// provider; the screen tests run without a GraphProvider, so stub the hook.
+const graph = vi.hoisted(() => ({ indexGeneration: 7 as number | null }))
+vi.mock('@/providers/graph-provider', () => ({
+  useGraph: () => ({ indexGeneration: graph.indexGeneration }),
+}))
 
 // jsdom doesn't implement this; Radix Select scrolls the selected option into
 // view when the listbox opens.
@@ -30,6 +38,8 @@ function installFakeBridge(): void {
         case 'embed_status':
         case 'embed_ensure':
           return embedStatus
+        case 'list_files':
+          return []
         default:
           return null
       }
@@ -61,6 +71,7 @@ function radio(name: RegExp): HTMLInputElement {
 beforeEach(() => {
   stored = {}
   embedStatus = { status: 'uninitialized' }
+  graph.indexGeneration = 7
   queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   })
@@ -408,6 +419,29 @@ describe('SettingsScreen', () => {
       ]),
     )
     expect(screen.getByRole('button', { name: /enable semantic search/i })).toBeTruthy()
+  })
+
+  it('rebuilding the index wipes and re-applies the projection through the bridge', async () => {
+    try {
+      renderScreen()
+
+      fireEvent.click(screen.getByRole('button', { name: /rebuild index/i }))
+
+      // The whole chain: button → rebuildIndexVisibly → wipe, then the
+      // projection-version stamp that marks a completed rebuild. (The graph is
+      // empty here, so there is no apply batch in between.)
+      await waitFor(() => expect(invoked).toContain('index_clear'))
+      await waitFor(() => expect(invoked).toContain('index_meta_set'))
+    } finally {
+      resetOperations()
+    }
+  })
+
+  it('disables the index rebuild until a graph index is open', () => {
+    graph.indexGeneration = null
+    renderScreen()
+    const button = screen.getByRole('button', { name: /rebuild index/i })
+    expect(button.hasAttribute('disabled')).toBe(true)
   })
 
   it('lists registered shortcuts from both keymap scopes', () => {

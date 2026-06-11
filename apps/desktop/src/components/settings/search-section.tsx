@@ -6,13 +6,15 @@ import { useEmbedStatus } from '@/lib/use-embed-status'
 import { useSettings } from '@/providers/settings-provider'
 import { SettingsField } from './field'
 import { ModelDownloadProgress } from './model-download-progress'
+import { RebuildIndexField } from './rebuild-index-field'
 import { SettingsSection } from './section'
 
 /**
- * The search settings: the semantic-search opt-in (Plan 09). Enabling
- * persists `semanticSearchEnabled`; EmbeddingsSync reacts by loading the
- * model, and the first load's ~90MB download streams through this section as
- * a progress bar (the `embed:status` events carry byte counts).
+ * The search settings: the semantic-search opt-in (Plan 09) and the index
+ * rebuild action. Enabling semantic search persists `semanticSearchEnabled`;
+ * EmbeddingsSync reacts by loading the model, and the first load's ~90MB
+ * download streams through this section as a progress bar (the `embed:status`
+ * events carry byte counts).
  */
 export function SearchSection(): ReactElement {
   const { settings, updateSettings } = useSettings()
@@ -90,6 +92,7 @@ export function SearchSection(): ReactElement {
       >
         <div className="mt-3">{control}</div>
       </SettingsField>
+      <RebuildIndexField />
     </SettingsSection>
   )
 }

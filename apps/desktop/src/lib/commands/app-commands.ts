@@ -1,10 +1,10 @@
-import { embedStatus, errorMessage, notePath, randomNotePath, rebuildIndex } from '@reflect/core'
+import { errorMessage, notePath, randomNotePath } from '@reflect/core'
 import { ulid } from 'ulidx'
 import { todayIso } from '@/lib/dates'
 import { toggleNotePinned } from '@/lib/note-pin'
 import { toggleNotePrivate } from '@/lib/note-private'
 import { startOperation } from '@/lib/operations'
-import { backfillEmbeddingsVisibly } from '@/lib/semantic'
+import { rebuildIndexVisibly } from '@/lib/rebuild-index'
 import { notePathForRoute, type Route } from '@/routing/route'
 import { registerCommands } from './registry'
 import type { AppCommand } from './types'
@@ -159,22 +159,7 @@ const APP_COMMANDS: AppCommand[] = [
       if (generation === null) {
         return
       }
-      // The index is a rebuildable cache; a full rebuild is safe and visible.
-      const operation = startOperation('Rebuilding search index')
-      try {
-        await rebuildIndex({ generation })
-        operation.done()
-      } catch (cause) {
-        operation.fail(cause instanceof Error ? cause.message : String(cause))
-        return
-      }
-      // index_clear wiped the embedding tables with everything else — rebuild
-      // them too, or semantic search stays silently empty until some other
-      // trigger re-embeds.
-      const embed = await embedStatus()
-      if (embed.status === 'ready') {
-        await backfillEmbeddingsVisibly({ generation, modelId: embed.model })
-      }
+      await rebuildIndexVisibly(generation)
     },
   },
 ]
