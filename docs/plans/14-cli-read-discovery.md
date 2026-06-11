@@ -161,9 +161,13 @@ errors go to stderr** so piped/JSON output stays clean. Exit codes:
   `--path`, a missing daily is exit 3.
 - **`reflect search <query> [--limit N=20]`** — lexical search over the FTS index.
   Build the `MATCH` expression exactly like `buildFtsMatch` (each whitespace-split term
-  double-quoted, embedded quotes doubled; empty query → empty result), rank with
-  `ORDER BY rank` (bm25), snippet via FTS5 `snippet()` on the body column. Private notes
-  are excluded (join `notes.is_private = 0`). A stale index
+  double-quoted, embedded quotes doubled; empty query → empty result), rank exactly like
+  the desktop's palette search: **title-boosted bm25** (`bm25(search_fts, 0, 10.0, 1.0)`,
+  `packages/core/src/indexing/filtered-search.ts`), snippet via FTS5 `snippet()` on the
+  body column. Private notes are excluded **twice**: the index filter
+  (`notes.is_private = 0`) *and* a frontmatter re-read of every hit's file before
+  emission — so a note flagged private after the last index run never reaches stdout
+  even from a stale row (same file-over-index rule as `show`). A stale index
   **warns on stderr and still returns rows** (and sets `"stale": true` in JSON); a
   missing/unopenable index is exit 4 with "open the graph in Reflect to build the index" —
   the CLI never runs the indexer or mutates the DB.
@@ -185,7 +189,8 @@ override flag**: `search` excludes them entirely; `show`/`today`/`path` on a pri
 print nothing to stdout, explain on stderr ("note is private"), and exit 3. Private notes
 are simply invisible through this surface — anyone who wants their content opens the file
 or the app directly. The check reads the frontmatter of the resolved file itself (not just
-the index row), so a just-flagged note is blocked even when the index is stale or absent.
+the index row) — and `search` re-reads each hit's file the same way — so a just-flagged
+note is blocked even when the index is stale or absent.
 
 ### Output contracts
 
