@@ -57,20 +57,24 @@ export function GraphFooter({ graph }: { graph: GraphInfo }): ReactElement {
           {recents.map((recent) => {
             const current = recent.root === graph.root
             return (
-              <DropdownMenuItem
-                key={recent.root}
-                onSelect={() => {
-                  if (!current) {
-                    void openRecent(recent.root)
-                  }
-                }}
-                className={MENU_ITEM_CLASS}
-              >
-                <span className="min-w-0 flex-1 truncate">{recent.name}</span>
-                {current ? (
-                  <Check aria-hidden className="size-3.5 shrink-0 text-accent" />
-                ) : null}
-              </DropdownMenuItem>
+              <Tooltip key={recent.root} delayDuration={700}>
+                <TooltipTrigger asChild>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      if (!current) {
+                        void openRecent(recent.root)
+                      }
+                    }}
+                    className={MENU_ITEM_CLASS}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{recent.name}</span>
+                    {current ? (
+                      <Check aria-hidden className="size-3.5 shrink-0 text-accent" />
+                    ) : null}
+                  </DropdownMenuItem>
+                </TooltipTrigger>
+                <TooltipContent side="right">{recent.root}</TooltipContent>
+              </Tooltip>
             )
           })}
           {recents.length > 0 ? <DropdownMenuSeparator /> : null}
