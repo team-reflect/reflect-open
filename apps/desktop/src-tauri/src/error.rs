@@ -69,11 +69,17 @@ impl From<git2::Error> for AppError {
         let message = err.message().to_string();
         // libgit2 reports HTTP auth failures inconsistently (code vs class vs
         // message), so classify with all three; Net class is reliably "couldn't
-        // reach the remote" and maps to the retryable Network kind.
+        // reach the remote" and maps to the retryable Network kind. The HTTP
+        // matches anchor on libgit2's "… status code: NNN" phrasing so a 401/403
+        // appearing in arbitrary content (an oid, a filename) can't false-match.
+        // Known ambiguity, accepted: GitHub can also answer 403 for secondary
+        // rate limits; at the transport layer that's indistinguishable from a
+        // rejected credential without the response body. Misclassification is
+        // not sticky — the auth state never blocks the next cycle's retry.
         let lowered = message.to_lowercase();
         if err.code() == ErrorCode::Auth
-            || lowered.contains("401")
-            || lowered.contains("403")
+            || lowered.contains("status code: 401")
+            || lowered.contains("status code: 403")
             || lowered.contains("authentication")
             || lowered.contains("authorization")
         {
@@ -153,6 +159,17 @@ mod tests {
     #[test]
     fn other_git_failures_classify_as_io() {
         let error = classify(ErrorCode::NotFound, ErrorClass::Odb, "object not found");
+        assert!(matches!(error, AppError::Io { .. }), "{error:?}");
+    }
+
+    #[test]
+    fn incidental_status_code_digits_do_not_classify_as_auth() {
+        // "403" inside an oid/filename must not read as an HTTP status.
+        let error = classify(
+            ErrorCode::NotFound,
+            ErrorClass::Odb,
+            "object 403fa1b2 not found",
+        );
         assert!(matches!(error, AppError::Io { .. }), "{error:?}");
     }
 }

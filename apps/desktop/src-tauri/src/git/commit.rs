@@ -98,13 +98,22 @@ fn add_all_with_size_guard(
     // unchanged" (skip silently — its old version is already backed up) from
     // "oversized changes being withheld" (skip and report). Size alone would
     // miss a same-length edit; matching git's own stat-based change detection
-    // (mtime) closes that without hashing gigabytes.
-    let tracked_stats: std::collections::HashMap<String, (u32, i32)> = index
+    // (mtime, at nanosecond precision where the index recorded it) closes
+    // that without hashing gigabytes. When the index entry carries no nsec
+    // component (libgit2 built without USE_NSEC), the comparison falls back
+    // to whole seconds — a same-length edit inside that second is then
+    // reported as withheld rather than silently matched, erring toward the
+    // warning.
+    let tracked_stats: std::collections::HashMap<String, (u32, i32, u32)> = index
         .iter()
         .map(|entry| {
             (
                 String::from_utf8_lossy(&entry.path).into_owned(),
-                (entry.file_size, entry.mtime.seconds()),
+                (
+                    entry.file_size,
+                    entry.mtime.seconds(),
+                    entry.mtime.nanoseconds(),
+                ),
             )
         })
         .collect();
@@ -119,13 +128,21 @@ fn add_all_with_size_guard(
             return 0;
         }
         let rel = path.to_string_lossy().replace('\\', "/");
-        let mtime_secs = meta
+        let mtime = meta
             .modified()
             .ok()
-            .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|duration| duration.as_secs() as i32)
-            .unwrap_or(0);
-        let unchanged = tracked_stats.get(&rel) == Some(&(meta.len() as u32, mtime_secs));
+            .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok());
+        let (file_secs, file_nsecs) = mtime
+            .map(|duration| (duration.as_secs() as i32, duration.subsec_nanos()))
+            .unwrap_or((0, 0));
+        let unchanged = match tracked_stats.get(&rel) {
+            Some(&(size, secs, nsecs)) => {
+                size == meta.len() as u32
+                    && secs == file_secs
+                    && (nsecs == 0 || nsecs == file_nsecs)
+            }
+            None => false,
+        };
         let mut skipped = skipped.borrow_mut();
         if !unchanged && !skipped.iter().any(|file| file.path == rel) {
             skipped.push(SkippedFile {

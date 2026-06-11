@@ -81,6 +81,7 @@ async function deriveExpectations(): Promise<ExpectedParity> {
     const indexed = buildIndexedNote(parseNote({ path: relPath, source }), {
       fileHash: await hashContent(source),
       mtime: 0,
+      source,
     })
     notes[relPath] = {
       title: indexed.title,

@@ -32,10 +32,15 @@ export function useDeviceFlowAuth(): DeviceFlowAuth {
   const [view, setView] = useState<DeviceFlowView>({ view: 'idle' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const abortRef = useRef(new AbortController())
+  // One controller per *mount*, created in the effect: a ref-initialized
+  // controller would be aborted once by StrictMode's probe unmount and the
+  // surviving instance would then poll with a dead signal forever (the code
+  // renders, polling never starts).
+  const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
-    const abort = abortRef.current
+    const abort = new AbortController()
+    abortRef.current = abort
     return () => {
       abort.abort() // closing the dialog stops the device-flow polling
     }
@@ -47,7 +52,7 @@ export function useDeviceFlowAuth(): DeviceFlowAuth {
     try {
       const auth = await runDeviceFlow({
         fetchFn: providerFetch,
-        signal: abortRef.current.signal,
+        signal: abortRef.current?.signal,
         onCode: (code) => {
           setView({ view: 'code', userCode: code.userCode, verificationUri: code.verificationUri })
           void openUrl(code.verificationUri).catch(() => {
