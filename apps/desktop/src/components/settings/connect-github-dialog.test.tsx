@@ -16,14 +16,29 @@ vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl: vi.fn() }))
 const httpFetch = vi.mocked(tauriFetch)
 const openedUrls = vi.mocked(openUrl)
 
-beforeEach(() => {
-  // A stored credential + GitHub accepting it ("alex") makes the auth step
-  // skip itself, so a Continue lands straight on the finish step.
+/** A keychain holding the given credential; GET /user accepting it makes the auth step skip itself. */
+function storeCredential(auth: Record<string, unknown>): void {
   setBridge({
-    invoke: async (command) =>
-      command === 'secret_get' ? JSON.stringify({ kind: 'pat', token: 'ghp_abc' }) : null,
+    invoke: async (command) => (command === 'secret_get' ? JSON.stringify(auth) : null),
     listen: async () => () => {},
   })
+}
+
+/** A device-flow (GitHub App) credential with a comfortably unexpired token. */
+function appCredential(): Record<string, unknown> {
+  return {
+    kind: 'app',
+    accessToken: 'ghu_live',
+    refreshToken: 'ghr_live',
+    expiresAt: Date.now() + 60 * 60 * 1000,
+  }
+}
+
+beforeEach(() => {
+  // A stored credential + GitHub accepting it ("alex") makes the auth step
+  // skip itself, so a Continue lands straight on the finish step. PAT by
+  // default; app-credential tests re-store before rendering.
+  storeCredential({ kind: 'pat', token: 'ghp_abc' })
   // A fresh Response per call — bodies are single-use, and a wizard run can
   // pass through the auth step more than once.
   httpFetch.mockImplementation(
@@ -195,6 +210,8 @@ describe('ConnectGithubDialog', () => {
     expect(await screen.findByText(/was not found/i)).toBeTruthy()
     expect(sync.connectNewRepo).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
+    // PAT remedy is token scope — the app-install flow is someone else's fix.
+    expect(screen.queryByRole('button', { name: /grant access/i })).toBeNull()
   })
 
   it('offers a way back to change the repository after a failed connect', async () => {
@@ -239,5 +256,55 @@ describe('ConnectGithubDialog', () => {
     // in a silently rejected promise.
     expect(await screen.findByText(/open the browser/i)).toBeTruthy()
     expect(screen.getByText(/github\.com\/new\?name=g-backup/)).toBeTruthy()
+  })
+
+  it('routes an app sign-in that cannot see the repo to the install flow', async () => {
+    // GitHub's 404 can't distinguish "doesn't exist" from "no access", and
+    // for app sign-ins it's almost always the latter — so granting access
+    // is the remedy, with no token language anywhere.
+    storeCredential(appCredential())
+    sync.connectExistingRepo.mockResolvedValueOnce('notFound')
+    const onClose = renderWizard()
+
+    fireEvent.click(screen.getByRole('radio', { name: /use an existing repository/i }))
+    fireEvent.change(screen.getByLabelText('Existing repository'), {
+      target: { value: 'alex/notes' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(await screen.findByText(/grant it access on GitHub/i)).toBeTruthy()
+    expect(screen.queryByText(/token/i)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Grant access on GitHub…' }))
+    expect(openedUrls).toHaveBeenCalledWith(
+      'https://github.com/apps/reflect-github-app/installations/new',
+    )
+
+    // Back from the browser with access granted: the retry connects.
+    fireEvent.click(screen.getByRole('button', { name: 'I granted it — try again' }))
+    await waitFor(() =>
+      expect(sync.connectExistingRepo).toHaveBeenLastCalledWith(
+        { owner: 'alex', name: 'notes' },
+        { allowPublic: false },
+      ),
+    )
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('points the app create guide at granting access, not token scope', async () => {
+    storeCredential(appCredential())
+    sync.connectExistingRepo.mockResolvedValueOnce('notFound')
+    sync.connectNewRepo.mockResolvedValueOnce('manualCreateNeeded')
+    renderWizard()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(await screen.findByText(/Reflect can’t create the repository itself/i)).toBeTruthy()
+    expect(screen.queryByText(/token/i)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: /grant the Reflect app access/i }))
+    expect(openedUrls).toHaveBeenCalledWith(
+      'https://github.com/apps/reflect-github-app/installations/new',
+    )
   })
 })
