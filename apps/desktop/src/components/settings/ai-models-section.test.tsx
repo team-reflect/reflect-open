@@ -15,6 +15,14 @@ vi.mock('@/lib/provider-fetch', () => ({ providerFetch: providerFetchMock }))
 // view when the listbox opens.
 Element.prototype.scrollIntoView ??= () => {}
 
+// jsdom doesn't implement ResizeObserver; cmdk uses it to observe the command
+// list dimensions.
+globalThis.ResizeObserver ??= class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
 let stored: Record<string, unknown>
 let saved: unknown[]
 let secrets: Map<string, string>
