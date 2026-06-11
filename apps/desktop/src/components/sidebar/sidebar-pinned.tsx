@@ -16,8 +16,10 @@ export function SidebarPinned(): ReactElement | null {
   }
 
   return (
-    <section aria-label="Pinned notes">
-      <h2 className="px-4 pt-4 text-2xs font-medium leading-5 tracking-wide text-text-muted">
+    // px-6.5 starts the section's text at the nav rows' icon edge (the nav's
+    // px-4 plus each row's px-2.5).
+    <section aria-label="Pinned notes" className="px-6.5">
+      <h2 className="pt-4 text-2xs font-medium leading-5 tracking-wide text-text-muted">
         Pinned notes
       </h2>
       <ul className="mt-2 flex flex-col space-y-1">

@@ -23,13 +23,15 @@ export function SidebarNoteRow({ path, title, date }: SidebarNoteRowProps): Reac
   const target = routeForPath(path)
   const active = routesEqual(route, target)
   return (
-    <li className="mx-2">
+    // The negative margin lets the hover wash bleed past the section's
+    // padding so the title text stays on the section's alignment line.
+    <li className="-mx-2.5">
       <button
         type="button"
         onClick={() => navigate(target)}
         aria-current={active ? 'page' : undefined}
         className={cn(
-          'flex w-full items-center rounded-md px-2 py-1 leading-5',
+          'flex w-full items-center rounded-md px-2.5 py-1 leading-5',
           'transition-colors duration-100',
           active
             ? 'bg-surface-hover text-text dark:bg-transparent dark:text-accent'
