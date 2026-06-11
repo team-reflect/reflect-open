@@ -1,7 +1,6 @@
 import type { ReactElement } from 'react'
 import type { GraphInfo } from '@reflect/core'
 import { Check, FolderOpen } from 'lucide-react'
-import { HelpIcon } from '@/components/icons/help-icon'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,21 +10,17 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
-import { useRouter } from '@/routing/router'
 
 const MENU_ITEM_CLASS = 'gap-2 px-2 py-1.5 text-[13px] text-text-secondary'
 
 /**
- * The sidebar footer, in the original app's idiom (its account nav): the
- * graph's color swatch and name on the left — a dropdown menu for switching
- * to a recent graph or the OS folder picker — and a help button on the right
- * (Settings hosts the keyboard cheat sheet, the closest analog to the old
- * help menu). The swatch pulses while the graph indexes. The menu content
- * matches the trigger width, so it stays inset from the sidebar edges.
+ * The sidebar footer: the graph's color swatch and name on the left — a
+ * dropdown menu for switching to a recent graph or the OS folder picker. The
+ * swatch pulses while the graph indexes. The menu content matches the trigger
+ * width, so it stays inset from the sidebar edges.
  */
 export function GraphFooter({ graph }: { graph: GraphInfo }): ReactElement {
   const { recents, indexing, openRecent, pickAndOpen } = useGraph()
-  const { navigate } = useRouter()
 
   return (
     <div className="flex items-center px-4 py-3">
@@ -84,15 +79,6 @@ export function GraphFooter({ graph }: { graph: GraphInfo }): ReactElement {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <button
-        type="button"
-        aria-label="Help"
-        title="Help"
-        onClick={() => navigate({ kind: 'settings' })}
-        className="flex-none text-text-muted transition-colors duration-100 hover:text-text"
-      >
-        <HelpIcon />
-      </button>
     </div>
   )
 }
