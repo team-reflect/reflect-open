@@ -140,4 +140,42 @@ describe('GithubAuthStep', () => {
 
     expect(await screen.findByText('my-notes-backup')).toBeTruthy()
   })
+
+  it('reports auth exactly once when the mount probe races a fresh sign-in', async () => {
+    // A stored credential's mount-time probe is slow; the user saves a new
+    // PAT meanwhile. Both paths complete — but the parent connects on every
+    // onAuthed, so the late probe must be swallowed, not start a second run.
+    fakeKeychain({ 'github-auth': JSON.stringify({ kind: 'pat', token: 'ghp_old' }) })
+    let resolveProbe: (response: Response) => void = () => {}
+    httpFetch.mockImplementationOnce(
+      () => new Promise<Response>((resolve) => (resolveProbe = resolve)),
+    )
+    httpFetch.mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ login: 'alex' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    )
+    const onAuthed = vi.fn()
+    render(<GithubAuthStep onAuthed={onAuthed} />)
+    await switchToPat()
+
+    fireEvent.change(screen.getByLabelText('Personal access token'), {
+      target: { value: 'github_pat_new' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save token' }))
+    await waitFor(() => expect(onAuthed).toHaveBeenCalledTimes(1))
+
+    // The old credential turns out valid too — its late arrival must not
+    // re-fire the step's completion.
+    resolveProbe(
+      new Response(JSON.stringify({ login: 'alex' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0)) // flush the probe's chain
+    expect(onAuthed).toHaveBeenCalledTimes(1)
+  })
 })

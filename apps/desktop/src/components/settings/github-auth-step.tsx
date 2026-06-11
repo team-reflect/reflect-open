@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from 'react'
+import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { isDeviceFlowConfigured, saveGithubAuth, type GithubUser } from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert'
@@ -40,6 +40,18 @@ export function GithubAuthStep({ onAuthed, repoName }: GithubAuthStepProps): Rea
   // The device flow leads when the app is registered; the PAT path stays one
   // click away (some users prefer a scoped token; GHES needs it).
   const [usePat, setUsePat] = useState(!isDeviceFlowConfigured())
+  const authedRef = useRef(false)
+
+  // Auth can complete twice — the mount-time probe of a stored credential
+  // racing a fresh sign-in — and the parent advances (and connects) on every
+  // call, so completion must be single-shot.
+  function reportAuthed(user: GithubUser): void {
+    if (authedRef.current) {
+      return
+    }
+    authedRef.current = true
+    onAuthed(user)
+  }
 
   // Already signed in with a working credential (e.g. connecting a second
   // graph) → skip the step. A stored-but-rejected credential is cleared by
@@ -49,7 +61,7 @@ export function GithubAuthStep({ onAuthed, repoName }: GithubAuthStepProps): Rea
     void fetchSignedInUser()
       .then((user) => {
         if (!cancelled && user !== null) {
-          onAuthed(user)
+          reportAuthed(user)
         }
       })
       .catch(() => {
@@ -67,7 +79,7 @@ export function GithubAuthStep({ onAuthed, repoName }: GithubAuthStepProps): Rea
     if (user === null) {
       throw new Error('GitHub rejected that token — check it and try again.')
     }
-    onAuthed(user)
+    reportAuthed(user)
   }
 
   async function signIn(): Promise<void> {
