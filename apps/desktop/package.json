@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "sidecar": "node scripts/build-sidecar.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "tauri": "tauri"

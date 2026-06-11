@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "com.alex.reflect-open",
   "build": {
-    "beforeDevCommand": "pnpm dev",
+    "beforeDevCommand": "pnpm sidecar && pnpm dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm build",
+    "beforeBuildCommand": "pnpm sidecar && pnpm build",
     "frontendDist": "../dist"
   },
   "app": {
