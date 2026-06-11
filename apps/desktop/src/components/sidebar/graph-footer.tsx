@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
 import { useRouter } from '@/routing/router'
 
-const menuItemClass = 'gap-2 px-2 py-1.5 text-[13px] text-text-secondary'
+const MENU_ITEM_CLASS = 'gap-2 px-2 py-1.5 text-[13px] text-text-secondary'
 
 /**
  * The sidebar footer, in the original app's idiom (its account nav): the
@@ -65,7 +65,7 @@ export function GraphFooter({ graph }: { graph: GraphInfo }): ReactElement {
                     void openRecent(recent.root)
                   }
                 }}
-                className={menuItemClass}
+                className={MENU_ITEM_CLASS}
               >
                 <span className="min-w-0 flex-1 truncate">{recent.name}</span>
                 {current ? (
@@ -77,7 +77,7 @@ export function GraphFooter({ graph }: { graph: GraphInfo }): ReactElement {
           {recents.length > 0 ? <DropdownMenuSeparator /> : null}
           <DropdownMenuItem
             onSelect={() => void pickAndOpen()}
-            className={menuItemClass}
+            className={MENU_ITEM_CLASS}
           >
             <FolderOpen aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
             <span className="min-w-0 flex-1 truncate">Open another graph…</span>
