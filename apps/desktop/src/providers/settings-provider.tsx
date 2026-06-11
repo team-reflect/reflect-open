@@ -79,23 +79,37 @@ function createLoadSettle(): LoadSettle {
 }
 
 /**
- * One settings value equals another: identity, or element-wise for arrays —
- * documents are flat JSON, so arrays are the only non-primitive values
+ * One settings value equals another: identity, element-wise for arrays
  * (`allNotesFilterTags`; `aiModels` holds plain config objects, compared as
- * JSON below). Reference equality alone would make an equal-but-rebuilt array
- * (a re-parse — `aiModels`' transform rebuilds its array on every parse — or
- * a no-op update) read as a change and trigger spurious saves.
+ * JSON below), or key-wise for plain-object records (`graphColors`, whose
+ * values are scalars). Reference equality alone would make an equal-but-
+ * rebuilt value (a re-parse — the schema transforms rebuild arrays and
+ * records on every parse — or a no-op update) read as a change and trigger
+ * spurious saves.
  */
 function sameValue(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) {
     return true
   }
-  return (
-    Array.isArray(a) &&
-    Array.isArray(b) &&
-    a.length === b.length &&
-    a.every((item, index) => sameItem(item, b[index]))
-  )
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return (
+      Array.isArray(a) &&
+      Array.isArray(b) &&
+      a.length === b.length &&
+      a.every((item, index) => sameItem(item, b[index]))
+    )
+  }
+  if (isRecord(a) && isRecord(b)) {
+    const aKeys = Object.keys(a)
+    const bKeys = Object.keys(b)
+    return aKeys.length === bKeys.length && aKeys.every((key) => sameItem(a[key], b[key]))
+  }
+  return false
+}
+
+/** A plain-object record (not an array, not null). */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /** One array element equals another: identity for scalars, JSON for objects. */

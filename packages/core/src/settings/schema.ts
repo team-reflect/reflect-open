@@ -84,6 +84,51 @@ export type AllNotesFilterTags = z.infer<typeof allNotesFilterTagsSchema>
 export const semanticSearchEnabledSchema = z.boolean().catch(false)
 
 /**
+ * The preset palette for a graph's identity color (the swatch shown next to
+ * the graph name). A closed set of named ids — not raw hex — so the UI can
+ * map each id to values that read well in both light and dark themes.
+ */
+export const graphColorSchema = z.enum([
+  'indigo',
+  'blue',
+  'teal',
+  'green',
+  'amber',
+  'orange',
+  'red',
+  'pink',
+  'purple',
+])
+
+export type GraphColor = z.infer<typeof graphColorSchema>
+
+/** Every graph color id, in the order pickers should display them. */
+export const GRAPH_COLOR_IDS = graphColorSchema.options
+
+export type GraphColors = Record<string, GraphColor>
+
+/**
+ * Identity colors the user has chosen per graph, keyed by the graph's absolute
+ * root path. An absent key means the default (the app accent). Entries for
+ * forgotten graphs are kept on purpose — re-opening that graph later restores
+ * its color. Resilience is per entry: a corrupt value is dropped while the
+ * rest load, and a non-object value degrades to the empty record.
+ */
+export const graphColorsSchema = z
+  .record(z.string(), z.unknown())
+  .catch({})
+  .transform((entries) => {
+    const colors: GraphColors = {}
+    for (const [root, value] of Object.entries(entries)) {
+      const parsed = graphColorSchema.safeParse(value)
+      if (parsed.success) {
+        colors[root] = parsed.data
+      }
+    }
+    return colors
+  })
+
+/**
  * The cloud AI providers Reflect can call directly (BYOK — the user's own
  * keys, no Reflect-hosted proxy).
  */
@@ -140,6 +185,7 @@ export const settingsSchema = z
     dateFormat: dateFormatSchema,
     weekStartDay: weekStartDaySchema,
     allNotesFilterTags: allNotesFilterTagsSchema,
+    graphColors: graphColorsSchema,
     aiModels: aiModelsSchema,
     defaultAiModelId: defaultAiModelIdSchema,
   })

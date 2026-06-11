@@ -39,9 +39,9 @@ describe('dates', () => {
 
   it('formatFullDate spells the date out per the date format', () => {
     expect(formatFullDate(new Date(2026, 5, 10), 'mdy')).toBe('June 10th, 2026')
-    expect(formatFullDate(new Date(2026, 5, 10), 'dmy')).toBe('10th June 2026')
+    expect(formatFullDate(new Date(2026, 5, 10), 'dmy')).toBe('10th June, 2026')
     expect(formatFullDate(new Date(2026, 0, 1), 'mdy')).toBe('January 1st, 2026')
-    expect(formatFullDate(new Date(2026, 0, 22), 'dmy')).toBe('22nd January 2026')
+    expect(formatFullDate(new Date(2026, 0, 22), 'dmy')).toBe('22nd January, 2026')
   })
 
   describe('formatTimeOfDay', () => {

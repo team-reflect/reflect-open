@@ -11,6 +11,10 @@ import { AiModelsSection } from './ai-models-section'
 const { providerFetchMock } = vi.hoisted(() => ({ providerFetchMock: vi.fn() }))
 vi.mock('@/lib/provider-fetch', () => ({ providerFetch: providerFetchMock }))
 
+// jsdom doesn't implement this; Radix Select scrolls the selected option into
+// view when the listbox opens.
+Element.prototype.scrollIntoView ??= () => {}
+
 let stored: Record<string, unknown>
 let saved: unknown[]
 let secrets: Map<string, string>
@@ -130,9 +134,13 @@ describe('AiModelsSection', () => {
     await waitFor(() => expect(screen.getByText(/No AI models configured/)).toBeTruthy())
 
     const dialog = openDialog()
-    fireEvent.change(dialog.getByLabelText('Provider'), { target: { value: 'anthropic' } })
-    fireEvent.change(dialog.getByLabelText('Model'), {
-      target: { value: 'claude-sonnet-4-6' },
+    // Keyboard-driven (the pointer path needs capture APIs jsdom lacks);
+    // options render in a portal, so they're queried from screen.
+    fireEvent.keyDown(dialog.getByRole('combobox', { name: 'Provider' }), { key: 'ArrowDown' })
+    fireEvent.keyDown(await screen.findByRole('option', { name: 'Anthropic' }), { key: 'Enter' })
+    fireEvent.keyDown(dialog.getByRole('combobox', { name: 'Model' }), { key: 'ArrowDown' })
+    fireEvent.keyDown(await screen.findByRole('option', { name: 'Claude Sonnet 4.6' }), {
+      key: 'Enter',
     })
     fireEvent.change(dialog.getByLabelText('API key'), {
       target: { value: 'sk-ant-test-wxyz1' },

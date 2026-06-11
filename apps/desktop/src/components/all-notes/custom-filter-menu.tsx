@@ -4,6 +4,7 @@ import { ChevronDown } from 'lucide-react'
 import {
   Command,
   CommandEmpty,
+  CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
@@ -87,24 +88,32 @@ export function CustomFilterMenu({
             {/* A force-mounted item never counts as a match, so cmdk would
                 show the empty state right above it — render one or the other. */}
             {offerTyped ? null : <CommandEmpty>{emptyMessage}</CommandEmpty>}
-            {facets.map((facet) => (
-              <CommandItem
-                key={foldTag(facet.tag)}
-                value={facet.tag}
-                keywords={[`#${facet.tag}`]}
-                data-checked={activeTag !== null && foldTag(activeTag) === foldTag(facet.tag)}
-                onSelect={() => choose(facet.tag)}
-              >
-                <span className="min-w-0 flex-1 truncate">#{facet.tag}</span>
-                <span className="shrink-0 text-xs tabular-nums text-text-muted">
-                  {facet.count}
-                </span>
-              </CommandItem>
-            ))}
+            {facets.length > 0 ? (
+              <CommandGroup>
+                {facets.map((facet) => (
+                  <CommandItem
+                    key={foldTag(facet.tag)}
+                    value={facet.tag}
+                    keywords={[`#${facet.tag}`]}
+                    data-checked={activeTag !== null && foldTag(activeTag) === foldTag(facet.tag)}
+                    onSelect={() => choose(facet.tag)}
+                  >
+                    <span className="min-w-0 flex-1 truncate">#{facet.tag}</span>
+                    <span className="shrink-0 text-xs tabular-nums text-text-muted">
+                      {facet.count}
+                    </span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ) : null}
             {offerTyped ? (
-              <CommandItem forceMount value={`custom:${typed}`} onSelect={() => choose(typed)}>
-                <span className="min-w-0 flex-1 truncate">Filter by #{typed}</span>
-              </CommandItem>
+              // The group needs forceMount too: cmdk hides a group whenever
+              // no item inside it matches the query, even force-mounted ones.
+              <CommandGroup forceMount>
+                <CommandItem forceMount value={`custom:${typed}`} onSelect={() => choose(typed)}>
+                  <span className="min-w-0 flex-1 truncate">Filter by #{typed}</span>
+                </CommandItem>
+              </CommandGroup>
             ) : null}
           </CommandList>
         </Command>

@@ -136,10 +136,35 @@ describe('SettingsProvider', () => {
           dateFormat: 'mdy',
           weekStartDay: 'monday',
           allNotesFilterTags: ['book'],
+          graphColors: {},
           aiModels: [],
           defaultAiModelId: null,
         },
       ]),
+    )
+  })
+
+  it('an equal-but-rebuilt record value does not trigger a save', async () => {
+    stored = { graphColors: { '/graphs/work': 'teal' } }
+    const { result } = renderHook(() => useSettings(), { wrapper })
+    await loadSettled()
+
+    // Same entries, new instance — re-choosing the current color rebuilds the
+    // record without changing it; that must not count as a change.
+    act(() => {
+      result.current.updateSettings({ graphColors: { '/graphs/work': 'teal' } })
+    })
+    await act(async () => {
+      await flushSettings()
+    })
+    expect(saved).toEqual([])
+
+    // A genuinely changed record still persists.
+    act(() => {
+      result.current.updateSettings({ graphColors: { '/graphs/work': 'pink' } })
+    })
+    await waitFor(() =>
+      expect(saved).toMatchObject([{ graphColors: { '/graphs/work': 'pink' } }]),
     )
   })
 
@@ -165,6 +190,7 @@ describe('SettingsProvider', () => {
           dateFormat: 'mdy',
           weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
+          graphColors: {},
           aiModels: [],
           defaultAiModelId: null,
           futureKey: true,
@@ -203,6 +229,7 @@ describe('SettingsProvider', () => {
           dateFormat: 'mdy',
           weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
+          graphColors: {},
           aiModels: [],
           defaultAiModelId: null,
           futureKey: true,
@@ -235,6 +262,7 @@ describe('SettingsProvider', () => {
           dateFormat: 'mdy',
           weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
+          graphColors: {},
           aiModels: [],
           defaultAiModelId: null,
         },
@@ -393,6 +421,7 @@ describe('SettingsProvider', () => {
           dateFormat: 'mdy',
           weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
+          graphColors: {},
           aiModels: [],
           defaultAiModelId: null,
         },
@@ -428,6 +457,7 @@ describe('SettingsProvider', () => {
         dateFormat: 'mdy',
         weekStartDay: 'monday',
         allNotesFilterTags: ['book', 'link', 'person'],
+        graphColors: {},
         aiModels: [],
         defaultAiModelId: null,
       },

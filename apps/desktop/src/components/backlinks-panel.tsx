@@ -21,8 +21,8 @@ const EXPANDED_STORAGE_KEY = 'reflect.backlinks-expanded'
 /**
  * Incoming backlinks at the bottom of every note — daily and ordinary — in
  * old Reflect's presentation: an "Incoming backlinks (N)" header with a
- * gutter chevron, references grouped by source note, and hairline dividers
- * between groups. The header toggle collapses the linking lines while the
+ * leading chevron, indented references grouped by source note, and hairline
+ * dividers between groups. The header toggle collapses the linking lines while the
  * source titles stay visible, and the choice persists for the session
  * across all notes. Ambient and always-available — the associative recall
  * the product is built on — and cheap: one indexed query per visible note,
@@ -74,15 +74,11 @@ export function BacklinksPanel({ path }: BacklinksPanelProps): ReactElement | nu
           type="button"
           aria-expanded={expanded}
           onClick={toggleExpanded}
-          className="relative flex w-full items-center text-left"
+          className="flex w-full items-center gap-2 text-left"
         >
-          {/* V1 floats the chevron in the note gutter, vertically centered
-              (`inset-y-0 left-[15px]` inside its 40px gutter). The stream
-              gutter bottoms out at 1.5rem, so -left-5 keeps the 16px icon
-              centered there — -left-6 presses it flush against the pane edge. */}
           <ChevronRight
             aria-hidden
-            className={`absolute inset-y-0 -left-5 my-auto size-4 text-text-muted transition-transform ${
+            className={`size-3 shrink-0 text-text-muted transition-transform ${
               expanded ? 'rotate-90' : ''
             }`}
           />
@@ -92,7 +88,10 @@ export function BacklinksPanel({ path }: BacklinksPanelProps): ReactElement | nu
         </button>
       </h3>
 
-      <div className="mt-5">
+      {/* pl-5 = the header's 12px chevron + 8px gap, so group titles line up
+          with the header label and the group hover-chevrons (-left-5) land
+          back at the section's left edge, under the header chevron. */}
+      <div className="mt-5 pl-5">
         {groups.map((group, index) => (
           <BacklinkSourceGroup
             // Scoped to the open note: the pane is reused across navigation,

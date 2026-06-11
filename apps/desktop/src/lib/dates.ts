@@ -48,11 +48,11 @@ export function formatDayLabel(date: string, dateFormat: DateFormat): string {
 
 /**
  * A date spelled out in full per the date-format setting: `June 10th, 2026`
- * for `mdy`, `10th June 2026` for `dmy` (the forms the settings screen shows
+ * for `mdy`, `10th June, 2026` for `dmy` (the forms the settings screen shows
  * as the options themselves).
  */
 export function formatFullDate(date: Date, dateFormat: DateFormat): string {
-  return format(date, dateFormat === 'dmy' ? 'do MMMM yyyy' : 'MMMM do, yyyy')
+  return format(date, dateFormat === 'dmy' ? 'do MMMM, yyyy' : 'MMMM do, yyyy')
 }
 
 /**

@@ -18,8 +18,8 @@ interface BacklinkSourceGroupProps {
 /**
  * One referencing note in the incoming-backlinks section, in old Reflect's
  * presentation: an accent-colored title that opens the note, the linking
- * lines beneath as selectable text, and a chevron in the left gutter —
- * revealed on hover — that toggles just this group. The group chevron
+ * lines beneath as selectable text, and a chevron in the indent to its
+ * left — revealed on hover — that toggles just this group. The group chevron
  * deliberately overrides the panel-level toggle (old Reflect's behavior):
  * collapsing the panel collapses every group, after which one source can be
  * peeked at without re-expanding the rest. Groups are separated by hairline
@@ -64,7 +64,7 @@ export function BacklinkSourceGroup({
           >
             <ChevronRight
               aria-hidden
-              className={`size-4 transition-transform ${expanded ? 'rotate-90' : ''}`}
+              className={`size-3 transition-transform ${expanded ? 'rotate-90' : ''}`}
             />
           </button>
         ) : null}
