@@ -50,6 +50,11 @@ export function useActiveSettingsSection(
       setActiveId(atBottom ? SETTINGS_SECTIONS[SETTINGS_SECTIONS.length - 1].id : current)
     }
     compute()
+    // ScrollRestored restores a saved scrollTop in its own effect, which runs
+    // after this one (React flushes child effects first) and whose scroll
+    // event only lands a frame later. Recompute in a microtask — after the
+    // whole effect pass, before paint — so a revisited entry starts right.
+    queueMicrotask(compute)
     container.addEventListener('scroll', compute, { passive: true })
     const resizeObserver = new ResizeObserver(compute)
     resizeObserver.observe(container)
