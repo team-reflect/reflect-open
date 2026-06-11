@@ -14,7 +14,7 @@ interface AllNotesTableProps {
   scrollRef: RefObject<HTMLDivElement | null>
 }
 
-const ESTIMATED_ROW_HEIGHT = 46
+const ESTIMATED_ROW_HEIGHT = 49
 
 /**
  * The All Notes table: a sticky header row over virtualized note rows. The
@@ -44,16 +44,16 @@ export function AllNotesTable({
       <div
         className={cn(
           ALL_NOTES_GRID,
-          'sticky top-0 z-10 border-b border-border bg-surface px-3 pb-2 text-xs font-medium text-text-muted',
+          'sticky top-0 z-10 border-b border-border bg-surface py-3 text-[13px] font-medium leading-none text-text-secondary shadow-sm',
         )}
       >
         <span>Subject</span>
         <span>Snippet</span>
-        <span>Tags</span>
+        <span className="text-right">Tags</span>
         <span className="text-right">Updated</span>
       </div>
       {notes.length === 0 ? (
-        <p className="px-3 py-8 text-sm text-text-muted">
+        <p className="py-8 pl-4 pr-7 text-sm text-text-muted lg:pl-12">
           {tag === null ? 'No notes yet.' : `No notes tagged #${tag}.`}
         </p>
       ) : (

@@ -57,33 +57,29 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
 
   return (
     <div aria-label="All notes" className="flex h-full min-h-0 flex-col">
-      <header className="px-6 pb-4 pt-8">
-        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3">
-          <h1 className="text-lg font-semibold text-text">Notes</h1>
-          <div className="flex flex-wrap items-center gap-3">
-            <AllNotesFilters
-              tag={tag}
-              facets={facets ?? []}
-              onSelect={(next) => navigate({ kind: 'allNotes', tag: next })}
-            />
-            <NewNoteButton />
-          </div>
+      <header className="flex flex-none flex-wrap items-center justify-between gap-3 border-b border-border py-4 pl-4 pr-7 lg:pl-12">
+        <h1 className="text-[15px] font-semibold text-text">Notes</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <AllNotesFilters
+            tag={tag}
+            facets={facets ?? []}
+            onSelect={(next) => navigate({ kind: 'allNotes', tag: next })}
+          />
+          <NewNoteButton />
         </div>
       </header>
       <div
         ref={scrollRef}
         data-testid="all-notes-scroll"
         onScroll={(event) => saveScrollState(event.currentTarget.scrollTop)}
-        className="min-h-0 flex-1 overflow-auto px-6 pb-8"
+        className="min-h-0 flex-1 overflow-auto"
       >
-        <div className="mx-auto w-full max-w-5xl">
-          <AllNotesTable
-            notes={notes}
-            tag={tag}
-            onOpen={(path) => navigate(routeForPath(path))}
-            scrollRef={scrollRef}
-          />
-        </div>
+        <AllNotesTable
+          notes={notes}
+          tag={tag}
+          onOpen={(path) => navigate(routeForPath(path))}
+          scrollRef={scrollRef}
+        />
       </div>
     </div>
   )
