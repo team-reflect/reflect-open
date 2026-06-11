@@ -21,7 +21,7 @@ vi.mock('@/providers/graph-provider', () => ({
 }))
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({
-    settings: { semanticSearchEnabled: true },
+    settings: { semanticSearchEnabled: true, dateFormat: 'mdy' },
     updateSettings: () => {},
   }),
 }))
@@ -53,7 +53,7 @@ describe('DailyContextSidebar header', () => {
   it('shows the day label and a Today badge on today', async () => {
     const today = todayIso()
     const view = renderSidebar(today)
-    expect(view.getByRole('heading', { name: formatDayLabel(today) })).toBeDefined()
+    expect(view.getByRole('heading', { name: formatDayLabel(today, 'mdy') })).toBeDefined()
     expect(view.getByText('Today')).toBeDefined()
     expect(view.queryByText('Go to today')).toBeNull()
     await waitFor(() => expect(relatedNotes).toHaveBeenCalled())
@@ -91,7 +91,7 @@ describe('DailyContextSidebar calendar', () => {
     expect(dailyDatesInRange).toHaveBeenCalledWith('2026-06-01', '2026-07-05')
     expect(view.queryByTestId('note-dot-2026-06-04')).toBeNull()
 
-    await userEvent.click(view.getByRole('button', { name: formatDayLabel('2026-06-18') }))
+    await userEvent.click(view.getByRole('button', { name: formatDayLabel('2026-06-18', 'mdy') }))
     expect(view.getByTestId('route').textContent).toContain('2026-06-18')
     view.unmount()
   })

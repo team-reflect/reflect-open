@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { dailyPath } from '@reflect/core'
 import { NotePane } from '@/components/note-pane'
 import { formatDayLabel, todayIso } from '@/lib/dates'
+import { useSettings } from '@/providers/settings-provider'
 import { useToday } from '@/lib/use-today'
 import { createDayWindow, dateAtIndex, indexOfDate } from '@/lib/day-window'
 import { useRouter } from '@/routing/router'
@@ -28,6 +29,7 @@ export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
   // (`dayWindow`, not `window` — shadowing the DOM global here was a footgun.)
   const [dayWindow] = useState(() => createDayWindow(todayIso()))
   const today = useToday()
+  const { settings } = useSettings()
 
   const virtualizer = useVirtualizer({
     count: dayWindow.count,
@@ -111,7 +113,7 @@ export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
             >
               <section className="border-b border-black/5 py-6 dark:border-white/5">
                 <h2 className="mb-3 text-lg font-semibold">
-                  {formatDayLabel(date)}
+                  {formatDayLabel(date, settings.dateFormat)}
                   {isToday ? (
                     <span className="ml-2 align-middle text-xs font-medium text-accent">
                       Today

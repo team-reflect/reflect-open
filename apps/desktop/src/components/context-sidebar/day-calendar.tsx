@@ -13,6 +13,7 @@ import {
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
+import { useSettings } from '@/providers/settings-provider'
 import { useRouter } from '@/routing/router'
 
 interface DayCalendarProps {
@@ -34,6 +35,7 @@ const WEEKDAYS = weekdayLabels()
 export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactElement {
   const { navigate } = useRouter()
   const { graph } = useGraph()
+  const { settings } = useSettings()
 
   const [month, setMonth] = useState(() => monthOf(selectedDate))
   // Render-time state adjustment (not an effect): navigating to another day
@@ -100,7 +102,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
                   <td key={cell.date} className="p-0">
                     <button
                       type="button"
-                      aria-label={formatDayLabel(cell.date)}
+                      aria-label={formatDayLabel(cell.date, settings.dateFormat)}
                       aria-current={isToday ? 'date' : undefined}
                       aria-pressed={isSelected}
                       onClick={() => navigate({ kind: 'daily', date: cell.date })}

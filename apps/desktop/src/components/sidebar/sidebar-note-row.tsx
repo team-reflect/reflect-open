@@ -2,6 +2,7 @@ import type { ReactElement } from 'react'
 import { CalendarDays, FileText } from 'lucide-react'
 import { formatDayLabel } from '@/lib/dates'
 import { cn } from '@/lib/utils'
+import { useSettings } from '@/providers/settings-provider'
 import { routeForPath, routesEqual } from '@/routing/route'
 import { useRouter } from '@/routing/router'
 
@@ -20,6 +21,7 @@ interface SidebarNoteRowProps {
  */
 export function SidebarNoteRow({ path, title, date }: SidebarNoteRowProps): ReactElement {
   const { route, navigate } = useRouter()
+  const { settings } = useSettings()
   const target = routeForPath(path)
   const active = routesEqual(route, target)
   const Icon = date !== null ? CalendarDays : FileText
@@ -39,7 +41,7 @@ export function SidebarNoteRow({ path, title, date }: SidebarNoteRowProps): Reac
       >
         <Icon aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0 text-text-muted" />
         <span className="min-w-0 flex-1 truncate text-left">
-          {date !== null ? formatDayLabel(date) : title}
+          {date !== null ? formatDayLabel(date, settings.dateFormat) : title}
         </span>
       </button>
     </li>

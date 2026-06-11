@@ -29,6 +29,12 @@ vi.mock('@/providers/graph-provider', () => ({
     pickAndOpen,
   }),
 }))
+vi.mock('@/providers/settings-provider', () => ({
+  useSettings: () => ({
+    settings: { dateFormat: 'mdy' },
+    updateSettings: () => {},
+  }),
+}))
 
 const GRAPH: GraphInfo = { root: '/notes', name: 'Notes', cloudSync: null, generation: 1 }
 

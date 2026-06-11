@@ -23,6 +23,8 @@ vi.mock('@/providers/settings-provider', () => ({
     settings: {
       editorMarkdownSyntax: 'focus',
       theme: 'system',
+      timeFormat: '12h',
+      dateFormat: 'mdy',
       allNotesFilterTags: ['book', 'person'],
     },
     updateSettings: () => {},

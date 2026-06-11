@@ -3,6 +3,7 @@ import { AboutSection } from './settings/about-section'
 import { AiModelsSection } from './settings/ai-models-section'
 import { AllNotesSection } from './settings/all-notes-section'
 import { AppearanceSection } from './settings/appearance-section'
+import { DateTimeSection } from './settings/date-time-section'
 import { EditorSection } from './settings/editor-section'
 import { KeyboardSection } from './settings/keyboard-section'
 import { SearchSection } from './settings/search-section'
@@ -18,6 +19,7 @@ export function SettingsScreen(): ReactElement {
       <h1 className="text-lg font-semibold text-text">Settings</h1>
       <div className="mt-6">
         <AppearanceSection />
+        <DateTimeSection />
         <EditorSection />
         <AllNotesSection />
         <SearchSection />
