@@ -57,9 +57,6 @@ jobs:
   rust:
     name: fmt · clippy · test (Rust)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/desktop/src-tauri
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
         with:
@@ -86,7 +83,6 @@ jobs:
       - name: Cache cargo build
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
-          workspaces: apps/desktop/src-tauri
           # A failed clippy/test run still compiled the dependency tree; save it
           # so the next push doesn't pay the cold-build cost again.
           cache-on-failure: true
@@ -101,7 +97,7 @@ jobs:
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.cache/ort.pyke.io
-          key: ort-bin-${{ runner.os }}-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}
+          key: ort-bin-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: |
             ort-bin-${{ runner.os }}-
 
@@ -110,11 +106,16 @@ jobs:
       - name: Ensure ort cache dir exists
         run: mkdir -p ~/.cache/ort.pyke.io
 
+      # tauri-build requires the sidecar to exist before the desktop crate's
+      # build script runs (clippy/test compile it), so stage the CLI first.
+      - name: Stage the reflect CLI sidecar
+        run: node apps/desktop/scripts/build-sidecar.mjs
+
       - name: Format check
         run: cargo fmt --all -- --check
 
       - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Test
-        run: cargo test
+        run: cargo test --workspace
