@@ -12,6 +12,7 @@ describe('settingsSchema', () => {
       dateFormat: 'mdy',
       weekStartDay: 'monday',
       allNotesFilterTags: ['book', 'link', 'person'],
+      graphColors: {},
       aiModels: [],
       defaultAiModelId: null,
     })
@@ -23,6 +24,7 @@ describe('settingsSchema', () => {
     expect(DEFAULT_SETTINGS.dateFormat).toBe('mdy')
     expect(DEFAULT_SETTINGS.weekStartDay).toBe('monday')
     expect(DEFAULT_SETTINGS.allNotesFilterTags).toEqual(['book', 'link', 'person'])
+    expect(DEFAULT_SETTINGS.graphColors).toEqual({})
     expect(DEFAULT_SETTINGS.aiModels).toEqual([])
     expect(DEFAULT_SETTINGS.defaultAiModelId).toBeNull()
   })
@@ -87,9 +89,29 @@ describe('settingsSchema', () => {
       dateFormat: 'mdy',
       weekStartDay: 'monday',
       allNotesFilterTags: ['book', 'link', 'person'],
+      graphColors: {},
       aiModels: [],
       defaultAiModelId: null,
       futureKey: true,
+    })
+  })
+
+  describe('graphColors', () => {
+    it('passes valid entries through', () => {
+      const colors = { '/graphs/work': 'teal', '/graphs/home': 'amber' }
+      expect(settingsSchema.parse({ graphColors: colors }).graphColors).toEqual(colors)
+    })
+
+    it('drops a corrupt entry without losing the rest', () => {
+      const parsed = settingsSchema.parse({
+        graphColors: { '/graphs/work': 'teal', '/graphs/home': 'chartreuse', '/graphs/x': 42 },
+      })
+      expect(parsed.graphColors).toEqual({ '/graphs/work': 'teal' })
+    })
+
+    it('degrades a non-object value to the empty record', () => {
+      expect(settingsSchema.parse({ graphColors: 'teal' }).graphColors).toEqual({})
+      expect(settingsSchema.parse({ graphColors: ['teal'] }).graphColors).toEqual({})
     })
   })
 

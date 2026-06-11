@@ -83,6 +83,9 @@ export {
   dateFormatSchema,
   weekStartDaySchema,
   allNotesFilterTagsSchema,
+  graphColorSchema,
+  graphColorsSchema,
+  GRAPH_COLOR_IDS,
   aiProviderIdSchema,
   aiModelConfigSchema,
   aiModelsSchema,
@@ -95,6 +98,8 @@ export {
   type DateFormat,
   type WeekStartDay,
   type AllNotesFilterTags,
+  type GraphColor,
+  type GraphColors,
   type AiProviderId,
   type AiModelConfig,
 } from './settings/schema'

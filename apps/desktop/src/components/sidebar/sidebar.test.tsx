@@ -2,7 +2,7 @@ import { cleanup, render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { GraphInfo, PinnedNote } from '@reflect/core'
+import { DEFAULT_SETTINGS, type GraphInfo, type PinnedNote, type Settings } from '@reflect/core'
 import type { CommandContext } from '@/lib/commands/types'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { RouterProvider } from '@/routing/router'
@@ -10,6 +10,9 @@ import { RouterProvider } from '@/routing/router'
 const getPinnedNotes = vi.hoisted(() => vi.fn<() => Promise<PinnedNote[]>>(async () => []))
 const openRecent = vi.hoisted(() => vi.fn())
 const pickAndOpen = vi.hoisted(() => vi.fn())
+const updateSettingsWith = vi.hoisted(() =>
+  vi.fn<(updater: (current: Settings) => Partial<Settings>) => void>(),
+)
 
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
@@ -30,8 +33,9 @@ vi.mock('@/providers/graph-provider', () => ({
 }))
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({
-    settings: { dateFormat: 'mdy' },
+    settings: { dateFormat: 'mdy', graphColors: {} },
     updateSettings: () => {},
+    updateSettingsWith,
   }),
 }))
 
@@ -148,5 +152,18 @@ describe('Sidebar', () => {
     await userEvent.click(view.getByRole('button', { name: /Notes/ }))
     await userEvent.click(view.getByRole('menuitem', { name: /open another graph/i }))
     expect(pickAndOpen).toHaveBeenCalled()
+  })
+
+  it('the graph footer recolors the current graph', async () => {
+    const { view } = renderSidebar()
+
+    await userEvent.click(view.getByRole('button', { name: /Notes/ }))
+    await userEvent.click(view.getByRole('menuitem', { name: 'Graph color' }))
+    await userEvent.click(await view.findByRole('menuitem', { name: 'Teal' }))
+
+    // The patch composes over the latest settings at apply time — feed the
+    // updater a document and check the record it builds.
+    const updater = updateSettingsWith.mock.lastCall?.[0]
+    expect(updater?.(DEFAULT_SETTINGS)).toEqual({ graphColors: { '/notes': 'teal' } })
   })
 })

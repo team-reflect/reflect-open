@@ -1,14 +1,20 @@
 import type { ReactElement } from 'react'
 import type { GraphInfo } from '@reflect/core'
 import { Check, FolderOpen } from 'lucide-react'
+import { GraphSwatch } from '@/components/graph-swatch'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useGraphColors } from '@/hooks/use-graph-colors'
+import { DEFAULT_GRAPH_COLOR, GRAPH_COLOR_OPTIONS } from '@/lib/graph-colors'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
 
@@ -16,12 +22,14 @@ const MENU_ITEM_CLASS = 'gap-2 px-2 py-1.5 text-[13px] text-text-secondary'
 
 /**
  * The sidebar footer: the graph's color swatch and name on the left — a
- * dropdown menu for switching to a recent graph or the OS folder picker. The
- * swatch pulses while the graph indexes. The menu content matches the trigger
- * width, so it stays inset from the sidebar edges.
+ * dropdown menu for switching to a recent graph, recoloring this graph, or
+ * the OS folder picker. The swatch pulses while the graph indexes. The menu
+ * content matches the trigger width, so it stays inset from the sidebar edges.
  */
 export function GraphFooter({ graph }: { graph: GraphInfo }): ReactElement {
   const { recents, indexing, openRecent, pickAndOpen } = useGraph()
+  const { colorFor, setColor } = useGraphColors()
+  const currentColor = colorFor(graph.root) ?? DEFAULT_GRAPH_COLOR
 
   return (
     <div className="flex items-center px-4 py-3">
@@ -33,12 +41,9 @@ export function GraphFooter({ graph }: { graph: GraphInfo }): ReactElement {
                 type="button"
                 className="flex min-w-0 flex-1 items-center space-x-2.5 text-left"
               >
-                <span
-                  aria-hidden
-                  className={cn(
-                    'h-5 w-5 flex-none rounded-md bg-accent',
-                    indexing && 'motion-safe:animate-pulse',
-                  )}
+                <GraphSwatch
+                  color={colorFor(graph.root)}
+                  className={cn('h-5 w-5', indexing && 'motion-safe:animate-pulse')}
                 />
                 <span className="min-w-0 truncate text-xs font-medium text-text">
                   {graph.name}
@@ -67,6 +72,7 @@ export function GraphFooter({ graph }: { graph: GraphInfo }): ReactElement {
                     }}
                     className={MENU_ITEM_CLASS}
                   >
+                    <GraphSwatch color={colorFor(recent.root)} className="size-3.5 rounded" />
                     <span className="min-w-0 flex-1 truncate">{recent.name}</span>
                     {current ? (
                       <Check aria-hidden className="size-3.5 shrink-0 text-accent" />
@@ -78,6 +84,27 @@ export function GraphFooter({ graph }: { graph: GraphInfo }): ReactElement {
             )
           })}
           {recents.length > 0 ? <DropdownMenuSeparator /> : null}
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className={MENU_ITEM_CLASS}>
+              <GraphSwatch color={currentColor} className="size-3.5 rounded" />
+              <span className="min-w-0 flex-1 truncate">Graph color</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent aria-label="Graph color">
+              {GRAPH_COLOR_OPTIONS.map((option) => (
+                <DropdownMenuItem
+                  key={option.id}
+                  onSelect={() => setColor(graph.root, option.id)}
+                  className={MENU_ITEM_CLASS}
+                >
+                  <GraphSwatch color={option.id} className="size-3.5 rounded" />
+                  <span className="min-w-0 flex-1">{option.label}</span>
+                  {option.id === currentColor ? (
+                    <Check aria-hidden className="size-3.5 shrink-0 text-accent" />
+                  ) : null}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
           <DropdownMenuItem
             onSelect={() => void pickAndOpen()}
             className={MENU_ITEM_CLASS}

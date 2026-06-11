@@ -1,14 +1,20 @@
 import { type ReactElement } from 'react'
 import { Folder, FolderPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useGraphColors } from '@/hooks/use-graph-colors'
+import { graphColorCss } from '@/lib/graph-colors'
+import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
 
 /**
  * First-run / no-graph screen: open a folder as a graph, or reopen a recent one.
- * Shown by `App` whenever no graph is active (Plan 02 loading gate).
+ * Shown by `App` whenever no graph is active (Plan 02 loading gate). A recent's
+ * folder icon takes the graph's identity color once one is chosen (sidebar
+ * footer → Graph color); until then it stays muted.
  */
 export function GraphChooser(): ReactElement {
   const { recents, error, pickAndOpen, openRecent, forget } = useGraph()
+  const { colorFor } = useGraphColors()
 
   return (
     <div className="flex h-screen w-screen overflow-auto bg-surface-app p-8">
@@ -44,42 +50,46 @@ export function GraphChooser(): ReactElement {
               Recent
             </p>
             <ul className="space-y-px">
-              {recents.map((recent) => (
-                <li
-                  key={recent.root}
-                  className="group flex items-center justify-between gap-2 rounded-md px-2 py-1.5 transition-colors duration-100 hover:bg-surface-hover"
-                >
-                  <button
-                    type="button"
-                    onClick={() => void openRecent(recent.root)}
-                    className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+              {recents.map((recent) => {
+                const color = colorFor(recent.root)
+                return (
+                  <li
+                    key={recent.root}
+                    className="group flex items-center justify-between gap-2 rounded-md px-2 py-1.5 transition-colors duration-100 hover:bg-surface-hover"
                   >
-                    <Folder
-                      aria-hidden
-                      strokeWidth={1.75}
-                      className="size-4 shrink-0 text-text-muted"
-                    />
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium text-text">
-                        {recent.name}
+                    <button
+                      type="button"
+                      onClick={() => void openRecent(recent.root)}
+                      className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+                    >
+                      <Folder
+                        aria-hidden
+                        strokeWidth={1.75}
+                        className={cn('size-4 shrink-0', color === undefined && 'text-text-muted')}
+                        style={color === undefined ? undefined : { color: graphColorCss(color) }}
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-text">
+                          {recent.name}
+                        </span>
+                        <span className="block truncate text-xs text-text-muted">
+                          {recent.root}
+                        </span>
                       </span>
-                      <span className="block truncate text-xs text-text-muted">
-                        {recent.root}
-                      </span>
-                    </span>
-                  </button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="xs"
-                    onClick={() => void forget(recent.root)}
-                    aria-label={`Forget ${recent.name}`}
-                    className="shrink-0 text-text-muted opacity-0 transition-opacity duration-100 hover:text-text-secondary group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100"
-                  >
-                    Forget
-                  </Button>
-                </li>
-              ))}
+                    </button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => void forget(recent.root)}
+                      aria-label={`Forget ${recent.name}`}
+                      className="shrink-0 text-text-muted opacity-0 transition-opacity duration-100 hover:text-text-secondary group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100"
+                    >
+                      Forget
+                    </Button>
+                  </li>
+                )
+              })}
             </ul>
           </div>
         ) : null}
