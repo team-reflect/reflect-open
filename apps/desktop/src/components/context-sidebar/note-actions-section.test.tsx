@@ -5,7 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NoteActionsSection } from './note-actions-section'
 
 const getPinnedNotes = vi.hoisted(() => vi.fn())
+const getNote = vi.hoisted(() => vi.fn())
 const toggleNotePinned = vi.hoisted(() => vi.fn(async () => true))
+const toggleNotePrivate = vi.hoisted(() => vi.fn(async () => true))
 const operationFail = vi.hoisted(() => vi.fn())
 const startOperation = vi.hoisted(() =>
   vi.fn(() => ({ progress: vi.fn(), done: vi.fn(), fail: operationFail })),
@@ -14,8 +16,10 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
   getPinnedNotes,
+  getNote,
 }))
 vi.mock('@/lib/note-pin', () => ({ toggleNotePinned }))
+vi.mock('@/lib/note-private', () => ({ toggleNotePrivate }))
 vi.mock('@/lib/operations', () => ({ startOperation }))
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', cloudSync: false, generation: 7 } }),
@@ -33,10 +37,16 @@ function renderSection(path: string) {
 beforeEach(() => {
   window.sessionStorage.clear()
   getPinnedNotes.mockReset().mockResolvedValue([])
+  getNote.mockReset().mockResolvedValue(undefined)
   toggleNotePinned.mockReset().mockResolvedValue(true)
+  toggleNotePrivate.mockReset().mockResolvedValue(true)
   startOperation.mockClear()
   operationFail.mockClear()
 })
+
+function noteRow(path: string, isPrivate: boolean) {
+  return { path, title: 'A', dailyDate: null, isPrivate }
+}
 
 describe('NoteActionsSection pin toggle', () => {
   it('offers Pin this note with the platform-formatted hint and toggles on click', async () => {
@@ -95,6 +105,63 @@ describe('NoteActionsSection pin toggle', () => {
     const view = renderSection('notes/a.md')
     await userEvent.click(await view.findByRole('button', { name: /Un-pin this note/ }))
     expect(startOperation).toHaveBeenCalledWith('Unpinning note')
+    expect(operationFail).toHaveBeenCalled()
+    view.unmount()
+  })
+})
+
+describe('NoteActionsSection private toggle', () => {
+  it('offers Mark this note as private and toggles on click', async () => {
+    const view = renderSection('notes/a.md')
+    await userEvent.click(view.getByRole('button', { name: /Mark this note as private/ }))
+    expect(toggleNotePrivate).toHaveBeenCalledWith('notes/a.md', 7)
+    view.unmount()
+  })
+
+  it('offers Un-mark this note as private when the index reports the note private', async () => {
+    getNote.mockResolvedValue(noteRow('daily/2026-06-10.md', true))
+    const view = renderSection('daily/2026-06-10.md')
+    await view.findByText('Un-mark this note as private')
+    await userEvent.click(view.getByRole('button', { name: /Un-mark this note as private/ }))
+    expect(toggleNotePrivate).toHaveBeenCalledWith('daily/2026-06-10.md', 7)
+    view.unmount()
+  })
+
+  it('flips the label from the toggle result before the index catches up', async () => {
+    const view = renderSection('notes/a.md')
+    await userEvent.click(view.getByRole('button', { name: /Mark this note as private/ }))
+    expect(await view.findByText('Un-mark this note as private')).toBeDefined()
+    toggleNotePrivate.mockResolvedValueOnce(false)
+    await userEvent.click(view.getByRole('button', { name: /Un-mark this note as private/ }))
+    expect(await view.findByText('Mark this note as private')).toBeDefined()
+    expect(toggleNotePrivate).toHaveBeenCalledTimes(2)
+    view.unmount()
+  })
+
+  it('stays on Mark this note as private for a note the index reports as not private', async () => {
+    getNote.mockResolvedValue(noteRow('notes/a.md', false))
+    const view = renderSection('notes/a.md')
+    await waitFor(() => expect(getNote).toHaveBeenCalled())
+    expect(view.getByText('Mark this note as private')).toBeDefined()
+    expect(view.queryByText('Un-mark this note as private')).toBeNull()
+    view.unmount()
+  })
+
+  it('surfaces a toggle failure through the operations status', async () => {
+    toggleNotePrivate.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
+    const view = renderSection('notes/a.md')
+    await userEvent.click(view.getByRole('button', { name: /Mark this note as private/ }))
+    expect(startOperation).toHaveBeenCalledWith('Marking note as private')
+    expect(operationFail).toHaveBeenCalled()
+    view.unmount()
+  })
+
+  it('labels a failed un-mark as un-marking', async () => {
+    getNote.mockResolvedValue(noteRow('notes/a.md', true))
+    toggleNotePrivate.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
+    const view = renderSection('notes/a.md')
+    await userEvent.click(await view.findByRole('button', { name: /Un-mark this note as private/ }))
+    expect(startOperation).toHaveBeenCalledWith('Un-marking note as private')
     expect(operationFail).toHaveBeenCalled()
     view.unmount()
   })

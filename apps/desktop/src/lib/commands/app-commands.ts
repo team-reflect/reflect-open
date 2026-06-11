@@ -2,6 +2,7 @@ import { embedStatus, errorMessage, notePath, randomNotePath, rebuildIndex } fro
 import { ulid } from 'ulidx'
 import { todayIso } from '@/lib/dates'
 import { toggleNotePinned } from '@/lib/note-pin'
+import { toggleNotePrivate } from '@/lib/note-private'
 import { startOperation } from '@/lib/operations'
 import { backfillEmbeddingsVisibly } from '@/lib/semantic'
 import { notePathForRoute, type Route } from '@/routing/route'
@@ -83,6 +84,27 @@ const APP_COMMANDS: AppCommand[] = [
         // runCommand has no error channel of its own — an unreported failure
         // here would be a silent ⌘O. Surface it like other background work.
         startOperation('Pinning note').fail(errorMessage(cause))
+      }
+    },
+  },
+  {
+    id: 'note.togglePrivate',
+    title: 'Mark or un-mark note as private',
+    keywords: ['privacy', 'lock', 'secret', 'hide', 'ai'],
+    // Flips the `private` frontmatter flag — the hard block on sending the
+    // note's content to AI or any other external service — of the note the
+    // current route edits. No default keybinding: the palette keeps it
+    // keyboard-reachable without spending a shortcut.
+    run: async (context) => {
+      const generation = context.generation()
+      const path = notePathForRoute(context.route(), todayIso())
+      if (generation === null || path === null) {
+        return
+      }
+      try {
+        await toggleNotePrivate(path, generation)
+      } catch (cause) {
+        startOperation('Marking note as private').fail(errorMessage(cause))
       }
     },
   },

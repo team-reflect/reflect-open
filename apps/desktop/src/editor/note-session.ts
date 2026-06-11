@@ -142,6 +142,12 @@ export interface FrontmatterPatch {
    * only metadata was the pin returns to having no frontmatter at all.
    */
   pinned?: boolean | number
+  /**
+   * The hard privacy flag (`private: true`): the note's content must never be
+   * sent to AI or any other external service. `false` deletes the key — like
+   * the pin, not-private is the absence of the flag.
+   */
+  private?: boolean
 }
 
 /** Translate the typed patch into the YAML write (`undefined` deletes a key). */
@@ -152,6 +158,9 @@ function yamlPatch(patch: FrontmatterPatch): Record<string, unknown> {
   }
   if (patch.pinned !== undefined) {
     yaml.pinned = patch.pinned === false ? undefined : patch.pinned
+  }
+  if (patch.private !== undefined) {
+    yaml.private = patch.private === false ? undefined : true
   }
   return yaml
 }
