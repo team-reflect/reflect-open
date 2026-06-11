@@ -56,26 +56,25 @@ pub(super) fn current_branch(repo: &Repository) -> AppResult<String> {
     }
 }
 
-/// Point the local branch at `name` so fetch/merge/push target the branch the
-/// backup repo actually uses. An unborn HEAD just retargets; an existing
-/// branch is renamed (history kept); if `name` already exists locally, HEAD
-/// switches to it.
+/// Rename the local branch to `name` so fetch/merge/push target the branch
+/// the backup repo actually uses.
+///
+/// HEAD's commit never changes here, so the working tree — the user's notes —
+/// is never rewritten and no checkout is needed. A stale local branch already
+/// carrying `name` loses the *name* (force rename), not our content: the
+/// local state always wins the collision, and the remote's history integrates
+/// through the next fetch + merge like any other divergence.
 pub(super) fn align_branch(repo: &Repository, name: &str) -> AppResult<()> {
     let current = current_branch(repo)?;
     if current == name {
         return Ok(());
     }
-    let target = format!("refs/heads/{name}");
-    if repo.find_reference(&target).is_ok() {
-        repo.set_head(&target)?;
-        return Ok(());
-    }
     if let Ok(reference) = repo.find_reference(&format!("refs/heads/{current}")) {
-        git2::Branch::wrap(reference).rename(name, false)?;
+        git2::Branch::wrap(reference).rename(name, true)?;
     }
     // With no current ref (unborn HEAD) there is nothing to rename — pointing
     // HEAD at the new name is enough; the first commit creates the branch.
-    repo.set_head(&target)?;
+    repo.set_head(&format!("refs/heads/{name}"))?;
     Ok(())
 }
 

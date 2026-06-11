@@ -245,6 +245,37 @@ fn connecting_an_existing_backup_on_another_branch_pulls_its_history() {
 }
 
 #[test]
+fn aligning_onto_a_stale_local_branch_keeps_the_working_tree() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+
+    // History: commit 1, a stale local `master` pointing at it, then commit 2
+    // on `main` with newer content.
+    write(root, "notes/ours.md", "# Ours v1\n");
+    commit_all(root, "v1", MAX_FILE_BYTES).unwrap();
+    {
+        let repo = Repository::open(root).unwrap();
+        let head = repo.head().unwrap().peel_to_commit().unwrap();
+        repo.branch("master", &head, false).unwrap();
+    }
+    write(root, "notes/ours.md", "# Ours v2\n");
+    commit_all(root, "v2", MAX_FILE_BYTES).unwrap();
+
+    // Aligning onto the stale name must keep our content (HEAD's commit and
+    // the working tree are untouched — the stale branch loses the name, we
+    // don't lose notes to its old tree).
+    setup(root, None, Some("master".to_string())).unwrap();
+    assert_eq!(status(root).unwrap().branch.as_deref(), Some("master"));
+    assert_eq!(read(root, "notes/ours.md"), "# Ours v2\n");
+    assert!(head_tree_paths(root).contains(&"notes/ours.md".to_string()));
+
+    // And the repo is immediately usable: a no-op commit stays a no-op (the
+    // tree still matches HEAD — nothing was silently reverted).
+    let outcome = commit_all(root, "noop", MAX_FILE_BYTES).unwrap();
+    assert!(!outcome.committed, "align must not desync tree and HEAD");
+}
+
+#[test]
 fn non_fast_forward_push_is_rejected_as_data() {
     let fixture = fixture();
     let root_a = &fixture.graph_a;
