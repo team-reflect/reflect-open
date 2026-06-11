@@ -32,7 +32,9 @@ interface NotePaneProps {
   /**
    * Extra classes for the editable area (e.g. the daily stream's per-day
    * `min-h-*`). Applied to the contenteditable root, so the reserved space
-   * is click-to-focus.
+   * is click-to-focus — and to the loading/error placeholders, so a pane
+   * holds the same space in every state instead of collapsing and re-expanding
+   * around the stream's scroll anchor while its note arrives.
    */
   editorClassName?: string
   /**
@@ -127,8 +129,18 @@ export function NotePane({
   )
 
   if (document.status === 'loading') {
+    // `reflect-note-loading` keeps the hint invisible for the first beat:
+    // local reads resolve in milliseconds, and the text flashing on every
+    // daily-stream row reads as flicker while the stream anchors.
     return (
-      <div className={cn('px-1 py-2 text-sm text-text-muted', gutterClassName, className)}>
+      <div
+        className={cn(
+          'reflect-note-loading px-1 py-2 text-sm text-text-muted',
+          gutterClassName,
+          editorClassName,
+          className,
+        )}
+      >
         Loading note…
       </div>
     )
@@ -138,7 +150,12 @@ export function NotePane({
     return (
       <div
         role="alert"
-        className={cn('px-1 py-2 text-sm text-red-500', gutterClassName, className)}
+        className={cn(
+          'px-1 py-2 text-sm text-red-500',
+          gutterClassName,
+          editorClassName,
+          className,
+        )}
       >
         Couldn’t open {path}: {document.error}
       </div>
