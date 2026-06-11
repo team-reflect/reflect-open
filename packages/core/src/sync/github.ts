@@ -181,7 +181,13 @@ function toAuth(
   return { kind: 'pat', token: accessToken }
 }
 
-/** Refresh an expiring app token; `null` means the refresh token lapsed (re-auth). */
+/**
+ * Refresh an expiring app token. `null` means the refresh token itself is
+ * dead (lapsed/revoked) and the user must reconnect — that is the **only**
+ * `null` case. Transient failures (5xx, throttling, other OAuth errors)
+ * throw instead, so a flaky network can never masquerade as a disconnected
+ * account and force a needless re-auth.
+ */
 export async function refreshGithubAuth(
   auth: Extract<GithubAuth, { kind: 'app' }>,
   fetchFn: FetchFn = fetch,
@@ -196,11 +202,23 @@ export async function refreshGithubAuth(
       refresh_token: auth.refreshToken,
     }),
   })
+  if (!response.ok) {
+    throw {
+      kind: 'network' as const,
+      message: `GitHub token refresh failed (${response.status}); will retry`,
+    }
+  }
   const parsed = tokenResponseSchema.parse(await response.json())
-  if (parsed.access_token === undefined) {
+  if (parsed.access_token !== undefined) {
+    return toAuth(parsed.access_token, parsed, now())
+  }
+  if (parsed.error === 'bad_refresh_token') {
     return null
   }
-  return toAuth(parsed.access_token, parsed, now())
+  throw {
+    kind: 'auth' as const,
+    message: `GitHub token refresh failed${parsed.error === undefined ? '' : ` (${parsed.error})`}`,
+  }
 }
 
 /** Proactive-refresh margin: refresh when within 5 minutes of expiry. */

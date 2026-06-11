@@ -36,12 +36,33 @@ pub enum MergeKind {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub enum ChangeKind {
+    Upsert,
+    Remove,
+}
+
+/// One working-tree file a merge/fast-forward rewrote, in the same shape as
+/// the watcher's `FileChange` so the caller can reindex directly.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangedFile {
+    /// Graph-relative path, forward-slashed.
+    pub path: String,
+    pub kind: ChangeKind,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MergeOutcome {
     pub kind: MergeKind,
     /// Graph-relative paths that now carry conflict markers (or a binary
     /// conflict copy). Informational — the indexer rediscovers them from
     /// content.
     pub conflicted_paths: Vec<String>,
+    /// Every file this merge changed on disk. The sync layer reindexes these
+    /// directly — pulls must not depend on the file watcher being up (on
+    /// launch it may not be yet) to keep the index in step with the notes.
+    pub changed_files: Vec<ChangedFile>,
 }
 
 /// One side of an index conflict, lifted out of the index so the borrow ends
@@ -72,6 +93,7 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
         return Ok(MergeOutcome {
             kind: MergeKind::UpToDate,
             conflicted_paths: Vec::new(),
+            changed_files: Vec::new(),
         });
     };
     let annotated = repo.find_annotated_commit(remote_oid)?;
@@ -81,10 +103,15 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
         return Ok(MergeOutcome {
             kind: MergeKind::UpToDate,
             conflicted_paths: Vec::new(),
+            changed_files: Vec::new(),
         });
     }
 
     if analysis.is_unborn() || analysis.is_fast_forward() {
+        // Capture the outgoing tree before the ref moves (None on unborn).
+        let old_tree = repo.head().ok().and_then(|head| head.peel_to_tree().ok());
+        let new_tree = repo.find_commit(remote_oid)?.tree()?;
+        let changed_files = changed_between(&repo, old_tree.as_ref(), &new_tree)?;
         let refname = format!("refs/heads/{branch}");
         repo.reference(&refname, remote_oid, true, "reflect sync: fast-forward")?;
         repo.set_head(&refname)?;
@@ -94,6 +121,7 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
         return Ok(MergeOutcome {
             kind: MergeKind::FastForward,
             conflicted_paths: Vec::new(),
+            changed_files,
         });
     }
 
@@ -106,14 +134,46 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
         .their_label(THEIR_LABEL);
     repo.merge(&[&annotated], Some(&mut merge_opts), Some(&mut checkout))?;
 
+    // From here the repo carries MERGE_* state; a failure that leaves it
+    // behind would trip `ensure_clean_state` on every later cycle and wedge
+    // sync until a manual repair — exactly what this design forbids. Clear it
+    // on every path; the next cycle re-derives anything a failed attempt lost.
+    let result = complete_merge(&repo, root, remote_oid);
+    if result.is_err() {
+        let _ = repo.cleanup_state();
+    }
+    let (conflicted_paths, changed_files) = result?;
+
+    let kind = if conflicted_paths.is_empty() {
+        MergeKind::Merged
+    } else {
+        MergeKind::MergedWithConflicts
+    };
+    Ok(MergeOutcome {
+        kind,
+        conflicted_paths,
+        changed_files,
+    })
+}
+
+/// The post-`repo.merge` half: materialize conflicts, commit the merge with
+/// both parents, and clear the merge state. Split out so [`merge_remote`] can
+/// guarantee `cleanup_state` runs even when any step here fails. Returns the
+/// conflicted paths and every file the merge changed relative to local HEAD.
+fn complete_merge(
+    repo: &Repository,
+    root: &Path,
+    remote_oid: git2::Oid,
+) -> AppResult<(Vec<String>, Vec<ChangedFile>)> {
     let mut index = repo.index()?;
-    let conflicted_paths = resolve_conflicts(&repo, root, &mut index)?;
+    let conflicted_paths = resolve_conflicts(repo, root, &mut index)?;
     index.write()?;
 
     let tree = repo.find_tree(index.write_tree()?)?;
     let local_commit = repo.head()?.peel_to_commit()?;
     let remote_commit = repo.find_commit(remote_oid)?;
-    let sig = signature(&repo)?;
+    let changed_files = changed_between(repo, Some(&local_commit.tree()?), &tree)?;
+    let sig = signature(repo)?;
     let message = if conflicted_paths.is_empty() {
         "Merge changes from other devices"
     } else {
@@ -128,16 +188,37 @@ pub(super) fn merge_remote(root: &Path) -> AppResult<MergeOutcome> {
         &[&local_commit, &remote_commit],
     )?;
     repo.cleanup_state()?;
+    Ok((conflicted_paths, changed_files))
+}
 
-    let kind = if conflicted_paths.is_empty() {
-        MergeKind::Merged
-    } else {
-        MergeKind::MergedWithConflicts
-    };
-    Ok(MergeOutcome {
-        kind,
-        conflicted_paths,
-    })
+/// Diff two trees into the watcher's change shape: what the merge wrote or
+/// removed on disk relative to the previous local HEAD.
+fn changed_between(
+    repo: &Repository,
+    old: Option<&git2::Tree>,
+    new: &git2::Tree,
+) -> AppResult<Vec<ChangedFile>> {
+    let diff = repo.diff_tree_to_tree(old, Some(new), None)?;
+    let mut out = Vec::new();
+    for delta in diff.deltas() {
+        let removed = delta.status() == git2::Delta::Deleted;
+        let file = if removed {
+            delta.old_file()
+        } else {
+            delta.new_file()
+        };
+        if let Some(path) = file.path() {
+            out.push(ChangedFile {
+                path: path.to_string_lossy().replace('\\', "/"),
+                kind: if removed {
+                    ChangeKind::Remove
+                } else {
+                    ChangeKind::Upsert
+                },
+            });
+        }
+    }
+    Ok(out)
 }
 
 /// Turn every index conflict into committed working-tree content:

@@ -43,15 +43,17 @@ pub(super) fn commit_all(
     ensure_clean_state(&repo)?;
 
     let mut index = repo.index()?;
-    // Sizes already in the index, so the guard can tell "oversized and
+    // Size + mtime already in the index, so the guard can tell "oversized and
     // unchanged" (skip silently — its old version is already backed up) from
-    // "oversized changes being withheld" (skip and report).
-    let tracked_sizes: std::collections::HashMap<String, u32> = index
+    // "oversized changes being withheld" (skip and report). Size alone would
+    // miss a same-length edit; matching git's own stat-based change detection
+    // (mtime) closes that without hashing gigabytes.
+    let tracked_stats: std::collections::HashMap<String, (u32, i32)> = index
         .iter()
         .map(|entry| {
             (
                 String::from_utf8_lossy(&entry.path).into_owned(),
-                entry.file_size,
+                (entry.file_size, entry.mtime.seconds()),
             )
         })
         .collect();
@@ -66,7 +68,13 @@ pub(super) fn commit_all(
             return 0;
         }
         let rel = path.to_string_lossy().replace('\\', "/");
-        let unchanged = tracked_sizes.get(&rel) == Some(&(meta.len() as u32));
+        let mtime_secs = meta
+            .modified()
+            .ok()
+            .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|duration| duration.as_secs() as i32)
+            .unwrap_or(0);
+        let unchanged = tracked_stats.get(&rel) == Some(&(meta.len() as u32, mtime_secs));
         let mut skipped = skipped.borrow_mut();
         if !unchanged && !skipped.iter().any(|file| file.path == rel) {
             skipped.push(SkippedFile {

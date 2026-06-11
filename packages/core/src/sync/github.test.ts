@@ -173,6 +173,39 @@ describe('getGithubToken', () => {
     const fetchFn = vi.fn(async () => jsonResponse({ error: 'bad_refresh_token' }))
     expect(await getGithubToken(fetchFn, () => 2_000)).toBeNull()
   })
+
+  it('surfaces a transient refresh failure as retryable, not as disconnected', async () => {
+    fakeKeychain({
+      'github-auth': JSON.stringify({
+        kind: 'app',
+        accessToken: 'ghu_old',
+        refreshToken: 'ghr_live',
+        expiresAt: 1_000,
+      }),
+    })
+    // A 5xx/throttle must throw (the engine maps it to a retryable state) —
+    // never read as "account disconnected", which would force a re-auth.
+    const fetchFn = vi.fn(async () => jsonResponse({ message: 'oops' }, 503))
+    await expect(getGithubToken(fetchFn, () => 2_000)).rejects.toMatchObject({
+      kind: 'network',
+    })
+  })
+
+  it('surfaces an unexpected OAuth error without dropping the stored credential', async () => {
+    const store = fakeKeychain({
+      'github-auth': JSON.stringify({
+        kind: 'app',
+        accessToken: 'ghu_old',
+        refreshToken: 'ghr_live',
+        expiresAt: 1_000,
+      }),
+    })
+    const fetchFn = vi.fn(async () => jsonResponse({ error: 'incorrect_client_credentials' }))
+    await expect(getGithubToken(fetchFn, () => 2_000)).rejects.toMatchObject({
+      kind: 'auth',
+    })
+    expect(store.has('github-auth')).toBe(true)
+  })
 })
 
 describe('loadGithubAuth', () => {

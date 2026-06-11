@@ -59,8 +59,9 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
 - **Commit cadence:** a watcher-settled edit marks the note dirty → commit all dirty
   files after ~30 s idle (cap: 5 min of continuous editing) → push. One commit per
   batch, auto-generated message ("Update 3 notes"). Commit on quit.
-- **Pull cadence:** on launch, on window focus, on a periodic timer, and always on push
-  rejection: push → non-fast-forward → fetch → merge → push again (bounded retries).
+- **Pull cadence:** on launch, on window focus, on a periodic timer, and on a
+  **non-fast-forward** push rejection: fetch → merge → push again (bounded retries).
+  Auth, push-protection, and size failures surface immediately — only divergence retries.
 - **Merge, not rebase.** Single branch; merge commits are fine — history is invisible
   product-wise, and rewriting published history breaks multi-device.
 - **Checkpoints = commits.** Plan 10's "checkpoint before AI patch apply" becomes
@@ -70,18 +71,20 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
 
 ## Steps
 
-1. **Rust git primitives** (`src-tauri/src/git/`): `git_init` / `git_open` /
-   adopt-existing-repo, `git_commit_all(message)`, `git_fetch`, `git_merge` (returns
-   per-file conflict info; writes marker files with labeled sides), `git_push`,
-   `git_log` / `git_show` (recovery), health checks (clear stale `index.lock` on
-   startup; refuse foreign states — detached HEAD, in-progress rebase — with a typed
-   error, never guess). Remote-agnostic; credentials via callback from the keychain.
-   `.reflect/` stays gitignored (Plan 02); `.git/` joins the watcher exclusion set.
+1. **Rust git primitives** (`src-tauri/src/git/`): `git_status`, `git_setup` (init or
+   adopt-existing + `origin` + align the local branch with the remote's default),
+   `git_commit_all(message)` (stage everything, no-op when clean, large-file
+   guardrail), `git_fetch`, `git_merge_remote` (fast-forward or merge; writes marker
+   files with labeled sides, commits conflicts, reports changed files for reindexing),
+   `git_push` (rejections returned as data). Health checks: refuse foreign states —
+   detached HEAD, in-progress rebase — with a typed error, never guess. Remote-agnostic;
+   credentials via callback from the keychain. `.reflect/` stays gitignored (Plan 02);
+   the watcher only tracks `daily/` + `notes/`, so `.git/` is never watched.
 
-2. **GitHub module** (`actions/sync/github.ts`): device flow + silent token refresh,
-   guided private-repo creation, repo metadata (visibility), and an error taxonomy
-   (auth, secret-scanning push protection, size) mapped to product states. zod at the
-   boundary.
+2. **GitHub module** (`sync/github.ts` in core): device flow + silent token refresh,
+   guided private-repo creation, repo metadata (visibility, default branch), and an
+   error taxonomy (auth, network, secret-scanning push protection, size) mapped to
+   product states. zod at the boundary.
 
 3. **Sync engine** (`actions/sync/`): the state machine + debounce scheduler; consumes
    watcher events for dirty tracking; orchestrates the Rust primitives; persists
@@ -132,8 +135,8 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
    committed marker merge both sides converge on; non-fast-forward push retries;
    edit/delete + binary policies; marker removal clears `Needs review`; size guardrail;
    public-repo confirmation; echo suppression (a pull doesn't storm the indexer; commits
-   don't re-dirty); stale-lock recovery; `.reflect/` excluded; token never appears in
-   the remote URL or `.git/config` (asserted).
+   don't re-dirty); `.reflect/` excluded; token never appears in the remote URL or
+   `.git/config` (asserted). (Stale-`index.lock` recovery is deferred, below.)
 
 ## Key decisions / contracts
 
@@ -166,7 +169,8 @@ Re-derived with research; **supersedes this plan's earlier backup-only scoping.*
 - AI-assisted resolution via the Plan 10 copilot (markers parse to base/ours/theirs;
   `private: true` notes never go to cloud AI).
 - Custom merge driver for daily notes; Git LFS / asset offload; generic-remote UX
-  toggle; background sync on mobile; "purge history" escape hatch.
+  toggle; background sync on mobile; "purge history" escape hatch; stale-`index.lock`
+  recovery on startup.
 
 ## Risks
 

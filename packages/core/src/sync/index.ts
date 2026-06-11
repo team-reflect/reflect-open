@@ -16,12 +16,14 @@ export {
   mergeOutcomeSchema,
   pushOutcomeSchema,
   skippedFileSchema,
+  changedFileSchema,
   type GitStatus,
   type CommitOutcome,
   type RemoteDelta,
   type MergeOutcome,
   type PushOutcome,
   type SkippedFile,
+  type ChangedFile,
 } from './commands'
 export {
   GITHUB_APP_CLIENT_ID,

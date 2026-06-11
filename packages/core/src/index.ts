@@ -144,6 +144,7 @@ export {
   type MergeOutcome,
   type PushOutcome,
   type SkippedFile,
+  type ChangedFile,
   type GithubAuth,
   type DeviceFlowStart,
   type DevicePollResult,

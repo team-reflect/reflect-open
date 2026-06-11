@@ -15,7 +15,8 @@
         { "url": "https://api.openai.com/*" },
         { "url": "https://api.anthropic.com/*" },
         { "url": "https://generativelanguage.googleapis.com/*" },
-        { "url": "https://github.com/*" },
+        { "url": "https://github.com/login/device/code" },
+        { "url": "https://github.com/login/oauth/access_token" },
         { "url": "https://api.github.com/*" }
       ]
     }

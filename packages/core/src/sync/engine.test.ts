@@ -19,7 +19,7 @@ const NON_FAST_FORWARD = {
   nonFastForward: true,
   rejectionMessage: 'fetch first',
 }
-const MERGED = { kind: 'merged', conflictedPaths: [] }
+const MERGED = { kind: 'merged', conflictedPaths: [], changedFiles: [] }
 const DELTA = { ahead: 1, behind: 0 }
 
 interface Call {
@@ -231,6 +231,70 @@ describe('createSyncEngine', () => {
 
     expect(calls.filter((call) => call.command === 'git_push')).toHaveLength(3)
     expect(statuses.at(-1)?.state).toBe('error')
+    engine.stop()
+  })
+
+  it('preserves the full-cycle mode when syncNow lands mid-cycle', async () => {
+    const pushGate: { resolve: ((value: unknown) => void) | null } = { resolve: null }
+    const calls = fakeGit((command) => {
+      if (command === 'git_push' && pushGate.resolve === null) {
+        return new Promise((resolve) => {
+          pushGate.resolve = resolve
+        })
+      }
+      return defaultResponses(command)
+    })
+    const engine = createSyncEngine({ generation: 1, getToken: async () => 'tok', idleMs: 10 })
+
+    engine.noteChanged()
+    await vi.advanceTimersByTimeAsync(10)
+    expect(commandsOf(calls)).toEqual(['git_commit_all', 'git_push'])
+
+    // A focus/manual sync arrives mid-cycle: its fetch+merge must not be
+    // downgraded to a push-only follow-up.
+    void engine.syncNow()
+    pushGate.resolve?.(PUSHED)
+    await vi.runAllTimersAsync()
+
+    expect(commandsOf(calls)).toEqual([
+      'git_commit_all',
+      'git_push',
+      'git_commit_all',
+      'git_fetch',
+      'git_merge_remote',
+      'git_push',
+    ])
+    engine.stop()
+  })
+
+  it('hands merge-changed files to the reindex callback', async () => {
+    fakeGit((command) =>
+      command === 'git_merge_remote'
+        ? {
+            kind: 'merged',
+            conflictedPaths: [],
+            changedFiles: [
+              { path: 'notes/from-b.md', kind: 'upsert' },
+              { path: 'notes/gone.md', kind: 'remove' },
+            ],
+          }
+        : defaultResponses(command),
+    )
+    const batches: Array<Array<{ path: string }>> = []
+    const engine = createSyncEngine({
+      generation: 1,
+      getToken: async () => 'tok',
+      onRemoteChanges: (changes) => batches.push(changes),
+    })
+
+    await engine.syncNow()
+
+    expect(batches).toEqual([
+      [
+        { path: 'notes/from-b.md', kind: 'upsert' },
+        { path: 'notes/gone.md', kind: 'remove' },
+      ],
+    ])
     engine.stop()
   })
 

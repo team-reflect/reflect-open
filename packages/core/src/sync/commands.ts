@@ -40,9 +40,22 @@ export const remoteDeltaSchema = z.object({
 })
 export type RemoteDelta = z.infer<typeof remoteDeltaSchema>
 
+/** A file a merge rewrote on disk — same shape as the watcher's FileChange. */
+export const changedFileSchema = z.object({
+  path: z.string(),
+  kind: z.enum(['upsert', 'remove']),
+})
+export type ChangedFile = z.infer<typeof changedFileSchema>
+
 export const mergeOutcomeSchema = z.object({
   kind: z.enum(['upToDate', 'fastForward', 'merged', 'mergedWithConflicts']),
   conflictedPaths: z.array(z.string()),
+  /**
+   * Every file the merge changed. The caller reindexes these directly —
+   * pulls must not depend on the file watcher being up (on launch it may
+   * not be yet) to keep the index in step with the notes.
+   */
+  changedFiles: z.array(changedFileSchema),
 })
 export type MergeOutcome = z.infer<typeof mergeOutcomeSchema>
 

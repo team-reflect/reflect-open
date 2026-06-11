@@ -4,6 +4,7 @@ import {
   gitFetch,
   gitMergeRemote,
   gitPush,
+  type ChangedFile,
   type SkippedFile,
 } from './commands'
 
@@ -39,6 +40,12 @@ export interface SyncEngineOptions {
   onStatus?: (status: SyncStatus) => void
   /** Surfaced when the size guardrail withholds files from backup. */
   onLargeFilesSkipped?: (files: SkippedFile[]) => void
+  /**
+   * Files a pull's merge changed on disk. The caller reindexes them directly:
+   * pull-applied writes must reach the index even when the file watcher isn't
+   * up yet (the launch pull can race the watcher start).
+   */
+  onRemoteChanges?: (changes: ChangedFile[]) => void
   /** Quiet period after the last edit before a backup commit. */
   idleMs?: number
   /** Ceiling on deferral while the user keeps typing. */
@@ -82,7 +89,8 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   /** Hard deadline (first unflushed edit + maxWaitMs); null = nothing pending. */
   let deadline: number | null = null
   let running: Promise<void> | null = null
-  let rerun = false
+  /** Follow-up requested while a cycle was in flight (strongest mode wins). */
+  let rerunMode: 'push' | 'full' | null = null
   let stopped = false
 
   function emit(status: SyncStatus): void {
@@ -134,7 +142,10 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       return
     }
     if (running !== null) {
-      rerun = true
+      // Queue one follow-up, keeping the strongest mode requested: a syncNow
+      // landing mid-cycle must still get its fetch+merge, not be downgraded
+      // to a push-only pass.
+      rerunMode = rerunMode === 'full' || mode === 'full' ? 'full' : 'push'
       return running
     }
     running = (async () => {
@@ -156,9 +167,10 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         }
       } finally {
         running = null
-        if (rerun && !stopped) {
-          rerun = false
-          noteChanged()
+        if (rerunMode !== null && !stopped) {
+          const next = rerunMode
+          rerunMode = null
+          void run(next)
         }
       }
     })()
@@ -174,7 +186,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
     if (mode === 'full') {
       // Launch/focus: pick up other devices' changes even with nothing to push.
       await step(gitFetch(token, options.generation))
-      await step(gitMergeRemote(options.generation)) // upToDate is a no-op
+      await merge()
     }
     for (let attempt = 0; attempt < MAX_PUSH_ATTEMPTS; attempt++) {
       const push = await step(gitPush(token, options.generation))
@@ -187,11 +199,19 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       // The normal two-device race: another device pushed first. Converge and
       // retry — a conflicted merge still commits (markers in the note).
       await step(gitFetch(token, options.generation))
-      await step(gitMergeRemote(options.generation))
+      await merge()
     }
     throw new PushRejectedError(
       'the backup repo kept changing while syncing; will retry on the next edit',
     )
+  }
+
+  /** Merge the fetched remote and hand any changed files to the reindexer. */
+  async function merge(): Promise<void> {
+    const outcome = await step(gitMergeRemote(options.generation)) // upToDate is a no-op
+    if (outcome.changedFiles.length > 0) {
+      options.onRemoteChanges?.(outcome.changedFiles)
+    }
   }
 
   function syncNow(): Promise<void> {

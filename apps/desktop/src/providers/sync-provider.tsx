@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import {
+  applyIndexChanges,
   clearGithubAuth,
   createGithubRepo,
   createSyncEngine,
@@ -20,6 +21,7 @@ import {
   loadGithubAuth,
   parseGithubRemote,
   subscribeFileChanges,
+  type ChangedFile,
   type GithubRepoRef,
   type GraphInfo,
   type SyncEngine,
@@ -28,6 +30,12 @@ import {
 } from '@reflect/core'
 import { startOperation } from '@/lib/operations'
 import { providerFetch } from '@/lib/provider-fetch'
+import { invalidateIndexQueries } from '@/lib/query-client'
+
+/** Pull-changed paths the index tracks (mirrors the watcher's filter). */
+function isIndexablePath(path: string): boolean {
+  return (path.startsWith('daily/') || path.startsWith('notes/')) && path.endsWith('.md')
+}
 
 /**
  * Backup state as the UI sees it. `connected` means the graph has a repo,
@@ -107,6 +115,15 @@ export function SyncProvider({ graph, children }: SyncProviderProps): ReactEleme
           // Surface the guardrail loudly: these files are NOT in the backup.
           const names = files.map((file) => file.path).join(', ')
           startOperation('Backing up').fail(`Too large for GitHub backup (kept local): ${names}`)
+        },
+        onRemoteChanges: (changes: ChangedFile[]) => {
+          // Reindex pull-applied writes directly: the launch pull can land
+          // before the file watcher is running, and a watcher event for these
+          // paths would only repeat work the hash check makes cheap.
+          const indexable = changes.filter((change) => isIndexablePath(change.path))
+          if (indexable.length > 0) {
+            void applyIndexChanges(indexable, generation).then(invalidateIndexQueries)
+          }
         },
       })
       engineRef.current = engine
