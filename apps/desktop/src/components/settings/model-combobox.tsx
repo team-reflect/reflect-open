@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactElement } from 'react'
+import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { useCommandState } from 'cmdk'
 import { ChevronsUpDownIcon } from 'lucide-react'
 import { aiModelLabel, type AiModelOption, type AiProviderId } from '@reflect/core'
@@ -54,10 +54,19 @@ export function ModelCombobox({
   const [inputValue, setInputValue] = useState('')
   const filteredCountRef = useRef(models.length)
 
+  // Clear stale search text whenever the popover closes or the provider changes.
+  const clearInput = () => setInputValue('')
+  useEffect(clearInput, [provider])
+
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen)
+    if (!isOpen) clearInput()
+  }
+
   const commit = (modelId: string) => {
     onChange(modelId)
     setOpen(false)
-    setInputValue('')
+    clearInput()
   }
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -68,7 +77,7 @@ export function ModelCombobox({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           type="button"
