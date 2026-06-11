@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useState,
   type ChangeEvent,
   type ReactElement,
@@ -65,6 +66,20 @@ export function AddAiModelDialog({ onAdd, onClose }: AddAiModelDialogProps): Rea
   // Set when the provider couldn't be reached to verify the key; the next
   // submit then saves without verification (the button says so).
   const [unverified, setUnverified] = useState(false)
+
+  // The dialog is conditionally mounted by its parent (not kept alive with
+  // open=false), so Radix's Presence/onCloseAutoFocus path is bypassed when
+  // Cancel or a successful submit calls onClose() directly.  Capturing focus
+  // here and restoring it in the cleanup ensures the opener always gets focus
+  // back regardless of which close path runs.
+  useEffect(() => {
+    const opener = document.activeElement
+    return () => {
+      if (opener instanceof HTMLElement) {
+        opener.focus()
+      }
+    }
+  }, [])
 
   const provider = aiProvider(watch('provider'))
 
