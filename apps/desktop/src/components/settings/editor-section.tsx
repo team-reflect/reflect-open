@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react'
 import type { EditorMarkdownSyntax } from '@reflect/core'
+import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import { useSettings } from '@/providers/settings-provider'
 import { SettingsField } from './field'
@@ -67,6 +68,19 @@ export function EditorSection(): ReactElement {
               </SettingsOptionCard>
             )
           })}
+        </div>
+      </SettingsField>
+
+      <SettingsField
+        legend="Spell check"
+        description="Underline misspelled words while you type."
+      >
+        <div className="mt-3">
+          <Switch
+            aria-label="Spell check"
+            checked={settings.editorSpellCheck}
+            onCheckedChange={(checked) => updateSettings({ editorSpellCheck: checked })}
+          />
         </div>
       </SettingsField>
     </SettingsSection>

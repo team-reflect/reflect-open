@@ -129,8 +129,10 @@ describe('SettingsProvider', () => {
       expect(saved).toEqual([
         {
           editorMarkdownSyntax: 'focus',
+          editorSpellCheck: true,
           semanticSearchEnabled: false,
           theme: 'system',
+          weekStartDay: 'monday',
           allNotesFilterTags: ['book'],
           aiModels: [],
           defaultAiModelId: null,
@@ -154,8 +156,10 @@ describe('SettingsProvider', () => {
       expect(saved).toEqual([
         {
           editorMarkdownSyntax: 'show',
+          editorSpellCheck: true,
           semanticSearchEnabled: false,
           theme: 'system',
+          weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
           aiModels: [],
           defaultAiModelId: null,
@@ -188,8 +192,10 @@ describe('SettingsProvider', () => {
       expect(saved).toEqual([
         {
           editorMarkdownSyntax: 'show',
+          editorSpellCheck: true,
           semanticSearchEnabled: false,
           theme: 'system',
+          weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
           aiModels: [],
           defaultAiModelId: null,
@@ -216,8 +222,10 @@ describe('SettingsProvider', () => {
       expect(saved).toEqual([
         {
           editorMarkdownSyntax: 'focus',
+          editorSpellCheck: true,
           semanticSearchEnabled: false,
           theme: 'system',
+          weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
           aiModels: [],
           defaultAiModelId: null,
@@ -370,8 +378,10 @@ describe('SettingsProvider', () => {
       expect(saved).toEqual([
         {
           editorMarkdownSyntax: 'show',
+          editorSpellCheck: true,
           semanticSearchEnabled: false,
           theme: 'system',
+          weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
           aiModels: [],
           defaultAiModelId: null,
@@ -401,8 +411,10 @@ describe('SettingsProvider', () => {
     expect(saved).toEqual([
       {
         editorMarkdownSyntax: 'show',
+        editorSpellCheck: true,
         semanticSearchEnabled: false,
         theme: 'system',
+        weekStartDay: 'monday',
         allNotesFilterTags: ['book', 'link', 'person'],
         aiModels: [],
         defaultAiModelId: null,

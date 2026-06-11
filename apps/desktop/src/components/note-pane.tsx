@@ -167,6 +167,7 @@ export function NotePane({
         initialContent={document.initialContent}
         onChange={document.onEditorChange}
         markMode={settings.editorMarkdownSyntax}
+        spellCheck={settings.editorSpellCheck}
         images={images}
         onWikiLinkClick={onWikiLinkClick}
         className={editorClassName}

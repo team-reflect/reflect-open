@@ -76,6 +76,7 @@ export {
 export {
   settingsSchema,
   editorMarkdownSyntaxSchema,
+  editorSpellCheckSchema,
   semanticSearchEnabledSchema,
   themePreferenceSchema,
   timeFormatSchema,

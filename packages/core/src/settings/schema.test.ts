@@ -5,6 +5,7 @@ describe('settingsSchema', () => {
   it('defaults every key on an empty document (fresh install)', () => {
     expect(settingsSchema.parse({})).toEqual({
       editorMarkdownSyntax: 'focus',
+      editorSpellCheck: true,
       semanticSearchEnabled: false,
       theme: 'system',
       timeFormat: '12h',
@@ -15,6 +16,7 @@ describe('settingsSchema', () => {
       defaultAiModelId: null,
     })
     expect(DEFAULT_SETTINGS.editorMarkdownSyntax).toBe('focus')
+    expect(DEFAULT_SETTINGS.editorSpellCheck).toBe(true)
     expect(DEFAULT_SETTINGS.semanticSearchEnabled).toBe(false)
     expect(DEFAULT_SETTINGS.theme).toBe('system')
     expect(DEFAULT_SETTINGS.timeFormat).toBe('12h')
@@ -28,6 +30,8 @@ describe('settingsSchema', () => {
   it('accepts valid values', () => {
     expect(settingsSchema.parse({ editorMarkdownSyntax: 'show' }).editorMarkdownSyntax).toBe('show')
     expect(settingsSchema.parse({ editorMarkdownSyntax: 'focus' }).editorMarkdownSyntax).toBe('focus')
+    expect(settingsSchema.parse({ editorSpellCheck: false }).editorSpellCheck).toBe(false)
+    expect(settingsSchema.parse({ editorSpellCheck: true }).editorSpellCheck).toBe(true)
     expect(settingsSchema.parse({ theme: 'dark' }).theme).toBe('dark')
     expect(settingsSchema.parse({ theme: 'light' }).theme).toBe('light')
     expect(settingsSchema.parse({ theme: 'system' }).theme).toBe('system')
@@ -48,6 +52,8 @@ describe('settingsSchema', () => {
   it('degrades an invalid value to its default instead of failing the load', () => {
     expect(settingsSchema.parse({ editorMarkdownSyntax: 'sideways' }).editorMarkdownSyntax).toBe('focus')
     expect(settingsSchema.parse({ editorMarkdownSyntax: 42 }).editorMarkdownSyntax).toBe('focus')
+    expect(settingsSchema.parse({ editorSpellCheck: 'off' }).editorSpellCheck).toBe(true)
+    expect(settingsSchema.parse({ editorSpellCheck: 0 }).editorSpellCheck).toBe(true)
     expect(settingsSchema.parse({ theme: 'sepia' }).theme).toBe('system')
     expect(settingsSchema.parse({ theme: 7 }).theme).toBe('system')
     expect(settingsSchema.parse({ timeFormat: '36h' }).timeFormat).toBe('12h')
@@ -74,6 +80,7 @@ describe('settingsSchema', () => {
     const parsed = settingsSchema.parse({ editorMarkdownSyntax: 'show', futureKey: true })
     expect(parsed).toEqual({
       editorMarkdownSyntax: 'show',
+      editorSpellCheck: true,
       semanticSearchEnabled: false,
       theme: 'system',
       timeFormat: '12h',

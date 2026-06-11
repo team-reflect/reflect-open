@@ -24,6 +24,13 @@ export const editorMarkdownSyntaxSchema = z.enum(['focus', 'show']).catch('focus
 export type EditorMarkdownSyntax = z.infer<typeof editorMarkdownSyntaxSchema>
 
 /**
+ * Whether the editor underlines misspelled words (the platform's native
+ * spell check on the contenteditable). On by default — turning it off is the
+ * preference of users who find the underlines noisy in note-taking.
+ */
+export const editorSpellCheckSchema = z.boolean().catch(true)
+
+/**
  * The app color theme. `system` (the default) follows the OS preference;
  * `light`/`dark` pin it. Persisted here so the choice survives relaunch.
  */
@@ -126,6 +133,7 @@ export const aiModelsSchema = z
 export const settingsSchema = z
   .object({
     editorMarkdownSyntax: editorMarkdownSyntaxSchema,
+    editorSpellCheck: editorSpellCheckSchema,
     semanticSearchEnabled: semanticSearchEnabledSchema,
     theme: themePreferenceSchema,
     timeFormat: timeFormatSchema,

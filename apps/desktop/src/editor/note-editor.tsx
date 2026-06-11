@@ -56,6 +56,12 @@ interface NoteEditorProps {
   onChange?: (markdown: string) => void
   /** How markdown syntax characters are shown; `focus` reveals them near the caret. */
   markMode?: MarkMode
+  /**
+   * Whether the browser underlines misspelled words (default on). ProseKit has
+   * no spellcheck option of its own, but none is needed: the mount div *is*
+   * the contenteditable, so the native DOM attribute is the editor setting.
+   */
+  spellCheck?: boolean
   /** Image rendering + paste/drop persistence (Plan 05b). */
   images?: ImageOptions
   /** Click on a `[[wiki link]]` chip (Plan 06 navigation). */
@@ -100,6 +106,7 @@ export function NoteEditor({
   initialContent,
   onChange,
   markMode = 'focus',
+  spellCheck = true,
   images,
   onWikiLinkClick,
   className,
@@ -159,7 +166,7 @@ export function NoteEditor({
 
   return (
     <ProseKit editor={editor}>
-      <div ref={editor.mount} className={cn('reflect-editor', className)} />
+      <div ref={editor.mount} spellCheck={spellCheck} className={cn('reflect-editor', className)} />
       {children}
     </ProseKit>
   )
