@@ -31,9 +31,10 @@ describe('dates', () => {
     expect(addDaysIso('2026-03-01', -1)).toBe('2026-02-28')
   })
 
-  it('formatDayLabel renders a readable day per the date format', () => {
-    expect(formatDayLabel('2026-06-09', 'mdy')).toBe('Tuesday, June 9')
-    expect(formatDayLabel('2026-06-09', 'dmy')).toBe('Tuesday, 9 June')
+  it('formatDayLabel renders the V1 daily-subject format per the date format', () => {
+    expect(formatDayLabel('2026-06-09', 'mdy')).toBe('Tue, June 9th, 2026')
+    expect(formatDayLabel('2026-06-09', 'dmy')).toBe('Tue, 9th June, 2026')
+    expect(formatDayLabel('2026-05-31', 'mdy')).toBe('Sun, May 31st, 2026')
   })
 
   it('formatFullDate spells the date out per the date format', () => {

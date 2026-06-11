@@ -1,12 +1,11 @@
 import { useState, type ReactElement, type ReactNode } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface SidebarSectionProps {
   /** Session-storage key suffix persisting this section's open state. */
   storageKey: string
   title: string
-  /** Optional count rendered after the title (e.g. backlink total). */
-  count?: number
   children: ReactNode
 }
 
@@ -18,14 +17,14 @@ function readOpenState(storageKey: string): boolean {
 
 /**
  * One collapsible sidebar section (the old app's `SidebarItem` shape): a
- * header row with a disclosure chevron, open by default, open/closed state
- * persisted per section for the session so a collapsed section stays
- * collapsed while navigating between days and notes.
+ * quiet sentence-case header whose disclosure chevron sits on the right and —
+ * while the section is open — only appears on hover. Open by default,
+ * open/closed state persisted per section for the session so a collapsed
+ * section stays collapsed while navigating between days and notes.
  */
 export function SidebarSection({
   storageKey,
   title,
-  count,
   children,
 }: SidebarSectionProps): ReactElement {
   const [open, setOpen] = useState(() => readOpenState(storageKey))
@@ -38,22 +37,19 @@ export function SidebarSection({
 
   const Chevron = open ? ChevronDown : ChevronRight
   return (
-    <section className="border-b border-black/5 py-1 dark:border-white/5">
+    <section className="space-y-2">
       <button
         type="button"
         onClick={toggle}
         aria-expanded={open}
-        className="flex w-full items-center gap-1 rounded px-2 py-1.5 text-left hover:bg-surface-hover"
+        className="group flex w-full items-center px-3.5 text-2xs font-medium text-text-muted"
       >
-        <Chevron aria-hidden className="size-3 text-text-muted" />
-        <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
-          {title}
+        <span className="flex-1 truncate text-left">{title}</span>
+        <span className={cn('flex-none group-hover:visible', open && 'invisible')}>
+          <Chevron aria-hidden className="size-3" />
         </span>
-        {count !== undefined && count > 0 ? (
-          <span className="text-xs tabular-nums text-text-muted">{count}</span>
-        ) : null}
       </button>
-      {open ? <div className="px-2 pb-2">{children}</div> : null}
+      {open ? <div className="px-2">{children}</div> : null}
     </section>
   )
 }

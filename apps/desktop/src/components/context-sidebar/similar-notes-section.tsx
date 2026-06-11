@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { NoteLinkRows } from '@/components/note-link-rows'
+import { ArrowUturnLeftIcon } from '@/components/icons/arrow-uturn-left-icon'
 import { useSimilarNotes } from '@/lib/use-similar-notes'
 import { routeForPath } from '@/routing/route'
 import { useRouter } from '@/routing/router'
@@ -11,8 +11,9 @@ interface SimilarNotesSectionProps {
 }
 
 /**
- * "Similar notes" as a context-sidebar section (the old app's feature of the
- * same name): semantic neighbors of `path`, seeded by the note's stored chunk
+ * "Similar notes" as a context-sidebar section, in the old app's exact shape:
+ * one truncated title per neighbor with a flipped return-arrow on the right —
+ * no snippets. Neighbors of `path` are seeded by the note's stored chunk
  * vectors. Renders nothing at all when there are no results — semantic search
  * may be disabled or the note not yet embedded, and an empty box would just
  * advertise a missing feature. Query errors are deliberately just as quiet:
@@ -27,16 +28,23 @@ export function SimilarNotesSection({ path }: SimilarNotesSectionProps): ReactEl
   }
 
   return (
-    <SidebarSection storageKey="similar" title="Similar notes" count={related.length}>
-      <NoteLinkRows
-        items={related.map((hit) => ({
-          key: hit.path,
-          title: hit.title,
-          snippet: hit.snippet,
-          path: hit.path,
-        }))}
-        onOpen={(target) => navigate(routeForPath(target))}
-      />
+    <SidebarSection storageKey="similar" title="Similar notes">
+      <ul className="space-y-2">
+        {related.map((hit) => (
+          <li key={hit.path}>
+            <button
+              type="button"
+              onClick={() => navigate(routeForPath(hit.path))}
+              className="flex w-full cursor-pointer items-center space-x-1 px-4 text-left text-xs"
+            >
+              <span className="min-w-0 flex-1 truncate">{hit.title}</span>
+              <span aria-hidden className="flex-none -scale-x-100">
+                <ArrowUturnLeftIcon width={13} height={13} />
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
     </SidebarSection>
   )
 }

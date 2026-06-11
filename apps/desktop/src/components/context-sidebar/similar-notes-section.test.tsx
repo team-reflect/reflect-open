@@ -74,7 +74,7 @@ describe('SimilarNotesSection', () => {
     view.unmount()
   })
 
-  it('renders the Similar notes section with one row per neighbor', async () => {
+  it('renders the Similar notes section with one title-only row per neighbor', async () => {
     relatedNotes.mockResolvedValue([
       {
         path: 'notes/rust.md',
@@ -96,9 +96,10 @@ describe('SimilarNotesSection', () => {
     const view = renderSimilar('notes/languages.md')
     await view.findByText('Rust')
     expect(view.getByText('Similar notes')).toBeDefined()
-    expect(view.getByText('borrow checker notes')).toBeDefined()
     expect(view.getByText('Zig')).toBeDefined()
-    expect(view.getByText('comptime experiments')).toBeDefined()
+    // V1 rows are bare titles — snippets never render here.
+    expect(view.queryByText('borrow checker notes')).toBeNull()
+    expect(view.queryByText('comptime experiments')).toBeNull()
     view.unmount()
   })
 

@@ -3,9 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { SidebarSection } from './sidebar-section'
 
-function renderSection(count?: number) {
+function renderSection() {
   return render(
-    <SidebarSection storageKey="probe" title="Probe" count={count}>
+    <SidebarSection storageKey="probe" title="Probe">
       <p>section body</p>
     </SidebarSection>,
   )
@@ -65,19 +65,5 @@ describe('SidebarSection', () => {
       remounted.getByRole('button', { name: /Probe/ }).getAttribute('aria-expanded'),
     ).toBe('true')
     remounted.unmount()
-  })
-
-  it('renders the count only when it is greater than zero', () => {
-    const withCount = renderSection(4)
-    expect(withCount.getByText('4')).toBeDefined()
-    withCount.unmount()
-
-    const zeroCount = renderSection(0)
-    expect(zeroCount.queryByText('0')).toBeNull()
-    zeroCount.unmount()
-
-    const noCount = renderSection()
-    expect(noCount.getByRole('button', { name: 'Probe' })).toBeDefined()
-    noCount.unmount()
   })
 })

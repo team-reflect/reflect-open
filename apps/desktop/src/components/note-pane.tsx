@@ -35,6 +35,14 @@ interface NotePaneProps {
    * is click-to-focus.
    */
   editorClassName?: string
+  /**
+   * Horizontal gutter applied *inside* the pane's pieces — the contenteditable
+   * itself plus the chrome around it (alerts, backlinks, loading/error text) —
+   * rather than on the pane root. The daily stream uses this so each day's row
+   * spans the pane's full width (dividers run edge to edge) while the gutter
+   * stays part of the editor's click-to-focus area.
+   */
+  gutterClassName?: string
 }
 
 /** The seeded title for a brand-new (missing) ordinary note. */
@@ -59,6 +67,7 @@ export function NotePane({
   onAutoFocused,
   className,
   editorClassName,
+  gutterClassName,
 }: NotePaneProps): ReactElement {
   const { graph } = useGraph()
   const { settings } = useSettings()
@@ -119,13 +128,18 @@ export function NotePane({
 
   if (document.status === 'loading') {
     return (
-      <div className={cn('px-1 py-2 text-sm text-text-muted', className)}>Loading note…</div>
+      <div className={cn('px-1 py-2 text-sm text-text-muted', gutterClassName, className)}>
+        Loading note…
+      </div>
     )
   }
 
   if (document.status === 'error') {
     return (
-      <div role="alert" className={cn('px-1 py-2 text-sm text-red-500', className)}>
+      <div
+        role="alert"
+        className={cn('px-1 py-2 text-sm text-red-500', gutterClassName, className)}
+      >
         Couldn’t open {path}: {document.error}
       </div>
     )
@@ -133,7 +147,7 @@ export function NotePane({
 
   if (document.protected) {
     return (
-      <div className={className}>
+      <div className={cn(gutterClassName, className)}>
         <ProtectedNoteView content={document.initialContent} />
         <BacklinksPanel path={path} />
       </div>
@@ -142,25 +156,27 @@ export function NotePane({
 
   return (
     <div className={cn('relative', className)} aria-label={`Editing ${path}`}>
-      {document.error !== null ? (
-        <InlineAlert tone="error" className="mb-4">
-          Saving failed: {document.error}. Your edits are kept in the editor and the next
-          successful save will persist them.
-        </InlineAlert>
-      ) : null}
+      <div className={gutterClassName}>
+        {document.error !== null ? (
+          <InlineAlert tone="error" className="mb-4">
+            Saving failed: {document.error}. Your edits are kept in the editor and the next
+            successful save will persist them.
+          </InlineAlert>
+        ) : null}
 
-      {imageSaveError !== null ? (
-        <InlineAlert tone="error" className="mb-4">
-          Couldn’t save the pasted image: {imageSaveError}. It was not added to the note.
-        </InlineAlert>
-      ) : null}
+        {imageSaveError !== null ? (
+          <InlineAlert tone="error" className="mb-4">
+            Couldn’t save the pasted image: {imageSaveError}. It was not added to the note.
+          </InlineAlert>
+        ) : null}
 
-      {document.conflict !== null ? (
-        <NoteConflictBanner
-          onKeepMine={document.keepMine}
-          onLoadTheirs={document.loadTheirs}
-        />
-      ) : null}
+        {document.conflict !== null ? (
+          <NoteConflictBanner
+            onKeepMine={document.keepMine}
+            onLoadTheirs={document.loadTheirs}
+          />
+        ) : null}
+      </div>
 
       <NoteEditor
         key={path}
@@ -170,13 +186,15 @@ export function NotePane({
         spellCheck={settings.editorSpellCheck}
         images={images}
         onWikiLinkClick={onWikiLinkClick}
-        className={editorClassName}
+        className={cn(gutterClassName, editorClassName)}
         handleRef={handleRef}
       >
         <WikiAutocomplete onCreate={createFromAutocomplete} />
       </NoteEditor>
 
-      <BacklinksPanel path={path} />
+      <div className={gutterClassName}>
+        <BacklinksPanel path={path} />
+      </div>
     </div>
   )
 }

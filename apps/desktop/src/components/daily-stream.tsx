@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { dailyPath } from '@reflect/core'
 import { NotePane } from '@/components/note-pane'
 import { formatDayLabel, todayIso } from '@/lib/dates'
+import { cn } from '@/lib/utils'
 import { useSettings } from '@/providers/settings-provider'
 import { useToday } from '@/lib/use-today'
 import { createDayWindow, dateAtIndex, indexOfDate } from '@/lib/day-window'
@@ -12,6 +13,16 @@ interface DailyStreamProps {
   /** The day to anchor/scroll to (from the `today` or `daily/:date` route). */
   targetDate: string
 }
+
+/**
+ * The stream's horizontal gutter: the old scroll-container `px-6` and centered
+ * `max-w-2xl` column folded into one `padding-inline`, applied *inside* each
+ * row's elements (day label, editor, pane chrome) instead of around the rows.
+ * Rows and the dividers between them span the pane's full width, and because
+ * the editor's share of the gutter is its own padding, clicking anywhere
+ * across the row focuses that day's note.
+ */
+const STREAM_GUTTER = 'px-[max(1.5rem,calc((100%-42rem)/2))]'
 
 /**
  * The daily stream (Plan 06b): a virtualized chronological run of days — past
@@ -81,7 +92,7 @@ export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
     <div
       ref={scrollRef}
       data-testid="daily-stream"
-      className="h-full overflow-auto px-6"
+      className="h-full overflow-auto"
       onScroll={(event) => saveScrollState(event.currentTarget.scrollTop)}
       // An explicit click/touch picks its own focus target — a focus still
       // pending for a day whose editor hasn't mounted yet must not steal the
@@ -91,10 +102,7 @@ export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
         focusPending.current = null
       }}
     >
-      <div
-        className="relative mx-auto w-full max-w-2xl"
-        style={{ height: virtualizer.getTotalSize() }}
-      >
+      <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
         {virtualizer.getVirtualItems().map((item) => {
           const date = dateAtIndex(dayWindow, item.index)
           const isToday = date === today
@@ -111,20 +119,24 @@ export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
               className="absolute inset-x-0"
               style={{ transform: `translateY(${item.start}px)` }}
             >
-              <section className="border-b border-black/5 py-6 dark:border-white/5">
-                <h2 className="mb-3 text-lg font-semibold">
+              <section className="border-b border-border py-6">
+                {/* V1 renders the date as the note's H1-sized subject, with
+                    today's tinted brand (its `highlightSubject`). */}
+                <h2
+                  className={cn(
+                    'reflect-daily-subject mb-3',
+                    STREAM_GUTTER,
+                    isToday && 'text-accent',
+                  )}
+                >
                   {formatDayLabel(date, settings.dateFormat)}
-                  {isToday ? (
-                    <span className="ml-2 align-middle text-xs font-medium text-accent">
-                      Today
-                    </span>
-                  ) : null}
                 </h2>
                 <NotePane
                   path={dailyPath(date)}
                   lazy
                   autoFocus={autoFocus}
                   onAutoFocused={consumeFocus}
+                  gutterClassName={STREAM_GUTTER}
                   editorClassName={isPast ? 'min-h-[100px]' : 'min-h-[60vh]'}
                 />
               </section>

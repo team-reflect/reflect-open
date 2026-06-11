@@ -16,12 +16,14 @@
                Consolas, monospace;
   /* The note editor / reading surface can swap to a serif */
   --font-reading: 'InterVariable', Georgia, 'Times New Roman', serif;
+  /* Keyboard-shortcut glyphs (⌘ ⌥ ⇧) — system-ui renders them cleanly */
+  --font-shortcut: system-ui, ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* ---- Type scale (px) -----------------------------------
      Named for usage. App chrome lives in 2xs–sm; prose in
      base–lg; the site display sizes are display-* .          */
-  --text-2xs:  0.75rem;   /* 12px — note titles, shortcuts, meta */
-  --text-xs:   0.8125rem; /* 13px — captions, labels             */
+  --text-2xs:  0.75rem;   /* 12px — section headers, ghost shortcut hints, meta */
+  --text-xs:   0.8125rem; /* 13px — sidebar note rows, captions, labels         */
   --text-sm:   0.875rem;  /* 14px — buttons, menu items, default chrome */
   --text-base: 1rem;      /* 16px — editor body                  */
   --text-lg:   1.125rem;  /* 18px — lead paragraphs              */
