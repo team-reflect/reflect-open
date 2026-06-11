@@ -234,6 +234,28 @@ fn search_ranks_hits_and_excludes_private_notes() {
     );
 }
 
+/// Ranking parity with the desktop palette search (`filtered-search.ts`):
+/// title hits are bm25-boosted 10× over body hits, so a title-only match must
+/// outrank a body-only match.
+#[test]
+fn search_boosts_title_matches_over_body_matches() {
+    let fixture = graph();
+    fixture.write_note("notes/title-hit.md", "# Quokka Habitat\nnothing else\n");
+    fixture.write_note(
+        "notes/body-hit.md",
+        "# Unrelated\na quokka appears mid-body\n",
+    );
+    fixture.build_index();
+
+    let text = stdout(&reflect(&fixture, &["search", "quokka"]));
+    let title_pos = text.find("notes/title-hit.md").unwrap();
+    let body_pos = text.find("notes/body-hit.md").unwrap();
+    assert!(
+        title_pos < body_pos,
+        "expected the title match ranked first:\n{text}"
+    );
+}
+
 #[test]
 fn search_without_an_index_exits_4() {
     let fixture = graph();

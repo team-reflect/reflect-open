@@ -1,7 +1,9 @@
 //! Lexical search over the FTS index. The `MATCH` expression is built exactly
-//! like `buildFtsMatch` (`packages/core/src/indexing/search-query.ts`) and the
-//! query mirrors the desktop's `searchNotes` (bm25 `ORDER BY rank`), with the
-//! CLI's privacy filter (`notes.is_private = 0`) and FTS5 `snippet()` added.
+//! like `buildFtsMatch` (`packages/core/src/indexing/search-query.ts`) and
+//! ranking matches the desktop's palette search (`filtered-search.ts`):
+//! title-boosted bm25 with the same column weights, so the same query against
+//! the same index orders the same in the CLI and the app. The CLI adds its
+//! privacy filter (`notes.is_private = 0`) and FTS5 `snippet()`.
 
 use rusqlite::{params, Connection};
 
@@ -29,9 +31,13 @@ pub struct SearchHit {
     pub title: String,
     /// FTS5 `snippet()` over the indexed plain-text body.
     pub snippet: String,
-    /// bm25 rank (more negative = better match).
+    /// Title-boosted bm25 score (more negative = better match).
     pub score: f64,
 }
+
+/// The palette search's bm25 column weights (`filtered-search.ts`): path
+/// unranked, title boosted 10× over body. Must stay in lockstep.
+const RANK_EXPR: &str = "bm25(search_fts, 0, 10.0, 1.0)";
 
 /// Ranked, private-excluded search. The caller re-checks each hit's file
 /// frontmatter (the index row may lag a just-flagged note).
@@ -40,15 +46,15 @@ pub fn search_index(
     match_expr: &str,
     limit: usize,
 ) -> Result<Vec<SearchHit>, CliError> {
-    let mut statement = conn.prepare(
+    let mut statement = conn.prepare(&format!(
         "SELECT search_fts.path, search_fts.title,
-                snippet(search_fts, 2, '', '', '…', 12), rank
+                snippet(search_fts, 2, '', '', '…', 12), {RANK_EXPR}
          FROM search_fts
          JOIN notes ON notes.path = search_fts.path
          WHERE search_fts MATCH ?1 AND notes.is_private = 0
-         ORDER BY rank
+         ORDER BY {RANK_EXPR}
          LIMIT ?2",
-    )?;
+    ))?;
     let rows = statement.query_map(params![match_expr, limit as i64], |row| {
         Ok(SearchHit {
             path: row.get(0)?,
