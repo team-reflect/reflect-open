@@ -65,8 +65,13 @@ export interface BackupController {
   getState(): BackupState
   /** Subscribe to state changes; returns the unsubscribe. */
   subscribe(listener: () => void): () => void
-  /** Create a new **private** repo for the signed-in user and connect it. */
-  connectNewRepo(name: string): Promise<void>
+  /**
+   * Create a new **private** repo for the signed-in user and connect it.
+   * `manualCreateNeeded` means the token *type* can't create repositories
+   * (fine-grained PATs can't call `POST /user/repos`) — the dialog falls
+   * back to the prefilled github.com/new handoff and connects afterwards.
+   */
+  connectNewRepo(name: string): Promise<'connected' | 'manualCreateNeeded'>
   /**
    * Connect an existing repo. A public repo returns `needsPublicConfirm`
    * unless `allowPublic` — everything in the graph (including `private:
@@ -240,6 +245,9 @@ export function createBackupController(options: BackupControllerOptions): Backup
     connectNewRepo: async (name) => {
       const token = await requireToken()
       const repo = await createGithubRepo(token, name, { isPrivate: true, fetchFn: providerFetch })
+      if (repo === null) {
+        return 'manualCreateNeeded' // fine-grained PATs can't create repos
+      }
       const [owner, repoName, ...rest] = repo.fullName.split('/')
       if (owner === undefined || repoName === undefined || rest.length > 0) {
         throw new ReflectError('parse', `unexpected repository name from GitHub: ${repo.fullName}`)
@@ -247,6 +255,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
       // Align with the account's default branch for new repos so the first
       // push creates the branch GitHub already considers the default.
       await connectRemote(githubRemoteUrl({ owner, name: repoName }), repo.defaultBranch)
+      return 'connected'
     },
     connectExistingRepo: async (ref, connectOptions = {}) => {
       const token = await requireToken()

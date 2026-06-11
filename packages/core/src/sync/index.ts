@@ -29,7 +29,9 @@ export {
 } from './commands'
 export {
   GITHUB_APP_CLIENT_ID,
+  GITHUB_APP_SLUG,
   GITHUB_AUTH_SECRET,
+  githubAppInstallUrl,
   isDeviceFlowConfigured,
   githubAuthSchema,
   saveGithubAuth,
@@ -42,14 +44,18 @@ export {
   getGithubToken,
   parseGithubRemote,
   githubRemoteUrl,
+  newRepoUrl,
+  BACKUP_REPO_DESCRIPTION,
   createGithubRepo,
   getGithubRepo,
+  getAuthenticatedUser,
   type GithubAuth,
   type DeviceFlowStart,
   type DevicePollResult,
   type RunDeviceFlowOptions,
   type GithubRepoRef,
   type GithubRepo,
+  type GithubUser,
 } from './github'
 export {
   createSyncEngine,

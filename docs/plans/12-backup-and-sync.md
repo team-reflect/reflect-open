@@ -95,9 +95,14 @@ present) · `Backup failed` (action needed). Git mechanics never surface.
    the watcher only tracks `daily/` + `notes/`, so `.git/` is never watched.
 
 2. **GitHub module** (`sync/github.ts` in core): device flow + silent token refresh,
-   guided private-repo creation, repo metadata (visibility, default branch), and an
+   repo creation + metadata (visibility, default branch), `GET /user` identity, and an
    error taxonomy (auth, network, secret-scanning push protection, size) mapped to
-   product states. zod at the boundary.
+   product states. zod at the boundary. **Repo-creation reality:** `POST /user/repos`
+   works with classic PATs and OAuth tokens but **not fine-grained PATs** (and a
+   fine-grained token can't be scoped to a repo that doesn't exist) — so the universal
+   create path is the prefilled `github.com/new` handoff (`newRepoUrl`: name +
+   `visibility=private` + description, one click on GitHub), with API creation as a
+   silent accelerator where the token allows it.
 
 3. **Sync engine + lifecycle** (`sync/engine.ts` in core; `lib/backup-controller.ts`
    in the app): the engine is the debounced state machine over the Rust primitives —
@@ -147,9 +152,14 @@ present) · `Backup failed` (action needed). Git mechanics never surface.
    suppression set and reindex after writes settle; our own commits must not re-mark
    notes dirty (no commit loops).
 
-7. **Auth UX:** guided device flow ("enter this code on github.com"), app install scoped
-   to the backup repo; silent 8-hour refresh; a lapsed refresh token → `Backup failed —
-   reconnect` with a one-click re-run. Advanced path: paste a fine-grained PAT.
+7. **Auth + connect UX:** a wizard ordered around how GitHub tokens actually work —
+   **repository first** (creating it needs no credential: the prefilled `github.com/new`
+   handoff), then the token (instructions name that exact repository; fine-grained PATs
+   can now be scoped to it because it exists), then the connection. Every sign-in path
+   ends in a `GET /user` round-trip, so a mistyped token fails at entry ("GitHub
+   rejected the token") and the wizard knows the owner — `owner/name` is never typed.
+   Device flow when the app is registered ("enter this code on github.com"), silent
+   8-hour refresh; a lapsed refresh token → `Backup failed — reconnect`.
 
 8. **Restore / second device:** "Connect existing backup" = clone → open as graph →
    full index rebuild (Plan 04). Repair of last resort for a corrupt local repo:

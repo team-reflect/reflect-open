@@ -1,6 +1,12 @@
-import { useEffect, useState, type ReactElement } from 'react'
+import { useState, type ReactElement } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
-import { getGithubToken, githubRemoteUrl, gitClone, ReflectError } from '@reflect/core'
+import {
+  getGithubToken,
+  githubRemoteUrl,
+  gitClone,
+  ReflectError,
+  type GithubUser,
+} from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert'
 import { GithubAuthStep } from '@/components/settings/github-auth-step'
 import { Button } from '@/components/ui/button'
@@ -13,6 +19,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useAsyncAction } from '@/hooks/use-async-action'
+import { useRestoreFocus } from '@/hooks/use-restore-focus'
 import { parseRepoInput } from '@/lib/github-repos'
 import { providerFetch } from '@/lib/provider-fetch'
 import { useGraph } from '@/providers/graph-provider'
@@ -37,20 +44,9 @@ export function RestoreFromGithubDialog({ onClose }: RestoreFromGithubDialogProp
   const [step, setStep] = useState<'auth' | 'repo'>('auth')
   const [repoInput, setRepoInput] = useState('')
   const [destination, setDestination] = useState<string | null>(null)
+  const [user, setUser] = useState<GithubUser | null>(null)
 
-  // The dialog is conditionally mounted by its parent (not kept alive with
-  // open=false), so Radix's Presence/onCloseAutoFocus path is bypassed when a
-  // successful restore calls onClose() directly. Capturing focus here and
-  // restoring it in the cleanup ensures the opener always gets focus back
-  // regardless of which close path runs.
-  useEffect(() => {
-    const opener = document.activeElement
-    return () => {
-      if (opener instanceof HTMLElement) {
-        opener.focus()
-      }
-    }
-  }, [])
+  useRestoreFocus()
 
   async function pickDestination(): Promise<void> {
     const picked = await open({ directory: true, multiple: false, title: 'Restore into folder' })
@@ -60,9 +56,17 @@ export function RestoreFromGithubDialog({ onClose }: RestoreFromGithubDialogProp
   }
 
   async function restore(): Promise<void> {
-    const ref = parseRepoInput(repoInput)
+    // A bare name belongs to the signed-in account — the common case never
+    // needs the owner typed. Normalize first so both spellings go through
+    // the same validation instead of failing later at the clone.
+    const trimmed = repoInput.trim()
+    const normalized =
+      !trimmed.includes('/') && trimmed.length > 0 && user !== null
+        ? `${user.login}/${trimmed}`
+        : trimmed
+    const ref = parseRepoInput(normalized)
     if (ref === null) {
-      action.setError('Enter the repository as owner/name or a GitHub URL.')
+      action.setError('Enter the repository name (or owner/name for another account).')
       return
     }
     if (destination === null) {
@@ -99,7 +103,12 @@ export function RestoreFromGithubDialog({ onClose }: RestoreFromGithubDialogProp
         </DialogHeader>
 
         {step === 'auth' ? (
-          <GithubAuthStep onAuthed={() => setStep('repo')} />
+          <GithubAuthStep
+            onAuthed={(authedUser) => {
+              setUser(authedUser)
+              setStep('repo')
+            }}
+          />
         ) : (
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1">
@@ -108,7 +117,7 @@ export function RestoreFromGithubDialog({ onClose }: RestoreFromGithubDialogProp
                 autoFocus
                 value={repoInput}
                 onChange={(event) => setRepoInput(event.target.value)}
-                placeholder="owner/name"
+                placeholder={user !== null ? `${user.login}/…` : 'owner/name'}
               />
             </label>
             <div className="flex items-center gap-2">

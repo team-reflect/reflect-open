@@ -21,7 +21,8 @@ export type { BackupState, ConnectExistingResult } from '@/lib/backup-controller
 
 interface SyncContextValue {
   backup: BackupState
-  connectNewRepo: (name: string) => Promise<void>
+  /** `manualCreateNeeded` = the token type can't create repos (guide instead). */
+  connectNewRepo: (name: string) => Promise<'connected' | 'manualCreateNeeded'>
   connectExistingRepo: (
     ref: GithubRepoRef,
     options?: { allowPublic?: boolean },
