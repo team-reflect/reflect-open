@@ -307,4 +307,43 @@ describe('ConnectGithubDialog', () => {
       'https://github.com/apps/reflect-github-app/installations/new',
     )
   })
+
+  it('promotes the grant remedy when a created repo still cannot be seen', async () => {
+    // App user, "selected repositories" install: they create the repo via
+    // the handoff, but the app was never granted access to it. After
+    // "I created it — connect" a 404 means visibility, not existence — the
+    // grant flow takes over instead of looping back into the create guide.
+    storeCredential(appCredential())
+    sync.connectExistingRepo.mockResolvedValueOnce('notFound').mockResolvedValueOnce('notFound')
+    sync.connectNewRepo.mockResolvedValueOnce('manualCreateNeeded')
+    const onClose = renderWizard()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'I created it — connect' }))
+
+    expect(await screen.findByText(/still can’t see the new repository/i)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Create on GitHub…' })).toBeNull()
+    // The repo exists now — re-running the API create would just 422.
+    expect(sync.connectNewRepo).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Grant access on GitHub…' }))
+    expect(openedUrls).toHaveBeenCalledWith(
+      'https://github.com/apps/reflect-github-app/installations/new',
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'I granted it — try again' }))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+  })
+
+  it('keeps the created-but-unseen remedy token-flavored for PAT users', async () => {
+    sync.connectExistingRepo.mockResolvedValueOnce('notFound').mockResolvedValueOnce('notFound')
+    sync.connectNewRepo.mockResolvedValueOnce('manualCreateNeeded')
+    renderWizard()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'I created it — connect' }))
+
+    expect(await screen.findByText(/included in your token’s repository access/i)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /grant access/i })).toBeNull()
+  })
 })

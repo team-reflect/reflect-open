@@ -76,6 +76,12 @@ export function ConnectGithubDialog({
   const [showCreateGuide, setShowCreateGuide] = useState(false)
   /** App sign-in couldn't see the repo → offer the install-access remedy. */
   const [showGrantHint, setShowGrantHint] = useState(false)
+  /**
+   * The user clicked "I created it — connect". From here on a 404 means
+   * "can't see it", not "doesn't exist": the remedy is access (install the
+   * app / widen the token), never the create guide again.
+   */
+  const [claimedCreated, setClaimedCreated] = useState(false)
 
   useRestoreFocus()
 
@@ -89,11 +95,13 @@ export function ConnectGithubDialog({
 
   async function finish(
     forUser: GithubUser,
-    options: { allowPublic?: boolean; kind?: AuthKind } = {},
+    options: { allowPublic?: boolean; kind?: AuthKind; claimedCreated?: boolean } = {},
   ): Promise<void> {
-    // The first run is invoked from the same tick that learned the credential
-    // kind, before state has committed — so it arrives as a parameter.
+    // Two values are read at call time because their setters fire in the
+    // same tick as the call (state hasn't committed): the credential kind on
+    // the first run, and the created-it claim on its button's click.
     const kind = options.kind ?? authKind
+    const claimed = options.claimedCreated ?? claimedCreated
     await action.run(async () => {
       // Each attempt re-derives the guidance from its own outcome — a stale
       // "can't create repositories" or "grant access" panel from an earlier
@@ -119,20 +127,25 @@ export function ConnectGithubDialog({
         setPublicConfirm(ref)
         return
       }
-      // Not found. For an existing repo that's the answer; for a new one,
-      // create it — by API when the token can, by guided handoff otherwise.
-      if (mode === 'existing') {
+      // Not found. For an existing repo — or one the user says they already
+      // created — that means "can't see it"; for a new one, create it, by
+      // API when the token can and by guided handoff otherwise.
+      if (mode === 'existing' || claimed) {
         // GitHub's 404 can't distinguish "doesn't exist" from "no access".
         // App sign-ins almost always mean the latter (the app isn't
         // installed on the repo), so that's the remedy they get.
         if (kind === 'app') {
           setShowGrantHint(true)
           action.setError(
-            'Reflect can’t see that repository — grant it access on GitHub, or check the name.',
+            claimed
+              ? 'Reflect still can’t see the new repository — grant it access on GitHub.'
+              : 'Reflect can’t see that repository — grant it access on GitHub, or check the name.',
           )
         } else {
           action.setError(
-            'That repository was not found (check the name and the token’s repo access).',
+            claimed
+              ? 'Still not found — make sure the new repository is included in your token’s repository access.'
+              : 'That repository was not found (check the name and the token’s repo access).',
           )
         }
         return
@@ -175,6 +188,7 @@ export function ConnectGithubDialog({
     setPublicConfirm(null)
     setShowCreateGuide(false)
     setShowGrantHint(false)
+    setClaimedCreated(false)
     setStep('repo')
   }
 
@@ -314,7 +328,10 @@ export function ConnectGithubDialog({
                     variant="outline"
                     size="sm"
                     disabled={action.pending}
-                    onClick={() => void finish(user)}
+                    onClick={() => {
+                      setClaimedCreated(true)
+                      void finish(user, { claimedCreated: true })
+                    }}
                   >
                     I created it — connect
                   </Button>
