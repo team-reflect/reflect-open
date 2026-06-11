@@ -17,10 +17,10 @@ export function SidebarPinned(): ReactElement | null {
 
   return (
     <section aria-label="Pinned notes">
-      <h2 className="px-2.5 pb-1 pt-4 text-[11px] font-semibold tracking-[0.08em] text-text-muted uppercase">
-        Pinned
+      <h2 className="px-4 pt-4 text-2xs font-medium leading-5 tracking-wide text-text-muted">
+        Pinned notes
       </h2>
-      <ul className="flex flex-col gap-px">
+      <ul className="mt-2 flex flex-col space-y-1">
         {pinned.map((note) => (
           <SidebarNoteRow
             key={note.path}

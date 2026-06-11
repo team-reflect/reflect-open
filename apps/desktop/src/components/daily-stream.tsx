@@ -119,14 +119,17 @@ export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
               className="absolute inset-x-0"
               style={{ transform: `translateY(${item.start}px)` }}
             >
-              <section className="border-b border-black/5 py-6 dark:border-white/5">
-                <h2 className={cn('mb-3 text-lg font-semibold', STREAM_GUTTER)}>
+              <section className="border-b border-border py-6">
+                {/* V1 renders the date as the note's H1-sized subject, with
+                    today's tinted brand (its `highlightSubject`). */}
+                <h2
+                  className={cn(
+                    'reflect-daily-subject mb-3',
+                    STREAM_GUTTER,
+                    isToday && 'text-accent',
+                  )}
+                >
                   {formatDayLabel(date, settings.dateFormat)}
-                  {isToday ? (
-                    <span className="ml-2 align-middle text-xs font-medium text-accent">
-                      Today
-                    </span>
-                  ) : null}
                 </h2>
                 <NotePane
                   path={dailyPath(date)}

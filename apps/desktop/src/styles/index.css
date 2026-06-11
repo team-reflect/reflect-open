@@ -20,11 +20,14 @@
   --color-surface-sunken: var(--surface-sunken);
   --color-surface-app: var(--surface-app);
   --color-surface-hover: var(--surface-hover);
+  --color-surface-active: var(--surface-active);
+  --color-surface-inverse: var(--surface-inverse);
 
   --color-text: var(--text);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
   --color-text-on-brand: var(--text-on-brand);
+  --color-text-on-inverse: var(--text-on-inverse);
 
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
@@ -42,6 +45,13 @@
   --shadow-sm: var(--ds-shadow-sm);
   --shadow-md: var(--ds-shadow-md);
   --shadow-pop: var(--ds-shadow-pop);
+  --shadow-app-input: var(--ds-shadow-app-input);
+
+  /* 12px chrome text (V1's `text-xs`; the DS `--text-xs` is 13px) and the
+     shortcut-glyph font, via the same --ds-* indirection as the shadows. */
+  --text-2xs: var(--ds-text-2xs);
+  --text-2xs--line-height: 1.25;
+  --font-shortcut: var(--ds-font-shortcut);
 
   /* shadcn semantic tokens (added by `shadcn init`, values rewired below in
      :root to reference DS tokens). Note `--color-accent` above stays the DS
@@ -96,6 +106,9 @@
   --ds-shadow-sm: var(--shadow-sm);
   --ds-shadow-md: var(--shadow-md);
   --ds-shadow-pop: var(--shadow-pop);
+  --ds-shadow-app-input: var(--shadow-app-input);
+  --ds-text-2xs: var(--text-2xs);
+  --ds-font-shortcut: var(--font-shortcut);
 }
 
 /* shadcn semantic tokens, bridged onto the DS tokens so both vocabularies
@@ -177,6 +190,15 @@ body,
 .reflect-editor h2 { font-size: var(--text-xl, 1.25rem); }
 .reflect-editor h3 { font-size: var(--text-lg, 1.125rem); }
 .reflect-editor h1:first-child { margin-top: 0; }
+
+/* The daily note's date heading shares the editor H1 metrics (V1 renders the
+   date as the note's subject) without living inside the editor DOM. */
+.reflect-daily-subject {
+  font-family: var(--font-reading, var(--font-sans));
+  font-size: var(--text-2xl, 1.5rem);
+  font-weight: 650;
+  letter-spacing: var(--tracking-snug, -0.01em);
+}
 
 .reflect-editor p {
   margin: 0.4em 0;

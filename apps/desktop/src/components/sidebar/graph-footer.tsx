@@ -1,17 +1,23 @@
 import { useState, type ReactElement } from 'react'
 import type { GraphInfo } from '@reflect/core'
-import { Check, ChevronsUpDown, FolderOpen } from 'lucide-react'
+import { Check, FolderOpen } from 'lucide-react'
+import { HelpIcon } from '@/components/icons/help-icon'
+import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
+import { useRouter } from '@/routing/router'
 
 /**
- * The sidebar footer, in the original app's idiom (its account/workspace
- * switcher): which graph you're in, and the way to another one — recent
- * graphs plus the OS folder picker, in a lightweight disclosure. No portal:
- * the footer is its own positioning context, and a fixed backdrop handles
+ * The sidebar footer, in the original app's idiom (its account nav): the
+ * graph's color swatch and name on the left — a disclosure for switching to a
+ * recent graph or the OS folder picker — and a help button on the right
+ * (Settings hosts the keyboard cheat sheet, the closest analog to the old
+ * help menu). The swatch pulses while the graph indexes. No portal: the
+ * footer is its own positioning context, and a fixed backdrop handles
  * click-outside.
  */
 export function GraphFooter({ graph }: { graph: GraphInfo }): ReactElement {
   const { recents, indexing, openRecent, pickAndOpen } = useGraph()
+  const { navigate } = useRouter()
   const [open, setOpen] = useState(false)
 
   const choose = (action: () => Promise<void>): void => {
@@ -83,39 +89,41 @@ export function GraphFooter({ graph }: { graph: GraphInfo }): ReactElement {
         </>
       ) : null}
 
-      <button
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        title={graph.root}
-        onClick={() => setOpen((current) => !current)}
-        className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors duration-100 hover:bg-surface-hover"
-      >
-        <span
-          aria-hidden
-          className="flex size-6 shrink-0 items-center justify-center rounded-md bg-surface-hover text-xs font-semibold text-accent"
+      <div className="flex items-center px-4 py-3">
+        <button
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          title={graph.root}
+          onClick={() => setOpen((current) => !current)}
+          className="flex min-w-0 flex-1 items-center space-x-2.5 text-left"
         >
-          {graph.name.charAt(0).toUpperCase()}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-medium text-text">
+          <span
+            aria-hidden
+            className={cn(
+              'h-5 w-5 flex-none rounded-md bg-accent',
+              indexing && 'motion-safe:animate-pulse',
+            )}
+          />
+          <span className="min-w-0 truncate text-sm font-medium text-text">
             {graph.name}
           </span>
           {indexing ? (
-            <span
-              role="status"
-              className="block truncate text-[11px] text-text-muted motion-safe:animate-pulse"
-            >
-              Indexing…
+            <span role="status" className="sr-only">
+              Indexing
             </span>
           ) : null}
-        </span>
-        <ChevronsUpDown
-          aria-hidden
-          strokeWidth={1.75}
-          className="size-3.5 shrink-0 text-text-muted"
-        />
-      </button>
+        </button>
+        <button
+          type="button"
+          aria-label="Help"
+          title="Help"
+          onClick={() => navigate({ kind: 'settings' })}
+          className="flex-none text-text-muted transition-colors duration-100 hover:text-text"
+        >
+          <HelpIcon />
+        </button>
+      </div>
     </div>
   )
 }

@@ -36,4 +36,12 @@ describe('ShortcutKeys', () => {
     expect(keycapLabels(view.container)).toEqual(['⌘', '⇧', '↩'])
     view.unmount()
   })
+
+  it('ghost mode renders the keys as plain joined text, not keycaps', () => {
+    isApplePlatform.mockReturnValue(true)
+    const view = render(<ShortcutKeys binding="Mod-k" ghost />)
+    expect(keycapLabels(view.container)).toEqual([])
+    expect(view.container.textContent).toBe('⌘K')
+    view.unmount()
+  })
 })

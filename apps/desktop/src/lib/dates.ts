@@ -34,11 +34,16 @@ export function addDaysIso(date: string, days: number): string {
 }
 
 /**
- * Human label for an ISO date per the user's date-format setting:
- * `Tuesday, June 9` for `mdy`, `Tuesday, 9 June` for `dmy`.
+ * Human label for an ISO date per the user's date-format setting, in the
+ * original app's daily-subject form: `Tue, June 9th, 2026` for `mdy`
+ * (V1's `weekMonthDayYear`), `Tue, 9th June, 2026` for `dmy`
+ * (V1's `weekDayMonthYear`).
  */
 export function formatDayLabel(date: string, dateFormat: DateFormat): string {
-  return format(parseIsoDate(date), dateFormat === 'dmy' ? 'EEEE, d MMMM' : 'EEEE, MMMM d')
+  return format(
+    parseIsoDate(date),
+    dateFormat === 'dmy' ? 'EEE, do MMMM, yyyy' : 'EEE, MMMM do, yyyy',
+  )
 }
 
 /**

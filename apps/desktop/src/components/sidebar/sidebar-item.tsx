@@ -1,10 +1,10 @@
-import type { ReactElement } from 'react'
-import type { LucideIcon } from 'lucide-react'
+import type { ReactElement, ReactNode } from 'react'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import { cn } from '@/lib/utils'
 
 interface SidebarItemProps {
-  icon: LucideIcon
+  /** A 24px icon node — the V1 custom glyphs, or a Lucide icon in a 24px box. */
+  icon: ReactNode
   label: string
   /** Keymap binding hinted on hover/focus (e.g. `Mod-d`). */
   binding?: string
@@ -13,12 +13,13 @@ interface SidebarItemProps {
 }
 
 /**
- * One primary-navigation row, in the original sidebar's idiom: icon + medium
- * label on a translucent hover wash, accent-tinted when active, with the
- * keyboard shortcut revealed on hover — chrome that teaches the fast path.
+ * One primary-navigation row, in the original sidebar's idiom: 24px icon +
+ * medium label on a translucent hover wash; selected rows keep the wash in
+ * light mode and tint the text brand-indigo in dark, with the keyboard
+ * shortcut revealed on hover — chrome that teaches the fast path.
  */
 export function SidebarItem({
-  icon: Icon,
+  icon,
   label,
   binding,
   active = false,
@@ -30,19 +31,19 @@ export function SidebarItem({
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium',
+        'group flex w-full items-center space-x-3 rounded-md px-2.5 py-1.5 text-sm font-medium',
         'transition-colors duration-100',
         active
-          ? 'bg-surface-hover text-accent dark:text-accent-hover'
-          : 'text-text-secondary hover:bg-surface-hover hover:text-text',
+          ? 'bg-surface-hover text-text dark:bg-transparent dark:text-accent'
+          : 'text-text hover:bg-surface-hover',
       )}
     >
-      <Icon aria-hidden strokeWidth={1.75} className="size-4 shrink-0" />
+      {icon}
       <span className="min-w-0 flex-1 truncate text-left">{label}</span>
       {binding ? (
         <ShortcutKeys
           binding={binding}
-          className="opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-visible:opacity-100"
+          className="invisible group-hover:visible group-focus-visible:visible"
         />
       ) : null}
     </button>

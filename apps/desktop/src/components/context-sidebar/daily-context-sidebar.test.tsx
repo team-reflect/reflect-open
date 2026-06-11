@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
-import { addDaysIso, formatDayLabel, todayIso } from '@/lib/dates'
-import { monthLabel, monthOf, addMonths } from '@/lib/month-grid'
+import { formatDayLabel } from '@/lib/dates'
+import { monthLabel, monthOf } from '@/lib/month-grid'
 import { RouterProvider, useRouter } from '@/routing/router'
 import { DailyContextSidebar } from './daily-context-sidebar'
 
@@ -21,7 +21,7 @@ vi.mock('@/providers/graph-provider', () => ({
 }))
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({
-    settings: { semanticSearchEnabled: true, dateFormat: 'mdy' },
+    settings: { semanticSearchEnabled: true, dateFormat: 'mdy', weekStartDay: 'monday' },
     updateSettings: () => {},
   }),
 }))
@@ -49,35 +49,11 @@ beforeEach(() => {
   relatedNotes.mockReset().mockResolvedValue([])
 })
 
-describe('DailyContextSidebar header', () => {
-  it('shows the day label and a Today badge on today', async () => {
-    const today = todayIso()
-    const view = renderSidebar(today)
-    expect(view.getByRole('heading', { name: formatDayLabel(today, 'mdy') })).toBeDefined()
-    expect(view.getByText('Today')).toBeDefined()
-    expect(view.queryByText('Go to today')).toBeNull()
-    await waitFor(() => expect(relatedNotes).toHaveBeenCalled())
-    view.unmount()
-  })
-
-  it('offers "Go to today" with the real platform-formatted hint on other days', async () => {
-    const past = addDaysIso(todayIso(), -3)
-    const view = renderSidebar(past)
-    const goToToday = view.getByRole('button', { name: /Go to today/ })
-    // jsdom reports a non-Apple platform, so Mod renders as Ctrl.
-    expect(goToToday.textContent).toContain('Ctrl+D')
-    await userEvent.click(goToToday)
+describe('DailyContextSidebar calendar header', () => {
+  it('jumps to today from the calendar-icon button', async () => {
+    const view = renderSidebar('2026-06-09')
+    await userEvent.click(view.getByRole('button', { name: 'Jump to today' }))
     expect(view.getByTestId('route').textContent).toContain('"kind":"today"')
-    view.unmount()
-  })
-
-  it('navigates to adjacent days', async () => {
-    const date = '2026-06-09'
-    const view = renderSidebar(date)
-    await userEvent.click(view.getByRole('button', { name: 'Previous day' }))
-    expect(view.getByTestId('route').textContent).toContain('2026-06-08')
-    await userEvent.click(view.getByRole('button', { name: 'Next day' }))
-    expect(view.getByTestId('route').textContent).toContain('2026-06-10')
     view.unmount()
   })
 })
@@ -158,19 +134,26 @@ describe('DailyContextSidebar related notes', () => {
 describe('DailyContextSidebar sections', () => {
   it('collapses a section and persists the state for the session', async () => {
     const view = renderSidebar('2026-06-09')
-    const header = view.getByRole('button', { name: /Calendar/ })
+    const header = view.getByRole('button', { name: /Note actions/ })
     expect(header.getAttribute('aria-expanded')).toBe('true')
-    expect(view.getByText(monthLabel(monthOf('2026-06-09')))).toBeDefined()
+    expect(view.getByText('Pin this note')).toBeDefined()
 
     await userEvent.click(header)
     expect(header.getAttribute('aria-expanded')).toBe('false')
-    expect(view.queryByText(monthLabel(addMonths(monthOf('2026-06-09'), 0)))).toBeNull()
+    expect(view.queryByText('Pin this note')).toBeNull()
     view.unmount()
 
     const reopened = renderSidebar('2026-06-09')
     expect(
-      reopened.getByRole('button', { name: /Calendar/ }).getAttribute('aria-expanded'),
+      reopened.getByRole('button', { name: /Note actions/ }).getAttribute('aria-expanded'),
     ).toBe('false')
     reopened.unmount()
+  })
+
+  it('the calendar is not collapsible', () => {
+    const view = renderSidebar('2026-06-09')
+    expect(view.getByText(monthLabel(monthOf('2026-06-09')))).toBeDefined()
+    expect(view.queryByRole('button', { name: /^Calendar$/ })).toBeNull()
+    view.unmount()
   })
 })

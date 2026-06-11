@@ -1,11 +1,12 @@
 import { useState, type ReactElement } from 'react'
 import { errorMessage } from '@reflect/core'
-import { Pin, PinOff } from 'lucide-react'
+import { PinIcon } from '@/components/icons/pin-icon'
+import { ShortcutKeys } from '@/components/shortcut-keys'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes'
 import { keybindingFor } from '@/lib/commands/app-commands'
-import { formatBindingLabel } from '@/lib/keybindings'
 import { toggleNotePinned } from '@/lib/note-pin'
 import { startOperation } from '@/lib/operations'
+import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
 import { SidebarSection } from './sidebar-section'
 
@@ -17,12 +18,11 @@ interface NoteActionsSectionProps {
 // Derived from the `note.togglePin` command definition so the hint can never
 // drift from the real binding (the same contract as the Today hint).
 const PIN_KEYBINDING = keybindingFor('note.togglePin')
-const PIN_HINT = PIN_KEYBINDING !== null ? formatBindingLabel(PIN_KEYBINDING) : null
 
 /**
  * The toggle's resolved state, held until the index reflects it. The pinned
  * label otherwise lags one watcher round-trip behind the write, and in that
- * window a stale "Pin note" click would silently unpin (and vice versa). The
+ * window a stale "Pin this note" click would silently unpin (and vice versa). The
  * toggle reads the note itself, so its return value is the freshest truth;
  * the bridge retires the moment the index agrees or the section moves to
  * another note.
@@ -71,21 +71,30 @@ export function NoteActionsSection({ path }: NoteActionsSectionProps): ReactElem
     }
   }
 
-  const PinIcon = isPinned ? PinOff : Pin
   return (
     <SidebarSection storageKey="note-actions" title="Note actions">
       <button
         type="button"
         onClick={() => void togglePin()}
         disabled={isToggling}
-        className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-surface-hover disabled:opacity-50"
+        className="group relative flex w-full items-center space-x-2 rounded-lg px-3 py-2 text-start transition-colors duration-100 hover:bg-surface-hover disabled:opacity-50"
       >
-        <PinIcon aria-hidden className="size-4 text-text-muted" />
-        <span className="min-w-0 flex-1 truncate">{isPinned ? 'Unpin note' : 'Pin note'}</span>
-        {PIN_HINT !== null ? (
-          <kbd className="rounded border border-black/10 px-1 font-sans text-[10px] text-text-muted dark:border-white/10">
-            {PIN_HINT}
-          </kbd>
+        <span
+          className={cn(
+            'flex h-5 w-5 flex-none items-center justify-center transition-colors duration-100',
+            isPinned ? 'text-accent' : 'text-text-muted group-hover:text-text',
+          )}
+        >
+          <PinIcon width={20} height={20} />
+        </span>
+        <span className="min-w-0 flex-1 truncate text-xs font-medium">
+          {isPinned ? 'Un-pin this note' : 'Pin this note'}
+        </span>
+        {PIN_KEYBINDING !== null ? (
+          <ShortcutKeys
+            binding={PIN_KEYBINDING}
+            className="invisible group-hover:visible"
+          />
         ) : null}
       </button>
     </SidebarSection>

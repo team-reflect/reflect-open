@@ -181,7 +181,7 @@ describe('CommandPalette', () => {
     ])
     const { view, navigate } = renderPalette('#work is:daily')
     await view.findByText('Work log')
-    expect(view.getByText('Monday, June 8')).toBeDefined() // dailies keep labels
+    expect(view.getByText('Mon, June 8th, 2026')).toBeDefined() // dailies keep labels
     expect(searchWithFilters).toHaveBeenCalledWith(
       expect.objectContaining({
         filtered: true,
@@ -238,7 +238,7 @@ describe('CommandPalette', () => {
     ])
     searchWithFilters.mockResolvedValue([])
     const { view, navigate } = renderPalette('2026-06-09')
-    await view.findByText('Tuesday, June 9')
+    await view.findByText('Tue, June 9th, 2026')
 
     await userEvent.keyboard('{Enter}')
     await waitFor(() =>

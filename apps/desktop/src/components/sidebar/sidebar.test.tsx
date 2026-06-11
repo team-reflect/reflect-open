@@ -73,7 +73,7 @@ describe('Sidebar', () => {
   it('nav rows run their registered commands', async () => {
     const { view, navigate } = renderSidebar()
 
-    await userEvent.click(view.getByRole('button', { name: /today/i }))
+    await userEvent.click(view.getByRole('button', { name: /daily notes/i }))
     await waitFor(() => expect(navigate).toHaveBeenCalledWith({ kind: 'today' }))
 
     await userEvent.click(view.getByRole('button', { name: /settings/i }))
@@ -110,6 +110,29 @@ describe('Sidebar', () => {
     const { view } = renderSidebar()
     await waitFor(() => expect(getPinnedNotes).toHaveBeenCalled())
     expect(view.queryByRole('region', { name: /pinned notes/i })).toBeNull()
+  })
+
+  it('history arrows walk the router stack and disable at its edges', async () => {
+    getPinnedNotes.mockResolvedValue([
+      { path: 'notes/rust.md', title: 'Rust', dailyDate: null },
+    ])
+    const { view } = renderSidebar()
+    const backButton = view.getByRole('button', { name: 'Go back' })
+    const forwardButton = view.getByRole('button', { name: 'Go forward' })
+    expect(backButton).toHaveProperty('disabled', true)
+    expect(forwardButton).toHaveProperty('disabled', true)
+
+    // Pinned rows push onto the real router, enabling history navigation.
+    const rust = await view.findByRole('button', { name: 'Rust' })
+    await userEvent.click(rust)
+    await waitFor(() => expect(backButton).toHaveProperty('disabled', false))
+
+    await userEvent.click(backButton)
+    await waitFor(() => expect(rust.getAttribute('aria-current')).toBeNull())
+    expect(forwardButton).toHaveProperty('disabled', false)
+
+    await userEvent.click(forwardButton)
+    await waitFor(() => expect(rust.getAttribute('aria-current')).toBe('page'))
   })
 
   it('the graph footer switches to another recent graph', async () => {

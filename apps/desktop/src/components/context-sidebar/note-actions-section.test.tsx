@@ -39,51 +39,51 @@ beforeEach(() => {
 })
 
 describe('NoteActionsSection pin toggle', () => {
-  it('offers Pin note with the platform-formatted hint and toggles on click', async () => {
+  it('offers Pin this note with the platform-formatted hint and toggles on click', async () => {
     const view = renderSection('notes/a.md')
-    const button = view.getByRole('button', { name: /Pin note/ })
+    const button = view.getByRole('button', { name: /Pin this note/ })
     // jsdom reports a non-Apple platform, so Mod renders as Ctrl.
-    expect(button.textContent).toContain('Ctrl+O')
+    expect(button.textContent).toContain('CtrlO')
     await userEvent.click(button)
     expect(toggleNotePinned).toHaveBeenCalledWith('notes/a.md', 7)
     view.unmount()
   })
 
-  it('offers Unpin note when the index lists the note as pinned', async () => {
+  it('offers Un-pin this note when the index lists the note as pinned', async () => {
     getPinnedNotes.mockResolvedValue([{ path: 'daily/2026-06-10.md', title: 'June 10th, 2026', dailyDate: '2026-06-10' }])
     const view = renderSection('daily/2026-06-10.md')
-    await view.findByText('Unpin note')
-    await userEvent.click(view.getByRole('button', { name: /Unpin note/ }))
+    await view.findByText('Un-pin this note')
+    await userEvent.click(view.getByRole('button', { name: /Un-pin this note/ }))
     expect(toggleNotePinned).toHaveBeenCalledWith('daily/2026-06-10.md', 7)
     view.unmount()
   })
 
   it('flips the label from the toggle result before the index catches up', async () => {
     const view = renderSection('notes/a.md')
-    await userEvent.click(view.getByRole('button', { name: /Pin note/ }))
+    await userEvent.click(view.getByRole('button', { name: /Pin this note/ }))
     // The index still reports unpinned; the toggle's resolved state bridges
     // the watcher round-trip so a second click can't invert the user's intent.
-    expect(await view.findByText('Unpin note')).toBeDefined()
+    expect(await view.findByText('Un-pin this note')).toBeDefined()
     toggleNotePinned.mockResolvedValueOnce(false)
-    await userEvent.click(view.getByRole('button', { name: /Unpin note/ }))
-    expect(await view.findByText('Pin note')).toBeDefined()
+    await userEvent.click(view.getByRole('button', { name: /Un-pin this note/ }))
+    expect(await view.findByText('Pin this note')).toBeDefined()
     expect(toggleNotePinned).toHaveBeenCalledTimes(2)
     view.unmount()
   })
 
-  it('stays on Pin note when a different note is pinned', async () => {
+  it('stays on Pin this note when a different note is pinned', async () => {
     getPinnedNotes.mockResolvedValue([{ path: 'notes/other.md', title: 'Other', dailyDate: null }])
     const view = renderSection('notes/a.md')
     await waitFor(() => expect(getPinnedNotes).toHaveBeenCalled())
-    expect(view.getByText('Pin note')).toBeDefined()
-    expect(view.queryByText('Unpin note')).toBeNull()
+    expect(view.getByText('Pin this note')).toBeDefined()
+    expect(view.queryByText('Un-pin this note')).toBeNull()
     view.unmount()
   })
 
   it('surfaces a toggle failure through the operations status', async () => {
     toggleNotePinned.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
     const view = renderSection('notes/a.md')
-    await userEvent.click(view.getByRole('button', { name: /Pin note/ }))
+    await userEvent.click(view.getByRole('button', { name: /Pin this note/ }))
     expect(startOperation).toHaveBeenCalledWith('Pinning note')
     expect(operationFail).toHaveBeenCalled()
     view.unmount()
@@ -93,7 +93,7 @@ describe('NoteActionsSection pin toggle', () => {
     getPinnedNotes.mockResolvedValue([{ path: 'notes/a.md', title: 'A', dailyDate: null }])
     toggleNotePinned.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
     const view = renderSection('notes/a.md')
-    await userEvent.click(await view.findByRole('button', { name: /Unpin note/ }))
+    await userEvent.click(await view.findByRole('button', { name: /Un-pin this note/ }))
     expect(startOperation).toHaveBeenCalledWith('Unpinning note')
     expect(operationFail).toHaveBeenCalled()
     view.unmount()

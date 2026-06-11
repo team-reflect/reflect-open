@@ -106,9 +106,10 @@ body/editor prose is 400. Headings use **tight negative tracking** (`-0.02em`);
 default UI uses Inter's slight optical setting (`-0.011em`).
 
 **Type scale.** The app is a *writing tool*, so chrome text is deliberately **small**
-(12–14px: note titles & shortcuts at `2xs/12px`, buttons & menu items at `sm/14px`),
-and the user's prose is the largest thing on screen (16px+). The marketing site
-inverts this with huge tight display headings (`40–72px`).
+(12–14px: section headers & shortcut hints at `2xs/12px`, note titles & labels at
+`xs/13px`, buttons & menu items at `sm/14px`), and the user's prose is the largest
+thing on screen (16px+). The marketing site inverts this with huge tight display
+headings (`40–72px`).
 
 **Color.**
 - **App:** near-white canvas (`#fff` surfaces on a `#f8fafa` app bg) or deep-navy dark
@@ -127,10 +128,10 @@ with `backdrop-blur`). The signature brand image is the **networked graph sphere
 stock photography; product screenshots and the graph illustration carry imagery.
 
 **Borders & dividers.** Hairlines do most of the structural work — `1px` borders in
-`--coolgray-200`, and the signature **`shadow-border-b` / `shadow-border-r`**
-(`0 1px 0 rgba(11,19,36,.05)`) for crisp 1px separators that don't add weight. Inputs
-get a `rgba(11,19,36,.15)` outline. In dark/space mode, borders drop to
-`rgba(255,255,255,.05–.08)`.
+`--coolgray-100` (V1's hairline; whisper-quiet), and the signature **`shadow-border-b`
+/ `shadow-border-r`** (`0 1px 0 rgba(11,19,36,.05)`) for crisp 1px separators that
+don't add weight. Inputs get a `rgba(11,19,36,.15)` outline. In dark/space mode,
+borders drop to `rgba(255,255,255,.05–.08)`.
 
 **Corner radii.** Gentle. Controls & cards = **8px** (`--radius-lg`, the house value);
 the search field is a precise **7px**; tags/chips 4px; modals & glass panels 12–16px;
@@ -143,8 +144,9 @@ glow** (`inset 0 0 12px rgba(191,151,255,.24)`) rather than a drop shadow.
 
 **Hover / press states.**
 - *Menu items & list rows:* hover = a translucent grey wash (`bg-gray-200/50`, i.e.
-  `rgba(229,231,235,.5)`; dark: `rgba(255,255,255,.04)`). Selected = same wash + the
-  text shifts to `--text` (darker).
+  `rgba(229,231,235,.5)`; dark: `rgba(255,255,255,.03)`). Selected = same wash + the
+  text shifts to `--text` (darker); in dark mode the wash drops and the selected
+  label tints brand indigo instead.
 - *Primary button:* hover **lightens** indigo-600 → indigo-500; focus = 2px indigo ring
   with offset; disabled = grey + `not-allowed`.
 - *Touchable (mobile/list):* `active:opacity-70` — a quick opacity dip on press.
@@ -172,6 +174,61 @@ circular testimonial avatars).
 
 ---
 
+## ADDENDUM — V1 visual parity (June 2026)
+
+The desktop app's chrome was restyled to match Reflect V1 exactly. That pass added
+tokens and pinned down conventions that earlier drafts of this guide left implicit.
+Everything below lives in `tokens/colors.css` / `tokens/typography.css` and is mapped
+to Tailwind utilities in the desktop app's `@theme inline` block.
+
+**New color tokens.**
+- `--surface-inverse` — V1's near-black-blue selection fill (`hsl(222.2 47.4% 11.2%)`;
+  dark mode: indigo-500). Used for the calendar's **selected-day square**: a 32×32px
+  `radius-md` block behind the day number.
+- `--text-on-inverse` — the near-white number on that square (`hsl(210 40% 98%)`,
+  both modes), set **bold** when selected.
+- `--surface-active` — *today's* calendar square when not selected: the same grey wash
+  as hover (`rgba(229,231,235,.5)`; dark `rgba(55,65,81,.5)`).
+- Light `--border` moved from `coolgray-200` → **`coolgray-100`** (V1's hairline).
+  This is deliberate and global: V1 sets every divider at gray-100.
+- Dark `--surface-hover` tightened to `rgba(255,255,255,.03)` and dark
+  `--border-strong` to `rgba(255,255,255,.05)` — V1's exact dark-mode opacities.
+
+**New shadow token.** `--shadow-app-input` — V1's signature five-layer stacked shadow
+for the search field (`0 1px 0 -1px` … `0 3px 6px -3px`, each `rgba(0,0,0,.05)`;
+`.10` in dark). It reads as one soft, crisp lift; pair it with the field's `7px`
+radius and `--border-strong` outline.
+
+**New type tokens.** `--font-shortcut` — `system-ui`-first stack so keyboard glyphs
+(⌘ ⌥ ⇧) render cleanly. Shortcut hints come in two styles: **keycaps** (bordered
+`<kbd>` chips, revealed on row hover) and **ghost** (borderless 12px uppercase text in
+`--font-shortcut`, always visible — the search field's `⌘K`). The desktop app also
+exposes `text-2xs` (12px) as a Tailwind utility; note the scale's intent — **13px
+(`--text-xs`) for sidebar note rows and labels, 12px (`--text-2xs`) for section
+headers, ghost hints, and meta**.
+
+**Selection & navigation conventions pinned by the pass.**
+- Sidebar nav rows: 24px icon + 14px medium label, `space-x-3`, `px-2.5 py-1.5`,
+  `radius-md`. Selected = grey wash + `--text` in light; **transparent bg + indigo
+  text** in dark.
+- Sidebar section headers ("Pinned notes") are sentence case, 12px medium,
+  `--text-muted`, `tracking-wide` — never uppercase.
+- Context-sidebar sections collapse from a quiet sentence-case header whose chevron
+  sits on the **right** and, while open, only appears on hover. No borders between
+  sections, no count badges.
+- The calendar is not a collapsible section: month title 14px semibold, prev /
+  **jump-to-today (calendar glyph)** / next controls in `--text-muted`, weekday row
+  with a bottom hairline, adjacent-month days at 20% opacity, and note-presence dots
+  (`4px`, `--surface-inverse` at 50%) that fade in only while the pointer is over the
+  calendar.
+- Daily-note date headings render as the note's H1 (24px / 650 weight) in the format
+  `Tue, June 9th, 2026` (`EEE, MMMM do, yyyy`; `dmy` swaps to `EEE, do MMMM, yyyy`),
+  with **today's heading tinted brand indigo**.
+- History back/forward chevrons live at the sidebar's top right as ghost icon buttons
+  (`--text-muted`, hover wash, `opacity-50` when at the stack's edge).
+
+---
+
 ## ICONOGRAPHY
 
 Reflect ships a small set of **hand-built single-path SVG icons** living in
@@ -193,6 +250,14 @@ that matches Reflect's weight and style almost exactly (`search`, `pencil`, `lis
 `check`, `map`, `calendar`, `mic`, `pin`, `link`, `trash`, `history`, chevrons all map
 1:1). **⚠️ Flagged substitution** — swap in the real `components/icons` SVGs if you
 need pixel-exact brand icons. Set `stroke-width: 1.75` to match.
+
+> **Update (V1 parity pass):** the desktop app now vendors the real V1 SVGs in
+> `apps/desktop/src/components/icons/` — `pencil`, `list`, `search`, `help`, `pin`,
+> `calendar`, `chevron-left/right`, plus a heroicons-traced `arrow-uturn-left` (the
+> similar-notes return arrow, rendered flipped via `-scale-x-100`). All are 24×24
+> `currentColor` fills (the magnifier is a 1.5px stroke). Prefer these over Lucide in
+> product chrome; Lucide remains the stand-in for glyphs without a V1 equivalent
+> (e.g. `square-pen` for New note, `settings`), sized 16px inside a 24px box.
 
 ---
 

@@ -8,16 +8,18 @@ interface NoteContextSidebarProps {
 }
 
 /**
- * An ordinary note's contextual sidebar: the note's semantic neighbors —
- * the only place similar notes appear — and note actions. Inbound links
+ * An ordinary note's contextual sidebar: note actions, then the note's
+ * semantic neighbors — the only place similar notes appear. Inbound links
  * live under the note itself (the incoming-backlinks panel), not here.
  * Rendered in the AppShell's right region on `note` routes.
  */
 export function NoteContextSidebar({ path }: NoteContextSidebarProps): ReactElement {
   return (
-    <div className="flex flex-col px-2 py-2 text-text">
-      <SimilarNotesSection path={path} />
-      <NoteActionsSection path={path} />
+    <div className="flex flex-col py-2 text-text">
+      <div className="my-4 space-y-4 pb-4">
+        <NoteActionsSection path={path} />
+        <SimilarNotesSection path={path} />
+      </div>
     </div>
   )
 }
