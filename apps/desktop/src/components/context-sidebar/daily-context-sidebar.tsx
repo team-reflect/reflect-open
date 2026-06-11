@@ -28,7 +28,7 @@ export function DailyContextSidebar({ date }: DailyContextSidebarProps): ReactEl
         'flex flex-col text-text',
         // The calendar's controls must clear the WindowDragRegion strip when
         // the macOS title bar is overlaid.
-        hasMacosTitleBarOverlay ? 'pt-7' : 'pt-2',
+        hasMacosTitleBarOverlay ? 'pt-0' : 'pt-2',
       )}
     >
       <DayCalendar selectedDate={date} today={today} />
