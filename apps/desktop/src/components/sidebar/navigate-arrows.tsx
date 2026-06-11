@@ -29,16 +29,20 @@ export function NavigateArrows(): ReactElement {
     // (the command palette) still cover them.
     <div className="relative z-40 flex items-center">
       <Tooltip>
+        {/* Span wrapper keeps pointer events alive when the button is disabled,
+            so the tooltip still opens at the start of the history stack. */}
         <TooltipTrigger asChild>
-          <button
-            type="button"
-            aria-label="Go back"
-            disabled={!canBack}
-            onClick={back}
-            className={BUTTON_CLASS}
-          >
-            <ChevronLeft aria-hidden className="size-4" />
-          </button>
+          <span>
+            <button
+              type="button"
+              aria-label="Go back"
+              disabled={!canBack}
+              onClick={back}
+              className={BUTTON_CLASS}
+            >
+              <ChevronLeft aria-hidden className="size-4" />
+            </button>
+          </span>
         </TooltipTrigger>
         <TooltipContent>
           Go back {BACK_BINDING && <ShortcutKeys binding={BACK_BINDING} />}
@@ -46,15 +50,17 @@ export function NavigateArrows(): ReactElement {
       </Tooltip>
       <Tooltip>
         <TooltipTrigger asChild>
-          <button
-            type="button"
-            aria-label="Go forward"
-            disabled={!canForward}
-            onClick={forward}
-            className={BUTTON_CLASS}
-          >
-            <ChevronRight aria-hidden className="size-4" />
-          </button>
+          <span>
+            <button
+              type="button"
+              aria-label="Go forward"
+              disabled={!canForward}
+              onClick={forward}
+              className={BUTTON_CLASS}
+            >
+              <ChevronRight aria-hidden className="size-4" />
+            </button>
+          </span>
         </TooltipTrigger>
         <TooltipContent>
           Go forward {FORWARD_BINDING && <ShortcutKeys binding={FORWARD_BINDING} />}
