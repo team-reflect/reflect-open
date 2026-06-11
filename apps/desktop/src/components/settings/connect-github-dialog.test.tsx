@@ -24,18 +24,25 @@ beforeEach(() => {
       command === 'secret_get' ? JSON.stringify({ kind: 'pat', token: 'ghp_abc' }) : null,
     listen: async () => () => {},
   })
-  httpFetch.mockResolvedValue(
-    new Response(JSON.stringify({ login: 'alex' }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    }),
+  // A fresh Response per call — bodies are single-use, and a wizard run can
+  // pass through the auth step more than once.
+  httpFetch.mockImplementation(
+    async () =>
+      new Response(JSON.stringify({ login: 'alex' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
   )
+  sync.connectNewRepo.mockResolvedValue('connected')
+  sync.connectExistingRepo.mockResolvedValue('connected')
 })
 
 afterEach(() => {
   cleanup()
   setBridge(null)
-  vi.clearAllMocks()
+  // Reset (not just clear): a failed test must not leak queued one-shot
+  // implementations into its neighbors. Defaults are re-applied above.
+  vi.resetAllMocks()
 })
 
 function renderWizard(onClose = vi.fn()): ReturnType<typeof vi.fn> {
@@ -98,6 +105,40 @@ describe('ConnectGithubDialog', () => {
       ),
     )
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('drops a stale create guide when the wizard takes a different path', async () => {
+    // Reach the manual-create guide, detour through the public-repo consent
+    // screen and back to the repo step — the old "can't create repositories"
+    // panel must not resurface during the new attempt.
+    sync.connectExistingRepo.mockResolvedValueOnce('notFound')
+    sync.connectNewRepo.mockResolvedValueOnce('manualCreateNeeded')
+    const onClose = renderWizard()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(await screen.findByText(/can’t create repositories/i)).toBeTruthy()
+
+    // "I created it" turns up a public repo → consent → choose another.
+    sync.connectExistingRepo.mockResolvedValueOnce('needsPublicConfirm')
+    fireEvent.click(screen.getByRole('button', { name: 'I created it — connect' }))
+    expect(await screen.findByText(/is public/i)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Choose another repo' }))
+
+    // New attempt with an existing repo; hold it pending to observe the UI.
+    const gate: { resolve: ((value: ConnectExistingResult) => void) | null } = { resolve: null }
+    sync.connectExistingRepo.mockImplementationOnce(
+      () => new Promise<ConnectExistingResult>((resolve) => (gate.resolve = resolve)),
+    )
+    fireEvent.click(await screen.findByRole('radio', { name: /use an existing repository/i }))
+    fireEvent.change(screen.getByLabelText('Existing repository'), {
+      target: { value: 'alex/other-notes' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(await screen.findByText('Connecting…')).toBeTruthy()
+    expect(screen.queryByText(/can’t create repositories/i)).toBeNull()
+
+    gate.resolve?.('connected')
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 
   it('validates the existing-repo input before any network work', async () => {

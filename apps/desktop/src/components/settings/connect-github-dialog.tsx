@@ -72,6 +72,10 @@ export function ConnectGithubDialog({
 
   async function finish(forUser: GithubUser, allowPublic = false): Promise<void> {
     await action.run(async () => {
+      // Each attempt re-derives the guide from its own outcome — a stale
+      // "can't create repositories" panel from an earlier path must not
+      // outlive the detour (e.g. consent screen → choose another repo).
+      setShowCreateGuide(false)
       const ref = publicConfirm ?? targetRef(forUser)
       if (ref === null) {
         action.setError(
@@ -218,6 +222,7 @@ export function ConnectGithubDialog({
                     size="sm"
                     onClick={() => {
                       setPublicConfirm(null)
+                      setShowCreateGuide(false)
                       setStep('repo')
                     }}
                   >
