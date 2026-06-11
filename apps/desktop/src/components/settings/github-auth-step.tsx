@@ -106,7 +106,7 @@ export function GithubAuthStep({ onAuthed }: GithubAuthStepProps): ReactElement 
             </button>
             :
           </p>
-          <p className="text-center font-mono text-xl tracking-[0.3em] text-text">
+          <p className="select-text text-center font-mono text-xl tracking-[0.3em] text-text">
             {flowView.userCode}
           </p>
           <p className="text-center text-xs text-text-muted">Waiting for GitHub…</p>

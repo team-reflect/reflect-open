@@ -175,11 +175,17 @@ body {
     user-select: none;
   }
 
+  /* The * rule above applies none to every element explicitly, so it also
+     hits children inside selectable roots. Restore text on those roots AND
+     their descendants so inner p/h* nodes inside the editor are selectable. */
   input,
   textarea,
   [contenteditable],
+  [contenteditable] *,
   .reflect-editor,
-  .reflect-protected-note {
+  .reflect-editor *,
+  .reflect-protected-note,
+  .reflect-protected-note * {
     -webkit-user-select: text;
     user-select: text;
   }
