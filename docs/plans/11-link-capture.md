@@ -113,6 +113,12 @@ Every capture lands in two phases so saving never waits on the network or AI:
    5. Remove the spool file.
    6. If not private: schedule async enrichment (phase 2).
 
+   **Two triggers for drain** — the app calls `drainCaptureInbox` in both places:
+   - **On launch:** scan the inbox directory for any files already present (captures
+     that arrived while the app was closed); drain each before starting the watcher.
+     The watcher only fires on *new* events and will miss pre-existing spool files.
+   - **On watcher event:** drain the newly created file as it lands.
+
    Extend the Rust watcher (currently `daily/`+`notes/` `.md` only) to also report the
    inbox dir.
 
