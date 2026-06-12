@@ -77,7 +77,7 @@ export function appendEvent(parts: AssistantPart[], event: ChatStreamEvent): Ass
       )
     case 'tool-error':
       return [
-        ...settleToolCall(parts, event.toolCallId),
+        ...settleToolCall(parts, event.toolCallId, event.message),
         { kind: 'notice', tone: 'error', text: event.message },
       ]
     case 'error':
@@ -89,14 +89,21 @@ export function appendEvent(parts: AssistantPart[], event: ChatStreamEvent): Ass
   }
 }
 
-/** A failed tool call must not keep rendering as in-flight. */
-function settleToolCall(parts: AssistantPart[], toolCallId: string): AssistantPart[] {
+/**
+ * A failed tool call must not keep rendering as in-flight — and a failed read
+ * must not render as a clickable "Read …" success, so it keeps the failure.
+ */
+function settleToolCall(
+  parts: AssistantPart[],
+  toolCallId: string,
+  message: string,
+): AssistantPart[] {
   return parts.map((part) => {
     if (part.kind === 'search' && part.toolCallId === toolCallId && part.hits === null) {
       return { ...part, hits: [] }
     }
     if (part.kind === 'read' && part.toolCallId === toolCallId && part.pending) {
-      return { ...part, pending: false }
+      return { ...part, pending: false, error: message }
     }
     return part
   })

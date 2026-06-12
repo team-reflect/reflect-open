@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -72,6 +73,16 @@ export function ChatProvider({ children }: { children: ReactNode }): ReactElemen
   const activeModelRef = useRef<AiModelConfig | null>(activeModel)
   activeModelRef.current = activeModel
 
+  // The workspace tree is keyed by graph root, so switching graphs unmounts
+  // this provider — an in-flight turn must die with it, or its tools would
+  // keep reading whichever graph Rust has open *now* and ship that content
+  // to the provider under the old conversation.
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort()
+    }
+  }, [])
+
   const send = useCallback(async (text: string): Promise<void> => {
     const trimmed = text.trim()
     const model = activeModelRef.current
@@ -100,14 +111,13 @@ export function ChatProvider({ children }: { children: ReactNode }): ReactElemen
     const controller = new AbortController()
     abortRef.current = controller
 
-    let completed = false
-    let partial = ''
     try {
       const apiKey = await getSecret(aiKeySecretName(model.id))
       if (apiKey === null) {
         applyEvent({
           type: 'error',
           message: 'No API key found for this model — re-add it in Settings → AI models.',
+          messages: [],
         })
         return
       }
@@ -120,26 +130,21 @@ export function ChatProvider({ children }: { children: ReactNode }): ReactElemen
         signal: controller.signal,
       })
       for await (const event of events) {
-        if (event.type === 'complete') {
-          completed = true
+        // Every terminal event carries the turn's messages — for a stopped or
+        // failed turn that's the completed steps plus partial text, so the
+        // history the next turn resends matches what stayed on screen.
+        if (event.type === 'complete' || event.type === 'aborted' || event.type === 'error') {
           historyRef.current.push(...event.messages)
-        } else {
-          if (event.type === 'text-delta') {
-            partial += event.text
-          }
+        }
+        if (event.type !== 'complete') {
           applyEvent(event)
         }
       }
     } catch (cause) {
       // streamChat normalizes its own failures; this guards the seams around
       // it (keychain read, event application) so the UI never sticks.
-      applyEvent({ type: 'error', message: errorMessage(cause) })
+      applyEvent({ type: 'error', message: errorMessage(cause), messages: [] })
     } finally {
-      // An aborted/failed turn still said something — keep the partial text
-      // in the history so the next turn's context matches what's on screen.
-      if (!completed && partial !== '') {
-        historyRef.current.push({ role: 'assistant', content: partial })
-      }
       abortRef.current = null
       setStatus('idle')
     }

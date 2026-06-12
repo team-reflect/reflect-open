@@ -166,6 +166,41 @@ describe('streamChat', () => {
         modelOverride: model,
       }),
     )
-    expect(events.at(-1)).toEqual({ type: 'error', message: 'rate limited' })
+    expect(events.at(-1)).toEqual({ type: 'error', message: 'rate limited', messages: [] })
+  })
+
+  it('a cut-short turn still carries the completed steps, properly paired', async () => {
+    // Step 1 completes (tool call + result); step 2 streams text, then errors.
+    const model = new MockLanguageModelV3({
+      doStream: sequence([
+        toolCallTurn('atlas'),
+        stream([
+          { type: 'text-start', id: 'text-1' },
+          { type: 'text-delta', id: 'text-1', delta: 'So far' },
+          { type: 'error', error: new Error('connection lost') },
+          { type: 'finish', finishReason: { unified: 'error', raw: undefined }, usage: USAGE },
+        ]),
+      ]),
+    })
+    const events = await collect(
+      streamChat({
+        model: MODEL_CONFIG,
+        apiKey: 'k',
+        fetchFn: fetch,
+        messages: [{ role: 'user', content: 'where is the launch plan?' }],
+        today: '2026-06-11',
+        modelOverride: model,
+        toolDeps: { retrieveFn: async () => [PUBLIC_HIT] },
+      }),
+    )
+
+    const last = events.at(-1)
+    if (last?.type !== 'error') {
+      expect.unreachable('expected a terminal error event')
+    }
+    // The completed step's assistant (tool call) + tool (result) pair survives,
+    // plus the interrupted step's partial text — never a dangling tool call.
+    expect(last.messages.map((message) => message.role)).toEqual(['assistant', 'tool', 'assistant'])
+    expect(JSON.stringify(last.messages.at(-1))).toContain('So far')
   })
 })

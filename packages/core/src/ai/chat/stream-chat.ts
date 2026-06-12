@@ -48,8 +48,8 @@ export type ChatStreamEvent =
   | { type: 'read-call'; toolCallId: string; path: string }
   | { type: 'read-result'; toolCallId: string; path: string; title: string | null; error: string | null }
   | { type: 'tool-error'; toolCallId: string; message: string }
-  | { type: 'error'; message: string }
-  | { type: 'aborted' }
+  | { type: 'error'; message: string; messages: ModelMessage[] }
+  | { type: 'aborted'; messages: ModelMessage[] }
   | { type: 'complete'; messages: ModelMessage[] }
 
 /** The slice of a search hit the UI's activity chips render. */
@@ -71,13 +71,25 @@ function languageModel(config: AiModelConfig, apiKey: string, fetchFn: typeof fe
 
 /**
  * Run one chat turn, yielding normalized {@link ChatStreamEvent}s. The stream
- * always terminates with exactly one of `complete` (carrying the
- * assistant/tool messages to append to history), `aborted`, or `error`.
+ * terminates with exactly one of `complete`, `aborted`, or `error` — each
+ * carrying the assistant/tool messages to append to the model history. For a
+ * cut-short turn those are the completed steps' messages (kept properly
+ * paired — a dangling tool call without its result would be rejected by
+ * providers on the next turn) plus the interrupted step's partial text, so
+ * the history the next turn resends matches what stayed on screen.
  */
 export async function* streamChat(options: StreamChatOptions): AsyncGenerator<ChatStreamEvent> {
   const tools = buildNoteTools(options.toolDeps)
 
-  let terminal: 'error' | 'aborted' | null = null
+  // Messages for all *completed* steps (cumulative, assistant/tool pairs)…
+  let stepMessages: ModelMessage[] = []
+  // …and the text streamed so far in the step still in flight.
+  let pendingText = ''
+  const partialMessages = (): ModelMessage[] =>
+    pendingText === ''
+      ? stepMessages
+      : [...stepMessages, { role: 'assistant', content: pendingText }]
+
   try {
     const result = streamText({
       model: options.modelOverride ?? languageModel(options.model, options.apiKey, options.fetchFn),
@@ -86,12 +98,21 @@ export async function* streamChat(options: StreamChatOptions): AsyncGenerator<Ch
       tools,
       stopWhen: stepCountIs(MAX_STEPS),
       abortSignal: options.signal,
+      onStepFinish: (step) => {
+        stepMessages = [...step.response.messages]
+      },
     })
 
     for await (const part of result.fullStream) {
       switch (part.type) {
         case 'text-delta':
+          pendingText += part.text
           yield { type: 'text-delta', text: part.text }
+          break
+        case 'finish-step':
+          // onStepFinish has already folded this step's text into
+          // stepMessages; only unfinished-step text may count as partial.
+          pendingText = ''
           break
         case 'tool-call':
           if (part.dynamic) {
@@ -128,32 +149,25 @@ export async function* streamChat(options: StreamChatOptions): AsyncGenerator<Ch
           yield { type: 'tool-error', toolCallId: part.toolCallId, message: errorMessage(part.error) }
           break
         case 'abort':
-          terminal = 'aborted'
-          yield { type: 'aborted' }
-          break
+          yield { type: 'aborted', messages: partialMessages() }
+          return
         case 'error':
-          terminal = 'error'
-          yield { type: 'error', message: errorMessage(part.error) }
-          break
+          yield { type: 'error', message: errorMessage(part.error), messages: partialMessages() }
+          return
         default:
           break
       }
     }
 
-    if (terminal === null) {
-      const response = await result.response
-      yield { type: 'complete', messages: response.messages }
-    }
+    const response = await result.response
+    yield { type: 'complete', messages: response.messages }
   } catch (cause) {
     // Belt and braces: most failures surface as `error` parts above, but a
     // synchronous throw (bad config, aborted before first byte) lands here.
-    if (terminal !== null) {
-      return
-    }
     if (options.signal?.aborted === true) {
-      yield { type: 'aborted' }
+      yield { type: 'aborted', messages: partialMessages() }
       return
     }
-    yield { type: 'error', message: errorMessage(cause) }
+    yield { type: 'error', message: errorMessage(cause), messages: partialMessages() }
   }
 }

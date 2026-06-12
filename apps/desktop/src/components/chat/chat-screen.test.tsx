@@ -122,6 +122,29 @@ describe('ChatScreen', () => {
     expect(streamChat).not.toHaveBeenCalled()
   })
 
+  it('aborts an in-flight turn when the provider unmounts (graph switch)', async () => {
+    configureModel()
+    let signal: AbortSignal | undefined
+    streamChat.mockImplementation((options) => {
+      signal = options.signal
+      return (async function* () {
+        yield { type: 'text-delta', text: 'Hi' } as const
+        // Never settles — the turn only ends through the abort signal.
+        await new Promise<never>(() => {})
+      })()
+    })
+    const view = renderChat()
+
+    await userEvent.type(view.getByLabelText('Chat message'), 'hey{Enter}')
+    await waitFor(() => expect(signal).toBeDefined())
+    expect(signal?.aborted).toBe(false)
+
+    // Switching graphs remounts the workspace tree: the dead conversation
+    // must not keep reading whichever graph is open now.
+    view.unmount()
+    expect(signal?.aborted).toBe(true)
+  })
+
   it('New chat clears the conversation', async () => {
     configureModel()
     scriptTurn([

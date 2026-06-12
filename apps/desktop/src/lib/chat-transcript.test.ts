@@ -83,11 +83,29 @@ describe('appendEvent', () => {
     ])
   })
 
+  it('a failed read keeps the failure — it must not settle as a clickable success', () => {
+    const parts = fold([
+      { type: 'read-call', toolCallId: 'tool-4', path: 'notes/a.md' },
+      { type: 'tool-error', toolCallId: 'tool-4', message: 'file unreadable' },
+    ])
+    expect(parts[0]).toEqual({
+      kind: 'read',
+      toolCallId: 'tool-4',
+      path: 'notes/a.md',
+      title: null,
+      error: 'file unreadable',
+      pending: false,
+    })
+  })
+
   it('abort and error become notices; complete changes nothing', () => {
-    const aborted = fold([{ type: 'text-delta', text: 'Half…' }, { type: 'aborted' }])
+    const aborted = fold([
+      { type: 'text-delta', text: 'Half…' },
+      { type: 'aborted', messages: [] },
+    ])
     expect(aborted.at(-1)).toEqual({ kind: 'notice', tone: 'info', text: 'Stopped.' })
 
-    const errored = fold([{ type: 'error', message: 'auth failed' }])
+    const errored = fold([{ type: 'error', message: 'auth failed', messages: [] }])
     expect(errored).toEqual([{ kind: 'notice', tone: 'error', text: 'auth failed' }])
 
     expect(appendEvent(errored, { type: 'complete', messages: [] })).toEqual(errored)
