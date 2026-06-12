@@ -6,7 +6,7 @@ import { retrieve, type RetrievalHit, type RetrieveOptions } from '../../embeddi
 import { listDailyNotes, type DailyNoteRow, type DailyNotesRange } from '../../indexing/queries'
 import { listRecentNotes, type RecentNoteRow, type RecentNotesOptions } from '../../indexing/note-list'
 import { parseFrontmatter, splitFrontmatter } from '../../markdown/frontmatter'
-import { parseNote } from '../../markdown/extract'
+import { isTagName, parseNote } from '../../markdown/extract'
 import {
   cloudSafeNoteContent,
   cloudSafeNoteListings,
@@ -63,9 +63,19 @@ export type ReadNoteOutput =
   | { ok: true; note: CloudSafe<CloudNoteContent> }
   | { ok: false; path: string; error: string }
 
-export interface ListRecentNotesOutput {
-  notes: CloudSafe<CloudNoteListing>[]
-}
+/**
+ * A listing, or a corrective refusal for a `tag` the tag grammar can never
+ * produce. Without the refusal a junk filter (`*`, `all`, whitespace…) reads
+ * as a clean "0 notes" — indistinguishable from a real tag nothing carries —
+ * and a model hunting for an "all notes" sentinel just keeps guessing.
+ */
+export type ListRecentNotesOutput =
+  | { ok: true; notes: CloudSafe<CloudNoteListing>[] }
+  | { ok: false; tag: string; error: string }
+
+/** The refusal text — one string, read verbatim by both model and chip. */
+export const INVALID_TAG_ERROR =
+  'Not a tag — omit the tag to list all recent notes. Tags are single words like "book" or "project/atlas".'
 
 export interface ListDailyNotesOutput {
   days: CloudSafe<CloudNoteListing>[]
@@ -98,9 +108,11 @@ const listRecentNotesInput = z.object({
     .describe(`How many notes to return (default ${DEFAULT_RECENT_LIMIT})`),
   tag: z
     .string()
-    .min(1)
-    .optional()
-    .describe('Only notes carrying this tag (case-insensitive, without the #)'),
+    .nullish()
+    .describe(
+      'Only notes carrying this tag (case-insensitive, without the #). ' +
+        'Omit, or pass null, to list all recent notes.',
+    ),
 })
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'an ISO date, YYYY-MM-DD')
@@ -151,7 +163,8 @@ export function buildNoteTools(deps: NoteToolDeps = {}) {
     search_notes: tool({
       description:
         'Search the user’s notes by meaning and keywords. Returns the best-matching ' +
-        'notes with short snippets. Private notes are excluded.',
+        'notes with short snippets. Queries are plain language — there is no wildcard ' +
+        'or operator syntax. Private notes are excluded.',
       inputSchema: searchNotesInput,
       execute: async ({ query, limit }): Promise<SearchNotesOutput> => {
         const hits = await retrieveFn(query, {
@@ -164,16 +177,23 @@ export function buildNoteTools(deps: NoteToolDeps = {}) {
 
     list_recent_notes: tool({
       description:
-        'List the most recently edited notes, newest first, optionally only those carrying ' +
-        'a tag. Daily notes are not included — use list_daily_notes for those. ' +
+        'List the most recently edited notes, newest first — call it with no tag to see ' +
+        'what the user wrote or worked on lately. Pass a tag only to narrow to notes ' +
+        'carrying it. Daily notes are not included — use list_daily_notes for those. ' +
         'Private notes are excluded.',
       inputSchema: listRecentNotesInput,
       execute: async ({ limit, tag }): Promise<ListRecentNotesOutput> => {
+        if (tag != null && !isTagName(tag)) {
+          return { ok: false, tag, error: INVALID_TAG_ERROR }
+        }
         const rows = await listRecentNotesFn({
           limit: limit ?? DEFAULT_RECENT_LIMIT,
           tag: tag ?? null,
         })
-        return { notes: await cloudSafeNoteListings(rows.map(listingCandidate), isPrivateLive) }
+        return {
+          ok: true,
+          notes: await cloudSafeNoteListings(rows.map(listingCandidate), isPrivateLive),
+        }
       },
     }),
 
@@ -248,11 +268,17 @@ export type NoteToolCall =
   | { tool: 'recents'; toolCallId: string; tag: string | null }
   | { tool: 'dailies'; toolCallId: string; start: string; end: string }
 
-/** One settled tool invocation. A failed read keeps its refusal. */
+/** One settled tool invocation. A failed read or listing keeps its refusal. */
 export type NoteToolResult =
   | { tool: 'search'; toolCallId: string; query: string; hits: NoteHitSummary[] }
   | { tool: 'read'; toolCallId: string; path: string; title: string | null; error: string | null }
-  | { tool: 'recents'; toolCallId: string; tag: string | null; notes: NoteHitSummary[] }
+  | {
+      tool: 'recents'
+      toolCallId: string
+      tag: string | null
+      notes: NoteHitSummary[]
+      error: string | null
+    }
   | { tool: 'dailies'; toolCallId: string; start: string; end: string; days: NoteHitSummary[] }
 
 /** Map an SDK tool-call part onto {@link NoteToolCall} (null for dynamic). */
@@ -301,13 +327,24 @@ export function noteToolResult(part: TypedToolResult<NoteTools>): NoteToolResult
         ? { tool: 'read', toolCallId: part.toolCallId, path: output.note.path, title: output.note.title, error: null }
         : { tool: 'read', toolCallId: part.toolCallId, path: output.path, title: null, error: output.error }
     }
-    case 'list_recent_notes':
-      return {
-        tool: 'recents',
-        toolCallId: part.toolCallId,
-        tag: part.input.tag ?? null,
-        notes: part.output.notes.map(listingSummary),
-      }
+    case 'list_recent_notes': {
+      const output = part.output
+      return output.ok
+        ? {
+            tool: 'recents',
+            toolCallId: part.toolCallId,
+            tag: part.input.tag ?? null,
+            notes: output.notes.map(listingSummary),
+            error: null,
+          }
+        : {
+            tool: 'recents',
+            toolCallId: part.toolCallId,
+            tag: output.tag,
+            notes: [],
+            error: output.error,
+          }
+    }
     case 'list_daily_notes':
       return {
         tool: 'dailies',

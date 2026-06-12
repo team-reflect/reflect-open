@@ -59,7 +59,11 @@ export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
       <ChipFrame pending={pending} icon={<History aria-hidden className="size-3.5" />}>
         <span className="truncate">
           Listed {call.tag !== null ? `#${call.tag}` : 'recent'} notes
-          {result !== null ? countSuffix(result.notes.length, 'note') : ''}
+          {result !== null
+            ? result.error !== null
+              ? ` — ${result.error}`
+              : countSuffix(result.notes.length, 'note')
+            : ''}
         </span>
       </ChipFrame>
     )

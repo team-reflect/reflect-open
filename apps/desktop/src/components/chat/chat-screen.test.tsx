@@ -185,6 +185,18 @@ describe('ChatScreen', () => {
           toolCallId: 'tool-1',
           tag: 'book',
           notes: [{ path: 'notes/atlas.md', title: 'Atlas' }],
+          error: null,
+        },
+      },
+      { type: 'tool-call', call: { tool: 'recents', toolCallId: 'tool-3', tag: '*' } },
+      {
+        type: 'tool-result',
+        result: {
+          tool: 'recents',
+          toolCallId: 'tool-3',
+          tag: '*',
+          notes: [],
+          error: 'Not a tag — omit the tag to list all recent notes.',
         },
       },
       {
@@ -211,6 +223,8 @@ describe('ChatScreen', () => {
     await userEvent.type(view.getByLabelText('Chat message'), 'what have I been reading?{Enter}')
 
     await view.findByText(/Listed #book notes · 1 note/)
+    // A refused listing shows the refusal, not a misleading count.
+    await view.findByText(/Listed #\* notes — Not a tag/)
     await view.findByText(/Listed daily notes 2026-06-01 – 2026-06-11 · 2 days/)
   })
 

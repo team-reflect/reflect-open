@@ -5,6 +5,7 @@ import type { DailyNoteRow, DailyNotesRange } from '../../indexing/queries'
 import type { RecentNoteRow, RecentNotesOptions } from '../../indexing/note-list'
 import {
   buildNoteTools,
+  INVALID_TAG_ERROR,
   MAX_DAILY_NOTE_DAYS,
   MAX_NOTE_CONTENT_CHARS,
   type ListDailyNotesOutput,
@@ -96,7 +97,7 @@ async function runRead(tools: NoteTools, path: string): Promise<ReadNoteOutput> 
 /** Execute `list_recent_notes` directly, asserting a non-streaming output. */
 async function runRecents(
   tools: NoteTools,
-  input: { limit?: number; tag?: string },
+  input: { limit?: number; tag?: string | null },
 ): Promise<ListRecentNotesOutput> {
   const execute = tools.list_recent_notes.execute
   if (!execute) {
@@ -267,6 +268,37 @@ describe('list_recent_notes', () => {
     expect(seen).toEqual([{ limit: 3, tag: 'book' }])
   })
 
+  it('treats an explicit null tag as no filter', async () => {
+    const seen: RecentNotesOptions[] = []
+    const tools = buildNoteTools({
+      listRecentNotesFn: async (options) => {
+        seen.push(options)
+        return []
+      },
+    })
+    await runRecents(tools, { tag: null })
+    expect(seen).toEqual([{ limit: 10, tag: null }])
+  })
+
+  it('refuses a non-tag filter without querying, pointing at the no-tag call', async () => {
+    const seen: RecentNotesOptions[] = []
+    const tools = buildNoteTools({
+      listRecentNotesFn: async (options) => {
+        seen.push(options)
+        return []
+      },
+    })
+    for (const tag of ['*', ' ', '#book', ']INVALIDNOFILTER[']) {
+      const output = await runRecents(tools, { tag })
+      if (output.ok) {
+        expect.unreachable('expected a refusal')
+      }
+      expect(output.tag).toBe(tag)
+      expect(output.error).toBe(INVALID_TAG_ERROR)
+    }
+    expect(seen).toEqual([])
+  })
+
   it('maps rows onto listings: preview as snippet, ISO modifiedAt, no daily date', async () => {
     const mtime = 1_750_000_000_000
     const tools = buildNoteTools({
@@ -274,6 +306,9 @@ describe('list_recent_notes', () => {
       readNoteFn: async () => 'a public body\n',
     })
     const output = await runRecents(tools, {})
+    if (!output.ok) {
+      expect.unreachable('expected a listing')
+    }
     expect(output.notes).toEqual([
       {
         path: 'notes/public.md',
@@ -297,6 +332,9 @@ describe('list_recent_notes', () => {
     const payload = JSON.stringify(output)
     expect(payload).not.toContain(PRIVATE_TITLE)
     expect(payload).not.toContain(PRIVATE_PATH)
+    if (!output.ok) {
+      expect.unreachable('expected a listing')
+    }
     expect(output.notes).toHaveLength(1)
   })
 
@@ -306,6 +344,9 @@ describe('list_recent_notes', () => {
       readNoteFn: async () => '---\nprivate: true\n---\n# Diary\n',
     })
     const output = await runRecents(tools, {})
+    if (!output.ok) {
+      expect.unreachable('expected a listing')
+    }
     expect(output.notes).toEqual([])
     expect(JSON.stringify(output)).not.toContain(PRIVATE_TITLE)
   })
@@ -318,6 +359,9 @@ describe('list_recent_notes', () => {
       },
     })
     const output = await runRecents(tools, {})
+    if (!output.ok) {
+      expect.unreachable('expected a listing')
+    }
     expect(output.notes).toEqual([])
   })
 })
