@@ -437,8 +437,10 @@ function ensureTagMatchesCommit(tag, commit) {
 
 /**
  * Build a signed + notarized DMG and upload it to a new GitHub release tagged
- * v<version> (from tauri.conf.json). All preflight checks run before the
- * build so a doomed publish fails in seconds, not after notarization.
+ * v<version> (from tauri.conf.json). A version with a prerelease segment
+ * (e.g. `0.2.0-beta.1`, the `next`-branch convention) publishes as a GitHub
+ * pre-release. All preflight checks run before the build so a doomed publish
+ * fails in seconds, not after notarization.
  */
 function publish({ draft }) {
   ensureGhReady()
@@ -452,7 +454,10 @@ function publish({ draft }) {
 
   const { dmg, updaterArchive, updaterSignature } = bundlePaths()
   const manifestPath = writeUpdaterManifest({ version, tag })
-  log(`creating GitHub release ${tag} from commit ${commit.slice(0, 7)}…`)
+  // Pre-releases are invisible to `releases/latest` — the committed updater
+  // endpoint — so installed stable apps never see a beta.
+  const prerelease = version.includes('-')
+  log(`creating GitHub ${prerelease ? 'pre-release' : 'release'} ${tag} from commit ${commit.slice(0, 7)}…`)
   const releaseArgs = [
     'release',
     'create',
@@ -467,6 +472,7 @@ function publish({ draft }) {
     commit,
     '--generate-notes',
   ]
+  if (prerelease) releaseArgs.push('--prerelease')
   if (draft) releaseArgs.push('--draft')
   const result = spawnSync('gh', releaseArgs, { encoding: 'utf8', stdio: ['inherit', 'pipe', 'inherit'] })
   if (result.status !== 0) fail(`creating the GitHub release failed${result.stdout ? `\n${result.stdout.trim()}` : ''}`)

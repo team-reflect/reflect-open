@@ -27,6 +27,12 @@ Drawn from the product docs — read these for deeper context:
 
 ### Development workflow
 
+Development happens on `next` (the default branch); branch from it and target it with
+PRs. `master` is the public-release branch and only advances when `next` is merged
+into it for a stable release. Versions on `next` carry a prerelease suffix
+(`0.2.0-beta.1`), which the release pipeline publishes as GitHub pre-releases — see
+[docs/macos-distribution.md](docs/macos-distribution.md).
+
 1. Make your changes
 2. Run typecheck (`pnpm typecheck`)
 3. Run lint (`pnpm lint`) — fix any errors; `pnpm lint:fix` auto-fixes where possible
