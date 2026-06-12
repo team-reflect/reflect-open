@@ -143,13 +143,11 @@ describe('ChatProvider persistence', () => {
     const first = core.saveChatMessage.mock.calls[0][0]
     const second = core.saveChatMessage.mock.calls[1][0]
     expect(first).toMatchObject({
-      seq: 0,
       generation: 7,
       conversation: { id: session?.activeConversationId, title: 'hello there' },
       turn: { userText: 'hello there', responseMessages: [] },
     })
     expect(second).toMatchObject({
-      seq: 0,
       turn: {
         status: 'done',
         responseMessages: [{ role: 'assistant', content: 'Hi.' }],
@@ -158,7 +156,7 @@ describe('ChatProvider persistence', () => {
     })
   })
 
-  it('numbers turns after restored history', async () => {
+  it('saves later turns into the restored conversation', async () => {
     core.listChatConversations.mockResolvedValue([conversation()])
     scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: 'More.' }] }])
     renderProvider()
@@ -167,8 +165,8 @@ describe('ChatProvider persistence', () => {
     await act(() => session?.send('and today?'))
 
     expect(core.saveChatMessage.mock.calls[0][0]).toMatchObject({
-      seq: 1,
       conversation: { id: 'conv-1', title: 'what did I write yesterday?' },
+      turn: { userText: 'and today?' },
     })
   })
 
@@ -181,6 +179,40 @@ describe('ChatProvider persistence', () => {
     expect(core.loadChatMessages).toHaveBeenCalledWith('conv-9')
     expect(session?.activeConversationId).toBe('conv-9')
     expect(session?.turns).toEqual([RESTORED_TURN])
+  })
+
+  it('abandons a switch when a send settled while the rows loaded', async () => {
+    // The send both starts AND finishes during the load — the in-flight slot
+    // is already clear when the rows arrive, but the switch must still be
+    // abandoned: swapping the transcript would hide the turn the user just
+    // streamed into the on-screen conversation.
+    let releaseLoad: (turns: ChatTurn[]) => void = () => {}
+    core.loadChatMessages.mockImplementation(
+      () =>
+        new Promise<ChatTurn[]>((resolve) => {
+          releaseLoad = resolve
+        }),
+    )
+    scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] }])
+    renderProvider()
+    await waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+    const homeConversation = session?.activeConversationId
+
+    let openDone: Promise<void> | undefined
+    await act(async () => {
+      openDone = session?.openConversation('conv-9')
+      await Promise.resolve()
+    })
+    await act(() => session?.send('hello'))
+    expect(session?.turns.at(-1)?.status).toBe('done')
+
+    releaseLoad([RESTORED_TURN])
+    await act(async () => {
+      await openDone
+    })
+
+    expect(session?.activeConversationId).toBe(homeConversation)
+    expect(session?.turns.map((turn) => turn.userText)).toEqual(['hello'])
   })
 
   it('deleting the active conversation starts a fresh chat', async () => {
@@ -229,5 +261,37 @@ describe('ChatProvider persistence', () => {
     })
 
     expect(core.saveChatMessage).toHaveBeenCalledTimes(1)
+  })
+
+  it('lets an in-flight save land before deleting its conversation', async () => {
+    // The delete and a dispatched save are independent IPC commands with no
+    // ordering guarantee — the provider must hold the delete until the
+    // conversation's save chain settles, or the upsert could resurrect it.
+    let releaseSave: () => void = () => {}
+    core.saveChatMessage.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseSave = resolve
+        }),
+    )
+    scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] }])
+    renderProvider()
+    await waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+
+    await act(() => session?.send('hello'))
+    const sentInto = core.saveChatMessage.mock.calls[0][0] as { conversation: { id: string } }
+
+    let deleteDone: Promise<void> | undefined
+    await act(async () => {
+      deleteDone = session?.deleteConversation(sentInto.conversation.id)
+      await Promise.resolve()
+    })
+    expect(core.deleteChatConversation).not.toHaveBeenCalled()
+
+    releaseSave()
+    await act(async () => {
+      await deleteDone
+    })
+    expect(core.deleteChatConversation).toHaveBeenCalledWith(sentInto.conversation.id, 7)
   })
 })

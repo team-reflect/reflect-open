@@ -110,12 +110,16 @@ const responseMessagesSchema = z.array(
     .passthrough(),
 )
 
-/** Save one turn (and upsert its conversation row) for `generation`. */
+/**
+ * Save one turn (and upsert its conversation row) for `generation`. The
+ * turn's position (`seq`) is assigned by Rust inside the insert — never
+ * here: this side's view of a conversation can undercount the table (see
+ * {@link loadChatMessages} dropping unreadable rows), so a counter derived
+ * from it could collide with a row it never saw.
+ */
 export async function saveChatMessage(input: {
   conversation: ChatConversation
   turn: ChatTurn
-  /** The turn's position in its conversation (unique per conversation). */
-  seq: number
   createdMs: number
   generation: number
 }): Promise<void> {
@@ -126,7 +130,6 @@ export async function saveChatMessage(input: {
       message: {
         id: input.turn.id,
         conversationId: input.conversation.id,
-        seq: input.seq,
         userText: input.turn.userText,
         attachments: JSON.stringify(input.turn.attachments),
         parts: JSON.stringify(input.turn.parts),

@@ -47,14 +47,14 @@ const conversation = { id: 'conv-1', title: 'what is this?', createdMs: 1_000, u
 describe('saveChatMessage', () => {
   it('sends the conversation and the JSON-encoded message row', async () => {
     invoke.mockResolvedValue(null)
-    await saveChatMessage({ conversation, turn, seq: 3, createdMs: 2_000, generation: 7 })
+    await saveChatMessage({ conversation, turn, createdMs: 2_000, generation: 7 })
 
+    // No `seq` in the payload — Rust assigns it inside the insert.
     expect(invoke).toHaveBeenCalledWith('chat_message_save', {
       conversation,
       message: {
         id: 'turn-1',
         conversationId: 'conv-1',
-        seq: 3,
         userText: 'what is this?',
         attachments: JSON.stringify(turn.attachments),
         parts: JSON.stringify(turn.parts),

@@ -152,10 +152,19 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
   // "this conversation is busy" and never clears a successor's slot.
   const sessionRef = useRef(0)
   const activeSendRef = useRef<{ controller: AbortController; session: number } | null>(null)
+  // The session of the most recent send — unlike `activeSendRef` this is not
+  // cleared when the turn settles, so a pending conversation switch can tell
+  // that the on-screen conversation received a message even after the stream
+  // finished.
+  const lastSendSessionRef = useRef(-1)
 
   // Conversations deleted this session: a settle-time save landing after its
   // conversation was deleted would re-create the row via the upsert.
   const deletedConversationsRef = useRef(new Set<string>())
+  // The tail of each conversation's save chain. Saves are serialized per
+  // conversation so a delete can wait for in-flight saves to land first —
+  // two independent IPC commands carry no ordering guarantee in Rust.
+  const pendingSavesRef = useRef(new Map<string, Promise<void>>())
 
   // The workspace tree is keyed by graph root, so switching graphs unmounts
   // this provider — an in-flight turn must die with it, or its tools would
@@ -170,11 +179,12 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
   /**
    * Persist one turn into its conversation, best-effort: the generation it
    * was issued under gates the write in Rust (a stale save no-ops), deleted
-   * conversations are never resurrected, and a failure logs without touching
-   * the in-memory conversation.
+   * conversations are never resurrected — the guard runs again when the
+   * save's turn in the chain comes up, not just at enqueue time — and a
+   * failure logs without touching the in-memory conversation.
    */
   const persistTurn = useCallback(
-    (conversation: ChatConversation, turn: ChatTurn, seq: number, createdMs: number) => {
+    (conversation: ChatConversation, turn: ChatTurn, createdMs: number) => {
       const generation = generationRef.current
       if (
         !hasBridge() ||
@@ -183,11 +193,20 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
       ) {
         return
       }
-      saveChatMessage({ conversation, turn, seq, createdMs, generation })
-        .then(invalidateChatQueries)
+      const queue = pendingSavesRef.current
+      const chained = (queue.get(conversation.id) ?? Promise.resolve())
+        .then(() => {
+          if (deletedConversationsRef.current.has(conversation.id)) {
+            return
+          }
+          return saveChatMessage({ conversation, turn, createdMs, generation }).then(
+            invalidateChatQueries,
+          )
+        })
         .catch((cause) => {
           console.error('chat: saving the turn failed:', errorMessage(cause))
         })
+      queue.set(conversation.id, chained)
     },
     [],
   )
@@ -243,7 +262,6 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
       // by New chat (or a conversation switch) still persists into the
       // conversation it was sent under.
       const sendConversationId = conversationIdRef.current
-      const seq = turnsRef.current.length
       const turnCreatedMs = Date.now()
       const title = conversationTitle(turnsRef.current[0]?.userText ?? trimmed)
       const conversationMeta = (): ChatConversation => ({
@@ -277,11 +295,12 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
       // The user half lands immediately, so a crash mid-stream keeps the
       // question (restored with an empty response, which the model history
       // derivation already omits).
-      persistTurn(conversationMeta(), localTurn, seq, turnCreatedMs)
+      persistTurn(conversationMeta(), localTurn, turnCreatedMs)
 
       const controller = new AbortController()
       const activeSend = { controller, session: sessionRef.current }
       activeSendRef.current = activeSend
+      lastSendSessionRef.current = activeSend.session
 
       try {
         // The graph overview degrades to null (prompt without the block)
@@ -327,7 +346,7 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
         applyEvent({ type: 'error', message: errorMessage(cause), messages: [] })
       } finally {
         updateTurn((turn) => ({ ...turn, status: 'done' }))
-        persistTurn(conversationMeta(), localTurn, seq, turnCreatedMs)
+        persistTurn(conversationMeta(), localTurn, turnCreatedMs)
         // Only release the slot if it's still ours: a turn detached by New
         // chat must not, while winding down, unhook the controller a newer
         // turn has since registered — Stop and the unmount abort always have
@@ -362,8 +381,14 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
     setAttachments([])
     try {
       const restored = await loadChatMessages(id)
-      if (session !== sessionRef.current) {
-        return // superseded by another switch or New chat
+      // Superseded by another switch or New chat — or by a send: a message
+      // composed while the rows loaded belongs to the conversation that was
+      // on screen, so the user's turn must not be swapped out from under it.
+      // Checked via the last send's session (not the in-flight slot, which
+      // is cleared on settle) — a turn that finished streaming before the
+      // rows arrived still anchors the switch to the conversation it's in.
+      if (session !== sessionRef.current || lastSendSessionRef.current === session) {
+        return
       }
       setConversationId(id)
       setTurns(restored)
@@ -377,6 +402,11 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
       deletedConversationsRef.current.add(id)
       const generation = generationRef.current
       if (hasBridge() && generation !== null) {
+        // Let any in-flight save for this conversation land first — the
+        // delete and a dispatched save are independent commands, so issuing
+        // the delete now could be overtaken in Rust and the save's upsert
+        // would resurrect the row. (The chain never rejects.)
+        await pendingSavesRef.current.get(id)
         try {
           await deleteChatConversation(id, generation)
         } catch (cause) {

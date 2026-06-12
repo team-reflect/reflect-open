@@ -31,7 +31,6 @@ pub struct ChatConversation {
 pub struct ChatMessageRow {
     pub(super) id: String,
     pub(super) conversation_id: String,
-    pub(super) seq: i64,
     pub(super) user_text: String,
     pub(super) attachments: String,
     pub(super) parts: String,
@@ -42,9 +41,14 @@ pub struct ChatMessageRow {
 /// Upsert the conversation row and the message row. The conversation keeps its
 /// original `title`/`created_ms` (set once, on insert) and bumps `updated_ms`;
 /// the message updates by **primary key** — deliberately not `INSERT OR
-/// REPLACE`, which deletes any row violating *any* unique constraint, so a
-/// `(conversation_id, seq)` collision would silently destroy a different turn.
-/// With `ON CONFLICT(id)` such a collision fails loudly instead.
+/// REPLACE`, which deletes any row violating *any* unique constraint and would
+/// silently destroy another turn on a `(conversation_id, seq)` collision.
+///
+/// `seq` is assigned **here**, inside the insert (`MAX(seq) + 1` over the
+/// conversation), never by the caller: the frontend's view of a conversation
+/// can undercount the table (the read path drops rows it cannot parse), so a
+/// TS-derived counter could collide with a row it never saw. A settle-time
+/// re-save conflicts on `id` and leaves `seq` untouched.
 pub(super) fn save_message(
     conn: &Connection,
     conversation: &ChatConversation,
@@ -65,7 +69,10 @@ pub(super) fn save_message(
         "INSERT INTO chat_messages(
             id, conversation_id, seq, user_text, attachments, parts,
             response_messages, created_ms)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+         VALUES (
+            ?1, ?2,
+            (SELECT COALESCE(MAX(seq) + 1, 0) FROM chat_messages WHERE conversation_id = ?2),
+            ?3, ?4, ?5, ?6, ?7)
          ON CONFLICT(id) DO UPDATE SET
             user_text = excluded.user_text,
             attachments = excluded.attachments,
@@ -75,7 +82,6 @@ pub(super) fn save_message(
     .execute(params![
         message.id,
         message.conversation_id,
-        message.seq,
         message.user_text,
         message.attachments,
         message.parts,
