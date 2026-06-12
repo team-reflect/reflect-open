@@ -165,8 +165,13 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
   }, [supported, transcriptionConfig, toggleSidebar, startRecorder])
 
   const stopAndSave = useCallback(async (): Promise<void> => {
+    // The stop click commits the memo: flip to 'transcribing' before the stop
+    // settles, so an Esc landing in the await gap can't read a lingering
+    // 'recording' phase and cancel a recording the user just saved.
+    setSaving(true)
     const recording = await stopRecorder()
     if (recording === null) {
+      setSaving(false)
       return
     }
     await runSave({ kind: 'transcribe', audio: recording.blob, mimeType: recording.mimeType })

@@ -17,6 +17,9 @@ const recorderControls = vi.hoisted(() => ({
   supported: true,
   /** Park start() at 'requesting', simulating an open OS permission prompt. */
   holdStart: false,
+  /** Park stop() until releaseStop, simulating MediaRecorder's async onstop. */
+  holdStop: false,
+  releaseStop: () => {},
   options: null as { maxDurationMs?: number; onMaxDuration?: () => void } | null,
 }))
 
@@ -42,6 +45,11 @@ vi.mock('@/hooks/use-audio-recorder', () => ({
       },
       stop: async () => {
         recorderControls.stopSpy()
+        if (recorderControls.holdStop) {
+          await new Promise<void>((resolve) => {
+            recorderControls.releaseStop = resolve
+          })
+        }
         setStatus('idle')
         return recorderControls.stopResult
       },
@@ -92,6 +100,7 @@ beforeEach(() => {
   recorderControls.stopResult = RECORDING
   recorderControls.supported = true
   recorderControls.holdStart = false
+  recorderControls.holdStop = false
   recorderControls.options = null
   sidebarState.collapsed = false
   SETTINGS.current = {
@@ -217,6 +226,27 @@ describe('AudioMemoProvider', () => {
     })
 
     await waitFor(() => expect(saveAudioMemo).toHaveBeenCalled())
+  })
+
+  it('the stop click commits immediately — no recording-phase gap for Esc to cancel in', async () => {
+    recorderControls.holdStop = true
+    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+
+    await act(async () => {
+      result.current.toggle()
+    })
+    act(() => {
+      void result.current.toggle()
+    })
+    // The recorder's stop hasn't settled, but the phase already left
+    // 'recording' — cancel() is unreachable from the popover.
+    expect(result.current.phase).toBe('transcribing')
+
+    await act(async () => {
+      recorderControls.releaseStop()
+    })
+    await waitFor(() => expect(result.current.phase).toBe('idle'))
+    expect(saveAudioMemo).toHaveBeenCalledTimes(1)
   })
 
   it('collapsing the sidebar during the permission prompt abandons the request', async () => {

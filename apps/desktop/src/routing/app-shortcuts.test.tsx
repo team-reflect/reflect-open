@@ -20,6 +20,9 @@ vi.mock('@/providers/settings-provider', () => ({
     updateSettings: vi.fn(),
   }),
 }))
+vi.mock('@/providers/audio-memo-provider', () => ({
+  useAudioMemo: () => ({ toggle: vi.fn() }),
+}))
 
 registerAppCommands() // production does this in main.tsx
 

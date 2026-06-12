@@ -218,6 +218,23 @@ describe('useAudioRecorder', () => {
     expect(second).toBe(first)
   })
 
+  it('stop on an already-inactive recorder settles instead of throwing', async () => {
+    getUserMedia.mockResolvedValue(fakeStream([{ stop: vi.fn() }]))
+    const { result } = renderHook(() => useAudioRecorder())
+
+    await act(async () => {
+      await result.current.start()
+    })
+    // Simulate an external stop landing first (a racing cancel).
+    FakeMediaRecorder.instances[0].state = 'inactive'
+
+    const recording = await act(async () => result.current.stop())
+
+    expect(recording).toBeNull()
+    expect(FakeMediaRecorder.instances[0].stopCalls).toBe(0)
+    expect(result.current.status).toBe('idle')
+  })
+
   it('fires onMaxDuration once when the cap is reached', async () => {
     getUserMedia.mockResolvedValue(fakeStream([{ stop: vi.fn() }]))
     const onMaxDuration = vi.fn()

@@ -178,7 +178,13 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
       const durationMs = Date.now() - startedAtRef.current
       await new Promise<void>((resolve) => {
         recorder.onstop = () => resolve()
-        recorder.stop()
+        if (recorder.state === 'inactive') {
+          // Already stopped (a cancel raced us): its onstop may never fire,
+          // and stop() on an inactive recorder throws — settle immediately.
+          resolve()
+        } else {
+          recorder.stop()
+        }
       })
       const mimeType = recorder.mimeType || pickMimeType() || FALLBACK_MIME_TYPE
       const blob = new Blob(chunksRef.current, { type: mimeType })
