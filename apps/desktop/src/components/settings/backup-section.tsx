@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getConflictedNotes, hasBridge } from '@reflect/core'
+import { getConflictedNotes, getDuplicateNoteIds, hasBridge } from '@reflect/core'
 import { ConnectGithubDialog } from '@/components/settings/connect-github-dialog'
 import { SettingsField } from '@/components/settings/field'
 import { SettingsSection } from '@/components/settings/section'
@@ -46,6 +46,16 @@ export function BackupSection(): ReactElement {
   })
   const conflictCount = conflicted.data?.length ?? 0
 
+  // A sync fork (Plan 17): two files claiming one frontmatter id — the same
+  // note retitled differently on two devices. Surfaced for review beside the
+  // marker conflicts; repair is the user's call, never automatic.
+  const duplicateIds = useQuery({
+    queryKey: [INDEX_QUERY_SCOPE, 'duplicate-note-ids', graph?.root],
+    queryFn: () => getDuplicateNoteIds(),
+    enabled: hasBridge() && graph !== null,
+  })
+  const forkGroups = duplicateIds.data ?? []
+
   const repoLabel =
     backup.phase === 'connected'
       ? (backup.repo !== null ? `${backup.repo.owner}/${backup.repo.name}` : backup.remoteUrl)
@@ -83,6 +93,21 @@ export function BackupSection(): ReactElement {
                     : `${conflictCount} notes need review`}{' '}
                   — open it to keep the version you want.
                 </p>
+              ) : null}
+              {forkGroups.length > 0 ? (
+                <div className="text-xs text-amber-700 dark:text-amber-300">
+                  <p>
+                    {forkGroups.length === 1
+                      ? '1 note was renamed differently on two devices and now exists as separate files'
+                      : `${forkGroups.length} notes were renamed differently on two devices and now exist as separate files`}{' '}
+                    — merge by hand, then delete the copy you don’t want:
+                  </p>
+                  <ul className="mt-1 list-disc pl-4">
+                    {forkGroups.map((group) => (
+                      <li key={group.id}>{group.paths.join('  ·  ')}</li>
+                    ))}
+                  </ul>
+                </div>
               ) : null}
               <div className="flex flex-wrap gap-2">
                 <Button

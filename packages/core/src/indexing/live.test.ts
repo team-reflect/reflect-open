@@ -165,3 +165,97 @@ describe('subscribeIndexChanges', () => {
     }
   })
 })
+
+describe('applyIndexChanges move healing (Plan 17)', () => {
+  const OLD = 'notes/01arz3ndektsv4rrffq69g5fav.md'
+  const NEW = 'notes/meeting-notes.md'
+  const CONTENT = '---\nid: 01abcdefghjkmnpqrstvwxyz00\n---\n# Meeting Notes\n'
+
+  /** Bridge where OLD is indexed (with the id) and NEW exists on disk. */
+  function renameBridge(options?: { rowId?: string | null }) {
+    const calls: Array<[string, Record<string, unknown>]> = []
+    fakeBridge(async (command, args) => {
+      calls.push([command, args])
+      if (command === 'note_read') {
+        if (args.path === NEW) {
+          return CONTENT
+        }
+        throw { kind: 'notFound', message: 'missing' }
+      }
+      if (command === 'db_query') {
+        const params = (args.params as unknown[]) ?? []
+        if (params.includes(OLD)) {
+          return [{ path: OLD, id: options?.rowId === undefined ? '01abcdefghjkmnpqrstvwxyz00' : options.rowId }]
+        }
+        return [] // the upsert path is not indexed
+      }
+      return null
+    })
+    return calls
+  }
+
+  it('heals a same-batch external rename: rows move, nothing is removed', async () => {
+    const calls = renameBridge()
+
+    await applyIndexChanges(
+      [
+        { path: OLD, kind: 'remove' },
+        { path: NEW, kind: 'upsert', modifiedMs: 42 },
+      ],
+      7,
+    )
+
+    const commands = calls.map(([command]) => command)
+    expect(commands).toContain('index_move')
+    expect(commands).not.toContain('index_remove')
+    const move = calls.find(([command]) => command === 'index_move')
+    expect(move?.[1]).toEqual({ from: OLD, to: NEW, generation: 7 })
+    const apply = calls.find(([command]) => command === 'index_apply')
+    expect((apply?.[1].note as { path: string; mtime: number }).path).toBe(NEW)
+    expect((apply?.[1].note as { path: string; mtime: number }).mtime).toBe(42)
+  })
+
+  it('falls back to delete+create when the ids do not match', async () => {
+    const calls = renameBridge({ rowId: 'completely-different-id' })
+
+    await applyIndexChanges(
+      [
+        { path: OLD, kind: 'remove' },
+        { path: NEW, kind: 'upsert' },
+      ],
+      7,
+    )
+
+    const commands = calls.map(([command]) => command)
+    expect(commands).not.toContain('index_move')
+    expect(commands).toContain('index_remove')
+    expect(commands).toContain('index_apply')
+  })
+
+  it("Reflect's own move echo never pairs: the removed side has no row left", async () => {
+    const calls: Array<[string, Record<string, unknown>]> = []
+    fakeBridge(async (command, args) => {
+      calls.push([command, args])
+      if (command === 'note_read') {
+        return CONTENT
+      }
+      if (command === 'db_query') {
+        return [] // neither path has a row under the old key (already moved)
+      }
+      return null
+    })
+
+    await applyIndexChanges(
+      [
+        { path: OLD, kind: 'remove' },
+        { path: NEW, kind: 'upsert' },
+      ],
+      7,
+    )
+
+    const commands = calls.map(([command]) => command)
+    expect(commands).not.toContain('index_move')
+    expect(commands).toContain('index_remove') // no-op against a moved row
+    expect(commands).toContain('index_apply') // idempotent re-apply
+  })
+})

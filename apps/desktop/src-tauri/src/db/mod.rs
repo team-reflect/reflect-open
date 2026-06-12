@@ -176,6 +176,32 @@ pub fn note_move_indexed(
     Ok(())
 }
 
+/// Move a note's projection rows **only** (the id-based reconcile, Plan 17):
+/// the file already lives at `to` — an external rename observed after the
+/// fact, paired to its old row by frontmatter `id`. The rows move rather than
+/// being re-created so embedding vectors survive (re-embedding identical
+/// content costs the user BYOK money). No filesystem half, and unlike
+/// `note_move_indexed` this is gated on the **index** generation like every
+/// other reconcile-path write — a superseded pass must no-op.
+#[tauri::command]
+pub fn index_move(
+    from: String,
+    to: String,
+    generation: u64,
+    index: State<IndexState>,
+) -> AppResult<()> {
+    let mut state = lock_state(&index)?;
+    if state.generation != generation {
+        return Ok(());
+    }
+    let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
+    let tx = conn.transaction()?;
+    tx.execute_batch("PRAGMA defer_foreign_keys = ON;")?;
+    write::move_note(&tx, &from, &to)?;
+    tx.commit()?;
+    Ok(())
+}
+
 /// Upsert one `index_meta` key (no-op if stale). The table is bookkeeping the
 /// TS policy layer owns — e.g. `syncIndex` stamps the projection version after
 /// a rebuild — and `index_clear` deliberately preserves it, so a marker can

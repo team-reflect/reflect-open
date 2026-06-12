@@ -1,5 +1,6 @@
 import {
   detectConflictMarkers,
+  getConflictedNotes,
   listNotes,
   parseNote,
   readNote,
@@ -29,15 +30,22 @@ export interface MigrationCandidate {
 }
 
 /**
- * Every indexed ULID-named note whose title is real (an untitled note's
- * index title falls back to the ULID stem — nothing readable to rename to;
- * those convert later via the birth path when first titled).
+ * Every indexed ULID-named note the migration would actually rename, so the
+ * prompt's count is a promise, not an estimate. Excluded up front (not
+ * silently skipped mid-run): untitled notes (their index title falls back to
+ * the ULID stem — nothing readable to rename to; they convert later via the
+ * birth path), notes awaiting sync-conflict review (their content — and so
+ * their title — is contested), and notes open in a pane right now (their
+ * session owns the buffer; the next graph open offers them again).
  */
 export async function findMigrationCandidates(): Promise<MigrationCandidate[]> {
-  const entries = await listNotes({ tag: null })
+  const [entries, conflicted] = await Promise.all([listNotes({ tag: null }), getConflictedNotes()])
+  const contested = new Set(conflicted.map((note) => note.path))
   return entries
     .filter((entry) => ULID_NOTE_RE.test(entry.path))
     .filter((entry) => !entry.path.endsWith(`/${entry.title}.md`))
+    .filter((entry) => !contested.has(entry.path))
+    .filter((entry) => openSession(entry.path) === null)
     .map((entry) => ({ path: entry.path, title: entry.title }))
 }
 

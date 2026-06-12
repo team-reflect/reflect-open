@@ -339,6 +339,24 @@ export async function getIndexedHashes(): Promise<Map<string, string>> {
 }
 
 /**
+ * Frontmatter `id`s of the given indexed paths (a path with no row is simply
+ * absent; a row without an id maps to `null`). The move-detection input: both
+ * the reconcile pass and the watcher batch handler pair vanished rows with
+ * appeared files through this.
+ */
+export async function getNoteIdsByPath(paths: string[]): Promise<Map<string, string | null>> {
+  if (paths.length === 0) {
+    return new Map()
+  }
+  const rows = await db
+    .selectFrom('notes')
+    .where('path', 'in', paths)
+    .select(['path', 'id'])
+    .execute()
+  return new Map(rows.map((row) => [row.path, row.id]))
+}
+
+/**
  * Resolve a `[[target]]` against the index, returning the note ref (its path).
  * The resolution *policy* (prefer daily-date, then title, then alias) lives once
  * in {@link resolveWikiLinkAsync}; this is only the DB-backed data access.

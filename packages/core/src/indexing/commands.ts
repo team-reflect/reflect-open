@@ -39,6 +39,21 @@ export async function removeFromIndex(path: string, generation: number): Promise
 }
 
 /**
+ * Move a note's index rows **only** — the id-based reconcile half of Plan 17:
+ * the file already lives at `to` (an external rename observed after the fact,
+ * paired to its old row by frontmatter id). Embeddings ride along, so a
+ * healed rename never re-embeds. Gated on the **index** generation like every
+ * other reconcile-path write.
+ */
+export async function moveIndexedRows(
+  from: string,
+  to: string,
+  generation: number,
+): Promise<void> {
+  await call('index_move', { from, to, generation }, voidSchema)
+}
+
+/**
  * Move a note file **and** its index rows in one Rust transaction (Plan 17):
  * pinned state, conflict flags, and embedding vectors survive the rename, and
  * the watcher's delete+create echo is benign by construction (the remove

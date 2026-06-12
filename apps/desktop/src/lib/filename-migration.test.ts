@@ -43,7 +43,7 @@ function bindBridge(): void {
       }
       if (command === 'db_query') {
         const sql = String(args?.sql)
-        if (sql.includes('"tags"')) {
+        if (sql.includes('"tags"') || sql.includes('has_conflict')) {
           return []
         }
         if (sql.includes('"path" = ')) {

@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
+import { emitNoteMoved } from '@/lib/note-moves'
 import type { Route } from './route'
 import { RouterProvider, useRouter } from './router'
 
@@ -127,5 +128,48 @@ describe('router', () => {
     act(() => result.current.navigate({ kind: 'search', query: 'x' }))
     act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }))
     expect(result.current.savedScroll()).toBeNull() // a new entry, not the old one
+  })
+
+  describe('note moves (Plan 17)', () => {
+    it('rewrites the current route and history entries when a note moves', () => {
+      const { result } = routerHook()
+      act(() => result.current.navigate({ kind: 'note', path: 'notes/01abc.md' }))
+      act(() => result.current.navigate({ kind: 'allNotes', tag: null }))
+      act(() => result.current.navigate({ kind: 'note', path: 'notes/01abc.md' }))
+      const arrivalsBefore = result.current.arrivalSeq
+      const entryBefore = result.current.entryId
+
+      act(() => emitNoteMoved('notes/01abc.md', 'notes/meeting-notes.md'))
+
+      // The current entry followed the file — a rewrite, not an arrival, on
+      // the same entry (views keep their scroll; nothing re-anchors).
+      expect(result.current.route).toEqual({ kind: 'note', path: 'notes/meeting-notes.md' })
+      expect(result.current.arrivalSeq).toBe(arrivalsBefore)
+      expect(result.current.entryId).toBe(entryBefore)
+
+      // The earlier history entry followed too: back over the rename lands
+      // on the file's real home, never the dead path.
+      act(() => result.current.back())
+      expect(result.current.route).toEqual({ kind: 'allNotes', tag: null })
+      act(() => result.current.back())
+      expect(result.current.route).toEqual({ kind: 'note', path: 'notes/meeting-notes.md' })
+    })
+
+    it('leaves unrelated routes untouched', () => {
+      const { result } = routerHook()
+      act(() => result.current.navigate({ kind: 'note', path: 'notes/other.md' }))
+
+      act(() => emitNoteMoved('notes/01abc.md', 'notes/meeting-notes.md'))
+
+      expect(result.current.route).toEqual({ kind: 'note', path: 'notes/other.md' })
+    })
+
+    it('a move settling after the workspace unmounts is harmless', () => {
+      const { result, unmount } = routerHook()
+      act(() => result.current.navigate({ kind: 'note', path: 'notes/01abc.md' }))
+      unmount()
+
+      emitNoteMoved('notes/01abc.md', 'notes/meeting-notes.md')
+    })
   })
 })

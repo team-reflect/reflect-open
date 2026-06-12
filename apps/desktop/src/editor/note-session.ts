@@ -7,9 +7,13 @@ import type { RoundTripFidelity } from './roundtrip'
  * `useNoteDocument` adapts it to React; tests drive it directly.
  *
  * A session is created for one `path` and lives until {@link NoteSession.dispose}.
- * Binding the path at construction is what keeps the machine simple: a note
- * switch is "dispose the old session (which flushes its buffer to *its* path),
- * create a new one" — there is no cross-note state to guard.
+ * Binding the path at construction keeps the machine simple: a note switch is
+ * "dispose the old session (which flushes its buffer to *its* path), create a
+ * new one" — there is no cross-note state to guard. The one sanctioned path
+ * mutation is {@link NoteSession.retarget} (Plan 17): a rename moves the
+ * *file*, not the document, so the same session continues under the new path
+ * — content, dirtiness, and conflict state untouched. Lifecycle policy around
+ * that (adopt vs teardown) lives in `document-binding.ts`, not here.
  *
  * Saves are debounced atomic writes (Plan 02); indexing is **not** triggered
  * here — the watcher is the sole incremental-reindex path (Plan 04b), so our own

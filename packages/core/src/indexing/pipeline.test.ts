@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '../ipc/bridge'
 import { getBacklinks, resolveWikiTarget, searchNotes } from './queries'
+import { hashContent } from './hash'
 import { PROJECTION_VERSION } from './indexed-note'
-import { indexNote, rebuildIndex, syncIndex, PROJECTION_VERSION_KEY } from './indexer'
+import { indexNote, rebuildIndex, reconcileIndex, syncIndex, PROJECTION_VERSION_KEY } from './indexer'
 import { applyIndexChanges } from './live'
 
 // Install a fake bridge so both core's `call` and the Kysely runner resolve
@@ -159,5 +160,81 @@ describe('Kysely → db_query bridge', () => {
 
   it('resolveWikiTarget resolves a title match to a note ref', async () => {
     expect(await resolveWikiTarget('World')).toEqual({ kind: 'resolved', ref: 'notes/a.md' })
+  })
+})
+
+describe('reconcileIndex move healing (Plan 17)', () => {
+  const OLD = 'notes/01arz3ndektsv4rrffq69g5fav.md'
+  const NEW = 'notes/meeting-notes.md'
+  const CONTENT = '---\nid: 01abcdefghjkmnpqrstvwxyz00\n---\n# Meeting Notes\n'
+
+  /** A graph where OLD's row remains but the file now lives at NEW. */
+  function renameFake(options: { storedHash: string; content?: string }) {
+    const calls: Array<[string, Record<string, unknown>]> = []
+    mockInvoke.mockImplementation(async (command, args) => {
+      calls.push([command, args])
+      const sql = String(args.sql ?? '')
+      if (command === 'list_files') {
+        return [{ path: NEW, size: 1, modifiedMs: 9 }]
+      }
+      if (command === 'note_read') {
+        if (args.path === NEW) {
+          return options.content ?? CONTENT
+        }
+        throw { kind: 'notFound', message: 'missing' }
+      }
+      if (command === 'db_query') {
+        if (sql.includes('file_hash')) {
+          return [{ path: OLD, file_hash: options.storedHash }]
+        }
+        if (((args.params as unknown[]) ?? []).includes(OLD)) {
+          return [{ path: OLD, id: '01abcdefghjkmnpqrstvwxyz00' }]
+        }
+        return []
+      }
+      return null
+    })
+    return calls
+  }
+
+  it('moves the rows and skips the re-index when content is unchanged', async () => {
+    const calls = renameFake({ storedHash: await hashContent(CONTENT) })
+
+    await reconcileIndex({ generation: 4 })
+
+    const commands = calls.map(([command]) => command)
+    expect(commands).toContain('index_move')
+    const move = calls.find(([command]) => command === 'index_move')
+    expect(move?.[1]).toEqual({ from: OLD, to: NEW, generation: 4 })
+    // The moved row carried its hash: identical content means no re-apply —
+    // and crucially no remove, so embeddings survived.
+    expect(commands).not.toContain('index_apply')
+    expect(commands).not.toContain('index_remove')
+  })
+
+  it('re-indexes at the new path when content changed in transit', async () => {
+    const calls = renameFake({ storedHash: 'stale-hash-from-before-the-edit' })
+
+    await reconcileIndex({ generation: 4 })
+
+    const commands = calls.map(([command]) => command)
+    expect(commands).toContain('index_move')
+    expect(commands).not.toContain('index_remove')
+    const apply = calls.find(([command]) => command === 'index_apply')
+    expect((apply?.[1].note as { path: string }).path).toBe(NEW)
+  })
+
+  it('a legacy file without an id still reconciles as delete+create', async () => {
+    const calls = renameFake({
+      storedHash: 'whatever',
+      content: '# Meeting Notes\n',
+    })
+
+    await reconcileIndex({ generation: 4 })
+
+    const commands = calls.map(([command]) => command)
+    expect(commands).not.toContain('index_move')
+    expect(commands).toContain('index_apply')
+    expect(commands).toContain('index_remove')
   })
 })

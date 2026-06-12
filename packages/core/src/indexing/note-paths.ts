@@ -32,16 +32,20 @@ async function pathTaken(path: string): Promise<boolean> {
 const MAX_COLLISION_PROBES = 1000
 
 /**
- * The first available `notes/…` path for `slug`: the bare slug, then `-2`,
- * `-3`, …. `taken` is injectable for tests; the default probes the index and
- * the filesystem.
+ * The one probe loop both entry points share: candidates are the bare slug,
+ * then `-2`, `-3`, …; the note's own current path (when given) is always an
+ * acceptable answer — a note never collides with itself.
  */
-export async function availableNotePath(
+async function probeNotePath(
   slug: string,
-  taken: (path: string) => Promise<boolean> = pathTaken,
+  taken: (candidate: string) => Promise<boolean>,
+  currentPath: string | null,
 ): Promise<string> {
   for (let ordinal = 1; ordinal <= MAX_COLLISION_PROBES; ordinal += 1) {
     const candidate = notePath(ordinal === 1 ? slug : `${slug}-${ordinal}`)
+    if (candidate === currentPath) {
+      return currentPath
+    }
     if (!(await taken(candidate))) {
       return candidate
     }
@@ -50,25 +54,26 @@ export async function availableNotePath(
 }
 
 /**
+ * The first available `notes/…` path for `slug` (note creation). `taken` is
+ * injectable for tests; the default probes the index and the filesystem.
+ */
+export async function availableNotePath(
+  slug: string,
+  taken: (path: string) => Promise<boolean> = pathTaken,
+): Promise<string> {
+  return probeNotePath(slug, taken, null)
+}
+
+/**
  * Where `path`'s file should live for `title` (the rename pipeline's target,
  * Plan 17): the slug path with a collision suffix — or `path` unchanged when
- * a candidate *is* the note's current path, so a note whose name already
- * matches its title never moves (and never collides with itself).
+ * its name already matches, so a note never moves onto (or collides with)
+ * itself.
  */
 export async function slugPathForTitle(
   path: string,
   title: string,
   taken: (candidate: string) => Promise<boolean> = pathTaken,
 ): Promise<string> {
-  const slug = slugForTitle(title)
-  for (let ordinal = 1; ordinal <= MAX_COLLISION_PROBES; ordinal += 1) {
-    const candidate = notePath(ordinal === 1 ? slug : `${slug}-${ordinal}`)
-    if (candidate === path) {
-      return path
-    }
-    if (!(await taken(candidate))) {
-      return candidate
-    }
-  }
-  throw new Error(`no available note path for slug "${slug}" after ${MAX_COLLISION_PROBES} probes`)
+  return probeNotePath(slugForTitle(title), taken, path)
 }

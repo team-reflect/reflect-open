@@ -73,7 +73,6 @@ export {
   writeNote,
   writeAsset,
   noteExists,
-  moveNote,
   deleteNote,
   listFiles,
   recentGraphs,

@@ -56,11 +56,6 @@ export async function noteExists(path: string): Promise<boolean> {
   return call('note_exists', { path }, z.boolean())
 }
 
-/** Move/rename a note within the graph (pinned to `generation`). */
-export async function moveNote(from: string, to: string, generation: number): Promise<void> {
-  await call('note_move', { from, to, generation }, voidSchema)
-}
-
 /** Send a note to the OS trash (recoverable; pinned to `generation`). */
 export async function deleteNote(path: string, generation: number): Promise<void> {
   await call('note_delete', { path, generation }, voidSchema)

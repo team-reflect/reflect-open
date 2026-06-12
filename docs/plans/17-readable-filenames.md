@@ -86,14 +86,20 @@ later surface), daily notes (untouched in every respect — `daily/YYYY-MM-DD.md
    to be rare; the suffix is the whole policy (no id-tails on every file — don't
    tax the common case for the rare one).
 
-3. **Identity at creation.** `createNoteWithTitle` writes
-   `notes/<slug>.md` with frontmatter `id: <lowercase ulid>` + `# Title`.
+3. **Identity at creation — and identity that works.** `createNoteWithTitle`
+   writes `notes/<slug>.md` with frontmatter `id: <lowercase ulid>` + `# Title`.
    `newNoteRoute` (⌘N) keeps its ULID birth path (no title exists yet) and the
    lazy-create seed gains the same `id:` frontmatter. The parser→indexer→`notes.id`
-   pipeline already exists and runs; this step just starts feeding it. Add a
-   non-unique index on `notes.id` and an index-time **duplicate-id flag** (two
-   paths claiming one id = a sync fork; surfaced like `Needs review`, repair
-   deferred).
+   pipeline already exists and runs; this step starts feeding it. Add a
+   non-unique index on `notes.id`, **duplicate-id detection** (two paths
+   claiming one id = a sync fork; surfaced beside `Needs review` in the
+   backup section, repair deferred), and — the payoff — **id-based move
+   healing**: the open-time reconcile and the live watcher pair a vanished
+   row with an appeared file carrying the same id and *move* the rows
+   (`index_move`) instead of delete+create, so external renames (Finder,
+   Obsidian, sync pulls) stop dropping embeddings and derived state.
+   Ambiguous ids never pair — guessing could wire one note's history to
+   another's file; the duplicate-id surface reports those instead.
 
 4. **Transactional move** (Rust, new command `note_move_indexed(from, to,
    generation)`). One SQLite transaction + fs rename that: moves the `notes` row
@@ -102,8 +108,9 @@ later surface), daily notes (untouched in every respect — `daily/YYYY-MM-DD.md
    FTS row — then renames the file (atomic-write discipline from Plan 02), then
    emits the index-changed event. Embedding vectors survive because the rows move
    and `content_hash` is unchanged; a rename must never trigger a re-embed (BYOK
-   re-embeds cost the user money). The existing bare `note_move` stays for
-   internal use; nothing else may rename tracked notes.
+   re-embeds cost the user money). The bare Plan-02 `note_move` is **removed**:
+   a file rename without its projection is exactly the bug class this command
+   exists to prevent, and nothing else may rename tracked notes.
 
 5. **Reconciliation by construction** (no watcher special-casing). The fs rename
    echoes back as `remove(old)` + `upsert(new)`. Because the DB moved *first*:
@@ -170,8 +177,11 @@ later surface), daily notes (untouched in every respect — `daily/YYYY-MM-DD.md
   `notes.id` column. Identity for *reconciliation and repair*; **path remains
   the index PK and the route key** — no id-based routing in this plan.
 - **Only settled in-app title changes move files.** Sync pulls, external edits,
-  reconciles, and rebuilds never rename. This single rule prevents move loops
-  with external tools and other devices.
+  reconciles, and rebuilds never rename a file. This single rule prevents move
+  loops with external tools and other devices. The complement: when something
+  *else* renames a file, Reflect **heals by id** — the reconcile and the
+  watcher recognize the moved identity and migrate the projection rows rather
+  than treating it as delete+create.
 - **A rename is never a re-embed.** The transactional move carries
   `embedding_chunks` rows; `content_hash` semantics are untouched.
 - **Sync stance:** a rename reaches git as delete+add; libgit2's default merge

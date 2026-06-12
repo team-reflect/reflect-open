@@ -245,23 +245,6 @@ pub(crate) fn move_note_file(root: &Path, from: &str, to: &str) -> AppResult<()>
     Ok(())
 }
 
-/// Move/rename a note within the graph (pinned to `generation`).
-#[tauri::command]
-pub fn note_move(
-    from: String,
-    to: String,
-    generation: u64,
-    state: State<GraphState>,
-) -> AppResult<()> {
-    let root = root_for_generation(&state, generation)?;
-    let to_abs = resolve(&root, &to)?;
-    if let Some(parent) = to_abs.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::rename(resolve(&root, &from)?, to_abs)?;
-    Ok(())
-}
-
 /// Send a note to the OS trash (recoverable), not a hard delete (pinned to
 /// `generation`).
 #[tauri::command]

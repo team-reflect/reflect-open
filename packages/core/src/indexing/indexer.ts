@@ -5,12 +5,14 @@ import {
   applyIndexedNote,
   applyIndexedNotes,
   clearIndex,
+  moveIndexedRows,
   removeFromIndex,
   setIndexMeta,
 } from './commands'
 import { hashContent } from './hash'
 import { buildIndexedNote, PROJECTION_VERSION, type IndexedNote } from './indexed-note'
-import { getIndexedHashes, getIndexMeta } from './queries'
+import { pairMovesById } from './move-detection'
+import { getIndexedHashes, getIndexMeta, getNoteIdsByPath } from './queries'
 
 /**
  * The indexing pipeline (Plan 04): read (Plan 02) → parse/extract in TS
@@ -131,21 +133,73 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
   const onDisk = new Set(files.map((file) => file.path))
   const stored = await getIndexedHashes()
 
+  // Id-based move healing (Plan 17): a row whose file vanished plus a new
+  // file carrying the same frontmatter id is a rename observed after the
+  // fact — an external tool or a sync pull moved it while Reflect wasn't
+  // looking. Move the rows instead of delete+create, so embedding vectors
+  // survive (re-embedding identical content costs the user BYOK money).
+  // Ambiguous ids (a rename/rename fork) never pair — the duplicate-id
+  // surface reports those for review.
+  const orphanPaths = [...stored.keys()].filter((path) => !onDisk.has(path))
+  const arrivalFiles = files.filter((file) => !stored.has(file.path))
+  /** Arrival content read for pairing — the main pass below reuses it. */
+  const arrivalContent = new Map<string, string>()
+  if (orphanPaths.length > 0 && arrivalFiles.length > 0) {
+    const orphanIds = await getNoteIdsByPath(orphanPaths)
+    const arrivalIds = new Map<string, string | null>()
+    for (const file of arrivalFiles) {
+      if (signal?.aborted) {
+        return
+      }
+      try {
+        const content = await readNote(file.path)
+        arrivalContent.set(file.path, content)
+        const parsed = parseNote({ path: file.path, source: content })
+        arrivalIds.set(file.path, parsed.frontmatter.id ?? null)
+      } catch {
+        // Unreadable arrival: it can't pair; the main pass retries the read.
+      }
+    }
+    for (const move of pairMovesById(orphanIds, arrivalIds)) {
+      if (signal?.aborted) {
+        return
+      }
+      try {
+        await moveIndexedRows(move.from, move.to, generation)
+      } catch (err) {
+        // A refused/failed move (e.g. a row appeared at the destination in a
+        // race) degrades to today's delete+create: the main pass indexes the
+        // arrival, the cleanup loop drops the orphan. Healing is best-effort.
+        console.error(`id-based move failed (${move.from} → ${move.to}):`, err)
+        continue
+      }
+      // The moved row carries the old path's hash: the main pass re-indexes
+      // at the new path only if the content actually changed in transit.
+      const hash = stored.get(move.from)
+      stored.delete(move.from)
+      if (hash !== undefined) {
+        stored.set(move.to, hash)
+      }
+    }
+  }
+
   for (const file of files) {
     if (signal?.aborted) {
       return
     }
-    let content: string
-    try {
-      content = await readNote(file.path)
-    } catch (err) {
-      // The file moved/was deleted/locked between listFiles() and here (TOCTOU).
-      // If it's gone, drop it from `onDisk` so the cleanup loop removes its
-      // now-ghost row this pass; for a transient error keep the row and retry.
-      if (isAppError(err) && err.kind === 'notFound') {
-        onDisk.delete(file.path)
+    let content = arrivalContent.get(file.path)
+    if (content === undefined) {
+      try {
+        content = await readNote(file.path)
+      } catch (err) {
+        // The file moved/was deleted/locked between listFiles() and here (TOCTOU).
+        // If it's gone, drop it from `onDisk` so the cleanup loop removes its
+        // now-ghost row this pass; for a transient error keep the row and retry.
+        if (isAppError(err) && err.kind === 'notFound') {
+          onDisk.delete(file.path)
+        }
+        continue
       }
-      continue
     }
     const fileHash = await hashContent(content)
     if (stored.get(file.path) === fileHash) {

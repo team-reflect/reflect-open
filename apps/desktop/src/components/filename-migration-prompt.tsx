@@ -105,10 +105,17 @@ export function FilenameMigrationPrompt(): ReactElement | null {
       })
       if (result.failed.length > 0) {
         console.error('readable-filenames migration failures:', result.failed)
+        const skippedToo =
+          result.skipped > 0
+            ? `; ${result.skipped} ${result.skipped === 1 ? 'was' : 'were'} skipped (opened or edited mid-run)`
+            : ''
         operation.fail(
-          `${result.failed.length} of ${count} renames failed — those notes keep their old filenames; relaunch to retry`,
+          `renamed ${result.moved} of ${count} — ${result.failed.length} failed and keep their old filenames${skippedToo}; reopening the graph offers the rest again`,
         )
       } else {
+        // Pure skips need no alarm: the scan excludes open/conflicted notes
+        // up front, so a skip here is a mid-run race, and the next graph
+        // open simply offers the remainder.
         operation.done()
       }
     })()

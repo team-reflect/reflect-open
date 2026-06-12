@@ -19,9 +19,18 @@ export function onNoteMoved(listener: NoteMovedListener): () => void {
   }
 }
 
-/** Announce a landed move to every subscriber. */
+/**
+ * Announce a landed move to every subscriber. Listeners are isolated: the
+ * emit runs inside the rename pipeline's success path, and a throwing
+ * subscriber must not get reported as a failed move (the move already
+ * landed).
+ */
 export function emitNoteMoved(from: string, to: string): void {
   for (const listener of [...listeners]) {
-    listener(from, to)
+    try {
+      listener(from, to)
+    } catch (cause) {
+      console.error('note-moved listener failed:', cause)
+    }
   }
 }
