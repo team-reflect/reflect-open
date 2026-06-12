@@ -149,6 +149,24 @@ describe('createUpdateController', () => {
     expect(controller.getState()).toEqual({ phase: 'ready', version: '0.3.0' })
   })
 
+  it('a silent re-check answering "no update" keeps an already-found update available', async () => {
+    checkMock.mockResolvedValueOnce(fakeUpdate({ version: '0.3.0' }))
+    controller = createUpdateController({ autoCheck: true, autoCheckIntervalMs: 1000 })
+    controller.start()
+    await vi.waitFor(() => {
+      expect(controller?.getState()).toEqual({ phase: 'available', version: '0.3.0' })
+    })
+
+    // e.g. the release is mid-edit and the manifest transiently lists nothing.
+    checkMock.mockResolvedValue(null)
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(controller.getState()).toEqual({ phase: 'available', version: '0.3.0' })
+
+    // The found update is still installable.
+    await controller.install()
+    expect(controller.getState()).toEqual({ phase: 'ready', version: '0.3.0' })
+  })
+
   it('a failed re-check keeps an already-found update available', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     checkMock.mockResolvedValueOnce(fakeUpdate({ version: '0.3.0' }))

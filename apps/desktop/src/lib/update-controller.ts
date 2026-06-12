@@ -85,11 +85,22 @@ export function createUpdateController(options: UpdateControllerOptions): Update
       if (currentPhase() !== 'checking') {
         return // an install of the previously-found update raced us; its state wins
       }
-      pendingUpdate = update
       if (update) {
+        pendingUpdate = update
         setState({ phase: 'available', version: update.version })
+      } else if (!silent) {
+        // The user asked: the endpoint's answer is authoritative.
+        pendingUpdate = null
+        setState({ phase: 'upToDate' })
+      } else if (before.phase === 'available') {
+        // A silent check only ever adds information — it never retracts a
+        // visible affordance. An empty answer can be transient (release being
+        // edited, manifest propagation); if the update truly vanished, the
+        // install fails loudly, which is the honest signal.
+        setState(before)
       } else {
-        setState(silent ? { phase: 'idle' } : { phase: 'upToDate' })
+        pendingUpdate = null
+        setState({ phase: 'idle' })
       }
     } catch (error) {
       if (currentPhase() !== 'checking') {
@@ -97,8 +108,8 @@ export function createUpdateController(options: UpdateControllerOptions): Update
       }
       if (silent) {
         console.warn('update check failed (ignored):', error)
-        // A re-check failing (e.g. offline) must not forget an update that an
-        // earlier check already found.
+        // Same rule as above: failing to re-check (e.g. offline) must not
+        // forget an update an earlier check already found.
         setState(before.phase === 'available' ? before : { phase: 'idle' })
       } else {
         setState({ phase: 'error', message: errorMessage(error), during: 'check' })

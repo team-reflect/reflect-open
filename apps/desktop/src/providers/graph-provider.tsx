@@ -26,6 +26,15 @@ import { createGraphIndex } from './graph-index'
 /** Lifecycle of the active graph (Plan 02 loading gate). */
 export type GraphStatus = 'loading' | 'choosing' | 'opening' | 'ready'
 
+interface OpenGraphOptions {
+  /**
+   * Seed the welcome note when this folder is brand new — empty AND never
+   * opened before (not in recents). Only the explicit folder pick sets this:
+   * reopening a graph someone emptied on purpose must not re-onboard them.
+   */
+  seedWelcome?: boolean
+}
+
 interface GraphContextValue {
   status: GraphStatus
   graph: GraphInfo | null
@@ -43,8 +52,8 @@ interface GraphContextValue {
   error: string | null
   /** Show the OS folder picker, then open (and bootstrap) the chosen graph. */
   pickAndOpen: () => Promise<void>
-  /** Open a previously-used graph by its root path. */
-  openRecent: (root: string) => Promise<void>
+  /** Open a graph by its root path. */
+  openRecent: (root: string, options?: OpenGraphOptions) => Promise<void>
   /** Drop a graph from the recents list. */
   forget: (root: string) => Promise<void>
 }
@@ -69,6 +78,10 @@ export function GraphProvider({ children }: { children: ReactNode }) {
   const openSeq = useRef(0)
   // Serializes backend opens (see `openRecent`).
   const openChain = useRef<Promise<unknown>>(Promise.resolve())
+  // The recents list as of the last load, readable inside the open chain
+  // (the `recents` state would be a stale closure there). Tells a brand-new
+  // folder apart from a previously-opened one that happens to be empty.
+  const recentsRef = useRef<RecentGraph[]>([])
   // The active graph's index lifecycle (open → reconcile → subscribe → watch), so
   // a graph switch can stop the prior pass before the Rust connection is swapped.
   const indexRef = useRef(
@@ -90,6 +103,7 @@ export function GraphProvider({ children }: { children: ReactNode }) {
       try {
         const list = await recentGraphs()
         setRecents(list)
+        recentsRef.current = list
         return list
       } catch (err) {
         // Surface a real failure (e.g. a corrupt recent-graphs.json, which Rust
@@ -106,11 +120,14 @@ export function GraphProvider({ children }: { children: ReactNode }) {
   )
 
   const openRecent = useCallback(
-    (root: string): Promise<void> => {
+    (root: string, options?: OpenGraphOptions): Promise<void> => {
       const seq = ++openSeq.current
       setStatus('opening')
       setError(null)
       const run = async (): Promise<void> => {
+        // Decided before `openGraph` records this open into recents: was the
+        // folder ever opened before?
+        const neverOpened = !recentsRef.current.some((recent) => recent.root === root)
         try {
           const info = await openGraph(root)
           if (seq !== openSeq.current) {
@@ -120,10 +137,12 @@ export function GraphProvider({ children }: { children: ReactNode }) {
           // Reflect" note before the index pass starts, so the reconcile
           // indexes it like any other file. Best-effort — a failed seed must
           // never block opening.
-          try {
-            await seedWelcomeNote(info.generation)
-          } catch (err) {
-            console.error('welcome seed failed:', errorMessage(err))
+          if (options?.seedWelcome && neverOpened) {
+            try {
+              await seedWelcomeNote(info.generation)
+            } catch (err) {
+              console.error('welcome seed failed:', errorMessage(err))
+            }
           }
           const index = indexRef.current
           // Stop any prior reconcile and wait for it to fully settle before the
@@ -197,7 +216,7 @@ export function GraphProvider({ children }: { children: ReactNode }) {
       return
     }
     if (selected) {
-      await openRecent(selected)
+      await openRecent(selected, { seedWelcome: true })
     }
   }, [openRecent])
 
