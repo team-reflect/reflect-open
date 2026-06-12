@@ -61,9 +61,13 @@ markers in markdown, AI task extraction (later, over this projection), CLI
   bump), keyed by `notes(path)` with `ON UPDATE CASCADE ON DELETE CASCADE` like the
   other child tables — so Plan 17 moves and deletes need zero new handling.
 - **Write-back is surgical and guarded.** Toggling from the Tasks view replaces
-  exactly the 3-byte marker (`[ ]` ↔ `[x]`) at the indexed offset **only if** the
-  surrounding item text still matches what the index recorded. On mismatch (stale
-  index, concurrent edit): refuse loudly and reindex — never a silent wrong write.
+  exactly the three-character marker (`[ ]` ↔ `[x]`) at the indexed position **only
+  if** the surrounding item text still matches what the index recorded. On mismatch
+  (stale index, concurrent edit): refuse loudly and reindex — never a silent wrong
+  write. Positions are **JS string indices (UTF-16 code units), the unit Lezer
+  reports and `extract.ts` already uses** — never UTF-8 byte offsets. The toggle
+  stays in string-land end-to-end (read string → splice → `note_write` the whole
+  string), so no byte conversion ever exists to get wrong.
 - **The Tasks view is local-only**, so `private: true` notes' tasks appear in it (same
   contract as local search/retrieval). Any future exposure of tasks to chat tools goes
   through the existing `CloudSafe` checkers like every other note-content path.
@@ -79,7 +83,8 @@ interface ParsedTask {
   text: string          // inline text of the item's first paragraph, markdown stripped
   raw: string           // exact source slice of that line (the write-back guard)
   checked: boolean
-  markerOffset: number  // byte offset of `[ ]`/`[x]` in the source
+  markerOffset: number  // string index of `[ ]`/`[x]` in the source — UTF-16 code
+                        // units, as Lezer positions are (never UTF-8 bytes)
   scheduled: string | null // ISO date per the resolution rules above
 }
 
@@ -97,7 +102,7 @@ export function toggleTaskMarker(
 CREATE TABLE tasks (
   note_path     TEXT NOT NULL REFERENCES notes(path)
                   ON UPDATE CASCADE ON DELETE CASCADE,
-  marker_offset INTEGER NOT NULL,
+  marker_offset INTEGER NOT NULL,  -- JS string index (UTF-16 units), not bytes
   text          TEXT NOT NULL,
   raw           TEXT NOT NULL,
   checked       INTEGER NOT NULL,
@@ -158,7 +163,8 @@ CREATE INDEX tasks_open_by_date ON tasks (checked, scheduled);
 ## Acceptance criteria
 
 - `- [ ]` renders as a clickable checkbox in the editor; click and `⌘⏎` toggle it;
-  the file changes by exactly the marker bytes; `pnpm typecheck` + targeted tests pass.
+  the file changes by exactly the marker characters; `pnpm typecheck` + targeted
+  tests pass.
 - `⌘T` opens Tasks: every open checkbox across the graph except `checklist: true`
   notes, grouped Overdue / Today / Upcoming / Unscheduled, with source-note context;
   completed tasks sit collapsed below; the whole flow works without the mouse.
@@ -167,7 +173,7 @@ CREATE INDEX tasks_open_by_date ON tasks (checked, scheduled);
   bare task in a regular note is Unscheduled.
 - Toggling from the Tasks view updates the markdown file, the index, and an open
   editor; toggling against a stale index refuses loudly and recovers via reindex —
-  never writes the wrong bytes.
+  never writes a wrong edit.
 - Deleting `.reflect/` and reopening reproduces the identical tasks projection;
   renaming/moving a note keeps its task rows; external edits re-project within the
   watcher debounce.
