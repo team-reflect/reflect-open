@@ -16,10 +16,9 @@ import {
   getSecret,
   streamChat,
   type AiModelConfig,
-  type ChatModelMessage,
   type ChatStreamEvent,
 } from '@reflect/core'
-import { appendEvent, type ChatTranscriptMessage } from '@/lib/chat-transcript'
+import { appendEvent, buildHistory, type ChatTurn } from '@/lib/chat-transcript'
 import { todayIso } from '@/lib/dates'
 import { providerFetch } from '@/lib/provider-fetch'
 import { useSettings } from '@/providers/settings-provider'
@@ -28,15 +27,15 @@ import { useSettings } from '@/providers/settings-provider'
  * One chat session per open graph (Plan 10): the conversation lives here, not
  * in the screen, so navigating away and back keeps it. Session-only by
  * design — a relaunch (or graph switch, which remounts the workspace tree)
- * starts fresh. The model-facing history is kept separately from the rendered
- * transcript: the transcript carries tool activity for display, the history
- * carries the exact messages (including tool results) the next turn resends.
+ * starts fresh. The state is just {@link ChatTurn}s: what each turn renders
+ * and what it contributed to the model history are one record, and the
+ * history a new turn resends is derived from them.
  */
 
 export type ChatStatus = 'idle' | 'streaming'
 
 interface ChatContextValue {
-  transcript: ChatTranscriptMessage[]
+  turns: ChatTurn[]
   status: ChatStatus
   /** Configured BYOK entries (the picker's options). */
   models: AiModelConfig[]
@@ -56,22 +55,25 @@ const ChatContext = createContext<ChatContextValue | null>(null)
 
 export function ChatProvider({ children }: { children: ReactNode }): ReactElement {
   const { settings } = useSettings()
-  const [transcript, setTranscript] = useState<ChatTranscriptMessage[]>([])
-  const [status, setStatus] = useState<ChatStatus>('idle')
+  const [turns, setTurns] = useState<ChatTurn[]>([])
   const [modelId, setModelId] = useState<string | null>(null)
+
+  const status: ChatStatus = turns.at(-1)?.status === 'streaming' ? 'streaming' : 'idle'
 
   const models = settings.aiModels
   const activeModel =
     (modelId !== null ? (models.find((model) => model.id === modelId) ?? null) : null) ??
     defaultAiModel({ models, defaultModelId: settings.defaultAiModelId })
 
-  // Mutated, never rendered: the exact model-facing message list.
-  const historyRef = useRef<ChatModelMessage[]>([])
-  const abortRef = useRef<AbortController | null>(null)
-  const statusRef = useRef<ChatStatus>('idle')
+  // Read at call time, not captured: send() can fire long after the render
+  // that created it.
+  const turnsRef = useRef(turns)
+  turnsRef.current = turns
+  const statusRef = useRef(status)
   statusRef.current = status
   const activeModelRef = useRef<AiModelConfig | null>(activeModel)
   activeModelRef.current = activeModel
+  const abortRef = useRef<AbortController | null>(null)
 
   // The workspace tree is keyed by graph root, so switching graphs unmounts
   // this provider — an in-flight turn must die with it, or its tools would
@@ -90,24 +92,24 @@ export function ChatProvider({ children }: { children: ReactNode }): ReactElemen
       return
     }
 
-    const assistantId = crypto.randomUUID()
-    const applyEvent = (event: ChatStreamEvent) => {
-      setTranscript((current) =>
-        current.map((message) =>
-          message.id === assistantId && message.role === 'assistant'
-            ? { ...message, parts: appendEvent(message.parts, event) }
-            : message,
-        ),
+    const turnId = crypto.randomUUID()
+    const messages = [
+      ...buildHistory(turnsRef.current),
+      { role: 'user' as const, content: trimmed },
+    ]
+    const updateTurn = (updater: (turn: ChatTurn) => ChatTurn) => {
+      setTurns((current) =>
+        current.map((turn) => (turn.id === turnId ? updater(turn) : turn)),
       )
     }
+    const applyEvent = (event: ChatStreamEvent) => {
+      updateTurn((turn) => ({ ...turn, parts: appendEvent(turn.parts, event) }))
+    }
 
-    setTranscript((current) => [
+    setTurns((current) => [
       ...current,
-      { id: crypto.randomUUID(), role: 'user', text: trimmed },
-      { id: assistantId, role: 'assistant', parts: [] },
+      { id: turnId, userText: trimmed, parts: [], responseMessages: [], status: 'streaming' },
     ])
-    historyRef.current.push({ role: 'user', content: trimmed })
-    setStatus('streaming')
     const controller = new AbortController()
     abortRef.current = controller
 
@@ -125,16 +127,16 @@ export function ChatProvider({ children }: { children: ReactNode }): ReactElemen
         model,
         apiKey,
         fetchFn: providerFetch,
-        messages: [...historyRef.current],
+        messages,
         today: todayIso(),
         signal: controller.signal,
       })
       for await (const event of events) {
         // Every terminal event carries the turn's messages — for a stopped or
         // failed turn that's the completed steps plus partial text, so the
-        // history the next turn resends matches what stayed on screen.
+        // derived history matches what stayed on screen.
         if (event.type === 'complete' || event.type === 'aborted' || event.type === 'error') {
-          historyRef.current.push(...event.messages)
+          updateTurn((turn) => ({ ...turn, responseMessages: event.messages }))
         }
         if (event.type !== 'complete') {
           applyEvent(event)
@@ -145,8 +147,8 @@ export function ChatProvider({ children }: { children: ReactNode }): ReactElemen
       // it (keychain read, event application) so the UI never sticks.
       applyEvent({ type: 'error', message: errorMessage(cause), messages: [] })
     } finally {
+      updateTurn((turn) => ({ ...turn, status: 'done' }))
       abortRef.current = null
-      setStatus('idle')
     }
   }, [])
 
@@ -156,8 +158,7 @@ export function ChatProvider({ children }: { children: ReactNode }): ReactElemen
 
   const newChat = useCallback(() => {
     abortRef.current?.abort()
-    historyRef.current = []
-    setTranscript([])
+    setTurns([])
   }, [])
 
   const selectModel = useCallback((id: string | null) => {
@@ -165,8 +166,8 @@ export function ChatProvider({ children }: { children: ReactNode }): ReactElemen
   }, [])
 
   const value = useMemo<ChatContextValue>(
-    () => ({ transcript, status, models, activeModel, selectModel, send, stop, newChat }),
-    [transcript, status, models, activeModel, selectModel, send, stop, newChat],
+    () => ({ turns, status, models, activeModel, selectModel, send, stop, newChat }),
+    [turns, status, models, activeModel, selectModel, send, stop, newChat],
   )
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>
 }

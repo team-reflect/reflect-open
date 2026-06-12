@@ -1,40 +1,44 @@
-import type { ChatStreamEvent, SearchEventHit } from '@reflect/core'
+import type {
+  ChatModelMessage,
+  ChatStreamEvent,
+  NoteToolCall,
+  NoteToolResult,
+} from '@reflect/core'
 
 /**
- * The chat view's transcript model (Plan 10): what one conversation renders.
- * An assistant message is an ordered list of parts — text interleaved with
- * the tool activity that produced it — built incrementally by folding the
- * engine's {@link ChatStreamEvent}s with {@link appendEvent} (pure, so the
- * fold is unit-testable without streaming).
+ * The chat view's conversation model (Plan 10). A {@link ChatTurn} is the
+ * single source of truth for one exchange: the user's text, the assistant's
+ * renderable parts, and the model-facing messages the turn contributed. The
+ * provider stores only turns — the history a new turn resends is *derived*
+ * via {@link buildHistory}, so the transcript and the model's view can never
+ * drift apart.
+ *
+ * Parts are built by folding the engine's {@link ChatStreamEvent}s with
+ * {@link appendEvent} (pure, so the fold is unit-testable without
+ * streaming). Tool parts are generic — only the chip that renders them
+ * switches on which tool it was.
  */
 
 /** One renderable slice of an assistant message. */
 export type AssistantPart =
   | { kind: 'text'; text: string }
-  | { kind: 'search'; toolCallId: string; query: string; hits: SearchEventHit[] | null }
-  | {
-      kind: 'read'
-      toolCallId: string
-      path: string
-      title: string | null
-      error: string | null
-      pending: boolean
-    }
+  | { kind: 'tool'; call: NoteToolCall; result: NoteToolResult | null; error: string | null }
   | { kind: 'notice'; tone: 'error' | 'info'; text: string }
 
-export interface ChatUserMessage {
+/** One user message and everything the assistant did in response. */
+export interface ChatTurn {
   id: string
-  role: 'user'
-  text: string
-}
-
-export interface ChatAssistantMessage {
-  id: string
-  role: 'assistant'
+  userText: string
   parts: AssistantPart[]
+  /** The model-facing messages this turn contributed once it settled. */
+  responseMessages: ChatModelMessage[]
+  status: 'streaming' | 'done'
 }
 
-export type ChatTranscriptMessage = ChatUserMessage | ChatAssistantMessage
+/** Whether a tool part is still awaiting its outcome. */
+export function isToolPending(part: Extract<AssistantPart, { kind: 'tool' }>): boolean {
+  return part.result === null && part.error === null
+}
 
 /** Fold one stream event into an assistant message's parts (immutable). */
 export function appendEvent(parts: AssistantPart[], event: ChatStreamEvent): AssistantPart[] {
@@ -46,38 +50,21 @@ export function appendEvent(parts: AssistantPart[], event: ChatStreamEvent): Ass
       }
       return [...parts, { kind: 'text', text: event.text }]
     }
-    case 'search-call':
-      return [
-        ...parts,
-        { kind: 'search', toolCallId: event.toolCallId, query: event.query, hits: null },
-      ]
-    case 'search-result':
+    case 'tool-call':
+      return [...parts, { kind: 'tool', call: event.call, result: null, error: null }]
+    case 'tool-result':
       return parts.map((part) =>
-        part.kind === 'search' && part.toolCallId === event.toolCallId
-          ? { ...part, hits: event.hits }
-          : part,
-      )
-    case 'read-call':
-      return [
-        ...parts,
-        {
-          kind: 'read',
-          toolCallId: event.toolCallId,
-          path: event.path,
-          title: null,
-          error: null,
-          pending: true,
-        },
-      ]
-    case 'read-result':
-      return parts.map((part) =>
-        part.kind === 'read' && part.toolCallId === event.toolCallId
-          ? { ...part, title: event.title, error: event.error, pending: false }
+        part.kind === 'tool' && part.call.toolCallId === event.result.toolCallId
+          ? { ...part, result: event.result }
           : part,
       )
     case 'tool-error':
       return [
-        ...settleToolCall(parts, event.toolCallId, event.message),
+        ...parts.map((part): AssistantPart =>
+          part.kind === 'tool' && part.call.toolCallId === event.toolCallId && isToolPending(part)
+            ? { ...part, error: event.message }
+            : part,
+        ),
         { kind: 'notice', tone: 'error', text: event.message },
       ]
     case 'error':
@@ -90,21 +77,13 @@ export function appendEvent(parts: AssistantPart[], event: ChatStreamEvent): Ass
 }
 
 /**
- * A failed tool call must not keep rendering as in-flight — and a failed read
- * must not render as a clickable "Read …" success, so it keeps the failure.
+ * The model-facing history a new turn resends: every user message followed
+ * by the messages its turn contributed (tool calls and results included —
+ * settled turns carry them even when stopped or failed part-way).
  */
-function settleToolCall(
-  parts: AssistantPart[],
-  toolCallId: string,
-  message: string,
-): AssistantPart[] {
-  return parts.map((part) => {
-    if (part.kind === 'search' && part.toolCallId === toolCallId && part.hits === null) {
-      return { ...part, hits: [] }
-    }
-    if (part.kind === 'read' && part.toolCallId === toolCallId && part.pending) {
-      return { ...part, pending: false, error: message }
-    }
-    return part
-  })
+export function buildHistory(turns: readonly ChatTurn[]): ChatModelMessage[] {
+  return turns.flatMap((turn): ChatModelMessage[] => [
+    { role: 'user', content: turn.userText },
+    ...turn.responseMessages,
+  ])
 }

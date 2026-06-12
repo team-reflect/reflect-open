@@ -1,22 +1,30 @@
-import { tool } from 'ai'
+import { tool, type TypedToolCall, type TypedToolResult } from 'ai'
 import { z } from 'zod'
 import { isAppError } from '../../errors'
 import { readNote } from '../../graph/commands'
 import { retrieve, type RetrievalHit, type RetrieveOptions } from '../../embeddings/retrieve'
 import { splitFrontmatter } from '../../markdown/frontmatter'
 import { parseNote } from '../../markdown/extract'
-import { assertCloudAllowed, isPrivateNoteError } from '../checkers'
+import {
+  cloudSafeNoteContent,
+  cloudSafeSearchHits,
+  isPrivateNoteError,
+  type CloudNoteContent,
+  type CloudSafe,
+  type CloudSearchHit,
+} from '../checkers'
 
 /**
- * The read-only note tools the chat model can call (Plan 10, first wave).
- * Both enforce the `private: true` hard block themselves — the model never
- * sees a private note's content, title, or snippet:
+ * The read-only note tools the chat model can call (Plan 10, first wave),
+ * and — deliberately in the same module — everything else that knows their
+ * names: the {@link NoteToolCall}/{@link NoteToolResult} unions the engine
+ * streams and the UI renders, and the mappers from SDK stream parts onto
+ * them. Adding a tool means extending this file and the chip that renders
+ * it; nothing else switches on tool names.
  *
- * - `search_notes` retrieves with `excludePrivateContent: true` and then
- *   drops private hits entirely (even a bare title is an outbound leak).
- * - `read_note` re-reads the live file and checks its frontmatter at call
- *   time (the index can be stale right after the user marks a note private),
- *   answering with a refusal instead of the body.
+ * Note content enters tool outputs only as {@link CloudSafe} values, minted
+ * by the privacy gate in `../checkers` — search drops private hits entirely,
+ * and reads re-check the live frontmatter before any content is minted.
  */
 
 /** Default and ceiling for search hits per call (token budget, not recall). */
@@ -32,27 +40,14 @@ export interface NoteToolDeps {
   readNoteFn?: (path: string) => Promise<string>
 }
 
-/** One search hit as the model sees it (private hits never appear). */
-export interface SearchNotesHit {
-  path: string
-  title: string
-  snippet: string
-  heading: string | null
-}
-
 export interface SearchNotesOutput {
-  hits: SearchNotesHit[]
+  hits: CloudSafe<CloudSearchHit>[]
 }
 
 /** A successful read, or a structured refusal/miss the model can relay. */
-export interface ReadNoteOutput {
-  path: string
-  title: string | null
-  content: string | null
-  truncated: boolean
-  /** Set when the note is private or missing; `content` is null. */
-  error: string | null
-}
+export type ReadNoteOutput =
+  | { ok: true; note: CloudSafe<CloudNoteContent> }
+  | { ok: false; path: string; error: string }
 
 const searchNotesInput = z.object({
   query: z.string().min(1).describe('Full-text search query over the note graph'),
@@ -88,16 +83,7 @@ export function buildNoteTools(deps: NoteToolDeps = {}) {
           limit: limit ?? DEFAULT_SEARCH_LIMIT,
           excludePrivateContent: true,
         })
-        return {
-          hits: hits
-            .filter((hit) => !hit.isPrivate)
-            .map((hit) => ({
-              path: hit.path,
-              title: hit.title,
-              snippet: hit.snippet,
-              heading: hit.heading,
-            })),
-        }
+        return { hits: cloudSafeSearchHits(hits) }
       },
     }),
 
@@ -112,36 +98,76 @@ export function buildNoteTools(deps: NoteToolDeps = {}) {
           source = await readNoteFn(path)
         } catch (cause) {
           if (isAppError(cause) && cause.kind === 'notFound') {
-            return refusal(path, 'No note exists at this path.')
+            return { ok: false, path, error: 'No note exists at this path.' }
           }
           throw cause
         }
         const parsed = parseNote({ path, source })
-        try {
-          assertCloudAllowed({ path, isPrivate: parsed.frontmatter.private })
-        } catch (cause) {
-          if (isPrivateNoteError(cause)) {
-            return refusal(path, 'This note is marked private and cannot be read by AI.')
-          }
-          throw cause
-        }
         const { body } = splitFrontmatter(source)
         const truncated = body.length > MAX_NOTE_CONTENT_CHARS
-        return {
-          path,
-          title: parsed.title,
-          content: truncated ? body.slice(0, MAX_NOTE_CONTENT_CHARS) : body,
-          truncated,
-          error: null,
+        try {
+          return {
+            ok: true,
+            note: cloudSafeNoteContent({
+              path,
+              isPrivate: parsed.frontmatter.private,
+              title: parsed.title,
+              content: truncated ? body.slice(0, MAX_NOTE_CONTENT_CHARS) : body,
+              truncated,
+            }),
+          }
+        } catch (cause) {
+          if (isPrivateNoteError(cause)) {
+            return { ok: false, path, error: 'This note is marked private and cannot be read by AI.' }
+          }
+          throw cause
         }
       },
     }),
   }
 }
 
-function refusal(path: string, error: string): ReadNoteOutput {
-  return { path, title: null, content: null, truncated: false, error }
-}
-
 /** The tool set type, for typed stream parts in the chat engine. */
 export type NoteTools = ReturnType<typeof buildNoteTools>
+
+/** The hit slice tool-activity UI renders (full hits stay engine-side). */
+export type NoteHitSummary = Pick<CloudSearchHit, 'path' | 'title'>
+
+/** One tool invocation, as the transcript sees it. */
+export type NoteToolCall =
+  | { tool: 'search'; toolCallId: string; query: string }
+  | { tool: 'read'; toolCallId: string; path: string }
+
+/** One settled tool invocation. A failed read keeps its refusal. */
+export type NoteToolResult =
+  | { tool: 'search'; toolCallId: string; query: string; hits: NoteHitSummary[] }
+  | { tool: 'read'; toolCallId: string; path: string; title: string | null; error: string | null }
+
+/** Map an SDK tool-call part onto {@link NoteToolCall} (null for dynamic). */
+export function noteToolCall(part: TypedToolCall<NoteTools>): NoteToolCall | null {
+  if (part.dynamic) {
+    return null
+  }
+  return part.toolName === 'search_notes'
+    ? { tool: 'search', toolCallId: part.toolCallId, query: part.input.query }
+    : { tool: 'read', toolCallId: part.toolCallId, path: part.input.path }
+}
+
+/** Map an SDK tool-result part onto {@link NoteToolResult} (null for dynamic). */
+export function noteToolResult(part: TypedToolResult<NoteTools>): NoteToolResult | null {
+  if (part.dynamic) {
+    return null
+  }
+  if (part.toolName === 'search_notes') {
+    return {
+      tool: 'search',
+      toolCallId: part.toolCallId,
+      query: part.input.query,
+      hits: part.output.hits.map((hit) => ({ path: hit.path, title: hit.title })),
+    }
+  }
+  const output = part.output
+  return output.ok
+    ? { tool: 'read', toolCallId: part.toolCallId, path: output.note.path, title: output.note.title, error: null }
+    : { tool: 'read', toolCallId: part.toolCallId, path: output.path, title: null, error: output.error }
+}

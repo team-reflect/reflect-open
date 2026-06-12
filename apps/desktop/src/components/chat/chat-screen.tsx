@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { useChatSession } from '@/providers/chat-provider'
 import { useRouter } from '@/routing/router'
 import { ChatInput } from './chat-input'
-import { ChatMessageList } from './chat-message-list'
+import { ChatTurnList } from './chat-turn-list'
 
 /**
  * The dedicated chat view (Plan 10, revised: a full route, not a side panel).
@@ -38,7 +38,7 @@ export function ChatScreen(): ReactElement {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <ChatMessageList />
+      <ChatTurnList />
       <ChatInput />
     </div>
   )

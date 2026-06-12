@@ -133,24 +133,30 @@ export {
 export { validateApiKey, type ApiKeyValidation } from './ai/validate-key'
 export {
   assertCloudAllowed,
+  cloudSafeNoteContent,
+  cloudSafeSearchHits,
   isPrivateNoteError,
   PrivateNoteError,
+  type CloudNoteContent,
+  type CloudSafe,
+  type CloudSearchHit,
   type CloudSendable,
 } from './ai/checkers'
 export {
   buildNoteTools,
   MAX_NOTE_CONTENT_CHARS,
+  type NoteHitSummary,
+  type NoteToolCall,
   type NoteToolDeps,
+  type NoteToolResult,
   type NoteTools,
   type ReadNoteOutput,
-  type SearchNotesHit,
   type SearchNotesOutput,
 } from './ai/chat/tools'
 export { chatSystemPrompt, type SystemPromptInput } from './ai/chat/system-prompt'
 export {
   streamChat,
   type ChatStreamEvent,
-  type SearchEventHit,
   type StreamChatOptions,
 } from './ai/chat/stream-chat'
 export type { ModelMessage as ChatModelMessage } from 'ai'

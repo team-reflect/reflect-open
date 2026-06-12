@@ -11,6 +11,12 @@ import {
 
 const CALL: ToolCallOptions = { toolCallId: 'call-1', messages: [] }
 
+// Sentinels that cannot collide with prompt copy or fixture prose, so the
+// not-in-payload assertions below can never pass vacuously.
+const PRIVATE_TITLE = 'sentinel-title-01jxq3'
+const PRIVATE_PATH = 'notes/sentinel-path-01jxq3.md'
+const PRIVATE_BODY = 'sentinel-body-01jxq3'
+
 function hit(overrides: Partial<RetrievalHit>): RetrievalHit {
   return {
     path: 'notes/public.md',
@@ -71,13 +77,13 @@ describe('search_notes', () => {
     const tools = buildNoteTools({
       retrieveFn: async () => [
         hit({}),
-        hit({ path: 'notes/diary.md', title: 'Secret Diary', snippet: '', isPrivate: true }),
+        hit({ path: PRIVATE_PATH, title: PRIVATE_TITLE, snippet: '', isPrivate: true }),
       ],
     })
     const output = await runSearch(tools, { query: 'diary' })
     const payload = JSON.stringify(output)
-    expect(payload).not.toContain('Secret Diary')
-    expect(payload).not.toContain('notes/diary.md')
+    expect(payload).not.toContain(PRIVATE_TITLE)
+    expect(payload).not.toContain(PRIVATE_PATH)
     expect(output.hits).toEqual([
       { path: 'notes/public.md', title: 'Public note', snippet: 'a public snippet', heading: null },
     ])
@@ -102,20 +108,24 @@ describe('read_note', () => {
       readNoteFn: async () => '---\npinned: true\n---\n# Project Atlas\n\nLaunch plan.\n',
     })
     const output = await runRead(tools, 'notes/atlas.md')
-    expect(output.error).toBeNull()
-    expect(output.title).toBe('Project Atlas')
-    expect(output.content).toBe('# Project Atlas\n\nLaunch plan.\n')
-    expect(output.truncated).toBe(false)
+    if (!output.ok) {
+      expect.unreachable('expected a successful read')
+    }
+    expect(output.note.title).toBe('Project Atlas')
+    expect(output.note.content).toBe('# Project Atlas\n\nLaunch plan.\n')
+    expect(output.note.truncated).toBe(false)
   })
 
   it('refuses a private note from its live frontmatter', async () => {
     const tools = buildNoteTools({
-      readNoteFn: async () => '---\nprivate: true\n---\n# Diary\n\nclassified contents\n',
+      readNoteFn: async () => `---\nprivate: true\n---\n# Diary\n\n${PRIVATE_BODY}\n`,
     })
-    const output = await runRead(tools, 'notes/diary.md')
+    const output = await runRead(tools, PRIVATE_PATH)
+    if (output.ok) {
+      expect.unreachable('expected a refusal')
+    }
     expect(output.error).toContain('private')
-    expect(output.content).toBeNull()
-    expect(JSON.stringify(output)).not.toContain('classified contents')
+    expect(JSON.stringify(output)).not.toContain(PRIVATE_BODY)
   })
 
   it('reports a missing note instead of throwing', async () => {
@@ -125,15 +135,20 @@ describe('read_note', () => {
       },
     })
     const output = await runRead(tools, 'notes/gone.md')
+    if (output.ok) {
+      expect.unreachable('expected a miss')
+    }
     expect(output.error).toContain('No note exists')
-    expect(output.content).toBeNull()
   })
 
   it('caps oversized notes and flags the cut', async () => {
     const body = 'x'.repeat(MAX_NOTE_CONTENT_CHARS + 10)
     const tools = buildNoteTools({ readNoteFn: async () => body })
     const output = await runRead(tools, 'notes/big.md')
-    expect(output.content?.length).toBe(MAX_NOTE_CONTENT_CHARS)
-    expect(output.truncated).toBe(true)
+    if (!output.ok) {
+      expect.unreachable('expected a successful read')
+    }
+    expect(output.note.content.length).toBe(MAX_NOTE_CONTENT_CHARS)
+    expect(output.note.truncated).toBe(true)
   })
 })

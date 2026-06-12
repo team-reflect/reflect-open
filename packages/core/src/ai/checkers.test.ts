@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { assertCloudAllowed, isPrivateNoteError, PrivateNoteError } from './checkers'
+import type { RetrievalHit } from '../embeddings/retrieve'
+import {
+  assertCloudAllowed,
+  cloudSafeNoteContent,
+  cloudSafeSearchHits,
+  isPrivateNoteError,
+  PrivateNoteError,
+} from './checkers'
+
+// Sentinels no other string in the system (prompts included) can collide
+// with — a payload assertion against them can never pass vacuously.
+const PRIVATE_TITLE = 'sentinel-title-01jxq3'
+const PRIVATE_PATH = 'notes/sentinel-path-01jxq3.md'
+const PRIVATE_BODY = 'sentinel-body-01jxq3'
 
 describe('assertCloudAllowed', () => {
   it('passes a non-private note through', () => {
@@ -26,5 +39,63 @@ describe('isPrivateNoteError', () => {
   it('rejects other errors', () => {
     expect(isPrivateNoteError(new Error('boom'))).toBe(false)
     expect(isPrivateNoteError(null)).toBe(false)
+  })
+})
+
+describe('cloudSafeSearchHits', () => {
+  const PUBLIC: RetrievalHit = {
+    path: 'notes/a.md',
+    title: 'Public',
+    score: 1,
+    snippet: 'body',
+    heading: null,
+    isPrivate: false,
+  }
+  const PRIVATE: RetrievalHit = {
+    path: PRIVATE_PATH,
+    title: PRIVATE_TITLE,
+    score: 0.9,
+    snippet: '',
+    heading: null,
+    isPrivate: true,
+  }
+
+  it('drops private hits entirely — not even the title survives', () => {
+    const safe = cloudSafeSearchHits([PUBLIC, PRIVATE])
+    const payload = JSON.stringify(safe)
+    expect(payload).not.toContain(PRIVATE_TITLE)
+    expect(payload).not.toContain(PRIVATE_PATH)
+    expect(safe).toEqual([{ path: 'notes/a.md', title: 'Public', snippet: 'body', heading: null }])
+  })
+
+  it('strips hits to the cloud-facing fields (no score, no flag)', () => {
+    const [hit] = cloudSafeSearchHits([PUBLIC])
+    expect(Object.keys(hit ?? {}).sort()).toEqual(['heading', 'path', 'snippet', 'title'])
+  })
+})
+
+describe('cloudSafeNoteContent', () => {
+  it('mints content for a non-private note', () => {
+    expect(
+      cloudSafeNoteContent({
+        path: 'notes/a.md',
+        isPrivate: false,
+        title: 'A',
+        content: 'body',
+        truncated: false,
+      }),
+    ).toEqual({ path: 'notes/a.md', title: 'A', content: 'body', truncated: false })
+  })
+
+  it('refuses to mint a private note before any content escapes', () => {
+    expect(() =>
+      cloudSafeNoteContent({
+        path: PRIVATE_PATH,
+        isPrivate: true,
+        title: PRIVATE_TITLE,
+        content: PRIVATE_BODY,
+        truncated: false,
+      }),
+    ).toThrow(PrivateNoteError)
   })
 })

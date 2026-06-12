@@ -11,8 +11,11 @@ local context, chat/summarize/rewrite, and reviewable multi-note patchsets — w
 > **read-only** — no patchsets, rewrite, or any write path yet (steps 5–6 below are
 > deferred). The model is grounded through two tools instead of pre-assembled context:
 > `search_notes` (the shared `retrieve()`, `excludePrivateContent: true`, private hits
-> dropped entirely) and `read_note` (live frontmatter re-check via `assertCloudAllowed`
-> before any content leaves; private notes get a structured refusal). Tool activity
+> dropped entirely) and `read_note` (live frontmatter re-check before any content leaves;
+> private notes get a structured refusal). Step 4's structural gate shipped as a branded
+> `CloudSafe<T>` type: tool outputs carry note content only as `CloudSafe` values, and the
+> sole constructors (`cloudSafeSearchHits`, `cloudSafeNoteContent` in `ai/checkers.ts`)
+> run the privacy checks — an unchecked payload doesn't typecheck. Tool activity
 > renders inline in the transcript — the transparent-context requirement, in tool form.
 > Engine: Vercel AI SDK v6 in `@reflect/core` (`ai/chat/`), streaming normalized to a
 > typed event union; answers cite notes as `[[wiki links]]` that navigate (and never

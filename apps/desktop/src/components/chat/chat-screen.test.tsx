@@ -8,11 +8,14 @@ import { RouterProvider } from '@/routing/router'
 /**
  * The chat view over a faked engine: the provider stack and screen are real,
  * `streamChat` is scripted. Covers the no-model call-to-action, a full
- * grounded turn (user bubble → tool chip → cited answer), and New chat.
+ * grounded turn (user bubble → tool chip → cited answer), the
+ * plain-while-streaming text rendering, abort-on-unmount, and New chat.
  */
 
-const streamChat = vi.hoisted(() => vi.fn<(options: StreamChatOptions) => AsyncGenerator<ChatStreamEvent>>())
-const getSecret = vi.hoisted(() => vi.fn(async () => 'sk-test'))
+const streamChat = vi.hoisted(() =>
+  vi.fn<(options: StreamChatOptions) => AsyncGenerator<ChatStreamEvent>>(),
+)
+const getSecret = vi.hoisted(() => vi.fn<(name: string) => Promise<string | null>>())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   streamChat,
@@ -47,7 +50,7 @@ beforeEach(() => {
   settingsState.models = []
   settingsState.defaultId = null
   streamChat.mockReset()
-  getSecret.mockClear()
+  getSecret.mockReset().mockResolvedValue('sk-test')
 })
 
 const MODEL: AiModelConfig = { id: 'm1', provider: 'openai', model: 'gpt-5.1', keyHint: '12345' }
@@ -85,12 +88,15 @@ describe('ChatScreen', () => {
   it('runs a grounded turn: user bubble, search chip, cited answer', async () => {
     configureModel()
     scriptTurn([
-      { type: 'search-call', toolCallId: 'tool-1', query: 'atlas' },
+      { type: 'tool-call', call: { tool: 'search', toolCallId: 'tool-1', query: 'atlas' } },
       {
-        type: 'search-result',
-        toolCallId: 'tool-1',
-        query: 'atlas',
-        hits: [{ path: 'notes/atlas.md', title: 'Atlas' }],
+        type: 'tool-result',
+        result: {
+          tool: 'search',
+          toolCallId: 'tool-1',
+          query: 'atlas',
+          hits: [{ path: 'notes/atlas.md', title: 'Atlas' }],
+        },
       },
       { type: 'text-delta', text: 'It ships in June. [[Atlas]]' },
       { type: 'complete', messages: [{ role: 'assistant', content: 'It ships in June. [[Atlas]]' }] },
@@ -101,20 +107,38 @@ describe('ChatScreen', () => {
 
     expect(view.getByText('when does atlas ship?')).toBeDefined()
     await view.findByText(/Searched “atlas” · 1 note/)
+    // The turn settled, so the answer renders as markdown (not plain text).
     await waitFor(() =>
       expect(view.getByTestId('markdown-preview').textContent).toContain('It ships in June.'),
     )
 
-    // The turn went out with the keychain key and the full history.
+    // The turn went out with the keychain key and the full derived history.
     expect(getSecret).toHaveBeenCalledWith('ai-api-key:m1')
     const options = streamChat.mock.lastCall?.[0]
     expect(options?.model).toEqual(MODEL)
     expect(options?.messages.at(-1)).toEqual({ role: 'user', content: 'when does atlas ship?' })
   })
 
+  it('renders streaming text as plain text until the turn settles', async () => {
+    configureModel()
+    streamChat.mockImplementation(() =>
+      (async function* (): AsyncGenerator<ChatStreamEvent> {
+        yield { type: 'text-delta', text: 'Streaming **markdown**' }
+        await new Promise<never>(() => {})
+      })(),
+    )
+    const view = renderChat()
+
+    await userEvent.type(view.getByLabelText('Chat message'), 'hi{Enter}')
+
+    // Visible immediately as plain text — never re-parsed per delta.
+    await view.findByText('Streaming **markdown**')
+    expect(view.queryByTestId('markdown-preview')).toBeNull()
+  })
+
   it('surfaces a missing keychain entry as an in-transcript error', async () => {
     configureModel()
-    getSecret.mockResolvedValueOnce(null as unknown as string)
+    getSecret.mockResolvedValueOnce(null)
     const view = renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'hi{Enter}')
@@ -127,8 +151,8 @@ describe('ChatScreen', () => {
     let signal: AbortSignal | undefined
     streamChat.mockImplementation((options) => {
       signal = options.signal
-      return (async function* () {
-        yield { type: 'text-delta', text: 'Hi' } as const
+      return (async function* (): AsyncGenerator<ChatStreamEvent> {
+        yield { type: 'text-delta', text: 'Hi' }
         // Never settles — the turn only ends through the abort signal.
         await new Promise<never>(() => {})
       })()

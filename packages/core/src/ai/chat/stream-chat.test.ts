@@ -6,14 +6,17 @@ import type {
   LanguageModelV3Usage,
 } from '@ai-sdk/provider'
 import type { RetrievalHit } from '../../embeddings/retrieve'
-import { streamChat, type ChatStreamEvent } from './stream-chat'
+import { streamChatTurn, type ChatStreamEvent } from './stream-chat'
 
 const USAGE: LanguageModelV3Usage = {
   inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined },
   outputTokens: { total: 1, text: 1, reasoning: undefined },
 }
 
-const MODEL_CONFIG = { id: 'cfg-1', provider: 'openai' as const, model: 'gpt-test', keyHint: '' }
+// Sentinels that cannot collide with prompt copy or fixture prose, so the
+// not-in-payload assertions below can never pass vacuously.
+const PRIVATE_TITLE = 'sentinel-title-01jxq3'
+const PRIVATE_PATH = 'notes/sentinel-path-01jxq3.md'
 
 function stream(parts: LanguageModelV3StreamPart[]): LanguageModelV3StreamResult {
   return {
@@ -81,42 +84,46 @@ const PUBLIC_HIT: RetrievalHit = {
 }
 
 const PRIVATE_HIT: RetrievalHit = {
-  path: 'notes/diary.md',
-  title: 'Secret Diary',
+  path: PRIVATE_PATH,
+  title: PRIVATE_TITLE,
   score: 0.9,
   snippet: '',
   heading: null,
   isPrivate: true,
 }
 
-describe('streamChat', () => {
+describe('streamChatTurn', () => {
   it('streams tool activity, text, and a terminal complete event', async () => {
     const model = new MockLanguageModelV3({
       doStream: sequence([toolCallTurn('atlas'), textTurn('Found it: [[Atlas Launch Plan]]')]),
     })
     const events = await collect(
-      streamChat({
-        model: MODEL_CONFIG,
-        apiKey: 'k',
-        fetchFn: fetch,
+      streamChatTurn(model, {
         messages: [{ role: 'user', content: 'where is the launch plan?' }],
         today: '2026-06-11',
-        modelOverride: model,
         toolDeps: { retrieveFn: async () => [PUBLIC_HIT, PRIVATE_HIT] },
       }),
     )
 
-    const types = events.map((event) => event.type)
-    expect(types).toEqual([
-      'search-call',
-      'search-result',
+    expect(events.map((event) => event.type)).toEqual([
+      'tool-call',
+      'tool-result',
       'text-delta',
       'complete',
     ])
-    expect(events[0]).toMatchObject({ query: 'atlas' })
+    expect(events[0]).toEqual({
+      type: 'tool-call',
+      call: { tool: 'search', toolCallId: 'call-1', query: 'atlas' },
+    })
     // The private hit is dropped before it ever reaches an event or payload.
-    expect(events[1]).toMatchObject({
-      hits: [{ path: 'notes/atlas.md', title: 'Atlas Launch Plan' }],
+    expect(events[1]).toEqual({
+      type: 'tool-result',
+      result: {
+        tool: 'search',
+        toolCallId: 'call-1',
+        query: 'atlas',
+        hits: [{ path: 'notes/atlas.md', title: 'Atlas Launch Plan' }],
+      },
     })
     expect(events[2]).toMatchObject({ text: 'Found it: [[Atlas Launch Plan]]' })
     const complete = events.at(-1)
@@ -128,22 +135,19 @@ describe('streamChat', () => {
       doStream: sequence([toolCallTurn('diary'), textTurn('done')]),
     })
     await collect(
-      streamChat({
-        model: MODEL_CONFIG,
-        apiKey: 'k',
-        fetchFn: fetch,
+      streamChatTurn(model, {
         messages: [{ role: 'user', content: 'what do my notes say?' }],
         today: '2026-06-11',
-        modelOverride: model,
         toolDeps: { retrieveFn: async () => [PUBLIC_HIT, PRIVATE_HIT] },
       }),
     )
 
     // Every prompt that left for the "provider", including the second step
     // carrying the tool result, must be free of the private note.
+    expect(model.doStreamCalls.length).toBe(2)
     const outbound = JSON.stringify(model.doStreamCalls.map((call) => call.prompt))
-    expect(outbound).not.toContain('Secret Diary')
-    expect(outbound).not.toContain('notes/diary.md')
+    expect(outbound).not.toContain(PRIVATE_TITLE)
+    expect(outbound).not.toContain(PRIVATE_PATH)
     expect(outbound).toContain('notes/atlas.md')
   })
 
@@ -157,13 +161,9 @@ describe('streamChat', () => {
       ]),
     })
     const events = await collect(
-      streamChat({
-        model: MODEL_CONFIG,
-        apiKey: 'k',
-        fetchFn: fetch,
+      streamChatTurn(model, {
         messages: [{ role: 'user', content: 'hi' }],
         today: '2026-06-11',
-        modelOverride: model,
       }),
     )
     expect(events.at(-1)).toEqual({ type: 'error', message: 'rate limited', messages: [] })
@@ -183,13 +183,9 @@ describe('streamChat', () => {
       ]),
     })
     const events = await collect(
-      streamChat({
-        model: MODEL_CONFIG,
-        apiKey: 'k',
-        fetchFn: fetch,
+      streamChatTurn(model, {
         messages: [{ role: 'user', content: 'where is the launch plan?' }],
         today: '2026-06-11',
-        modelOverride: model,
         toolDeps: { retrieveFn: async () => [PUBLIC_HIT] },
       }),
     )
