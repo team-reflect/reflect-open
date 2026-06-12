@@ -18,12 +18,6 @@ export const graphInfoSchema = z.object({
    * one graph can never land in another graph's same-named file.
    */
   generation: z.number(),
-  /**
-   * True when this open was the root's first ever (it was absent from the
-   * recents store when Rust recorded the open). The fact behind first-run
-   * behavior — e.g. welcome-note seeding — whose policy stays in the app.
-   */
-  firstOpen: z.boolean(),
 })
 export type GraphInfo = z.infer<typeof graphInfoSchema>
 

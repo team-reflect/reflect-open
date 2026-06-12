@@ -77,21 +77,15 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-/// Record a graph as most-recently-opened. Returns whether this was the
-/// root's **first** recorded open (absent from the stored list) — the fact
-/// `graph_open` reports so first-run policy (welcome-note seeding) can live
-/// in the frontend without re-deriving open history.
-pub fn record(root: &Path, name: &str) -> AppResult<bool> {
+/// Record a graph as most-recently-opened.
+pub fn record(root: &Path, name: &str) -> AppResult<()> {
     let path = store_path()?;
     let entry = RecentGraph {
         root: root.to_string_lossy().into_owned(),
         name: name.to_string(),
         opened_ms: now_ms(),
     };
-    let recents = load_from(&path)?;
-    let first_open = !recents.iter().any(|recent| recent.root == entry.root);
-    save_to(&path, &with_entry(recents, entry))?;
-    Ok(first_open)
+    save_to(&path, &with_entry(load_from(&path)?, entry))
 }
 
 /// The recent-graphs list, newest first.
@@ -99,10 +93,7 @@ pub fn list() -> AppResult<Vec<RecentGraph>> {
     load_from(&store_path()?)
 }
 
-/// Drop a graph from the recents list (by root path). Forgetting also resets
-/// first-open: a later open of this root reads as brand new (and, when empty,
-/// re-seeds the welcome note). Deliberate — "forget" means Reflect keeps no
-/// residual history of the folder.
+/// Drop a graph from the recents list (by root path).
 pub fn forget(root: &str) -> AppResult<()> {
     let path = store_path()?;
     let mut recents = load_from(&path)?;

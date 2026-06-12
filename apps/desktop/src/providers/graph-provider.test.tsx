@@ -19,12 +19,18 @@ let pendingOpens: Map<string, () => void>
 let failOpens: boolean
 /** What `recent_graphs` returns — set before render to simulate prior opens. */
 let storedRecents: Array<{ root: string; name: string; openedMs: number }>
+/** What `list_files` returns — set before render to simulate existing notes. */
+let storedFiles: Array<{ path: string; size: number; modifiedMs: number }>
+/** The fake `index_meta` table (the welcome marker lives here). */
+let metaStore: Record<string, string>
 
 function installFakeBridge(): void {
   invokeLog = []
   pendingOpens = new Map()
   failOpens = false
   storedRecents = []
+  storedFiles = []
+  metaStore = {}
   let generation = 0
   setBridge({
     invoke: async (command, args) => {
@@ -39,22 +45,26 @@ function installFakeBridge(): void {
             pendingOpens.set(root, resolve)
           })
           generation += 1
-          // Mirror Rust's recents recording: firstOpen is decided against the
-          // stored list, then the open lands in it.
-          const firstOpen = !storedRecents.some((recent) => recent.root === root)
-          storedRecents = [
-            { root, name: root.slice(1), openedMs: generation },
-            ...storedRecents.filter((recent) => recent.root !== root),
-          ]
-          return { root, name: root.slice(1), cloudSync: null, generation, firstOpen }
+          return { root, name: root.slice(1), cloudSync: null, generation }
         }
         case 'recent_graphs':
           return storedRecents
         case 'index_open':
           return generation
         case 'list_files':
-        case 'db_query':
+          return storedFiles
+        case 'index_meta_set':
+          metaStore[String(args.key)] = String(args.value)
+          return null
+        case 'db_query': {
+          // The only meta read the provider issues is the welcome marker.
+          const sql = String(args.sql ?? '')
+          if (/index_?meta/i.test(sql)) {
+            const key = String((args.params as unknown[])?.[0])
+            return key in metaStore ? [{ value: metaStore[key] }] : []
+          }
           return []
+        }
         default:
           return null
       }
@@ -131,7 +141,7 @@ describe('GraphProvider open sequencing', () => {
 })
 
 describe('GraphProvider welcome seeding', () => {
-  it('seeds the welcome note on a folder’s first-ever open when it is empty', async () => {
+  it('seeds an empty unmarked graph and stamps the welcomeSeeded marker', async () => {
     vi.mocked(open).mockResolvedValue('/fresh')
     const { result } = renderHook(() => useGraph(), { wrapper })
     await waitFor(() => expect(result.current.status).toBe('choosing'))
@@ -145,13 +155,12 @@ describe('GraphProvider welcome seeding', () => {
 
     expect(result.current.status).toBe('ready')
     expect(invokeLog).toContain('note_write')
+    expect(metaStore.welcomeSeeded).toBe('true')
   })
 
-  it('never seeds a previously-opened graph, even when it is empty', async () => {
-    // '/known' is in recents: it auto-opens on mount, and re-picking it via
-    // the folder picker is also not a first open.
+  it('never seeds a marked graph, even when it is empty (deleted notes stay deleted)', async () => {
     storedRecents = [{ root: '/known', name: 'known', openedMs: 1 }]
-    vi.mocked(open).mockResolvedValue('/known')
+    metaStore.welcomeSeeded = 'true'
     const { result } = renderHook(() => useGraph(), { wrapper })
 
     await act(async () => {
@@ -160,13 +169,22 @@ describe('GraphProvider welcome seeding', () => {
     })
     await waitFor(() => expect(result.current.status).toBe('ready'))
 
+    expect(invokeLog).not.toContain('note_write')
+  })
+
+  it('marks an unmarked graph with existing notes without writing into it', async () => {
+    storedRecents = [{ root: '/existing', name: 'existing', openedMs: 1 }]
+    storedFiles = [{ path: 'daily/2026-06-12.md', size: 10, modifiedMs: 0 }]
+    const { result } = renderHook(() => useGraph(), { wrapper })
+
     await act(async () => {
-      const picking = result.current.pickAndOpen()
-      await waitFor(() => expect(pendingOpens.has('/known')).toBe(true))
-      resolveOpen('/known')
-      await picking
+      await waitFor(() => expect(pendingOpens.has('/existing')).toBe(true))
+      resolveOpen('/existing')
     })
+    await waitFor(() => expect(result.current.status).toBe('ready'))
 
     expect(invokeLog).not.toContain('note_write')
+    // Onboarding was considered: emptying this graph later won't re-seed.
+    expect(metaStore.welcomeSeeded).toBe('true')
   })
 })

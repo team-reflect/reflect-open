@@ -20,7 +20,7 @@ import {
 } from '@reflect/core'
 import { followHealedMove } from '@/editor/move-note'
 import { invalidateIndexQueries } from '@/lib/query-client'
-import { seedWelcomeNote } from '@/lib/welcome-note'
+import { ensureWelcomeNote } from '@/lib/welcome-note'
 import { createGraphIndex } from './graph-index'
 
 /** Lifecycle of the active graph (Plan 02 loading gate). */
@@ -116,17 +116,6 @@ export function GraphProvider({ children }: { children: ReactNode }) {
           if (seq !== openSeq.current) {
             return // superseded by a newer open
           }
-          // First-ever open of this folder (Rust's fact, from the recents
-          // store): seed the pinned "How to use Reflect" note before the
-          // index pass starts, so the reconcile indexes it like any other
-          // file. Best-effort — a failed seed must never block opening.
-          if (info.firstOpen) {
-            try {
-              await seedWelcomeNote(info.generation)
-            } catch (err) {
-              console.error('welcome seed failed:', errorMessage(err))
-            }
-          }
           const index = indexRef.current
           // Stop any prior reconcile and wait for it to fully settle before the
           // Rust index connection is swapped, so a stale pass can't write into
@@ -137,6 +126,19 @@ export function GraphProvider({ children }: { children: ReactNode }) {
           const generation = await index.open()
           if (seq !== openSeq.current) {
             return
+          }
+          // Onboarding, considered exactly once per graph (the `welcomeSeeded`
+          // meta marker): an empty graph gets the pinned "How to use Reflect"
+          // note, seeded before the index pass starts so the reconcile indexes
+          // it like any other file. Needs the index for the marker, so a graph
+          // whose index failed to open simply tries again next time.
+          // Best-effort — a failed seed must never block opening.
+          if (generation !== null) {
+            try {
+              await ensureWelcomeNote({ fileGeneration: info.generation, indexGeneration: generation })
+            } catch (err) {
+              console.error('welcome seed failed:', errorMessage(err))
+            }
           }
           setGraph(info)
           setIndexGeneration(generation)

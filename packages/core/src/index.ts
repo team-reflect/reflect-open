@@ -351,6 +351,8 @@ export {
   rebuildIndex,
   reconcileIndex,
   syncIndex,
+  getIndexMeta,
+  setIndexMeta,
   dailyDatesInRange,
   getBacklinks,
   getBacklinksWithContext,

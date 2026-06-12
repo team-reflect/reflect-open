@@ -67,13 +67,7 @@ vi.mock('@/providers/audio-memo-provider', () => ({
   useAudioMemo: () => audioMemo,
 }))
 
-const GRAPH: GraphInfo = {
-  root: '/notes',
-  name: 'Notes',
-  cloudSync: null,
-  generation: 1,
-  firstOpen: false,
-}
+const GRAPH: GraphInfo = { root: '/notes', name: 'Notes', cloudSync: null, generation: 1 }
 
 // Import after the core mock so the command registry sees the mocked module.
 const { Sidebar } = await import('./sidebar')

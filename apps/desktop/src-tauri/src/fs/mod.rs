@@ -52,11 +52,6 @@ pub struct GraphInfo {
     pub cloud_sync: Option<String>,
     /// Open-session generation; mutating file commands must echo it back.
     pub generation: u64,
-    /// True when this open was the root's first ever (it was absent from the
-    /// recents store when the open was recorded). A fact, not a policy — the
-    /// frontend decides what first-run behavior (e.g. welcome-note seeding)
-    /// hangs off it.
-    pub first_open: bool,
 }
 
 /// Metadata for a file inside the graph.
@@ -82,7 +77,6 @@ fn graph_info(root: &Path, generation: u64) -> GraphInfo {
         name,
         cloud_sync: crate::recents::detect_cloud_sync(root).map(str::to_string),
         generation,
-        first_open: false,
     }
 }
 
@@ -95,15 +89,12 @@ fn activate(state: &State<GraphState>, root: &Path) -> AppResult<GraphInfo> {
         inner.root = Some(root.to_path_buf());
         inner.generation
     };
-    let mut info = graph_info(root, generation);
+    let info = graph_info(root, generation);
     // Recents is a convenience cache: a failure to persist it must not fail the
     // open (which would leave Rust treating the graph as open while the command
-    // returns an error, out of sync with the UI). Best-effort, log and move on —
-    // an unknowable history reads as not-first, so first-run behavior never
-    // fires on a graph we can't vouch for.
-    match crate::recents::record(root, &info.name) {
-        Ok(first_open) => info.first_open = first_open,
-        Err(err) => tracing::warn!(?err, "failed to record recent graph"),
+    // returns an error, out of sync with the UI). Best-effort, log and move on.
+    if let Err(err) = crate::recents::record(root, &info.name) {
+        tracing::warn!(?err, "failed to record recent graph");
     }
     Ok(info)
 }

@@ -13,7 +13,7 @@ afterEach(() => {
   httpFetch.mockReset()
 })
 
-const GRAPH: GraphInfo = { root: '/g', name: 'G', cloudSync: null, generation: 3, firstOpen: false }
+const GRAPH: GraphInfo = { root: '/g', name: 'G', cloudSync: null, generation: 3 }
 
 const AUTH = JSON.stringify({ kind: 'pat', token: 'ghp_abc' })
 const CLEAN_COMMIT = { committed: false, sha: null, ahead: 0, skippedLargeFiles: [] }
