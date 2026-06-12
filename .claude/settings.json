@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -d node_modules ] || pnpm install --prefer-offline >/dev/null"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -31,5 +31,6 @@ dist-ssr
 # Reflect graph index + local state (rebuildable projection; never committed)
 .reflect/
 
-# Claude Code session artifacts
-.claude/
+# Claude Code session artifacts (shared hooks in settings.json stay tracked)
+.claude/*
+!.claude/settings.json
