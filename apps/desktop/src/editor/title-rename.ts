@@ -1,17 +1,26 @@
 import { foldKey, hasAuthoredTitle, parseNote } from '@reflect/core'
 
 /**
- * Settled-title detection for the auto-rename flow (Plan 07b). A title change
- * triggers a graph-wide link rewrite, so it must fire on **settled** titles
- * only — never per keystroke: editing "My Note" → "My Notebook" passes through
- * garbage intermediate titles ("My N…") as each debounced save lands, and
- * rewriting backlinks to those would spray the graph with junk.
+ * Settled-title detection for the auto-rename flow. A title change triggers a
+ * graph-wide link rewrite *and* a file move (`docs/readable-filenames.md`),
+ * so it must fire on **settled** titles only — never per keystroke: editing
+ * "My Note" → "My Notebook" passes through garbage intermediate titles
+ * ("My N…") as each debounced save lands, and rewriting backlinks to those
+ * would spray the graph with junk.
  *
- * The tracker consumes the session's `onContent` stream: `load`/`external`
- * content re-baselines (external edits never trigger rewrites — only edits
- * the user made here), `saved` content arms a quiet timer, and a settle point
- * (blur, pane teardown) fires the pending rename immediately. Renames chain:
- * the previous auto-added alias rides along so a re-rename can prune it.
+ * The tracker consumes the session's `onContent` stream and reduces it to at
+ * most one pending event:
+ *
+ * - `load`/`external` content **re-baselines** — external edits never trigger
+ *   rewrites, only edits the user made here;
+ * - `saved` content arms (or re-arms) a quiet timer;
+ * - a settle point (blur, pane teardown, quit) fires the pending event now.
+ *
+ * Two event shapes come out: a **rename** (`from` is the old title) and a
+ * **birth** (`from: null` — the first authored title on an untitled note;
+ * nothing links to a title that never existed, but the file still sheds its
+ * placeholder name). Renames chain: the previous auto-added alias rides along
+ * so a re-rename can prune it instead of accreting one alias per edit.
  */
 
 export interface TitleRename {

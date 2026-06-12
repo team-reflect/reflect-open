@@ -1,13 +1,19 @@
 /**
- * Title → filename slug derivation (Plan 17). The slug is a *projection* of
- * the title — the only author of regular-note filenames in-app — so its output
- * must be safe on every filesystem a graph can sync to. Lowercase-only output
- * is load-bearing: it makes APFS/NTFS case-insensitivity and git
- * case-sensitivity agree by construction. Non-Latin scripts pass through
- * untransliterated; a CJK title keeps its characters.
+ * Title → filename slug derivation: regular notes live at `notes/<slug>.md`,
+ * and this module is the **only author** of that slug — the filename is a
+ * projection of the title, never edited directly. Output must be safe on
+ * every filesystem a graph can sync to: lowercase-only is load-bearing (it
+ * makes APFS/NTFS case-insensitivity and git case-sensitivity agree by
+ * construction), and non-Latin scripts pass through untransliterated — a CJK
+ * title keeps its characters.
  *
- * The rules are frozen by the golden corpus in `slug.test.ts`: a silent change
- * here would re-slug every title differently — a rename storm across graphs.
+ * The rules are **frozen** by the golden corpus in `slug.test.ts`: a silent
+ * change here would re-slug every title differently — a rename storm across
+ * graphs. Treat a corpus failure as a breaking-change gate, not a test to
+ * update.
+ *
+ * The full system — births, renames, healing — is documented in
+ * `docs/readable-filenames.md`.
  */
 
 /**
@@ -62,6 +68,14 @@ const EDGE_DASHES_RE = /^-+|-+$/g
  * {@link MAX_SLUG_CHARS} code points (never splitting a surrogate pair).
  * Never empty (`untitled`), never a Windows reserved device name.
  * Idempotent: a slug slugs to itself.
+ *
+ * ```ts
+ * slugForTitle('Meeting Notes')   // 'meeting-notes'
+ * slugForTitle("Don't Panic!")    // 'dont-panic'
+ * slugForTitle('日本語ノート')      // '日本語ノート'
+ * slugForTitle('🎉🎉🎉')           // 'untitled'
+ * slugForTitle('CON')             // 'con-note'
+ * ```
  */
 export function slugForTitle(title: string): string {
   const folded = title.normalize('NFC').toLowerCase()

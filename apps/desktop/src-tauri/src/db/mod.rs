@@ -154,7 +154,8 @@ pub fn index_remove(path: String, generation: u64, index: State<IndexState>) -> 
 /// Failure shape: every path converges. A failed commit touches nothing; a
 /// failed rename compensates the rows back; and if even the compensation
 /// fails, the projection is rebuildable and the id-based reconcile re-pairs
-/// the row with the file wherever it actually lives. The rename must never
+/// the row with the file wherever it actually lives (healing flow:
+/// `docs/readable-filenames.md`). The rename must never
 /// run *inside* the transaction — a commit failing after the file moved
 /// would roll the rows back while the disk kept the new path.
 ///
@@ -162,6 +163,8 @@ pub fn index_remove(path: String, generation: u64, index: State<IndexState>) -> 
 /// a rename is user-initiated file mutation, and a stale UI must be rejected
 /// loudly. The index connection is whatever is current — the two states rebind
 /// together on graph open, and the projection is rebuildable in the worst case.
+///
+/// The rename pipeline end-to-end: `docs/readable-filenames.md`.
 #[tauri::command]
 pub fn note_move_indexed(
     from: String,

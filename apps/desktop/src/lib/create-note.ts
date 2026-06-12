@@ -8,8 +8,9 @@ import {
 } from '@reflect/core'
 
 /**
- * Note identity at creation (Plan 17): regular notes get a **title-derived
- * filename** (`notes/<slug>.md`, `-2` suffix on collision) and a frontmatter
+ * Note identity at creation (`docs/readable-filenames.md`): regular notes get
+ * a **title-derived filename** (`notes/<slug>.md`, `-2` suffix on collision)
+ * and a frontmatter
  * `id:` ULID — the durable identity Plan 02 specified, which survives the
  * renames that now follow title changes (17b).
  */

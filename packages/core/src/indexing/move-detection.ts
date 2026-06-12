@@ -23,6 +23,14 @@ export interface DetectedMove {
  * never pairs — that's a rename/rename fork or a hand-copied id, which the
  * duplicate-id surface reports for review; guessing a move there could wire
  * one note's history to another's file.
+ *
+ * ```ts
+ * pairMovesById(
+ *   new Map([['notes/01abc.md', 'id-1']]),        // row whose file vanished
+ *   new Map([['notes/meeting.md', 'id-1']]),      // file that appeared
+ * )
+ * // → [{ from: 'notes/01abc.md', to: 'notes/meeting.md' }]
+ * ```
  */
 export function pairMovesById(
   orphans: ReadonlyMap<string, string | null>,

@@ -16,16 +16,28 @@ import { createTitleRenameTracker } from './title-rename'
 import type { TitleRename } from './title-rename'
 
 /**
- * Owns one note's auto-rename lifecycle (Plan 07b + Plan 17): the
- * settled-title tracker, the serialized rewrite chain, where the old-title
- * alias lands — and the **file move** that keeps the filename a projection of
- * the title. Extracted from `useNoteDocument` for the same reason the session
- * was — lifecycle coupling (pane teardown, quit, note switches) belongs to an
- * owned object, not to effect-closure flags. The rename path holds no React
- * ref and no session of its own: session liveness comes from the
- * open-documents service at placement time, and status surfaces through the
- * global operations store — a rename is app-level background work, not pane
- * state.
+ * Owns one note's auto-rename lifecycle: the settled-title tracker, the
+ * serialized rewrite chain, where the old-title alias lands — and the **file
+ * move** that keeps the filename a projection of the title
+ * (`docs/readable-filenames.md`).
+ *
+ * A settled rename runs three phases, each failing independently with an
+ * honest report (see `rename-failure.ts`):
+ *
+ * 1. **Rewrite** inbound `[[old title]]` links across the graph;
+ * 2. **Alias** the old title onto this note (`alias-placement.ts`) — the
+ *    safety net for links the rewrite missed;
+ * 3. **Move** the file onto the new title's slug (`move-note.ts`).
+ *
+ * A *birth* (the first authored title on an untitled note) runs phase 3
+ * alone: nothing links to a title that never existed.
+ *
+ * Extracted from `useNoteDocument` for the same reason the session was —
+ * lifecycle coupling (pane teardown, quit, note switches) belongs to an owned
+ * object, not to effect-closure flags. The rename path holds no React ref and
+ * no session of its own: session liveness comes from the open-documents
+ * service at placement time, and status surfaces through the global
+ * operations store — a rename is app-level background work, not pane state.
  *
  * The coordinator tracks its note's **current** path: a landed move retargets
  * the live session, the open-documents registration, and this coordinator in

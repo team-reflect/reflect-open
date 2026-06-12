@@ -1,10 +1,10 @@
 /**
- * App-global fan-out for note file moves (Plan 17). The rename pipeline emits
- * here after a move lands; the router rewrites its history entries so the
- * current route (and back/forward) follow the file, and the owning pane
- * adopts its retargeted session instead of reloading. Module-level — like the
- * open-documents service — because a move can settle from teardown or quit
- * paths where no pane is mounted.
+ * App-global fan-out for note file moves (`docs/readable-filenames.md`). The
+ * rename pipeline and the id-healing path emit here after a move lands; the
+ * router rewrites its history entries so the current route (and back/forward)
+ * follow the file, and the owning pane adopts its retargeted session instead
+ * of reloading. Module-level — like the open-documents service — because a
+ * move can settle from teardown or quit paths where no pane is mounted.
  */
 
 export type NoteMovedListener = (from: string, to: string) => void

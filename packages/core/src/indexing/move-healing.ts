@@ -15,7 +15,9 @@ import { getNoteIdsByPath } from './queries'
  *
  * Detection is best-effort by contract: callers treat a thrown error or a
  * missed pair as "no move detected" and fall back to plain delete+create,
- * which always converges.
+ * which always converges. The healing flow end-to-end (including how the
+ * desktop layer carries open sessions and routes along) is documented in
+ * `docs/readable-filenames.md`.
  */
 
 /** What {@link detectExternalMoves} found. */

@@ -22,6 +22,23 @@ import type { RenameCoordinator } from './rename-coordinator'
  *   if none does (the pane really unmounted) does a deferred check tear the
  *   session down — a moved document must never flush over its old home, and
  *   an unadopted one must never leak.
+ *
+ * The hook's effect drives it like so (see `use-note-document.ts`):
+ *
+ * ```ts
+ * useEffect(() => {
+ *   const { session, created } = binding.bind(path, {
+ *     coordinator: () => createRenameCoordinator({ ... }),
+ *     session: (coordinator) => createNoteSession({ ... }),
+ *   })
+ *   if (created) session.load()            // adopted sessions are already live
+ *   return () => binding.unbind(path)
+ * }, [path, ...])
+ * // …and the editor is keyed on binding.epoch(), not the path, so a rename
+ * // that retargets the session never remounts it — the cursor survives.
+ * ```
+ *
+ * Why a rename leads here: `docs/readable-filenames.md`.
  */
 
 export interface BindFactories {

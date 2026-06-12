@@ -4,12 +4,19 @@ import { slugForTitle } from '../markdown/slug'
 import { db } from './db'
 
 /**
- * Collision-free note-path selection (Plan 17). New notes are
- * `notes/<slug>.md`; when that's taken, `<slug>-2.md`, `-3`, … — the suffix is
- * the entire collision policy (no id-tails on every filename for the rare
- * clash). A candidate is taken when **either** the index has a row for it or
- * the file exists on disk: the index lags the watcher by a debounce, and an
- * unindexed file must never be clobbered by a new note's slug.
+ * Collision-free note-path selection — where a note's file should live for
+ * its title. New notes are `notes/<slug>.md`; when that's taken,
+ * `<slug>-2.md`, `-3`, … — the numeric suffix is the *entire* collision
+ * policy (no id-tails on every filename for the rare clash). A candidate is
+ * taken when **either** the index has a row for it or the file exists on
+ * disk: the index lags the watcher by a debounce, and an unindexed file must
+ * never be clobbered by a new note's slug.
+ *
+ * Two entry points share one probe loop: {@link availableNotePath} for
+ * creation (every candidate must be free) and {@link slugPathForTitle} for
+ * the rename pipeline (the note's own path always counts as free — a note
+ * never collides with itself, and never "tightens" to a shorter suffix).
+ * See `docs/readable-filenames.md`.
  */
 
 /** Is `path` already taken — indexed, or present on disk? */
