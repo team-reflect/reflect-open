@@ -310,7 +310,8 @@ pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> A
 }
 
 /// Move a deleted file under `<graph>/.reflect/trash/`, stamping the name
-/// with epoch millis when it is already taken (two deletes of `a.md`).
+/// with epoch millis — and a counter beyond that — until the name is free
+/// (repeat deletes of `a.md`, even within one millisecond).
 #[cfg(mobile)]
 fn move_to_graph_trash(root: &Path, abs: &Path) -> AppResult<()> {
     let trash_dir = root.join(".reflect").join("trash");
@@ -318,21 +319,30 @@ fn move_to_graph_trash(root: &Path, abs: &Path) -> AppResult<()> {
     let name = abs
         .file_name()
         .ok_or_else(|| AppError::io("delete target has no file name"))?;
-    let mut target = trash_dir.join(name);
-    if target.exists() {
-        let millis = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|err| AppError::io(err.to_string()))?
-            .as_millis();
-        let name = Path::new(name);
-        let stem = name
-            .file_stem()
-            .and_then(|value| value.to_str())
-            .unwrap_or("note");
-        target = trash_dir.join(match name.extension().and_then(|value| value.to_str()) {
-            Some(ext) => format!("{stem}-{millis}.{ext}"),
-            None => format!("{stem}-{millis}"),
-        });
+    let name = Path::new(name);
+    let stem = name
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("note");
+    let ext = name.extension().and_then(|value| value.to_str());
+    let with_suffix = |suffix: &str| match ext {
+        Some(ext) => format!("{stem}{suffix}.{ext}"),
+        None => format!("{stem}{suffix}"),
+    };
+    let millis = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|err| AppError::io(err.to_string()))?
+        .as_millis();
+    let mut target = trash_dir.join(with_suffix(""));
+    let mut attempt: u32 = 0;
+    while target.exists() {
+        attempt += 1;
+        let suffix = if attempt == 1 {
+            format!("-{millis}")
+        } else {
+            format!("-{millis}-{attempt}")
+        };
+        target = trash_dir.join(with_suffix(&suffix));
     }
     fs::rename(abs, target)?;
     Ok(())
