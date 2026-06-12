@@ -97,6 +97,7 @@ function renderSidebar(overrides?: Partial<CommandContext>) {
     toggleAudioMemo: vi.fn(),
     generation: () => 1,
     openPalette,
+    openShortcuts: vi.fn(),
     enableSemanticSearch: vi.fn(),
     ...overrides,
   }

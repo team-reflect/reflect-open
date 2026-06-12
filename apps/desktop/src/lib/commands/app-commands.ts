@@ -156,6 +156,13 @@ const APP_COMMANDS: AppCommand[] = [
     run: (context) => context.navigate({ kind: 'settings' }),
   },
   {
+    id: 'shortcuts.show',
+    title: 'Keyboard shortcuts',
+    keywords: ['cheat', 'sheet', 'keys', 'bindings', 'hotkeys', 'help'],
+    keybinding: 'Mod-/',
+    run: (context) => context.openShortcuts(),
+  },
+  {
     id: 'semantic.enable',
     title: 'Enable semantic search',
     keywords: ['embeddings', 'ai', 'similar', 'model'],

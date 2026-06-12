@@ -46,6 +46,7 @@ function fakeContext(overrides?: Partial<CommandContext>) {
     toggleAudioMemo: vi.fn(),
     generation: () => 7,
     openPalette: vi.fn(),
+    openShortcuts: vi.fn(),
     enableSemanticSearch: vi.fn(),
     ...overrides,
   }
@@ -87,6 +88,13 @@ describe('app commands', () => {
     const { context, navigated } = fakeContext()
     await command('settings.open').run(context)
     expect(navigated).toEqual([{ kind: 'settings' }])
+  })
+
+  it('shortcuts.show opens the ⌘/ cheat-sheet through the context capability', async () => {
+    const { context } = fakeContext()
+    await command('shortcuts.show').run(context)
+    expect(context.openShortcuts).toHaveBeenCalledTimes(1)
+    expect(keybindingFor('shortcuts.show')).toBe('Mod-/')
   })
 
   it('note.new navigates to a fresh lazy ULID note path', async () => {

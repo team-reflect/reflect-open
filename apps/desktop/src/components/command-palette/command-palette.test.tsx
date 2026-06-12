@@ -90,6 +90,7 @@ function renderPalette(query: string, context?: Partial<CommandContext>) {
     toggleAudioMemo: vi.fn(),
     generation: () => 1,
     openPalette: vi.fn(),
+    openShortcuts: vi.fn(),
     enableSemanticSearch: vi.fn(),
     ...context,
   }

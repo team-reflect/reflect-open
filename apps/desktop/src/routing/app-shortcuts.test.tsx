@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { PaletteProvider, usePalette } from '@/components/command-palette/palette-provider'
 import { listRegisteredBindings } from '@/editor/keymap'
 import { registerAppCommands } from '@/lib/commands/app-commands'
+import { ShortcutsProvider, useShortcuts } from '@/providers/shortcuts-provider'
 import { SidebarProvider } from '@/providers/sidebar-provider'
 import { useAppShortcuts } from './app-shortcuts'
 import { RouterProvider, useRouter } from './router'
@@ -30,13 +31,15 @@ function shortcutsHook() {
   return renderHook(
     () => {
       useAppShortcuts()
-      return { router: useRouter(), palette: usePalette() }
+      return { router: useRouter(), palette: usePalette(), shortcuts: useShortcuts() }
     },
     {
       wrapper: ({ children }: { children: ReactNode }) => (
         <RouterProvider>
           <PaletteProvider>
-            <SidebarProvider>{children}</SidebarProvider>
+            <ShortcutsProvider>
+              <SidebarProvider>{children}</SidebarProvider>
+            </ShortcutsProvider>
           </PaletteProvider>
         </RouterProvider>
       ),
@@ -103,6 +106,21 @@ describe('app shortcuts', () => {
     act(() => press('n'))
     expect(result.current.router.route).toEqual({ kind: 'today' }) // nothing behind the overlay
     act(() => result.current.palette.closePalette())
+    act(() => press('n'))
+    expect(result.current.router.route.kind).toBe('note') // resumes after close
+  })
+
+  it('⌘/ opens the cheat-sheet, closes it again, and mutes other shortcuts meanwhile', () => {
+    const { result } = shortcutsHook()
+    act(() => press('/'))
+    expect(result.current.shortcuts.open).toBe(true)
+
+    act(() => press('n'))
+    expect(result.current.router.route).toEqual({ kind: 'today' }) // modal mutes navigation
+
+    act(() => press('/'))
+    expect(result.current.shortcuts.open).toBe(false)
+
     act(() => press('n'))
     expect(result.current.router.route.kind).toBe('note') // resumes after close
   })

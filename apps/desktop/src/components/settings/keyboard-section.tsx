@@ -1,22 +1,8 @@
 import type { ReactElement } from 'react'
 import { ShortcutKeys } from '@/components/shortcut-keys'
-import { EDITOR_BINDING_DESCRIPTIONS } from '@/editor/keymap'
-import { APP_COMMANDS } from '@/lib/commands/app-commands'
 import { formatBindingLabel } from '@/lib/keybindings'
+import { APP_SHORTCUTS, EDITOR_SHORTCUTS, type Shortcut } from '@/lib/shortcuts'
 import { SettingsSection } from './section'
-
-interface Shortcut {
-  binding: string
-  description: string
-}
-
-/** Both keymap scopes, straight from their registries — never hand-listed. */
-const APP_SHORTCUTS: Shortcut[] = APP_COMMANDS.flatMap((command) =>
-  command.keybinding ? [{ binding: command.keybinding, description: command.title }] : [],
-)
-const EDITOR_SHORTCUTS: Shortcut[] = Object.entries(EDITOR_BINDING_DESCRIPTIONS).map(
-  ([binding, description]) => ({ binding, description }),
-)
 
 function ShortcutGroup({
   heading,

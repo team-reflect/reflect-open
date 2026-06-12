@@ -8,6 +8,7 @@ import type { CommandContext } from '@/lib/commands/types'
 import { useAudioMemo } from '@/providers/audio-memo-provider'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
+import { useShortcuts } from '@/providers/shortcuts-provider'
 import { useSidebar } from '@/providers/sidebar-provider'
 import { useTheme } from '@/providers/theme-provider'
 import { useRouter } from './router'
@@ -45,6 +46,7 @@ export function useAppShortcuts(): CommandContext {
   const { resolvedTheme, setTheme } = useTheme()
   const { graph } = useGraph()
   const { openPalette, open: paletteOpen } = usePalette()
+  const { openShortcuts, closeShortcuts, open: shortcutsOpen } = useShortcuts()
   const { toggleSidebar } = useSidebar()
   const { toggle: toggleAudioMemo } = useAudioMemo()
   const { updateSettings } = useSettings()
@@ -53,6 +55,10 @@ export function useAppShortcuts(): CommandContext {
   // A ref keeps the listener stable across open/close renders.
   const paletteOpenRef = useRef(paletteOpen)
   paletteOpenRef.current = paletteOpen
+
+  // Same for the ⌘/ cheat-sheet, except ⌘/ itself toggles it closed.
+  const shortcutsOpenRef = useRef(shortcutsOpen)
+  shortcutsOpenRef.current = shortcutsOpen
 
   // Read at run time, not captured: a command can fire long after the render
   // that created the context (palette open across an index rebuild, etc.).
@@ -72,6 +78,7 @@ export function useAppShortcuts(): CommandContext {
       toggleAudioMemo,
       generation: () => generationRef.current,
       openPalette,
+      openShortcuts,
       enableSemanticSearch: () => {
         updateSettings({ semanticSearchEnabled: true })
         // EmbeddingsSync loads an untouched runtime; a `failed` one only
@@ -86,6 +93,7 @@ export function useAppShortcuts(): CommandContext {
       resolvedTheme,
       setTheme,
       openPalette,
+      openShortcuts,
       toggleSidebar,
       toggleAudioMemo,
       updateSettings,
@@ -101,6 +109,15 @@ export function useAppShortcuts(): CommandContext {
         return // held keys must not spam navigations (e.g. a stack of new notes)
       }
       const id = BINDING_TO_ID.get(`Mod-${event.key.toLowerCase()}`)
+      if (shortcutsOpenRef.current) {
+        // The cheat-sheet is modal too: nothing may navigate behind it, but
+        // the key that opened it closes it again.
+        if (id === 'shortcuts.show') {
+          event.preventDefault()
+          closeShortcuts()
+        }
+        return
+      }
       if (id !== undefined) {
         event.preventDefault()
         void runCommand(id, context)
@@ -110,7 +127,7 @@ export function useAppShortcuts(): CommandContext {
     return () => {
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [context])
+  }, [context, closeShortcuts])
 
   return context
 }

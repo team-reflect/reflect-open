@@ -15,6 +15,7 @@ import { ShortcutKeys } from '@/components/shortcut-keys'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { OperationsStatus } from '@/components/operations-status'
 import { RouteContent } from '@/components/route-content'
+import { ShortcutsDialog } from '@/components/shortcuts-dialog'
 import { Sidebar } from '@/components/sidebar/sidebar'
 import { keybindingFor } from '@/lib/commands/app-commands'
 import { useToday } from '@/lib/use-today'
@@ -97,6 +98,7 @@ export function WorkspaceContent({ graph }: WorkspaceContentProps): ReactElement
 
         <OperationsStatus />
         <CommandPalette context={commandContext} />
+        <ShortcutsDialog />
         <EmbeddingsSync />
       </div>
     </AppShell>
