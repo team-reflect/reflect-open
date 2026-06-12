@@ -13,7 +13,13 @@
  */
 export { setBridge, hasBridge, type IpcBridge, type Unlisten } from './ipc/bridge'
 export { call } from './ipc/invoke'
-export { getAppVersion } from './ipc/commands'
+export {
+  getAppVersion,
+  getAppPlatform,
+  isMobilePlatform,
+  mobileGraphRoot,
+  type AppPlatform,
+} from './ipc/commands'
 export { confirmQuit, subscribeQuitRequested } from './app/quit'
 
 // Embeddings & retrieval (Plan 09)

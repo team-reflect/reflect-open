@@ -1,6 +1,6 @@
 name: reflect-open
 options:
-  bundleIdPrefix: com.alex.reflect-open
+  bundleIdPrefix: app.reflect
   deploymentTarget:
     iOS: 14.0
 fileGroups: [../../src]
@@ -10,8 +10,8 @@ configs:
 settingGroups:
   app:
     base:
-      PRODUCT_NAME: reflect-open
-      PRODUCT_BUNDLE_IDENTIFIER: com.alex.reflect-open
+      PRODUCT_NAME: Reflect
+      PRODUCT_BUNDLE_IDENTIFIER: app.reflect.ios
       CODE_SIGN_STYLE: Automatic
       DEVELOPMENT_TEAM: 789ULN5MZB
 targetTemplates:
@@ -46,6 +46,10 @@ targets:
       path: reflect-open_iOS/Info.plist
       properties:
         LSRequiresIPhoneOS: true
+        # The graph lives in Documents/ — expose it in the Files app so the
+        # user can see, copy, and back up their markdown (Plan 19).
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
         UILaunchStoryboardName: LaunchScreen
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:

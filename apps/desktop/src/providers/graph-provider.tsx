@@ -13,8 +13,11 @@ import {
   errorMessage,
   forgetRecent,
   hasBridge,
+  isMobilePlatform,
+  mobileGraphRoot,
   openGraph,
   recentGraphs,
+  type AppPlatform,
   type GraphInfo,
   type RecentGraph,
 } from '@reflect/core'
@@ -55,8 +58,20 @@ const GraphContext = createContext<GraphContextValue | null>(null)
  * Owns the active graph and the open/choose flow. On mount it auto-opens the
  * most-recent graph (so the app reopens where you left off) and otherwise shows
  * the chooser. All durable file access goes through `@reflect/core` commands.
+ *
+ * On mobile (Plan 19) there is no chooser and no recents-driven reopen: the
+ * graph root is fixed (the app's `Documents/`) and is **derived fresh every
+ * launch** — iOS container paths change across restore/update, so a persisted
+ * recent would point at a dead path. `platform` selects the bootstrap;
+ * everything downstream of the open is shared.
  */
-export function GraphProvider({ children }: { children: ReactNode }) {
+export function GraphProvider({
+  children,
+  platform = 'desktop',
+}: {
+  children: ReactNode
+  platform?: AppPlatform
+}) {
   const [status, setStatus] = useState<GraphStatus>('loading')
   const [graph, setGraph] = useState<GraphInfo | null>(null)
   const [recents, setRecents] = useState<RecentGraph[]>([])
@@ -172,6 +187,21 @@ export function GraphProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true
     void (async () => {
+      if (isMobilePlatform(platform)) {
+        // Fixed root, derived fresh (never from recents — see the docblock).
+        try {
+          const root = await mobileGraphRoot()
+          if (active) {
+            await openRecent(root)
+          }
+        } catch (err) {
+          if (active) {
+            setError(errorMessage(err))
+            setStatus('choosing')
+          }
+        }
+        return
+      }
       const list = await loadRecents({ surfaceErrors: true })
       if (!active) {
         return
@@ -185,7 +215,7 @@ export function GraphProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false
     }
-  }, [loadRecents, openRecent])
+  }, [loadRecents, openRecent, platform])
 
   const pickAndOpen = useCallback(async (): Promise<void> => {
     let selected: string | null = null

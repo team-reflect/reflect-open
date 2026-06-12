@@ -48,6 +48,42 @@ fn app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+/// Which UI family this build serves. The frontend's root gate (Plan 19)
+/// switches between the desktop and mobile surface trees on this answer.
+#[tauri::command]
+fn app_platform() -> &'static str {
+    if cfg!(target_os = "ios") {
+        "ios"
+    } else if cfg!(target_os = "android") {
+        "android"
+    } else {
+        "desktop"
+    }
+}
+
+/// The fixed mobile graph root (Plan 19): the app's `Documents/` directory,
+/// exposed in the iOS Files app. Derived fresh on every call — iOS container
+/// paths embed a UUID that changes across restore/update, so the frontend
+/// must never persist the absolute path it gets back.
+#[tauri::command]
+fn mobile_graph_root(app: tauri::AppHandle) -> Result<String, error::AppError> {
+    #[cfg(mobile)]
+    {
+        let dir = app
+            .path()
+            .document_dir()
+            .map_err(|err| error::AppError::io(format!("no documents directory: {err}")))?;
+        Ok(dir.to_string_lossy().into_owned())
+    }
+    #[cfg(desktop)]
+    {
+        let _ = app; // desktop picks graph folders; there is no fixed root
+        Err(error::AppError::Unknown {
+            message: "mobile_graph_root is mobile-only".into(),
+        })
+    }
+}
+
 /// Route `tracing` output to stderr, honoring `RUST_LOG` (default `info`).
 fn init_tracing() {
     use tracing_subscriber::EnvFilter;
@@ -91,6 +127,8 @@ pub fn run() {
         .manage(embed::EmbedState::default())
         .invoke_handler(tauri::generate_handler![
             app_version,
+            app_platform,
+            mobile_graph_root,
             fs::graph_open,
             fs::graph_create,
             fs::note_read,

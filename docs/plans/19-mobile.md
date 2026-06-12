@@ -283,6 +283,23 @@ Steps 1 and 2 are the existential gates; nothing else starts until both pass.
    `src/mobile/` tree, tab/stack navigation over the `Route` subset, theme +
    safe-area tokens, sync-status pill stub. Desktop bundle unaffected
    (verify chunk split).
+
+   > **Status (2026-06-12): steps 3–4 partially landed, ahead of the spike-B
+   > gate.** Done: `mobile_graph_root` + `app_platform` commands with core
+   > wrappers, Files-app exposure (`UIFileSharingEnabled` +
+   > `LSSupportsOpeningDocumentsInPlace`), identity normalized to
+   > `app.reflect.ios` / product name Reflect, the lazy `PlatformRoot` gate
+   > (desktop chrome split into `desktop-root.tsx`), the fixed-root mobile
+   > bootstrap in `GraphProvider`, and a Today screen mounting the real
+   > editor via `NotePane`. **Verified on the simulator end-to-end:** boot →
+   > auto-bootstrap in `Documents/` → type into meowdown → the daily note
+   > lands on disk through the shared save pipeline. Two findings: the
+   > document stack requires `RouterProvider` (a missing router unmounted the
+   > tree to a white screen — `MobileErrorBoundary` now makes that class
+   > visible), and `capabilities/mobile.json` is deliberately deferred until
+   > a mobile-only permission exists. Still open from these steps: tab/stack
+   > navigation, day pager, sync-status pill, and the decision-5 write-event
+   > seam (step 5).
 5. **The in-process write-notification seam (decision 5).** Local write paths
    emit file-change batches on mobile; prove with a unit-level test that a
    session save reaches the index and the engine's dirty mark without a
