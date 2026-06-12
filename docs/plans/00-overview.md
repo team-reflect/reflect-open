@@ -72,6 +72,7 @@ before the editor, and the editor lands before search/AI.
 | 16 | [Generic git remotes](16-generic-git-remotes.md) | Any git host (GitLab/Gitea/GHES/NAS) via hand-wired `origin`, zero new UI — V1 SSH (agent) + path remotes, V2 HTTPS (credential helpers) |
 | 17 | [Readable filenames](17-readable-filenames.md) | Title-derived note filenames (slug + collision suffix), frontmatter `id` adoption, rename-on-settled-title file moves, id-healed external renames |
 | 18 | [Tasks](18-tasks.md) | **Post-release add-on.** GFM-checkbox tasks as a rebuildable projection: interactive editor checkboxes, Tasks view (Overdue/Today/Upcoming), `[[date]]`/daily scheduling, guarded toggle write-back, `checklist: true` opt-out |
+| 19 | [Mobile companion](19-mobile.md) | **Post-release add-on.** iOS (then Android) as a target of the existing Tauri app: today/daily browsing, in-place note editing, quick capture, new notes, lexical search, GitHub sync parity; shell decision in [TDR 0003](../decisions/0003-mobile-shell.md) |
 
 ## Milestone map
 
@@ -159,8 +160,9 @@ extraction, graph-map view, templates,
 contacts/calendar, publishing, any non-GitHub sync (iCloud/Dropbox/Drive are unsupported
 by design, not "deferred"), a public plugin API, typed-entity layer, and full multi-device
 sync conflict automation (incl. AI-assisted resolution). Mobile
-is *planned* (capture/read/lexical-search later) but does not block the Mac release;
-plans avoid choices that make mobile or Windows impossible.
+did not block the Mac release and is now planned as a post-release add-on —
+[Plan 19](19-mobile.md): capture/read/**edit**/lexical-search on iOS first (Tauri
+mobile, per [TDR 0003](../decisions/0003-mobile-shell.md)), Android shortly after.
 
 ## Conventions (apply to every plan)
 
