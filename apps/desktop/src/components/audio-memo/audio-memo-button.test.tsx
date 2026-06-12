@@ -44,6 +44,22 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('AudioMemoButton', () => {
+  it('unavailable renders aria-disabled — never natively disabled — and ignores clicks', async () => {
+    memo.available = false
+    memo.unavailableReason = 'Add an OpenAI or Gemini model in Settings to record audio memos'
+    const view = renderButton()
+
+    // aria-disabled (not `disabled`) keeps pointer events alive so the
+    // explanatory tooltip can fire; the reason copy itself is asserted in the
+    // provider test, and jsdom can't drive Radix's tooltip-open mechanics.
+    const micButton = view.getByRole('button', { name: 'Record audio memo' })
+    expect(micButton.getAttribute('aria-disabled')).toBe('true')
+    expect(micButton).toHaveProperty('disabled', false)
+
+    await userEvent.click(micButton)
+    expect(memo.toggle).not.toHaveBeenCalled()
+  })
+
   it('recording shows the stop control and the elapsed time', async () => {
     memo.phase = 'recording'
     memo.elapsedMs = 83_000

@@ -1,7 +1,7 @@
 import { cleanup, render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_SETTINGS, type GraphInfo, type PinnedNote, type Settings } from '@reflect/core'
 import type { CommandContext } from '@/lib/commands/types'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -73,6 +73,14 @@ const { Sidebar } = await import('./sidebar')
 const { registerAppCommands } = await import('@/lib/commands/app-commands')
 registerAppCommands()
 
+beforeEach(() => {
+  // The hoisted mock is shared module state — restore it so mic-related cases
+  // can't inherit mutations from earlier tests.
+  audioMemo.available = true
+  audioMemo.unavailableReason = null
+  audioMemo.toggle.mockReset()
+})
+
 afterEach(cleanup) // `globals: false` disables testing-library's automatic cleanup
 
 function renderSidebar(overrides?: Partial<CommandContext>) {
@@ -122,9 +130,6 @@ describe('Sidebar', () => {
   })
 
   it('the mic button starts an audio memo', async () => {
-    audioMemo.available = true
-    audioMemo.unavailableReason = null
-    audioMemo.toggle.mockClear()
     const { view } = renderSidebar()
     await userEvent.click(view.getByRole('button', { name: /record audio memo/i }))
     expect(audioMemo.toggle).toHaveBeenCalled()
@@ -133,7 +138,6 @@ describe('Sidebar', () => {
   it('the mic button disables (without vanishing) when no provider can transcribe', async () => {
     audioMemo.available = false
     audioMemo.unavailableReason = 'Add an OpenAI or Gemini model in Settings to record audio memos'
-    audioMemo.toggle.mockClear()
     const { view } = renderSidebar()
     const micButton = view.getByRole('button', { name: /record audio memo/i })
     expect(micButton.getAttribute('aria-disabled')).toBe('true')

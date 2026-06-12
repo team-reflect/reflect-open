@@ -135,13 +135,9 @@ export {
   type TranscriptionProvider,
 } from './ai/models'
 export { validateApiKey, type ApiKeyValidation } from './ai/validate-key'
-export {
-  GOOGLE_TRANSCRIPTION_MODEL,
-  OPENAI_TRANSCRIPTION_FALLBACK_MODEL,
-  OPENAI_TRANSCRIPTION_MODEL,
-  transcribeAudio,
-  type TranscriptionRequest,
-} from './ai/transcribe'
+// The fixed per-provider model ids stay internal to `ai/transcribe` —
+// exporting them would let callers couple to vendor model names.
+export { transcribeAudio, type TranscriptionRequest } from './ai/transcribe'
 
 // Capture actions (audio memos; Plan 11's link capture joins here)
 export {
