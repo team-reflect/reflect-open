@@ -10,7 +10,6 @@
 //! [`error`] (the shared error contract).
 
 mod db;
-mod embed;
 mod error;
 mod fs;
 mod git;
@@ -18,6 +17,19 @@ mod quit;
 mod recents;
 mod secrets;
 mod settings;
+
+// The watcher and the embedding runtime are desktop capabilities (Plan 19):
+// mobile swaps in stand-ins with the identical command surface, so the
+// `invoke_handler` list below needs no platform branches.
+#[cfg(desktop)]
+mod embed;
+#[cfg(mobile)]
+#[path = "embed_mobile.rs"]
+mod embed;
+#[cfg(desktop)]
+mod watcher;
+#[cfg(mobile)]
+#[path = "watcher_mobile.rs"]
 mod watcher;
 
 use tauri::{Emitter, Manager};
@@ -45,16 +57,18 @@ pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_http::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build());
+        .plugin(tauri_plugin_http::init());
 
     // Auto-update is desktop-only: updates verify against the minisign pubkey
     // in tauri.conf.json (`plugins.updater`), and `process` provides the
     // post-install relaunch. Mobile updates go through the app stores.
+    // Window-state restore is likewise meaningless on mobile (one fullscreen
+    // webview, no window frames to remember).
     #[cfg(desktop)]
     let builder = builder
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_process::init());
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build());
 
     builder
         .manage(fs::GraphState::default())

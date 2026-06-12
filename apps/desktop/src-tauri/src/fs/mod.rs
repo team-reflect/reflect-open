@@ -21,6 +21,7 @@ use crate::error::{AppError, AppResult};
 use self::io::{atomic_write, atomic_write_bytes, bootstrap, collect_files, NOTE_DIRS};
 use self::resolve::resolve;
 
+#[cfg(desktop)] // sole consumer is the watcher, which mobile stands in for
 pub(crate) use self::io::modified_ms;
 
 /// The open graph root plus a monotonic generation, kept **under one lock** so
@@ -294,11 +295,46 @@ pub(crate) fn move_note_file(root: &Path, from: &str, to: &str) -> AppResult<()>
 }
 
 /// Send a note to the OS trash (recoverable), not a hard delete (pinned to
-/// `generation`).
+/// `generation`). Mobile has no OS trash: the file moves into the graph-local
+/// `.reflect/trash/` instead (Plan 19) — the same recoverability promise, and
+/// `.reflect/` is already excluded from sync and indexing.
 #[tauri::command]
 pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> AppResult<()> {
     let root = root_for_generation(&state, generation)?;
-    trash::delete(resolve(&root, &path)?).map_err(|err| AppError::io(err.to_string()))?;
+    let abs = resolve(&root, &path)?;
+    #[cfg(desktop)]
+    trash::delete(abs).map_err(|err| AppError::io(err.to_string()))?;
+    #[cfg(mobile)]
+    move_to_graph_trash(&root, &abs)?;
+    Ok(())
+}
+
+/// Move a deleted file under `<graph>/.reflect/trash/`, stamping the name
+/// with epoch millis when it is already taken (two deletes of `a.md`).
+#[cfg(mobile)]
+fn move_to_graph_trash(root: &Path, abs: &Path) -> AppResult<()> {
+    let trash_dir = root.join(".reflect").join("trash");
+    fs::create_dir_all(&trash_dir)?;
+    let name = abs
+        .file_name()
+        .ok_or_else(|| AppError::io("delete target has no file name"))?;
+    let mut target = trash_dir.join(name);
+    if target.exists() {
+        let millis = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|err| AppError::io(err.to_string()))?
+            .as_millis();
+        let name = Path::new(name);
+        let stem = name
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .unwrap_or("note");
+        target = trash_dir.join(match name.extension().and_then(|value| value.to_str()) {
+            Some(ext) => format!("{stem}-{millis}.{ext}"),
+            None => format!("{stem}-{millis}"),
+        });
+    }
+    fs::rename(abs, target)?;
     Ok(())
 }
 

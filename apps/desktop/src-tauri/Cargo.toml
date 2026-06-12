@@ -27,18 +27,11 @@ serde_json = { workspace = true }
 rusqlite = { workspace = true, features = ["hooks"] }
 reflect-index-schema = { path = "../../../crates/index-schema" }
 tempfile = { workspace = true }
-trash = "5.2.6"
 dirs = "6.0.0"
 tauri-plugin-dialog = "2.7.1"
-notify = "8.2.0"
-notify-debouncer-full = "0.7.0"
 base64 = "0.22.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-fastembed = "5"
-# Direct dependency on fastembed's own downloader, used to pre-fetch the
-# embedding model with byte-level progress (fastembed downloads silently).
-hf-hub = { version = "0.5.0", default-features = false, features = ["ureq", "native-tls"] }
 keyring = { version = "3", features = [
   "apple-native",
   "windows-native",
@@ -56,13 +49,24 @@ git2 = { version = "0.21", default-features = false, features = [
   "vendored-openssl",
 ] }
 tauri-plugin-http = "2.5.9"
-tauri-plugin-window-state = "2"
 
-# Auto-update (Plan 15): desktop-only — the updater has no mobile story, and
-# iOS distribution goes through the App Store.
+# Desktop-only capabilities (Plan 19): auto-update (mobile updates go through
+# the app stores), window-state (no windows to restore on mobile), the file
+# watcher (nothing else writes the mobile sandbox; local writes notify
+# in-process), the embedding runtime (fastembed/ORT is not built for mobile —
+# semantic search is desktop-only in the first mobile wave), and OS-trash
+# deletes (mobile moves into the graph-local `.reflect/trash/` instead).
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
+tauri-plugin-window-state = "2"
+trash = "5.2.6"
+notify = "8.2.0"
+notify-debouncer-full = "0.7.0"
+fastembed = "5"
+# Direct dependency on fastembed's own downloader, used to pre-fetch the
+# embedding model with byte-level progress (fastembed downloads silently).
+hf-hub = { version = "0.5.0", default-features = false, features = ["ureq", "native-tls"] }
 
 [dev-dependencies]
 tauri = { version = "2", features = ["test"] }
