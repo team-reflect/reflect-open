@@ -113,6 +113,9 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
       data-testid="palette-overlay"
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
         className={cn('w-full', splitLayout ? 'max-w-4xl' : 'max-w-xl')}
         onPointerDown={(event) => {
           event.stopPropagation() // clicks inside must not close
