@@ -68,8 +68,8 @@ vi.mock('@/hooks/use-audio-recorder', () => ({
 
 const SETTINGS = vi.hoisted(() => ({
   current: {
-    aiModels: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
-    defaultAiModelId: 'cfg-openai',
+    aiProviders: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
+    defaultAiProviderId: 'cfg-openai',
   },
 }))
 
@@ -110,8 +110,8 @@ beforeEach(() => {
   recorderControls.options = null
   sidebarState.collapsed = false
   SETTINGS.current = {
-    aiModels: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
-    defaultAiModelId: 'cfg-openai',
+    aiProviders: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
+    defaultAiProviderId: 'cfg-openai',
   }
   saveAudioMemo.mockResolvedValue({ ok: true, text: 'memo transcript' })
 })
@@ -136,7 +136,7 @@ describe('AudioMemoProvider', () => {
     expect(saveAudioMemo).toHaveBeenCalledWith(
       expect.objectContaining({
         payload: { kind: 'transcribe', audio: RECORDING.blob, mimeType: 'audio/mp4' },
-        models: { models: SETTINGS.current.aiModels, defaultModelId: 'cfg-openai' },
+        providers: { providers: SETTINGS.current.aiProviders, defaultProviderId: 'cfg-openai' },
         date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
         generation: 3,
       }),
@@ -585,10 +585,10 @@ describe('AudioMemoProvider', () => {
 
   it('is unavailable without an OpenAI or Gemini model, and toggle is a no-op', async () => {
     SETTINGS.current = {
-      aiModels: [
+      aiProviders: [
         { id: 'claude', provider: 'anthropic', model: 'claude-fable-5', keyHint: 'wxyz1' },
       ],
-      defaultAiModelId: 'claude',
+      defaultAiProviderId: 'claude',
     }
     const { result } = renderHook(() => useAudioMemo(), { wrapper })
 

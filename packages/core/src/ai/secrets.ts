@@ -5,8 +5,8 @@
  */
 
 /**
- * The keychain account name holding the API key for a configured AI model
- * (`AiModelConfig.id` is the stable half of the address).
+ * The keychain account name holding the API key for a configured AI provider
+ * (`AiProviderConfig.id` is the stable half of the address).
  */
 export function aiKeySecretName(configId: string): string {
   return `ai-api-key:${configId}`

@@ -121,8 +121,8 @@ describe('SettingsScreen', () => {
           weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
           graphColors: {},
-          aiModels: [],
-          defaultAiModelId: null,
+          aiProviders: [],
+          defaultAiProviderId: null,
         },
       ]),
     )
@@ -158,8 +158,8 @@ describe('SettingsScreen', () => {
           weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
           graphColors: {},
-          aiModels: [],
-          defaultAiModelId: null,
+          aiProviders: [],
+          defaultAiProviderId: null,
         },
       ]),
     )
@@ -185,8 +185,8 @@ describe('SettingsScreen', () => {
           weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
           graphColors: {},
-          aiModels: [],
-          defaultAiModelId: null,
+          aiProviders: [],
+          defaultAiProviderId: null,
         },
       ]),
     )
@@ -225,8 +225,8 @@ describe('SettingsScreen', () => {
           weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
           graphColors: {},
-          aiModels: [],
-          defaultAiModelId: null,
+          aiProviders: [],
+          defaultAiProviderId: null,
         },
       ]),
     )
@@ -261,8 +261,8 @@ describe('SettingsScreen', () => {
           weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
           graphColors: {},
-          aiModels: [],
-          defaultAiModelId: null,
+          aiProviders: [],
+          defaultAiProviderId: null,
         },
       ]),
     )
@@ -288,8 +288,8 @@ describe('SettingsScreen', () => {
           weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person', 'meeting'],
           graphColors: {},
-          aiModels: [],
-          defaultAiModelId: null,
+          aiProviders: [],
+          defaultAiProviderId: null,
         },
       ]),
     )
@@ -347,8 +347,8 @@ describe('SettingsScreen', () => {
           weekStartDay: 'monday',
           allNotesFilterTags: ['person'],
           graphColors: {},
-          aiModels: [],
-          defaultAiModelId: null,
+          aiProviders: [],
+          defaultAiProviderId: null,
         },
       ]),
     )
@@ -362,7 +362,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'focus', editorSpellCheck: true, semanticSearchEnabled: true, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiModels: [], defaultAiModelId: null },
+        { editorMarkdownSyntax: 'focus', editorSpellCheck: true, semanticSearchEnabled: true, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null },
       ]),
     )
     // The control flips to the loading state (EmbeddingsSync owns the actual
@@ -391,7 +391,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'focus', editorSpellCheck: true, semanticSearchEnabled: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiModels: [], defaultAiModelId: null },
+        { editorMarkdownSyntax: 'focus', editorSpellCheck: true, semanticSearchEnabled: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null },
       ]),
     )
     expect(screen.getByRole('button', { name: /enable semantic search/i })).toBeTruthy()
@@ -414,7 +414,7 @@ describe('SettingsScreen', () => {
     await waitFor(() => expect(invoked).toContain('embed_ensure'))
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'focus', editorSpellCheck: true, semanticSearchEnabled: true, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiModels: [], defaultAiModelId: null },
+        { editorMarkdownSyntax: 'focus', editorSpellCheck: true, semanticSearchEnabled: true, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null },
       ]),
     )
   })
@@ -433,7 +433,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'focus', editorSpellCheck: true, semanticSearchEnabled: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiModels: [], defaultAiModelId: null },
+        { editorMarkdownSyntax: 'focus', editorSpellCheck: true, semanticSearchEnabled: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null },
       ]),
     )
     expect(screen.getByRole('button', { name: /enable semantic search/i })).toBeTruthy()

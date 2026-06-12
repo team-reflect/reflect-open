@@ -1,5 +1,5 @@
 import { errorMessage, isAppError } from '../errors'
-import { pickTranscriptionConfig, type AiModelsState } from '../ai/models'
+import { pickTranscriptionConfig, type AiProvidersState } from '../ai/provider-config'
 import { aiKeySecretName } from '../ai/secrets'
 import { transcribeAudio } from '../ai/transcribe'
 import { readNote, writeNote } from '../graph/commands'
@@ -38,8 +38,8 @@ export type SaveAudioMemoOutcome =
 export interface SaveAudioMemoInput {
   /** A fresh recording, or the resume payload from a prior failure. */
   payload: AudioMemoResume
-  /** The configured-models state — decides the provider and keychain entry. */
-  models: AiModelsState
+  /** The configured-provider state — decides the provider and keychain entry. */
+  providers: AiProvidersState
   /** The target day (local ISO date) — resolved at save time, not record time. */
   date: string
   /** `GraphInfo.generation` — pins the write to the issuing graph. */
@@ -52,7 +52,7 @@ export interface SaveAudioMemoInput {
 export async function saveAudioMemo(input: SaveAudioMemoInput): Promise<SaveAudioMemoOutcome> {
   let step = input.payload
   if (step.kind === 'transcribe') {
-    const transcribed = await transcribeStep(step, input.models, input.fetchFn)
+    const transcribed = await transcribeStep(step, input.providers, input.fetchFn)
     if (!transcribed.ok) {
       return transcribed
     }
@@ -72,12 +72,12 @@ type TranscribeStepOutcome =
 
 async function transcribeStep(
   payload: AudioMemoResume & { kind: 'transcribe' },
-  models: AiModelsState,
+  providers: AiProvidersState,
   fetchFn: typeof fetch | undefined,
 ): Promise<TranscribeStepOutcome> {
   // Re-picked on every run (not once at record time): a retry after the user
-  // fixes their model configuration should see the fix.
-  const config = pickTranscriptionConfig(models)
+  // fixes their provider configuration should see the fix.
+  const config = pickTranscriptionConfig(providers)
   if (config === null) {
     return { ok: false, message: 'No OpenAI or Gemini model is configured.', resume: payload }
   }

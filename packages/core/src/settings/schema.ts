@@ -137,40 +137,41 @@ export const aiProviderIdSchema = z.enum(['openai', 'anthropic', 'google'])
 export type AiProviderId = z.infer<typeof aiProviderIdSchema>
 
 /**
- * One configured AI model: a provider and the chosen model id. The API key
- * itself lives in the OS keychain (addressed by `id` — see `aiKeySecretName`)
- * and **never** in this document; `keyHint` keeps only the key's trailing
- * characters so the settings UI can identify it. Which entry is the app-wide
- * default is a sibling scalar (`defaultAiModelId`), not a per-entry flag, so
- * "at most one default" holds by construction.
+ * One configured AI provider: the provider, its default model id, and a key
+ * hint. The API key itself lives in the OS keychain (addressed by `id` — see
+ * `aiKeySecretName`) and **never** in this document; `keyHint` keeps only the
+ * key's trailing characters so the settings UI can identify it. Which entry
+ * is the app-wide default is a sibling scalar (`defaultAiProviderId`), not a
+ * per-entry flag, so "at most one default" holds by construction.
  */
-export const aiModelConfigSchema = z.object({
+export const aiProviderConfigSchema = z.object({
   id: z.string().min(1),
   provider: aiProviderIdSchema,
   model: z.string().min(1),
   keyHint: z.string().catch(''),
 })
 
-export type AiModelConfig = z.infer<typeof aiModelConfigSchema>
+export type AiProviderConfig = z.infer<typeof aiProviderConfigSchema>
 
 /**
- * The `aiModels` entry AI features use by default. A dangling or null id is
- * legal (hand-edits, removed entries) — readers resolve it through
- * `defaultAiModel`, which falls back to the first entry.
+ * The `aiProviders` entry AI features use by default. A dangling or null id
+ * is legal (hand-edits, removed entries) — readers resolve it through
+ * `defaultAiProvider`, which falls back to the first entry.
  */
-export const defaultAiModelIdSchema = z.string().nullable().catch(null)
+export const defaultAiProviderIdSchema = z.string().nullable().catch(null)
 
 /**
- * The configured AI models. Resilience is per entry, not per list: a corrupt
- * entry is dropped while the rest load, so one bad hand-edit can't wipe every
- * configured provider. A non-array value degrades to the empty list.
+ * The configured AI providers. Resilience is per entry, not per list: a
+ * corrupt entry is dropped while the rest load, so one bad hand-edit can't
+ * wipe every configured provider. A non-array value degrades to the empty
+ * list.
  */
-export const aiModelsSchema = z
+export const aiProvidersSchema = z
   .array(z.unknown())
   .catch([])
   .transform((entries) =>
     entries.flatMap((entry) => {
-      const parsed = aiModelConfigSchema.safeParse(entry)
+      const parsed = aiProviderConfigSchema.safeParse(entry)
       return parsed.success ? [parsed.data] : []
     }),
   )
@@ -186,8 +187,8 @@ export const settingsSchema = z
     weekStartDay: weekStartDaySchema,
     allNotesFilterTags: allNotesFilterTagsSchema,
     graphColors: graphColorsSchema,
-    aiModels: aiModelsSchema,
-    defaultAiModelId: defaultAiModelIdSchema,
+    aiProviders: aiProvidersSchema,
+    defaultAiProviderId: defaultAiProviderIdSchema,
   })
   .passthrough()
 

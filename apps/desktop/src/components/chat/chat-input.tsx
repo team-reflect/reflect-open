@@ -1,30 +1,72 @@
-import { useState, type ReactElement } from 'react'
-import { aiModelLabel, aiProvider } from '@reflect/core'
+import { useMemo, useState, type ReactElement } from 'react'
+import { aiProvider, type AiProviderConfig, type ChatModelOption } from '@reflect/core'
 import { ArrowUp, Plus, Square, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
 import { imageFilesFrom } from '@/lib/chat-attachments'
 import { useChatSession } from '@/providers/chat-provider'
 
+interface ModelOptionGroup {
+  configId: string
+  /** Provider label, key-hint-qualified when the provider is configured twice. */
+  label: string
+  /** The group's models, each with its picker value (index into the options). */
+  options: Array<{ option: ChatModelOption; value: string }>
+}
+
+/**
+ * The flat option list regrouped per configured provider for rendering
+ * (options arrive consecutively per entry). Values are list indexes — model
+ * ids alone can collide across providers.
+ */
+function groupModelOptions(
+  options: ChatModelOption[],
+  providers: AiProviderConfig[],
+): ModelOptionGroup[] {
+  const groups: ModelOptionGroup[] = []
+  options.forEach((option, index) => {
+    const item = { option, value: String(index) }
+    const last = groups.at(-1)
+    if (last?.configId === option.configId) {
+      last.options.push(item)
+      return
+    }
+    const providerLabel = aiProvider(option.provider).label
+    const duplicated =
+      providers.filter((provider) => provider.provider === option.provider).length > 1
+    const keyHint = providers.find((provider) => provider.id === option.configId)?.keyHint ?? ''
+    groups.push({
+      configId: option.configId,
+      label: duplicated && keyHint !== '' ? `${providerLabel} ·····${keyHint}` : providerLabel,
+      options: [item],
+    })
+  })
+  return groups
+}
+
 /**
  * The composer: a textarea (Enter sends, Shift-Enter breaks, Esc stops a
- * streaming turn), the session's model picker, and a send button that turns
- * into stop while a turn streams. Pasted images queue as attachments and
- * preview above the textarea — a message can be a photo alone, so Enter
- * sends whenever there is text *or* something attached. "New chat" appears
- * once there's a conversation to clear.
+ * streaming turn), the session's model picker — every configured provider's
+ * full model list — and a send button that turns into stop while a turn
+ * streams. Pasted images queue as attachments and preview above the
+ * textarea — a message can be a photo alone, so Enter sends whenever there
+ * is text *or* something attached. "New chat" appears once there's a
+ * conversation to clear.
  */
 export function ChatInput(): ReactElement {
   const {
     turns,
     status,
-    models,
+    providers,
+    modelOptions,
     activeModel,
     selectModel,
     attachments,
@@ -37,6 +79,17 @@ export function ChatInput(): ReactElement {
   const [text, setText] = useState('')
   const streaming = status === 'streaming'
   const empty = text.trim() === '' && attachments.length === 0
+
+  const groups = useMemo(
+    () => groupModelOptions(modelOptions, providers),
+    [modelOptions, providers],
+  )
+  const activeIndex = modelOptions.findIndex(
+    (option) =>
+      activeModel !== null &&
+      option.configId === activeModel.id &&
+      option.modelId === activeModel.model,
+  )
 
   const submit = () => {
     if (streaming || empty) {
@@ -101,7 +154,15 @@ export function ChatInput(): ReactElement {
           className="field-sizing-content max-h-48 w-full resize-none bg-transparent px-3.5 pt-3 text-sm text-text outline-none placeholder:text-text-muted"
         />
         <div className="flex items-center gap-2 px-2.5 pb-2.5">
-          <Select value={activeModel?.id ?? ''} onValueChange={(id) => selectModel(id)}>
+          <Select
+            value={activeIndex >= 0 ? String(activeIndex) : ''}
+            onValueChange={(value) => {
+              const option = modelOptions[Number(value)]
+              if (option !== undefined) {
+                selectModel({ configId: option.configId, modelId: option.modelId })
+              }
+            }}
+          >
             <SelectTrigger
               aria-label="Model"
               size="sm"
@@ -110,12 +171,15 @@ export function ChatInput(): ReactElement {
               <SelectValue placeholder="Choose a model" />
             </SelectTrigger>
             <SelectContent>
-              {models.map((model) => (
-                <SelectItem key={model.id} value={model.id}>
-                  {/* Provider-qualified: the same model id can be configured
-                      under two providers and must stay tellable apart. */}
-                  {aiProvider(model.provider).label} · {aiModelLabel(model.provider, model.model)}
-                </SelectItem>
+              {groups.map((group) => (
+                <SelectGroup key={group.configId}>
+                  <SelectLabel>{group.label}</SelectLabel>
+                  {group.options.map(({ option, value }) => (
+                    <SelectItem key={value} value={value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               ))}
             </SelectContent>
           </Select>

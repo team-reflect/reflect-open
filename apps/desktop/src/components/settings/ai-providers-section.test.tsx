@@ -1,10 +1,10 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { setBridge, settingsSchema, type AiModelConfig, type Settings } from '@reflect/core'
+import { setBridge, settingsSchema, type AiProviderConfig, type Settings } from '@reflect/core'
 import { SettingsProvider } from '@/providers/settings-provider'
 import { resetOperations } from '@/lib/operations'
-import { AiModelsSection } from './ai-models-section'
+import { AiProvidersSection } from './ai-providers-section'
 
 // The dialog verifies keys against the provider through this transport; the
 // default per-test behavior is "key accepted".
@@ -68,7 +68,7 @@ function renderSection(): void {
   render(
     <QueryClientProvider client={queryClient}>
       <SettingsProvider>
-        <AiModelsSection />
+        <AiProvidersSection />
       </SettingsProvider>
     </QueryClientProvider>,
   )
@@ -79,7 +79,7 @@ function lastSavedDoc(): Settings {
   return settingsSchema.parse(saved.at(-1))
 }
 
-function entry(overrides: Partial<AiModelConfig>): AiModelConfig {
+function entry(overrides: Partial<AiProviderConfig>): AiProviderConfig {
   return {
     id: 'id',
     provider: 'anthropic',
@@ -92,17 +92,17 @@ function entry(overrides: Partial<AiModelConfig>): AiModelConfig {
 /** Two configured entries with 'a' as the default. */
 function twoStoredModels(): Record<string, unknown> {
   return {
-    aiModels: [
+    aiProviders: [
       entry({ id: 'a' }),
       entry({ id: 'b', provider: 'openai', model: 'gpt-5.5', keyHint: 'abcd2' }),
     ],
-    defaultAiModelId: 'a',
+    defaultAiProviderId: 'a',
   }
 }
 
 function openDialog(): ReturnType<typeof within> {
-  fireEvent.click(screen.getByRole('button', { name: /add model/i }))
-  return within(screen.getByRole('dialog', { name: 'Add AI model' }))
+  fireEvent.click(screen.getByRole('button', { name: /add provider/i }))
+  return within(screen.getByRole('dialog', { name: 'Add AI provider' }))
 }
 
 beforeEach(() => {
@@ -122,8 +122,8 @@ afterEach(() => {
   resetOperations()
 })
 
-describe('AiModelsSection', () => {
-  it('lists configured models with their key hint and default badge', async () => {
+describe('AiProvidersSection', () => {
+  it('lists configured providers with their key hint and default badge', async () => {
     stored = twoStoredModels()
     renderSection()
 
@@ -139,30 +139,30 @@ describe('AiModelsSection', () => {
 
   it('adds a model: key verified, then keychain + settings entry', async () => {
     renderSection()
-    await waitFor(() => expect(screen.getByText(/No AI models configured/)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/No AI providers configured/)).toBeTruthy())
 
     const dialog = openDialog()
     // Keyboard-driven (the pointer path needs capture APIs jsdom lacks);
     // options render in a portal, so they're queried from screen.
     fireEvent.keyDown(dialog.getByRole('combobox', { name: 'Provider' }), { key: 'ArrowDown' })
     fireEvent.keyDown(await screen.findByRole('option', { name: 'Anthropic' }), { key: 'Enter' })
-    fireEvent.click(dialog.getByRole('combobox', { name: 'Model' }))
+    fireEvent.click(dialog.getByRole('combobox', { name: 'Default model' }))
     fireEvent.click(await screen.findByRole('option', { name: /Claude Sonnet 4\.6/ }))
     fireEvent.change(dialog.getByLabelText('API key'), {
       target: { value: 'sk-ant-test-wxyz1' },
     })
-    fireEvent.click(dialog.getByRole('button', { name: 'Add model' }))
+    fireEvent.click(dialog.getByRole('button', { name: 'Add provider' }))
 
     await waitFor(() => expect(saved).toHaveLength(1))
     const doc = lastSavedDoc()
-    const [added] = doc.aiModels
+    const [added] = doc.aiProviders
     expect(added).toMatchObject({
       provider: 'anthropic',
       model: 'claude-sonnet-4-6',
       keyHint: 'wxyz1',
     })
     // The first entry becomes the default automatically.
-    expect(doc.defaultAiModelId).toBe(added.id)
+    expect(doc.defaultAiProviderId).toBe(added.id)
     // The key was verified against the provider before being stored.
     expect(providerFetchMock).toHaveBeenCalledWith(
       'https://api.anthropic.com/v1/models',
@@ -177,11 +177,11 @@ describe('AiModelsSection', () => {
   it('rejects a key the provider turns down, storing nothing', async () => {
     providerFetchMock.mockResolvedValue(new Response(null, { status: 401 }))
     renderSection()
-    await waitFor(() => expect(screen.getByText(/No AI models configured/)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/No AI providers configured/)).toBeTruthy())
 
     const dialog = openDialog()
     fireEvent.change(dialog.getByLabelText('API key'), { target: { value: 'sk-typo' } })
-    fireEvent.click(dialog.getByRole('button', { name: 'Add model' }))
+    fireEvent.click(dialog.getByRole('button', { name: 'Add provider' }))
 
     await waitFor(() =>
       expect(dialog.getByRole('alert').textContent).toMatch(/rejected this API key/i),
@@ -193,11 +193,11 @@ describe('AiModelsSection', () => {
   it('offers save-anyway when the provider cannot be reached', async () => {
     providerFetchMock.mockRejectedValue(new TypeError('offline'))
     renderSection()
-    await waitFor(() => expect(screen.getByText(/No AI models configured/)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/No AI providers configured/)).toBeTruthy())
 
     const dialog = openDialog()
     fireEvent.change(dialog.getByLabelText('API key'), { target: { value: 'sk-offline-key' } })
-    fireEvent.click(dialog.getByRole('button', { name: 'Add model' }))
+    fireEvent.click(dialog.getByRole('button', { name: 'Add provider' }))
 
     // First submit downgrades to an explicit unverified save, not a block.
     await waitFor(() => expect(dialog.getByRole('alert').textContent).toMatch(/reach OpenAI/))
@@ -211,12 +211,12 @@ describe('AiModelsSection', () => {
 
   it('a failed keychain write keeps the dialog open and persists nothing', async () => {
     renderSection()
-    await waitFor(() => expect(screen.getByText(/No AI models configured/)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/No AI providers configured/)).toBeTruthy())
     failSecretSet = true
 
     const dialog = openDialog()
     fireEvent.change(dialog.getByLabelText('API key'), { target: { value: 'sk-test' } })
-    fireEvent.click(dialog.getByRole('button', { name: 'Add model' }))
+    fireEvent.click(dialog.getByRole('button', { name: 'Add provider' }))
 
     await waitFor(() => expect(dialog.getByRole('alert').textContent).toBe('keychain locked'))
     expect(screen.getByRole('dialog')).toBeTruthy()
@@ -227,11 +227,11 @@ describe('AiModelsSection', () => {
   it('refuses to add when the settings store failed to load (no orphaned key)', async () => {
     failLoad = true
     renderSection()
-    await waitFor(() => expect(screen.getByText(/No AI models configured/)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/No AI providers configured/)).toBeTruthy())
 
     const dialog = openDialog()
     fireEvent.change(dialog.getByLabelText('API key'), { target: { value: 'sk-test' } })
-    fireEvent.click(dialog.getByRole('button', { name: 'Add model' }))
+    fireEvent.click(dialog.getByRole('button', { name: 'Add provider' }))
 
     // A session-only entry would vanish on restart, stranding the key in the
     // keychain with no UI to delete it — so the key must never be stored.
@@ -256,8 +256,8 @@ describe('AiModelsSection', () => {
 
     await waitFor(() =>
       expect(lastSavedDoc()).toMatchObject({
-        aiModels: [entry({ id: 'b', provider: 'openai', model: 'gpt-5.5', keyHint: 'abcd2' })],
-        defaultAiModelId: 'b',
+        aiProviders: [entry({ id: 'b', provider: 'openai', model: 'gpt-5.5', keyHint: 'abcd2' })],
+        defaultAiProviderId: 'b',
       }),
     )
     expect(secrets.has('ai-api-key:a')).toBe(false)
@@ -282,7 +282,7 @@ describe('AiModelsSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove OpenAI — GPT-5.5' }))
 
     await waitFor(() =>
-      expect(lastSavedDoc()).toMatchObject({ aiModels: [], defaultAiModelId: null }),
+      expect(lastSavedDoc()).toMatchObject({ aiProviders: [], defaultAiProviderId: null }),
     )
     expect(secrets.size).toBe(0)
   })
@@ -296,16 +296,16 @@ describe('AiModelsSection', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Make default' }))
 
-    await waitFor(() => expect(lastSavedDoc().defaultAiModelId).toBe('b'))
-    expect(lastSavedDoc().aiModels).toHaveLength(2)
+    await waitFor(() => expect(lastSavedDoc().defaultAiProviderId).toBe('b'))
+    expect(lastSavedDoc().aiProviders).toHaveLength(2)
   })
 
   it('traps Tab inside the dialog', async () => {
     renderSection()
-    await waitFor(() => expect(screen.getByText(/No AI models configured/)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/No AI providers configured/)).toBeTruthy())
 
     const dialog = openDialog()
-    const submitButton = dialog.getByRole('button', { name: 'Add model' })
+    const submitButton = dialog.getByRole('button', { name: 'Add provider' })
     submitButton.focus()
     fireEvent.keyDown(submitButton, { key: 'Tab' })
 
@@ -315,7 +315,7 @@ describe('AiModelsSection', () => {
   })
 
   it('falls back to the first entry when the default id dangles', async () => {
-    stored = { ...twoStoredModels(), defaultAiModelId: 'gone' }
+    stored = { ...twoStoredModels(), defaultAiProviderId: 'gone' }
     renderSection()
 
     await waitFor(() => expect(screen.getByText('Default')).toBeTruthy())

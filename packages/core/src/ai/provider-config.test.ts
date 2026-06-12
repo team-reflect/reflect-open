@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import type { AiModelConfig } from '../settings/schema'
+import type { AiProviderConfig } from '../settings/schema'
 import {
   apiKeyHint,
-  defaultAiModel,
+  defaultAiProvider,
   pickTranscriptionConfig,
-  withAiModelAdded,
-  withAiModelRemoved,
-  type AiModelsState,
-} from './models'
+  withAiProviderAdded,
+  withAiProviderRemoved,
+  type AiProvidersState,
+} from './provider-config'
 
-function config(overrides: Partial<AiModelConfig>): AiModelConfig {
+function config(overrides: Partial<AiProviderConfig>): AiProviderConfig {
   return {
     id: 'id',
     provider: 'openai',
@@ -19,8 +19,8 @@ function config(overrides: Partial<AiModelConfig>): AiModelConfig {
   }
 }
 
-function state(models: AiModelConfig[], defaultModelId: string | null): AiModelsState {
-  return { models, defaultModelId }
+function state(providers: AiProviderConfig[], defaultProviderId: string | null): AiProvidersState {
+  return { providers, defaultProviderId }
 }
 
 describe('apiKeyHint', () => {
@@ -35,67 +35,67 @@ describe('apiKeyHint', () => {
   })
 })
 
-describe('withAiModelAdded', () => {
+describe('withAiProviderAdded', () => {
   it('makes the first entry the default even when not requested', () => {
-    expect(withAiModelAdded(state([], null), config({ id: 'a' }), false)).toEqual(
+    expect(withAiProviderAdded(state([], null), config({ id: 'a' }), false)).toEqual(
       state([config({ id: 'a' })], 'a'),
     )
   })
 
   it('appends a non-default entry without touching the default', () => {
     const before = state([config({ id: 'a' })], 'a')
-    expect(withAiModelAdded(before, config({ id: 'b' }), false)).toEqual(
+    expect(withAiProviderAdded(before, config({ id: 'b' }), false)).toEqual(
       state([config({ id: 'a' }), config({ id: 'b' })], 'a'),
     )
   })
 
   it('an entry added as default takes over', () => {
     const before = state([config({ id: 'a' })], 'a')
-    expect(withAiModelAdded(before, config({ id: 'b' }), true).defaultModelId).toBe('b')
+    expect(withAiProviderAdded(before, config({ id: 'b' }), true).defaultProviderId).toBe('b')
   })
 })
 
-describe('withAiModelRemoved', () => {
+describe('withAiProviderRemoved', () => {
   it('removes the entry with the id', () => {
     const before = state([config({ id: 'a' }), config({ id: 'b' })], 'a')
-    expect(withAiModelRemoved(before, 'b')).toEqual(state([config({ id: 'a' })], 'a'))
+    expect(withAiProviderRemoved(before, 'b')).toEqual(state([config({ id: 'a' })], 'a'))
   })
 
   it('promotes the first remaining entry when the default is removed', () => {
     const before = state([config({ id: 'a' }), config({ id: 'b' })], 'a')
-    expect(withAiModelRemoved(before, 'a')).toEqual(state([config({ id: 'b' })], 'b'))
+    expect(withAiProviderRemoved(before, 'a')).toEqual(state([config({ id: 'b' })], 'b'))
   })
 
   it('removing the last entry clears the default', () => {
-    expect(withAiModelRemoved(state([config({ id: 'a' })], 'a'), 'a')).toEqual(state([], null))
+    expect(withAiProviderRemoved(state([config({ id: 'a' })], 'a'), 'a')).toEqual(state([], null))
   })
 })
 
 describe('pickTranscriptionConfig', () => {
   it('prefers any openai entry over a google default', () => {
-    const models = [
+    const providers = [
       config({ id: 'gemini', provider: 'google', model: 'gemini-2.5-flash' }),
       config({ id: 'oai', provider: 'openai' }),
     ]
-    expect(pickTranscriptionConfig(state(models, 'gemini'))?.id).toBe('oai')
+    expect(pickTranscriptionConfig(state(providers, 'gemini'))?.id).toBe('oai')
   })
 
   it('prefers the app default among entries of the chosen provider', () => {
-    const models = [config({ id: 'first' }), config({ id: 'second' })]
-    expect(pickTranscriptionConfig(state(models, 'second'))?.id).toBe('second')
+    const providers = [config({ id: 'first' }), config({ id: 'second' })]
+    expect(pickTranscriptionConfig(state(providers, 'second'))?.id).toBe('second')
   })
 
   it('falls back to google when no openai entry exists', () => {
-    const models = [
+    const providers = [
       config({ id: 'claude', provider: 'anthropic', model: 'claude-fable-5' }),
       config({ id: 'gemini', provider: 'google', model: 'gemini-2.5-flash' }),
     ]
-    expect(pickTranscriptionConfig(state(models, 'claude'))?.id).toBe('gemini')
+    expect(pickTranscriptionConfig(state(providers, 'claude'))?.id).toBe('gemini')
   })
 
   it('returns null when only anthropic entries exist', () => {
-    const models = [config({ id: 'claude', provider: 'anthropic', model: 'claude-fable-5' })]
-    expect(pickTranscriptionConfig(state(models, 'claude'))).toBeNull()
+    const providers = [config({ id: 'claude', provider: 'anthropic', model: 'claude-fable-5' })]
+    expect(pickTranscriptionConfig(state(providers, 'claude'))).toBeNull()
   })
 
   it('returns null for the empty list', () => {
@@ -103,19 +103,19 @@ describe('pickTranscriptionConfig', () => {
   })
 })
 
-describe('defaultAiModel', () => {
+describe('defaultAiProvider', () => {
   it('returns the entry the id points at', () => {
-    const models = [config({ id: 'a' }), config({ id: 'b' })]
-    expect(defaultAiModel(state(models, 'b'))?.id).toBe('b')
+    const providers = [config({ id: 'a' }), config({ id: 'b' })]
+    expect(defaultAiProvider(state(providers, 'b'))?.id).toBe('b')
   })
 
   it('falls back to the first entry for a null or dangling id', () => {
-    const models = [config({ id: 'a' }), config({ id: 'b' })]
-    expect(defaultAiModel(state(models, null))?.id).toBe('a')
-    expect(defaultAiModel(state(models, 'gone'))?.id).toBe('a')
+    const providers = [config({ id: 'a' }), config({ id: 'b' })]
+    expect(defaultAiProvider(state(providers, null))?.id).toBe('a')
+    expect(defaultAiProvider(state(providers, 'gone'))?.id).toBe('a')
   })
 
   it('returns null for the empty list', () => {
-    expect(defaultAiModel(state([], null))).toBeNull()
+    expect(defaultAiProvider(state([], null))).toBeNull()
   })
 })

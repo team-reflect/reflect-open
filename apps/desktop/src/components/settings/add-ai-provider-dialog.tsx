@@ -26,16 +26,16 @@ import {
 } from '@/components/ui/select'
 import { InlineAlert } from '@/components/inline-alert'
 import { providerFetch } from '@/lib/provider-fetch'
-import type { NewAiModel } from '@/hooks/use-ai-models'
+import type { NewAiProvider } from '@/hooks/use-ai-providers'
 import { ModelCombobox } from './model-combobox'
 
-interface AddAiModelDialogProps {
-  /** Persists the new model (keychain + settings); rejects on failure. */
-  onAdd: (draft: NewAiModel) => Promise<void>
+interface AddAiProviderDialogProps {
+  /** Persists the new provider (keychain + settings); rejects on failure. */
+  onAdd: (draft: NewAiProvider) => Promise<void>
   onClose: () => void
 }
 
-interface AddAiModelForm {
+interface AddAiProviderForm {
   provider: AiProviderId
   model: string
   apiKey: string
@@ -45,17 +45,17 @@ interface AddAiModelForm {
 const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
 
 /**
- * The "Add AI model" modal: pick a provider, pick one of its models, paste an
- * API key, optionally mark it as the app default. The key is verified against
+ * The "Add AI provider" modal: pick a provider, pick its default model, paste
+ * an API key, optionally mark it as the app default. The key is verified against
  * the provider before anything is stored — a rejected key shows inline; an
  * unreachable provider (offline) downgrades the submit to an explicit "Save
  * anyway" instead of hard-blocking on connectivity. Submitting hands the
- * draft to {@link AddAiModelDialogProps.onAdd} — the key goes to the OS
+ * draft to {@link AddAiProviderDialogProps.onAdd} — the key goes to the OS
  * keychain, never into the settings document — and a failure keeps the
  * dialog open with the typed key intact so the user can retry.
  */
-export function AddAiModelDialog({ onAdd, onClose }: AddAiModelDialogProps): ReactElement {
-  const { register, handleSubmit, watch, setValue, formState } = useForm<AddAiModelForm>({
+export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps): ReactElement {
+  const { register, handleSubmit, watch, setValue, formState } = useForm<AddAiProviderForm>({
     defaultValues: {
       provider: AI_PROVIDERS[0].id,
       model: AI_PROVIDERS[0].models[0].id,
@@ -115,7 +115,7 @@ export function AddAiModelDialog({ onAdd, onClose }: AddAiModelDialogProps): Rea
     <Dialog open onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
       <DialogContent showCloseButton={false} className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Add AI model</DialogTitle>
+          <DialogTitle>Add AI provider</DialogTitle>
           <DialogDescription>
             The API key is stored in your OS keychain, never in your graph.
           </DialogDescription>
@@ -151,7 +151,7 @@ export function AddAiModelDialog({ onAdd, onClose }: AddAiModelDialogProps): Rea
           </div>
 
           <div className="flex flex-col gap-1">
-            <span className={FIELD_LABEL_CLASS}>Model</span>
+            <span className={FIELD_LABEL_CLASS}>Default model</span>
             <ModelCombobox
               value={watch('model')}
               provider={provider.id}
@@ -183,7 +183,7 @@ export function AddAiModelDialog({ onAdd, onClose }: AddAiModelDialogProps): Rea
 
           <label className="flex items-center gap-2">
             <input type="checkbox" className="accent-accent" {...register('isDefault')} />
-            <span className="text-sm text-text">Use as the default model</span>
+            <span className="text-sm text-text">Use as the default provider</span>
           </label>
 
           {submitError !== null ? <InlineAlert tone="error">{submitError}</InlineAlert> : null}
@@ -199,7 +199,7 @@ export function AddAiModelDialog({ onAdd, onClose }: AddAiModelDialogProps): Rea
               Cancel
             </Button>
             <Button type="submit" size="sm" disabled={formState.isSubmitting}>
-              {unverified ? 'Save anyway' : 'Add model'}
+              {unverified ? 'Save anyway' : 'Add provider'}
             </Button>
           </div>
         </form>

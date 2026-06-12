@@ -11,11 +11,14 @@ import {
 } from 'react'
 import {
   aiKeySecretName,
-  defaultAiModel,
+  chatModelOptions,
   errorMessage,
   getSecret,
+  resolveChatModel,
   streamChat,
-  type AiModelConfig,
+  type AiProviderConfig,
+  type ChatModelOption,
+  type ChatModelSelection,
   type ChatStreamEvent,
 } from '@reflect/core'
 import { toChatAttachment, type ChatAttachment } from '@/lib/chat-attachments'
@@ -38,12 +41,17 @@ export type ChatStatus = 'idle' | 'streaming'
 interface ChatContextValue {
   turns: ChatTurn[]
   status: ChatStatus
-  /** Configured BYOK entries (the picker's options). */
-  models: AiModelConfig[]
-  /** The entry the next turn calls — session override or settings default. */
-  activeModel: AiModelConfig | null
+  /** Configured provider entries (empty → the add-a-provider CTA). */
+  providers: AiProviderConfig[]
+  /** Every model the picker offers: each provider's full curated list. */
+  modelOptions: ChatModelOption[]
+  /**
+   * The provider entry + model the next turn calls (`model` already carries
+   * the session's choice) — session override or the settings default.
+   */
+  activeModel: AiProviderConfig | null
   /** Override the session's model (null returns to the settings default). */
-  selectModel: (id: string | null) => void
+  selectModel: (selection: ChatModelSelection | null) => void
   /** Images queued for the next message (dropped or pasted onto the chat). */
   attachments: ChatAttachment[]
   /** Queue image files for the next message. */
@@ -64,14 +72,16 @@ export function ChatProvider({ children }: { children: ReactNode }): ReactElemen
   const { settings } = useSettings()
   const [turns, setTurns] = useState<ChatTurn[]>([])
   const [attachments, setAttachments] = useState<ChatAttachment[]>([])
-  const [modelId, setModelId] = useState<string | null>(null)
+  const [selection, setSelection] = useState<ChatModelSelection | null>(null)
 
   const status: ChatStatus = turns.at(-1)?.status === 'streaming' ? 'streaming' : 'idle'
 
-  const models = settings.aiModels
-  const activeModel =
-    (modelId !== null ? (models.find((model) => model.id === modelId) ?? null) : null) ??
-    defaultAiModel({ models, defaultModelId: settings.defaultAiModelId })
+  const providers = settings.aiProviders
+  const modelOptions = useMemo(() => chatModelOptions(providers), [providers])
+  const activeModel = resolveChatModel(
+    { providers, defaultProviderId: settings.defaultAiProviderId },
+    selection,
+  )
 
   // Read at call time, not captured: send() can fire long after the render
   // that created it.
@@ -79,7 +89,7 @@ export function ChatProvider({ children }: { children: ReactNode }): ReactElemen
   turnsRef.current = turns
   const attachmentsRef = useRef(attachments)
   attachmentsRef.current = attachments
-  const activeModelRef = useRef<AiModelConfig | null>(activeModel)
+  const activeModelRef = useRef<AiProviderConfig | null>(activeModel)
   activeModelRef.current = activeModel
 
   // The in-flight send, tracked synchronously — the no-concurrent-sends
@@ -103,10 +113,10 @@ export function ChatProvider({ children }: { children: ReactNode }): ReactElemen
   const send = useCallback(async (text: string): Promise<void> => {
     const trimmed = text.trim()
     const attached = attachmentsRef.current
-    const model = activeModelRef.current
+    const config = activeModelRef.current
     if (
       (trimmed === '' && attached.length === 0) ||
-      model === null ||
+      config === null ||
       activeSendRef.current?.session === sessionRef.current
     ) {
       return
@@ -140,17 +150,17 @@ export function ChatProvider({ children }: { children: ReactNode }): ReactElemen
     activeSendRef.current = activeSend
 
     try {
-      const apiKey = await getSecret(aiKeySecretName(model.id))
+      const apiKey = await getSecret(aiKeySecretName(config.id))
       if (apiKey === null) {
         applyEvent({
           type: 'error',
-          message: 'No API key found for this model — re-add it in Settings → AI models.',
+          message: 'No API key found for this provider — re-add it in Settings → AI providers.',
           messages: [],
         })
         return
       }
       const events = streamChat({
-        model,
+        config,
         apiKey,
         fetchFn: providerFetch,
         messages,
@@ -195,8 +205,8 @@ export function ChatProvider({ children }: { children: ReactNode }): ReactElemen
     setAttachments([])
   }, [])
 
-  const selectModel = useCallback((id: string | null) => {
-    setModelId(id)
+  const selectModel = useCallback((next: ChatModelSelection | null) => {
+    setSelection(next)
   }, [])
 
   const attachImages = useCallback(async (files: File[]): Promise<void> => {
@@ -212,7 +222,8 @@ export function ChatProvider({ children }: { children: ReactNode }): ReactElemen
     () => ({
       turns,
       status,
-      models,
+      providers,
+      modelOptions,
       activeModel,
       selectModel,
       attachments,
@@ -225,7 +236,8 @@ export function ChatProvider({ children }: { children: ReactNode }): ReactElemen
     [
       turns,
       status,
-      models,
+      providers,
+      modelOptions,
       activeModel,
       selectModel,
       attachments,

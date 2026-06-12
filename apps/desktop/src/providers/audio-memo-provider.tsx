@@ -118,10 +118,10 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
   const transcriptionConfig = useMemo(
     () =>
       pickTranscriptionConfig({
-        models: settings.aiModels,
-        defaultModelId: settings.defaultAiModelId,
+        providers: settings.aiProviders,
+        defaultProviderId: settings.defaultAiProviderId,
       }),
-    [settings.aiModels, settings.defaultAiModelId],
+    [settings.aiProviders, settings.defaultAiProviderId],
   )
 
   const collapsedRef = useRef(collapsed)
@@ -158,7 +158,7 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
         try {
           outcome = await saveAudioMemo({
             payload,
-            models: { models: settings.aiModels, defaultModelId: settings.defaultAiModelId },
+            providers: { providers: settings.aiProviders, defaultProviderId: settings.defaultAiProviderId },
             date: todayIso(),
             generation: graph.generation,
             fetchFn: providerFetch,
@@ -183,7 +183,7 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
     } finally {
       pumpingRef.current = false
     }
-  }, [settings.aiModels, settings.defaultAiModelId, graph.generation])
+  }, [settings.aiProviders, settings.defaultAiProviderId, graph.generation])
 
   const start = useCallback(async (): Promise<void> => {
     if (!supported || transcriptionConfig === null) {

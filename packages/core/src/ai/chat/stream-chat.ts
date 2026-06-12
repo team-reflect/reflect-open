@@ -3,7 +3,7 @@ import { createAnthropic } from '@ai-sdk/anthropic'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createOpenAI } from '@ai-sdk/openai'
 import { errorMessage } from '../../errors'
-import type { AiModelConfig } from '../../settings/schema'
+import type { AiProviderConfig } from '../../settings/schema'
 import { chatSystemPrompt } from './system-prompt'
 import {
   buildNoteTools,
@@ -27,8 +27,8 @@ import {
 const MAX_STEPS = 8
 
 export interface StreamChatOptions {
-  /** The configured model entry to call (provider + model id). */
-  model: AiModelConfig
+  /** The provider entry to call, with `model` set to the model id to use. */
+  config: AiProviderConfig
   /** The BYOK API key, read from the OS keychain by the caller. */
   apiKey: string
   /**
@@ -54,7 +54,7 @@ export type ChatStreamEvent =
   | { type: 'aborted'; messages: ModelMessage[] }
   | { type: 'complete'; messages: ModelMessage[] }
 
-function languageModel(config: AiModelConfig, apiKey: string, fetchFn: typeof fetch): LanguageModel {
+function languageModel(config: AiProviderConfig, apiKey: string, fetchFn: typeof fetch): LanguageModel {
   switch (config.provider) {
     case 'openai':
       return createOpenAI({ apiKey, fetch: fetchFn })(config.model)
@@ -71,7 +71,7 @@ function languageModel(config: AiModelConfig, apiKey: string, fetchFn: typeof fe
  * stream's contract.
  */
 export function streamChat(options: StreamChatOptions): AsyncGenerator<ChatStreamEvent> {
-  return streamChatTurn(languageModel(options.model, options.apiKey, options.fetchFn), options)
+  return streamChatTurn(languageModel(options.config, options.apiKey, options.fetchFn), options)
 }
 
 /** {@link streamChatTurn}'s options: {@link StreamChatOptions} minus provider wiring. */

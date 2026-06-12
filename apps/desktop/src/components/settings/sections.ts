@@ -10,7 +10,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'all-notes', title: 'All notes' },
   { id: 'search', title: 'Search' },
   { id: 'backup', title: 'Backup' },
-  { id: 'ai-models', title: 'AI models' },
+  { id: 'ai-providers', title: 'AI providers' },
   { id: 'keyboard', title: 'Keyboard shortcuts' },
   { id: 'about', title: 'About' },
 ] as const

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AiModelsState } from '../ai/models'
+import type { AiProvidersState } from '../ai/provider-config'
 import { appendToDailyNote, saveAudioMemo, type AudioMemoResume } from './audio-memo'
 import { readNote, writeNote } from '../graph/commands'
 import { transcribeAudio } from '../ai/transcribe'
@@ -22,9 +22,9 @@ const writeNoteMock = vi.mocked(writeNote)
 const transcribeMock = vi.mocked(transcribeAudio)
 const getSecretMock = vi.mocked(getSecret)
 
-const MODELS: AiModelsState = {
-  models: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
-  defaultModelId: 'cfg-openai',
+const PROVIDERS: AiProvidersState = {
+  providers: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
+  defaultProviderId: 'cfg-openai',
 }
 
 const RECORDING: AudioMemoResume & { kind: 'transcribe' } = {
@@ -33,8 +33,8 @@ const RECORDING: AudioMemoResume & { kind: 'transcribe' } = {
   mimeType: 'audio/mp4',
 }
 
-function save(payload: AudioMemoResume, models: AiModelsState = MODELS) {
-  return saveAudioMemo({ payload, models, date: '2026-06-11', generation: 3 })
+function save(payload: AudioMemoResume, providers: AiProvidersState = PROVIDERS) {
+  return saveAudioMemo({ payload, providers, date: '2026-06-11', generation: 3 })
 }
 
 beforeEach(() => {
@@ -75,7 +75,7 @@ describe('saveAudioMemo', () => {
   })
 
   it('reports a missing provider as resumable — a retry sees fixed settings', async () => {
-    const outcome = await save(RECORDING, { models: [], defaultModelId: null })
+    const outcome = await save(RECORDING, { providers: [], defaultProviderId: null })
 
     expect(outcome).toEqual({
       ok: false,
