@@ -37,7 +37,7 @@ export function AudioMemoButton(): ReactElement {
               !memo.available && 'opacity-50 hover:bg-transparent hover:text-text-muted',
             )}
           >
-            <MicIcon className="size-4" />
+            <MicIcon className="size-[18px]" />
           </Button>
         </TooltipTrigger>
         <TooltipContent side="bottom">
@@ -72,7 +72,7 @@ export function AudioMemoButton(): ReactElement {
           }}
         >
           {memo.phase === 'error' ? (
-            <MicIcon className="size-4" />
+            <MicIcon className="size-[18px]" />
           ) : (
             <Square aria-hidden fill="currentColor" className="size-3" />
           )}
