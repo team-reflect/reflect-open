@@ -4,8 +4,9 @@ How to produce a signed, notarized macOS build of Reflect for distribution outsi
 Mac App Store.
 
 ```bash
-pnpm release:macos setup   # once: store notarization credentials in the keychain
-pnpm release:macos         # signed + notarized build, verified end to end
+pnpm release:macos setup     # once: store notarization credentials in the keychain
+pnpm release:macos           # signed + notarized build, verified end to end
+pnpm release:macos publish   # the above, then upload the DMG to a new GitHub release
 ```
 
 The helper lives at `apps/desktop/scripts/release-macos.mjs` and is exposed as
@@ -57,8 +58,28 @@ Bundles land in `target/release/bundle/macos/Reflect.app` and
 pnpm release:macos                 # build + notarize + verify (default)
 pnpm release:macos setup           # store Apple ID + app-specific password in the keychain
 pnpm release:macos verify          # re-run all checks on already-built bundles
+pnpm release:macos publish         # build + notarize + verify, then create a GitHub release
+pnpm release:macos publish --draft # same, but leave the release as a draft for review
 pnpm release:macos --no-notarize   # signed-only build (runs locally; Gatekeeper rejects it elsewhere)
 ```
+
+## Publishing to GitHub Releases
+
+`pnpm release:macos publish` runs the full build above, then creates a GitHub release
+tagged `v<version>` (the `version` in `apps/desktop/src-tauri/tauri.conf.json`) with the
+notarized DMG attached and auto-generated release notes. Beyond the signing requirements,
+it needs the [GitHub CLI](https://cli.github.com) authenticated with `gh auth login`.
+
+All preflight checks run before the build, so a doomed publish fails in seconds rather
+than after notarization:
+
+- the working tree is clean and `HEAD` is on a remote branch — the release tag is
+  created at that exact commit;
+- no release for `v<version>` exists yet. Publishing a new release means bumping
+  `version` in `tauri.conf.json` first (keep `src-tauri/Cargo.toml` in step).
+
+Pass `--draft` to create the release without publishing it, then review and publish it
+from the GitHub UI.
 
 ## CI
 

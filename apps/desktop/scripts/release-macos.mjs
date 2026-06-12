@@ -4,6 +4,7 @@
 //   pnpm release:macos              Signed + notarized build, then verify
 //   pnpm release:macos setup        Store notarization credentials (one-time)
 //   pnpm release:macos verify       Re-run Gatekeeper checks on existing bundles
+//   pnpm release:macos publish      Build, then upload the DMG to a new GitHub release
 //   pnpm release:macos --no-notarize  Signed-only build (won't pass Gatekeeper elsewhere)
 //
 // Signing configuration is intentionally not committed — contributors must be
@@ -145,9 +146,14 @@ function hostArch() {
   return arch
 }
 
+/** Parse tauri.conf.json — the source of truth for the bundle name and version. */
+function readTauriConf() {
+  return JSON.parse(readFileSync(join(appDir, 'src-tauri', 'tauri.conf.json'), 'utf8'))
+}
+
 /** Derive bundle output paths from tauri.conf.json and cargo's target dir. */
 function bundlePaths() {
-  const conf = JSON.parse(readFileSync(join(appDir, 'src-tauri', 'tauri.conf.json'), 'utf8'))
+  const conf = readTauriConf()
   const metadata = JSON.parse(
     capture('cargo', ['metadata', '--format-version', '1', '--no-deps'], { cwd: repoRoot }),
   )
@@ -284,6 +290,75 @@ function build({ notarize }) {
   log(notarize ? 'done — ready to distribute' : 'done — signed but NOT notarized')
 }
 
+/** Assert the GitHub CLI is installed and authenticated. */
+function ensureGhReady() {
+  if (run('gh', ['--version']).status !== 0) {
+    fail('GitHub CLI not found — install it from https://cli.github.com and run `gh auth login`')
+  }
+  const auth = run('gh', ['auth', 'status'])
+  if (auth.status !== 0) fail(`gh is not authenticated — run \`gh auth login\`\n${auth.output.trim()}`)
+}
+
+/**
+ * Assert HEAD is a clean, pushed commit and return its SHA. The release tag
+ * is created at this commit, so it must exist on GitHub and match what gets
+ * built.
+ */
+function ensurePublishableCommit() {
+  if (capture('git', ['status', '--porcelain']).trim() !== '') {
+    fail('the working tree has uncommitted changes — commit or stash them before publishing')
+  }
+  const commit = capture('git', ['rev-parse', 'HEAD']).trim()
+  if (capture('git', ['branch', '--remotes', '--contains', commit]).trim() === '') {
+    fail('HEAD is not on any remote branch — push it first so the release tag points at published code')
+  }
+  return commit
+}
+
+/** Assert no release exists for the tag yet, distinguishing "absent" from gh errors. */
+function ensureReleaseIsNew(tag) {
+  const existing = run('gh', ['release', 'view', tag])
+  if (existing.status === 0) {
+    fail(`release ${tag} already exists — bump "version" in apps/desktop/src-tauri/tauri.conf.json first`)
+  }
+  if (!/release not found/i.test(existing.output)) {
+    fail(`could not check GitHub for an existing ${tag} release:\n${existing.output.trim()}`)
+  }
+}
+
+/**
+ * Build a signed + notarized DMG and upload it to a new GitHub release tagged
+ * v<version> (from tauri.conf.json). All preflight checks run before the
+ * build so a doomed publish fails in seconds, not after notarization.
+ */
+function publish({ draft }) {
+  ensureGhReady()
+  const commit = ensurePublishableCommit()
+  const { productName, version } = readTauriConf()
+  const tag = `v${version}`
+  ensureReleaseIsNew(tag)
+
+  build({ notarize: true })
+
+  const { dmg } = bundlePaths()
+  log(`creating GitHub release ${tag} from commit ${commit.slice(0, 7)}…`)
+  const releaseArgs = [
+    'release',
+    'create',
+    tag,
+    dmg,
+    '--title',
+    `${productName} ${version}`,
+    '--target',
+    commit,
+    '--generate-notes',
+  ]
+  if (draft) releaseArgs.push('--draft')
+  const result = spawnSync('gh', releaseArgs, { encoding: 'utf8', stdio: ['inherit', 'pipe', 'inherit'] })
+  if (result.status !== 0) fail(`creating the GitHub release failed${result.stdout ? `\n${result.stdout.trim()}` : ''}`)
+  log(`${draft ? 'draft release created' : 'release published'}: ${result.stdout.trim()}`)
+}
+
 async function setup() {
   console.log(
     `This stores notarization credentials in your login keychain (item "${KEYCHAIN_SERVICE}").\n` +
@@ -313,9 +388,11 @@ Commands:
   build     Signed + notarized release build, then verify (default)
   setup     Store the notarization Apple ID + app-specific password in the keychain
   verify    Re-run signing/Gatekeeper checks on already-built bundles
+  publish   Build, then upload the DMG to a new GitHub release (needs the gh CLI)
 
 Flags:
   --no-notarize   Skip notarization (signed-only build/verify)
+  --draft         Create the GitHub release as a draft (publish only)
   --help          Show this help
 
 Docs: docs/macos-distribution.md`
@@ -324,7 +401,7 @@ async function main() {
   const argv = process.argv.slice(2)
   const flags = argv.filter((arg) => arg.startsWith('--'))
   const commands = argv.filter((arg) => !arg.startsWith('--'))
-  const unknownFlag = flags.find((flag) => !['--no-notarize', '--help'].includes(flag))
+  const unknownFlag = flags.find((flag) => !['--no-notarize', '--draft', '--help'].includes(flag))
   if (unknownFlag) fail(`unknown flag "${unknownFlag}"\n\n${USAGE}`)
   if (flags.includes('--help')) {
     console.log(USAGE)
@@ -334,6 +411,8 @@ async function main() {
 
   const command = commands[0] ?? 'build'
   const notarize = !flags.includes('--no-notarize')
+  if (command === 'publish' && !notarize) fail('publish always notarizes — drop --no-notarize')
+  if (command !== 'publish' && flags.includes('--draft')) fail('--draft only applies to publish')
   switch (command) {
     case 'build':
       return build({ notarize })
@@ -342,6 +421,8 @@ async function main() {
     case 'verify':
       verify({ notarized: notarize })
       return printArtifacts()
+    case 'publish':
+      return publish({ draft: flags.includes('--draft') })
     default:
       fail(`unknown command "${command}"\n\n${USAGE}`)
   }
