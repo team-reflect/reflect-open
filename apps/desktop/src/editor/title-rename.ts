@@ -1,4 +1,4 @@
-import { foldKey, parseNote } from '@reflect/core'
+import { foldKey, hasAuthoredTitle, parseNote } from '@reflect/core'
 
 /**
  * Settled-title detection for the auto-rename flow (Plan 07b). A title change
@@ -64,17 +64,16 @@ export function createTitleRenameTracker(options: TitleRenameTrackerOptions): Ti
   let disposed = false
 
   // A title only counts when the *content* declares one (frontmatter `title:`
-  // or an H1). parseNote falls back to the filename stem for untitled notes —
-  // baselining on that would make a fresh lazy note's first heading look like
-  // a rename from its ULID filename, spraying a junk alias (and potentially
-  // rewrites) on every new note. Untitled is `null` here.
+  // or an H1) — `hasAuthoredTitle`, the same predicate the title derivation
+  // and the 17c migration share, so "is this note titled?" can never drift
+  // between birth/rename detection and the rest of the app. parseNote falls
+  // back to the filename stem for untitled notes — baselining on that would
+  // make a fresh lazy note's first heading look like a rename from its ULID
+  // filename, spraying a junk alias (and potentially rewrites) on every new
+  // note. Untitled is `null` here.
   const titleOf = (content: string): string | null => {
     const parsed = parseNote({ path, source: content })
-    const fmTitle = (parsed.frontmatter as Record<string, unknown>).title
-    const titled =
-      (typeof fmTitle === 'string' && fmTitle.trim() !== '') ||
-      parsed.headings.some((heading) => heading.level === 1 && heading.text !== '')
-    return titled ? parsed.title : null
+    return hasAuthoredTitle(parsed) ? parsed.title : null
   }
 
   function cancelTimer(): void {
