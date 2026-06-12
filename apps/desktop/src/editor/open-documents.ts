@@ -53,13 +53,16 @@ export function openSession(path: string): NoteSession | null {
 /**
  * Re-key an open document after its note file moved (Plan 17), so
  * {@link openSession} lookups under the new path find the live session. The
- * old registration's unregister closure no-ops afterwards (it checks
- * identity under the old key), and the adopting pane re-registers under the
- * new path.
+ * entry moves only when it actually holds `session` — a failed move's
+ * compensating re-key must never grab a *different* pane's document that
+ * legitimately sits at `from` (then quit-time flush and `openSession` would
+ * target the wrong path). The old registration's unregister closure stays
+ * correct either way (it checks identity, not keys), and the adopting pane
+ * re-registers under the new path.
  */
-export function retargetOpenDocument(from: string, to: string): void {
+export function retargetOpenDocument(from: string, to: string, session: NoteSession): void {
   const document = documents.get(from)
-  if (document !== undefined) {
+  if (document !== undefined && document.session === session) {
     documents.delete(from)
     documents.set(to, document)
   }

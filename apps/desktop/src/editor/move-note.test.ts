@@ -1,0 +1,107 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { onNoteMoved } from '@/lib/note-moves'
+import { moveNoteCarryingSession } from './move-note'
+import type { NoteSession } from './note-session'
+import { openSession, registerOpenDocument } from './open-documents'
+
+/**
+ * The shared move helper's carry/compensate contract (Plan 17): the session
+ * and registry follow the file, a failure undoes exactly what was done — and
+ * never touches a *different* pane's document that happens to sit at the
+ * destination (the Bugbot-reported foreign-re-key case).
+ */
+
+const core = vi.hoisted(() => ({ moveNoteIndexed: vi.fn() }))
+vi.mock('@reflect/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@reflect/core')>()),
+  moveNoteIndexed: core.moveNoteIndexed,
+}))
+
+function fakeSession(path: string) {
+  let current = path
+  const flush = vi.fn(async () => {})
+  const session: NoteSession = {
+    get path() {
+      return current
+    },
+    retarget: (to: string) => {
+      current = to
+    },
+    load: () => {},
+    editorChanged: () => {},
+    externalChanged: () => {},
+    flush,
+    keepMine: () => {},
+    loadTheirs: () => {},
+    commitFrontmatter: async () => true,
+    content: () => '',
+    updateFrontmatter: () => true,
+    dispose: () => {},
+  }
+  return { session, flush }
+}
+
+beforeEach(() => {
+  core.moveNoteIndexed.mockReset()
+  core.moveNoteIndexed.mockResolvedValue(undefined)
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+describe('moveNoteCarryingSession', () => {
+  it('flushes, retargets, re-keys, moves, and announces', async () => {
+    const { session, flush } = fakeSession('notes/a.md')
+    const unregister = registerOpenDocument({ session })
+    const moves: Array<[string, string]> = []
+    const unsubscribe = onNoteMoved((from, to) => moves.push([from, to]))
+    try {
+      await moveNoteCarryingSession('notes/a.md', 'notes/b.md', 7)
+
+      expect(flush).toHaveBeenCalled()
+      expect(session.path).toBe('notes/b.md')
+      expect(openSession('notes/b.md')).toBe(session)
+      expect(core.moveNoteIndexed).toHaveBeenCalledWith('notes/a.md', 'notes/b.md', 7)
+      expect(moves).toEqual([['notes/a.md', 'notes/b.md']])
+    } finally {
+      unsubscribe()
+      unregister()
+    }
+  })
+
+  it('a failed move with a carried session retargets and re-keys back', async () => {
+    core.moveNoteIndexed.mockRejectedValue(new Error('disk full'))
+    const { session } = fakeSession('notes/a.md')
+    const unregister = registerOpenDocument({ session })
+    try {
+      await expect(moveNoteCarryingSession('notes/a.md', 'notes/b.md', 7)).rejects.toThrow(
+        'disk full',
+      )
+      expect(session.path).toBe('notes/a.md')
+      expect(openSession('notes/a.md')).toBe(session)
+      expect(openSession('notes/b.md')).toBeNull()
+    } finally {
+      unregister()
+    }
+  })
+
+  it("a failed move with no carried session never re-keys a foreign pane's document", async () => {
+    core.moveNoteIndexed.mockRejectedValue(new Error('refused'))
+    // Another pane legitimately holds a note at the destination path.
+    const foreign = fakeSession('notes/b.md')
+    const unregister = registerOpenDocument({ session: foreign.session })
+    try {
+      await expect(moveNoteCarryingSession('notes/a.md', 'notes/b.md', 7)).rejects.toThrow(
+        'refused',
+      )
+      // The foreign document stays exactly where it was — quit-time flush and
+      // openSession lookups keep targeting the right path.
+      expect(openSession('notes/b.md')).toBe(foreign.session)
+      expect(openSession('notes/a.md')).toBeNull()
+      expect(foreign.session.path).toBe('notes/b.md')
+    } finally {
+      unregister()
+    }
+  })
+})

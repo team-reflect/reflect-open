@@ -84,7 +84,7 @@ describe('retargetOpenDocument (Plan 17)', () => {
     const session = fakeSession('notes/a.md', [])
     const unregister = registerOpenDocument({ session })
 
-    retargetOpenDocument('notes/a.md', 'notes/renamed.md')
+    retargetOpenDocument('notes/a.md', 'notes/renamed.md', session)
     expect(openSession('notes/a.md')).toBeNull()
     expect(openSession('notes/renamed.md')).toBe(session)
 
@@ -94,7 +94,22 @@ describe('retargetOpenDocument (Plan 17)', () => {
 
   it('re-keying a path with no entry is a no-op', async () => {
     const { retargetOpenDocument } = await import('./open-documents')
-    retargetOpenDocument('notes/ghost.md', 'notes/elsewhere.md')
+    retargetOpenDocument('notes/ghost.md', 'notes/elsewhere.md', fakeSession('notes/ghost.md', []))
     expect(openSession('notes/elsewhere.md')).toBeNull()
+  })
+
+  it("never re-keys a different pane's document at the same path", async () => {
+    // The failed-move compensation re-keys (to → from); when the entry at
+    // `to` belongs to another pane, it must stay exactly where it is.
+    const { retargetOpenDocument } = await import('./open-documents')
+    const foreign = fakeSession('notes/taken.md', [])
+    const unregister = registerOpenDocument({ session: foreign })
+    try {
+      retargetOpenDocument('notes/taken.md', 'notes/old.md', fakeSession('notes/taken.md', []))
+      expect(openSession('notes/taken.md')).toBe(foreign)
+      expect(openSession('notes/old.md')).toBeNull()
+    } finally {
+      unregister()
+    }
   })
 })

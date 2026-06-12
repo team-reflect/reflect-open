@@ -297,7 +297,7 @@ describe('rename coordinator', () => {
       expect(operationLog.records[0].outcome).toBe('done')
     } finally {
       unsubscribe()
-      retargetOpenDocument('notes/new-title.md', PATH) // restore for other tests
+      retargetOpenDocument('notes/new-title.md', PATH, session) // restore for other tests
       unregister()
     }
   })
