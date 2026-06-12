@@ -126,7 +126,12 @@ const MEMO: AudioMemoIdentity = {
   mimeType: 'audio/mp4',
 }
 
-const DRAINED: ReconcileAudioMemosOutcome = { pending: 0, transcribed: 0, stopped: null }
+const DRAINED: ReconcileAudioMemosOutcome = {
+  pending: 0,
+  transcribed: 0,
+  rejected: 0,
+  stopped: null,
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -624,7 +629,7 @@ describe('AudioMemoProvider', () => {
     await waitFor(() => expect(result.current.phase).toBe('transcribing'))
 
     await act(async () => {
-      release({ pending: 2, transcribed: 2, stopped: null })
+      release({ pending: 2, transcribed: 2, rejected: 0, stopped: null })
     })
     await waitFor(() => expect(result.current.phase).toBe('idle'))
   })
@@ -633,6 +638,7 @@ describe('AudioMemoProvider', () => {
     reconcileAudioMemos.mockResolvedValue({
       pending: 1,
       transcribed: 0,
+      rejected: 0,
       stopped: { reason: 'auth', message: 'openai rejected the API key (401)' },
     })
     renderHook(() => useAudioMemo(), { wrapper })
@@ -653,6 +659,7 @@ describe('AudioMemoProvider', () => {
     reconcileAudioMemos.mockResolvedValue({
       pending: 1,
       transcribed: 0,
+      rejected: 0,
       stopped: { reason: 'network', message: 'provider down' },
     })
     const { result } = renderHook(() => useAudioMemo(), { wrapper })

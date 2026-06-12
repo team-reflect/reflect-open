@@ -175,7 +175,12 @@ export {
 export type { ModelMessage as ChatModelMessage } from 'ai'
 // The fixed per-provider model ids stay internal to `ai/transcribe` —
 // exporting them would let callers couple to vendor model names.
-export { transcribeAudio, type TranscriptionRequest } from './ai/transcribe'
+export {
+  isTranscriptionRejected,
+  transcribeAudio,
+  TranscriptionRejectedError,
+  type TranscriptionRequest,
+} from './ai/transcribe'
 
 // Capture actions (audio memos; Plan 11's link capture joins here)
 export {

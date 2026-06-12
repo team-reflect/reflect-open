@@ -1,11 +1,16 @@
 import { errorMessage, isAppError, toAppError, type AppError } from '../errors'
-import { pickTranscriptionConfig, type AiModelsState } from '../ai/models'
+import {
+  pickTranscriptionConfig,
+  type AiModelsState,
+  type TranscriptionProvider,
+} from '../ai/models'
 import { aiKeySecretName } from '../ai/secrets'
 import {
   AUDIO_EXTENSION_BY_MIME,
   base64ToBytes,
   baseMimeType,
   bytesToBase64,
+  isTranscriptionRejected,
   transcribeAudio,
 } from '../ai/transcribe'
 import { listDir, listFiles, readAsset, readNote, writeAsset, writeNote } from '../graph/commands'
@@ -25,11 +30,15 @@ import { getSecret } from '../secrets/keychain'
  *    network. The sync engine commits it like any other change.
  * 2. **Reconcile** ({@link reconcileAudioMemos}): a memo's transcription is a
  *    note with the **same basename** (`notes/<base>.md`). Any memo without
- *    one is transcribed (BYOK provider), backlinked from its day's daily
- *    note, and the transcription note written — in that order, so the note's
- *    existence marks the memo fully done. A failed pass (offline, bad key)
- *    leaves the memo pending; the next trigger retries. Nothing is ever lost
- *    to a network error.
+ *    one is transcribed (BYOK provider), its transcription note written, and
+ *    a backlink appended to its day's daily note — note first, because it
+ *    carries the transcript: a failure between the two writes leaves an
+ *    unlinked note, never a tombstoned memo whose transcript was dropped. A
+ *    failed pass (offline, bad key) leaves the memo pending; the next
+ *    trigger retries. Nothing is ever lost to a network error. A recording
+ *    the provider *refuses* (oversized, unsupported container) is tombstoned
+ *    with a failure note instead — retrying the same bytes can't help, and
+ *    stopping would wedge every memo behind it.
  *
  * Deleting a transcription note does **not** resurrect it: the daily-note
  * backlink doubles as the tombstone (a memo is only pending while *neither*
@@ -200,9 +209,38 @@ export async function listPendingAudioMemos(): Promise<AudioMemoIdentity[]> {
   return pending
 }
 
-function transcriptionNote(memo: AudioMemoIdentity, text: string): string {
-  const body = text === '' ? 'No speech detected.' : text
+function transcriptionNote(memo: AudioMemoIdentity, body: string): string {
   return `# ${memo.title}\n\n[Recording](${memo.audioPath})\n\n${body}\n`
+}
+
+/**
+ * The note body for one memo: the transcript, a placeholder for silence, or
+ * — when the provider refuses the recording itself — a failure notice that
+ * tombstones the memo. Anything transient (offline, auth, rate limit)
+ * rethrows and stops the pass.
+ */
+async function memoNoteBody(input: {
+  audio: Blob
+  memo: AudioMemoIdentity
+  provider: TranscriptionProvider
+  apiKey: string
+  fetchFn?: typeof fetch
+}): Promise<{ body: string; rejected: boolean }> {
+  try {
+    const text = await transcribeAudio({
+      provider: input.provider,
+      apiKey: input.apiKey,
+      audio: input.audio,
+      mimeType: input.memo.mimeType,
+      fetchFn: input.fetchFn,
+    })
+    return { body: text === '' ? 'No speech detected.' : text, rejected: false }
+  } catch (cause) {
+    if (!isTranscriptionRejected(cause)) {
+      throw cause
+    }
+    return { body: `Transcription failed: ${errorMessage(cause)}`, rejected: true }
+  }
 }
 
 /** Append the memo's wikilink to its day's daily note, once. */
@@ -244,17 +282,21 @@ export interface ReconcileAudioMemosOutcome {
   pending: number
   /** Memos this pass transcribed and backlinked. */
   transcribed: number
+  /** Memos whose recording the provider refused — tombstoned with a failure note. */
+  rejected: number
   /** Why memos remain pending, or `null` when the pass drained. */
   stopped: ReconcileStop | null
 }
 
 /**
- * Transcribe every pending memo: read the recording back, transcribe, append
- * the daily-note backlink, then write the transcription note. The note is
- * written **last** so its existence marks the memo fully done; the backlink
- * append is idempotent, so a crash between the two writes costs at most one
- * re-transcription. The first failure stops the pass — one memo's network or
- * auth error means the rest would fail the same way. Never throws.
+ * Transcribe every pending memo: read the recording back, transcribe, write
+ * the transcription note, then append the daily-note backlink. The note is
+ * written **first** — it carries the transcript, so a failure between the
+ * two writes leaves an unlinked note (recoverable from All Notes), never a
+ * backlink-tombstoned memo whose transcript was dropped. A recording the
+ * provider refuses gets a failure note (tombstoning it) and the pass moves
+ * on; any other failure stops the pass — one memo's network or auth error
+ * means the rest would fail the same way. Never throws.
  */
 export async function reconcileAudioMemos(
   input: ReconcileAudioMemosInput,
@@ -266,12 +308,13 @@ export async function reconcileAudioMemos(
     return {
       pending: 0,
       transcribed: 0,
+      rejected: 0,
       stopped: { reason: toAppError(cause).kind, message: errorMessage(cause) },
     }
   }
   input.onPending?.(pending.length)
   if (pending.length === 0) {
-    return { pending: 0, transcribed: 0, stopped: null }
+    return { pending: 0, transcribed: 0, rejected: 0, stopped: null }
   }
 
   // Re-picked on every pass (not once at record time): a pass after the user
@@ -281,6 +324,7 @@ export async function reconcileAudioMemos(
     return {
       pending: pending.length,
       transcribed: 0,
+      rejected: 0,
       stopped: { reason: 'config', message: 'No OpenAI or Gemini model is configured.' },
     }
   }
@@ -289,6 +333,7 @@ export async function reconcileAudioMemos(
     return {
       pending: pending.length,
       transcribed: 0,
+      rejected: 0,
       stopped: {
         reason: 'config',
         message: `The API key for the configured ${config.provider} model is missing from the keychain.`,
@@ -297,11 +342,13 @@ export async function reconcileAudioMemos(
   }
 
   let transcribed = 0
+  let rejected = 0
   for (const memo of pending) {
     if (input.isStale?.() === true) {
       return {
         pending: pending.length,
         transcribed,
+        rejected,
         stopped: { reason: 'stale', message: 'the graph session ended mid-pass' },
       }
     }
@@ -309,25 +356,30 @@ export async function reconcileAudioMemos(
       const audio = new Blob([base64ToBytes(await readAsset(memo.audioPath))], {
         type: memo.mimeType,
       })
-      const text = await transcribeAudio({
+      const note = await memoNoteBody({
+        audio,
+        memo,
         provider: config.provider,
         apiKey,
-        audio,
-        mimeType: memo.mimeType,
         fetchFn: input.fetchFn,
       })
+      await writeNote(memo.notePath, transcriptionNote(memo, note.body), input.generation)
       await ensureDailyBacklink(memo, input.generation)
-      await writeNote(memo.notePath, transcriptionNote(memo, text), input.generation)
-      transcribed += 1
+      if (note.rejected) {
+        rejected += 1
+      } else {
+        transcribed += 1
+      }
     } catch (cause) {
       return {
         pending: pending.length,
         transcribed,
+        rejected,
         stopped: { reason: toAppError(cause).kind, message: errorMessage(cause) },
       }
     }
   }
-  return { pending: pending.length, transcribed, stopped: null }
+  return { pending: pending.length, transcribed, rejected, stopped: null }
 }
 
 export interface AppendToDailyNoteInput {

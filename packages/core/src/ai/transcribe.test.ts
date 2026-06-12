@@ -5,6 +5,7 @@ import {
   OPENAI_TRANSCRIPTION_FALLBACK_MODEL,
   OPENAI_TRANSCRIPTION_MODEL,
   bytesToBase64,
+  isTranscriptionRejected,
   transcribeAudio,
   type TranscriptionRequest,
 } from './transcribe'
@@ -89,17 +90,38 @@ describe('transcribeAudio (openai)', () => {
     expect((calls[1].body as FormData).get('model')).toBe(OPENAI_TRANSCRIPTION_FALLBACK_MODEL)
   })
 
-  it('does not retry other request rejections', async () => {
+  it('marks a refused recording as a rejection — retrying the same bytes cannot help', async () => {
     const calls: RecordedCall[] = []
     const fetchFn = recordingFetch(calls, () =>
       jsonResponse(400, { error: { message: 'Invalid file format.', code: null } }),
     )
 
-    await expect(transcribeAudio(request({ fetchFn }))).rejects.toMatchObject({
-      kind: 'network',
-      message: expect.stringContaining('Invalid file format.'),
-    })
+    const failure: unknown = await transcribeAudio(request({ fetchFn })).catch(
+      (cause: unknown) => cause,
+    )
+
+    expect(isTranscriptionRejected(failure)).toBe(true)
+    expect(failure).toMatchObject({ message: expect.stringContaining('Invalid file format.') })
     expect(calls).toHaveLength(1)
+  })
+
+  it('an oversized payload is a rejection; a rate limit stays a retryable network error', async () => {
+    const tooLarge = recordingFetch([], () =>
+      jsonResponse(413, { error: { message: 'Maximum content size exceeded.' } }),
+    )
+    const rejection: unknown = await transcribeAudio(request({ fetchFn: tooLarge })).catch(
+      (cause: unknown) => cause,
+    )
+    expect(isTranscriptionRejected(rejection)).toBe(true)
+
+    const rateLimited = recordingFetch([], () =>
+      jsonResponse(429, { error: { message: 'Rate limit reached.' } }),
+    )
+    const transient: unknown = await transcribeAudio(request({ fetchFn: rateLimited })).catch(
+      (cause: unknown) => cause,
+    )
+    expect(isTranscriptionRejected(transient)).toBe(false)
+    expect(transient).toMatchObject({ kind: 'network' })
   })
 
   it('reports a rejected key as an auth error', async () => {
@@ -214,6 +236,18 @@ describe('transcribeAudio (google)', () => {
       message: expect.stringContaining('quota exhausted'),
     })
     expect(calls).toHaveLength(1)
+  })
+
+  it('marks a refused recording as a rejection', async () => {
+    const fetchFn = recordingFetch([], () =>
+      jsonResponse(400, { error: { message: 'Invalid audio content.' } }),
+    )
+
+    const failure: unknown = await transcribeAudio(
+      request({ provider: 'google', fetchFn }),
+    ).catch((cause: unknown) => cause)
+
+    expect(isTranscriptionRejected(failure)).toBe(true)
   })
 
   it('returns an empty transcript when no candidates come back', async () => {

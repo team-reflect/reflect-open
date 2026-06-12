@@ -16,7 +16,7 @@ import {
   writeAsset,
   writeNote,
 } from '../graph/commands'
-import { transcribeAudio } from '../ai/transcribe'
+import { transcribeAudio, TranscriptionRejectedError } from '../ai/transcribe'
 import { getSecret } from '../secrets/keychain'
 
 vi.mock('../graph/commands', () => ({
@@ -142,7 +142,7 @@ describe('reconcileAudioMemos', () => {
     const onPending = vi.fn()
     const outcome = await reconcile({ onPending })
 
-    expect(outcome).toEqual({ pending: 0, transcribed: 0, stopped: null })
+    expect(outcome).toEqual({ pending: 0, transcribed: 0, rejected: 0, stopped: null })
     expect(onPending).toHaveBeenCalledWith(0)
     expect(transcribeMock).not.toHaveBeenCalled()
     expect(getSecretMock).not.toHaveBeenCalled()
@@ -153,16 +153,16 @@ describe('reconcileAudioMemos', () => {
 
     const outcome = await reconcile()
 
-    expect(outcome).toEqual({ pending: 0, transcribed: 0, stopped: null })
+    expect(outcome).toEqual({ pending: 0, transcribed: 0, rejected: 0, stopped: null })
     expect(transcribeMock).not.toHaveBeenCalled()
   })
 
-  it('transcribes a pending memo, backlinks the daily note, then writes the note', async () => {
+  it('transcribes a pending memo, writes the note, then backlinks the daily note', async () => {
     listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
 
     const outcome = await reconcile()
 
-    expect(outcome).toEqual({ pending: 1, transcribed: 1, stopped: null })
+    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, stopped: null })
     expect(getSecretMock).toHaveBeenCalledWith('ai-api-key:cfg-openai')
     expect(readAssetMock).toHaveBeenCalledWith(MEMO.audioPath)
     expect(transcribeMock).toHaveBeenCalledWith(
@@ -174,19 +174,63 @@ describe('reconcileAudioMemos', () => {
     )
     const sent = transcribeMock.mock.calls[0]?.[0].audio
     expect(new TextDecoder().decode(await sent?.arrayBuffer())).toBe('audio-bytes')
-    // The backlink lands first; the transcription note is the done marker.
+    // The note lands first — it carries the transcript; the backlink follows.
     expect(writeNoteMock.mock.calls).toEqual([
-      [
-        'daily/2026-06-11.md',
-        'morning thoughts\n\n[[Audio memo 2026-06-11 15:30:22|Audio memo 15:30]]\n',
-        3,
-      ],
       [
         MEMO.notePath,
         '# Audio memo 2026-06-11 15:30:22\n\n[Recording](audio-memos/audio-memo-2026-06-11-153022-845.webm)\n\nmemo transcript\n',
         3,
       ],
+      [
+        'daily/2026-06-11.md',
+        'morning thoughts\n\n[[Audio memo 2026-06-11 15:30:22|Audio memo 15:30]]\n',
+        3,
+      ],
     ])
+  })
+
+  it('a provider-refused recording is tombstoned with a failure note; the pass continues', async () => {
+    const earlier = audioMemoIdentity(new Date(2026, 5, 10, 9, 0, 0, 0), 'audio/mp4')
+    listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath), fileMeta(earlier.audioPath)])
+    transcribeMock
+      .mockRejectedValueOnce(
+        new TranscriptionRejectedError('openai rejected the recording (413): too large'),
+      )
+      .mockResolvedValueOnce('second transcript')
+
+    const outcome = await reconcile()
+
+    expect(outcome).toEqual({ pending: 2, transcribed: 1, rejected: 1, stopped: null })
+    expect(writeNoteMock).toHaveBeenCalledWith(
+      earlier.notePath,
+      expect.stringContaining(
+        'Transcription failed: openai rejected the recording (413): too large',
+      ),
+      3,
+    )
+    expect(writeNoteMock).toHaveBeenCalledWith(
+      MEMO.notePath,
+      expect.stringContaining('second transcript'),
+      3,
+    )
+  })
+
+  it('a failed note write stops before the backlink — the transcript is never tombstoned away', async () => {
+    listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
+    writeNoteMock.mockRejectedValue({ kind: 'io', message: 'disk full' })
+
+    const outcome = await reconcile()
+
+    expect(outcome).toEqual({
+      pending: 1,
+      transcribed: 0,
+      rejected: 0,
+      stopped: { reason: 'io', message: 'disk full' },
+    })
+    // Only the note write was attempted: no backlink means no tombstone, so
+    // the next pass retries this memo instead of dropping its transcript.
+    expect(writeNoteMock).toHaveBeenCalledTimes(1)
+    expect(writeNoteMock.mock.calls[0]?.[0]).toBe(MEMO.notePath)
   })
 
   it('creates the daily note when the day has none yet', async () => {
@@ -211,7 +255,7 @@ describe('reconcileAudioMemos', () => {
     const onPending = vi.fn()
     const outcome = await reconcile({ onPending })
 
-    expect(outcome).toEqual({ pending: 0, transcribed: 0, stopped: null })
+    expect(outcome).toEqual({ pending: 0, transcribed: 0, rejected: 0, stopped: null })
     expect(onPending).toHaveBeenCalledWith(0)
     expect(transcribeMock).not.toHaveBeenCalled()
     expect(writeNoteMock).not.toHaveBeenCalled()
@@ -223,7 +267,7 @@ describe('reconcileAudioMemos', () => {
 
     const outcome = await reconcile()
 
-    expect(outcome).toEqual({ pending: 1, transcribed: 1, stopped: null })
+    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, stopped: null })
     expect(writeNoteMock).toHaveBeenCalledWith(
       MEMO.notePath,
       expect.stringContaining('No speech detected.'),
@@ -253,6 +297,7 @@ describe('reconcileAudioMemos', () => {
     expect(outcome).toEqual({
       pending: 2,
       transcribed: 0,
+      rejected: 0,
       stopped: { reason: 'network', message: 'provider down' },
     })
     expect(transcribeMock).toHaveBeenCalledTimes(1)
@@ -306,6 +351,7 @@ describe('reconcileAudioMemos', () => {
     expect(outcome).toEqual({
       pending: 0,
       transcribed: 0,
+      rejected: 0,
       stopped: { reason: 'noGraph', message: 'no graph open' },
     })
   })
