@@ -45,13 +45,15 @@ function defineReadOnly(): PlainExtension {
 
 function createPreviewEditor(
   resolveUrl: (src: string) => string | null,
-  onNavigate: (target: string) => void,
+  onNavigate: ((target: string) => void) | undefined,
 ): Editor {
   return createEditor({
     extension: union(
       defineEditorExtension(),
       defineMarkMode('hide'),
-      defineWikiLinks({ onNavigate }),
+      // No handler, no plugin option: a registered callback makes the plugin
+      // consume chip clicks, and an inert preview must not swallow them.
+      defineWikiLinks(onNavigate ? { onNavigate } : {}),
       defineImages({ resolveUrl }),
       defineReadOnly(),
     ),
@@ -65,7 +67,9 @@ export function MarkdownPreview({
   className,
 }: MarkdownPreviewProps): ReactElement {
   // The extension set is created once; the resolver and click handler are
-  // read through refs so a changing prop never rebuilds the editor.
+  // read through refs so a changing prop never rebuilds the editor. Whether
+  // wiki links navigate at all is fixed by the first render — hosts either
+  // always pass the handler (chat) or never do (palette preview).
   const resolveRef = useRef<((src: string) => string | null) | undefined>(resolveImageUrl)
   resolveRef.current = resolveImageUrl
   const navigateRef = useRef<((target: string) => void) | undefined>(onWikiLinkClick)
@@ -73,7 +77,7 @@ export function MarkdownPreview({
   const [editor] = useState(() =>
     createPreviewEditor(
       (src) => resolveRef.current?.(src) ?? null,
-      (target) => navigateRef.current?.(target),
+      onWikiLinkClick ? (target) => navigateRef.current?.(target) : undefined,
     ),
   )
 
