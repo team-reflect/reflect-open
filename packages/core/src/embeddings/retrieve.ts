@@ -199,35 +199,59 @@ export async function retrieve(query: string, options?: RetrieveOptions): Promis
 }
 
 /**
- * Semantic neighbors of an existing note, seeded by its own **stored** lead
- * chunk vector — no re-embedding, no pane-provided seed text: the embedding
- * sync keeps chunks current on every save, and the index invalidation scope
- * refetches consumers, so freshness is automatic. Returns [] when the note
- * has no vectors yet (model never enabled, or not yet embedded). Candidates
- * past {@link MAX_COSINE_DISTANCE} are dropped rather than padded in, so a
- * sparse graph shows few (or no) neighbors instead of wrong ones.
+ * KNN result lists from several seed vectors, merged nearest-first so
+ * {@link bestChunkPerNote} keeps each note's best distance across seeds.
  */
-export async function relatedNotes(path: string, limit = 6): Promise<RetrievalHit[]> {
-  const seed = await sql<{ vec: string }>`
+export function mergeNearestFirst(lists: ReadonlyArray<readonly ChunkHitRow[]>): ChunkHitRow[] {
+  return lists.flat().sort((a, b) => a.distance - b.distance)
+}
+
+/**
+ * Seed-vector cap for {@link relatedNotes}: one KNN query runs per seed, so
+ * a pathological note (a huge import) must not turn every sidebar refetch
+ * into hundreds of queries. Sixteen seeds cover ~16k chars of note text —
+ * past any real daily note — before later topics stop influencing neighbors.
+ */
+const MAX_RELATED_SEEDS = 16
+
+/**
+ * Semantic neighbors of an existing note, seeded by its own **stored** chunk
+ * vectors — no re-embedding, no pane-provided seed text: the embedding sync
+ * keeps chunks current on every save, and the index invalidation scope
+ * refetches consumers, so freshness is automatic. Every chunk seeds its own
+ * KNN pass (capped at {@link MAX_RELATED_SEEDS}) and the lists merge
+ * nearest-first, so a multi-topic note — a daily note above all — surfaces
+ * neighbors for anything written in it, not just its lead paragraph.
+ * Returns [] when the note has no vectors yet (model never enabled, or not
+ * yet embedded). Candidates past {@link MAX_COSINE_DISTANCE} are dropped
+ * rather than padded in, so a sparse graph shows few (or no) neighbors
+ * instead of wrong ones.
+ */
+export async function relatedNotes(path: string, limit = 10): Promise<RetrievalHit[]> {
+  const seeds = await sql<{ vec: string }>`
     SELECT vec_to_json(v.embedding) AS vec
     FROM embedding_chunks c
     JOIN embedding_vectors v ON v.rowid = c.id
     WHERE c.note_path = ${path}
     ORDER BY c.pos_from
-    LIMIT 1
+    LIMIT ${MAX_RELATED_SEEDS}
   `.execute(db)
-  const vec = seed.rows[0]?.vec
-  if (vec === undefined) {
+  if (seeds.rows.length === 0) {
     return []
   }
-  const result = await sql<ChunkHitRow>`
-    SELECT c.note_path AS path, n.title, c.heading, c.text,
-           n.is_private AS isPrivate, v.distance
-    FROM embedding_vectors v
-    JOIN embedding_chunks c ON c.id = v.rowid
-    JOIN notes n ON n.path = c.note_path
-    WHERE v.embedding MATCH ${vec} AND k = ${KNN_CANDIDATES}
-    ORDER BY v.distance
-  `.execute(db)
-  return bestChunkPerNote(result.rows, limit, path)
+  const neighborLists = await Promise.all(
+    seeds.rows.map(async (seed) => {
+      const result = await sql<ChunkHitRow>`
+        SELECT c.note_path AS path, n.title, c.heading, c.text,
+               n.is_private AS isPrivate, v.distance
+        FROM embedding_vectors v
+        JOIN embedding_chunks c ON c.id = v.rowid
+        JOIN notes n ON n.path = c.note_path
+        WHERE v.embedding MATCH ${seed.vec} AND k = ${KNN_CANDIDATES}
+        ORDER BY v.distance
+      `.execute(db)
+      return result.rows
+    }),
+  )
+  return bestChunkPerNote(mergeNearestFirst(neighborLists), limit, path)
 }

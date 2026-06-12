@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { bestChunkPerNote, fuseRanked, type ChunkHitRow, type RetrievalHit } from './retrieve'
+import {
+  bestChunkPerNote,
+  fuseRanked,
+  mergeNearestFirst,
+  type ChunkHitRow,
+  type RetrievalHit,
+} from './retrieve'
 
 function hit(path: string, overrides?: Partial<RetrievalHit>): RetrievalHit {
   return {
@@ -58,6 +64,36 @@ describe('bestChunkPerNote', () => {
     const hits = bestChunkPerNote([row('notes/p.md', 0.1, { isPrivate: 1 })], 12)
     expect(hits[0].snippet).toBe('about notes/p.md')
     expect(hits[0].isPrivate).toBe(true)
+  })
+})
+
+describe('mergeNearestFirst (multi-seed related notes)', () => {
+  it('interleaves seed lists by distance so every seed contributes', () => {
+    const fromLeadChunk = [row('notes/morning.md', 0.3), row('notes/noise.md', 0.6)]
+    const fromLaterChunk = [row('notes/afternoon.md', 0.4)]
+    const merged = mergeNearestFirst([fromLeadChunk, fromLaterChunk])
+    expect(merged.map((entry) => entry.path)).toEqual([
+      'notes/morning.md',
+      'notes/afternoon.md',
+      'notes/noise.md',
+    ])
+  })
+
+  it('a neighbor found only by a later seed survives bestChunkPerNote', () => {
+    const fromLeadChunk = [row('notes/self.md', 0.0)]
+    const fromLaterChunk = [row('notes/self.md', 0.0), row('notes/afternoon.md', 0.4)]
+    const merged = mergeNearestFirst([fromLeadChunk, fromLaterChunk])
+    const hits = bestChunkPerNote(merged, 10, 'notes/self.md')
+    expect(hits.map((hit) => hit.path)).toEqual(['notes/afternoon.md'])
+  })
+
+  it('a note hit by several seeds keeps its best distance', () => {
+    const fromLeadChunk = [row('notes/both.md', 0.5, { text: 'far chunk' })]
+    const fromLaterChunk = [row('notes/both.md', 0.2, { text: 'near chunk' })]
+    const hits = bestChunkPerNote(mergeNearestFirst([fromLeadChunk, fromLaterChunk]), 10)
+    expect(hits).toHaveLength(1)
+    expect(hits[0].snippet).toBe('near chunk')
+    expect(hits[0].score).toBeCloseTo(0.8)
   })
 })
 
