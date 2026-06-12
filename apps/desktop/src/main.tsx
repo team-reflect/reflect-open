@@ -6,6 +6,7 @@ import { WindowDragRegion } from '@/components/window-drag-region'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { queryClient } from '@/lib/query-client'
 import { registerAppCommands } from '@/lib/commands/app-commands'
+import { installNativeMenu } from '@/lib/native-menu/menu'
 import { installTauriBridge } from '@/lib/tauri-bridge'
 import { GraphProvider } from '@/providers/graph-provider'
 import { SettingsProvider } from '@/providers/settings-provider'
@@ -15,6 +16,9 @@ import '@/styles/index.css'
 
 installTauriBridge()
 registerAppCommands()
+installNativeMenu().catch((cause: unknown) => {
+  console.error('failed to install the native menu', cause)
+})
 
 const rootElement = document.getElementById('root')
 if (!rootElement) {

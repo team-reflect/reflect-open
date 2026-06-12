@@ -48,12 +48,12 @@ export function NoteActionsSection({ path }: NoteActionsSectionProps): ReactElem
         toggle={toggleNotePrivate}
         icon={<Lock size={14} aria-hidden />}
         labels={{
-          active: 'Mark as public',
-          inactive: 'Mark as private',
+          active: 'Unlock note',
+          inactive: 'Lock note',
         }}
         operations={{
-          activate: 'Marking note as private',
-          deactivate: 'Un-marking note as private',
+          activate: 'Locking note',
+          deactivate: 'Unlocking note',
         }}
         keybinding={PRIVATE_KEYBINDING}
         tooltip="Private notes are never sent to AI or any other external service"

@@ -3,6 +3,7 @@ import { usePalette } from '@/components/command-palette/palette-provider'
 import { registerKeymap } from '@/editor/keymap'
 import { APP_COMMANDS } from '@/lib/commands/app-commands'
 import { runCommand } from '@/lib/commands/registry'
+import { setMenuCommandDispatch } from '@/lib/native-menu/dispatch'
 import { retryFailedEmbeddings } from '@/lib/semantic'
 import type { CommandContext } from '@/lib/commands/types'
 import { useAudioMemo } from '@/providers/audio-memo-provider'
@@ -39,7 +40,9 @@ function isModKey(event: KeyboardEvent): boolean {
 /**
  * Install the app-level shortcut listener and build the {@link CommandContext}
  * commands run with. Mount once inside the router + palette providers; the
- * returned context is also what the palette itself runs commands through.
+ * returned context is also what the palette itself runs commands through, and
+ * the native menu's command items dispatch into the same guard path while
+ * mounted (`setMenuCommandDispatch`).
  */
 export function useAppShortcuts(): CommandContext {
   const { route, navigate, back, forward } = useRouter()
@@ -101,10 +104,26 @@ export function useAppShortcuts(): CommandContext {
   )
 
   useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
+    // The one guarded entry point for app commands, shared by keystrokes and
+    // native menu activations. Returns whether the command was handled.
+    function triggerCommand(id: string): boolean {
       if (paletteOpenRef.current) {
-        return // modal palette owns the keyboard; Esc closes, then keys resume
+        return false // modal palette owns the screen; Esc closes, then commands resume
       }
+      if (shortcutsOpenRef.current) {
+        // The cheat-sheet is modal too: nothing may navigate behind it, but
+        // the command that opened it closes it again.
+        if (id === 'shortcuts.show') {
+          closeShortcuts()
+          return true
+        }
+        return false
+      }
+      void runCommand(id, context)
+      return true
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
       if (!isModKey(event) || event.altKey || event.repeat) {
         return // held keys must not spam navigations (e.g. a stack of new notes)
       }
@@ -112,22 +131,20 @@ export function useAppShortcuts(): CommandContext {
         ? `Mod-Shift-${event.key.toLowerCase()}`
         : `Mod-${event.key.toLowerCase()}`
       const id = BINDING_TO_ID.get(bindingKey)
-      if (shortcutsOpenRef.current) {
-        // The cheat-sheet is modal too: nothing may navigate behind it, but
-        // the key that opened it closes it again.
-        if (id === 'shortcuts.show') {
-          event.preventDefault()
-          closeShortcuts()
-        }
+      if (id === undefined) {
         return
       }
-      if (id !== undefined) {
+      if (triggerCommand(id)) {
+        // Also keeps the native menu's matching accelerator from firing the
+        // same command again: the webview consumes the key equivalent.
         event.preventDefault()
-        void runCommand(id, context)
       }
     }
+
+    setMenuCommandDispatch(triggerCommand)
     window.addEventListener('keydown', onKeyDown)
     return () => {
+      setMenuCommandDispatch(null)
       window.removeEventListener('keydown', onKeyDown)
     }
   }, [context, closeShortcuts])
