@@ -48,7 +48,7 @@ export function NoteActionsSection({ path }: NoteActionsSectionProps): ReactElem
         toggle={toggleNotePrivate}
         icon={<Lock size={14} aria-hidden />}
         labels={{
-          active: 'Mark as public',
+          active: 'Un-mark as private',
           inactive: 'Mark as private',
         }}
         operations={{
