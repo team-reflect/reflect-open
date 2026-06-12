@@ -66,6 +66,13 @@ export interface IndexPassOptions {
   generation: number
   /** Aborts the pass early when the active graph changes. */
   signal?: AbortSignal
+  /**
+   * Called after id-based move healing relocates a note's rows (Plan 17): an
+   * external rename observed after the fact. The desktop layer uses it to
+   * carry live sessions and rewrite routes, exactly as for an in-app rename
+   * — without it, history entries keep pointing at the dead path.
+   */
+  onMoved?: (from: string, to: string) => void
 }
 
 /**
@@ -125,7 +132,7 @@ export async function syncIndex(options: IndexPassOptions): Promise<void> {
  * the newly-opened index — Rust drops its stale writes.
  */
 export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
-  const { generation, signal } = options
+  const { generation, signal, onMoved } = options
   const files = await listFiles()
   if (signal?.aborted) {
     return
@@ -165,6 +172,7 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
       if (hash !== undefined) {
         stored.set(move.to, hash)
       }
+      onMoved?.(move.from, move.to)
     }
   } catch (err) {
     // A failed detection (e.g. the id lookup) must not cost the reconcile.

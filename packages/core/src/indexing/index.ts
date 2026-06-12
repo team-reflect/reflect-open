@@ -23,6 +23,7 @@ export {
   subscribeIndexChanges,
   applyIndexChanges,
   type ApplyErrorHandler,
+  type MovedHandler,
 } from './live'
 export { hashContent } from './hash'
 export { availableNotePath, slugPathForTitle } from './note-paths'

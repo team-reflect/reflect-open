@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { onNoteMoved } from '@/lib/note-moves'
-import { moveNoteCarryingSession } from './move-note'
+import { followHealedMove, moveNoteCarryingSession } from './move-note'
 import type { NoteSession } from './note-session'
 import { openSession, registerOpenDocument } from './open-documents'
 
@@ -102,6 +102,39 @@ describe('moveNoteCarryingSession', () => {
       expect(foreign.session.path).toBe('notes/b.md')
     } finally {
       unregister()
+    }
+  })
+})
+
+describe('followHealedMove', () => {
+  it('carries a live session to the healed path and announces', () => {
+    const { session } = fakeSession('notes/a.md')
+    const unregister = registerOpenDocument({ session })
+    const moves: Array<[string, string]> = []
+    const unsubscribe = onNoteMoved((from, to) => moves.push([from, to]))
+    try {
+      followHealedMove('notes/a.md', 'notes/renamed.md')
+
+      // The open pane follows the externally renamed file: its next save
+      // writes the new path instead of resurrecting the dead one.
+      expect(session.path).toBe('notes/renamed.md')
+      expect(openSession('notes/renamed.md')).toBe(session)
+      expect(openSession('notes/a.md')).toBeNull()
+      expect(moves).toEqual([['notes/a.md', 'notes/renamed.md']])
+    } finally {
+      unsubscribe()
+      unregister()
+    }
+  })
+
+  it('a heal of a closed note just announces (routes still follow)', () => {
+    const moves: Array<[string, string]> = []
+    const unsubscribe = onNoteMoved((from, to) => moves.push([from, to]))
+    try {
+      followHealedMove('notes/a.md', 'notes/renamed.md')
+      expect(moves).toEqual([['notes/a.md', 'notes/renamed.md']])
+    } finally {
+      unsubscribe()
     }
   })
 })

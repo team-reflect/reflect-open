@@ -69,6 +69,13 @@ export interface GraphIndexOptions {
    * (Plan 07): firing on raw file events instead would refetch stale rows.
    */
   onApplied?: () => void
+  /**
+   * Called when id-based healing relocates a note's rows (Plan 17): an
+   * external rename observed by the reconcile or a watcher batch. The app
+   * carries live sessions and rewrites routes off this, exactly as for an
+   * in-app rename.
+   */
+  onMoved?: (from: string, to: string) => void
 }
 
 /**
@@ -77,7 +84,7 @@ export interface GraphIndexOptions {
  * keeps one instance (e.g. in a ref) across graph switches.
  */
 export function createGraphIndex(options: GraphIndexOptions = {}): GraphIndex {
-  const { onError, onProgress, onApplied } = options
+  const { onError, onProgress, onApplied, onMoved } = options
   let abort: AbortController | null = null
   let done: Promise<void> = Promise.resolve()
   // Boxed so the async sync pass can read/replace the active subscription without
@@ -120,12 +127,12 @@ export function createGraphIndex(options: GraphIndexOptions = {}): GraphIndex {
       // later step threw) is torn down in `finally` so listeners can't leak.
       let pending: (() => void) | null = null
       try {
-        await syncIndex({ generation, signal: controller.signal })
+        await syncIndex({ generation, signal: controller.signal, onMoved })
         if (isStale()) {
           return
         }
         onApplied?.()
-        pending = await subscribeIndexChanges(generation, onApplied)
+        pending = await subscribeIndexChanges(generation, onApplied, onMoved)
         if (isStale()) {
           return
         }

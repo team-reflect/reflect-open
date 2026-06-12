@@ -215,6 +215,23 @@ describe('applyIndexChanges move healing (Plan 17)', () => {
     expect((apply?.[1].note as { path: string; mtime: number }).mtime).toBe(42)
   })
 
+  it('announces the heal via onMoved so the app can follow', async () => {
+    renameBridge()
+    const moves: Array<[string, string]> = []
+
+    await applyIndexChanges(
+      [
+        { path: OLD, kind: 'remove' },
+        { path: NEW, kind: 'upsert' },
+      ],
+      7,
+      undefined,
+      (from, to) => moves.push([from, to]),
+    )
+
+    expect(moves).toEqual([[OLD, NEW]])
+  })
+
   it('falls back to delete+create when the ids do not match', async () => {
     const calls = renameBridge({ rowId: 'completely-different-id' })
 

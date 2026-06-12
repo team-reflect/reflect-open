@@ -36,3 +36,21 @@ export async function moveNoteCarryingSession(
   }
   emitNoteMoved(from, to)
 }
+
+/**
+ * Follow a move the index healed by id (Plan 17): an external rename —
+ * Finder, Obsidian, a sync pull — already relocated the file, and the
+ * reconcile/watcher just moved the rows to match. Carry any live session to
+ * the new path and announce, so the route, history, and open pane follow the
+ * file exactly as for an in-app rename. No flush and no compensation: the
+ * move already happened; this only updates what points at it — and without
+ * it, an open pane's next save would resurrect the dead path.
+ */
+export function followHealedMove(from: string, to: string): void {
+  const owner = openSession(from)
+  if (owner !== null) {
+    owner.retarget(to)
+    retargetOpenDocument(from, to, owner)
+  }
+  emitNoteMoved(from, to)
+}

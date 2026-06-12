@@ -16,6 +16,13 @@ import { getNoteIdsByPath } from './queries'
 /** Reports a change that failed to apply; the batch continues past it. */
 export type ApplyErrorHandler = (error: unknown, change: FileChange) => void
 
+/**
+ * Announces an id-based heal (Plan 17): the rows for an externally renamed
+ * note moved `from` → `to`. The desktop layer carries live sessions and
+ * rewrites routes off this, exactly as for an in-app rename.
+ */
+export type MovedHandler = (from: string, to: string) => void
+
 const logApplyError: ApplyErrorHandler = (error, change) => {
   console.error(`failed to index change for ${change.path}:`, error)
 }
@@ -36,6 +43,7 @@ async function healBatchMoves(
   changes: FileChange[],
   generation: number,
   onError: ApplyErrorHandler,
+  onMoved?: MovedHandler,
 ): Promise<Set<string>> {
   const handled = new Set<string>()
   const removes = changes.filter((change) => change.kind === 'remove')
@@ -63,6 +71,7 @@ async function healBatchMoves(
       })
       handled.add(move.from)
       handled.add(move.to)
+      onMoved?.(move.from, move.to)
     } catch (error) {
       // Unhandled paths fall through to the plain remove/upsert below, which
       // converges (a half-moved row is re-indexed; a missed remove no-ops).
@@ -83,10 +92,11 @@ export async function applyIndexChanges(
   changes: FileChange[],
   generation: number,
   onError: ApplyErrorHandler = logApplyError,
+  onMoved?: MovedHandler,
 ): Promise<void> {
   let handled: Set<string>
   try {
-    handled = await healBatchMoves(changes, generation, onError)
+    handled = await healBatchMoves(changes, generation, onError, onMoved)
   } catch (error) {
     // Healing is best-effort: a failure here (e.g. the id lookup) must not
     // cost the batch — everything degrades to the plain path below.
@@ -121,13 +131,14 @@ export async function applyIndexChanges(
 export function subscribeIndexChanges(
   generation: number,
   onApplied?: (changes: FileChange[]) => void,
+  onMoved?: MovedHandler,
 ): Promise<Unlisten> {
   // Serialize batches so overlapping events for the same path can't reorder
   // (e.g. an upsert landing after a later remove, leaving a ghost row).
   let applyQueue: Promise<void> = Promise.resolve()
   return subscribeFileChanges((changes) => {
     applyQueue = applyQueue
-      .then(() => applyIndexChanges(changes, generation))
+      .then(() => applyIndexChanges(changes, generation, undefined, onMoved))
       .then(() => {
         onApplied?.(changes)
       })

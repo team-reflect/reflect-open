@@ -58,12 +58,19 @@ describe('createGraphIndex', () => {
     const unlisten = vi.fn()
     mockSubscribe.mockResolvedValue(unlisten)
     const onApplied = vi.fn()
-    const index = createGraphIndex({ onApplied })
+    const onMoved = vi.fn()
+    const index = createGraphIndex({ onApplied, onMoved })
     index.sync(5, () => false)
     await index.stop()
 
-    expect(mockSync).toHaveBeenCalledWith({ generation: 5, signal: expect.any(AbortSignal) })
-    expect(mockSubscribe).toHaveBeenCalledWith(5, onApplied)
+    // Both healing paths get the move hook: the reconcile pass and the live
+    // subscription — external renames must follow through to sessions/routes.
+    expect(mockSync).toHaveBeenCalledWith({
+      generation: 5,
+      signal: expect.any(AbortSignal),
+      onMoved,
+    })
+    expect(mockSubscribe).toHaveBeenCalledWith(5, onApplied, onMoved)
     // The initial reconcile is itself an index change: invalidate once there.
     expect(onApplied).toHaveBeenCalledTimes(1)
     expect(mockWatchStart).toHaveBeenCalledTimes(1)

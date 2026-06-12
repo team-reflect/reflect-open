@@ -18,6 +18,7 @@ import {
   type GraphInfo,
   type RecentGraph,
 } from '@reflect/core'
+import { followHealedMove } from '@/editor/move-note'
 import { invalidateIndexQueries } from '@/lib/query-client'
 import { createGraphIndex } from './graph-index'
 
@@ -74,6 +75,9 @@ export function GraphProvider({ children }: { children: ReactNode }) {
       onError: (stage, err) => console.error(`index ${stage} failed:`, errorMessage(err)),
       onProgress: (progress) => setIndexing(progress === 'reconciling'),
       onApplied: invalidateIndexQueries,
+      // External renames healed by id follow through to sessions and routes,
+      // exactly as for an in-app rename (Plan 17).
+      onMoved: followHealedMove,
     }),
   )
 

@@ -179,6 +179,14 @@ pub(super) fn move_note(conn: &Connection, from: &str, to: &str) -> AppResult<()
                 "cannot move note: {to} is already indexed"
             )));
         }
+        // Nothing is merged from the stale source row, deliberately: every
+        // `notes` column is content-derived (pinned and conflict flags come
+        // from frontmatter/markers — migrations 0004/0006), and the
+        // destination row is the same note's *fresher* projection. Copying
+        // the source's `is_pinned`/`has_conflict` over it would resurrect
+        // exactly the changes the racing save just made. Embedding chunks are
+        // the one path-keyed derivative that is expensive rather than
+        // re-derivable — they carry over below.
         let dest_has_chunks: bool = conn
             .prepare_cached("SELECT 1 FROM embedding_chunks WHERE note_path = ?1 LIMIT 1")?
             .exists(params![to])?;

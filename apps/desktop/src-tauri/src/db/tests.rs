@@ -867,6 +867,7 @@ fn move_note_adopts_a_same_id_destination_row_and_carries_chunks() {
     let mut conn = migrated();
     let mut stale = note("notes/old.md", "Old Title", vec![]);
     stale.id = Some("01samenote".to_string());
+    stale.is_pinned = true; // pinned in the OLD content — the racing save unpinned
     apply_note(&conn, &stale).unwrap();
     apply_chunks(&conn, "notes/old.md", &[chunk("c1", Some(vec384(0.5)))]).unwrap();
     let mut fresh = note("notes/new-title.md", "New Title", vec![]);
@@ -875,14 +876,23 @@ fn move_note_adopts_a_same_id_destination_row_and_carries_chunks() {
 
     move_in_txn(&mut conn, "notes/old.md", "notes/new-title.md").unwrap();
 
-    // One note left — the fresh row, untouched.
-    let rows = run_query(&conn, "SELECT path, title FROM notes ORDER BY path", &[]).unwrap();
+    // One note left — the fresh row, untouched. Flags are deliberately NOT
+    // merged from the stale source: every notes column is content-derived
+    // (the racing save's projection already says whether it's pinned), and
+    // copying the old is_pinned over it would resurrect the undone pin.
+    let rows = run_query(
+        &conn,
+        "SELECT path, title, is_pinned FROM notes ORDER BY path",
+        &[],
+    )
+    .unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(
         rows[0].get("path").unwrap().as_str().unwrap(),
         "notes/new-title.md"
     );
     assert_eq!(rows[0].get("title").unwrap().as_str().unwrap(), "New Title");
+    assert_eq!(rows[0].get("is_pinned").unwrap().as_i64().unwrap(), 0);
     // The chunks moved with the note; the vector survived.
     assert_eq!(
         chunk_rows(&conn),

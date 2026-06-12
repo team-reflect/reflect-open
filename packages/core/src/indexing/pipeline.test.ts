@@ -212,6 +212,15 @@ describe('reconcileIndex move healing (Plan 17)', () => {
     expect(commands).not.toContain('index_remove')
   })
 
+  it('announces the heal via onMoved so the app can follow', async () => {
+    renameFake({ storedHash: await hashContent(CONTENT) })
+    const moves: Array<[string, string]> = []
+
+    await reconcileIndex({ generation: 4, onMoved: (from, to) => moves.push([from, to]) })
+
+    expect(moves).toEqual([[OLD, NEW]])
+  })
+
   it('re-indexes at the new path when content changed in transit', async () => {
     const calls = renameFake({ storedHash: 'stale-hash-from-before-the-edit' })
 
