@@ -89,14 +89,15 @@ describe('AudioMemoButton', () => {
     expect(memo.discard).not.toHaveBeenCalled()
   })
 
-  it('transcribing disables the control and shows progress', () => {
+  it('transcribing shows progress while the mic stays live for the next memo', async () => {
     memo.phase = 'transcribing'
     const view = renderButton()
 
     expect(view.getByText('Transcribing…')).not.toBeNull()
-    expect(
-      view.getByRole('button', { name: 'Transcribing audio memo' }),
-    ).toHaveProperty('disabled', true)
+    const micButton = view.getByRole('button', { name: 'Record audio memo' })
+    expect(micButton).toHaveProperty('disabled', false)
+    await userEvent.click(micButton)
+    expect(memo.toggle).toHaveBeenCalled()
   })
 
   it('a resumable failure offers Retry and Discard', async () => {

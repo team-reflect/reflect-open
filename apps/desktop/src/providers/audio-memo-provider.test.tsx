@@ -255,6 +255,154 @@ describe('AudioMemoProvider', () => {
     expect(saveAudioMemo).toHaveBeenCalledTimes(1)
   })
 
+  it('a new recording can start while a save is pending, and saves run serially in order', async () => {
+    let releaseFirst: (outcome: SaveAudioMemoOutcome) => void = () => {}
+    saveAudioMemo.mockImplementationOnce(
+      () =>
+        new Promise<SaveAudioMemoOutcome>((resolve) => {
+          releaseFirst = resolve
+        }),
+    )
+    const second = {
+      blob: new Blob(['second'], { type: 'audio/mp4' }),
+      mimeType: 'audio/mp4',
+      durationMs: 2000,
+    }
+    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+
+    await act(async () => {
+      result.current.toggle()
+    })
+    await act(async () => {
+      result.current.toggle()
+    })
+    expect(result.current.phase).toBe('transcribing')
+
+    // The first save is still in flight — the mic must accept the next memo.
+    await act(async () => {
+      result.current.toggle()
+    })
+    expect(result.current.phase).toBe('recording')
+
+    recorderControls.stopResult = second
+    await act(async () => {
+      result.current.toggle()
+    })
+    expect(result.current.phase).toBe('transcribing')
+    expect(result.current.pendingCount).toBe(2)
+    // Serial: the second memo waits — concurrent saves would race the
+    // daily-note read-modify-write.
+    expect(saveAudioMemo).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      releaseFirst({ ok: true, text: 'memo one' })
+    })
+    await waitFor(() => expect(result.current.phase).toBe('idle'))
+    expect(result.current.pendingCount).toBe(0)
+    expect(saveAudioMemo).toHaveBeenCalledTimes(2)
+    expect(saveAudioMemo).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        payload: { kind: 'transcribe', audio: second.blob, mimeType: 'audio/mp4' },
+      }),
+    )
+  })
+
+  it('a failure parks the queue; retry lands the failed memo before the ones behind it', async () => {
+    let releaseFirst: (outcome: SaveAudioMemoOutcome) => void = () => {}
+    saveAudioMemo.mockImplementationOnce(
+      () =>
+        new Promise<SaveAudioMemoOutcome>((resolve) => {
+          releaseFirst = resolve
+        }),
+    )
+    const second = {
+      blob: new Blob(['second'], { type: 'audio/mp4' }),
+      mimeType: 'audio/mp4',
+      durationMs: 2000,
+    }
+    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+
+    await act(async () => {
+      result.current.toggle()
+    })
+    await act(async () => {
+      result.current.toggle()
+    })
+    await act(async () => {
+      result.current.toggle()
+    })
+    recorderControls.stopResult = second
+    await act(async () => {
+      result.current.toggle()
+    })
+
+    await act(async () => {
+      releaseFirst({ ok: false, message: 'provider down', resume: { kind: 'append', text: 'memo one' } })
+    })
+    await waitFor(() => expect(result.current.phase).toBe('error'))
+    // The second memo holds behind the failure — retrying later must not
+    // append the first transcript after the second.
+    expect(saveAudioMemo).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      result.current.retry()
+    })
+    await waitFor(() => expect(result.current.phase).toBe('idle'))
+    expect(saveAudioMemo).toHaveBeenCalledTimes(3)
+    expect(saveAudioMemo.mock.calls[1]?.[0].payload).toEqual({ kind: 'append', text: 'memo one' })
+    expect(saveAudioMemo.mock.calls[2]?.[0].payload).toEqual({
+      kind: 'transcribe',
+      audio: second.blob,
+      mimeType: 'audio/mp4',
+    })
+  })
+
+  it('discarding a failed memo releases the queue behind it', async () => {
+    let releaseFirst: (outcome: SaveAudioMemoOutcome) => void = () => {}
+    saveAudioMemo.mockImplementationOnce(
+      () =>
+        new Promise<SaveAudioMemoOutcome>((resolve) => {
+          releaseFirst = resolve
+        }),
+    )
+    const second = {
+      blob: new Blob(['second'], { type: 'audio/mp4' }),
+      mimeType: 'audio/mp4',
+      durationMs: 2000,
+    }
+    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+
+    await act(async () => {
+      result.current.toggle()
+    })
+    await act(async () => {
+      result.current.toggle()
+    })
+    await act(async () => {
+      result.current.toggle()
+    })
+    recorderControls.stopResult = second
+    await act(async () => {
+      result.current.toggle()
+    })
+
+    await act(async () => {
+      releaseFirst({ ok: false, message: 'provider down', resume: { kind: 'append', text: 'memo one' } })
+    })
+    await waitFor(() => expect(result.current.phase).toBe('error'))
+
+    await act(async () => {
+      result.current.discard()
+    })
+    await waitFor(() => expect(result.current.phase).toBe('idle'))
+    expect(saveAudioMemo).toHaveBeenCalledTimes(2)
+    expect(saveAudioMemo).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        payload: { kind: 'transcribe', audio: second.blob, mimeType: 'audio/mp4' },
+      }),
+    )
+  })
+
   it('a second toggle during the permission prompt aborts the request', async () => {
     recorderControls.holdStart = true
     const { result } = renderHook(() => useAudioMemo(), { wrapper })

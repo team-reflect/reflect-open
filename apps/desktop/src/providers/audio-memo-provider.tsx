@@ -15,6 +15,7 @@ import {
   saveAudioMemo,
   type AudioMemoResume,
   type GraphInfo,
+  type SaveAudioMemoOutcome,
 } from '@reflect/core'
 import { isRecordingSupported, useAudioRecorder } from '@/hooks/use-audio-recorder'
 import { todayIso } from '@/lib/dates'
@@ -30,8 +31,18 @@ import { useSidebar } from '@/providers/sidebar-provider'
  * the mic button unmounts with the sidebar (`Mod-\`), and a recording must
  * never outlive its UI invisibly: collapsing mid-recording stops and saves
  * instead of leaving a hidden hot microphone.
+ *
+ * Saves drain through a serial queue so memos can be recorded back-to-back
+ * while earlier ones are still transcribing. One save at a time keeps the
+ * daily-note read-modify-write race-free and appends memos in recording
+ * order; a resumable failure parks the queue behind the error, so a retry
+ * lands its transcript before the memos recorded after it.
  */
 
+/**
+ * 'transcribing' means committed memos are still saving in the background —
+ * the mic stays available, so the next recording can start immediately.
+ */
 export type AudioMemoPhase = 'idle' | 'requesting' | 'recording' | 'transcribing' | 'error'
 
 interface AudioMemoContextValue {
@@ -40,6 +51,8 @@ interface AudioMemoContextValue {
   elapsedMs: number
   /** The live input stream, for the waveform. */
   stream: MediaStream | null
+  /** Memos committed but not yet appended — queued plus in flight. */
+  pendingCount: number
   /** False when no OpenAI/Gemini model is configured or the platform can't record. */
   available: boolean
   /** Why the mic is disabled (tooltip copy), null when `available`. */
@@ -54,7 +67,7 @@ interface AudioMemoContextValue {
   cancel: () => void
   /** Re-run the failed step — transcription is never paid for twice. */
   retry: () => void
-  /** Leave the error phase, dropping the failed payload. */
+  /** Drop the failed memo and let the queue continue. */
   discard: () => void
 }
 
@@ -83,7 +96,9 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
   const { settings } = useSettings()
   const { collapsed, toggleSidebar } = useSidebar()
 
-  const [saving, setSaving] = useState(false)
+  const [pendingCount, setPendingCount] = useState(0)
+  /** True from the stop click until the recorder hands over the blob. */
+  const [stopping, setStopping] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [resume, setResume] = useState<AudioMemoResume | null>(null)
 
@@ -112,51 +127,66 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
   const collapsedRef = useRef(collapsed)
   collapsedRef.current = collapsed
 
-  // Re-entry guard: state-based `saving` flips a render too late to stop a
-  // rapid second Retry, and two pipelines would append the transcript twice.
-  const savingRef = useRef(false)
+  /** Committed memos waiting their turn; the pump owns the head. */
+  const queueRef = useRef<AudioMemoResume[]>([])
+  /** Single-drainer guard: one pump loop at a time, one append at a time. */
+  const pumpingRef = useRef(false)
+  /**
+   * The failed step a retry should re-run. While parked, the queue holds —
+   * memo order in the note must survive the failure. A ref, not state: rapid
+   * double Retry must see the first click's take synchronously, or two
+   * pipelines append the transcript twice.
+   */
+  const parkedRef = useRef<AudioMemoResume | null>(null)
+  /** Re-entry guard for the stop click's await gap. */
+  const stoppingRef = useRef(false)
 
-  const runSave = useCallback(
-    async (payload: AudioMemoResume): Promise<void> => {
-      if (savingRef.current) {
-        return
-      }
-      savingRef.current = true
-      setSaving(true)
-      setError(null)
-      try {
-        const outcome = await saveAudioMemo({
-          payload,
-          models: { models: settings.aiModels, defaultModelId: settings.defaultAiModelId },
-          date: todayIso(),
-          generation: graph.generation,
-          fetchFn: providerFetch,
-        })
-        if (outcome.ok) {
-          setResume(null)
-        } else {
-          setError(outcome.message)
+  const pump = useCallback(async (): Promise<void> => {
+    if (pumpingRef.current) {
+      return
+    }
+    pumpingRef.current = true
+    try {
+      while (parkedRef.current === null) {
+        const payload = queueRef.current.shift()
+        if (payload === undefined) {
+          break
+        }
+        let outcome: SaveAudioMemoOutcome
+        try {
+          outcome = await saveAudioMemo({
+            payload,
+            models: { models: settings.aiModels, defaultModelId: settings.defaultAiModelId },
+            date: todayIso(),
+            generation: graph.generation,
+            fetchFn: providerFetch,
+          })
+        } finally {
+          setPendingCount((count) => count - 1)
+        }
+        if (!outcome.ok) {
+          // Resumable: park the queue behind the failure. Non-resumable
+          // (nothing to re-run, nothing to mis-order): surface and keep
+          // draining the memos behind it.
+          parkedRef.current = outcome.resume
           setResume(outcome.resume)
+          setError(outcome.message)
           if (collapsedRef.current) {
             // The mic button (and its popover) unmounted with the sidebar —
             // the failure must still surface somewhere.
             startOperation('Saving audio memo').fail(outcome.message)
           }
         }
-      } finally {
-        savingRef.current = false
-        setSaving(false)
       }
-    },
-    [settings.aiModels, settings.defaultAiModelId, graph.generation],
-  )
+    } finally {
+      pumpingRef.current = false
+    }
+  }, [settings.aiModels, settings.defaultAiModelId, graph.generation])
 
   const start = useCallback(async (): Promise<void> => {
     if (!supported || transcriptionConfig === null) {
       return
     }
-    setError(null)
-    setResume(null)
     if (collapsedRef.current) {
       // Never record without visible recording UI.
       toggleSidebar()
@@ -173,23 +203,38 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
   }, [supported, transcriptionConfig, toggleSidebar, startRecorder])
 
   const stopAndSave = useCallback(async (): Promise<void> => {
+    if (stoppingRef.current) {
+      return
+    }
+    stoppingRef.current = true
     // The stop click commits the memo: flip to 'transcribing' before the stop
     // settles, so an Esc landing in the await gap can't read a lingering
     // 'recording' phase and cancel a recording the user just saved.
-    setSaving(true)
-    const recording = await stopRecorder()
-    if (recording === null) {
-      setSaving(false)
-      return
+    setStopping(true)
+    try {
+      const recording = await stopRecorder()
+      if (recording !== null) {
+        queueRef.current.push({
+          kind: 'transcribe',
+          audio: recording.blob,
+          mimeType: recording.mimeType,
+        })
+        setPendingCount((count) => count + 1)
+        void pump()
+      }
+    } finally {
+      stoppingRef.current = false
+      setStopping(false)
     }
-    await runSave({ kind: 'transcribe', audio: recording.blob, mimeType: recording.mimeType })
-  }, [stopRecorder, runSave])
+  }, [stopRecorder, pump])
   stopAndSaveRef.current = () => void stopAndSave()
 
   const discard = useCallback((): void => {
+    parkedRef.current = null
     setError(null)
     setResume(null)
-  }, [])
+    void pump()
+  }, [pump])
 
   const toggle = useCallback((): void => {
     if (recorder.status === 'recording') {
@@ -208,22 +253,27 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
       } else {
         discard()
       }
-    } else if (recorder.status === 'idle' && !saving) {
+    } else if (recorder.status === 'idle') {
       void start()
     }
-  }, [recorder.status, saving, error, stopAndSave, cancelRecorder, start, toggleSidebar, discard])
+  }, [recorder.status, error, stopAndSave, cancelRecorder, start, toggleSidebar, discard])
 
   const cancel = useCallback((): void => {
     cancelRecorder()
-    setError(null)
-    setResume(null)
   }, [cancelRecorder])
 
   const retry = useCallback((): void => {
-    if (resume !== null) {
-      void runSave(resume)
+    const parked = parkedRef.current
+    if (parked === null) {
+      return
     }
-  }, [resume, runSave])
+    parkedRef.current = null
+    setError(null)
+    setResume(null)
+    queueRef.current.unshift(parked)
+    setPendingCount((count) => count + 1)
+    void pump()
+  }, [pump])
 
   // Collapsing the sidebar mid-flow: stop-and-save a live recording, and
   // abandon a pending permission request — a grant arriving after the
@@ -239,14 +289,18 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
     }
   }, [collapsed, recorder.status, cancelRecorder, stopAndSave])
 
+  // A live capture owns the surface — a background save's failure parks and
+  // shows after the stop, never yanking the waveform mid-recording.
   const phase: AudioMemoPhase =
-    error !== null
-      ? 'error'
-      : saving
-        ? 'transcribing'
-        : recorder.status === 'idle'
-          ? 'idle'
-          : recorder.status
+    recorder.status === 'recording' && !stopping
+      ? 'recording'
+      : recorder.status === 'requesting'
+        ? 'requesting'
+        : error !== null
+          ? 'error'
+          : stopping || pendingCount > 0
+            ? 'transcribing'
+            : 'idle'
 
   const unavailableReason = !supported
     ? UNSUPPORTED_REASON
@@ -259,6 +313,7 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
       phase,
       elapsedMs: recorder.elapsedMs,
       stream: recorder.stream,
+      pendingCount,
       available: unavailableReason === null,
       unavailableReason,
       error,
@@ -272,6 +327,7 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
       phase,
       recorder.elapsedMs,
       recorder.stream,
+      pendingCount,
       unavailableReason,
       error,
       resume,

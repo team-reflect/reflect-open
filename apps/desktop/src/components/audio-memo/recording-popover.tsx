@@ -11,8 +11,10 @@ import { useAudioMemo } from '@/providers/audio-memo-provider'
  * failure state with Retry/Discard. Esc cancels a live recording and
  * dismisses an error, but is deliberately inert while transcribing — the
  * user already committed the memo by stopping, and "cancelling" a save
- * that may have reached the provider would only feign control. Clicks
- * elsewhere don't dismiss; the recording owns its lifecycle.
+ * that may have reached the provider would only feign control. The mic
+ * beside the panel stays live while transcribing: memos queue, so the next
+ * recording can start immediately. Clicks elsewhere don't dismiss; the
+ * recording owns its lifecycle.
  */
 export function RecordingPopover(): ReactElement {
   const memo = useAudioMemo()
