@@ -129,6 +129,18 @@ export const graphColorsSchema = z
   })
 
 /**
+ * Graph roots (absolute paths) where the user declined the one-time
+ * readable-filenames migration (Plan 17c). Sticky per graph — the prompt
+ * never re-asks. Only the rename of *existing* ULID-named files is declined;
+ * new notes get slug filenames regardless. Resilience is per entry: non-string
+ * junk is dropped while the rest load.
+ */
+export const filenameMigrationDeclinedSchema = z
+  .array(z.unknown())
+  .catch([])
+  .transform((entries) => entries.filter((entry): entry is string => typeof entry === 'string'))
+
+/**
  * The cloud AI providers Reflect can call directly (BYOK — the user's own
  * keys, no Reflect-hosted proxy).
  */
@@ -186,6 +198,7 @@ export const settingsSchema = z
     weekStartDay: weekStartDaySchema,
     allNotesFilterTags: allNotesFilterTagsSchema,
     graphColors: graphColorsSchema,
+    filenameMigrationDeclined: filenameMigrationDeclinedSchema,
     aiModels: aiModelsSchema,
     defaultAiModelId: defaultAiModelIdSchema,
   })

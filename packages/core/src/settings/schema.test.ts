@@ -13,6 +13,7 @@ describe('settingsSchema', () => {
       weekStartDay: 'monday',
       allNotesFilterTags: ['book', 'link', 'person'],
       graphColors: {},
+      filenameMigrationDeclined: [],
       aiModels: [],
       defaultAiModelId: null,
     })
@@ -90,6 +91,7 @@ describe('settingsSchema', () => {
       weekStartDay: 'monday',
       allNotesFilterTags: ['book', 'link', 'person'],
       graphColors: {},
+      filenameMigrationDeclined: [],
       aiModels: [],
       defaultAiModelId: null,
       futureKey: true,
@@ -153,5 +155,20 @@ describe('settingsSchema', () => {
       expect(settingsSchema.parse({ defaultAiModelId: null }).defaultAiModelId).toBeNull()
       expect(settingsSchema.parse({ defaultAiModelId: 42 }).defaultAiModelId).toBeNull()
     })
+  })
+})
+
+describe('filenameMigrationDeclined', () => {
+  it('passes graph roots through and drops non-string junk', () => {
+    expect(
+      settingsSchema.parse({ filenameMigrationDeclined: ['/graphs/work', 42, null, '/graphs/home'] })
+        .filenameMigrationDeclined,
+    ).toEqual(['/graphs/work', '/graphs/home'])
+  })
+
+  it('degrades a non-array value to the empty list', () => {
+    expect(
+      settingsSchema.parse({ filenameMigrationDeclined: '/graphs/work' }).filenameMigrationDeclined,
+    ).toEqual([])
   })
 })

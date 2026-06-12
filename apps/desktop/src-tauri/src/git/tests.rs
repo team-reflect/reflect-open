@@ -652,3 +652,127 @@ fn adopting_an_existing_repo_appends_reflect_ignore() {
     let again = read(&root, ".gitignore");
     assert_eq!(again.matches(".reflect").count(), 1, "{again}");
 }
+
+// ---- the Plan 17 rename matrix ----------------------------------------------
+// Title renames now move files (delete+add in git terms). These pin the three
+// new merge shapes: rename+edit must converge via rename detection, and the
+// two genuinely new conflict shapes (add/add, rename/rename) must surface
+// without wedging or losing content.
+
+#[test]
+fn rename_on_one_device_merges_with_edit_on_the_other() {
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    let base = "# Meeting Notes\n\n- agenda point one\n- agenda point two\n- agenda point three\n";
+    write(root_a, "notes/01arz3ndektsv4rrffq69g5fav.md", base);
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    // Device B edits a body line of the old path.
+    let root_b = second_device(&fixture);
+    write(
+        &root_b,
+        "notes/01arz3ndektsv4rrffq69g5fav.md",
+        "# Meeting Notes\n\n- agenda point one\n- agenda point two EDITED ON B\n- agenda point three\n",
+    );
+    commit_all(&root_b, "b edit", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    // Device A renames the file the way the rename pipeline does: the slug
+    // path changes and the H1 line with it; the body is untouched.
+    fs::remove_file(root_a.join("notes/01arz3ndektsv4rrffq69g5fav.md")).unwrap();
+    write(
+        root_a,
+        "notes/meeting-notes.md",
+        "# Meeting Notes\n\n- agenda point one\n- agenda point two\n- agenda point three\n",
+    );
+    commit_all(root_a, "rename", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    let merged = merge_remote(root_a).unwrap();
+
+    // Rename detection (libgit2 merge default) lands B's edit in the moved
+    // file — no conflict, no resurrected ULID path.
+    assert!(matches!(merged.kind, MergeKind::Merged), "{merged:?}");
+    assert!(merged.conflicted_paths.is_empty(), "{merged:?}");
+    let content = read(root_a, "notes/meeting-notes.md");
+    assert!(content.contains("EDITED ON B"), "{content}");
+    assert!(!root_a.join("notes/01arz3ndektsv4rrffq69g5fav.md").exists());
+    assert!(push(root_a, None).unwrap().pushed);
+}
+
+#[test]
+fn same_title_created_on_two_devices_surfaces_as_a_review_conflict() {
+    // New with slug filenames: two offline devices can create the same path.
+    // The merge must surface it through the existing marker flow, not wedge.
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    write(root_a, "notes/seed.md", "# Seed\n");
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    write(&root_b, "notes/meeting.md", "# Meeting\n\nnotes from device b\n");
+    commit_all(&root_b, "b creates", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    write(root_a, "notes/meeting.md", "# Meeting\n\nnotes from device a\n");
+    commit_all(root_a, "a creates", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    let merged = merge_remote(root_a).unwrap();
+
+    assert!(
+        matches!(merged.kind, MergeKind::MergedWithConflicts),
+        "{merged:?}"
+    );
+    assert_eq!(merged.conflicted_paths, vec!["notes/meeting.md".to_string()]);
+    let content = read(root_a, "notes/meeting.md");
+    assert!(content.contains("notes from device a"), "{content}");
+    assert!(content.contains("notes from device b"), "{content}");
+    let repo = Repository::open(root_a).unwrap();
+    assert_eq!(repo.state(), git2::RepositoryState::Clean);
+    assert!(push(root_a, None).unwrap().pushed);
+}
+
+#[test]
+fn diverging_renames_keep_both_files_and_never_wedge() {
+    // Both devices retitle the same note differently while offline: the note
+    // forks into two paths. Accepted outcome (the duplicate-id flag surfaces
+    // the fork at index time): both files survive, nothing wedges.
+    let fixture = fixture();
+    let root_a = &fixture.graph_a;
+    let base = "# Shared\n\n- line one\n- line two\n- line three\n";
+    write(root_a, "notes/01arz3ndektsv4rrffq69g5fav.md", base);
+    commit_all(root_a, "base", MAX_FILE_BYTES).unwrap();
+    push(root_a, None).unwrap();
+
+    let root_b = second_device(&fixture);
+    fs::remove_file(root_b.join("notes/01arz3ndektsv4rrffq69g5fav.md")).unwrap();
+    write(
+        &root_b,
+        "notes/title-b.md",
+        "# Title B\n\n- line one\n- line two\n- line three\n",
+    );
+    commit_all(&root_b, "b rename", MAX_FILE_BYTES).unwrap();
+    push(&root_b, None).unwrap();
+
+    fs::remove_file(root_a.join("notes/01arz3ndektsv4rrffq69g5fav.md")).unwrap();
+    write(
+        root_a,
+        "notes/title-a.md",
+        "# Title A\n\n- line one\n- line two\n- line three\n",
+    );
+    commit_all(root_a, "a rename", MAX_FILE_BYTES).unwrap();
+    fetch(root_a, None).unwrap();
+    let merged = merge_remote(root_a).unwrap();
+
+    // Whatever the merge classifies this as, the invariants hold: no wedge,
+    // both titles' content present, the old path gone, and the result pushes.
+    let repo = Repository::open(root_a).unwrap();
+    assert_eq!(repo.state(), git2::RepositoryState::Clean, "{merged:?}");
+    assert!(root_a.join("notes/title-a.md").exists(), "{merged:?}");
+    assert!(root_a.join("notes/title-b.md").exists(), "{merged:?}");
+    assert!(!root_a.join("notes/01arz3ndektsv4rrffq69g5fav.md").exists());
+    assert!(read(root_a, "notes/title-a.md").contains("Title A"));
+    assert!(read(root_a, "notes/title-b.md").contains("Title B"));
+    assert!(push(root_a, None).unwrap().pushed);
+}

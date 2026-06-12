@@ -93,6 +93,7 @@ export {
   allNotesFilterTagsSchema,
   graphColorSchema,
   graphColorsSchema,
+  filenameMigrationDeclinedSchema,
   GRAPH_COLOR_IDS,
   aiProviderIdSchema,
   aiModelConfigSchema,

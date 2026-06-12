@@ -1,7 +1,6 @@
 import {
   errorMessage,
   getLinkSources,
-  moveNoteIndexed,
   nextAliases,
   parseNote,
   readNote,
@@ -11,9 +10,9 @@ import {
   upsertFrontmatter,
   writeNote,
 } from '@reflect/core'
+import { moveNoteCarryingSession } from './move-note'
 import type { NoteContentOrigin } from './note-session'
-import { openSession, retargetOpenDocument } from './open-documents'
-import { emitNoteMoved } from '@/lib/note-moves'
+import { openSession } from './open-documents'
 import { startOperation } from '@/lib/operations'
 import { createTitleRenameTracker } from './title-rename'
 import type { TitleRename } from './title-rename'
@@ -66,34 +65,17 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
   let chain: Promise<void> = Promise.resolve()
 
   /**
-   * Move the file onto its title's slug path (Plan 17). Ordering is the
-   * mechanism: flush, retarget the live session (so a racing save writes the
-   * *new* path — Rust keeps the newest bytes if it lands first), then move
-   * file + index rows in one transaction. A failed move retargets back; the
-   * filename drifts (cosmetic — resolution never reads filenames) until the
-   * next settled rename re-derives it.
+   * Move the file onto its title's slug path (Plan 17). A failed move leaves
+   * the filename drifting (cosmetic — resolution never reads filenames) until
+   * the next settled rename re-derives it.
    */
   const runMove = async (title: string, gen: number): Promise<void> => {
     const target = await slugPathForTitle(currentPath, title)
     if (target === currentPath) {
       return
     }
-    const from = currentPath
-    const owner = openSession(from)
-    if (owner !== null) {
-      await owner.flush()
-      owner.retarget(target)
-      retargetOpenDocument(from, target)
-    }
-    try {
-      await moveNoteIndexed(from, target, gen)
-    } catch (cause) {
-      owner?.retarget(from)
-      retargetOpenDocument(target, from)
-      throw cause
-    }
+    await moveNoteCarryingSession(currentPath, target, gen)
     currentPath = target
-    emitNoteMoved(from, target)
   }
 
   // Rewrite inbound links across the graph, record the old title as an alias

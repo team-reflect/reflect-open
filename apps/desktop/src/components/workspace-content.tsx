@@ -11,6 +11,7 @@ import {
   type ContextSidebarTarget,
 } from '@/components/context-sidebar/sidebar-route'
 import { EmbeddingsSync } from '@/components/embeddings-sync'
+import { FilenameMigrationPrompt } from '@/components/filename-migration-prompt'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { OperationsStatus } from '@/components/operations-status'
@@ -98,6 +99,7 @@ export function WorkspaceContent({ graph }: WorkspaceContentProps): ReactElement
         <OperationsStatus />
         <CommandPalette context={commandContext} />
         <EmbeddingsSync />
+        <FilenameMigrationPrompt />
       </div>
     </AppShell>
   )
