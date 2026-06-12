@@ -1,5 +1,9 @@
 # Plan 17 — Readable filenames
 
+> As-built documentation: [docs/readable-filenames.md](../readable-filenames.md)
+> — how the shipped system works, with a code map. This file is the plan and
+> decision history.
+
 **Goal:** Finish the note-identity contract Plan 02 specified but the first wave
 shortcut: regular notes get **title-derived filenames** (`notes/meeting-notes.md`,
 not `notes/01kts4w0cb3n39zb99ycs48fj1.md`), a **frontmatter `id`** (ULID) written at
