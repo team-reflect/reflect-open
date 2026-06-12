@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import { MarkdownPreview } from '@/editor/markdown-preview'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
-import type { ChatTurn as ChatTurnModel } from '@/lib/chat-transcript'
+import type { ChatTurn as ChatTurnModel } from '@reflect/core'
 import { cn } from '@/lib/utils'
 import { ChatToolChip } from './chat-tool-chip'
 

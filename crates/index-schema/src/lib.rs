@@ -9,6 +9,10 @@
 //! `rusqlite_migration` tracks the applied version in SQLite's `user_version`
 //! pragma. Append a new `M::up(include_str!(...))` (never edit a shipped one)
 //! as later plans add tables — and bump [`LATEST_SCHEMA_VERSION`] with it.
+//!
+//! Almost every table is a rebuildable projection of the markdown — except
+//! the `chat_*` tables (0008), which hold durable chat history. Wipe-style
+//! migrations (0004, 0006) and `index_clear` must never touch them.
 
 /// Directory inside a graph that holds the index (and marks a dir as a graph).
 pub const REFLECT_DIR: &str = ".reflect";
@@ -19,7 +23,7 @@ pub const INDEX_FILE: &str = "index.sqlite";
 /// `user_version` after every migration has run. Read-only consumers compare
 /// this against `PRAGMA user_version` to detect an index written by a newer
 /// (or older) app than they were built for.
-pub const LATEST_SCHEMA_VERSION: usize = 7;
+pub const LATEST_SCHEMA_VERSION: usize = 8;
 
 /// The `index_meta` key holding the TS-owned projection version (the rows'
 /// derivation version, distinct from the schema version above).
@@ -46,6 +50,7 @@ mod schema {
             M::up(include_str!("../migrations/0005_note_list_projection.sql")),
             M::up(include_str!("../migrations/0006_conflicts.sql")),
             M::up(include_str!("../migrations/0007_note_id_index.sql")),
+            M::up(include_str!("../migrations/0008_chat.sql")),
         ])
     });
 

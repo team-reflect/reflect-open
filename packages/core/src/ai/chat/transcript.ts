@@ -1,24 +1,32 @@
-import type {
-  ChatModelMessage,
-  ChatStreamEvent,
-  NoteToolCall,
-  NoteToolResult,
-} from '@reflect/core'
-import type { ChatAttachment } from '@/lib/chat-attachments'
+import type { ModelMessage } from 'ai'
+import type { ChatStreamEvent } from './stream-chat'
+import type { NoteToolCall, NoteToolResult } from './tools'
 
 /**
- * The chat view's conversation model (Plan 10). A {@link ChatTurn} is the
- * single source of truth for one exchange: the user's text and image
- * attachments, the assistant's renderable parts, and the model-facing
- * messages the turn contributed. The provider stores only turns — the
- * history a new turn resends is *derived* via {@link buildHistory}, so the
- * transcript and the model's view can never drift apart.
+ * The chat conversation model (Plan 10). A {@link ChatTurn} is the single
+ * source of truth for one exchange: the user's text and image attachments,
+ * the assistant's renderable parts, and the model-facing messages the turn
+ * contributed. Hosts store only turns — the history a new turn resends is
+ * *derived* via {@link buildHistory}, so the transcript and the model's view
+ * can never drift apart. The same record is what the store persists
+ * (`./store`), so a restored conversation renders and resends identically.
  *
  * Parts are built by folding the engine's {@link ChatStreamEvent}s with
  * {@link appendEvent} (pure, so the fold is unit-testable without
  * streaming). Tool parts are generic — only the chip that renders them
  * switches on which tool it was.
  */
+
+/** One image the user attached to a chat turn. */
+export interface ChatAttachment {
+  id: string
+  /** Original filename — the preview's alt text and accessible labels. */
+  name: string
+  /** IANA media type, e.g. `image/png`. */
+  mediaType: string
+  /** The image bytes as a `data:` URL — rendered as-is and sent to the provider. */
+  dataUrl: string
+}
 
 /** One renderable slice of an assistant message. */
 export type AssistantPart =
@@ -34,7 +42,7 @@ export interface ChatTurn {
   attachments: ChatAttachment[]
   parts: AssistantPart[]
   /** The model-facing messages this turn contributed once it settled. */
-  responseMessages: ChatModelMessage[]
+  responseMessages: ModelMessage[]
   status: 'streaming' | 'done'
 }
 
@@ -110,7 +118,7 @@ function settleTools(
 export function userMessage(
   text: string,
   attachments: readonly ChatAttachment[],
-): ChatModelMessage {
+): ModelMessage {
   if (attachments.length === 0) {
     return { role: 'user', content: text }
   }
@@ -138,10 +146,10 @@ export function userMessage(
  * enforce, and invite the model to answer a question the transcript shows
  * as failed.
  */
-export function buildHistory(turns: readonly ChatTurn[]): ChatModelMessage[] {
+export function buildHistory(turns: readonly ChatTurn[]): ModelMessage[] {
   return turns
     .filter((turn) => turn.responseMessages.length > 0)
-    .flatMap((turn): ChatModelMessage[] => [
+    .flatMap((turn): ModelMessage[] => [
       userMessage(turn.userText, turn.attachments),
       ...turn.responseMessages,
     ])

@@ -6,9 +6,12 @@
 //! module owns the schema/migrations ([`migrations`]), all writes — one
 //! transaction per batch, generation-gated here in the command layer
 //! ([`write`] holds the row logic) — plus a read-only `db_query` bridge
-//! ([`query`]) that executes the SQL the frontend builds with Kysely. The DB is
-//! a cache: deleting it loses nothing durable.
+//! ([`query`]) that executes the SQL the frontend builds with Kysely. The DB
+//! is *mostly* a cache: the note projection is rebuildable from markdown, but
+//! the `chat_*` tables ([`chat_write`]) hold durable chat history — deleting
+//! the file loses those.
 
+mod chat_write;
 mod embed_write;
 mod migrations;
 mod query;
@@ -25,6 +28,7 @@ use tauri::State;
 use crate::error::{AppError, AppResult};
 use crate::fs::GraphState;
 
+pub use chat_write::{ChatConversation, ChatMessageRow};
 pub use embed_write::EmbeddedChunk;
 pub use write::IndexedNote;
 
@@ -249,7 +253,9 @@ pub fn index_meta_set(
     Ok(())
 }
 
-/// Wipe all derived tables (the TS layer then re-applies every note; no-op if stale).
+/// Wipe all derived tables (the TS layer then re-applies every note; no-op if
+/// stale). The `chat_*` tables are deliberately untouched — chat history is
+/// durable, not a rebuildable projection.
 #[tauri::command]
 pub fn index_clear(generation: u64, index: State<IndexState>) -> AppResult<()> {
     let state = lock_state(&index)?;
@@ -258,6 +264,44 @@ pub fn index_clear(generation: u64, index: State<IndexState>) -> AppResult<()> {
     }
     let conn = state.conn.as_ref().ok_or_else(AppError::no_graph)?;
     write::clear_index(conn)
+}
+
+/// Upsert one chat message and its conversation row in a single transaction
+/// (no-op if stale). Called at send time with the user half and again at
+/// settle with the full record, so a crash mid-stream keeps the user message.
+/// Stale-generation writes are dropped like every other index write — a turn
+/// detached by a graph switch must not land in the new graph's history.
+#[tauri::command]
+pub fn chat_message_save(
+    conversation: ChatConversation,
+    message: ChatMessageRow,
+    generation: u64,
+    index: State<IndexState>,
+) -> AppResult<()> {
+    let mut state = lock_state(&index)?;
+    if state.generation != generation {
+        return Ok(());
+    }
+    let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
+    let tx = conn.transaction()?;
+    chat_write::save_message(&tx, &conversation, &message)?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// Delete a conversation and (via cascade) its messages (no-op if stale).
+#[tauri::command]
+pub fn chat_conversation_delete(
+    id: String,
+    generation: u64,
+    index: State<IndexState>,
+) -> AppResult<()> {
+    let state = lock_state(&index)?;
+    if state.generation != generation {
+        return Ok(());
+    }
+    let conn = state.conn.as_ref().ok_or_else(AppError::no_graph)?;
+    chat_write::delete_conversation(conn, &id)
 }
 
 /// Replace a note's embedding chunk set (diff applied in one transaction;

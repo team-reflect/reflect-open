@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from 'react'
 import { CalendarDays, FileText, History, Search } from 'lucide-react'
-import { isToolPending, type AssistantPart } from '@/lib/chat-transcript'
+import { isToolPending, type AssistantPart } from '@reflect/core'
 import { routeForPath } from '@/routing/route'
 import { useRouter } from '@/routing/router'
 import { Spinner } from '@/components/ui/spinner'

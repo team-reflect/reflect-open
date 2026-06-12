@@ -3,8 +3,10 @@ import { createAnthropic } from '@ai-sdk/anthropic'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createOpenAI } from '@ai-sdk/openai'
 import { errorMessage } from '../../errors'
+import { modelContextWindow } from '../provider-catalog'
 import type { AiProviderConfig } from '../../settings/schema'
 import type { CloudGraphContext, CloudSafe } from '../checkers'
+import { fitToContextWindow } from './context-window'
 import { chatSystemPrompt } from './system-prompt'
 import {
   buildNoteTools,
@@ -74,11 +76,22 @@ function languageModel(config: AiProviderConfig, apiKey: string, fetchFn: typeof
 
 /**
  * Run one chat turn against the user's configured provider, yielding
- * normalized {@link ChatStreamEvent}s. See {@link streamChatTurn} for the
- * stream's contract.
+ * normalized {@link ChatStreamEvent}s. The history is first fitted to the
+ * model's context budget ({@link fitToContextWindow}) — a long conversation
+ * trims its oldest turns here rather than erroring at the provider. See
+ * {@link streamChatTurn} for the stream's contract.
  */
 export function streamChat(options: StreamChatOptions): AsyncGenerator<ChatStreamEvent> {
-  return streamChatTurn(languageModel(options.config, options.apiKey, options.fetchFn), options)
+  const messages = fitToContextWindow(options.messages, {
+    contextWindow: modelContextWindow(options.config.provider, options.config.model),
+    systemPrompt: chatSystemPrompt({ today: options.today, context: options.context }),
+  })
+  return streamChatTurn(languageModel(options.config, options.apiKey, options.fetchFn), {
+    messages,
+    today: options.today,
+    context: options.context,
+    signal: options.signal,
+  })
 }
 
 /** {@link streamChatTurn}'s options: {@link StreamChatOptions} minus provider wiring. */

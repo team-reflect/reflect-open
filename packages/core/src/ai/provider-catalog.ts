@@ -13,6 +13,13 @@ export interface AiModelOption {
   id: string
   /** Human-readable name shown in pickers. */
   label: string
+  /**
+   * The model's context window in tokens — a deliberate floor, not a spec
+   * sheet: the chat engine only needs a budget that never exceeds the real
+   * window (`ai/chat/context-window`), so undershooting is safe and exact
+   * vendor numbers don't matter.
+   */
+  contextWindow: number
 }
 
 /** One supported BYOK provider. */
@@ -32,10 +39,10 @@ export const AI_PROVIDERS: AiProviderInfo[] = [
     label: 'OpenAI',
     keyPlaceholder: 'sk-…',
     models: [
-      { id: 'gpt-5.5', label: 'GPT-5.5' },
-      { id: 'gpt-5.4', label: 'GPT-5.4' },
-      { id: 'gpt-5.4-mini', label: 'GPT-5.4 mini' },
-      { id: 'gpt-5.4-nano', label: 'GPT-5.4 nano' },
+      { id: 'gpt-5.5', label: 'GPT-5.5', contextWindow: 1_000_000 },
+      { id: 'gpt-5.4', label: 'GPT-5.4', contextWindow: 1_000_000 },
+      { id: 'gpt-5.4-mini', label: 'GPT-5.4 mini', contextWindow: 400_000 },
+      { id: 'gpt-5.4-nano', label: 'GPT-5.4 nano', contextWindow: 400_000 },
     ],
   },
   {
@@ -43,10 +50,10 @@ export const AI_PROVIDERS: AiProviderInfo[] = [
     label: 'Anthropic',
     keyPlaceholder: 'sk-ant-…',
     models: [
-      { id: 'claude-fable-5', label: 'Claude Fable 5' },
-      { id: 'claude-opus-4-8', label: 'Claude Opus 4.8' },
-      { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
-      { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
+      { id: 'claude-fable-5', label: 'Claude Fable 5', contextWindow: 1_000_000 },
+      { id: 'claude-opus-4-8', label: 'Claude Opus 4.8', contextWindow: 1_000_000 },
+      { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', contextWindow: 1_000_000 },
+      { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', contextWindow: 200_000 },
     ],
   },
   {
@@ -54,10 +61,10 @@ export const AI_PROVIDERS: AiProviderInfo[] = [
     label: 'Google Gemini',
     keyPlaceholder: 'AIza…',
     models: [
-      { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro' },
-      { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash' },
-      { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite' },
-      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+      { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', contextWindow: 1_000_000 },
+      { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', contextWindow: 1_000_000 },
+      { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite', contextWindow: 1_000_000 },
+      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', contextWindow: 1_000_000 },
     ],
   },
 ]
@@ -78,4 +85,20 @@ export function aiProvider(id: AiProviderId): AiProviderInfo {
 export function aiModelLabel(provider: AiProviderId, modelId: string): string {
   const match = aiProvider(provider).models.find((model) => model.id === modelId)
   return match?.label ?? modelId
+}
+
+/**
+ * Floor for models outside the curated list (a settings document may carry
+ * ids added by a newer version): small enough to be safe on any model worth
+ * configuring, large enough not to cripple the history.
+ */
+export const DEFAULT_CONTEXT_WINDOW = 128_000
+
+/**
+ * Context window (in tokens) for a model, falling back to
+ * {@link DEFAULT_CONTEXT_WINDOW} for ids outside the curated list.
+ */
+export function modelContextWindow(provider: AiProviderId, modelId: string): number {
+  const match = aiProvider(provider).models.find((model) => model.id === modelId)
+  return match?.contextWindow ?? DEFAULT_CONTEXT_WINDOW
 }

@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
@@ -48,6 +49,12 @@ vi.mock('@/providers/settings-provider', () => ({
     settings: { aiProviders: settingsState.models, defaultAiProviderId: settingsState.defaultId },
     updateSettings: () => {},
   }),
+}))
+
+// No open index → the provider's persistence layer stays inert; these tests
+// cover the screen, chat-provider.test.tsx covers persistence.
+vi.mock('@/providers/graph-provider', () => ({
+  useGraph: () => ({ indexGeneration: null, graph: null }),
 }))
 
 // jsdom can't host the ProseMirror contenteditable (same stub as the palette
@@ -119,13 +126,16 @@ function SendProbe(): ReactElement | null {
 
 function renderChat() {
   probedSend = null
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
-    <RouterProvider>
-      <ChatProvider graph={GRAPH}>
-        <ChatScreen />
-        <SendProbe />
-      </ChatProvider>
-    </RouterProvider>,
+    <QueryClientProvider client={client}>
+      <RouterProvider>
+        <ChatProvider graph={GRAPH}>
+          <ChatScreen />
+          <SendProbe />
+        </ChatProvider>
+      </RouterProvider>
+    </QueryClientProvider>,
   )
 }
 

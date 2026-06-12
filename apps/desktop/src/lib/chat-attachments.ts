@@ -1,22 +1,16 @@
+import type { ChatAttachment } from '@reflect/core'
 import { base64Of } from '@/lib/base64'
 
 /**
  * Image attachments for the chat composer. A dropped or pasted photo is read
  * once into a {@link ChatAttachment} whose `data:` URL serves double duty —
  * it is the `<img src>` for the composer preview and the transcript bubble,
- * and the image payload the AI SDK sends to the provider.
+ * and the image payload the AI SDK sends to the provider. The type itself
+ * lives in `@reflect/core` (it is part of the persisted conversation model);
+ * this module owns only the browser side — reading `File`s into it.
  */
 
-/** One image the user attached to a chat turn. */
-export interface ChatAttachment {
-  id: string
-  /** Original filename — the preview's alt text and accessible labels. */
-  name: string
-  /** IANA media type, e.g. `image/png`. */
-  mediaType: string
-  /** The image bytes as a `data:` URL — rendered as-is and sent to the provider. */
-  dataUrl: string
-}
+export type { ChatAttachment } from '@reflect/core'
 
 /** The image files in a drop or paste payload; everything else is ignored. */
 export function imageFilesFrom(data: DataTransfer | null): File[] {

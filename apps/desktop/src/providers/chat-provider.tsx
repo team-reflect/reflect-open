@@ -11,34 +11,58 @@ import {
 } from 'react'
 import {
   aiKeySecretName,
+  appendEvent,
+  buildHistory,
   chatModelOptions,
+  deleteChatConversation,
   errorMessage,
   getSecret,
+  hasBridge,
+  listChatConversations,
   loadChatGraphContext,
+  loadChatMessages,
   resolveChatModel,
+  saveChatMessage,
   streamChat,
+  userMessage,
   type AiProviderConfig,
+  type ChatConversation,
   type ChatModelOption,
   type ChatModelSelection,
   type ChatStreamEvent,
+  type ChatTurn,
   type GraphInfo,
 } from '@reflect/core'
 import { toChatAttachment, type ChatAttachment } from '@/lib/chat-attachments'
-import { appendEvent, buildHistory, userMessage, type ChatTurn } from '@/lib/chat-transcript'
 import { todayIso } from '@/lib/dates'
 import { providerFetch } from '@/lib/provider-fetch'
+import { invalidateChatQueries } from '@/lib/query-client'
+import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
 
 /**
  * One chat session per open graph (Plan 10): the conversation lives here, not
- * in the screen, so navigating away and back keeps it. Session-only by
- * design — a relaunch (or graph switch, which remounts the workspace tree)
- * starts fresh. The state is just {@link ChatTurn}s: what each turn renders
- * and what it contributed to the model history are one record, and the
- * history a new turn resends is derived from them.
+ * in the screen, so navigating away and back keeps it. The state is just
+ * {@link ChatTurn}s — what each turn renders and what it contributed to the
+ * model history are one record, and the history a new turn resends is derived
+ * from them.
+ *
+ * Conversations persist to the graph's index DB (`@reflect/core`'s chat
+ * store): each turn is saved when sent (the user half) and again when it
+ * settles, so a relaunch restores the conversation exactly. On mount the
+ * latest conversation is resumed unless it has been idle past
+ * {@link CHAT_IDLE_CUTOFF_MS} — then a fresh one starts and the old one stays
+ * in the history. Persistence is best-effort: a failed save logs and the
+ * in-memory conversation carries on.
  */
 
 export type ChatStatus = 'idle' | 'streaming'
+
+/** Resume the latest conversation within this window; otherwise start fresh. */
+const CHAT_IDLE_CUTOFF_MS = 6 * 60 * 60 * 1000
+
+/** Conversation titles are the first message, cut for the history list. */
+const TITLE_MAX_CHARS = 60
 
 interface ChatContextValue {
   turns: ChatTurn[]
@@ -64,11 +88,26 @@ interface ChatContextValue {
   send: (text: string) => Promise<void>
   /** Abort the in-flight turn (partial text stays in the transcript). */
   stop: () => void
-  /** Drop the conversation and start over. */
+  /** Leave the conversation in the history and start a fresh one. */
   newChat: () => void
+  /** The persisted conversation the transcript belongs to. */
+  activeConversationId: string
+  /** Load a past conversation from the history. */
+  openConversation: (id: string) => Promise<void>
+  /** Delete a conversation; deleting the active one starts a fresh chat. */
+  deleteConversation: (id: string) => Promise<void>
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null)
+
+/** `title` for a conversation row: its first message, cut to list length. */
+function conversationTitle(firstUserText: string): string {
+  const trimmed = firstUserText.trim().replace(/\s+/g, ' ')
+  if (trimmed === '') {
+    return 'New chat'
+  }
+  return trimmed.length > TITLE_MAX_CHARS ? `${trimmed.slice(0, TITLE_MAX_CHARS)}…` : trimmed
+}
 
 interface ChatProviderProps {
   /** The open graph — names the prompt's overview block. */
@@ -78,9 +117,11 @@ interface ChatProviderProps {
 
 export function ChatProvider({ graph, children }: ChatProviderProps): ReactElement {
   const { settings } = useSettings()
+  const { indexGeneration } = useGraph()
   const [turns, setTurns] = useState<ChatTurn[]>([])
   const [attachments, setAttachments] = useState<ChatAttachment[]>([])
   const [selection, setSelection] = useState<ChatModelSelection | null>(null)
+  const [conversationId, setConversationId] = useState<string>(() => crypto.randomUUID())
 
   const status: ChatStatus = turns.at(-1)?.status === 'streaming' ? 'streaming' : 'idle'
 
@@ -99,6 +140,10 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
   attachmentsRef.current = attachments
   const activeModelRef = useRef<AiProviderConfig | null>(activeModel)
   activeModelRef.current = activeModel
+  const conversationIdRef = useRef(conversationId)
+  conversationIdRef.current = conversationId
+  const generationRef = useRef<number | null>(indexGeneration)
+  generationRef.current = indexGeneration
 
   // The in-flight send, tracked synchronously — the no-concurrent-sends
   // guard can't ride on rendered state, which only reflects a send after
@@ -107,6 +152,10 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
   // "this conversation is busy" and never clears a successor's slot.
   const sessionRef = useRef(0)
   const activeSendRef = useRef<{ controller: AbortController; session: number } | null>(null)
+
+  // Conversations deleted this session: a settle-time save landing after its
+  // conversation was deleted would re-create the row via the upsert.
+  const deletedConversationsRef = useRef(new Set<string>())
 
   // The workspace tree is keyed by graph root, so switching graphs unmounts
   // this provider — an in-flight turn must die with it, or its tools would
@@ -118,98 +167,178 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
     }
   }, [])
 
-  const send = useCallback(async (text: string): Promise<void> => {
-    const trimmed = text.trim()
-    const attached = attachmentsRef.current
-    const config = activeModelRef.current
-    if (
-      (trimmed === '' && attached.length === 0) ||
-      config === null ||
-      activeSendRef.current?.session === sessionRef.current
-    ) {
+  /**
+   * Persist one turn into its conversation, best-effort: the generation it
+   * was issued under gates the write in Rust (a stale save no-ops), deleted
+   * conversations are never resurrected, and a failure logs without touching
+   * the in-memory conversation.
+   */
+  const persistTurn = useCallback(
+    (conversation: ChatConversation, turn: ChatTurn, seq: number, createdMs: number) => {
+      const generation = generationRef.current
+      if (
+        !hasBridge() ||
+        generation === null ||
+        deletedConversationsRef.current.has(conversation.id)
+      ) {
+        return
+      }
+      saveChatMessage({ conversation, turn, seq, createdMs, generation })
+        .then(invalidateChatQueries)
+        .catch((cause) => {
+          console.error('chat: saving the turn failed:', errorMessage(cause))
+        })
+    },
+    [],
+  )
+
+  // Resume the latest conversation on mount — unless it has been idle past
+  // the cutoff (then the next message starts a fresh one and the old chat
+  // stays in the history). Guarded against races: by the time the rows
+  // arrive the user may have started typing into the fresh conversation.
+  useEffect(() => {
+    if (!hasBridge() || indexGeneration === null) {
       return
     }
-    setAttachments([])
-
-    const turnId = crypto.randomUUID()
-    const messages = [...buildHistory(turnsRef.current), userMessage(trimmed, attached)]
-    const updateTurn = (updater: (turn: ChatTurn) => ChatTurn) => {
-      setTurns((current) =>
-        current.map((turn) => (turn.id === turnId ? updater(turn) : turn)),
-      )
+    const session = sessionRef.current
+    let active = true
+    void (async () => {
+      try {
+        const [latest] = await listChatConversations(1)
+        if (latest === undefined || Date.now() - latest.updatedMs > CHAT_IDLE_CUTOFF_MS) {
+          return
+        }
+        const restored = await loadChatMessages(latest.id)
+        if (!active || session !== sessionRef.current || turnsRef.current.length > 0) {
+          return
+        }
+        setConversationId(latest.id)
+        setTurns(restored)
+      } catch (cause) {
+        console.error('chat: restoring the last conversation failed:', errorMessage(cause))
+      }
+    })()
+    return () => {
+      active = false
     }
-    const applyEvent = (event: ChatStreamEvent) => {
-      updateTurn((turn) => ({ ...turn, parts: appendEvent(turn.parts, event) }))
-    }
+  }, [indexGeneration])
 
-    setTurns((current) => [
-      ...current,
-      {
+  const send = useCallback(
+    async (text: string): Promise<void> => {
+      const trimmed = text.trim()
+      const attached = attachmentsRef.current
+      const config = activeModelRef.current
+      if (
+        (trimmed === '' && attached.length === 0) ||
+        config === null ||
+        activeSendRef.current?.session === sessionRef.current
+      ) {
+        return
+      }
+      setAttachments([])
+
+      const turnId = crypto.randomUUID()
+      const messages = [...buildHistory(turnsRef.current), userMessage(trimmed, attached)]
+      // Everything the settle-time save needs, captured now: a turn detached
+      // by New chat (or a conversation switch) still persists into the
+      // conversation it was sent under.
+      const sendConversationId = conversationIdRef.current
+      const seq = turnsRef.current.length
+      const turnCreatedMs = Date.now()
+      const title = conversationTitle(turnsRef.current[0]?.userText ?? trimmed)
+      const conversationMeta = (): ChatConversation => ({
+        id: sendConversationId,
+        title,
+        createdMs: turnCreatedMs,
+        updatedMs: Date.now(),
+      })
+      // The turn is folded locally alongside the rendered state — the settle
+      // save must not depend on the turn still being mounted in `turns`.
+      let localTurn: ChatTurn = {
         id: turnId,
         userText: trimmed,
         attachments: attached,
         parts: [],
         responseMessages: [],
         status: 'streaming',
-      },
-    ])
-    const controller = new AbortController()
-    const activeSend = { controller, session: sessionRef.current }
-    activeSendRef.current = activeSend
+      }
 
-    try {
-      // The graph overview degrades to null (prompt without the block)
-      // rather than blocking the turn — a cold index shouldn't kill chat.
-      const [apiKey, context] = await Promise.all([
-        getSecret(aiKeySecretName(config.id)),
-        loadChatGraphContext(graph.name).catch((cause: unknown) => {
-          console.error('chat graph context failed:', errorMessage(cause))
-          return null
-        }),
-      ])
-      if (apiKey === null) {
-        applyEvent({
-          type: 'error',
-          message: 'No API key found for this provider — re-add it in Settings → AI providers.',
-          messages: [],
+      const updateTurn = (updater: (turn: ChatTurn) => ChatTurn) => {
+        localTurn = updater(localTurn)
+        setTurns((current) =>
+          current.map((turn) => (turn.id === turnId ? updater(turn) : turn)),
+        )
+      }
+      const applyEvent = (event: ChatStreamEvent) => {
+        updateTurn((turn) => ({ ...turn, parts: appendEvent(turn.parts, event) }))
+      }
+
+      setTurns((current) => [...current, localTurn])
+      // The user half lands immediately, so a crash mid-stream keeps the
+      // question (restored with an empty response, which the model history
+      // derivation already omits).
+      persistTurn(conversationMeta(), localTurn, seq, turnCreatedMs)
+
+      const controller = new AbortController()
+      const activeSend = { controller, session: sessionRef.current }
+      activeSendRef.current = activeSend
+
+      try {
+        // The graph overview degrades to null (prompt without the block)
+        // rather than blocking the turn — a cold index shouldn't kill chat.
+        const [apiKey, context] = await Promise.all([
+          getSecret(aiKeySecretName(config.id)),
+          loadChatGraphContext(graph.name).catch((cause: unknown) => {
+            console.error('chat graph context failed:', errorMessage(cause))
+            return null
+          }),
+        ])
+        if (apiKey === null) {
+          applyEvent({
+            type: 'error',
+            message: 'No API key found for this provider — re-add it in Settings → AI providers.',
+            messages: [],
+          })
+          return
+        }
+        const events = streamChat({
+          config,
+          apiKey,
+          fetchFn: providerFetch,
+          messages,
+          today: todayIso(),
+          context,
+          signal: controller.signal,
         })
-        return
-      }
-      const events = streamChat({
-        config,
-        apiKey,
-        fetchFn: providerFetch,
-        messages,
-        today: todayIso(),
-        context,
-        signal: controller.signal,
-      })
-      for await (const event of events) {
-        // Every terminal event carries the turn's messages — for a stopped or
-        // failed turn that's the completed steps plus partial text, so the
-        // derived history matches what stayed on screen.
-        if (event.type === 'complete' || event.type === 'aborted' || event.type === 'error') {
-          updateTurn((turn) => ({ ...turn, responseMessages: event.messages }))
+        for await (const event of events) {
+          // Every terminal event carries the turn's messages — for a stopped or
+          // failed turn that's the completed steps plus partial text, so the
+          // derived history matches what stayed on screen.
+          if (event.type === 'complete' || event.type === 'aborted' || event.type === 'error') {
+            updateTurn((turn) => ({ ...turn, responseMessages: event.messages }))
+          }
+          if (event.type !== 'complete') {
+            applyEvent(event)
+          }
         }
-        if (event.type !== 'complete') {
-          applyEvent(event)
+      } catch (cause) {
+        // streamChat normalizes its own failures; this guards the seams around
+        // it (keychain read, event application) so the UI never sticks.
+        applyEvent({ type: 'error', message: errorMessage(cause), messages: [] })
+      } finally {
+        updateTurn((turn) => ({ ...turn, status: 'done' }))
+        persistTurn(conversationMeta(), localTurn, seq, turnCreatedMs)
+        // Only release the slot if it's still ours: a turn detached by New
+        // chat must not, while winding down, unhook the controller a newer
+        // turn has since registered — Stop and the unmount abort always have
+        // to target the live stream.
+        if (activeSendRef.current === activeSend) {
+          activeSendRef.current = null
         }
       }
-    } catch (cause) {
-      // streamChat normalizes its own failures; this guards the seams around
-      // it (keychain read, event application) so the UI never sticks.
-      applyEvent({ type: 'error', message: errorMessage(cause), messages: [] })
-    } finally {
-      updateTurn((turn) => ({ ...turn, status: 'done' }))
-      // Only release the slot if it's still ours: a turn detached by New
-      // chat must not, while winding down, unhook the controller a newer
-      // turn has since registered — Stop and the unmount abort always have
-      // to target the live stream.
-      if (activeSendRef.current === activeSend) {
-        activeSendRef.current = null
-      }
-    }
-  }, [graph.name])
+    },
+    [graph.name, persistTurn],
+  )
 
   const stop = useCallback(() => {
     activeSendRef.current?.controller.abort()
@@ -220,7 +349,47 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
     sessionRef.current += 1
     setTurns([])
     setAttachments([])
+    setConversationId(crypto.randomUUID())
   }, [])
+
+  const openConversation = useCallback(async (id: string): Promise<void> => {
+    if (id === conversationIdRef.current) {
+      return
+    }
+    activeSendRef.current?.controller.abort()
+    sessionRef.current += 1
+    const session = sessionRef.current
+    setAttachments([])
+    try {
+      const restored = await loadChatMessages(id)
+      if (session !== sessionRef.current) {
+        return // superseded by another switch or New chat
+      }
+      setConversationId(id)
+      setTurns(restored)
+    } catch (cause) {
+      console.error('chat: opening the conversation failed:', errorMessage(cause))
+    }
+  }, [])
+
+  const deleteConversation = useCallback(
+    async (id: string): Promise<void> => {
+      deletedConversationsRef.current.add(id)
+      const generation = generationRef.current
+      if (hasBridge() && generation !== null) {
+        try {
+          await deleteChatConversation(id, generation)
+        } catch (cause) {
+          console.error('chat: deleting the conversation failed:', errorMessage(cause))
+        }
+        invalidateChatQueries()
+      }
+      if (id === conversationIdRef.current) {
+        newChat()
+      }
+    },
+    [newChat],
+  )
 
   const selectModel = useCallback((next: ChatModelSelection | null) => {
     setSelection(next)
@@ -255,6 +424,9 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
       send,
       stop,
       newChat,
+      activeConversationId: conversationId,
+      openConversation,
+      deleteConversation,
     }),
     [
       turns,
@@ -269,6 +441,9 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
       send,
       stop,
       newChat,
+      conversationId,
+      openConversation,
+      deleteConversation,
     ],
   )
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>

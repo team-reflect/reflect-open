@@ -80,6 +80,8 @@ pub fn run() {
             db::note_move_indexed,
             db::index_meta_set,
             db::db_query,
+            db::chat_message_save,
+            db::chat_conversation_delete,
             db::embed_apply,
             db::embed_remove,
             embed::embed_status,
