@@ -1,57 +1,57 @@
 # Reflect
 
-**Daily notes, linked thinking, and an AI that answers from your own notes —
-in plain files on your Mac.**
+**Daily notes, linked thinking, and an AI that answers from your own notes.
+All in plain files on your Mac.**
 
 [![Release](https://img.shields.io/github/v/release/team-reflect/reflect-open)](https://github.com/team-reflect/reflect-open/releases/latest)
 [![CI](https://github.com/team-reflect/reflect-open/actions/workflows/ci.yml/badge.svg)](https://github.com/team-reflect/reflect-open/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Reflect opens to today's note. Write your day — meetings, ideas, journal —
-and type `[[` to link the people and projects in it. Those links grow into a
+Reflect opens to today's note. Write your day (meetings, ideas, journal) and
+type `[[` to link the people and projects in it. Those links grow into a
 personal graph of everything you've written, and search and AI sit on top of
 it, so "what did we decide about this last spring?" is one search (`⌘K`) or
 one question (`⌘J`) away.
 
 It's built on a single promise: **your notes stay yours.** They are ordinary
-text files in a folder you choose — no account, no cloud database, no
-telemetry. Nothing leaves your Mac except services you explicitly connect,
-and if Reflect disappeared tomorrow, your notes would still open in any text
-editor.
+text files in a folder you choose. There's no account, no cloud database, and
+no telemetry; nothing leaves your Mac except through services you explicitly
+connect. If Reflect disappeared tomorrow, your notes would still open in any
+text editor.
 
 ## Highlights
 
 - **Today, first.** The app opens to today's note. Capture everything there
-  and let links — not folders — organize it.
+  and let links, not folders, organize it.
 - **Links that build a graph.** Type `[[` to connect notes; every note shows
-  what links back to it. Rename freely — links follow.
+  what links back to it. Rename a note and its links follow.
 - **Search that gets meaning (`⌘K`).** Instant search over every note, plus
   optional semantic search that finds "that pasta thing" even if you never
   wrote "pasta". Both run entirely on your Mac.
 - **Ask your notes (`⌘J`).** Connect your own OpenAI, Anthropic, or Google
-  account; Reflect talks straight to the provider — there is no middleman
-  server. Answers cite the notes they came from, as clickable links.
+  account; Reflect talks straight to the provider, with no middleman server.
+  Answers cite the notes they came from, as clickable links.
 - **A private flag that means it.** Mark a note `private: true` and its
-  content can never be sent to any AI or online service — enforced in code,
-  covered by tests.
+  content can never be sent to any AI or online service. That rule is
+  enforced in code and covered by tests.
 - **Talk instead of type.** Record an audio memo; it's saved instantly and
   transcribed into your daily note with your own key.
 - **Free backup, full history.** Connect GitHub in-app (or
   [any git host you run](docs/generic-git-remotes.md)) and every change is
-  versioned in a repository you own. Conflicts read as plain choices, not
-  merge jargon.
+  versioned in a repository you own. Conflicts show up as plain choices
+  instead of merge jargon.
 - **Keyboard-native and light.** Every core action has a shortcut (`⌘/` shows
-  them all), in a native app — Tauri, not Electron — that's signed, notarized,
-  and auto-updating.
-- **Scriptable.** A real CLI — `reflect today`, `reflect search`,
-  `reflect show` — for scripts and agents ([docs/cli.md](docs/cli.md)).
+  them all). The app itself is Tauri rather than Electron: native, signed,
+  notarized, and auto-updating.
+- **Scriptable.** A real CLI (`reflect today`, `reflect search`,
+  `reflect show`) for scripts and agents; see [docs/cli.md](docs/cli.md).
 
 ## Install
 
 Download the latest DMG from
 [**Releases**](https://github.com/team-reflect/reflect-open/releases/latest)
 (macOS, Apple Silicon). The app is Developer-ID signed and notarized, and
-updates itself from GitHub Releases — update payloads are verified against a
+updates itself from GitHub Releases; update payloads are verified against a
 public key compiled into the app.
 
 Or [build from source](#building-from-source).
@@ -67,21 +67,21 @@ my-graph/
 ├── notes/some-title.md     # everything else, readable title-derived names
 ├── assets/                 # images and attachments, relative-linked
 ├── audio-memos/            # recordings awaiting/after transcription
-└── .reflect/               # SQLite index — rebuildable, git-ignored
+└── .reflect/               # SQLite index (rebuildable, git-ignored)
 ```
 
-Markdown is the source of truth. Everything derived from it — search index,
-backlinks, tags, embeddings — lives in `.reflect/index.sqlite` and is rebuilt
+Markdown is the source of truth. Everything derived from it (search index,
+backlinks, tags, embeddings) lives in `.reflect/index.sqlite` and is rebuilt
 from the files on demand; deleting it loses nothing. Frontmatter stays
 minimal: a stable `id`, optional `aliases`, and the `private` / `pinned`
-flags. Edit your notes with any other tool while Reflect runs — the file
+flags. Edit your notes with any other tool while Reflect runs; the file
 watcher picks up external changes and re-indexes.
 
 ## Privacy model
 
-Every network call the app can make — what it carries, where it goes, and
-what's off by default — is documented in
-[**What leaves the device, and when**](docs/privacy.md). The short version:
+Every network call the app can make is documented in
+[**What leaves the device, and when**](docs/privacy.md): what each one
+carries, where it goes, and what's off by default. The short version:
 nothing leaves your machine unless you add a provider key or connect a git
 remote, and `private: true` notes are excluded from anything that reads
 content. Secrets live in the OS keychain only.
@@ -137,9 +137,9 @@ read-only rather than ever being silently rewritten.
 ### The plans
 
 Code and comments reference numbered plans (e.g. "Plan 04b"). These are the
-dependency-ordered design documents in [docs/plans/](docs/plans/) —
+dependency-ordered design documents in [docs/plans/](docs/plans/).
 [00-overview.md](docs/plans/00-overview.md) is the roadmap and records what
-shipped in each release, and
+shipped in each release;
 [architecture-conventions.md](docs/plans/architecture-conventions.md) holds
 the cross-cutting decisions every plan assumes. A comment like "Plan 02"
 points at the design rationale for that subsystem.
@@ -152,7 +152,7 @@ pnpm typecheck        # all packages (tsc)
 pnpm test             # all packages (vitest); --run path/to/test for one file
 pnpm lint             # oxlint
 
-# Rust — stage the CLI sidecar once per checkout first, or tauri-build fails:
+# Rust: stage the CLI sidecar once per checkout first, or tauri-build fails
 pnpm --filter @reflect/desktop sidecar
 cargo test --workspace
 ```
@@ -165,15 +165,17 @@ contributor guide.
 ## Status & roadmap
 
 Reflect is early (`0.1.x`) but used daily. Shipped today: everything listed
-above. Designed but not yet built — each has a written plan:
+above. Designed but not yet built, each with a written plan:
 
-- **Browser link capture** ([Plan 11](docs/plans/11-link-capture.md)) — Chrome
-  extension → local native-messaging bridge → daily note.
-- **Import / export surfaces** ([Plan 13](docs/plans/13-import-export-portability.md)) —
-  the graph is already portable markdown you can copy wholesale; the in-app
-  Obsidian import and Markdown/JSON/HTML export are still to come.
-- **Tasks** ([Plan 18](docs/plans/18-tasks.md)) — GFM checkboxes aggregated
-  into a Tasks view, as a pure projection.
+- **Browser link capture** ([Plan 11](docs/plans/11-link-capture.md)): a
+  Chrome extension that hands the page to the desktop app, which saves it
+  into today's note.
+- **Import / export surfaces**
+  ([Plan 13](docs/plans/13-import-export-portability.md)): the graph is
+  already portable markdown you can copy wholesale; in-app Obsidian import
+  and Markdown/JSON/HTML export are still to come.
+- **Tasks** ([Plan 18](docs/plans/18-tasks.md)): checkboxes in your notes,
+  collected into one Tasks view.
 
 Windows, mobile, and a plugin API are out of scope for now; the
 [product vision](docs/reflect-v2-product-vision.md) explains the long-term
@@ -181,4 +183,4 @@ direction and what is deliberately *not* planned.
 
 ## License
 
-[MIT](LICENSE) — including the editor and every bundled dependency.
+[MIT](LICENSE), including the editor and every bundled dependency.
