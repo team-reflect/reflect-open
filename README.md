@@ -1,40 +1,50 @@
 # Reflect
 
-**A local-first, markdown-native, AI-native notes app for macOS.**
+**Daily notes, linked thinking, and an AI that answers from your own notes —
+in plain files on your Mac.**
 
 [![Release](https://img.shields.io/github/v/release/team-reflect/reflect-open)](https://github.com/team-reflect/reflect-open/releases/latest)
 [![CI](https://github.com/team-reflect/reflect-open/actions/workflows/ci.yml/badge.svg)](https://github.com/team-reflect/reflect-open/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Your notes are plain `.md` files in a folder you choose. Reflect gives them a
-fast keyboard-native editor, a knowledge graph built from `[[wiki links]]`,
-local full-text *and* semantic search, an AI chat that reads your notes with
-your own API key — and never runs a server. There is no account, no telemetry,
-and no Reflect-hosted API in any code path.
+Reflect opens to today's note. Write your day — meetings, ideas, journal —
+and type `[[` to link the people and projects in it. Those links grow into a
+personal graph of everything you've written, and search and AI sit on top of
+it, so "what did we decide about this last spring?" is one search (`⌘K`) or
+one question (`⌘J`) away.
 
-- **Daily notes first.** The app opens to today (`⌘D`). Capture goes there by
-  default; structure emerges from links, not folders.
-- **`[[Wiki links]]` & backlinks.** Autocomplete on `[[`, create-on-link,
-  incoming backlinks under every note. Renames rewrite inbound links and keep
-  the old title as an alias.
-- **Search (`⌘K`).** SQLite FTS5 with filters (`#tag`, `is:daily`, `links:`,
-  `linked-from:`, `updated:>2026-01-01`), plus semantic search powered by
-  on-device embeddings — note content never leaves the machine to be indexed.
-- **AI chat (`⌘J`), bring-your-own-key.** OpenAI, Anthropic, or Google — your
-  key, stored in the macOS keychain, calls made directly to the provider.
-  The model reads your graph through search/read tools with citations.
-- **`private: true` is a hard block.** Flag a note and its content can never
-  be sent to any external service — enforced in the type system at every AI
-  call site, re-checked from disk at call time, covered by tests.
-- **Audio memos.** Record into today's note; the recording is saved locally
-  first and transcribed asynchronously with your own provider key.
-- **Backup & sync via git.** Connect GitHub in-app (private repo by default)
-  or [any git host over SSH](docs/generic-git-remotes.md). Conflicts surface
-  as plain-language review, never raw merge mechanics.
-- **A real CLI.** `reflect today`, `reflect search`, `reflect show` — script
-  your notes, pipe them to agents ([docs/cli.md](docs/cli.md)).
-- **Native, not Electron.** Tauri 2: a React frontend in a Rust shell. Signed,
-  notarized, auto-updating.
+It's built on a single promise: **your notes stay yours.** They are ordinary
+text files in a folder you choose — no account, no cloud database, no
+telemetry. Nothing leaves your Mac except services you explicitly connect,
+and if Reflect disappeared tomorrow, your notes would still open in any text
+editor.
+
+## Highlights
+
+- **Today, first.** The app opens to today's note. Capture everything there
+  and let links — not folders — organize it.
+- **Links that build a graph.** Type `[[` to connect notes; every note shows
+  what links back to it. Rename freely — links follow.
+- **Search that gets meaning (`⌘K`).** Instant search over every note, plus
+  optional semantic search that finds "that pasta thing" even if you never
+  wrote "pasta". Both run entirely on your Mac.
+- **Ask your notes (`⌘J`).** Connect your own OpenAI, Anthropic, or Google
+  account; Reflect talks straight to the provider — there is no middleman
+  server. Answers cite the notes they came from, as clickable links.
+- **A private flag that means it.** Mark a note `private: true` and its
+  content can never be sent to any AI or online service — enforced in code,
+  covered by tests.
+- **Talk instead of type.** Record an audio memo; it's saved instantly and
+  transcribed into your daily note with your own key.
+- **Free backup, full history.** Connect GitHub in-app (or
+  [any git host you run](docs/generic-git-remotes.md)) and every change is
+  versioned in a repository you own. Conflicts read as plain choices, not
+  merge jargon.
+- **Keyboard-native and light.** Every core action has a shortcut (`⌘/` shows
+  them all), in a native app — Tauri, not Electron — that's signed, notarized,
+  and auto-updating.
+- **Scriptable.** A real CLI — `reflect today`, `reflect search`,
+  `reflect show` — for scripts and agents ([docs/cli.md](docs/cli.md)).
 
 ## Install
 
