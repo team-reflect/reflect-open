@@ -80,6 +80,10 @@ export function FilenameMigrationPrompt(): ReactElement | null {
   }
 
   return (
+    // Esc / outside-click is a **defer**, deliberately distinct from the
+    // decline button: nothing is recorded and the next graph open re-offers.
+    // A reflexive Esc at startup must not be a permanent answer; only the
+    // explicit "Keep current names" choice is sticky.
     <Dialog open onOpenChange={(open) => !open && setDismissed(true)}>
       <DialogContent>
         <DialogHeader>

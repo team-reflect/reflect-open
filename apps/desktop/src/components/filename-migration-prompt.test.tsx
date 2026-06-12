@@ -72,6 +72,23 @@ describe('FilenameMigrationPrompt', () => {
     view.unmount()
   })
 
+  it('Esc is a defer, not a decline: nothing recorded, re-offered next open', async () => {
+    const view = render(<FilenameMigrationPrompt />)
+    await view.findByText('Use readable filenames?')
+
+    // Radix closes on Escape; the reflexive startup-Esc must not be sticky.
+    act(() => {
+      view.getByRole('dialog').dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      )
+    })
+
+    expect(view.queryByText('Use readable filenames?')).toBeNull()
+    expect(settingsState.patches).toEqual([]) // no decline written
+    expect(migration.runFilenameMigration).not.toHaveBeenCalled()
+    view.unmount()
+  })
+
   it('declining records the graph root, sticky', async () => {
     const view = render(<FilenameMigrationPrompt />)
     const decline = await view.findByRole('button', { name: 'Keep current names' })
