@@ -68,48 +68,45 @@ export function createUpdateController(options: UpdateControllerOptions): Update
     }
   }
 
-  // Read through a call so post-await guards see the live phase — TypeScript
+  // Read through a call so post-await guards see the live object — TypeScript
   // would otherwise keep the pre-await narrowing of the closed-over `state`.
-  function currentPhase(): UpdateState['phase'] {
-    return state.phase
+  function currentState(): UpdateState {
+    return state
   }
 
   async function runCheck(silent: boolean): Promise<void> {
     if (state.phase === 'checking' || state.phase === 'downloading' || state.phase === 'ready') {
       return
     }
-    const before = state
-    setState({ phase: 'checking' })
-    // A silent check only ever adds information — it never retracts a visible
-    // affordance. Any outcome other than a found update (an empty answer can
-    // be transient: release mid-edit, manifest propagation; a failure is just
-    // offline) puts the state back the way the user saw it. If the update
-    // truly vanished, installing it fails loudly — the honest signal.
-    const restoreQuietly = (): void => {
-      setState(before.phase === 'available' ? before : { phase: 'idle' })
+    // A silent check never touches visible state except to add a found
+    // update: no "Checking…" blink over the sidebar row, and no retracting
+    // anything on an empty answer (transient: release mid-edit, manifest
+    // propagation) or a failure (offline is normal). Only the user's own
+    // check shows its lifecycle, and only its answer is authoritative.
+    if (!silent) {
+      setState({ phase: 'checking' })
     }
+    // Every setState replaces the object, so identity = "nothing else (e.g.
+    // an install of a previously-found update) transitioned while we awaited".
+    const baseline = state
     try {
       const update = await check()
-      if (currentPhase() !== 'checking') {
-        return // an install of the previously-found update raced us; its state wins
+      if (currentState() !== baseline) {
+        return // something raced us; its state wins
       }
       if (update) {
         pendingUpdate = update
         setState({ phase: 'available', version: update.version })
-      } else if (silent) {
-        restoreQuietly()
-      } else {
-        // The user asked: the endpoint's answer is authoritative.
+      } else if (!silent) {
         pendingUpdate = null
         setState({ phase: 'upToDate' })
       }
     } catch (error) {
-      if (currentPhase() !== 'checking') {
+      if (currentState() !== baseline) {
         return
       }
       if (silent) {
         console.warn('update check failed (ignored):', error)
-        restoreQuietly()
       } else {
         setState({ phase: 'error', message: errorMessage(error), during: 'check' })
       }

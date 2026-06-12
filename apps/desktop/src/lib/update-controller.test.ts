@@ -157,10 +157,16 @@ describe('createUpdateController', () => {
       expect(controller?.getState()).toEqual({ phase: 'available', version: '0.3.0' })
     })
 
+    // Watch every transition: the "Install update" row must not even blink —
+    // a silent check never enters a visible "checking" phase.
+    const phases: string[] = []
+    controller.subscribe(() => phases.push(controller?.getState().phase ?? ''))
+
     // e.g. the release is mid-edit and the manifest transiently lists nothing.
     checkMock.mockResolvedValue(null)
     await vi.advanceTimersByTimeAsync(1500)
     expect(controller.getState()).toEqual({ phase: 'available', version: '0.3.0' })
+    expect(phases).not.toContain('checking')
 
     // The found update is still installable.
     await controller.install()
