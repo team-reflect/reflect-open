@@ -27,3 +27,11 @@ export const INDEX_QUERY_SCOPE = 'index'
 export function invalidateIndexQueries(): void {
   void queryClient.invalidateQueries({ queryKey: [INDEX_QUERY_SCOPE] })
 }
+
+/** Chat-history queries nest under this key (e.g. `['chat', 'conversations', root]`). */
+export const CHAT_QUERY_SCOPE = 'chat'
+
+/** Refetch chat-history queries; called after a turn save or a delete. */
+export function invalidateChatQueries(): void {
+  void queryClient.invalidateQueries({ queryKey: [CHAT_QUERY_SCOPE] })
+}

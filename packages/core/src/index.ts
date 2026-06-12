@@ -122,6 +122,8 @@ export {
   AI_PROVIDERS,
   aiProvider,
   aiModelLabel,
+  DEFAULT_CONTEXT_WINDOW,
+  modelContextWindow,
   type AiProviderInfo,
   type AiModelOption,
 } from './ai/provider-catalog'
@@ -186,6 +188,27 @@ export {
   type ChatStreamEvent,
   type StreamChatOptions,
 } from './ai/chat/stream-chat'
+export {
+  appendEvent,
+  buildHistory,
+  isToolPending,
+  userMessage,
+  type AssistantPart,
+  type ChatAttachment,
+  type ChatTurn,
+} from './ai/chat/transcript'
+export {
+  deleteChatConversation,
+  listChatConversations,
+  loadChatMessages,
+  saveChatMessage,
+  type ChatConversation,
+} from './ai/chat/store'
+export {
+  estimateTokens,
+  fitToContextWindow,
+  type ContextWindowOptions,
+} from './ai/chat/context-window'
 export type { ModelMessage as ChatModelMessage } from 'ai'
 // The fixed per-provider model ids stay internal to `ai/transcribe` —
 // exporting them would let callers couple to vendor model names.

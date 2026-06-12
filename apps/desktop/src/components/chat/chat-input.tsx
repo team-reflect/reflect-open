@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select'
 import { imageFilesFrom } from '@/lib/chat-attachments'
 import { useChatSession } from '@/providers/chat-provider'
+import { ChatHistoryMenu } from './chat-history-menu'
 
 interface ModelOptionGroup {
   configId: string
@@ -58,8 +59,8 @@ function groupModelOptions(
  * full model list — and a send button that turns into stop while a turn
  * streams. Pasted images queue as attachments and preview above the
  * textarea — a message can be a photo alone, so Enter sends whenever there
- * is text *or* something attached. "New chat" appears once there's a
- * conversation to clear.
+ * is text *or* something attached. The history menu loads past
+ * conversations; "New chat" appears once there's a conversation to leave.
  */
 export function ChatInput(): ReactElement {
   const {
@@ -184,6 +185,7 @@ export function ChatInput(): ReactElement {
             </SelectContent>
           </Select>
           <div className="flex-1" />
+          <ChatHistoryMenu />
           {turns.length > 0 && !streaming ? (
             <Button variant="ghost" size="sm" onClick={newChat}>
               <Plus aria-hidden data-icon="inline-start" />

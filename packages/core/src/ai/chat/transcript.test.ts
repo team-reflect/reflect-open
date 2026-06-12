@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import type { ChatStreamEvent } from '@reflect/core'
-import type { ChatAttachment } from './chat-attachments'
+import type { ChatStreamEvent } from './stream-chat'
 import {
   appendEvent,
   buildHistory,
   userMessage,
   type AssistantPart,
+  type ChatAttachment,
   type ChatTurn,
-} from './chat-transcript'
+} from './transcript'
 
 function fold(events: ChatStreamEvent[]): AssistantPart[] {
   return events.reduce<AssistantPart[]>(appendEvent, [])
