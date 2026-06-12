@@ -58,11 +58,13 @@ to `meeting.md` when it frees up.
   unresolved link): the file is born at its slug path with `id:` frontmatter
   and the title as H1 (`apps/desktop/src/lib/create-note.ts`).
 - **Created untitled** (⌘N): no title exists yet, so the file gets a ULID
-  placeholder name (`untitledNotePath`). The lazy-create seed — a selectable
-  "Untitled" H1 plus a fresh `id:` — reaches disk only when the user actually
-  types. When the first title settles, a **birth** fires (a rename with
-  `from: null`): no links to rewrite, no alias to record, the file just sheds
-  its placeholder for the slug.
+  placeholder name (`untitledNotePath`). The lazy-create seed — an empty H1
+  the caret lands in (ghosted "Untitled" by
+  `apps/desktop/src/editor/title-placeholder.ts`) plus a fresh `id:` —
+  reaches disk only when the user actually types. When the first title
+  settles, a **birth** fires (a rename with `from: null`): no links to
+  rewrite, no alias to record, the file just sheds its placeholder for the
+  slug.
 
 ## Rename: filenames follow settled titles
 

@@ -382,7 +382,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     dirty = header + markdown !== disk
     if (missing && markdown.trim() === '') {
       // A still-unwritten note cleared back to nothing (e.g. the seeded
-      // "Untitled" template deleted wholesale) stays unwritten: creating an
+      // empty-title template deleted wholesale) stays unwritten: creating an
       // empty file would break the lazy no-litter contract. Dirtiness — and
       // the file's birth — resume with the next real content.
       dirty = false

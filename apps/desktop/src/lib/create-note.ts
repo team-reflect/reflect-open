@@ -26,12 +26,16 @@ export function newNoteSource(title: string): string {
 }
 
 /**
- * The buffer seed for a ⌘N note (created lazily on the first keystroke): the
- * selectable "Untitled" H1 plus a fresh `id:`. The id rides the seed's header
- * through the session, so it lands on disk with the note's first real save.
+ * The buffer seed for a ⌘N note (created lazily on the first keystroke): an
+ * empty H1 — the caret lands in it, the editor ghosts "Untitled" over it
+ * (`title-placeholder.ts`), and typing names the note — plus a fresh `id:`.
+ * The id rides the seed's header through the session, so it lands on disk
+ * with the note's first real save. The `#` carries no trailing space: that
+ * is the serializer's round-trip form, and anything else would classify the
+ * seed lossy and open the new note read-only.
  */
 export function untitledNoteSeed(): string {
-  return upsertFrontmatter('# Untitled\n', { id: newNoteId() })
+  return upsertFrontmatter('#\n', { id: newNoteId() })
 }
 
 /**
@@ -41,6 +45,18 @@ export function untitledNoteSeed(): string {
  */
 export function untitledNotePath(): string {
   return notePath(newNoteId())
+}
+
+/** `notes/<26-char Crockford-base32 ULID>.md` — {@link untitledNotePath}'s shape. */
+const ULID_NOTE_PATH_RE = /^notes\/[0-9a-hjkmnp-tv-z]{26}\.md$/
+
+/**
+ * Is `path` a ULID placeholder name — a note born untitled that has not yet
+ * shed it for a title slug (Plan 17's birth rename)? The sidebar's "New note"
+ * row uses this to show as active while such a note is the current route.
+ */
+export function isUntitledNotePath(path: string): boolean {
+  return ULID_NOTE_PATH_RE.test(path)
 }
 
 /**

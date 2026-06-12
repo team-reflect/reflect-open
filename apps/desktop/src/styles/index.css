@@ -258,6 +258,17 @@ body {
 .reflect-editor h3 { font-size: var(--text-lg, 1.125rem); }
 .reflect-editor h1:first-child { margin-top: 0; }
 
+/* The new-note flow's name field: ghost "Untitled" over the seeded empty H1
+   (`editor/title-placeholder.ts`) without occupying layout, so the caret
+   blinks at the line start as if the ghost text weren't there. */
+.reflect-editor .reflect-title-placeholder::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--text-muted);
+}
+
 /* The daily note's date heading (V1 renders the date as the note's subject)
    without living inside the editor DOM. */
 .reflect-daily-subject {

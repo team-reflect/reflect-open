@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_SETTINGS, type GraphInfo, type PinnedNote, type Settings } from '@reflect/core'
 import type { CommandContext } from '@/lib/commands/types'
+import { untitledNotePath } from '@/lib/create-note'
+import type { Route } from '@/routing/route'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { UpdateProvider } from '@/providers/update-provider'
 import { RouterProvider } from '@/routing/router'
@@ -84,7 +86,7 @@ beforeEach(() => {
 
 afterEach(cleanup) // `globals: false` disables testing-library's automatic cleanup
 
-function renderSidebar(overrides?: Partial<CommandContext>) {
+function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?: Route) {
   const navigate = vi.fn()
   const openPalette = vi.fn()
   const context: CommandContext = {
@@ -106,7 +108,7 @@ function renderSidebar(overrides?: Partial<CommandContext>) {
     <TooltipProvider>
       <QueryClientProvider client={client}>
         <UpdateProvider autoCheck={false}>
-          <RouterProvider>
+          <RouterProvider initialRoute={initialRoute}>
             <Sidebar graph={GRAPH} context={context} />
           </RouterProvider>
         </UpdateProvider>
@@ -128,6 +130,33 @@ describe('Sidebar', () => {
 
     await userEvent.click(view.getByRole('button', { name: /chat/i }))
     await waitFor(() => expect(navigate).toHaveBeenCalledWith({ kind: 'chat' }))
+  })
+
+  it('New note runs its command and shows active while the placeholder note is open', async () => {
+    // The route a ⌘N/new-note click lands on: a fresh ULID placeholder path.
+    const { view, navigate } = renderSidebar(undefined, {
+      kind: 'note',
+      path: untitledNotePath(),
+    })
+    const newNote = view.getByRole('button', { name: /new note/i })
+
+    // Active like every other row whose route is current — until the birth
+    // rename moves the note onto a title slug.
+    expect(newNote.getAttribute('aria-current')).toBe('page')
+
+    await userEvent.click(newNote)
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: 'note', path: expect.stringMatching(/^notes\/.+\.md$/) }),
+      ),
+    )
+  })
+
+  it('New note is inactive on slug-named note routes', () => {
+    const { view } = renderSidebar(undefined, { kind: 'note', path: 'notes/meeting.md' })
+    expect(
+      view.getByRole('button', { name: /new note/i }).getAttribute('aria-current'),
+    ).toBeNull()
   })
 
   it('the search affordance opens the palette', async () => {

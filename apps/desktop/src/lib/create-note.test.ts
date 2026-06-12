@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '@reflect/core'
-import { createNoteWithTitle, untitledNoteSeed } from './create-note'
+import {
+  createNoteWithTitle,
+  isUntitledNotePath,
+  untitledNotePath,
+  untitledNoteSeed,
+} from './create-note'
 
 afterEach(() => {
   setBridge(null)
@@ -50,10 +55,25 @@ describe('createNoteWithTitle', () => {
 })
 
 describe('untitledNoteSeed', () => {
-  it('is the selectable Untitled H1 plus a fresh id, unique per call', () => {
+  it('is an empty H1 (the caret lands there) plus a fresh id, unique per call', () => {
     const first = untitledNoteSeed()
     const second = untitledNoteSeed()
-    expect(first).toMatch(/^---\nid: [0-9a-z]{26}\n---\n# Untitled\n$/)
+    expect(first).toMatch(/^---\nid: [0-9a-z]{26}\n---\n#\n$/)
     expect(second).not.toBe(first)
+  })
+})
+
+describe('isUntitledNotePath', () => {
+  it('recognizes the ULID placeholder paths untitledNotePath mints', () => {
+    expect(isUntitledNotePath(untitledNotePath())).toBe(true)
+  })
+
+  it('rejects slug-named, daily, and near-miss paths', () => {
+    expect(isUntitledNotePath('notes/meeting-notes.md')).toBe(false)
+    expect(isUntitledNotePath('daily/2026-06-12.md')).toBe(false)
+    // Right length, but `u` is outside the Crockford base32 alphabet.
+    expect(isUntitledNotePath('notes/uuuuuuuuuuuuuuuuuuuuuuuuuu.md')).toBe(false)
+    // A ULID-shaped name outside notes/ is not a placeholder.
+    expect(isUntitledNotePath('01jxk2v9qz3m4n5p6r7s8t9vwx.md')).toBe(false)
   })
 })
