@@ -43,7 +43,11 @@ import { getSecret } from '../secrets/keychain'
  * Deleting a transcription note does **not** resurrect it: the daily-note
  * backlink doubles as the tombstone (a memo is only pending while *neither*
  * its note nor its backlink exists). Deleting both regenerates the
- * transcription on the next pass — the documented way to redo one.
+ * transcription on the next pass — the documented way to redo one. The
+ * backlink targets the memo's *base name*, declared as a frontmatter alias
+ * on the transcription note: bases are unique per recording, so two memos
+ * stopped within the same second (whose display titles collide) can never
+ * tombstone each other, and the link survives a note-title rename.
  *
  * Privacy: only the captured audio is sent to the provider — never any note
  * content — and all transcription output is written locally, so recording is
@@ -52,11 +56,15 @@ import { getSecret } from '../secrets/keychain'
 
 /** Everything derivable from a memo's shared basename. */
 export interface AudioMemoIdentity {
-  /** The shared basename, e.g. `audio-memo-2026-06-11-153022-845`. */
+  /**
+   * The shared basename, e.g. `audio-memo-2026-06-11-153022-845` — also the
+   * daily-note wikilink target, resolvable through the transcription note's
+   * frontmatter alias.
+   */
   base: string
   /** Local ISO day it was recorded — the daily note that backlinks it. */
   date: string
-  /** The transcription note's title (its H1, the wikilink target). */
+  /** The transcription note's title (its H1). Not unique within a second. */
   title: string
   /** Short display alias for the daily-note link, e.g. `Audio memo 15:30`. */
   alias: string
@@ -182,9 +190,13 @@ async function dailyNoteSource(date: string): Promise<string> {
   }
 }
 
-/** Matches the plain and aliased form of the memo's backlink. */
+/**
+ * Matches the plain and aliased form of the memo's backlink. The probe is the
+ * memo's base, never its display title — titles have second precision and a
+ * sibling memo from the same second must not read as this memo's tombstone.
+ */
 function hasBacklink(source: string, memo: AudioMemoIdentity): boolean {
-  return source.includes(`[[${memo.title}`)
+  return source.includes(`[[${memo.base}`)
 }
 
 /**
@@ -209,8 +221,13 @@ export async function listPendingAudioMemos(): Promise<AudioMemoIdentity[]> {
   return pending
 }
 
+/**
+ * The note declares its base name as an alias so the daily-note link
+ * (`[[<base>|…]]`) resolves through the index — and keeps resolving if the
+ * user renames the title.
+ */
 function transcriptionNote(memo: AudioMemoIdentity, body: string): string {
-  return `# ${memo.title}\n\n[Recording](${memo.audioPath})\n\n${body}\n`
+  return `---\naliases: [${memo.base}]\n---\n\n# ${memo.title}\n\n[Recording](${memo.audioPath})\n\n${body}\n`
 }
 
 /**
@@ -249,7 +266,7 @@ async function ensureDailyBacklink(memo: AudioMemoIdentity, generation: number):
   if (hasBacklink(source, memo)) {
     return
   }
-  const link = `[[${memo.title}|${memo.alias}]]`
+  const link = `[[${memo.base}|${memo.alias}]]`
   await writeNote(dailyPath(memo.date), appendBlock(source, link), generation)
 }
 

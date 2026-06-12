@@ -175,15 +175,17 @@ describe('reconcileAudioMemos', () => {
     const sent = transcribeMock.mock.calls[0]?.[0].audio
     expect(new TextDecoder().decode(await sent?.arrayBuffer())).toBe('audio-bytes')
     // The note lands first — it carries the transcript; the backlink follows.
+    // The link targets the base (unique per recording), resolved through the
+    // note's frontmatter alias; the title alone repeats within a second.
     expect(writeNoteMock.mock.calls).toEqual([
       [
         MEMO.notePath,
-        '# Audio memo 2026-06-11 15:30:22\n\n[Recording](audio-memos/audio-memo-2026-06-11-153022-845.webm)\n\nmemo transcript\n',
+        '---\naliases: [audio-memo-2026-06-11-153022-845]\n---\n\n# Audio memo 2026-06-11 15:30:22\n\n[Recording](audio-memos/audio-memo-2026-06-11-153022-845.webm)\n\nmemo transcript\n',
         3,
       ],
       [
         'daily/2026-06-11.md',
-        'morning thoughts\n\n[[Audio memo 2026-06-11 15:30:22|Audio memo 15:30]]\n',
+        'morning thoughts\n\n[[audio-memo-2026-06-11-153022-845|Audio memo 15:30]]\n',
         3,
       ],
     ])
@@ -241,7 +243,7 @@ describe('reconcileAudioMemos', () => {
 
     expect(writeNoteMock).toHaveBeenCalledWith(
       'daily/2026-06-11.md',
-      '[[Audio memo 2026-06-11 15:30:22|Audio memo 15:30]]\n',
+      '[[audio-memo-2026-06-11-153022-845|Audio memo 15:30]]\n',
       3,
     )
   })
@@ -249,7 +251,7 @@ describe('reconcileAudioMemos', () => {
   it('a daily-note backlink without the note is a tombstone — deletion stays deleted', async () => {
     listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
     readNoteMock.mockResolvedValue(
-      'notes\n\n[[Audio memo 2026-06-11 15:30:22|Audio memo 15:30]]\n',
+      'notes\n\n[[audio-memo-2026-06-11-153022-845|Audio memo 15:30]]\n',
     )
 
     const onPending = vi.fn()
@@ -259,6 +261,24 @@ describe('reconcileAudioMemos', () => {
     expect(onPending).toHaveBeenCalledWith(0)
     expect(transcribeMock).not.toHaveBeenCalled()
     expect(writeNoteMock).not.toHaveBeenCalled()
+  })
+
+  it('a same-second sibling backlink is not this memo\'s tombstone', async () => {
+    // Same second, different milliseconds: identical display titles, distinct
+    // bases. The earlier sibling is fully done; the later one must still run.
+    const sibling = audioMemoIdentity(new Date(2026, 5, 11, 15, 30, 22, 100), 'audio/webm')
+    listDirMock.mockResolvedValue([fileMeta(sibling.audioPath), fileMeta(MEMO.audioPath)])
+    listFilesMock.mockResolvedValue([fileMeta(sibling.notePath)])
+    readNoteMock.mockResolvedValue(`notes\n\n[[${sibling.base}|Audio memo 15:30]]\n`)
+
+    const outcome = await reconcile()
+
+    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, stopped: null })
+    expect(writeNoteMock).toHaveBeenCalledWith(
+      MEMO.notePath,
+      expect.stringContaining('memo transcript'),
+      3,
+    )
   })
 
   it('an empty transcript writes a placeholder note — silence must not retry forever', async () => {
