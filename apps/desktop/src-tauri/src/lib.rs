@@ -32,6 +32,11 @@ mod watcher;
 #[path = "watcher_mobile.rs"]
 mod watcher;
 
+// TEMPORARY (Plan 19 spike A): on-device capability probes; delete with the
+// spike once the runtime gate verdict is recorded in the plan.
+#[cfg(mobile)]
+mod spike_mobile;
+
 use tauri::{Emitter, Manager};
 
 /// Returns the desktop application version from Cargo metadata.
@@ -69,6 +74,14 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_window_state::Builder::default().build());
+
+    // TEMPORARY (Plan 19 spike A): probe the native capabilities on startup;
+    // verdicts land in the dev console as `[plan19-spike]` lines.
+    #[cfg(mobile)]
+    let builder = builder.setup(|app| {
+        spike_mobile::run_self_check(app.handle());
+        Ok(())
+    });
 
     builder
         .manage(fs::GraphState::default())

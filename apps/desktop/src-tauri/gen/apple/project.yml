@@ -74,6 +74,11 @@ targets:
     dependencies:
       - framework: libapp.a
         embed: false
+      # libgit2 (vendored into libapp.a) needs zlib and iconv at the final
+      # Xcode link — cargo's `rustc-link-lib` directives don't reach
+      # xcodebuild. iconv backs libgit2's Apple filename-precompose support.
+      - sdk: libz.tbd
+      - sdk: libiconv.tbd
       - sdk: CoreGraphics.framework
       - sdk: Metal.framework
       - sdk: MetalKit.framework

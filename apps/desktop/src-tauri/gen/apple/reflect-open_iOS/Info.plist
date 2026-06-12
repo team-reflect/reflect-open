@@ -40,5 +40,7 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Reflect uses the microphone to record audio memos that are transcribed into your daily note.</string>
 </dict>
 </plist>

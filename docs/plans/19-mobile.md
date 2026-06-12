@@ -257,6 +257,18 @@ Steps 1 and 2 are the existential gates; nothing else starts until both pass.
    device: git2 vendored OpenSSL cross-compile, keyring round-trip to the iOS
    keychain, rusqlite FTS5 query, fs read/write under `Documents/`. *Failures
    here trip TDR 0003's fallback triggers.*
+
+   > **Status (2026-06-12): simulator half passed.** The crate cross-compiles
+   > clean for `aarch64-apple-ios`, and the app boots on the iPhone 17 Pro
+   > simulator with the frontend rendering and all four runtime probes green
+   > (keychain round-trip, FTS5 query, `Documents/` file IO, libgit2
+   > init+commit — the temporary `spike_mobile.rs` instrumentation).
+   > One real finding: cargo's `rustc-link-lib` directives don't reach the
+   > final Xcode link, so libgit2's zlib/iconv must be declared in
+   > `ios.project.yml` (`libz.tbd`, `libiconv.tbd`); after editing the
+   > template, re-run `tauri ios init` to regenerate `gen/apple/`.
+   > Remaining: the same probes on a physical iPhone.
+
 2. **Gate spike B — editing on a real iPhone (timeboxed).** Prototype the
    Swift keyboard plugin (decision 8) far enough to evaluate honestly, then
    run the meowdown checklist from decision 7 on-device. Outcome is a
