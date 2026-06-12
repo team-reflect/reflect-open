@@ -4,9 +4,10 @@ How to produce a signed, notarized macOS build of Reflect for distribution outsi
 Mac App Store.
 
 ```bash
-pnpm release:macos setup     # once: store notarization credentials in the keychain
-pnpm release:macos           # signed + notarized build, verified end to end
-pnpm release:macos publish   # the above, then upload the DMG to a new GitHub release
+pnpm release:macos setup           # once: store notarization credentials in the keychain
+pnpm release:macos setup-updater   # once: generate the auto-update signing keypair
+pnpm release:macos                 # signed + notarized build, verified end to end
+pnpm release:macos publish         # the above, then upload the DMG + updater artifacts to a new GitHub release
 ```
 
 The helper lives at `apps/desktop/scripts/release-macos.mjs` and is exposed as
@@ -31,6 +32,14 @@ The helper lives at `apps/desktop/scripts/release-macos.mjs` and is exposed as
    history or the repo.
 
 3. **Xcode Command Line Tools** (`xcode-select --install`) for `notarytool` and `stapler`.
+
+4. **The updater signing key** (for `publish`). Auto-update payloads are verified against
+   the minisign public key committed in `tauri.conf.json` (`plugins.updater.pubkey`) —
+   distinct from Apple signing. `pnpm release:macos setup-updater` generates the keypair,
+   stores the private key in your login keychain (item `reflect-updater`), and prints the
+   public key to commit. **Losing the private key strands every installed app** (they
+   reject anything not signed with it), so back it up; rotating it only reaches users via
+   a release signed with the old key that ships the new pubkey.
 
 Nothing signing-related is committed to the repo: contributors without the certificate
 can still build unsigned bundles with plain `pnpm tauri build`.
@@ -67,8 +76,13 @@ pnpm release:macos --no-notarize   # signed-only build (runs locally; Gatekeeper
 
 `pnpm release:macos publish` runs the full build above, then creates a GitHub release
 tagged `v<version>` (the `version` in `apps/desktop/src-tauri/tauri.conf.json`) with the
-notarized DMG attached and auto-generated release notes. Beyond the signing requirements,
-it needs the [GitHub CLI](https://cli.github.com) authenticated with `gh auth login`.
+notarized DMG, the updater artifacts (`Reflect.app.tar.gz` + `.sig`), and the
+`latest.json` manifest attached, plus auto-generated release notes. Installed apps poll
+`releases/latest/download/latest.json` (the committed `plugins.updater.endpoints` URL),
+so publish requires the updater key and always attaches the manifest — a release without
+it would stop existing installs from seeing any future updates. Beyond the signing
+requirements, it needs the [GitHub CLI](https://cli.github.com) authenticated with
+`gh auth login`.
 
 All preflight checks run before the build, so a doomed publish fails in seconds rather
 than after notarization:
@@ -94,6 +108,7 @@ which take precedence over the keychain:
 | `APPLE_ID` / `APPLE_PASSWORD` / `APPLE_TEAM_ID` | Apple ID notarization (app-specific password) |
 | `APPLE_API_KEY` / `APPLE_API_ISSUER` / `APPLE_API_KEY_PATH` | App Store Connect API key notarization (preferred for CI — not tied to a personal Apple ID) |
 | `APPLE_CERTIFICATE` / `APPLE_CERTIFICATE_PASSWORD` | base64 `.p12` + password; Tauri imports it into a temporary keychain on runners with no cert installed |
+| `TAURI_SIGNING_PRIVATE_KEY` (or `…_PATH`) / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | The updater signing key (content or path) + its password; overrides the `reflect-updater` keychain item |
 
 See the [Tauri macOS signing docs](https://v2.tauri.app/distribute/sign/macos/) for the
 runner keychain setup.
@@ -118,5 +133,5 @@ runner keychain setup.
   `scripts/build-sidecar.mjs`, and `pnpm tauri build --target universal-apple-darwin`.
 - The iOS project template (`src-tauri/ios.project.yml`) still uses the pre-rename bundle
   identifier and needs its own provisioning pass.
-- Updater-artifact signing (`TAURI_SIGNING_PRIVATE_KEY`) is separate from Apple signing
-  and not yet set up; it becomes relevant if we adopt Tauri's updater plugin.
+- `latest.json` only lists the host architecture, so auto-update serves the arch that was
+  built (Apple Silicon in practice); the universal-build work above lifts both limits.

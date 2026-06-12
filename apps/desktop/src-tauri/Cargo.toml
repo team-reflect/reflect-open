@@ -56,6 +56,12 @@ git2 = { version = "0.21", default-features = false, features = [
 tauri-plugin-http = "2.5.9"
 tauri-plugin-window-state = "2"
 
+# Auto-update (Plan 15): desktop-only — the updater has no mobile story, and
+# iOS distribution goes through the App Store.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+
 [dev-dependencies]
 tauri = { version = "2", features = ["test"] }
 

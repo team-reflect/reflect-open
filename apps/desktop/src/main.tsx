@@ -10,6 +10,7 @@ import { installTauriBridge } from '@/lib/tauri-bridge'
 import { GraphProvider } from '@/providers/graph-provider'
 import { SettingsProvider } from '@/providers/settings-provider'
 import { ThemeProvider } from '@/providers/theme-provider'
+import { UpdateProvider } from '@/providers/update-provider'
 import '@/styles/index.css'
 
 installTauriBridge()
@@ -25,12 +26,14 @@ createRoot(rootElement).render(
     <QueryClientProvider client={queryClient}>
       <SettingsProvider>
         <ThemeProvider>
-          <GraphProvider>
-            <TooltipProvider>
-              <WindowDragRegion />
-              <App />
-            </TooltipProvider>
-          </GraphProvider>
+          <UpdateProvider>
+            <GraphProvider>
+              <TooltipProvider>
+                <WindowDragRegion />
+                <App />
+              </TooltipProvider>
+            </GraphProvider>
+          </UpdateProvider>
         </ThemeProvider>
       </SettingsProvider>
     </QueryClientProvider>

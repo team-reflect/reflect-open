@@ -5,6 +5,7 @@ import { setBridge, type EmbedStatus } from '@reflect/core'
 import { formatFullDate } from '@/lib/dates'
 import { resetOperations } from '@/lib/operations'
 import { SettingsProvider } from '@/providers/settings-provider'
+import { UpdateProvider } from '@/providers/update-provider'
 import { SettingsScreen } from './settings-screen'
 
 // The rebuild-index field reads the open index generation — and the Backup
@@ -65,7 +66,9 @@ function renderScreen(): void {
   render(
     <QueryClientProvider client={queryClient}>
       <SettingsProvider>
-        <SettingsScreen />
+        <UpdateProvider autoCheck={false}>
+          <SettingsScreen />
+        </UpdateProvider>
       </SettingsProvider>
     </QueryClientProvider>,
   )

@@ -1,10 +1,11 @@
 // Build a signed, notarized, distribution-ready macOS bundle of Reflect.
 //
 // Usage:
-//   pnpm release:macos              Signed + notarized build, then verify
-//   pnpm release:macos setup        Store notarization credentials (one-time)
-//   pnpm release:macos verify       Re-run Gatekeeper checks on existing bundles
-//   pnpm release:macos publish      Build, then upload the DMG to a new GitHub release
+//   pnpm release:macos                Signed + notarized build, then verify
+//   pnpm release:macos setup          Store notarization credentials (one-time)
+//   pnpm release:macos setup-updater  Generate the auto-update signing keypair (one-time)
+//   pnpm release:macos verify         Re-run Gatekeeper checks on existing bundles
+//   pnpm release:macos publish        Build, then upload the DMG + updater artifacts to a new GitHub release
 //   pnpm release:macos --no-notarize  Signed-only build (won't pass Gatekeeper elsewhere)
 //
 // Signing configuration is intentionally not committed — contributors must be
@@ -18,12 +19,14 @@
 // Full procedure and troubleshooting: docs/macos-distribution.md
 
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
 
 const KEYCHAIN_SERVICE = 'reflect-notary'
+const UPDATER_KEYCHAIN_SERVICE = 'reflect-updater'
 const APP_SPECIFIC_PASSWORD_URL = 'https://account.apple.com'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -136,6 +139,29 @@ function resolveNotaryCredentials(identity) {
 }
 
 /**
+ * Resolve the Tauri updater signing key (minisign — distinct from Apple
+ * signing). Environment wins (CI: TAURI_SIGNING_PRIVATE_KEY or …_PATH),
+ * then the keychain item created by `setup-updater` (the key file,
+ * base64-wrapped so the blob survives the keychain round-trip). Returns
+ * { env, source } to merge into the build environment, or null.
+ */
+function resolveUpdaterSigningEnv() {
+  const password = process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD ?? ''
+  if (process.env.TAURI_SIGNING_PRIVATE_KEY || process.env.TAURI_SIGNING_PRIVATE_KEY_PATH) {
+    return { env: { TAURI_SIGNING_PRIVATE_KEY_PASSWORD: password }, source: 'environment' }
+  }
+  const stored = run('security', ['find-generic-password', '-s', UPDATER_KEYCHAIN_SERVICE, '-w'])
+  if (stored.status !== 0) return null
+  return {
+    env: {
+      TAURI_SIGNING_PRIVATE_KEY: Buffer.from(stored.output.trim(), 'base64').toString('utf8'),
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: password,
+    },
+    source: `keychain item "${UPDATER_KEYCHAIN_SERVICE}"`,
+  }
+}
+
+/**
  * The architecture segment of the host triple (e.g. "aarch64"). Taken from
  * rustc — the same source Tauri names bundle artifacts from — rather than
  * process.arch, which diverges when Node runs under Rosetta.
@@ -162,7 +188,35 @@ function bundlePaths() {
   return {
     app: join(bundleDir, 'macos', `${conf.productName}.app`),
     dmg: join(bundleDir, 'dmg', `${conf.productName}_${conf.version}_${arch}.dmg`),
+    // The auto-update payload (when built with an updater key): the archive
+    // the installed app downloads, and its minisign signature.
+    updaterArchive: join(bundleDir, 'macos', `${conf.productName}.app.tar.gz`),
+    updaterSignature: join(bundleDir, 'macos', `${conf.productName}.app.tar.gz.sig`),
   }
+}
+
+/**
+ * Write the updater manifest next to the bundle and return its path. The
+ * committed updater endpoint resolves `releases/latest/download/latest.json`,
+ * so every published release must carry this file — it is how installed apps
+ * discover the new version and verify its payload.
+ */
+function writeUpdaterManifest({ version, tag }) {
+  const { updaterArchive, updaterSignature } = bundlePaths()
+  const slug = capture('gh', ['repo', 'view', '--json', 'nameWithOwner', '-q', '.nameWithOwner']).trim()
+  const manifest = {
+    version,
+    pub_date: new Date().toISOString(),
+    platforms: {
+      [`darwin-${hostArch()}`]: {
+        signature: readFileSync(updaterSignature, 'utf8').trim(),
+        url: `https://github.com/${slug}/releases/download/${tag}/${basename(updaterArchive)}`,
+      },
+    },
+  }
+  const manifestPath = join(dirname(updaterArchive), 'latest.json')
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
+  return manifestPath
 }
 
 /**
@@ -243,9 +297,22 @@ function printArtifacts() {
   console.log(`  ${dmg} (${dmgSizeMb} MB)`)
 }
 
-function build({ notarize }) {
+function build({ notarize, requireUpdater = false }) {
   const identity = findSigningIdentity()
   log(`signing identity: ${identity}`)
+
+  const updater = resolveUpdaterSigningEnv()
+  if (updater) {
+    log(`updater signing key: ${updater.source}`)
+  } else if (requireUpdater) {
+    fail(
+      'no updater signing key found.\n' +
+        '  Published releases must carry updater artifacts, or installed apps stop receiving\n' +
+        '  updates. Run `pnpm release:macos setup-updater` once, or export TAURI_SIGNING_PRIVATE_KEY.',
+    )
+  } else {
+    log('no updater signing key — skipping updater artifacts (run `pnpm release:macos setup-updater` to set one up)')
+  }
 
   let credentials = null
   if (notarize) {
@@ -266,7 +333,12 @@ function build({ notarize }) {
     log('notarization skipped (--no-notarize): the bundle will not pass Gatekeeper on other Macs')
   }
 
-  const buildEnv = { ...process.env, APPLE_SIGNING_IDENTITY: identity, ...credentials?.buildEnv }
+  const buildEnv = {
+    ...process.env,
+    APPLE_SIGNING_IDENTITY: identity,
+    ...credentials?.buildEnv,
+    ...updater?.env,
+  }
   if (!notarize) {
     // Tauri notarizes the .app whenever these are present, so inherited shell
     // exports would silently override --no-notarize.
@@ -281,8 +353,22 @@ function build({ notarize }) {
       delete buildEnv[name]
     }
   }
-  const result = spawnSync('pnpm', ['tauri', 'build'], { cwd: appDir, stdio: 'inherit', env: buildEnv })
+  // createUpdaterArtifacts stays out of the committed config: with it on,
+  // `tauri build` hard-fails without the private key, which would break plain
+  // contributor builds. The release script turns it on only when it can sign.
+  const buildArgs = ['tauri', 'build']
+  if (updater) {
+    buildArgs.push('--config', JSON.stringify({ bundle: { createUpdaterArtifacts: true } }))
+  }
+  const result = spawnSync('pnpm', buildArgs, { cwd: appDir, stdio: 'inherit', env: buildEnv })
   if (result.status !== 0) fail('tauri build failed')
+
+  if (updater) {
+    const { updaterArchive, updaterSignature } = bundlePaths()
+    if (!existsSync(updaterArchive) || !existsSync(updaterSignature)) {
+      fail(`updater artifacts missing after build — expected ${updaterArchive} and its .sig`)
+    }
+  }
 
   if (notarize) notarizeDmg(bundlePaths().dmg, credentials)
   verify({ notarized: notarize })
@@ -362,15 +448,19 @@ function publish({ draft }) {
   ensureReleaseIsNew(tag)
   ensureTagMatchesCommit(tag, commit)
 
-  build({ notarize: true })
+  build({ notarize: true, requireUpdater: true })
 
-  const { dmg } = bundlePaths()
+  const { dmg, updaterArchive, updaterSignature } = bundlePaths()
+  const manifestPath = writeUpdaterManifest({ version, tag })
   log(`creating GitHub release ${tag} from commit ${commit.slice(0, 7)}…`)
   const releaseArgs = [
     'release',
     'create',
     tag,
     dmg,
+    updaterArchive,
+    updaterSignature,
+    manifestPath,
     '--title',
     `${productName} ${version}`,
     '--target',
@@ -406,13 +496,61 @@ async function setup() {
   log(`stored credentials for ${account} — you can now run \`pnpm release:macos\``)
 }
 
+/**
+ * Generate the Tauri updater keypair and store the private key in the
+ * keychain (item "reflect-updater", base64-wrapped). The public key must be
+ * committed as `plugins.updater.pubkey` in tauri.conf.json — installed apps
+ * verify every update payload against it, so rotating the key only reaches
+ * users through a release signed with the OLD key that ships the NEW pubkey.
+ */
+function setupUpdater() {
+  if (run('security', ['find-generic-password', '-s', UPDATER_KEYCHAIN_SERVICE]).status === 0) {
+    fail(
+      `an updater signing key already exists (keychain item "${UPDATER_KEYCHAIN_SERVICE}").\n` +
+        '  Rotating it strands installed apps unless a release signed with the old key ships\n' +
+        '  the new pubkey first. If you really mean to rotate, delete the item with\n' +
+        `  \`security delete-generic-password -s ${UPDATER_KEYCHAIN_SERVICE}\` and rerun.`,
+    )
+  }
+  const keyDir = mkdtempSync(join(tmpdir(), 'reflect-updater-'))
+  try {
+    const keyPath = join(keyDir, 'updater.key')
+    const generate = spawnSync(
+      'pnpm',
+      ['tauri', 'signer', 'generate', '--write-keys', keyPath, '--password', '', '--ci'],
+      { cwd: appDir, encoding: 'utf8' },
+    )
+    if (generate.status !== 0 || !existsSync(keyPath)) {
+      fail(`generating the updater keypair failed:\n${generate.stdout ?? ''}${generate.stderr ?? ''}`)
+    }
+    const store = run('security', [
+      'add-generic-password',
+      '-U',
+      '-s',
+      UPDATER_KEYCHAIN_SERVICE,
+      '-a',
+      'updater',
+      '-w',
+      readFileSync(keyPath).toString('base64'),
+    ])
+    if (store.status !== 0) fail(`storing the private key in the keychain failed:\n${store.output}`)
+    log(`private key stored in the keychain (item "${UPDATER_KEYCHAIN_SERVICE}") — never commit it`)
+    log('public key (set as plugins.updater.pubkey in apps/desktop/src-tauri/tauri.conf.json):')
+    console.log(readFileSync(`${keyPath}.pub`, 'utf8').trim())
+    log('for CI, copy the private key into the TAURI_SIGNING_PRIVATE_KEY secret')
+  } finally {
+    rmSync(keyDir, { recursive: true, force: true })
+  }
+}
+
 const USAGE = `Usage: pnpm release:macos [command] [flags]
 
 Commands:
-  build     Signed + notarized release build, then verify (default)
-  setup     Store the notarization Apple ID + app-specific password in the keychain
-  verify    Re-run signing/Gatekeeper checks on already-built bundles
-  publish   Build, then upload the DMG to a new GitHub release (needs the gh CLI)
+  build          Signed + notarized release build, then verify (default)
+  setup          Store the notarization Apple ID + app-specific password in the keychain
+  setup-updater  Generate the auto-update signing keypair (keychain + pubkey to commit)
+  verify         Re-run signing/Gatekeeper checks on already-built bundles
+  publish        Build, then upload the DMG + updater artifacts to a new GitHub release
 
 Flags:
   --no-notarize   Skip notarization (signed-only build/verify)
@@ -442,6 +580,8 @@ async function main() {
       return build({ notarize })
     case 'setup':
       return setup()
+    case 'setup-updater':
+      return setupUpdater()
     case 'verify':
       verify({ notarized: notarize })
       return printArtifacts()

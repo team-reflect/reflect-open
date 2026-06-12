@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_SETTINGS, type GraphInfo, type PinnedNote, type Settings } from '@reflect/core'
 import type { CommandContext } from '@/lib/commands/types'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { UpdateProvider } from '@/providers/update-provider'
 import { RouterProvider } from '@/routing/router'
 
 const getPinnedNotes = vi.hoisted(() => vi.fn<() => Promise<PinnedNote[]>>(async () => []))
@@ -103,9 +104,11 @@ function renderSidebar(overrides?: Partial<CommandContext>) {
   const view = render(
     <TooltipProvider>
       <QueryClientProvider client={client}>
-        <RouterProvider>
-          <Sidebar graph={GRAPH} context={context} />
-        </RouterProvider>
+        <UpdateProvider autoCheck={false}>
+          <RouterProvider>
+            <Sidebar graph={GRAPH} context={context} />
+          </RouterProvider>
+        </UpdateProvider>
       </QueryClientProvider>
     </TooltipProvider>,
   )

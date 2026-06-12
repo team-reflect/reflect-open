@@ -42,11 +42,21 @@ fn init_tracing() {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     init_tracing();
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_window_state::Builder::default().build());
+
+    // Auto-update is desktop-only: updates verify against the minisign pubkey
+    // in tauri.conf.json (`plugins.updater`), and `process` provides the
+    // post-install relaunch. Mobile updates go through the app stores.
+    #[cfg(desktop)]
+    let builder = builder
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init());
+
+    builder
         .manage(fs::GraphState::default())
         .manage(db::IndexState::default())
         .manage(watcher::WatcherState::default())
