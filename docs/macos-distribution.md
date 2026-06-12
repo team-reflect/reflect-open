@@ -98,6 +98,23 @@ than after notarization:
 Pass `--draft` to create the release without publishing it, then review and publish it
 from the GitHub UI.
 
+## Beta releases
+
+Development happens on `next` (the repo default branch); `master` only advances when
+`next` is merged into it for a public release. On `next`, `version` in
+`tauri.conf.json` carries a prerelease suffix (e.g. `0.2.0-beta.1`), and `publish`
+turns that suffix into a GitHub **pre-release** automatically. `releases/latest` — the
+committed updater endpoint — ignores pre-releases, so stable installs never see a
+beta.
+
+Beta installs poll that same stable endpoint: they get offered the next stable release
+when it ships, but not newer betas. A dedicated beta updater channel is future work.
+
+Cutting a beta is the normal release flow on `next`: bump the prerelease version
+(`0.2.0-beta.2`, …) in `tauri.conf.json` + `src-tauri/Cargo.toml`, then run the
+Release workflow on `next`. For a stable release, merge `next` into `master`, set a
+stable version there (e.g. `0.2.0`), and run the workflow on `master`.
+
 ## Releasing from CI
 
 `.github/workflows/release.yml` runs `pnpm release:macos publish` on a GitHub-hosted

@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    # next is the development default; master only advances on release merges.
+    branches: [master, next]
   pull_request:
   workflow_dispatch:
 
