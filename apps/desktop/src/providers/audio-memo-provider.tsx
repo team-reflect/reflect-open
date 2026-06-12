@@ -66,6 +66,14 @@ const MAX_DURATION_MS = 10 * 60_000
 const NO_PROVIDER_REASON = 'Add an OpenAI or Gemini model in Settings to record audio memos'
 const UNSUPPORTED_REASON = 'Audio recording is not supported on this platform'
 
+/** Same macOS check as `hasMacosTitleBarOverlay` — settings paths differ per OS. */
+function micDeniedMessage(): string {
+  const isMac = typeof navigator !== 'undefined' && navigator.userAgent.includes('Macintosh')
+  return isMac
+    ? 'Microphone access was denied. Allow it in System Settings → Privacy & Security → Microphone.'
+    : 'Microphone access was denied. Allow microphone access for Reflect in your system settings.'
+}
+
 interface AudioMemoProviderProps {
   graph: GraphInfo
   children: ReactNode
@@ -158,7 +166,7 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
     } catch (cause) {
       setError(
         cause instanceof DOMException && cause.name === 'NotAllowedError'
-          ? 'Microphone access was denied. Allow it in System Settings → Privacy & Security → Microphone.'
+          ? micDeniedMessage()
           : errorMessage(cause),
       )
     }
@@ -186,6 +194,10 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
   const toggle = useCallback((): void => {
     if (recorder.status === 'recording') {
       void stopAndSave()
+    } else if (recorder.status === 'requesting') {
+      // A second press while the OS prompt is up aborts the request — the
+      // alternative is a click that visibly does nothing.
+      cancelRecorder()
     } else if (error !== null) {
       // A parked error must never invisibly block recording. Collapsed, the
       // error UI doesn't exist — surface it; visible, it was on screen and a
@@ -199,7 +211,7 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
     } else if (recorder.status === 'idle' && !saving) {
       void start()
     }
-  }, [recorder.status, saving, error, stopAndSave, start, toggleSidebar, discard])
+  }, [recorder.status, saving, error, stopAndSave, cancelRecorder, start, toggleSidebar, discard])
 
   const cancel = useCallback((): void => {
     cancelRecorder()

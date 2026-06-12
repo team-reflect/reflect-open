@@ -20,6 +20,8 @@ const recorderControls = vi.hoisted(() => ({
   /** Park stop() until releaseStop, simulating MediaRecorder's async onstop. */
   holdStop: false,
   releaseStop: () => {},
+  /** Make start() reject like a denied getUserMedia. */
+  failStart: null as DOMException | null,
   options: null as { maxDurationMs?: number; onMaxDuration?: () => void } | null,
 }))
 
@@ -41,6 +43,9 @@ vi.mock('@/hooks/use-audio-recorder', () => ({
       stream: null,
       start: async () => {
         recorderControls.startSpy()
+        if (recorderControls.failStart !== null) {
+          throw recorderControls.failStart
+        }
         setStatus(recorderControls.holdStart ? 'requesting' : 'recording')
       },
       stop: async () => {
@@ -101,6 +106,7 @@ beforeEach(() => {
   recorderControls.supported = true
   recorderControls.holdStart = false
   recorderControls.holdStop = false
+  recorderControls.failStart = null
   recorderControls.options = null
   sidebarState.collapsed = false
   SETTINGS.current = {
@@ -247,6 +253,36 @@ describe('AudioMemoProvider', () => {
     })
     await waitFor(() => expect(result.current.phase).toBe('idle'))
     expect(saveAudioMemo).toHaveBeenCalledTimes(1)
+  })
+
+  it('a second toggle during the permission prompt aborts the request', async () => {
+    recorderControls.holdStart = true
+    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+
+    await act(async () => {
+      result.current.toggle()
+    })
+    expect(result.current.phase).toBe('requesting')
+
+    await act(async () => {
+      result.current.toggle()
+    })
+    expect(recorderControls.cancelSpy).toHaveBeenCalled()
+    expect(result.current.phase).toBe('idle')
+  })
+
+  it('a denied microphone maps to platform-appropriate guidance', async () => {
+    recorderControls.failStart = new DOMException('denied', 'NotAllowedError')
+    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+
+    await act(async () => {
+      result.current.toggle()
+    })
+
+    await waitFor(() => expect(result.current.phase).toBe('error'))
+    // jsdom is not a Macintosh user agent — the copy must not name macOS paths.
+    expect(result.current.error).toMatch(/system settings/i)
+    expect(result.current.error).not.toMatch(/Privacy & Security/)
   })
 
   it('collapsing the sidebar during the permission prompt abandons the request', async () => {
