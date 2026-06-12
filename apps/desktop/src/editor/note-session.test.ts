@@ -374,7 +374,9 @@ describe('frontmatter ownership (Plan 07b)', () => {
 })
 
 describe('missing-note seed (new ordinary notes)', () => {
-  const SEED = '# Untitled\n'
+  // The empty H1 the new-note flow seeds (`untitledNoteSeed` body): the
+  // caret lands in it and typing names the note.
+  const SEED = '#\n'
 
   it('a missing note opens ready with the seed, marked missing, and writes nothing', async () => {
     const h = harness({ disk: null, createIfMissing: true, missingSeed: SEED })
@@ -387,8 +389,8 @@ describe('missing-note seed (new ordinary notes)', () => {
     expect(ready?.initialContent).toBe(SEED)
     expect(ready?.dirty).toBe(false)
     expect(h.writes).toEqual([]) // opening never litters the graph
-    // The rename tracker baselines on the real (empty) disk content, so the
-    // first authored title is a birth, not a rename from "Untitled".
+    // The rename tracker baselines on the real (empty) disk content, never
+    // the seed, so the first authored title is a birth, not a rename.
     expect(h.contents).toEqual([{ content: '', origin: 'load' }])
   })
 
@@ -412,8 +414,8 @@ describe('missing-note seed (new ordinary notes)', () => {
     h.session.load()
     await settled()
 
-    // The user selects the seeded "Untitled" and deletes it without typing a
-    // replacement: an empty unwritten note must not be created on disk.
+    // The user deletes the seeded empty title without typing a replacement:
+    // an empty unwritten note must not be created on disk.
     h.session.editorChanged('')
     await h.session.flush()
     await settled()

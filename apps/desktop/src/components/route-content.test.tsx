@@ -41,7 +41,6 @@ vi.mock('@/editor/note-editor', async () => {
           setMarkdown: () => {},
           getMarkdown: () => '',
           focus: () => editorProbe.focusCalls.push('focus'),
-          selectTitle: () => editorProbe.focusCalls.push('selectTitle'),
         })
         return () => handleRef?.(null)
       }, [handleRef])
@@ -171,20 +170,19 @@ describe('RouteContent', () => {
     expect(view.queryByTestId('daily-stream')).toBeNull()
     expect(view.getByTestId('fake-editor').textContent).toContain('# Hello')
 
-    // An existing note focuses plainly — no title to claim.
+    // The navigated-to note takes focus on mount.
     await waitFor(() => expect(editorProbe.focusCalls).toContain('focus'))
-    expect(editorProbe.focusCalls).not.toContain('selectTitle')
     view.unmount()
   })
 
-  it('opens a missing note seeded with a selected Untitled title, writing nothing', async () => {
+  it('opens a missing note seeded with an empty focused title, writing nothing', async () => {
     const view = renderRoute({ kind: 'note', path: 'notes/new.md' })
 
     await view.findByLabelText('Editing notes/new.md')
-    expect(view.getByTestId('fake-editor').textContent).toContain('# Untitled')
-    // The macOS rename pattern: the title is selected so typing names the note.
-    await waitFor(() => expect(editorProbe.focusCalls).toContain('selectTitle'))
-    expect(editorProbe.focusCalls).not.toContain('focus')
+    // The seed is an empty H1: the caret lands in it (plain focus, no text
+    // to select) and the title placeholder ghosts "Untitled" over the line.
+    expect(view.getByTestId('fake-editor').textContent).toBe('#\n')
+    await waitFor(() => expect(editorProbe.focusCalls).toContain('focus'))
 
     // Opening never litters the graph — even a forced flush writes nothing.
     await act(() => flushOpenDocuments())

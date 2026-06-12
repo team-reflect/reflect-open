@@ -6,6 +6,7 @@ import { ListIcon } from '@/components/icons/list-icon'
 import { PencilIcon } from '@/components/icons/pencil-icon'
 import { keybindingFor } from '@/lib/commands/app-commands'
 import { runCommand } from '@/lib/commands/registry'
+import { isUntitledNotePath } from '@/lib/create-note'
 import type { CommandContext } from '@/lib/commands/types'
 import { hasMacosTitleBarOverlay } from '@/lib/window-chrome'
 import { cn } from '@/lib/utils'
@@ -81,6 +82,11 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             }
             label="New note"
             binding={keybindingFor('note.new') ?? undefined}
+            // Active while the open note is still on its ULID placeholder
+            // name — the state this row creates. The birth rename onto a
+            // title slug is also what hands the note off to ordinary
+            // navigation, releasing the highlight.
+            active={route.kind === 'note' && isUntitledNotePath(route.path)}
             onClick={() => void runCommand('note.new', context)}
           />
           <SidebarItem

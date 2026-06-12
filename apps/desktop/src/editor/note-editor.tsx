@@ -20,7 +20,7 @@ import {
   type MarkMode,
   type MeowdownEditorHandle,
 } from './meowdown'
-import { selectFirstHeadingText } from './title-selection'
+import { defineTitlePlaceholder } from './title-placeholder'
 import { defineWikiLinks } from './wiki-links'
 
 /**
@@ -44,11 +44,6 @@ export interface NoteEditorHandle extends MeowdownEditorHandle {
   /** Replace the document (note switch / external reload). */
   setMarkdown(markdown: string): void
   focus(): void
-  /**
-   * Focus with the first heading's text selected, so typing replaces it (the
-   * seeded-"Untitled" new-note flow). Plain focus when there is no heading.
-   */
-  selectTitle(): void
 }
 
 interface NoteEditorProps {
@@ -68,6 +63,11 @@ interface NoteEditorProps {
   images?: ImageOptions
   /** Click on a `[[wiki link]]` (Plan 06 navigation). */
   onWikiLinkClick?: (target: string) => void
+  /**
+   * Ghost text over a leading empty H1 (the new-note flow's "Untitled");
+   * omitted for documents without title semantics (the daily stream).
+   */
+  titlePlaceholder?: string
   /**
    * Extra classes for the editable root. The mount div *is* the ProseMirror
    * contenteditable, so e.g. a `min-h-*` here makes the whole reserved area
@@ -101,6 +101,7 @@ export function NoteEditor({
   spellCheck = true,
   images,
   onWikiLinkClick,
+  titlePlaceholder,
   className,
   handleRef,
   children,
@@ -129,6 +130,14 @@ export function NoteEditor({
 
   useExtension(
     useMemo(
+      () => (titlePlaceholder !== undefined ? defineTitlePlaceholder(titlePlaceholder) : null),
+      [titlePlaceholder],
+    ),
+    { editor },
+  )
+
+  useExtension(
+    useMemo(
       () =>
         onChange
           ? defineDocChangeHandler(() => {
@@ -148,10 +157,6 @@ export function NoteEditor({
       },
       getMarkdown: () => serializeMarkdown(editor.state.doc),
       focus: () => editor.focus(),
-      selectTitle: () => {
-        editor.focus()
-        editor.exec(selectFirstHeadingText)
-      },
     }),
     [editor],
   )

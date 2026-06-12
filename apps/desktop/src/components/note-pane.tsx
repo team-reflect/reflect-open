@@ -90,11 +90,11 @@ export function NotePane({
     // Daily notes are excluded from rename tracking: their date labels are
     // stream chrome, not content (decided 2026-06-09).
     trackRenames: !dailyNote,
-    // A missing ordinary note opens as a titled template (old Reflect's
-    // new-note flow): the seed — `id:` frontmatter plus a selectable
-    // "Untitled" H1 — only reaches disk if the user edits, and the title is
-    // selected on focus so typing names the note. Daily notes stay unseeded —
-    // the date is their identity.
+    // A missing ordinary note opens as a name-me template (old Reflect's
+    // new-note flow): the seed — `id:` frontmatter plus an empty H1 the
+    // caret lands in, ghosted "Untitled" by the title placeholder — only
+    // reaches disk if the user edits, and typing names the note. Daily
+    // notes stay unseeded — the date is their identity.
     missingSeed,
   })
   const { options: images, saveError: imageSaveError } = useImagePersistence(
@@ -115,23 +115,13 @@ export function NotePane({
   )
 
   const bindEditor = document.bindEditor
-  // Read through a ref so the callback's identity never changes with the
-  // snapshot — React re-invokes a changed callback ref (null, then handle),
-  // which would re-focus an editor the user is already typing in.
-  const missingRef = useRef(false)
-  missingRef.current = document.missing
   const handleRef = useCallback(
     (handle: NoteEditorHandle | null) => {
       bindEditor(handle)
       if (handle && autoFocus) {
-        // A seeded new note focuses with "Untitled" selected so typing names
-        // it; selectTitle falls back to a plain focus when there's no heading
-        // (e.g. a lazy daily note).
-        if (missingRef.current) {
-          handle.selectTitle()
-        } else {
-          handle.focus()
-        }
+        // The caret lands at the document start — for a seeded new note
+        // that is the empty H1, so typing names the note.
+        handle.focus()
         onAutoFocused?.()
       }
     },
@@ -221,6 +211,9 @@ export function NotePane({
         spellCheck={settings.editorSpellCheck}
         images={images}
         onWikiLinkClick={onWikiLinkClick}
+        // Daily notes carry no title semantics (the date is their subject),
+        // so an empty leading H1 there is just an empty heading.
+        titlePlaceholder={dailyNote ? undefined : 'Untitled'}
         className={cn(gutterClassName, editorClassName)}
         handleRef={handleRef}
       >
