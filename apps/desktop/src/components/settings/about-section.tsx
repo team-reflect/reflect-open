@@ -9,9 +9,6 @@ export function AboutSection(): ReactElement {
       <div className="flex items-center justify-between gap-4 px-4 py-3.5">
         <div className="min-w-0">
           <div className="text-sm font-medium text-text">Reflect Open</div>
-          <p className="mt-0.5 text-xs text-text-muted">
-            Local-first networked notes. Your graph is a folder of markdown files.
-          </p>
         </div>
         <span className="shrink-0 text-sm text-text-secondary">
           {version !== null ? `v${version}` : '—'}
