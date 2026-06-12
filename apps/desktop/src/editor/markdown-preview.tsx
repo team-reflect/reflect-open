@@ -30,6 +30,11 @@ interface MarkdownPreviewProps {
   content: string
   /** Resolve `![…](…)` sources to displayable URLs; unresolved images are skipped. */
   resolveImageUrl?: (src: string) => string | null
+  /**
+   * Navigate a clicked `[[wiki link]]` target. Omitted, links render as
+   * inert chips (the palette preview's behavior).
+   */
+  onWikiLinkClick?: (target: string) => void
   /** Extra classes for the rendered root. */
   className?: string
 }
@@ -38,12 +43,17 @@ function defineReadOnly(): PlainExtension {
   return definePlugin(new Plugin({ props: { editable: () => false } }))
 }
 
-function createPreviewEditor(resolveUrl: (src: string) => string | null): Editor {
+function createPreviewEditor(
+  resolveUrl: (src: string) => string | null,
+  onNavigate: ((target: string) => void) | undefined,
+): Editor {
   return createEditor({
     extension: union(
       defineEditorExtension(),
       defineMarkMode('hide'),
-      defineWikiLinks(),
+      // No handler, no plugin option: a registered callback makes the plugin
+      // consume chip clicks, and an inert preview must not swallow them.
+      defineWikiLinks(onNavigate ? { onNavigate } : {}),
       defineImages({ resolveUrl }),
       defineReadOnly(),
     ),
@@ -53,13 +63,23 @@ function createPreviewEditor(resolveUrl: (src: string) => string | null): Editor
 export function MarkdownPreview({
   content,
   resolveImageUrl,
+  onWikiLinkClick,
   className,
 }: MarkdownPreviewProps): ReactElement {
-  // The extension set is created once; the resolver is read through a ref so
-  // a changing prop never rebuilds the editor.
+  // The extension set is created once; the resolver and click handler are
+  // read through refs so a changing prop never rebuilds the editor. Whether
+  // wiki links navigate at all is fixed by the first render — hosts either
+  // always pass the handler (chat) or never do (palette preview).
   const resolveRef = useRef<((src: string) => string | null) | undefined>(resolveImageUrl)
   resolveRef.current = resolveImageUrl
-  const [editor] = useState(() => createPreviewEditor((src) => resolveRef.current?.(src) ?? null))
+  const navigateRef = useRef<((target: string) => void) | undefined>(onWikiLinkClick)
+  navigateRef.current = onWikiLinkClick
+  const [editor] = useState(() =>
+    createPreviewEditor(
+      (src) => resolveRef.current?.(src) ?? null,
+      onWikiLinkClick ? (target) => navigateRef.current?.(target) : undefined,
+    ),
+  )
 
   useLayoutEffect(() => {
     editor.setContent(markdownToDoc(editor as TypedEditor, content))

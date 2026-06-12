@@ -121,6 +121,9 @@ describe('Sidebar', () => {
 
     await userEvent.click(view.getByRole('button', { name: /settings/i }))
     await waitFor(() => expect(navigate).toHaveBeenCalledWith({ kind: 'settings' }))
+
+    await userEvent.click(view.getByRole('button', { name: /chat/i }))
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith({ kind: 'chat' }))
   })
 
   it('the search affordance opens the palette', async () => {

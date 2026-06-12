@@ -4,6 +4,24 @@
 local context, chat/summarize/rewrite, and reviewable multi-note patchsets — with
 `private: true` as a hard cloud block. This is **M3.**
 
+> **Revision (2026-06-11) — dedicated Chat view, read-only first wave.** The copilot
+> shipped as a **dedicated full-screen view** (`chat` route, a "Chat" sidebar button under
+> "New note", `⌘J`) rather than the right-sidebar panel: a conversation deserves the whole
+> column, and the right slot stays free for note context (Plan 07). The first wave is
+> **read-only** — no patchsets, rewrite, or any write path yet (steps 5–6 below are
+> deferred). The model is grounded through two tools instead of pre-assembled context:
+> `search_notes` (the shared `retrieve()`, `excludePrivateContent: true`, private hits
+> dropped entirely) and `read_note` (live frontmatter re-check before any content leaves;
+> private notes get a structured refusal). Step 4's structural gate shipped as a branded
+> `CloudSafe<T>` type: tool outputs carry note content only as `CloudSafe` values, and the
+> sole constructors (`cloudSafeSearchHits`, `cloudSafeNoteContent` in `ai/checkers.ts`)
+> run the privacy checks — an unchecked payload doesn't typecheck. Tool activity
+> renders inline in the transcript — the transparent-context requirement, in tool form.
+> Engine: Vercel AI SDK v6 in `@reflect/core` (`ai/chat/`), streaming normalized to a
+> typed event union; answers cite notes as `[[wiki links]]` that navigate (and never
+> create) notes. Keychain secrets, BYOK settings UI, and provider key validation
+> (steps 1–2) had already landed.
+
 **Depends on:** Plan 05 (apply edits), Plan 07 (backlink context), Plan 09 (`retrieve()`),
 keychain (introduced here, reused by Plan 12).
 **Unlocks:** AI-assisted conflict resolution (Plan 12), future agentic workflows.

@@ -30,6 +30,11 @@ describe('routesEqual', () => {
     )
     expect(routesEqual({ kind: 'allNotes', tag: null }, { kind: 'today' })).toBe(false)
   })
+
+  it('treats singleton screens as equal to themselves', () => {
+    expect(routesEqual({ kind: 'chat' }, { kind: 'chat' })).toBe(true)
+    expect(routesEqual({ kind: 'chat' }, { kind: 'settings' })).toBe(false)
+  })
 })
 
 describe('notePathForRoute', () => {
@@ -47,5 +52,6 @@ describe('notePathForRoute', () => {
     expect(notePathForRoute({ kind: 'search', query: 'x' }, TODAY)).toBeNull()
     expect(notePathForRoute({ kind: 'settings' }, TODAY)).toBeNull()
     expect(notePathForRoute({ kind: 'allNotes', tag: null }, TODAY)).toBeNull()
+    expect(notePathForRoute({ kind: 'chat' }, TODAY)).toBeNull()
   })
 })

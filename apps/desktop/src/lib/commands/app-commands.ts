@@ -46,6 +46,13 @@ const APP_COMMANDS: AppCommand[] = [
     run: (context) => context.navigate(newNoteRoute()),
   },
   {
+    id: 'chat.open',
+    title: 'Chat',
+    keywords: ['ai', 'assistant', 'copilot', 'ask'],
+    keybinding: 'Mod-j',
+    run: (context) => context.navigate({ kind: 'chat' }),
+  },
+  {
     id: 'history.back',
     title: 'Back',
     keybinding: 'Mod-[',

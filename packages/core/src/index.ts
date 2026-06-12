@@ -135,6 +135,35 @@ export {
   type TranscriptionProvider,
 } from './ai/models'
 export { validateApiKey, type ApiKeyValidation } from './ai/validate-key'
+export {
+  assertCloudAllowed,
+  cloudSafeNoteContent,
+  cloudSafeSearchHits,
+  isPrivateNoteError,
+  PrivateNoteError,
+  type CloudNoteContent,
+  type CloudSafe,
+  type CloudSearchHit,
+  type CloudSendable,
+} from './ai/checkers'
+export {
+  buildNoteTools,
+  MAX_NOTE_CONTENT_CHARS,
+  type NoteHitSummary,
+  type NoteToolCall,
+  type NoteToolDeps,
+  type NoteToolResult,
+  type NoteTools,
+  type ReadNoteOutput,
+  type SearchNotesOutput,
+} from './ai/chat/tools'
+export { chatSystemPrompt, type SystemPromptInput } from './ai/chat/system-prompt'
+export {
+  streamChat,
+  type ChatStreamEvent,
+  type StreamChatOptions,
+} from './ai/chat/stream-chat'
+export type { ModelMessage as ChatModelMessage } from 'ai'
 // The fixed per-provider model ids stay internal to `ai/transcribe` —
 // exporting them would let callers couple to vendor model names.
 export { transcribeAudio, type TranscriptionRequest } from './ai/transcribe'

@@ -3,6 +3,7 @@ import type { GraphInfo } from '@reflect/core'
 import { PaletteProvider } from '@/components/command-palette/palette-provider'
 import { WorkspaceContent } from '@/components/workspace-content'
 import { AudioMemoProvider } from '@/providers/audio-memo-provider'
+import { ChatProvider } from '@/providers/chat-provider'
 import { SidebarProvider } from '@/providers/sidebar-provider'
 import { SyncProvider } from '@/providers/sync-provider'
 import { RouterProvider } from '@/routing/router'
@@ -27,7 +28,9 @@ export function GraphWorkspace({ graph }: GraphWorkspaceProps): ReactElement {
             {/* Above the sidebar: a recording must survive the sidebar (and its
                 mic button) unmounting on collapse. */}
             <AudioMemoProvider graph={graph}>
-              <WorkspaceContent graph={graph} />
+              <ChatProvider>
+                <WorkspaceContent graph={graph} />
+              </ChatProvider>
             </AudioMemoProvider>
           </SidebarProvider>
         </PaletteProvider>

@@ -16,6 +16,7 @@ export type Route =
   | { kind: 'note'; path: string }
   | { kind: 'allNotes'; tag: string | null }
   | { kind: 'search'; query: string }
+  | { kind: 'chat' }
   | { kind: 'settings' }
 
 /** Structural route equality (used to avoid pushing no-op history entries). */
@@ -25,6 +26,7 @@ export function routesEqual(a: Route, b: Route): boolean {
   }
   switch (a.kind) {
     case 'today':
+    case 'chat':
     case 'settings':
       return true
     case 'daily':
@@ -53,7 +55,7 @@ export function routeForPath(path: string): Route {
  * The note file a route is editing — what note-scoped commands (pin, …) act
  * on: a note route's path, a daily route's file (today's for the `today`
  * route, hence the `today` parameter), and null for screens that edit no
- * note (search, settings).
+ * note (search, chat, settings).
  */
 export function notePathForRoute(route: Route, today: string): string | null {
   switch (route.kind) {
@@ -65,6 +67,7 @@ export function notePathForRoute(route: Route, today: string): string | null {
       return dailyPath(today)
     case 'allNotes':
     case 'search':
+    case 'chat':
     case 'settings':
       return null
   }

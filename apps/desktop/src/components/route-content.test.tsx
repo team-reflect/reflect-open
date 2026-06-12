@@ -79,6 +79,11 @@ vi.mock('@/providers/settings-provider', () => ({
 vi.mock('@/components/settings-screen', () => ({
   SettingsScreen: () => <div data-testid="settings-screen" />,
 }))
+// The chat screen needs the ChatProvider stack (covered by its own tests);
+// here only the route → view mapping is under test.
+vi.mock('@/components/chat/chat-screen', () => ({
+  ChatScreen: () => <div data-testid="chat-screen" />,
+}))
 
 // jsdom implements neither — the daily stream's virtualizer needs both.
 class ResizeObserverStub {
@@ -213,6 +218,13 @@ describe('RouteContent', () => {
   it('renders the settings screen for the settings route', () => {
     const view = renderRoute({ kind: 'settings' })
     expect(view.getByTestId('settings-screen')).toBeDefined()
+    view.unmount()
+  })
+
+  it('renders the chat screen for the chat route, not the stream', () => {
+    const view = renderRoute({ kind: 'chat' })
+    expect(view.getByTestId('chat-screen')).toBeDefined()
+    expect(view.queryByTestId('daily-stream')).toBeNull()
     view.unmount()
   })
 

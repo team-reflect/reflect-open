@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react'
 import { AllNotesScreen } from '@/components/all-notes/all-notes-screen'
+import { ChatScreen } from '@/components/chat/chat-screen'
 import { DailyStream } from '@/components/daily-stream'
 import { NotePane } from '@/components/note-pane'
 import { SearchRoute } from '@/components/search-route'
@@ -52,6 +53,10 @@ export function RouteContent(): ReactElement {
       return <AllNotesScreen tag={route.tag} />
     case 'search':
       return <SearchRoute query={route.query} today={today} />
+    case 'chat':
+      // Owns its scroll container (the message list pins to the bottom while
+      // streaming), so no ScrollRestored wrapper — same shape as All Notes.
+      return <ChatScreen />
     case 'settings':
       // The section navigator floats in the left gutter — absolutely
       // positioned off the centered column so the column never shifts — and
