@@ -38,6 +38,7 @@ export {
   type ConflictResolution,
 } from './conflict-markers'
 export { foldKey, foldTag } from './keys'
+export { slugForTitle } from './slug'
 export {
   normalizeWikiTarget,
   resolved,

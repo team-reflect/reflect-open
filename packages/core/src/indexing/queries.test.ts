@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '../ipc/bridge'
-import { dailyDatesInRange, getPinnedNotes } from './queries'
+import { dailyDatesInRange, getDuplicateNoteIds, getPinnedNotes } from './queries'
 
 // A fake bridge resolves `db_query` so the test exercises the real compiled
 // SQL (snake_case columns, range parameters) — the same harness pipeline.test
@@ -62,5 +62,36 @@ describe('getPinnedNotes', () => {
     expect(sql).toContain('"pinned_order"')
     expect(sql).toContain('title_key')
     expect(args.params).toEqual([1])
+  })
+})
+
+describe('getDuplicateNoteIds', () => {
+  it('returns empty without a second query when no id is duplicated', async () => {
+    mockInvoke.mockResolvedValue([])
+
+    await expect(getDuplicateNoteIds()).resolves.toEqual([])
+
+    expect(mockInvoke).toHaveBeenCalledTimes(1)
+    const [command, args] = mockInvoke.mock.calls[0]
+    expect(command).toBe('db_query')
+    const sql = String(args.sql)
+    expect(sql).toContain('group by')
+    expect(sql).toContain('count(*)')
+    expect(sql).toContain('is not null')
+  })
+
+  it('groups every path claiming a duplicated id, ordered', async () => {
+    mockInvoke
+      .mockResolvedValueOnce([{ id: 'dup-1' }])
+      .mockResolvedValueOnce([
+        { id: 'dup-1', path: 'notes/a.md' },
+        { id: 'dup-1', path: 'notes/b.md' },
+      ])
+
+    await expect(getDuplicateNoteIds()).resolves.toEqual([
+      { id: 'dup-1', paths: ['notes/a.md', 'notes/b.md'] },
+    ])
+    const [, args] = mockInvoke.mock.calls[1]
+    expect(args.params).toEqual(['dup-1'])
   })
 })

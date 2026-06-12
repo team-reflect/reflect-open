@@ -215,6 +215,15 @@ pub fn asset_write(
     atomic_write_bytes(&resolve(&root, &path)?, &bytes)
 }
 
+/// Does a graph-relative path currently exist as a file? The collision picker
+/// (Plan 17) probes disk as well as the index — the index lags the watcher by
+/// a debounce, and an unindexed file must never be clobbered by a new note.
+#[tauri::command]
+pub fn note_exists(path: String, state: State<GraphState>) -> AppResult<bool> {
+    let root = current_root(&state)?;
+    Ok(resolve(&root, &path)?.is_file())
+}
+
 /// Move/rename a note within the graph (pinned to `generation`).
 #[tauri::command]
 pub fn note_move(

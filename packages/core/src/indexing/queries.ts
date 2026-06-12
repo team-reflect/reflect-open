@@ -229,6 +229,49 @@ export async function getConflictedNotes(): Promise<ConflictedNote[]> {
     .execute()
 }
 
+/** Notes sharing one frontmatter `id` — a sync fork (Plan 17). */
+export interface DuplicateIdGroup {
+  id: string
+  /** Every path claiming the id, ordered (the first is resolution's winner). */
+  paths: string[]
+}
+
+/**
+ * Frontmatter `id`s claimed by more than one note. Two files claiming one
+ * identity means a sync fork (e.g. rename/rename divergence) — surfaced for
+ * review like conflicts; repair is deliberately not automatic.
+ */
+export async function getDuplicateNoteIds(): Promise<DuplicateIdGroup[]> {
+  const duplicated = await db
+    .selectFrom('notes')
+    .where('id', 'is not', null)
+    .select('id')
+    .groupBy('id')
+    .having(sql<number>`count(*)`, '>', 1)
+    .execute()
+  const ids = duplicated.flatMap((row) => (row.id === null ? [] : [row.id]))
+  if (ids.length === 0) {
+    return []
+  }
+  const rows = await db
+    .selectFrom('notes')
+    .where('id', 'in', ids)
+    .select(['id', 'path'])
+    .orderBy('id')
+    .orderBy('path')
+    .execute()
+  const groups = new Map<string, string[]>()
+  for (const row of rows) {
+    if (row.id === null) {
+      continue
+    }
+    const paths = groups.get(row.id) ?? []
+    paths.push(row.path)
+    groups.set(row.id, paths)
+  }
+  return [...groups.entries()].map(([id, paths]) => ({ id, paths }))
+}
+
 /**
  * ISO dates within `[start, end]` (inclusive) that have an indexed daily note,
  * ascending. Daily files are created lazily on first write, so an indexed row

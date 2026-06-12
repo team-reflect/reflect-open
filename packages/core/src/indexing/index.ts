@@ -24,6 +24,7 @@ export {
   type ApplyErrorHandler,
 } from './live'
 export { hashContent } from './hash'
+export { availableNotePath } from './note-paths'
 export {
   buildIndexedNote,
   indexedNoteSchema,
@@ -49,6 +50,7 @@ export {
   getBacklinks,
   getBacklinksWithContext,
   getConflictedNotes,
+  getDuplicateNoteIds,
   getIndexMeta,
   getLinkSources,
   getNote,
@@ -61,6 +63,7 @@ export {
   type Backlink,
   type BacklinkContext,
   type ConflictedNote,
+  type DuplicateIdGroup,
   type NoteRow,
   type PinnedNote,
   type SearchHit,

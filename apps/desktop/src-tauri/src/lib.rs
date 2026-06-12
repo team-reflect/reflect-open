@@ -59,6 +59,7 @@ pub fn run() {
             fs::note_read,
             fs::note_write,
             fs::asset_write,
+            fs::note_exists,
             fs::note_move,
             fs::note_delete,
             fs::list_files,

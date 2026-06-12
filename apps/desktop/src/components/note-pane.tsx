@@ -10,7 +10,7 @@ import { useImagePersistence } from '@/editor/use-image-persistence'
 import { useNoteDocument } from '@/editor/use-note-document'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
 import { WikiAutocomplete } from '@/editor/wiki-autocomplete'
-import { createNoteWithTitle } from '@/lib/create-note'
+import { createNoteWithTitle, untitledNoteSeed } from '@/lib/create-note'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
@@ -48,8 +48,6 @@ interface NotePaneProps {
   gutterClassName?: string
 }
 
-/** The seeded title for a brand-new (missing) ordinary note. */
-const UNTITLED_SEED = '# Untitled\n'
 
 /**
  * One open note: the editor bound to its on-disk document via the Plan 05 save
@@ -77,16 +75,27 @@ export function NotePane({
   const graphRoot = graph?.root ?? null
   const generation = graph?.generation ?? null
   const dailyNote = isDaily(path)
+  // One seed per (pane, path): a fresh seed carries a fresh `id:`, and a mere
+  // re-render must not mint a new identity (the session is keyed on the seed).
+  const seedRef = useRef<{ path: string; seed: string } | null>(null)
+  let missingSeed: string | undefined
+  if (lazy && !dailyNote) {
+    if (seedRef.current === null || seedRef.current.path !== path) {
+      seedRef.current = { path, seed: untitledNoteSeed() }
+    }
+    missingSeed = seedRef.current.seed
+  }
   const document = useNoteDocument(path, generation, {
     createIfMissing: lazy,
     // Daily notes are excluded from rename tracking: their date labels are
     // stream chrome, not content (decided 2026-06-09).
     trackRenames: !dailyNote,
     // A missing ordinary note opens as a titled template (old Reflect's
-    // new-note flow): the seed only reaches disk if the user edits, and the
-    // title is selected on focus so typing names the note. Daily notes stay
-    // unseeded — the date is their identity.
-    missingSeed: lazy && !dailyNote ? UNTITLED_SEED : undefined,
+    // new-note flow): the seed — `id:` frontmatter plus a selectable
+    // "Untitled" H1 — only reaches disk if the user edits, and the title is
+    // selected on focus so typing names the note. Daily notes stay unseeded —
+    // the date is their identity.
+    missingSeed,
   })
   const { options: images, saveError: imageSaveError } = useImagePersistence(
     graphRoot,
