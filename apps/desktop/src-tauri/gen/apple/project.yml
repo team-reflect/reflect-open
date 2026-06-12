@@ -32,7 +32,11 @@ targets:
     sources:
       - path: Sources
       - path: Assets.xcassets
+      # Build artifacts (libapp.a) land here; without an explicit `none`,
+      # regenerating after a build sweeps them into Copy Bundle Resources,
+      # shipping the Rust static archive inside the app bundle.
       - path: Externals
+        buildPhase: none
       - path: reflect-open_iOS
       - path: assets
         buildPhase: resources

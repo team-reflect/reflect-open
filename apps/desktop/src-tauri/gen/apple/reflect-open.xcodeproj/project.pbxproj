@@ -21,7 +21,6 @@
 		E413DBCB60FF081C8E58468A /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 088536D8F462855DCFDA7B06 /* WebKit.framework */; };
 		E9E7B6C59015E7301EE63308 /* libiconv.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 44C3B8C21F2D38187423AB2F /* libiconv.tbd */; };
 		F00F5EAED90E34102F9AE651 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A86D201016958E2276806466 /* Assets.xcassets */; };
-		FF9BC489B3A9BE06C2125BAD /* libapp.a in Resources */ = {isa = PBXBuildFile; fileRef = 2090398BADEFF8597C73DEF4 /* libapp.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -253,7 +252,7 @@
 			path = "reflect-open_iOS";
 			sourceTree = "<group>";
 		};
-		"TEMP_7DEC9962-5D8A-4D30-B8CA-08ECDE0BBAE5" /* x86_64 */ = {
+		"TEMP_84C932FA-35F3-490F-9439-19735265C147" /* x86_64 */ = {
 			isa = PBXGroup;
 			children = (
 			);
@@ -325,7 +324,6 @@
 				F00F5EAED90E34102F9AE651 /* Assets.xcassets in Resources */,
 				5693613DE956199D6486EA26 /* LaunchScreen.storyboard in Resources */,
 				C1FBC0B57C41A13D88225DFB /* assets in Resources */,
-				FF9BC489B3A9BE06C2125BAD /* libapp.a in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
