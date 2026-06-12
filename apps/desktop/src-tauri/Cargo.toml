@@ -57,6 +57,10 @@ git2 = { version = "0.21", default-features = false, features = [
 ] }
 tauri-plugin-http = "2.5.9"
 tauri-plugin-window-state = "2"
+# Link capture (Plan 11): screenshot downscale + the bounded meta-scrape fetch.
+# reqwest 0.12 rides the exact version tauri-plugin-http already compiles.
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 
 # Auto-update (Plan 15): desktop-only — the updater has no mobile story, and
 # iOS distribution goes through the App Store.

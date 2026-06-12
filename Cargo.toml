@@ -3,7 +3,7 @@
 # the desktop writer and the CLI reader can never skew.
 [workspace]
 resolver = "2"
-members = ["apps/cli", "apps/desktop/src-tauri", "crates/index-schema"]
+members = ["apps/cli", "apps/desktop/src-tauri", "apps/native-host", "crates/index-schema"]
 
 [workspace.dependencies]
 rusqlite = { version = "0.40.1", features = ["bundled"] }

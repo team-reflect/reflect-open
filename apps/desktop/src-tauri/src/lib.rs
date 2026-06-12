@@ -7,8 +7,10 @@
 //! [`fs`] (graph file IO), [`db`] (SQLite index), [`watcher`] (file events),
 //! [`recents`] (recent-graphs store), [`settings`] (user settings store),
 //! [`secrets`] (OS keychain), [`git`] (backup/sync primitives),
+//! [`capture`] (link-capture inbox + native-messaging host plumbing),
 //! [`error`] (the shared error contract).
 
+mod capture;
 mod db;
 mod embed;
 mod error;
@@ -99,6 +101,12 @@ pub fn run() {
             embed::embed_texts,
             watcher::watch_start,
             watcher::watch_stop,
+            capture::capture_host_register,
+            capture::capture_inbox_list,
+            capture::capture_inbox_read,
+            capture::capture_inbox_remove,
+            capture::capture_screenshot_promote,
+            capture::capture_meta_fetch,
             git::git_status,
             git::git_setup,
             git::git_disconnect,

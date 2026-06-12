@@ -22,6 +22,9 @@ use self::io::{atomic_write, atomic_write_bytes, bootstrap, collect_files, NOTE_
 use self::resolve::resolve;
 
 pub(crate) use self::io::modified_ms;
+/// The traversal guard, shared with sibling modules that address graph files
+/// (capture promotes screenshots into `assets/`).
+pub(crate) use self::resolve::resolve as resolve_in_graph;
 
 /// The open graph root plus a monotonic generation, kept **under one lock** so
 /// they swap atomically (the same pattern as the index's `IndexState`, Plan 04b).

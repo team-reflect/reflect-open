@@ -1,8 +1,10 @@
-// Build the `reflect` CLI (apps/cli) and stage it where Tauri's sidecar
-// bundling expects it: src-tauri/binaries/reflect-<target-triple>[.exe].
+// Build the sidecar binaries — the `reflect` CLI (apps/cli, Plan 14) and the
+// `reflect-capture-host` native-messaging host (apps/native-host, Plan 11) —
+// and stage them where Tauri's sidecar bundling expects them:
+// src-tauri/binaries/<name>-<target-triple>[.exe].
 //
 // Wired into beforeDevCommand/beforeBuildCommand because tauri-build requires
-// the triple-suffixed file to exist before the app crate compiles (dev
+// the triple-suffixed files to exist before the app crate compiles (dev
 // included). There is no first-party way to build a Rust sidecar from a
 // workspace crate, so this script is the blessed pattern (Plan 14).
 
@@ -30,17 +32,27 @@ if (!triple) {
   throw new Error('build-sidecar: could not determine the target triple from rustc -vV')
 }
 
-// The explicit --target keeps the artifact in target/<triple>/release/ — away
-// from target/release/, where tauri-build copies the de-suffixed sidecar —
+// crate → binary name, mirroring the `externalBin` entries in the platform
+// tauri.*.conf.json overlays.
+const SIDECARS = [
+  { crate: 'reflect-cli', binary: 'reflect' },
+  { crate: 'reflect-capture-host', binary: 'reflect-capture-host' },
+]
+
+// The explicit --target keeps the artifacts in target/<triple>/release/ — away
+// from target/release/, where tauri-build copies the de-suffixed sidecars —
 // and is what makes cross-compilation work.
-execFileSync('cargo', ['build', '--release', '-p', 'reflect-cli', '--target', triple], {
+const packageArgs = SIDECARS.flatMap(({ crate }) => ['-p', crate])
+execFileSync('cargo', ['build', '--release', ...packageArgs, '--target', triple], {
   cwd: repoRoot,
   stdio: 'inherit',
 })
 
 const extension = triple.includes('windows') ? '.exe' : ''
-const built = join(repoRoot, 'target', triple, 'release', `reflect${extension}`)
-const staged = join(binariesDir, `reflect-${triple}${extension}`)
 mkdirSync(binariesDir, { recursive: true })
-copyFileSync(built, staged)
-console.log(`build-sidecar: staged ${staged}`)
+for (const { binary } of SIDECARS) {
+  const built = join(repoRoot, 'target', triple, 'release', `${binary}${extension}`)
+  const staged = join(binariesDir, `${binary}-${triple}${extension}`)
+  copyFileSync(built, staged)
+  console.log(`build-sidecar: staged ${staged}`)
+}

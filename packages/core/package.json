@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./capture-envelope": "./src/actions/capture-envelope.ts"
   },
   "types": "./src/index.ts",
   "scripts": {
@@ -26,6 +27,7 @@
   "devDependencies": {
     "@ai-sdk/provider": "^3.0.10",
     "@types/node": "^25.9.3",
+    "jsdom": "^29.1.1",
     "typescript": "~5.8.3",
     "vitest": "^3"
   }

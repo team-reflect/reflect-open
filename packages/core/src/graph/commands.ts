@@ -92,6 +92,56 @@ export async function listFiles(generation?: number): Promise<FileMeta[]> {
   return call('list_files', { generation }, z.array(fileMetaSchema))
 }
 
+/**
+ * Point the capture host at the active graph (pointer file + inbox dir) and
+ * rewrite native-messaging manifests for detected browsers. Called after
+ * every graph open — rewriting self-heals app moves (Plan 11).
+ */
+export async function captureHostRegister(): Promise<void> {
+  await call('capture_host_register', {}, voidSchema)
+}
+
+/**
+ * List the capture inbox (`.reflect/inbox/`): spooled `.json` envelopes and
+ * their screenshot siblings. A missing inbox lists as empty. Pinned to
+ * `generation` like every background-pass read.
+ */
+export async function captureInboxList(generation: number): Promise<FileMeta[]> {
+  return call('capture_inbox_list', { generation }, z.array(fileMetaSchema))
+}
+
+/** Read one spooled envelope's JSON text by spool filename (e.g. `<id>.json`). */
+export async function captureInboxRead(name: string, generation: number): Promise<string> {
+  return call('capture_inbox_read', { name, generation }, z.string())
+}
+
+/** Remove a spool file by filename. Idempotent — crash re-drains re-remove. */
+export async function captureInboxRemove(name: string, generation: number): Promise<void> {
+  await call('capture_inbox_remove', { name, generation }, voidSchema)
+}
+
+/**
+ * Copy a spooled screenshot into the graph as a downscaled JPEG asset (the
+ * spool file stays until the drain removes it — crash-safe copy semantics).
+ */
+export async function promoteCaptureScreenshot(
+  spoolName: string,
+  assetPath: string,
+  maxDim: number,
+  generation: number,
+): Promise<void> {
+  await call('capture_screenshot_promote', { spoolName, assetPath, maxDim, generation }, voidSchema)
+}
+
+/**
+ * Fetch a captured page's HTML for meta-tag scraping — the Rust side caps
+ * scheme/timeout/size/redirects, so arbitrary capture URLs never widen the
+ * webview's own HTTP capability. The privacy gate runs before any call here.
+ */
+export async function captureMetaFetch(url: string): Promise<string> {
+  return call('capture_meta_fetch', { url }, z.string())
+}
+
 /** The recently-opened graphs, newest first. */
 export async function recentGraphs(): Promise<RecentGraph[]> {
   return call('recent_graphs', {}, z.array(recentGraphSchema))

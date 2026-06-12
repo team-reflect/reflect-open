@@ -54,14 +54,15 @@ cargo test -p reflect-open
 ```
 
 **Before any cargo build/check/test that compiles the desktop crate** (including
-`--workspace` commands and clippy), the CLI sidecar must be staged once per checkout:
+`--workspace` commands and clippy), the sidecars (the `reflect` CLI and the
+`reflect-capture-host` native-messaging host) must be staged once per checkout:
 
 ```bash
 pnpm --filter @reflect/desktop sidecar
 ```
 
-Otherwise tauri-build fails with `resource path binaries/reflect-<triple> doesn't exist`
-(`pnpm tauri dev`/`build` stage it automatically; details in [docs/cli.md](docs/cli.md)).
+Otherwise tauri-build fails with `resource path binaries/<name>-<triple> doesn't exist`
+(`pnpm tauri dev`/`build` stage them automatically; details in [docs/cli.md](docs/cli.md)).
 
 ### Repo layout
 
@@ -87,7 +88,9 @@ reflect-open/
 │   │   ├── scripts/        # build-sidecar.mjs (stages the reflect CLI for bundling)
 │   │   ├── dist/           # Vite build output (frontendDist in tauri.conf.json)
 │   │   └── public/         # Static assets served by Vite
-│   └── cli/                # `reflect` — self-contained Rust read/discovery CLI (see docs/cli.md)
+│   ├── cli/                # `reflect` — self-contained Rust read/discovery CLI (see docs/cli.md)
+│   ├── extension/          # @reflect/extension — Chrome MV3 capture extension (WXT; see its README)
+│   └── native-host/        # `reflect-capture-host` — native-messaging spooler sidecar (Plan 11)
 ├── packages/
 │   ├── core/               # @reflect/core — ALL TS business logic (markdown/, indexing/,
 │   │                       #   graph/, embeddings/, ai/, settings/, ipc/)
@@ -97,7 +100,7 @@ reflect-open/
 │                           #   (one schema for the desktop writer + CLI reader)
 ├── design-system/          # Design tokens, components, and UI guidelines (see design-system/readme.md)
 ├── docs/                   # Product/architecture docs + docs/plans/ (Reflect V2)
-├── Cargo.toml              # Root Cargo workspace (reflect-open, reflect-cli, reflect-index-schema)
+├── Cargo.toml              # Root Cargo workspace (reflect-open, reflect-cli, reflect-capture-host, reflect-index-schema)
 └── turbo.json, pnpm-workspace.yaml
 ```
 
