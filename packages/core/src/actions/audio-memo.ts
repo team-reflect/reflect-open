@@ -1,9 +1,9 @@
 import { errorMessage, isAppError, toAppError, type AppError } from '../errors'
 import {
   pickTranscriptionConfig,
-  type AiModelsState,
+  type AiProvidersState,
   type TranscriptionProvider,
-} from '../ai/models'
+} from '../ai/provider-config'
 import { aiKeySecretName } from '../ai/secrets'
 import {
   AUDIO_EXTENSION_BY_MIME,
@@ -294,8 +294,8 @@ export interface ReconcileStop {
 }
 
 export interface ReconcileAudioMemosInput {
-  /** The configured-models state — decides the provider and keychain entry. */
-  models: AiModelsState
+  /** The configured-providers state — decides the provider and keychain entry. */
+  providers: AiProvidersState
   /** `GraphInfo.generation` — pins every write to the issuing graph. */
   generation: number
   /** Host transport for the provider call (the Tauri HTTP plugin's fetch). */
@@ -348,7 +348,7 @@ export async function reconcileAudioMemos(
 
   // Re-picked on every pass (not once at record time): a pass after the user
   // fixes their model configuration must see the fix.
-  const config = pickTranscriptionConfig(input.models)
+  const config = pickTranscriptionConfig(input.providers)
   if (config === null) {
     return {
       pending: pending.length,

@@ -80,7 +80,7 @@ function createLoadSettle(): LoadSettle {
 
 /**
  * One settings value equals another: identity, element-wise for arrays
- * (`allNotesFilterTags`; `aiModels` holds plain config objects, compared as
+ * (`allNotesFilterTags`; `aiProviders` holds plain config objects, compared as
  * JSON below), or key-wise for plain-object records (`graphColors`, whose
  * values are scalars). Reference equality alone would make an equal-but-
  * rebuilt value (a re-parse — the schema transforms rebuild arrays and

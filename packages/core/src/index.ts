@@ -99,9 +99,9 @@ export {
   graphColorsSchema,
   GRAPH_COLOR_IDS,
   aiProviderIdSchema,
-  aiModelConfigSchema,
-  aiModelsSchema,
-  defaultAiModelIdSchema,
+  aiProviderConfigSchema,
+  aiProvidersSchema,
+  defaultAiProviderIdSchema,
   DEFAULT_SETTINGS,
   type Settings,
   type EditorMarkdownSyntax,
@@ -113,7 +113,7 @@ export {
   type GraphColor,
   type GraphColors,
   type AiProviderId,
-  type AiModelConfig,
+  type AiProviderConfig,
 } from './settings/schema'
 export { loadSettings, saveSettings } from './settings/commands'
 
@@ -131,14 +131,20 @@ export {
   KEY_HINT_LENGTH,
   TRANSCRIPTION_PROVIDERS,
   apiKeyHint,
-  withAiModelAdded,
-  withAiModelRemoved,
-  defaultAiModel,
+  withAiProviderAdded,
+  withAiProviderRemoved,
+  defaultAiProvider,
   pickTranscriptionConfig,
-  type AiModelsState,
+  type AiProvidersState,
   type TranscriptionConfig,
   type TranscriptionProvider,
-} from './ai/models'
+} from './ai/provider-config'
+export {
+  chatModelOptions,
+  resolveChatModel,
+  type ChatModelOption,
+  type ChatModelSelection,
+} from './ai/chat/model-options'
 export { validateApiKey, type ApiKeyValidation } from './ai/validate-key'
 export {
   assertCloudAllowed,

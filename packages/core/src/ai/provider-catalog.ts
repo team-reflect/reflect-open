@@ -4,7 +4,7 @@ import type { AiProviderId } from '../settings/schema'
  * The static BYOK provider catalog (Plan 10): display names, key hints, and
  * the curated model list the settings UI offers per provider. This is policy
  * data, not configuration — the user's chosen entries live in settings as
- * `AiModelConfig` values.
+ * `AiProviderConfig` values.
  */
 
 /** One selectable model in a provider's curated list. */

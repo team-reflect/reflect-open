@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AiModelsState } from '../ai/models'
+import type { AiProvidersState } from '../ai/provider-config'
 import {
   audioMemoFromPath,
   audioMemoIdentity,
@@ -43,9 +43,9 @@ const writeNoteMock = vi.mocked(writeNote)
 const transcribeMock = vi.mocked(transcribeAudio)
 const getSecretMock = vi.mocked(getSecret)
 
-const MODELS: AiModelsState = {
-  models: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
-  defaultModelId: 'cfg-openai',
+const PROVIDERS: AiProvidersState = {
+  providers: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
+  defaultProviderId: 'cfg-openai',
 }
 
 /** 2026-06-11 15:30:22.845 local — every derived name is asserted from it. */
@@ -57,7 +57,7 @@ function fileMeta(path: string): { path: string; size: number; modifiedMs: numbe
 }
 
 function reconcile(overrides: Partial<ReconcileAudioMemosInput> = {}) {
-  return reconcileAudioMemos({ models: MODELS, generation: 3, ...overrides })
+  return reconcileAudioMemos({ providers: PROVIDERS, generation: 3, ...overrides })
 }
 
 beforeEach(() => {
@@ -353,7 +353,7 @@ describe('reconcileAudioMemos', () => {
   it('reports a missing provider as config — the pass retries after settings change', async () => {
     listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
 
-    const outcome = await reconcile({ models: { models: [], defaultModelId: null } })
+    const outcome = await reconcile({ providers: { providers: [], defaultProviderId: null } })
 
     expect(outcome).toMatchObject({
       pending: 1,

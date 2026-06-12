@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
-  AiModelsState,
+  AiProvidersState,
   FileChange,
   ReconcileAudioMemosInput,
   ReconcileAudioMemosOutcome,
@@ -31,11 +31,11 @@ vi.mock('@/lib/operations', () => ({
   startOperation: () => ({ progress: vi.fn(), done: vi.fn(), fail: failOperation }),
 }))
 
-const MODELS: AiModelsState = {
-  models: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
-  defaultModelId: 'cfg-openai',
+const PROVIDERS: AiProvidersState = {
+  providers: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
+  defaultProviderId: 'cfg-openai',
 }
-const NO_MODELS: AiModelsState = { models: [], defaultModelId: null }
+const NO_PROVIDERS: AiProvidersState = { providers: [], defaultProviderId: null }
 
 const DRAINED: ReconcileAudioMemosOutcome = {
   pending: 0,
@@ -50,8 +50,8 @@ let onFileChanges: ((changes: FileChange[]) => void) | null = null
 const unlisten = vi.fn()
 let reconciler: TranscriptionReconciler | null = null
 
-function create(models: AiModelsState = MODELS): TranscriptionReconciler {
-  reconciler = createTranscriptionReconciler({ generation: 3, getModels: () => models })
+function create(providers: AiProvidersState = PROVIDERS): TranscriptionReconciler {
+  reconciler = createTranscriptionReconciler({ generation: 3, getProviders: () => providers })
   return reconciler
 }
 
@@ -82,12 +82,12 @@ describe('createTranscriptionReconciler', () => {
 
     expect(reconcileAudioMemos).toHaveBeenCalledTimes(1)
     expect(reconcileAudioMemos).toHaveBeenCalledWith(
-      expect.objectContaining({ models: MODELS, generation: 3 }),
+      expect.objectContaining({ providers: PROVIDERS, generation: 3 }),
     )
   })
 
   it('gates every pass on a transcription-capable model — no IO without one', async () => {
-    create(NO_MODELS).start()
+    create(NO_PROVIDERS).start()
     await flush()
 
     window.dispatchEvent(new Event('focus'))

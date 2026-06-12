@@ -1,11 +1,11 @@
 import type { ReactElement } from 'react'
 import { Trash2 } from 'lucide-react'
-import { aiModelLabel, aiProvider, errorMessage, type AiModelConfig } from '@reflect/core'
+import { aiModelLabel, aiProvider, errorMessage, type AiProviderConfig } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import { startOperation } from '@/lib/operations'
 
-interface AiModelRowProps {
-  config: AiModelConfig
+interface AiProviderRowProps {
+  config: AiProviderConfig
   /** Whether this entry is the (resolved) app-wide default. */
   isDefault: boolean
   /** Make this entry the app-wide default. */
@@ -15,16 +15,17 @@ interface AiModelRowProps {
 }
 
 /**
- * One configured AI model in the settings list: provider + model, the stored
- * key's trailing characters, and the default/remove controls. The row owns
- * its own removal (including surfacing a keychain failure as an operation).
+ * One configured AI provider in the settings list: provider + default model,
+ * the stored key's trailing characters, and the default/remove controls. The
+ * row owns its own removal (including surfacing a keychain failure as an
+ * operation).
  */
-export function AiModelRow({
+export function AiProviderRow({
   config,
   isDefault,
   onMakeDefault,
   onRemove,
-}: AiModelRowProps): ReactElement {
+}: AiProviderRowProps): ReactElement {
   const providerLabel = aiProvider(config.provider).label
   const modelLabel = aiModelLabel(config.provider, config.model)
   const name = `${providerLabel} — ${modelLabel}`

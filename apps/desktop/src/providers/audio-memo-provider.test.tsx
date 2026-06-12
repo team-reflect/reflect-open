@@ -2,7 +2,7 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { useState, type ReactElement, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
-  AiModelsState,
+  AiProvidersState,
   AudioMemoIdentity,
   CaptureAudioMemoInput,
   CaptureAudioMemoOutcome,
@@ -43,7 +43,7 @@ const reconcilerControls = vi.hoisted(() => {
   }
 })
 const createTranscriptionReconciler = vi.hoisted(() =>
-  vi.fn((_options: { generation: number; getModels: () => AiModelsState }) => reconcilerControls.fake),
+  vi.fn((_options: { generation: number; getProviders: () => AiProvidersState }) => reconcilerControls.fake),
 )
 
 const recorderControls = vi.hoisted(() => ({
@@ -109,8 +109,8 @@ vi.mock('@/hooks/use-audio-recorder', () => ({
 
 const SETTINGS = vi.hoisted(() => ({
   current: {
-    aiModels: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
-    defaultAiModelId: 'cfg-openai',
+    aiProviders: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
+    defaultAiProviderId: 'cfg-openai',
   },
 }))
 
@@ -161,8 +161,8 @@ beforeEach(() => {
   recorderControls.options = null
   sidebarState.collapsed = false
   SETTINGS.current = {
-    aiModels: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
-    defaultAiModelId: 'cfg-openai',
+    aiProviders: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
+    defaultAiProviderId: 'cfg-openai',
   }
   captureAudioMemo.mockResolvedValue({ ok: true, memo: MEMO })
   reconcilerControls.fake.getTranscribing.mockReturnValue(false)
@@ -202,7 +202,7 @@ describe('AudioMemoProvider', () => {
     const options = createTranscriptionReconciler.mock.calls[0]?.[0]
     expect(options?.generation).toBe(3)
     // Models are read lazily, so a key added mid-session reaches the next pass.
-    expect(options?.getModels().defaultModelId).toBe('cfg-openai')
+    expect(options?.getProviders().defaultProviderId).toBe('cfg-openai')
     expect(reconcilerControls.fake.start).toHaveBeenCalledTimes(1)
 
     unmount()
@@ -225,17 +225,17 @@ describe('AudioMemoProvider', () => {
 
   it('adding the first transcription-capable model kicks the pass the gate was suppressing', async () => {
     SETTINGS.current = {
-      aiModels: [
+      aiProviders: [
         { id: 'claude', provider: 'anthropic', model: 'claude-fable-5', keyHint: 'wxyz1' },
       ],
-      defaultAiModelId: 'claude',
+      defaultAiProviderId: 'claude',
     }
     const { rerender } = renderHook(() => useAudioMemo(), { wrapper })
     expect(reconcilerControls.fake.schedule).not.toHaveBeenCalled()
 
     SETTINGS.current = {
-      aiModels: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
-      defaultAiModelId: 'cfg-openai',
+      aiProviders: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
+      defaultAiProviderId: 'cfg-openai',
     }
     await act(async () => {
       rerender()
@@ -621,10 +621,10 @@ describe('AudioMemoProvider', () => {
 
   it('is unavailable without an OpenAI or Gemini model, and nothing runs', async () => {
     SETTINGS.current = {
-      aiModels: [
+      aiProviders: [
         { id: 'claude', provider: 'anthropic', model: 'claude-fable-5', keyHint: 'wxyz1' },
       ],
-      defaultAiModelId: 'claude',
+      defaultAiProviderId: 'claude',
     }
     const { result } = renderHook(() => useAudioMemo(), { wrapper })
 

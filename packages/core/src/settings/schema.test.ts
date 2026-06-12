@@ -13,8 +13,8 @@ describe('settingsSchema', () => {
       weekStartDay: 'monday',
       allNotesFilterTags: ['book', 'link', 'person'],
       graphColors: {},
-      aiModels: [],
-      defaultAiModelId: null,
+      aiProviders: [],
+      defaultAiProviderId: null,
     })
     expect(DEFAULT_SETTINGS.editorMarkdownSyntax).toBe('focus')
     expect(DEFAULT_SETTINGS.editorSpellCheck).toBe(true)
@@ -25,8 +25,8 @@ describe('settingsSchema', () => {
     expect(DEFAULT_SETTINGS.weekStartDay).toBe('monday')
     expect(DEFAULT_SETTINGS.allNotesFilterTags).toEqual(['book', 'link', 'person'])
     expect(DEFAULT_SETTINGS.graphColors).toEqual({})
-    expect(DEFAULT_SETTINGS.aiModels).toEqual([])
-    expect(DEFAULT_SETTINGS.defaultAiModelId).toBeNull()
+    expect(DEFAULT_SETTINGS.aiProviders).toEqual([])
+    expect(DEFAULT_SETTINGS.defaultAiProviderId).toBeNull()
   })
 
   it('accepts valid values', () => {
@@ -90,8 +90,8 @@ describe('settingsSchema', () => {
       weekStartDay: 'monday',
       allNotesFilterTags: ['book', 'link', 'person'],
       graphColors: {},
-      aiModels: [],
-      defaultAiModelId: null,
+      aiProviders: [],
+      defaultAiProviderId: null,
       futureKey: true,
     })
   })
@@ -115,7 +115,7 @@ describe('settingsSchema', () => {
     })
   })
 
-  describe('aiModels', () => {
+  describe('aiProviders', () => {
     const valid = {
       id: 'abc',
       provider: 'anthropic',
@@ -124,34 +124,34 @@ describe('settingsSchema', () => {
     }
 
     it('passes valid entries through', () => {
-      expect(settingsSchema.parse({ aiModels: [valid] }).aiModels).toEqual([valid])
+      expect(settingsSchema.parse({ aiProviders: [valid] }).aiProviders).toEqual([valid])
     })
 
     it('defaults the per-entry display fields', () => {
       const entry = { id: 'abc', provider: 'openai', model: 'gpt-5.1' }
-      expect(settingsSchema.parse({ aiModels: [entry] }).aiModels).toEqual([
+      expect(settingsSchema.parse({ aiProviders: [entry] }).aiProviders).toEqual([
         { ...entry, keyHint: '' },
       ])
     })
 
     it('drops a corrupt entry without losing the rest', () => {
       const parsed = settingsSchema.parse({
-        aiModels: [valid, { provider: 'aliens' }, 42],
+        aiProviders: [valid, { provider: 'aliens' }, 42],
       })
-      expect(parsed.aiModels).toEqual([valid])
+      expect(parsed.aiProviders).toEqual([valid])
     })
 
     it('degrades a non-array value to the empty list', () => {
-      expect(settingsSchema.parse({ aiModels: 'nope' }).aiModels).toEqual([])
-      expect(settingsSchema.parse({ aiModels: { id: 'x' } }).aiModels).toEqual([])
+      expect(settingsSchema.parse({ aiProviders: 'nope' }).aiProviders).toEqual([])
+      expect(settingsSchema.parse({ aiProviders: { id: 'x' } }).aiProviders).toEqual([])
     })
   })
 
-  describe('defaultAiModelId', () => {
+  describe('defaultAiProviderId', () => {
     it('passes a string id through and defaults invalid values to null', () => {
-      expect(settingsSchema.parse({ defaultAiModelId: 'abc' }).defaultAiModelId).toBe('abc')
-      expect(settingsSchema.parse({ defaultAiModelId: null }).defaultAiModelId).toBeNull()
-      expect(settingsSchema.parse({ defaultAiModelId: 42 }).defaultAiModelId).toBeNull()
+      expect(settingsSchema.parse({ defaultAiProviderId: 'abc' }).defaultAiProviderId).toBe('abc')
+      expect(settingsSchema.parse({ defaultAiProviderId: null }).defaultAiProviderId).toBeNull()
+      expect(settingsSchema.parse({ defaultAiProviderId: 42 }).defaultAiProviderId).toBeNull()
     })
   })
 })

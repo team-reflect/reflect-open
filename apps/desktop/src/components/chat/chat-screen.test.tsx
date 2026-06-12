@@ -1,16 +1,16 @@
-import { act, cleanup, render, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
-import type { AiModelConfig, ChatStreamEvent, StreamChatOptions } from '@reflect/core'
+import type { AiProviderConfig, ChatStreamEvent, StreamChatOptions } from '@reflect/core'
 import { ChatProvider, useChatSession } from '@/providers/chat-provider'
 import { RouterProvider } from '@/routing/router'
 
 /**
  * The chat view over a faked engine: the provider stack and screen are real,
- * `streamChat` is scripted. Covers the no-model call-to-action, a full
- * grounded turn (user bubble → tool chip → cited answer), the
- * plain-while-streaming text rendering, abort-on-unmount, and New chat.
+ * `streamChat` is scripted. Covers the no-provider call-to-action, a full
+ * grounded turn (user bubble → tool chip → cited answer), the model picker,
+ * the plain-while-streaming text rendering, abort-on-unmount, and New chat.
  */
 
 const streamChat = vi.hoisted(() =>
@@ -24,12 +24,12 @@ vi.mock('@reflect/core', async (importOriginal) => ({
 }))
 
 const settingsState = vi.hoisted(() => ({
-  models: [] as AiModelConfig[],
+  models: [] as AiProviderConfig[],
   defaultId: null as string | null,
 }))
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({
-    settings: { aiModels: settingsState.models, defaultAiModelId: settingsState.defaultId },
+    settings: { aiProviders: settingsState.models, defaultAiProviderId: settingsState.defaultId },
     updateSettings: () => {},
   }),
 }))
@@ -43,6 +43,10 @@ vi.mock('@/editor/markdown-preview', () => ({
 }))
 vi.mock('@/lib/provider-fetch', () => ({ providerFetch: vi.fn() }))
 
+// jsdom doesn't implement this; Radix Select scrolls the selected option into
+// view when the listbox opens.
+Element.prototype.scrollIntoView ??= () => {}
+
 const { ChatScreen } = await import('./chat-screen')
 
 afterEach(cleanup)
@@ -54,7 +58,7 @@ beforeEach(() => {
   getSecret.mockReset().mockResolvedValue('sk-test')
 })
 
-const MODEL: AiModelConfig = { id: 'm1', provider: 'openai', model: 'gpt-5.1', keyHint: '12345' }
+const MODEL: AiProviderConfig = { id: 'm1', provider: 'openai', model: 'gpt-5.1', keyHint: '12345' }
 
 function configureModel() {
   settingsState.models = [MODEL]
@@ -89,9 +93,9 @@ function renderChat() {
 }
 
 describe('ChatScreen', () => {
-  it('shows the add-a-model call to action when nothing is configured', () => {
+  it('shows the add-a-provider call to action when nothing is configured', () => {
     const view = renderChat()
-    expect(view.getByRole('button', { name: /add an ai model/i })).toBeDefined()
+    expect(view.getByRole('button', { name: /add an ai provider/i })).toBeDefined()
     expect(view.queryByLabelText('Chat message')).toBeNull()
   })
 
@@ -125,8 +129,40 @@ describe('ChatScreen', () => {
     // The turn went out with the keychain key and the full derived history.
     expect(getSecret).toHaveBeenCalledWith('ai-api-key:m1')
     const options = streamChat.mock.lastCall?.[0]
-    expect(options?.model).toEqual(MODEL)
+    expect(options?.config).toEqual(MODEL)
     expect(options?.messages.at(-1)).toEqual({ role: 'user', content: 'when does atlas ship?' })
+  })
+
+  it('offers the provider catalog in the picker, keeping a custom model selectable', async () => {
+    configureModel()
+    const view = renderChat()
+
+    // Keyboard-driven (the pointer path needs capture APIs jsdom lacks);
+    // options render in a portal, so they're queried from screen.
+    fireEvent.keyDown(view.getByRole('combobox', { name: 'Model' }), { key: 'ArrowDown' })
+
+    expect(await screen.findByText('OpenAI')).toBeDefined()
+    const labels = screen.getAllByRole('option').map((option) => option.textContent)
+    // The full curated catalog plus the entry's custom configured model.
+    expect(labels).toEqual(['GPT-5.5', 'GPT-5.4', 'GPT-5.4 mini', 'GPT-5.4 nano', 'gpt-5.1'])
+  })
+
+  it('routes the turn to the picked catalog model', async () => {
+    configureModel()
+    scriptTurn([
+      { type: 'text-delta', text: 'Hi.' },
+      { type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] },
+    ])
+    const view = renderChat()
+
+    fireEvent.keyDown(view.getByRole('combobox', { name: 'Model' }), { key: 'ArrowDown' })
+    fireEvent.keyDown(await screen.findByRole('option', { name: 'GPT-5.5' }), { key: 'Enter' })
+
+    await userEvent.type(view.getByLabelText('Chat message'), 'hi{Enter}')
+
+    await waitFor(() => expect(streamChat).toHaveBeenCalledTimes(1))
+    // Same entry (id → keychain key), with the picked model applied.
+    expect(streamChat.mock.lastCall?.[0].config).toEqual({ ...MODEL, model: 'gpt-5.5' })
   })
 
   it('renders listing chips: recent notes by tag and a daily range', async () => {
@@ -215,7 +251,7 @@ describe('ChatScreen', () => {
     const view = renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'hi{Enter}')
-    await view.findByText(/No API key found for this model/)
+    await view.findByText(/No API key found for this provider/)
     expect(streamChat).not.toHaveBeenCalled()
   })
 

@@ -4,7 +4,7 @@ import {
   pickTranscriptionConfig,
   reconcileAudioMemos,
   subscribeFileChanges,
-  type AiModelsState,
+  type AiProvidersState,
   type ReconcileStop,
   type Unlisten,
 } from '@reflect/core'
@@ -43,11 +43,11 @@ export interface TranscriptionReconcilerOptions {
   /** The open graph's generation — every pass's reads and writes pin to it. */
   generation: number
   /**
-   * The configured-models state, read at the start of every pass rather than
+   * The configured-providers state, read at the start of every pass rather than
    * captured once — a key the user adds in Settings mid-session must be seen
    * by the very next pass.
    */
-  getModels: () => AiModelsState
+  getProviders: () => AiProvidersState
 }
 
 /** Build the reconciler for one graph session. `dispose()` is terminal. */
@@ -100,7 +100,7 @@ export function createTranscriptionReconciler(
     }
     // Gate before any IO: without a transcription-capable model every pass
     // would list the graph just to stop on `config`.
-    if (pickTranscriptionConfig(options.getModels()) === null) {
+    if (pickTranscriptionConfig(options.getProviders()) === null) {
       return
     }
     running = true
@@ -108,7 +108,7 @@ export function createTranscriptionReconciler(
       do {
         queued = false
         const outcome = await reconcileAudioMemos({
-          models: options.getModels(),
+          providers: options.getProviders(),
           generation: options.generation,
           fetchFn: providerFetch,
           isStale: () => disposed,

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { ReflectError } from '../errors'
-import type { TranscriptionProvider } from './models'
+import type { TranscriptionProvider } from './provider-config'
 
 /**
  * BYOK audio transcription (audio memos): one short recording in, plain text

@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { AboutSection } from './settings/about-section'
-import { AiModelsSection } from './settings/ai-models-section'
+import { AiProvidersSection } from './settings/ai-providers-section'
 import { AllNotesSection } from './settings/all-notes-section'
 import { AppearanceSection } from './settings/appearance-section'
 import { BackupSection } from './settings/backup-section'
@@ -25,7 +25,7 @@ export function SettingsScreen(): ReactElement {
         <AllNotesSection />
         <SearchSection />
         <BackupSection />
-        <AiModelsSection />
+        <AiProvidersSection />
         <KeyboardSection />
         <AboutSection />
       </div>

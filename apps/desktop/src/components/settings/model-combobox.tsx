@@ -84,7 +84,7 @@ export function ModelCombobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          aria-label="Model"
+          aria-label="Default model"
           className="w-full justify-between font-normal"
         >
           <span className="truncate">{aiModelLabel(provider, value)}</span>

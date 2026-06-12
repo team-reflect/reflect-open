@@ -14,7 +14,7 @@ import {
   captureAudioMemo,
   errorMessage,
   pickTranscriptionConfig,
-  type AiModelsState,
+  type AiProvidersState,
   type GraphInfo,
 } from '@reflect/core'
 import { isRecordingSupported, useAudioRecorder } from '@/hooks/use-audio-recorder'
@@ -129,10 +129,10 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
   const transcriptionConfig = useMemo(
     () =>
       pickTranscriptionConfig({
-        models: settings.aiModels,
-        defaultModelId: settings.defaultAiModelId,
+        providers: settings.aiProviders,
+        defaultProviderId: settings.defaultAiProviderId,
       }),
-    [settings.aiModels, settings.defaultAiModelId],
+    [settings.aiProviders, settings.defaultAiProviderId],
   )
 
   const collapsedRef = useRef(collapsed)
@@ -157,11 +157,11 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
   // The configured-models state, by ref: the reconciler reads it lazily at
   // the start of every pass, so a key added mid-session is seen without
   // rebuilding the lifecycle on every settings change.
-  const modelsRef = useRef<AiModelsState>({
-    models: settings.aiModels,
-    defaultModelId: settings.defaultAiModelId,
+  const providersRef = useRef<AiProvidersState>({
+    providers: settings.aiProviders,
+    defaultProviderId: settings.defaultAiProviderId,
   })
-  modelsRef.current = { models: settings.aiModels, defaultModelId: settings.defaultAiModelId }
+  providersRef.current = { providers: settings.aiProviders, defaultProviderId: settings.defaultAiProviderId }
 
   // One reconciler per graph session (this provider remounts per graph). It
   // owns the launch pass and all retry triggers; the pump only schedules.
@@ -170,7 +170,7 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
   useEffect(() => {
     const next = createTranscriptionReconciler({
       generation: graph.generation,
-      getModels: () => modelsRef.current,
+      getProviders: () => providersRef.current,
     })
     setReconciler(next)
     reconcilerRef.current = next
