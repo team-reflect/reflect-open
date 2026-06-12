@@ -40,22 +40,35 @@ fn delete_from(entry: &Entry) -> AppResult<()> {
     }
 }
 
+/// Keychain calls run on a blocking thread, never the main loop: macOS parks
+/// `get_password` on a user-facing password prompt whenever the binary's code
+/// signature doesn't match the item's ACL (every dev rebuild), and a sync
+/// command would freeze the whole app — no paint, no notes — until the user
+/// answers.
+async fn run_blocking<T: Send + 'static>(
+    task: impl FnOnce() -> AppResult<T> + Send + 'static,
+) -> AppResult<T> {
+    tauri::async_runtime::spawn_blocking(task)
+        .await
+        .map_err(|err| AppError::io(err.to_string()))?
+}
+
 /// Command: store `value` under `name`, replacing any prior value.
 #[tauri::command]
-pub fn secret_set(name: String, value: String) -> AppResult<()> {
-    set_in(&entry(&name)?, &value)
+pub async fn secret_set(name: String, value: String) -> AppResult<()> {
+    run_blocking(move || set_in(&entry(&name)?, &value)).await
 }
 
 /// Command: the secret stored under `name`, or `None` when there isn't one.
 #[tauri::command]
-pub fn secret_get(name: String) -> AppResult<Option<String>> {
-    get_from(&entry(&name)?)
+pub async fn secret_get(name: String) -> AppResult<Option<String>> {
+    run_blocking(move || get_from(&entry(&name)?)).await
 }
 
 /// Command: remove the secret stored under `name`.
 #[tauri::command]
-pub fn secret_delete(name: String) -> AppResult<()> {
-    delete_from(&entry(&name)?)
+pub async fn secret_delete(name: String) -> AppResult<()> {
+    run_blocking(move || delete_from(&entry(&name)?)).await
 }
 
 #[cfg(test)]
@@ -85,5 +98,17 @@ mod tests {
 
         // Idempotent: deleting again is fine.
         delete_from(&entry).unwrap();
+    }
+
+    /// The commands hop to a blocking thread (a parked keychain prompt must
+    /// never stall the main loop); this exercises that plumbing end-to-end
+    /// against the mock store.
+    #[test]
+    fn commands_resolve_through_the_blocking_hop() {
+        keyring::set_default_credential_builder(keyring::mock::default_credential_builder());
+        tauri::async_runtime::block_on(async {
+            assert_eq!(secret_get("plumbing-test".into()).await.unwrap(), None);
+            secret_delete("plumbing-test".into()).await.unwrap();
+        });
     }
 }
