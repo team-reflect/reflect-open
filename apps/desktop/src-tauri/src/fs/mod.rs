@@ -224,17 +224,51 @@ pub fn note_exists(path: String, state: State<GraphState>) -> AppResult<bool> {
     Ok(resolve(&root, &path)?.is_file())
 }
 
+/// The frontmatter `id:` of a note file, by cheap line scan — just enough to
+/// tell whether two files are the *same note* for the move guard below. Full
+/// YAML parsing is TS's job; this only reads a `id: <value>` line inside a
+/// leading `---` block.
+fn frontmatter_id(path: &Path) -> Option<String> {
+    let content = fs::read_to_string(path).ok()?;
+    let mut lines = content.lines();
+    if lines.next()?.trim_end() != "---" {
+        return None;
+    }
+    for line in lines {
+        let trimmed = line.trim_end();
+        if trimmed == "---" {
+            return None;
+        }
+        if let Some(value) = trimmed.strip_prefix("id:") {
+            let value = value.trim();
+            return (!value.is_empty()).then(|| value.to_string());
+        }
+    }
+    None
+}
+
 /// Rename `from` → `to` on disk (both graph-relative, traversal-guarded).
 ///
-/// When `to` already exists, the source is **removed instead of renamed**: in
-/// the rename pipeline (Plan 17) the only realistic cause is the note's own
-/// just-retargeted save landing at the destination first — that file carries
-/// the *newest* content, and overwriting it with the stale source would lose
-/// the very keystrokes the save persisted.
+/// An occupied destination is consumed **only when both files carry the same
+/// frontmatter `id`** — the note's own just-retargeted save landing first;
+/// that file holds the *newest* content, and overwriting it with the stale
+/// source would lose the very keystrokes the save persisted. Anything else
+/// at the destination (a foreign file that appeared after the collision
+/// probe) refuses the move: deleting the source for it would graft this
+/// note's identity onto another file's content.
 pub(crate) fn move_note_file(root: &Path, from: &str, to: &str) -> AppResult<()> {
     let from_abs = resolve(root, from)?;
     let to_abs = resolve(root, to)?;
     if to_abs.is_file() {
+        let same_note = match (frontmatter_id(&from_abs), frontmatter_id(&to_abs)) {
+            (Some(from_id), Some(to_id)) => from_id == to_id,
+            _ => false,
+        };
+        if !same_note {
+            return Err(AppError::io(format!(
+                "cannot move note: {to} already exists on disk"
+            )));
+        }
         fs::remove_file(from_abs)?;
         return Ok(());
     }
@@ -263,4 +297,63 @@ pub fn list_files(state: State<GraphState>) -> AppResult<Vec<FileMeta>> {
         collect_markdown(&root, dir, &mut out)?;
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod move_tests {
+    use super::move_note_file;
+    use std::fs;
+
+    fn graph() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("notes")).unwrap();
+        dir
+    }
+
+    #[test]
+    fn renames_when_the_destination_is_free() {
+        let root = graph();
+        fs::write(root.path().join("notes/a.md"), "# A\n").unwrap();
+        move_note_file(root.path(), "notes/a.md", "notes/b.md").unwrap();
+        assert!(!root.path().join("notes/a.md").exists());
+        assert_eq!(fs::read_to_string(root.path().join("notes/b.md")).unwrap(), "# A\n");
+    }
+
+    #[test]
+    fn same_note_at_the_destination_keeps_its_newer_bytes() {
+        // The note's own retargeted save landed first: same frontmatter id,
+        // newer content. The stale source is dropped, never written over it.
+        let root = graph();
+        fs::write(root.path().join("notes/a.md"), "---\nid: 01x\n---\n# Old\n").unwrap();
+        fs::write(root.path().join("notes/b.md"), "---\nid: 01x\n---\n# Old\n\nnewest\n").unwrap();
+        move_note_file(root.path(), "notes/a.md", "notes/b.md").unwrap();
+        assert!(!root.path().join("notes/a.md").exists());
+        assert!(fs::read_to_string(root.path().join("notes/b.md"))
+            .unwrap()
+            .contains("newest"));
+    }
+
+    #[test]
+    fn a_foreign_file_at_the_destination_refuses_the_move() {
+        // A different note (different id) appeared after the collision probe:
+        // consuming it would graft this note's identity onto foreign content.
+        let root = graph();
+        fs::write(root.path().join("notes/a.md"), "---\nid: 01x\n---\n# Mine\n").unwrap();
+        fs::write(root.path().join("notes/b.md"), "---\nid: 01y\n---\n# Theirs\n").unwrap();
+        assert!(move_note_file(root.path(), "notes/a.md", "notes/b.md").is_err());
+        // Both files intact — nothing was lost.
+        assert!(root.path().join("notes/a.md").exists());
+        assert!(fs::read_to_string(root.path().join("notes/b.md"))
+            .unwrap()
+            .contains("Theirs"));
+    }
+
+    #[test]
+    fn files_without_ids_never_treat_an_occupied_destination_as_their_own() {
+        let root = graph();
+        fs::write(root.path().join("notes/a.md"), "# Mine\n").unwrap();
+        fs::write(root.path().join("notes/b.md"), "# Theirs\n").unwrap();
+        assert!(move_note_file(root.path(), "notes/a.md", "notes/b.md").is_err());
+        assert!(root.path().join("notes/a.md").exists());
+    }
 }

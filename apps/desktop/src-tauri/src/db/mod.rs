@@ -145,11 +145,18 @@ pub fn index_remove(path: String, generation: u64, index: State<IndexState>) -> 
 }
 
 /// Move a note file **and** its projection in one step (Plan 17): the index
-/// rows migrate inside a transaction, the file renames while it's still open,
-/// and a rename failure rolls everything back. DB-first ordering is what makes
-/// the watcher's echo benign by construction: `remove(from)` finds no rows,
-/// and `upsert(to)` re-applies an identical projection over the moved one —
+/// rows migrate and **commit first**, then the file renames; a failed rename
+/// compensates with a reverse row-move. DB-first ordering is what makes the
+/// watcher's echo benign by construction: `remove(from)` finds no rows, and
+/// `upsert(to)` re-applies an identical projection over the moved one —
 /// embedding chunks live outside `apply_note`, so vectors survive the echo.
+///
+/// Failure shape: every path converges. A failed commit touches nothing; a
+/// failed rename compensates the rows back; and if even the compensation
+/// fails, the projection is rebuildable and the id-based reconcile re-pairs
+/// the row with the file wherever it actually lives. The rename must never
+/// run *inside* the transaction — a commit failing after the file moved
+/// would roll the rows back while the disk kept the new path.
 ///
 /// `generation` is the **graph** generation (the same gate as `note_write`):
 /// a rename is user-initiated file mutation, and a stale UI must be rejected
@@ -166,12 +173,26 @@ pub fn note_move_indexed(
     let root = crate::fs::root_for_generation(&graph, generation)?;
     let mut state = lock_state(&index)?;
     let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
+    move_rows(conn, &from, &to)?;
+    if let Err(err) = crate::fs::move_note_file(&root, &from, &to) {
+        // Compensate: the disk refused, so the rows go back. Best-effort —
+        // a failed compensation must surface the *original* error, and the
+        // reconcile heals any residue by id.
+        if let Err(comp) = move_rows(conn, &to, &from) {
+            tracing::error!(?comp, "rename compensation failed; reconcile will heal by id");
+        }
+        return Err(err);
+    }
+    Ok(())
+}
+
+/// One committed row-move transaction (the rename pipeline's halves).
+fn move_rows(conn: &mut Connection, from: &str, to: &str) -> AppResult<()> {
     let tx = conn.transaction()?;
     // Child tables FK `notes(path)`; deferring lets the parent key move first
     // and the constraint re-check at commit, when the children have followed.
     tx.execute_batch("PRAGMA defer_foreign_keys = ON;")?;
-    write::move_note(&tx, &from, &to)?;
-    crate::fs::move_note_file(&root, &from, &to)?;
+    write::move_note(&tx, from, to)?;
     tx.commit()?;
     Ok(())
 }
@@ -195,11 +216,7 @@ pub fn index_move(
         return Ok(());
     }
     let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
-    let tx = conn.transaction()?;
-    tx.execute_batch("PRAGMA defer_foreign_keys = ON;")?;
-    write::move_note(&tx, &from, &to)?;
-    tx.commit()?;
-    Ok(())
+    move_rows(conn, &from, &to)
 }
 
 /// Upsert one `index_meta` key (no-op if stale). The table is bookkeeping the
