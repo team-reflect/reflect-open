@@ -30,7 +30,9 @@ fn report(name: &str, result: Result<(), String>) {
 fn check_keychain() -> Result<(), String> {
     let entry =
         keyring::Entry::new("app.reflect.plan19-spike", "probe").map_err(|err| err.to_string())?;
-    entry.set_password("plan19").map_err(|err| err.to_string())?;
+    entry
+        .set_password("plan19")
+        .map_err(|err| err.to_string())?;
     let read = entry.get_password().map_err(|err| err.to_string())?;
     entry.delete_credential().map_err(|err| err.to_string())?;
     if read == "plan19" {
@@ -52,9 +54,11 @@ fn check_fts5(app: &AppHandle) -> Result<(), String> {
     )
     .map_err(|err| err.to_string())?;
     let hits: i64 = conn
-        .query_row("SELECT count(*) FROM probe WHERE probe MATCH 'nineteen'", [], |row| {
-            row.get(0)
-        })
+        .query_row(
+            "SELECT count(*) FROM probe WHERE probe MATCH 'nineteen'",
+            [],
+            |row| row.get(0),
+        )
         .map_err(|err| err.to_string())?;
     drop(conn);
     let _ = fs::remove_file(&db_path);
