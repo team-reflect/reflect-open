@@ -49,7 +49,7 @@ Plan 19 defines the binding scope. Summarized, with the product-owner calls of 2
 | Full editing (meowdown; CM6 live-preview fallback) | **In** | Hard requirement. The editor choice is locked by an on-device gate spike before screens are built (Plan 19, decision 7 / step 2). |
 | New note (`+` button) | **In** | V1 parity (product call 2026-06-12): there is **no capture sheet** — the daily note is the capture surface; `+` opens a fresh untitled note via desktop's ⌘N seed/ghost-title flow. |
 | All notes + lexical search (FTS5) | **In** | Same index schema and getters as desktop; search embedded in the All tab with filter badges, V1-style. |
-| Note actions (pin, share, trash) | **In** | Product call 2026-06-12: full V1 parity — pin/unpin (frontmatter flag), native share sheet (small Swift plugin), trash to `.reflect/trash/`. |
+| Note actions (pin, share, trash) | **In** | Product call 2026-06-12: full V1 parity — pin/unpin (frontmatter flag), share via the Web Share API (`navigator.share`, verified working in the Tauri iOS WKWebView — no native plugin needed), trash to `.reflect/trash/`. |
 | Settings sheet | **In** | V1's avatar spot: graph name, note count, GitHub connect/disconnect, sync status, version. |
 | GitHub sync (device flow, HTTPS) | **In** | Foreground-only; cycle on resume, after debounced edits, and on network regain. |
 | Onboarding: Start fresh / Connect GitHub | **In** | One graph per device, fixed root in `Documents/`, Files-app visible. |

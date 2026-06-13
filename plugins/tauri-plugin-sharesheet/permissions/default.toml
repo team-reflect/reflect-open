@@ -1,3 +1,0 @@
-[default]
-description = "Present the OS share sheet"
-permissions = ["allow-share"]

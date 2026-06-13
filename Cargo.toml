@@ -10,7 +10,6 @@ members = [
   "apps/native-host",
   "crates/index-schema",
   "plugins/tauri-plugin-keyboard",
-  "plugins/tauri-plugin-sharesheet",
 ]
 
 [workspace.dependencies]

@@ -344,8 +344,9 @@ Steps 1 and 2 are the existential gates; nothing else starts until both pass.
    Embla day carousel replacing the chevron pager; the `+` button opens a
    fresh untitled note (desktop's ⌘N seed/ghost-title flow — V1 had no
    capture sheet, and the 2026-06-12 product call removed the V2 one). Then
-   the settings sheet (V1's avatar spot) and note actions (pin, share via a
-   small native share plugin, trash).
+   the settings sheet (V1's avatar spot) and note actions (pin, share via the
+   webview's Web Share API — `navigator.share`, verified working in the Tauri
+   iOS WKWebView, so no native plugin — and trash).
 10. **Sync wiring.** Resume/edit/online triggers, background-flush + local
     commit on pause, `onRemoteChanges` reindex (unchanged), conflicted notes
     protected with "Needs review on desktop", status pill live.

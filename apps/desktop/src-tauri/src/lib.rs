@@ -113,13 +113,11 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_window_state::Builder::default().build());
 
-    // The keyboard bridge (Plan 19, decision 8) and the share sheet are
-    // mobile-only: desktop has no software keyboard, and the share sheet is
-    // an iOS affordance.
+    // The keyboard bridge (Plan 19, decision 8) is mobile-only: desktop has
+    // no software keyboard to track. (Sharing uses the webview's Web Share
+    // API, so it needs no native plugin.)
     #[cfg(mobile)]
-    let builder = builder
-        .plugin(tauri_plugin_keyboard::init())
-        .plugin(tauri_plugin_sharesheet::init());
+    let builder = builder.plugin(tauri_plugin_keyboard::init());
 
     // TEMPORARY (Plan 19 spike A): probe the native capabilities on startup;
     // verdicts land in the dev console as `[plan19-spike]` lines.
