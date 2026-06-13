@@ -18,7 +18,6 @@ import {
   mobileGraphRoot,
   openGraph,
   recentGraphs,
-  saveSettings,
   type AppPlatform,
   type GraphInfo,
   type RecentGraph,
@@ -26,6 +25,7 @@ import {
 import { followHealedMove } from '@/editor/move-note'
 import { invalidateIndexQueries } from '@/lib/query-client'
 import { ensureWelcomeNote } from '@/lib/welcome-note'
+import { useSettings } from '@/providers/settings-provider'
 import { createGraphIndex } from './graph-index'
 
 /** Lifecycle of the active graph (Plan 02 loading gate). */
@@ -99,6 +99,10 @@ export function GraphProvider({
   // Mobile onboarding gate (Plan 19, step 6) — inert on desktop.
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [mobileRoot, setMobileRoot] = useState<string | null>(null)
+  // Settings live in one place (the app-wide provider, mounted above
+  // PlatformRoot): write the onboarded flag through it so its cached document
+  // carries the flag too — a raw save would be clobbered by the next change.
+  const { updateSettings, whenSettingsLoaded } = useSettings()
   // Monotonic open token: only the most recent open may commit `graph`/`status`,
   // so overlapping opens (double-click, StrictMode remount) can't finish out of
   // order and leave us on a graph the user didn't pick last.
@@ -307,16 +311,14 @@ export function GraphProvider({
       return
     }
     // Persist the flag only once the graph is actually open, so a failed open
-    // never strands the user past onboarding. Best effort: a failed write just
-    // re-shows onboarding next launch, where Start fresh re-opens the existing
-    // graph without re-seeding (no data loss).
-    try {
-      const current = await loadSettings()
-      await saveSettings({ ...current, mobileOnboarded: true })
-    } catch (err) {
-      console.error('persist onboarded flag failed:', errorMessage(err))
-    }
-  }, [mobileRoot, openRecent])
+    // never strands the user past onboarding. Write through the settings
+    // provider (not a raw save), awaiting hydration first — the provider's
+    // contract for a setting paired with a keychain secret (here the GitHub
+    // token): after a failed load it stays session-only and the next launch
+    // re-onboards, where Start fresh re-opens the existing graph (no data loss).
+    await whenSettingsLoaded()
+    updateSettings({ mobileOnboarded: true })
+  }, [mobileRoot, openRecent, updateSettings, whenSettingsLoaded])
 
   const value = useMemo<GraphContextValue>(
     () => ({

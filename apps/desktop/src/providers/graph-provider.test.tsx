@@ -1,9 +1,11 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { open } from '@tauri-apps/plugin-dialog'
 import { setBridge } from '@reflect/core'
 import { GraphProvider, useGraph } from './graph-provider'
+import { SettingsProvider } from './settings-provider'
 
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open: vi.fn() }))
 
@@ -25,6 +27,8 @@ let storedFiles: Array<{ path: string; size: number; modifiedMs: number }>
 let metaStore: Record<string, string>
 /** The fake settings document (`mobileOnboarded` lives here). */
 let settingsStore: Record<string, unknown>
+/** A fresh QueryClient per test — the settings provider reads through it. */
+let queryClient: QueryClient
 
 /** The fixed mobile graph root the fake `mobile_graph_root` resolves to. */
 const MOBILE_ROOT = '/Documents'
@@ -92,15 +96,24 @@ function resolveOpen(root: string): void {
 }
 
 const wrapper = ({ children }: { children: ReactNode }) => (
-  <GraphProvider>{children}</GraphProvider>
+  <QueryClientProvider client={queryClient}>
+    <SettingsProvider>
+      <GraphProvider>{children}</GraphProvider>
+    </SettingsProvider>
+  </QueryClientProvider>
 )
 
 const mobileWrapper = ({ children }: { children: ReactNode }) => (
-  <GraphProvider platform="ios">{children}</GraphProvider>
+  <QueryClientProvider client={queryClient}>
+    <SettingsProvider>
+      <GraphProvider platform="ios">{children}</GraphProvider>
+    </SettingsProvider>
+  </QueryClientProvider>
 )
 
 beforeEach(() => {
   installFakeBridge()
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 })
 
 afterEach(() => {
@@ -233,8 +246,9 @@ describe('GraphProvider mobile onboarding (Plan 19, step 6)', () => {
     await waitFor(() => expect(result.current.status).toBe('ready'))
     expect(result.current.needsOnboarding).toBe(false)
     expect(result.current.graph?.root).toBe(MOBILE_ROOT)
-    // The gate is persisted so later launches open the root directly.
-    expect(settingsStore.mobileOnboarded).toBe(true)
+    // The gate is persisted (through the settings provider) so later launches
+    // open the root directly — persistence trails the state update, so wait.
+    await waitFor(() => expect(settingsStore.mobileOnboarded).toBe(true))
   })
 
   it('does not persist the onboarded flag when the open fails (stays recoverable)', async () => {
