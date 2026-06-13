@@ -100,7 +100,7 @@ fn disconnect(root: &Path) -> AppResult<GitStatus> {
 
 fn setup(root: &Path, remote_url: Option<String>, branch: Option<String>) -> AppResult<GitStatus> {
     let repo = repo::open_or_init(root)?;
-    repo::ensure_reflect_ignored(root)?;
+    repo::ensure_gitignore_defaults(root)?;
     if let Some(url) = remote_url {
         if repo.find_remote("origin").is_ok() {
             repo.remote_set_url("origin", &url)?;

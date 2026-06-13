@@ -15,6 +15,7 @@ mod db;
 mod error;
 mod fs;
 mod git;
+mod graph_gitignore;
 mod quit;
 mod recents;
 mod secrets;

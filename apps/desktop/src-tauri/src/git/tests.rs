@@ -20,7 +20,7 @@ fn scaffold_graph(root: &Path) {
     }
     fs::write(
         root.join(".gitignore"),
-        "# Reflect local index + caches (rebuildable; never committed)\n/.reflect/\n",
+        crate::graph_gitignore::default_contents(),
     )
     .unwrap();
     fs::write(root.join(".reflect/index.sqlite"), "not a real db").unwrap();
@@ -95,6 +95,21 @@ fn setup_initializes_main_and_origin() {
         Some(fixture.remote_url.as_str())
     );
     assert!(!status.in_progress);
+}
+
+#[test]
+fn setup_creates_graph_gitignore_defaults_when_missing() {
+    let dir = tempdir().unwrap();
+    let root = dir.path().join("graph");
+    fs::create_dir_all(&root).unwrap();
+
+    setup(&root, None, None).unwrap();
+
+    let gitignore = read(&root, ".gitignore");
+    assert!(gitignore.contains("/.reflect/"));
+    assert!(gitignore.contains(".DS_Store"));
+    assert!(gitignore.contains("Thumbs.db"));
+    assert!(gitignore.contains("*.swp"));
 }
 
 #[test]
@@ -635,7 +650,7 @@ fn fetch_without_remote_is_a_typed_error() {
 }
 
 #[test]
-fn adopting_an_existing_repo_appends_reflect_ignore() {
+fn adopting_an_existing_repo_appends_graph_gitignore_defaults() {
     let dir = tempdir().unwrap();
     let root = dir.path().join("graph");
     scaffold_graph(&root);
@@ -646,11 +661,17 @@ fn adopting_an_existing_repo_appends_reflect_ignore() {
     let gitignore = read(&root, ".gitignore");
     assert!(gitignore.contains("node_modules/"));
     assert!(gitignore.contains("/.reflect/"));
+    assert!(gitignore.contains(".DS_Store"));
+    assert!(gitignore.contains("Thumbs.db"));
+    assert!(gitignore.contains("*.swp"));
 
     // Idempotent: a second setup must not duplicate the entry.
     setup(&root, None, None).unwrap();
     let again = read(&root, ".gitignore");
     assert_eq!(again.matches(".reflect").count(), 1, "{again}");
+    assert_eq!(again.matches(".DS_Store").count(), 1, "{again}");
+    assert_eq!(again.matches("Thumbs.db").count(), 1, "{again}");
+    assert_eq!(again.matches("*.swp").count(), 1, "{again}");
 }
 
 // ---- the Plan 17 rename matrix ----------------------------------------------

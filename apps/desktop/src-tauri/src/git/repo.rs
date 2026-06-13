@@ -1,13 +1,12 @@
 //! Repository plumbing: open/init/adopt, branch + signature resolution, and
-//! the `.reflect/` ignore guarantee.
+//! graph `.gitignore` defaults.
 
-use std::fs;
-use std::io::Write;
 use std::path::Path;
 
 use git2::{Repository, RepositoryInitOptions, Signature};
 
 use crate::error::{AppError, AppResult};
+use crate::graph_gitignore;
 
 /// The branch Reflect creates for new backup repos. Adopted repos keep
 /// whatever branch their HEAD already points at — nothing below hardcodes it.
@@ -87,34 +86,8 @@ pub(super) fn signature(repo: &Repository) -> AppResult<Signature<'static>> {
     Ok(Signature::now("Reflect", "backup@reflect.app")?)
 }
 
-/// Make sure `.reflect/` is ignored even in adopted repos whose `.gitignore`
-/// predates Reflect. The graph bootstrap (Plan 02) already writes one, but a
-/// user pointing Reflect at an existing repo may have their own. Idempotent:
-/// an existing `.reflect` entry (any common spelling) is left alone.
-pub(super) fn ensure_reflect_ignored(root: &Path) -> AppResult<()> {
-    let path = root.join(".gitignore");
-    let existing = fs::read_to_string(&path).unwrap_or_default();
-    let already = existing.lines().any(|line| {
-        matches!(
-            line.trim(),
-            "/.reflect/" | ".reflect/" | "/.reflect" | ".reflect"
-        )
-    });
-    if already {
-        return Ok(());
-    }
-    let mut file = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)?;
-    let separator = if existing.is_empty() || existing.ends_with('\n') {
-        ""
-    } else {
-        "\n"
-    };
-    write!(
-        file,
-        "{separator}# Reflect local index + caches (rebuildable; never committed)\n/.reflect/\n"
-    )?;
-    Ok(())
+/// Make sure graph repositories carry Reflect's safe ignore defaults. The graph
+/// bootstrap already writes these, but setup may adopt an existing repository.
+pub(super) fn ensure_gitignore_defaults(root: &Path) -> AppResult<()> {
+    graph_gitignore::ensure_defaults(root)
 }

@@ -10,6 +10,7 @@ use std::path::Path;
 use std::time::UNIX_EPOCH;
 
 use crate::error::{AppError, AppResult};
+use crate::graph_gitignore;
 
 use super::FileMeta;
 
@@ -26,10 +27,7 @@ pub(super) fn bootstrap(root: &Path) -> AppResult<()> {
     }
     let gitignore = root.join(".gitignore");
     if !gitignore.exists() {
-        fs::write(
-            &gitignore,
-            "# Reflect local index + caches (rebuildable; never committed)\n/.reflect/\n",
-        )?;
+        fs::write(&gitignore, graph_gitignore::default_contents())?;
     }
     let meta = root.join(REFLECT_DIR).join("meta.json");
     if !meta.exists() {
@@ -129,7 +127,11 @@ mod tests {
         for sub in TOP_LEVEL_DIRS {
             assert!(dir.path().join(sub).is_dir(), "missing dir {sub}");
         }
-        assert!(dir.path().join(".gitignore").exists());
+        let gitignore = fs::read_to_string(dir.path().join(".gitignore")).unwrap();
+        assert!(gitignore.contains("/.reflect/"));
+        assert!(gitignore.contains(".DS_Store"));
+        assert!(gitignore.contains("Thumbs.db"));
+        assert!(gitignore.contains("*.swp"));
         assert!(dir.path().join(".reflect/meta.json").exists());
     }
 
