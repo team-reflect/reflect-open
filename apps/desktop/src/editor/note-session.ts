@@ -337,10 +337,13 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   }
 
   function save(): void {
-    // A parked conflict pauses all saves: writing the buffer before the user
+    // A discarded session never writes: its file is being deleted, so any
+    // save — including a teardown `flush()` (the pane unmounts via flush →
+    // dispose) or an already-queued step — would recreate it. A parked
+    // conflict likewise pauses all saves: writing the buffer before the user
     // chooses Keep mine / Load theirs would clobber the external change and
     // defeat the non-destructive flow.
-    if (io.write === null || !dirty || isProtected || conflict !== null) {
+    if (discarded || io.write === null || !dirty || isProtected || conflict !== null) {
       return
     }
     const write = io.write
@@ -348,9 +351,10 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
       .then(async () => {
         // Re-check at execution time and take the freshest buffer — a queued
         // step can run behind a slow prior write, during which the user may
-        // have reverted or kept typing. (After dispose the buffer is frozen, so
-        // this same step doubles as the final flush.)
-        if (!dirty || isProtected || conflict !== null) {
+        // have reverted or kept typing, or the session may have been discarded
+        // for a delete. (After dispose the buffer is frozen, so this same step
+        // doubles as the final flush.)
+        if (discarded || !dirty || isProtected || conflict !== null) {
           return
         }
         const content = header + buffer

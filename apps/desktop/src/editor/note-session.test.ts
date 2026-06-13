@@ -134,7 +134,9 @@ describe('createNoteSession', () => {
     // Nothing written: the file is being deleted, so a flush would recreate it.
     expect(writes).toEqual([])
 
-    // A later dispose (the pane unmounting) stays a no-op too.
+    // The pane tears down via flush() → dispose() (document-binding); neither
+    // may write after a discard, or the trashed file would come back.
+    await session.flush()
     session.dispose()
     await settled()
     expect(writes).toEqual([])
