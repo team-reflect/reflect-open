@@ -34,9 +34,18 @@ filenames — the title-rename machinery rides along with editing).
   visible in the iOS Files app (portability holds on mobile).
 - Onboarding: **Start fresh** (create an empty graph) or **Connect GitHub**
   (device flow + clone), reusing `@reflect/core`'s sync/github module.
-- Mobile UI surfaces: Today (daily note + previous/next day), note view
-  (**editable**), all notes, search, quick capture (append to today / new
-  note), minimal settings (GitHub connect/disconnect, version).
+- Mobile UI surfaces, **per the 2026-06-12 product call: re-implement V1
+  mobile's feature-set and design** (see the
+  [V1 mobile overview](../reflect-v1-mobile-overview.md)): a **Daily / All**
+  tab shell; the Daily tab as V1's signature surface (month header + week
+  calendar strip + a touch-swipeable day carousel — Embla Carousel, recorded
+  in [libraries](libraries.md)); editable note view; the All tab as a
+  virtualized note list with embedded search and filter badges; a **new-note
+  `+` button** (V1 parity — there is **no capture sheet**: the daily note
+  itself is the capture surface, and `+` opens a fresh untitled note via the
+  same seed/ghost-title flow as desktop's ⌘N); note actions (pin, share,
+  trash); a settings sheet in V1's avatar spot (graph name, note count,
+  GitHub connect/disconnect, sync status, version).
 - **Editing**, reusing the desktop document stack wholesale (note sessions,
   document binding, open documents, title-rename, wiki-link autocomplete) —
   meowdown first, CodeMirror 6 live-preview as the editing fallback
@@ -328,11 +337,15 @@ Steps 1 and 2 are the existential gates; nothing else starts until both pass.
    (sessions, binding, open-documents, title-rename); wiki-link autocomplete
    under touch; flush-on-background (decision 6); images render via the asset
    protocol.
-8. **All notes + search.** Virtualized all-notes list; search screen over the
-   existing FTS getters (title + body, snippets), result → note.
-9. **Capture.** Append-to-today sheet (fast path: autosizing textarea, no
-   session mount) + new-note flow into the editor — both through core setters,
-   both emitting per decision 5.
+8. **Tab shell + All tab.** The Daily / All tab bar; the All tab as a
+   virtualized note list with an embedded search bar and filter badges over
+   the existing FTS getters (V1's All Notes shape), result → note.
+9. **Daily V1 parity + new note.** Month header + week calendar strip + the
+   Embla day carousel replacing the chevron pager; the `+` button opens a
+   fresh untitled note (desktop's ⌘N seed/ghost-title flow — V1 had no
+   capture sheet, and the 2026-06-12 product call removed the V2 one). Then
+   the settings sheet (V1's avatar spot) and note actions (pin, share via a
+   small native share plugin, trash).
 10. **Sync wiring.** Resume/edit/online triggers, background-flush + local
     commit on pause, `onRemoteChanges` reindex (unchanged), conflicted notes
     protected with "Needs review on desktop", status pill live.

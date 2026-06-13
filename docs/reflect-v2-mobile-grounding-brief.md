@@ -45,10 +45,12 @@ Plan 19 defines the binding scope. Summarized, with the product-owner calls of 2
 
 | Capability | First mobile release | Notes |
 | --- | --- | --- |
-| Today + day pager, daily notes | **In** | The default screen; open-to-today. |
+| Today + day pager, daily notes | **In** | The default screen; open-to-today. V1 design parity (product call 2026-06-12): month header + week calendar strip + touch-swipeable day carousel (Embla), in a Daily / All tab shell. |
 | Full editing (meowdown; CM6 live-preview fallback) | **In** | Hard requirement. The editor choice is locked by an on-device gate spike before screens are built (Plan 19, decision 7 / step 2). |
-| Quick capture (append to today / new note) | **In** | Fast path that doesn't mount a full session. |
-| All notes + lexical search (FTS5) | **In** | Same index schema and getters as desktop. |
+| New note (`+` button) | **In** | V1 parity (product call 2026-06-12): there is **no capture sheet** — the daily note is the capture surface; `+` opens a fresh untitled note via desktop's ⌘N seed/ghost-title flow. |
+| All notes + lexical search (FTS5) | **In** | Same index schema and getters as desktop; search embedded in the All tab with filter badges, V1-style. |
+| Note actions (pin, share, trash) | **In** | Product call 2026-06-12: full V1 parity — pin/unpin (frontmatter flag), native share sheet (small Swift plugin), trash to `.reflect/trash/`. |
+| Settings sheet | **In** | V1's avatar spot: graph name, note count, GitHub connect/disconnect, sync status, version. |
 | GitHub sync (device flow, HTTPS) | **In** | Foreground-only; cycle on resume, after debounced edits, and on network regain. |
 | Onboarding: Start fresh / Connect GitHub | **In** | One graph per device, fixed root in `Documents/`, Files-app visible. |
 | Minimal settings | **In** | GitHub connect/disconnect, version. No graph chooser. |
@@ -143,11 +145,11 @@ Push notifications (no server), OAuth token exchange, Firebase everything, App-S
 | Daily tab (swiper carousel, calendar strip) | **v1**: Today screen + day pager |
 | Full rich editor + native keyboard toolbar | **v1**: meowdown (or CM6 fallback) + keyboard-height plugin; formatting toolbar webview-drawn, later |
 | All Notes list + FTS search | **v1**: virtualized list + FTS5 search screen |
-| Quick capture into today | **v1**: append-to-today sheet + new-note flow |
+| Quick capture into today | **v1**: the daily note itself (open-to-today + editing); `+` = new untitled note — the V2 append-to-today sheet was removed by the 2026-06-12 product call |
 | Auth (Apple/Google/OTP), encryption unlock | **Dropped** — no accounts, no E2EE; onboarding = Start fresh / Connect GitHub |
 | Graph switcher | **Dropped in v1** — one graph per device, fixed root |
 | Trash / delete | **v1** — to graph-local `.reflect/trash/` (recoverable, sync-ignored) |
-| Pin, publish, share-as-text note actions | Not in Plan 19's v1 surface; cheap later, publishing deferred product-wide |
+| Pin, publish, share-as-text note actions | **v1**: pin + share + trash (product call 2026-06-12); publishing stays deferred product-wide |
 | JSON export via share sheet | Superseded: the workspace is Files-app-visible markdown |
 | Tasks tab | Post-release, follows desktop Plan 18 |
 | Search-grounded AI chat | Later wave, with the copilot |

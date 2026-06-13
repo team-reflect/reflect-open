@@ -30,6 +30,7 @@ first-party (owned by the team) and MIT-licensed, so there is no copyleft constr
 | List virtualization | `@tanstack/react-virtual` | 06 / 08 |
 | UI components (dialogs, popovers, menus) | shadcn/ui (on Radix Primitives) | 07 / 08 / 10 / 15 |
 | Command palette (⌘K) | `cmdk` | 08 |
+| Mobile day carousel (touch swipe, V1 parity) | `embla-carousel-react` | 19 |
 | AI provider (BYOK, streaming, multi-provider) | Vercel AI SDK (`ai` + `@ai-sdk/openai` …) | 10 |
 | Diff / patch (patchsets, conflict diffs) | `diff` (jsdiff) | 10 / 12 |
 | Export — ZIP | `fflate` (client-side) | 13 |
