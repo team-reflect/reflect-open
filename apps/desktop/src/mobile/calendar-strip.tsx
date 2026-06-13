@@ -33,14 +33,20 @@ export function CalendarStrip({ date, today, onSelect }: CalendarStripProps): Re
       className="shrink-0 border-b border-border px-2 pb-1"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <div className="flex items-center gap-1 px-1 py-1">
-        <SettingsSheet />
-        <h1 className="min-w-0 flex-1 truncate text-base font-semibold">{monthLabel(date)}</h1>
-        {date !== today && (
-          <Button variant="ghost" size="sm" onClick={() => onSelect(today)}>
-            Today
-          </Button>
-        )}
+      {/* Three equal-flanked columns so the month sits at the screen's center
+          regardless of the gear (left) and the conditional Today button (right). */}
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 px-1 py-1">
+        <div className="justify-self-start">
+          <SettingsSheet />
+        </div>
+        <h1 className="min-w-0 truncate text-center text-base font-semibold">{monthLabel(date)}</h1>
+        <div className="justify-self-end">
+          {date !== today && (
+            <Button variant="ghost" size="sm" onClick={() => onSelect(today)}>
+              Today
+            </Button>
+          )}
+        </div>
       </div>
       <div className="flex">
         {week.map((day) => {

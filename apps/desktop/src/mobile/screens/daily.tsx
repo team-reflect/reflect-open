@@ -32,7 +32,7 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
   return (
     <div className="flex h-full w-screen flex-col">
       <CalendarStrip date={date} today={today} onSelect={select} />
-      <DayCarousel date={date} onSelect={select} />
+      <DayCarousel date={date} today={today} onSelect={select} />
       <Button
         size="icon"
         aria-label="New note"

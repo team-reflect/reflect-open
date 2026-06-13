@@ -7,7 +7,7 @@ import type { ReactElement } from 'react'
 import { setBridge } from '@reflect/core'
 import { RouterProvider, useRouter } from '@/routing/router'
 import type { Route } from '@/routing/route'
-import { addDaysIso, parseIsoDate, todayIso } from '@/lib/dates'
+import { addDaysIso, formatDayLabel, parseIsoDate, todayIso } from '@/lib/dates'
 import { monthLabel, weekOf } from './calendar'
 import { MobileShell } from './mobile-shell'
 
@@ -143,8 +143,9 @@ describe('MobileShell', () => {
     const view = mount({ kind: 'today' })
 
     // The header is the month; the carousel mounts today's slide (±1
-    // neighbours), and today's shows its note.
-    expect(view.getByRole('heading').textContent).toBe(monthLabel(today))
+    // neighbours), each carrying its formatted date as the note's subject.
+    expect(view.getByRole('heading', { level: 1 }).textContent).toBe(monthLabel(today))
+    expect(view.getByText(formatDayLabel(today, 'mdy'))).toBeTruthy()
     await waitFor(() => {
       const editors = view.getAllByTestId('fake-editor')
       expect(editors.some((editor) => editor.textContent?.includes('captured on the go'))).toBe(true)
@@ -180,7 +181,7 @@ describe('MobileShell', () => {
     const view = mount({ kind: 'today' }, { kind: 'daily', date: farDay })
 
     await user.click(view.getByRole('button', { name: 'probe-navigate' }))
-    expect(view.getByRole('heading').textContent).toBe(monthLabel(farDay))
+    expect(view.getByRole('heading', { level: 1 }).textContent).toBe(monthLabel(farDay))
     await waitFor(() => {
       const editors = view.getAllByTestId('fake-editor')
       expect(editors.some((editor) => editor.textContent?.includes('far future plans'))).toBe(true)
@@ -196,7 +197,7 @@ describe('MobileShell', () => {
     expect(view.getByRole('heading').textContent).toContain('meeting-notes')
 
     await user.click(view.getByRole('button', { name: 'Back' }))
-    expect(view.getByRole('heading').textContent).toBe(monthLabel(todayIso()))
+    expect(view.getByRole('heading', { level: 1 }).textContent).toBe(monthLabel(todayIso()))
   })
 
   it('switches tabs: All shows the searchable list, Daily returns to today', async () => {
@@ -208,7 +209,7 @@ describe('MobileShell', () => {
     expect((await view.findByText('No notes yet')).textContent).toBe('No notes yet')
 
     await user.click(view.getByRole('button', { name: 'Daily' }))
-    expect(view.getByRole('heading').textContent).toBe(monthLabel(todayIso()))
+    expect(view.getByRole('heading', { level: 1 }).textContent).toBe(monthLabel(todayIso()))
   })
 
   it('renders a search entry as the All tab with the query seeded', async () => {
@@ -232,6 +233,6 @@ describe('MobileShell', () => {
     })
 
     await user.click(view.getByRole('button', { name: 'Back' }))
-    expect(view.getByRole('heading').textContent).toBe(monthLabel(todayIso()))
+    expect(view.getByRole('heading', { level: 1 }).textContent).toBe(monthLabel(todayIso()))
   })
 })
