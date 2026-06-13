@@ -18,7 +18,7 @@ export function MobileNote({ path }: { path: string }): ReactElement {
   const untitled = isUntitledNotePath(path)
 
   return (
-    <div className="flex h-dvh w-screen flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <div className="flex h-full w-screen flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <header className="flex shrink-0 items-center gap-1 border-b border-border px-1 pb-1">
         <Button
           variant="ghost"

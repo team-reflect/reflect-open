@@ -25,7 +25,7 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
   const isToday = date === useToday()
 
   return (
-    <div className="flex h-dvh w-screen flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <div className="flex h-full w-screen flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <header className="flex shrink-0 items-center gap-1 border-b border-border px-1 pb-1">
         <Button
           variant="ghost"
@@ -64,7 +64,7 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
         size="icon"
         aria-label="New note"
         className="fixed right-4 z-40 size-12 rounded-full shadow-lg"
-        style={{ bottom: 'calc(max(env(safe-area-inset-bottom), var(--keyboard-height, 0px)) + 1rem)' }}
+        style={{ bottom: 'calc(max(env(safe-area-inset-bottom), var(--keyboard-height, 0px)) + 4.25rem)' }}
         onClick={() => navigate({ kind: 'note', path: untitledNotePath() })}
       >
         <Plus className="size-6" />

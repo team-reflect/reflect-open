@@ -1,6 +1,6 @@
 import { type ReactElement } from 'react'
 import { MobileErrorBoundary } from '@/mobile/mobile-error-boundary'
-import { MobileScreen } from '@/mobile/mobile-screen'
+import { MobileShell } from '@/mobile/mobile-shell'
 import { useKeyboardHeightVar } from '@/mobile/use-keyboard'
 import { useGraph } from '@/providers/graph-provider'
 import { RouterProvider } from '@/routing/router'
@@ -24,7 +24,7 @@ export function MobileApp(): ReactElement {
     return (
       <MobileErrorBoundary>
         <RouterProvider key={graph.root}>
-          <MobileScreen />
+          <MobileShell />
         </RouterProvider>
       </MobileErrorBoundary>
     )
