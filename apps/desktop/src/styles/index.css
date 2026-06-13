@@ -225,18 +225,30 @@ body {
   --meowdown-selection: var(--accent-soft, rgb(99 102 241 / 12%));
 
   /* The panes own all spacing and sizing: cancel the theme's editor padding
-     (no floating UI of ours needs the `--meowdown-gutter`) and font size. */
+     (no floating UI of ours needs the `--meowdown-gutter`) and font size.
+     The matching .reflect-editor.ProseMirror block below re-states these with
+     0-2-0 specificity; see the note on .reflect-stream-gutter for why. */
   padding: 0;
   font-size: inherit;
   font-family: var(--font-reading, var(--font-sans));
 }
 
+.reflect-editor.ProseMirror {
+  padding: 0;
+  font-size: inherit;
+}
+
 /* The daily stream's horizontal gutter (STREAM_GUTTER in daily-stream.tsx),
    shared by each row's day label, pane chrome, and the editor itself so they
-   align. An un-layered class — a `px-*` utility sits in `@layer utilities`
-   and would lose to the un-layered `padding: 0` reset above; this rule beats
-   it as the later equal-specificity declaration. Keep it below that reset. */
+   align. Un-layered so it beats the un-layered `padding: 0` reset above by
+   source order. The `.ProseMirror` compound bumps specificity to 0-2-0:
+   meowdown's stylesheet is injected dynamically when the editor lazy-loads,
+   so its `.ProseMirror { padding }` rule arrives after this file and wins
+   equal-specificity ties; the compound restores our rule's priority. */
 .reflect-stream-gutter {
+  padding-inline: max(1.5rem, calc((100% - 42rem) / 2));
+}
+.reflect-stream-gutter.ProseMirror {
   padding-inline: max(1.5rem, calc((100% - 42rem) / 2));
 }
 
