@@ -38,7 +38,7 @@ export interface CloudSendable {
 /** Thrown when a private note would otherwise reach an external service. */
 export class PrivateNoteError extends Error {
   constructor(path: string) {
-    super(`"${path}" is marked private and cannot be sent to an AI service`)
+    super(`"${path}" is marked private and cannot be sent to an external service`)
     this.name = 'PrivateNoteError'
   }
 }

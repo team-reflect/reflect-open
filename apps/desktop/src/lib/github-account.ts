@@ -7,6 +7,7 @@ import {
   type GithubAuth,
   type GithubUser,
 } from '@reflect/core'
+import { invalidateGithubAuth } from '@/lib/github-auth-state'
 import { providerFetch } from '@/lib/provider-fetch'
 
 /** The token a stored credential would supply right now (no refresh). */
@@ -40,6 +41,7 @@ export async function fetchSignedInUser(): Promise<GithubUser | null> {
       const current = await loadGithubAuth()
       if (current !== null && usableToken(current) === token) {
         await clearGithubAuth()
+        invalidateGithubAuth()
       }
     }
     throw error

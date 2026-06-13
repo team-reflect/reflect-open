@@ -4,9 +4,11 @@ import {
   detectConflictMarkers,
   foldKey,
   foldTag,
+  gistBodyHash,
   isPinned,
   normalizeWikiTarget,
   pinnedOrder,
+  splitFrontmatter,
   type ParsedNote,
 } from '../markdown'
 import { previewSnippet } from './snippet'
@@ -34,9 +36,10 @@ import { previewSnippet } from './snippet'
  * first stamped version; v2 rows also carry the 0004 pinned columns) ·
  * 3 — repairs `notes.mtime` 0 rows written by the watcher path before it
  * carried `modifiedMs` (hash-reconcile can never refresh them) ·
- * 4 — `notes.has_conflict` (sync conflict markers, Plan 12).
+ * 4 — `notes.has_conflict` (sync conflict markers, Plan 12) ·
+ * 5 — `notes.gist_url` + `notes.gist_stale` (gist publishing).
  */
-export const PROJECTION_VERSION = 4
+export const PROJECTION_VERSION = 5
 
 export const indexedLinkSchema = z.object({
   kind: z.enum(['wiki', 'md']),
@@ -75,6 +78,10 @@ export const indexedNoteSchema = z.object({
   pinnedOrder: z.number().nullable(),
   /** The file carries Git conflict markers from a sync merge (Plan 12). */
   hasConflict: z.boolean(),
+  /** The published gist's html url, or null when the note has none. */
+  gistUrl: z.string().nullable(),
+  /** The body changed since it was last published to the gist. */
+  gistStale: z.boolean(),
   fileHash: z.string(),
   mtime: z.number(),
   text: z.string(),
@@ -123,6 +130,13 @@ export function buildIndexedNote(
     isPinned: isPinned(parsed.frontmatter),
     pinnedOrder: pinnedOrder(parsed.frontmatter),
     hasConflict: detectConflictMarkers(meta.source),
+    gistUrl: parsed.frontmatter.gist?.url ?? null,
+    // Staleness is a body-hash comparison (frontmatter excluded): publishing
+    // writes the `gist` block itself, and a pin/private toggle is not an edit
+    // worth a "republish" nudge.
+    gistStale:
+      parsed.frontmatter.gist !== undefined &&
+      gistBodyHash(splitFrontmatter(meta.source).body) !== parsed.frontmatter.gist.hash,
     fileHash: meta.fileHash,
     mtime: meta.mtime,
     text: parsed.text,

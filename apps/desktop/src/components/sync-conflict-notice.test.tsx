@@ -31,6 +31,8 @@ const NOTE = {
   dailyDate: null,
   isPrivate: false,
   hasConflict: true,
+  gistUrl: null,
+  gistStale: false,
 }
 
 let queryClient: QueryClient

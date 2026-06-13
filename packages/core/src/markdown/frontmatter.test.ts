@@ -129,4 +129,51 @@ describe('upsertFrontmatter', () => {
     expect(pinned).toBe('---\npinned: true\n---\n# Body\n\ntext')
     expect(upsertFrontmatter(pinned, { pinned: undefined })).toBe(source)
   })
+
+  it('writes a nested mapping (the gist block) and round-trips it through the parser', () => {
+    const gist = { id: 'g1', url: 'https://gist.github.com/alex/g1', file: 'A.md', hash: 'ab12cd34ef56ab78' }
+    const next = upsertFrontmatter('# A\n\nbody', { gist })
+    const split = splitFrontmatter(next)
+    expect(split.body).toBe('# A\n\nbody')
+    expect(parseFrontmatter(split.raw).data.gist).toEqual(gist)
+  })
+
+  it('replaces an existing gist block wholesale on republish', () => {
+    const first = upsertFrontmatter('body', {
+      gist: { id: 'g1', url: 'u1', file: 'Old.md', hash: 'h1' },
+    })
+    const second = upsertFrontmatter(first, {
+      gist: { id: 'g1', url: 'u1', file: 'New.md', hash: 'h2' },
+    })
+    const { data } = parseFrontmatter(splitFrontmatter(second).raw)
+    expect(data.gist).toEqual({ id: 'g1', url: 'u1', file: 'New.md', hash: 'h2' })
+    expect(second).not.toContain('Old.md')
+  })
+})
+
+describe('frontmatter gist block', () => {
+  it('parses a well-formed block', () => {
+    const { data } = parseFrontmatter(
+      'gist:\n  id: g1\n  url: https://gist.github.com/alex/g1\n  file: A.md\n  hash: ab12cd34ef56ab78',
+    )
+    expect(data.gist).toEqual({
+      id: 'g1',
+      url: 'https://gist.github.com/alex/g1',
+      file: 'A.md',
+      hash: 'ab12cd34ef56ab78',
+    })
+  })
+
+  it('coerces all-digit ids and hashes a third-party rewrite may have unquoted', () => {
+    const { data } = parseFrontmatter(
+      'gist:\n  id: 12345678\n  url: u\n  file: A.md\n  hash: 1234567812345678',
+    )
+    expect(data.gist?.id).toBe('12345678')
+    expect(data.gist?.hash).toBe('1234567812345678')
+  })
+
+  it('degrades a mangled block to "never published" without failing the note', () => {
+    expect(parseFrontmatter('gist: not-an-object').data.gist).toBeUndefined()
+    expect(parseFrontmatter('gist:\n  id: g1').data.gist).toBeUndefined()
+  })
 })

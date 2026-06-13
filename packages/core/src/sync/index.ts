@@ -58,6 +58,12 @@ export {
   type GithubUser,
 } from './github'
 export {
+  createGist,
+  updateGist,
+  type PublishedGist,
+  type GistContent,
+} from './gists'
+export {
   createSyncEngine,
   isSyncError,
   type SyncEngine,

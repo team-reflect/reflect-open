@@ -199,6 +199,10 @@ export interface NoteRow {
   isPrivate: boolean
   /** The file carries sync conflict markers (Plan 12) — surface `Needs review`. */
   hasConflict: boolean
+  /** The published gist's html url, or null when the note has none. */
+  gistUrl: string | null
+  /** The body changed since it was last published — the "Republish" nudge. */
+  gistStale: boolean
 }
 
 /** Fetch a single note's row by graph-relative path, or `undefined` if absent. */
@@ -206,10 +210,15 @@ export async function getNote(path: string): Promise<NoteRow | undefined> {
   const row = await db
     .selectFrom('notes')
     .where('path', '=', path)
-    .select(['path', 'title', 'dailyDate', 'isPrivate', 'hasConflict'])
+    .select(['path', 'title', 'dailyDate', 'isPrivate', 'hasConflict', 'gistUrl', 'gistStale'])
     .executeTakeFirst()
   return row
-    ? { ...row, isPrivate: row.isPrivate !== 0, hasConflict: row.hasConflict !== 0 }
+    ? {
+        ...row,
+        isPrivate: row.isPrivate !== 0,
+        hasConflict: row.hasConflict !== 0,
+        gistStale: row.gistStale !== 0,
+      }
     : undefined
 }
 

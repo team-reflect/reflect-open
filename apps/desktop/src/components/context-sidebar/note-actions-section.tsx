@@ -6,6 +6,7 @@ import { usePinnedNotes } from '@/hooks/use-pinned-notes'
 import { keybindingFor } from '@/lib/commands/app-commands'
 import { toggleNotePinned } from '@/lib/note-pin'
 import { toggleNotePrivate } from '@/lib/note-private'
+import { NoteGistAction } from './note-gist-action'
 import { NoteToggleAction } from './note-toggle-action'
 import { SidebarSection } from './sidebar-section'
 
@@ -18,6 +19,7 @@ interface NoteActionsSectionProps {
 // real bindings (the same contract as the Today hint).
 const PIN_KEYBINDING = keybindingFor('note.togglePin')
 const PRIVATE_KEYBINDING = keybindingFor('note.togglePrivate')
+const GIST_KEYBINDING = keybindingFor('note.publishGist')
 
 /**
  * "Note actions" as a context-sidebar section: mouse-reachable counterparts
@@ -58,6 +60,7 @@ export function NoteActionsSection({ path }: NoteActionsSectionProps): ReactElem
         keybinding={PRIVATE_KEYBINDING}
         tooltip="Private notes are never sent to AI or any other external service"
       />
+      <NoteGistAction path={path} keybinding={GIST_KEYBINDING} />
     </SidebarSection>
   )
 }

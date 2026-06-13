@@ -1,4 +1,10 @@
-import { errorMessage, isAppError, splitFrontmatter, upsertFrontmatter } from '@reflect/core'
+import {
+  errorMessage,
+  isAppError,
+  splitFrontmatter,
+  upsertFrontmatter,
+  type GistFrontmatter,
+} from '@reflect/core'
 import type { RoundTripFidelity } from './roundtrip'
 
 /**
@@ -152,6 +158,12 @@ export interface FrontmatterPatch {
    * the pin, not-private is the absence of the flag.
    */
   private?: boolean
+  /**
+   * The published GitHub Gist block (id, url, file, hash of the published
+   * body) — written whole after every publish. Publishing is set-only in the
+   * first wave; there is no unpublish, so no delete encoding either.
+   */
+  gist?: GistFrontmatter
 }
 
 /** Translate the typed patch into the YAML write (`undefined` deletes a key). */
@@ -165,6 +177,16 @@ function yamlPatch(patch: FrontmatterPatch): Record<string, unknown> {
   }
   if (patch.private !== undefined) {
     yaml.private = patch.private === false ? undefined : true
+  }
+  if (patch.gist !== undefined) {
+    // Spelled out key-by-key so the YAML block's shape (and key order) is
+    // this module's contract, not whatever object the caller happened to hold.
+    yaml.gist = {
+      id: patch.gist.id,
+      url: patch.gist.url,
+      file: patch.gist.file,
+      hash: patch.gist.hash,
+    }
   }
   return yaml
 }

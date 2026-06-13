@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { errorMessage, runDeviceFlow } from '@reflect/core'
+import { invalidateGithubAuth } from '@/lib/github-auth-state'
 import { providerFetch } from '@/lib/provider-fetch'
 
 /** What a device-flow surface renders: nothing yet, or the code to enter. */
@@ -58,6 +59,9 @@ export function useDeviceFlowAuth(): DeviceFlowAuth {
           setView({ view: 'code', userCode: code.userCode, verificationUri: code.verificationUri })
         },
       })
+      if (auth !== null) {
+        invalidateGithubAuth()
+      }
       return auth !== null
     } catch (caught: unknown) {
       setView({ view: 'idle' })

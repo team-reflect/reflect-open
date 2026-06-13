@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseNote } from '../markdown'
+import { gistBodyHash, parseNote } from '../markdown'
 import { buildIndexedNote, indexedNoteSchema } from './indexed-note'
 
 describe('buildIndexedNote', () => {
@@ -76,6 +76,52 @@ describe('buildIndexedNote', () => {
     })
     expect(indexed.isPinned).toBe(true)
     expect(indexed.pinnedOrder).toBe(2)
+  })
+
+  it('projects no gist state for an unpublished note', () => {
+    const source = '# N\n\nbody'
+    const indexed = buildIndexedNote(parseNote({ path: 'notes/n.md', source }), {
+      fileHash: 'h',
+      mtime: 0,
+      source,
+    })
+    expect(indexed.gistUrl).toBeNull()
+    expect(indexed.gistStale).toBe(false)
+  })
+
+  it('projects the gist url and computes staleness from the body hash', () => {
+    const body = '# N\n\npublished body\n'
+    const block = (hash: string): string =>
+      `---\ngist:\n  id: g1\n  url: https://gist.github.com/alex/g1\n  file: N.md\n  hash: ${hash}\n---\n`
+
+    const fresh = block(gistBodyHash(body)) + body
+    const indexedFresh = buildIndexedNote(parseNote({ path: 'notes/n.md', source: fresh }), {
+      fileHash: 'h',
+      mtime: 0,
+      source: fresh,
+    })
+    expect(indexedFresh.gistUrl).toBe('https://gist.github.com/alex/g1')
+    expect(indexedFresh.gistStale).toBe(false)
+
+    const edited = block(gistBodyHash(body)) + body + 'an edit'
+    const indexedEdited = buildIndexedNote(parseNote({ path: 'notes/n.md', source: edited }), {
+      fileHash: 'h2',
+      mtime: 1,
+      source: edited,
+    })
+    expect(indexedEdited.gistStale).toBe(true)
+  })
+
+  it('frontmatter-only changes never flag the gist stale (the hash covers the body alone)', () => {
+    const body = '# N\n\npublished body\n'
+    const hash = gistBodyHash(body)
+    const source = `---\npinned: true\nprivate: true\ngist:\n  id: g1\n  url: u\n  file: N.md\n  hash: ${hash}\n---\n${body}`
+    const indexed = buildIndexedNote(parseNote({ path: 'notes/n.md', source }), {
+      fileHash: 'h',
+      mtime: 0,
+      source,
+    })
+    expect(indexed.gistStale).toBe(false)
   })
 
   it('flags notes carrying sync conflict markers', () => {

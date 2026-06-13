@@ -5,10 +5,12 @@
  */
 export {
   frontmatterSchema,
+  gistFrontmatterSchema,
   isPinned,
   pinnedOrder,
   PARSED_NOTE_VERSION,
   type Frontmatter,
+  type GistFrontmatter,
   type Span,
   type WikiLink,
   type MarkdownLink,
@@ -38,6 +40,7 @@ export {
   type ConflictResolution,
 } from './conflict-markers'
 export { foldKey, foldTag } from './keys'
+export { gistBodyHash, gistFilename } from './gist'
 export { slugForTitle } from './slug'
 export {
   normalizeWikiTarget,

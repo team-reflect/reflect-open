@@ -82,6 +82,8 @@ export interface NoteKeys {
 export interface Notes {
   dailyDate: string | null;
   fileHash: string;
+  gistStale: Generated<number>;
+  gistUrl: string | null;
   hasConflict: Generated<number>;
   id: string | null;
   isPinned: Generated<number>;

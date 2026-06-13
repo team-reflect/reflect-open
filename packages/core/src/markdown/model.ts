@@ -49,6 +49,32 @@ function coercePinned(value: unknown): boolean | number {
 }
 
 /**
+ * The note's published GitHub Gist (Plan 12 follow-up): written by the publish
+ * action, read back to drive "Republish" and to update the same gist in place.
+ * `file` is the gist filename last published as (a PATCH renames via the old
+ * name), and `hash` is {@link gistBodyHash} of the published body — staleness
+ * is a hash comparison, never an mtime one (writing this very block bumps the
+ * file's mtime).
+ */
+export const gistFrontmatterSchema = z.object({
+  /**
+   * The gist id (`PATCH /gists/{id}` updates it in place). Coerced: ids and
+   * hashes are hex and can land all-digits — our writer quotes those, but a
+   * third-party frontmatter rewrite may not, and YAML would then hand us a
+   * number. Coercion keeps the gist linked instead of silently forking a new
+   * one on the next publish.
+   */
+  id: z.coerce.string(),
+  /** The gist's html url — what publishing copies to the clipboard. */
+  url: z.string(),
+  /** The gist filename the body was last published under. */
+  file: z.string(),
+  /** {@link gistBodyHash} of the body as last published (coerced like `id`). */
+  hash: z.coerce.string(),
+})
+export type GistFrontmatter = z.infer<typeof gistFrontmatterSchema>
+
+/**
  * Known frontmatter subset; unknown keys are preserved untouched (passthrough).
  * Built to tolerate external edits — bad known fields fall back via `.catch`
  * rather than failing the whole parse and making a note unreadable.
@@ -66,6 +92,12 @@ export const frontmatterSchema = z
      * {@link isPinned}/{@link pinnedOrder} — `pinned: 0` is a pinned note.
      */
     pinned: z.preprocess(coercePinned, z.union([z.boolean(), z.number()])).default(false),
+    /**
+     * The published GitHub Gist block. A hand-mangled block degrades to
+     * "never published" (`.catch`) rather than an unreadable note; the next
+     * publish then creates a fresh gist and rewrites it whole.
+     */
+    gist: gistFrontmatterSchema.optional().catch(undefined),
   })
   .passthrough()
 export type Frontmatter = z.infer<typeof frontmatterSchema>

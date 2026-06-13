@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { useAsyncAction } from '@/hooks/use-async-action'
 import { useDeviceFlowAuth } from '@/hooks/use-device-flow-auth'
 import { fetchSignedInUser } from '@/lib/github-account'
+import { invalidateGithubAuth } from '@/lib/github-auth-state'
 
 interface GithubAuthStepProps {
   /**
@@ -125,6 +126,7 @@ export function GithubAuthStep({ onAuthed, repoName }: GithubAuthStepProps): Rea
     // can reject the token — the action envelope surfaces both inline.
     await pat.run(async () => {
       await saveGithubAuth({ kind: 'pat', token })
+      invalidateGithubAuth()
       await verifyAndFinish()
     })
   }

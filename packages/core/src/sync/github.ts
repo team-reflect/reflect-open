@@ -125,7 +125,7 @@ const JSON_HEADERS = { Accept: 'application/json', 'Content-Type': 'application/
  * never mistaken for a dead credential. A JSON body the schema rejects is an
  * API contract change — `parse`.
  */
-async function readJson<Schema extends z.ZodType>(
+export async function readJson<Schema extends z.ZodType>(
   response: Response,
   schema: Schema,
   what: string,
@@ -483,7 +483,8 @@ const repoResponseSchema = z.object({
   html_url: z.string(),
 })
 
-function apiHeaders(token: string): Record<string, string> {
+/** Standard `api.github.com` request headers (shared with the gists module). */
+export function apiHeaders(token: string): Record<string, string> {
   return {
     Accept: 'application/vnd.github+json',
     Authorization: `Bearer ${token}`,

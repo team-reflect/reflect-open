@@ -1,6 +1,7 @@
 import { errorMessage, randomNotePath } from '@reflect/core'
 import { untitledNotePath } from '@/lib/create-note'
 import { todayIso } from '@/lib/dates'
+import { runGistPublish } from '@/lib/note-gist'
 import { toggleNotePinned } from '@/lib/note-pin'
 import { toggleNotePrivate } from '@/lib/note-private'
 import { startOperation } from '@/lib/operations'
@@ -113,6 +114,24 @@ const APP_COMMANDS: AppCommand[] = [
       } catch (cause) {
         startOperation('Marking note as private').fail(errorMessage(cause))
       }
+    },
+  },
+  {
+    id: 'note.publishGist',
+    title: 'Publish note to gist',
+    keywords: ['gist', 'github', 'share', 'publish', 'export'],
+    // Publishes the body of the note the current route edits to a secret
+    // GitHub gist (republishing to the same gist thereafter) and copies the
+    // link. No default keybinding: the palette keeps it keyboard-reachable
+    // without spending a shortcut. `runGistPublish` owns all feedback — the
+    // progress line, the failure surface, and the "link copied" confirmation.
+    run: async (context) => {
+      const generation = context.generation()
+      const path = notePathForRoute(context.route(), todayIso())
+      if (generation === null || path === null) {
+        return
+      }
+      await runGistPublish(path, generation)
     },
   },
   {
