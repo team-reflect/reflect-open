@@ -50,7 +50,7 @@ export function CalendarStrip({ date, onSelect }: CalendarStripProps): ReactElem
               aria-label={format(parseIsoDate(day), 'EEEE, MMMM do')}
               aria-current={selected ? 'date' : undefined}
               onClick={() => onSelect(day)}
-              className="flex flex-1 flex-col items-center gap-1 py-1"
+              className="flex flex-1 flex-col items-center gap-0.5 py-1"
             >
               <span className="text-[11px] font-medium text-text-muted">
                 {format(parseIsoDate(day), 'EEEEE')}
@@ -65,6 +65,15 @@ export function CalendarStrip({ date, onSelect }: CalendarStripProps): ReactElem
               >
                 {format(parseIsoDate(day), 'd')}
               </span>
+              {/* Today dot (V1) — a fixed-height slot so cells stay aligned;
+                  shown only when today isn't the selected (circled) day. */}
+              <span
+                aria-hidden
+                className={cn(
+                  'size-1 rounded-full',
+                  !selected && isToday ? 'bg-primary' : 'bg-transparent',
+                )}
+              />
             </button>
           )
         })}

@@ -7,7 +7,7 @@ import type { ReactElement } from 'react'
 import { setBridge } from '@reflect/core'
 import { RouterProvider, useRouter } from '@/routing/router'
 import type { Route } from '@/routing/route'
-import { parseIsoDate, todayIso } from '@/lib/dates'
+import { addDaysIso, parseIsoDate, todayIso } from '@/lib/dates'
 import { monthLabel, weekOf } from './calendar'
 import { MobileShell } from './mobile-shell'
 
@@ -169,6 +169,22 @@ describe('MobileShell', () => {
     expect(view.getByRole('button', { name: dayCellLabel(today) }).getAttribute('aria-current')).toBe(
       'date',
     )
+  })
+
+  it('re-anchors the carousel when a date link lands outside its window', async () => {
+    const user = userEvent.setup()
+    // Beyond the ±366-day window — only reachable as a date-link navigation,
+    // which forces the carousel to rebuild its window around the day.
+    const farDay = addDaysIso(todayIso(), 400)
+    files[`daily/${farDay}.md`] = 'far future plans'
+    const view = mount({ kind: 'today' }, { kind: 'daily', date: farDay })
+
+    await user.click(view.getByRole('button', { name: 'probe-navigate' }))
+    expect(view.getByRole('heading').textContent).toBe(monthLabel(farDay))
+    await waitFor(() => {
+      const editors = view.getAllByTestId('fake-editor')
+      expect(editors.some((editor) => editor.textContent?.includes('far future plans'))).toBe(true)
+    })
   })
 
   it('opens a note from in-screen navigation and pops back through history', async () => {
