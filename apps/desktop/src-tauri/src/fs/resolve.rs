@@ -53,7 +53,7 @@ fn existing_ancestor(path: &Path) -> PathBuf {
 /// the lexical guard, this canonicalizes the deepest existing ancestor and
 /// verifies it stays under the canonicalized root, so a symlink inside the graph
 /// can't redirect reads/writes outside it.
-pub(super) fn resolve(root: &Path, rel: &str) -> AppResult<PathBuf> {
+pub(crate) fn resolve(root: &Path, rel: &str) -> AppResult<PathBuf> {
     let rel = ensure_relative(rel)?;
     let joined = root.join(&rel);
     let canonical_root = root.canonicalize()?;

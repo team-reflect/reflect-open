@@ -1,0 +1,3 @@
+# WXT build + generated types (recreated by `wxt prepare` / `wxt build`)
+.output/
+.wxt/

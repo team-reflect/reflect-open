@@ -4543,6 +4543,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "reflect-capture-host"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "dirs",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "reflect-cli"
 version = "0.1.0"
 dependencies = [
@@ -4576,10 +4587,12 @@ dependencies = [
  "fastembed",
  "git2",
  "hf-hub",
+ "image",
  "keyring",
  "notify",
  "notify-debouncer-full",
  "reflect-index-schema",
+ "reqwest 0.12.28",
  "rusqlite",
  "serde",
  "serde_json",

@@ -1,7 +1,10 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "bundle": {
-    "externalBin": ["binaries/reflect"],
+    "externalBin": [
+      "binaries/reflect",
+      "binaries/reflect-capture-host"
+    ],
     "macOS": {
       "entitlements": "Entitlements.plist"
     }

@@ -46,15 +46,19 @@ pub struct FileChange {
 }
 
 /// Graph-relative path if `path` is tracked: a markdown note (`.md` under
-/// `daily/` or `notes/`) or an audio-memo recording (anything under
-/// `audio-memos/`), else `None`. Pure — the filtering rule, unit-tested.
+/// `daily/` or `notes/`), an audio-memo recording (anything under
+/// `audio-memos/`), or a spooled capture envelope (`.json` under
+/// `.reflect/inbox/` — the one carve-out from the `.reflect/` blackout; the
+/// envelope is the spool's commit point and triggers the capture drain), else
+/// `None`. Pure — the filtering rule, unit-tested.
 fn tracked_relpath(path: &Path, root: &Path) -> Option<String> {
     let rel = path.strip_prefix(root).ok()?;
     let rel_str = rel.to_string_lossy().replace('\\', "/");
     let note = (rel_str.starts_with("daily/") || rel_str.starts_with("notes/"))
         && rel_str.ends_with(".md");
     let recording = rel_str.starts_with("audio-memos/");
-    (note || recording).then_some(rel_str)
+    let capture = rel_str.starts_with(".reflect/inbox/") && rel_str.ends_with(".json");
+    (note || recording || capture).then_some(rel_str)
 }
 
 /// Reduce a debounced batch of paths to unique tracked changes (last kind wins).
@@ -177,6 +181,26 @@ mod tests {
             )
             .as_deref(),
             Some("audio-memos/audio-memo-2026-06-09-090000-000.m4a")
+        );
+        // Capture envelopes are tracked: `.json` under `.reflect/inbox/` is
+        // the spool's commit point and triggers the drain. Sibling screenshots
+        // and host tmp files are not.
+        assert_eq!(
+            tracked_relpath(Path::new("/g/.reflect/inbox/7c9e6679.json"), root).as_deref(),
+            Some(".reflect/inbox/7c9e6679.json")
+        );
+        assert_eq!(
+            tracked_relpath(Path::new("/g/.reflect/inbox/7c9e6679.jpg"), root),
+            None
+        );
+        assert_eq!(
+            tracked_relpath(Path::new("/g/.reflect/inbox/.tmp-x8f2"), root),
+            None
+        );
+        // Quarantined spools must not re-trigger the drain.
+        assert_eq!(
+            tracked_relpath(Path::new("/g/.reflect/inbox-rejected/bad.json"), root),
+            None
         );
         // Not tracked: the index, assets, non-markdown, dotfiles, outside root,
         // or the audio-memos directory entry itself.

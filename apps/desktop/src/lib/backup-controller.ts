@@ -12,6 +12,7 @@ import {
   gitDisconnect,
   gitSetup,
   gitStatus,
+  isCaptureSpoolPath,
   isNotePath,
   loadGithubAuth,
   parseGithubRemote,
@@ -211,7 +212,14 @@ export function createBackupController(options: BackupControllerOptions): Backup
       engine = next
       setState({ phase: 'connected', remoteUrl, repo, status: { state: 'idle' } })
 
-      const subscription = await subscribeFileChanges(() => next.noteChanged())
+      // Spooled capture envelopes (`.reflect/inbox/`) are git-ignored and
+      // drained within seconds — they must not tick the commit debounce. The
+      // drain's own note writes arrive as ordinary changes right after.
+      const subscription = await subscribeFileChanges((changes) => {
+        if (changes.some((change) => !isCaptureSpoolPath(change.path))) {
+          next.noteChanged()
+        }
+      })
       if (disposed || engine !== next) {
         // Teardown (or a restart) won the race against the subscribe.
         subscription()

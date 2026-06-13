@@ -49,6 +49,10 @@ git2 = { version = "0.21", default-features = false, features = [
   "vendored-openssl",
 ] }
 tauri-plugin-http = "2.5.9"
+# Link capture (Plan 11): screenshot downscale + the bounded meta-scrape fetch.
+# reqwest 0.12 rides the exact version tauri-plugin-http already compiles.
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 
 # Desktop-only capabilities (Plan 19): auto-update (mobile updates go through
 # the app stores), window-state (no windows to restore on mobile), the file

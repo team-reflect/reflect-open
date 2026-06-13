@@ -1,0 +1,287 @@
+{
+  "comment": "Shared contract fixtures for the capture wire message. Consumed by BOTH packages/core/src/actions/capture-envelope.parity.test.ts (zod, the source of truth) and apps/native-host/src/envelope.rs's parity test (the serde mirror). Every `accepted` message must pass both validators; every `rejected` message must fail both. This pins the invariant that the host never spools an envelope the drain would quarantine, and that the two validators cannot drift apart silently.",
+  "accepted": [
+    {
+      "name": "minimal",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://example.com/article",
+          "title": "An article",
+          "capturedAt": "2026-06-12T15:30:22Z",
+          "source": "extension"
+        }
+      }
+    },
+    {
+      "name": "full with selection, note, and screenshot",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "http://localhost:3000/page",
+          "title": "Local page",
+          "selection": "quoted text",
+          "note": "check later",
+          "capturedAt": "2026-06-12T15:30:22.845Z",
+          "source": "extension"
+        },
+        "screenshotBase64": "aGVsbG8="
+      }
+    },
+    {
+      "name": "negative-offset timestamp",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://example.com",
+          "title": "Example",
+          "capturedAt": "2026-06-12T15:30:22.845-07:00",
+          "source": "extension"
+        }
+      }
+    },
+    {
+      "name": "leap-day timestamp",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://example.com",
+          "title": "Example",
+          "capturedAt": "2028-02-29T00:00:00Z",
+          "source": "extension"
+        }
+      }
+    },
+    {
+      "name": "uppercase UUID",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7C9E6679-7425-40DE-944B-E07FC1F90AE7",
+          "url": "https://example.com",
+          "title": "Example",
+          "capturedAt": "2026-06-12T15:30:22Z",
+          "source": "extension"
+        }
+      }
+    },
+    {
+      "name": "unknown envelope field is tolerated (forward compat)",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://example.com",
+          "title": "Example",
+          "capturedAt": "2026-06-12T15:30:22Z",
+          "source": "extension",
+          "futureField": "ignored"
+        }
+      }
+    },
+    {
+      "name": "pre-stamped screenshotRef is ignored (the host owns it)",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://example.com",
+          "title": "Example",
+          "screenshotRef": "sneaky.jpg",
+          "capturedAt": "2026-06-12T15:30:22Z",
+          "source": "extension"
+        }
+      }
+    }
+  ],
+  "rejected": [
+    {
+      "name": "unsupported version",
+      "message": {
+        "envelope": {
+          "version": 2,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://example.com",
+          "title": "Example",
+          "capturedAt": "2026-06-12T15:30:22Z",
+          "source": "extension"
+        }
+      }
+    },
+    {
+      "name": "non-uuid id",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "not-a-uuid",
+          "url": "https://example.com",
+          "title": "Example",
+          "capturedAt": "2026-06-12T15:30:22Z",
+          "source": "extension"
+        }
+      }
+    },
+    {
+      "name": "traversal-shaped id",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "../../../etc/passwd",
+          "url": "https://example.com",
+          "title": "Example",
+          "capturedAt": "2026-06-12T15:30:22Z",
+          "source": "extension"
+        }
+      }
+    },
+    {
+      "name": "ftp url",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "ftp://example.com/file",
+          "title": "Example",
+          "capturedAt": "2026-06-12T15:30:22Z",
+          "source": "extension"
+        }
+      }
+    },
+    {
+      "name": "file url",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "file:///etc/passwd",
+          "title": "Example",
+          "capturedAt": "2026-06-12T15:30:22Z",
+          "source": "extension"
+        }
+      }
+    },
+    {
+      "name": "not a url at all",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "example dot com",
+          "title": "Example",
+          "capturedAt": "2026-06-12T15:30:22Z",
+          "source": "extension"
+        }
+      }
+    },
+    {
+      "name": "empty capturedAt",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://example.com",
+          "title": "Example",
+          "capturedAt": "",
+          "source": "extension"
+        }
+      }
+    },
+    {
+      "name": "prose capturedAt",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://example.com",
+          "title": "Example",
+          "capturedAt": "yesterday",
+          "source": "extension"
+        }
+      }
+    },
+    {
+      "name": "date-only capturedAt",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://example.com",
+          "title": "Example",
+          "capturedAt": "2026-06-12",
+          "source": "extension"
+        }
+      }
+    },
+    {
+      "name": "thirteenth month",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://example.com",
+          "title": "Example",
+          "capturedAt": "2026-13-12T15:30:22Z",
+          "source": "extension"
+        }
+      }
+    },
+    {
+      "name": "June 31st",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://example.com",
+          "title": "Example",
+          "capturedAt": "2026-06-31T15:30:22Z",
+          "source": "extension"
+        }
+      }
+    },
+    {
+      "name": "unknown source",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://example.com",
+          "title": "Example",
+          "capturedAt": "2026-06-12T15:30:22Z",
+          "source": "carrier-pigeon"
+        }
+      }
+    },
+    {
+      "name": "screenshot is not base64",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://example.com",
+          "title": "Example",
+          "capturedAt": "2026-06-12T15:30:22Z",
+          "source": "extension"
+        },
+        "screenshotBase64": "not base64!!!"
+      }
+    },
+    {
+      "name": "screenshot is empty",
+      "message": {
+        "envelope": {
+          "version": 1,
+          "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+          "url": "https://example.com",
+          "title": "Example",
+          "capturedAt": "2026-06-12T15:30:22Z",
+          "source": "extension"
+        },
+        "screenshotBase64": ""
+      }
+    }
+  ]
+}

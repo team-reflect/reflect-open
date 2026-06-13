@@ -21,8 +21,12 @@ use crate::error::{AppError, AppResult};
 use self::io::{atomic_write, atomic_write_bytes, bootstrap, collect_files, NOTE_DIRS};
 use self::resolve::resolve;
 
-#[cfg(desktop)] // sole consumer is the watcher, which mobile stands in for
+// Consumed by the watcher (desktop) and the capture inbox (all platforms),
+// so the re-export is no longer desktop-gated.
 pub(crate) use self::io::modified_ms;
+/// The traversal guard, shared with sibling modules that address graph files
+/// (capture promotes screenshots into `assets/`).
+pub(crate) use self::resolve::resolve as resolve_in_graph;
 
 /// The open graph root plus a monotonic generation, kept **under one lock** so
 /// they swap atomically (the same pattern as the index's `IndexState`, Plan 04b).

@@ -88,6 +88,13 @@ export {
   listFiles,
   recentGraphs,
   forgetRecent,
+  captureHostRegister,
+  captureInboxList,
+  captureInboxRead,
+  captureInboxReject,
+  captureInboxRemove,
+  captureMetaFetch,
+  promoteCaptureScreenshot,
 } from './graph/commands'
 
 // User settings (config-dir JSON document; Rust persists, this layer validates)
@@ -240,6 +247,41 @@ export {
   type ReconcileAudioMemosOutcome,
   type ReconcileStop,
 } from './actions/audio-memo'
+
+// Link capture (Plan 11) — the envelope also ships to the extension via the
+// `./capture-envelope` subpath export (browser-safe, zod-only)
+export {
+  captureAckSchema,
+  captureEnvelopeSchema,
+  captureWireMessageSchema,
+  type CaptureAck,
+  type CaptureEnvelope,
+  type CaptureSource,
+  type CaptureWireMessage,
+} from './actions/capture-envelope'
+export {
+  captureFromPath,
+  captureIdentity,
+  captureNoteMeta,
+  drainCaptureInbox,
+  isCaptureSpoolPath,
+  listPendingCaptures,
+  reconcileCaptureEnrichment,
+  type CaptureIdentity,
+  type CaptureNoteMeta,
+  type CaptureStatus,
+  type DrainCaptureInboxInput,
+  type DrainCaptureInboxOutcome,
+  type ReconcileCaptureEnrichmentInput,
+  type ReconcileCaptureEnrichmentOutcome,
+} from './actions/capture'
+export { parsePageMeta, scrapePageMeta, type PageMeta } from './actions/meta-scrape'
+export {
+  describePage,
+  isDescriptionRejected,
+  DescriptionRejectedError,
+  type DescribePageRequest,
+} from './ai/describe-page'
 
 // Backup & sync (Plan 12)
 export {

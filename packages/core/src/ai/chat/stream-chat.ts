@@ -1,8 +1,6 @@
 import { stepCountIs, streamText, type LanguageModel, type ModelMessage } from 'ai'
-import { createAnthropic } from '@ai-sdk/anthropic'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
-import { createOpenAI } from '@ai-sdk/openai'
 import { errorMessage } from '../../errors'
+import { languageModel } from '../language-model'
 import { modelContextWindow } from '../provider-catalog'
 import type { AiProviderConfig } from '../../settings/schema'
 import type { CloudGraphContext, CloudSafe } from '../checkers'
@@ -62,17 +60,6 @@ export type ChatStreamEvent =
   | { type: 'error'; message: string; messages: ModelMessage[] }
   | { type: 'aborted'; messages: ModelMessage[] }
   | { type: 'complete'; messages: ModelMessage[] }
-
-function languageModel(config: AiProviderConfig, apiKey: string, fetchFn: typeof fetch): LanguageModel {
-  switch (config.provider) {
-    case 'openai':
-      return createOpenAI({ apiKey, fetch: fetchFn })(config.model)
-    case 'anthropic':
-      return createAnthropic({ apiKey, fetch: fetchFn })(config.model)
-    case 'google':
-      return createGoogleGenerativeAI({ apiKey, fetch: fetchFn })(config.model)
-  }
-}
 
 /**
  * Run one chat turn against the user's configured provider, yielding

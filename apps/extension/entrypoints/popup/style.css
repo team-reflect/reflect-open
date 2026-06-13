@@ -1,0 +1,31 @@
+/* Design-system tokens (the same `:root` / `.dark` variables the desktop app
+   themes with), then Tailwind v4. The popup bridges only the tokens it uses —
+   the full mapping lives in apps/desktop/src/styles/index.css. */
+@import '@reflect/design-system/styles.css';
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-surface-app: var(--surface-app);
+  --color-surface-hover: var(--surface-hover);
+  --color-text: var(--text);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-on-brand: var(--text-on-brand);
+  --color-border: var(--border);
+  --color-input-bg: var(--input-bg);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-focus-ring: var(--focus-ring);
+  --color-destructive: var(--destructive);
+}
+
+body {
+  margin: 0;
+  width: 320px;
+  background: var(--surface-app);
+  color: var(--text);
+  font-family: var(--font-sans, system-ui, sans-serif);
+}

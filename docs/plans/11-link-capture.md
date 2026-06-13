@@ -1,12 +1,19 @@
 # Plan 11 — Link Capture
 
-> **Status (2026-06-12): Deferred — the first macOS release ships without link
-> capture.** Nothing below has been built (no `apps/extension`, no native-messaging
-> host, no capture inbox). The design and the
-> [bridge spike](../spikes/link-capture-bridge.md) remain the blueprint for when
-> capture is picked up post-launch; the shipped audio-memo pipeline
-> (`packages/core/src/actions/audio-memo.ts`) already follows the same raw-first
-> capture/async-enrichment shape and is the template to sit alongside.
+> **Status (2026-06-12): Implemented.** The pipeline below is built end-to-end:
+> `apps/extension` (WXT MV3, popup + queue + ⌘⇧K), `apps/native-host`
+> (`reflect-capture-host`, bundled as a second sidecar), the capture inbox +
+> watcher carve-out, `drainCaptureInbox`/`reconcileCaptureEnrichment` in
+> `packages/core/src/actions/capture.ts`, and the desktop controller
+> (`apps/desktop/src/lib/capture-controller.ts`). Two deliberate narrowings for
+> the first release: browser-manifest registration is **macOS-only** (Windows
+> HKCU keys / Linux paths land with Plan 15), and there is **no settings UI** —
+> host registration is silent and the extension popup explains the
+> missing-app/missing-graph states. Every capture creates a dedicated
+> `notes/capture-<stamp>.md` (screenshots are always taken, so the
+> "enough phase-1 content" condition below is always met) plus the daily
+> `[[Links]]` backlink; enrichment status lives in the capture note's
+> frontmatter (`captureStatus: pending | done | skipped`).
 
 **Goal:** Launch-grade web capture: a Chrome extension hands URL/title/selection/
 screenshot to the **installed desktop app** through a local **capture inbox**; the
