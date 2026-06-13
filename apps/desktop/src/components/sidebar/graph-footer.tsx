@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 import type { GraphInfo } from '@reflect/core'
-import { Check, FolderOpen } from 'lucide-react'
+import { revealItemInDir } from '@tauri-apps/plugin-opener'
+import { Check, FolderOpen, LocateFixed } from 'lucide-react'
 import { GraphSwatch } from '@/components/graph-swatch'
 import {
   DropdownMenu,
@@ -139,6 +140,17 @@ export function GraphFooter({ graph }: { graph: GraphInfo }): ReactElement {
               ))}
             </DropdownMenuSubContent>
           </DropdownMenuSub>
+          <DropdownMenuItem
+            onSelect={() => {
+              void revealItemInDir(graph.root).catch((cause: unknown) => {
+                console.error('open graph folder failed:', cause)
+              })
+            }}
+            className={MENU_ITEM_CLASS}
+          >
+            <LocateFixed aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">Open graph in Finder</span>
+          </DropdownMenuItem>
           <DropdownMenuItem
             onSelect={() => void pickAndOpen()}
             className={MENU_ITEM_CLASS}
