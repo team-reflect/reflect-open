@@ -18,6 +18,7 @@ function fakeSession(path: string, log: string[]): NoteSession {
     content: () => '',
     updateFrontmatter: () => true,
     dispose: () => {},
+    discard: () => {},
   }
 }
 

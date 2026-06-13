@@ -108,6 +108,7 @@ function fakeSession(content: string): NoteSession & {
     content: () => content,
     updateFrontmatter: vi.fn(() => true),
     dispose: () => {},
+    discard: () => {},
   }
 }
 

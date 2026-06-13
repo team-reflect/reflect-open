@@ -244,6 +244,13 @@ export interface NoteSession {
   commitFrontmatter: (patch: FrontmatterPatch) => Promise<boolean>
   /** Flush pending edits and detach: no further snapshots are emitted. */
   dispose: () => void
+  /**
+   * Detach **without** flushing — for deleting the note: a final flush (which
+   * `dispose` performs) would rewrite the buffer and recreate the file we are
+   * removing. After `discard`, a later `dispose` (e.g. on the pane's unmount)
+   * is a no-op. Pending saves are cancelled.
+   */
+  discard: () => void
 }
 
 /** Exact frontmatter bytes (may be empty) and the body that follows them. */
@@ -294,6 +301,9 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   /** A watcher event arrived during the load; replay reconciliation after it. */
   let missedChange = false
   let disposed = false
+  // Set by `discard` — tells `dispose` to skip its flush (the file is being
+  // deleted, so rewriting it would recreate it).
+  let discarded = false
 
   let lastEmitted: NoteSessionSnapshot | null = null
 
@@ -620,9 +630,19 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   }
 
   function dispose(): void {
-    // Flush first: the queued save step reads the (now frozen) buffer, so
-    // pending edits persist to this session's path even after the UI moves on.
-    void flush()
+    // A discarded session must not write: its file is being deleted, and a
+    // flush would recreate it. Otherwise flush first — the queued save step
+    // reads the (now frozen) buffer, so pending edits persist to this
+    // session's path even after the UI moves on.
+    if (!discarded) {
+      void flush()
+    }
+    disposed = true
+  }
+
+  function discard(): void {
+    cancelScheduledSave()
+    discarded = true
     disposed = true
   }
 
@@ -643,5 +663,6 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     updateFrontmatter,
     commitFrontmatter,
     dispose,
+    discard,
   }
 }

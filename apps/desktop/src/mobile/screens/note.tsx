@@ -3,6 +3,7 @@ import { ChevronLeft } from 'lucide-react'
 import { NotePane } from '@/components/note-pane'
 import { Button } from '@/components/ui/button'
 import { isUntitledNotePath } from '@/lib/create-note'
+import { NoteActionsMenu } from '@/mobile/note-actions-menu'
 import { useRouter } from '@/routing/router'
 
 /**
@@ -32,7 +33,10 @@ export function MobileNote({ path }: { path: string }): ReactElement {
         <h1 className="min-w-0 flex-1 truncate text-base font-semibold">
           {untitled ? 'New note' : noteTitleFromPath(path)}
         </h1>
-        <div aria-hidden className="size-10 shrink-0" />
+        <NoteActionsMenu
+          path={path}
+          onDeleted={() => (canBack ? back() : navigate({ kind: 'today' }))}
+        />
       </header>
       <main
         className="min-h-0 flex-1 overflow-y-auto"

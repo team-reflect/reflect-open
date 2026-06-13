@@ -37,6 +37,7 @@ function fakeSession(path: string) {
     content: () => '',
     updateFrontmatter: () => true,
     dispose: () => {},
+    discard: () => {},
   }
   return { session, flush }
 }

@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { parseIsoDate } from '@/lib/dates'
 import { monthLabel, weekOf } from '@/mobile/calendar'
+import { SettingsSheet } from '@/mobile/settings-sheet'
 import { cn } from '@/lib/utils'
 import { useSettings } from '@/providers/settings-provider'
 
@@ -32,8 +33,9 @@ export function CalendarStrip({ date, today, onSelect }: CalendarStripProps): Re
       className="shrink-0 border-b border-border px-2 pb-1"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <div className="flex items-center justify-between px-2 py-1">
-        <h1 className="text-base font-semibold">{monthLabel(date)}</h1>
+      <div className="flex items-center gap-1 px-1 py-1">
+        <SettingsSheet />
+        <h1 className="min-w-0 flex-1 truncate text-base font-semibold">{monthLabel(date)}</h1>
         {date !== today && (
           <Button variant="ghost" size="sm" onClick={() => onSelect(today)}>
             Today

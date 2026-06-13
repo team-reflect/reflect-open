@@ -122,6 +122,24 @@ describe('createNoteSession', () => {
     expect(snapshots.length).toBe(emittedBeforeDispose)
   })
 
+  it('discard detaches without writing — even with a pending edit (delete path)', async () => {
+    const { session, writes } = harness()
+    session.load()
+    await settled()
+
+    session.editorChanged('# Unsaved edit\n')
+    session.discard()
+    await settled()
+
+    // Nothing written: the file is being deleted, so a flush would recreate it.
+    expect(writes).toEqual([])
+
+    // A later dispose (the pane unmounting) stays a no-op too.
+    session.dispose()
+    await settled()
+    expect(writes).toEqual([])
+  })
+
   it('does not re-emit identical snapshots', async () => {
     const { session, snapshots } = harness()
     session.load()

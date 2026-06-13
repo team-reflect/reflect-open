@@ -15,6 +15,7 @@ function fakeSession(path: string) {
   let current = path
   const flush = vi.fn(async () => {})
   const dispose = vi.fn()
+  const discard = vi.fn()
   const session: NoteSession = {
     get path() {
       return current
@@ -32,6 +33,7 @@ function fakeSession(path: string) {
     content: () => '',
     updateFrontmatter: () => true,
     dispose,
+    discard,
   }
   return { session, flush, dispose }
 }
