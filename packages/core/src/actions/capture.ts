@@ -84,7 +84,7 @@ export interface CaptureIdentity {
 }
 
 const CAPTURE_PATH_RE =
-  /^notes\/(capture-(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})(\d{2})-\d{3})\.md$/
+  /^notes\/(capture-(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})(\d{2})-\d{3}-[0-9a-f]{4})\.md$/
 
 function pad(value: number, width: number): string {
   return String(value).padStart(width, '0')
@@ -101,14 +101,18 @@ function buildIdentity(base: string, date: string): CaptureIdentity {
 
 /**
  * The identity a capture stores under — **local-time** components of
- * `capturedAt` (the audio-memo convention), so the daily note matches the
- * day the user experienced. Deterministic, which makes a crashed drain's
- * re-run overwrite its own partial work instead of duplicating it.
+ * `capturedAt` (the audio-memo convention, so the daily note matches the day
+ * the user experienced) plus a slice of the envelope's UUID. Deterministic
+ * per envelope, which makes a crashed drain's re-run overwrite its own
+ * partial work instead of duplicating it; the id slice keeps two *different*
+ * envelopes stamped in the same millisecond (two windows' popups saving at
+ * once) from colliding onto one note path.
  */
-export function captureIdentity(capturedAt: Date): CaptureIdentity {
+export function captureIdentity(capturedAt: Date, envelopeId: string): CaptureIdentity {
   const date = `${capturedAt.getFullYear()}-${pad(capturedAt.getMonth() + 1, 2)}-${pad(capturedAt.getDate(), 2)}`
   const stamp = `${pad(capturedAt.getHours(), 2)}${pad(capturedAt.getMinutes(), 2)}${pad(capturedAt.getSeconds(), 2)}`
-  const base = `capture-${date}-${stamp}-${pad(capturedAt.getMilliseconds(), 3)}`
+  const suffix = envelopeId.slice(0, 4).toLowerCase()
+  const base = `capture-${date}-${stamp}-${pad(capturedAt.getMilliseconds(), 3)}-${suffix}`
   return buildIdentity(base, date)
 }
 
@@ -372,7 +376,7 @@ export async function drainCaptureInbox(
         continue
       }
 
-      const fresh = captureIdentity(new Date(envelope.capturedAt))
+      const fresh = captureIdentity(new Date(envelope.capturedAt), envelope.id)
       const daily = dailyPath(fresh.date)
       const dailySource = await noteSource(daily, input.generation)
       const selection = envelope.selection?.trim()

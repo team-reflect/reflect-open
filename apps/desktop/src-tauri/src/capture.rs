@@ -373,7 +373,8 @@ pub async fn capture_meta_fetch(url: String) -> AppResult<String> {
         .headers()
         .get(reqwest::header::CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())
-        .unwrap_or("");
+        .unwrap_or("")
+        .to_ascii_lowercase(); // MIME types are case-insensitive (`TEXT/HTML`)
     if !content_type.contains("html") {
         return Err(AppError::parse(format!(
             "{url} is not an HTML page ({content_type})"

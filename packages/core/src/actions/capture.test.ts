@@ -68,7 +68,7 @@ const NO_PROVIDERS: AiProvidersState = { providers: [], defaultProviderId: null 
 
 /** 2026-06-11 15:30:22.845 local — every derived name is asserted from it. */
 const CAPTURED_AT = new Date(2026, 5, 11, 15, 30, 22, 845)
-const IDENTITY = captureIdentity(CAPTURED_AT)
+const IDENTITY = captureIdentity(CAPTURED_AT, '7c9e6679-7425-40de-944b-e07fc1f90ae7')
 const DAILY = 'daily/2026-06-11.md'
 const URL = 'https://example.com/article'
 
@@ -171,13 +171,19 @@ beforeEach(() => {
 })
 
 describe('captureIdentity', () => {
-  it('derives every name from the capture moment, in local time', () => {
+  it('derives every name from the capture moment (local time) plus the envelope id', () => {
     expect(IDENTITY).toEqual({
-      base: 'capture-2026-06-11-153022-845',
+      base: 'capture-2026-06-11-153022-845-7c9e',
       date: '2026-06-11',
-      notePath: 'notes/capture-2026-06-11-153022-845.md',
-      assetPath: 'assets/capture-2026-06-11-153022-845.jpg',
+      notePath: 'notes/capture-2026-06-11-153022-845-7c9e.md',
+      assetPath: 'assets/capture-2026-06-11-153022-845-7c9e.jpg',
     })
+  })
+
+  it('two envelopes stamped in the same millisecond get distinct identities', () => {
+    const other = captureIdentity(CAPTURED_AT, 'ffff0000-0000-4000-8000-000000000001')
+    expect(other.base).toBe('capture-2026-06-11-153022-845-ffff')
+    expect(other.notePath).not.toBe(IDENTITY.notePath)
   })
 })
 
@@ -188,9 +194,10 @@ describe('captureFromPath', () => {
 
   it('rejects everything that is not a well-formed capture note', () => {
     expect(captureFromPath('notes/capture-the-flag.md')).toBeNull()
-    expect(captureFromPath('notes/capture-2026-13-40-153022-845.md')).toBeNull()
-    expect(captureFromPath('notes/capture-2026-06-11-993022-845.md')).toBeNull()
-    expect(captureFromPath('daily/capture-2026-06-11-153022-845.md')).toBeNull()
+    expect(captureFromPath('notes/capture-2026-06-11-153022-845.md')).toBeNull() // no id suffix
+    expect(captureFromPath('notes/capture-2026-13-40-153022-845-7c9e.md')).toBeNull()
+    expect(captureFromPath('notes/capture-2026-06-11-993022-845-7c9e.md')).toBeNull()
+    expect(captureFromPath('daily/capture-2026-06-11-153022-845-7c9e.md')).toBeNull()
     expect(captureFromPath('notes/audio-memo-2026-06-11-153022-845.md')).toBeNull()
   })
 })
@@ -219,7 +226,7 @@ describe('drainCaptureInbox', () => {
     const note = files.get(IDENTITY.notePath)
     expect(note).toContain('captureUrl: https://example.com/article')
     expect(note).toContain('captureStatus: pending')
-    expect(note).toContain('captureScreenshot: assets/capture-2026-06-11-153022-845.jpg')
+    expect(note).toContain('captureScreenshot: assets/capture-2026-06-11-153022-845-7c9e.jpg')
     expect(note).toContain('# An article')
     expect(note).toContain('[example.com](https://example.com/article)')
     expect(note).toContain('check later')
@@ -228,7 +235,7 @@ describe('drainCaptureInbox', () => {
 
     const daily = files.get(DAILY)
     expect(daily).toContain('## Links')
-    expect(daily).toContain('[[capture-2026-06-11-153022-845|An article]]')
+    expect(daily).toContain('[[capture-2026-06-11-153022-845-7c9e|An article]]')
     expect(spool.size).toBe(0)
   })
 
@@ -264,15 +271,15 @@ describe('drainCaptureInbox', () => {
   })
 
   it('appends to the existing Links section without duplicating it', async () => {
-    files.set(DAILY, '# plans\n\n## Links\n\n[[capture-2026-06-11-090000-000|Old]]\n')
+    files.set(DAILY, '# plans\n\n## Links\n\n[[capture-2026-06-11-090000-000-0000|Old]]\n')
     addSpool(envelope())
 
     await drain()
 
     const daily = files.get(DAILY) ?? ''
     expect(daily.match(/## Links/g)).toHaveLength(1)
-    expect(daily).toContain('[[capture-2026-06-11-090000-000|Old]]')
-    expect(daily).toContain('[[capture-2026-06-11-153022-845|An article]]')
+    expect(daily).toContain('[[capture-2026-06-11-090000-000-0000|Old]]')
+    expect(daily).toContain('[[capture-2026-06-11-153022-845-7c9e|An article]]')
   })
 
   it('saves a private-day capture raw, marked skipped', async () => {
@@ -283,7 +290,7 @@ describe('drainCaptureInbox', () => {
 
     expect(outcome.drained).toBe(1)
     expect(files.get(IDENTITY.notePath)).toContain('captureStatus: skipped')
-    expect(files.get(DAILY)).toContain('[[capture-2026-06-11-153022-845|An article]]')
+    expect(files.get(DAILY)).toContain('[[capture-2026-06-11-153022-845-7c9e|An article]]')
   })
 
   it('refreshes a same-day same-URL same-selection re-capture in place', async () => {
@@ -294,7 +301,7 @@ describe('drainCaptureInbox', () => {
       }),
     )
     await drain()
-    const originalNotePath = 'notes/capture-2026-06-11-093000-000.md'
+    const originalNotePath = 'notes/capture-2026-06-11-093000-000-0000.md'
     expect(files.has(originalNotePath)).toBe(true)
 
     addSpool(envelope()) // same URL, no selection, same day, 15:30
@@ -306,12 +313,12 @@ describe('drainCaptureInbox', () => {
     expect(files.get(originalNotePath)).toContain('captureStatus: pending')
     expect(promoteMock).toHaveBeenLastCalledWith(
       '7c9e6679-7425-40de-944b-e07fc1f90ae7.jpg',
-      'assets/capture-2026-06-11-093000-000.jpg',
+      'assets/capture-2026-06-11-093000-000-0000.jpg',
       1600,
       3,
     )
     const daily = files.get(DAILY) ?? ''
-    expect(daily.match(/capture-2026-06-11-093000-000/g)).toHaveLength(1)
+    expect(daily.match(/capture-2026-06-11-093000-000-0000/g)).toHaveLength(1)
     expect(daily).not.toContain('capture-2026-06-11-153022-845')
   })
 
@@ -361,6 +368,23 @@ describe('drainCaptureInbox', () => {
     expect(rejected.get('garbage.json')).toBe('not json')
     expect(inboxRemoveMock).not.toHaveBeenCalledWith('garbage.json', 3)
     expect(writeNoteMock).toHaveBeenCalled()
+  })
+
+  it('drains two same-millisecond captures of different pages into distinct notes', async () => {
+    addSpool(
+      envelope({ id: '00000000-0000-4000-8000-000000000001', url: 'https://a.com' }),
+      { screenshot: false },
+    )
+    addSpool(
+      envelope({ id: 'ffff0000-0000-4000-8000-000000000002', url: 'https://b.com' }),
+      { screenshot: false },
+    )
+
+    const outcome = await drain()
+
+    expect(outcome.drained).toBe(2)
+    expect(files.has('notes/capture-2026-06-11-153022-845-0000.md')).toBe(true)
+    expect(files.has('notes/capture-2026-06-11-153022-845-ffff.md')).toBe(true)
   })
 
   it('saves a capture whose screenshot cannot decode, without wedging the pass', async () => {
