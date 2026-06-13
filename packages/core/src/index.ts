@@ -268,6 +268,7 @@ export {
   getAuthenticatedUser,
   createGist,
   updateGist,
+  deleteGist,
   createSyncEngine,
   isSyncError,
   type GitStatus,

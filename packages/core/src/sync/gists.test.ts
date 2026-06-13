@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createGist, updateGist } from './gists'
+import { createGist, deleteGist, updateGist } from './gists'
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -82,5 +82,25 @@ describe('updateGist', () => {
     await expect(
       updateGist('tok', 'g1', 'A.md', { name: 'A.md', content: 'x' }, fetchFn),
     ).rejects.toMatchObject({ kind: 'auth' })
+  })
+})
+
+describe('deleteGist', () => {
+  it('issues the DELETE and resolves on success', async () => {
+    const fetchFn = vi.fn(async () => new Response(null, { status: 204 }))
+    await expect(deleteGist('tok', 'g1', fetchFn)).resolves.toBeUndefined()
+    const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://api.github.com/gists/g1')
+    expect(init.method).toBe('DELETE')
+  })
+
+  it('treats 404 as success — already gone is the goal state', async () => {
+    const fetchFn = vi.fn(async () => jsonResponse({ message: 'Not Found' }, 404))
+    await expect(deleteGist('tok', 'g1', fetchFn)).resolves.toBeUndefined()
+  })
+
+  it('maps 401/403 to auth errors', async () => {
+    const fetchFn = vi.fn(async () => jsonResponse({ message: 'Forbidden' }, 403))
+    await expect(deleteGist('tok', 'g1', fetchFn)).rejects.toMatchObject({ kind: 'auth' })
   })
 })

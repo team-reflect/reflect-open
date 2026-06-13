@@ -1,6 +1,7 @@
 import {
   assertCloudAllowed,
   createGist,
+  deleteGist,
   errorMessage,
   getGithubToken,
   gistBodyHash,
@@ -43,6 +44,13 @@ export async function publishNoteToGist(path: string, generation: number): Promi
   const parsed = parseNote({ path, source })
   assertCloudAllowed({ path, isPrivate: parsed.frontmatter.private })
 
+  // The gist must be recorded in frontmatter or the next publish forks a new
+  // one — and `upsertFrontmatter` rightly refuses to rewrite a header it
+  // can't parse. That refusal must come *before* the gist exists, not after.
+  if (parsed.frontmatterWarning !== undefined) {
+    throw new ReflectError('parse', 'The note has invalid frontmatter — fix it before publishing')
+  }
+
   const body = splitFrontmatter(source).body
   if (body.trim() === '') {
     throw new ReflectError('io', 'The note is empty — nothing to publish')
@@ -66,9 +74,25 @@ export async function publishNoteToGist(path: string, generation: number): Promi
     file: filename,
     hash: gistBodyHash(body),
   }
-  if (owner === null || !(await owner.commitFrontmatter({ gist }))) {
-    const onDisk = await readNoteOrEmpty(path)
-    await writeNote(path, upsertFrontmatter(onDisk, { gist }), generation)
+  try {
+    if (owner === null || !(await owner.commitFrontmatter({ gist }))) {
+      const onDisk = await readNoteOrEmpty(path)
+      await writeNote(path, upsertFrontmatter(onDisk, { gist }), generation)
+    }
+  } catch (cause) {
+    // The remote and local halves can't be atomic; compensate instead. A
+    // *freshly created* gist with no local record would be orphaned (and
+    // re-created on the next publish), so best-effort delete it. A failed
+    // *republish* record keeps the old block — same gist next time — and the
+    // existing gist must never be deleted out from under its shared link.
+    if (previous === undefined || published.id !== previous.id) {
+      try {
+        await deleteGist(token, published.id, providerFetch)
+      } catch {
+        // Best effort — the publish failure below is the error that matters.
+      }
+    }
+    throw cause
   }
   return published.htmlUrl
 }

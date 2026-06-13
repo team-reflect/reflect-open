@@ -60,6 +60,7 @@ export {
 export {
   createGist,
   updateGist,
+  deleteGist,
   type PublishedGist,
   type GistFile,
 } from './gists'

@@ -108,3 +108,27 @@ export async function updateGist(
   }
   return toPublished(await readJson(response, gistResponseSchema, 'gist update'))
 }
+
+/**
+ * Delete a gist. The publish flow's compensating action: a gist created
+ * moments ago whose local frontmatter record then failed to land would be
+ * orphaned on GitHub — and re-created on the next publish. A 404 counts as
+ * success (already gone is the goal state).
+ */
+export async function deleteGist(
+  token: string,
+  gistId: string,
+  fetchFn: FetchFn = fetch,
+): Promise<void> {
+  const response = await fetchFn(`https://api.github.com/gists/${gistId}`, {
+    method: 'DELETE',
+    headers: apiHeaders(token),
+  })
+  if (response.status === 404 || response.ok) {
+    return
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new ReflectError('auth', `GitHub rejected the token (${response.status})`)
+  }
+  throw new ReflectError('io', `deleting the gist failed (${response.status})`)
+}

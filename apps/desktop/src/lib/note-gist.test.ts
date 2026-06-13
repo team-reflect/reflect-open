@@ -7,6 +7,7 @@ const writeNote = vi.hoisted(() => vi.fn(async () => {}))
 const getGithubToken = vi.hoisted(() => vi.fn(async (): Promise<string | null> => 'tok'))
 const createGist = vi.hoisted(() => vi.fn())
 const updateGist = vi.hoisted(() => vi.fn())
+const deleteGist = vi.hoisted(() => vi.fn(async () => {}))
 const openSession = vi.hoisted(() => vi.fn<(path: string) => NoteSession | null>(() => null))
 const operationDone = vi.hoisted(() => vi.fn())
 const operationFail = vi.hoisted(() => vi.fn())
@@ -21,6 +22,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   getGithubToken,
   createGist,
   updateGist,
+  deleteGist,
 }))
 vi.mock('@/editor/open-documents', () => ({ openSession }))
 vi.mock('@/lib/operations', () => ({ startOperation }))
@@ -41,6 +43,7 @@ beforeEach(() => {
   getGithubToken.mockReset().mockResolvedValue('tok')
   createGist.mockReset().mockResolvedValue(PUBLISHED)
   updateGist.mockReset().mockResolvedValue(PUBLISHED)
+  deleteGist.mockReset().mockResolvedValue(undefined)
   openSession.mockReset().mockReturnValue(null)
   startOperation.mockClear()
   operationDone.mockClear()
@@ -134,6 +137,44 @@ describe('publishNoteToGist', () => {
     await expect(publishNoteToGist('notes/a.md', 3)).rejects.toMatchObject({
       kind: 'auth',
       message: expect.stringMatching(/connect github/i),
+    })
+  })
+
+  it('refuses invalid frontmatter before anything reaches GitHub (the record write would refuse)', async () => {
+    readNote.mockResolvedValue('---\nfoo: [unclosed\n---\nbody')
+    await expect(publishNoteToGist('notes/a.md', 3)).rejects.toMatchObject({
+      kind: 'parse',
+      message: expect.stringMatching(/invalid frontmatter/i),
+    })
+    expect(createGist).not.toHaveBeenCalled()
+    expect(updateGist).not.toHaveBeenCalled()
+  })
+
+  it('deletes a freshly created gist when recording it locally fails (no orphans)', async () => {
+    readNote.mockResolvedValue(BODY)
+    writeNote.mockRejectedValueOnce(new Error('disk on fire'))
+    await expect(publishNoteToGist('notes/a.md', 3)).rejects.toMatchObject({
+      message: 'disk on fire',
+    })
+    expect(deleteGist).toHaveBeenCalledWith('tok', 'g1', expect.any(Function))
+  })
+
+  it('never deletes the existing gist when recording a republish fails (shared links survive)', async () => {
+    readNote.mockResolvedValue(REPUBLISH_SOURCE)
+    updateGist.mockResolvedValue({ id: 'g0', htmlUrl: 'https://gist.github.com/alex/g0' })
+    writeNote.mockRejectedValueOnce(new Error('disk on fire'))
+    await expect(publishNoteToGist('notes/a.md', 3)).rejects.toMatchObject({
+      message: 'disk on fire',
+    })
+    expect(deleteGist).not.toHaveBeenCalled()
+  })
+
+  it('still surfaces the record failure when the compensating delete also fails', async () => {
+    readNote.mockResolvedValue(BODY)
+    writeNote.mockRejectedValueOnce(new Error('disk on fire'))
+    deleteGist.mockRejectedValueOnce(new Error('network down'))
+    await expect(publishNoteToGist('notes/a.md', 3)).rejects.toMatchObject({
+      message: 'disk on fire',
     })
   })
 })
