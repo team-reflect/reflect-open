@@ -101,7 +101,7 @@ export function MobileOnboardingScreen(): ReactElement {
               setStep('repo')
             }}
           />
-          <BackLink onClick={() => setStep('choose')} />
+          <BackLink onClick={() => setStep('choose')} disabled={action.pending} />
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -117,7 +117,7 @@ export function MobileOnboardingScreen(): ReactElement {
           <Button onClick={downloadAndOpen} disabled={action.pending}>
             {action.pending ? 'Downloading…' : 'Download & open'}
           </Button>
-          <BackLink onClick={() => setStep('choose')} />
+          <BackLink onClick={() => setStep('choose')} disabled={action.pending} />
         </div>
       )}
 
@@ -126,9 +126,20 @@ export function MobileOnboardingScreen(): ReactElement {
   )
 }
 
-function BackLink({ onClick }: { onClick: () => void }): ReactElement {
+function BackLink({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void
+  disabled?: boolean
+}): ReactElement {
   return (
-    <button type="button" className="text-center text-xs text-text-muted underline" onClick={onClick}>
+    <button
+      type="button"
+      className="text-center text-xs text-text-muted underline disabled:opacity-50"
+      onClick={onClick}
+      disabled={disabled}
+    >
       Back
     </button>
   )

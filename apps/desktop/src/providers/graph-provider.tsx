@@ -298,18 +298,17 @@ export function GraphProvider({
     if (mobileRoot === null) {
       throw new Error('No mobile graph root to open')
     }
-    // Clear the gate and start the open in one tick — `openRecent` moves the
-    // status to 'opening' synchronously, so the shell never flashes the
-    // open-failed screen in between.
-    setNeedsOnboarding(false)
+    // Keep the onboarding gate up while the open runs — `openRecent` moves the
+    // status to 'opening' synchronously and the onboarding screen shows its own
+    // pending state, so the shell never flashes. On failure throw rather than
+    // clear the gate: the screen surfaces the error and stays on onboarding for
+    // an in-app retry (Start fresh re-opens an already-cloned root) instead of
+    // landing on the dead-end open-failed screen.
     const opened = await openRecent(mobileRoot)
     if (!opened) {
-      // The open failed (e.g. a clone that won't open). Leave the onboarded
-      // flag unset so the next launch re-offers onboarding instead of getting
-      // stuck retrying a broken auto-open with no in-app way back; the
-      // open-failed screen surfaces the error in the meantime.
-      return
+      throw new Error('Couldn’t open your notes — please try again.')
     }
+    setNeedsOnboarding(false)
     // Persist the flag only once the graph is actually open, so a failed open
     // never strands the user past onboarding. Write through the settings
     // provider (not a raw save), awaiting hydration first — the provider's

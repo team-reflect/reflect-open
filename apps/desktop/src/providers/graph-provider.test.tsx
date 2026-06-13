@@ -251,18 +251,19 @@ describe('GraphProvider mobile onboarding (Plan 19, step 6)', () => {
     await waitFor(() => expect(settingsStore.mobileOnboarded).toBe(true))
   })
 
-  it('does not persist the onboarded flag when the open fails (stays recoverable)', async () => {
+  it('keeps onboarding up (flag unset) when the open fails, for an in-app retry', async () => {
     const { result } = renderHook(() => useGraph(), { wrapper: mobileWrapper })
     await waitFor(() => expect(result.current.needsOnboarding).toBe(true))
 
     failOpens = true
     await act(async () => {
-      await result.current.completeOnboarding()
+      await expect(result.current.completeOnboarding()).rejects.toThrow()
     })
 
-    // Open failed → the error screen shows (choosing) and the flag is NOT set,
-    // so the next launch re-offers onboarding instead of getting stuck.
-    expect(result.current.status).toBe('choosing')
+    // Open failed → onboarding stays up (the screen surfaces the thrown error)
+    // for an in-app retry, and the flag is never persisted — no way to get
+    // stranded past onboarding on a broken open.
+    expect(result.current.needsOnboarding).toBe(true)
     expect(result.current.graph).toBeNull()
     expect(settingsStore.mobileOnboarded).toBeUndefined()
   })

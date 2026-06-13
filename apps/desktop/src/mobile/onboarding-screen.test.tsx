@@ -13,9 +13,12 @@ vi.mock('@/providers/graph-provider', () => ({
 }))
 
 let cloned: Array<Record<string, unknown>>
+/** When set, `git_clone` never resolves — to exercise the in-flight UI. */
+let hangClone: boolean
 
 beforeEach(() => {
   cloned = []
+  hangClone = false
   setBridge({
     invoke: async (command, args) => {
       if (command === 'secret_get') {
@@ -24,6 +27,9 @@ beforeEach(() => {
       }
       if (command === 'git_clone') {
         cloned.push(args)
+        if (hangClone) {
+          return new Promise(() => {}) // stays pending
+        }
         return null
       }
       return null
@@ -73,6 +79,25 @@ describe('MobileOnboardingScreen', () => {
       ]),
     )
     expect(completeOnboarding).toHaveBeenCalled()
+  })
+
+  it('disables Back while a clone is in flight (can’t leave it running)', async () => {
+    hangClone = true
+    render(<MobileOnboardingScreen />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Connect to GitHub' }))
+    await waitFor(() => expect(screen.getByLabelText('Backup repository')).toBeTruthy())
+
+    fireEvent.change(screen.getByLabelText('Backup repository'), { target: { value: 'notes' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Download & open' }))
+
+    // The clone is pending, so Back must be disabled — leaving would let the
+    // clone finish and open the graph after the user returned to the choice.
+    await waitFor(() =>
+      expect((screen.getByRole('button', { name: 'Back' }) as HTMLButtonElement).disabled).toBe(
+        true,
+      ),
+    )
   })
 
   it('rejects an empty repo name instead of cloning', async () => {
