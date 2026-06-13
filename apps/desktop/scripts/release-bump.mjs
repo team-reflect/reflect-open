@@ -1,11 +1,13 @@
-// Bump the app version everywhere it lives and push the release tag.
+// Bump the app version everywhere it lives and prepare the release.
 //
 // The version is declared in three places that must stay in lockstep:
 //   - apps/desktop/src-tauri/tauri.conf.json  (what release-macos.mjs reads)
 //   - apps/desktop/src-tauri/Cargo.toml       (the crate that gets compiled)
 //   - Cargo.lock                              (the reflect-open entry)
-// This script edits all three, commits, pushes the branch, then creates and
-// pushes the `v<version>` tag — which is what triggers the Release workflow
+// This script edits all three, commits the bump on a release branch, and opens
+// a PR back to the protected release branch. After the PR lands, run
+// `pnpm release:bump --tag-only` from the updated release branch to push the
+// `v<version>` tag — which triggers the Release workflow
 // (.github/workflows/release.yml) to build, sign, notarize and publish.
 //
 // Usage:
@@ -15,10 +17,12 @@
 //   pnpm release:bump patch|minor|major        Stable bump
 //   pnpm release:bump prepatch|preminor|premajor  Open a new beta cycle (…-beta.1)
 //   pnpm release:bump 0.5.0-beta.1   Set an explicit version
+//   pnpm release:bump --tag-only     Push the tag for the already-merged version bump
 //
 // Flags:
 //   --dry-run   Show the plan and exit; touch nothing
-//   --no-tag    Bump + commit + push the branch, but don't tag (no release)
+//   --direct    Push the bump commit directly to next/master and tag immediately
+//   --no-tag    With --direct, bump + push the branch, but don't tag (no release)
 //   --yes       Skip the confirmation prompt
 //   --help
 //
@@ -139,6 +143,12 @@ function tryGit(args) {
   return { status: result.status, output: `${result.stdout ?? ''}${result.stderr ?? ''}` }
 }
 
+/** Run a command, returning { status, output } without throwing. */
+function run(command, args) {
+  const result = spawnSync(command, args, { cwd: repoRoot, encoding: 'utf8' })
+  return { status: result.status, output: `${result.stdout ?? ''}${result.stderr ?? ''}` }
+}
+
 /** The current branch name, or fail on a detached HEAD. */
 function currentBranch() {
   const branch = git(['rev-parse', '--abbrev-ref', 'HEAD'])
@@ -179,6 +189,11 @@ function writeVersion(current, next) {
   }
 }
 
+/** Name the short-lived branch that carries the release bump PR. */
+function releaseBranchName(tag) {
+  return `release/${tag}`
+}
+
 /** Confirm the destructive part of the run unless --yes was passed. */
 async function confirm(question) {
   const readline = createInterface({ input: process.stdin, output: process.stdout })
@@ -187,11 +202,88 @@ async function confirm(question) {
   return answer === 'y' || answer === 'yes'
 }
 
+/** Push the tag for a version bump that has already landed on next/master. */
+async function pushTagOnly({ skipPrompt }) {
+  const current = readCurrentVersion()
+  const tag = `v${current}`
+  const isPrerelease = current.includes('-')
+  const branch = currentBranch()
+  const requiredBranch = isPrerelease ? BETA_BRANCH : STABLE_BRANCH
+  if (branch !== requiredBranch) {
+    const channel = isPrerelease ? 'pre-release' : 'stable'
+    fail(`refusing to tag ${channel} ${current} from "${branch}" — switch to ${requiredBranch} first`)
+  }
+  if (git(['status', '--porcelain']) !== '') {
+    fail('the working tree has uncommitted changes — commit or stash them first')
+  }
+
+  log('fetching origin…')
+  const fetch = tryGit(['fetch', 'origin', branch, '--tags'])
+  if (fetch.status !== 0) fail(`git fetch failed:\n${fetch.output.trim()}`)
+  if (tryGit(['rev-parse', '--verify', `origin/${branch}`]).status !== 0) {
+    fail(`origin/${branch} does not exist — push ${branch} first`)
+  }
+  if (git(['rev-parse', 'HEAD']) !== git(['rev-parse', `origin/${branch}`])) {
+    fail(`local ${branch} is not in sync with origin/${branch} — pull the merged release PR first`)
+  }
+  if (git(['tag', '--list', tag]) !== '') fail(`tag ${tag} already exists locally`)
+  if (git(['ls-remote', '--tags', 'origin', tag]) !== '') fail(`tag ${tag} already exists on origin`)
+
+  const releaseKind = isPrerelease ? 'pre-release' : 'release'
+  log(`version: ${current}`)
+  log(`branch:  ${branch}  (in sync with origin)`)
+  log('plan:')
+  console.log(`  - tag ${tag} at ${branch}`)
+  console.log(`  - push ${tag} to origin → triggers the Release workflow (${releaseKind})`)
+
+  if (!skipPrompt && !(await confirm('Proceed? [y/N] '))) {
+    log('aborted — nothing changed')
+    return
+  }
+
+  git(['tag', tag])
+  log(`pushing tag ${tag}…`)
+  if (spawnSync('git', ['push', 'origin', tag], { cwd: repoRoot, stdio: 'inherit' }).status !== 0) {
+    fail(`pushing the tag failed — run \`git push origin ${tag}\` to retry`)
+  }
+  log(`done — ${tag} pushed; the Release workflow will build & publish the ${releaseKind}.`)
+  log('track it in GitHub → Actions → Release.')
+}
+
+/** Create a GitHub PR for the pushed release branch when gh is available. */
+function createReleasePr({ releaseBranch, baseBranch, tag, version }) {
+  if (run('gh', ['--version']).status !== 0) {
+    log('GitHub CLI not found; create the release PR manually.')
+    console.log(`  gh pr create --base ${baseBranch} --head ${releaseBranch} --title "Release ${tag}"`)
+    return
+  }
+
+  const body = [
+    `Bumps Reflect to ${version}.`,
+    '',
+    'After this PR merges, run:',
+    '',
+    '```bash',
+    `git switch ${baseBranch}`,
+    `git pull --ff-only origin ${baseBranch}`,
+    'pnpm release:bump --tag-only',
+    '```',
+  ].join('\n')
+  const create = run('gh', ['pr', 'create', '--base', baseBranch, '--head', releaseBranch, '--title', `Release ${tag}`, '--body', body])
+  if (create.status === 0) {
+    log(`opened release PR: ${create.output.trim()}`)
+    return
+  }
+
+  log(`could not create the PR automatically:\n${create.output.trim()}`)
+  console.log(`  gh pr create --base ${baseBranch} --head ${releaseBranch} --title "Release ${tag}"`)
+}
+
 async function main() {
   const argv = process.argv.slice(2)
   const flags = argv.filter((arg) => arg.startsWith('--'))
   const positionals = argv.filter((arg) => !arg.startsWith('--'))
-  const knownFlags = ['--dry-run', '--no-tag', '--yes', '--help']
+  const knownFlags = ['--dry-run', '--direct', '--no-tag', '--tag-only', '--yes', '--help']
   const unknownFlag = flags.find((flag) => !knownFlags.includes(flag))
   if (unknownFlag) fail(`unknown flag "${unknownFlag}" — try --help`)
   if (positionals.length > 1) fail(`expected at most one level/version, got: ${positionals.join(' ')}`)
@@ -201,8 +293,21 @@ async function main() {
   }
 
   const dryRun = flags.includes('--dry-run')
+  const direct = flags.includes('--direct')
   const noTag = flags.includes('--no-tag')
+  const tagOnly = flags.includes('--tag-only')
   const skipPrompt = flags.includes('--yes')
+  if (tagOnly) {
+    if (positionals.length > 0) fail('--tag-only does not take a level/version')
+    if (dryRun) fail('--tag-only cannot be combined with --dry-run')
+    if (direct) fail('--tag-only cannot be combined with --direct')
+    if (noTag) fail('--tag-only cannot be combined with --no-tag')
+    await pushTagOnly({ skipPrompt })
+    return
+  }
+  if (noTag && !direct) {
+    fail('--no-tag only applies with --direct; PR mode always waits to tag until after merge')
+  }
   const bump = positionals[0] ?? 'beta'
 
   const current = readCurrentVersion()
@@ -231,6 +336,7 @@ async function main() {
       : `Stable releases ship from ${STABLE_BRANCH} — merge ${BETA_BRANCH} → ${STABLE_BRANCH} and run this there.`
     fail(`refusing to cut ${channel} ${next} from "${branch}".\n  ${hint}`)
   }
+  const releaseBranch = releaseBranchName(tag)
 
   if (git(['status', '--porcelain']) !== '') {
     fail('the working tree has uncommitted changes — commit or stash them first')
@@ -254,19 +360,35 @@ async function main() {
   if (git(['ls-remote', '--tags', 'origin', tag]) !== '') {
     fail(`tag ${tag} already exists on origin — bump to a new version`)
   }
+  if (!direct) {
+    if (tryGit(['rev-parse', '--verify', `refs/heads/${releaseBranch}`]).status === 0) {
+      fail(`local branch ${releaseBranch} already exists — delete it or choose another version`)
+    }
+    if (git(['ls-remote', '--heads', 'origin', releaseBranch]) !== '') {
+      fail(`origin branch ${releaseBranch} already exists — delete it or choose another version`)
+    }
+  }
 
   const releaseKind = isPrerelease ? 'pre-release' : 'release'
   log(`current version: ${current}`)
   log(`next version:    ${next}  (${bump})`)
   log(`branch:          ${branch}  (in sync with origin)`)
   log('plan:')
+  if (!direct) console.log(`  - create ${releaseBranch} from ${branch}`)
   console.log('  - update tauri.conf.json, Cargo.toml, Cargo.lock')
   console.log(`  - commit "Release ${tag}"`)
-  console.log(`  - push ${branch} to origin`)
-  if (noTag) {
-    console.log('  - (skipping the tag — no release will be triggered)')
+  if (direct) {
+    console.log(`  - push ${branch} to origin`)
   } else {
+    console.log(`  - push ${releaseBranch} to origin`)
+    console.log(`  - open a PR into ${branch}`)
+  }
+  if (direct && noTag) {
+    console.log('  - (skipping the tag — no release will be triggered)')
+  } else if (direct) {
     console.log(`  - tag ${tag} and push it → triggers the Release workflow (${releaseKind})`)
+  } else {
+    console.log(`  - after the PR merges, run \`pnpm release:bump --tag-only\` to push ${tag}`)
   }
 
   if (dryRun) {
@@ -278,9 +400,20 @@ async function main() {
     return
   }
 
+  if (!direct) git(['switch', '-c', releaseBranch])
   writeVersion(current, next)
   git(['add', tauriConfPath, cargoTomlPath, cargoLockPath])
   git(['commit', '-m', `Release ${tag}`])
+
+  if (!direct) {
+    log(`pushing ${releaseBranch} to origin…`)
+    if (spawnSync('git', ['push', '-u', 'origin', releaseBranch], { cwd: repoRoot, stdio: 'inherit' }).status !== 0) {
+      fail('pushing the release branch failed — resolve the issue and retry (nothing was tagged)')
+    }
+    createReleasePr({ releaseBranch, baseBranch: branch, tag, version: next })
+    log(`release bump PR is ready. After it merges, run \`pnpm release:bump --tag-only\` from ${branch}.`)
+    return
+  }
 
   log(`pushing ${branch} to origin…`)
   if (spawnSync('git', ['push', 'origin', `HEAD:${branch}`], { cwd: repoRoot, stdio: 'inherit' }).status !== 0) {
@@ -317,7 +450,9 @@ Levels:
 
 Flags:
   --dry-run   show the plan and exit; change nothing
-  --no-tag    bump + commit + push the branch, but don't tag (no release)
+  --tag-only  push the tag for an already-merged release bump
+  --direct    push the bump commit directly to next/master and tag immediately
+  --no-tag    with --direct, bump + push the branch, but don't tag (no release)
   --yes       skip the confirmation prompt
   --help      show this help
 
