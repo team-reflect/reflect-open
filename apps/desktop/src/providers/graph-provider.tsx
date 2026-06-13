@@ -14,9 +14,11 @@ import {
   forgetRecent,
   hasBridge,
   isMobilePlatform,
+  loadSettings,
   mobileGraphRoot,
   openGraph,
   recentGraphs,
+  saveSettings,
   type AppPlatform,
   type GraphInfo,
   type RecentGraph,
@@ -50,6 +52,22 @@ interface GraphContextValue {
   openRecent: (root: string) => Promise<void>
   /** Drop a graph from the recents list. */
   forget: (root: string) => Promise<void>
+  /**
+   * Mobile only (Plan 19, step 6): the user hasn't yet chosen how to start
+   * (Start fresh / Connect to GitHub), so the fixed root is left untouched and
+   * the onboarding screen is shown instead of the graph. Always false on
+   * desktop, which has its own chooser.
+   */
+  needsOnboarding: boolean
+  /** Mobile only: the fixed graph root, derived once at bootstrap (null elsewhere). */
+  mobileRoot: string | null
+  /**
+   * Mobile only: finish onboarding — open the (now-populated, for the GitHub
+   * path already-cloned) fixed root and persist the onboarded flag so later
+   * launches skip the screen. The GitHub clone must already have landed in the
+   * root before this is called.
+   */
+  completeOnboarding: () => Promise<void>
 }
 
 const GraphContext = createContext<GraphContextValue | null>(null)
@@ -78,6 +96,9 @@ export function GraphProvider({
   const [indexing, setIndexing] = useState(false)
   const [indexGeneration, setIndexGeneration] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Mobile onboarding gate (Plan 19, step 6) — inert on desktop.
+  const [needsOnboarding, setNeedsOnboarding] = useState(false)
+  const [mobileRoot, setMobileRoot] = useState<string | null>(null)
   // Monotonic open token: only the most recent open may commit `graph`/`status`,
   // so overlapping opens (double-click, StrictMode remount) can't finish out of
   // order and leave us on a graph the user didn't pick last.
@@ -191,8 +212,24 @@ export function GraphProvider({
         // Fixed root, derived fresh (never from recents — see the docblock).
         try {
           const root = await mobileGraphRoot()
-          if (active) {
+          if (!active) {
+            return
+          }
+          setMobileRoot(root)
+          // Gate the first launch on the onboarding choice (Plan 19, step 6).
+          // A missing/false flag is a fresh install: defer the open so the
+          // GitHub path can clone into the still-empty root (`git_clone`
+          // refuses a non-empty directory, and opening here would bootstrap
+          // and seed it). Once onboarded, open the fixed root directly.
+          const onboarded = (await loadSettings()).mobileOnboarded === true
+          if (!active) {
+            return
+          }
+          if (onboarded) {
             await openRecent(root)
+          } else {
+            setNeedsOnboarding(true)
+            setStatus('choosing')
           }
         } catch (err) {
           if (active) {
@@ -247,6 +284,27 @@ export function GraphProvider({
     [loadRecents],
   )
 
+  const completeOnboarding = useCallback(async (): Promise<void> => {
+    if (mobileRoot === null) {
+      throw new Error('No mobile graph root to open')
+    }
+    // Clear the gate and start the open in one tick — `openRecent` moves the
+    // status to 'opening' synchronously, so the shell never flashes the
+    // open-failed screen in between.
+    setNeedsOnboarding(false)
+    const opening = openRecent(mobileRoot)
+    // Persist the flag so later launches open the fixed root directly. Best
+    // effort: a failed write just re-shows onboarding next launch, where Start
+    // fresh re-opens the existing graph without re-seeding (no data loss).
+    try {
+      const current = await loadSettings()
+      await saveSettings({ ...current, mobileOnboarded: true })
+    } catch (err) {
+      console.error('persist onboarded flag failed:', errorMessage(err))
+    }
+    await opening
+  }, [mobileRoot, openRecent])
+
   const value = useMemo<GraphContextValue>(
     () => ({
       status,
@@ -258,8 +316,24 @@ export function GraphProvider({
       pickAndOpen,
       openRecent,
       forget,
+      needsOnboarding,
+      mobileRoot,
+      completeOnboarding,
     }),
-    [status, graph, recents, indexGeneration, indexing, error, pickAndOpen, openRecent, forget],
+    [
+      status,
+      graph,
+      recents,
+      indexGeneration,
+      indexing,
+      error,
+      pickAndOpen,
+      openRecent,
+      forget,
+      needsOnboarding,
+      mobileRoot,
+      completeOnboarding,
+    ],
   )
 
   return <GraphContext.Provider value={value}>{children}</GraphContext.Provider>

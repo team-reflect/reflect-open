@@ -23,6 +23,11 @@ let storedRecents: Array<{ root: string; name: string; openedMs: number }>
 let storedFiles: Array<{ path: string; size: number; modifiedMs: number }>
 /** The fake `index_meta` table (the welcome marker lives here). */
 let metaStore: Record<string, string>
+/** The fake settings document (`mobileOnboarded` lives here). */
+let settingsStore: Record<string, unknown>
+
+/** The fixed mobile graph root the fake `mobile_graph_root` resolves to. */
+const MOBILE_ROOT = '/Documents'
 
 function installFakeBridge(): void {
   invokeLog = []
@@ -31,6 +36,7 @@ function installFakeBridge(): void {
   storedRecents = []
   storedFiles = []
   metaStore = {}
+  settingsStore = {}
   let generation = 0
   setBridge({
     invoke: async (command, args) => {
@@ -49,6 +55,13 @@ function installFakeBridge(): void {
         }
         case 'recent_graphs':
           return storedRecents
+        case 'mobile_graph_root':
+          return MOBILE_ROOT
+        case 'settings_load':
+          return settingsStore
+        case 'settings_save':
+          settingsStore = args.settings as Record<string, unknown>
+          return null
         case 'index_open':
           return generation
         case 'list_files':
@@ -80,6 +93,10 @@ function resolveOpen(root: string): void {
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <GraphProvider>{children}</GraphProvider>
+)
+
+const mobileWrapper = ({ children }: { children: ReactNode }) => (
+  <GraphProvider platform="ios">{children}</GraphProvider>
 )
 
 beforeEach(() => {
@@ -186,5 +203,51 @@ describe('GraphProvider welcome seeding', () => {
     expect(invokeLog).not.toContain('note_write')
     // Onboarding was considered: emptying this graph later won't re-seed.
     expect(metaStore.welcomeSeeded).toBe('true')
+  })
+})
+
+describe('GraphProvider mobile onboarding (Plan 19, step 6)', () => {
+  it('defers opening the fixed root and shows onboarding on a fresh install', async () => {
+    const { result } = renderHook(() => useGraph(), { wrapper: mobileWrapper })
+
+    await waitFor(() => expect(result.current.needsOnboarding).toBe(true))
+    expect(result.current.status).toBe('choosing')
+    expect(result.current.graph).toBeNull()
+    expect(result.current.mobileRoot).toBe(MOBILE_ROOT)
+    // The root must stay untouched until the user chooses — the GitHub clone
+    // path needs it empty (`git_clone` refuses a non-empty directory).
+    expect(invokeLog).not.toContain(`graph_open:${MOBILE_ROOT}`)
+  })
+
+  it('opens the fixed root and records the flag on completeOnboarding', async () => {
+    const { result } = renderHook(() => useGraph(), { wrapper: mobileWrapper })
+    await waitFor(() => expect(result.current.needsOnboarding).toBe(true))
+
+    await act(async () => {
+      const done = result.current.completeOnboarding()
+      await waitFor(() => expect(pendingOpens.has(MOBILE_ROOT)).toBe(true))
+      resolveOpen(MOBILE_ROOT)
+      await done
+    })
+
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    expect(result.current.needsOnboarding).toBe(false)
+    expect(result.current.graph?.root).toBe(MOBILE_ROOT)
+    // The gate is persisted so later launches open the root directly.
+    expect(settingsStore.mobileOnboarded).toBe(true)
+  })
+
+  it('opens the fixed root directly when already onboarded', async () => {
+    settingsStore = { mobileOnboarded: true }
+    const { result } = renderHook(() => useGraph(), { wrapper: mobileWrapper })
+
+    await act(async () => {
+      await waitFor(() => expect(pendingOpens.has(MOBILE_ROOT)).toBe(true))
+      resolveOpen(MOBILE_ROOT)
+    })
+
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    expect(result.current.needsOnboarding).toBe(false)
+    expect(result.current.graph?.root).toBe(MOBILE_ROOT)
   })
 })

@@ -84,6 +84,16 @@ export type AllNotesFilterTags = z.infer<typeof allNotesFilterTagsSchema>
 export const semanticSearchEnabledSchema = z.boolean().catch(false)
 
 /**
+ * Whether the user has finished the mobile onboarding choice (Plan 19, step
+ * 6): "Start fresh" or "Connect to GitHub". Off by default — a fresh install
+ * shows the onboarding screen, which (for the GitHub path) clones into the
+ * still-empty graph root before anything seeds it. Once set, later launches
+ * open the fixed root directly. Mobile-only; desktop has its own chooser, so
+ * this key is simply never read there.
+ */
+export const mobileOnboardedSchema = z.boolean().catch(false)
+
+/**
  * The preset palette for a graph's identity color (the swatch shown next to
  * the graph name). A closed set of named ids — not raw hex — so the UI can
  * map each id to values that read well in both light and dark themes.
@@ -201,6 +211,7 @@ export const settingsSchema = z
     editorMarkdownSyntax: editorMarkdownSyntaxSchema,
     editorSpellCheck: editorSpellCheckSchema,
     semanticSearchEnabled: semanticSearchEnabledSchema,
+    mobileOnboarded: mobileOnboardedSchema,
     theme: themePreferenceSchema,
     timeFormat: timeFormatSchema,
     dateFormat: dateFormatSchema,

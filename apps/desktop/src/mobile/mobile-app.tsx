@@ -1,5 +1,6 @@
 import { type ReactElement } from 'react'
 import { MobileErrorBoundary } from '@/mobile/mobile-error-boundary'
+import { MobileOnboardingScreen } from '@/mobile/onboarding-screen'
 import { MobileShell } from '@/mobile/mobile-shell'
 import { useKeyboardHeightVar } from '@/mobile/use-keyboard'
 import { useGraph } from '@/providers/graph-provider'
@@ -17,7 +18,7 @@ import { RouterProvider } from '@/routing/router'
  * screen inherits `--keyboard-height`.
  */
 export function MobileApp(): ReactElement {
-  const { status, graph, error } = useGraph()
+  const { status, graph, error, needsOnboarding } = useGraph()
   useKeyboardHeightVar()
 
   if (status === 'ready' && graph) {
@@ -28,6 +29,13 @@ export function MobileApp(): ReactElement {
         </RouterProvider>
       </MobileErrorBoundary>
     )
+  }
+
+  // First run: the provider derived the fixed root but deferred opening it
+  // until the user chooses how to start (Plan 19, step 6). Checked before the
+  // 'choosing' error branch — onboarding parks at 'choosing' deliberately.
+  if (needsOnboarding) {
+    return <MobileOnboardingScreen />
   }
 
   if (status === 'choosing') {

@@ -118,6 +118,7 @@ describe('SettingsScreen', () => {
           editorMarkdownSyntax: 'show',
           editorSpellCheck: true,
           semanticSearchEnabled: false,
+          mobileOnboarded: false,
           theme: 'system',
           timeFormat: '12h',
           dateFormat: 'mdy',
@@ -156,6 +157,7 @@ describe('SettingsScreen', () => {
           editorMarkdownSyntax: 'focus',
           editorSpellCheck: false,
           semanticSearchEnabled: false,
+          mobileOnboarded: false,
           theme: 'system',
           timeFormat: '12h',
           dateFormat: 'mdy',
@@ -184,6 +186,7 @@ describe('SettingsScreen', () => {
           editorMarkdownSyntax: 'focus',
           editorSpellCheck: true,
           semanticSearchEnabled: false,
+          mobileOnboarded: false,
           theme: 'light',
           timeFormat: '12h',
           dateFormat: 'mdy',
@@ -225,6 +228,7 @@ describe('SettingsScreen', () => {
           editorMarkdownSyntax: 'focus',
           editorSpellCheck: true,
           semanticSearchEnabled: false,
+          mobileOnboarded: false,
           theme: 'system',
           timeFormat: '12h',
           dateFormat: 'dmy',
@@ -262,6 +266,7 @@ describe('SettingsScreen', () => {
           editorMarkdownSyntax: 'focus',
           editorSpellCheck: true,
           semanticSearchEnabled: false,
+          mobileOnboarded: false,
           theme: 'system',
           timeFormat: '24h',
           dateFormat: 'mdy',
@@ -290,6 +295,7 @@ describe('SettingsScreen', () => {
           editorMarkdownSyntax: 'focus',
           editorSpellCheck: true,
           semanticSearchEnabled: false,
+          mobileOnboarded: false,
           theme: 'system',
           timeFormat: '12h',
           dateFormat: 'mdy',
@@ -350,6 +356,7 @@ describe('SettingsScreen', () => {
           editorMarkdownSyntax: 'focus',
           editorSpellCheck: true,
           semanticSearchEnabled: false,
+          mobileOnboarded: false,
           theme: 'system',
           timeFormat: '12h',
           dateFormat: 'mdy',
@@ -372,7 +379,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'focus', editorSpellCheck: true, semanticSearchEnabled: true, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
+        { editorMarkdownSyntax: 'focus', editorSpellCheck: true, semanticSearchEnabled: true, mobileOnboarded: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
       ]),
     )
     // The control flips to the loading state (EmbeddingsSync owns the actual
@@ -401,7 +408,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'focus', editorSpellCheck: true, semanticSearchEnabled: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
+        { editorMarkdownSyntax: 'focus', editorSpellCheck: true, semanticSearchEnabled: false, mobileOnboarded: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
       ]),
     )
     expect(screen.getByRole('button', { name: /enable semantic search/i })).toBeTruthy()
@@ -424,7 +431,7 @@ describe('SettingsScreen', () => {
     await waitFor(() => expect(invoked).toContain('embed_ensure'))
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'focus', editorSpellCheck: true, semanticSearchEnabled: true, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
+        { editorMarkdownSyntax: 'focus', editorSpellCheck: true, semanticSearchEnabled: true, mobileOnboarded: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
       ]),
     )
   })
@@ -443,7 +450,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'focus', editorSpellCheck: true, semanticSearchEnabled: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
+        { editorMarkdownSyntax: 'focus', editorSpellCheck: true, semanticSearchEnabled: false, mobileOnboarded: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
       ]),
     )
     expect(screen.getByRole('button', { name: /enable semantic search/i })).toBeTruthy()

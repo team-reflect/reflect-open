@@ -7,6 +7,7 @@ describe('settingsSchema', () => {
       editorMarkdownSyntax: 'focus',
       editorSpellCheck: true,
       semanticSearchEnabled: false,
+      mobileOnboarded: false,
       theme: 'system',
       timeFormat: '12h',
       dateFormat: 'mdy',
@@ -20,6 +21,7 @@ describe('settingsSchema', () => {
     expect(DEFAULT_SETTINGS.editorMarkdownSyntax).toBe('focus')
     expect(DEFAULT_SETTINGS.editorSpellCheck).toBe(true)
     expect(DEFAULT_SETTINGS.semanticSearchEnabled).toBe(false)
+    expect(DEFAULT_SETTINGS.mobileOnboarded).toBe(false)
     expect(DEFAULT_SETTINGS.theme).toBe('system')
     expect(DEFAULT_SETTINGS.timeFormat).toBe('12h')
     expect(DEFAULT_SETTINGS.dateFormat).toBe('mdy')
@@ -86,6 +88,7 @@ describe('settingsSchema', () => {
       editorMarkdownSyntax: 'show',
       editorSpellCheck: true,
       semanticSearchEnabled: false,
+      mobileOnboarded: false,
       theme: 'system',
       timeFormat: '12h',
       dateFormat: 'mdy',
