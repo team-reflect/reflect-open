@@ -2,12 +2,36 @@ import { cleanup, render, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { format } from 'date-fns'
 import type { ReactElement } from 'react'
 import { setBridge } from '@reflect/core'
 import { RouterProvider, useRouter } from '@/routing/router'
 import type { Route } from '@/routing/route'
-import { addDaysIso, formatDayLabel, todayIso } from '@/lib/dates'
+import { parseIsoDate, todayIso } from '@/lib/dates'
+import { monthLabel, weekOf } from './calendar'
 import { MobileShell } from './mobile-shell'
+
+// jsdom implements none of these; Embla (the day carousel) needs them to init.
+class ObserverStub {
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+  takeRecords(): [] {
+    return []
+  }
+}
+globalThis.ResizeObserver ??= ObserverStub as unknown as typeof ResizeObserver
+globalThis.IntersectionObserver ??= ObserverStub as unknown as typeof IntersectionObserver
+globalThis.matchMedia ??= ((query: string) => ({
+  matches: false,
+  media: query,
+  onchange: null,
+  addEventListener: () => {},
+  removeEventListener: () => {},
+  addListener: () => {},
+  removeListener: () => {},
+  dispatchEvent: () => false,
+})) as unknown as typeof matchMedia
 
 /**
  * The tabbed mobile shell (Plan 19, V1 parity): the daily spine pages
@@ -40,7 +64,7 @@ vi.mock('@/providers/graph-provider', () => ({
 }))
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({
-    settings: { editorMarkdownSyntax: 'always', dateFormat: 'mdy' },
+    settings: { editorMarkdownSyntax: 'always', dateFormat: 'mdy', weekStartDay: 'monday' },
     updateSettings: async () => {},
   }),
 }))
@@ -101,8 +125,15 @@ function NavProbe({ to }: { to: Route }): ReactElement {
   )
 }
 
-function dayHeading(date: string): string {
-  return formatDayLabel(date, 'mdy')
+/** The calendar strip's per-day aria-label (CalendarStrip uses this form). */
+function dayCellLabel(date: string): string {
+  return format(parseIsoDate(date), 'EEEE, MMMM do')
+}
+
+/** A day in `date`'s week that isn't `date` itself (always present). */
+function otherDayInWeek(date: string): string {
+  const week = weekOf(date, 'monday')
+  return week.find((day) => day !== date) ?? week[0]
 }
 
 describe('MobileShell', () => {
@@ -111,24 +142,33 @@ describe('MobileShell', () => {
     files[`daily/${today}.md`] = 'captured on the go'
     const view = mount({ kind: 'today' })
 
-    expect(view.getByRole('heading').textContent).toContain(dayHeading(today))
+    // The header is the month; the carousel mounts today's slide (±1
+    // neighbours), and today's shows its note.
+    expect(view.getByRole('heading').textContent).toBe(monthLabel(today))
     await waitFor(() => {
-      expect(view.getByTestId('fake-editor').textContent).toContain('captured on the go')
+      const editors = view.getAllByTestId('fake-editor')
+      expect(editors.some((editor) => editor.textContent?.includes('captured on the go'))).toBe(true)
     })
   })
 
-  it('pages between days and jumps back to today', async () => {
+  it('selects a day from the calendar strip and jumps back to today', async () => {
     const user = userEvent.setup()
     const today = todayIso()
-    const yesterday = addDaysIso(today, -1)
+    const other = otherDayInWeek(today)
     const view = mount({ kind: 'today' })
 
     expect(view.queryByRole('button', { name: 'Today' })).toBeNull()
-    await user.click(view.getByRole('button', { name: 'Previous day' }))
-    expect(view.getByRole('heading').textContent).toContain(dayHeading(yesterday))
+    await user.click(view.getByRole('button', { name: dayCellLabel(other) }))
+    expect(view.getByRole('button', { name: dayCellLabel(other) }).getAttribute('aria-current')).toBe(
+      'date',
+    )
+    expect(view.getByRole('button', { name: 'Today' })).toBeTruthy()
 
     await user.click(view.getByRole('button', { name: 'Today' }))
-    expect(view.getByRole('heading').textContent).toContain(dayHeading(today))
+    expect(view.queryByRole('button', { name: 'Today' })).toBeNull()
+    expect(view.getByRole('button', { name: dayCellLabel(today) }).getAttribute('aria-current')).toBe(
+      'date',
+    )
   })
 
   it('opens a note from in-screen navigation and pops back through history', async () => {
@@ -140,7 +180,7 @@ describe('MobileShell', () => {
     expect(view.getByRole('heading').textContent).toContain('meeting-notes')
 
     await user.click(view.getByRole('button', { name: 'Back' }))
-    expect(view.getByRole('heading').textContent).toContain(dayHeading(todayIso()))
+    expect(view.getByRole('heading').textContent).toBe(monthLabel(todayIso()))
   })
 
   it('switches tabs: All shows the searchable list, Daily returns to today', async () => {
@@ -152,7 +192,7 @@ describe('MobileShell', () => {
     expect((await view.findByText('No notes yet')).textContent).toBe('No notes yet')
 
     await user.click(view.getByRole('button', { name: 'Daily' }))
-    expect(view.getByRole('heading').textContent).toContain(dayHeading(todayIso()))
+    expect(view.getByRole('heading').textContent).toBe(monthLabel(todayIso()))
   })
 
   it('renders a search entry as the All tab with the query seeded', async () => {
@@ -176,6 +216,6 @@ describe('MobileShell', () => {
     })
 
     await user.click(view.getByRole('button', { name: 'Back' }))
-    expect(view.getByRole('heading').textContent).toContain(dayHeading(todayIso()))
+    expect(view.getByRole('heading').textContent).toBe(monthLabel(todayIso()))
   })
 })

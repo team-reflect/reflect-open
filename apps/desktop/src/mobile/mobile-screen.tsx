@@ -24,8 +24,10 @@ export function MobileScreen({ allQuery, onAllQueryChange }: MobileScreenProps):
   const today = useToday()
 
   switch (route.kind) {
+    // One stable key for the whole daily surface (today + any day): a day
+    // change scrolls the carousel rather than remounting it.
     case 'daily':
-      return <MobileDaily key={route.date} date={route.date} />
+      return <MobileDaily key="daily" date={route.date} />
     case 'note':
       return <MobileNote key={route.path} path={route.path} />
     case 'allNotes':
@@ -36,6 +38,6 @@ export function MobileScreen({ allQuery, onAllQueryChange }: MobileScreenProps):
       // the live query from the entry.
       return <MobileAllNotes query={allQuery} onQueryChange={onAllQueryChange} tag={null} />
     default:
-      return <MobileDaily key="today" date={today} />
+      return <MobileDaily key="daily" date={today} />
   }
 }

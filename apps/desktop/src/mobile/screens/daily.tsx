@@ -1,65 +1,30 @@
 import { type ReactElement } from 'react'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
-import { dailyPath } from '@reflect/core'
-import { NotePane } from '@/components/note-pane'
+import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { untitledNotePath } from '@/lib/create-note'
-import { addDaysIso, formatDayLabel } from '@/lib/dates'
-import { useToday } from '@/lib/use-today'
-import { useSettings } from '@/providers/settings-provider'
+import { CalendarStrip } from '@/mobile/calendar-strip'
+import { DayCarousel } from '@/mobile/day-carousel'
 import { useRouter } from '@/routing/router'
 
 /**
- * One daily note — the mobile spine (Plan 19). The header pages between
- * days, with a jump back to today whenever the view has wandered; the body
- * is the shared document stack via `NotePane`, exactly as on desktop. The
- * scroll container yields to the keyboard via `--keyboard-height`, and the
- * new-note button floats above both — V1 parity: the daily note itself is
- * the capture surface, and `+` opens a fresh untitled note (the same
- * seed/ghost-title flow as desktop's ⌘N).
+ * The mobile spine (Plan 19, V1 parity): a month header + week calendar strip
+ * over a swipeable day carousel of daily notes. The strip and the carousel
+ * stay in lockstep through `date` — tapping a strip day or swiping the
+ * carousel both navigate a daily route, which flows back as `date`. The
+ * new-note button floats above it all (V1: the daily note is the capture
+ * surface; `+` opens a fresh untitled note via desktop's ⌘N seed flow).
+ *
+ * Mounted once for the daily surface (a stable key in `MobileScreen`), so a
+ * day change scrolls the carousel rather than remounting it.
  */
 export function MobileDaily({ date }: { date: string }): ReactElement {
-  const { settings } = useSettings()
   const { navigate } = useRouter()
-  // Live: the Today affordance appears at midnight without a re-navigation.
-  const isToday = date === useToday()
+  const select = (day: string): void => navigate({ kind: 'daily', date: day })
 
   return (
-    <div className="flex h-full w-screen flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-      <header className="flex shrink-0 items-center gap-1 border-b border-border px-1 pb-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-10"
-          aria-label="Previous day"
-          onClick={() => navigate({ kind: 'daily', date: addDaysIso(date, -1) })}
-        >
-          <ChevronLeft />
-        </Button>
-        <h1 className="min-w-0 flex-1 truncate text-center text-base font-semibold">
-          {formatDayLabel(date, settings.dateFormat)}
-        </h1>
-        {!isToday && (
-          <Button variant="ghost" size="sm" onClick={() => navigate({ kind: 'today' })}>
-            Today
-          </Button>
-        )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-10"
-          aria-label="Next day"
-          onClick={() => navigate({ kind: 'daily', date: addDaysIso(date, 1) })}
-        >
-          <ChevronRight />
-        </Button>
-      </header>
-      <main
-        className="min-h-0 flex-1 overflow-y-auto"
-        style={{ paddingBottom: 'max(env(safe-area-inset-bottom), var(--keyboard-height, 0px))' }}
-      >
-        <NotePane path={dailyPath(date)} lazy gutterClassName="px-4" editorClassName="min-h-[60dvh]" />
-      </main>
+    <div className="flex h-full w-screen flex-col">
+      <CalendarStrip date={date} onSelect={select} />
+      <DayCarousel date={date} onSelect={select} />
       <Button
         size="icon"
         aria-label="New note"
