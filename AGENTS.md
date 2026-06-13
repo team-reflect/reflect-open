@@ -132,6 +132,7 @@ pnpm dev              # turbo dev across packages (Vite on http://localhost:1420
 pnpm tauri dev        # Full Tauri app with hot reload (stages the CLI sidecar first)
 pnpm build            # turbo build pipeline → apps/desktop/dist/
 pnpm tauri build      # Native app bundle, incl. the reflect CLI sidecar
+pnpm release:bump     # Bump the version everywhere + push the release tag (docs/macos-distribution.md)
 pnpm release:macos    # Signed + notarized macOS build for distribution (docs/macos-distribution.md)
 pnpm release:macos publish  # The above, then upload the DMG to a new GitHub release
 ```

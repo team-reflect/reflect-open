@@ -73,6 +73,35 @@ pnpm release:macos publish --draft # same, but leave the release as a draft for 
 pnpm release:macos --no-notarize   # signed-only build (runs locally; Gatekeeper rejects it elsewhere)
 ```
 
+## Cutting a release (`pnpm release:bump`)
+
+The version is declared in three places that must move together —
+`apps/desktop/src-tauri/tauri.conf.json`, `apps/desktop/src-tauri/Cargo.toml`, and the
+`reflect-open` entry in `Cargo.lock`. `pnpm release:bump` is the one-command way to do
+the whole ritual: it edits all three, commits, pushes the branch, and pushes a
+`v<version>` tag — and that tag push is what triggers the Release workflow to build,
+sign, notarize, and publish. You don't run `release:macos` by hand for a normal release.
+
+```bash
+pnpm release:bump                # cut the next beta: 0.2.0-beta.1 → 0.2.0-beta.2
+pnpm release:bump stable         # drop the prerelease: 0.2.0-beta.3 → 0.2.0
+pnpm release:bump patch          # 0.2.0 → 0.2.1   (also: minor, major)
+pnpm release:bump preminor       # open a new beta cycle: 0.2.0 → 0.3.0-beta.1
+pnpm release:bump 0.5.0-beta.1   # set an explicit version
+pnpm release:bump --dry-run      # show the plan, change nothing
+```
+
+Default (no argument) is `beta`, the common case on `next`. The script refuses to run on
+a dirty tree or a branch out of sync with origin, refuses a version whose tag already
+exists, and — because a stable tag would reach every stable install — refuses to cut a
+stable (non-prerelease) version from `next`. It prints the plan and asks for confirmation
+(skip with `--yes`); `--no-tag` bumps and pushes the branch without tagging, for when you
+want the version commit but aren't ready to release. The typical flows:
+
+- **Beta** (on `next`): `pnpm release:bump`.
+- **Stable** (on `master`, after merging `next` → `master`): `pnpm release:bump stable`,
+  then `pnpm release:bump preminor` back on `next` to open the next cycle.
+
 ## Publishing to GitHub Releases
 
 `pnpm release:macos publish` runs the full build above, then creates a GitHub release
@@ -110,10 +139,10 @@ beta.
 Beta installs poll that same stable endpoint: they get offered the next stable release
 when it ships, but not newer betas. A dedicated beta updater channel is future work.
 
-Cutting a beta is the normal release flow on `next`: bump the prerelease version
-(`0.2.0-beta.2`, …) in `tauri.conf.json` + `src-tauri/Cargo.toml`, then run the
-Release workflow on `next`. For a stable release, merge `next` into `master`, set a
-stable version there (e.g. `0.2.0`), and run the workflow on `master`.
+Cutting a beta is the normal release flow on `next`: `pnpm release:bump` (see
+[Cutting a release](#cutting-a-release-pnpm-releasebump) above) bumps the prerelease
+version and pushes the tag that triggers the workflow. For a stable release, merge
+`next` into `master` and run `pnpm release:bump stable` there.
 
 ## Releasing from CI
 
