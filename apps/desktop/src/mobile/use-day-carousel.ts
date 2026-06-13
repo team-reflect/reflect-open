@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
 import { createDayWindow, dateAtIndex, indexWithin, type DayWindow } from '@/lib/day-window'
 
@@ -125,8 +125,9 @@ export function useDayCarousel(date: string, onSelect: (date: string) => void): 
   // Re-anchor only when the requested day falls outside the window (a far date
   // link): rebuild the window centered on it. The follow effect below then
   // reinitializes Embla onto the new slides — so `reportedRef` is left
-  // untouched here.
-  useEffect(() => {
+  // untouched here. Layout effect so the rebuilt window + scroll land in the
+  // same frame as the strip's new selection (no visible lag).
+  useLayoutEffect(() => {
     if (indexWithin(dayWindow, date) === -1) {
       setDayWindow(createDayWindow(date, CAROUSEL_WINDOW))
     }
@@ -134,8 +135,11 @@ export function useDayCarousel(date: string, onSelect: (date: string) => void): 
 
   // Follow an external selection (calendar tap, Today, date link): scroll, or
   // reinit after a re-anchor, or do nothing for our own swipe's echo —
-  // {@link reconcileCarousel} owns the decision.
-  useEffect(() => {
+  // {@link reconcileCarousel} owns the decision. A *layout* effect so Embla's
+  // scroll and `selectedIndex` (which decides slide mounting) update before
+  // paint — otherwise the centered/mounted slide lags the route by a frame and
+  // the strip could show one day while the editor still shows the previous.
+  useLayoutEffect(() => {
     if (!emblaApi) {
       return
     }
