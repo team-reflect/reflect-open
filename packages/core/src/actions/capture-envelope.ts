@@ -17,6 +17,14 @@ import { z } from 'zod'
 /** Where a capture originated. Widens when mobile capture lands. */
 export const captureSourceSchema = z.literal('extension')
 
+/** Only web pages are capturable — `chrome://`, `file://` etc. never spool. */
+function isHttpUrl(value: string): boolean {
+  return value.startsWith('https://') || value.startsWith('http://')
+}
+
+/** Standard padded base64 (what `btoa`/`captureVisibleTab` produce). */
+const BASE64_RE = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
+
 /** One captured page, as spooled into the capture inbox. */
 export const captureEnvelopeSchema = z.object({
   /** Envelope format version; bump on breaking changes. */
@@ -24,7 +32,7 @@ export const captureEnvelopeSchema = z.object({
   /** Producer-generated UUID — names the spool files, dedups host retries. */
   id: z.string().uuid(),
   /** The captured page's URL. */
-  url: z.string().url(),
+  url: z.string().url().refine(isHttpUrl, 'must be an http(s) url'),
   /** The page title at capture time (may be empty on restricted pages). */
   title: z.string(),
   /** Text the user had selected, verbatim. */
@@ -54,7 +62,7 @@ export type CaptureSource = z.infer<typeof captureSourceSchema>
 export const captureWireMessageSchema = z.object({
   envelope: captureEnvelopeSchema.omit({ screenshotRef: true }),
   /** JPEG screenshot bytes, base64 (no data-URL prefix). */
-  screenshotBase64: z.string().optional(),
+  screenshotBase64: z.string().min(1).regex(BASE64_RE, 'must be base64').optional(),
 })
 
 export type CaptureWireMessage = z.infer<typeof captureWireMessageSchema>

@@ -85,6 +85,7 @@ export {
   captureHostRegister,
   captureInboxList,
   captureInboxRead,
+  captureInboxReject,
   captureInboxRemove,
   captureMetaFetch,
   promoteCaptureScreenshot,

@@ -197,6 +197,11 @@ mod tests {
             tracked_relpath(Path::new("/g/.reflect/inbox/.tmp-x8f2"), root),
             None
         );
+        // Quarantined spools must not re-trigger the drain.
+        assert_eq!(
+            tracked_relpath(Path::new("/g/.reflect/inbox-rejected/bad.json"), root),
+            None
+        );
         // Not tracked: the index, assets, non-markdown, dotfiles, outside root,
         // or the audio-memos directory entry itself.
         assert_eq!(

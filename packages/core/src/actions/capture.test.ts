@@ -5,6 +5,7 @@ import { ReflectError } from '../errors'
 import {
   captureInboxList,
   captureInboxRead,
+  captureInboxReject,
   captureInboxRemove,
   listFiles,
   promoteCaptureScreenshot,
@@ -27,6 +28,7 @@ import { scrapePageMeta } from './meta-scrape'
 vi.mock('../graph/commands', () => ({
   captureInboxList: vi.fn(),
   captureInboxRead: vi.fn(),
+  captureInboxReject: vi.fn(),
   captureInboxRemove: vi.fn(),
   listFiles: vi.fn(),
   promoteCaptureScreenshot: vi.fn(),
@@ -47,6 +49,7 @@ vi.mock('../secrets/keychain', () => ({
 
 const inboxListMock = vi.mocked(captureInboxList)
 const inboxReadMock = vi.mocked(captureInboxRead)
+const inboxRejectMock = vi.mocked(captureInboxReject)
 const inboxRemoveMock = vi.mocked(captureInboxRemove)
 const listFilesMock = vi.mocked(listFiles)
 const promoteMock = vi.mocked(promoteCaptureScreenshot)
@@ -78,6 +81,8 @@ const notFound = () => ({ kind: 'notFound', message: 'missing' })
  */
 const files = new Map<string, string>()
 const spool = new Map<string, { contents: string; modifiedMs: number }>()
+/** What `captureInboxReject` moved into `.reflect/inbox-rejected/`. */
+const rejected = new Map<string, string>()
 
 function envelope(overrides: Partial<CaptureEnvelope> = {}): CaptureEnvelope {
   return {
@@ -121,6 +126,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   files.clear()
   spool.clear()
+  rejected.clear()
 
   inboxListMock.mockImplementation(async () =>
     [...spool.entries()].map(([name, entry]) => ({
@@ -136,6 +142,13 @@ beforeEach(() => {
   })
   inboxRemoveMock.mockImplementation(async (name) => {
     spool.delete(name)
+  })
+  inboxRejectMock.mockImplementation(async (name) => {
+    const entry = spool.get(name)
+    if (entry) {
+      rejected.set(name, entry.contents)
+      spool.delete(name)
+    }
   })
   promoteMock.mockImplementation(async (spoolName) => {
     if (!spool.has(spoolName)) throw notFound()
@@ -334,7 +347,7 @@ describe('drainCaptureInbox', () => {
     expect(daily.match(/capture-2026-06-11-153022-845/g)).toHaveLength(1)
   })
 
-  it('removes an unparseable spool file loudly instead of wedging the queue', async () => {
+  it('quarantines an unparseable spool file instead of wedging the queue or deleting it', async () => {
     spool.set('garbage.json', { contents: 'not json', modifiedMs: 0 })
     addSpool(envelope({ id: '00000000-0000-4000-8000-000000000001' }))
 
@@ -343,7 +356,26 @@ describe('drainCaptureInbox', () => {
     expect(outcome.invalid).toBe(1)
     expect(outcome.drained).toBe(1)
     expect(spool.has('garbage.json')).toBe(false)
+    // Moved, never deleted — a newer extension's envelope must survive an
+    // older app that can't parse it yet.
+    expect(rejected.get('garbage.json')).toBe('not json')
+    expect(inboxRemoveMock).not.toHaveBeenCalledWith('garbage.json', 3)
     expect(writeNoteMock).toHaveBeenCalled()
+  })
+
+  it('saves a capture whose screenshot cannot decode, without wedging the pass', async () => {
+    addSpool(envelope())
+    promoteMock.mockRejectedValue({ kind: 'parse', message: 'screenshot does not decode' })
+
+    const outcome = await drain()
+
+    // Retrying identical bytes can't help — the capture lands without its
+    // image instead of permanently blocking every capture behind it.
+    expect(outcome).toEqual({ pending: 1, drained: 1, deduped: 0, invalid: 0, stopped: null })
+    const note = files.get(IDENTITY.notePath) ?? ''
+    expect(note).not.toContain('![')
+    expect(note).not.toContain('captureScreenshot')
+    expect(spool.size).toBe(0)
   })
 
   it('saves a capture whose screenshot sibling never landed, without the image', async () => {

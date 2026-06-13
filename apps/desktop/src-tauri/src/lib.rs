@@ -105,6 +105,7 @@ pub fn run() {
             capture::capture_inbox_list,
             capture::capture_inbox_read,
             capture::capture_inbox_remove,
+            capture::capture_inbox_reject,
             capture::capture_screenshot_promote,
             capture::capture_meta_fetch,
             git::git_status,

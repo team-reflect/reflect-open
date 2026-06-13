@@ -121,6 +121,15 @@ export async function captureInboxRemove(name: string, generation: number): Prom
 }
 
 /**
+ * Quarantine an unparseable spool file into `.reflect/inbox-rejected/` —
+ * moved, never deleted: "the raw link is never lost" holds even for an
+ * envelope a newer extension wrote that this app version can't read yet.
+ */
+export async function captureInboxReject(name: string, generation: number): Promise<void> {
+  await call('capture_inbox_reject', { name, generation }, voidSchema)
+}
+
+/**
  * Copy a spooled screenshot into the graph as a downscaled JPEG asset (the
  * spool file stays until the drain removes it — crash-safe copy semantics).
  */

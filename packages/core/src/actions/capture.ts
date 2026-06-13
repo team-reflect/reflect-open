@@ -6,6 +6,7 @@ import { aiKeySecretName } from '../ai/secrets'
 import {
   captureInboxList,
   captureInboxRead,
+  captureInboxReject,
   captureInboxRemove,
   listFiles,
   promoteCaptureScreenshot,
@@ -259,7 +260,7 @@ export interface DrainCaptureInboxOutcome {
   drained: number
   /** Of `drained`, how many refreshed an existing same-day entry in place. */
   deduped: number
-  /** Spool files removed as unparseable — reported, never silently dropped. */
+  /** Unparseable spool files quarantined under `.reflect/inbox-rejected/`. */
   invalid: number
   /** Why spool files remain, or `null` when the inbox drained. */
   stopped: ReconcileStop | null
@@ -362,10 +363,11 @@ export async function drainCaptureInbox(
       const raw = await captureInboxRead(name, input.generation)
       const envelope = parseEnvelope(raw)
       if (envelope === null) {
-        // A poison file must not wedge the queue behind it: remove it (and a
-        // screenshot sibling, if any) and report it in the outcome.
-        await captureInboxRemove(name, input.generation)
-        await captureInboxRemove(name.replace(/\.json$/, '.jpg'), input.generation)
+        // An unparseable file must not wedge the queue behind it — but it is
+        // quarantined (with its screenshot sibling), never deleted: it may be
+        // a capture from a newer extension this app version can't read yet.
+        await captureInboxReject(name, input.generation)
+        await captureInboxReject(name.replace(/\.json$/, '.jpg'), input.generation)
         invalid += 1
         continue
       }
@@ -401,10 +403,14 @@ export async function drainCaptureInbox(
           )
           hasScreenshot = true
         } catch (cause) {
-          if (!isAppError(cause) || cause.kind !== 'notFound') {
-            throw cause
+          const kind = isAppError(cause) ? cause.kind : null
+          if (kind !== 'notFound' && kind !== 'parse') {
+            throw cause // io etc. — transient, stop the pass and retry
           }
-          // The referenced sibling never landed — save the capture without it.
+          // notFound: the sibling never landed. parse: bytes that don't
+          // decode as an image — retrying the identical bytes can't help,
+          // and stopping would wedge every capture behind this one. Either
+          // way, save the capture without its screenshot.
         }
       }
 

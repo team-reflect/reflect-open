@@ -111,6 +111,9 @@ export async function describePage(request: DescribePageRequest): Promise<string
       model: languageModel(request.config, request.apiKey, request.fetchFn ?? fetch),
       messages: [{ role: 'user', content }],
       abortSignal: AbortSignal.timeout(DESCRIBE_TIMEOUT_MS),
+      // The enrichment pass is the retry layer (next trigger re-runs pending
+      // captures); the SDK's own backoff would only delay that.
+      maxRetries: 0,
     })
     return result.text.trim()
   } catch (cause) {

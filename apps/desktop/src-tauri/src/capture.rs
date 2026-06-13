@@ -240,6 +240,35 @@ pub fn capture_inbox_remove(
     }
 }
 
+/// Where the drain quarantines spool files it cannot parse. Outside
+/// `.reflect/inbox/`, so nothing here re-triggers the watcher or a drain.
+const INBOX_REJECTED_DIR: &str = ".reflect/inbox-rejected";
+
+fn quarantine_spool(root: &Path, name: &str) -> AppResult<()> {
+    let source = inbox_file(root, name)?;
+    let rejected = root.join(INBOX_REJECTED_DIR);
+    fs::create_dir_all(&rejected)?;
+    match fs::rename(&source, rejected.join(name)) {
+        Ok(()) => Ok(()),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(err.into()),
+    }
+}
+
+/// Quarantine a spool file the drain cannot parse — moved, never deleted:
+/// "the raw link is never lost" must hold even for an envelope written by a
+/// newer extension this app version cannot read yet. Idempotent like
+/// `capture_inbox_remove`; an existing quarantined file of the same name is
+/// replaced (same capture id ⇒ same content).
+#[tauri::command]
+pub fn capture_inbox_reject(
+    name: String,
+    generation: u64,
+    state: State<GraphState>,
+) -> AppResult<()> {
+    quarantine_spool(&root_for_generation(&state, generation)?, &name)
+}
+
 // ---- screenshot promote ---------------------------------------------------------
 
 /// Decode, downscale to `max_dim` on the long edge, re-encode as JPEG. Pure —
@@ -429,6 +458,29 @@ mod tests {
             assert!(inbox_file(root, name).is_err(), "{name}");
         }
         assert!(inbox_file(root, "7c9e6679.json").is_ok());
+    }
+
+    #[test]
+    fn quarantine_moves_the_spool_file_out_of_the_inbox() {
+        let dir = tempfile::tempdir().unwrap();
+        let inbox = dir.path().join(INBOX_DIR);
+        fs::create_dir_all(&inbox).unwrap();
+        fs::write(inbox.join("bad.json"), "not an envelope").unwrap();
+
+        quarantine_spool(dir.path(), "bad.json").unwrap();
+
+        assert!(!inbox.join("bad.json").exists());
+        assert_eq!(
+            fs::read_to_string(dir.path().join(INBOX_REJECTED_DIR).join("bad.json")).unwrap(),
+            "not an envelope"
+        );
+    }
+
+    #[test]
+    fn quarantine_is_idempotent_for_a_missing_source() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::create_dir_all(dir.path().join(INBOX_DIR)).unwrap();
+        assert!(quarantine_spool(dir.path(), "gone.json").is_ok());
     }
 
     #[test]
