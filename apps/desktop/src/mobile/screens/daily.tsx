@@ -2,6 +2,7 @@ import { type ReactElement } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { untitledNotePath } from '@/lib/create-note'
+import { todayIso } from '@/lib/dates'
 import { CalendarStrip } from '@/mobile/calendar-strip'
 import { DayCarousel } from '@/mobile/day-carousel'
 import { useRouter } from '@/routing/router'
@@ -19,7 +20,11 @@ import { useRouter } from '@/routing/router'
  */
 export function MobileDaily({ date }: { date: string }): ReactElement {
   const { navigate } = useRouter()
-  const select = (day: string): void => navigate({ kind: 'daily', date: day })
+  // Selecting today routes to the live `today` route (not a frozen `daily`
+  // date), so the spine keeps rolling over at midnight — the Today button and
+  // tapping today's cell both land here.
+  const select = (day: string): void =>
+    navigate(day === todayIso() ? { kind: 'today' } : { kind: 'daily', date: day })
 
   return (
     <div className="flex h-full w-screen flex-col">

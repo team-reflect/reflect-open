@@ -59,26 +59,42 @@ export function DayCarousel({ date, onSelect }: DayCarouselProps): ReactElement 
   }, [emblaApi, onEmblaSelect])
 
   // Re-anchor only when the requested day falls outside the window (a far
-  // date link). Rebuilding the window remounts Embla at the new start index.
+  // date link). Rebuilds the window centered on it; the follow effect below
+  // then reinitializes Embla onto the new slides (it must not be short-
+  // circuited here, so `reportedRef` is left untouched).
   useEffect(() => {
     if (carouselIndexOf(window, date) === -1) {
-      reportedRef.current = date
       setWindow(carouselWindow(date))
     }
   }, [date, window])
 
-  // Follow an external selection (calendar strip tap, Today, date link) by
-  // scrolling to its slide — skipped when this is the echo of our own swipe.
+  // Follow an external selection (calendar strip tap, Today, date link). A
+  // re-anchor changes the slide set, so Embla is reinitialized onto the new
+  // window at the target slide; an in-window change just scrolls. Both are
+  // skipped when this is the echo of our own swipe.
+  const windowStartRef = useRef(window.start)
   useEffect(() => {
-    if (!emblaApi || date === reportedRef.current) {
+    if (!emblaApi) {
       return
     }
     const index = carouselIndexOf(window, date)
-    if (index !== -1) {
-      reportedRef.current = date
-      emblaApi.scrollTo(index, true)
-      setSelectedIndex(index)
+    if (index === -1) {
+      return // re-anchor pending — the window effect rebuilds, then this reruns
     }
+    if (windowStartRef.current !== window.start) {
+      // The window was re-anchored: reinit onto the rebuilt slides at the date.
+      windowStartRef.current = window.start
+      reportedRef.current = date
+      emblaApi.reInit({ startIndex: index })
+      setSelectedIndex(index)
+      return
+    }
+    if (date === reportedRef.current) {
+      return
+    }
+    reportedRef.current = date
+    emblaApi.scrollTo(index, true)
+    setSelectedIndex(index)
   }, [emblaApi, date, window])
 
   return (
