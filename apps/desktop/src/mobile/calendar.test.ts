@@ -1,16 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import {
-  CAROUSEL_RADIUS,
-  carouselDateAt,
-  carouselIndexOf,
-  carouselWindow,
-  monthLabel,
-  weekOf,
-} from './calendar'
+import { monthLabel, weekOf } from './calendar'
 
 /**
- * 2026-06-12 is a Friday; 2026-06-15 a Monday, 2026-06-14 a Sunday — fixed
- * anchors for the week-start math.
+ * 2026-06-12 is a Friday; 2026-06-14 a Sunday — fixed anchors for the
+ * week-start math.
  */
 describe('weekOf', () => {
   it('builds a Monday-first week containing the date', () => {
@@ -45,26 +38,18 @@ describe('weekOf', () => {
       '2026-06-14',
     ])
   })
+
+  it('spans the year boundary without skipping or repeating a day', () => {
+    // 2026-01-01 is a Thursday: a Monday-first week reaches back into 2025.
+    const week = weekOf('2026-01-01', 'monday')
+    expect(week[0]).toBe('2025-12-29')
+    expect(week[6]).toBe('2026-01-04')
+    expect(week).toContain('2026-01-01')
+  })
 })
 
 describe('monthLabel', () => {
   it('formats the month and year', () => {
     expect(monthLabel('2026-06-12')).toBe('June 2026')
   })
-})
-
-describe('carousel window', () => {
-  it('centers the anchor and round-trips index↔date', () => {
-    const window = carouselWindow('2026-06-12')
-    expect(window.count).toBe(CAROUSEL_RADIUS * 2 + 1)
-    const center = carouselIndexOf(window, '2026-06-12')
-    expect(center).toBe(CAROUSEL_RADIUS)
-    expect(carouselDateAt(window, center)).toBe('2026-06-12')
-  })
-
-  it('returns -1 for a date outside the window', () => {
-    const window = carouselWindow('2026-06-12')
-    expect(carouselIndexOf(window, '2025-01-01')).toBe(-1)
-  })
-
 })

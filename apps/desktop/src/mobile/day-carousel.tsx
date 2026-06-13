@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
-import useEmblaCarousel from 'embla-carousel-react'
+import { type ReactElement } from 'react'
 import { dailyPath } from '@reflect/core'
 import { NotePane } from '@/components/note-pane'
-import { carouselDateAt, carouselIndexOf, carouselWindow, type CarouselWindow } from '@/mobile/calendar'
+import { dateAtIndex } from '@/lib/day-window'
+import { useDayCarousel } from '@/mobile/use-day-carousel'
 
 interface DayCarouselProps {
   /** The selected day (from the route). Drives the carousel position. */
@@ -16,92 +16,19 @@ interface DayCarouselProps {
 const MOUNT_RADIUS = 1
 
 /**
- * V1's swipeable day carousel: horizontal paging between daily notes over a
- * generous fixed window (≈1 year each way — no runtime re-anchoring). Each
- * settled slide navigates its day; the route flows back in as `date` and
- * scrolls the carousel to match (guarded so a swipe's own navigation doesn't
- * re-scroll). A date-link beyond the window re-anchors the window around it
- * — the rare case, never the common swipe.
+ * V1's swipeable day carousel: horizontal paging between daily notes. The slide
+ * window, Embla wiring, and route↔slide sync all live in {@link useDayCarousel};
+ * this component just renders the slides, mounting a `NotePane` only near the
+ * selection and leaving the rest as empty spacers.
  */
 export function DayCarousel({ date, onSelect }: DayCarouselProps): ReactElement {
-  const [window, setWindow] = useState<CarouselWindow>(() => carouselWindow(date))
-  const [emblaRef, emblaApi] = useEmblaCarousel({
-    startIndex: carouselIndexOf(window, date),
-    align: 'center',
-    skipSnaps: false,
-  })
-  const [selectedIndex, setSelectedIndex] = useState(() => carouselIndexOf(window, date))
-  // The day we last reported via onSelect — so the route echo it produces
-  // doesn't trigger a redundant (animation-cancelling) scrollTo.
-  const reportedRef = useRef(date)
-
-  const onEmblaSelect = useCallback(
-    (api: NonNullable<typeof emblaApi>) => {
-      const index = api.selectedScrollSnap()
-      setSelectedIndex(index)
-      const day = carouselDateAt(window, index)
-      if (day !== reportedRef.current) {
-        reportedRef.current = day
-        onSelect(day)
-      }
-    },
-    [window, onSelect],
-  )
-
-  useEffect(() => {
-    if (!emblaApi) {
-      return
-    }
-    emblaApi.on('select', onEmblaSelect)
-    return () => {
-      emblaApi.off('select', onEmblaSelect)
-    }
-  }, [emblaApi, onEmblaSelect])
-
-  // Re-anchor only when the requested day falls outside the window (a far
-  // date link). Rebuilds the window centered on it; the follow effect below
-  // then reinitializes Embla onto the new slides (it must not be short-
-  // circuited here, so `reportedRef` is left untouched).
-  useEffect(() => {
-    if (carouselIndexOf(window, date) === -1) {
-      setWindow(carouselWindow(date))
-    }
-  }, [date, window])
-
-  // Follow an external selection (calendar strip tap, Today, date link). A
-  // re-anchor changes the slide set, so Embla is reinitialized onto the new
-  // window at the target slide; an in-window change just scrolls. Both are
-  // skipped when this is the echo of our own swipe.
-  const windowStartRef = useRef(window.start)
-  useEffect(() => {
-    if (!emblaApi) {
-      return
-    }
-    const index = carouselIndexOf(window, date)
-    if (index === -1) {
-      return // re-anchor pending — the window effect rebuilds, then this reruns
-    }
-    if (windowStartRef.current !== window.start) {
-      // The window was re-anchored: reinit onto the rebuilt slides at the date.
-      windowStartRef.current = window.start
-      reportedRef.current = date
-      emblaApi.reInit({ startIndex: index })
-      setSelectedIndex(index)
-      return
-    }
-    if (date === reportedRef.current) {
-      return
-    }
-    reportedRef.current = date
-    emblaApi.scrollTo(index, true)
-    setSelectedIndex(index)
-  }, [emblaApi, date, window])
+  const { emblaRef, dayWindow, selectedIndex } = useDayCarousel(date, onSelect)
 
   return (
     <div className="min-h-0 flex-1 overflow-hidden" ref={emblaRef}>
       <div className="flex h-full">
-        {Array.from({ length: window.count }, (_, index) => {
-          const day = carouselDateAt(window, index)
+        {Array.from({ length: dayWindow.count }, (_, index) => {
+          const day = dateAtIndex(dayWindow, index)
           const mounted = Math.abs(index - selectedIndex) <= MOUNT_RADIUS
           return (
             <div key={day} className="min-w-0 flex-[0_0_100%]">
