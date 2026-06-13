@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactElement } from 'react'
+import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { MobileScreen } from '@/mobile/mobile-screen'
 import { MobileTabBar, type MobileTab } from '@/mobile/mobile-tab-bar'
 import { useRouter } from '@/routing/router'
@@ -11,9 +11,19 @@ import { useRouter } from '@/routing/router'
  * screen, so opening a note and coming back doesn't lose the query.
  */
 export function MobileShell(): ReactElement {
-  const { route, navigate } = useRouter()
+  const { route, navigate, entryId } = useRouter()
   const [allQuery, setAllQuery] = useState('')
   const lastTab = useRef<MobileTab>('daily')
+
+  // A `search` history entry seeds the live query — once per entry, so the
+  // user can keep typing without the effect snapping the text back.
+  const seededEntry = useRef<number | null>(null)
+  useEffect(() => {
+    if (route.kind === 'search' && seededEntry.current !== entryId) {
+      seededEntry.current = entryId
+      setAllQuery(route.query)
+    }
+  }, [route, entryId])
 
   const tab: MobileTab =
     route.kind === 'allNotes' || route.kind === 'search'

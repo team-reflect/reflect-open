@@ -155,6 +155,16 @@ describe('MobileShell', () => {
     expect(view.getByRole('heading').textContent).toContain(dayHeading(todayIso()))
   })
 
+  it('renders a search entry as the All tab with the query seeded', async () => {
+    const view = mount({ kind: 'search', query: 'meeting' })
+
+    const box = view.getByRole('searchbox', { name: 'Search notes' })
+    await waitFor(() => {
+      expect((box as HTMLInputElement).value).toBe('meeting')
+    })
+    expect(view.getByRole('button', { name: 'All' }).getAttribute('aria-current')).toBe('page')
+  })
+
   it('back from a cold note entry lands on today', async () => {
     const user = userEvent.setup()
     files['notes/meeting-notes.md'] = 'agenda'

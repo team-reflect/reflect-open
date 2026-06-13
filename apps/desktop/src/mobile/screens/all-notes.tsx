@@ -11,6 +11,7 @@ import {
   foldTag,
   type FilteredSearchHit,
   type NoteListEntry,
+  type ParsedSearchQuery,
 } from '@reflect/core'
 import { Input } from '@/components/ui/input'
 import { formatRecencyLabel } from '@/lib/dates'
@@ -22,6 +23,27 @@ import { routeForPath } from '@/routing/route'
 import { useRouter } from '@/routing/router'
 
 const SEARCH_LIMIT = 50
+
+/**
+ * A typed search constrained by the route's tag badge: the badge stays
+ * honest while searching (exported for tests). Tags parsed from `#tokens`
+ * in the text dedupe against the route tag by folded key.
+ */
+export function searchQueryWithTag(query: string, tag: string | null): ParsedSearchQuery {
+  const parsed = parseSearchQuery(query)
+  if (tag === null) {
+    return parsed
+  }
+  const key = foldTag(tag)
+  if (parsed.filters.tags.includes(key)) {
+    return parsed
+  }
+  return {
+    ...parsed,
+    filtered: true,
+    filters: { ...parsed.filters, tags: [...parsed.filters.tags, key] },
+  }
+}
 
 interface MobileAllNotesProps {
   /** The live search text — lifted to the shell so it survives navigation. */
@@ -56,8 +78,14 @@ export function MobileAllNotes({ query, onQueryChange, tag }: MobileAllNotesProp
     enabled,
   })
   const { data: hits } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'mobile-search', query],
-    queryFn: () => searchWithFilters(parseSearchQuery(query), SEARCH_LIMIT),
+    queryKey: [
+      INDEX_QUERY_SCOPE,
+      graph?.root,
+      'mobile-search',
+      query,
+      tag === null ? null : foldTag(tag),
+    ],
+    queryFn: () => searchWithFilters(searchQueryWithTag(query, tag), SEARCH_LIMIT),
     enabled: enabled && searching,
   })
 
