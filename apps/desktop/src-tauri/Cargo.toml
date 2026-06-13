@@ -68,6 +68,11 @@ fastembed = "5"
 # embedding model with byte-level progress (fastembed downloads silently).
 hf-hub = { version = "0.5.0", default-features = false, features = ["ureq", "native-tls"] }
 
+# Mobile-only capabilities (Plan 19): the first-party keyboard bridge —
+# desktop has no software keyboard to track.
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+tauri-plugin-keyboard = { path = "../../../plugins/tauri-plugin-keyboard" }
+
 [dev-dependencies]
 tauri = { version = "2", features = ["test"] }
 

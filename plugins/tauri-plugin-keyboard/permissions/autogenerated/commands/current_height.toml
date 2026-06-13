@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-current-height"
+description = "Enables the current_height command without any pre-configured scope."
+commands.allow = ["current_height"]
+
+[[permission]]
+identifier = "deny-current-height"
+description = "Denies the current_height command without any pre-configured scope."
+commands.deny = ["current_height"]

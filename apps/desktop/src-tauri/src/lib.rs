@@ -111,6 +111,11 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_window_state::Builder::default().build());
 
+    // The keyboard bridge (Plan 19, decision 8) is mobile-only: desktop has
+    // no software keyboard to track.
+    #[cfg(mobile)]
+    let builder = builder.plugin(tauri_plugin_keyboard::init());
+
     // TEMPORARY (Plan 19 spike A): probe the native capabilities on startup;
     // verdicts land in the dev console as `[plan19-spike]` lines.
     #[cfg(mobile)]

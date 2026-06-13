@@ -1,9 +1,15 @@
 # Workspace for all Rust crates: the Tauri desktop shell, the `reflect` CLI,
-# and the shared index-schema crate. One lockfile pins one SQLite everywhere —
-# the desktop writer and the CLI reader can never skew.
+# the shared index-schema crate, and first-party mobile plugins. One lockfile
+# pins one SQLite everywhere — the desktop writer and the CLI reader can
+# never skew.
 [workspace]
 resolver = "2"
-members = ["apps/cli", "apps/desktop/src-tauri", "crates/index-schema"]
+members = [
+  "apps/cli",
+  "apps/desktop/src-tauri",
+  "crates/index-schema",
+  "plugins/tauri-plugin-keyboard",
+]
 
 [workspace.dependencies]
 rusqlite = { version = "0.40.1", features = ["bundled"] }

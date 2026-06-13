@@ -1,0 +1,3 @@
+[default]
+description = "Read the keyboard state and subscribe to keyboard-change events"
+permissions = ["allow-current-height", "allow-registerListener", "allow-remove-listener"]

@@ -348,6 +348,7 @@ export {
   subscribeIndexChanges,
   subscribeFileChanges,
   emitFileChanges,
+  setLocalWriteEcho,
   applyIndexChanges,
   hashContent,
   buildIndexedNote,

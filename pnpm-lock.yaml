@@ -116,6 +116,9 @@ importers:
       ulidx:
         specifier: ^2.4.1
         version: 2.4.1
+      zod:
+        specifier: 3.23.0
+        version: 3.23.0
     devDependencies:
       '@tailwindcss/vite':
         specifier: ^4.3.0
@@ -4240,6 +4243,9 @@ packages:
     peerDependencies:
       zod: ^3.25.28 || ^4
 
+  zod@3.23.0:
+    resolution: {integrity: sha512-OFLT+LTocvabn6q76BTwVB0hExEBS0IduTr3cqZyMqEDbOnYmcU+y0tUAYbND4uwclpBGi4I4UUBGzylWpjLGA==}
+
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
@@ -8356,6 +8362,8 @@ snapshots:
   zod-to-json-schema@3.25.2(zod@3.25.76):
     dependencies:
       zod: 3.25.76
+
+  zod@3.23.0: {}
 
   zod@3.25.76: {}
 

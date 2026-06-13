@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { echoLocalWrite } from '../indexing/local-write-echo'
 import { call } from '../ipc/invoke'
 import {
   fileMetaSchema,
@@ -38,6 +39,7 @@ export async function readNote(path: string, generation?: number): Promise<strin
  */
 export async function writeNote(path: string, contents: string, generation: number): Promise<void> {
   await call('note_write', { path, contents, generation }, voidSchema)
+  echoLocalWrite({ path, kind: 'upsert', modifiedMs: Date.now() })
 }
 
 /**
@@ -50,6 +52,7 @@ export async function writeAsset(
   generation: number,
 ): Promise<void> {
   await call('asset_write', { path, contentsBase64, generation }, voidSchema)
+  echoLocalWrite({ path, kind: 'upsert', modifiedMs: Date.now() })
 }
 
 /**
@@ -82,6 +85,7 @@ export async function noteExists(path: string): Promise<boolean> {
 /** Send a note to the OS trash (recoverable; pinned to `generation`). */
 export async function deleteNote(path: string, generation: number): Promise<void> {
   await call('note_delete', { path, generation }, voidSchema)
+  echoLocalWrite({ path, kind: 'remove' })
 }
 
 /**

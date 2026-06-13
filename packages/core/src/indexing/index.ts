@@ -19,6 +19,7 @@ export {
   emitFileChanges,
   type FileChange,
 } from './file-changes'
+export { setLocalWriteEcho } from './local-write-echo'
 export {
   subscribeIndexChanges,
   applyIndexChanges,
