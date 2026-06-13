@@ -222,6 +222,15 @@ export interface NoteSession {
   /** The full current document (frontmatter + buffer), as a save would write it. */
   content: () => string
   /**
+   * The live document **only when the session has loaded** (`status` is
+   * `ready`), else `null`. Distinguishes a genuinely-empty loaded note (return
+   * `''` — authoritative) from one still loading (return `null` — the buffer
+   * is `''` only because the read hasn't landed). Callers that read the live
+   * buffer for an out-of-band use (e.g. sharing) fall back to disk on `null`
+   * rather than treating the loading buffer's emptiness as the truth.
+   */
+  liveContent: () => string | null
+  /**
    * Patch frontmatter keys (e.g. `aliases`, Plan 07b) without touching the
    * editor: the header is updated in place and saved through the normal
    * pipeline. Returns false (and does nothing) when the session can't take
@@ -664,6 +673,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     keepMine,
     loadTheirs,
     content: () => header + buffer,
+    liveContent: () => (status === 'ready' ? header + buffer : null),
     updateFrontmatter,
     commitFrontmatter,
     dispose,

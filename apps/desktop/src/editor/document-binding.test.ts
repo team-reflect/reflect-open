@@ -31,6 +31,7 @@ function fakeSession(path: string) {
     loadTheirs: () => {},
     commitFrontmatter: async () => true,
     content: () => '',
+    liveContent: () => '',
     updateFrontmatter: () => true,
     dispose,
     discard,

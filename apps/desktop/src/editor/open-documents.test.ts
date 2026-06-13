@@ -16,6 +16,7 @@ function fakeSession(path: string, log: string[]): NoteSession {
     loadTheirs: () => {},
     commitFrontmatter: async () => true,
     content: () => '',
+    liveContent: () => '',
     updateFrontmatter: () => true,
     dispose: () => {},
     discard: () => {},

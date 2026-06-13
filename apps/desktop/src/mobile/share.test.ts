@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const shareMock = vi.fn<(data: ShareData) => Promise<void>>()
 const readNoteMock = vi.fn<(path: string) => Promise<string>>()
-const openSessionMock = vi.fn<(path: string) => { content: () => string } | null>()
+const openSessionMock = vi.fn<(path: string) => { liveContent: () => string | null } | null>()
 
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
@@ -26,9 +26,9 @@ afterEach(() => {
 
 describe('shareNote', () => {
   it('prefers the live editor buffer (frontmatter stripped, title as subject)', async () => {
-    // The open session holds unsaved edits the file doesn't have yet.
+    // A ready session holding unsaved edits the file doesn't have yet.
     openSessionMock.mockReturnValue({
-      content: () => '---\nid: abc123\n---\n# Meeting\n\nAgenda + the unsaved line.\n',
+      liveContent: () => '---\nid: abc123\n---\n# Meeting\n\nAgenda + the unsaved line.\n',
     })
     const { shareNote } = await import('./share')
 
@@ -52,9 +52,9 @@ describe('shareNote', () => {
     expect(shareMock).toHaveBeenCalledWith({ title: 'meeting-notes', text: '# Meeting\n\nFrom disk.\n' })
   })
 
-  it('reads disk when the open session is still loading (empty content)', async () => {
-    // A session is registered before its async load() lands; content() is ''.
-    openSessionMock.mockReturnValue({ content: () => '' })
+  it('reads disk when the open session is still loading (liveContent null)', async () => {
+    // A session is registered before its async load() lands; liveContent() is null.
+    openSessionMock.mockReturnValue({ liveContent: () => null })
     readNoteMock.mockResolvedValue('---\nid: abc123\n---\n# Meeting\n\nReal content.\n')
     const { shareNote } = await import('./share')
 
@@ -65,5 +65,17 @@ describe('shareNote', () => {
       title: 'meeting-notes',
       text: '# Meeting\n\nReal content.\n',
     })
+  })
+
+  it('shares the empty live buffer (not stale disk) when a ready note was cleared', async () => {
+    // Ready + empty: the user removed the body; share that, not old disk text.
+    openSessionMock.mockReturnValue({ liveContent: () => '' })
+    readNoteMock.mockResolvedValue('---\nid: abc123\n---\n# Stale on disk.\n')
+    const { shareNote } = await import('./share')
+
+    await shareNote('notes/meeting-notes.md')
+
+    expect(readNoteMock).not.toHaveBeenCalled()
+    expect(shareMock).toHaveBeenCalledWith({ title: 'meeting-notes', text: '' })
   })
 })

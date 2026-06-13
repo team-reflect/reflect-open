@@ -31,9 +31,9 @@ interface NoteActionsMenuProps {
 
 /**
  * The note screen's "⋯" actions menu (Plan 19, V1 parity): pin/unpin, share,
- * and delete-to-trash. Pin reflects the index's pinned set; share hands the
- * note's markdown to the OS share sheet (the `tauri-plugin-sharesheet`
- * native command); delete confirms first (it's destructive, even if
+ * and delete-to-trash. Pin reflects the index's pinned set; {@link shareNote}
+ * hands the note's body to the OS share sheet via the Web Share API
+ * (`navigator.share`); delete confirms first (it's destructive, even if
  * recoverable from `.reflect/trash/`) and routes through
  * {@link deleteOpenNote} so the open session is discarded rather than flushed.
  */

@@ -11,18 +11,18 @@ import { openSession } from '@/editor/open-documents'
  * sees the `id:` block), with the title (the readable filename) as the
  * subject for targets that use one (Mail).
  *
- * Prefers the **live editor buffer** (`openSession().content()`) over disk:
- * the note is open on the screen this action lives on, and its session is
- * debounced — disk alone would drop the user's most recent typing. Reading it
- * is also synchronous, which keeps the tap's transient activation alive for
- * `navigator.share` (an `await` before the call would consume it). Falls back
- * to disk only when the content is empty — no session, or one still loading
- * (`content()` is `''` until its async `load()` lands), where `??` alone
- * would share blank text.
+ * Prefers the **live editor buffer** over disk: the note is open on the
+ * screen this action lives on, and its session is debounced — disk alone
+ * would drop the user's most recent typing. `liveContent()` returns the
+ * buffer only once the session is *ready*, so a genuinely-empty loaded note
+ * stays authoritative (shares empty), while a session still loading returns
+ * `null` and we read disk instead of sharing the loading buffer's transient
+ * emptiness. Reading the ready buffer is synchronous, which also keeps the
+ * tap's transient activation alive for `navigator.share` (an `await` first
+ * would consume it).
  */
 export async function shareNote(path: string): Promise<void> {
-  const live = openSession(path)?.content()
-  const source = live !== undefined && live.trim() !== '' ? live : await readNote(path)
+  const source = openSession(path)?.liveContent() ?? (await readNote(path))
   const text = splitFrontmatter(source).body.trimStart()
   await navigator.share({ title: noteTitle(path), text })
 }
