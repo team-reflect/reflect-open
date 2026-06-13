@@ -78,18 +78,26 @@ export async function publishNoteToGist(path: string, generation: number): Promi
  * command): publish, copy the gist link, and surface progress through the
  * operations status line — the second short-lived entry is the only success
  * feedback ("Gist link copied"), in keeping with no-toast feedback. Returns
- * the gist url, or `null` when the publish failed (already surfaced).
+ * the gist url whenever the publish itself landed — a failed clipboard copy
+ * (focus, permissions) gets its own failure line, never a phantom "publish
+ * failed" for a gist that exists — or `null` when the publish failed
+ * (already surfaced).
  */
 export async function runGistPublish(path: string, generation: number): Promise<string | null> {
   const operation = startOperation('Publishing gist')
+  let url: string
   try {
-    const url = await publishNoteToGist(path, generation)
-    await navigator.clipboard.writeText(url)
-    operation.done()
-    startOperation('Gist link copied').done()
-    return url
+    url = await publishNoteToGist(path, generation)
   } catch (cause) {
     operation.fail(errorMessage(cause))
     return null
   }
+  operation.done()
+  try {
+    await navigator.clipboard.writeText(url)
+    startOperation('Gist link copied').done()
+  } catch (cause) {
+    startOperation('Copying the gist link').fail(errorMessage(cause))
+  }
+  return url
 }

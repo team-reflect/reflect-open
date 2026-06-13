@@ -168,4 +168,17 @@ describe('runGistPublish', () => {
     expect(operationFail).toHaveBeenCalledWith(expect.stringMatching(/connect github/i))
     expect(writeText).not.toHaveBeenCalled()
   })
+
+  it('a failed clipboard copy never reads as a failed publish', async () => {
+    readNote.mockResolvedValue(BODY)
+    writeText.mockRejectedValueOnce(new Error('Document is not focused'))
+    // The publish landed: the url comes back so the UI flips to Republish.
+    await expect(runGistPublish('notes/a.md', 3)).resolves.toBe(PUBLISHED.htmlUrl)
+
+    expect(startOperation).toHaveBeenCalledWith('Publishing gist')
+    expect(startOperation).toHaveBeenCalledWith('Copying the gist link')
+    expect(startOperation).not.toHaveBeenCalledWith('Gist link copied')
+    expect(operationDone).toHaveBeenCalledTimes(1) // the publish itself
+    expect(operationFail).toHaveBeenCalledWith(expect.stringMatching(/not focused/i))
+  })
 })

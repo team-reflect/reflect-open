@@ -42,12 +42,13 @@ export function NoteGistAction({ path, keybinding = null }: NoteGistActionProps)
   const [isPublishing, setIsPublishing] = useState(false)
   const [pending, setPending] = useState<PendingPublish | null>(null)
 
-  // Render-time state adjustment: drop the bridge once the index caught up
-  // (url landed and staleness recomputed) or the action moved to another note.
-  if (
-    pending !== null &&
-    (pending.path !== path || (row !== null && row.gistUrl === pending.url && !row.gistStale))
-  ) {
+  // Render-time state adjustment: drop the bridge once the index reports the
+  // published url (or the action moved to another note). Deliberately url-only:
+  // also waiting for `gistStale` to clear could hold the bridge forever — a
+  // body edited right after publishing keeps recomputing stale, and a stuck
+  // bridge would suppress the republish nudge until navigation. The cost is a
+  // one-watcher-round-trip nudge flash after a same-url republish.
+  if (pending !== null && (pending.path !== path || row?.gistUrl === pending.url)) {
     setPending(null)
   }
   const bridged = pending !== null && pending.path === path
