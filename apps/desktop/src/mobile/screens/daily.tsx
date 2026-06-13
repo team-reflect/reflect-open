@@ -3,7 +3,8 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { dailyPath } from '@reflect/core'
 import { NotePane } from '@/components/note-pane'
 import { Button } from '@/components/ui/button'
-import { addDaysIso, formatDayLabel, todayIso } from '@/lib/dates'
+import { addDaysIso, formatDayLabel } from '@/lib/dates'
+import { useToday } from '@/lib/use-today'
 import { useSettings } from '@/providers/settings-provider'
 import { useRouter } from '@/routing/router'
 
@@ -16,7 +17,8 @@ import { useRouter } from '@/routing/router'
 export function MobileDaily({ date }: { date: string }): ReactElement {
   const { settings } = useSettings()
   const { navigate } = useRouter()
-  const isToday = date === todayIso()
+  // Live: the Today affordance appears at midnight without a re-navigation.
+  const isToday = date === useToday()
 
   return (
     <div className="flex h-dvh w-screen flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
