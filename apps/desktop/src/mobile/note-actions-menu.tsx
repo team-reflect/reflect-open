@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react'
-import { MoreHorizontal, Pin, PinOff, Trash2 } from 'lucide-react'
+import { MoreHorizontal, Pin, PinOff, Share, Trash2 } from 'lucide-react'
 import { errorMessage } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import {
@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { toggleNotePinned } from '@/lib/note-pin'
 import { deleteOpenNote } from '@/mobile/note-delete'
+import { shareNote } from '@/mobile/share'
 import { useGraph } from '@/providers/graph-provider'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes'
 
@@ -29,11 +30,12 @@ interface NoteActionsMenuProps {
 }
 
 /**
- * The note screen's "⋯" actions menu (Plan 19, V1 parity): pin/unpin and
- * delete-to-trash. Pin reflects the index's pinned set; delete confirms
- * first (it's destructive, even if recoverable from `.reflect/trash/`) and
- * routes through {@link deleteOpenNote} so the open session is discarded
- * rather than flushed. Share lands with its native plugin in a later slice.
+ * The note screen's "⋯" actions menu (Plan 19, V1 parity): pin/unpin, share,
+ * and delete-to-trash. Pin reflects the index's pinned set; share hands the
+ * note's markdown to the OS share sheet (the `tauri-plugin-sharesheet`
+ * native command); delete confirms first (it's destructive, even if
+ * recoverable from `.reflect/trash/`) and routes through
+ * {@link deleteOpenNote} so the open session is discarded rather than flushed.
  */
 export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): ReactElement {
   const { graph } = useGraph()
@@ -46,6 +48,10 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
     if (graph !== null) {
       void toggleNotePinned(path, graph.generation).catch(() => {})
     }
+  }
+
+  const share = (): void => {
+    void shareNote(path).catch((cause) => console.error('share failed:', errorMessage(cause)))
   }
 
   const confirmDelete = (): void => {
@@ -75,6 +81,10 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
           <DropdownMenuItem onSelect={pin}>
             {isPinned ? <PinOff /> : <Pin />}
             {isPinned ? 'Unpin' : 'Pin'}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={share}>
+            <Share />
+            Share
           </DropdownMenuItem>
           <DropdownMenuItem variant="destructive" onSelect={() => setConfirmingDelete(true)}>
             <Trash2 />

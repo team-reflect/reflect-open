@@ -4603,6 +4603,7 @@ dependencies = [
  "tauri-plugin-keyboard",
  "tauri-plugin-opener",
  "tauri-plugin-process",
+ "tauri-plugin-sharesheet",
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
  "tempfile",
@@ -5902,6 +5903,16 @@ checksum = "d55511a7bf6cd70c8767b02c97bf8134fa434daf3926cfc1be0a0f94132d165a"
 dependencies = [
  "tauri",
  "tauri-plugin",
+]
+
+[[package]]
+name = "tauri-plugin-sharesheet"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
