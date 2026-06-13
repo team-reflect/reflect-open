@@ -296,10 +296,26 @@ Steps 1 and 2 are the existential gates; nothing else starts until both pass.
    > lands on disk through the shared save pipeline. Two findings: the
    > document stack requires `RouterProvider` (a missing router unmounted the
    > tree to a white screen — `MobileErrorBoundary` now makes that class
-   > visible), and `capabilities/mobile.json` is deliberately deferred until
-   > a mobile-only permission exists. Still open from these steps: tab/stack
-   > navigation, day pager, sync-status pill, and the decision-5 write-event
-   > seam (step 5).
+   > visible). Still open from these steps: tab/stack navigation, day pager,
+   > and the sync-status pill.
+   >
+   > **Also landed 2026-06-12: step 5 and the decision-8 keyboard plugin.**
+   > The write-event seam ships as `setLocalWriteEcho`/`echoLocalWrite` in
+   > core — `writeNote`/`writeAsset`/`deleteNote` emit their change batch
+   > in-process after the write lands, enabled by the mobile root chunk at
+   > load, unit-tested (including no-emit-on-failed-write).
+   > `plugins/tauri-plugin-keyboard` (workspace member, mobile-only dep)
+   > implements decision 8: Swift disables the system scroll nudge and
+   > streams keyboard overlap as `keyboardChange` events; the frontend
+   > mirrors it into `--keyboard-height` and Today's scroll container yields
+   > via `max(safe-area, keyboard)`. **Simulator-verified with the software
+   > keyboard: the caret line stays visible above the keyboard while
+   > editing.** Gotcha worth keeping: `registerListener`/`remove_listener`
+   > (those exact spellings) must be in a plugin's `COMMANDS` for
+   > `addPluginListener` to pass the ACL. `capabilities/mobile.json` now
+   > exists (keyboard:default). Spike B's remaining on-device checklist
+   > (IME, autocorrect, selection, real-device feel) still gates the editor
+   > decision.
 5. **The in-process write-notification seam (decision 5).** Local write paths
    emit file-change batches on mobile; prove with a unit-level test that a
    session save reaches the index and the engine's dirty mark without a
