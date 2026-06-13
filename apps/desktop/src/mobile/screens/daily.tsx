@@ -2,7 +2,7 @@ import { type ReactElement } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { untitledNotePath } from '@/lib/create-note'
-import { todayIso } from '@/lib/dates'
+import { useToday } from '@/lib/use-today'
 import { CalendarStrip } from '@/mobile/calendar-strip'
 import { DayCarousel } from '@/mobile/day-carousel'
 import { useRouter } from '@/routing/router'
@@ -20,15 +20,18 @@ import { useRouter } from '@/routing/router'
  */
 export function MobileDaily({ date }: { date: string }): ReactElement {
   const { navigate } = useRouter()
-  // Selecting today routes to the live `today` route (not a frozen `daily`
-  // date), so the spine keeps rolling over at midnight — the Today button and
-  // tapping today's cell both land here.
+  // One live `today` for the whole surface: the strip marks today's cell and
+  // the `select` below decide "is this today?" from the *same* value, so they
+  // can't disagree across the midnight rollover (which would otherwise route a
+  // tap on the highlighted today cell to a frozen `daily` date). Selecting
+  // today routes to the live `today` route, keeping the spine rolling over.
+  const today = useToday()
   const select = (day: string): void =>
-    navigate(day === todayIso() ? { kind: 'today' } : { kind: 'daily', date: day })
+    navigate(day === today ? { kind: 'today' } : { kind: 'daily', date: day })
 
   return (
     <div className="flex h-full w-screen flex-col">
-      <CalendarStrip date={date} onSelect={select} />
+      <CalendarStrip date={date} today={today} onSelect={select} />
       <DayCarousel date={date} onSelect={select} />
       <Button
         size="icon"

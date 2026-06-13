@@ -1,15 +1,17 @@
 import { useMemo, type ReactElement } from 'react'
 import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
-import { parseIsoDate, todayIso } from '@/lib/dates'
+import { parseIsoDate } from '@/lib/dates'
 import { monthLabel, weekOf } from '@/mobile/calendar'
 import { cn } from '@/lib/utils'
 import { useSettings } from '@/providers/settings-provider'
-import { useToday } from '@/lib/use-today'
 
 interface CalendarStripProps {
   /** The selected day (the centered carousel slide). */
   date: string
+  /** Today's live ISO date — owned by the parent so the strip and the
+   *  parent's select logic share one value (no midnight-rollover skew). */
+  today: string
   /** Select a day — drives the carousel and the route. */
   onSelect: (date: string) => void
 }
@@ -21,9 +23,8 @@ interface CalendarStripProps {
  * strip and the carousel stay in lockstep through the parent's `date`. A
  * **Today** affordance appears in the header when the selection has wandered.
  */
-export function CalendarStrip({ date, onSelect }: CalendarStripProps): ReactElement {
+export function CalendarStrip({ date, today, onSelect }: CalendarStripProps): ReactElement {
   const { settings } = useSettings()
-  const today = useToday()
   const week = useMemo(() => weekOf(date, settings.weekStartDay), [date, settings.weekStartDay])
 
   return (
@@ -34,7 +35,7 @@ export function CalendarStrip({ date, onSelect }: CalendarStripProps): ReactElem
       <div className="flex items-center justify-between px-2 py-1">
         <h1 className="text-base font-semibold">{monthLabel(date)}</h1>
         {date !== today && (
-          <Button variant="ghost" size="sm" onClick={() => onSelect(todayIso())}>
+          <Button variant="ghost" size="sm" onClick={() => onSelect(today)}>
             Today
           </Button>
         )}
