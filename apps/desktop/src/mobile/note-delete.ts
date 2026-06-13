@@ -7,13 +7,16 @@ import { openSession } from '@/editor/open-documents'
  * (recoverable, sync-ignored) and emits the in-process `remove` so the index
  * and queries drop it.
  *
- * The note is open in the editor, so its session is **discarded** first: a
- * normal dispose flushes, which would rewrite — and recreate — the file we're
- * deleting (especially with unsaved edits). `discard` detaches without
- * writing, and the pane's later unmount-dispose stays a no-op. The caller
+ * **Delete first, discard second.** If the delete fails, the open session is
+ * left fully intact — the note screen stays mounted and editable, edits keep
+ * persisting. Only once the file is in trash do we `discard` the session: it
+ * stays `dirty` after its file vanishes (a removed file is "nothing to
+ * reconcile", so dirtiness isn't cleared), and a normal teardown flush would
+ * therefore rewrite — recreate — the file. `discard` detaches without
+ * writing, so the pane's unmount (flush → dispose) is a no-op. The caller
  * navigates away after this resolves.
  */
 export async function deleteOpenNote(path: string, generation: number): Promise<void> {
-  openSession(path)?.discard()
   await deleteNote(path, generation)
+  openSession(path)?.discard()
 }
