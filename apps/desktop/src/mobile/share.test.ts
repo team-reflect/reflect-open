@@ -4,9 +4,8 @@ const shareMock = vi.fn<(data: ShareData) => Promise<void>>()
 const readNoteMock = vi.fn<(path: string) => Promise<string>>()
 const openSessionMock = vi.fn<(path: string) => { liveContent: () => string | null } | null>()
 
-vi.mock('@reflect/core', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@reflect/core')>()),
-  readNote: (path: string) => readNoteMock(path),
+vi.mock('@/lib/note-read', () => ({
+  readNoteOrEmpty: (path: string) => readNoteMock(path),
 }))
 vi.mock('@/editor/open-documents', () => ({
   openSession: (path: string) => openSessionMock(path),
@@ -41,7 +40,7 @@ describe('shareNote', () => {
     })
   })
 
-  it('reads disk when no session is open', async () => {
+  it('reads disk (via readNoteOrEmpty) when no session is open', async () => {
     openSessionMock.mockReturnValue(null)
     readNoteMock.mockResolvedValue('---\nid: abc123\n---\n# Meeting\n\nFrom disk.\n')
     const { shareNote } = await import('./share')
@@ -50,6 +49,17 @@ describe('shareNote', () => {
 
     expect(readNoteMock).toHaveBeenCalledWith('notes/meeting-notes.md')
     expect(shareMock).toHaveBeenCalledWith({ title: 'meeting-notes', text: '# Meeting\n\nFrom disk.\n' })
+  })
+
+  it('shares empty for a lazy note with no file yet (readNoteOrEmpty returns "")', async () => {
+    // Loading window of a brand-new note: no session content, no file on disk.
+    openSessionMock.mockReturnValue({ liveContent: () => null })
+    readNoteMock.mockResolvedValue('')
+    const { shareNote } = await import('./share')
+
+    await shareNote('notes/01jh-untitled.md')
+
+    expect(shareMock).toHaveBeenCalledWith({ title: '01jh-untitled', text: '' })
   })
 
   it('reads disk when the open session is still loading (liveContent null)', async () => {

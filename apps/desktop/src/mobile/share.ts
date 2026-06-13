@@ -1,5 +1,6 @@
-import { readNote, splitFrontmatter } from '@reflect/core'
+import { splitFrontmatter } from '@reflect/core'
 import { openSession } from '@/editor/open-documents'
+import { readNoteOrEmpty } from '@/lib/note-read'
 
 /**
  * Share a note through the OS share sheet (Plan 19, V1 parity) via the Web
@@ -20,9 +21,14 @@ import { openSession } from '@/editor/open-documents'
  * emptiness. Reading the ready buffer is synchronous, which also keeps the
  * tap's transient activation alive for `navigator.share` (an `await` first
  * would consume it).
+ *
+ * The disk fallback uses `readNoteOrEmpty`: a lazy note (`createIfMissing`)
+ * has no file until its first save, so a plain read would throw during the
+ * loading window — sharing empty is the right answer for a not-yet-written
+ * note.
  */
 export async function shareNote(path: string): Promise<void> {
-  const source = openSession(path)?.liveContent() ?? (await readNote(path))
+  const source = openSession(path)?.liveContent() ?? (await readNoteOrEmpty(path))
   const text = splitFrontmatter(source).body.trimStart()
   await navigator.share({ title: noteTitle(path), text })
 }
