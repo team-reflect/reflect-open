@@ -4,6 +4,7 @@ This document is a handoff for an agent or engineer building a second version of
 
 For deeper implementation notes, see:
 
+- [Mobile app](./reflect-v1-mobile-overview.md)
 - [Search](./search.md)
 - [Note sync](./note-sync.md)
 - [SQLite persistence](./sqlite-persistence.md)
