@@ -3,7 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover makes env(safe-area-inset-*) report real values on
+         iOS (zero otherwise); maximum-scale blocks the input auto-zoom that
+         WKWebView applies to focused fields. No effect on desktop. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
     <title>Reflect</title>
   </head>
 
