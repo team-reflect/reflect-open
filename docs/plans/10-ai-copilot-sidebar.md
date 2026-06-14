@@ -31,17 +31,19 @@ keychain (introduced here, reused by Plan 12).
 (`assertCloudAllowed`); keychain is a Rust primitive. See
 [Architecture & Conventions](architecture-conventions.md).
 
-**Libraries:** Vercel AI SDK (`ai` + `@ai-sdk/openai`/…), `diff` (jsdiff, patchsets),
-`keyring` (Rust, BYOK keys). See [Libraries](libraries.md).
+**Libraries:** Vercel AI SDK (`ai` + `@ai-sdk/openai`/`@ai-sdk/anthropic`/
+`@ai-sdk/google`), `keyring` (Rust, BYOK keys). `diff`/jsdiff is not installed because
+patchsets are deferred. See [Libraries](libraries.md).
 
 ## Scope
 
-**In:** provider config (BYOK, OpenAI-first), keychain secrets, context assembly from
-local retrieval, chat over current note + related notes, summarize, rewrite selection,
-patchset generation/review/apply, local checkpoints, transparent context UI, privacy
-enforcement.
+**In:** provider config (BYOK, multi-provider), keychain secrets, context assembly from
+local retrieval, read-only chat over notes, transparent tool activity, durable chat
+history, and privacy enforcement. The original summarize/rewrite/patchset scope is still
+recorded below as the next wave.
 **Out:** local generative models (later), background auto-extraction beyond opt-in
-reviewable suggestions, agentic multi-step tools (later), audio (deferred).
+reviewable suggestions, agentic multi-step tools (later), audio memos (shipped
+separately through `actions/audio-memo`).
 
 ## Steps
 

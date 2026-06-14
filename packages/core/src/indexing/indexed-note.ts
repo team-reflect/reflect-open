@@ -37,9 +37,10 @@ import { previewSnippet } from './snippet'
  * 3 — repairs `notes.mtime` 0 rows written by the watcher path before it
  * carried `modifiedMs` (hash-reconcile can never refresh them) ·
  * 4 — `notes.has_conflict` (sync conflict markers, Plan 12) ·
- * 5 — `notes.gist_url` + `notes.gist_stale` (gist publishing).
+ * 5 — `notes.gist_url` + `notes.gist_stale` (gist publishing) ·
+ * 6 — rendered Markdown escapes in titles, wiki-link targets, and previews.
  */
-export const PROJECTION_VERSION = 5
+export const PROJECTION_VERSION = 6
 
 export const indexedLinkSchema = z.object({
   kind: z.enum(['wiki', 'md']),

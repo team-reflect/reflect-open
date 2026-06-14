@@ -80,7 +80,7 @@ describe('listNotes', () => {
     expect(tagArgs.params).toEqual([])
   })
 
-  it('narrows both queries to one tag via the stored folded tag_key', async () => {
+  it('narrows both queries to one tag via tag-first joins on the stored folded tag_key', async () => {
     mockInvoke
       .mockResolvedValueOnce([
         { path: 'notes/health.md', title: 'Health Stacked', mtime: 2000, preview: '' },
@@ -90,14 +90,22 @@ describe('listNotes', () => {
     await listNotes({ tag: 'Book' })
 
     expect(mockInvoke).toHaveBeenCalledTimes(2)
-    for (const call of mockInvoke.mock.calls) {
-      const [, args] = call
-      const sql = String(args.sql)
-      expect(sql).toContain('exists')
-      expect(sql).toContain('"tag_key"')
-      expect(sql).not.toContain('lower(')
-      expect(args.params).toEqual(['book'])
-    }
+    const [, listArgs] = mockInvoke.mock.calls[0]
+    const listSql = String(listArgs.sql)
+    expect(listSql).toContain('from "tags"')
+    expect(listSql).toContain('inner join "notes"')
+    expect(listSql).toContain('"tags"."tag_key"')
+    expect(listSql).not.toContain('exists')
+    expect(listSql).not.toContain('lower(')
+    expect(listArgs.params).toEqual(['book'])
+
+    const [, tagArgs] = mockInvoke.mock.calls[1]
+    const tagSql = String(tagArgs.sql)
+    expect(tagSql).toContain('inner join "tags" as "filter_tags"')
+    expect(tagSql).toContain('"filter_tags"."tag_key"')
+    expect(tagSql).not.toContain('exists')
+    expect(tagSql).not.toContain('lower(')
+    expect(tagArgs.params).toEqual(['book'])
   })
 
   it('skips the tag fetch entirely when no notes match', async () => {
@@ -147,10 +155,12 @@ describe('listRecentNotes', () => {
 
     const [, args] = mockInvoke.mock.calls[0]
     const sql = String(args.sql)
-    expect(sql).toContain('exists')
-    expect(sql).toContain('"tag_key"')
+    expect(sql).toContain('from "tags"')
+    expect(sql).toContain('inner join "notes"')
+    expect(sql).toContain('"tags"."tag_key"')
+    expect(sql).not.toContain('exists')
     expect(sql).not.toContain('lower(')
-    expect(args.params).toEqual([0, 'book', 5])
+    expect(args.params).toEqual(['book', 0, 5])
   })
 })
 

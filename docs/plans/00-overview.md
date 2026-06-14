@@ -4,32 +4,30 @@ This directory holds the numbered, dependency-ordered plans for building the **f
 version (first wave)** of Reflect V2: the open-source, local-first, markdown-native,
 AI-native rewrite described in the product docs.
 
-## Current status
+## Current source status (2026-06-14)
 
-The first macOS release shipped Plans 01–10, 12, 14–17 (Plan 16 at its V1 scope:
-SSH + path remotes; HTTPS credential helpers later). Since that release, the
-roadmap has moved in a few places:
+The source tree now implements Plans 01–12 and 14–17, with Plan 16 at its V1 scope
+(SSH agent auth + path remotes; HTTPS credential helpers remain V2). Plan 11 is no
+longer deferred: the repo contains the WXT extension (`apps/extension`), the native
+messaging sidecar (`apps/native-host`), desktop capture commands
+(`apps/desktop/src-tauri/src/capture.rs`), and the TS drain/enrichment path in
+`@reflect/core`.
 
-- **Plan 11 (link capture) is now implemented.** The WXT Chrome extension,
-  native-messaging host sidecar, capture inbox, desktop drain controller, screenshot
-  asset path, and BYOK enrichment flow are built end-to-end. Remaining capture work is
-  narrower: browser/store packaging validation beyond macOS, Safari/mobile share
-  targets, and full article/read-later clipping.
-- **Plan 13 (import/export portability) is closed by decision.** We are not building a
-  dedicated import/export suite. The graph folder itself is the portable artifact; copy
-  or zip `daily/`, `notes/`, and `assets/` directly. The existing V1 Markdown ZIP
-  importer remains a migration convenience, not a broader roadmap commitment.
-- **Plan 19 (mobile) is in progress.** The iOS Tauri target, fixed graph root,
-  onboarding, Daily/All mobile surfaces, keyboard-height plugin, and shared editor
-  plumbing have landed. Physical-device editor validation, foreground sync wiring,
-  background-flush/kill recovery, TestFlight/App Store release, and Android remain.
+Plan 13 is **closed by product decision**: the graph folder itself is the portability
+surface, so no dedicated import/export suite is planned. A focused Reflect V1 Markdown
+ZIP importer exists in `packages/core/src/import/v1-markdown.ts`, using `fflate`, but it
+is a migration convenience rather than a broader roadmap commitment. Plan 18 remains an
+unbuilt add-on. Plan 19 is active implementation work, not just a future track: the
+existing Tauri app has a platform root gate, mobile UI tree, fixed-root onboarding,
+target-gated Rust capabilities, and the first-party iOS keyboard plugin;
+physical-device validation and App Store/TestFlight hardening are still open.
 
-Two features landed beyond the written plans: **audio memos** (raw-first capture with
-async BYOK cloud transcription — listed below as deferred, but shipped early via
-`actions/audio-memo`), and **durable AI chat persistence** (the `chat_*` tables in
-`index.sqlite` are the one sanctioned non-rebuildable exception to the
-projection-only rule). The AI copilot (Plan 10) shipped **read-only** (chat over
-local context); patchsets/edits remain a later wave, per the plan's revision note.
+Two features landed beyond the original written plans: **audio memos** (raw-first
+capture with async BYOK cloud transcription via `actions/audio-memo`) and **durable AI
+chat persistence** (the `chat_*` tables in `index.sqlite` are the one sanctioned
+non-rebuildable exception to the projection-only rule). The AI copilot (Plan 10) ships
+as a dedicated, read-only chat view over local tools; patchsets/edits remain a later
+wave, per the plan's revision note.
 
 Read these alongside the source docs they implement:
 
@@ -70,8 +68,8 @@ before the editor, and the editor lands before search/AI.
 | 07 | [Backlinks](07-backlinks.md) | `[[` autocomplete, create-from-unresolved, incoming backlinks, rename-rewrite + aliases |
 | 08 | [Lexical search & command palette](08-lexical-search-and-command-palette.md) | `⌘K` search/command surface, FTS over titles/body, filters, navigation commands |
 | 09 | [Semantic search & local embeddings](09-semantic-search-and-embeddings.md) | Local embedding runtime (Rust), chunking, `sqlite-vec`, incremental re-embed, retrieval layer |
-| 10 | [AI copilot sidebar](10-ai-copilot-sidebar.md) | BYOK provider, keychain secrets, context/retrieval, chat/summarize/rewrite, reviewable patchsets, `private: true` hard-block |
-| 11 | [Link capture](11-link-capture.md) | **Implemented.** Chrome extension → native-messaging host/inbox → desktop write path, screenshots, BYOK enrichment, daily-note `[[Links]]` |
+| 10 | [AI copilot sidebar](10-ai-copilot-sidebar.md) | BYOK providers, keychain secrets, read-only chat route over `search_notes`/`read_note`, durable chat history, `private: true` hard-block; patchsets deferred |
+| 11 | [Link capture](11-link-capture.md) | Chrome extension → native-messaging sidecar → desktop capture inbox, screenshots, meta/BYOK enrichment, dedicated capture notes + daily-note `[[Links]]` |
 | 12 | [Backup & sync (GitHub-only)](12-backup-and-sync.md) | GitHub/Git backup + restore (the only supported remote), Git-native conflict surface, manual review, checkpoints; file-sync providers unsupported |
 | 13 | [Import / export / portability](13-import-export-portability.md) | **Closed by decision.** Markdown files are the portability surface; no JSON/HTML/ZIP export or Obsidian/folder import suite is planned |
 | 14 | [CLI (read/discovery)](14-cli-read-discovery.md) | `reflect today`, `reflect search`, `reflect show`, path lookup |
@@ -79,7 +77,7 @@ before the editor, and the editor lands before search/AI.
 | 16 | [Generic git remotes](16-generic-git-remotes.md) | Any git host (GitLab/Gitea/GHES/NAS) via hand-wired `origin`, zero new UI — V1 SSH (agent) + path remotes, V2 HTTPS (credential helpers) |
 | 17 | [Readable filenames](17-readable-filenames.md) | Title-derived note filenames (slug + collision suffix), frontmatter `id` adoption, rename-on-settled-title file moves, id-healed external renames |
 | 18 | [Tasks](18-tasks.md) | **Post-release add-on.** GFM-checkbox tasks as a rebuildable projection: interactive editor checkboxes, Tasks view (Overdue/Today/Upcoming), `[[date]]`/daily scheduling, guarded toggle write-back, `checklist: true` opt-out |
-| 19 | [Mobile companion](19-mobile.md) | **In progress.** iOS as a target of the existing Tauri app: Daily/All surfaces and editing foundations landed; device validation, sync hardening, TestFlight/App Store, then Android remain |
+| 19 | [Mobile companion](19-mobile.md) | **In progress.** iOS target of the existing Tauri app: mobile root gate, fixed graph root, onboarding, Daily/All shell, editable notes, keyboard plugin; device validation + store hardening remain |
 
 ## Milestone map
 

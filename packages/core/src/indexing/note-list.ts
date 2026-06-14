@@ -1,5 +1,4 @@
-import { sql, type Expression, type ExpressionBuilder, type SqlBool } from 'kysely'
-import type { Database } from '@reflect/db'
+import { sql } from 'kysely'
 import { foldTag } from '../markdown'
 import { db } from './db'
 
@@ -29,39 +28,30 @@ export interface NoteListOptions {
   tag?: string | null
 }
 
-/**
- * EXISTS predicate: the candidate `notes` row carries `tag`. Matching is on
- * the stored `tag_key` ({@link foldTag} at index time — the same collation as
- * the `#tag` search token). Shared by the note and per-note-tag queries so
- * the two can't disagree about what "filtered" means.
- */
-function noteCarriesTag(tag: string) {
-  const folded = foldTag(tag)
-  return (eb: ExpressionBuilder<Database, 'notes'>): Expression<SqlBool> =>
-    eb.exists(
-      eb
-        .selectFrom('tags')
-        .select(sql<number>`1`.as('one'))
-        .whereRef('tags.notePath', '=', 'notes.path')
-        .where('tags.tagKey', '=', folded),
-    )
-}
-
 /** Non-daily notes for the All Notes screen, most recently edited first. */
 export async function listNotes(options: NoteListOptions = {}): Promise<NoteListEntry[]> {
   const tag = options.tag ?? null
 
-  let query = db
-    .selectFrom('notes')
-    .where('notes.dailyDate', 'is', null)
-    .select(['notes.path', 'notes.title', 'notes.mtime', 'notes.preview'])
-    .orderBy('notes.mtime', 'desc')
-    .orderBy('notes.path')
-  if (tag !== null) {
-    query = query.where(noteCarriesTag(tag))
-  }
+  const rows =
+    tag === null
+      ? await db
+          .selectFrom('notes')
+          .where('notes.dailyDate', 'is', null)
+          .select(['notes.path', 'notes.title', 'notes.mtime', 'notes.preview'])
+          .orderBy('notes.mtime', 'desc')
+          .orderBy('notes.path')
+          .execute()
+      : await db
+          .selectFrom('tags')
+          .innerJoin('notes', 'notes.path', 'tags.notePath')
+          .where('tags.tagKey', '=', foldTag(tag))
+          .where('notes.dailyDate', 'is', null)
+          .select(['notes.path', 'notes.title', 'notes.mtime', 'notes.preview'])
+          .distinct()
+          .orderBy('notes.mtime', 'desc')
+          .orderBy('notes.path')
+          .execute()
 
-  const rows = await query.execute()
   if (rows.length === 0) {
     return []
   }
@@ -69,18 +59,27 @@ export async function listNotes(options: NoteListOptions = {}): Promise<NoteList
   // Tags for the same note set, via the same predicates — a join rather than a
   // `note_path IN (…)` list, which would put a per-row parameter between the
   // list and SQLite's bound-parameter ceiling.
-  let tagQuery = db
-    .selectFrom('tags')
-    .innerJoin('notes', 'notes.path', 'tags.notePath')
-    .where('notes.dailyDate', 'is', null)
-    .select(['tags.notePath', 'tags.tag'])
-    // Order on the folded key so a row's tags read in the same alphabetical
-    // order as the facet list, regardless of display casing.
-    .orderBy('tags.tagKey')
-  if (tag !== null) {
-    tagQuery = tagQuery.where(noteCarriesTag(tag))
-  }
-  const tagRows = await tagQuery.execute()
+  const tagRows =
+    tag === null
+      ? await db
+          .selectFrom('tags')
+          .innerJoin('notes', 'notes.path', 'tags.notePath')
+          .where('notes.dailyDate', 'is', null)
+          .select(['tags.notePath', 'tags.tag'])
+          // Order on the folded key so a row's tags read in the same alphabetical
+          // order as the facet list, regardless of display casing.
+          .orderBy('tags.tagKey')
+          .execute()
+      : await db
+          .selectFrom('tags')
+          .innerJoin('notes', 'notes.path', 'tags.notePath')
+          .innerJoin('tags as filterTags', 'filterTags.notePath', 'notes.path')
+          .where('filterTags.tagKey', '=', foldTag(tag))
+          .where('notes.dailyDate', 'is', null)
+          .select(['tags.notePath', 'tags.tag'])
+          .distinct()
+          .orderBy('tags.tagKey')
+          .execute()
   const tagsByPath = new Map<string, string[]>()
   for (const row of tagRows) {
     const tags = tagsByPath.get(row.notePath)
@@ -128,19 +127,29 @@ export interface RecentNotesOptions {
 export async function listRecentNotes(options: RecentNotesOptions): Promise<RecentNoteRow[]> {
   const tag = options.tag ?? null
 
-  let query = db
-    .selectFrom('notes')
-    .where('notes.dailyDate', 'is', null)
-    .where('notes.isPrivate', '=', 0)
-    .select(['notes.path', 'notes.title', 'notes.preview', 'notes.mtime', 'notes.isPrivate'])
-    .orderBy('notes.mtime', 'desc')
-    .orderBy('notes.path')
-    .limit(options.limit)
-  if (tag !== null) {
-    query = query.where(noteCarriesTag(tag))
-  }
-
-  const rows = await query.execute()
+  const rows =
+    tag === null
+      ? await db
+          .selectFrom('notes')
+          .where('notes.dailyDate', 'is', null)
+          .where('notes.isPrivate', '=', 0)
+          .select(['notes.path', 'notes.title', 'notes.preview', 'notes.mtime', 'notes.isPrivate'])
+          .orderBy('notes.mtime', 'desc')
+          .orderBy('notes.path')
+          .limit(options.limit)
+          .execute()
+      : await db
+          .selectFrom('tags')
+          .innerJoin('notes', 'notes.path', 'tags.notePath')
+          .where('tags.tagKey', '=', foldTag(tag))
+          .where('notes.dailyDate', 'is', null)
+          .where('notes.isPrivate', '=', 0)
+          .select(['notes.path', 'notes.title', 'notes.preview', 'notes.mtime', 'notes.isPrivate'])
+          .distinct()
+          .orderBy('notes.mtime', 'desc')
+          .orderBy('notes.path')
+          .limit(options.limit)
+          .execute()
   return rows.map((row) => ({ ...row, isPrivate: row.isPrivate !== 0 }))
 }
 

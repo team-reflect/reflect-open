@@ -12,6 +12,7 @@ responsibilities follows the usual rule:
   keys, their defaults, and validation.
 - **The desktop app** consumes settings through `useSettings()`
   (`apps/desktop/src/providers/settings-provider.tsx`) and renders controls in
+  section components under `apps/desktop/src/components/settings/`, composed by
   `settings-screen.tsx`.
 
 ## 1. Declare the key in the schema
@@ -52,9 +53,10 @@ invalid, accepted values pass through.
 ## 2. Consume it
 
 ```tsx
-const { settings, updateSettings } = useSettings()
+const { settings, updateSettings, updateSettingsWith } = useSettings()
 // read:  settings.yourNewSetting
-// write: updateSettings({ yourNewSetting: value })
+// write scalar: updateSettings({ yourNewSetting: value })
+// write derived/list value: updateSettingsWith((current) => ({ yourList: nextList(current) }))
 ```
 
 Semantics you get for free from the provider (and must not re-implement):
@@ -66,14 +68,28 @@ Semantics you get for free from the provider (and must not re-implement):
   hydration (nothing is written before the disk document has been read), and
   save the full merged document. Failures surface through the operations
   status UI and retry on the next change or the quit flush.
+- **Functional updates for read-modify-write.** Use `updateSettingsWith` for
+  list/object edits or anything derived from the current document. Updaters
+  dispatched before hydration are queued and replayed over the loaded
+  document, so an early edit cannot accidentally compute from defaults and
+  wipe the stored value.
+- **Load-sensitive side effects must await hydration.** If a settings entry is
+  paired with state elsewhere (for example an OS-keychain secret), call
+  `whenSettingsLoaded()` before writing the other half. If the initial load
+  failed, settings are session-only and the paired write would be stranded.
 - **No save button.** Settings apply live — design your control accordingly.
 
 ## 3. Add the control
 
 `apps/desktop/src/components/settings-screen.tsx` is a routed view (⌘, or the
 palette's "Open settings") composed of one section component per group under
-`apps/desktop/src/components/settings/`. Build yours from the shared
-primitives in that directory rather than hand-rolling markup:
+`apps/desktop/src/components/settings/`. Add new groups to
+`SETTINGS_SECTIONS` (`settings/sections.ts`) and render the matching component
+from `SettingsScreen`; the sticky navigator and section DOM ids derive from
+that registry.
+
+Build the section from the shared settings primitives rather than hand-rolling
+the section/card markup:
 
 - `SettingsSection` (`section.tsx`) — the heading + bordered card per group.
 - `SettingsField` (`field.tsx`) — the `<fieldset>` with a `legend` and a
@@ -81,12 +97,21 @@ primitives in that directory rather than hand-rolling markup:
 - `SettingsOptionCard` (`option-card.tsx`) — one choice in a radio group, with
   the shared selected/hover/focus treatment.
 
-`onChange` calls `updateSettings` directly (see `appearance-section.tsx` for
-the complete shape). Add a test in `settings-screen.test.tsx` — the existing
-ones render the screen inside the *real* provider over a fake bridge
-(`setBridge`), interact with the control, and assert the document that reaches
-`settings_save`. That covers the whole chain (control → patch → merge →
-persist), not just the click handler.
+For controls and overlays, check `apps/desktop/src/components/ui/` first and
+use the existing shadcn primitive (`Switch`, `Select`, `Dialog`, `Popover`,
+`Tooltip`, etc.) rather than building a custom one.
+
+`onChange` calls `updateSettings` or `updateSettingsWith` directly (see
+`appearance-section.tsx`, `editor-section.tsx`, and `all-notes-section.tsx` for
+the common shapes). Add the test at the narrowest useful level:
+
+- For a setting whose value should round-trip through the provider, use
+  `settings-screen.test.tsx`: it renders the screen inside the *real* provider
+  over a fake bridge (`setBridge`), interacts with the control, and asserts the
+  document that reaches `settings_save`.
+- For a section with its own branching behavior or provider dependencies, add
+  a focused section test next to it (for example `backup-section.test.tsx` or
+  `rebuild-index-field.test.tsx`) and mock only the surrounding providers.
 
 ## Checklist
 
@@ -95,5 +120,8 @@ persist), not just the click handler.
 - [ ] Schema tests: missing → default, invalid → default, valid round-trips
 - [ ] Section under `components/settings/` built from the shared primitives,
       wired to `updateSettings`
-- [ ] Screen test covering the new control
+- [ ] New section registered in `settings/sections.ts` and rendered from
+      `settings-screen.tsx` if it adds a group
+- [ ] Screen/provider test for persistence, plus focused section tests for
+      section-specific behavior where needed
 - [ ] No Rust changes, no migrations, no per-key save logic

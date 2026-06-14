@@ -50,6 +50,65 @@ export async function searchWithFilters(
 
   const match = buildFtsMatch(parsed.text)
 
+  if (match === null && filters.tags.length > 0) {
+    const [primaryTag, ...remainingTags] = filters.tags
+    let taggedQuery = db
+      .selectFrom('tags')
+      .innerJoin('notes', 'notes.path', 'tags.notePath')
+      .select(['notes.path', 'notes.title', 'notes.dailyDate'])
+      .where('tags.tagKey', '=', primaryTag)
+      .distinct()
+      .limit(limit)
+
+    for (const tag of remainingTags) {
+      taggedQuery = taggedQuery.where(({ exists, selectFrom }) =>
+        exists(
+          selectFrom('tags as filterTags')
+            .select(sql<number>`1`.as('one'))
+            .whereRef('filterTags.notePath', '=', 'notes.path')
+            .where('filterTags.tagKey', '=', tag),
+        ),
+      )
+    }
+    if (filters.dailyOnly) {
+      taggedQuery = taggedQuery.where('notes.dailyDate', 'is not', null)
+    }
+    if (filters.pinnedOnly) {
+      taggedQuery = taggedQuery.where('notes.isPinned', '=', 1)
+    }
+    if (linksToPath !== null) {
+      const target = linksToPath
+      taggedQuery = taggedQuery.where(({ exists, selectFrom }) =>
+        exists(
+          selectFrom('backlinks')
+            .select(sql<number>`1`.as('one'))
+            .whereRef('backlinks.sourcePath', '=', 'notes.path')
+            .where('backlinks.targetPath', '=', target),
+        ),
+      )
+    }
+    if (linkedFromPath !== null) {
+      const source = linkedFromPath
+      taggedQuery = taggedQuery.where(({ exists, selectFrom }) =>
+        exists(
+          selectFrom('backlinks')
+            .select(sql<number>`1`.as('one'))
+            .whereRef('backlinks.targetPath', '=', 'notes.path')
+            .where('backlinks.sourcePath', '=', source),
+        ),
+      )
+    }
+    if (filters.updatedAfterMs !== null) {
+      taggedQuery = taggedQuery.where('notes.mtime', '>=', filters.updatedAfterMs)
+    }
+    if (filters.updatedBeforeMs !== null) {
+      taggedQuery = taggedQuery.where('notes.mtime', '<', filters.updatedBeforeMs)
+    }
+
+    const rows = await taggedQuery.orderBy('notes.mtime', 'desc').execute()
+    return rows.map((row) => ({ ...row, snippet: null }))
+  }
+
   let query = db
     .selectFrom('notes')
     .select(['notes.path', 'notes.title', 'notes.dailyDate'])
