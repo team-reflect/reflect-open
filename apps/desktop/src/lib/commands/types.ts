@@ -23,6 +23,8 @@ export interface CommandContext {
   toggleTheme: () => void
   /** Collapse/expand the workspace sidebar. */
   toggleSidebar: () => void
+  /** Start a fresh chat conversation. */
+  newChat: () => void
   /** Start an audio memo, or stop-and-save the one recording. */
   toggleAudioMemo: () => void
   /**

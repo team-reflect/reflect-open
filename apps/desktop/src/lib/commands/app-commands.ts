@@ -43,6 +43,7 @@ const APP_COMMANDS: AppCommand[] = [
     id: 'nav.allNotes',
     title: 'All notes',
     keywords: ['notes', 'list', 'browse', 'library'],
+    keybinding: 'Mod-Shift-a',
     run: (context) => context.navigate({ kind: 'allNotes', tag: null }),
   },
   {
@@ -58,6 +59,18 @@ const APP_COMMANDS: AppCommand[] = [
     keywords: ['ai', 'assistant', 'copilot', 'ask'],
     keybinding: 'Mod-j',
     run: (context) => context.navigate({ kind: 'chat' }),
+  },
+  {
+    id: 'chat.new',
+    title: 'New chat',
+    keywords: ['ai', 'assistant', 'copilot', 'conversation'],
+    keybinding: 'Mod-Shift-n',
+    run: (context) => {
+      if (context.route().kind !== 'chat') {
+        return
+      }
+      context.newChat()
+    },
   },
   {
     id: 'history.back',

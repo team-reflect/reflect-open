@@ -9,6 +9,7 @@ import { setMenuCommandDispatch } from '@/lib/native-menu/dispatch'
 import { retryFailedEmbeddings } from '@/lib/semantic'
 import type { CommandContext } from '@/lib/commands/types'
 import { useAudioMemo } from '@/providers/audio-memo-provider'
+import { useChatSession } from '@/providers/chat-provider'
 import { useFocusedDailyDate } from '@/providers/focused-daily-provider'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
@@ -57,6 +58,7 @@ export function useAppShortcuts(): CommandContext {
   const { openShortcuts, closeShortcuts, open: shortcutsOpen } = useShortcuts()
   const { toggleSidebar } = useSidebar()
   const { toggle: toggleAudioMemo } = useAudioMemo()
+  const { newChat } = useChatSession()
   const { updateSettings } = useSettings()
 
   // The palette is modal: app shortcuts must not navigate behind its overlay.
@@ -94,6 +96,7 @@ export function useAppShortcuts(): CommandContext {
       forward,
       toggleTheme: () => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark'),
       toggleSidebar,
+      newChat,
       toggleAudioMemo,
       generation: () => generationRef.current,
       openPalette,
@@ -114,6 +117,7 @@ export function useAppShortcuts(): CommandContext {
       openPalette,
       openShortcuts,
       toggleSidebar,
+      newChat,
       toggleAudioMemo,
       updateSettings,
     ],

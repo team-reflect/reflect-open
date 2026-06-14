@@ -1,5 +1,5 @@
-import { renderHook, act } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { act, cleanup, renderHook } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import { PaletteProvider, usePalette } from '@/components/command-palette/palette-provider'
 import { listRegisteredBindings } from '@/editor/keymap'
@@ -8,6 +8,8 @@ import { ShortcutsProvider, useShortcuts } from '@/providers/shortcuts-provider'
 import { SidebarProvider } from '@/providers/sidebar-provider'
 import { useAppShortcuts } from './app-shortcuts'
 import { RouterProvider, useRouter } from './router'
+
+const newChat = vi.hoisted(() => vi.fn())
 
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', cloudSync: null, generation: 1 } }),
@@ -24,8 +26,13 @@ vi.mock('@/providers/settings-provider', () => ({
 vi.mock('@/providers/audio-memo-provider', () => ({
   useAudioMemo: () => ({ toggle: vi.fn() }),
 }))
+vi.mock('@/providers/chat-provider', () => ({
+  useChatSession: () => ({ newChat }),
+}))
 
 registerAppCommands() // production does this in main.tsx
+
+afterEach(cleanup)
 
 function shortcutsHook() {
   return renderHook(
@@ -47,14 +54,24 @@ function shortcutsHook() {
   )
 }
 
-function press(key: string) {
-  window.dispatchEvent(new KeyboardEvent('keydown', { key, metaKey: true, cancelable: true }))
+function press(key: string, options: KeyboardEventInit = {}) {
+  window.dispatchEvent(
+    new KeyboardEvent('keydown', { key, metaKey: true, cancelable: true, ...options }),
+  )
 }
 
 describe('app shortcuts', () => {
   it('registers the command keybindings in the central keymap registry', () => {
     const bindings = listRegisteredBindings()
-    for (const key of ['Mod-d', 'Mod-n', 'Mod-[', 'Mod-]', 'Mod-k']) {
+    for (const key of [
+      'Mod-d',
+      'Mod-Shift-a',
+      'Mod-n',
+      'Mod-Shift-n',
+      'Mod-[',
+      'Mod-]',
+      'Mod-k',
+    ]) {
       expect(bindings.get(key)).toBe('app')
     }
   })
@@ -82,6 +99,33 @@ describe('app shortcuts', () => {
     expect(result.current.palette.open).toBe(false)
     act(() => press('k'))
     expect(result.current.palette.open).toBe(true)
+  })
+
+  it('⌘⇧A opens All notes', () => {
+    const { result } = shortcutsHook()
+
+    act(() => press('a', { shiftKey: true }))
+    expect(result.current.router.route).toEqual({ kind: 'allNotes', tag: null })
+  })
+
+  it('⌘⇧N starts a fresh chat when the chat route is active', () => {
+    newChat.mockClear()
+    const { result } = shortcutsHook()
+
+    act(() => press('j'))
+    expect(result.current.router.route).toEqual({ kind: 'chat' })
+
+    act(() => press('n', { shiftKey: true }))
+    expect(newChat).toHaveBeenCalledTimes(1)
+  })
+
+  it('⌘⇧N is inert outside the chat route', () => {
+    newChat.mockClear()
+    const { result } = shortcutsHook()
+
+    act(() => press('n', { shiftKey: true }))
+    expect(result.current.router.route).toEqual({ kind: 'today' })
+    expect(newChat).not.toHaveBeenCalled()
   })
 
   it('matches uppercase keys (caps lock) and ignores auto-repeat', () => {
@@ -129,7 +173,7 @@ describe('app shortcuts', () => {
     const { result } = shortcutsHook()
     act(() => {
       window.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'n', metaKey: true, shiftKey: true }),
+        new KeyboardEvent('keydown', { key: 'n', metaKey: true, altKey: true }),
       )
     })
     expect(result.current.router.route).toEqual({ kind: 'today' })

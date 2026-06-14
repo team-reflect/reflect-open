@@ -67,6 +67,7 @@ function fakeContext(overrides?: Partial<CommandContext>) {
     forward: vi.fn(),
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
+    newChat: vi.fn(),
     toggleAudioMemo: vi.fn(),
     generation: () => 7,
     openPalette: vi.fn(),
@@ -92,6 +93,7 @@ function noteRow(isPrivate: boolean): NoteRow {
 describe('keybindingFor', () => {
   it('returns the binding UI hints derive from', () => {
     expect(keybindingFor('nav.today')).toBe('Mod-d')
+    expect(keybindingFor('nav.allNotes')).toBe('Mod-Shift-a')
     expect(keybindingFor('palette.open')).toBe('Mod-k')
   })
 
@@ -139,6 +141,17 @@ describe('app commands', () => {
     await command('shortcuts.show').run(context)
     expect(context.openShortcuts).toHaveBeenCalledTimes(1)
     expect(keybindingFor('shortcuts.show')).toBe('Mod-/')
+  })
+
+  it('chat.new starts a fresh conversation only from the chat route', async () => {
+    const { context } = fakeContext({ route: () => ({ kind: 'chat' }) })
+    await command('chat.new').run(context)
+    expect(context.newChat).toHaveBeenCalledTimes(1)
+    expect(keybindingFor('chat.new')).toBe('Mod-Shift-n')
+
+    const { context: outsideChat } = fakeContext()
+    await command('chat.new').run(outsideChat)
+    expect(outsideChat.newChat).not.toHaveBeenCalled()
   })
 
   it('note.new navigates to a fresh lazy ULID note path', async () => {

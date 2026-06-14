@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactElement } from 'react'
 import { aiProvider, type AiProviderConfig, type ChatModelOption } from '@reflect/core'
 import { ArrowUp, Plus, Square, X } from 'lucide-react'
+import { ShortcutKeys } from '@/components/shortcut-keys'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -12,8 +13,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { imageFilesFrom } from '@/lib/chat-attachments'
+import { keybindingFor } from '@/lib/commands/app-commands'
 import { useChatSession } from '@/providers/chat-provider'
 import { ChatHistoryMenu } from './chat-history-menu'
+
+const NEW_CHAT_BINDING = keybindingFor('chat.new')
 
 interface ModelOptionGroup {
   configId: string
@@ -190,6 +194,9 @@ export function ChatInput(): ReactElement {
             <Button variant="ghost" size="sm" onClick={newChat}>
               <Plus aria-hidden data-icon="inline-start" />
               New chat
+              {NEW_CHAT_BINDING ? (
+                <ShortcutKeys binding={NEW_CHAT_BINDING} className="ml-1 text-text-muted" />
+              ) : null}
             </Button>
           ) : null}
           {streaming ? (
