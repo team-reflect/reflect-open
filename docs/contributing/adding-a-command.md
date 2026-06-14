@@ -23,10 +23,10 @@ on the commands that already exist.
 
 ## 1. The Rust command
 
-Pick the module that owns the capability (`fs.rs` for graph file IO, `db/` for
-the index, `settings.rs`, `recents.rs`, …) or add a new one for a genuinely new
-capability. Commands are snake_case, return `AppResult<T>`, and serialize
-camelCase:
+Pick the module that owns the capability (`fs/` for graph file IO, `db/` for
+the index, `settings.rs`, `recents.rs`, `secrets.rs`, `git/`, `capture.rs`,
+`embed.rs`, …) or add a new one for a genuinely new capability. Commands are
+snake_case, return `AppResult<T>`, and serialize camelCase:
 
 ```rust
 // apps/desktop/src-tauri/src/fs/mod.rs
@@ -59,10 +59,15 @@ Conventions that matter here:
   resolves it via `resolve()` (`fs/resolve.rs`), which rejects traversal and
   symlink escapes. Don't build paths by hand.
 - **Writes are generation-pinned.** Mutating commands take a `generation`
-  argument (from `graph_open`) and get the root via `root_for_generation`,
-  which rejects stale ones — a write racing a graph switch fails loudly
-  instead of landing in the wrong graph. A new mutating command must follow
-  this pattern; read-only commands use `current_root`.
+  argument (from `graph_open`/`graph_create`) and get the root via
+  `root_for_generation`, which rejects stale ones — a write racing a graph
+  switch fails loudly instead of landing in the wrong graph. A new mutating
+  command must follow this pattern.
+- **Background reads may also pin.** UI reads for the currently open graph can
+  use `current_root`, but a read that belongs to a background pass that can
+  span a graph switch should accept `generation: Option<u64>` (or a required
+  `generation`, if the pass always has one) and use the `root_for` pattern
+  from `fs::note_read`/`asset_read`.
 - **No product policy.** A command exposes a primitive. If you find yourself
   encoding "what to do when X", that decision belongs in `@reflect/core`.
 
@@ -73,7 +78,13 @@ runtime with a "command not found" rejection.
 Test the logic with `#[cfg(test)]` against the pure helper, not the command
 wrapper: `settings.rs` is a good model — `settings_load`/`settings_save` are
 two-liners over `load_from`/`save_to`, and the tests exercise those with
-`tempfile`. Run with `cargo test` from `apps/desktop/src-tauri`.
+`tempfile`. From the repo root, stage the sidecars once before compiling the
+desktop crate, then run the crate tests:
+
+```bash
+pnpm --filter @reflect/desktop sidecar
+cargo test -p reflect-open
+```
 
 ## 2. The TypeScript binding
 
@@ -133,8 +144,10 @@ it.
 
 - [ ] Rust: command in the owning capability module, returns `AppResult<T>`,
       camelCase serde, traversal-guarded paths, generation-pinned if mutating
+      (and pinned for background reads that can span a graph switch)
 - [ ] Rust: registered in `lib.rs` `generate_handler!`
-- [ ] Rust: `#[cfg(test)]` tests on the pure helper; `cargo test` passes
+- [ ] Rust: `#[cfg(test)]` tests on the pure helper; `cargo test -p reflect-open`
+      passes after staging sidecars when the desktop crate compiles
 - [ ] TS: zod schema + typed binding through `call()` in the domain module
 - [ ] TS: exported from `packages/core/src/index.ts`
 - [ ] TS: behavior covered with a fake bridge where it matters
