@@ -23,14 +23,18 @@ import type { NoteRow } from '@reflect/core'
  */
 
 /**
- * Index-row fields an action may assert ahead of the re-index. `gistUrl` is the
- * only one today: publishing yields a concrete URL, and unpublishing yields
- * `null`. `gistStale` is intentionally absent: a body edited right after
- * publishing keeps it `true`, which would pin the overlay open forever and mute
- * the update nudge.
+ * Index-row fields an action may assert ahead of the re-index. Publishing
+ * yields a concrete `gistUrl` and a fresh `gistStale: false`; unpublishing
+ * yields `gistUrl: null`. These overlays are short-lived read-model facts that
+ * retire as soon as the index catches up.
  */
 export interface NoteRowOverlay {
   readonly gistUrl?: string | null
+  readonly gistStale?: boolean
+}
+
+type MutableNoteRowOverlay = {
+  -readonly [Key in keyof NoteRowOverlay]: NoteRowOverlay[Key]
 }
 
 interface OverlayEntry {
@@ -57,12 +61,12 @@ function subscribe(listener: () => void): () => void {
 
 /** Strip `undefined` fields — an all-`undefined` patch must never be stored. */
 function definedFields(patch: NoteRowOverlay): NoteRowOverlay {
-  const result: { -readonly [Key in keyof NoteRowOverlay]: NoteRowOverlay[Key] } = {}
-  for (const key of Object.keys(patch) as (keyof NoteRowOverlay)[]) {
-    const value = patch[key]
-    if (value !== undefined) {
-      result[key] = value
-    }
+  const result: MutableNoteRowOverlay = {}
+  if (patch.gistUrl !== undefined) {
+    result.gistUrl = patch.gistUrl
+  }
+  if (patch.gistStale !== undefined) {
+    result.gistStale = patch.gistStale
   }
   return result
 }
@@ -120,13 +124,15 @@ export function reconcileNoteRowOverlay(path: string, generation: number, row: N
   if (entry === undefined || entry.generation !== generation || row === null) {
     return
   }
-  const remaining: { -readonly [Key in keyof NoteRowOverlay]: NoteRowOverlay[Key] } = {}
+  const remaining: MutableNoteRowOverlay = {}
   let retired = false
   for (const key of Object.keys(entry.overlay) as (keyof NoteRowOverlay)[]) {
     if (row[key] === entry.overlay[key]) {
       retired = true
+    } else if (key === 'gistUrl') {
+      remaining.gistUrl = entry.overlay.gistUrl
     } else {
-      remaining[key] = entry.overlay[key]
+      remaining.gistStale = entry.overlay.gistStale
     }
   }
   if (!retired) {

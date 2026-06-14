@@ -211,6 +211,32 @@ describe('unpublishNoteGist', () => {
     expect(writeNote).toHaveBeenCalledWith('notes/a.md', BODY, 3)
   })
 
+  it('does not delete the remote gist when clearing local frontmatter fails', async () => {
+    readNote.mockResolvedValue(REPUBLISH_SOURCE)
+    writeNote.mockRejectedValueOnce(new Error('disk on fire'))
+
+    await expect(unpublishNoteGist('notes/a.md', 3)).rejects.toMatchObject({
+      message: 'disk on fire',
+    })
+
+    expect(deleteGist).not.toHaveBeenCalled()
+  })
+
+  it('restores local gist frontmatter when the remote delete fails', async () => {
+    readNote
+      .mockResolvedValueOnce(REPUBLISH_SOURCE)
+      .mockResolvedValueOnce(REPUBLISH_SOURCE)
+      .mockResolvedValueOnce(BODY)
+    deleteGist.mockRejectedValueOnce(new Error('network down'))
+
+    await expect(unpublishNoteGist('notes/a.md', 3)).rejects.toMatchObject({
+      message: 'network down',
+    })
+
+    expect(writeNote).toHaveBeenNthCalledWith(1, 'notes/a.md', BODY, 3)
+    expect(writeNote).toHaveBeenNthCalledWith(2, 'notes/a.md', REPUBLISH_SOURCE, 3)
+  })
+
   it('routes the gist removal through the live session when the note is open', async () => {
     const { session, commitFrontmatter } = fakeSession(REPUBLISH_SOURCE)
     openSession.mockReturnValue(session)
@@ -268,7 +294,10 @@ describe('runGistPublish', () => {
     readNote.mockResolvedValue(BODY)
     await runGistPublish('notes/a.md', 3)
 
-    expect(getNoteRowOverlay('notes/a.md', 3)?.gistUrl).toBe(PUBLISHED.htmlUrl)
+    expect(getNoteRowOverlay('notes/a.md', 3)).toMatchObject({
+      gistUrl: PUBLISHED.htmlUrl,
+      gistStale: false,
+    })
     // Stamped with the publishing generation — a reader on another graph won't see it.
     expect(getNoteRowOverlay('notes/a.md', 4)).toBeNull()
   })
@@ -293,7 +322,7 @@ describe('runGistPublish', () => {
   it('a failed clipboard copy never reads as a failed publish', async () => {
     readNote.mockResolvedValue(BODY)
     writeText.mockRejectedValueOnce(new Error('Document is not focused'))
-    // The publish landed: the url comes back so the UI flips to Republish.
+    // The publish landed: the url comes back so the UI flips to its published state.
     await expect(runGistPublish('notes/a.md', 3)).resolves.toBe(PUBLISHED.htmlUrl)
 
     expect(startOperation).toHaveBeenCalledWith('Publishing gist')
@@ -312,7 +341,7 @@ describe('runGistUnpublish', () => {
 
     expect(startOperation).toHaveBeenCalledWith('Unpublishing gist')
     expect(operationDone).toHaveBeenCalled()
-    expect(getNoteRowOverlay('notes/a.md', 3)?.gistUrl).toBeNull()
+    expect(getNoteRowOverlay('notes/a.md', 3)).toMatchObject({ gistUrl: null, gistStale: false })
   })
 
   it('surfaces failures and leaves no overlay', async () => {

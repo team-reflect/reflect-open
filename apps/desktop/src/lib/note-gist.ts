@@ -94,8 +94,9 @@ export async function publishNoteToGist(path: string, generation: number): Promi
 /**
  * Delete the note's published GitHub Gist and remove the local `gist`
  * frontmatter block. A missing local block is already unpublished, so this is a
- * no-op. A remote 404 is success through {@link deleteGist}: the desired shared
- * link is gone, and the local record can be cleared.
+ * no-op. The local record is cleared before the remote delete, so a local write
+ * failure cannot leave Reflect pointing at a dead link. If GitHub rejects the
+ * delete, the local block is restored before the error is surfaced.
  */
 export async function unpublishNoteGist(path: string, generation: number): Promise<void> {
   const source = await readNoteSource(path)
@@ -114,8 +115,13 @@ export async function unpublishNoteGist(path: string, generation: number): Promi
     throw new ReflectError('auth', 'Connect GitHub in Settings to unpublish gists')
   }
 
-  await deleteGist(token, previous.id, providerFetch)
   await commitNoteFrontmatter(path, { gist: false }, generation)
+  try {
+    await deleteGist(token, previous.id, providerFetch)
+  } catch (cause) {
+    await commitNoteFrontmatter(path, { gist: previous }, generation)
+    throw cause
+  }
 }
 
 /**
@@ -144,7 +150,7 @@ export async function runGistPublish(path: string, generation: number): Promise<
   operation.done()
   // Stamp the optimism with the publishing graph's generation, so a publish
   // that resolves after a graph switch can't surface on the new graph.
-  setNoteRowOverlay(path, generation, { gistUrl: url })
+  setNoteRowOverlay(path, generation, { gistUrl: url, gistStale: false })
   try {
     await navigator.clipboard.writeText(url)
     startOperation('Gist link copied').done()
@@ -168,6 +174,6 @@ export async function runGistUnpublish(path: string, generation: number): Promis
     return false
   }
   operation.done()
-  setNoteRowOverlay(path, generation, { gistUrl: null })
+  setNoteRowOverlay(path, generation, { gistUrl: null, gistStale: false })
   return true
 }

@@ -35,7 +35,10 @@ afterEach(() => {
 
 describe('applyNoteRowOverlay', () => {
   it('merges overlay fields over the row', () => {
-    expect(applyNoteRowOverlay(noteRow(), { gistUrl: URL })?.gistUrl).toBe(URL)
+    expect(applyNoteRowOverlay(noteRow({ gistStale: true }), { gistUrl: URL, gistStale: false })).toMatchObject({
+      gistUrl: URL,
+      gistStale: false,
+    })
   })
 
   it('passes a null row through — the overlay only sharpens an existing row', () => {
@@ -87,6 +90,17 @@ describe('useNoteRowOverlay', () => {
     act(() => setNoteRowOverlay('notes/a.md', GEN, { gistUrl: URL }))
     expect(result.current?.gistUrl).toBe(URL)
     expect(other.result.current).toBeNull()
+  })
+
+  it('retires overlay fields independently as the index catches up', () => {
+    const { result } = renderHook(() => useNoteRowOverlay('notes/a.md', GEN))
+    act(() => setNoteRowOverlay('notes/a.md', GEN, { gistUrl: URL, gistStale: false }))
+
+    act(() => reconcileNoteRowOverlay('notes/a.md', GEN, noteRow({ gistUrl: URL, gistStale: true })))
+    expect(result.current).toEqual({ gistStale: false })
+
+    act(() => reconcileNoteRowOverlay('notes/a.md', GEN, noteRow({ gistUrl: URL, gistStale: false })))
+    expect(result.current).toBeNull()
   })
 })
 
