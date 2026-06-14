@@ -114,6 +114,11 @@ describe('parseNote — links, assets, tags, text', () => {
     expect(note.text).toBe('Hi Some bold text with Link alias.')
   })
 
+  it('keeps markdown escapes literal inside code text', () => {
+    const note = parse('Rendered www\\.reddit.com, code `www\\.reddit.com`.\n\n```\nwww\\.reddit.com\n```')
+    expect(note.text).toBe('Rendered www.reddit.com, code www\\.reddit.com. www\\.reddit.com')
+  })
+
   it('keeps #tags inside fenced code out of the tag list', () => {
     const note = parse('real #tag\n\n```\nnot #acode tag\n```')
     expect(note.tags).toEqual(['tag'])

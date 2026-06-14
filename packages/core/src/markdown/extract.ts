@@ -62,6 +62,10 @@ function isTagExcludedNode(name: string): boolean {
   )
 }
 
+function isLiteralPlainTextNode(name: string): boolean {
+  return name === 'InlineCode' || name === 'FencedCode' || name === 'CodeBlock'
+}
+
 function headingLevelOf(name: string): number | null {
   const match = /^(?:ATXHeading|SetextHeading)([1-6])$/.exec(name)
   return match ? Number(match[1]) : null
@@ -132,23 +136,56 @@ function readLink(body: string, from: number, to: number, offset: number): Markd
   return { href, text, from: from + offset, to: to + offset, domain: hostOf(href) }
 }
 
+function renderMarkdownText(text: string): string {
+  return text
+    .replace(WIKI_INNER_RE, (_, inner: string) => inner.replace(/\|/g, ' '))
+    .replace(MARKDOWN_ESCAPE_RE, '$1')
+}
+
+function appendPlainTextChunk(
+  body: string,
+  from: number,
+  to: number,
+  literalRanges: Span[],
+): string {
+  let kept = ''
+  let cursor = from
+  for (const literalRange of literalRanges) {
+    if (literalRange.to <= cursor) {
+      continue
+    }
+    if (literalRange.from >= to) {
+      break
+    }
+
+    const literalFrom = Math.max(cursor, literalRange.from)
+    const literalTo = Math.min(to, literalRange.to)
+    if (cursor < literalFrom) {
+      kept += renderMarkdownText(body.slice(cursor, literalFrom))
+    }
+    kept += body.slice(literalFrom, literalTo)
+    cursor = literalTo
+  }
+  if (cursor < to) {
+    kept += renderMarkdownText(body.slice(cursor, to))
+  }
+  return kept
+}
+
 /** Body text minus the cut (syntax) ranges, with wiki brackets/pipes flattened. */
-function buildPlainText(body: string, cuts: Span[]): string {
+function buildPlainText(body: string, cuts: Span[], literalRanges: Span[]): string {
   const sorted = [...cuts].sort((a, b) => a.from - b.from)
+  const sortedLiteralRanges = [...literalRanges].sort((a, b) => a.from - b.from)
   let kept = ''
   let pos = 0
   for (const cut of sorted) {
     if (cut.from > pos) {
-      kept += body.slice(pos, cut.from)
+      kept += appendPlainTextChunk(body, pos, cut.from, sortedLiteralRanges)
     }
     pos = Math.max(pos, cut.to)
   }
-  kept += body.slice(pos)
-  return kept
-    .replace(WIKI_INNER_RE, (_, inner: string) => inner.replace(/\|/g, ' '))
-    .replace(MARKDOWN_ESCAPE_RE, '$1')
-    .replace(/\s+/g, ' ')
-    .trim()
+  kept += appendPlainTextChunk(body, pos, body.length, sortedLiteralRanges)
+  return kept.replace(/\s+/g, ' ').trim()
 }
 
 function inAnyRange(index: number, ranges: Span[]): boolean {
@@ -221,6 +258,7 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
   const assets: AssetRef[] = []
   const cuts: Span[] = [] // body coords — syntax to drop from plain text
   const tagExcluded: Span[] = [] // body coords — regions that don't yield tags
+  const literalPlainText: Span[] = [] // body coords — regions that render backslashes literally
 
   tree.iterate({
     enter: (node) => {
@@ -231,6 +269,9 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
       }
       if (isTagExcludedNode(name)) {
         tagExcluded.push({ from, to })
+      }
+      if (isLiteralPlainTextNode(name)) {
+        literalPlainText.push({ from, to })
       }
 
       if (name === 'WikiLink') {
@@ -275,6 +316,6 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
     tags: [...tags.values()],
     headings,
     assets,
-    text: buildPlainText(body, cuts),
+    text: buildPlainText(body, cuts, literalPlainText),
   }
 }
