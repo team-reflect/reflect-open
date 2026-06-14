@@ -57,6 +57,7 @@ export async function searchWithFilters(
       .innerJoin('notes', 'notes.path', 'tags.notePath')
       .select(['notes.path', 'notes.title', 'notes.dailyDate'])
       .where('tags.tagKey', '=', primaryTag)
+      .distinct()
       .limit(limit)
 
     for (const tag of remainingTags) {

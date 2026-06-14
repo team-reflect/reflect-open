@@ -108,9 +108,9 @@ beforeEach(() => {
       return facetRows
     }
     if (sql.includes('"preview"')) {
-      // A tag-filtered list (EXISTS subquery carries the folded tag) — only
-      // `travel` has matches in this fixture.
-      if (sql.includes('exists')) {
+      // A tag-filtered list starts from the folded tag key — only `travel`
+      // has matches in this fixture.
+      if (sql.includes('from "tags"')) {
         return params.includes('travel') ? [noteRows[1]] : []
       }
       return noteRows

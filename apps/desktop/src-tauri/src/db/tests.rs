@@ -83,6 +83,40 @@ fn tag_search_indexes_are_created() {
         .exists(["notes_daily_date_mtime_path"])
         .unwrap();
     assert!(has_notes_index);
+
+    let tag_columns: Vec<(String, i64)> = conn
+        .prepare(
+            "SELECT name, seqno FROM pragma_index_xinfo('tags_tag_key_note_path')
+             WHERE key = 1 ORDER BY seqno",
+        )
+        .unwrap()
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(
+        tag_columns,
+        vec![("tag_key".to_string(), 0), ("note_path".to_string(), 1)]
+    );
+
+    let notes_columns: Vec<(String, i64, i64)> = conn
+        .prepare(
+            "SELECT name, seqno, \"desc\" FROM pragma_index_xinfo('notes_daily_date_mtime_path')
+             WHERE key = 1 ORDER BY seqno",
+        )
+        .unwrap()
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(
+        notes_columns,
+        vec![
+            ("daily_date".to_string(), 0, 0),
+            ("mtime".to_string(), 1, 1),
+            ("path".to_string(), 2, 0),
+        ]
+    );
 }
 
 #[test]
