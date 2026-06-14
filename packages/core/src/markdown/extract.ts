@@ -39,6 +39,12 @@ export function isTagName(value: string): boolean {
 }
 // Inner of a wiki link, for plain-text rendering.
 const WIKI_INNER_RE = /\[\[([^\]\n]*)\]\]/g
+// CommonMark backslash escapes are visible in source, but not rendered text.
+const MARKDOWN_ESCAPE_RE = /\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g
+
+function unescapeMarkdownText(text: string): string {
+  return text.replace(MARKDOWN_ESCAPE_RE, '$1')
+}
 
 /** Names whose source range is markup to drop from plain text. */
 function isSyntaxNode(name: string): boolean {
@@ -64,12 +70,10 @@ function headingLevelOf(name: string): number | null {
 function cleanHeadingText(raw: string): string {
   const newline = raw.indexOf('\n')
   if (newline !== -1) {
-    return raw.slice(0, newline).trim() // setext: heading text is the first line
+    return unescapeMarkdownText(raw.slice(0, newline).trim()) // setext: heading text is the first line
   }
-  return raw
-    .replace(/^#{1,6}[ \t]*/, '')
-    .replace(/[ \t]*#*[ \t]*$/, '')
-    .trim()
+  const text = raw.replace(/^#{1,6}[ \t]*/, '').replace(/[ \t]*#*[ \t]*$/, '').trim()
+  return unescapeMarkdownText(text)
 }
 
 /** GitHub-style anchor slug. */
@@ -113,8 +117,9 @@ function basename(path: string): string {
 function readWikiLink(body: string, from: number, to: number, offset: number): WikiLink {
   const inner = body.slice(from + 2, to - 2)
   const pipe = inner.indexOf('|')
-  const target = (pipe === -1 ? inner : inner.slice(0, pipe)).trim()
-  const alias = pipe === -1 ? undefined : inner.slice(pipe + 1).trim() || undefined
+  const target = unescapeMarkdownText((pipe === -1 ? inner : inner.slice(0, pipe)).trim())
+  const alias =
+    pipe === -1 ? undefined : unescapeMarkdownText(inner.slice(pipe + 1).trim()) || undefined
   return { target, alias, from: from + offset, to: to + offset }
 }
 
@@ -141,6 +146,7 @@ function buildPlainText(body: string, cuts: Span[]): string {
   kept += body.slice(pos)
   return kept
     .replace(WIKI_INNER_RE, (_, inner: string) => inner.replace(/\|/g, ' '))
+    .replace(MARKDOWN_ESCAPE_RE, '$1')
     .replace(/\s+/g, ' ')
     .trim()
 }

@@ -19,6 +19,14 @@ describe('parseNote — wiki links', () => {
     expect(first.to).toBe('See [[Charlotte]]'.length)
   })
 
+  it('renders markdown escapes inside wiki-link targets and aliases', () => {
+    const note = parse('See [[www\\.reddit.com/r/test|www\\.reddit.com]].')
+    expect(note.wikiLinks.map((w) => ({ target: w.target, alias: w.alias }))).toEqual([
+      { target: 'www.reddit.com/r/test', alias: 'www.reddit.com' },
+    ])
+    expect(note.text).toBe('See www.reddit.com/r/test www.reddit.com.')
+  })
+
   it('does not match wiki links inside code spans or empty brackets', () => {
     const note = parse('Code `[[NotALink]]` stays literal, and [[]] is ignored.')
     expect(note.wikiLinks).toEqual([])
@@ -37,6 +45,15 @@ describe('parseNote — headings & title', () => {
       expect.objectContaining({ level: 1, text: 'Title', slug: 'title' }),
       expect.objectContaining({ level: 2, text: 'A Section!', slug: 'a-section' }),
     ])
+  })
+
+  it('renders markdown escapes in headings and derived titles', () => {
+    const note = parse('# www\\.reddit.com/r/test\n\nbody')
+    expect(note.title).toBe('www.reddit.com/r/test')
+    expect(note.headings[0]).toEqual(
+      expect.objectContaining({ text: 'www.reddit.com/r/test', slug: 'wwwredditcomrtest' }),
+    )
+    expect(note.text).toBe('www.reddit.com/r/test body')
   })
 
   it('derives title from frontmatter, else first H1, else filename/date', () => {
