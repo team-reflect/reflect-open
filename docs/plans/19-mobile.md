@@ -16,6 +16,15 @@ Rust core (git2 sync, rusqlite/FTS5 index, keychain) and the React frontend by
 building mobile as a target of the existing crate; Capacitor is the documented
 fallback with explicit triggers.
 
+> **Status (2026-06-14): In progress in source.** The app has the platform root gate
+> (`src/platform-root.tsx`), mobile route shell (`src/mobile/`), fixed-root graph
+> bootstrap/onboarding in `GraphProvider`, mobile-gated Rust commands and stand-ins
+> (`mobile_graph_root`, `watcher_mobile.rs`, `embed_mobile.rs`), iOS identity/config, and
+> the first-party `tauri-plugin-keyboard`. The Daily/All shell, editable note screen,
+> note actions, share helper, and settings sheet exist. Still open: physical-device
+> editing validation, full GitHub-connect restore polish on mobile, foreground-sync
+> product hardening, TestFlight/App Store packaging, and Android follow-through.
+
 **Depends on:** Plans 02–05 (graph/storage, document model, index, **editor**),
 06 (daily notes/route model), 07 (backlinks/autocomplete), 08 (lexical
 search), 12 + 16 (GitHub sync over HTTPS + device flow), 17 (readable
@@ -293,20 +302,19 @@ Steps 1 and 2 are the existential gates; nothing else starts until both pass.
    safe-area tokens, sync-status pill stub. Desktop bundle unaffected
    (verify chunk split).
 
-   > **Status (2026-06-12): steps 3–4 partially landed, ahead of the spike-B
-   > gate.** Done: `mobile_graph_root` + `app_platform` commands with core
-   > wrappers, Files-app exposure (`UIFileSharingEnabled` +
+   > **Status (2026-06-14): steps 3–4 have moved past skeleton.** Done:
+   > `mobile_graph_root` + `app_platform` commands with core wrappers,
+   > Files-app exposure (`UIFileSharingEnabled` +
    > `LSSupportsOpeningDocumentsInPlace`), identity normalized to
    > `app.reflect.ios` / product name Reflect, the lazy `PlatformRoot` gate
    > (desktop chrome split into `desktop-root.tsx`), the fixed-root mobile
-   > bootstrap in `GraphProvider`, and a Today screen mounting the real
-   > editor via `NotePane`. **Verified on the simulator end-to-end:** boot →
-   > auto-bootstrap in `Documents/` → type into meowdown → the daily note
-   > lands on disk through the shared save pipeline. Two findings: the
-   > document stack requires `RouterProvider` (a missing router unmounted the
-   > tree to a white screen — `MobileErrorBoundary` now makes that class
-   > visible). Still open from these steps: tab/stack navigation, day pager,
-   > and the sync-status pill.
+   > bootstrap in `GraphProvider`, and the `MobileShell` route tree. The mobile
+   > surfaces now include Daily, All/search, editable note pages, note actions,
+   > share helper, onboarding, and settings sheet. **Verified earlier on the
+   > simulator end-to-end:** boot → auto-bootstrap in `Documents/` → type into
+   > meowdown → the daily note lands on disk through the shared save pipeline.
+   > Remaining from the gate: physical-device editing validation and final
+   > product hardening.
    >
    > **Also landed 2026-06-12: step 5 and the decision-8 keyboard plugin.**
    > The write-event seam ships as `setLocalWriteEcho`/`echoLocalWrite` in

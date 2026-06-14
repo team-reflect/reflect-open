@@ -1,15 +1,16 @@
 # Libraries & Dependencies
 
-Canonical record of the libraries chosen for each plan step (decided with the user). The
-foundational libraries installed in Plan 01 are listed first for completeness; later
-phases name the additions they bring in. Licensing is **MIT-core** — meowdown is
-first-party (owned by the team) and MIT-licensed, so there is no copyleft constraint.
+Canonical record of the libraries chosen for each plan step (decided with the user and
+checked against `package.json`/`Cargo.toml` on 2026-06-14). The foundational libraries
+installed in Plan 01 are listed first for completeness; later phases name the additions
+they bring in. Licensing is **MIT-core** — meowdown is first-party (owned by the team)
+and MIT-licensed, so there is no copyleft constraint.
 
 ## Installed in Plan 01 (foundation)
 
 - **Monorepo / build:** pnpm workspaces, Turborepo, TypeScript, Vite, `@vitejs/plugin-react`.
-- **UI:** React 19, Tailwind CSS v4 (`@tailwindcss/vite`), `clsx` + `tailwind-merge` (the
-  `cn` helper), `lucide-react`.
+- **UI:** React 19, Tailwind CSS v4 (`@tailwindcss/vite`), shadcn primitives via
+  `radix-ui`, `clsx` + `tailwind-merge` (the `cn` helper), `lucide-react`.
 - **Validation:** `zod`.
 - **Database:** `kysely` (query builder, TS); `rusqlite` (bundled) + `sqlite-vec` (Rust).
 - **Editor:** meowdown (`@meowdown/react`, `@meowdown/core`) on ProseKit (`@prosekit/*`) +
@@ -22,7 +23,7 @@ first-party (owned by the team) and MIT-licensed, so there is no copyleft constr
 | Need | Library | Plan |
 | --- | --- | --- |
 | Projection/IPC data cache + invalidation (server-state) | `@tanstack/react-query` | 04 |
-| Shared UI / session state (theme, route, palette, sync) | React context + hooks; `zustand` *available if a slice earns it* | 06 / 08 |
+| Shared UI / session state (theme, route, palette, sync) | React context + hooks (no external store dependency today) | 06 / 08 |
 | Frontmatter YAML (tolerant, round-trippable) | `yaml` (eemeli) | 03 |
 | Note IDs (ULID) | `ulidx` | 02 |
 | Routing (typed product routes + history) | **custom, no dependency** | 06 |
@@ -31,9 +32,9 @@ first-party (owned by the team) and MIT-licensed, so there is no copyleft constr
 | UI components (dialogs, popovers, menus) | shadcn/ui (on Radix Primitives) | 07 / 08 / 10 / 15 |
 | Command palette (⌘K) | `cmdk` | 08 |
 | Mobile day carousel (touch swipe, V1 parity) | `embla-carousel-react` | 19 |
-| AI provider (BYOK, streaming, multi-provider) | Vercel AI SDK (`ai` + `@ai-sdk/openai` …) | 10 |
-| Diff / patch (patchsets, conflict diffs) | `diff` (jsdiff) | 10 / 12 |
-| Export — ZIP | `fflate` (client-side) | 13 |
+| AI provider (BYOK, streaming, multi-provider) | Vercel AI SDK (`ai` + `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google`) | 10 |
+| Diff / patch (patchsets, conflict diffs) | Not installed; patchsets remain deferred | 10 / 12 |
+| Import/export — ZIP | `fflate` (client-side; currently used by the V1 Markdown ZIP importer) | 13 |
 | Export — HTML | reuse the editor: `markdownToDoc` → ProseMirror `DOMSerializer` (no remark) | 13 |
 | Chrome extension framework | WXT | 11 |
 | Auto-update (JS API + relaunch) | `@tauri-apps/plugin-updater` + `@tauri-apps/plugin-process` | 15 |
@@ -54,18 +55,21 @@ first-party (owned by the team) and MIT-licensed, so there is no copyleft constr
 | SSH transport for generic remotes (agent auth) | `git2` `ssh` feature (vendored libssh2 + openssl) | 16 |
 | Local embeddings | `fastembed` | 09 |
 | Image processing (screenshot downscale) | `image` | 11 |
+| Bounded capture meta fetch | `reqwest` with rustls | 11 |
 | CLI framework (derive) | `clap` v4 | 14 |
 | CLI local "today" (tz/DST-correct) | `jiff` | 14 |
 | CLI content hashes (match TS SHA-256) | `sha2` | 14 |
 | CLI frontmatter reads (tolerant YAML) | `saphyr` | 14 |
 | CLI first-H1 title fallback | `pulldown-cmark` | 14 |
 | Auto-update | `tauri-plugin-updater` | 15 |
+| Window-state restore | `tauri-plugin-window-state` | 15 |
+| Mobile keyboard bridge | first-party `tauri-plugin-keyboard` | 19 |
 
 ## Notes & caveats
 
-- **Export is fully client-side (TS):** `fflate` for zipping; HTML rendered by reusing the
-  editor's ProseMirror schema + `DOMSerializer` (no remark, reuses libraries we already
-  ship). Rust just persists the produced bytes to a chosen path.
+- **Plan 13 is only partial in source:** `fflate` is installed and used by
+  `importReflectMarkdownZip`; the Markdown/JSON/HTML export pipeline described in the
+  plan is still outstanding.
 - **The CLI (Plan 14) is a Rust binary** (superseding the earlier `cac` + `node:sqlite`
   Node-CLI choice): rusqlite `bundled` gives the same SQLite + FTS5 as the desktop app via
   one workspace lockfile, and the binary ships as a Tauri sidecar. `saphyr` is chosen for
