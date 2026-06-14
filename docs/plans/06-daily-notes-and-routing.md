@@ -27,7 +27,8 @@ seam).
   navigation (step 3), and the `⌘D/⌘N/⌘[/⌘]` shortcuts through the keymap registry
   (step 5). The note route carries `path` (identity = path in the first wave, Plan 03;
   `id` joins later).
-- **06b** — the virtualized daily stream + navigation polish (planned 2026-06-09):
+- **06b** — the virtualized daily stream + navigation polish (implemented in
+  `apps/desktop/src/components/daily-stream.tsx` and the route history scroll API):
 
   1. **The stream (step 2).** A virtualized chronological list where **every day is a
      virtual note**: each row mounts the Plan 05 single-note editor (`NotePane` with
@@ -54,7 +55,7 @@ seam).
      indicator — product states, not spinners.
 
   **Deferred from 06b:** jot-to-today quick capture → **Plan 11** (decided
-  2026-06-09; `⌘D` + typing covers the need until capture is formalized).
+  2026-06-09; `⌘D` + typing covered the need until the capture pipeline landed).
 
   **Tests (headless):** window↔date math, router scroll-state semantics, lazy
   materialize-on-edit (exists), launch-focus. Stream scroll feel + height

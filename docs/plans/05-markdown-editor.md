@@ -33,7 +33,7 @@ ProseMirror rich editor:
   resolves the round-trip concern that would otherwise push us to a source-buffer editor.
 
 This supersedes the earlier CodeMirror-6 recommendation. Round-trip fidelity is now
-verified (the Plan 01 spike — [docs/spikes/meowdown-wiki-links.md](spikes/meowdown-wiki-links.md));
+verified (the Plan 01 spike — [docs/spikes/meowdown-wiki-links.md](../spikes/meowdown-wiki-links.md));
 the remaining watch-item is meowdown's early maturity (see Risks).
 
 > **License:** meowdown is **first-party** (owned by the team) and MIT-licensed, so it fits

@@ -10,11 +10,12 @@ docs, and a release pipeline. This is **M5.**
 ## Scope
 
 **In:** onboarding/first-run, keyboard-map completeness + discoverability, accessibility,
-performance budgets, error/repair UX, privacy review, signing/notarization, MIT licensing
-+ public docs, CI, and **auto-update** (Tauri updater plugin).
-**Out:** mobile release (planned, separate track), Windows/Android (later), publishing/
-tasks (deferred features), link capture (Plan 11 — deferred from the first release).
-Audio memos shipped ahead of plan and are **in** scope for the privacy review.
+performance budgets, error/repair UX, privacy review, signing/notarization,
+MIT licensing and public docs, CI, **auto-update** (Tauri updater plugin), and the
+bundled CLI + capture host sidecars.
+**Out:** mobile release (active separate track), Windows/Android packaging (later),
+publishing/tasks (deferred features). Audio memos and link capture both shipped ahead of
+the original release scope and are **in** scope for the privacy/signing review.
 
 ## Steps
 
@@ -42,21 +43,23 @@ Audio memos shipped ahead of plan and are **in** scope for the privacy review.
 
 6. **Privacy review (release gate).** End-to-end audit that `private: true` is enforced at
    every external call site — copilot (Plan 10), retrieval (Plan 09), audio transcription,
-   conflict resolution (Plan 12). (Capture, Plan 11, joins this list when it ships.) Confirm secrets are keychain-only (never markdown/Git/
-   `.reflect/`) and that no Reflect-hosted API exists in the core path. Document exactly
-   what leaves the device and when.
+   capture enrichment/meta fetch (Plan 11), and conflict resolution (Plan 12). Confirm
+   secrets are keychain-only (never markdown/Git/`.reflect/`) and that no Reflect-hosted
+   API exists in the core path. Document exactly what leaves the device and when.
 
 7. **Signing & notarization.** Apple Developer ID signing + notarization for the Tauri
    bundle; verify Gatekeeper-clean install. **Every bundled native dylib must be signed
    with the hardened runtime** — notably the ONNX/embedding runtime (Plan 9) and any
    sqlite-vec/native-messaging-host binaries — for both arm64 and x64; an unsigned nested
-   binary fails notarization. Bundle the `reflect` CLI (Plan 14); consider a Homebrew cask.
-   Confirm **first
-   release is notarized non-sandboxed** (security-scoped bookmarks, Plan 02, only needed if
-   we later sandbox for the App Store). Native-messaging host registration is moot for the
-   first release (link capture, Plan 11, is deferred). **Two distinct keys:** Apple Developer ID (Gatekeeper/
-   notarization) *and* the Tauri **updater signing key** (minisign, verifies update payloads
-   — step 10); both private keys live in CI secrets, never in the repo.
+   binary fails notarization. Bundle the `reflect` CLI (Plan 14) and
+   `reflect-capture-host` (Plan 11) through the macOS Tauri overlay; consider a Homebrew
+   cask. Confirm **first release is notarized non-sandboxed** (security-scoped bookmarks,
+   Plan 02, only needed if we later sandbox for the App Store). Native-messaging host
+   manifests are rewritten on launch for detected browsers, so packaging must verify both
+   the sidecar path and manifest registration after app moves/translocation. **Two
+   distinct keys:** Apple Developer ID (Gatekeeper/notarization) *and* the Tauri
+   **updater signing key** (minisign, verifies update payloads — step 10); both private
+   keys live in CI secrets, never in the repo.
 
 8. **Licensing & open-source readiness.** MIT `LICENSE`; per-file headers where
    appropriate; `README` (what/why/install/build), `CONTRIBUTING`, architecture overview
@@ -66,10 +69,12 @@ Audio memos shipped ahead of plan and are **in** scope for the privacy review.
    permissive. License/dependency scanning is **manual** for now (a periodic audit; no
    automated CI gate yet — revisit if the dep tree grows).
 
-9. **CI + release.** GitHub Actions: typecheck, lint (oxlint adherence config), tests,
-   Rust build, Tauri bundle, and a release workflow (`tauri-apps/tauri-action`) that builds,
-   code-signs + notarizes, **updater-signs**, and publishes a GitHub Release with the DMG,
-   the updater artifacts, and the `latest.json` manifest. Bundles the `reflect` CLI.
+9. **CI + release.** GitHub Actions: typecheck, lint (oxlint), tests, build,
+   generated-schema drift check, Rust fmt/clippy/test, Tauri sidecar staging before Rust
+   compilation, and a release workflow that runs the repo's `pnpm release:macos publish`
+   script to build, code-sign + notarize, **updater-sign**, and publish a GitHub Release
+   with the DMG, updater artifacts, and `latest.json` manifest. Bundles the `reflect` CLI
+   and `reflect-capture-host` sidecars.
 
 10. **Auto-update (Tauri best practices).** Ship first-class auto-update with the official
     plugin — `tauri-plugin-updater` (Rust) + `@tauri-apps/plugin-updater` (JS), paired with
@@ -97,10 +102,9 @@ Audio memos shipped ahead of plan and are **in** scope for the privacy review.
 
 A user can: install the Mac app; open today's markdown daily note instantly; write in a
 beautiful markdown editor without thinking about files; create `[[Wiki Links]]` naturally;
-search locally; ask the AI sidebar about the current and related notes with their own key;
-back up their notes for free; and open their note folder to find portable markdown files.
-(Browser-page capture drops out of this checklist while link capture, Plan 11, is
-deferred; it rejoins when capture ships.)
+search locally; ask the Chat view about the current and related notes with their own key;
+back up their notes for free; capture a browser page through the extension/native host;
+and open their note folder to find portable markdown files.
 
 ## Acceptance criteria
 
@@ -109,7 +113,8 @@ deferred; it rejoins when capture ships.)
 - a11y + perf budgets met; deleting `.reflect/` fully rebuilds with no data loss.
 - Privacy review passes: `private: true` enforced everywhere; secrets keychain-only; no
   hosted API in the core path.
-- Signed, notarized DMG installs Gatekeeper-clean; CLI bundled; CI green.
+- Signed, notarized DMG installs Gatekeeper-clean; CLI and capture host are bundled; CI
+  green.
 - **Auto-update works end-to-end:** an installed older build detects a newer GitHub
   Release, downloads the updater-signed artifact, verifies it against the pubkey, installs,
   and relaunches; a tampered/unsigned payload is rejected.
