@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NoteRow } from '@reflect/core'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { NoteGistAction } from './note-gist-action'
+import { clearPendingPublishedUrl } from './published-url-bridge'
 
 const useGithubConnected = vi.hoisted(() => vi.fn(() => true))
 const useNoteRow = vi.hoisted(() => vi.fn<(path: string) => NoteRow | null>(() => null))
@@ -40,6 +41,7 @@ function renderAction() {
 }
 
 beforeEach(() => {
+  clearPendingPublishedUrl('notes/a.md', 'https://gist.github.com/alex/g1')
   useGithubConnected.mockReset().mockReturnValue(true)
   useNoteRow.mockReset().mockReturnValue(null)
   runGistPublish.mockReset().mockResolvedValue('https://gist.github.com/alex/g1')

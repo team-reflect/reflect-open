@@ -5,6 +5,7 @@ import type { NoteRow } from '@reflect/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { PublishedUrlSection } from './published-url-section'
+import { clearPendingPublishedUrl, setPendingPublishedUrl } from './published-url-bridge'
 
 const useNoteRow = vi.hoisted(() => vi.fn<(path: string) => NoteRow | null>(() => null))
 const operationDone = vi.hoisted(() => vi.fn())
@@ -47,6 +48,8 @@ function stubClipboard(writeText: (text: string) => Promise<void>): void {
 
 beforeEach(() => {
   window.sessionStorage.clear()
+  clearPendingPublishedUrl('notes/a.md', 'https://gist.github.com/alex/g1')
+  clearPendingPublishedUrl('notes/a.md', 'https://gist.github.com/alex/pending')
   useNoteRow.mockReset().mockReturnValue(null)
   vi.mocked(openUrl).mockClear()
   startOperation.mockClear()
@@ -68,6 +71,15 @@ describe('PublishedUrlSection', () => {
   it('shows the published gist URL for a published note', () => {
     const url = 'https://gist.github.com/alex/g1'
     useNoteRow.mockReturnValue(noteRow({ gistUrl: url }))
+
+    const view = renderSection()
+    expect(view.getByText('Published URL')).toBeTruthy()
+    expect(view.getByRole('link', { name: url }).getAttribute('href')).toBe(url)
+  })
+
+  it('shows a just-published URL before the index row catches up', () => {
+    const url = 'https://gist.github.com/alex/pending'
+    setPendingPublishedUrl('notes/a.md', url)
 
     const view = renderSection()
     expect(view.getByText('Published URL')).toBeTruthy()

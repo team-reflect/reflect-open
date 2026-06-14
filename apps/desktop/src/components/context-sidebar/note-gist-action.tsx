@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react'
+import { useEffect, useState, type ReactElement } from 'react'
 import { CloudUpload } from 'lucide-react'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -7,23 +7,17 @@ import { useNoteRow } from '@/hooks/use-note-row'
 import { runGistPublish } from '@/lib/note-gist'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
+import {
+  clearPendingPublishedUrl,
+  setPendingPublishedUrl,
+  usePendingPublishedUrl,
+} from './published-url-bridge'
 
 interface NoteGistActionProps {
   /** Graph-relative path of the note the action operates on. */
   path: string
   /** Keybinding hint, from the matching command definition. */
   keybinding?: string | null
-}
-
-/**
- * The last publish's result, held until the index reflects it — the same
- * bridge as `NoteToggleAction`: the label otherwise lags one watcher
- * round-trip behind the frontmatter write, and in that window the button
- * would still read "Share with private link" after the gist already exists.
- */
-interface PendingPublish {
-  path: string
-  url: string
 }
 
 /**
@@ -40,18 +34,20 @@ export function NoteGistAction({ path, keybinding = null }: NoteGistActionProps)
   const connected = useGithubConnected()
   const row = useNoteRow(path)
   const [isPublishing, setIsPublishing] = useState(false)
-  const [pending, setPending] = useState<PendingPublish | null>(null)
+  const pendingUrl = usePendingPublishedUrl(path)
 
-  // Render-time state adjustment: drop the bridge once the index reports the
-  // published url (or the action moved to another note). Deliberately url-only:
-  // also waiting for `gistStale` to clear could hold the bridge forever — a
+  // Drop the bridge once the index reports the published url. Deliberately
+  // url-only: also waiting for `gistStale` to clear could hold the bridge forever — a
   // body edited right after publishing keeps recomputing stale, and a stuck
   // bridge would suppress the republish nudge until navigation. The cost is a
   // one-watcher-round-trip nudge flash after a same-url republish.
-  if (pending !== null && (pending.path !== path || row?.gistUrl === pending.url)) {
-    setPending(null)
-  }
-  const bridged = pending !== null && pending.path === path
+  useEffect(() => {
+    if (pendingUrl !== null && row?.gistUrl === pendingUrl) {
+      clearPendingPublishedUrl(path, pendingUrl)
+    }
+  }, [path, pendingUrl, row?.gistUrl])
+
+  const bridged = pendingUrl !== null
   const published = bridged || (row?.gistUrl ?? null) !== null
   const stale = !bridged && (row?.gistStale ?? false)
 
@@ -67,8 +63,8 @@ export function NoteGistAction({ path, keybinding = null }: NoteGistActionProps)
     setIsPublishing(true)
     try {
       const url = await runGistPublish(path, generation)
-      if (url !== null) {
-        setPending({ path, url })
+      if (url !== null && row?.gistUrl !== url) {
+        setPendingPublishedUrl(path, url)
       }
     } finally {
       setIsPublishing(false)

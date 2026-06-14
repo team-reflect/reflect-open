@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useNoteRow } from '@/hooks/use-note-row'
 import { startOperation } from '@/lib/operations'
+import { usePendingPublishedUrl } from './published-url-bridge'
 import { SidebarSection } from './sidebar-section'
 
 interface PublishedUrlSectionProps {
@@ -23,7 +24,8 @@ const COPY_RESET_MS = 1400
  */
 export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactElement | null {
   const row = useNoteRow(path)
-  const url = row?.gistUrl ?? null
+  const pendingUrl = usePendingPublishedUrl(path)
+  const url = row?.gistUrl ?? pendingUrl
   const [copyState, setCopyState] = useState<CopyState>('idle')
 
   useEffect(() => {
