@@ -399,8 +399,8 @@ V2 considerations:
 
 - Daily note is again the capture destination.
 - Web capture creates an information-ingestion stream that should be searchable and linkable.
-- V2 link capture is designed but deferred from the first macOS release; full article clipping is deferred further still.
-- When capture ships, the path should be a Chrome extension talking to the installed desktop app through a local bridge.
+- V2 link capture is implemented for the desktop Chrome-extension path; full article clipping, Safari, and mobile share targets are deferred further still.
+- The shipped desktop path is a Chrome extension talking to the installed desktop app through the native host/inbox bridge.
 - The desktop app should own markdown writes, screenshot asset storage, BYOK AI calls, keychain access, and privacy checks.
 - V2 should not host a link-description API; enrichment calls should go directly from the app to the user's chosen model provider.
 - Captured links should append to today's daily note by default, with a dedicated markdown note when the capture includes richer description, highlights, or screenshot context.
@@ -655,8 +655,9 @@ Caveat:
 V2 considerations:
 
 - Data portability is an explicit value, not a checkbox.
-- V2 should preserve clean export paths from day one.
-- The proprietary internal format can exist, but open export must remain reliable.
+- V2 preserves portability by making markdown files and assets the source of truth.
+- No dedicated import/export suite is planned for V2; copying or zipping the graph folder is the export path.
+- The small V1 Markdown ZIP importer is a migration convenience, not the beginning of a broader importer framework.
 - Backup and recovery need a clear architecture, especially with local-first files, GitHub backup, optional encrypted layers, and sync conflict recovery.
 
 ---
@@ -825,7 +826,7 @@ The major hard parts for V2:
 | Kindle sync       | Book notes, highlights, `#book`, author backlinks        | Generalize source-specific importers                    |
 | API               | OAuth, append-only due to E2EE                           | Read/discovery CLI first; markdown files are write path |
 | Deep links        | External command URLs                                    | Unify with command registry                             |
-| Import/export     | Multiple imports; JSON/CSV/Markdown/HTML export          | Maintain portability from day one                       |
+| Import/export     | Multiple imports; JSON/CSV/Markdown/HTML export          | Superseded by markdown-folder portability               |
 | Security          | E2EE with XChaCha20-Poly1305; Doyensec audit             | Treat trust boundaries explicitly                       |
 | Note history      | Continuous revisions; restore to new note                | Preserve for trust and sync safety                      |
 | Tasks             | Aggregate, schedule, complete, archive                   | Choose lightweight vs serious task system               |
@@ -1035,22 +1036,18 @@ Current docs intentionally avoid becoming a full task manager. V2 must choose:
 
 The worst path is half-building a complex task manager and losing the simplicity of the note-taking product.
 
-### 9.8 Preserve Export from Day One
+### 9.8 Preserve Portability Through Markdown
 
-The docs make data portability part of Reflect's values. V2 should not defer export/import until late.
+The docs make data portability part of Reflect's values. V2 should satisfy that promise through its storage model rather than a parallel import/export product area.
 
 Minimum viable V2 portability:
 
-- Full JSON export
-- Markdown export
-- HTML export
-- Attachments
-- Backlinks preserved
-- Tags preserved
-- Tasks preserved
-- Daily note dates preserved
-- Published-note state preserved or clearly excluded
-- Import compatibility from existing Reflect export
+- Notes are plain markdown files under `daily/` and `notes/`.
+- Attachments live as normal files under `assets/` and use relative markdown links.
+- Backlinks, tags, tasks, and daily-note dates remain readable in markdown.
+- `.reflect/` stays out of the durable portability contract except for deliberately documented durable local tables such as `chat_*`.
+- Users can copy or zip the graph folder directly.
+- The existing V1 Markdown ZIP importer remains a migration convenience while it is useful.
 
 ### 9.9 Make Mobile Capture Excellent
 
@@ -1064,7 +1061,7 @@ Some earlier V2 questions have now been answered in the decision docs. This sect
 
 ### Resolved Direction
 
-- **V1 graph compatibility**: prioritize markdown and Obsidian-style vault import first; preserve V1 migration as a later path without forcing V2 to keep the V1 graph format.
+- **V1 graph compatibility**: keep the existing V1 Markdown ZIP importer as a migration convenience. Do not build a generalized Obsidian/folder import surface unless the portability premise changes.
 - **Data model**: keep V2 note-first. Use readable markdown files, stable IDs, aliases, and case-insensitive backlink resolution.
 - **Entities**: do not introduce a typed entity layer in the first wave. Canonical people, companies, projects, and other entities can emerge later as projections over notes and aliases.
 - **AI model**: use BYOK/cloud generative AI first. Treat local generative models as a later possibility. Keep local embeddings separate from generative AI.
@@ -1072,7 +1069,7 @@ Some earlier V2 questions have now been answered in the decision docs. This sect
 - **Tasks**: deferred from the first release; now planned as a post-release add-on (Plan 18). As decided here: lightweight markdown-backed projections (GFM checkboxes + a `tasks` table + a Tasks view) rather than a full task-management system.
 - **Contacts and calendar**: defer as first-wave surfaces, but preserve them as future memory context for meetings, backlinks, daily notes, and AI.
 - **Daily AI automation**: allow opt-in background extraction into reviewable suggestions. Do not silently mutate notes with summaries, entities, backlinks, or tasks.
-- **Links**: basic Chrome link capture is designed (Plan 11: extension hands URL/title/selection/screenshot to the desktop app via a local bridge; desktop owns BYOK AI and markdown/asset writes; no Reflect-hosted link-description API) but **deferred — the first macOS release ships without it**.
+- **Links**: basic Chrome link capture shipped (Plan 11: extension hands URL/title/selection/screenshot to the desktop app via the native host/inbox bridge; desktop owns BYOK AI and markdown/asset writes; no Reflect-hosted link-description API). Safari, mobile share targets, and full article clipping remain later work.
 - **Audio**: **shipped in the first release** (ahead of the original deferral): raw-first audio memos with async BYOK cloud transcription, explicit privacy UX, and `private: true` cloud-processing lockouts.
 - **Publishing and templates**: defer both. They should not block the first-wave editor, storage, search, sync, and AI foundation.
 
@@ -1132,6 +1129,6 @@ The V2 rewrite should not start from a generic notes-app architecture. It should
 - Search as retrieval layer
 - Capture from everywhere
 - AI as an assistant over personal context
-- Strong portability and user ownership
+- Strong markdown-folder portability and user ownership
 
-The highest-leverage V2 work is likely to be architectural, not cosmetic: unified ingestion, typed commands, better entity/backlink semantics, privacy-preserving AI/search, robust sync/history, and preserving data portability.
+The highest-leverage V2 work is likely to be architectural, not cosmetic: unified ingestion, typed commands, better entity/backlink semantics, privacy-preserving AI/search, robust sync/history, and keeping the markdown graph easy to copy, inspect, and recover.

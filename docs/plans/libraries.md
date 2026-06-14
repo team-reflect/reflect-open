@@ -33,8 +33,6 @@ first-party (owned by the team) and MIT-licensed, so there is no copyleft constr
 | Mobile day carousel (touch swipe, V1 parity) | `embla-carousel-react` | 19 |
 | AI provider (BYOK, streaming, multi-provider) | Vercel AI SDK (`ai` + `@ai-sdk/openai` …) | 10 |
 | Diff / patch (patchsets, conflict diffs) | `diff` (jsdiff) | 10 / 12 |
-| Export — ZIP | `fflate` (client-side) | 13 |
-| Export — HTML | reuse the editor: `markdownToDoc` → ProseMirror `DOMSerializer` (no remark) | 13 |
 | Chrome extension framework | WXT | 11 |
 | Auto-update (JS API + relaunch) | `@tauri-apps/plugin-updater` + `@tauri-apps/plugin-process` | 15 |
 
@@ -63,9 +61,8 @@ first-party (owned by the team) and MIT-licensed, so there is no copyleft constr
 
 ## Notes & caveats
 
-- **Export is fully client-side (TS):** `fflate` for zipping; HTML rendered by reusing the
-  editor's ProseMirror schema + `DOMSerializer` (no remark, reuses libraries we already
-  ship). Rust just persists the produced bytes to a chosen path.
+- **Plan 13 is closed by product decision:** no ZIP, JSON, or HTML export dependencies are
+  planned. The graph folder's markdown files and assets are the portability surface.
 - **The CLI (Plan 14) is a Rust binary** (superseding the earlier `cac` + `node:sqlite`
   Node-CLI choice): rusqlite `bundled` gives the same SQLite + FTS5 as the desktop app via
   one workspace lockfile, and the binary ships as a Tauri sidecar. `saphyr` is chosen for

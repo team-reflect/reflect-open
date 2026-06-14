@@ -104,9 +104,9 @@ edits — and write the wiki-link inline extension exactly once. A single
 by node position rather than re-serializing. The editor's `docToMarkdown` and these edits
 operate on the same syntax, so a round-trip test covers both.
 
-**remark is optional, and only for HTML export** (Plan 13), where `mdast`→`mdast-util-to-
-hast` is convenient. If we use it there, it's a leaf dependency of the export action, not
-the canonical model. (Even that can be done from the Lezer tree if we prefer zero remark.)
+**remark is intentionally out of the editor/indexer hot path.** Plan 13 is closed by
+product decision, so there is no planned HTML export pipeline that would justify adding
+remark for portability.
 
 ## Key decisions / contracts
 

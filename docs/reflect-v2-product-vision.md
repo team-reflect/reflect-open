@@ -141,7 +141,7 @@ The implementation should leave room for Tauri, a native shell with a WebView, o
 
 V2 should be open source at the core.
 
-The app, local storage format, editor behaviors, import/export path, and protocol assumptions should be inspectable and community-extensible. The business model is TBD; V2 should not assume a specific monetization path yet.
+The app, local storage format, editor behaviors, and protocol assumptions should be inspectable and community-extensible. The business model is TBD; V2 should not assume a specific monetization path yet.
 
 The open-source promise should apply to the local app and storage model first. The intended license for the open-source core is MIT.
 
@@ -219,7 +219,6 @@ This local layer can store:
 - AI context cache.
 - File modification state.
 - UI state.
-- Import/export bookkeeping.
 
 The local database should be treated as a cache/projection unless a specific field cannot safely live in markdown. Any non-rebuildable local state should be deliberately justified. See [Reflect V2 Indexing Strategy](./reflect-v2-indexing-strategy.md) for the proposed projection and vector-index model.
 
@@ -360,9 +359,11 @@ The search system should operate over markdown files plus the local projection d
 
 ## Link Capture
 
-> **Status (2026-06-12):** Link capture is **deferred — the first macOS release ships
-> without it**. The design below (and [Plan 11](./plans/11-link-capture.md) plus the
-> bridge spike) remains the intended post-launch direction.
+> **Status:** Link capture is now implemented for the desktop Chrome-extension path:
+> extension → native-messaging host → capture inbox → desktop markdown/assets write →
+> async BYOK enrichment. Safari/mobile share targets, full article clipping, and
+> read-later state remain later work; [Plan 11](./plans/11-link-capture.md) is the
+> current implementation contract.
 
 V2 should include basic link capture. This is narrower than a full browser clipper, but it is still part of Reflect's daily-first capture spine.
 
@@ -506,8 +507,8 @@ These should be treated as core to the V2 vision:
 | Semantic search    | Required on supported desktop runtimes; mobile can start lexical-only.                              |
 | AI note copilot    | Required right-sidebar experience.                                                                  |
 | BYOK AI            | Required initial AI model.                                                                          |
-| Link capture       | Designed (Plan 11) but **deferred from the first macOS release**: Chrome extension to local desktop bridge, daily note entry, optional note. |
-| Import/export      | Required for trust and portability; prioritize markdown and Obsidian-style vaults first.            |
+| Link capture       | Implemented for the desktop Chrome-extension path (Plan 11): native host/inbox bridge, daily note entry, dedicated capture note, screenshots, BYOK enrichment. |
+| Portability        | Required for trust: the graph folder itself is the portable artifact; no dedicated import/export suite is planned. |
 | Backup             | Free/open backup path required.                                                                     |
 | Open-source core   | Required.                                                                                           |
 | Local DB/index     | Allowed and expected for projections.                                                               |
@@ -560,7 +561,7 @@ Implementation details are not final, but future agents should start from these 
 - **AI**: BYOK generative provider calls with visible/current context and local retrieval, excluding locked notes.
 - **AI edits**: multi-note patchsets, checkpointed before application; unsafe edits require review.
 - **Search**: local lexical search and local-only semantic embeddings.
-- **Link capture**: deferred from the first release. When built: Chrome extension sends URL/title/selection/screenshot data to a local desktop bridge; the desktop app uses BYOK AI, writes markdown/assets, and appends the capture to today's daily note.
+- **Link capture**: shipped for the desktop Chrome-extension path. The extension sends URL/title/selection/screenshot data to a native host/inbox bridge; the desktop app uses BYOK AI, writes markdown/assets, and appends the capture to today's daily note. Safari/mobile share targets and full article clipping remain later work.
 - **Audio memos**: shipped — raw-first capture (the recording is the durable artifact), async BYOK cloud transcription with `private: true` cloud-processing lockouts.
 - **Network model**: no Reflect-hosted APIs for the core product; external calls go directly to user-approved providers such as LLM providers, GitHub, Git remotes, iCloud Drive, or cloud transcription providers.
 - **Desktop shell**: Mac-first, no Electron, spike Tauri against a native WebView shell.
@@ -597,7 +598,6 @@ Reflect V2 succeeds if a user can:
 7. Back up their notes for free.
 8. Open their note folder and see portable markdown files.
 
-(A ninth item — save the current browser page into today's note with screenshot-backed
-BYOK AI enrichment — rejoins this list when link capture ships post-launch.)
+9. Save the current browser page into today's note with screenshot-backed BYOK AI enrichment.
 
 The product should feel like Reflect's memory model survived, but the substrate became open, local, markdown-native, and AI-ready.

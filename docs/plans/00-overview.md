@@ -4,18 +4,25 @@ This directory holds the numbered, dependency-ordered plans for building the **f
 version (first wave)** of Reflect V2: the open-source, local-first, markdown-native,
 AI-native rewrite described in the product docs.
 
-## Status at first release (2026-06-12)
+## Current status
 
-The first macOS release ships Plans 01–10, 12, 14–17 (Plan 16 at its V1 scope: SSH +
-path remotes; HTTPS credential helpers later). Two deliberate divergences:
+The first macOS release shipped Plans 01–10, 12, 14–17 (Plan 16 at its V1 scope:
+SSH + path remotes; HTTPS credential helpers later). Since that release, the
+roadmap has moved in a few places:
 
-- **Plan 11 (link capture) is deferred — the first release ships without the browser
-  integration.** The design and [bridge spike](../spikes/link-capture-bridge.md) stand;
-  the capture envelope/inbox architecture is unbuilt, and no extension exists yet.
-- **Plan 13 (import/export) has not been built.** The graph is already a plain markdown
-  folder (copyable, inspectable — the core portability promise holds), but the in-app
-  import (Obsidian/markdown) and export (Markdown/JSON/HTML ZIP) surfaces are
-  outstanding.
+- **Plan 11 (link capture) is now implemented.** The WXT Chrome extension,
+  native-messaging host sidecar, capture inbox, desktop drain controller, screenshot
+  asset path, and BYOK enrichment flow are built end-to-end. Remaining capture work is
+  narrower: browser/store packaging validation beyond macOS, Safari/mobile share
+  targets, and full article/read-later clipping.
+- **Plan 13 (import/export portability) is closed by decision.** We are not building a
+  dedicated import/export suite. The graph folder itself is the portable artifact; copy
+  or zip `daily/`, `notes/`, and `assets/` directly. The existing V1 Markdown ZIP
+  importer remains a migration convenience, not a broader roadmap commitment.
+- **Plan 19 (mobile) is in progress.** The iOS Tauri target, fixed graph root,
+  onboarding, Daily/All mobile surfaces, keyboard-height plugin, and shared editor
+  plumbing have landed. Physical-device editor validation, foreground sync wiring,
+  background-flush/kill recovery, TestFlight/App Store release, and Android remain.
 
 Two features landed beyond the written plans: **audio memos** (raw-first capture with
 async BYOK cloud transcription — listed below as deferred, but shipped early via
@@ -64,15 +71,15 @@ before the editor, and the editor lands before search/AI.
 | 08 | [Lexical search & command palette](08-lexical-search-and-command-palette.md) | `⌘K` search/command surface, FTS over titles/body, filters, navigation commands |
 | 09 | [Semantic search & local embeddings](09-semantic-search-and-embeddings.md) | Local embedding runtime (Rust), chunking, `sqlite-vec`, incremental re-embed, retrieval layer |
 | 10 | [AI copilot sidebar](10-ai-copilot-sidebar.md) | BYOK provider, keychain secrets, context/retrieval, chat/summarize/rewrite, reviewable patchsets, `private: true` hard-block |
-| 11 | [Link capture](11-link-capture.md) | **Deferred — not in the first release.** Chrome extension → native-messaging bridge → desktop write path, screenshots, BYOK enrichment, daily-note `[[Links]]` |
+| 11 | [Link capture](11-link-capture.md) | **Implemented.** Chrome extension → native-messaging host/inbox → desktop write path, screenshots, BYOK enrichment, daily-note `[[Links]]` |
 | 12 | [Backup & sync (GitHub-only)](12-backup-and-sync.md) | GitHub/Git backup + restore (the only supported remote), Git-native conflict surface, manual review, checkpoints; file-sync providers unsupported |
-| 13 | [Import / export / portability](13-import-export-portability.md) | **Not started — outstanding at release.** Markdown/Obsidian-graph import, JSON/Markdown/HTML export, attachments preserved |
+| 13 | [Import / export / portability](13-import-export-portability.md) | **Closed by decision.** Markdown files are the portability surface; no JSON/HTML/ZIP export or Obsidian/folder import suite is planned |
 | 14 | [CLI (read/discovery)](14-cli-read-discovery.md) | `reflect today`, `reflect search`, `reflect show`, path lookup |
 | 15 | [Hardening, packaging & OSS release](15-hardening-packaging-release.md) | a11y, perf budgets, signing/notarization, MIT + docs, onboarding, release pipeline |
 | 16 | [Generic git remotes](16-generic-git-remotes.md) | Any git host (GitLab/Gitea/GHES/NAS) via hand-wired `origin`, zero new UI — V1 SSH (agent) + path remotes, V2 HTTPS (credential helpers) |
 | 17 | [Readable filenames](17-readable-filenames.md) | Title-derived note filenames (slug + collision suffix), frontmatter `id` adoption, rename-on-settled-title file moves, id-healed external renames |
 | 18 | [Tasks](18-tasks.md) | **Post-release add-on.** GFM-checkbox tasks as a rebuildable projection: interactive editor checkboxes, Tasks view (Overdue/Today/Upcoming), `[[date]]`/daily scheduling, guarded toggle write-back, `checklist: true` opt-out |
-| 19 | [Mobile companion](19-mobile.md) | **Post-release add-on.** iOS (then Android) as a target of the existing Tauri app: today/daily browsing, in-place note editing, quick capture, new notes, lexical search, GitHub sync parity; shell decision in [TDR 0003](../decisions/0003-mobile-shell.md) |
+| 19 | [Mobile companion](19-mobile.md) | **In progress.** iOS as a target of the existing Tauri app: Daily/All surfaces and editing foundations landed; device validation, sync hardening, TestFlight/App Store, then Android remain |
 
 ## Milestone map
 
@@ -91,9 +98,10 @@ demonstrable.
 - **M2 — A connected graph you can find** (Plans 07–09): backlinks, `⌘K` lexical
   search, then local semantic search.
 - **M3 — AI-native** (Plan 10): the right-sidebar copilot over local context.
-- **M4 — Capture & durability** (Plans 11–13): link capture, backup/sync, import/export.
-  *(Shipped partially: backup/sync landed; link capture was cut from the first release;
-  import/export is unbuilt. Audio-memo capture shipped instead, ahead of plan.)*
+- **M4 — Capture & durability** (Plans 11–13): link capture, backup/sync, and the
+  markdown-folder portability contract. *(Shipped substantially: backup/sync, link
+  capture, and audio memos landed; Plan 13 is closed because the graph itself is the
+  export.)*
 - **M5 — Reach & release** (Plans 14–15): CLI, hardening, packaging, open-source launch.
 
 ## Dependency graph (abridged)
@@ -102,7 +110,7 @@ demonstrable.
 01 ─┬─ 02 ─┬─ 03 ─┬─ 04 ─┬─ 05 ─ 06 ─┬─ 07 ─┬─ 08 ─ 09 ─ 10
     │      │      │      │           │      │
     │      │      │      └───────────┴──────┘  (index feeds backlinks + search)
-    │      │      └─ 13 (import/export needs the doc model)
+    │      │      └─ 13 (closed: markdown graph is the portability surface)
     │      └─ 11 (capture writes via the file/IO + daily-note contract)
     └─ 12 (GitHub-only backup/sync; thin internal seam, after M1)
 14 (CLI) reuses 02+03+04.  15 (release) gates everything.
@@ -144,8 +152,9 @@ they are not re-litigated per phase:
   external service — AI, capture enrichment, conflict resolution, or otherwise.
 - **Secrets live in the OS keychain.** Never in markdown, Git, or `.reflect/`.
 - **Keyboard-native.** Every core workflow reachable from the keyboard.
-- **Portable data + export from day one.** Backup must be free, via **GitHub only**;
-  file-sync providers (iCloud/Dropbox/Drive) are unsupported for sync by design.
+- **Portable data from day one.** The graph folder itself is the export; backup must be
+  free, via **GitHub only**. File-sync providers (iCloud/Dropbox/Drive) are unsupported
+  for sync by design.
 - **No Electron, no web app, Mac-first.** Tauri shell; iOS/Windows later.
 - **MIT open-source core.** Write as if the code is public and will be critiqued. The
   editor [meowdown](https://github.com/prosekit/meowdown) is **first-party** (owned by the
@@ -154,15 +163,14 @@ they are not re-litigated per phase:
 ## Explicitly deferred (NOT first wave)
 
 Do not build these now; keep the door open in the data model. Tasks (now planned as a
-post-release add-on — [Plan 18](18-tasks.md)), link capture
-(Plan 11 — designed, deferred from the first release), full browser clipper / article
-extraction, graph-map view, templates,
+post-release add-on — [Plan 18](18-tasks.md)), full browser clipper / article
+extraction beyond the implemented Plan 11 link-capture flow, graph-map view, templates,
 contacts/calendar, publishing, any non-GitHub sync (iCloud/Dropbox/Drive are unsupported
 by design, not "deferred"), a public plugin API, typed-entity layer, and full multi-device
-sync conflict automation (incl. AI-assisted resolution). Mobile
-did not block the Mac release and is now planned as a post-release add-on —
-[Plan 19](19-mobile.md): capture/read/**edit**/lexical-search on iOS first (Tauri
-mobile, per [TDR 0003](../decisions/0003-mobile-shell.md)), Android shortly after.
+sync conflict automation (incl. AI-assisted resolution). Mobile did not block the Mac
+release, but [Plan 19](19-mobile.md) is now underway: capture/read/**edit**/lexical-search
+on iOS first (Tauri mobile, per [TDR 0003](../decisions/0003-mobile-shell.md)), Android
+shortly after.
 
 ## Conventions (apply to every plan)
 

@@ -1,96 +1,51 @@
 # Plan 13 — Import / Export / Portability
 
-> **Status (2026-06-12): Not started — outstanding at the first release.** The graph is
-> already a plain markdown folder (the core "open your folder and it's just files"
-> promise holds, and Obsidian-style vaults are close enough to open directly in many
-> cases), but none of the in-app surfaces below — previewed import, Markdown/JSON/HTML
-> ZIP export — exist yet.
+> **Status:** Closed by product decision. We are **not** building a dedicated
+> import/export portability surface. Reflect's portability contract is the graph
+> itself: ordinary markdown files in `daily/`, `notes/`, and `assets/`, plus a
+> rebuildable `.reflect/` index that can be deleted at any time.
 
-**Goal:** Make data ownership tangible from day one: import existing markdown/Obsidian
-graphs, and export the graph to Markdown, JSON, and HTML with backlinks, tags, and
-daily dates preserved.
+## Decision
 
-**Depends on:** Plan 02 (file IO), Plan 03 (doc model), Plan 04 (projections for export
-metadata).
-**Unlocks:** trust + adoption; a migration on-ramp.
+Markdown is good enough.
 
-**Libraries:** export is client-side TS — `fflate` (ZIP) + the editor's ProseMirror
-`DOMSerializer` for HTML (no remark). See [Libraries](libraries.md).
+The original plan called for previewed Markdown/Obsidian import plus Markdown,
+JSON, and HTML ZIP export. That work is no longer planned. It adds product and
+maintenance surface without improving the core promise: the user's durable data is
+already plain files they can copy, back up, edit, zip, inspect in GitHub, or open in
+another markdown tool.
 
-## Scope
+The small V1 Markdown ZIP importer that exists today is treated as a migration
+convenience, not the start of a broader import/export suite.
 
-**In:** Markdown / Obsidian-style graph import; full-graph export to Markdown ZIP,
-JSON, and HTML ZIP; attachments preserved; backlinks/tags/daily-dates preserved.
-**Out:** V1 graph migration (later — not a first-wave constraint), Evernote/Roam/Notion/
-Readwise importers (later), publishing (deferred).
+## Portability Contract
 
-## Why now (not later)
+- The graph folder is the export. Copy or zip the folder directly.
+- `daily/`, `notes/`, and `assets/` contain the user-owned durable data.
+- `.reflect/` is excluded from the portability contract. It is a rebuildable local
+  projection, except for explicitly documented durable local tables such as
+  `chat_*`.
+- Markdown frontmatter carries minimal metadata such as stable IDs, aliases,
+  `private`, `pinned`, and capture provenance.
+- Backlinks, tags, daily-note dates, attachments, and readable filenames remain useful
+  outside Reflect because they are encoded in the files themselves.
 
-Portability is an explicit Reflect value, not a checkbox. Because the source of truth is
-already plain markdown files, "export" is mostly faithful copying + format conversion —
-cheap to do well early, and a strong trust signal for an open-source launch.
+## Non-Goals
 
-## Steps
+- No Markdown ZIP export button.
+- No JSON export.
+- No HTML export.
+- No Obsidian/folder import workflow.
+- No generalized importer framework for Evernote, Roam, Notion, Readwise, Kindle, or
+  other apps.
+- No export-to-import round-trip test suite beyond the normal markdown parser,
+  writer, and index rebuild guarantees.
 
-1. **Import: markdown / Obsidian graph.** Point at a folder; copy/normalize into the
-   Reflect layout (`daily/`, `notes/`, `assets/`):
-   - detect daily notes by filename pattern → `daily/YYYY-MM-DD.md`;
-   - keep `[[wiki links]]` as-is (already the canonical syntax); map Obsidian aliases →
-     frontmatter `aliases` (Plan 03); carry attachments into `assets/` and fix relative
-     links;
-   - assign `id`s to regular notes without one; tolerate unknown frontmatter (Plan 03).
-   Run as a previewed job (counts, conflicts, skips) before writing. Reindex on finish.
+## What Remains
 
-2. **Import safety.** Never overwrite existing graph files silently; surface name
-   collisions; import into a subfolder or merge with explicit choices. Large imports show
-   progress and are cancellable.
+Keep the existing V1 Markdown ZIP importer working while it is useful for migration.
+Future migration tools can be considered case-by-case, but they should not reopen a
+general import/export product area unless the portability premise changes.
 
-   **Export runs client-side (TS):** zip with **`fflate`** (in `@reflect/core`); Rust just
-   persists the produced bytes to a chosen path via a save command. Perf is fine at our
-   scale, and it reuses libraries we already ship.
-
-3. **Export: Markdown ZIP.** The portable baseline — the graph *is* markdown, so export is
-   a faithful `fflate` ZIP of `daily/`, `notes/`, `assets/` (excluding `.reflect/`), with
-   links and frontmatter intact. This is the "open your folder and it's just files" promise,
-   packaged.
-
-4. **Export: JSON.** A structured dump (notes with id/path/title/frontmatter/body, links,
-   backlinks, tags, aliases, daily dates, asset references) for programmatic reuse and a
-   future re-import path. Derive from Plan 04 projections + file bodies; zod-typed schema.
-
-5. **Export: HTML ZIP.** Rendered, self-contained HTML — **reuse the editor**: parse each
-   note with `markdownToDoc` and serialize the ProseMirror doc to HTML via ProseMirror's
-   `DOMSerializer` (no remark; one parser everywhere). Wiki links → relative anchors,
-   assets bundled, zipped with `fflate`.
-
-6. **Round-trip guarantee.** Markdown export → fresh import reproduces an equivalent graph
-   (same notes, links, tags, dailies, attachments). This is the portability contract,
-   test-asserted.
-
-7. **Tests.** Obsidian fixture imports with links/aliases/attachments preserved; daily
-   detection; collision handling; each export format produced; markdown export→import
-   round-trip equivalence.
-
-## Key decisions / contracts
-
-- **Markdown export is a faithful copy** (source of truth is already files); JSON + HTML
-  are derived views.
-- **Import is previewed, non-destructive, and reindexed** on completion.
-- **Markdown round-trips** (export→import) to an equivalent graph.
-- **Attachments, backlinks, tags, daily dates, and aliases are always preserved.**
-
-## Acceptance criteria
-
-- Importing an Obsidian-style graph yields working notes, backlinks, aliases, and
-  attachments in Reflect layout, with a pre-write preview.
-- Export produces valid Markdown ZIP, JSON, and HTML ZIP excluding `.reflect/`.
-- Markdown export re-imported reproduces an equivalent graph (test-asserted).
-- `pnpm typecheck` + tests pass.
-
-## Risks
-
-- **Link/attachment path rewriting** during import (Obsidian shortest-path vs relative).
-  Mitigate with AST-based link rewriting (Plan 03) + a fixture corpus.
-- **Frontmatter dialect drift** across tools. Mitigate with tolerant parsing +
-  passthrough of unknown keys (Plan 03).
-- **Large-graph performance.** Stream + batch; show progress; keep memory bounded.
+The acceptance criterion for this plan is now simple: a user can close Reflect, copy
+their graph folder, and still have their notes and assets in normal markdown files.

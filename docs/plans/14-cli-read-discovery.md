@@ -196,7 +196,7 @@ note is blocked even when the index is stale or absent.
 
 `--json` emits stable serde-serialized camelCase shapes, documented in `docs/cli.md` and
 locked by snapshot tests (the Rust analog of the original zod contract; share field names
-with the Plan 13 export JSON where sensible):
+with markdown frontmatter where sensible):
 
 ```jsonc
 // today / show

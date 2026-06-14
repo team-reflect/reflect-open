@@ -13,8 +13,9 @@ docs, and a release pipeline. This is **M5.**
 performance budgets, error/repair UX, privacy review, signing/notarization, MIT licensing
 + public docs, CI, and **auto-update** (Tauri updater plugin).
 **Out:** mobile release (planned, separate track), Windows/Android (later), publishing/
-tasks (deferred features), link capture (Plan 11 — deferred from the first release).
-Audio memos shipped ahead of plan and are **in** scope for the privacy review.
+tasks (deferred features), and full browser clipping/article extraction. Audio memos and
+Plan 11 link capture both shipped beyond the original release scope and are **in** scope
+for the privacy review.
 
 ## Steps
 
@@ -42,7 +43,7 @@ Audio memos shipped ahead of plan and are **in** scope for the privacy review.
 
 6. **Privacy review (release gate).** End-to-end audit that `private: true` is enforced at
    every external call site — copilot (Plan 10), retrieval (Plan 09), audio transcription,
-   conflict resolution (Plan 12). (Capture, Plan 11, joins this list when it ships.) Confirm secrets are keychain-only (never markdown/Git/
+   capture enrichment (Plan 11), and conflict resolution (Plan 12). Confirm secrets are keychain-only (never markdown/Git/
    `.reflect/`) and that no Reflect-hosted API exists in the core path. Document exactly
    what leaves the device and when.
 
@@ -53,8 +54,8 @@ Audio memos shipped ahead of plan and are **in** scope for the privacy review.
    binary fails notarization. Bundle the `reflect` CLI (Plan 14); consider a Homebrew cask.
    Confirm **first
    release is notarized non-sandboxed** (security-scoped bookmarks, Plan 02, only needed if
-   we later sandbox for the App Store). Native-messaging host registration is moot for the
-   first release (link capture, Plan 11, is deferred). **Two distinct keys:** Apple Developer ID (Gatekeeper/
+   we later sandbox for the App Store). Native-messaging host registration and signing are
+   part of the release bundle now that Plan 11 ships a host sidecar. **Two distinct keys:** Apple Developer ID (Gatekeeper/
    notarization) *and* the Tauri **updater signing key** (minisign, verifies update payloads
    — step 10); both private keys live in CI secrets, never in the repo.
 
@@ -99,8 +100,7 @@ A user can: install the Mac app; open today's markdown daily note instantly; wri
 beautiful markdown editor without thinking about files; create `[[Wiki Links]]` naturally;
 search locally; ask the AI sidebar about the current and related notes with their own key;
 back up their notes for free; and open their note folder to find portable markdown files.
-(Browser-page capture drops out of this checklist while link capture, Plan 11, is
-deferred; it rejoins when capture ships.)
+Browser-page capture is also part of the current walkthrough now that Plan 11 has shipped.
 
 ## Acceptance criteria
 

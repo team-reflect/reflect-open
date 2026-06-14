@@ -164,20 +164,28 @@ contributor guide.
 
 ## Status & roadmap
 
-Reflect is early (`0.1.x`) but used daily. Shipped today: everything listed
-above. Designed but not yet built, each with a written plan:
+Reflect is early (`0.2.x` beta) but used daily. Shipped today: everything
+listed above, plus browser link capture through the Chrome extension/native
+host pipeline described in [Plan 11](docs/plans/11-link-capture.md).
 
-- **Browser link capture** ([Plan 11](docs/plans/11-link-capture.md)): a
-  Chrome extension that hands the page to the desktop app, which saves it
-  into today's note.
+Closed by decision:
+
 - **Import / export surfaces**
-  ([Plan 13](docs/plans/13-import-export-portability.md)): the graph is
-  already portable markdown you can copy wholesale; in-app Obsidian import
-  and Markdown/JSON/HTML export are still to come.
+  ([Plan 13](docs/plans/13-import-export-portability.md)): no dedicated
+  import/export suite is planned. The graph folder itself is the portable
+  artifact; copy or zip the markdown files and assets directly. The existing
+  V1 Markdown ZIP importer remains a migration convenience.
+
+Designed or in progress, each with a written plan:
+
 - **Tasks** ([Plan 18](docs/plans/18-tasks.md)): checkboxes in your notes,
   collected into one Tasks view.
+- **Mobile companion** ([Plan 19](docs/plans/19-mobile.md)): iOS is in
+  progress in the Tauri app, with Daily/All surfaces and editing foundations
+  landed; device validation, sync hardening, and TestFlight/App Store release
+  remain.
 
-Windows, mobile, and a plugin API are out of scope for now; the
+Windows, Android, and a plugin API are out of scope for now; the
 [product vision](docs/reflect-v2-product-vision.md) explains the long-term
 direction and what is deliberately *not* planned.
 

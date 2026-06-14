@@ -56,7 +56,7 @@ Plan 19 defines the binding scope. Summarized, with the product-owner calls of 2
 | Minimal settings | **In** | GitHub connect/disconnect, version. No graph chooser. |
 | Conflict **resolution** UI | **Out** | Conflicted notes open protected with "Needs review on desktop" — the same session contract as desktop; mine/theirs/both stays desktop-only in v1. |
 | Audio memos | **Later wave** | Product owner: first post-release wave, reusing desktop's raw-first + async BYOK transcription pipeline; OS entry points (widget, Siri, Live Activity) come with it. |
-| Share-sheet capture | **Later wave** | Product owner: deferred together with link capture (Plan 11) so mobile and desktop ship one consistent capture model. Needs its own native share-target plugin. |
+| Share-sheet capture | **Later wave** | Product owner: defer until the mobile share-target plugin can reuse the Plan 11 capture envelope/inbox model. Desktop Chrome capture has shipped; mobile still needs App Group ingestion. |
 | AI copilot (BYOK) | **Later wave** | Architecture holds (keys would live in the iOS keychain via the same secrets module); the surface is deferred. |
 | Semantic search / embeddings | **Later** | `fastembed`/ORT is desktop-only; mobile is lexical-first per the indexing strategy. |
 | Tasks, widgets, push, background sync, multiple graphs | **Out of v1** | Per Plan 19's explicit out-of-scope list; tasks follow desktop's Plan 18. |
@@ -154,7 +154,7 @@ Push notifications (no server), OAuth token exchange, Firebase everything, App-S
 | Tasks tab | Post-release, follows desktop Plan 18 |
 | Search-grounded AI chat | Later wave, with the copilot |
 | Voice memos + widget/Siri/Live Activity | Later wave (raw-first + BYOK transcription; OS entry points with it) |
-| Share extension | Later wave, designed with link capture (Plan 11); App Group inbox |
+| Share extension | Later wave, reusing the shipped Plan 11 capture envelope; App Group inbox still needed |
 | Note history UI | Git history exists; history UI deferred product-wide |
 | Push notifications | Dropped — no server |
 | Deep links (`reflect://`) | Tauri's deep-link plugin exists; not a v1 surface — revisit with the command registry |

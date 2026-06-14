@@ -17,7 +17,8 @@ It complements [Reflect V2 Product Vision](./reflect-v2-product-vision.md).
 > - **One durable exception to "projections only":** the `chat_*` tables hold AI chat
 >   history, which is not derivable from markdown. Index wipes/rebuilds must leave
 >   them untouched.
-> - The `web_captures` projection is deferred along with link capture (Plan 11).
+> - Link-capture provenance now lives in normal markdown/frontmatter plus asset
+>   references; a separate `web_captures` projection has not been added yet.
 
 ## Strategy
 
