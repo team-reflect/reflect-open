@@ -58,6 +58,7 @@ export function BackupSection(): ReactElement {
   const [connectOpen, setConnectOpen] = useState(false)
   const [signOutOpen, setSignOutOpen] = useState(false)
   const action = useAsyncAction()
+  const signOutAction = useAsyncAction()
 
   const conflicted = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, 'conflicted-notes', graph?.root],
@@ -94,7 +95,7 @@ export function BackupSection(): ReactElement {
   }
 
   async function confirmSignOut(): Promise<void> {
-    await action.run(async () => {
+    await signOutAction.run(async () => {
       await signOut()
       setSignOutOpen(false)
     })
@@ -176,7 +177,7 @@ export function BackupSection(): ReactElement {
                         variant="destructive"
                         size="sm"
                         title="Removes the GitHub token from this machine"
-                        disabled={action.pending}
+                        disabled={signOutAction.pending}
                       >
                         Sign out of GitHub…
                       </Button>
@@ -189,8 +190,10 @@ export function BackupSection(): ReactElement {
                           GitHub-backed graph will stop backing up until you sign in again.
                         </DialogDescription>
                       </DialogHeader>
-                      {action.error !== null ? (
-                        <p className="text-xs text-red-700 dark:text-red-300">{action.error}</p>
+                      {signOutAction.error !== null ? (
+                        <p className="text-xs text-red-700 dark:text-red-300">
+                          {signOutAction.error}
+                        </p>
                       ) : null}
                       <DialogFooter>
                         <DialogClose asChild>
@@ -198,7 +201,7 @@ export function BackupSection(): ReactElement {
                         </DialogClose>
                         <Button
                           variant="destructive"
-                          disabled={action.pending}
+                          disabled={signOutAction.pending}
                           onClick={() => void confirmSignOut()}
                         >
                           Sign out

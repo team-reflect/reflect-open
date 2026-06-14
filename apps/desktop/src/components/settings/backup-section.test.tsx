@@ -89,6 +89,26 @@ describe('BackupSection', () => {
     expect(openUrl).toHaveBeenCalledWith('https://github.com/alex/notes')
   })
 
+  it('keeps unrelated action errors out of the sign-out dialog', async () => {
+    vi.mocked(openUrl).mockRejectedValueOnce(new Error('No browser'))
+    renderSection({
+      phase: 'connected',
+      remoteUrl: 'https://github.com/alex/notes.git',
+      repo: { owner: 'alex', name: 'notes' },
+      status: { state: 'idle' },
+    })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open GitHub repo' }))
+
+    expect(await screen.findByText(/Couldn’t open the browser/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /Sign out of GitHub/ }))
+
+    expect(
+      within(screen.getByRole('dialog')).queryByText(/Couldn’t open the browser/),
+    ).toBeNull()
+  })
+
   it('confirms before signing out of GitHub', async () => {
     renderSection({
       phase: 'connected',
@@ -125,5 +145,6 @@ describe('BackupSection', () => {
 
     expect(await screen.findByRole('heading', { name: 'Sign out of GitHub?' })).toBeTruthy()
     expect(within(screen.getByRole('dialog')).getByText('Keychain denied')).toBeTruthy()
+    expect(screen.getAllByText('Keychain denied')).toHaveLength(1)
   })
 })
