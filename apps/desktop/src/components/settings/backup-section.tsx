@@ -89,9 +89,21 @@ export function BackupSection(): ReactElement {
       return
     }
     const url = githubRepoBrowserUrl(backup.repo)
-    void openUrl(url).catch(() => {
-      action.setError(`Couldn’t open the browser — visit ${url} yourself.`)
-    })
+    action.setError(null)
+    void openUrl(url)
+      .then(() => {
+        action.setError(null)
+      })
+      .catch(() => {
+        action.setError(`Couldn’t open the browser — visit ${url} yourself.`)
+      })
+  }
+
+  function setSignOutDialogOpen(open: boolean): void {
+    if (!open && signOutAction.pending) {
+      return
+    }
+    setSignOutOpen(open)
   }
 
   async function confirmSignOut(): Promise<void> {
@@ -171,7 +183,7 @@ export function BackupSection(): ReactElement {
                       Sign out on this machine; connected graphs stop backing up.
                     </p>
                   </div>
-                  <Dialog open={signOutOpen} onOpenChange={setSignOutOpen}>
+                  <Dialog open={signOutOpen} onOpenChange={setSignOutDialogOpen}>
                     <DialogTrigger asChild>
                       <Button
                         variant="destructive"
@@ -182,7 +194,7 @@ export function BackupSection(): ReactElement {
                         Sign out of GitHub…
                       </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent showCloseButton={!signOutAction.pending}>
                       <DialogHeader>
                         <DialogTitle>Sign out of GitHub?</DialogTitle>
                         <DialogDescription>
@@ -197,7 +209,9 @@ export function BackupSection(): ReactElement {
                       ) : null}
                       <DialogFooter>
                         <DialogClose asChild>
-                          <Button variant="outline">Cancel</Button>
+                          <Button variant="outline" disabled={signOutAction.pending}>
+                            Cancel
+                          </Button>
                         </DialogClose>
                         <Button
                           variant="destructive"

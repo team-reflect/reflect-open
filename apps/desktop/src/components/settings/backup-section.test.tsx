@@ -109,6 +109,24 @@ describe('BackupSection', () => {
     ).toBeNull()
   })
 
+  it('clears stale open-repo errors before retrying', async () => {
+    vi.mocked(openUrl).mockRejectedValueOnce(new Error('No browser'))
+    renderSection({
+      phase: 'connected',
+      remoteUrl: 'https://github.com/alex/notes.git',
+      repo: { owner: 'alex', name: 'notes' },
+      status: { state: 'idle' },
+    })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open GitHub repo' }))
+
+    expect(await screen.findByText(/Couldn’t open the browser/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open GitHub repo' }))
+
+    await waitFor(() => expect(screen.queryByText(/Couldn’t open the browser/)).toBeNull())
+  })
+
   it('confirms before signing out of GitHub', async () => {
     renderSection({
       phase: 'connected',
@@ -146,5 +164,33 @@ describe('BackupSection', () => {
     expect(await screen.findByRole('heading', { name: 'Sign out of GitHub?' })).toBeTruthy()
     expect(within(screen.getByRole('dialog')).getByText('Keychain denied')).toBeTruthy()
     expect(screen.getAllByText('Keychain denied')).toHaveLength(1)
+  })
+
+  it('does not close the sign-out dialog while sign-out is pending', async () => {
+    let resolveSignOut: () => void = () => {}
+    sync.signOut.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSignOut = resolve
+        }),
+    )
+    renderSection({
+      phase: 'connected',
+      remoteUrl: 'https://github.com/alex/notes.git',
+      repo: { owner: 'alex', name: 'notes' },
+      status: { state: 'idle' },
+    })
+
+    fireEvent.click(await screen.findByRole('button', { name: /Sign out of GitHub/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.getByRole('heading', { name: 'Sign out of GitHub?' })).toBeTruthy()
+
+    resolveSignOut()
+
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: 'Sign out of GitHub?' })).toBeNull(),
+    )
   })
 })
