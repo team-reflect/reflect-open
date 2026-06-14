@@ -8,6 +8,23 @@
 const DEFAULT_MAX_LENGTH = 160
 const PREVIEW_MAX_LENGTH = 120
 
+/**
+ * `text.slice(0, maxLength)` that never ends on a lone UTF-16 high surrogate.
+ * A raw code-unit slice can cut an astral character — an emoji, or the
+ * mathematical-alphanumeric letters people paste from Twitter — in half,
+ * leaving a dangling high surrogate. That half-character survives `JSON.stringify`
+ * as a lone `\udXXX`, which the Rust index writer's serde_json rejects with
+ * "unexpected end of hex escape", and the whole note is dropped from the rebuilt
+ * index. Trimming the orphaned surrogate keeps the slice a single code unit
+ * shorter and always well-formed.
+ */
+function sliceWithoutSplittingSurrogate(text: string, maxLength: number): string {
+  const end = Math.min(maxLength, text.length)
+  const lastCode = text.charCodeAt(end - 1)
+  const isLoneHighSurrogate = lastCode >= 0xd800 && lastCode <= 0xdbff
+  return text.slice(0, isLoneHighSurrogate ? end - 1 : end)
+}
+
 /** The single line of `content` containing `pos`, windowed to `maxLength`. */
 export function lineSnippet(content: string, pos: number, maxLength = DEFAULT_MAX_LENGTH): string {
   const at = Math.max(0, Math.min(pos, content.length))
@@ -57,5 +74,7 @@ export function previewSnippet(
       body = body.slice(foldedTitle.length + 1)
     }
   }
-  return body.length <= maxLength ? body : `${body.slice(0, maxLength).trimEnd()}…`
+  return body.length <= maxLength
+    ? body
+    : `${sliceWithoutSplittingSurrogate(body, maxLength).trimEnd()}…`
 }

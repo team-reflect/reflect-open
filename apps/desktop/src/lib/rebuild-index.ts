@@ -38,7 +38,13 @@ async function runRebuild(generation: number): Promise<void> {
   try {
     await rebuildIndex({
       generation,
-      onSkippedNote: (note) => skippedNotes.push(`${note.path}: ${note.message}`),
+      onSkippedNote: (note) => {
+        // The status toast lingers only briefly and samples the first few, so
+        // log every skip in full — this is the durable record of which notes
+        // fell out of the index and why.
+        console.warn(`Index rebuild skipped ${note.path}: ${note.message}`)
+        skippedNotes.push(`${note.path}: ${note.message}`)
+      },
     })
     if (skippedNotes.length === 0) {
       operation.done()
