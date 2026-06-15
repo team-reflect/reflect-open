@@ -76,6 +76,7 @@ export {
   type PinnedNote,
   type SearchHit,
 } from './queries'
+export { groupTasks, type TaskGroup, type TaskGroupKind } from './group-tasks'
 export {
   listNotes,
   listNoteTags,

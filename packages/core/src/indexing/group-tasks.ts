@@ -1,4 +1,4 @@
-import type { OpenTask } from '@reflect/core'
+import type { OpenTask } from './queries'
 
 /**
  * Grouping for the Tasks view (Plan 18), faithful to V1's `task-view.ts`: open
@@ -8,6 +8,10 @@ import type { OpenTask } from '@reflect/core'
  * dropped), so the buckets are symmetric: a task in a past daily note is
  * overdue, today's is current, a future daily note's is upcoming, and a task in
  * a regular note groups under that note's title.
+ *
+ * Lives in core (not the desktop view) so the same grouping serves any surface —
+ * the desktop list today, a `reflect tasks` CLI later — without re-deriving it.
+ * Pure: the caller supplies `today`.
  */
 
 /** A date bucket (tasks aggregated across daily notes) or a single regular note. */

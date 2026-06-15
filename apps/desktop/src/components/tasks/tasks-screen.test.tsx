@@ -18,8 +18,8 @@ vi.mock('@/providers/graph-provider', () => ({
 }))
 vi.mock('@/lib/use-today', () => ({ useToday: () => '2026-06-14' }))
 
-const completeTask = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/note-task', () => ({ completeTask }))
+const toggleTask = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/note-task', () => ({ toggleTask }))
 
 const fail = vi.hoisted(() => vi.fn())
 const startOperation = vi.hoisted(() => vi.fn(() => ({ fail })))
@@ -63,7 +63,7 @@ function renderScreen() {
 beforeEach(() => {
   window.sessionStorage.clear()
   getOpenTasks.mockReset()
-  completeTask.mockReset()
+  toggleTask.mockReset()
   startOperation.mockClear()
   fail.mockReset()
 })
@@ -112,7 +112,7 @@ describe('TasksScreen', () => {
   })
 
   it('completes a task when its checkbox is clicked', async () => {
-    completeTask.mockResolvedValue(undefined)
+    toggleTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([
       task({
         notePath: 'notes/p.md',
@@ -125,23 +125,29 @@ describe('TasksScreen', () => {
     const view = renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
-    expect(completeTask).toHaveBeenCalledWith(
-      expect.objectContaining({ notePath: 'notes/p.md', markerOffset: 5, raw: '[ ] project task' }),
-      1,
+    await waitFor(() =>
+      expect(toggleTask).toHaveBeenCalledWith(
+        expect.objectContaining({ notePath: 'notes/p.md', markerOffset: 5, raw: '[ ] project task' }),
+        1,
+      ),
     )
+    // Optimistically removed from the list on completion.
+    await waitFor(() => expect(view.queryByText('project task')).toBeNull())
     view.unmount()
   })
 
-  it('surfaces a failed completion via the operations toast', async () => {
-    completeTask.mockRejectedValue(new Error('stale index'))
+  it('rolls the row back and surfaces a failed completion via the operations toast', async () => {
+    toggleTask.mockRejectedValue(new Error('stale index'))
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/p.md', text: 'project task', noteTitle: 'Project' }),
     ])
     const view = renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
-    expect(startOperation).toHaveBeenCalledWith('Completing task')
     await waitFor(() => expect(fail).toHaveBeenCalledWith('stale index'))
+    expect(startOperation).toHaveBeenCalledWith('Completing task')
+    // Rolled back: the row returns after the failed write.
+    await view.findByText('project task')
     view.unmount()
   })
 

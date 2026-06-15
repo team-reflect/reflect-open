@@ -1,6 +1,6 @@
-import type { OpenTask } from '@reflect/core'
 import { describe, expect, it } from 'vitest'
 import { groupTasks } from './group-tasks'
+import type { OpenTask } from './queries'
 
 const TODAY = '2026-06-14'
 

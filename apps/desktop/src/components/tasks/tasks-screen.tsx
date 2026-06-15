@@ -1,8 +1,7 @@
 import { useEffect, useRef, type KeyboardEvent, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getOpenTasks, hasBridge } from '@reflect/core'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
-import { groupTasks } from '@/lib/tasks/group-tasks'
+import { getOpenTasks, groupTasks, hasBridge } from '@reflect/core'
+import { tasksQueryKey } from '@/lib/tasks/tasks-query'
 import { useToday } from '@/lib/use-today'
 import { useGraph } from '@/providers/graph-provider'
 import { routeForPath } from '@/routing/route'
@@ -42,7 +41,7 @@ export function TasksScreen(): ReactElement {
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   const { data: tasks, isError } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'tasks'],
+    queryKey: tasksQueryKey(graph?.root),
     queryFn: () => getOpenTasks(),
     enabled: hasBridge() && graph !== null,
   })

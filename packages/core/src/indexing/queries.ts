@@ -106,18 +106,18 @@ export interface OpenTask {
 
 /**
  * Every open checkbox across the graph, with note context, for the Tasks view.
- * Completed tasks are excluded (the view shows open work only) and so are
- * `private: true` notes' tasks: the Tasks view is an always-visible global
- * surface, and there is no per-note opt-out, so private content stays out of it.
- * (To include them — they never leave the device here — drop the `isPrivate`
- * predicate; grouping/ordering is finalised in the view, this read just gathers.)
+ * Completed tasks are excluded (the view shows open work only). `private: true`
+ * notes' tasks **are** included: the Tasks view is a local-only surface that
+ * never sends content anywhere — exactly like local search and the daily stream
+ * — so the `private` hard-block (content never leaves the device) is unaffected.
+ * The ordering here is only for a deterministic result; the final grouping and
+ * sort live in {@link groupTasks}, so this read just gathers the rows.
  */
 export function getOpenTasks(): Promise<OpenTask[]> {
   return db
     .selectFrom('tasks')
     .innerJoin('notes', 'notes.path', 'tasks.notePath')
     .where('tasks.checked', '=', 0)
-    .where('notes.isPrivate', '=', 0)
     .select([
       'tasks.notePath',
       'tasks.markerOffset',
@@ -129,8 +129,7 @@ export function getOpenTasks(): Promise<OpenTask[]> {
       'notes.pinnedOrder',
       'notes.updatedAt',
     ])
-    .orderBy('notes.dailyDate')
-    .orderBy('notes.updatedAt', 'desc')
+    .orderBy('tasks.notePath')
     .orderBy('tasks.markerOffset')
     .execute()
 }

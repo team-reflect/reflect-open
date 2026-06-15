@@ -402,6 +402,41 @@ fn apply_note_inserts_tasks_and_replace_clears_them() {
 }
 
 #[test]
+fn open_tasks_read_includes_private_notes_and_excludes_completed() {
+    // The semantics `getOpenTasks` (queries.ts) relies on: open checkboxes joined
+    // to note context, completed tasks excluded, and `private: true` notes' tasks
+    // INCLUDED (the Tasks view is a local-only surface, like local search).
+    let conn = migrated();
+    let mut public = note("notes/a.md", "A", vec![]);
+    public.daily_date = Some("2026-06-10".to_string());
+    public.tasks = vec![task(2, "open a", false)];
+    apply_note(&conn, &public).unwrap();
+
+    let mut private = note("notes/b.md", "B", vec![]);
+    private.is_private = true;
+    private.tasks = vec![task(2, "open b", false), task(20, "done b", true)];
+    apply_note(&conn, &private).unwrap();
+
+    let rows = run_query(
+        &conn,
+        "SELECT tasks.note_path, tasks.text, notes.title AS note_title, notes.daily_date \
+         FROM tasks INNER JOIN notes ON notes.path = tasks.note_path \
+         WHERE tasks.checked = 0 ORDER BY tasks.note_path, tasks.marker_offset",
+        &[],
+    )
+    .unwrap();
+
+    assert_eq!(rows.len(), 2); // both open tasks; the completed one is gone
+    assert_eq!(rows[0]["note_path"], Value::from("notes/a.md"));
+    assert_eq!(rows[0]["text"], Value::from("open a"));
+    assert_eq!(rows[0]["note_title"], Value::from("A"));
+    assert_eq!(rows[0]["daily_date"], Value::from("2026-06-10"));
+    // The private note's open task is present (local-only surface).
+    assert_eq!(rows[1]["note_path"], Value::from("notes/b.md"));
+    assert_eq!(rows[1]["text"], Value::from("open b"));
+}
+
+#[test]
 fn link_kind_check_rejects_unknown_kinds() {
     let conn = migrated();
     apply_note(&conn, &note("notes/a.md", "A", vec![])).unwrap();

@@ -25,23 +25,25 @@ export class TaskStaleError extends Error {
 
 /**
  * Locate the task marker in `source`: trust `markerOffset` when the recorded
- * marker line (`raw`) still sits exactly there, else fall back to a unique
- * search for `raw` — so an edit *above* the task (which shifts every later
- * offset) can't misfire the toggle. Throws {@link TaskStaleError} when `raw`
- * is absent or ambiguous.
+ * marker line (`raw`) still sits exactly there, else re-extract the note's tasks
+ * and match the unique one whose marker line is `raw`. Re-extracting (rather than
+ * a raw string search) means the relocation can only ever land on a real task
+ * line — never a coincidental mid-line or in-code-block occurrence of `raw` — so
+ * an edit *above* the task is tolerated without risking a wrong-line toggle.
+ * Throws {@link TaskStaleError} when `raw` matches no task, or more than one.
  */
 function locateTaskMarker(source: string, markerOffset: number, raw: string): number {
   if (source.slice(markerOffset, markerOffset + raw.length) === raw) {
     return markerOffset
   }
-  const first = source.indexOf(raw)
-  if (first === -1) {
+  const matches = parseNote({ path: '', source }).tasks.filter((task) => task.raw === raw)
+  if (matches.length === 0) {
     throw new TaskStaleError(`task line no longer in note: ${JSON.stringify(raw)}`)
   }
-  if (source.indexOf(raw, first + 1) !== -1) {
+  if (matches.length > 1) {
     throw new TaskStaleError(`task line is ambiguous: ${JSON.stringify(raw)}`)
   }
-  return first
+  return matches[0].markerOffset
 }
 
 /**

@@ -1,6 +1,6 @@
 import { TaskStaleError } from '@reflect/core'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { completeTask } from './note-task'
+import { NoteBusyError, toggleTask } from './note-task'
 
 const openSession = vi.hoisted(() => vi.fn())
 vi.mock('@/editor/open-documents', () => ({ openSession }))
@@ -22,13 +22,13 @@ beforeEach(() => {
   writeNote.mockReset()
 })
 
-describe('completeTask', () => {
+describe('toggleTask', () => {
   it('writes the toggled marker to disk when the note is not open', async () => {
     openSession.mockReturnValue(null)
     readNote.mockResolvedValue('- [ ] do it\n')
     writeNote.mockResolvedValue(undefined)
 
-    await completeTask(task, 7)
+    await toggleTask(task, 7)
     expect(writeNote).toHaveBeenCalledWith('notes/a.md', '- [x] do it\n', 7)
   })
 
@@ -38,7 +38,7 @@ describe('completeTask', () => {
     readNote.mockResolvedValue('- [ ] do it\n')
     writeNote.mockResolvedValue(undefined)
 
-    await completeTask(task, 7)
+    await toggleTask(task, 7)
     expect(commitTaskToggle).not.toHaveBeenCalled()
     expect(writeNote).toHaveBeenCalledWith('notes/a.md', '- [x] do it\n', 7)
   })
@@ -47,17 +47,25 @@ describe('completeTask', () => {
     const commitTaskToggle = vi.fn().mockResolvedValue(true)
     openSession.mockReturnValue({ isDirty: () => true, commitTaskToggle })
 
-    await completeTask(task, 7)
+    await toggleTask(task, 7)
     expect(commitTaskToggle).toHaveBeenCalledWith({ markerOffset: 2, raw: '[ ] do it' })
     expect(writeNote).not.toHaveBeenCalled()
     expect(readNote).not.toHaveBeenCalled()
   })
 
-  it('refuses loudly when a dirty session declines, never clobbering via disk', async () => {
+  it('throws NoteBusyError when a dirty session declines, never clobbering via disk', async () => {
     const commitTaskToggle = vi.fn().mockResolvedValue(false)
     openSession.mockReturnValue({ isDirty: () => true, commitTaskToggle })
 
-    await expect(completeTask(task, 7)).rejects.toBeInstanceOf(TaskStaleError)
+    await expect(toggleTask(task, 7)).rejects.toBeInstanceOf(NoteBusyError)
+    expect(writeNote).not.toHaveBeenCalled()
+  })
+
+  it('propagates TaskStaleError from the disk path when the index is stale', async () => {
+    openSession.mockReturnValue(null)
+    readNote.mockResolvedValue('- [ ] something else entirely\n')
+
+    await expect(toggleTask(task, 7)).rejects.toBeInstanceOf(TaskStaleError)
     expect(writeNote).not.toHaveBeenCalled()
   })
 })

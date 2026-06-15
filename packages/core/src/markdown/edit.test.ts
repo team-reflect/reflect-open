@@ -122,6 +122,22 @@ describe('toggleTaskMarker', () => {
     expect(() => toggleTaskMarker('intro\n\n- [ ] dup\n- [ ] dup\n', task)).toThrow(TaskStaleError)
   })
 
+  it('relocates to the real task line, not a coincidental inline match', () => {
+    const task = indexedTask('- [ ] dup\n')
+    // The same text appears inline (not a task) and as a task, and the recorded
+    // offset is stale. Relocation re-extracts tasks, so it can only toggle the
+    // real list item — the inline mention is untouched.
+    const result = toggleTaskMarker('mention [ ] dup inline\n\n- [ ] dup\n', task)
+    expect(result.source).toBe('mention [ ] dup inline\n\n- [x] dup\n')
+  })
+
+  it('never toggles a marker that only appears inside a code block', () => {
+    const task = indexedTask('- [ ] incode\n')
+    // The line moved into a fenced code block, so it is no longer a task; a raw
+    // string search would have spliced it, but re-extraction sees no task.
+    expect(() => toggleTaskMarker('```\n- [ ] incode\n```\n', task)).toThrow(TaskStaleError)
+  })
+
   it('round-trips back to the original after two toggles', () => {
     const source = '- [ ] task [[2026-07-01]] #tag\n'
     const once = toggleTaskMarker(source, indexedTask(source))

@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import type { TaskGroup } from '@/lib/tasks/group-tasks'
+import type { TaskGroup } from '@reflect/core'
 import { TaskRow } from './task-row'
 
 interface TaskGroupSectionProps {
