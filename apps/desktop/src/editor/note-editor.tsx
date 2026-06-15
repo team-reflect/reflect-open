@@ -80,6 +80,7 @@ export function NoteEditor({
 
   // Latest callbacks, read through refs so a changing prop identity never
   // rebuilds meowdown's extensions (the uncontrolled-editor contract).
+  // TODO: This violates "Rule of hooks". Refactor this later.
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
   const onWikiLinkClickRef = useRef(onWikiLinkClick)
