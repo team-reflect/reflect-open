@@ -17,8 +17,8 @@
   "dependencies": {
     "@lezer/common": "^1.5.2",
     "@lezer/markdown": "^1.6.4",
-    "@meowdown/core": "0.7.0",
-    "@meowdown/react": "0.7.0",
+    "@meowdown/core": "0.8.0",
+    "@meowdown/react": "0.8.0",
     "@reflect/core": "workspace:*",
     "@reflect/db": "workspace:*",
     "@reflect/design-system": "workspace:*",
