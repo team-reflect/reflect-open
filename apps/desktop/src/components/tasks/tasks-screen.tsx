@@ -94,11 +94,13 @@ export function TasksScreen(): ReactElement {
     if (open === undefined) {
       return []
     }
-    const all = filters.archived
-      ? completed
-        ? [...open, ...completed]
-        : open
-      : [...open, ...recentlyCompleted]
+    // The struck "completed" rows come from the completed query (archived on) or
+    // the session set (off). Drop any open row that's also present there — a
+    // refetch can briefly restore a just-completed task to the open cache before
+    // the reindex lands, and listing it both open and struck collides React keys.
+    const completedRows = filters.archived ? (completed ?? []) : recentlyCompleted
+    const completedKeys = new Set(completedRows.map(taskKey))
+    const all = [...open.filter((task) => !completedKeys.has(taskKey(task))), ...completedRows]
     const matched = needle ? all.filter((task) => task.text.toLowerCase().includes(needle)) : all
     return visibleGroups(groupTasks(matched, today), filters)
   }, [open, completed, recentlyCompleted, filters, needle, today])

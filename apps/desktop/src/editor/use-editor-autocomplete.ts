@@ -59,8 +59,11 @@ export function useEditorAutocomplete(): EditorAutocomplete {
             target: entry.title,
             label: `Create “${entry.title}”`,
             // Insert happens in the menu; create the note in the background.
+            // Best-effort: a failed create just leaves an unresolved link.
             onSelect: () => {
-              void createFromAutocomplete(entry.title)
+              void createFromAutocomplete(entry.title).catch((error: unknown) => {
+                console.error('create-from-autocomplete failed:', error)
+              })
             },
           }
         }

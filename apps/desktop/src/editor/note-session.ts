@@ -709,11 +709,14 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     buffer = doc.body
     applyToEditor(doc.body) // the open editor shows the edited line
     dirty = header + buffer !== disk
+    // A no-op edit (transform changed nothing) writes nothing, so a *prior*
+    // surfaced save error must not be mistaken for this edit's failure.
+    const shouldPersist = dirty
     emit()
     await flush()
     // `flush()` resolves even when the write failed (captured in `error`, not
     // thrown). Revert and surface the failure: it persists, or nothing changes.
-    if (error !== null) {
+    if (shouldPersist && error !== null) {
       const message = error
       header = previousHeader
       buffer = previousBuffer

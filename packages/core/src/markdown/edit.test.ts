@@ -210,6 +210,11 @@ describe('editTaskLine', () => {
     expect(() => editTaskLine(source, indexedTask(source), 'one\n- [ ] two')).toThrow(TaskStaleError)
   })
 
+  it('refuses content with a carriage return too', () => {
+    const source = '- [ ] one\n'
+    expect(() => editTaskLine(source, indexedTask(source), 'one\r- [ ] two')).toThrow(TaskStaleError)
+  })
+
   it('refuses loudly when the task line is gone', () => {
     const source = '- [ ] buy milk\n'
     const task = indexedTask(source)

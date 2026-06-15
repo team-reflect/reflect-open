@@ -81,6 +81,13 @@ describe('useTaskEditorFinalizer', () => {
     expect(unchanged.onCancel).not.toHaveBeenCalled()
   })
 
+  it('unmount persists a cleared edit (onFlush with empty content), not drops it', () => {
+    const emptied = setup('milk')
+    emptied.type('   ')
+    emptied.unmount()
+    expect(emptied.onFlush).toHaveBeenCalledWith('')
+  })
+
   it('is single-shot: a committed editor does not also flush on unmount', () => {
     const h = setup('milk')
     h.type('oat milk')

@@ -93,15 +93,19 @@ export function useTaskEditorFinalizer({
   // — flushes against this render's `initial`/`onFlush`, not the mount-time ones.
   const flushRef = useRef<() => void>(() => {})
   flushRef.current = (): void => {
-    if (!claim()) {
+    if (doneRef.current) {
       return
     }
-    // Selection already moved → persist a real change, but leave the selection
-    // (and the cancel/exit path) alone. Unchanged or emptied just drops.
+    // Selection already moved → persist a real change (or the cleared line as an
+    // empty task) without touching the selection or the cancel/exit path. An
+    // unchanged editor claims nothing — so a StrictMode double-cleanup can't
+    // starve a later explicit commit/cancel of the single-shot claim.
     const result = resolveTaskEdit(initial, currentRef.current)
-    if (result.type === 'commit') {
-      onFlush(result.content)
+    if (result.type === 'cancel') {
+      return
     }
+    doneRef.current = true
+    onFlush(result.type === 'commit' ? result.content : '')
   }
   apiRef.current = {
     commit: () => {

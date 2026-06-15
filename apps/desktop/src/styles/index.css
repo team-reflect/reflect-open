@@ -238,6 +238,17 @@ body {
   font-size: inherit;
 }
 
+/* meowdown 0.8.1 ships a per-block gutter handle (a grip for drag-reordering and
+   a "+" add button). Reflect doesn't use block reordering — and the grip showed
+   up beside the Tasks inline editor — so hide the whole gutter. Matched by the
+   stable `meow_<Name>_` class prefix so a meowdown hash bump doesn't revive it.
+   (The positioner is a portal, so this is global, not scoped to one editor.) */
+[class*='meow_Add_'],
+[class*='meow_Draggable_'],
+[class*='meow_DropIndicator_'] {
+  display: none !important;
+}
+
 /* The daily stream's horizontal gutter (STREAM_GUTTER in daily-stream.tsx),
    shared by each row's day label, pane chrome, and the editor itself so they
    align. Un-layered so it beats the un-layered `padding: 0` reset above by

@@ -135,14 +135,13 @@ export function useTaskActions(): TaskActions {
     },
     onMutate: async ({ task, content }: { task: OpenTask; content: string }) => {
       const snapshot = await cache.snapshot()
-      // Same optimistic shape as completing: drop from open, surface struck in
-      // the completed list. The reindex fills in the edited text a beat later.
+      // Surface the *edited* row struck (its new text), in both the completed
+      // cache (archived on) and the session set (off) — not the pre-edit task.
+      const edited = withEditedTask([task], task, content)?.[0] ?? task
       cache.patch(
         (rows) => withoutTasks(rows, [task]),
-        (rows) => asCompleted(rows, [task]),
+        (rows) => asCompleted(rows, [edited]),
       )
-      // Keep it showing struck with its new text; mark as the edited row.
-      const edited = withEditedTask([task], task, content)?.[0] ?? task
       markRecentlyCompleted(root, [edited])
       return snapshot
     },

@@ -84,7 +84,7 @@ export function toggleTaskMarker(
  */
 export function editTaskLine(source: string, task: TaskMarker, content: string): string {
   const text = content.trim()
-  if (text.includes('\n')) {
+  if (text.includes('\n') || text.includes('\r')) {
     throw new TaskStaleError(`task content must be a single line: ${JSON.stringify(content)}`)
   }
   const offset = locateTaskMarker(source, task.markerOffset, task.raw)

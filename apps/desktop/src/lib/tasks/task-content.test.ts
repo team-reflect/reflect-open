@@ -6,6 +6,10 @@ describe('taskContent', () => {
     expect(taskContent('[ ] buy milk')).toBe('buy milk')
   })
 
+  it('strips the open marker and a tab separator', () => {
+    expect(taskContent('[ ]\tbuy milk')).toBe('buy milk')
+  })
+
   it('strips a checked marker', () => {
     expect(taskContent('[x] done')).toBe('done')
     expect(taskContent('[X] done')).toBe('done')
