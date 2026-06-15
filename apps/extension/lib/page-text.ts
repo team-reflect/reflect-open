@@ -17,6 +17,23 @@ export const extractPageTextResponseSchema = z.discriminatedUnion('ok', [
 export type ExtractPageTextRequest = z.infer<typeof extractPageTextRequestSchema>
 export type ExtractPageTextResponse = z.infer<typeof extractPageTextResponseSchema>
 
+function comparablePageUrl(value: string): string | null {
+  try {
+    const url = new URL(value)
+    url.hash = ''
+    return url.href
+  } catch {
+    return null
+  }
+}
+
+/** True when two page URLs identify the same document for capture purposes. */
+export function samePageUrl(first: string, second: string): boolean {
+  const firstUrl = comparablePageUrl(first)
+  const secondUrl = comparablePageUrl(second)
+  return firstUrl !== null && secondUrl !== null ? firstUrl === secondUrl : first === second
+}
+
 /** Collapse intra-paragraph whitespace while preserving paragraph breaks. */
 export function normalizeParagraphText(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
