@@ -26,6 +26,8 @@ interface TaskRowProps {
   onEditCancel: () => void
   /** ⌘↵ in the editor: complete the task, saving the edit first when `content` isn't null. */
   onEditComplete: (content: string | null) => void
+  /** Persist a changed edit when the row unmounts (selection moved), without exiting. */
+  onEditFlush: (content: string) => void
   onOpen: (notePath: string) => void
 }
 
@@ -48,6 +50,7 @@ export function TaskRow({
   onEditDelete,
   onEditCancel,
   onEditComplete,
+  onEditFlush,
   onOpen,
 }: TaskRowProps): ReactElement {
   const { settings } = useSettings()
@@ -66,7 +69,9 @@ export function TaskRow({
         type="button"
         data-task-row
         aria-label={task.checked ? 'Completed task' : `Complete: ${label}`}
-        disabled={task.checked || isPending}
+        // Disabled while editing so a checkbox click can't race the editor's
+        // write-back (and so focus can't drift off the editor onto it).
+        disabled={task.checked || isPending || editing}
         onClick={complete}
         className="mt-px shrink-0 text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none disabled:cursor-default"
       >
@@ -83,6 +88,7 @@ export function TaskRow({
           onDelete={onEditDelete}
           onCancel={onEditCancel}
           onComplete={onEditComplete}
+          onFlush={onEditFlush}
         />
       ) : (
         <button
@@ -112,8 +118,13 @@ export function TaskRow({
       <button
         type="button"
         aria-label={`Open ${task.noteTitle}`}
+        // Hidden while editing: keep focus on the editor (Esc first to leave).
+        disabled={editing}
         onClick={() => onOpen(task.notePath)}
-        className="mt-0.5 shrink-0 text-text-muted/60 opacity-0 transition-opacity hover:text-text focus-visible:opacity-100 focus-visible:outline-none group-hover/task:opacity-100"
+        className={cn(
+          'mt-0.5 shrink-0 text-text-muted/60 opacity-0 transition-opacity hover:text-text focus-visible:opacity-100 focus-visible:outline-none',
+          !editing && 'group-hover/task:opacity-100',
+        )}
       >
         <ArrowRight aria-hidden className="size-3.5" />
       </button>

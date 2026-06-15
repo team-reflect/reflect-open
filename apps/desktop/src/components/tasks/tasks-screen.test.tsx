@@ -39,12 +39,14 @@ vi.mock('./task-editor', () => ({
     onDelete,
     onCancel,
     onComplete,
+    onFlush,
   }: {
     task: { text: string }
     onCommit: (content: string) => void
     onDelete: () => void
     onCancel: () => void
     onComplete: (content: string | null) => void
+    onFlush: (content: string) => void
   }) => (
     <div data-task-editor data-testid="task-editor">
       <span>editing: {task.text}</span>
@@ -62,6 +64,9 @@ vi.mock('./task-editor', () => ({
       </button>
       <button type="button" onClick={() => onComplete(null)}>
         complete-unchanged
+      </button>
+      <button type="button" onClick={() => onFlush('edited content')}>
+        flush-edit
       </button>
     </div>
   ),
@@ -273,6 +278,27 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'edited content' }))
     await userEvent.click(view.getByText('delete-edit'))
     await waitFor(() => expect(deleteTask).toHaveBeenCalled())
+    view.unmount()
+  })
+
+  it('flush persists an edit without exiting edit mode (selection unchanged)', async () => {
+    editTask.mockResolvedValue(undefined)
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/p.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'P' }),
+    ])
+    const view = renderScreen()
+
+    await userEvent.click(await view.findByRole('button', { name: 'first' }))
+    await userEvent.click(view.getByText('flush-edit'))
+    await waitFor(() =>
+      expect(editTask).toHaveBeenCalledWith(
+        expect.objectContaining({ notePath: 'notes/p.md', markerOffset: 2 }),
+        'edited content',
+        1,
+      ),
+    )
+    // The selection (and so the inline editor) is left intact — flush never clears.
+    expect(view.getByTestId('task-editor')).toBeDefined()
     view.unmount()
   })
 

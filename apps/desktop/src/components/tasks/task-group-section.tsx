@@ -95,6 +95,9 @@ export function TaskGroupSection({
                 }
                 selection.clear()
               }}
+              // Unmount flush: the selection has already moved, so persist the
+              // edit but leave the (new) selection alone.
+              onEditFlush={(content) => actions.edit(task, content)}
               onOpen={onOpen}
             />
           )

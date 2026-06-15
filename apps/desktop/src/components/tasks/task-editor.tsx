@@ -29,6 +29,8 @@ interface TaskEditorProps {
   onCancel: () => void
   /** ⌘↵: complete the task (saving the edit first when `content` isn't null). */
   onComplete: (content: string | null) => void
+  /** Persist a changed edit when the row unmounts (selection moved), without exiting. */
+  onFlush: (content: string) => void
 }
 
 /**
@@ -82,6 +84,7 @@ export function TaskEditor({
   onDelete,
   onCancel,
   onComplete,
+  onFlush,
 }: TaskEditorProps): ReactElement {
   const { graph } = useGraph()
   const { settings } = useSettings()
@@ -90,12 +93,13 @@ export function TaskEditor({
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
 
   const initial = useMemo(() => taskContent(task.raw), [task.raw])
-  const { apiRef, rootRef, onChange, onBlur } = useTaskEditorFinalizer({
+  const { apiRef, onChange } = useTaskEditorFinalizer({
     initial,
     onCommit,
     onDelete,
     onCancel,
     onComplete,
+    onFlush,
   })
 
   const handleRef = useCallback((handle: NoteEditorHandle | null) => {
@@ -103,7 +107,7 @@ export function TaskEditor({
   }, [])
 
   return (
-    <div ref={rootRef} onBlur={onBlur} data-task-editor className="min-w-0 flex-1">
+    <div data-task-editor className="min-w-0 flex-1">
       <NoteEditor
         initialContent={initial}
         onChange={onChange}
