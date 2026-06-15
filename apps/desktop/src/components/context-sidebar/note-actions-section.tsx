@@ -64,7 +64,7 @@ export function NoteActionsSection({
           deactivate: 'Unlocking note',
         }}
         keybinding={PRIVATE_KEYBINDING}
-        tooltip="Private notes are never sent to AI or any other external service"
+        tooltip="Locks this note out of AI. Backup and sync still include it."
       />
       <NoteGistAction path={path} keybinding={GIST_KEYBINDING} />
       {showTrash ? <NoteTrashAction path={path} /> : null}
