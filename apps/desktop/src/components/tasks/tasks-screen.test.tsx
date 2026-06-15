@@ -8,10 +8,12 @@ import { RouterProvider, useRouter } from '@/routing/router'
 import { TasksScreen } from './tasks-screen'
 
 const getOpenTasks = vi.hoisted(() => vi.fn())
+const getCompletedTasks = vi.hoisted(() => vi.fn())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
   getOpenTasks,
+  getCompletedTasks,
 }))
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', cloudSync: false, generation: 1 } }),
@@ -71,6 +73,8 @@ function renderScreen() {
 beforeEach(() => {
   window.sessionStorage.clear()
   getOpenTasks.mockReset()
+  getCompletedTasks.mockReset()
+  getCompletedTasks.mockResolvedValue([])
   toggleTask.mockReset()
   startOperation.mockClear()
   fail.mockReset()
@@ -143,6 +147,30 @@ describe('TasksScreen', () => {
     )
     // Optimistically removed from the list on completion.
     await waitFor(() => expect(view.queryByText('project task')).toBeNull())
+    view.unmount()
+  })
+
+  it('keeps a completed task visible (struck) when archived tasks are shown', async () => {
+    // With "show archived" on, completing must move the row into the completed
+    // list (struck), not drop it until the refetch (Bugbot regression).
+    window.sessionStorage.setItem('reflect.tasks.filter.archived', 'true')
+    toggleTask.mockResolvedValue(undefined)
+    getCompletedTasks.mockResolvedValue([])
+    getOpenTasks.mockResolvedValue([
+      task({
+        notePath: 'notes/p.md',
+        markerOffset: 5,
+        raw: '[ ] project task',
+        text: 'project task',
+        noteTitle: 'Project',
+      }),
+    ])
+    const view = renderScreen()
+
+    await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
+    // Flipped to completed in place — still on screen, now marked done.
+    await view.findByRole('button', { name: 'Completed task' })
+    expect(view.getByText('project task')).toBeDefined()
     view.unmount()
   })
 

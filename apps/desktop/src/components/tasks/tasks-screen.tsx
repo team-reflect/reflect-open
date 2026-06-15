@@ -3,9 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { Search } from 'lucide-react'
 import { getCompletedTasks, getOpenTasks, groupTasks, hasBridge, type TaskGroup } from '@reflect/core'
 import { Input } from '@/components/ui/input'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useTaskFilters, type TaskFilters } from '@/lib/tasks/task-filters'
-import { tasksQueryKey } from '@/lib/tasks/tasks-query'
+import { completedTasksQueryKey, tasksQueryKey } from '@/lib/tasks/tasks-query'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration'
 import { useToday } from '@/lib/use-today'
 import { useGraph } from '@/providers/graph-provider'
@@ -70,7 +69,7 @@ export function TasksScreen(): ReactElement {
     enabled,
   })
   const { data: completed } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'tasks-completed'],
+    queryKey: completedTasksQueryKey(graph?.root),
     queryFn: () => getCompletedTasks(),
     enabled: enabled && filters.archived,
   })
