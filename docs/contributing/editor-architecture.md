@@ -71,6 +71,30 @@ Invariants the loop maintains:
   read-only view rather than silently rewriting the file minus what the editor
   couldn't model.
 
+## Drag and drop needs Tauri's native handler off
+
+Every drag interaction in the editor rides the browser's HTML5 drag-and-drop
+events, which Tauri's webview swallows by default. The window sets
+`dragDropEnabled: false`
+([`tauri.conf.json`](../../apps/desktop/src-tauri/tauri.conf.json)); without it,
+none of these work:
+
+- **meowdown's block-handle reorder.** The drag handle is a native `draggable`
+  element, and meowdown's drop indicator is drawn *only* from a `dragover`
+  listener on the editor DOM. No `dragover` means no indicator, and the `drop`
+  that commits the move never fires either.
+- **Image paste/drop** (`use-image-persistence.ts`) and **chat file drop**
+  (`chat-screen.tsx`), both of which read `event.dataTransfer` off HTML5 drop
+  events.
+
+Tauri's native drag-drop handler (on by default) registers an OS-level drop
+target on the webview so file drops reach Rust. While it is on, it intercepts
+`dragstart`/`dragover`/`drop` before the DOM sees them, so the features above
+silently do nothing inside the app even though they work in a plain browser
+(for example the meowdown dev server). Turning it off costs us Tauri's
+`onDragDropEvent` (OS file drops delivered to Rust), which the app does not use:
+we handle every drop in the webview with HTML5 events instead.
+
 ## Work that outlives a pane
 
 React unmount effects never run on the quit paths (window close, ⌘Q), and some
