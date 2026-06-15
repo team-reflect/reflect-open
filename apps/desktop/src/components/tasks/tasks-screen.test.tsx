@@ -468,7 +468,7 @@ describe('TasksScreen', () => {
     view.unmount()
   })
 
-  it('removes a freshly inserted task when it is left empty', async () => {
+  it('dismissing the inserted row deletes the right note line (V1 empty cleanup)', async () => {
     deleteTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
@@ -478,9 +478,11 @@ describe('TasksScreen', () => {
     await view.findByRole('button', { name: 'first' })
     await userEvent.keyboard('{Enter}')
     await view.findByTestId('task-editor')
-    // Leaving the still-empty new row (cancel) deletes it instead of keeping a
-    // blank `- [ ] ` task on disk (V1).
-    await userEvent.click(view.getByRole('button', { name: 'cancel-edit' }))
+    // An empty Return-to-add row, left untouched, is removed rather than left as a
+    // blank `- [ ] ` line — the real editor routes that empty exit to delete (see
+    // the finalizer unit test); here we check the optimistic row's identity flows
+    // through, deleting the freshly written daily-note line, not some other row.
+    await userEvent.click(view.getByRole('button', { name: 'delete-edit' }))
     await waitFor(() =>
       expect(deleteTask).toHaveBeenCalledWith(
         expect.objectContaining({ notePath: 'daily/2026-06-14.md' }),

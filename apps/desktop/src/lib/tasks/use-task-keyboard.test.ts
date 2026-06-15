@@ -34,6 +34,7 @@ function makeSelection(over: Partial<TaskSelection> = {}): TaskSelection {
     clear: vi.fn(),
     move: vi.fn(),
     extend: vi.fn(),
+    activeKey: () => null,
     ...over,
   }
 }
@@ -230,7 +231,7 @@ describe('useTaskKeyboard', () => {
     })
   })
 
-  it('Return adds to the last selected task’s note instead', () => {
+  it('Return adds to the active selected row’s note, not whichever renders last', () => {
     const pinned = task({
       notePath: 'notes/a.md',
       noteTitle: 'A',
@@ -238,9 +239,23 @@ describe('useTaskKeyboard', () => {
       isPinned: true,
       pinnedOrder: 3,
     })
+    const other = task({ notePath: 'notes/z.md', noteTitle: 'Z' })
     const insert = vi.fn().mockResolvedValue(null)
-    const selection = makeSelection({ selected: new Set(['k']), selectedCount: 1 })
-    mount({ selection, actions: makeActions({ insert }), tasksByKey: new Map([['k', pinned]]) })
+    // Two notes selected; the pivot ('a') is the row last touched even though 'z'
+    // renders later — the new task must join 'a', not 'z'.
+    const selection = makeSelection({
+      selected: new Set(['a', 'z']),
+      selectedCount: 2,
+      activeKey: () => 'a',
+    })
+    mount({
+      selection,
+      actions: makeActions({ insert }),
+      tasksByKey: new Map([
+        ['a', pinned],
+        ['z', other],
+      ]),
+    })
 
     press(root, 'Enter')
     expect(insert).toHaveBeenCalledWith({

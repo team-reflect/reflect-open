@@ -35,13 +35,30 @@ describe('useTaskEditorFinalizer', () => {
     expect(emptied.onDelete).toHaveBeenCalled()
   })
 
-  it('Escape cancels and ⌘⌫ deletes regardless of content', () => {
-    const escaped = setup('milk')
-    escaped.type('edited but escaped')
-    escaped.api().cancel()
-    expect(escaped.onCancel).toHaveBeenCalled()
-    expect(escaped.onCommit).not.toHaveBeenCalled()
+  it('Escape keeps a typed row but removes an empty one; ⌘⌫ always deletes', () => {
+    // Typed content → Escape discards the unsaved edit but keeps the task. The
+    // decision is the live editor content, not the row's (stale) projected text.
+    const typed = setup('milk')
+    typed.type('edited but escaped')
+    typed.api().cancel()
+    expect(typed.onCancel).toHaveBeenCalled()
+    expect(typed.onDelete).not.toHaveBeenCalled()
+    expect(typed.onCommit).not.toHaveBeenCalled()
 
+    // An empty editor (a Return-to-add row never typed into) → Escape removes the
+    // line rather than leaving a blank task.
+    const empty = setup('')
+    empty.api().cancel()
+    expect(empty.onDelete).toHaveBeenCalled()
+    expect(empty.onCancel).not.toHaveBeenCalled()
+
+    // A task cleared to empty then escaped → also removed.
+    const cleared = setup('milk')
+    cleared.type('   ')
+    cleared.api().cancel()
+    expect(cleared.onDelete).toHaveBeenCalled()
+
+    // ⌘⌫ deletes outright regardless of content.
     const deleted = setup('milk')
     deleted.type('still here')
     deleted.api().delete()

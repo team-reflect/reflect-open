@@ -78,22 +78,19 @@ export function useTaskKeyboard({
       return
     }
     const inSearch = target instanceof HTMLInputElement
-    // The note a Return-inserted task lands in: the last selected task's note (so
-    // it joins that group), else today's daily — V1's "add to Today" default.
+    // The note a Return-inserted task lands in: the active selected row's note (so
+    // it joins that group — the row you last touched, not whichever renders last
+    // in a multi-note selection), else today's daily — V1's "add to Today".
     const insertTarget = (): InsertTaskTarget => {
-      let last: OpenTask | null = null
-      for (const [key, task] of tasksByKey) {
-        if (selection.selected.has(key)) {
-          last = task
-        }
-      }
-      return last !== null
+      const activeKey = selection.activeKey()
+      const active = activeKey !== null ? tasksByKey.get(activeKey) : undefined
+      return active !== undefined
         ? {
-            notePath: last.notePath,
-            noteTitle: last.noteTitle,
-            dailyDate: last.dailyDate,
-            isPinned: last.isPinned,
-            pinnedOrder: last.pinnedOrder,
+            notePath: active.notePath,
+            noteTitle: active.noteTitle,
+            dailyDate: active.dailyDate,
+            isPinned: active.isPinned,
+            pinnedOrder: active.pinnedOrder,
           }
         : { notePath: dailyPath(today), noteTitle: today, dailyDate: today, isPinned: false, pinnedOrder: null }
     }

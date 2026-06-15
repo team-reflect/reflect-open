@@ -31,6 +31,13 @@ export interface TaskSelection {
   move: (direction: 1 | -1) => void
   /** Shift+↑/↓: extend the range from the anchor by one. */
   extend: (direction: 1 | -1) => void
+  /**
+   * The row the next gesture pivots on — the moving end (`cursor`), else the
+   * `anchor` — read live from the refs, never render order. Return-to-add targets
+   * its note, so a multi-note selection adds to the row you last touched, not
+   * whichever happens to render last.
+   */
+  activeKey: () => string | null
 }
 
 /** Clamp `index` into `[0, length)`. */
@@ -156,6 +163,8 @@ export function useTaskSelection(orderedKeys: readonly string[]): TaskSelection 
     [move, rangeBetween],
   )
 
+  const activeKey = useCallback(() => cursorRef.current ?? anchorRef.current, [])
+
   return {
     selected,
     selectedCount: selected.size,
@@ -166,5 +175,6 @@ export function useTaskSelection(orderedKeys: readonly string[]): TaskSelection 
     clear,
     move,
     extend,
+    activeKey,
   }
 }

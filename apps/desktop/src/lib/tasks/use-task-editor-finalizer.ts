@@ -122,7 +122,17 @@ export function useTaskEditorFinalizer({
       }
     },
     cancel: () => {
-      if (claim()) {
+      if (!claim()) {
+        return
+      }
+      // An editor left empty on Escape — a Return-to-add row never typed into, or
+      // a task whose text was cleared — removes the line rather than leaving a
+      // blank task (V1). Decided on the *live* editor content, never the row's
+      // (possibly stale) projected text: Escape discards the unsaved edit, so a
+      // row with typed content is kept, not deleted.
+      if (currentRef.current.trim() === '') {
+        onDelete()
+      } else {
         onCancel()
       }
     },

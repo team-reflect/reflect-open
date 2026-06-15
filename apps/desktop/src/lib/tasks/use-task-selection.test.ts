@@ -61,6 +61,31 @@ describe('useTaskSelection', () => {
     expect([...result.current.selected]).toEqual(['a'])
   })
 
+  it('tracks the active pivot (cursor, else anchor) for Return-to-add', () => {
+    const { result, rerender } = renderHook(({ keys }) => useTaskSelection(keys), {
+      initialProps: { keys: KEYS },
+    })
+    expect(result.current.activeKey()).toBeNull()
+
+    act(() => result.current.clickSelect('b', noMods))
+    expect(result.current.activeKey()).toBe('b')
+
+    // A ⌘-click across notes moves the pivot to the row just touched, not render order.
+    act(() => result.current.clickSelect('d', { ...noMods, metaKey: true }))
+    expect(result.current.activeKey()).toBe('d')
+
+    // Arrow movement carries the pivot; clearing drops it.
+    act(() => result.current.move(-1))
+    expect(result.current.activeKey()).toBe('c')
+    act(() => result.current.clear())
+    expect(result.current.activeKey()).toBeNull()
+
+    // A pruned pivot (its row left the order) falls back to null.
+    act(() => result.current.clickSelect('d', noMods))
+    rerender({ keys: ['a', 'b'] })
+    expect(result.current.activeKey()).toBeNull()
+  })
+
   it('prunes keys that leave the visible order', () => {
     const { result, rerender } = renderHook(({ keys }) => useTaskSelection(keys), {
       initialProps: { keys: KEYS },
