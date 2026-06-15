@@ -4,16 +4,27 @@ import { useTaskEditorFinalizer } from './use-task-editor-finalizer'
 
 function setup(initial = 'milk') {
   const onCommit = vi.fn()
+  const onContinue = vi.fn()
   const onDelete = vi.fn()
+  const onDeleteEmpty = vi.fn()
   const onCancel = vi.fn()
   const onComplete = vi.fn()
   const onFlush = vi.fn()
   const { result, unmount } = renderHook(() =>
-    useTaskEditorFinalizer({ initial, onCommit, onDelete, onCancel, onComplete, onFlush }),
+    useTaskEditorFinalizer({
+      initial,
+      onCommit,
+      onContinue,
+      onDelete,
+      onDeleteEmpty,
+      onCancel,
+      onComplete,
+      onFlush,
+    }),
   )
   const api = () => result.current.apiRef.current
   const type = (markdown: string) => result.current.onChange(markdown)
-  return { api, type, unmount, onCommit, onDelete, onCancel, onComplete, onFlush }
+  return { api, type, unmount, onCommit, onContinue, onDelete, onDeleteEmpty, onCancel, onComplete, onFlush }
 }
 
 describe('useTaskEditorFinalizer', () => {
@@ -63,6 +74,29 @@ describe('useTaskEditorFinalizer', () => {
     deleted.type('still here')
     deleted.api().delete()
     expect(deleted.onDelete).toHaveBeenCalled()
+  })
+
+  it('Enter (continue) hands the screen the resolved content to persist then insert', () => {
+    const changed = setup('milk')
+    changed.type('oat milk')
+    changed.api().commitAndContinue()
+    expect(changed.onContinue).toHaveBeenCalledWith('oat milk')
+
+    const unchanged = setup('milk')
+    unchanged.api().commitAndContinue()
+    expect(unchanged.onContinue).toHaveBeenCalledWith(null) // don't rewrite the row
+
+    const emptied = setup('milk')
+    emptied.type('   ')
+    emptied.api().commitAndContinue()
+    expect(emptied.onContinue).toHaveBeenCalledWith('')
+  })
+
+  it('Backspace on an empty row routes to delete-and-select-previous, not plain delete', () => {
+    const h = setup('')
+    h.api().deleteEmpty()
+    expect(h.onDeleteEmpty).toHaveBeenCalled()
+    expect(h.onDelete).not.toHaveBeenCalled()
   })
 
   it('completes: unchanged toggles, a change saves first, emptied deletes', () => {
@@ -122,7 +156,9 @@ describe('useTaskEditorFinalizer', () => {
         useTaskEditorFinalizer({
           initial: 'milk',
           onCommit: vi.fn(),
+          onContinue: vi.fn(),
           onDelete: vi.fn(),
+          onDeleteEmpty: vi.fn(),
           onCancel: vi.fn(),
           onComplete: vi.fn(),
           onFlush: props.onFlush,

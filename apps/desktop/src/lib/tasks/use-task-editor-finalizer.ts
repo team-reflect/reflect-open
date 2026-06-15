@@ -4,11 +4,18 @@ import { resolveTaskEdit } from '@/lib/tasks/task-content'
 /** The finalizer commands a task editor's keymap binds to its keys. */
 export interface TaskEditorApi {
   commit: () => void
+  /**
+   * Enter (V1 continuous entry): persist any change like {@link commit}, then ask
+   * the screen to add the next task. Carries the resolved content — the new text
+   * to save, `''` for an emptied row, or `null` when nothing changed.
+   */
+  commitAndContinue: () => void
   cancel: () => void
   /** ⌘↵: save any change, then complete the task (or delete it if emptied). */
   complete: () => void
   /** ⌘⌫: delete the task outright, discarding any pending edit. */
   delete: () => void
+  /** Backspace on an empty row: delete it and select the previous task (V1). */
   deleteEmpty: () => void
   isEmpty: () => boolean
 }
@@ -16,10 +23,18 @@ export interface TaskEditorApi {
 export interface TaskEditorFinalizerOptions {
   /** The content the editor was seeded with — the baseline a commit compares against. */
   initial: string
-  /** Persist the new content (non-empty, changed) and exit edit mode (Enter). */
+  /** Persist the new content (non-empty, changed) and exit edit mode. */
   onCommit: (content: string) => void
-  /** Delete the task (emptied, ⌫-empty, or ⌘⌫) and exit edit mode. */
+  /**
+   * Enter (V1 continuous entry): persist the current edit then add the next task.
+   * `content` is the new text (changed), `''` (emptied), or `null` (unchanged) —
+   * the screen rewrites the row only when it isn't null before inserting below.
+   */
+  onContinue: (content: string | null) => void
+  /** Delete the task (emptied via ⌘↵, or ⌘⌫) and exit edit mode. */
   onDelete: () => void
+  /** Backspace on an empty row: delete it and select the previous task (V1). */
+  onDeleteEmpty: () => void
   /** Exit edit mode without writing (Escape / unchanged). */
   onCancel: () => void
   /**
@@ -64,7 +79,9 @@ export interface TaskEditorFinalizer {
 export function useTaskEditorFinalizer({
   initial,
   onCommit,
+  onContinue,
   onDelete,
+  onDeleteEmpty,
   onCancel,
   onComplete,
   onFlush,
@@ -76,6 +93,7 @@ export function useTaskEditorFinalizer({
   // always reaches this render's finalizers.
   const apiRef = useRef<TaskEditorApi>({
     commit: () => {},
+    commitAndContinue: () => {},
     cancel: () => {},
     complete: () => {},
     delete: () => {},
@@ -121,6 +139,18 @@ export function useTaskEditorFinalizer({
         onCancel()
       }
     },
+    commitAndContinue: () => {
+      if (!claim()) {
+        return
+      }
+      // Enter always adds the next task (V1). Hand the screen the resolved content
+      // to persist first — the new text, `''` for an emptied row, or `null` when
+      // unchanged (don't rewrite) — so the insert can sequence after the save.
+      const result = resolveTaskEdit(initial, currentRef.current)
+      onContinue(
+        result.type === 'commit' ? result.content : result.type === 'delete' ? '' : null,
+      )
+    },
     cancel: () => {
       if (!claim()) {
         return
@@ -158,7 +188,7 @@ export function useTaskEditorFinalizer({
     },
     deleteEmpty: () => {
       if (claim()) {
-        onDelete()
+        onDeleteEmpty()
       }
     },
     isEmpty: () => currentRef.current.trim() === '',

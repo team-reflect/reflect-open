@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Archive, Search } from 'lucide-react'
 import { getCompletedTasks, getOpenTasks, groupTasks, hasBridge, type TaskGroup } from '@reflect/core'
 import { Input } from '@/components/ui/input'
 import { useRecentlyCompleted } from '@/lib/tasks/recently-completed'
 import { sameTask, taskKey } from '@/lib/tasks/task-identity'
+import { scrollTaskIntoView } from '@/lib/tasks/task-navigation'
 import { useTaskActions } from '@/lib/tasks/use-task-actions'
+import { useTaskRowHandlers } from '@/lib/tasks/use-task-row-handlers'
 import { useTaskFilters, type TaskFilters } from '@/lib/tasks/task-filters'
 import { useTaskKeyboard } from '@/lib/tasks/use-task-keyboard'
 import { useTaskSelection } from '@/lib/tasks/use-task-selection'
@@ -124,7 +126,23 @@ export function TasksScreen(): ReactElement {
   )
   const selection = useTaskSelection(orderedKeys)
   const actions = useTaskActions()
-  useTaskKeyboard({ selection, actions, tasksByKey, query, setQuery, today, rootRef })
+  const scrollToKey = useCallback((key: string | null) => {
+    if (key !== null) {
+      scrollTaskIntoView(rootRef.current, key)
+    }
+  }, [])
+  const editHandlers = useTaskRowHandlers({ selection, actions, orderedTasks, scrollToKey })
+  useTaskKeyboard({
+    selection,
+    actions,
+    tasksByKey,
+    orderedTasks,
+    query,
+    setQuery,
+    today,
+    rootRef,
+    scrollToKey,
+  })
 
   // Move focus into the Tasks surface on mount so the shortcuts work the moment
   // you navigate here — without it, focus would linger on the sidebar link that
@@ -185,7 +203,7 @@ export function TasksScreen(): ReactElement {
               key={group.kind === 'note' ? `note:${group.notePath}` : group.kind}
               group={group}
               selection={selection}
-              actions={actions}
+              editHandlers={editHandlers}
               onOpen={(path) => navigate(routeForPath(path))}
             />
           ))

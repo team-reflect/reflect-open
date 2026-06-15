@@ -50,6 +50,17 @@ export interface TaskActions {
    */
   insert: (target: InsertTaskTarget) => Promise<OpenTask | null>
   /**
+   * Enter while editing (V1 continuous entry): persist the current row's edit
+   * (when `content` isn't null), then add the next task in `target` and return it
+   * to select. The edit is **awaited before** the insert reads the note, so the
+   * new task's marker offset reflects the post-edit source and can't drift.
+   */
+  insertAfter: (
+    task: OpenTask,
+    content: string | null,
+    target: InsertTaskTarget,
+  ) => Promise<OpenTask | null>
+  /**
    * Save an inline edit and complete the task in one go (⌘↵ while editing). The
    * two writes run **sequentially** — edit then toggle the rebuilt line — so they
    * can't race each other on the same note line.
@@ -234,6 +245,29 @@ export function useTaskActions(): TaskActions {
         markerOffset = await insertMutation.mutateAsync(target)
       } catch {
         return null // reconcile already surfaced the failure
+      }
+      const created = insertedRow(target, markerOffset)
+      cache.addOpen(created)
+      return created
+    },
+    insertAfter: async (task, content, target) => {
+      if (graph?.generation === undefined) {
+        return null
+      }
+      // Persist the current edit first and *await* it, so the append reads the
+      // post-edit source — the new offset can't drift when the line above resized.
+      if (content !== null) {
+        try {
+          await editMutation.mutateAsync({ task, content })
+        } catch {
+          return null // the edit's rollback already surfaced the failure
+        }
+      }
+      let markerOffset: number
+      try {
+        markerOffset = await insertMutation.mutateAsync(target)
+      } catch {
+        return null
       }
       const created = insertedRow(target, markerOffset)
       cache.addOpen(created)

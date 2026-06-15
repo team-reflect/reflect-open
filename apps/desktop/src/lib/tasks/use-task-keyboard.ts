@@ -1,6 +1,7 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import { dailyPath, type OpenTask } from '@reflect/core'
 import { taskKey } from '@/lib/tasks/task-identity'
+import { previousTaskKey } from '@/lib/tasks/task-navigation'
 import { type InsertTaskTarget, type TaskActions } from '@/lib/tasks/use-task-actions'
 import { type TaskSelection } from '@/lib/tasks/use-task-selection'
 
@@ -9,6 +10,8 @@ export interface TaskKeyboardOptions {
   actions: TaskActions
   /** The flat, render-order tasks the selection's keys resolve against. */
   tasksByKey: ReadonlyMap<string, OpenTask>
+  /** The flat, render-order tasks — used to pick the row to select after a delete. */
+  orderedTasks: readonly OpenTask[]
   /** The search box's text, and its setter — Escape clears it. */
   query: string
   setQuery: (value: string) => void
@@ -16,6 +19,8 @@ export interface TaskKeyboardOptions {
   today: string
   /** The Tasks surface; shortcuts back off when focus is outside it (another panel). */
   rootRef: RefObject<HTMLElement | null>
+  /** Bring a row into view after a keyboard move (V1 scrolls the selection). */
+  scrollToKey: (key: string | null) => void
 }
 
 /** Elements that own their own keyboard nav — the shortcuts back off entirely. */
@@ -51,10 +56,12 @@ export function useTaskKeyboard({
   selection,
   actions,
   tasksByKey,
+  orderedTasks,
   query,
   setQuery,
   today,
   rootRef,
+  scrollToKey,
 }: TaskKeyboardOptions): void {
   const handlerRef = useRef<(event: KeyboardEvent) => void>(() => {})
   handlerRef.current = (event) => {
@@ -94,8 +101,10 @@ export function useTaskKeyboard({
           }
         : { notePath: dailyPath(today), noteTitle: today, dailyDate: today, isPinned: false, pinnedOrder: null }
     }
-    const selectExclusively = (key: string): void =>
+    const selectExclusively = (key: string): void => {
       selection.clickSelect(key, { metaKey: false, ctrlKey: false, shiftKey: false })
+      scrollToKey(key)
+    }
     const mod = event.metaKey || event.ctrlKey
     const selectedTasks = (): OpenTask[] =>
       [...selection.selected]
@@ -132,13 +141,20 @@ export function useTaskKeyboard({
       actions.remove(selectedTasks())
       selection.clear()
     } else if (event.key === 'Backspace') {
-      // Plain ⌫ deletes only empty rows (V1) — never content, so a stray
-      // Backspace can't lose work; ⌘⌫ above is the unconditional delete. The
-      // sole-empty case runs in the inline editor; this covers a multi-selection.
-      const empties = selectedTasks().filter((row) => row.text.trim() === '')
-      if (empties.length > 0) {
+      // Plain ⌫ deletes only a single empty row (V1) — never content, and never a
+      // multi-selection (which is ambiguous). The sole-selection case usually runs
+      // in the focused editor; here it covers an unfocused single selection, and
+      // lands on the previous row so the keyboard flow continues.
+      const selected = selectedTasks()
+      if (selected.length === 1 && selected[0].text.trim() === '') {
         event.preventDefault()
-        actions.remove(empties)
+        const previous = previousTaskKey(orderedTasks, selected[0])
+        actions.remove(selected)
+        if (previous !== null) {
+          selectExclusively(previous)
+        } else {
+          selection.clear()
+        }
       }
     } else if (mod && (event.key === 'a' || event.key === 'A')) {
       event.preventDefault()
@@ -150,6 +166,7 @@ export function useTaskKeyboard({
       } else {
         selection.move(1)
       }
+      scrollToKey(selection.activeKey())
     } else if (event.key === 'ArrowUp') {
       event.preventDefault()
       if (event.shiftKey) {
@@ -157,6 +174,7 @@ export function useTaskKeyboard({
       } else {
         selection.move(-1)
       }
+      scrollToKey(selection.activeKey())
     } else if (event.key === 'Escape') {
       if (selection.selectedCount > 0) {
         selection.clear()

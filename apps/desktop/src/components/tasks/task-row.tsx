@@ -2,10 +2,11 @@ import type { MouseEvent, ReactElement } from 'react'
 import { ArrowRight, Circle, CircleCheck } from 'lucide-react'
 import type { OpenTask } from '@reflect/core'
 import { formatDayLabel } from '@/lib/dates'
+import { taskKey } from '@/lib/tasks/task-identity'
 import { useCompleteTask } from '@/lib/tasks/use-complete-task'
 import { cn } from '@/lib/utils'
 import { useSettings } from '@/providers/settings-provider'
-import { TaskEditor } from './task-editor'
+import { TaskEditor, type TaskNavigate } from './task-editor'
 import { TaskText } from './task-text'
 
 interface TaskRowProps {
@@ -20,14 +21,20 @@ interface TaskRowProps {
   onSelect: (event: MouseEvent) => void
   /** Persist an inline edit (content after the marker) and exit edit mode. */
   onEditCommit: (content: string) => void
-  /** Delete the task from the inline editor (emptied / ⌘⌫) and exit edit mode. */
+  /** Enter in the editor: persist this row then add the next task (V1 continuous entry). */
+  onEditContinue: (content: string | null) => void
+  /** Delete the task from the inline editor (emptied via ⌘↵ / ⌘⌫) and exit edit mode. */
   onEditDelete: () => void
+  /** Backspace on an empty row in the editor: delete it and select the previous task. */
+  onEditDeleteEmpty: () => void
   /** Exit edit mode without writing (Escape / unchanged). */
   onEditCancel: () => void
   /** ⌘↵ in the editor: complete the task, saving the edit first when `content` isn't null. */
   onEditComplete: (content: string | null) => void
   /** Persist a changed edit when the row unmounts (selection moved), without exiting. */
   onEditFlush: (content: string) => void
+  /** ↑/↓ in the editor: move the selection between rows (Shift extends). */
+  onEditNavigate: TaskNavigate
   onOpen: (notePath: string) => void
 }
 
@@ -47,10 +54,13 @@ export function TaskRow({
   editing,
   onSelect,
   onEditCommit,
+  onEditContinue,
   onEditDelete,
+  onEditDeleteEmpty,
   onEditCancel,
   onEditComplete,
   onEditFlush,
+  onEditNavigate,
   onOpen,
 }: TaskRowProps): ReactElement {
   const { settings } = useSettings()
@@ -60,6 +70,7 @@ export function TaskRow({
 
   return (
     <li
+      data-task-key={taskKey(task)}
       className={cn(
         'group/task flex items-start gap-3 rounded-md px-2 py-1.5',
         selected ? 'bg-surface-hover ring-1 ring-inset ring-accent' : 'hover:bg-surface-hover',
@@ -85,10 +96,13 @@ export function TaskRow({
         <TaskEditor
           task={task}
           onCommit={onEditCommit}
+          onContinue={onEditContinue}
           onDelete={onEditDelete}
+          onDeleteEmpty={onEditDeleteEmpty}
           onCancel={onEditCancel}
           onComplete={onEditComplete}
           onFlush={onEditFlush}
+          onNavigate={onEditNavigate}
         />
       ) : (
         <button

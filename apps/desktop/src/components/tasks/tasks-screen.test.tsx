@@ -8,6 +8,9 @@ import { resetRecentlyCompleted } from '@/lib/tasks/recently-completed'
 import { RouterProvider, useRouter } from '@/routing/router'
 import { TasksScreen } from './tasks-screen'
 
+// jsdom doesn't implement scrollIntoView; the keyboard nav scrolls the active row.
+Element.prototype.scrollIntoView ??= () => {}
+
 const getOpenTasks = vi.hoisted(() => vi.fn())
 const getCompletedTasks = vi.hoisted(() => vi.fn())
 vi.mock('@reflect/core', async (importOriginal) => ({
@@ -38,25 +41,40 @@ vi.mock('./task-editor', () => ({
   TaskEditor: ({
     task,
     onCommit,
+    onContinue,
     onDelete,
+    onDeleteEmpty,
     onCancel,
     onComplete,
     onFlush,
+    onNavigate,
   }: {
     task: { text: string }
     onCommit: (content: string) => void
+    onContinue: (content: string | null) => void
     onDelete: () => void
+    onDeleteEmpty: () => void
     onCancel: () => void
     onComplete: (content: string | null) => void
     onFlush: (content: string) => void
+    onNavigate: (direction: -1 | 1, options: { span: boolean }) => void
   }) => (
     <div data-task-editor data-testid="task-editor">
       <span>editing: {task.text}</span>
       <button type="button" onClick={() => onCommit('edited content')}>
         commit-edit
       </button>
+      <button type="button" onClick={() => onContinue('edited content')}>
+        continue-edit
+      </button>
+      <button type="button" onClick={() => onContinue(null)}>
+        continue-unchanged
+      </button>
       <button type="button" onClick={() => onDelete()}>
         delete-edit
+      </button>
+      <button type="button" onClick={() => onDeleteEmpty()}>
+        delete-empty-edit
       </button>
       <button type="button" onClick={() => onCancel()}>
         cancel-edit
@@ -69,6 +87,12 @@ vi.mock('./task-editor', () => ({
       </button>
       <button type="button" onClick={() => onFlush('edited content')}>
         flush-edit
+      </button>
+      <button type="button" onClick={() => onNavigate(1, { span: false })}>
+        nav-down
+      </button>
+      <button type="button" onClick={() => onNavigate(-1, { span: false })}>
+        nav-up
       </button>
     </div>
   ),
@@ -492,7 +516,28 @@ describe('TasksScreen', () => {
     view.unmount()
   })
 
-  it('deletes only empty rows on plain ⌫, leaving content rows', async () => {
+  it('Backspace deletes a row and lands the editor on the previous one (V1)', async () => {
+    deleteTask.mockResolvedValue(undefined)
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
+      task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] second', text: 'second', noteTitle: 'B' }),
+    ])
+    const view = renderScreen()
+
+    // Select the second row (its editor opens), then ⌫-delete it.
+    await userEvent.click(await view.findByRole('button', { name: 'second' }))
+    await view.findByTestId('task-editor')
+    await userEvent.click(view.getByRole('button', { name: 'delete-empty-edit' }))
+
+    await waitFor(() =>
+      expect(deleteTask).toHaveBeenCalledWith(expect.objectContaining({ notePath: 'notes/b.md' }), 1),
+    )
+    // Lands on the previous row, whose editor now opens.
+    await view.findByText('editing: first')
+    view.unmount()
+  })
+
+  it('plain ⌫ leaves a multi-selection untouched (ambiguous, V1)', async () => {
     deleteTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ]', text: '', noteTitle: 'A' }),
@@ -503,9 +548,42 @@ describe('TasksScreen', () => {
     await view.findByText('keep')
     await userEvent.keyboard('{Meta>}a{/Meta}') // select both
     await userEvent.keyboard('{Backspace}')
-    // Only the empty row is removed; the content row is untouched.
-    await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(1))
-    expect(deleteTask).toHaveBeenCalledWith(expect.objectContaining({ notePath: 'notes/a.md' }), 1)
+    await Promise.resolve()
+    // V1 refuses a multi-row ⌫ (which row would survive is unclear).
+    expect(deleteTask).not.toHaveBeenCalled()
+    view.unmount()
+  })
+
+  it('Enter in the editor saves the row and opens the next task (continuous entry)', async () => {
+    editTask.mockResolvedValue(undefined)
+    insertTask.mockResolvedValue(7)
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
+    ])
+    const view = renderScreen()
+
+    await userEvent.click(await view.findByRole('button', { name: 'first' }))
+    await view.findByTestId('task-editor')
+    await userEvent.click(view.getByRole('button', { name: 'continue-edit' }))
+
+    // Persists this row's edit, then appends the next task in the same note.
+    await waitFor(() => expect(editTask).toHaveBeenCalled())
+    await waitFor(() => expect(insertTask).toHaveBeenCalledWith('notes/a.md', 1))
+    view.unmount()
+  })
+
+  it('↑/↓ in the editor move the selection between rows (V1)', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
+      task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] second', text: 'second', noteTitle: 'B' }),
+    ])
+    const view = renderScreen()
+
+    await userEvent.click(await view.findByRole('button', { name: 'first' }))
+    await view.findByText('editing: first')
+    await userEvent.click(view.getByRole('button', { name: 'nav-down' }))
+    // The editor follows the selection to the next row.
+    await view.findByText('editing: second')
     view.unmount()
   })
 

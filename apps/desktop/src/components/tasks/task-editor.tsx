@@ -19,37 +19,59 @@ import { useSettings } from '@/providers/settings-provider'
  * editor; the write-back only rewrites the content line. The single-shot rules
  * live in {@link useTaskEditorFinalizer}.
  */
+/** A keyboard move between task rows: −1 up, +1 down; `span` extends the range (Shift). */
+export type TaskNavigate = (direction: -1 | 1, options: { span: boolean }) => void
+
 interface TaskEditorProps {
   task: OpenTask
   /** Persist the new content (non-empty, changed) and exit edit mode. */
   onCommit: (content: string) => void
-  /** Delete the task (emptied, ⌫-empty, or ⌘⌫) and exit edit mode. */
+  /**
+   * Enter (V1 continuous entry): persist the current edit then add the next task.
+   * `content` is the new text, `''` (emptied), or `null` (unchanged → don't rewrite).
+   */
+  onContinue: (content: string | null) => void
+  /** Delete the task (emptied via ⌘↵, or ⌘⌫) and exit edit mode. */
   onDelete: () => void
+  /** Backspace on an empty row: delete it and select the previous task (V1). */
+  onDeleteEmpty: () => void
   /** Exit edit mode without writing (Escape / unchanged). */
   onCancel: () => void
   /** ⌘↵: complete the task (saving the edit first when `content` isn't null). */
   onComplete: (content: string | null) => void
   /** Persist a changed edit when the row unmounts (selection moved), without exiting. */
   onFlush: (content: string) => void
+  /** ↑/↓ (Shift to extend): move the selection between rows while editing (V1). */
+  onNavigate: TaskNavigate
 }
 
 /**
  * Binds the editor's keys inside its ProseKit context (meowdown renders children
- * there). High priority so it runs before the editor's default Enter — but the
- * `[[`/`#` menus claim Enter/Escape first while open, so those select a menu item
- * rather than committing. ⌘↵ completes and ⌘⌫ deletes the task (V1) — handled
- * here, not by the screen's bulk shortcuts, which back off while editing.
+ * there). High priority so it runs before the editor's default Enter/arrows — but
+ * the `[[`/`#` menus claim Enter/Escape/arrows first while open, so those drive
+ * the menu rather than navigation. This is where V1's "navigation is global"
+ * lives in V2: the inline editor never traps ↑/↓ or Enter — they move between
+ * rows and add the next task, even mid-edit — so the keyboard flows task to task
+ * without leaving the editor. ⌘↵ completes, ⌘⌫ deletes, Backspace on an empty row
+ * deletes it; all handled here, not by the screen's bulk shortcuts (which back
+ * off while editing).
  */
-function TaskCommitKeymap({ apiRef }: { apiRef: MutableRefObject<TaskEditorApi> }): null {
+function TaskCommitKeymap({
+  apiRef,
+  onNavigate,
+}: {
+  apiRef: MutableRefObject<TaskEditorApi>
+  onNavigate: TaskNavigate
+}): null {
   const keymap = useMemo(
     () => ({
-      // A task is one line, never a new block.
+      // Enter adds the next task (V1 continuous entry), never a new block.
       Enter: () => {
-        apiRef.current.commit()
+        apiRef.current.commitAndContinue()
         return true
       },
       'Shift-Enter': () => {
-        apiRef.current.commit()
+        apiRef.current.commitAndContinue()
         return true
       },
       'Mod-Enter': () => {
@@ -71,8 +93,26 @@ function TaskCommitKeymap({ apiRef }: { apiRef: MutableRefObject<TaskEditorApi> 
         }
         return false
       },
+      // ↑/↓ navigate between rows even mid-edit (the unmount flush saves this row);
+      // Shift extends the range. Single-line tasks never need a vertical caret move.
+      ArrowUp: () => {
+        onNavigate(-1, { span: false })
+        return true
+      },
+      ArrowDown: () => {
+        onNavigate(1, { span: false })
+        return true
+      },
+      'Shift-ArrowUp': () => {
+        onNavigate(-1, { span: true })
+        return true
+      },
+      'Shift-ArrowDown': () => {
+        onNavigate(1, { span: true })
+        return true
+      },
     }),
-    [apiRef],
+    [apiRef, onNavigate],
   )
   useKeymap(keymap, { priority: Priority.high })
   return null
@@ -81,10 +121,13 @@ function TaskCommitKeymap({ apiRef }: { apiRef: MutableRefObject<TaskEditorApi> 
 export function TaskEditor({
   task,
   onCommit,
+  onContinue,
   onDelete,
+  onDeleteEmpty,
   onCancel,
   onComplete,
   onFlush,
+  onNavigate,
 }: TaskEditorProps): ReactElement {
   const { graph } = useGraph()
   const { settings } = useSettings()
@@ -98,7 +141,9 @@ export function TaskEditor({
   const { apiRef, onChange } = useTaskEditorFinalizer({
     initial,
     onCommit,
+    onContinue,
     onDelete,
+    onDeleteEmpty,
     onCancel,
     onComplete,
     onFlush,
@@ -121,7 +166,7 @@ export function TaskEditor({
         className="reflect-task-editor text-sm leading-6"
         handleRef={handleRef}
       >
-        <TaskCommitKeymap apiRef={apiRef} />
+        <TaskCommitKeymap apiRef={apiRef} onNavigate={onNavigate} />
       </NoteEditor>
     </div>
   )

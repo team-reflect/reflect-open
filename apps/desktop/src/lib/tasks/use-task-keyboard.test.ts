@@ -45,6 +45,7 @@ function makeActions(over: Partial<TaskActions> = {}): TaskActions {
     remove: vi.fn(),
     edit: vi.fn(),
     insert: vi.fn().mockResolvedValue(null),
+    insertAfter: vi.fn().mockResolvedValue(null),
     editAndComplete: vi.fn(),
     archive: vi.fn(),
     isPending: false,
@@ -68,24 +69,28 @@ function mount(options: {
   selection?: TaskSelection
   actions?: TaskActions
   tasksByKey?: ReadonlyMap<string, OpenTask>
+  orderedTasks?: OpenTask[]
   query?: string
   today?: string
 }) {
   const selection = options.selection ?? makeSelection()
   const actions = options.actions ?? makeActions()
   const setQuery = vi.fn()
+  const scrollToKey = vi.fn()
   renderHook(() =>
     useTaskKeyboard({
       selection,
       actions,
       tasksByKey: options.tasksByKey ?? new Map(),
+      orderedTasks: options.orderedTasks ?? [...(options.tasksByKey?.values() ?? [])],
       query: options.query ?? '',
       setQuery,
       today: options.today ?? '2026-06-15',
       rootRef: { current: root },
+      scrollToKey,
     }),
   )
-  return { selection, actions, setQuery }
+  return { selection, actions, setQuery, scrollToKey }
 }
 
 /** Let the `void insert(...).then(...)` microtask settle before asserting. */
@@ -148,9 +153,37 @@ describe('useTaskKeyboard', () => {
     expect(actions.complete).not.toHaveBeenCalled()
   })
 
-  it('plain ⌫ removes only the empty rows in the selection', () => {
-    const empty = task({ notePath: 'notes/a.md', text: '' })
-    const full = task({ notePath: 'notes/b.md', text: 'keep' })
+  it('plain ⌫ removes a single empty row and selects the previous (V1)', () => {
+    const a = task({ notePath: 'notes/a.md', markerOffset: 2, text: 'first' })
+    const empty = task({ notePath: 'notes/b.md', markerOffset: 2, text: '' })
+    const selection = makeSelection({
+      selected: new Set(['b']),
+      selectedCount: 1,
+      activeKey: () => 'b',
+    })
+    const ordered = [a, empty]
+    const { actions } = mount({
+      selection,
+      orderedTasks: ordered,
+      tasksByKey: new Map([
+        ['a', a],
+        ['b', empty],
+      ]),
+    })
+
+    press(root, 'Backspace')
+    expect(actions.remove).toHaveBeenCalledWith([empty])
+    // Lands on the previous row so the keyboard flow continues.
+    expect(selection.clickSelect).toHaveBeenCalledWith(taskKey(a), {
+      metaKey: false,
+      ctrlKey: false,
+      shiftKey: false,
+    })
+  })
+
+  it('plain ⌫ leaves a multi-selection untouched (ambiguous, V1)', () => {
+    const empty = task({ notePath: 'notes/a.md', markerOffset: 2, text: '' })
+    const full = task({ notePath: 'notes/b.md', markerOffset: 2, text: 'keep' })
     const selection = makeSelection({ selected: new Set(['e', 'f']), selectedCount: 2 })
     const { actions } = mount({
       selection,
@@ -161,7 +194,7 @@ describe('useTaskKeyboard', () => {
     })
 
     press(root, 'Backspace')
-    expect(actions.remove).toHaveBeenCalledWith([empty])
+    expect(actions.remove).not.toHaveBeenCalled()
   })
 
   it('Escape clears a selection, else clears the search query', () => {

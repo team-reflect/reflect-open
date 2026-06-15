@@ -1,16 +1,17 @@
 import type { ReactElement } from 'react'
 import { AlarmClock, Calendar, FileText, Pin, Star } from 'lucide-react'
-import type { TaskGroup } from '@reflect/core'
+import type { OpenTask, TaskGroup } from '@reflect/core'
 import { taskKey } from '@/lib/tasks/task-identity'
-import type { TaskActions } from '@/lib/tasks/use-task-actions'
 import type { TaskSelection } from '@/lib/tasks/use-task-selection'
+import type { TaskRowEditHandlers } from '@/lib/tasks/use-task-row-handlers'
 import { cn } from '@/lib/utils'
 import { TaskRow } from './task-row'
 
 interface TaskGroupSectionProps {
   group: TaskGroup
   selection: TaskSelection
-  actions: TaskActions
+  /** The inline-editor callbacks for a row, built once by the screen. */
+  editHandlers: (task: OpenTask) => TaskRowEditHandlers
   onOpen: (notePath: string) => void
 }
 
@@ -39,7 +40,7 @@ function headerStyle(group: TaskGroup): { icon: ReactElement; colorClass: string
 export function TaskGroupSection({
   group,
   selection,
-  actions,
+  editHandlers,
   onOpen,
 }: TaskGroupSectionProps): ReactElement {
   const showSource = group.kind !== 'note'
@@ -78,35 +79,7 @@ export function TaskGroupSection({
               selected={selection.isSelected(key)}
               editing={selection.isSoleSelected(key)}
               onSelect={(event) => selection.clickSelect(key, event)}
-              onEditCommit={(content) => {
-                actions.edit(task, content)
-                selection.clear()
-              }}
-              onEditDelete={() => {
-                actions.remove([task])
-                selection.clear()
-              }}
-              // An empty editor on exit deletes the line (the finalizer decides
-              // from the live content — a Return-to-add row left untouched, or a
-              // cleared task), so cancel itself only ends edit mode.
-              onEditCancel={() => selection.clear()}
-              onEditComplete={(content) => {
-                if (task.checked) {
-                  // Already complete (editing an archived row) — ⌘↵ saves an
-                  // edit but never flips the marker back to open.
-                  if (content !== null) {
-                    actions.edit(task, content)
-                  }
-                } else if (content === null) {
-                  actions.complete([task])
-                } else {
-                  actions.editAndComplete(task, content)
-                }
-                selection.clear()
-              }}
-              // Unmount flush: the selection has already moved, so persist the
-              // edit but leave the (new) selection alone.
-              onEditFlush={(content) => actions.edit(task, content)}
+              {...editHandlers(task)}
               onOpen={onOpen}
             />
           )
