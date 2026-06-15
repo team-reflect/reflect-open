@@ -130,6 +130,24 @@ describe('TasksScreen', () => {
     view.unmount()
   })
 
+  it('clears the archived error when "show archived" is turned off', async () => {
+    window.sessionStorage.setItem('reflect.tasks.filter.archived', 'true')
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/p.md', text: 'open task', noteTitle: 'P' }),
+    ])
+    getCompletedTasks.mockRejectedValue(new Error('index unavailable'))
+    const view = renderScreen()
+    await view.findByRole('alert') // archived read failed → alert
+
+    await userEvent.click(view.getByRole('button', { name: 'Task filters' }))
+    await userEvent.click(await view.findByText('Show archived tasks'))
+
+    // The retained archived error no longer counts → open tasks render, no alert.
+    await view.findByText('open task')
+    expect(view.queryByRole('alert')).toBeNull()
+    view.unmount()
+  })
+
   it('groups tasks by date bucket then note, in display order', async () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'daily/2026-06-14.md', dailyDate: '2026-06-14', text: 'today task', noteTitle: '2026-06-14' }),

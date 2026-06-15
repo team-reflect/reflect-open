@@ -76,7 +76,9 @@ export function TasksScreen(): ReactElement {
 
   // Either read failing surfaces the alert — a failed completed read must not
   // leave `ready` stuck (and the list blank) just because its data never arrived.
-  const isError = openFailed || completedFailed
+  // The completed error only counts while archived is on: TanStack keeps the last
+  // error on the disabled query, so turning archived off must clear it.
+  const isError = openFailed || (filters.archived && completedFailed)
   // When archived is on, the list merges open + completed, so the empty state
   // must wait for both — else a graph with only completed tasks flashes "No
   // tasks to show." while the completed query is still loading.
