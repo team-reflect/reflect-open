@@ -22,6 +22,50 @@ beforeEach(() => {
   writeNote.mockReset()
 })
 
+const flushMicrotasks = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+describe('write serialization', () => {
+  it('serializes concurrent writes to the same note — no read/write interleave', async () => {
+    openSession.mockReturnValue(null)
+    readNote.mockResolvedValue('- [ ] do it\n')
+    let releaseFirstWrite: () => void = () => {}
+    let writes = 0
+    writeNote.mockImplementation(() => {
+      writes += 1
+      return writes === 1
+        ? new Promise<void>((resolve) => {
+            releaseFirstWrite = resolve
+          })
+        : Promise.resolve()
+    })
+
+    const first = toggleTask(task, 7)
+    const second = toggleTask(task, 7)
+    await flushMicrotasks()
+
+    // The first write is in flight; the second hasn't even read yet — it's queued.
+    expect(readNote).toHaveBeenCalledTimes(1)
+    expect(writeNote).toHaveBeenCalledTimes(1)
+
+    releaseFirstWrite()
+    await Promise.all([first, second])
+    // The second only read after the first's write settled.
+    expect(readNote).toHaveBeenCalledTimes(2)
+    expect(writeNote).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the chain alive when a write fails', async () => {
+    openSession.mockReturnValue(null)
+    readNote.mockResolvedValue('- [ ] do it\n')
+    writeNote.mockRejectedValueOnce(new Error('disk full')).mockResolvedValue(undefined)
+
+    const first = toggleTask(task, 7)
+    const second = toggleTask(task, 7)
+    await expect(first).rejects.toThrow('disk full')
+    await expect(second).resolves.toBeUndefined() // not wedged by the prior failure
+  })
+})
+
 describe('toggleTask', () => {
   it('writes the toggled marker to disk when the note is not open', async () => {
     openSession.mockReturnValue(null)

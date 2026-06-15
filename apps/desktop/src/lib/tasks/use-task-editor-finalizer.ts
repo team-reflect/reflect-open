@@ -89,7 +89,10 @@ export function useTaskEditorFinalizer({
     doneRef.current = true
     return true
   }
-  const flush = (): void => {
+  // Reassigned each render (like apiRef) so the unmount cleanup — registered once
+  // — flushes against this render's `initial`/`onFlush`, not the mount-time ones.
+  const flushRef = useRef<() => void>(() => {})
+  flushRef.current = (): void => {
     if (!claim()) {
       return
     }
@@ -149,7 +152,7 @@ export function useTaskEditorFinalizer({
 
   // Persist a pending edit when the row unmounts — the selection moved off it, so
   // flush (never clear/cancel) keeps the now-current selection intact.
-  useEffect(() => () => flush(), [])
+  useEffect(() => () => flushRef.current(), [])
 
   const onChange = useCallback((markdown: string) => {
     currentRef.current = markdown

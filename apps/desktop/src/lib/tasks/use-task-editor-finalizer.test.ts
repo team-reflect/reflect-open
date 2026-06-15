@@ -89,4 +89,26 @@ describe('useTaskEditorFinalizer', () => {
     expect(h.onCommit).toHaveBeenCalledTimes(1)
     expect(h.onFlush).not.toHaveBeenCalled()
   })
+
+  it('unmount flush uses the latest render’s callback, not the mount-time one', () => {
+    const onFlushA = vi.fn()
+    const onFlushB = vi.fn()
+    const { result, rerender, unmount } = renderHook(
+      (props: { onFlush: (content: string) => void }) =>
+        useTaskEditorFinalizer({
+          initial: 'milk',
+          onCommit: vi.fn(),
+          onDelete: vi.fn(),
+          onCancel: vi.fn(),
+          onComplete: vi.fn(),
+          onFlush: props.onFlush,
+        }),
+      { initialProps: { onFlush: onFlushA } },
+    )
+    result.current.onChange('oat milk')
+    rerender({ onFlush: onFlushB }) // e.g. the row re-rendered with a fresh closure
+    unmount()
+    expect(onFlushB).toHaveBeenCalledWith('oat milk')
+    expect(onFlushA).not.toHaveBeenCalled()
+  })
 })

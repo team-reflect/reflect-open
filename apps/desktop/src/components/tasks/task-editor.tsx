@@ -1,4 +1,4 @@
-import { useCallback, useMemo, type MutableRefObject, type ReactElement } from 'react'
+import { useCallback, useMemo, useState, type MutableRefObject, type ReactElement } from 'react'
 import { Priority } from '@prosekit/core'
 import { useKeymap } from '@prosekit/react'
 import { type OpenTask } from '@reflect/core'
@@ -92,7 +92,9 @@ export function TaskEditor({
   const navigate = useWikiLinkNavigation(generation)
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
 
-  const initial = useMemo(() => taskContent(task.raw), [task.raw])
+  // Frozen at mount: the editor is seeded once (uncontrolled), so the commit
+  // baseline must stay the seed even if `task.raw` is re-derived mid-edit.
+  const [initial] = useState(() => taskContent(task.raw))
   const { apiRef, onChange } = useTaskEditorFinalizer({
     initial,
     onCommit,
