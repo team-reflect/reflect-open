@@ -1,11 +1,9 @@
-import { useEffect, useRef, type RefObject } from 'react'
+import { useEffect, useRef } from 'react'
 import { type OpenTask } from '@reflect/core'
 import { type TaskActions } from '@/lib/tasks/use-task-actions'
 import { type TaskSelection } from '@/lib/tasks/use-task-selection'
 
 export interface TaskKeyboardOptions {
-  /** The screen's root: shortcuts fire only for keys on this surface (or the body). */
-  rootRef: RefObject<HTMLElement | null>
   selection: TaskSelection
   actions: TaskActions
   /** The flat, render-order tasks the selection's keys resolve against. */
@@ -15,29 +13,32 @@ export interface TaskKeyboardOptions {
   setQuery: (value: string) => void
 }
 
+/** Elements that own their own keyboard nav — the shortcuts back off entirely. */
+const OWNS_KEYS = '[data-task-editor], [role="menu"], [role="dialog"], [role="listbox"]'
+
 /**
  * The Tasks view's keyboard shortcuts (Plan 18, V1 parity), bound to a single
- * `document` keydown listener for the life of the screen. Kept out of the
- * component so the screen reads as markup + wiring and the shortcut map is one
- * cohesive unit, mirroring {@link useTaskSelection}/{@link useTaskActions}.
+ * `document` keydown listener for the life of the screen — so they work as soon
+ * as you're on the Tasks view, without first clicking into the list. Kept out of
+ * the component so the screen reads as markup + wiring and the shortcut map is
+ * one cohesive unit, mirroring {@link useTaskSelection}/{@link useTaskActions}.
  *
  * The map: ⌘A select all, ↑/↓ move a single selection (Shift to extend the
  * range), ⌘↵ complete the selection, ⌘⇧↵ archive (stop showing the session's
  * completed tasks), ⌘⌫ delete (plain ⌫ deletes only empty rows, so a stray
  * Backspace can't lose content), Esc clears the selection then the search box.
  *
- * Scoping rules keep the global listener from hijacking unrelated keys: it
- * ignores anything a focused widget already handled (`defaultPrevented`) or that
- * targets a portaled overlay outside `rootRef`; the search box only honors
- * Escape; and while a sole task's inline editor is focused the editor owns its
- * keys entirely — the bulk shortcuts must not also fire, or a ⌘⌫ would race the
- * editor's own commit-on-unmount with a second write to the same line.
+ * Scoping: the listener backs off only when a focused control owns the key —
+ * anything already handled (`defaultPrevented`), the inline editor (it owns its
+ * keys, and a ⌘⌫ there must not race its commit-on-unmount), a portaled overlay
+ * (the filters menu, a dialog, the ⌘K palette — they own arrow/Enter/Escape),
+ * or the search box (which honors only Escape). Everything else on the Tasks
+ * route — a focused row, a nav button, or nothing focused — drives the shortcuts.
  *
  * The handler closes over the latest render's state but registers once: a ref
  * carries the current closure so the listener stays stable.
  */
 export function useTaskKeyboard({
-  rootRef,
   selection,
   actions,
   tasksByKey,
@@ -52,29 +53,21 @@ export function useTaskKeyboard({
       return
     }
     const target = event.target as HTMLElement | null
-    // Only the Tasks screen's own surface drives these shortcuts — or the body
-    // when nothing is focused. A portaled overlay (the filters menu, a future
-    // dialog) renders outside the root, so its keys are never hijacked.
-    const onSurface =
-      target === document.body || (target !== null && (rootRef.current?.contains(target) ?? false))
-    if (!onSurface) {
+    // Back off only when a focused control owns the key: the inline editor (it
+    // owns its keys, and a ⌘⌫ there must not race its commit-on-unmount) or a
+    // portaled overlay (filters menu, dialog, ⌘K palette). Anything else on the
+    // Tasks route — a focused row, a nav button, or nothing focused — drives the
+    // shortcuts, so they work without first clicking into the list.
+    if (target?.closest?.(OWNS_KEYS) != null) {
       return
     }
     const inSearch = target instanceof HTMLInputElement
-    const inEditor = target?.closest?.('[data-task-editor]') != null
     const mod = event.metaKey || event.ctrlKey
     const selectedTasks = (): OpenTask[] =>
       [...selection.selected]
         .map((key) => tasksByKey.get(key))
         .filter((task): task is OpenTask => task !== undefined)
 
-    // While editing a sole task the inline editor owns its keys — typing, ⌘A to
-    // select its text, and ⌘↵ commit / ⌘⌫ delete for that one task. The bulk
-    // shortcuts below must NOT also fire: a ⌘⌫ that both deletes here and lets
-    // the editor commit on unmount would race two writes to the same line.
-    if (inEditor) {
-      return
-    }
     if (inSearch) {
       if (event.key === 'Escape') {
         setQuery('')

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactElement } from 'react'
+import { useMemo, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Archive, Search } from 'lucide-react'
 import { getCompletedTasks, getOpenTasks, groupTasks, hasBridge, type TaskGroup } from '@reflect/core'
@@ -60,7 +60,6 @@ export function TasksScreen(): ReactElement {
   const { filters, toggle } = useTaskFilters()
   const [query, setQuery] = useState('')
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
-  const rootRef = useRef<HTMLDivElement | null>(null)
   const enabled = hasBridge() && graph !== null
 
   const { data: open, isError: openFailed } = useQuery({
@@ -113,10 +112,10 @@ export function TasksScreen(): ReactElement {
   )
   const selection = useTaskSelection(orderedKeys)
   const actions = useTaskActions()
-  useTaskKeyboard({ rootRef, selection, actions, tasksByKey, query, setQuery })
+  useTaskKeyboard({ selection, actions, tasksByKey, query, setQuery })
 
   return (
-    <div ref={rootRef} aria-label="Tasks" className="flex h-full min-h-0 flex-col">
+    <div aria-label="Tasks" className="flex h-full min-h-0 flex-col">
       <header className="flex flex-none items-center gap-2 border-b border-border py-2.5 pl-2 pr-3 lg:pl-10">
         <div className="relative min-w-0 flex-1">
           <Search

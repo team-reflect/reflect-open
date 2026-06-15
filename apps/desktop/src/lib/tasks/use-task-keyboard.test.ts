@@ -72,7 +72,6 @@ function mount(options: {
   const setQuery = vi.fn()
   renderHook(() =>
     useTaskKeyboard({
-      rootRef: { current: root },
       selection,
       actions,
       tasksByKey: options.tasksByKey ?? new Map(),
@@ -173,13 +172,27 @@ describe('useTaskKeyboard', () => {
     expect(selection.selectAll).not.toHaveBeenCalled()
   })
 
-  it('ignores keys from outside the Tasks surface (a portaled overlay)', () => {
+  it('ignores keys from a portaled overlay (the filters menu)', () => {
     const { selection } = mount({})
-    const outside = document.createElement('button')
-    document.body.appendChild(outside)
-    press(outside, 'a', { metaKey: true })
+    const menu = document.createElement('div')
+    menu.setAttribute('role', 'menu')
+    const item = document.createElement('div')
+    menu.appendChild(item)
+    document.body.appendChild(menu)
+    press(item, 'a', { metaKey: true })
     expect(selection.selectAll).not.toHaveBeenCalled()
-    outside.remove()
+    menu.remove()
+  })
+
+  it('fires even when focus is outside the list (a nav button, nothing in the editor)', () => {
+    const { selection } = mount({})
+    // The shortcuts must work as soon as you're on the Tasks view — not only
+    // after clicking a row. A plain focused element that owns no keys drives them.
+    const nav = document.createElement('button')
+    document.body.appendChild(nav)
+    press(nav, 'a', { metaKey: true })
+    expect(selection.selectAll).toHaveBeenCalled()
+    nav.remove()
   })
 
   it('backs off entirely while the inline editor is focused', () => {

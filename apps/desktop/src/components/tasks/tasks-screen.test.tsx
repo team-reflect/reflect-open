@@ -494,7 +494,7 @@ describe('TasksScreen', () => {
     view.unmount()
   })
 
-  it('ignores task shortcuts when focus is outside the Tasks surface', async () => {
+  it('ignores task shortcuts coming from a portaled overlay (the filters menu)', async () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/a.md', markerOffset: 2, text: 'first', noteTitle: 'A' }),
       task({ notePath: 'notes/b.md', markerOffset: 2, text: 'second', noteTitle: 'B' }),
@@ -502,16 +502,18 @@ describe('TasksScreen', () => {
     const view = renderScreen()
     await view.findByRole('button', { name: 'first' })
 
-    // A portaled overlay (the filters menu, a future dialog) renders outside the
-    // Tasks root. A keydown from there must not drive the task selection.
-    const overlay = document.createElement('button')
-    document.body.appendChild(overlay)
-    overlay.focus()
-    fireEvent.keyDown(overlay, { key: 'ArrowDown' })
+    // The filters menu portals a role="menu" outside the list and owns its own
+    // arrow navigation — a keydown from there must not drive the task selection.
+    const menu = document.createElement('div')
+    menu.setAttribute('role', 'menu')
+    const item = document.createElement('button')
+    menu.appendChild(item)
+    document.body.appendChild(menu)
+    fireEvent.keyDown(item, { key: 'ArrowDown' })
 
     expect(view.queryByTestId('task-editor')).toBeNull()
     expect(view.getByRole('button', { name: 'first' }).getAttribute('aria-pressed')).toBe('false')
-    overlay.remove()
+    menu.remove()
     view.unmount()
   })
 
