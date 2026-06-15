@@ -183,8 +183,9 @@ export interface ParsedTask extends TaskMarker {
   dueDate: string | null
 }
 
-/** Version of the extraction contract; bump on breaking shape changes. */
-export const PARSED_NOTE_VERSION = 1
+/** Version of the extraction contract; bump on breaking shape changes.
+ * 1 — Plan 03 baseline · 2 — `tasks: ParsedTask[]` (with `dueDate`) added (Plan 18). */
+export const PARSED_NOTE_VERSION = 2
 
 /** The full parse of one note — the stable contract downstream plans depend on. */
 export interface ParsedNote {

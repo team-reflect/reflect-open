@@ -138,6 +138,14 @@ describe('toggleTaskMarker', () => {
     expect(() => toggleTaskMarker('```\n- [ ] incode\n```\n', task)).toThrow(TaskStaleError)
   })
 
+  it('refuses the offset fast-path when its byte-matching line is no longer a task', () => {
+    // `[ ] x` still sits verbatim at offset 4, but inside a fenced code block —
+    // so it is not a parsed task. The fast path must re-validate, not trust bytes.
+    expect(() => toggleTaskMarker('```\n[ ] x\n```\n', { markerOffset: 4, raw: '[ ] x' })).toThrow(
+      TaskStaleError,
+    )
+  })
+
   it('round-trips back to the original after two toggles', () => {
     const source = '- [ ] task [[2026-07-01]] #tag\n'
     const once = toggleTaskMarker(source, indexedTask(source))

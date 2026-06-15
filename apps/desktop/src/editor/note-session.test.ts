@@ -727,6 +727,16 @@ describe('commitTaskToggle', () => {
     expect(await h.session.commitTaskToggle(firstTask(source))).toBe(false)
   })
 
+  it('surfaces a write failure instead of reporting a phantom commit', async () => {
+    const source = '- [ ] x\n'
+    const h = harness({ disk: source })
+    h.session.load()
+    await settled()
+
+    h.failWrites('disk full')
+    await expect(h.session.commitTaskToggle(firstTask(source))).rejects.toThrow('disk full')
+  })
+
   it('propagates TaskStaleError when the task line is gone', async () => {
     const source = '- [ ] gone\n'
     const h = harness({ disk: source })

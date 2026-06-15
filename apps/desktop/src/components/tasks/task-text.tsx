@@ -33,7 +33,9 @@ export function TaskText({ task }: { task: OpenTask }): ReactElement {
       const pipe = wiki.indexOf('|')
       const target = (pipe === -1 ? wiki : wiki.slice(0, pipe)).trim()
       const alias = pipe === -1 ? '' : wiki.slice(pipe + 1).trim()
-      label = isIsoDate(target) ? formatShortDate(target, settings.dateFormat) : alias || target
+      // An explicit alias is the author's display text — honour it even for a
+      // date target; otherwise format a date, else show the bare target.
+      label = alias || (isIsoDate(target) ? formatShortDate(target, settings.dateFormat) : target)
     } else if (mdHref !== undefined) {
       label = mdText || mdHref
     } else {

@@ -687,6 +687,11 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     dirty = header + buffer !== disk
     emit()
     await flush() // land it now so the Tasks view refreshes promptly
+    // `flush()` resolves even when the write failed (the failure is captured in
+    // `error`, not thrown), so surface it rather than reporting a phantom commit.
+    if (error !== null) {
+      throw new Error(error)
+    }
     return true
   }
 

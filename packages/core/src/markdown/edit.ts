@@ -31,10 +31,14 @@ export class TaskStaleError extends Error {
  * Throws {@link TaskStaleError} when `raw` matches no task, or more than one.
  */
 function locateTaskMarker(source: string, markerOffset: number, raw: string): number {
-  if (source.slice(markerOffset, markerOffset + raw.length) === raw) {
+  // Re-extract: the recorded offset is trusted only when it still holds a real
+  // parsed task with this line — a byte match alone isn't enough, since an edit
+  // above could have turned the line into (say) code without changing its bytes.
+  const tasks = parseNote({ path: '', source }).tasks
+  if (tasks.some((task) => task.markerOffset === markerOffset && task.raw === raw)) {
     return markerOffset
   }
-  const matches = parseNote({ path: '', source }).tasks.filter((task) => task.raw === raw)
+  const matches = tasks.filter((task) => task.raw === raw)
   if (matches.length === 0) {
     throw new TaskStaleError(`task line no longer in note: ${JSON.stringify(raw)}`)
   }
