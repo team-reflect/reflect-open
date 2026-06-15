@@ -469,7 +469,13 @@ describe('reconcileCaptureEnrichment', () => {
   }
 
   it('patches the AI description into the metadata bullets with provenance', async () => {
-    await drainOne({ selection: 'quoted text', contentText: 'First paragraph.\n\nSecond paragraph.' })
+    const contentText = [
+      'First paragraph.',
+      '- Description: A line from the captured article.',
+      '## Article heading',
+      'Second paragraph.',
+    ].join('\n\n')
+    await drainOne({ selection: 'quoted text', contentText })
     scrapeMock.mockResolvedValue({
       title: 'An article',
       description: 'A scraped description.',
@@ -482,6 +488,8 @@ describe('reconcileCaptureEnrichment', () => {
     const note = files.get(IDENTITY.notePath) ?? ''
     expect(note).toContain('- Type: #link\n- Description: An AI description of the page.\n\n## Selection')
     expect(note).not.toContain('A scraped description.')
+    expect(note).toContain('- Description: A line from the captured article.')
+    expect(note).toContain('## Article heading')
     expect(note).toContain('captureStatus: done')
     expect(note).toContain('captureProvider: openai')
     expect(note).toContain('captureModel: gpt-5.5')
@@ -490,7 +498,7 @@ describe('reconcileCaptureEnrichment', () => {
         url: URL,
         title: 'An article',
         metaDescription: 'A scraped description.',
-        contentText: 'First paragraph.\n\nSecond paragraph.',
+        contentText,
         screenshotBase64: btoa('jpeg-bytes'),
       }),
     )

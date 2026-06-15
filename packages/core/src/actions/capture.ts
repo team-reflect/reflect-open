@@ -213,26 +213,29 @@ function captureNoteBody(
   return `${parts.join('\n\n')}\n`
 }
 
-function h2SectionBody(body: string, heading: string): string | undefined {
-  const marker = new RegExp(`^## ${heading}[ \\t]*$`, 'mu')
-  const match = marker.exec(body)
-  if (match === null) {
+function capturePageTextFromBody(body: string): string | undefined {
+  const marker = /^## Page Text[ \t]*$/mu.exec(body)
+  if (marker === null) {
     return undefined
   }
-  const contentStart = body.indexOf('\n', match.index + match[0].length)
+  const contentStart = body.indexOf('\n', marker.index + marker[0].length)
   if (contentStart === -1) {
     return undefined
   }
   const rest = body.slice(contentStart + 1)
-  const nextHeading = rest.search(/^##\s+/mu)
-  const content = (nextHeading === -1 ? rest : rest.slice(0, nextHeading))
+  const screenshotSection = /^## Screenshot[ \t]*$/mu.exec(rest)
+  const content = (screenshotSection === null ? rest : rest.slice(0, screenshotSection.index))
     .replace(/\n+!\[[^\]\n]*\]\(assets\/capture-[^)]+\.jpg\)\s*$/u, '')
     .trim()
   return content === '' ? undefined : content
 }
 
-function capturePageTextFromBody(body: string): string | undefined {
-  return h2SectionBody(body, 'Page Text')
+function firstSectionStart(body: string): number {
+  const match = /^##\s+/mu.exec(body)
+  if (match === null) {
+    return body.length
+  }
+  return match.index
 }
 
 async function captureNoteSource(
@@ -588,10 +591,15 @@ function metadataValue(text: string): string {
  */
 function withDescription(body: string, description: string): string {
   const line = `- Description: ${metadataValue(description)}`
-  if (/^- Description: /mu.test(body)) {
-    return body.replace(/^- Description: .*$/mu, line)
+  const metadataEnd = firstSectionStart(body)
+  const metadata = body.slice(0, metadataEnd)
+  const existing = /^- Description: .*$/mu.exec(metadata)
+  if (existing !== null) {
+    const from = existing.index
+    const to = existing.index + existing[0].length
+    return `${metadata.slice(0, from)}${line}${metadata.slice(to)}${body.slice(metadataEnd)}`
   }
-  const typeLine = /^- Type: #link[ \t]*$/mu.exec(body)
+  const typeLine = /^- Type: #link[ \t]*$/mu.exec(metadata)
   if (typeLine === null) {
     return `${body.replace(/\s*$/, '')}\n\n${line}\n`
   }
