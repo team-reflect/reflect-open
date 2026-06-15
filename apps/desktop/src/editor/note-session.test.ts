@@ -1,6 +1,13 @@
+import { parseNote, TaskStaleError } from '@reflect/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createNoteSession, type NoteSessionSnapshot } from './note-session'
 import type { RoundTripFidelity } from './roundtrip'
+
+/** The first task's `{ markerOffset, raw }` as the index records it. */
+function firstTask(source: string): { markerOffset: number; raw: string } {
+  const [task] = parseNote({ path: 'notes/a.md', source }).tasks
+  return { markerOffset: task.markerOffset, raw: task.raw }
+}
 
 /**
  * Direct tests of the document state machine, no React. The full pipeline
@@ -665,5 +672,68 @@ describe('retarget (Plan 17)', () => {
       path: 'notes/hello.md',
       contents: '---\nid: 01abc\n---\n# Hello\n\nbody\n',
     })
+  })
+})
+
+describe('commitTaskToggle', () => {
+  it('toggles the marker while preserving unsaved edits, and reflects it in the editor', async () => {
+    const source = '# Todo\n\n- [ ] buy milk\n'
+    const h = harness({ disk: source })
+    h.session.load()
+    await settled()
+
+    // The user appends a line below the task — unsaved when the toggle arrives.
+    h.session.editorChanged('# Todo\n\n- [ ] buy milk\n\njot\n')
+    expect(h.session.isDirty()).toBe(true)
+
+    const applied = await h.session.commitTaskToggle(firstTask(source))
+    expect(applied).toBe(true)
+    // The write carries both the unsaved edit and the toggled marker.
+    expect(h.writes.at(-1)?.contents).toBe('# Todo\n\n- [x] buy milk\n\njot\n')
+    // The open editor was updated to show the toggled checkbox.
+    expect(h.applied.at(-1)).toBe('# Todo\n\n- [x] buy milk\n\njot\n')
+  })
+
+  it('toggles a clean note (frontmatter offset intact) and writes only the marker', async () => {
+    const source = '---\nid: 01abc\n---\n- [ ] ship it\n'
+    const h = harness({ disk: source })
+    h.session.load()
+    await settled()
+
+    expect(await h.session.commitTaskToggle(firstTask(source))).toBe(true)
+    expect(h.writes.at(-1)?.contents).toBe('---\nid: 01abc\n---\n- [x] ship it\n')
+  })
+
+  it('refuses (returns false) a protected note rather than write', async () => {
+    const h = harness({ disk: '- [ ] x\n', classify: () => 'lossy' })
+    h.session.load()
+    await settled()
+
+    expect(await h.session.commitTaskToggle(firstTask('- [ ] x\n'))).toBe(false)
+    expect(h.writes).toEqual([])
+  })
+
+  it('refuses (returns false) while a conflict is parked', async () => {
+    const source = '- [ ] x\n'
+    const h = harness({ disk: source })
+    h.session.load()
+    await settled()
+
+    h.session.editorChanged('- [ ] x edited\n') // dirty
+    h.setDisk('- [ ] x external\n')
+    h.session.externalChanged() // parks a conflict (dirty + divergent disk)
+    await settled()
+
+    expect(await h.session.commitTaskToggle(firstTask(source))).toBe(false)
+  })
+
+  it('propagates TaskStaleError when the task line is gone', async () => {
+    const source = '- [ ] gone\n'
+    const h = harness({ disk: source })
+    h.session.load()
+    await settled()
+
+    h.session.editorChanged('- [ ] something else entirely\n')
+    await expect(h.session.commitTaskToggle(firstTask(source))).rejects.toBeInstanceOf(TaskStaleError)
   })
 })

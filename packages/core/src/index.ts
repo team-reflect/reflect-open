@@ -353,6 +353,8 @@ export {
   appendBlock,
   appendUnderHeading,
   renameWikiLink,
+  toggleTaskMarker,
+  TaskStaleError,
   resolved,
   resolveWikiLink,
   resolveWikiLinkAsync,

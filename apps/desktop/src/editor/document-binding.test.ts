@@ -33,6 +33,8 @@ function fakeSession(path: string) {
     content: () => '',
     liveContent: () => '',
     updateFrontmatter: () => true,
+    isDirty: () => false,
+    commitTaskToggle: async () => false,
     dispose,
     discard,
   }

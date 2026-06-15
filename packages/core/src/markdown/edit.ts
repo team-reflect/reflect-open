@@ -8,6 +8,66 @@ import type { Heading } from './model'
  * `frontmatter.ts`'s `upsertFrontmatter`.)
  */
 
+/** The three GFM checkbox markers a task line can carry (`[X]` is GitHub-valid). */
+const TASK_MARKERS = new Set(['[ ]', '[x]', '[X]'])
+
+/**
+ * The indexed task no longer matches the source, so toggling it would edit the
+ * wrong line. Thrown by {@link toggleTaskMarker}; the caller refuses loudly and
+ * reindexes rather than writing a silent wrong edit (Plan 18).
+ */
+export class TaskStaleError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'TaskStaleError'
+  }
+}
+
+/**
+ * Locate the task marker in `source`: trust `markerOffset` when the recorded
+ * marker line (`raw`) still sits exactly there, else fall back to a unique
+ * search for `raw` — so an edit *above* the task (which shifts every later
+ * offset) can't misfire the toggle. Throws {@link TaskStaleError} when `raw`
+ * is absent or ambiguous.
+ */
+function locateTaskMarker(source: string, markerOffset: number, raw: string): number {
+  if (source.slice(markerOffset, markerOffset + raw.length) === raw) {
+    return markerOffset
+  }
+  const first = source.indexOf(raw)
+  if (first === -1) {
+    throw new TaskStaleError(`task line no longer in note: ${JSON.stringify(raw)}`)
+  }
+  if (source.indexOf(raw, first + 1) !== -1) {
+    throw new TaskStaleError(`task line is ambiguous: ${JSON.stringify(raw)}`)
+  }
+  return first
+}
+
+/**
+ * Toggle a GFM checkbox between `[ ]` and `[x]` by splicing exactly the three
+ * marker characters — the file changes by the marker alone, nothing else. The
+ * task is located by {@link locateTaskMarker}; a stale or ambiguous location, or
+ * a position that no longer holds a marker, throws {@link TaskStaleError} rather
+ * than writing the wrong line. Returns the new source and the new checked state.
+ */
+export function toggleTaskMarker(
+  source: string,
+  task: { markerOffset: number; raw: string },
+): { source: string; checked: boolean } {
+  const offset = locateTaskMarker(source, task.markerOffset, task.raw)
+  const marker = source.slice(offset, offset + 3)
+  if (!TASK_MARKERS.has(marker)) {
+    throw new TaskStaleError(`no task marker at offset ${offset}: ${JSON.stringify(marker)}`)
+  }
+  const wasChecked = marker !== '[ ]'
+  const next = wasChecked ? '[ ]' : '[x]'
+  return {
+    source: source.slice(0, offset) + next + source.slice(offset + 3),
+    checked: !wasChecked,
+  }
+}
+
 interface Splice {
   from: number
   to: number

@@ -18,6 +18,8 @@ function fakeSession(path: string, log: string[]): NoteSession {
     content: () => '',
     liveContent: () => '',
     updateFrontmatter: () => true,
+    isDirty: () => false,
+    commitTaskToggle: async () => false,
     dispose: () => {},
     discard: () => {},
   }

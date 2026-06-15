@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react'
+import { render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -17,6 +17,16 @@ vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', cloudSync: false, generation: 1 } }),
 }))
 vi.mock('@/lib/use-today', () => ({ useToday: () => '2026-06-14' }))
+
+const completeTask = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/note-task', () => ({ completeTask }))
+
+const fail = vi.hoisted(() => vi.fn())
+const startOperation = vi.hoisted(() => vi.fn(() => ({ fail })))
+vi.mock('@/lib/operations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/operations')>()),
+  startOperation,
+}))
 
 function task(overrides: Partial<OpenTask> = {}): OpenTask {
   return {
@@ -53,6 +63,9 @@ function renderScreen() {
 beforeEach(() => {
   window.sessionStorage.clear()
   getOpenTasks.mockReset()
+  completeTask.mockReset()
+  startOperation.mockClear()
+  fail.mockReset()
 })
 
 describe('TasksScreen', () => {
@@ -98,19 +111,53 @@ describe('TasksScreen', () => {
     view.unmount()
   })
 
-  it('moves focus between rows with the arrow keys', async () => {
+  it('completes a task when its checkbox is clicked', async () => {
+    completeTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/a.md', text: 'first', noteTitle: 'A' }),
-      task({ notePath: 'notes/b.md', text: 'second', noteTitle: 'B' }),
+      task({
+        notePath: 'notes/p.md',
+        markerOffset: 5,
+        raw: '[ ] project task',
+        text: 'project task',
+        noteTitle: 'Project',
+      }),
     ])
     const view = renderScreen()
 
-    const first = await view.findByRole('button', { name: /first/ })
+    await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
+    expect(completeTask).toHaveBeenCalledWith(
+      expect.objectContaining({ notePath: 'notes/p.md', markerOffset: 5, raw: '[ ] project task' }),
+      1,
+    )
+    view.unmount()
+  })
+
+  it('surfaces a failed completion via the operations toast', async () => {
+    completeTask.mockRejectedValue(new Error('stale index'))
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/p.md', text: 'project task', noteTitle: 'Project' }),
+    ])
+    const view = renderScreen()
+
+    await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
+    expect(startOperation).toHaveBeenCalledWith('Completing task')
+    await waitFor(() => expect(fail).toHaveBeenCalledWith('stale index'))
+    view.unmount()
+  })
+
+  it('moves focus between task checkboxes with the arrow keys', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/a.md', markerOffset: 2, text: 'first', noteTitle: 'A' }),
+      task({ notePath: 'notes/b.md', markerOffset: 2, text: 'second', noteTitle: 'B' }),
+    ])
+    const view = renderScreen()
+
+    const first = await view.findByRole('button', { name: 'Complete: first' })
     first.focus()
     await userEvent.keyboard('{ArrowDown}')
-    expect((document.activeElement as HTMLElement).textContent).toContain('second')
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Complete: second')
     await userEvent.keyboard('{ArrowUp}')
-    expect((document.activeElement as HTMLElement).textContent).toContain('first')
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Complete: first')
     view.unmount()
   })
 })
