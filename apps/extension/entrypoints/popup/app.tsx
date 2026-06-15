@@ -1,8 +1,12 @@
-import { useEffect, useState, type FormEvent, type ReactElement } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react'
 import { browser } from 'wxt/browser'
 import { buildWireMessage } from '@/lib/capture-message'
 import { enqueueCapture, readQueue } from '@/lib/flush'
 import { flushResultSchema, type FlushResult } from '@/lib/messages'
+import {
+  readIncludePageTextPreference,
+  writeIncludePageTextPreference,
+} from '@/lib/popup-preferences'
 import { extractPageText } from './extract-page-text'
 import { useCapturedPage } from './use-captured-page'
 
@@ -62,11 +66,29 @@ export function CapturePopup(): ReactElement {
   const captured = useCapturedPage()
   const [note, setNote] = useState('')
   const [includePageText, setIncludePageText] = useState(false)
+  const includePageTextTouched = useRef(false)
   const [save, setSave] = useState<SaveState>({ phase: 'idle' })
   const [heldCount, setHeldCount] = useState(0)
 
   useEffect(() => {
     void readQueue().then((queue) => setHeldCount(queue.length))
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    void readIncludePageTextPreference().then(
+      (preference) => {
+        if (!cancelled && !includePageTextTouched.current) {
+          setIncludePageText(preference)
+        }
+      },
+      (cause) => {
+        console.warn('capture page text preference could not be read:', cause)
+      },
+    )
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
@@ -116,6 +138,14 @@ export function CapturePopup(): ReactElement {
   const host = new URL(page.url).host
   const busy = save.phase === 'saving' || save.phase === 'queued'
 
+  function onIncludePageTextChange(checked: boolean): void {
+    includePageTextTouched.current = true
+    setIncludePageText(checked)
+    void writeIncludePageTextPreference(checked).catch((cause) => {
+      console.warn('capture page text preference could not be saved:', cause)
+    })
+  }
+
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3 p-3">
       {page.screenshotDataUrl ? (
@@ -147,7 +177,7 @@ export function CapturePopup(): ReactElement {
         <input
           type="checkbox"
           checked={includePageText}
-          onChange={(event) => setIncludePageText(event.target.checked)}
+          onChange={(event) => onIncludePageTextChange(event.target.checked)}
           disabled={busy}
           className="size-3.5 rounded border-border text-accent focus:ring-focus-ring"
         />
