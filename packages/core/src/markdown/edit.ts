@@ -113,6 +113,21 @@ export function removeTaskLine(source: string, task: TaskMarker): string {
   return source.slice(0, lineStart) + source.slice(lineEnd)
 }
 
+/**
+ * Append a new empty task — a `- [ ] ` line — to the end of `source`, returning
+ * the new source and the marker's offset (the `[`). The Tasks view's Return-to-add
+ * (Plan 18) writes the empty line, then the inline editor on the new row fills it.
+ * A single newline separates it from existing content (continuing a trailing
+ * list, or interrupting a paragraph — a non-empty task item is allowed to); an
+ * empty note just becomes the one task. The trailing space keeps it a valid GFM
+ * checkbox and seats the caret.
+ */
+export function appendTaskLine(source: string): { source: string; markerOffset: number } {
+  const base = source.replace(/\s*$/, '')
+  const prefix = base.length > 0 ? `${base}\n- ` : '- '
+  return { source: `${prefix}[ ] \n`, markerOffset: prefix.length }
+}
+
 interface Splice {
   from: number
   to: number

@@ -1,10 +1,10 @@
-import { useMemo, useState, type ReactElement } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Archive, Search } from 'lucide-react'
 import { getCompletedTasks, getOpenTasks, groupTasks, hasBridge, type TaskGroup } from '@reflect/core'
 import { Input } from '@/components/ui/input'
 import { useRecentlyCompleted } from '@/lib/tasks/recently-completed'
-import { taskKey } from '@/lib/tasks/task-identity'
+import { sameTask, taskKey } from '@/lib/tasks/task-identity'
 import { useTaskActions } from '@/lib/tasks/use-task-actions'
 import { useTaskFilters, type TaskFilters } from '@/lib/tasks/task-filters'
 import { useTaskKeyboard } from '@/lib/tasks/use-task-keyboard'
@@ -60,6 +60,7 @@ export function TasksScreen(): ReactElement {
   const { filters, toggle } = useTaskFilters()
   const [query, setQuery] = useState('')
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
   const enabled = hasBridge() && graph !== null
 
   const { data: open, isError: openFailed } = useQuery({
@@ -84,9 +85,7 @@ export function TasksScreen(): ReactElement {
   const ready = open !== undefined && (!filters.archived || completed !== undefined)
   const { onScroll } = useScrollRestoration(scrollElement, ready)
 
-  // This session's completed tasks, still showing struck until archived. When the
-  // "show archived" filter is on we use the full completed list instead (which
-  // already includes them), so we don't double-list a row.
+  // This session's completed tasks, still showing struck until archived.
   const recentlyCompleted = useRecentlyCompleted(graph?.root ?? null)
 
   const needle = query.trim().toLowerCase()
@@ -94,11 +93,22 @@ export function TasksScreen(): ReactElement {
     if (open === undefined) {
       return []
     }
-    // The struck "completed" rows come from the completed query (archived on) or
-    // the session set (off). Drop any open row that's also present there — a
-    // refetch can briefly restore a just-completed task to the open cache before
-    // the reindex lands, and listing it both open and struck collides React keys.
-    const completedRows = filters.archived ? (completed ?? []) : recentlyCompleted
+    // The struck "completed" rows. With archived on, the completed query is the
+    // full history — but a just-completed task may not be in it until the reindex
+    // refetches (and the query reloads blank when you first flip the filter on),
+    // so union the session set on top, deduped, to keep this run's rows visible.
+    // With archived off, the session set is the only source.
+    const completedRows = filters.archived
+      ? [
+          ...(completed ?? []),
+          ...recentlyCompleted.filter(
+            (task) => !(completed ?? []).some((row) => sameTask(row, task)),
+          ),
+        ]
+      : recentlyCompleted
+    // Drop any open row that's also present there — a refetch can briefly restore a
+    // just-completed task to the open cache before the reindex lands, and listing
+    // it both open and struck collides React keys.
     const completedKeys = new Set(completedRows.map(taskKey))
     const all = [...open.filter((task) => !completedKeys.has(taskKey(task))), ...completedRows]
     const matched = needle ? all.filter((task) => task.text.toLowerCase().includes(needle)) : all
@@ -114,10 +124,22 @@ export function TasksScreen(): ReactElement {
   )
   const selection = useTaskSelection(orderedKeys)
   const actions = useTaskActions()
-  useTaskKeyboard({ selection, actions, tasksByKey, query, setQuery })
+  useTaskKeyboard({ selection, actions, tasksByKey, query, setQuery, today, rootRef })
+
+  // Move focus into the Tasks surface on mount so the shortcuts work the moment
+  // you navigate here — without it, focus would linger on the sidebar link that
+  // navigated, where the scoping guard (rightly) backs the shortcuts off.
+  useEffect(() => {
+    rootRef.current?.focus({ preventScroll: true })
+  }, [])
 
   return (
-    <div aria-label="Tasks" className="flex h-full min-h-0 flex-col">
+    <div
+      ref={rootRef}
+      tabIndex={-1}
+      aria-label="Tasks"
+      className="flex h-full min-h-0 flex-col outline-none"
+    >
       <header className="flex flex-none items-center gap-2 border-b border-border py-2.5 pl-2 pr-3 lg:pl-10">
         <div className="relative min-w-0 flex-1">
           <Search

@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { type OpenTask } from '@reflect/core'
-import { deleteTask, editTask, toggleTask } from '@/lib/note-task'
+import { deleteTask, editTask, insertTask, toggleTask } from '@/lib/note-task'
 import {
   archiveRecentlyCompleted,
   forgetRecentlyCompleted,
@@ -12,13 +12,26 @@ import { useTaskCacheWriter } from '@/lib/tasks/use-task-cache'
 import { useGraph } from '@/providers/graph-provider'
 
 /**
+ * The note a new task is added to (Return-to-add, V1): its path plus the context
+ * the optimistic row needs to render and bucket before the reindex — the same
+ * fields {@link OpenTask} carries beyond the marker itself.
+ */
+export interface InsertTaskTarget {
+  notePath: string
+  noteTitle: string
+  dailyDate: string | null
+  isPinned: boolean
+  pinnedOrder: number | null
+}
+
+/**
  * Bulk task actions for the Tasks view's keyboard shortcuts (Plan 18): complete
- * a selection (⌘↵), delete a selection (⌫/⌘⌫), and edit one task from the inline
- * editor. All three update the open and completed caches optimistically through
- * the shared {@link useTaskCacheWriter} — the same path single-row
- * {@link useCompleteTask} takes — so the selection reacts instantly, then the
- * reindex reconciles. A failed write rolls every row back and surfaces the
- * reason once.
+ * a selection (⌘↵), delete a selection (⌫/⌘⌫), edit one task from the inline
+ * editor, and add a task (Return). They update the open and completed caches
+ * optimistically through the shared {@link useTaskCacheWriter} — the same path
+ * single-row {@link useCompleteTask} takes — so the selection reacts instantly,
+ * then the reindex reconciles. A failed write rolls every row back and surfaces
+ * the reason once.
  *
  * Writes within a batch run **sequentially**: tasks can share a note, and two
  * concurrent edits to one file would race (the loser's read predates the
@@ -30,6 +43,12 @@ export interface TaskActions {
   remove: (tasks: OpenTask[]) => void
   /** Replace one task's content from the inline editor (Plan 18). */
   edit: (task: OpenTask, content: string) => void
+  /**
+   * Add a new empty task to `target`'s note (Return-to-add, V1) and return the
+   * optimistic row to select — its inline editor opens focused. Resolves to
+   * `null` when there's no graph or the write failed (the toast already fired).
+   */
+  insert: (target: InsertTaskTarget) => Promise<OpenTask | null>
   /**
    * Save an inline edit and complete the task in one go (⌘↵ while editing). The
    * two writes run **sequentially** — edit then toggle the rebuilt line — so they
@@ -121,6 +140,34 @@ export function useTaskActions(): TaskActions {
     onError: (cause, _vars, context) => cache.rollback(context, 'Editing task', cause),
   })
 
+  const insertMutation = useMutation({
+    mutationFn: (target: InsertTaskTarget) => {
+      const generation = graph?.generation
+      if (generation === undefined) {
+        throw new Error('No graph is open.')
+      }
+      return insertTask(target.notePath, generation)
+    },
+    onError: (cause) => cache.reconcile('Adding task', cause),
+  })
+
+  // Build the optimistic open row for a just-written task. Its `raw` is the empty
+  // checkbox the parser will record (`[ ] ` — trailing space and all), so a
+  // follow-up edit's staleness guard matches disk before the reindex lands.
+  const insertedRow = (target: InsertTaskTarget, markerOffset: number): OpenTask => ({
+    notePath: target.notePath,
+    markerOffset,
+    raw: '[ ] ',
+    checked: false,
+    text: '',
+    noteTitle: target.noteTitle,
+    dueDate: null,
+    dailyDate: target.dailyDate,
+    isPinned: target.isPinned,
+    pinnedOrder: target.pinnedOrder,
+    updatedAt: Date.now(),
+  })
+
   const editAndCompleteMutation = useMutation({
     mutationFn: async ({ task, content }: { task: OpenTask; content: string }) => {
       const generation = graph?.generation
@@ -158,7 +205,8 @@ export function useTaskActions(): TaskActions {
       completeMutation.isPending ||
       deleteMutation.isPending ||
       editMutation.isPending ||
-      editAndCompleteMutation.isPending,
+      editAndCompleteMutation.isPending ||
+      insertMutation.isPending,
     complete: (tasks) => {
       // ⌘↵ *completes*; with archived rows in the selection, toggling an
       // already-checked task would reopen it on disk. Only act on open rows.
@@ -176,6 +224,20 @@ export function useTaskActions(): TaskActions {
       if (graph?.generation !== undefined) {
         editMutation.mutate({ task, content })
       }
+    },
+    insert: async (target) => {
+      if (graph?.generation === undefined) {
+        return null
+      }
+      let markerOffset: number
+      try {
+        markerOffset = await insertMutation.mutateAsync(target)
+      } catch {
+        return null // reconcile already surfaced the failure
+      }
+      const created = insertedRow(target, markerOffset)
+      cache.addOpen(created)
+      return created
     },
     editAndComplete: (task, content) => {
       if (graph?.generation !== undefined && !editAndCompleteMutation.isPending) {

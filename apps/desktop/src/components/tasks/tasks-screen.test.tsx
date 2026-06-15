@@ -27,7 +27,8 @@ vi.mock('@/providers/settings-provider', () => ({
 const toggleTask = vi.hoisted(() => vi.fn())
 const deleteTask = vi.hoisted(() => vi.fn())
 const editTask = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/note-task', () => ({ toggleTask, deleteTask, editTask }))
+const insertTask = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/note-task', () => ({ toggleTask, deleteTask, editTask, insertTask }))
 
 // The real inline editor mounts ProseKit, which jsdom can't render (no
 // getClientRects/getAnimations). Stub it with the callback surface the row
@@ -125,6 +126,8 @@ beforeEach(() => {
   toggleTask.mockReset()
   deleteTask.mockReset()
   editTask.mockReset()
+  insertTask.mockReset()
+  insertTask.mockResolvedValue(0)
   startOperation.mockClear()
   fail.mockReset()
   resetRecentlyCompleted()
@@ -447,6 +450,43 @@ describe('TasksScreen', () => {
     await userEvent.keyboard('{Meta>}{Backspace}{/Meta}')
     await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(view.queryByText('first')).toBeNull())
+    view.unmount()
+  })
+
+  it('Return adds a task to today’s daily and opens its inline editor', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
+    ])
+    const view = renderScreen()
+
+    await view.findByRole('button', { name: 'first' })
+    await userEvent.keyboard('{Enter}')
+    // Nothing was selected, so the new task lands in today's daily note.
+    await waitFor(() => expect(insertTask).toHaveBeenCalledWith('daily/2026-06-14.md', 1))
+    // The optimistic empty row mounts its inline editor, ready to type into.
+    await view.findByTestId('task-editor')
+    view.unmount()
+  })
+
+  it('removes a freshly inserted task when it is left empty', async () => {
+    deleteTask.mockResolvedValue(undefined)
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
+    ])
+    const view = renderScreen()
+
+    await view.findByRole('button', { name: 'first' })
+    await userEvent.keyboard('{Enter}')
+    await view.findByTestId('task-editor')
+    // Leaving the still-empty new row (cancel) deletes it instead of keeping a
+    // blank `- [ ] ` task on disk (V1).
+    await userEvent.click(view.getByRole('button', { name: 'cancel-edit' }))
+    await waitFor(() =>
+      expect(deleteTask).toHaveBeenCalledWith(
+        expect.objectContaining({ notePath: 'daily/2026-06-14.md' }),
+        1,
+      ),
+    )
     view.unmount()
   })
 

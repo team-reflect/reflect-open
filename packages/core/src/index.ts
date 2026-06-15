@@ -354,6 +354,7 @@ export {
   parseNote,
   appendBlock,
   appendUnderHeading,
+  appendTaskLine,
   editTaskLine,
   removeTaskLine,
   parseTaskMarker,

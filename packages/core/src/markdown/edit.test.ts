@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { parseNote } from './extract'
 import {
   appendBlock,
+  appendTaskLine,
   appendUnderHeading,
   editTaskLine,
   removeTaskLine,
@@ -219,6 +220,33 @@ describe('editTaskLine', () => {
     const source = '- [ ] buy milk\n'
     const task = indexedTask(source)
     expect(() => editTaskLine('- [ ] something else\n', task, 'x')).toThrow(TaskStaleError)
+  })
+})
+
+describe('appendTaskLine', () => {
+  it('starts the note with a single empty task', () => {
+    const { source, markerOffset } = appendTaskLine('')
+    expect(source).toBe('- [ ] \n')
+    const [task] = parseNote({ path: 'n.md', source }).tasks
+    expect(task.markerOffset).toBe(markerOffset)
+    expect(task.text).toBe('')
+    expect(task.checked).toBe(false)
+  })
+
+  it('continues an existing task list and reports the new marker offset', () => {
+    const { source, markerOffset } = appendTaskLine('- [ ] buy milk\n')
+    expect(source).toBe('- [ ] buy milk\n- [ ] \n')
+    const tasks = parseNote({ path: 'n.md', source }).tasks
+    expect(tasks).toHaveLength(2)
+    expect(tasks[1].markerOffset).toBe(markerOffset)
+    expect(tasks[1].text).toBe('')
+  })
+
+  it('appends after prose, with the marker locatable by the parser', () => {
+    const { source, markerOffset } = appendTaskLine('# Notes\n\nsome intro')
+    const tasks = parseNote({ path: 'n.md', source }).tasks
+    expect(tasks).toHaveLength(1)
+    expect(tasks[0].markerOffset).toBe(markerOffset)
   })
 })
 

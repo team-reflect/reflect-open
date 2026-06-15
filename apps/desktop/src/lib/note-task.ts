@@ -1,5 +1,7 @@
 import {
+  appendTaskLine,
   editTaskLine,
+  isAppError,
   readNote,
   removeTaskLine,
   toggleTaskMarker,
@@ -127,4 +129,33 @@ export function deleteTask(task: TaskRef, generation: number): Promise<void> {
     (owner, marker) => owner.commitTaskRemove(marker),
     (source, marker) => removeTaskLine(source, marker),
   )
+}
+
+/**
+ * Insert a new empty `- [ ] ` task at the end of `notePath` (Plan 18's Return-to-
+ * add) and return its marker offset, so the Tasks view can select the new row and
+ * open its inline editor. A missing note — today's daily not yet created — starts
+ * empty. Refuses an **open** note via {@link NoteBusyError}: appending through
+ * disk would clobber its live buffer, and the Tasks view rarely targets one.
+ * Serialized per path with the other task writes.
+ */
+export function insertTask(notePath: string, generation: number): Promise<number> {
+  return serializeByPath(notePath, async () => {
+    if (openSession(notePath) !== null) {
+      throw new NoteBusyError('This note is open — add the task in the note itself.')
+    }
+    let source: string
+    try {
+      source = await readNote(notePath)
+    } catch (cause) {
+      if (isAppError(cause) && cause.kind === 'notFound') {
+        source = '' // a not-yet-created daily note: the first task creates it
+      } else {
+        throw cause
+      }
+    }
+    const { source: next, markerOffset } = appendTaskLine(source)
+    await writeNote(notePath, next, generation)
+    return markerOffset
+  })
 }

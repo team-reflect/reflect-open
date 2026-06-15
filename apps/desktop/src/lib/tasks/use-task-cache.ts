@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { errorMessage, type OpenTask } from '@reflect/core'
 import { startOperation } from '@/lib/operations'
+import { sameTask } from '@/lib/tasks/task-identity'
 import { completedTasksQueryKey, tasksQueryKey } from '@/lib/tasks/tasks-query'
 import { useGraph } from '@/providers/graph-provider'
 
@@ -18,6 +19,11 @@ export interface TaskCacheWriter {
   snapshot: () => Promise<TaskCacheSnapshot>
   /** Optimistically rewrite the open and completed lists at once. */
   patch: (open: TaskListPatch, completed: TaskListPatch) => void
+  /**
+   * Append one optimistic open row (Return-to-add): idempotent by task identity,
+   * so a reindex refetch that already added the real row can't double-list it.
+   */
+  addOpen: (task: OpenTask) => void
   /** Restore both lists from a snapshot and surface the failure once (single-write undo). */
   rollback: (captured: TaskCacheSnapshot | undefined, label: string, cause: unknown) => void
   /**
@@ -62,6 +68,13 @@ export function useTaskCacheWriter(): TaskCacheWriter {
     queryClient.setQueryData<OpenTask[]>(completedKey, completed)
   }
 
+  const addOpen = (task: OpenTask): void => {
+    queryClient.setQueryData<OpenTask[]>(openKey, (rows) => {
+      const list = rows ?? []
+      return list.some((row) => sameTask(row, task)) ? list : [...list, task]
+    })
+  }
+
   const rollback = (
     captured: TaskCacheSnapshot | undefined,
     label: string,
@@ -82,5 +95,5 @@ export function useTaskCacheWriter(): TaskCacheWriter {
     startOperation(label).fail(errorMessage(cause))
   }
 
-  return { snapshot, patch, rollback, reconcile }
+  return { snapshot, patch, addOpen, rollback, reconcile }
 }

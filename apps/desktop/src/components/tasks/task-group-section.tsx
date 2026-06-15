@@ -86,7 +86,16 @@ export function TaskGroupSection({
                 actions.remove([task])
                 selection.clear()
               }}
-              onEditCancel={() => selection.clear()}
+              onEditCancel={() => {
+                // V1: an empty task doesn't survive being left — Escape (or Enter
+                // on a still-empty new row, which resolves to a no-op cancel)
+                // removes it rather than leaving a stray `- [ ] ` line behind. A
+                // non-empty unchanged edit just exits.
+                if (task.text.trim() === '') {
+                  actions.remove([task])
+                }
+                selection.clear()
+              }}
               onEditComplete={(content) => {
                 if (task.checked) {
                   // Already complete (editing an archived row) — ⌘↵ saves an

@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react'
-import { type OpenTask } from '@reflect/core'
-import { type TaskActions } from '@/lib/tasks/use-task-actions'
+import { useEffect, useRef, type RefObject } from 'react'
+import { dailyPath, type OpenTask } from '@reflect/core'
+import { taskKey } from '@/lib/tasks/task-identity'
+import { type InsertTaskTarget, type TaskActions } from '@/lib/tasks/use-task-actions'
 import { type TaskSelection } from '@/lib/tasks/use-task-selection'
 
 export interface TaskKeyboardOptions {
@@ -11,6 +12,10 @@ export interface TaskKeyboardOptions {
   /** The search box's text, and its setter — Escape clears it. */
   query: string
   setQuery: (value: string) => void
+  /** Today's ISO date — Return with no selection adds a task to today's daily. */
+  today: string
+  /** The Tasks surface; shortcuts back off when focus is outside it (another panel). */
+  rootRef: RefObject<HTMLElement | null>
 }
 
 /** Elements that own their own keyboard nav — the shortcuts back off entirely. */
@@ -23,17 +28,21 @@ const OWNS_KEYS = '[data-task-editor], [role="menu"], [role="dialog"], [role="li
  * the component so the screen reads as markup + wiring and the shortcut map is
  * one cohesive unit, mirroring {@link useTaskSelection}/{@link useTaskActions}.
  *
- * The map: ⌘A select all, ↑/↓ move a single selection (Shift to extend the
- * range), ⌘↵ complete the selection, ⌘⇧↵ archive (stop showing the session's
- * completed tasks), ⌘⌫ delete (plain ⌫ deletes only empty rows, so a stray
- * Backspace can't lose content), Esc clears the selection then the search box.
+ * The map: Return adds a task (to the selected task's note, else today's daily),
+ * ⌘A select all, ↑/↓ move a single selection (Shift to extend the range), ⌘↵
+ * complete the selection, ⌘⇧↵ archive (stop showing the session's completed
+ * tasks), ⌘⌫ delete (plain ⌫ deletes only empty rows, so a stray Backspace can't
+ * lose content), Esc clears the selection then the search box.
  *
- * Scoping: the listener backs off only when a focused control owns the key —
- * anything already handled (`defaultPrevented`), the inline editor (it owns its
- * keys, and a ⌘⌫ there must not race its commit-on-unmount), a portaled overlay
- * (the filters menu, a dialog, the ⌘K palette — they own arrow/Enter/Escape),
- * or the search box (which honors only Escape). Everything else on the Tasks
- * route — a focused row, a nav button, or nothing focused — drives the shortcuts.
+ * Scoping: the listener is on `document` (so the shortcuts work the moment you're
+ * on Tasks, no click needed — the screen focuses its surface on mount), but backs
+ * off when focus sits **outside** the Tasks surface — the workspace sidebar or
+ * another panel keeps its own keys. Within the surface it still backs off for a
+ * focused control that owns the key: the inline editor (it owns its keys, and a
+ * ⌘⌫ there must not race its commit-on-unmount), a portaled overlay (the filters
+ * menu, a dialog, the ⌘K palette), or the search box (which honors only Escape).
+ * Everything else on the Tasks surface — a focused row or nothing focused — drives
+ * the shortcuts.
  *
  * The handler closes over the latest render's state but registers once: a ref
  * carries the current closure so the listener stays stable.
@@ -44,6 +53,8 @@ export function useTaskKeyboard({
   tasksByKey,
   query,
   setQuery,
+  today,
+  rootRef,
 }: TaskKeyboardOptions): void {
   const handlerRef = useRef<(event: KeyboardEvent) => void>(() => {})
   handlerRef.current = (event) => {
@@ -53,15 +64,41 @@ export function useTaskKeyboard({
       return
     }
     const target = event.target as HTMLElement | null
-    // Back off only when a focused control owns the key: the inline editor (it
-    // owns its keys, and a ⌘⌫ there must not race its commit-on-unmount) or a
-    // portaled overlay (filters menu, dialog, ⌘K palette). Anything else on the
-    // Tasks route — a focused row, a nav button, or nothing focused — drives the
-    // shortcuts, so they work without first clicking into the list.
+    // Focus outside the Tasks surface (the workspace sidebar, another panel) keeps
+    // its own keys — only `body`/no-focus and elements inside the surface drive the
+    // shortcuts. `body` is allowed so they still fire when focus falls back to it.
+    const root = rootRef.current
+    if (root !== null && target !== null && target !== root.ownerDocument.body && !root.contains(target)) {
+      return
+    }
+    // Back off when a focused control inside the surface owns the key: the inline
+    // editor (it owns its keys, and a ⌘⌫ there must not race its commit-on-unmount)
+    // or a portaled overlay (filters menu, dialog, ⌘K palette).
     if (target?.closest?.(OWNS_KEYS) != null) {
       return
     }
     const inSearch = target instanceof HTMLInputElement
+    // The note a Return-inserted task lands in: the last selected task's note (so
+    // it joins that group), else today's daily — V1's "add to Today" default.
+    const insertTarget = (): InsertTaskTarget => {
+      let last: OpenTask | null = null
+      for (const [key, task] of tasksByKey) {
+        if (selection.selected.has(key)) {
+          last = task
+        }
+      }
+      return last !== null
+        ? {
+            notePath: last.notePath,
+            noteTitle: last.noteTitle,
+            dailyDate: last.dailyDate,
+            isPinned: last.isPinned,
+            pinnedOrder: last.pinnedOrder,
+          }
+        : { notePath: dailyPath(today), noteTitle: today, dailyDate: today, isPinned: false, pinnedOrder: null }
+    }
+    const selectExclusively = (key: string): void =>
+      selection.clickSelect(key, { metaKey: false, ctrlKey: false, shiftKey: false })
     const mod = event.metaKey || event.ctrlKey
     const selectedTasks = (): OpenTask[] =>
       [...selection.selected]
@@ -83,6 +120,16 @@ export function useTaskKeyboard({
       } else {
         actions.complete(selectedTasks())
       }
+    } else if (event.key === 'Enter') {
+      // Return adds a task (V1). A sole selection's editor owns Enter (it bailed
+      // above via OWNS_KEYS and continues the entry there), so this fires from the
+      // list itself: insert, then select the new row to open its editor focused.
+      event.preventDefault()
+      void actions.insert(insertTarget()).then((created) => {
+        if (created !== null) {
+          selectExclusively(taskKey(created))
+        }
+      })
     } else if (mod && event.key === 'Backspace') {
       event.preventDefault()
       actions.remove(selectedTasks())

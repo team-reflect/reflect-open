@@ -1,6 +1,7 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type OpenTask } from '@reflect/core'
+import { taskKey } from './task-identity'
 import { type TaskActions } from './use-task-actions'
 import { type TaskSelection } from './use-task-selection'
 import { useTaskKeyboard } from './use-task-keyboard'
@@ -42,6 +43,7 @@ function makeActions(over: Partial<TaskActions> = {}): TaskActions {
     complete: vi.fn(),
     remove: vi.fn(),
     edit: vi.fn(),
+    insert: vi.fn().mockResolvedValue(null),
     editAndComplete: vi.fn(),
     archive: vi.fn(),
     isPending: false,
@@ -66,6 +68,7 @@ function mount(options: {
   actions?: TaskActions
   tasksByKey?: ReadonlyMap<string, OpenTask>
   query?: string
+  today?: string
 }) {
   const selection = options.selection ?? makeSelection()
   const actions = options.actions ?? makeActions()
@@ -77,9 +80,18 @@ function mount(options: {
       tasksByKey: options.tasksByKey ?? new Map(),
       query: options.query ?? '',
       setQuery,
+      today: options.today ?? '2026-06-15',
+      rootRef: { current: root },
     }),
   )
   return { selection, actions, setQuery }
+}
+
+/** Let the `void insert(...).then(...)` microtask settle before asserting. */
+async function flush(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve()
+  })
 }
 
 function press(
@@ -184,15 +196,60 @@ describe('useTaskKeyboard', () => {
     menu.remove()
   })
 
-  it('fires even when focus is outside the list (a nav button, nothing in the editor)', () => {
+  it('backs off when focus is outside the Tasks surface (the workspace sidebar)', () => {
     const { selection } = mount({})
-    // The shortcuts must work as soon as you're on the Tasks view — not only
-    // after clicking a row. A plain focused element that owns no keys drives them.
-    const nav = document.createElement('button')
-    document.body.appendChild(nav)
-    press(nav, 'a', { metaKey: true })
-    expect(selection.selectAll).toHaveBeenCalled()
-    nav.remove()
+    // A focused control in another panel keeps its own keys — the shortcuts must
+    // not reach across to the task list. (The surface is focused on mount, so the
+    // shortcuts still work the moment you're on Tasks; see the body test above.)
+    const sidebarButton = document.createElement('button')
+    document.body.appendChild(sidebarButton)
+    press(sidebarButton, 'a', { metaKey: true })
+    expect(selection.selectAll).not.toHaveBeenCalled()
+    sidebarButton.remove()
+  })
+
+  it('Return adds a task to today’s daily when nothing is selected', async () => {
+    const created = task({ notePath: 'daily/2026-06-15.md', markerOffset: 0, text: '' })
+    const insert = vi.fn().mockResolvedValue(created)
+    const { selection } = mount({ actions: makeActions({ insert }), today: '2026-06-15' })
+
+    const event = press(root, 'Enter')
+    expect(event.defaultPrevented).toBe(true)
+    expect(insert).toHaveBeenCalledWith({
+      notePath: 'daily/2026-06-15.md',
+      noteTitle: '2026-06-15',
+      dailyDate: '2026-06-15',
+      isPinned: false,
+      pinnedOrder: null,
+    })
+    await flush()
+    expect(selection.clickSelect).toHaveBeenCalledWith(taskKey(created), {
+      metaKey: false,
+      ctrlKey: false,
+      shiftKey: false,
+    })
+  })
+
+  it('Return adds to the last selected task’s note instead', () => {
+    const pinned = task({
+      notePath: 'notes/a.md',
+      noteTitle: 'A',
+      dailyDate: null,
+      isPinned: true,
+      pinnedOrder: 3,
+    })
+    const insert = vi.fn().mockResolvedValue(null)
+    const selection = makeSelection({ selected: new Set(['k']), selectedCount: 1 })
+    mount({ selection, actions: makeActions({ insert }), tasksByKey: new Map([['k', pinned]]) })
+
+    press(root, 'Enter')
+    expect(insert).toHaveBeenCalledWith({
+      notePath: 'notes/a.md',
+      noteTitle: 'A',
+      dailyDate: null,
+      isPinned: true,
+      pinnedOrder: 3,
+    })
   })
 
   it('backs off entirely while the inline editor is focused', () => {

@@ -39,6 +39,7 @@ export {
 export {
   appendBlock,
   appendUnderHeading,
+  appendTaskLine,
   editTaskLine,
   removeTaskLine,
   renameWikiLink,
