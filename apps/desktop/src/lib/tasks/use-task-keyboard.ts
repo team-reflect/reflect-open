@@ -22,9 +22,9 @@ export interface TaskKeyboardOptions {
  * cohesive unit, mirroring {@link useTaskSelection}/{@link useTaskActions}.
  *
  * The map: ⌘A select all, ↑/↓ move a single selection (Shift to extend the
- * range), ⌘↵ complete the selection, ⌘⌫ delete it (plain ⌫ deletes only empty
- * rows, so a stray Backspace can't lose content), Esc clears the selection then
- * the search box.
+ * range), ⌘↵ complete the selection, ⌘⇧↵ archive (stop showing the session's
+ * completed tasks), ⌘⌫ delete (plain ⌫ deletes only empty rows, so a stray
+ * Backspace can't lose content), Esc clears the selection then the search box.
  *
  * Scoping rules keep the global listener from hijacking unrelated keys: it
  * ignores anything a focused widget already handled (`defaultPrevented`) or that
@@ -85,7 +85,11 @@ export function useTaskKeyboard({
     }
     if (mod && event.key === 'Enter') {
       event.preventDefault()
-      actions.complete(selectedTasks())
+      if (event.shiftKey) {
+        actions.archive() // ⌘⇧↵ — hide the session's completed tasks
+      } else {
+        actions.complete(selectedTasks())
+      }
     } else if (mod && event.key === 'Backspace') {
       event.preventDefault()
       actions.remove(selectedTasks())

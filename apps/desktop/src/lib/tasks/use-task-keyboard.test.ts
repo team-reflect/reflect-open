@@ -43,6 +43,7 @@ function makeActions(over: Partial<TaskActions> = {}): TaskActions {
     remove: vi.fn(),
     edit: vi.fn(),
     editAndComplete: vi.fn(),
+    archive: vi.fn(),
     isPending: false,
     ...over,
   }
@@ -126,6 +127,13 @@ describe('useTaskKeyboard', () => {
     press(root, 'Backspace', { metaKey: true })
     expect(actions.remove).toHaveBeenCalledWith([t])
     expect(selection.clear).toHaveBeenCalled()
+  })
+
+  it('archives on ⌘⇧↵ instead of completing', () => {
+    const { actions } = mount({})
+    press(root, 'Enter', { metaKey: true, shiftKey: true })
+    expect(actions.archive).toHaveBeenCalled()
+    expect(actions.complete).not.toHaveBeenCalled()
   })
 
   it('plain ⌫ removes only the empty rows in the selection', () => {

@@ -1,7 +1,9 @@
 import { useMutation } from '@tanstack/react-query'
 import { type OpenTask } from '@reflect/core'
 import { toggleTask } from '@/lib/note-task'
+import { forgetRecentlyCompleted, markRecentlyCompleted } from '@/lib/tasks/recently-completed'
 import { asCompleted, withoutTasks } from '@/lib/tasks/task-cache'
+import { taskKey } from '@/lib/tasks/task-identity'
 import { useTaskCacheWriter } from '@/lib/tasks/use-task-cache'
 import { useGraph } from '@/providers/graph-provider'
 
@@ -25,6 +27,7 @@ export function useCompleteTask(task: OpenTask): { complete: () => void; isPendi
   const { graph } = useGraph()
   const cache = useTaskCacheWriter()
 
+  const root = graph?.root ?? null
   const mutation = useMutation({
     mutationFn: (generation: number) => toggleTask(task, generation),
     onMutate: async () => {
@@ -33,9 +36,14 @@ export function useCompleteTask(task: OpenTask): { complete: () => void; isPendi
         (rows) => withoutTasks(rows, [task]),
         (rows) => asCompleted(rows, [task]),
       )
+      // Keep it showing struck in the active list (V1's middle state) until archived.
+      markRecentlyCompleted(root, [task])
       return snapshot
     },
-    onError: (cause, _generation, context) => cache.rollback(context, 'Completing task', cause),
+    onError: (cause, _generation, context) => {
+      cache.rollback(context, 'Completing task', cause)
+      forgetRecentlyCompleted(root, [taskKey(task)])
+    },
   })
 
   return {

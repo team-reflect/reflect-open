@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OpenTask } from '@reflect/core'
 import type { ReactNode } from 'react'
+import { resetRecentlyCompleted } from '@/lib/tasks/recently-completed'
 import { RouterProvider, useRouter } from '@/routing/router'
 import { TasksScreen } from './tasks-screen'
 
@@ -126,6 +127,7 @@ beforeEach(() => {
   editTask.mockReset()
   startOperation.mockClear()
   fail.mockReset()
+  resetRecentlyCompleted()
 })
 
 describe('TasksScreen', () => {
@@ -424,8 +426,9 @@ describe('TasksScreen', () => {
     await userEvent.keyboard('{Meta>}a{/Meta}') // select all
     await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
     await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(2))
-    // Optimistically dropped from the open list.
-    await waitFor(() => expect(view.queryByText('first')).toBeNull())
+    // Completing keeps both showing struck (the middle state), not dropped.
+    await waitFor(() => expect(view.getAllByRole('button', { name: 'Completed task' })).toHaveLength(2))
+    expect(view.getByText('first')).toBeDefined()
     view.unmount()
   })
 
@@ -532,8 +535,9 @@ describe('TasksScreen', () => {
         1,
       ),
     )
-    // Optimistically removed from the list on completion.
-    await waitFor(() => expect(view.queryByText('project task')).toBeNull())
+    // V1's middle state: the row stays visible, struck, until archived.
+    await view.findByRole('button', { name: 'Completed task' })
+    expect(view.getByText('project task')).toBeDefined()
     view.unmount()
   })
 
@@ -558,6 +562,39 @@ describe('TasksScreen', () => {
     // Flipped to completed in place — still on screen, now marked done.
     await view.findByRole('button', { name: 'Completed task' })
     expect(view.getByText('project task')).toBeDefined()
+    view.unmount()
+  })
+
+  it('shows the Archive button after completing, and Archive hides the row', async () => {
+    toggleTask.mockResolvedValue(undefined)
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/p.md', markerOffset: 5, raw: '[ ] project task', text: 'project task', noteTitle: 'P' }),
+    ])
+    const view = renderScreen()
+
+    await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
+    // The row lingers struck and an Archive (1) action appears.
+    const archive = await view.findByRole('button', { name: /Archive \(1\)/ })
+    expect(view.getByText('project task')).toBeDefined()
+
+    await userEvent.click(archive)
+    // Archiving hides this session's completed rows (still `[x]` on disk).
+    await waitFor(() => expect(view.queryByText('project task')).toBeNull())
+    expect(view.queryByRole('button', { name: /Archive/ })).toBeNull()
+    view.unmount()
+  })
+
+  it('archives the session’s completed tasks with ⌘⇧↵', async () => {
+    toggleTask.mockResolvedValue(undefined)
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/p.md', markerOffset: 5, raw: '[ ] project task', text: 'project task', noteTitle: 'P' }),
+    ])
+    const view = renderScreen()
+
+    await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
+    await view.findByRole('button', { name: 'Completed task' })
+    await userEvent.keyboard('{Meta>}{Shift>}{Enter}{/Shift}{/Meta}')
+    await waitFor(() => expect(view.queryByText('project task')).toBeNull())
     view.unmount()
   })
 

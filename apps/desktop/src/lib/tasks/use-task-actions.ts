@@ -1,7 +1,13 @@
 import { useMutation } from '@tanstack/react-query'
 import { type OpenTask } from '@reflect/core'
 import { deleteTask, editTask, toggleTask } from '@/lib/note-task'
+import {
+  archiveRecentlyCompleted,
+  forgetRecentlyCompleted,
+  markRecentlyCompleted,
+} from '@/lib/tasks/recently-completed'
 import { asCompleted, taskRawWithContent, withEditedTask, withoutTasks } from '@/lib/tasks/task-cache'
+import { taskKey } from '@/lib/tasks/task-identity'
 import { useTaskCacheWriter } from '@/lib/tasks/use-task-cache'
 import { useGraph } from '@/providers/graph-provider'
 
@@ -30,11 +36,14 @@ export interface TaskActions {
    * can't race each other on the same note line.
    */
   editAndComplete: (task: OpenTask, content: string) => void
+  /** Archive (⌘⇧↵): stop showing the session's completed tasks in the active list. */
+  archive: () => void
   isPending: boolean
 }
 
 export function useTaskActions(): TaskActions {
   const { graph } = useGraph()
+  const root = graph?.root ?? null
   const cache = useTaskCacheWriter()
 
   const completeMutation = useMutation({
@@ -55,9 +64,14 @@ export function useTaskActions(): TaskActions {
         (rows) => withoutTasks(rows, tasks),
         (rows) => asCompleted(rows, tasks),
       )
+      // Keep them showing struck (V1's middle state) until archived.
+      markRecentlyCompleted(root, tasks)
       return snapshot
     },
-    onError: (cause, _tasks, context) => cache.rollback(context, 'Completing tasks', cause),
+    onError: (cause, tasks, context) => {
+      cache.rollback(context, 'Completing tasks', cause)
+      forgetRecentlyCompleted(root, tasks.map(taskKey))
+    },
   })
 
   const deleteMutation = useMutation({
@@ -77,6 +91,8 @@ export function useTaskActions(): TaskActions {
         (rows) => withoutTasks(rows, tasks),
         (rows) => withoutTasks(rows, tasks),
       )
+      // A deleted task must not linger struck in the session's completed set.
+      forgetRecentlyCompleted(root, tasks.map(taskKey))
       return snapshot
     },
     onError: (cause, _tasks, context) => cache.rollback(context, 'Deleting tasks', cause),
@@ -115,7 +131,7 @@ export function useTaskActions(): TaskActions {
       await editTask(task, content, generation)
       await toggleTask({ ...task, raw: taskRawWithContent(task, content) }, generation)
     },
-    onMutate: async ({ task }: { task: OpenTask; content: string }) => {
+    onMutate: async ({ task, content }: { task: OpenTask; content: string }) => {
       const snapshot = await cache.snapshot()
       // Same optimistic shape as completing: drop from open, surface struck in
       // the completed list. The reindex fills in the edited text a beat later.
@@ -123,9 +139,15 @@ export function useTaskActions(): TaskActions {
         (rows) => withoutTasks(rows, [task]),
         (rows) => asCompleted(rows, [task]),
       )
+      // Keep it showing struck with its new text; mark as the edited row.
+      const edited = withEditedTask([task], task, content)?.[0] ?? task
+      markRecentlyCompleted(root, [edited])
       return snapshot
     },
-    onError: (cause, _vars, context) => cache.rollback(context, 'Completing task', cause),
+    onError: (cause, { task }, context) => {
+      cache.rollback(context, 'Completing task', cause)
+      forgetRecentlyCompleted(root, [taskKey(task)])
+    },
   })
 
   return {
@@ -157,5 +179,6 @@ export function useTaskActions(): TaskActions {
         editAndCompleteMutation.mutate({ task, content })
       }
     },
+    archive: () => archiveRecentlyCompleted(root),
   }
 }

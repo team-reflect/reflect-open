@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Search } from 'lucide-react'
+import { Archive, Search } from 'lucide-react'
 import { getCompletedTasks, getOpenTasks, groupTasks, hasBridge, type TaskGroup } from '@reflect/core'
 import { Input } from '@/components/ui/input'
+import { useRecentlyCompleted } from '@/lib/tasks/recently-completed'
 import { taskKey } from '@/lib/tasks/task-identity'
 import { useTaskActions } from '@/lib/tasks/use-task-actions'
 import { useTaskFilters, type TaskFilters } from '@/lib/tasks/task-filters'
@@ -46,6 +47,11 @@ function visibleGroups(groups: TaskGroup[], filters: TaskFilters): TaskGroup[] {
  * keyboard shortcuts act on the selection — ⌘A select all, ↑/↓ (Shift to extend),
  * ⌘↵ complete, ⌘⌫ delete (plain ⌫ deletes only empty rows), Esc clear. A sole
  * selection opens the inline editor.
+ *
+ * Completing a task keeps it showing (struck) in place — V1's middle state — via
+ * the session-scoped {@link useRecentlyCompleted} set, until "Archive" (⌘⇧↵)
+ * hides this run's completed tasks. They stay `[x]` on disk and remain under the
+ * "show archived" filter, which reveals the whole completed history.
  */
 export function TasksScreen(): ReactElement {
   const { graph } = useGraph()
@@ -79,15 +85,24 @@ export function TasksScreen(): ReactElement {
   const ready = open !== undefined && (!filters.archived || completed !== undefined)
   const { onScroll } = useScrollRestoration(scrollElement, ready)
 
+  // This session's completed tasks, still showing struck until archived. When the
+  // "show archived" filter is on we use the full completed list instead (which
+  // already includes them), so we don't double-list a row.
+  const recentlyCompleted = useRecentlyCompleted(graph?.root ?? null)
+
   const needle = query.trim().toLowerCase()
   const groups = useMemo(() => {
     if (open === undefined) {
       return []
     }
-    const all = filters.archived && completed ? [...open, ...completed] : open
+    const all = filters.archived
+      ? completed
+        ? [...open, ...completed]
+        : open
+      : [...open, ...recentlyCompleted]
     const matched = needle ? all.filter((task) => task.text.toLowerCase().includes(needle)) : all
     return visibleGroups(groupTasks(matched, today), filters)
-  }, [open, completed, filters, needle, today])
+  }, [open, completed, recentlyCompleted, filters, needle, today])
 
   // The flat, render-order list of tasks the selection and its shortcuts act on.
   const orderedTasks = useMemo(() => groups.flatMap((group) => group.tasks), [groups])
@@ -116,6 +131,16 @@ export function TasksScreen(): ReactElement {
             className="h-9 border-none bg-transparent pl-8 shadow-none focus-visible:ring-0"
           />
         </div>
+        {recentlyCompleted.length > 0 ? (
+          <button
+            type="button"
+            onClick={actions.archive}
+            className="flex flex-none items-center gap-2 rounded-md px-2 py-1 text-sm text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none"
+          >
+            <Archive aria-hidden className="size-4" />
+            Archive ({recentlyCompleted.length})
+          </button>
+        ) : null}
         <TaskFiltersMenu filters={filters} toggle={toggle} />
       </header>
       <div
