@@ -43,6 +43,8 @@ export {
   editTaskLine,
   removeTaskLine,
   renameWikiLink,
+  setTaskDueDate,
+  clearTaskDueDate,
   toggleTaskMarker,
   TaskStaleError,
 } from './edit'

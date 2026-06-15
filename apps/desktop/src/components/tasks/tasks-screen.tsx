@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Archive, Search } from 'lucide-react'
+import { Archive, CalendarClock, Search } from 'lucide-react'
 import { getCompletedTasks, getOpenTasks, groupTasks, hasBridge, type TaskGroup } from '@reflect/core'
 import { Input } from '@/components/ui/input'
 import { useRecentlyCompleted } from '@/lib/tasks/recently-completed'
@@ -19,6 +19,7 @@ import { routeForPath } from '@/routing/route'
 import { useRouter } from '@/routing/router'
 import { TaskFiltersMenu } from './task-filters-menu'
 import { TaskGroupSection } from './task-group-section'
+import { TaskScheduleCalendar } from './task-schedule-calendar'
 
 /** Keep only the groups the active filters allow (V1's per-bucket toggles). */
 function visibleGroups(groups: TaskGroup[], filters: TaskFilters): TaskGroup[] {
@@ -62,6 +63,7 @@ export function TasksScreen(): ReactElement {
   const { filters, toggle } = useTaskFilters()
   const [query, setQuery] = useState('')
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [scheduleOpen, setScheduleOpen] = useState(false)
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const enabled = hasBridge() && graph !== null
@@ -148,6 +150,17 @@ export function TasksScreen(): ReactElement {
     },
     [actions, selection, scrollToKey],
   )
+  // Schedule the current selection (the calendar / ⌘⇧S), then deselect (V1).
+  const onSchedule = useCallback(
+    (isoDate: string | null) => {
+      const tasks = [...selection.selected]
+        .map((key) => tasksByKey.get(key))
+        .filter((task): task is NonNullable<typeof task> => task !== undefined)
+      actions.schedule(tasks, isoDate)
+      selection.clear()
+    },
+    [actions, selection, tasksByKey],
+  )
   useTaskKeyboard({
     selection,
     actions,
@@ -159,6 +172,7 @@ export function TasksScreen(): ReactElement {
     rootRef,
     scrollToKey,
     onToggleFilters: () => setFiltersOpen((open) => !open),
+    onToggleSchedule: () => setScheduleOpen((open) => !open),
   })
 
   // Move focus into the Tasks surface on mount so the shortcuts work the moment
@@ -189,6 +203,22 @@ export function TasksScreen(): ReactElement {
             className="h-9 border-none bg-transparent pl-8 shadow-none focus-visible:ring-0"
           />
         </div>
+        {selection.selectedCount > 0 ? (
+          <TaskScheduleCalendar
+            open={scheduleOpen}
+            onOpenChange={setScheduleOpen}
+            today={today}
+            onSchedule={onSchedule}
+          >
+            <button
+              type="button"
+              className="flex flex-none items-center gap-2 rounded-md px-2 py-1 text-sm text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none"
+            >
+              <CalendarClock aria-hidden className="size-4" />
+              Schedule ({selection.selectedCount})
+            </button>
+          </TaskScheduleCalendar>
+        ) : null}
         {recentlyCompleted.length > 0 ? (
           <button
             type="button"

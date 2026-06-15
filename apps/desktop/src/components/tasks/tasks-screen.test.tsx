@@ -647,6 +647,29 @@ describe('TasksScreen', () => {
     view.unmount()
   })
 
+  it('scheduling the selection writes a due-date link to each task (V1)', async () => {
+    editTask.mockResolvedValue(undefined)
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] plan', text: 'plan', noteTitle: 'A' }),
+      task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] ship', text: 'ship', noteTitle: 'B' }),
+    ])
+    const view = renderScreen()
+
+    await view.findByText('plan')
+    await userEvent.keyboard('{Meta>}a{/Meta}') // select both (no editor)
+    await userEvent.click(view.getByRole('button', { name: /Schedule \(2\)/ }))
+    // Pick June 20 in the calendar (today mock = 2026-06-14, so it opens on June).
+    await userEvent.click(await view.findByText('20'))
+
+    await waitFor(() => expect(editTask).toHaveBeenCalledTimes(2))
+    expect(editTask).toHaveBeenCalledWith(
+      expect.objectContaining({ notePath: 'notes/a.md' }),
+      'plan [[2026-06-20]]',
+      1,
+    )
+    view.unmount()
+  })
+
   it('⌘↵ reopens a selection that is already all checked (toggle both ways, V1)', async () => {
     toggleTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([

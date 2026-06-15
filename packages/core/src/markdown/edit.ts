@@ -1,4 +1,6 @@
 import { parseNote } from './extract'
+import { normalizeWikiTarget } from './resolve'
+import { scanInlineWikiLinks } from './scan'
 import { parseTaskMarker } from './task-marker'
 import type { Heading, TaskMarker } from './model'
 
@@ -126,6 +128,42 @@ export function appendTaskLine(source: string): { source: string; markerOffset: 
   const base = source.replace(/\s*$/, '')
   const prefix = base.length > 0 ? `${base}\n- ` : '- '
   return { source: `${prefix}[ ] \n`, markerOffset: prefix.length }
+}
+
+/**
+ * Schedule a task by setting its due date to `isoDate` (a `YYYY-MM-DD`), working
+ * on the task's **content** — the markdown after the marker. A task's due date is
+ * the first calendar-valid `[[YYYY-MM-DD]]` link inside it (the same rule the
+ * projection reads), so this replaces that link's target when one exists, else
+ * appends `[[isoDate]]` to the content. Returned content is fed back through
+ * {@link editTaskLine}; the caller supplies a valid ISO date (the calendar only
+ * yields real days).
+ */
+export function setTaskDueDate(content: string, isoDate: string): string {
+  const existing = scanInlineWikiLinks(content).find(
+    (link) => normalizeWikiTarget(link.target).date !== undefined,
+  )
+  if (existing !== undefined) {
+    return content.slice(0, existing.from) + `[[${isoDate}]]` + content.slice(existing.to)
+  }
+  const trimmed = content.replace(/\s+$/, '')
+  return trimmed.length > 0 ? `${trimmed} [[${isoDate}]]` : `[[${isoDate}]]`
+}
+
+/**
+ * Unschedule a task: drop its first calendar-valid `[[YYYY-MM-DD]]` due-date link
+ * from the content (collapsing the surrounding whitespace), or return the content
+ * unchanged when it has no due date. The inverse of {@link setTaskDueDate}.
+ */
+export function clearTaskDueDate(content: string): string {
+  const existing = scanInlineWikiLinks(content).find(
+    (link) => normalizeWikiTarget(link.target).date !== undefined,
+  )
+  if (existing === undefined) {
+    return content
+  }
+  const removed = content.slice(0, existing.from) + content.slice(existing.to)
+  return removed.replace(/[ \t]{2,}/g, ' ').trim()
 }
 
 interface Splice {

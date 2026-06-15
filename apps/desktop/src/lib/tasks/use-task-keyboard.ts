@@ -27,6 +27,8 @@ export interface TaskKeyboardOptions {
   scrollToKey: (key: string | null) => void
   /** ⌘⇧E: open/close the "Task filters" menu (V1). */
   onToggleFilters: () => void
+  /** ⌘⇧S: open/close the schedule calendar for the selection (V1). */
+  onToggleSchedule: () => void
 }
 
 /** Elements that own their own keyboard nav — the shortcuts back off entirely. */
@@ -69,6 +71,7 @@ export function useTaskKeyboard({
   rootRef,
   scrollToKey,
   onToggleFilters,
+  onToggleSchedule,
 }: TaskKeyboardOptions): void {
   const handlerRef = useRef<(event: KeyboardEvent) => void>(() => {})
   handlerRef.current = (event) => {
@@ -83,6 +86,15 @@ export function useTaskKeyboard({
     if ((event.metaKey || event.ctrlKey) && event.shiftKey && (event.key === 'e' || event.key === 'E')) {
       event.preventDefault()
       onToggleFilters()
+      return
+    }
+    // ⌘⇧S opens/closes the schedule calendar for the selection (V1) — also a
+    // screen-level chord, but only when there's something to schedule.
+    if ((event.metaKey || event.ctrlKey) && event.shiftKey && (event.key === 's' || event.key === 'S')) {
+      if (selection.selectedCount > 0) {
+        event.preventDefault()
+        onToggleSchedule()
+      }
       return
     }
     const target = event.target as HTMLElement | null

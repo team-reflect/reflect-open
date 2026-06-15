@@ -48,6 +48,7 @@ function makeActions(over: Partial<TaskActions> = {}): TaskActions {
     insert: vi.fn().mockResolvedValue(null),
     insertAfter: vi.fn().mockResolvedValue(null),
     editAndComplete: vi.fn(),
+    schedule: vi.fn(),
     archive: vi.fn(),
     isPending: false,
     ...over,
@@ -79,6 +80,7 @@ function mount(options: {
   const setQuery = vi.fn()
   const scrollToKey = vi.fn()
   const onToggleFilters = vi.fn()
+  const onToggleSchedule = vi.fn()
   renderHook(() =>
     useTaskKeyboard({
       selection,
@@ -91,9 +93,10 @@ function mount(options: {
       rootRef: { current: root },
       scrollToKey,
       onToggleFilters,
+      onToggleSchedule,
     }),
   )
-  return { selection, actions, setQuery, scrollToKey, onToggleFilters }
+  return { selection, actions, setQuery, scrollToKey, onToggleFilters, onToggleSchedule }
 }
 
 /** Let the `void insert(...).then(...)` microtask settle before asserting. */
@@ -165,6 +168,18 @@ describe('useTaskKeyboard', () => {
     // Fires regardless of focus (it's a screen-level chord).
     press(input, 'e', { metaKey: true, shiftKey: true })
     expect(onToggleFilters).toHaveBeenCalledTimes(2)
+  })
+
+  it('opens the schedule calendar on ⌘⇧S only when something is selected', () => {
+    const withNone = mount({ selection: makeSelection({ selectedCount: 0 }) })
+    const noneEvent = press(root, 's', { metaKey: true, shiftKey: true })
+    expect(withNone.onToggleSchedule).not.toHaveBeenCalled()
+    expect(noneEvent.defaultPrevented).toBe(false)
+
+    const withSel = mount({ selection: makeSelection({ selectedCount: 2 }) })
+    const selEvent = press(root, 's', { metaKey: true, shiftKey: true })
+    expect(withSel.onToggleSchedule).toHaveBeenCalledTimes(1)
+    expect(selEvent.defaultPrevented).toBe(true)
   })
 
   it('plain ⌫ removes a single empty row and selects the previous (V1)', () => {

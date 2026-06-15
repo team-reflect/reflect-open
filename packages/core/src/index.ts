@@ -359,6 +359,8 @@ export {
   removeTaskLine,
   parseTaskMarker,
   renameWikiLink,
+  setTaskDueDate,
+  clearTaskDueDate,
   toggleTaskMarker,
   TaskStaleError,
   resolved,

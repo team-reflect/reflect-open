@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
-import { type OpenTask } from '@reflect/core'
+import { clearTaskDueDate, setTaskDueDate, type OpenTask } from '@reflect/core'
 import { deleteTask, editTask, insertTask, toggleTask } from '@/lib/note-task'
+import { taskContent } from '@/lib/tasks/task-content'
 import {
   archiveRecentlyCompleted,
   forgetRecentlyCompleted,
@@ -72,9 +73,21 @@ export interface TaskActions {
    * can't race each other on the same note line.
    */
   editAndComplete: (task: OpenTask, content: string) => void
+  /**
+   * Schedule a selection (⌘⇧S / the calendar, V1): set each task's due date to
+   * `isoDate`, or clear it when `isoDate` is null. Written as a content edit that
+   * adds/replaces the `[[YYYY-MM-DD]]` link the projection reads as the due date.
+   */
+  schedule: (tasks: OpenTask[], isoDate: string | null) => void
   /** Archive (⌘⇧↵): stop showing the session's completed tasks in the active list. */
   archive: () => void
   isPending: boolean
+}
+
+/** The content a scheduled/unscheduled task line carries after the marker. */
+function scheduledContent(task: OpenTask, isoDate: string | null): string {
+  const content = taskContent(task.raw)
+  return isoDate === null ? clearTaskDueDate(content) : setTaskDueDate(content, isoDate)
 }
 
 export function useTaskActions(): TaskActions {
@@ -187,6 +200,33 @@ export function useTaskActions(): TaskActions {
     onError: (cause, _vars, context) => cache.rollback(context, 'Editing task', cause),
   })
 
+  const scheduleMutation = useMutation({
+    mutationFn: async ({ tasks, isoDate }: { tasks: OpenTask[]; isoDate: string | null }) => {
+      const generation = graph?.generation
+      if (generation === undefined) {
+        throw new Error('No graph is open.')
+      }
+      // Sequential, like the other batch writes — tasks can share a note, and the
+      // core edit relocates by `raw`, so a same-note batch tolerates offset drift.
+      for (const task of tasks) {
+        await editTask(task, scheduledContent(task, isoDate), generation)
+      }
+    },
+    onMutate: async ({ tasks, isoDate }: { tasks: OpenTask[]; isoDate: string | null }) => {
+      const snapshot = await cache.snapshot()
+      // Show the new date link in place; the row only changes bucket once the
+      // reindex re-derives the due date (V1 likewise defers the move).
+      const patch = (rows: OpenTask[] | undefined): OpenTask[] | undefined =>
+        tasks.reduce<OpenTask[] | undefined>(
+          (acc, task) => withEditedTask(acc, task, scheduledContent(task, isoDate)),
+          rows,
+        )
+      cache.patch(patch, patch)
+      return snapshot
+    },
+    onError: (cause) => cache.reconcile('Scheduling tasks', cause),
+  })
+
   const insertMutation = useMutation({
     mutationFn: (target: InsertTaskTarget) => {
       const generation = graph?.generation
@@ -254,7 +294,8 @@ export function useTaskActions(): TaskActions {
       deleteMutation.isPending ||
       editMutation.isPending ||
       editAndCompleteMutation.isPending ||
-      insertMutation.isPending,
+      insertMutation.isPending ||
+      scheduleMutation.isPending,
     complete: (tasks) => {
       // ⌘↵ *completes*; with archived rows in the selection, toggling an
       // already-checked task would reopen it on disk. Only act on open rows.
@@ -329,6 +370,11 @@ export function useTaskActions(): TaskActions {
     editAndComplete: (task, content) => {
       if (graph?.generation !== undefined && !editAndCompleteMutation.isPending) {
         editAndCompleteMutation.mutate({ task, content })
+      }
+    },
+    schedule: (tasks, isoDate) => {
+      if (tasks.length > 0 && graph?.generation !== undefined && !scheduleMutation.isPending) {
+        scheduleMutation.mutate({ tasks, isoDate })
       }
     },
     archive: () => archiveRecentlyCompleted(root),
