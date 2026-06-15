@@ -1,10 +1,7 @@
 import { useCallback, useImperativeHandle, useRef, type ReactElement, type Ref } from 'react'
-import {
-  MeowdownEditor,
-  type EditorHandle,
-  type MarkMode,
-  type WikilinkSearchHandler,
-} from '@meowdown/react'
+import { type MarkMode } from '@meowdown/core'
+import { MeowdownEditor, type EditorHandle, type WikilinkSearchHandler } from '@meowdown/react'
+import '@meowdown/core/style.css'
 import '@meowdown/react/style.css'
 import { cn } from '@/lib/utils'
 
@@ -120,7 +117,7 @@ export function NoteEditor({
     [],
   )
   const handleImageSaveError = useCallback(
-    (error: Error, file: File) => onImageSaveErrorRef.current?.(error, file),
+    (error: unknown, file: File) => onImageSaveErrorRef.current?.(error, file),
     [],
   )
 

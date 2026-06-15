@@ -200,8 +200,8 @@ body {
 }
 
 /* ---- Editor (Plan 05) ------------------------------------------------------
-   meowdown ships a default editor theme (`@meowdown/react/style.css`, imported
-   by the `editor/meowdown` bridge) driven by `--meowdown-*` variables —
+   meowdown ships a default editor theme (`@meowdown/core/style.css`, imported
+   by the editor components) driven by `--meowdown-*` variables,
    including markdown-syntax visibility per the MarkMode `data-mark-mode` /
    `.show` contract, tag pills, wikilink styling, and selection colors scoped
    under the `.meowdown` wrapper the NoteEditor renders. We remap its variables

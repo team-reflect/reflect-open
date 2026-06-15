@@ -1,4 +1,4 @@
-import { EDITOR_KEY_BINDINGS } from '@meowdown/react'
+import { EDITOR_KEY_BINDINGS } from '@meowdown/core'
 
 /**
  * The central keymap registry (Plan 05 step 9). Every shortcut the app binds —

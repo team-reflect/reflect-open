@@ -1,5 +1,6 @@
 import { useCallback, useLayoutEffect, useRef, type ReactElement } from 'react'
 import { MeowdownEditor, type EditorHandle } from '@meowdown/react'
+import '@meowdown/core/style.css'
 import '@meowdown/react/style.css'
 import { cn } from '@/lib/utils'
 

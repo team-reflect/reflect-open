@@ -6,4 +6,4 @@
  * note protected (read-only) rather than letting a converter gap silently
  * rewrite the file.
  */
-export { checkRoundTrip, type RoundTripFidelity } from '@meowdown/react'
+export { checkRoundTrip, type RoundTripFidelity } from '@meowdown/core'
