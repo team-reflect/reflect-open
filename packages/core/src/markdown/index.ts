@@ -16,6 +16,7 @@ export {
   type MarkdownLink,
   type Heading,
   type AssetRef,
+  type TaskMarker,
   type ParsedNote,
 } from './model'
 export {

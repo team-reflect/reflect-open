@@ -1,5 +1,6 @@
 import { parseNote } from './extract'
-import type { Heading } from './model'
+import { parseTaskMarker } from './task-marker'
+import type { Heading, TaskMarker } from './model'
 
 /**
  * Source-level edit helpers (Plan 03). These splice the original string by node
@@ -7,9 +8,6 @@ import type { Heading } from './model'
  * thus sync diffs (Plan 12) — stay minimal. (Frontmatter edits live in
  * `frontmatter.ts`'s `upsertFrontmatter`.)
  */
-
-/** The three GFM checkbox markers a task line can carry (`[X]` is GitHub-valid). */
-const TASK_MARKERS = new Set(['[ ]', '[x]', '[X]'])
 
 /**
  * The indexed task no longer matches the source, so toggling it would edit the
@@ -55,18 +53,18 @@ function locateTaskMarker(source: string, markerOffset: number, raw: string): nu
  */
 export function toggleTaskMarker(
   source: string,
-  task: { markerOffset: number; raw: string },
+  task: TaskMarker,
 ): { source: string; checked: boolean } {
   const offset = locateTaskMarker(source, task.markerOffset, task.raw)
   const marker = source.slice(offset, offset + 3)
-  if (!TASK_MARKERS.has(marker)) {
+  const parsed = parseTaskMarker(marker)
+  if (parsed === null) {
     throw new TaskStaleError(`no task marker at offset ${offset}: ${JSON.stringify(marker)}`)
   }
-  const wasChecked = marker !== '[ ]'
-  const next = wasChecked ? '[ ]' : '[x]'
+  const next = parsed.checked ? '[ ]' : '[x]'
   return {
     source: source.slice(0, offset) + next + source.slice(offset + 3),
-    checked: !wasChecked,
+    checked: !parsed.checked,
   }
 }
 

@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react'
 import type { TaskGroup } from '@reflect/core'
+import { taskKey } from '@/lib/tasks/task-identity'
 import { TaskRow } from './task-row'
 
 interface TaskGroupSectionProps {
@@ -34,7 +35,7 @@ export function TaskGroupSection({ group, onOpen }: TaskGroupSectionProps): Reac
       <ul className="space-y-1.5">
         {group.tasks.map((task) => (
           <TaskRow
-            key={`${task.notePath}:${task.markerOffset}`}
+            key={taskKey(task)}
             task={task}
             showSource={showSource}
             onOpen={onOpen}

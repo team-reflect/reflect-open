@@ -1,13 +1,9 @@
-import { readNote, toggleTaskMarker, writeNote } from '@reflect/core'
+import { readNote, toggleTaskMarker, writeNote, type TaskMarker } from '@reflect/core'
 import { openSession } from '@/editor/open-documents'
 
-/** The coordinates the Tasks view carries for a guarded checkbox write-back. */
-export interface TaskRef {
+/** The marker coordinates ({@link TaskMarker}) plus the note they live in. */
+export interface TaskRef extends TaskMarker {
   notePath: string
-  /** Character offset of the marker's `[` in the file (UTF-16 units). */
-  markerOffset: number
-  /** The marker line verbatim — the staleness guard / relocation key. */
-  raw: string
 }
 
 /**
@@ -40,7 +36,9 @@ export class NoteBusyError extends Error {
  * `TaskStaleError` (from {@link toggleTaskMarker}) rather than a silent wrong write.
  */
 export async function toggleTask(task: TaskRef, generation: number): Promise<void> {
-  const marker = { markerOffset: task.markerOffset, raw: task.raw }
+  // Pass only the marker coordinates onward — neither the session nor the disk
+  // toggle needs (or should depend on) the note path beyond locating the owner.
+  const marker: TaskMarker = { markerOffset: task.markerOffset, raw: task.raw }
   const owner = openSession(task.notePath)
   if (owner !== null) {
     if (await owner.commitTaskToggle(marker)) {

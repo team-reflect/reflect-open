@@ -143,26 +143,36 @@ export interface AssetRef extends Span {
 }
 
 /**
- * A GFM checkbox item (`- [ ] text` / `- [x] text`) — the unit the Tasks view
- * (Plan 18) projects across the graph. Every checkbox is a task; there is no
- * invented syntax, so the files stay meaningful in any markdown tool.
+ * The write-back coordinates of one task's checkbox: where its marker sits and
+ * what its line looked like. Carried from the index to the toggle ({@link
+ * toggleTaskMarker}); `raw` is the staleness guard that lets the toggle relocate
+ * the marker — or refuse — when the file drifted under it. {@link ParsedTask}
+ * extends this with the rendered text and checked state.
  */
-export interface ParsedTask {
-  /** Inline text of the item's marker line, markdown stripped, for display + search. */
-  text: string
-  /**
-   * Exact source of the marker's physical line — the write-back staleness guard.
-   * Begins with the three-character marker, so `raw.slice(0, 3)` is `[ ]`/`[x]`.
-   */
-  raw: string
-  /** `[x]`/`[X]` → true, `[ ]` → false. */
-  checked: boolean
+export interface TaskMarker {
   /**
    * Character offset of the marker's `[` in the **original** file (UTF-16 code
    * units, the unit Lezer reports — never UTF-8 bytes). The toggle splices the
    * three marker characters here after re-confirming {@link raw}.
    */
   markerOffset: number
+  /**
+   * Exact source of the marker's physical line — the write-back staleness guard.
+   * Begins with the three-character marker, so `raw.slice(0, 3)` is `[ ]`/`[x]`.
+   */
+  raw: string
+}
+
+/**
+ * A GFM checkbox item (`- [ ] text` / `- [x] text`) — the unit the Tasks view
+ * (Plan 18) projects across the graph. Every checkbox is a task; there is no
+ * invented syntax, so the files stay meaningful in any markdown tool.
+ */
+export interface ParsedTask extends TaskMarker {
+  /** Inline text of the item's marker line, markdown stripped, for display + search. */
+  text: string
+  /** `[x]`/`[X]` → true, `[ ]` → false. */
+  checked: boolean
 }
 
 /** Version of the extraction contract; bump on breaking shape changes. */

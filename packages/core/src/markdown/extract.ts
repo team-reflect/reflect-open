@@ -3,6 +3,8 @@ import { parseFrontmatter, splitFrontmatter } from './frontmatter'
 import { parseBody } from './grammar'
 import { foldTag } from './keys'
 import { parseInlineLink } from './link-syntax'
+import { buildPlainText, plainTextOfRange, unescapeMarkdownText } from './plain-text'
+import { parseTaskMarker } from './task-marker'
 import type {
   AssetRef,
   Frontmatter,
@@ -37,14 +39,6 @@ const TAG_NAME_RE = /^\p{L}[\p{L}\p{N}/_-]*$/u
  */
 export function isTagName(value: string): boolean {
   return TAG_NAME_RE.test(value)
-}
-// Inner of a wiki link, for plain-text rendering.
-const WIKI_INNER_RE = /\[\[([^\]\n]*)\]\]/g
-// CommonMark backslash escapes are visible in source, but not rendered text.
-const MARKDOWN_ESCAPE_RE = /\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g
-
-function unescapeMarkdownText(text: string): string {
-  return text.replace(MARKDOWN_ESCAPE_RE, '$1')
 }
 
 /** Names whose source range is markup to drop from plain text. */
@@ -137,83 +131,6 @@ function readLink(body: string, from: number, to: number, offset: number): Markd
   return { href, text, from: from + offset, to: to + offset, domain: hostOf(href) }
 }
 
-function renderMarkdownText(text: string): string {
-  return text
-    .replace(WIKI_INNER_RE, (_, inner: string) => inner.replace(/\|/g, ' '))
-    .replace(MARKDOWN_ESCAPE_RE, '$1')
-}
-
-function appendPlainTextChunk(
-  body: string,
-  from: number,
-  to: number,
-  literalRanges: Span[],
-): string {
-  let kept = ''
-  let cursor = from
-  for (const literalRange of literalRanges) {
-    if (literalRange.to <= cursor) {
-      continue
-    }
-    if (literalRange.from >= to) {
-      break
-    }
-
-    const literalFrom = Math.max(cursor, literalRange.from)
-    const literalTo = Math.min(to, literalRange.to)
-    if (cursor < literalFrom) {
-      kept += renderMarkdownText(body.slice(cursor, literalFrom))
-    }
-    kept += body.slice(literalFrom, literalTo)
-    cursor = literalTo
-  }
-  if (cursor < to) {
-    kept += renderMarkdownText(body.slice(cursor, to))
-  }
-  return kept
-}
-
-/**
- * Plain text of `[start, end)` minus the cut (syntax) ranges, with wiki
- * brackets/pipes flattened. Shared by the whole-body plain text and per-task
- * text so a task renders exactly as the note's body does (emphasis marks and
- * the `[ ]` TaskMarker dropped, code kept literal).
- */
-function plainTextOfRange(
-  body: string,
-  start: number,
-  end: number,
-  cuts: Span[],
-  literalRanges: Span[],
-): string {
-  const sorted = [...cuts].sort((a, b) => a.from - b.from)
-  const sortedLiteralRanges = [...literalRanges].sort((a, b) => a.from - b.from)
-  let kept = ''
-  let pos = start
-  for (const cut of sorted) {
-    if (cut.to <= start) {
-      continue
-    }
-    if (cut.from >= end) {
-      break
-    }
-    const cutFrom = Math.max(start, cut.from)
-    if (cutFrom > pos) {
-      kept += appendPlainTextChunk(body, pos, cutFrom, sortedLiteralRanges)
-    }
-    pos = Math.max(pos, Math.min(end, cut.to))
-  }
-  if (pos < end) {
-    kept += appendPlainTextChunk(body, pos, end, sortedLiteralRanges)
-  }
-  return kept.replace(/\s+/g, ' ').trim()
-}
-
-/** Body text minus the cut (syntax) ranges, with wiki brackets/pipes flattened. */
-function buildPlainText(body: string, cuts: Span[], literalRanges: Span[]): string {
-  return plainTextOfRange(body, 0, body.length, cuts, literalRanges)
-}
-
 /**
  * Resolve a `Task` Lezer node (the marker starts at `from`) into a
  * {@link ParsedTask}, or `null` when the marker shape isn't a real GFM checkbox
@@ -227,11 +144,8 @@ function readTask(
   cuts: Span[],
   literalRanges: Span[],
 ): ParsedTask | null {
-  if (body[from] !== '[' || body[from + 2] !== ']') {
-    return null
-  }
-  const mark = body[from + 1]
-  if (mark !== ' ' && mark !== 'x' && mark !== 'X') {
+  const marker = parseTaskMarker(body.slice(from, from + 3))
+  if (marker === null) {
     return null
   }
   const newline = body.indexOf('\n', from)
@@ -239,7 +153,7 @@ function readTask(
   return {
     text: plainTextOfRange(body, from, lineEnd, cuts, literalRanges),
     raw: body.slice(from, lineEnd),
-    checked: mark === 'x' || mark === 'X',
+    checked: marker.checked,
     markerOffset: from + bodyOffset,
   }
 }

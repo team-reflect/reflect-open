@@ -1,7 +1,13 @@
 import type { Database } from '@reflect/db'
 import { sql, type Selectable } from 'kysely'
 import { readNote } from '../graph/commands'
-import { foldTag, normalizeWikiTarget, resolveWikiLinkAsync, type Resolution } from '../markdown'
+import {
+  foldTag,
+  normalizeWikiTarget,
+  resolveWikiLinkAsync,
+  type Resolution,
+  type TaskMarker,
+} from '../markdown'
 import { db } from './db'
 import { buildFtsMatch } from './search-query'
 import { lineSnippet } from './snippet'
@@ -89,17 +95,15 @@ export async function getBacklinksWithContext(path: string): Promise<BacklinkCon
  * Current/Overdue/Upcoming off it; `isPinned`/`pinnedOrder`/`updatedAt` order the
  * per-note groups for tasks in regular (dateless) notes.
  */
-export interface OpenTask {
+export interface OpenTask extends TaskMarker {
   notePath: string
-  /** Marker offset + raw line: the surgical write-back's coordinates (Plan 18 PR3). */
-  markerOffset: number
-  raw: string
   /** Display text, markdown stripped. */
   text: string
   noteTitle: string
   /** ISO date for daily-note tasks; null for tasks in regular notes. */
   dailyDate: string | null
-  isPinned: number
+  /** Pin flag mapped to a real boolean at the read boundary (SQLite stores `0|1`). */
+  isPinned: boolean
   pinnedOrder: number | null
   updatedAt: number
 }
@@ -113,8 +117,8 @@ export interface OpenTask {
  * The ordering here is only for a deterministic result; the final grouping and
  * sort live in {@link groupTasks}, so this read just gathers the rows.
  */
-export function getOpenTasks(): Promise<OpenTask[]> {
-  return db
+export async function getOpenTasks(): Promise<OpenTask[]> {
+  const rows = await db
     .selectFrom('tasks')
     .innerJoin('notes', 'notes.path', 'tasks.notePath')
     .where('tasks.checked', '=', 0)
@@ -132,6 +136,9 @@ export function getOpenTasks(): Promise<OpenTask[]> {
     .orderBy('tasks.notePath')
     .orderBy('tasks.markerOffset')
     .execute()
+  // Map the SQLite `0|1` flag to a real boolean at the read boundary, like the
+  // other note getters — so `groupTasks` orders on a boolean, not a raw integer.
+  return rows.map((row) => ({ ...row, isPinned: row.isPinned !== 0 }))
 }
 
 /** Distinct source paths of links whose folded target key is `targetKey`. */

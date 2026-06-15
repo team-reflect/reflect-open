@@ -1,7 +1,8 @@
-import { useEffect, useRef, type KeyboardEvent, type ReactElement } from 'react'
+import { useState, type KeyboardEvent, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getOpenTasks, groupTasks, hasBridge } from '@reflect/core'
 import { tasksQueryKey } from '@/lib/tasks/tasks-query'
+import { useScrollRestoration } from '@/lib/use-scroll-restoration'
 import { useToday } from '@/lib/use-today'
 import { useGraph } from '@/providers/graph-provider'
 import { routeForPath } from '@/routing/route'
@@ -30,15 +31,18 @@ function moveTaskFocus(event: KeyboardEvent<HTMLDivElement>): void {
  * The Tasks view (Plan 18): every open checkbox across the graph, grouped
  * Current / Overdue / Upcoming (by the source note's daily date) and then by
  * note, read from the SQLite projection and kept fresh by the index
- * invalidation hook — no polling. Completing a task from here lands in PR3, so
- * the rows open their source note for now. Owns its scroll container so the
- * header stays put; per-entry scroll memory mirrors All Notes.
+ * invalidation hook — no polling. A row's checkbox completes the task (the
+ * guarded write-back, optimistically dropping the row); its text opens the
+ * source note. Owns its scroll container so the header stays put; per-entry
+ * scroll memory mirrors All Notes.
  */
 export function TasksScreen(): ReactElement {
   const { graph } = useGraph()
-  const { arrivalSeq, entryId, navigate, saveScrollState, savedScroll } = useRouter()
+  const { navigate } = useRouter()
   const today = useToday()
-  const scrollRef = useRef<HTMLDivElement | null>(null)
+  // State, not a ref, so the scroll-restore effect re-runs once the container
+  // mounts (the All Notes shape — see useScrollRestoration).
+  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
 
   const { data: tasks, isError } = useQuery({
     queryKey: tasksQueryKey(graph?.root),
@@ -46,15 +50,8 @@ export function TasksScreen(): ReactElement {
     enabled: hasBridge() && graph !== null,
   })
 
-  // Restore the saved offset on back/forward; reset to the top on re-arrival
-  // (the router clears the offset for that case). Gated on the rows being
-  // loaded so a restore against an empty list can't clamp the position to 0.
   const ready = tasks !== undefined
-  useEffect(() => {
-    if (ready && scrollRef.current) {
-      scrollRef.current.scrollTop = savedScroll() ?? 0
-    }
-  }, [arrivalSeq, entryId, ready, savedScroll])
+  const { onScroll } = useScrollRestoration(scrollElement, ready)
 
   const groups = tasks ? groupTasks(tasks, today) : []
 
@@ -64,8 +61,8 @@ export function TasksScreen(): ReactElement {
         <h1 className="text-[15px] font-semibold text-text">Tasks</h1>
       </header>
       <div
-        ref={scrollRef}
-        onScroll={(event) => saveScrollState(event.currentTarget.scrollTop)}
+        ref={setScrollElement}
+        onScroll={onScroll}
         onKeyDown={moveTaskFocus}
         className="min-h-0 flex-1 overflow-auto px-4 py-6 lg:px-12"
       >

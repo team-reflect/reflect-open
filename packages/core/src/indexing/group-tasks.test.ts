@@ -13,7 +13,7 @@ function task(overrides: Partial<OpenTask> = {}): OpenTask {
     text: 'do it',
     noteTitle: 'N',
     dailyDate: null,
-    isPinned: 0,
+    isPinned: false,
     pinnedOrder: null,
     updatedAt: 0,
     ...overrides,
@@ -75,9 +75,9 @@ describe('groupTasks', () => {
       [
         task({ notePath: 'notes/old.md', noteTitle: 'Old', updatedAt: 100 }),
         task({ notePath: 'notes/new.md', noteTitle: 'New', updatedAt: 200 }),
-        task({ notePath: 'notes/pin2.md', noteTitle: 'Pin2', isPinned: 1, pinnedOrder: 2 }),
-        task({ notePath: 'notes/pin1.md', noteTitle: 'Pin1', isPinned: 1, pinnedOrder: 1 }),
-        task({ notePath: 'notes/pinbare.md', noteTitle: 'PinBare', isPinned: 1, pinnedOrder: null }),
+        task({ notePath: 'notes/pin2.md', noteTitle: 'Pin2', isPinned: true, pinnedOrder: 2 }),
+        task({ notePath: 'notes/pin1.md', noteTitle: 'Pin1', isPinned: true, pinnedOrder: 1 }),
+        task({ notePath: 'notes/pinbare.md', noteTitle: 'PinBare', isPinned: true, pinnedOrder: null }),
       ],
       TODAY,
     )

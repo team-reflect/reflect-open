@@ -1,10 +1,10 @@
-import { parseNote, TaskStaleError } from '@reflect/core'
+import { parseNote, TaskStaleError, type TaskMarker } from '@reflect/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createNoteSession, type NoteSessionSnapshot } from './note-session'
 import type { RoundTripFidelity } from './roundtrip'
 
-/** The first task's `{ markerOffset, raw }` as the index records it. */
-function firstTask(source: string): { markerOffset: number; raw: string } {
+/** The first task's {@link TaskMarker} as the index records it. */
+function firstTask(source: string): TaskMarker {
   const [task] = parseNote({ path: 'notes/a.md', source }).tasks
   return { markerOffset: task.markerOffset, raw: task.raw }
 }

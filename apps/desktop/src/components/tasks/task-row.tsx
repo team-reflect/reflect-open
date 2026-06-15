@@ -1,11 +1,7 @@
 import type { ReactElement } from 'react'
 import { CheckSquare, Square } from 'lucide-react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { errorMessage, type OpenTask } from '@reflect/core'
-import { toggleTask } from '@/lib/note-task'
-import { startOperation } from '@/lib/operations'
-import { tasksQueryKey } from '@/lib/tasks/tasks-query'
-import { useGraph } from '@/providers/graph-provider'
+import type { OpenTask } from '@reflect/core'
+import { useCompleteTask } from '@/lib/tasks/use-complete-task'
 
 interface TaskRowProps {
   task: OpenTask
@@ -23,39 +19,8 @@ interface TaskRowProps {
  * the reason (stale index, or the note is busy) via the operations toast.
  */
 export function TaskRow({ task, showSource, onOpen }: TaskRowProps): ReactElement {
-  const { graph } = useGraph()
-  const queryClient = useQueryClient()
-  const key = tasksQueryKey(graph?.root)
+  const { complete, isPending } = useCompleteTask(task)
   const label = task.text || 'Empty task'
-
-  const mutation = useMutation({
-    mutationFn: (generation: number) => toggleTask(task, generation),
-    onMutate: async () => {
-      // Drop the row now so completing feels instant; the reindex reconciles.
-      await queryClient.cancelQueries({ queryKey: key })
-      const previous = queryClient.getQueryData<OpenTask[]>(key)
-      queryClient.setQueryData<OpenTask[]>(key, (rows) =>
-        rows?.filter(
-          (row) => row.notePath !== task.notePath || row.markerOffset !== task.markerOffset,
-        ),
-      )
-      return { previous }
-    },
-    onError: (cause, _generation, context) => {
-      if (context?.previous !== undefined) {
-        queryClient.setQueryData(key, context.previous)
-      }
-      startOperation('Completing task').fail(errorMessage(cause))
-    },
-  })
-
-  const onComplete = (): void => {
-    const generation = graph?.generation
-    if (generation === undefined || mutation.isPending) {
-      return
-    }
-    mutation.mutate(generation)
-  }
 
   return (
     <li className="flex items-start gap-2">
@@ -63,11 +28,11 @@ export function TaskRow({ task, showSource, onOpen }: TaskRowProps): ReactElemen
         type="button"
         data-task-row
         aria-label={`Complete: ${label}`}
-        disabled={mutation.isPending}
-        onClick={onComplete}
+        disabled={isPending}
+        onClick={complete}
         className="mt-0.5 shrink-0 text-text-muted hover:text-text focus-visible:text-text focus-visible:outline-none"
       >
-        {mutation.isPending ? (
+        {isPending ? (
           <CheckSquare aria-hidden className="size-4" strokeWidth={1.75} />
         ) : (
           <Square aria-hidden className="size-4" strokeWidth={1.75} />

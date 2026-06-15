@@ -5,6 +5,7 @@ import {
   toggleTaskMarker,
   upsertFrontmatter,
   type GistFrontmatter,
+  type TaskMarker,
 } from '@reflect/core'
 import type { RoundTripFidelity } from './roundtrip'
 
@@ -271,7 +272,7 @@ export interface NoteSession {
    * the editor, so a normalizing-fidelity note normalizes like any edit (an
    * exact-fidelity note stays byte-identical apart from the marker).
    */
-  commitTaskToggle: (task: { markerOffset: number; raw: string }) => Promise<boolean>
+  commitTaskToggle: (task: TaskMarker) => Promise<boolean>
   /** Flush pending edits and detach: no further snapshots are emitted. */
   dispose: () => void
   /**
@@ -668,7 +669,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     return true
   }
 
-  async function commitTaskToggle(task: { markerOffset: number; raw: string }): Promise<boolean> {
+  async function commitTaskToggle(task: TaskMarker): Promise<boolean> {
     // Refuse when the session can't safely take a body edit: no write channel,
     // disposed, protected (read-only), still loading, or a parked conflict. The
     // caller then refuses rather than risk a disk write clobbering the buffer.

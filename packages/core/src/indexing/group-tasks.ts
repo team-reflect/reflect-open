@@ -36,26 +36,44 @@ function compareDated(left: OpenTask, right: OpenTask): number {
 }
 
 /**
- * Order the per-note groups: pinned notes first (by explicit `pinnedOrder`, bare
- * `pinned: true` last), then by most-recently edited, then by path for a stable
- * tiebreak. Each group's note metadata is shared by all its tasks, so the first
- * task carries the sort key.
+ * Compare two notes by pin shelf precedence: pinned before unpinned, then
+ * numbered pins (`pinned: <n>`, ascending) before bare `pinned: true`. Returns 0
+ * when the two share a rank, leaving the caller's own tiebreak (recency, title)
+ * to decide. This is the one JS expression of the order the sidebar's pinned list
+ * encodes in SQL ({@link getPinnedNotes}), so the two can't drift.
+ */
+function comparePinPrecedence(
+  left: Pick<OpenTask, 'isPinned' | 'pinnedOrder'>,
+  right: Pick<OpenTask, 'isPinned' | 'pinnedOrder'>,
+): number {
+  if (left.isPinned !== right.isPinned) {
+    return left.isPinned ? -1 : 1 // pinned before unpinned
+  }
+  if (!left.isPinned) {
+    return 0 // both unpinned — no pin-derived order
+  }
+  const { pinnedOrder: leftOrder } = left
+  const { pinnedOrder: rightOrder } = right
+  if (leftOrder !== null && rightOrder !== null && leftOrder !== rightOrder) {
+    return leftOrder - rightOrder
+  }
+  if ((leftOrder === null) !== (rightOrder === null)) {
+    return leftOrder === null ? 1 : -1 // numbered pins before bare ones
+  }
+  return 0
+}
+
+/**
+ * Order the per-note groups: pinned notes first ({@link comparePinPrecedence}),
+ * then by most-recently edited, then by path for a stable tiebreak. Each group's
+ * note metadata is shared by all its tasks, so the first task carries the sort key.
  */
 function compareNoteGroups(left: TaskGroup, right: TaskGroup): number {
   const first = left.tasks[0]
   const second = right.tasks[0]
-  if (first.isPinned !== second.isPinned) {
-    return second.isPinned - first.isPinned // pinned (1) before unpinned (0)
-  }
-  if (first.isPinned === 1) {
-    const leftOrder = first.pinnedOrder
-    const rightOrder = second.pinnedOrder
-    if (leftOrder !== null && rightOrder !== null && leftOrder !== rightOrder) {
-      return leftOrder - rightOrder
-    }
-    if ((leftOrder === null) !== (rightOrder === null)) {
-      return leftOrder === null ? 1 : -1 // numbered pins before bare ones
-    }
+  const byPin = comparePinPrecedence(first, second)
+  if (byPin !== 0) {
+    return byPin
   }
   if (first.updatedAt !== second.updatedAt) {
     return second.updatedAt - first.updatedAt // most recent first

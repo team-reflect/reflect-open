@@ -1,7 +1,8 @@
-import { useEffect, useState, type ReactElement } from 'react'
+import { useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { foldTag, hasBridge, listNotes, listNoteTags } from '@reflect/core'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { useScrollRestoration } from '@/lib/use-scroll-restoration'
 import { useGraph } from '@/providers/graph-provider'
 import { routeForPath } from '@/routing/route'
 import { useRouter } from '@/routing/router'
@@ -26,7 +27,7 @@ interface AllNotesScreenProps {
  */
 export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   const { graph } = useGraph()
-  const { arrivalSeq, entryId, navigate, saveScrollState, savedScroll } = useRouter()
+  const { navigate } = useRouter()
   // The scroll container lives in state, not a ref: the virtualizer down in
   // AllNotesTable reads it via getScrollElement, and a plain ref would be null
   // during the table's mount-time layout effect (refs on ancestor DOM nodes
@@ -48,19 +49,8 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
     enabled,
   })
 
-  // Per-entry scroll memory (ScrollRestored's contract): restore on
-  // back/forward, reset to the top for a fresh entry. `arrivalSeq` covers
-  // re-arrival on the same entry (sidebar/palette while already here) — the
-  // router clears the saved offset for that case, so the list re-anchors to
-  // the top like the daily stream does. Gated on the rows being loaded —
-  // restoring against an empty (zero-height) list would clamp the offset to 0
-  // and lose the position.
   const ready = notes !== undefined
-  useEffect(() => {
-    if (ready && scrollElement) {
-      scrollElement.scrollTop = savedScroll() ?? 0
-    }
-  }, [arrivalSeq, entryId, ready, savedScroll, scrollElement])
+  const { onScroll } = useScrollRestoration(scrollElement, ready)
 
   return (
     <div aria-label="All notes" className="flex h-full min-h-0 flex-col">
@@ -78,7 +68,7 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
       <div
         ref={setScrollElement}
         data-testid="all-notes-scroll"
-        onScroll={(event) => saveScrollState(event.currentTarget.scrollTop)}
+        onScroll={onScroll}
         className="min-h-0 flex-1 overflow-auto"
       >
         <AllNotesTable
