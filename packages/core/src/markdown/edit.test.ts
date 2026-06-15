@@ -3,6 +3,8 @@ import { parseNote } from './extract'
 import {
   appendBlock,
   appendUnderHeading,
+  editTaskLine,
+  removeTaskLine,
   renameWikiLink,
   TaskStaleError,
   toggleTaskMarker,
@@ -151,5 +153,102 @@ describe('toggleTaskMarker', () => {
     const once = toggleTaskMarker(source, indexedTask(source))
     const twice = toggleTaskMarker(once.source, indexedTask(once.source))
     expect(twice.source).toBe(source)
+  })
+})
+
+describe('editTaskLine', () => {
+  /** The first task's `{ markerOffset, raw }` as the index would record it. */
+  function indexedTask(source: string) {
+    const [task] = parseNote({ path: 'notes/n.md', source }).tasks
+    return { markerOffset: task.markerOffset, raw: task.raw }
+  }
+
+  it('replaces the content after the marker, keeping bullet and marker', () => {
+    const source = '# Todo\n\n- [ ] buy milk\n- [ ] call mum\n'
+    expect(editTaskLine(source, indexedTask(source), 'buy oat milk')).toBe(
+      '# Todo\n\n- [ ] buy oat milk\n- [ ] call mum\n',
+    )
+  })
+
+  it('preserves a checked marker and the line ending', () => {
+    const source = '- [x] done\n'
+    expect(editTaskLine(source, indexedTask(source), 'really done')).toBe('- [x] really done\n')
+  })
+
+  it('keeps the indentation and bullet style of a nested item', () => {
+    const source = '  * [ ] nested task\n'
+    expect(editTaskLine(source, indexedTask(source), 'edited')).toBe('  * [ ] edited\n')
+  })
+
+  it('trims surrounding whitespace from the new content', () => {
+    const source = '- [ ] a\n'
+    expect(editTaskLine(source, indexedTask(source), '  spaced  ')).toBe('- [ ] spaced\n')
+  })
+
+  it('rewrites links and tags in the new content verbatim', () => {
+    const source = '- [ ] plain\n'
+    expect(editTaskLine(source, indexedTask(source), 'ship [[2026-07-01]] #release')).toBe(
+      '- [ ] ship [[2026-07-01]] #release\n',
+    )
+  })
+
+  it('clears to a bare marker when the content is empty', () => {
+    const source = '- [ ] gone soon\n'
+    expect(editTaskLine(source, indexedTask(source), '   ')).toBe('- [ ]\n')
+  })
+
+  it('relocates by the raw line when an edit above shifted the offset', () => {
+    const source = '- [ ] buy milk\n'
+    const stale = indexedTask(source)
+    expect(editTaskLine(`Intro.\n\n${source}`, stale, 'buy oat milk')).toBe(
+      'Intro.\n\n- [ ] buy oat milk\n',
+    )
+  })
+
+  it('refuses content with an embedded newline (would split the item)', () => {
+    const source = '- [ ] one\n'
+    expect(() => editTaskLine(source, indexedTask(source), 'one\n- [ ] two')).toThrow(TaskStaleError)
+  })
+
+  it('refuses loudly when the task line is gone', () => {
+    const source = '- [ ] buy milk\n'
+    const task = indexedTask(source)
+    expect(() => editTaskLine('- [ ] something else\n', task, 'x')).toThrow(TaskStaleError)
+  })
+})
+
+describe('removeTaskLine', () => {
+  function indexedTask(source: string, index = 0) {
+    const task = parseNote({ path: 'notes/n.md', source }).tasks[index]
+    return { markerOffset: task.markerOffset, raw: task.raw }
+  }
+
+  it('removes a middle task line and closes the gap', () => {
+    const source = '- [ ] a\n- [ ] b\n- [ ] c\n'
+    expect(removeTaskLine(source, indexedTask(source, 1))).toBe('- [ ] a\n- [ ] c\n')
+  })
+
+  it('removes the first task line', () => {
+    const source = '- [ ] a\n- [ ] b\n'
+    expect(removeTaskLine(source, indexedTask(source, 0))).toBe('- [ ] b\n')
+  })
+
+  it('empties a note whose only line was the task', () => {
+    expect(removeTaskLine('- [ ] only\n', indexedTask('- [ ] only\n'))).toBe('')
+  })
+
+  it('removes a final task with no trailing newline, keeping the line above', () => {
+    const source = 'intro\n- [ ] last'
+    expect(removeTaskLine(source, indexedTask(source))).toBe('intro\n')
+  })
+
+  it('leaves surrounding prose intact', () => {
+    const source = '# Notes\n\n- [ ] task\n\nMore prose.\n'
+    expect(removeTaskLine(source, indexedTask(source))).toBe('# Notes\n\n\nMore prose.\n')
+  })
+
+  it('refuses loudly when the task line is gone', () => {
+    const task = indexedTask('- [ ] buy milk\n')
+    expect(() => removeTaskLine('- [ ] something else\n', task)).toThrow(TaskStaleError)
   })
 })

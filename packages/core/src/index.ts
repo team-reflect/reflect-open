@@ -354,6 +354,8 @@ export {
   parseNote,
   appendBlock,
   appendUnderHeading,
+  editTaskLine,
+  removeTaskLine,
   renameWikiLink,
   toggleTaskMarker,
   TaskStaleError,

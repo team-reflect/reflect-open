@@ -39,6 +39,8 @@ export {
 export {
   appendBlock,
   appendUnderHeading,
+  editTaskLine,
+  removeTaskLine,
   renameWikiLink,
   toggleTaskMarker,
   TaskStaleError,

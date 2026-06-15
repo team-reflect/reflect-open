@@ -72,6 +72,47 @@ export function toggleTaskMarker(
   }
 }
 
+/**
+ * Replace a task's content — everything after its `[ ]`/`[x]` marker — with
+ * `content`, leaving the list bullet, indentation, and the marker (and so its
+ * checked state) untouched. The task is located by {@link locateTaskMarker}, the
+ * same staleness guard the toggle uses, so a drifted or ambiguous line refuses
+ * loudly rather than editing the wrong row. `content` is one line of markdown
+ * (the inline editor's serialization); an embedded newline would split the item
+ * into fresh lines or tasks, so it throws. Empty content is the caller's signal
+ * to delete (see {@link removeTaskLine}) — here it just clears to a bare marker.
+ */
+export function editTaskLine(source: string, task: TaskMarker, content: string): string {
+  const text = content.trim()
+  if (text.includes('\n')) {
+    throw new TaskStaleError(`task content must be a single line: ${JSON.stringify(content)}`)
+  }
+  const offset = locateTaskMarker(source, task.markerOffset, task.raw)
+  const marker = source.slice(offset, offset + 3)
+  if (parseTaskMarker(marker) === null) {
+    throw new TaskStaleError(`no task marker at offset ${offset}: ${JSON.stringify(marker)}`)
+  }
+  const newline = source.indexOf('\n', offset)
+  const lineEnd = newline === -1 ? source.length : newline
+  const rewritten = text.length > 0 ? `${marker} ${text}` : marker
+  return source.slice(0, offset) + rewritten + source.slice(lineEnd)
+}
+
+/**
+ * Remove a task's whole physical line — its list bullet, marker, and content —
+ * along with the trailing newline, so deleting a middle task closes the gap and
+ * deleting the only task empties the note. Located by {@link locateTaskMarker};
+ * a stale or ambiguous line refuses loudly. Continuation lines of a multi-line
+ * item aren't removed — the projection (and so a task's identity) is one line.
+ */
+export function removeTaskLine(source: string, task: TaskMarker): string {
+  const offset = locateTaskMarker(source, task.markerOffset, task.raw)
+  const lineStart = source.lastIndexOf('\n', offset - 1) + 1
+  const newline = source.indexOf('\n', offset)
+  const lineEnd = newline === -1 ? source.length : newline + 1
+  return source.slice(0, lineStart) + source.slice(lineEnd)
+}
+
 interface Splice {
   from: number
   to: number
