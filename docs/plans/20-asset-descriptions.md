@@ -369,6 +369,45 @@ assets" button that runs the backfill with a cost warning and progress.
   retried on its next change (incremental) or on every backfill. Acceptable;
   passes are change-triggered, not continuous (no loop).
 
+## Search integration (Phase 2)
+
+> **Status (2026-06-16): Implemented.** Lexical only; transparent surfacing;
+> descriptions treated like body text (decisions confirmed). Closes the "v2
+> indexing" item deferred above.
+
+**Goal:** a query typed in ⌘K that matches an asset's AI description surfaces the
+note(s) that reference that asset, as ordinary hits.
+
+**Design — fold into the note's FTS `body`, search-index-only.**
+- `IndexedNote` gains `assetText`. When a note is indexed, `gatherAssetDescriptionText`
+  (`indexing/asset-description-text.ts`) reads each referenced asset's
+  `…​.reflect.md` body (managed or user-authored — D1), strips frontmatter,
+  concatenates, and caps at 8 KB (D2). All three `buildIndexedNote` call sites
+  (`indexNote`, `rebuildIndex`, `reconcileIndex`) gather it.
+- Rust `apply_note` writes `search_fts.body = note.text + "\n" + asset_text`.
+  **`notes.preview`, `note_text`, and AI-reachable text stay the note body
+  alone** — so descriptions are locally searchable but never widen the All-Notes
+  preview or what is sent to a provider (those read the note body / live
+  markdown). That falls out of enriching only the FTS column.
+- `PROJECTION_VERSION` 8 → 9, so existing graphs rebuild and fold descriptions.
+
+**Async re-index seam.** Descriptions are written *after* a note is indexed and
+live in `assets/`, so the note's hash is unchanged and nothing re-indexes it on
+its own. `reconcileAssetDescriptions` now returns `describedAssetPaths`; after a
+pass, both callers (the controller and the Settings backfill) call
+`reindexNotesReferencing(paths, generation)` (`indexing/indexer.ts`) — it looks
+up referencing notes via the `assets` table and `indexNote`s each (not
+hash-gated, so the unchanged files re-index and pick up the new text). No loop:
+`indexNote` writes index rows, not note files.
+
+**Privacy.** None added — local lexical search already includes private notes,
+and enriching only `search_fts.body` keeps descriptions out of AI/cloud and the
+preview. (`descriptionPathFor`/`DESCRIPTION_SUFFIX` moved to `graph/paths.ts` so
+`indexing/` need not import `actions/`.)
+
+**Deferred:** semantic embedding of descriptions (Plan 09 is opt-in/off by
+default); attributed "matched in image: X" result UI (transparent chosen).
+
 ## Conventions
 
 Per AGENTS.md: no `any`; zod at boundaries; kebab-case files; one component per

@@ -1,5 +1,6 @@
 import {
   reconcileAssetDescriptions,
+  reindexNotesReferencing,
   type AiProvidersState,
   type ReconcileAssetDescriptionsOutcome,
 } from '@reflect/core'
@@ -44,6 +45,17 @@ async function runBackfill(
     fetchFn: providerFetch,
     onProgress: (done, total) => operation.progress(done, total),
   })
+  // Make the new descriptions searchable: re-index the notes that reference the
+  // assets we just described (Plan 20 search integration). A failure here must
+  // not fail the backfill — the descriptions are written; search folds them on
+  // the next re-index or a rebuild.
+  if (outcome.describedAssetPaths.length > 0) {
+    try {
+      await reindexNotesReferencing(outcome.describedAssetPaths, generation)
+    } catch (cause) {
+      console.warn('asset-description re-index failed:', cause)
+    }
+  }
   if (outcome.stopped === null || outcome.stopped.reason === 'stale') {
     operation.done()
   } else if (outcome.stopped.reason === 'config') {

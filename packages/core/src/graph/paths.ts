@@ -50,6 +50,17 @@ export function audioMemoPath(name: string): string {
   return `${AUDIO_MEMOS_DIR}/${name}`
 }
 
+/**
+ * Suffix of a managed asset-description file (Plan 20): the AI description +
+ * OCR for an asset lives beside it as `<asset>.reflect.md`.
+ */
+export const DESCRIPTION_SUFFIX = '.reflect.md'
+
+/** Graph-relative description path for an asset (`assets/x.png` → `assets/x.png.reflect.md`). */
+export function descriptionPathFor(assetPath: string): string {
+  return `${assetPath}${DESCRIPTION_SUFFIX}`
+}
+
 /** Is this graph-relative path a daily note (`daily/YYYY-MM-DD.md`)? */
 export function isDaily(path: string): boolean {
   return DAILY_PATH_RE.test(path)

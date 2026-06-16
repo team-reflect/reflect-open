@@ -5,7 +5,7 @@ import { aiKeySecretName } from '../ai/secrets'
 import { base64ToBytes } from '../ai/transcribe'
 import { isAppError, toAppError } from '../errors'
 import { listDir, readAsset, readNote, writeNote } from '../graph/commands'
-import { ASSETS_DIR } from '../graph/paths'
+import { ASSETS_DIR, DESCRIPTION_SUFFIX, descriptionPathFor } from '../graph/paths'
 import type { FileMeta } from '../graph/schemas'
 import { assetReferencingNotePaths } from '../indexing/asset-refs'
 import { hashContent } from '../indexing/hash'
@@ -27,9 +27,6 @@ import type { ReconcileStop } from './audio-memo'
  * (auth/network stop the pass; the next trigger re-runs it). Privacy is a hard
  * block — an asset referenced by any private note is never sent.
  */
-
-/** Description filename suffix appended to the asset's graph-relative path. */
-export const DESCRIPTION_SUFFIX = '.reflect.md'
 
 /** Largest source we send to a provider; bigger assets are skipped, not sent. */
 const MAX_ASSET_BYTES = 20 * 1024 * 1024
@@ -69,11 +66,6 @@ export function assetTypeFor(path: string): AssetType | null {
 /** Whether a graph-relative path is an asset this feature describes. */
 export function isEligibleAssetPath(path: string): boolean {
   return assetTypeFor(path) !== null
-}
-
-/** The description path for an asset (`assets/x.png` → `assets/x.png.reflect.md`). */
-export function descriptionPathFor(assetPath: string): string {
-  return `${assetPath}${DESCRIPTION_SUFFIX}`
 }
 
 /** Provenance recorded in a managed description's frontmatter. */
@@ -227,6 +219,12 @@ export interface ReconcileAssetDescriptionsOutcome {
   skippedOversize: number
   /** Permanent provider refusals — logged, no description written. */
   refused: number
+  /**
+   * Asset paths for which a description was written this pass. The caller
+   * re-indexes the notes referencing them so the new text becomes searchable
+   * (`reindexNotesReferencing`).
+   */
+  describedAssetPaths: string[]
   /** Why the pass ended early, or `null` when every asset was handled. */
   stopped: ReconcileStop | null
 }
@@ -453,12 +451,14 @@ export async function reconcileAssetDescriptions(
       skippedUserAuthored: 0,
       skippedOversize: 0,
       refused: 0,
+      describedAssetPaths: [],
       stopped: { reason: toAppError(cause).kind, message: errorMessage(cause) },
     }
   }
 
   const total = candidate.paths.length
   let described = 0
+  const describedAssetPaths: string[] = []
   let skippedUpToDate = 0
   let skippedUnreferenced = 0
   let skippedPrivate = 0
@@ -474,6 +474,7 @@ export async function reconcileAssetDescriptions(
     skippedUserAuthored,
     skippedOversize,
     refused,
+    describedAssetPaths,
     stopped,
   })
 
@@ -522,6 +523,7 @@ export async function reconcileAssetDescriptions(
     }
     if (step.kind === 'described') {
       described += 1
+      describedAssetPaths.push(assetPath)
     } else if (step.kind === 'refused') {
       refused += 1
     } else {

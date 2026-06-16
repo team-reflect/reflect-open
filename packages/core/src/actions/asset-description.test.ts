@@ -6,6 +6,7 @@ import { listDir, readAsset, readNote, writeNote } from '../graph/commands'
 import { assetReferencingNotePaths } from '../indexing/asset-refs'
 import { hashContent } from '../indexing/hash'
 import { getSecret } from '../secrets/keychain'
+import { descriptionPathFor } from '../graph/paths'
 import {
   assetTypeFor,
   base64ByteLength,
@@ -14,7 +15,6 @@ import {
   isEligibleAssetPath,
   readManagedDescription,
   reconcileAssetDescriptions,
-  descriptionPathFor,
   type ReconcileAssetDescriptionsInput,
 } from './asset-description'
 
@@ -216,6 +216,7 @@ describe('reconcileAssetDescriptions', () => {
     const outcome = await reconcileAssetDescriptions(input())
 
     expect(outcome.described).toBe(1)
+    expect(outcome.describedAssetPaths).toEqual(['assets/a.png'])
     expect(outcome.stopped).toBeNull()
     const hash = await hashContent('aGVsbG8=')
     const written = files.get('assets/a.png.reflect.md')!

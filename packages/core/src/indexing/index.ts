@@ -42,6 +42,7 @@ export {
 } from './indexed-note'
 export {
   indexNote,
+  reindexNotesReferencing,
   rebuildIndex,
   reconcileIndex,
   syncIndex,

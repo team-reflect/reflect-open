@@ -17,6 +17,9 @@ const subscribeFileChanges = vi.hoisted(() =>
   vi.fn<(handler: (changes: FileChange[]) => void) => Promise<() => void>>(),
 )
 const readNote = vi.hoisted(() => vi.fn<(path: string, generation?: number) => Promise<string>>())
+const reindexNotesReferencing = vi.hoisted(() =>
+  vi.fn<(assetPaths: readonly string[], generation: number) => Promise<void>>(),
+)
 const failOperation = vi.hoisted(() => vi.fn<(message: string) => void>())
 
 vi.mock('@reflect/core', async (importOriginal) => ({
@@ -24,6 +27,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   reconcileAssetDescriptions,
   subscribeFileChanges,
   readNote,
+  reindexNotesReferencing,
   hasBridge: () => true,
 }))
 vi.mock('@/lib/provider-fetch', () => ({
@@ -48,6 +52,7 @@ function outcome(overrides: Partial<ReconcileAssetDescriptionsOutcome> = {}): Re
     skippedUserAuthored: 0,
     skippedOversize: 0,
     refused: 0,
+    describedAssetPaths: [],
     stopped: null,
     ...overrides,
   }
@@ -82,6 +87,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   onFileChanges = null
   reconcileAssetDescriptions.mockResolvedValue(outcome())
+  reindexNotesReferencing.mockResolvedValue(undefined)
   readNote.mockResolvedValue('# A note with no asset references\n')
   subscribeFileChanges.mockImplementation(async (handler) => {
     onFileChanges = handler
@@ -116,6 +122,28 @@ describe('createAssetDescribeController', () => {
         generation: 3,
       }),
     )
+  })
+
+  it('re-indexes the notes referencing assets it described, so the text is searchable', async () => {
+    reconcileAssetDescriptions.mockResolvedValueOnce(
+      outcome({ describedAssetPaths: ['assets/a.png'] }),
+    )
+    create().start()
+    await flush()
+    onFileChanges?.([upsert('assets/a.png')])
+    await flush()
+
+    expect(reindexNotesReferencing).toHaveBeenCalledWith(['assets/a.png'], 3)
+  })
+
+  it('does not re-index when nothing was described this pass', async () => {
+    reconcileAssetDescriptions.mockResolvedValueOnce(outcome({ described: 0, describedAssetPaths: [] }))
+    create().start()
+    await flush()
+    onFileChanges?.([upsert('assets/a.png')])
+    await flush()
+
+    expect(reindexNotesReferencing).not.toHaveBeenCalled()
   })
 
   it('ignores descriptions, ineligible types, removes, and notes with no asset refs', async () => {

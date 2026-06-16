@@ -5,6 +5,7 @@ import {
   parseNote,
   readNote,
   reconcileAssetDescriptions,
+  reindexNotesReferencing,
   subscribeFileChanges,
   type AiProvidersState,
   type ReconcileStop,
@@ -104,6 +105,21 @@ export function createAssetDescribeController(
           isStale: () => disposed,
         })
         surfaceStop(outcome.stopped)
+        if (disposed) {
+          return
+        }
+        // Fold the new descriptions into the referencing notes' search rows so
+        // a query matching a description surfaces the note (Plan 20 search
+        // integration). Runs even on a stop — whatever was described is real.
+        // A re-index failure must not crash the loop: the descriptions are
+        // written, so search catches up on the note's next re-index or a rebuild.
+        if (outcome.describedAssetPaths.length > 0) {
+          try {
+            await reindexNotesReferencing(outcome.describedAssetPaths, options.generation)
+          } catch (cause) {
+            console.warn('asset-description re-index failed:', cause)
+          }
+        }
         if (disposed) {
           return
         }
