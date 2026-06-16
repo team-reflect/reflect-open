@@ -57,8 +57,8 @@ const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
 export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps): ReactElement {
   const { register, handleSubmit, watch, setValue, formState } = useForm<AddAiProviderForm>({
     defaultValues: {
-      provider: AI_PROVIDERS[0]!.id,
-      model: AI_PROVIDERS[0]!.models[0]!.id,
+      provider: AI_PROVIDERS[0].id,
+      model: AI_PROVIDERS[0].models[0].id,
       apiKey: '',
       isDefault: false,
     },
@@ -133,7 +133,7 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
               onValueChange={(value) => {
                 const next = aiProvider(aiProviderIdSchema.parse(value))
                 setValue('provider', next.id)
-                setValue('model', next.models[0]!.id)
+                setValue('model', next.models[0].id)
                 setUnverified(false)
               }}
             >

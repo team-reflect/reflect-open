@@ -21,7 +21,7 @@
       }
     },
     {
-      "files": ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+      "files": ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}", "**/scripts/**"],
       "rules": {
         "eslint/max-lines": "off"
       }

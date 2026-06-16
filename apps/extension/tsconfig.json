@@ -1,4 +1,7 @@
 {
+  // The extension extends the WXT-generated config, so it can't also extend
+  // ../../tsconfig.base.json. The strictness block below must be kept in sync
+  // with that base by hand.
   "extends": "./.wxt/tsconfig.json",
   "compilerOptions": {
     "target": "ES2022",
