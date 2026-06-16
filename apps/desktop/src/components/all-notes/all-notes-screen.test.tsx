@@ -361,3 +361,96 @@ describe('AllNotesScreen', () => {
     view.unmount()
   })
 })
+
+describe('AllNotesScreen — selection and bulk trash', () => {
+  it('selects a row on click and reveals the bulk Trash action', async () => {
+    const view = renderScreen()
+    await view.findByText('Health Stacked')
+
+    // Clicking the row body (the snippet, not a button) selects without opening.
+    fireEvent.click(view.getByText('Shop your health goals.'))
+    expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: null })
+    expect(view.getByRole('button', { name: /Trash \(1\)/ })).toBeDefined()
+
+    // ⌘-click a second row extends the selection.
+    fireEvent.click(view.getByText('Dandelion chocolate.'), { metaKey: true })
+    expect(view.getByRole('button', { name: /Trash \(2\)/ })).toBeDefined()
+    view.unmount()
+  })
+
+  it('opens a note on double-click', async () => {
+    const view = renderScreen()
+    await view.findByText('Health Stacked')
+
+    fireEvent.doubleClick(view.getByText('Shop your health goals.'))
+    expect(probedRoute(view)).toEqual({ kind: 'note', path: 'notes/health.md' })
+    view.unmount()
+  })
+
+  it('drives selection from the keyboard and opens with Return', async () => {
+    const view = renderScreen()
+    await view.findByText('Health Stacked')
+    const surface = view.getByLabelText('All notes')
+
+    fireEvent.keyDown(surface, { key: 'ArrowDown' }) // selects the first row
+    expect(view.getByRole('button', { name: /Trash \(1\)/ })).toBeDefined()
+
+    fireEvent.keyDown(surface, { key: 'Enter' })
+    expect(probedRoute(view)).toEqual({ kind: 'note', path: 'notes/health.md' })
+    view.unmount()
+  })
+
+  it('clears the selection on Escape', async () => {
+    const view = renderScreen()
+    await view.findByText('Health Stacked')
+    const surface = view.getByLabelText('All notes')
+
+    fireEvent.click(view.getByText('Shop your health goals.'))
+    expect(view.queryByRole('button', { name: /Trash \(1\)/ })).not.toBeNull()
+
+    fireEvent.keyDown(surface, { key: 'Escape' })
+    expect(view.queryByRole('button', { name: /Trash \(/ })).toBeNull()
+    view.unmount()
+  })
+
+  it('bulk-trashes the selection to the OS trash and drops the rows', async () => {
+    const view = renderScreen()
+    await view.findByText('Health Stacked')
+
+    fireEvent.click(view.getByText('Shop your health goals.'))
+    fireEvent.click(view.getByText('Dandelion chocolate.'), { metaKey: true })
+    fireEvent.click(view.getByRole('button', { name: /Trash \(2\)/ }))
+
+    // Confirm, then the two notes go to the trash via `note_delete`.
+    await view.findByText('Trash 2 notes?')
+    fireEvent.click(view.getByRole('button', { name: 'Trash' }))
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith('note_delete', {
+        path: 'notes/health.md',
+        generation: 1,
+      })
+      expect(mockInvoke).toHaveBeenCalledWith('note_delete', {
+        path: 'notes/tokyo.md',
+        generation: 1,
+      })
+    })
+    // Optimistic removal: the rows leave at once — the test harness has no file
+    // watcher to drive the reindex that would otherwise refresh the list.
+    await waitFor(() => expect(view.queryByText('Health Stacked')).toBeNull())
+    expect(view.queryByText('Tokyo Gâteau')).toBeNull()
+    view.unmount()
+  })
+
+  it('opens the confirm dialog from the ⌘⌫ shortcut', async () => {
+    const view = renderScreen()
+    await view.findByText('Health Stacked')
+    const surface = view.getByLabelText('All notes')
+
+    fireEvent.click(view.getByText('Shop your health goals.'))
+    fireEvent.keyDown(surface, { key: 'Backspace', metaKey: true })
+
+    expect(await view.findByText('Trash 1 note?')).toBeDefined()
+    view.unmount()
+  })
+})

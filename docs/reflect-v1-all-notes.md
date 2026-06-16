@@ -226,7 +226,13 @@ already deleted (`note-list-view.desktop.ts:100-103`, `action-menu.tsx:51-54`).
 
 Note a V1 gap: the Trash view's only bulk action is permanent destruction. There is no
 **restore** affordance in this UI — recovering a trashed note would require clearing
-its `deletedAt` through another path. V2 should add an explicit restore action.
+its `deletedAt` through another path.
+
+> **V2 decision (supersedes the original "V2 should add restore" note here):** V2
+> deletes to the **OS-native trash** instead of a `deletedAt` soft-delete, so it ships
+> *no* in-app Trash view and *no* Restore action — the OS handles both, and a restored
+> `.md` re-indexes itself back into the list. See
+> [TDR 0004](./decisions/0004-all-notes-trash-and-tag-scope.md).
 
 ## Empty States and Counts
 
@@ -264,5 +270,9 @@ its `deletedAt` through another path. V2 should add an explicit restore action.
 - The placeholder/model-pool indirection exists to virtualize large graphs against a
   local index. V2's projection should expose the same "IDs cheap, hydrate on demand"
   shape so the list scales without loading every note.
-- Add a real **restore from trash** action; V1 only supports permanent destruction
-  from the Trash view.
+- ~~Add a real **restore from trash** action; V1 only supports permanent destruction
+  from the Trash view.~~ **Declined** — V2 deletes to the OS-native trash, which owns
+  browse + restore; see [TDR 0004](./decisions/0004-all-notes-trash-and-tag-scope.md).
+- The V1 "Custom" dropdown's inline **delete-a-tag** affordance is **not** ported:
+  tags are derived from note bodies, so removing a tag means editing it out of the
+  notes; see [TDR 0004](./decisions/0004-all-notes-trash-and-tag-scope.md).

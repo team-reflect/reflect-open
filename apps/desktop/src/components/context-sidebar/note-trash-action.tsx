@@ -77,7 +77,7 @@ export function NoteTrashAction({ path }: NoteTrashActionProps): ReactElement | 
         <DialogContent>
           <DialogTitle>Trash this note?</DialogTitle>
           <DialogDescription>
-            It moves to the graph trash and disappears from your notes.
+            It moves to your system Trash, where you can restore it.
           </DialogDescription>
           {error !== null ? <p className="text-sm text-destructive">{error}</p> : null}
           <DialogFooter>
