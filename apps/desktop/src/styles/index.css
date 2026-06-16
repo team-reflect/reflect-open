@@ -298,13 +298,14 @@ body {
   letter-spacing: var(--tracking-snug, -0.01em);
   margin: 1.25em 0 0.4em;
 }
-.reflect-editor h1 { font-size: var(--text-2xl, 1.5rem); }
+/* Cap headings at --text-xl: the leading H1 is the note title and in-prose
+   `# headings` shouldn't tower over the body, so neither H1 nor H2 exceeds the
+   design-system "note title" size, matching the daily date heading
+   (.reflect-daily-subject) and the new-note "Untitled" ghost. */
+.reflect-editor h1 { font-size: var(--text-xl, 1.25rem); }
 .reflect-editor h2 { font-size: var(--text-xl, 1.25rem); }
 .reflect-editor h3 { font-size: var(--text-lg, 1.125rem); }
-/* The leading H1 is the note title, so it takes the design-system "note title"
-   size (--text-xl) rather than the larger prose-H1 size, matching the daily
-   date heading (.reflect-daily-subject) and the new-note "Untitled" ghost. */
-.reflect-editor h1:first-child { margin-top: 0; font-size: var(--text-xl, 1.25rem); }
+.reflect-editor h1:first-child { margin-top: 0; }
 .reflect-editor .reflect-note-title { font-size: var(--text-xl, 1.25rem); }
 
 /* The new-note flow's name field: ghost "Untitled" over the seeded empty H1
