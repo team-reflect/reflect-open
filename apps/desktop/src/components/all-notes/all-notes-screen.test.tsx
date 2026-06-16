@@ -528,18 +528,67 @@ describe('AllNotesScreen — selection and bulk trash', () => {
 
     // The failure message shows and the dialog stays open — the optimistic
     // removal pruning the selection to zero must not auto-dismiss it.
-    expect(await view.findByText('disk on fire')).toBeDefined()
+    expect(await view.findByText(/Couldn’t trash 1 note|Couldn't trash 1 note/)).toBeDefined()
     expect(view.getByText('Trash 1 note?')).toBeDefined()
     // The optimistically-removed row reappears as the failed delete reconciles.
     await waitFor(() => expect(view.getByText('Health Stacked')).toBeDefined())
 
     // Dismissing and reopening starts clean — the prior failure isn't stale.
     fireEvent.click(view.getByRole('button', { name: 'Cancel' }))
-    await waitFor(() => expect(view.queryByText('disk on fire')).toBeNull())
+    await waitFor(() => expect(view.queryByText(/Couldn.t trash/)).toBeNull())
     fireEvent.click(view.getByText('Shop your health goals.'))
     fireEvent.click(view.getByRole('button', { name: /Trash \(1\)/ }))
     await view.findByText('Trash 1 note?')
-    expect(view.queryByText('disk on fire')).toBeNull()
+    expect(view.queryByText(/Couldn.t trash/)).toBeNull()
+    view.unmount()
+  })
+
+  it('retries only the notes that failed, never re-trashing the ones already gone', async () => {
+    let failTokyo = true
+    mockInvoke.mockImplementation(async (command, args) => {
+      if (command === 'note_delete') {
+        if (args.path === 'notes/tokyo.md' && failTokyo) {
+          failTokyo = false // succeed on the retry
+          throw new Error('locked')
+        }
+        return null
+      }
+      if (command !== 'db_query') {
+        return null
+      }
+      const sql = String(args.sql)
+      if (sql.includes('group by')) {
+        return facetRows
+      }
+      if (sql.includes('"preview"')) {
+        return sql.includes('from "tags"') ? [] : noteRows
+      }
+      if (sql.includes('from "tags"')) {
+        return tagRows
+      }
+      return []
+    })
+    const view = renderScreen()
+    await view.findByText('Health Stacked')
+
+    // Select both, confirm: health trashes, tokyo fails → the dialog narrows to
+    // the one leftover.
+    fireEvent.click(view.getByText('Shop your health goals.'))
+    fireEvent.click(view.getByText('Dandelion chocolate.'), { metaKey: true })
+    fireEvent.click(view.getByRole('button', { name: /Trash \(2\)/ }))
+    await view.findByText('Trash 2 notes?')
+    fireEvent.click(view.getByRole('button', { name: 'Trash' }))
+    await view.findByText('Trash 1 note?') // remaining narrowed to the failure
+
+    // Retry: only tokyo is attempted again, and it succeeds → dialog closes.
+    fireEvent.click(view.getByRole('button', { name: 'Trash' }))
+    await waitFor(() => expect(view.queryByText('Trash 1 note?')).toBeNull())
+
+    const deletes = mockInvoke.mock.calls.filter(([command]) => command === 'note_delete')
+    const healthDeletes = deletes.filter(([, args]) => args.path === 'notes/health.md')
+    const tokyoDeletes = deletes.filter(([, args]) => args.path === 'notes/tokyo.md')
+    expect(healthDeletes).toHaveLength(1) // not re-trashed on the retry
+    expect(tokyoDeletes).toHaveLength(2) // failed once, then retried
     view.unmount()
   })
 })

@@ -23,17 +23,20 @@ interface AllNotesTrashDialogProps {
    * and keeps a failure message from being yanked away mid-render.
    */
   paths: readonly string[]
-  /** Run after a successful trash, so the screen can clear its selection. */
+  /** Run after every note is trashed, so the screen can clear its selection. */
   onTrashed: () => void
 }
 
 /**
  * The All Notes bulk-trash confirmation. Owns the delete ({@link useNoteTrash})
- * and its error so the screen only has to track which paths to trash and
- * whether the dialog is open. On success it clears the selection and closes; on
- * failure it stays open with the reason (the rows reappear as the failed delete
- * reconciles). The error is dropped whenever the dialog closes, so a later open
- * never inherits a stale message.
+ * and its error so the screen only tracks which paths to trash and whether the
+ * dialog is open.
+ *
+ * On full success it clears the selection and closes. On a partial failure it
+ * narrows its retry set to just the notes that *didn't* trash and stays open —
+ * so confirming again retries only the leftovers, never re-deleting notes
+ * already in the trash (the OS trash isn't idempotent). A fresh open (a new
+ * `paths` array) resets the retry set and clears any prior error.
  */
 export function AllNotesTrashDialog({
   open,
@@ -42,16 +45,35 @@ export function AllNotesTrashDialog({
   onTrashed,
 }: AllNotesTrashDialogProps): ReactElement {
   const { trash, isTrashing } = useNoteTrash()
+  // The notes the next confirm will attempt: the snapshot, less any already
+  // trashed in a prior (partly failed) attempt.
+  const [remaining, setRemaining] = useState<readonly string[]>(paths)
+  const [syncedPaths, setSyncedPaths] = useState(paths)
   const [error, setError] = useState<string | null>(null)
   const confirmButtonRef = useRef<HTMLButtonElement>(null)
-  const count = paths.length
+
+  // A fresh open hands in a new `paths` array (the screen re-snapshots the
+  // selection each time): reset the retry set and drop any stale error. Done in
+  // render — the React-recommended way to reset state from a changed prop.
+  if (paths !== syncedPaths) {
+    setSyncedPaths(paths)
+    setRemaining(paths)
+    setError(null)
+  }
+
+  const count = remaining.length
 
   const onConfirm = async (): Promise<void> => {
     try {
-      await trash(paths)
-      setError(null) // a prior failure's message must not survive a later success
-      onTrashed()
-      onOpenChange(false)
+      const failed = await trash(remaining)
+      if (failed.length === 0) {
+        onTrashed()
+        onOpenChange(false)
+        return
+      }
+      // Some notes are now in the trash; keep only the leftovers for the retry.
+      setRemaining(failed)
+      setError(`Couldn't trash ${failed.length} ${failed.length === 1 ? 'note' : 'notes'}. Try again.`)
     } catch (cause) {
       setError(errorMessage(cause))
     }
@@ -63,9 +85,6 @@ export function AllNotesTrashDialog({
       onOpenChange={(next) => {
         if (isTrashing) {
           return // a trash in flight owns the dialog until it settles
-        }
-        if (!next) {
-          setError(null)
         }
         onOpenChange(next)
       }}
