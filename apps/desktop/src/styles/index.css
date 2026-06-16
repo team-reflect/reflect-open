@@ -323,6 +323,16 @@ body {
   margin: 0.4em 0;
 }
 
+/* The Tasks inline editor (TaskEditor) shares each row's single-line leading-6
+   box with the read-only TaskText, which renders the content in a marginless
+   span. The editor wraps it in a paragraph, so the `.reflect-editor p` block
+   margin above would grow the row the moment it enters edit mode. Zero it (same
+   0-1-1 specificity, later source order wins the tie) so focusing a task never
+   shifts its height. */
+.reflect-task-editor p {
+  margin: 0;
+}
+
 .reflect-editor blockquote {
   border-left: 2px solid var(--accent-soft, var(--border));
   color: var(--text-secondary);
