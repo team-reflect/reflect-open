@@ -90,9 +90,12 @@ export function useNoteDocument(
   // the unmounted pane never re-renders, its ref keeps the old generation, and
   // Rust rejects its final flush instead of landing it in the new graph.
   const generationRef = useRef(generation)
-  useEffect(() => {
-    generationRef.current = generation
-  })
+  // Written during render, not in an effect: a debounced save or rename reads
+  // this at write time, and reopening the *same* graph bumps the generation
+  // without remounting the pane — an effect-based update would lag and let a
+  // write land with the previous generation, which Rust rejects.
+  // eslint-disable-next-line react-hooks/refs
+  generationRef.current = generation
   const canWrite = generation !== null
 
   useEffect(() => {
