@@ -50,15 +50,19 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
   // query with empty filters — one search path.
   const parsed = useMemo(() => parseSearchQuery(trimmed), [trimmed])
   const searching = open && hasBridge() && graph !== null && !trimmed.startsWith('>')
+  // The generated date suggestions are relative to today, so the calendar day is
+  // part of the cache identity — without it a palette cached before midnight
+  // would serve a stale "Tomorrow" afterwards. Computed once so the key and the
+  // query agree on the same day.
+  const today = todayIso()
 
   const {
     data: suggestions,
     isLoading: suggestionsLoading,
     isError: suggestionsError,
   } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'palette-suggest', trimmed, settings.dateFormat],
-    queryFn: () =>
-      suggestWikiTargets(trimmed, 8, { today: todayIso(), dateFormat: settings.dateFormat }),
+    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'palette-suggest', trimmed, settings.dateFormat, today],
+    queryFn: () => suggestWikiTargets(trimmed, 8, { today, dateFormat: settings.dateFormat }),
     enabled: searching && !parsed.filtered,
   })
   const useHybrid = hybrid && !parsed.filtered
