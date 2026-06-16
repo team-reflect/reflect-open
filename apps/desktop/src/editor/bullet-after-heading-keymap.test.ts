@@ -14,7 +14,7 @@ const editor = createEditor({ extension: defineEditorExtension() })
 
 /** A state holding `md`, with the caret at `pos(doc)`. */
 function stateAt(markdown: string, pos: (doc: ReturnType<typeof markdownToDoc>) => number): EditorState {
-  const doc = markdownToDoc(markdown, editor.nodes)
+  const doc = markdownToDoc(editor, markdown)
   const base = EditorState.create({ schema: editor.schema, doc })
   return base.apply(base.tr.setSelection(TextSelection.create(doc, pos(doc))))
 }
