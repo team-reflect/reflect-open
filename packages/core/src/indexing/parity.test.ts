@@ -104,7 +104,7 @@ async function deriveExpectations(): Promise<ExpectedParity> {
 describe('TS↔Rust parity corpus', () => {
   it('expected.json matches what the core pipeline derives', async () => {
     const derived = await deriveExpectations()
-    if (process.env.UPDATE_PARITY) {
+    if (process.env['UPDATE_PARITY']) {
       writeFileSync(expectedFile, `${JSON.stringify(derived, null, 2)}\n`)
     }
     const committed: ExpectedParity = JSON.parse(readFileSync(expectedFile, 'utf8'))

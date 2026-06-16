@@ -23,18 +23,18 @@ export interface DescribePageRequest {
   /** The BYOK API key, read from the OS keychain by the caller. */
   apiKey: string
   /** Host transport (the Tauri HTTP plugin's fetch; tests pass a stub). */
-  fetchFn?: typeof fetch
+  fetchFn?: typeof fetch | undefined
   /** The captured page. */
   url: string
   title: string
   /** Text the user had selected, if any. */
-  selection?: string
+  selection?: string | undefined
   /** Extracted full-page text, capped before it enters the provider prompt. */
-  contentText?: string
+  contentText?: string | undefined
   /** Scraped meta description, if the scrape produced one. */
-  metaDescription?: string
+  metaDescription?: string | undefined
   /** Downscaled JPEG screenshot, base64 (no data-URL prefix), if captured. */
-  screenshotBase64?: string
+  screenshotBase64?: string | undefined
 }
 
 /**

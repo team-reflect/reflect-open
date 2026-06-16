@@ -7,7 +7,8 @@ describe('scanInlineWikiLinks', () => {
     const links = scanInlineWikiLinks(text)
     expect(links).toHaveLength(2)
 
-    const [plain, aliased] = links
+    const plain = links[0]!
+    const aliased = links[1]!
     expect(plain.target).toBe('Charlotte')
     expect(plain.alias).toBeNull()
     expect(text.slice(plain.from, plain.to)).toBe('[[Charlotte]]')
@@ -21,7 +22,7 @@ describe('scanInlineWikiLinks', () => {
 
   it('falls back to the target when the alias is blank', () => {
     const text = 'see [[Target|   ]] here'
-    const [link] = scanInlineWikiLinks(text)
+    const link = scanInlineWikiLinks(text)[0]!
     expect(link.alias).toBeNull()
     expect(text.slice(link.displayFrom, link.displayTo)).toBe('Target')
   })
@@ -42,7 +43,7 @@ describe('scanInlineImages', () => {
     const images = scanInlineImages(text)
     expect(images).toHaveLength(2)
     expect(images[0]).toMatchObject({ alt: 'screenshot', src: 'assets/shot.png' })
-    expect(text.slice(images[0].from, images[0].to)).toBe('![screenshot](assets/shot.png)')
+    expect(text.slice(images[0]!.from, images[0]!.to)).toBe('![screenshot](assets/shot.png)')
     expect(images[1]).toMatchObject({ alt: '', src: 'https://x.com/i.jpg' })
   })
 

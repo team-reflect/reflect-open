@@ -52,9 +52,10 @@ export function useDeviceFlowAuth(): DeviceFlowAuth {
     setError(null)
     setBusy(true)
     try {
+      const signal = abortRef.current?.signal
       const auth = await runDeviceFlow({
         fetchFn: providerFetch,
-        signal: abortRef.current?.signal,
+        ...(signal !== undefined ? { signal } : {}),
         onCode: (code) => {
           setView({ view: 'code', userCode: code.userCode, verificationUri: code.verificationUri })
         },

@@ -42,10 +42,10 @@ beforeEach(() => {
         case 'recent_graphs':
           return recents
         case 'forget_recent':
-          recents = recents.filter((recent) => recent.root !== args.root)
+          recents = recents.filter((recent) => recent.root !== args['root'])
           return null
         case 'graph_open':
-          return { root: String(args.path), name: 'work', cloudSync: null, generation: 1 }
+          return { root: String(args['path']), name: 'work', cloudSync: null, generation: 1 }
         case 'index_open':
           return 1
         case 'list_files':

@@ -40,7 +40,7 @@ export interface ExternalMoveScan {
 export async function detectExternalMoves(
   orphanPaths: string[],
   arrivalPaths: string[],
-  options?: { signal?: AbortSignal },
+  options?: { signal?: AbortSignal | undefined },
 ): Promise<ExternalMoveScan> {
   const content = new Map<string, string>()
   if (orphanPaths.length === 0 || arrivalPaths.length === 0) {

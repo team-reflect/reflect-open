@@ -38,7 +38,7 @@ describe('parseFrontmatter', () => {
     expect(data.id).toBe('abc')
     expect(data.aliases).toEqual(['a', 'b'])
     expect(data.private).toBe(false)
-    expect((data as Record<string, unknown>).custom).toBe('hello')
+    expect((data as Record<string, unknown>)['custom']).toBe('hello')
   })
 
   it('degrades broken YAML to defaults + a warning, never throwing', () => {

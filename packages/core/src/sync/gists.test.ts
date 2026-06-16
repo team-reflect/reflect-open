@@ -19,7 +19,7 @@ describe('createGist', () => {
     const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('https://api.github.com/gists')
     expect(init.method).toBe('POST')
-    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok')
+    expect((init.headers as Record<string, string>)['Authorization']).toBe('Bearer tok')
     expect(JSON.parse(init.body as string)).toEqual({
       public: false,
       files: { 'A.md': { content: '# A\n' } },

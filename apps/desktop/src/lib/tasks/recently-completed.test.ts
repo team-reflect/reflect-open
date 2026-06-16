@@ -39,10 +39,10 @@ describe('recently-completed', () => {
 
     act(() => markRecentlyCompleted('/g', [task({ notePath: 'a.md', markerOffset: 2 })]))
     expect(result.current).toHaveLength(1)
-    expect(result.current[0].checked).toBe(true)
+    expect(result.current[0]!.checked).toBe(true)
     // The marker in raw is flipped to [x] to match disk — these rows outlive the
     // reindex, so a stale [ ] would later fail a reopen/edit/delete write-back.
-    expect(result.current[0].raw).toBe('[x] do it')
+    expect(result.current[0]!.raw).toBe('[x] do it')
   })
 
   it('dedupes by task key', () => {

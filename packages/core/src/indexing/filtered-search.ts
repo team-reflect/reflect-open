@@ -56,7 +56,8 @@ export async function searchWithFilters(
       .selectFrom('tags')
       .innerJoin('notes', 'notes.path', 'tags.notePath')
       .select(['notes.path', 'notes.title', 'notes.dailyDate'])
-      .where('tags.tagKey', '=', primaryTag)
+      // The length guard above guarantees a primary tag.
+      .where('tags.tagKey', '=', primaryTag!)
       .distinct()
       .limit(limit)
 

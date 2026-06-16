@@ -43,26 +43,26 @@ describe('loadGraphStats', () => {
     for (const [command, args] of mockInvoke.mock.calls) {
       expect(command).toBe('db_query')
       // The hard block: every aggregate is computed over public rows only.
-      expect(String(args.sql)).toContain('"is_private" = ?')
-      expect(args.params).toContain(0)
+      expect(String(args['sql'])).toContain('"is_private" = ?')
+      expect(args['params']).toContain(0)
     }
 
-    const [, noteArgs] = mockInvoke.mock.calls[0]
-    expect(String(noteArgs.sql)).toContain('"daily_date" is null')
+    const [, noteArgs] = mockInvoke.mock.calls[0]!
+    expect(String(noteArgs['sql'])).toContain('"daily_date" is null')
 
-    const [, dailyArgs] = mockInvoke.mock.calls[1]
-    const dailySql = String(dailyArgs.sql)
+    const [, dailyArgs] = mockInvoke.mock.calls[1]!
+    const dailySql = String(dailyArgs['sql'])
     expect(dailySql).toContain('"daily_date" is not null')
     expect(dailySql).toContain('min(daily_date)')
     expect(dailySql).toContain('max(daily_date)')
 
-    const [, tagArgs] = mockInvoke.mock.calls[2]
-    const tagSql = String(tagArgs.sql)
+    const [, tagArgs] = mockInvoke.mock.calls[2]!
+    const tagSql = String(tagArgs['sql'])
     expect(tagSql).toContain('inner join "notes"')
     expect(tagSql).toContain('group by "tags"."tag_key"')
     expect(tagSql).toContain('order by count(*) desc')
     // One row past the cap, so truncation is detectable.
-    expect(tagArgs.params).toContain(41)
+    expect(tagArgs['params']).toContain(41)
   })
 
   it('caps the facets at the limit and flags the truncation', async () => {

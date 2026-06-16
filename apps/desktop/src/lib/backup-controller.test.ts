@@ -62,7 +62,7 @@ function fakeBridge(options: FakeOptions = {}) {
           }
           return status
         case 'git_setup':
-          status.remoteUrl = typeof args.remoteUrl === 'string' ? args.remoteUrl : null
+          status.remoteUrl = typeof args['remoteUrl'] === 'string' ? args['remoteUrl'] : null
           return status
         case 'secret_get':
           return auth

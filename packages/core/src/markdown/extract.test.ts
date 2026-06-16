@@ -13,7 +13,7 @@ describe('parseNote — wiki links', () => {
       { target: 'Project X', alias: 'the project' },
       { target: '2026-06-09', alias: undefined },
     ])
-    const first = note.wikiLinks[0]
+    const first = note.wikiLinks[0]!
     expect(note.text.slice(0)).toContain('Charlotte')
     expect(first.from).toBe('See '.length)
     expect(first.to).toBe('See [[Charlotte]]'.length)
@@ -143,7 +143,7 @@ describe('parseNote — tasks', () => {
 
   it('strips inline syntax from text but keeps it verbatim in raw', () => {
     const note = parse('- [ ] call [[Bob]] about **billing**\n')
-    const [item] = note.tasks
+    const item = note.tasks[0]!
     expect(item.text).toBe('call Bob about billing')
     expect(item.raw).toBe('[ ] call [[Bob]] about **billing**')
     // markerOffset points at the `[` of the checkbox, not the wiki link.
@@ -154,7 +154,7 @@ describe('parseNote — tasks', () => {
   it('offsets the marker past frontmatter', () => {
     const source = '---\nid: abc\n---\n- [ ] later\n'
     const note = parse(source)
-    const [item] = note.tasks
+    const item = note.tasks[0]!
     expect(item.markerOffset).toBe(source.indexOf('[ ]'))
     expect(source.slice(item.markerOffset, item.markerOffset + item.raw.length)).toBe(item.raw)
   })
@@ -181,12 +181,12 @@ describe('parseNote — tasks', () => {
 
   it('reads the first calendar [[YYYY-MM-DD]] link in the item as the due date', () => {
     const note = parse('- [ ] ship it [[2026-07-01]] and review [[2026-08-01]]\n')
-    expect(note.tasks[0].dueDate).toBe('2026-07-01') // first date link wins
+    expect(note.tasks[0]!.dueDate).toBe('2026-07-01') // first date link wins
   })
 
   it('ignores an impossible date as a due date', () => {
     const note = parse('- [ ] not a real day [[2026-02-31]]\n')
-    expect(note.tasks[0].dueDate).toBeNull()
+    expect(note.tasks[0]!.dueDate).toBeNull()
   })
 
   it('does not borrow a due-date link from a neighbouring task', () => {

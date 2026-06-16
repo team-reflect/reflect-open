@@ -90,9 +90,9 @@ export interface ChatTurnOptions {
   /** Graph overview for the system prompt, or `null` to omit the block. */
   context: CloudSafe<CloudGraphContext> | null
   /** Aborts the provider call mid-stream (the UI's stop button). */
-  signal?: AbortSignal
+  signal?: AbortSignal | undefined
   /** Test seam for the note tools' effects. */
-  toolDeps?: NoteToolDeps
+  toolDeps?: NoteToolDeps | undefined
 }
 
 /**
@@ -127,7 +127,7 @@ export async function* streamChatTurn(
       messages: options.messages,
       tools,
       stopWhen: stepCountIs(MAX_STEPS),
-      abortSignal: options.signal,
+      ...(options.signal !== undefined ? { abortSignal: options.signal } : {}),
       onStepFinish: (step) => {
         stepMessages = [...step.response.messages]
       },

@@ -162,8 +162,8 @@ describe('ChatProvider persistence', () => {
     await act(() => session?.send('hello there'))
 
     expect(core.saveChatMessage).toHaveBeenCalledTimes(2)
-    const first = core.saveChatMessage.mock.calls[0][0]
-    const second = core.saveChatMessage.mock.calls[1][0]
+    const first = core.saveChatMessage.mock.calls[0]![0]
+    const second = core.saveChatMessage.mock.calls[1]![0]
     expect(first).toMatchObject({
       generation: 7,
       conversation: { id: session?.activeConversationId, title: 'hello there' },
@@ -186,7 +186,7 @@ describe('ChatProvider persistence', () => {
 
     await act(() => session?.send('and today?'))
 
-    expect(core.saveChatMessage.mock.calls[0][0]).toMatchObject({
+    expect(core.saveChatMessage.mock.calls[0]![0]).toMatchObject({
       conversation: { id: 'conv-1', title: 'what did I write yesterday?' },
       turn: { userText: 'and today?' },
     })
@@ -272,7 +272,7 @@ describe('ChatProvider persistence', () => {
       sendDone = session?.send('hello')
       await Promise.resolve()
     })
-    const sentInto = core.saveChatMessage.mock.calls[0][0] as { conversation: { id: string } }
+    const sentInto = core.saveChatMessage.mock.calls[0]![0] as { conversation: { id: string } }
 
     // Delete the conversation while the turn is streaming, then let it settle:
     // the settle-time save must not resurrect the deleted row.
@@ -301,7 +301,7 @@ describe('ChatProvider persistence', () => {
     await waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
 
     await act(() => session?.send('hello'))
-    const sentInto = core.saveChatMessage.mock.calls[0][0] as { conversation: { id: string } }
+    const sentInto = core.saveChatMessage.mock.calls[0]![0] as { conversation: { id: string } }
 
     let deleteDone: Promise<void> | undefined
     await act(async () => {

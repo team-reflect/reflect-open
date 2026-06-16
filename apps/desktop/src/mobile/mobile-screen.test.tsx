@@ -133,7 +133,7 @@ function dayCellLabel(date: string): string {
 /** A day in `date`'s week that isn't `date` itself (always present). */
 function otherDayInWeek(date: string): string {
   const week = weekOf(date, 'monday')
-  return week.find((day) => day !== date) ?? week[0]
+  return week.find((day) => day !== date) ?? week[0]!
 }
 
 describe('MobileShell', () => {

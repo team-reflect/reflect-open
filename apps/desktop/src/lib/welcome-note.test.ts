@@ -23,13 +23,13 @@ function installFakeBridge(options: {
         case 'list_files':
           return (options.existingFiles ?? []).map((path) => ({ path, size: 0, modifiedMs: 0 }))
         case 'note_write':
-          graph.written.push({ path: String(args.path), contents: String(args.contents) })
+          graph.written.push({ path: String(args['path']), contents: String(args['contents']) })
           return null
         case 'index_meta_set':
-          graph.meta[String(args.key)] = String(args.value)
+          graph.meta[String(args['key'])] = String(args['value'])
           return null
         case 'db_query': {
-          const key = String((args.params as unknown[])?.[0])
+          const key = String((args['params'] as unknown[])?.[0])
           return key in graph.meta ? [{ value: graph.meta[key] }] : []
         }
         default:
@@ -52,18 +52,18 @@ describe('ensureWelcomeNote', () => {
     const graph = installFakeBridge({})
     expect(await ensureWelcomeNote(GENERATIONS)).toBe(true)
     expect(graph.written).toHaveLength(1)
-    expect(graph.written[0].path).toBe(WELCOME_NOTE_PATH)
+    expect(graph.written[0]!.path).toBe(WELCOME_NOTE_PATH)
     expect(WELCOME_NOTE_PATH).toBe('notes/how-to-use-reflect.md')
     expect(graph.meta[WELCOME_SEEDED_META_KEY]).toBe('true')
 
     const { frontmatter, title } = parseNote({
-      path: graph.written[0].path,
-      source: graph.written[0].contents,
+      path: graph.written[0]!.path,
+      source: graph.written[0]!.contents,
     })
     expect(title).toBe('How to use Reflect')
     expect(isPinned(frontmatter)).toBe(true)
     expect(frontmatter.id).toMatch(/^[0-9a-z]{26}$/)
-    expect(graph.written[0].contents).toContain('[[Wiki Links]]')
+    expect(graph.written[0]!.contents).toContain('[[Wiki Links]]')
   })
 
   it('marks a graph with existing notes without writing into it', async () => {

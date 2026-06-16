@@ -21,7 +21,7 @@ interface GithubAuthStepProps {
    * already knows it — the instructions name it instead of speaking
    * abstractly about "your backup repository".
    */
-  repoName?: string
+  repoName?: string | undefined
 }
 
 const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'

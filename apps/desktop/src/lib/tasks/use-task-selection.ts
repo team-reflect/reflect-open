@@ -123,8 +123,8 @@ export function useTaskSelection(orderedKeys: readonly string[]): TaskSelection 
       return
     }
     setSelected(new Set(order))
-    anchorRef.current = order[0]
-    cursorRef.current = order[order.length - 1]
+    anchorRef.current = order[0]!
+    cursorRef.current = order[order.length - 1]!
   }, [])
 
   const clear = useCallback(() => {
@@ -142,7 +142,7 @@ export function useTaskSelection(orderedKeys: readonly string[]): TaskSelection 
     const index = from === null ? -1 : order.indexOf(from)
     const next =
       index === -1 ? (direction === 1 ? 0 : order.length - 1) : clamp(index + direction, order.length)
-    const key = order[next]
+    const key = order[next]!
     setSelected(new Set([key]))
     anchorRef.current = key
     cursorRef.current = key
@@ -162,7 +162,7 @@ export function useTaskSelection(orderedKeys: readonly string[]): TaskSelection 
       const from = cursorRef.current ?? base
       const index = order.indexOf(from)
       const next = clamp((index === -1 ? 0 : index) + direction, order.length)
-      const key = order[next]
+      const key = order[next]!
       setSelected(new Set(rangeBetween(base, key)))
       cursorRef.current = key
     },

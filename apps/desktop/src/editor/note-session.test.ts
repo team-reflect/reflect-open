@@ -6,7 +6,7 @@ import type { RoundTripFidelity } from './roundtrip'
 /** The first task's {@link TaskMarker} as the index records it. */
 function firstTask(source: string): TaskMarker {
   const [task] = parseNote({ path: 'notes/a.md', source }).tasks
-  return { markerOffset: task.markerOffset, raw: task.raw }
+  return { markerOffset: task!.markerOffset, raw: task!.raw }
 }
 
 /**
@@ -408,7 +408,7 @@ describe('frontmatter ownership (Plan 07b)', () => {
     h.session.externalChanged()
     await vi.runAllTimersAsync()
     expect(h.contents.map((c) => c.origin)).toEqual(['load', 'saved', 'external'])
-    expect(h.contents[1].content).toBe(`${FM}# Renamed\n`)
+    expect(h.contents[1]!.content).toBe(`${FM}# Renamed\n`)
   })
 })
 

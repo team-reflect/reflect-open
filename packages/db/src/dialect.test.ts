@@ -18,7 +18,7 @@ describe('IpcDialect (Kysely → injected runner bridge)', () => {
       .execute()
 
     expect(runQuery).toHaveBeenCalledTimes(1)
-    const [sql, params] = runQuery.mock.calls[0]
+    const [sql, params] = runQuery.mock.calls[0]!
     expect(sql).toContain('"file_hash"')
     expect(sql).toContain('"title_key"')
     expect(params).toEqual(['project x'])

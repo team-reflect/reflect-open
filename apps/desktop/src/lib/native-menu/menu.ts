@@ -24,8 +24,8 @@ import { dispatchMenuCommand } from './dispatch'
 type PredefinedItem = PredefinedMenuItemOptions['item']
 
 export type AppMenuEntry =
-  | { kind: 'command'; commandId: string; text?: string }
-  | { kind: 'predefined'; item: PredefinedItem; text?: string }
+  | { kind: 'command'; commandId: string; text?: string | undefined }
+  | { kind: 'predefined'; item: PredefinedItem; text?: string | undefined }
 
 export interface AppSubmenuLayout {
   text: string
@@ -126,10 +126,11 @@ function menuItemOptions(commandId: string, text?: string): MenuItemOptions {
   if (!appCommand) {
     throw new Error(`native menu references unknown command: ${commandId}`)
   }
+  const accelerator = appCommand.keybinding ? bindingToAccelerator(appCommand.keybinding) : undefined
   return {
     id: appCommand.id,
     text: text ?? appCommand.title,
-    accelerator: appCommand.keybinding ? bindingToAccelerator(appCommand.keybinding) : undefined,
+    ...(accelerator !== undefined ? { accelerator } : {}),
     action: dispatchMenuCommand,
   }
 }
@@ -137,7 +138,7 @@ function menuItemOptions(commandId: string, text?: string): MenuItemOptions {
 function entryOptions(entry: AppMenuEntry): MenuItemOptions | PredefinedMenuItemOptions {
   return entry.kind === 'command'
     ? menuItemOptions(entry.commandId, entry.text)
-    : { item: entry.item, text: entry.text }
+    : { item: entry.item, ...(entry.text !== undefined ? { text: entry.text } : {}) }
 }
 
 /**

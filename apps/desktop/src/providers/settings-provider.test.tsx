@@ -50,7 +50,7 @@ function installFakeBridge(): void {
           if (failSaves) {
             throw { kind: 'io', message: 'disk full' }
           }
-          saved.push(args.settings)
+          saved.push(args['settings'])
           return null
         default:
           return null

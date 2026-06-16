@@ -11,13 +11,13 @@ export interface CapturedPage {
   url: string
   title: string
   /** `tabs.captureVisibleTab`'s data URL, when the page allowed a screenshot. */
-  screenshotDataUrl?: string
+  screenshotDataUrl?: string | undefined
   /** The page's current selection, when the page allowed the script. */
-  selection?: string
+  selection?: string | undefined
   /** Defuddle-extracted page paragraphs, when the user asks to include them. */
-  contentText?: string
+  contentText?: string | undefined
   /** The user's comment from the popup. */
-  note?: string
+  note?: string | undefined
 }
 
 /** Only http(s) pages are capturable — the envelope (and product) contract. */

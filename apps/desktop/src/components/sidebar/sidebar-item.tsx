@@ -7,7 +7,7 @@ interface SidebarItemProps {
   icon: ReactNode
   label: string
   /** Keymap binding hinted on hover/focus (e.g. `Mod-d`). */
-  binding?: string
+  binding?: string | undefined
   active?: boolean
   onClick: () => void
 }

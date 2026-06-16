@@ -14,17 +14,17 @@ export class MobileErrorBoundary extends Component<
   { children: ReactNode },
   MobileErrorBoundaryState
 > {
-  state: MobileErrorBoundaryState = { message: null }
+  override state: MobileErrorBoundaryState = { message: null }
 
   static getDerivedStateFromError(error: unknown): MobileErrorBoundaryState {
     return { message: error instanceof Error ? error.message : String(error) }
   }
 
-  componentDidCatch(error: unknown, info: ErrorInfo): void {
+  override componentDidCatch(error: unknown, info: ErrorInfo): void {
     console.error('mobile render crash:', error, info.componentStack)
   }
 
-  render(): ReactNode {
+  override render(): ReactNode {
     if (this.state.message !== null) {
       return (
         <div className="flex h-dvh w-screen flex-col items-center justify-center gap-2 px-8 text-center">

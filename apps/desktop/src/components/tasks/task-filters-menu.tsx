@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react'
 import { ListFilter } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -38,9 +39,11 @@ export function TaskFiltersMenu({
 }: TaskFiltersMenuProps): ReactElement {
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
-      <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none">
-        <ListFilter aria-hidden className="size-4" />
-        Task filters
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="font-normal text-text-muted">
+          <ListFilter aria-hidden className="size-4" />
+          Task filters
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>Tasks</DropdownMenuLabel>

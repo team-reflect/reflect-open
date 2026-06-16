@@ -11,7 +11,7 @@ export function parseRepoInput(input: string): GithubRepoRef | null {
     return fromUrl
   }
   const match = /^([\w.-]+)\/([\w.-]+)$/.exec(trimmed)
-  return match === null ? null : { owner: match[1], name: match[2] }
+  return match === null ? null : { owner: match[1]!, name: match[2]! }
 }
 
 /**

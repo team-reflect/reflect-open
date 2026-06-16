@@ -3,7 +3,7 @@ import type { EmbedProgress } from '@reflect/core'
 
 interface ModelDownloadProgressProps {
   /** Byte counts from an active download, once the runtime has reported them. */
-  progress?: EmbedProgress
+  progress?: EmbedProgress | undefined
 }
 
 function formatMegabytes(bytes: number): string {

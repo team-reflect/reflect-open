@@ -48,7 +48,7 @@ const RouterContext = createContext<RouterValue | null>(null)
 
 interface RouterProviderProps {
   /** The launch route; defaults to today (the daily note is the spine). */
-  initialRoute?: Route
+  initialRoute?: Route | undefined
   children: ReactNode
 }
 
@@ -82,16 +82,17 @@ export function RouterProvider({
   // commit, and React runs effects child-before-parent — so updating it in an
   // effect here would lag a frame and restore or save the wrong entry's offset.
   // eslint-disable-next-line react-hooks/refs
-  currentId.current = history.stack[history.index].id
+  currentId.current = history.stack[history.index]!.id
 
   const navigate = useCallback((route: Route) => {
     const target = normalizeRoute(route)
     setHistory((current) => {
-      if (routesEqual(current.stack[current.index].route, target)) {
+      const currentEntry = current.stack[current.index]!
+      if (routesEqual(currentEntry.route, target)) {
         // No stack growth — but this is still an explicit arrival: forget the
         // entry's saved offset so the view re-anchors to its target instead of
         // restoring the old scroll position.
-        scrollById.current.delete(current.stack[current.index].id)
+        scrollById.current.delete(currentEntry.id)
         return current
       }
       const dropped = current.stack.slice(current.index + 1)
@@ -150,10 +151,11 @@ export function RouterProvider({
     [],
   )
 
-  const value = useMemo<RouterValue>(
-    () => ({
-      route: history.stack[history.index].route,
-      entryId: history.stack[history.index].id,
+  const value = useMemo<RouterValue>(() => {
+    const entry = history.stack[history.index]!
+    return {
+      route: entry.route,
+      entryId: entry.id,
       arrivalSeq,
       navigate,
       back,
@@ -162,9 +164,8 @@ export function RouterProvider({
       canForward: history.index < history.stack.length - 1,
       saveScrollState,
       savedScroll,
-    }),
-    [history, arrivalSeq, navigate, back, forward, saveScrollState, savedScroll],
-  )
+    }
+  }, [history, arrivalSeq, navigate, back, forward, saveScrollState, savedScroll])
 
   return <RouterContext.Provider value={value}>{children}</RouterContext.Provider>
 }

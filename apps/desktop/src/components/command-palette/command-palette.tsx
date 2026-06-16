@@ -87,7 +87,7 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
     const notes = notesRef.current
     if (notes.length > 0) {
       if (!notes.some((entry) => entry.path === selectedValueRef.current)) {
-        setSelectedValue(notes[0].path)
+        setSelectedValue(notes[0]!.path)
       }
     } else if (!selectedValueRef.current.startsWith('command:')) {
       setSelectedValue('')

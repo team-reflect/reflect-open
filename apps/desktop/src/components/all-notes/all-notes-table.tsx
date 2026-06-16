@@ -64,7 +64,7 @@ export function AllNotesTable({
       ) : (
         <ul className="relative" style={{ height: virtualizer.getTotalSize() }}>
           {virtualizer.getVirtualItems().map((item) => {
-            const note = rows[item.index]
+            const note = rows[item.index]!
             return (
               <li
                 key={note.path}

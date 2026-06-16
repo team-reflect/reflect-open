@@ -21,11 +21,11 @@ describe('operations store', () => {
       handle = startOperation('Renaming "A" → "B"')
     })
     expect(result.current).toHaveLength(1)
-    expect(result.current[0].label).toBe('Renaming "A" → "B"')
-    expect(result.current[0].progress).toBeNull()
+    expect(result.current[0]!.label).toBe('Renaming "A" → "B"')
+    expect(result.current[0]!.progress).toBeNull()
 
     act(() => handle.progress(3, 12))
-    expect(result.current[0].progress).toEqual({ done: 3, total: 12 })
+    expect(result.current[0]!.progress).toEqual({ done: 3, total: 12 })
 
     act(() => handle.done())
     // Once shown, the entry stays for the minimum visible window — a fast
@@ -42,8 +42,8 @@ describe('operations store', () => {
       handle = startOperation('Renaming "A" → "B"')
     })
     act(() => handle.fail('disk full'))
-    expect(result.current[0].status).toBe('failed')
-    expect(result.current[0].message).toBe('disk full')
+    expect(result.current[0]!.status).toBe('failed')
+    expect(result.current[0]!.message).toBe('disk full')
 
     act(() => vi.advanceTimersByTime(8000 + 1200))
     expect(result.current).toEqual([])
@@ -56,8 +56,8 @@ describe('operations store', () => {
       handle = startOperation('Rebuilding search index')
     })
     act(() => handle.warn('Rebuilt with 1 skipped note: notes/bad.md'))
-    expect(result.current[0].status).toBe('warning')
-    expect(result.current[0].message).toBe('Rebuilt with 1 skipped note: notes/bad.md')
+    expect(result.current[0]!.status).toBe('warning')
+    expect(result.current[0]!.message).toBe('Rebuilt with 1 skipped note: notes/bad.md')
 
     act(() => vi.advanceTimersByTime(8000 + 1200))
     expect(result.current).toEqual([])

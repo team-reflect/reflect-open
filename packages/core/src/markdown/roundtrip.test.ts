@@ -7,7 +7,7 @@ import { parseNote } from './extract'
  * truth and files may be edited outside Reflect, so the bar is: every input
  * parses into a usable note, and position-based edits touch only what they must.
  */
-const CORPUS: Record<string, string> = {
+const CORPUS = {
   reflect: '---\nid: 01HXX\naliases: [pjx]\n---\n# Project X\n\nLinks [[Charlotte]] and #status/active.\n',
   obsidian: '# Notes\n\nSee [[Some Page|alias]] and ![img](assets/a.png) and [ext](https://x.com).\n',
   gfm: '## Tasks\n\n- [ ] todo\n- [x] done\n\n| a | b |\n| - | - |\n| 1 | 2 |\n\n~~strike~~\n',

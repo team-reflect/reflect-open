@@ -46,7 +46,7 @@ describe('placeOldTitleAlias', () => {
     await placeOldTitleAlias(PATH, RENAME, 7)
 
     expect(io.writeNote).toHaveBeenCalledTimes(1)
-    const [path, content, generation] = io.writeNote.mock.calls[0]
+    const [path, content, generation] = io.writeNote.mock.calls[0]!
     expect(path).toBe(PATH)
     expect(content).toContain('aliases:')
     expect(content).toContain('Old Title')

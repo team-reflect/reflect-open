@@ -87,7 +87,7 @@ describe('appendBlock', () => {
 describe('toggleTaskMarker', () => {
   /** The first task's `{ markerOffset, raw }` as the index would record it. */
   function indexedTask(source: string) {
-    const [task] = parseNote({ path: 'notes/n.md', source }).tasks
+    const task = parseNote({ path: 'notes/n.md', source }).tasks[0]!
     return { markerOffset: task.markerOffset, raw: task.raw }
   }
 
@@ -163,7 +163,7 @@ describe('toggleTaskMarker', () => {
 describe('editTaskLine', () => {
   /** The first task's `{ markerOffset, raw }` as the index would record it. */
   function indexedTask(source: string) {
-    const [task] = parseNote({ path: 'notes/n.md', source }).tasks
+    const task = parseNote({ path: 'notes/n.md', source }).tasks[0]!
     return { markerOffset: task.markerOffset, raw: task.raw }
   }
 
@@ -230,7 +230,7 @@ describe('appendTaskLine', () => {
   it('starts the note with a single empty task', () => {
     const { source, markerOffset } = appendTaskLine('')
     expect(source).toBe('- [ ] \n')
-    const [task] = parseNote({ path: 'n.md', source }).tasks
+    const task = parseNote({ path: 'n.md', source }).tasks[0]!
     expect(task.markerOffset).toBe(markerOffset)
     expect(task.text).toBe('')
     expect(task.checked).toBe(false)
@@ -241,15 +241,15 @@ describe('appendTaskLine', () => {
     expect(source).toBe('- [ ] buy milk\n- [ ] \n')
     const tasks = parseNote({ path: 'n.md', source }).tasks
     expect(tasks).toHaveLength(2)
-    expect(tasks[1].markerOffset).toBe(markerOffset)
-    expect(tasks[1].text).toBe('')
+    expect(tasks[1]!.markerOffset).toBe(markerOffset)
+    expect(tasks[1]!.text).toBe('')
   })
 
   it('appends after prose, with the marker locatable by the parser', () => {
     const { source, markerOffset } = appendTaskLine('# Notes\n\nsome intro')
     const tasks = parseNote({ path: 'n.md', source }).tasks
     expect(tasks).toHaveLength(1)
-    expect(tasks[0].markerOffset).toBe(markerOffset)
+    expect(tasks[0]!.markerOffset).toBe(markerOffset)
   })
 })
 
@@ -300,7 +300,7 @@ describe('clearTaskDueDate', () => {
 
 describe('removeTaskLine', () => {
   function indexedTask(source: string, index = 0) {
-    const task = parseNote({ path: 'notes/n.md', source }).tasks[index]
+    const task = parseNote({ path: 'notes/n.md', source }).tasks[index]!
     return { markerOffset: task.markerOffset, raw: task.raw }
   }
 
@@ -336,7 +336,7 @@ describe('removeTaskLine', () => {
 
 describe('taskLineToBullet', () => {
   function indexedTask(source: string, index = 0) {
-    const task = parseNote({ path: 'notes/n.md', source }).tasks[index]
+    const task = parseNote({ path: 'notes/n.md', source }).tasks[index]!
     return { markerOffset: task.markerOffset, raw: task.raw }
   }
 

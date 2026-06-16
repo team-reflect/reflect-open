@@ -170,14 +170,24 @@ body {
    Placed in @layer base so Tailwind's select-* utilities (select-text,
    select-all, select-none) in @layer utilities can override per-element. */
 @layer base {
+  /* Strip the mobile-webview "this is a webpage" tells: the gray flash on
+     every tap, and the long-press callout menu. `tap-highlight-color` is an
+     inherited property (set once on html); both are no-ops on desktop
+     pointers, so no platform gate is needed. */
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
   * {
     -webkit-user-select: none;
     user-select: none;
+    -webkit-touch-callout: none;
   }
 
   /* The * rule above applies none to every element explicitly, so it also
-     hits children inside selectable roots. Restore text on those roots AND
-     their descendants so inner p/h* nodes inside the editor are selectable. */
+     hits children inside selectable roots. Restore text selection — and the
+     long-press callout (the iOS selection magnifier) — on those roots AND
+     their descendants so editing text still works. */
   input,
   textarea,
   [contenteditable],
@@ -188,6 +198,18 @@ body {
   .reflect-protected-note * {
     -webkit-user-select: text;
     user-select: text;
+    -webkit-touch-callout: default;
+  }
+
+  /* Interactive chrome skips the double-tap-zoom wait. The viewport already
+     sets user-scalable=no (so the gesture is gone), making this belt-and-
+     suspenders; scoped to controls so it never fights editor or carousel
+     panning. */
+  button,
+  a,
+  [role='button'],
+  label {
+    touch-action: manipulation;
   }
 }
 
@@ -321,6 +343,16 @@ body {
 
 .reflect-editor p {
   margin: 0.4em 0;
+}
+
+/* The Tasks inline editor (TaskEditor) shares each row's single-line leading-6
+   box with the read-only TaskText, which renders the content in a marginless
+   span. The editor wraps it in a paragraph, so the `.reflect-editor p` block
+   margin above would grow the row the moment it enters edit mode. Zero it (same
+   0-1-1 specificity, later source order wins the tie) so focusing a task never
+   shifts its height. */
+.reflect-task-editor p {
+  margin: 0;
 }
 
 .reflect-editor blockquote {

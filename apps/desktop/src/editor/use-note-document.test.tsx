@@ -196,7 +196,7 @@ describe('useNoteDocument', () => {
       expect(files['notes/a.md']).toBeUndefined()
       expect(files['notes/new-title.md']).toContain('aliases:')
       expect(files['notes/new-title.md']).toContain('Old Title')
-      expect(files['notes/new-title.md'].endsWith('# New Title\n')).toBe(true)
+      expect(files['notes/new-title.md']!.endsWith('# New Title\n')).toBe(true)
     } finally {
       vi.useRealTimers()
     }

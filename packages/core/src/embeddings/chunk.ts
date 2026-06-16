@@ -54,12 +54,12 @@ export async function chunkNote(path: string, source: string): Promise<NoteChunk
   // extending to the next heading or end of file).
   const sections: Section[] = []
   const bodyStart = splitFrontmatter(source).bodyOffset
-  const firstHeadingAt = headings.length > 0 ? headings[0].from : source.length
+  const firstHeadingAt = headings.length > 0 ? headings[0]!.from : source.length
   if (firstHeadingAt > bodyStart) {
     sections.push({ heading: null, from: bodyStart, to: firstHeadingAt })
   }
   headings.forEach((heading, i) => {
-    const to = i + 1 < headings.length ? headings[i + 1].from : source.length
+    const to = i + 1 < headings.length ? headings[i + 1]!.from : source.length
     sections.push({ heading: heading.text, from: heading.from, to })
   })
 
@@ -103,8 +103,8 @@ export async function chunkNote(path: string, source: string): Promise<NoteChunk
 
   // A runt tail reads better (and embeds better) merged into its predecessor.
   if (chunks.length >= 2) {
-    const last = chunks[chunks.length - 1]
-    const prev = chunks[chunks.length - 2]
+    const last = chunks[chunks.length - 1]!
+    const prev = chunks[chunks.length - 2]!
     if (last.text.length < MIN_CHARS && prev.heading === last.heading) {
       const text = source.slice(prev.posFrom, last.posTo)
       chunks.splice(chunks.length - 2, 2, {

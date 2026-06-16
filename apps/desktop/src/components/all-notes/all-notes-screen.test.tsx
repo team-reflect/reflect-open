@@ -102,8 +102,8 @@ beforeEach(() => {
     if (command !== 'db_query') {
       return null
     }
-    const sql = String(args.sql)
-    const params = args.params as unknown[]
+    const sql = String(args['sql'])
+    const params = args['params'] as unknown[]
     if (sql.includes('group by')) {
       return facetRows
     }
@@ -180,7 +180,7 @@ describe('AllNotesScreen', () => {
       if (command !== 'db_query') {
         return null
       }
-      const sql = String(args.sql)
+      const sql = String(args['sql'])
       if (sql.includes('group by')) {
         return facetRows
       }
@@ -283,7 +283,7 @@ describe('AllNotesScreen', () => {
       if (command !== 'db_query') {
         return null
       }
-      const sql = String(args.sql)
+      const sql = String(args['sql'])
       if (sql.includes('"preview"')) {
         return many
       }

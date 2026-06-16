@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 interface GraphSwatchProps {
   /** The graph's chosen color; `undefined` renders the default (app accent). */
-  color?: GraphColor
+  color?: GraphColor | undefined
   /** Size (and shape overrides) — the swatch has no intrinsic dimensions. */
   className?: string
 }

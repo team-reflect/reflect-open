@@ -1,3 +1,4 @@
+import ObjectiveC
 import SwiftRs
 import Tauri
 import UIKit
@@ -29,6 +30,10 @@ class KeyboardPlugin: Plugin {
     // The system's automatic inset adjustment is the source of the jump:
     // page layout owns keyboard avoidance instead (via the events below).
     webview.scrollView.contentInsetAdjustmentBehavior = .never
+    // iOS injects a form-assistant bar (‹ › field stepper + Done) above the
+    // keyboard for any focused field or contenteditable. Reflect edits one
+    // continuous document, so the bar is meaningless chrome — strip it.
+    Self.suppressInputAccessoryBar()
     let center = NotificationCenter.default
     center.addObserver(
       self,
@@ -79,6 +84,29 @@ class KeyboardPlugin: Plugin {
   /// when a screen mounts and subscribes).
   @objc public func currentHeight(_ invoke: Invoke) {
     invoke.resolve(currentState)
+  }
+
+  /// `WKContentView` (the webview's private first responder) returns the
+  /// keyboard's form-assistant bar from `inputAccessoryView`. Replace that
+  /// getter at the *class* level with one returning nil, so the swap doesn't
+  /// depend on the content view already existing when the plugin loads, and so
+  /// it survives the content view being recreated. Guarded by the class lookup,
+  /// so a future WebKit rename degrades to "bar stays" rather than crashing.
+  /// Idempotent via the static flag. iPad's separate `inputAssistantItem`
+  /// shortcut bar is intentionally left untouched here.
+  private static var didSuppressAccessoryBar = false
+  private static func suppressInputAccessoryBar() {
+    guard !didSuppressAccessoryBar, let contentClass = NSClassFromString("WKContentView")
+    else { return }
+    didSuppressAccessoryBar = true
+    let selector = NSSelectorFromString("inputAccessoryView")
+    let block: @convention(block) (AnyObject) -> UIView? = { _ in nil }
+    let implementation = imp_implementationWithBlock(block)
+    if let method = class_getInstanceMethod(contentClass, selector) {
+      class_replaceMethod(contentClass, selector, implementation, method_getTypeEncoding(method))
+    } else {
+      class_replaceMethod(contentClass, selector, implementation, "@@:")
+    }
   }
 }
 

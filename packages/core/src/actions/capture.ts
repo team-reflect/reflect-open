@@ -128,6 +128,15 @@ export function captureFromPath(path: string): CaptureIdentity | null {
     return null
   }
   const [, base, date, hours, minutes, seconds] = match
+  if (
+    base === undefined ||
+    date === undefined ||
+    hours === undefined ||
+    minutes === undefined ||
+    seconds === undefined
+  ) {
+    return null
+  }
   if (Number(hours) > 23 || Number(minutes) > 59 || Number(seconds) > 59) {
     return null
   }
@@ -245,7 +254,7 @@ function firstSectionStart(body: string): number {
 async function captureNoteSource(
   envelope: CaptureEnvelope,
   identity: CaptureIdentity,
-  options: { hasScreenshot: boolean; status: CaptureStatus; selectionHash?: string },
+  options: { hasScreenshot: boolean; status: CaptureStatus; selectionHash?: string | undefined },
 ): Promise<string> {
   const body = captureNoteBody(envelope, identity, options.hasScreenshot)
   return upsertFrontmatter(body, {

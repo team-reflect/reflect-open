@@ -23,12 +23,12 @@ function fakeKeychain(initial: Record<string, string> = {}) {
   const store = new Map(Object.entries(initial))
   setBridge({
     invoke: async (command, args) => {
-      const name = args.name as string
+      const name = args['name'] as string
       if (command === 'secret_get') {
         return store.get(name) ?? null
       }
       if (command === 'secret_set') {
-        store.set(name, args.value as string)
+        store.set(name, args['value'] as string)
         return null
       }
       if (command === 'secret_delete') {
@@ -263,7 +263,7 @@ describe('getGithubToken', () => {
       return jsonResponse({ access_token: 'ghu_new', refresh_token: 'ghr_new', expires_in: 28800 })
     })
     await getGithubToken(fetchFn, () => 2_000)
-    expect(bodies[0].client_id).toBe('fork-app')
+    expect(bodies[0]!['client_id']).toBe('fork-app')
   })
 
   it('surfaces a transient refresh failure as retryable, not as disconnected', async () => {

@@ -47,7 +47,7 @@ function locateTaskMarker(source: string, markerOffset: number, raw: string): nu
   if (matches.length > 1) {
     throw new TaskStaleError(`task line is ambiguous: ${JSON.stringify(raw)}`)
   }
-  return matches[0].markerOffset
+  return matches[0]!.markerOffset
 }
 
 /**

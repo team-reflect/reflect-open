@@ -29,9 +29,11 @@ export function parseInlineLink(source: string): InlineLinkParts | null {
   if (!match) {
     return null
   }
+  // All three groups are mandatory in INLINE_LINK_RE, so a successful match
+  // always populates them.
   return {
     isImage: match[1] === '!',
-    text: match[2],
-    href: match[3].replace(/^<|>$/g, ''),
+    text: match[2]!,
+    href: match[3]!.replace(/^<|>$/g, ''),
   }
 }

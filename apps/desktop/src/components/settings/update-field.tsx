@@ -14,8 +14,8 @@ export function UpdateField(): ReactElement {
   const action: {
     label: string
     icon: typeof RefreshCw
-    run?: () => Promise<void>
-    spinning?: boolean
+    run?: (() => Promise<void>) | undefined
+    spinning?: boolean | undefined
   } = (() => {
     switch (state.phase) {
       case 'checking':

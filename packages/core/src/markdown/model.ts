@@ -116,7 +116,7 @@ export interface WikiLink extends Span {
   /** The link target as written (pre-resolution), trimmed. */
   target: string
   /** Display alias after `|`, if present. */
-  alias?: string
+  alias?: string | undefined
 }
 
 /** A standard markdown link or autolink `[text](href)`. */
@@ -124,7 +124,7 @@ export interface MarkdownLink extends Span {
   href: string
   text: string
   /** Host for external `http(s)` links, else undefined. */
-  domain?: string
+  domain?: string | undefined
 }
 
 /** An ATX or setext heading. */
@@ -191,12 +191,12 @@ export interface ParsedNote {
   /** Graph-relative path; the note's identity in the first wave. */
   path: string
   /** Stable id from frontmatter, if the note carries one (else identity = path). */
-  id?: string
+  id?: string | undefined
   /** `frontmatter.title` → first H1 → filename (or the date for daily notes). */
   title: string
   frontmatter: Frontmatter
   /** Set when YAML frontmatter failed to parse; the note is still usable. */
-  frontmatterWarning?: string
+  frontmatterWarning?: string | undefined
   wikiLinks: WikiLink[]
   links: MarkdownLink[]
   /** Body `#tag` names (without the leading `#`), deduped, in document order. */

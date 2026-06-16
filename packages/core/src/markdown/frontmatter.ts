@@ -111,7 +111,7 @@ export function upsertFrontmatter(source: string, patch: Record<string, unknown>
   // must not: re-serializing a partial parse would drop the bytes the parser
   // couldn't model. Refuse rather than silently corrupt the note's frontmatter.
   if (doc.errors.length > 0) {
-    throw new Error(`refusing to update invalid YAML frontmatter: ${doc.errors[0].message}`)
+    throw new Error(`refusing to update invalid YAML frontmatter: ${doc.errors[0]!.message}`)
   }
   for (const [key, value] of Object.entries(patch)) {
     if (value === undefined) {

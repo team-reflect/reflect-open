@@ -60,6 +60,6 @@ describe('buildAutocompleteEntries', () => {
       { offerCreate: false },
     )
     expect(entries).toHaveLength(1)
-    expect(entries[0].kind).toBe('suggestion')
+    expect(entries[0]!.kind).toBe('suggestion')
   })
 })

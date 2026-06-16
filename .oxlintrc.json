@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "import"],
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "import/no-default-export": "error",
+    "import/no-namespace": "error",
+    "eslint/max-lines": ["warn", 500]
+  },
+  "overrides": [
+    {
+      "files": ["**/*.config.{ts,js,mjs}", "apps/extension/entrypoints/**"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
+    },
+    {
+      "files": ["apps/desktop/src/components/ui/**", "**/scripts/**"],
+      "rules": {
+        "import/no-namespace": "off"
+      }
+    },
+    {
+      "files": ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}", "**/scripts/**"],
+      "rules": {
+        "eslint/max-lines": "off"
+      }
+    }
+  ]
+}

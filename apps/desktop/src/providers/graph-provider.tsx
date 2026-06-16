@@ -259,7 +259,7 @@ export function GraphProvider({
         return
       }
       if (list.length > 0) {
-        await openRecent(list[0].root)
+        await openRecent(list[0]!.root)
       } else {
         setStatus('choosing')
       }

@@ -75,7 +75,7 @@ describe('useAudioRecorder', () => {
     expect(result.current.status).toBe('recording')
     expect(result.current.stream).not.toBeNull()
     // WKWebView profile: webm unsupported, mp4 picked.
-    expect(FakeMediaRecorder.instances[0].mimeType).toBe('audio/mp4')
+    expect(FakeMediaRecorder.instances[0]!.mimeType).toBe('audio/mp4')
 
     act(() => {
       vi.advanceTimersByTime(3000)
@@ -100,7 +100,7 @@ describe('useAudioRecorder', () => {
     await act(async () => {
       await result.current.start()
     })
-    expect(FakeMediaRecorder.instances[0].mimeType).toBe('audio/webm;codecs=opus')
+    expect(FakeMediaRecorder.instances[0]!.mimeType).toBe('audio/webm;codecs=opus')
   })
 
   it('discards a sub-half-second recording as a misclick', async () => {
@@ -246,7 +246,7 @@ describe('useAudioRecorder', () => {
       return Promise.all([racingStop, racingStopTwin])
     })
 
-    expect(FakeMediaRecorder.instances[0].stopCalls).toBe(1)
+    expect(FakeMediaRecorder.instances[0]!.stopCalls).toBe(1)
     expect(first).not.toBeNull()
     expect(second).toBe(first)
   })
@@ -259,12 +259,12 @@ describe('useAudioRecorder', () => {
       await result.current.start()
     })
     // Simulate an external stop landing first (a racing cancel).
-    FakeMediaRecorder.instances[0].state = 'inactive'
+    FakeMediaRecorder.instances[0]!.state = 'inactive'
 
     const recording = await act(async () => result.current.stop())
 
     expect(recording).toBeNull()
-    expect(FakeMediaRecorder.instances[0].stopCalls).toBe(0)
+    expect(FakeMediaRecorder.instances[0]!.stopCalls).toBe(0)
     expect(result.current.status).toBe('idle')
   })
 

@@ -76,7 +76,9 @@ export async function embedNote(options: EmbedNoteOptions): Promise<number> {
     text: chunk.text,
     contentHash: chunk.contentHash,
     modelId,
-    vector: skip[i] ? null : vectors[vectorAt++],
+    // A non-skipped chunk always has a freshly-embedded vector: `vectors` is
+    // exactly as long as the non-skipped chunks, consumed in order here.
+    vector: skip[i] ? null : vectors[vectorAt++]!,
   }))
   await embedApply(path, payload, generation)
   return toEmbed.length

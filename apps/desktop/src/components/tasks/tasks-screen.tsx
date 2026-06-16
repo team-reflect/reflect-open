@@ -9,6 +9,7 @@ import {
   type OpenTask,
   type TaskGroup,
 } from '@reflect/core'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useRecentlyCompleted } from '@/lib/tasks/recently-completed'
 import { sameTask, taskKey } from '@/lib/tasks/task-identity'
@@ -237,35 +238,29 @@ export function TasksScreen(): ReactElement {
             today={today}
             onSchedule={onSchedule}
           >
-            <button
-              type="button"
-              className="flex flex-none items-center gap-2 rounded-md px-2 py-1 text-sm text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none"
-            >
+            <Button type="button" variant="ghost" className="font-normal text-text-muted">
               <CalendarClock aria-hidden className="size-4" />
               Schedule ({selection.selectedCount})
-            </button>
+            </Button>
           </TaskScheduleCalendar>
         ) : null}
         {selection.selectedCount > 0 ? (
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={onConvertToBullet}
             title="Drop the checkbox, keeping the line as a plain bullet — leaves the Tasks list"
-            className="flex flex-none items-center gap-2 rounded-md px-2 py-1 text-sm text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none"
+            className="font-normal text-text-muted"
           >
             <List aria-hidden className="size-4" />
             Convert to bullet ({selection.selectedCount})
-          </button>
+          </Button>
         ) : null}
         {recentlyCompleted.length > 0 ? (
-          <button
-            type="button"
-            onClick={actions.archive}
-            className="flex flex-none items-center gap-2 rounded-md px-2 py-1 text-sm text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none"
-          >
+          <Button type="button" variant="ghost" onClick={actions.archive} className="font-normal text-text-muted">
             <Archive aria-hidden className="size-4" />
             Archive ({recentlyCompleted.length})
-          </button>
+          </Button>
         ) : null}
         <TaskFiltersMenu
           filters={filters}

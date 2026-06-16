@@ -8,8 +8,8 @@ describe('chunkNote', () => {
     const source = '# Alpha\n\nFirst section text.\n\n# Beta\n\nSecond section text.\n'
     const chunks = await chunkNote(PATH, source)
     expect(chunks).toHaveLength(2)
-    expect(chunks[0].heading).toBe('Alpha')
-    expect(chunks[1].heading).toBe('Beta')
+    expect(chunks[0]!.heading).toBe('Alpha')
+    expect(chunks[1]!.heading).toBe('Beta')
     // Offsets slice back to the exact chunk text.
     for (const chunk of chunks) {
       expect(source.slice(chunk.posFrom, chunk.posTo)).toBe(chunk.text)
@@ -26,8 +26,8 @@ describe('chunkNote', () => {
     const after = '# Stable\n\nUnchanged text here.\n\n# Volatile\n\nNew content entirely.\n'
     const a = await chunkNote(PATH, before)
     const b = await chunkNote(PATH, after)
-    expect(b[0].contentHash).toBe(a[0].contentHash) // the hash-skip foundation
-    expect(b[1].contentHash).not.toBe(a[1].contentHash)
+    expect(b[0]!.contentHash).toBe(a[0]!.contentHash) // the hash-skip foundation
+    expect(b[1]!.contentHash).not.toBe(a[1]!.contentHash)
   })
 
   it('splits a long section into sentence-aligned chunks', async () => {
@@ -41,7 +41,7 @@ describe('chunkNote', () => {
     }
     // Chunks cover the section contiguously, in order.
     for (let i = 1; i < chunks.length; i += 1) {
-      expect(chunks[i].posFrom).toBe(chunks[i - 1].posTo)
+      expect(chunks[i]!.posFrom).toBe(chunks[i - 1]!.posTo)
     }
   })
 
@@ -49,8 +49,8 @@ describe('chunkNote', () => {
     const source = '---\ntitle: Meta\n---\n\nJust a body without headings.\n'
     const chunks = await chunkNote(PATH, source)
     expect(chunks).toHaveLength(1)
-    expect(chunks[0].heading).toBeNull()
-    expect(chunks[0].text).not.toContain('title: Meta')
+    expect(chunks[0]!.heading).toBeNull()
+    expect(chunks[0]!.text).not.toContain('title: Meta')
   })
 
   it('returns nothing for empty or whitespace-only notes', async () => {
@@ -62,7 +62,7 @@ describe('chunkNote', () => {
     const sentence = 'A solid sentence that carries real length for the chunker to count. '
     const source = `# One\n\n${sentence.repeat(16)}Tiny tail.`
     const chunks = await chunkNote(PATH, source)
-    const last = chunks[chunks.length - 1]
+    const last = chunks[chunks.length - 1]!
     expect(last.text.length).toBeGreaterThanOrEqual(200)
     expect(last.text.endsWith('Tiny tail.')).toBe(true)
   })
