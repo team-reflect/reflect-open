@@ -50,6 +50,8 @@ describe('cloudSafeSearchHits', () => {
     snippet: 'body',
     heading: null,
     isPrivate: false,
+    matchKind: 'note',
+    assetPath: null,
   }
   const PRIVATE: RetrievalHit = {
     path: PRIVATE_PATH,
@@ -58,6 +60,8 @@ describe('cloudSafeSearchHits', () => {
     snippet: '',
     heading: null,
     isPrivate: true,
+    matchKind: 'note',
+    assetPath: null,
   }
 
   const neverPrivate = async () => false

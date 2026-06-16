@@ -225,6 +225,11 @@ function SearchResults({
               className="flex w-full flex-col gap-0.5 border-b border-border px-4 py-2.5 text-left"
             >
               <span className="truncate text-sm font-medium">{hit.title}</span>
+              {hit.matchKind === 'asset' && hit.assetPath !== null ? (
+                <span className="truncate text-xs text-text-muted">
+                  Asset: {hit.assetPath.split('/').pop() ?? hit.assetPath}
+                </span>
+              ) : null}
               {hit.snippet !== null && (
                 <span className="line-clamp-2 text-xs text-text-muted">
                   {parseHighlights(hit.snippet).map((segment, index) =>

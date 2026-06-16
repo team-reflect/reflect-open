@@ -104,6 +104,8 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
         title: hit.title,
         dailyDate: null,
         snippet: hit.snippet === '' ? null : hit.snippet,
+        matchKind: hit.matchKind,
+        assetPath: hit.assetPath,
       }))
     },
     enabled: searching && trimmed !== '',

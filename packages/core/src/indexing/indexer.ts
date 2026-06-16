@@ -9,6 +9,7 @@ import {
   removeFromIndex,
   setIndexMeta,
 } from './commands'
+import { rebuildAssetSearchIndex } from './asset-search'
 import { hashContent } from './hash'
 import { buildIndexedNote, PROJECTION_VERSION, type IndexedNote } from './indexed-note'
 import { detectExternalMoves } from './move-healing'
@@ -141,6 +142,7 @@ export async function rebuildIndex(options: IndexPassOptions): Promise<void> {
     }
   }
   await applyRebuildBatch(batch, generation, onSkippedNote)
+  await rebuildAssetSearchIndex({ generation })
   // The rows now match the current projection — stamp it so `syncIndex` can
   // reconcile cheaply from here on. A superseded pass stamps into a stale
   // generation, which Rust drops: the next open then rebuilds again, which is
@@ -262,4 +264,5 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
       await removeFromIndex(path, generation)
     }
   }
+  await rebuildAssetSearchIndex(signal === undefined ? { generation } : { generation, signal })
 }

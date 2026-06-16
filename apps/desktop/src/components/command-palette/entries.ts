@@ -16,6 +16,8 @@ export interface NoteEntry {
   date: string | null
   /** Body snippet with highlight markers (search hits only). */
   snippet: string | null
+  matchKind: 'note' | 'asset'
+  assetPath: string | null
   /** Human label for a generated date suggestion ("Next Friday"); null otherwise. */
   phrase: string | null
 }
@@ -84,6 +86,8 @@ export function buildPaletteSections(options: {
         title: hit.title,
         date: hit.dailyDate,
         snippet: hit.snippet,
+        matchKind: hit.matchKind,
+        assetPath: hit.assetPath,
         phrase: null,
       })),
       commands: [],
@@ -115,6 +119,8 @@ export function buildPaletteSections(options: {
         title: suggestion.title,
         date: suggestion.date,
         snippet: null,
+        matchKind: 'note',
+        assetPath: null,
         phrase: suggestion.generated?.phrase ?? null,
       })
     }
@@ -129,6 +135,8 @@ export function buildPaletteSections(options: {
         title: hit.title,
         date: hit.dailyDate,
         snippet: hit.snippet,
+        matchKind: hit.matchKind,
+        assetPath: hit.assetPath,
         phrase: null,
       })
     }

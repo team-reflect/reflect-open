@@ -64,6 +64,8 @@ describe('SimilarNotesSection', () => {
         snippet: 'borrow checker notes',
         heading: null,
         isPrivate: false,
+        matchKind: 'note',
+        assetPath: null,
       },
     ])
     const view = renderSimilar('notes/languages.md', false)
@@ -83,6 +85,8 @@ describe('SimilarNotesSection', () => {
         snippet: 'borrow checker notes',
         heading: null,
         isPrivate: false,
+        matchKind: 'note',
+        assetPath: null,
       },
       {
         path: 'notes/zig.md',
@@ -91,6 +95,8 @@ describe('SimilarNotesSection', () => {
         snippet: 'comptime experiments',
         heading: null,
         isPrivate: false,
+        matchKind: 'note',
+        assetPath: null,
       },
     ])
     const view = renderSimilar('notes/languages.md')
@@ -115,6 +121,8 @@ describe('SimilarNotesSection', () => {
         snippet: `snippet ${index + 1}`,
         heading: null,
         isPrivate: false,
+        matchKind: 'note' as const,
+        assetPath: null,
       })),
     )
     const view = renderSimilar('notes/languages.md', false)
@@ -133,6 +141,8 @@ describe('SimilarNotesSection', () => {
         snippet: 'tomato beds',
         heading: null,
         isPrivate: false,
+        matchKind: 'note',
+        assetPath: null,
       },
     ])
     const view = renderSimilar('daily/2026-06-09.md')

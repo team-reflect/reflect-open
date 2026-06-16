@@ -170,6 +170,8 @@ pub fn run() {
             db::index_apply,
             db::index_apply_batch,
             db::index_remove,
+            db::index_asset_search_apply,
+            db::index_asset_search_remove,
             db::index_clear,
             db::index_move,
             db::note_move_indexed,

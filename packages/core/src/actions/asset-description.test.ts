@@ -1,14 +1,17 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FileMeta } from '../graph/schemas'
 import { describeAsset } from '../ai/describe-asset'
 import { getSecret } from '../secrets/keychain'
 import { listDir, listFiles, readAsset, readNote, writeNote } from '../graph/commands'
 import {
   assetDescriptionSidecarPath,
+  assetPathFromDescriptionSidecar,
   isDescribableAssetPath,
   parseAssetDescriptionSidecarMeta,
   reconcileAssetDescriptions,
 } from './asset-description'
+import { subscribeFileChanges, type FileChange } from '../indexing/file-changes'
+import { setBridge } from '../ipc/bridge'
 
 vi.mock('../graph/commands', () => ({
   listDir: vi.fn(),
@@ -35,6 +38,10 @@ const readNoteMock = vi.mocked(readNote)
 const writeNoteMock = vi.mocked(writeNote)
 const getSecretMock = vi.mocked(getSecret)
 const describeAssetMock = vi.mocked(describeAsset)
+
+afterEach(() => {
+  setBridge(null)
+})
 
 const PROVIDERS = {
   providers: [{ id: 'cfg-openai', provider: 'openai' as const, model: 'gpt-5.5', keyHint: 'wxyz1' }],
@@ -67,6 +74,8 @@ function setupNotes(entries: Array<FileMeta & { source: string }>): void {
 describe('asset description helpers', () => {
   it('names adjacent sidecars and detects supported source assets', () => {
     expect(assetDescriptionSidecarPath('assets/photo.png')).toBe('assets/photo.png.reflect.md')
+    expect(assetPathFromDescriptionSidecar('assets/photo.png.reflect.md')).toBe('assets/photo.png')
+    expect(assetPathFromDescriptionSidecar('assets/movie.mov.reflect.md')).toBeNull()
     expect(isDescribableAssetPath('assets/photo.png')).toBe(true)
     expect(isDescribableAssetPath('assets/report.pdf')).toBe(true)
     expect(isDescribableAssetPath('assets/photo.png.reflect.md')).toBe(false)
@@ -99,6 +108,7 @@ describe('asset description helpers', () => {
 describe('reconcileAssetDescriptions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setBridge({ invoke: vi.fn(), listen: async () => () => {} })
     getSecretMock.mockResolvedValue('sk-live')
     readAssetMock.mockResolvedValue(encoded('image'))
     writeNoteMock.mockResolvedValue(undefined)
@@ -108,11 +118,14 @@ describe('reconcileAssetDescriptions', () => {
   })
 
   it('describes a public referenced asset and writes a managed sidecar', async () => {
+    const changes: FileChange[][] = []
+    const unlisten = await subscribeFileChanges((batch) => changes.push(batch))
     const outcome = await reconcileAssetDescriptions({
       providers: PROVIDERS,
       generation: 3,
       assetPaths: ['assets/photo.png'],
     })
+    unlisten()
 
     expect(outcome).toMatchObject({ considered: 1, described: 1, stopped: null })
     expect(describeAssetMock).toHaveBeenCalledWith(
@@ -129,6 +142,9 @@ describe('reconcileAssetDescriptions', () => {
     const sidecar = writeNoteMock.mock.calls[0]?.[1]
     expect(sidecar).toContain('reflectAssetDescription: 1')
     expect(sidecar).toContain('source: assets/photo.png')
+    expect(changes).toEqual([
+      [expect.objectContaining({ path: 'assets/photo.png.reflect.md', kind: 'upsert' })],
+    ])
   })
 
   it('skips private, mixed, and unreferenced assets before provider calls', async () => {

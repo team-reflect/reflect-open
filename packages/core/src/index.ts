@@ -234,7 +234,7 @@ export {
   type ReconcileAudioMemosOutcome,
   type ReconcileStop,
 } from './actions/audio-memo'
-export { assetDescriptionPending, assetDescriptionSidecarPath, isDescribableAssetPath, listDescribableAssets, mediaTypeForAsset, parseAssetDescriptionSidecarMeta, reconcileAssetDescriptions, type AssetDescriptionCandidate, type AssetDescriptionSidecarMeta, type AssetDescriptionSkipReason, type ReconcileAssetDescriptionsInput, type ReconcileAssetDescriptionsOutcome } from './actions/asset-description'
+export { assetDescriptionPending, assetDescriptionSidecarPath, assetPathFromDescriptionSidecar, isDescribableAssetPath, listDescribableAssets, mediaTypeForAsset, parseAssetDescriptionSidecarMeta, reconcileAssetDescriptions, type AssetDescriptionCandidate, type AssetDescriptionSidecarMeta, type AssetDescriptionSkipReason, type ReconcileAssetDescriptionsInput, type ReconcileAssetDescriptionsOutcome } from './actions/asset-description'
 
 // Link capture (Plan 11) — the envelope also ships to the extension via the
 // `./capture-envelope` subpath export (browser-safe, zod-only)
@@ -392,6 +392,12 @@ export {
   applyIndexedNote,
   applyIndexedNotes,
   removeFromIndex,
+  applyAssetSearch,
+  removeAssetSearchRows,
+  assetPathsForNotes,
+  reconcileAssetSearch,
+  rebuildAssetSearchIndex,
+  removeAssetSearch,
   moveNoteIndexed,
   clearIndex,
   watchStart,

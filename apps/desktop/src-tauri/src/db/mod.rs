@@ -30,7 +30,7 @@ use crate::fs::GraphState;
 
 pub use chat_write::{ChatConversation, ChatMessageRow};
 pub use embed_write::EmbeddedChunk;
-pub use write::IndexedNote;
+pub use write::{AssetSearchRow, IndexedNote};
 
 /// The open index connection plus its monotonic generation, kept **under one
 /// lock** so they swap atomically. `index_open` bumps the generation and rebinds
@@ -144,6 +144,43 @@ pub fn index_remove(path: String, generation: u64, index: State<IndexState>) -> 
     let tx = conn.transaction()?;
     write::remove_note(&tx, &path)?;
     embed_write::remove_chunks(&tx, &path)?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// Replace all searchable sidecar rows for one source asset (no-op if stale).
+#[tauri::command]
+pub fn index_asset_search_apply(
+    asset_path: String,
+    rows: Vec<AssetSearchRow>,
+    generation: u64,
+    index: State<IndexState>,
+) -> AppResult<()> {
+    let mut state = lock_state(&index)?;
+    if state.generation != generation {
+        return Ok(());
+    }
+    let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
+    let tx = conn.transaction()?;
+    write::apply_asset_search(&tx, &asset_path, &rows)?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// Drop every searchable sidecar row for one source asset (no-op if stale).
+#[tauri::command]
+pub fn index_asset_search_remove(
+    asset_path: String,
+    generation: u64,
+    index: State<IndexState>,
+) -> AppResult<()> {
+    let mut state = lock_state(&index)?;
+    if state.generation != generation {
+        return Ok(());
+    }
+    let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
+    let tx = conn.transaction()?;
+    write::remove_asset_search(&tx, &asset_path)?;
     tx.commit()?;
     Ok(())
 }

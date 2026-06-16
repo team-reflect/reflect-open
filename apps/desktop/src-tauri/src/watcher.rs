@@ -7,8 +7,9 @@
 //! loop back. The watcher reports `.md` under `daily/` and `notes/`, plus
 //! anything under `audio-memos/` (recordings feed the sync debounce and the
 //! transcription reconciler, not the index), plus supported source assets under
-//! `assets/` (for AI description sidecars). Frontend consumers filter by
-//! path. The frontend resolves create-vs-delete and re-indexes
+//! `assets/` (for AI description sidecars) plus generated asset-description
+//! sidecars (for search). Frontend consumers filter by path. The frontend
+//! resolves create-vs-delete and re-indexes
 //! (content-hash gated).
 
 use std::path::{Path, PathBuf};
@@ -48,11 +49,11 @@ pub struct FileChange {
 
 /// Graph-relative path if `path` is tracked: a markdown note (`.md` under
 /// `daily/` or `notes/`), an audio-memo recording (anything under
-/// `audio-memos/`), a supported source asset under `assets/`, or a spooled
-/// capture envelope (`.json` under `.reflect/inbox/` — the one carve-out from
-/// the `.reflect/` blackout; the envelope is the spool's commit point and
-/// triggers the capture drain), else `None`. Pure — the filtering rule,
-/// unit-tested.
+/// `audio-memos/`), a supported source asset under `assets/`, a generated
+/// asset-description sidecar, or a spooled capture envelope (`.json` under
+/// `.reflect/inbox/` — the one carve-out from the `.reflect/` blackout; the
+/// envelope is the spool's commit point and triggers the capture drain), else
+/// `None`. Pure — the filtering rule, unit-tested.
 fn tracked_relpath(path: &Path, root: &Path) -> Option<String> {
     let rel = path.strip_prefix(root).ok()?;
     let rel_str = rel.to_string_lossy().replace('\\', "/");
@@ -60,8 +61,9 @@ fn tracked_relpath(path: &Path, root: &Path) -> Option<String> {
         && rel_str.ends_with(".md");
     let recording = rel_str.starts_with("audio-memos/");
     let asset = is_describable_asset(&rel_str);
+    let asset_sidecar = is_asset_description_sidecar(&rel_str);
     let capture = rel_str.starts_with(".reflect/inbox/") && rel_str.ends_with(".json");
-    (note || recording || asset || capture).then_some(rel_str)
+    (note || recording || asset || asset_sidecar || capture).then_some(rel_str)
 }
 
 fn is_describable_asset(path: &str) -> bool {
@@ -75,6 +77,14 @@ fn is_describable_asset(path: &str) -> bool {
         extension.to_ascii_lowercase().as_str(),
         "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg" | "pdf"
     )
+}
+
+fn is_asset_description_sidecar(path: &str) -> bool {
+    if !path.starts_with("assets/") || !path.ends_with(".reflect.md") {
+        return false;
+    }
+    let source = path.trim_end_matches(".reflect.md");
+    is_describable_asset(source)
 }
 
 /// Reduce a debounced batch of paths to unique tracked changes (last kind wins).
@@ -227,7 +237,12 @@ mod tests {
             tracked_relpath(Path::new("/g/assets/doc.pdf"), root).as_deref(),
             Some("assets/doc.pdf")
         );
-        // Not tracked: the index, unsupported assets, generated sidecars,
+        // Generated sidecars feed the search projection.
+        assert_eq!(
+            tracked_relpath(Path::new("/g/assets/x.png.reflect.md"), root),
+            Some("assets/x.png.reflect.md".to_string())
+        );
+        // Not tracked: the index, unsupported assets, unsupported sidecars,
         // non-markdown notes, dotfiles, outside root, or the audio-memos
         // directory entry itself.
         assert_eq!(
@@ -235,10 +250,13 @@ mod tests {
             None
         );
         assert_eq!(
-            tracked_relpath(Path::new("/g/assets/x.png.reflect.md"), root),
+            tracked_relpath(Path::new("/g/assets/movie.mov.reflect.md"), root),
             None
         );
-        assert_eq!(tracked_relpath(Path::new("/g/assets/movie.mov"), root), None);
+        assert_eq!(
+            tracked_relpath(Path::new("/g/assets/movie.mov"), root),
+            None
+        );
         assert_eq!(tracked_relpath(Path::new("/g/notes/x.txt"), root), None);
         assert_eq!(tracked_relpath(Path::new("/g/README.md"), root), None);
         assert_eq!(tracked_relpath(Path::new("/g/audio-memos"), root), None);

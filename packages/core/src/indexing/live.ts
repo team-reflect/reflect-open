@@ -1,5 +1,7 @@
 import type { Unlisten } from '../ipc/bridge'
+import { assetPathFromDescriptionSidecar } from '../actions/asset-description'
 import { isNotePath } from '../graph/paths'
+import { assetPathsForNotes, reconcileAssetSearch } from './asset-search'
 import { moveIndexedRows, removeFromIndex } from './commands'
 import { subscribeFileChanges, type FileChange } from './file-changes'
 import { indexNote } from './indexer'
@@ -26,6 +28,20 @@ export type MovedHandler = (from: string, to: string) => void
 
 const logApplyError: ApplyErrorHandler = (error, change) => {
   console.error(`failed to index change for ${change.path}:`, error)
+}
+
+async function reconcileAffectedAssets(
+  paths: Iterable<string>,
+  generation: number,
+  onError: ApplyErrorHandler,
+): Promise<void> {
+  for (const path of [...new Set(paths)].sort()) {
+    try {
+      await reconcileAssetSearch(path, generation)
+    } catch (error) {
+      onError(error, { path, kind: 'upsert' })
+    }
+  }
 }
 
 /**
@@ -96,10 +112,24 @@ export async function applyIndexChanges(
   onMoved?: MovedHandler,
 ): Promise<void> {
   // The change stream carries more than notes (the watcher also reports
-  // audio-memo recordings); only markdown notes reach the index.
+  // audio-memo recordings and asset sidecars); only notes and managed sidecars
+  // reach the index.
   const notes = changes.filter((change) => isNotePath(change.path))
+  const sidecarAssets = changes
+    .map((change) => assetPathFromDescriptionSidecar(change.path))
+    .filter((path): path is string => path !== null)
   if (notes.length === 0) {
+    await reconcileAffectedAssets(sidecarAssets, generation, onError)
     return
+  }
+  const notePaths = [...new Set(notes.map((change) => change.path))]
+  const affectedAssets = new Set<string>()
+  try {
+    for (const path of await assetPathsForNotes(notePaths)) {
+      affectedAssets.add(path)
+    }
+  } catch (error) {
+    console.error('failed to read existing asset references before indexing:', error)
   }
   let handled: Set<string>
   try {
@@ -124,6 +154,14 @@ export async function applyIndexChanges(
       onError(error, change)
     }
   }
+  try {
+    for (const path of await assetPathsForNotes(notePaths)) {
+      affectedAssets.add(path)
+    }
+  } catch (error) {
+    console.error('failed to read updated asset references after indexing:', error)
+  }
+  await reconcileAffectedAssets([...affectedAssets, ...sidecarAssets], generation, onError)
 }
 
 /**
@@ -144,14 +182,16 @@ export function subscribeIndexChanges(
   // (e.g. an upsert landing after a later remove, leaving a ghost row).
   let applyQueue: Promise<void> = Promise.resolve()
   return subscribeFileChanges((changes) => {
-    const notes = changes.filter((change) => isNotePath(change.path))
-    if (notes.length === 0) {
+    const indexable = changes.filter(
+      (change) => isNotePath(change.path) || assetPathFromDescriptionSidecar(change.path) !== null,
+    )
+    if (indexable.length === 0) {
       return // e.g. a batch of audio-memo recordings — nothing the index tracks
     }
     applyQueue = applyQueue
-      .then(() => applyIndexChanges(notes, generation, undefined, onMoved))
+      .then(() => applyIndexChanges(indexable, generation, undefined, onMoved))
       .then(() => {
-        onApplied?.(notes)
+        onApplied?.(indexable)
       })
       .catch((error) => {
         console.error('failed to apply watcher batch:', error)

@@ -15,6 +15,8 @@ function hit(path: string, overrides?: Partial<RetrievalHit>): RetrievalHit {
     snippet: `about ${path}`,
     heading: null,
     isPrivate: false,
+    matchKind: 'note',
+    assetPath: null,
     ...overrides,
   }
 }

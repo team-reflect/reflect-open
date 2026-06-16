@@ -12,6 +12,7 @@ function startOfLocalDay(date: string): number {
 
 beforeEach(() => {
   mockInvoke.mockReset()
+  mockInvoke.mockResolvedValue([])
   setBridge({ invoke: mockInvoke, listen: async () => () => {} })
 })
 
@@ -28,7 +29,14 @@ describe('searchWithFilters', () => {
     const hits = await searchWithFilters(parseSearchQuery('#Work'), 12)
 
     expect(hits).toEqual([
-      { path: 'notes/work.md', title: 'Work', dailyDate: null, snippet: null },
+      {
+        path: 'notes/work.md',
+        title: 'Work',
+        dailyDate: null,
+        snippet: null,
+        matchKind: 'note',
+        assetPath: null,
+      },
     ])
 
     const [command, args] = mockInvoke.mock.calls[0]!
@@ -73,6 +81,8 @@ describe('searchWithFilters', () => {
         title: '2026-01-02',
         dailyDate: '2026-01-02',
         snippet: null,
+        matchKind: 'note',
+        assetPath: null,
       },
     ])
     const [, args] = mockInvoke.mock.calls[0]!
@@ -93,7 +103,14 @@ describe('searchWithFilters', () => {
     const hits = await searchWithFilters(parseSearchQuery('quokka'), 12)
 
     expect(hits).toEqual([
-      { path: 'notes/quokka.md', title: 'Quokka', dailyDate: null, snippet: 'a …' },
+      {
+        path: 'notes/quokka.md',
+        title: 'Quokka',
+        dailyDate: null,
+        snippet: 'a …',
+        matchKind: 'note',
+        assetPath: null,
+      },
     ])
 
     const [command, args] = mockInvoke.mock.calls[0]!
@@ -124,5 +141,35 @@ describe('searchWithFilters', () => {
     // foldKey('Quokka Habitat') — trimmed + lowercased — so it matches the
     // stored `notes.title_key`, never the raw casing.
     expect(params).toContain('quokka habitat')
+  })
+
+  it('fills remaining text search results from asset sidecars', async () => {
+    mockInvoke
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          path: 'notes/receipt.md',
+          title: 'Receipt',
+          daily_date: null,
+          asset_path: 'assets/receipt.pdf',
+          assetPath: 'assets/receipt.pdf',
+          snippet: 'total $42',
+        },
+      ])
+
+    const hits = await searchWithFilters(parseSearchQuery('$42'), 12)
+
+    expect(hits).toEqual([
+      {
+        path: 'notes/receipt.md',
+        title: 'Receipt',
+        dailyDate: null,
+        snippet: 'total $42',
+        matchKind: 'asset',
+        assetPath: 'assets/receipt.pdf',
+      },
+    ])
+    const assetQuery = mockInvoke.mock.calls[1]?.[1]
+    expect(String(assetQuery?.['sql']).toLowerCase()).toContain('asset_search_fts match')
   })
 })

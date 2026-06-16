@@ -38,6 +38,29 @@ export async function removeFromIndex(path: string, generation: number): Promise
   await call('index_remove', { path, generation }, voidSchema)
 }
 
+export interface AssetSearchRow {
+  notePath: string
+  assetPath: string
+  sidecarPath: string
+  sourceHash: string
+  sidecarHash: string
+  text: string
+}
+
+/** Replace all searchable sidecar rows for one source asset. */
+export async function applyAssetSearch(
+  assetPath: string,
+  rows: AssetSearchRow[],
+  generation: number,
+): Promise<void> {
+  await call('index_asset_search_apply', { assetPath, rows, generation }, voidSchema)
+}
+
+/** Remove all searchable sidecar rows for one source asset. */
+export async function removeAssetSearch(assetPath: string, generation: number): Promise<void> {
+  await call('index_asset_search_remove', { assetPath, generation }, voidSchema)
+}
+
 /**
  * Move a note's index rows **only** — the id-based reconcile half of Plan 17:
  * the file already lives at `to` (an external rename observed after the fact,

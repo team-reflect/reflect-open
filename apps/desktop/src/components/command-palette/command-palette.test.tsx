@@ -108,6 +108,15 @@ function renderPalette(query: string, context?: Partial<CommandContext>) {
   return { view, navigate }
 }
 
+function searchHit(input: {
+  path: string
+  title: string
+  dailyDate: string | null
+  snippet: string | null
+}) {
+  return { ...input, matchKind: 'note' as const, assetPath: null }
+}
+
 describe('CommandPalette', () => {
   it('never shows "No results" while the recall feed is still loading', async () => {
     let release!: (value: never[]) => void
@@ -156,7 +165,12 @@ describe('CommandPalette', () => {
   it('a typed query shows ranked notes with highlighted snippets and Enter opens the top hit', async () => {
     suggestWikiTargets.mockResolvedValue([])
     searchWithFilters.mockResolvedValue([
-      { path: 'notes/rust.md', title: 'Rust Notes', snippet: 'about rust things', dailyDate: null },
+      searchHit({
+        path: 'notes/rust.md',
+        title: 'Rust Notes',
+        snippet: 'about rust things',
+        dailyDate: null,
+      }),
     ])
     const { view, navigate } = renderPalette('rust')
     await view.findByText('Rust Notes')
@@ -190,8 +204,13 @@ describe('CommandPalette', () => {
     suggestWikiTargets.mockClear()
     suggestWikiTargets.mockResolvedValue([])
     searchWithFilters.mockResolvedValue([
-      { path: 'daily/2026-06-08.md', title: '2026-06-08', dailyDate: '2026-06-08', snippet: null },
-      { path: 'notes/w.md', title: 'Work log', dailyDate: null, snippet: null },
+      searchHit({
+        path: 'daily/2026-06-08.md',
+        title: '2026-06-08',
+        dailyDate: '2026-06-08',
+        snippet: null,
+      }),
+      searchHit({ path: 'notes/w.md', title: 'Work log', dailyDate: null, snippet: null }),
     ])
     const { view, navigate } = renderPalette('#work is:daily')
     await view.findByText('Work log')
@@ -234,6 +253,8 @@ describe('CommandPalette', () => {
         snippet: 'borrow checker notes',
         heading: null,
         isPrivate: false,
+        matchKind: 'note',
+        assetPath: null,
       },
     ])
     const { view } = renderPalette('rust')
@@ -244,8 +265,8 @@ describe('CommandPalette', () => {
   it('previews the highlighted note and follows arrow-key selection', async () => {
     suggestWikiTargets.mockResolvedValue([])
     searchWithFilters.mockResolvedValue([
-      { path: 'notes/first.md', title: 'First', dailyDate: null, snippet: null },
-      { path: 'notes/second.md', title: 'Second', dailyDate: null, snippet: null },
+      searchHit({ path: 'notes/first.md', title: 'First', dailyDate: null, snippet: null }),
+      searchHit({ path: 'notes/second.md', title: 'Second', dailyDate: null, snippet: null }),
     ])
     readNote.mockImplementation(async (path) =>
       path === 'notes/first.md' ? '# First\n\nfirst body\n' : '# Second\n\nsecond body\n',
@@ -268,7 +289,7 @@ describe('CommandPalette', () => {
   it('frontmatter never reaches the preview', async () => {
     suggestWikiTargets.mockResolvedValue([])
     searchWithFilters.mockResolvedValue([
-      { path: 'notes/pinned.md', title: 'Pinned', dailyDate: null, snippet: null },
+      searchHit({ path: 'notes/pinned.md', title: 'Pinned', dailyDate: null, snippet: null }),
     ])
     readNote.mockResolvedValue('---\npinned: true\n---\n# Pinned\n\nbody\n')
     const { view } = renderPalette('pinned')

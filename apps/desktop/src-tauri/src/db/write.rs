@@ -42,6 +42,18 @@ pub struct IndexedNote {
     pub(super) tasks: Vec<IndexedTask>,
 }
 
+/// One searchable sidecar row attached to a public referencing note.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetSearchRow {
+    pub(super) note_path: String,
+    pub(super) asset_path: String,
+    pub(super) sidecar_path: String,
+    pub(super) source_hash: String,
+    pub(super) sidecar_hash: String,
+    pub(super) text: String,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct IndexedLink {
@@ -211,6 +223,10 @@ pub(super) fn move_note(conn: &Connection, from: &str, to: &str) -> AppResult<()
         .execute(params![from, to])?;
     conn.prepare_cached("UPDATE tasks SET note_path = ?2 WHERE note_path = ?1")?
         .execute(params![from, to])?;
+    conn.prepare_cached("UPDATE asset_search SET note_path = ?2 WHERE note_path = ?1")?
+        .execute(params![from, to])?;
+    conn.prepare_cached("UPDATE asset_search_fts SET note_path = ?2 WHERE note_path = ?1")?
+        .execute(params![from, to])?;
     conn.prepare_cached("UPDATE embedding_chunks SET note_path = ?2 WHERE note_path = ?1")?
         .execute(params![from, to])?;
     conn.prepare_cached("UPDATE search_fts SET path = ?2 WHERE path = ?1")?
@@ -224,6 +240,7 @@ pub(super) fn move_note(conn: &Connection, from: &str, to: &str) -> AppResult<()
 pub(super) fn clear_index(conn: &Connection) -> AppResult<()> {
     conn.execute_batch(
         "DELETE FROM notes; DELETE FROM search_fts;
+         DELETE FROM asset_search_fts; DELETE FROM asset_search;
          DELETE FROM embedding_vectors; DELETE FROM embedding_chunks;",
     )?;
     Ok(())
@@ -236,5 +253,44 @@ pub(super) fn remove_note(conn: &Connection, path: &str) -> AppResult<()> {
         .execute(params![path])?;
     conn.prepare_cached("DELETE FROM search_fts WHERE path = ?1")?
         .execute(params![path])?;
+    conn.prepare_cached("DELETE FROM asset_search_fts WHERE note_path = ?1")?
+        .execute(params![path])?;
+    Ok(())
+}
+
+/// Replace all searchable sidecar rows for one source asset.
+pub(super) fn apply_asset_search(
+    conn: &Connection,
+    asset_path: &str,
+    rows: &[AssetSearchRow],
+) -> AppResult<()> {
+    remove_asset_search(conn, asset_path)?;
+    let mut row_stmt = conn.prepare_cached(
+        "INSERT INTO asset_search(note_path, asset_path, sidecar_path, source_hash, sidecar_hash, text)
+         VALUES(?1, ?2, ?3, ?4, ?5, ?6)",
+    )?;
+    let mut fts_stmt = conn.prepare_cached(
+        "INSERT INTO asset_search_fts(note_path, asset_path, body) VALUES(?1, ?2, ?3)",
+    )?;
+    for row in rows {
+        row_stmt.execute(params![
+            row.note_path,
+            row.asset_path,
+            row.sidecar_path,
+            row.source_hash,
+            row.sidecar_hash,
+            row.text
+        ])?;
+        fts_stmt.execute(params![row.note_path, row.asset_path, row.text])?;
+    }
+    Ok(())
+}
+
+/// Drop every searchable sidecar row for one source asset.
+pub(super) fn remove_asset_search(conn: &Connection, asset_path: &str) -> AppResult<()> {
+    conn.prepare_cached("DELETE FROM asset_search WHERE asset_path = ?1")?
+        .execute(params![asset_path])?;
+    conn.prepare_cached("DELETE FROM asset_search_fts WHERE asset_path = ?1")?
+        .execute(params![asset_path])?;
     Ok(())
 }

@@ -12,7 +12,7 @@ function hit(
   snippet: string | null = '…body…',
   dailyDate: string | null = null,
 ): FilteredSearchHit {
-  return { path, title, snippet, dailyDate }
+  return { path, title, snippet, dailyDate, matchKind: 'note', assetPath: null }
 }
 const COMMANDS: AppCommand[] = [
   { id: 'nav.today', title: 'Go to today', keywords: ['daily'], run: () => {} },
@@ -115,6 +115,8 @@ describe('buildPaletteSections', () => {
         title: '2026-08-01',
         date: '2026-08-01',
         snippet: null,
+        matchKind: 'note',
+        assetPath: null,
         phrase: null,
       },
     ])

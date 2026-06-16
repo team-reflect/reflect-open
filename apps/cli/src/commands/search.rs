@@ -68,6 +68,7 @@ pub fn run(graph: &Graph, json: bool, query: &str, limit: usize) -> Result<(), C
                 .map(|hit| HitJson {
                     path: hit.path,
                     title: hit.title,
+                    asset_path: hit.asset_path,
                     snippet: hit.snippet,
                     score: hit.score,
                 })
@@ -77,7 +78,12 @@ pub fn run(graph: &Graph, json: bool, query: &str, limit: usize) -> Result<(), C
     for hit in &hits {
         println!("{}\t{}", hit.path, hit.title);
         if !hit.snippet.is_empty() {
-            println!("    {}", hit.snippet.replace('\n', " "));
+            let snippet = hit.snippet.replace('\n', " ");
+            if let Some(asset_path) = &hit.asset_path {
+                println!("    Asset: {asset_path} - {snippet}");
+            } else {
+                println!("    {snippet}");
+            }
         }
     }
     Ok(())

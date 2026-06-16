@@ -363,6 +363,40 @@ fn search_json_shape() {
 }
 
 #[test]
+fn search_surfaces_asset_sidecar_matches_as_note_hits() {
+    let fixture = graph();
+    fixture.write_note(
+        "notes/receipt.md",
+        "# Receipt\nsee ![receipt](assets/receipt.png)\n",
+    );
+    fixture.build_index();
+    let conn = rusqlite::Connection::open(fixture.root().join(".reflect/index.sqlite")).unwrap();
+    conn.execute(
+        "INSERT INTO asset_search(note_path, asset_path, sidecar_path, source_hash, sidecar_hash, text)
+         VALUES('notes/receipt.md', 'assets/receipt.png', 'assets/receipt.png.reflect.md', 'h1', 'h2', 'OCR total forty two')",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO asset_search_fts(note_path, asset_path, body)
+         VALUES('notes/receipt.md', 'assets/receipt.png', 'OCR total forty two')",
+        [],
+    )
+    .unwrap();
+    drop(conn);
+
+    let output = reflect(&fixture, &["search", "forty"]);
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    assert!(stdout(&output).contains("notes/receipt.md"));
+    assert!(stdout(&output).contains("Asset: assets/receipt.png"));
+
+    let value = json(&reflect(&fixture, &["search", "forty", "--json"]));
+    let result = &value["results"].as_array().unwrap()[0];
+    assert_eq!(result["path"], "notes/receipt.md");
+    assert_eq!(result["assetPath"], "assets/receipt.png");
+}
+
+#[test]
 fn search_drops_a_note_flagged_private_after_indexing() {
     let fixture = graph();
     let note = fixture.write_note("notes/a.md", "# Alpha\nsearchable text\n");

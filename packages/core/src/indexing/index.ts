@@ -7,6 +7,8 @@ export {
   applyIndexedNote,
   applyIndexedNotes,
   removeFromIndex,
+  applyAssetSearch,
+  removeAssetSearch as removeAssetSearchRows,
   moveNoteIndexed,
   clearIndex,
   setIndexMeta,
@@ -26,6 +28,12 @@ export {
   type ApplyErrorHandler,
   type MovedHandler,
 } from './live'
+export {
+  assetPathsForNotes,
+  reconcileAssetSearch,
+  rebuildAssetSearchIndex,
+  removeAssetSearch,
+} from './asset-search'
 export { hashContent } from './hash'
 export { availableNotePath, slugPathForTitle } from './note-paths'
 export {

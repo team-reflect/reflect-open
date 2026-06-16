@@ -33,6 +33,8 @@ function hit(overrides: Partial<RetrievalHit>): RetrievalHit {
     snippet: 'a public snippet',
     heading: null,
     isPrivate: false,
+    matchKind: 'note',
+    assetPath: null,
     ...overrides,
   }
 }

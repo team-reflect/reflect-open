@@ -56,11 +56,14 @@ describe('applyIndexChanges', () => {
     const calls: Array<[string, Record<string, unknown>]> = []
     fakeBridge(async (command, args) => {
       calls.push([command, args])
+      if (command === 'db_query') {
+        return []
+      }
       return null
     })
 
     await applyIndexChanges([{ path: 'notes/gone.md', kind: 'remove' }], 9)
-    expect(calls).toEqual([['index_remove', { path: 'notes/gone.md', generation: 9 }]])
+    expect(calls).toContainEqual(['index_remove', { path: 'notes/gone.md', generation: 9 }])
   })
 
   it('skips non-note paths — the watcher also reports audio-memo recordings', async () => {
@@ -79,6 +82,38 @@ describe('applyIndexChanges', () => {
     )
 
     expect(invoked).toEqual([])
+  })
+
+  it('reconciles asset search when a generated sidecar changes', async () => {
+    const calls: Array<[string, Record<string, unknown>]> = []
+    fakeBridge(async (command, args) => {
+      calls.push([command, args])
+      if (command === 'db_query') {
+        return [{ notePath: 'notes/a.md', isPrivate: 0 }]
+      }
+      if (command === 'note_read') {
+        return [
+          '---',
+          'reflectAssetDescription: 1',
+          'source: assets/a.png',
+          'sourceHash: h',
+          'sourceSize: 1',
+          'provider: openai',
+          'model: m',
+          'generatedAt: "2026-06-16T00:00:00.000Z"',
+          '---',
+          '',
+          'ocr text',
+        ].join('\n')
+      }
+      return null
+    })
+
+    await applyIndexChanges([{ path: 'assets/a.png.reflect.md', kind: 'upsert' }], 3)
+
+    expect(calls.map(([command]) => command)).not.toContain('index_apply')
+    const apply = calls.find(([command]) => command === 'index_asset_search_apply')
+    expect(apply?.[1]).toMatchObject({ assetPath: 'assets/a.png', generation: 3 })
   })
 })
 

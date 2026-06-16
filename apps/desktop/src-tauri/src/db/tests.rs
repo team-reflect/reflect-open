@@ -10,7 +10,8 @@ use super::embed_write::{apply_chunks, remove_chunks, EmbeddedChunk};
 use super::migrations::{migrate, migrate_to, open_in_memory, open_index_at, validate_migrations};
 use super::query::run_query;
 use super::write::{
-    apply_note, clear_index, move_note, IndexedLink, IndexedNote, IndexedTag, IndexedTask,
+    apply_asset_search, apply_note, clear_index, move_note, AssetSearchRow, IndexedLink,
+    IndexedNote, IndexedTag, IndexedTask,
 };
 
 fn migrated() -> Connection {
@@ -68,6 +69,17 @@ fn task(marker_offset: i64, text: &str, checked: bool) -> IndexedTask {
     }
 }
 
+fn asset_search_row(note_path: &str, asset_path: &str, text: &str) -> AssetSearchRow {
+    AssetSearchRow {
+        note_path: note_path.to_string(),
+        asset_path: asset_path.to_string(),
+        sidecar_path: format!("{asset_path}.reflect.md"),
+        source_hash: "source-hash".to_string(),
+        sidecar_hash: "sidecar-hash".to_string(),
+        text: text.to_string(),
+    }
+}
+
 #[test]
 fn migrations_are_valid_and_idempotent() {
     // Guards every migration's SQL (rusqlite_migration validates the set).
@@ -76,8 +88,25 @@ fn migrations_are_valid_and_idempotent() {
     let version: i64 = conn
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 13); // applied migrations (0001 through 0013)
+    assert_eq!(version, 14); // applied migrations (0001 through 0014)
     migrate(&mut conn).expect("re-running to_latest is a no-op");
+}
+
+#[test]
+fn asset_search_tables_are_created() {
+    let conn = migrated();
+    let asset_search: bool = conn
+        .prepare("SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'asset_search'")
+        .unwrap()
+        .exists([])
+        .unwrap();
+    assert!(asset_search);
+    let asset_search_fts: bool = conn
+        .prepare("SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'asset_search_fts'")
+        .unwrap()
+        .exists([])
+        .unwrap();
+    assert!(asset_search_fts);
 }
 
 #[test]
@@ -349,6 +378,16 @@ fn clear_cascades_to_child_tables() {
     let mut seeded = note("notes/a.md", "A", vec![wiki("X")]);
     seeded.tasks = vec![task(0, "buy milk", false)];
     apply_note(&conn, &seeded).unwrap();
+    apply_asset_search(
+        &conn,
+        "assets/a.png",
+        &[asset_search_row(
+            "notes/a.md",
+            "assets/a.png",
+            "whiteboard text",
+        )],
+    )
+    .unwrap();
     clear_index(&conn).unwrap();
     // Deleting notes cascades to children; search_fts is cleared explicitly.
     for table in [
@@ -359,6 +398,8 @@ fn clear_cascades_to_child_tables() {
         "aliases",
         "assets",
         "tasks",
+        "asset_search",
+        "asset_search_fts",
         "search_fts",
     ] {
         let rows = run_query(&conn, &format!("SELECT count(*) AS n FROM {table}"), &[]).unwrap();
@@ -375,6 +416,50 @@ fn reapplying_a_note_cascades_away_stale_children() {
     apply_note(&conn, &note("notes/a.md", "A", vec![])).unwrap();
     let rows = run_query(&conn, "SELECT count(*) AS n FROM links", &[]).unwrap();
     assert_eq!(rows[0]["n"], Value::from(0));
+}
+
+#[test]
+fn asset_search_rows_replace_and_remove_by_asset() {
+    let conn = migrated();
+    apply_note(&conn, &note("notes/a.md", "A", vec![])).unwrap();
+    apply_note(&conn, &note("notes/b.md", "B", vec![])).unwrap();
+    apply_asset_search(
+        &conn,
+        "assets/a.png",
+        &[
+            asset_search_row("notes/a.md", "assets/a.png", "alpha text"),
+            asset_search_row("notes/b.md", "assets/a.png", "beta text"),
+        ],
+    )
+    .unwrap();
+    apply_asset_search(
+        &conn,
+        "assets/a.png",
+        &[asset_search_row(
+            "notes/a.md",
+            "assets/a.png",
+            "replacement text",
+        )],
+    )
+    .unwrap();
+
+    let rows = run_query(
+        &conn,
+        "SELECT note_path FROM asset_search_fts WHERE asset_search_fts MATCH ?1",
+        &[Value::from("replacement")],
+    )
+    .unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["note_path"], Value::from("notes/a.md"));
+
+    super::write::remove_asset_search(&conn, "assets/a.png").unwrap();
+    let count = run_query(
+        &conn,
+        "SELECT count(*) AS n FROM asset_search_fts WHERE asset_path = 'assets/a.png'",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(count[0]["n"], Value::from(0));
 }
 
 #[test]
@@ -466,7 +551,7 @@ fn open_index_at_creates_migrates_and_reopens() {
     let version: i64 = conn
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 13);
+    assert_eq!(version, 14);
     let journal: String = conn
         .query_row("PRAGMA journal_mode", [], |row| row.get(0))
         .unwrap();
@@ -530,6 +615,46 @@ fn stale_generation_writes_are_dropped_end_to_end() {
 
     super::index_apply(note("notes/b.md", "B", vec![]), fresh, app.state()).expect("fresh apply");
     assert_eq!(count("after fresh apply"), Value::from(2));
+
+    let asset_count = |label: &str| -> Value {
+        let rows = super::db_query(
+            "SELECT count(*) AS n FROM asset_search".to_string(),
+            vec![],
+            app.state(),
+        )
+        .unwrap_or_else(|err| panic!("{label}: {err:?}"));
+        rows[0]["n"].clone()
+    };
+    super::index_asset_search_apply(
+        "assets/a.png".to_string(),
+        vec![asset_search_row(
+            "notes/a.md",
+            "assets/a.png",
+            "sidecar text",
+        )],
+        stale,
+        app.state(),
+    )
+    .expect("stale asset search apply returns Ok");
+    assert_eq!(asset_count("after stale asset apply"), Value::from(0));
+    super::index_asset_search_apply(
+        "assets/a.png".to_string(),
+        vec![asset_search_row(
+            "notes/a.md",
+            "assets/a.png",
+            "sidecar text",
+        )],
+        fresh,
+        app.state(),
+    )
+    .expect("fresh asset search apply");
+    assert_eq!(asset_count("after fresh asset apply"), Value::from(1));
+    super::index_asset_search_remove("assets/a.png".to_string(), stale, app.state())
+        .expect("stale asset search remove returns Ok");
+    assert_eq!(asset_count("after stale asset remove"), Value::from(1));
+    super::index_asset_search_remove("assets/a.png".to_string(), fresh, app.state())
+        .expect("fresh asset search remove");
+    assert_eq!(asset_count("after fresh asset remove"), Value::from(0));
 
     // index_meta_set rides the same gate: stale stamps vanish, fresh ones land
     // (and upsert — the projection-version stamp is written after every rebuild).
@@ -924,6 +1049,16 @@ fn move_note_migrates_every_row_and_preserves_derived_state() {
     moved.has_conflict = true;
     moved.tasks = vec![task(0, "do thing", false)];
     apply_note(&conn, &moved).unwrap();
+    apply_asset_search(
+        &conn,
+        "assets/a.png",
+        &[asset_search_row(
+            "notes/old.md",
+            "assets/a.png",
+            "sidecar text",
+        )],
+    )
+    .unwrap();
     apply_note(
         &conn,
         &note("notes/src.md", "Src", vec![wiki("Kept Title")]),
@@ -979,7 +1114,23 @@ fn move_note_migrates_every_row_and_preserves_derived_state() {
             1,
         ),
         (
+            "SELECT count(*) AS n FROM asset_search WHERE note_path = 'notes/kept-title.md'",
+            1,
+        ),
+        (
+            "SELECT count(*) AS n FROM asset_search_fts WHERE note_path = 'notes/kept-title.md'",
+            1,
+        ),
+        (
             "SELECT count(*) AS n FROM tasks WHERE note_path = 'notes/old.md'",
+            0,
+        ),
+        (
+            "SELECT count(*) AS n FROM asset_search WHERE note_path = 'notes/old.md'",
+            0,
+        ),
+        (
+            "SELECT count(*) AS n FROM asset_search_fts WHERE note_path = 'notes/old.md'",
             0,
         ),
     ] {

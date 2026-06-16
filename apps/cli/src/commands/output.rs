@@ -45,6 +45,8 @@ pub struct SearchJson<'a> {
 pub struct HitJson {
     pub path: String,
     pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset_path: Option<String>,
     pub snippet: String,
     /// bm25 rank (more negative = better match).
     pub score: f64,

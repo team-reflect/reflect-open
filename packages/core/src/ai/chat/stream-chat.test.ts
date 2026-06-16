@@ -82,6 +82,8 @@ const PUBLIC_HIT: RetrievalHit = {
   snippet: 'launch plan',
   heading: null,
   isPrivate: false,
+  matchKind: 'note',
+  assetPath: null,
 }
 
 const PRIVATE_HIT: RetrievalHit = {
@@ -91,6 +93,8 @@ const PRIVATE_HIT: RetrievalHit = {
   snippet: '',
   heading: null,
   isPrivate: true,
+  matchKind: 'note',
+  assetPath: null,
 }
 
 describe('streamChatTurn', () => {

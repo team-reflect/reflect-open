@@ -31,6 +31,7 @@ pub fn build_fts_match(query: &str) -> Option<String> {
 pub struct SearchHit {
     pub path: String,
     pub title: String,
+    pub asset_path: Option<String>,
     /// FTS5 `snippet()` over the indexed plain-text body.
     pub snippet: String,
     /// Title-boosted bm25 score (more negative = better match).
@@ -70,6 +71,7 @@ pub fn search_index(
         Ok(SearchHit {
             path: row.get(0)?,
             title: row.get(1)?,
+            asset_path: None,
             snippet: row.get(2)?,
             score: row.get(3)?,
         })
@@ -77,6 +79,41 @@ pub fn search_index(
     let mut hits = Vec::new();
     for row in rows {
         hits.push(row?);
+    }
+    if hits.len() >= limit {
+        return Ok(hits);
+    }
+    let mut asset_statement = conn.prepare(
+        "SELECT asset_search_fts.note_path, notes.title, asset_search_fts.asset_path,
+                snippet(asset_search_fts, 2, '', '', '…', 12),
+                bm25(asset_search_fts, 0, 0, 1.0)
+         FROM asset_search_fts
+         JOIN notes ON notes.path = asset_search_fts.note_path
+         WHERE asset_search_fts MATCH ?1 AND notes.is_private = 0
+         ORDER BY bm25(asset_search_fts, 0, 0, 1.0),
+                  notes.is_pinned DESC,
+                  notes.mtime DESC,
+                  notes.path ASC
+         LIMIT ?2",
+    )?;
+    let asset_rows = asset_statement.query_map(params![match_expr, limit as i64], |row| {
+        Ok(SearchHit {
+            path: row.get(0)?,
+            title: row.get(1)?,
+            asset_path: row.get(2)?,
+            snippet: row.get(3)?,
+            score: row.get(4)?,
+        })
+    })?;
+    for row in asset_rows {
+        let hit = row?;
+        if hits.iter().any(|existing| existing.path == hit.path) {
+            continue;
+        }
+        hits.push(hit);
+        if hits.len() >= limit {
+            break;
+        }
     }
     Ok(hits)
 }

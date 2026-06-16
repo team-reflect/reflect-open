@@ -20,6 +20,21 @@ export interface Assets {
   notePath: string;
 }
 
+export interface AssetSearch {
+  assetPath: string;
+  notePath: string;
+  sidecarHash: string;
+  sidecarPath: string;
+  sourceHash: string;
+  text: string;
+}
+
+export interface AssetSearchFts {
+  assetPath: string | null;
+  body: string | null;
+  notePath: string | null;
+}
+
 export interface Backlinks {
   alias: string | null;
   kind: string | null;
@@ -126,6 +141,8 @@ export interface Tasks {
 export interface DB {
   aliases: Aliases;
   assets: Assets;
+  assetSearch: AssetSearch;
+  assetSearchFts: AssetSearchFts;
   backlinks: Backlinks;
   chatConversations: ChatConversations;
   chatMessages: ChatMessages;

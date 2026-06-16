@@ -42,9 +42,10 @@ import { previewSnippet } from './snippet'
  * 7 — `tasks` projection (GFM checkboxes, Plan 18): existing notes carry no task
  * rows until reprojected, so the bump backfills them ·
  * 8 — `tasks.due_date` (explicit `[[YYYY-MM-DD]]` per task, V1 Overdue semantics):
- * existing task rows have a null due date until reprojected.
+ * existing task rows have a null due date until reprojected · 9 — asset
+ * description sidecars enter lexical search through public referencing notes.
  */
-export const PROJECTION_VERSION = 8
+export const PROJECTION_VERSION = 9
 
 export const indexedLinkSchema = z.object({
   kind: z.enum(['wiki', 'md']),

@@ -11,6 +11,7 @@ import { errorMessage, isAppError, toAppError, type AppError } from '../errors'
 import { ASSETS_DIR } from '../graph/paths'
 import { listDir, listFiles, readAsset, readNote, writeNote } from '../graph/commands'
 import type { FileMeta } from '../graph/schemas'
+import { emitFileChanges } from '../indexing/file-changes'
 import { parseNote } from '../markdown/extract'
 import { splitFrontmatter } from '../markdown/frontmatter'
 import { getSecret } from '../secrets/keychain'
@@ -18,8 +19,8 @@ import { base64ToBytes } from '../ai/transcribe'
 
 /**
  * Asset description sidecars: AI-generated markdown stored beside images/PDFs
- * under `assets/`. The sidecars are portable files, but v1 leaves search alone
- * because `assets/` is not part of the note index.
+ * under `assets/`. Search indexes the managed sidecar text separately through
+ * the notes that publicly reference the source asset.
  */
 
 const SIDECAR_SUFFIX = '.reflect.md'
@@ -91,6 +92,15 @@ export interface ReconcileAssetDescriptionsOutcome {
 /** Graph-relative markdown sidecar path for a source asset path. */
 export function assetDescriptionSidecarPath(assetPath: string): string {
   return `${assetPath}${SIDECAR_SUFFIX}`
+}
+
+/** Source asset path for a generated sidecar path, or null when it is not one. */
+export function assetPathFromDescriptionSidecar(path: string): string | null {
+  if (!path.startsWith(`${ASSETS_DIR}/`) || !path.endsWith(SIDECAR_SUFFIX)) {
+    return null
+  }
+  const assetPath = path.slice(0, -SIDECAR_SUFFIX.length)
+  return isDescribableAssetPath(assetPath) ? assetPath : null
 }
 
 /** True for an image/PDF source asset that v1 can send to the provider. */
@@ -378,8 +388,9 @@ export async function reconcileAssetDescriptions(
       if (stale()) {
         return stalled()
       }
+      const sidecarPath = assetDescriptionSidecarPath(candidate.path)
       await writeNote(
-        assetDescriptionSidecarPath(candidate.path),
+        sidecarPath,
         sidecarMarkdown({
           assetPath: candidate.path,
           sourceHash,
@@ -390,6 +401,7 @@ export async function reconcileAssetDescriptions(
         }),
         input.generation,
       )
+      emitFileChanges([{ path: sidecarPath, kind: 'upsert', modifiedMs: Date.now() }])
       described += 1
     } catch (cause) {
       if (isAssetDescriptionRejected(cause)) {

@@ -24,6 +24,17 @@ export interface FilteredSearchHit {
   dailyDate: string | null
   /** Highlighted body snippet when free text was searched, else null. */
   snippet: string | null
+  matchKind: 'note' | 'asset'
+  assetPath: string | null
+}
+
+function noteHit(row: {
+  path: string
+  title: string
+  dailyDate: string | null
+  snippet: string | null
+}): FilteredSearchHit {
+  return { ...row, matchKind: 'note', assetPath: null }
 }
 
 export async function searchWithFilters(
@@ -111,7 +122,7 @@ export async function searchWithFilters(
     }
 
     const rows = await taggedQuery.orderBy('notes.mtime', 'desc').execute()
-    return rows.map((row) => ({ ...row, snippet: null }))
+    return rows.map((row) => noteHit({ ...row, snippet: null }))
   }
 
   let query = db
@@ -170,7 +181,7 @@ export async function searchWithFilters(
   if (match === null) {
     // No free text: a filtered recall feed, newest first.
     const rows = await query.orderBy('notes.mtime', 'desc').execute()
-    return rows.map((row) => ({ ...row, snippet: null }))
+    return rows.map((row) => noteHit({ ...row, snippet: null }))
   }
 
   // Free text: constrain + rank + snippet through FTS. An exact title match
@@ -194,5 +205,89 @@ export async function searchWithFilters(
     .orderBy('notes.mtime', 'desc')
     .orderBy('notes.path', 'asc')
     .execute()
-  return rows
+  const noteHits = rows.map(noteHit)
+  if (noteHits.length >= limit) {
+    return noteHits
+  }
+
+  let assetQuery = db
+    .selectFrom('notes')
+    .innerJoin('assetSearchFts', 'assetSearchFts.notePath', 'notes.path')
+    .select(['notes.path', 'notes.title', 'notes.dailyDate', 'assetSearchFts.assetPath'])
+    .select(
+      sql<string>`snippet(asset_search_fts, 2, ${HIGHLIGHT_START}, ${HIGHLIGHT_END}, '…', 10)`.as(
+        'snippet',
+      ),
+    )
+    .where(sql<boolean>`asset_search_fts MATCH ${match}`)
+    .limit(limit)
+
+  for (const tag of filters.tags) {
+    assetQuery = assetQuery.where(({ exists, selectFrom }) =>
+      exists(
+        selectFrom('tags')
+          .select(sql<number>`1`.as('one'))
+          .whereRef('tags.notePath', '=', 'notes.path')
+          .where('tags.tagKey', '=', tag),
+      ),
+    )
+  }
+  if (filters.dailyOnly) {
+    assetQuery = assetQuery.where('notes.dailyDate', 'is not', null)
+  }
+  if (filters.pinnedOnly) {
+    assetQuery = assetQuery.where('notes.isPinned', '=', 1)
+  }
+  if (linksToPath !== null) {
+    const target = linksToPath
+    assetQuery = assetQuery.where(({ exists, selectFrom }) =>
+      exists(
+        selectFrom('backlinks')
+          .select(sql<number>`1`.as('one'))
+          .whereRef('backlinks.sourcePath', '=', 'notes.path')
+          .where('backlinks.targetPath', '=', target),
+      ),
+    )
+  }
+  if (linkedFromPath !== null) {
+    const source = linkedFromPath
+    assetQuery = assetQuery.where(({ exists, selectFrom }) =>
+      exists(
+        selectFrom('backlinks')
+          .select(sql<number>`1`.as('one'))
+          .whereRef('backlinks.targetPath', '=', 'notes.path')
+          .where('backlinks.sourcePath', '=', source),
+      ),
+    )
+  }
+  if (filters.updatedAfterMs !== null) {
+    assetQuery = assetQuery.where('notes.mtime', '>=', filters.updatedAfterMs)
+  }
+  if (filters.updatedBeforeMs !== null) {
+    assetQuery = assetQuery.where('notes.mtime', '<', filters.updatedBeforeMs)
+  }
+
+  const seen = new Set(noteHits.map((hit) => hit.path))
+  const assetRows = await assetQuery
+    .orderBy(sql`bm25(asset_search_fts, 0, 0, 1.0)`)
+    .orderBy('notes.isPinned', 'desc')
+    .orderBy('notes.mtime', 'desc')
+    .orderBy('notes.path', 'asc')
+    .execute()
+  const assetHits: FilteredSearchHit[] = []
+  for (const row of assetRows) {
+    if (row.assetPath === null || seen.has(row.path)) {
+      continue
+    }
+    seen.add(row.path)
+    assetHits.push({
+      path: row.path,
+      title: row.title,
+      dailyDate: row.dailyDate,
+      snippet: row.snippet,
+      matchKind: 'asset',
+      assetPath: row.assetPath,
+    })
+  }
+  return [...noteHits, ...assetHits].slice(0, limit)
 }

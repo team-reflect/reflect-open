@@ -48,6 +48,10 @@ function Snippet({ snippet }: { snippet: string }): ReactElement {
   )
 }
 
+function assetLabel(path: string): string {
+  return path.split('/').pop() ?? path
+}
+
 export function CommandPalette({ context }: CommandPaletteProps): ReactElement | null {
   const { open, query, setQuery, closePalette } = usePalette()
   const { settings } = useSettings()
@@ -190,6 +194,11 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
                             {entry.phrase !== null && entry.date !== null ? (
                               <span className="block truncate text-xs text-text-muted">
                                 {formatDayLabel(entry.date, settings.dateFormat)}
+                              </span>
+                            ) : null}
+                            {entry.matchKind === 'asset' && entry.assetPath !== null ? (
+                              <span className="block truncate text-xs text-text-muted">
+                                Asset: {assetLabel(entry.assetPath)}
                               </span>
                             ) : null}
                             {entry.snippet !== null ? <Snippet snippet={entry.snippet} /> : null}

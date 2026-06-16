@@ -22,6 +22,8 @@ export interface RetrievalHit {
   snippet: string
   heading: string | null
   isPrivate: boolean
+  matchKind: 'note' | 'asset'
+  assetPath: string | null
 }
 
 export interface RetrieveOptions {
@@ -81,6 +83,8 @@ export function bestChunkPerNote(
       snippet: row.text.trim(),
       heading: row.heading,
       isPrivate: row.isPrivate !== 0,
+      matchKind: 'note',
+      assetPath: null,
     })
   }
   return [...byNote.values()].slice(0, limit)
@@ -138,6 +142,8 @@ async function lexicalHits(query: string, limit: number): Promise<RetrievalHit[]
     snippet: hit.snippet ?? '',
     heading: null,
     isPrivate: privateByPath.get(hit.path) ?? false,
+    matchKind: hit.matchKind,
+    assetPath: hit.assetPath,
   }))
 }
 
