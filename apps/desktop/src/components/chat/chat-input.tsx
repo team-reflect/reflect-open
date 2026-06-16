@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { imageFilesFrom } from '@/lib/chat-attachments'
 import { keybindingFor } from '@/lib/commands/app-commands'
 import { useChatSession } from '@/providers/chat-provider'
@@ -191,13 +192,17 @@ export function ChatInput(): ReactElement {
           <div className="flex-1" />
           <ChatHistoryMenu />
           {turns.length > 0 && !streaming ? (
-            <Button variant="ghost" size="sm" onClick={newChat}>
-              <Plus aria-hidden data-icon="inline-start" />
-              New chat
-              {NEW_CHAT_BINDING ? (
-                <ShortcutKeys binding={NEW_CHAT_BINDING} className="ml-1 text-text-muted" />
-              ) : null}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="sm" onClick={newChat}>
+                  <Plus aria-hidden data-icon="inline-start" />
+                  New chat
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                New chat {NEW_CHAT_BINDING ? <ShortcutKeys binding={NEW_CHAT_BINDING} /> : null}
+              </TooltipContent>
+            </Tooltip>
           ) : null}
           {streaming ? (
             <Button size="icon-sm" aria-label="Stop" onClick={stop}>

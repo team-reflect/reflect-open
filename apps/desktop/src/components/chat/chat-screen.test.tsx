@@ -15,6 +15,7 @@ import {
   type Settings,
   type StreamChatOptions,
 } from '@reflect/core'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { ChatProvider, useChatSession } from '@/providers/chat-provider'
 import { RouterProvider, useRouter } from '@/routing/router'
 
@@ -183,11 +184,13 @@ function renderChat() {
   return render(
     <QueryClientProvider client={client}>
       <RouterProvider>
-        <ChatProvider graph={GRAPH}>
-          <ChatScreen />
-          <SendProbe />
-          <RouteProbe />
-        </ChatProvider>
+        <TooltipProvider>
+          <ChatProvider graph={GRAPH}>
+            <ChatScreen />
+            <SendProbe />
+            <RouteProbe />
+          </ChatProvider>
+        </TooltipProvider>
       </RouterProvider>
     </QueryClientProvider>,
   )

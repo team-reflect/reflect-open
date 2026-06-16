@@ -194,6 +194,8 @@ body {
   [contenteditable] *,
   .reflect-editor,
   .reflect-editor *,
+  .reflect-chat-message,
+  .reflect-chat-message *,
   .reflect-protected-note,
   .reflect-protected-note * {
     -webkit-user-select: text;

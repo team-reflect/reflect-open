@@ -41,7 +41,7 @@ export function ChatTurn({ turn }: ChatTurnProps): ReactElement {
             />
           ))}
           {turn.userText !== '' ? (
-            <div className="rounded-2xl bg-surface-hover px-4 py-2 text-sm whitespace-pre-wrap text-text">
+            <div className="reflect-chat-message rounded-2xl bg-surface-hover px-4 py-2 text-sm whitespace-pre-wrap text-text">
               {turn.userText}
             </div>
           ) : null}
@@ -56,7 +56,10 @@ export function ChatTurn({ turn }: ChatTurnProps): ReactElement {
           switch (part.kind) {
             case 'text':
               return turn.status === 'streaming' && index === lastIndex ? (
-                <div key={index} className="text-sm whitespace-pre-wrap text-text">
+                <div
+                  key={index}
+                  className="reflect-chat-message text-sm whitespace-pre-wrap text-text"
+                >
                   {part.text}
                 </div>
               ) : (
@@ -64,7 +67,7 @@ export function ChatTurn({ turn }: ChatTurnProps): ReactElement {
                   key={index}
                   content={part.text}
                   onWikiLinkClick={navigateWikiLink}
-                  className="text-sm"
+                  className="reflect-chat-message text-sm"
                 />
               )
             case 'tool':
@@ -74,7 +77,7 @@ export function ChatTurn({ turn }: ChatTurnProps): ReactElement {
                 <p
                   key={index}
                   className={cn(
-                    'text-sm',
+                    'reflect-chat-message text-sm',
                     part.tone === 'error' ? 'text-destructive' : 'text-text-muted italic',
                   )}
                 >
