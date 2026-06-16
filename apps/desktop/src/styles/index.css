@@ -301,7 +301,10 @@ body {
 .reflect-editor h1 { font-size: var(--text-2xl, 1.5rem); }
 .reflect-editor h2 { font-size: var(--text-xl, 1.25rem); }
 .reflect-editor h3 { font-size: var(--text-lg, 1.125rem); }
-.reflect-editor h1:first-child { margin-top: 0; }
+/* The leading H1 is the note title, so it takes the design-system "note title"
+   size (--text-xl) rather than the larger prose-H1 size, matching the daily
+   date heading (.reflect-daily-subject) and the new-note "Untitled" ghost. */
+.reflect-editor h1:first-child { margin-top: 0; font-size: var(--text-xl, 1.25rem); }
 .reflect-editor .reflect-note-title { font-size: var(--text-xl, 1.25rem); }
 
 /* The new-note flow's name field: ghost "Untitled" over the seeded empty H1
