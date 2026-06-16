@@ -378,6 +378,37 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     view.unmount()
   })
 
+  it('range-selects rows with Shift-click', async () => {
+    const rows = [
+      { path: 'notes/a.md', title: 'Note A', mtime: 3, preview: 'alpha' },
+      { path: 'notes/b.md', title: 'Note B', mtime: 2, preview: 'bravo' },
+      { path: 'notes/c.md', title: 'Note C', mtime: 1, preview: 'charlie' },
+    ]
+    mockInvoke.mockImplementation(async (command, args) => {
+      if (command !== 'db_query') {
+        return null
+      }
+      const sql = String(args.sql)
+      if (sql.includes('group by')) {
+        return facetRows
+      }
+      if (sql.includes('"preview"')) {
+        return sql.includes('from "tags"') ? [] : rows
+      }
+      return []
+    })
+    const view = renderScreen()
+    await view.findByText('Note A')
+
+    // Click the first row's body (the snippet), then Shift-click the third →
+    // the whole range is selected (the row passes the modifier through).
+    fireEvent.click(view.getByText('alpha'))
+    fireEvent.click(view.getByText('charlie'), { shiftKey: true })
+
+    expect(view.getByRole('button', { name: /Trash \(3\)/ })).toBeDefined()
+    view.unmount()
+  })
+
   it('opens a note on double-click', async () => {
     const view = renderScreen()
     await view.findByText('Health Stacked')
@@ -499,6 +530,16 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     // removal pruning the selection to zero must not auto-dismiss it.
     expect(await view.findByText('disk on fire')).toBeDefined()
     expect(view.getByText('Trash 1 note?')).toBeDefined()
+    // The optimistically-removed row reappears as the failed delete reconciles.
+    await waitFor(() => expect(view.getByText('Health Stacked')).toBeDefined())
+
+    // Dismissing and reopening starts clean — the prior failure isn't stale.
+    fireEvent.click(view.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(view.queryByText('disk on fire')).toBeNull())
+    fireEvent.click(view.getByText('Shop your health goals.'))
+    fireEvent.click(view.getByRole('button', { name: /Trash \(1\)/ }))
+    await view.findByText('Trash 1 note?')
+    expect(view.queryByText('disk on fire')).toBeNull()
     view.unmount()
   })
 })

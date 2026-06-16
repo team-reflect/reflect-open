@@ -61,8 +61,14 @@ export function useNoteTrash(): NoteTrash {
         (rows) => rows?.filter((row) => !removing.has(row.path)),
       )
       try {
+        // Trashing a large multi-select is a sequence of file moves; report
+        // progress so it reads as work in flight, not a frozen spinner.
+        let done = 0
+        operation.progress(done, paths.length)
         for (const path of paths) {
           await deleteOpenNote(path, generation)
+          done += 1
+          operation.progress(done, paths.length)
         }
         operation.done()
       } catch (cause) {
