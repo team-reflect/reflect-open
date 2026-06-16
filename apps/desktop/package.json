@@ -16,13 +16,11 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@lezer/common": "^1.5.2",
-    "@lezer/markdown": "^1.6.4",
-    "@meowdown/core": "0.8.1",
-    "@meowdown/react": "0.8.1",
-    "@prosekit/core": "^0.12.3",
+    "@meowdown/core": "0.9.0",
+    "@meowdown/react": "0.9.0",
+    "@prosekit/core": "^0.13.0-beta.1",
     "@prosekit/pm": "^0.1.18",
-    "@prosekit/react": "^0.8.0-beta.0",
+    "@prosekit/react": "^0.8.0-beta.2",
     "@reflect/core": "workspace:*",
     "@reflect/db": "workspace:*",
     "@reflect/design-system": "workspace:*",

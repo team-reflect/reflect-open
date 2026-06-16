@@ -84,4 +84,45 @@ describe('searchWithFilters', () => {
     expect(sql).not.toContain('search_fts')
     expect(args['params']).toEqual(['work', 1, startOfLocalDay('2026-01-01'), 12])
   })
+
+  it('promotes exact title, then bm25, then pinned and recency on text search', async () => {
+    mockInvoke.mockResolvedValueOnce([
+      { path: 'notes/quokka.md', title: 'Quokka', daily_date: null, snippet: 'a …' },
+    ])
+
+    const hits = await searchWithFilters(parseSearchQuery('quokka'), 12)
+
+    expect(hits).toEqual([
+      { path: 'notes/quokka.md', title: 'Quokka', dailyDate: null, snippet: 'a …' },
+    ])
+
+    const [command, args] = mockInvoke.mock.calls[0]!
+    expect(command).toBe('db_query')
+    const sql = String(args['sql']).toLowerCase()
+    expect(sql).toContain('search_fts match')
+    // Exact-title rank leads, then title-boosted bm25, then the deterministic
+    // pinned/recency/path tiebreakers — in that order.
+    expect(sql).toContain('case when "notes"."title_key" =')
+    expect(sql).toContain('bm25(search_fts, 0, 10.0, 1.0)')
+    expect(sql).toContain('"notes"."is_pinned" desc')
+    expect(sql).toContain('"notes"."mtime" desc')
+    expect(sql).toContain('"notes"."path" asc')
+
+    const params = args['params'] as unknown[]
+    // The folded exact-title key and the literal FTS match expression.
+    expect(params).toContain('quokka')
+    expect(params).toContain('"quokka"')
+  })
+
+  it('folds the exact-title key the way titles were indexed', async () => {
+    mockInvoke.mockResolvedValueOnce([])
+
+    await searchWithFilters(parseSearchQuery('Quokka Habitat'), 12)
+
+    const [, args] = mockInvoke.mock.calls[0]!
+    const params = args['params'] as unknown[]
+    // foldKey('Quokka Habitat') — trimmed + lowercased — so it matches the
+    // stored `notes.title_key`, never the raw casing.
+    expect(params).toContain('quokka habitat')
+  })
 })

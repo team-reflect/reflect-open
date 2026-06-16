@@ -256,6 +256,62 @@ fn search_boosts_title_matches_over_body_matches() {
     );
 }
 
+/// The V1-style exact-title boost (`filtered-search.ts`): a note whose title
+/// *is* the query ranks ahead of a louder lexical (bm25) match whose title only
+/// contains the query among other words — exact title is promoted before bm25.
+#[test]
+fn search_promotes_exact_title_over_a_stronger_lexical_match() {
+    let fixture = graph();
+    fixture.write_note("notes/exact.md", "# Zebra\na single zebra\n");
+    fixture.write_note(
+        "notes/loud.md",
+        "# Zebra Zebra Zebra Notes\nzebra zebra zebra zebra\n",
+    );
+    fixture.build_index();
+
+    let text = stdout(&reflect(&fixture, &["search", "zebra"]));
+    let exact_pos = text.find("notes/exact.md").unwrap();
+    let loud_pos = text.find("notes/loud.md").unwrap();
+    assert!(
+        exact_pos < loud_pos,
+        "expected the exact-title note ranked first:\n{text}"
+    );
+}
+
+/// Pinned and recency are tiebreakers *after* exact-title and bm25 ordering:
+/// two equally-ranked body hits order pinned-first, and pinned wins over a
+/// newer mtime (mirrors the desktop's lexical ordering).
+#[test]
+fn search_breaks_ties_by_pinned_then_recency() {
+    let fixture = graph();
+    fixture.write_note("notes/older-pinned.md", "# Notes\napricot apricot\n");
+    fixture.write_note("notes/newer-plain.md", "# Notes\napricot apricot\n");
+    fixture.build_index();
+
+    // Identical title + body → identical title-rank and bm25; only the
+    // tiebreakers differ. Pin the older note: pinned must win over recency.
+    let conn = rusqlite::Connection::open(fixture.root().join(".reflect/index.sqlite")).unwrap();
+    conn.execute(
+        "UPDATE notes SET mtime = 100, is_pinned = 1 WHERE path = 'notes/older-pinned.md'",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "UPDATE notes SET mtime = 200, is_pinned = 0 WHERE path = 'notes/newer-plain.md'",
+        [],
+    )
+    .unwrap();
+    drop(conn);
+
+    let text = stdout(&reflect(&fixture, &["search", "apricot"]));
+    let pinned_pos = text.find("notes/older-pinned.md").unwrap();
+    let plain_pos = text.find("notes/newer-plain.md").unwrap();
+    assert!(
+        pinned_pos < plain_pos,
+        "expected the pinned note ranked before the newer unpinned note:\n{text}"
+    );
+}
+
 #[test]
 fn search_without_an_index_exits_4() {
     let fixture = graph();

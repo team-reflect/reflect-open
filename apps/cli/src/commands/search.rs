@@ -13,6 +13,7 @@ use crate::commands::warn;
 use crate::error::CliError;
 use crate::graph::Graph;
 use crate::index::{detect_staleness, open_read_only, IndexOpen};
+use crate::keys::fold_key;
 use crate::note_file::parse_note_meta;
 use crate::search::{build_fts_match, search_index, SearchHit};
 
@@ -50,7 +51,7 @@ pub fn run(graph: &Graph, json: bool, query: &str, limit: usize) -> Result<(), C
     }
 
     let hits: Vec<SearchHit> = match build_fts_match(query) {
-        Some(match_expr) => search_index(&opened.conn, &match_expr, limit)?,
+        Some(match_expr) => search_index(&opened.conn, &match_expr, &fold_key(query), limit)?,
         None => Vec::new(),
     };
     let hits: Vec<SearchHit> = hits

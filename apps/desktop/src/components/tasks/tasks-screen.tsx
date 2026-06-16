@@ -248,7 +248,7 @@ export function TasksScreen(): ReactElement {
             today={today}
             onSchedule={onSchedule}
           >
-            <Button type="button" variant="ghost" className="window-drag-control text-text-muted">
+            <Button type="button" variant="ghost" className="window-drag-control text-xs text-text-muted">
               <CalendarClock aria-hidden className="size-4" />
               Schedule ({selection.selectedCount})
             </Button>
@@ -260,7 +260,7 @@ export function TasksScreen(): ReactElement {
             variant="ghost"
             onClick={onConvertToBullet}
             title="Drop the checkbox, keeping the line as a plain bullet — leaves the Tasks list"
-            className="window-drag-control text-text-muted"
+            className="window-drag-control text-xs text-text-muted"
           >
             <List aria-hidden className="size-4" />
             Convert to bullet ({selection.selectedCount})
@@ -271,7 +271,7 @@ export function TasksScreen(): ReactElement {
             type="button"
             variant="ghost"
             onClick={actions.archive}
-            className="window-drag-control text-text-muted"
+            className="window-drag-control text-xs text-text-muted"
           >
             <Archive aria-hidden className="size-4" />
             Archive ({recentlyCompleted.length})

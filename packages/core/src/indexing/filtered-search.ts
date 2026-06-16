@@ -1,4 +1,5 @@
 import { sql } from 'kysely'
+import { foldKey } from '../markdown'
 import { db } from './db'
 import type { ParsedSearchQuery } from './filter-query'
 import { resolveWikiTarget } from './queries'
@@ -8,10 +9,13 @@ import { buildFtsMatch } from './search-query'
 /**
  * The one palette search (Plan 08): parsed filter tokens become composable
  * predicates on `notes` (EXISTS subqueries against `tags` and the `backlinks`
- * view), with free text constraining and ranking through FTS (title-boosted
- * bm25, highlighted snippets). Filters may be empty — plain text search is the
- * degenerate case, so there is exactly one search path to keep correct.
- * Without text, results order by recency — a (possibly filtered) recall feed.
+ * view), with free text constraining and ranking through FTS. Free-text
+ * ranking promotes an exact title match (V1's strongest jump-to-note signal)
+ * ahead of every body hit, then orders by title-boosted bm25, with pinned and
+ * recency as deterministic tiebreakers. Filters may be empty — plain text
+ * search is the degenerate case, so there is exactly one search path to keep
+ * correct. Without text, results order by recency — a (possibly filtered)
+ * recall feed.
  */
 
 export interface FilteredSearchHit {
@@ -169,8 +173,13 @@ export async function searchWithFilters(
     return rows.map((row) => ({ ...row, snippet: null }))
   }
 
-  // Free text: constrain + rank + snippet through FTS (title-boosted bm25,
-  // same weights as the unfiltered palette search).
+  // Free text: constrain + rank + snippet through FTS. An exact title match
+  // leads (title-rank 0); within a rank class, title-boosted bm25 orders (same
+  // weights as the unfiltered palette search), then pinned and recency break
+  // ties, with `path` as the stable final fallback. The exact-title key is
+  // folded the same way titles were at index time, so it can never drift from
+  // the stored `notes.title_key`.
+  const titleKey = foldKey(parsed.text)
   const rows = await query
     .innerJoin('searchFts', 'searchFts.path', 'notes.path')
     .select(
@@ -179,7 +188,11 @@ export async function searchWithFilters(
       ),
     )
     .where(sql<boolean>`search_fts MATCH ${match}`)
+    .orderBy(sql`case when "notes"."title_key" = ${titleKey} then 0 else 1 end`)
     .orderBy(sql`bm25(search_fts, 0, 10.0, 1.0)`)
+    .orderBy('notes.isPinned', 'desc')
+    .orderBy('notes.mtime', 'desc')
+    .orderBy('notes.path', 'asc')
     .execute()
   return rows
 }

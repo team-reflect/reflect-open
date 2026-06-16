@@ -1,9 +1,11 @@
 //! Lexical search over the FTS index. The `MATCH` expression is built exactly
 //! like `buildFtsMatch` (`packages/core/src/indexing/search-query.ts`) and
-//! ranking matches the desktop's palette search (`filtered-search.ts`):
-//! title-boosted bm25 with the same column weights, so the same query against
-//! the same index orders the same in the CLI and the app. The CLI adds its
-//! privacy filter (`notes.is_private = 0`) and FTS5 `snippet()`.
+//! ranking matches the desktop's palette search (`filtered-search.ts`): an
+//! exact title match leads, then title-boosted bm25 with the same column
+//! weights, then pinned and recency as deterministic tiebreakers and `path`
+//! as the stable fallback — so the same query against the same index orders
+//! the same in the CLI and the app. The CLI adds its privacy filter
+//! (`notes.is_private = 0`) and FTS5 `snippet()`.
 
 use rusqlite::{params, Connection};
 
@@ -39,11 +41,16 @@ pub struct SearchHit {
 /// unranked, title boosted 10× over body. Must stay in lockstep.
 const RANK_EXPR: &str = "bm25(search_fts, 0, 10.0, 1.0)";
 
-/// Ranked, private-excluded search. The caller re-checks each hit's file
+/// Ranked, private-excluded search mirroring the desktop palette ordering
+/// (`filtered-search.ts`): exact title match first (`title_key = ?2`), then
+/// title-boosted bm25, then pinned and recency tiebreakers, then `path`. The
+/// returned `score` is the bm25 component only — it doesn't capture the
+/// exact-title or tiebreak ordering. The caller re-checks each hit's file
 /// frontmatter (the index row may lag a just-flagged note).
 pub fn search_index(
     conn: &Connection,
     match_expr: &str,
+    title_key: &str,
     limit: usize,
 ) -> Result<Vec<SearchHit>, CliError> {
     let mut statement = conn.prepare(&format!(
@@ -52,10 +59,14 @@ pub fn search_index(
          FROM search_fts
          JOIN notes ON notes.path = search_fts.path
          WHERE search_fts MATCH ?1 AND notes.is_private = 0
-         ORDER BY {RANK_EXPR}
-         LIMIT ?2",
+         ORDER BY CASE WHEN notes.title_key = ?2 THEN 0 ELSE 1 END,
+                  {RANK_EXPR},
+                  notes.is_pinned DESC,
+                  notes.mtime DESC,
+                  notes.path ASC
+         LIMIT ?3",
     ))?;
-    let rows = statement.query_map(params![match_expr, limit as i64], |row| {
+    let rows = statement.query_map(params![match_expr, title_key, limit as i64], |row| {
         Ok(SearchHit {
             path: row.get(0)?,
             title: row.get(1)?,
