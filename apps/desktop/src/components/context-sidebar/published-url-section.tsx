@@ -62,7 +62,9 @@ export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactEl
 
   const openPublishedUrl = (event: MouseEvent<HTMLAnchorElement>): void => {
     event.preventDefault()
-    void openUrl(url)
+    if (url.startsWith('https://') || url.startsWith('http://')) {
+      void openUrl(url)
+    }
   }
 
   const updateGist = async (): Promise<void> => {

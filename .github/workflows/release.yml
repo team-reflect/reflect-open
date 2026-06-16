@@ -122,4 +122,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm release:macos publish ${{ inputs.draft && '--draft' || '' }}
+          # Pass the boolean flag through an env variable so the shell never
+          # interpolates ${{ }} expressions directly into the run command.
+          DRAFT_FLAG: ${{ inputs.draft && '--draft' || '' }}
+        run: pnpm release:macos publish $DRAFT_FLAG

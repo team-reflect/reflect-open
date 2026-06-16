@@ -248,6 +248,7 @@ export async function relatedNotes(path: string, limit = 10): Promise<RetrievalH
         JOIN embedding_chunks c ON c.id = v.rowid
         JOIN notes n ON n.path = c.note_path
         WHERE v.embedding MATCH ${seed.vec} AND k = ${KNN_CANDIDATES}
+          AND n.is_private = 0
         ORDER BY v.distance
       `.execute(db)
       return result.rows

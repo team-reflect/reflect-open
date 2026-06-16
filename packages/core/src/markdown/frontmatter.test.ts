@@ -140,13 +140,18 @@ describe('upsertFrontmatter', () => {
 
   it('replaces an existing gist block wholesale on republish', () => {
     const first = upsertFrontmatter('body', {
-      gist: { id: 'g1', url: 'u1', file: 'Old.md', hash: 'h1' },
+      gist: { id: 'g1', url: 'https://gist.github.com/alex/g1', file: 'Old.md', hash: 'h1' },
     })
     const second = upsertFrontmatter(first, {
-      gist: { id: 'g1', url: 'u1', file: 'New.md', hash: 'h2' },
+      gist: { id: 'g1', url: 'https://gist.github.com/alex/g1', file: 'New.md', hash: 'h2' },
     })
     const { data } = parseFrontmatter(splitFrontmatter(second).raw)
-    expect(data.gist).toEqual({ id: 'g1', url: 'u1', file: 'New.md', hash: 'h2' })
+    expect(data.gist).toEqual({
+      id: 'g1',
+      url: 'https://gist.github.com/alex/g1',
+      file: 'New.md',
+      hash: 'h2',
+    })
     expect(second).not.toContain('Old.md')
   })
 })
@@ -166,10 +171,23 @@ describe('frontmatter gist block', () => {
 
   it('coerces all-digit ids and hashes a third-party rewrite may have unquoted', () => {
     const { data } = parseFrontmatter(
-      'gist:\n  id: 12345678\n  url: u\n  file: A.md\n  hash: 1234567812345678',
+      'gist:\n  id: 12345678\n  url: https://gist.github.com/alex/g1\n  file: A.md\n  hash: 1234567812345678',
     )
     expect(data.gist?.id).toBe('12345678')
     expect(data.gist?.hash).toBe('1234567812345678')
+  })
+
+  it('rejects a non-http(s) gist url, degrading to "never published"', () => {
+    expect(
+      parseFrontmatter(
+        'gist:\n  id: g1\n  url: file:///etc/passwd\n  file: A.md\n  hash: h1',
+      ).data.gist,
+    ).toBeUndefined()
+    expect(
+      parseFrontmatter(
+        'gist:\n  id: g1\n  url: javascript:alert(1)\n  file: A.md\n  hash: h1',
+      ).data.gist,
+    ).toBeUndefined()
   })
 
   it('degrades a mangled block to "never published" without failing the note', () => {

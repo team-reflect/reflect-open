@@ -65,8 +65,17 @@ export const gistFrontmatterSchema = z.object({
    * one on the next publish.
    */
   id: z.coerce.string(),
-  /** The gist's html url — what publishing copies to the clipboard. */
-  url: z.string(),
+  /**
+   * The gist's html url — what publishing copies to the clipboard.
+   * Validated as https-only: only GitHub Gist URLs are valid here and
+   * `openUrl()` is called directly on this value; non-http(s) schemes
+   * (file://, javascript:, etc.) are rejected so a crafted frontmatter
+   * cannot open arbitrary resources.
+   */
+  url: z.string().refine(
+    (value) => value.startsWith('https://') || value.startsWith('http://'),
+    { message: 'gist url must be an http(s) url' },
+  ),
   /** The gist filename the body was last published under. */
   file: z.string(),
   /** {@link gistBodyHash} of the body as last published (coerced like `id`). */

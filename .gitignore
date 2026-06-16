@@ -23,6 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 
+# Environment secrets (never commit; use OS keychain or CI secrets)
+.env
+.env.*
+!.env.example
+
 # Monorepo / build caches
 .turbo
 /target

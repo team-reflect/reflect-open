@@ -111,9 +111,12 @@ export function GithubAuthStep({ onAuthed, repoName }: GithubAuthStepProps): Rea
       }
     }
     setOpenFailed(false)
-    void openUrl(flow.verificationUri).catch(() => {
-      setOpenFailed(true)
-    })
+    const uri = flow.verificationUri
+    if (uri.startsWith('https://') || uri.startsWith('http://')) {
+      void openUrl(uri).catch(() => {
+        setOpenFailed(true)
+      })
+    }
   }
 
   async function savePat(): Promise<void> {
