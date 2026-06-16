@@ -102,12 +102,10 @@ const attachmentsSchema = z.array(
  * wrote; gross corruption still fails the envelope and drops the row.
  */
 const responseMessagesSchema = z.array(
-  z
-    .object({
-      role: z.enum(['system', 'user', 'assistant', 'tool']),
-      content: z.unknown(),
-    })
-    .passthrough(),
+  z.looseObject({
+    role: z.enum(['system', 'user', 'assistant', 'tool']),
+    content: z.unknown(),
+  }),
 )
 
 /**

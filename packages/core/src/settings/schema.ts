@@ -232,7 +232,7 @@ export const aiProvidersSchema = z
   )
 
 export const settingsSchema = z
-  .object({
+  .looseObject({
     editorMarkdownSyntax: editorMarkdownSyntaxSchema,
     editorSpellCheck: editorSpellCheckSchema,
     editorDefaultBullet: editorDefaultBulletSchema,
@@ -249,7 +249,6 @@ export const settingsSchema = z
     defaultAiProviderId: defaultAiProviderIdSchema,
     chatModelSelection: chatModelSelectionSchema,
   })
-  .passthrough()
 
 export type Settings = z.infer<typeof settingsSchema>
 

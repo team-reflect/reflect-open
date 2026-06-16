@@ -1,4 +1,4 @@
-import type { ZodType, ZodTypeDef } from 'zod'
+import type { ZodType } from 'zod'
 import { toAppError, type AppError } from '../errors'
 import { getBridge } from './bridge'
 
@@ -25,8 +25,9 @@ export async function call<TOutput>(
   args: Record<string, unknown>,
   // Input is `unknown`, not `TOutput`: schemas that normalize (`.catch`,
   // `.default`) have a wider input type than output, and a validator's job is
-  // to consume untyped IPC data anyway.
-  schema: ZodType<TOutput, ZodTypeDef, unknown>,
+  // to consume untyped IPC data anyway. (zod 4's `ZodType<Output, Input>`
+  // dropped the `ZodTypeDef` middle generic that zod 3 required here.)
+  schema: ZodType<TOutput, unknown>,
 ): Promise<TOutput> {
   const bridge = getBridge()
   let raw: unknown

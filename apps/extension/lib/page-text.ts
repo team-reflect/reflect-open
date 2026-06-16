@@ -5,7 +5,7 @@ export const EXTRACT_PAGE_TEXT_MESSAGE_TYPE = 'reflect:capture-page-text'
 /** Popup request sent to the injected content script. */
 export const extractPageTextRequestSchema = z.object({
   type: z.literal(EXTRACT_PAGE_TEXT_MESSAGE_TYPE),
-  expectedUrl: z.string().url(),
+  expectedUrl: z.url(),
 })
 
 /** Content-script reply with normalized paragraph text, or a typed failure. */

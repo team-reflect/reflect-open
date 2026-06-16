@@ -29,10 +29,15 @@ const BASE64_RE = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=
 export const captureEnvelopeSchema = z.object({
   /** Envelope format version; bump on breaking changes. */
   version: z.literal(1),
-  /** Producer-generated UUID — names the spool files, dedups host retries. */
-  id: z.string().uuid(),
+  /**
+   * Producer-generated UUID — names the spool files, dedups host retries.
+   * `z.guid()`, not `z.uuid()`: the host's `is_uuid` (apps/native-host) accepts
+   * any 8-4-4-4-12 hex string, so the drain must too — `z.uuid()` enforces RFC
+   * version/variant nibbles and would quarantine captures the host spooled.
+   */
+  id: z.guid(),
   /** The captured page's URL. */
-  url: z.string().url().refine(isHttpUrl, 'must be an http(s) url'),
+  url: z.url().refine(isHttpUrl, 'must be an http(s) url'),
   /** The page title at capture time (may be empty on restricted pages). */
   title: z.string(),
   /** Text the user had selected, verbatim. */
@@ -47,7 +52,7 @@ export const captureEnvelopeSchema = z.object({
    */
   screenshotRef: z.string().optional(),
   /** When the capture happened, ISO-8601 — decides the daily note it lands on. */
-  capturedAt: z.string().datetime({ offset: true }),
+  capturedAt: z.iso.datetime({ offset: true }),
   /** Where the capture originated. */
   source: captureSourceSchema,
 })

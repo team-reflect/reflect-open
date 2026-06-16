@@ -80,7 +80,7 @@ export type GistFrontmatter = z.infer<typeof gistFrontmatterSchema>
  * rather than failing the whole parse and making a note unreadable.
  */
 export const frontmatterSchema = z
-  .object({
+  .looseObject({
     /** Reserved stable id. Not auto-written in the first wave (identity = path). */
     id: z.string().optional().catch(undefined),
     aliases: z.array(z.string()).catch([]).default([]),
@@ -99,7 +99,6 @@ export const frontmatterSchema = z
      */
     gist: gistFrontmatterSchema.optional().catch(undefined),
   })
-  .passthrough()
 export type Frontmatter = z.infer<typeof frontmatterSchema>
 
 /** Is the note pinned at all? Never truthiness — `pinned: 0` is order 0, pinned. */

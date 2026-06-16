@@ -23,13 +23,13 @@
     "fflate": "^0.8.3",
     "kysely": "^0.28.17",
     "yaml": "^2.9.0",
-    "zod": "^3.23.0"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@ai-sdk/provider": "^3.0.10",
     "@types/node": "^25.9.3",
     "jsdom": "^29.1.1",
     "typescript": "~5.8.3",
-    "vitest": "^3"
+    "vitest": "^4"
   }
 }
