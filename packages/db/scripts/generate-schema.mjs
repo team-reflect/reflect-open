@@ -65,7 +65,7 @@ try {
       '--camel-case',
       // Hide FTS5's internal shadow tables (search_fts_config/content/data/...).
       '--exclude-pattern',
-      'search_fts_*',
+      '*_fts_*',
       '--out-file',
       outFile,
     ],

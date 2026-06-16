@@ -35,34 +35,6 @@ export interface AssetSearchFts {
   notePath: string | null;
 }
 
-export interface AssetSearchFtsConfig {
-  k: string;
-  v: string | null;
-}
-
-export interface AssetSearchFtsContent {
-  c0: string | null;
-  c1: string | null;
-  c2: string | null;
-  id: Generated<number | null>;
-}
-
-export interface AssetSearchFtsData {
-  block: Buffer | null;
-  id: Generated<number | null>;
-}
-
-export interface AssetSearchFtsDocsize {
-  id: Generated<number | null>;
-  sz: Buffer | null;
-}
-
-export interface AssetSearchFtsIdx {
-  pgno: string | null;
-  segid: string;
-  term: string;
-}
-
 export interface Backlinks {
   alias: string | null;
   kind: string | null;
@@ -171,11 +143,6 @@ export interface DB {
   assets: Assets;
   assetSearch: AssetSearch;
   assetSearchFts: AssetSearchFts;
-  assetSearchFtsConfig: AssetSearchFtsConfig;
-  assetSearchFtsContent: AssetSearchFtsContent;
-  assetSearchFtsData: AssetSearchFtsData;
-  assetSearchFtsDocsize: AssetSearchFtsDocsize;
-  assetSearchFtsIdx: AssetSearchFtsIdx;
   backlinks: Backlinks;
   chatConversations: ChatConversations;
   chatMessages: ChatMessages;
