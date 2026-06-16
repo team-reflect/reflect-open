@@ -107,6 +107,15 @@ describe('parseNote — links, assets, tags, text', () => {
     ])
   })
 
+  it('canonicalizes ./ and .. asset path spellings to the on-disk form', () => {
+    const note = parse('![a](./assets/a.png) ![b](assets/sub/../b.png) ![c](assets//c.png)')
+    expect(note.assets.map((asset) => asset.path)).toEqual([
+      'assets/a.png',
+      'assets/b.png',
+      'assets/c.png',
+    ])
+  })
+
   it('extracts body #tags only, deduped case-insensitively', () => {
     const note = parse('#alpha and #Alpha and #beta/sub, but not #123 or a#b')
     expect(note.tags).toEqual(['alpha', 'beta/sub'])

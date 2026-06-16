@@ -12,18 +12,23 @@ import type { FileChange } from './file-changes'
  *
  * In-process only (no IPC): both the emitter and the subscriber live in the
  * frontend. The payload is the full batch — note changes *and* asset-file
- * changes — so the consumer filters for what it cares about.
+ * changes — so the consumer filters for what it cares about. The batch's
+ * `generation` (the issuing graph session) rides along so a consumer pinned to a
+ * graph can ignore a delayed emit from a graph it has since switched away from.
  */
 
-/** A listener for applied watcher batches; receives the full batch, post-index. */
-export type IndexAppliedListener = (changes: readonly FileChange[]) => void
+/**
+ * A listener for applied watcher batches; receives the full batch and the
+ * `generation` (graph session) it was applied at, post-index.
+ */
+export type IndexAppliedListener = (changes: readonly FileChange[], generation: number) => void
 
 const listeners = new Set<IndexAppliedListener>()
 
 /**
  * Subscribe to post-index batch-applied notifications. Returns an unsubscribe
- * function. Independent of `generation`: callers that pin to a graph session
- * compare it themselves (and tear down on graph switch).
+ * function. Listeners that pin to a graph session must compare `generation`
+ * themselves and ignore mismatches (a stale emit from the previous graph).
  */
 export function subscribeIndexApplied(listener: IndexAppliedListener): () => void {
   listeners.add(listener)
@@ -32,9 +37,9 @@ export function subscribeIndexApplied(listener: IndexAppliedListener): () => voi
   }
 }
 
-/** Notify subscribers that `changes` have been applied to the index. */
-export function emitIndexApplied(changes: readonly FileChange[]): void {
+/** Notify subscribers that `changes` were applied to the index at `generation`. */
+export function emitIndexApplied(changes: readonly FileChange[], generation: number): void {
   for (const listener of [...listeners]) {
-    listener(changes)
+    listener(changes, generation)
   }
 }

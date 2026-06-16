@@ -5,20 +5,22 @@ import { emitIndexApplied, subscribeIndexApplied } from './index-applied'
 const batch: FileChange[] = [{ path: 'assets/a.png', kind: 'upsert', modifiedMs: 1 }]
 
 describe('subscribeIndexApplied', () => {
-  it('delivers emitted batches to every subscriber until it unsubscribes', () => {
-    const a: FileChange[][] = []
-    const b: FileChange[][] = []
-    const unsubA = subscribeIndexApplied((changes) => a.push([...changes]))
-    const unsubB = subscribeIndexApplied((changes) => b.push([...changes]))
+  it('delivers emitted batches (with generation) to every subscriber until it unsubscribes', () => {
+    const a: Array<{ paths: string[]; generation: number }> = []
+    const b: number[] = []
+    const unsubA = subscribeIndexApplied((changes, generation) =>
+      a.push({ paths: changes.map((change) => change.path), generation }),
+    )
+    const unsubB = subscribeIndexApplied((_changes, generation) => b.push(generation))
 
-    emitIndexApplied(batch)
-    expect(a).toEqual([batch])
-    expect(b).toEqual([batch])
+    emitIndexApplied(batch, 7)
+    expect(a).toEqual([{ paths: ['assets/a.png'], generation: 7 }])
+    expect(b).toEqual([7])
 
     unsubA()
-    emitIndexApplied(batch)
+    emitIndexApplied(batch, 8)
     expect(a).toHaveLength(1) // no longer delivered
-    expect(b).toHaveLength(2)
+    expect(b).toEqual([7, 8])
 
     unsubB()
   })
@@ -29,8 +31,8 @@ describe('subscribeIndexApplied', () => {
       seen.push(1)
       unsub() // remove self mid-emit
     })
-    expect(() => emitIndexApplied(batch)).not.toThrow()
-    emitIndexApplied(batch)
+    expect(() => emitIndexApplied(batch, 1)).not.toThrow()
+    emitIndexApplied(batch, 1)
     expect(seen).toEqual([1]) // fired once, then gone
   })
 })

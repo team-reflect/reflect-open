@@ -105,21 +105,37 @@ function isAssetHref(href: string): boolean {
 }
 
 /**
- * Decode an asset href to the on-disk path. A note body may percent-encode an
- * asset reference (`assets/my%20photo.png`) while the file on disk — and the
- * watcher / `dir_list` paths — are `assets/my photo.png`. The index projection
- * and the asset-description privacy gate both key off this decoded form, so two
- * notes referencing the same file under different spellings collapse to one key
- * (a private referer can't hide behind an alternate encoding). A malformed
- * escape keeps the raw href. The `AssetRef` span still points at the raw body
- * text; only the logical `path` is decoded.
+ * Canonicalize an asset href to the on-disk path. A note body may write the same
+ * file many ways — percent-encoded (`assets/my%20photo.png`), `./`-prefixed
+ * (`./assets/a.png`), with `..`/empty segments — while the file on disk (and the
+ * watcher / `dir_list` / `readAsset` paths) is the collapsed `assets/...` form.
+ * The index projection and the asset-description privacy gate key off this
+ * canonical form, so every spelling of one file collapses to one key — a private
+ * referer can't hide behind an alternate encoding *or* an alternate path shape.
+ *
+ * Decodes percent-escapes (a malformed escape keeps the raw href), then resolves
+ * `.`/`..`/empty segments. The `AssetRef` span still points at the raw body text;
+ * only the logical `path` is canonicalized.
  */
 function decodeAssetPath(href: string): string {
+  let decoded: string
   try {
-    return decodeURIComponent(href)
+    decoded = decodeURIComponent(href)
   } catch {
-    return href
+    decoded = href
   }
+  const segments: string[] = []
+  for (const segment of decoded.split('/')) {
+    if (segment === '' || segment === '.') {
+      continue
+    }
+    if (segment === '..') {
+      segments.pop()
+      continue
+    }
+    segments.push(segment)
+  }
+  return segments.join('/')
 }
 
 function stringField(frontmatter: Frontmatter, key: string): string | undefined {

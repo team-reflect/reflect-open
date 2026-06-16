@@ -70,13 +70,19 @@ function upsert(path: string): FileChange {
   return { path, kind: 'upsert', modifiedMs: 1 }
 }
 
-let onApplied: ((changes: readonly FileChange[]) => void) | null = null
+const GEN = 3
+let onApplied: ((changes: readonly FileChange[], generation: number) => void) | null = null
 const unlisten = vi.fn()
 let controller: AssetDescribeController | null = null
 
 function create(): AssetDescribeController {
-  controller = createAssetDescribeController({ generation: 3, getProviders: () => PROVIDERS })
+  controller = createAssetDescribeController({ generation: GEN, getProviders: () => PROVIDERS })
   return controller
+}
+
+/** Deliver a post-apply batch at the controller's generation (the common case). */
+function emitApplied(changes: FileChange[]): void {
+  onApplied?.(changes, GEN)
 }
 
 function flush(): Promise<void> {
@@ -110,7 +116,7 @@ describe('createAssetDescribeController', () => {
   it('describes a newly observed eligible asset, pinned to the generation', async () => {
     create().start()
     await flush()
-    onApplied?.([upsert('assets/a.png')])
+    emitApplied([upsert('assets/a.png')])
     await flush()
 
     expect(reconcileAssetDescriptions).toHaveBeenCalledTimes(1)
@@ -130,7 +136,7 @@ describe('createAssetDescribeController', () => {
     )
     create().start()
     await flush()
-    onApplied?.([upsert('assets/a.png')])
+    emitApplied([upsert('assets/a.png')])
     await flush()
 
     expect(reindexNotesReferencing).toHaveBeenCalledWith(['assets/a.png'], 3)
@@ -140,7 +146,7 @@ describe('createAssetDescribeController', () => {
     reconcileAssetDescriptions.mockResolvedValueOnce(outcome({ described: 0, describedAssetPaths: [] }))
     create().start()
     await flush()
-    onApplied?.([upsert('assets/a.png')])
+    emitApplied([upsert('assets/a.png')])
     await flush()
 
     expect(reindexNotesReferencing).not.toHaveBeenCalled()
@@ -149,7 +155,7 @@ describe('createAssetDescribeController', () => {
   it('ignores descriptions, ineligible types, removes, and notes with no asset refs', async () => {
     create().start()
     await flush()
-    onApplied?.([
+    emitApplied([
       upsert('assets/a.png.reflect.md'),
       upsert('assets/notes.txt'),
       { path: 'assets/a.png', kind: 'remove' },
@@ -164,7 +170,7 @@ describe('createAssetDescribeController', () => {
     readNote.mockResolvedValue('# Now public\n\n![](assets/a.png)\n')
     create().start()
     await flush()
-    onApplied?.([upsert('notes/x.md')])
+    emitApplied([upsert('notes/x.md')])
     await flush()
 
     expect(readNote).toHaveBeenCalledWith('notes/x.md', 3)
@@ -178,9 +184,9 @@ describe('createAssetDescribeController', () => {
     create().start()
     await flush()
 
-    onApplied?.([upsert('assets/a.png')]) // starts the pass (now in-flight)
+    emitApplied([upsert('assets/a.png')]) // starts the pass (now in-flight)
     await flush()
-    onApplied?.([upsert('assets/b.pdf')]) // lands mid-pass → queued
+    emitApplied([upsert('assets/b.pdf')]) // lands mid-pass → queued
     await flush()
     expect(reconcileAssetDescriptions).toHaveBeenCalledTimes(1)
 
@@ -199,7 +205,7 @@ describe('createAssetDescribeController', () => {
     create().start()
     await flush()
 
-    onApplied?.([upsert('assets/a.png')])
+    emitApplied([upsert('assets/a.png')])
     await flush()
     expect(reconcileAssetDescriptions).toHaveBeenCalledTimes(1)
 
@@ -214,7 +220,7 @@ describe('createAssetDescribeController', () => {
     create().start()
     await flush()
 
-    onApplied?.([upsert('assets/a.png')])
+    emitApplied([upsert('assets/a.png')])
     await flush()
     window.dispatchEvent(new Event('focus'))
     await flush()
@@ -229,7 +235,7 @@ describe('createAssetDescribeController', () => {
     handle.dispose()
 
     expect(unlisten).toHaveBeenCalledTimes(1)
-    onApplied?.([upsert('assets/a.png')])
+    emitApplied([upsert('assets/a.png')])
     await flush()
     expect(reconcileAssetDescriptions).not.toHaveBeenCalled()
   })
@@ -241,8 +247,21 @@ describe('createAssetDescribeController', () => {
     await flush()
 
     expect(subscribeIndexApplied).toHaveBeenCalledTimes(1)
-    onApplied?.([upsert('assets/a.png')])
+    emitApplied([upsert('assets/a.png')])
     await flush()
     expect(reconcileAssetDescriptions).toHaveBeenCalledTimes(1) // one pass, not two
+  })
+
+  it('ignores a post-apply batch from a different graph generation', async () => {
+    create().start()
+    await flush()
+
+    onApplied?.([upsert('assets/a.png')], GEN + 1) // a stale emit from another graph
+    await flush()
+    expect(reconcileAssetDescriptions).not.toHaveBeenCalled()
+
+    emitApplied([upsert('assets/a.png')]) // our generation → processed
+    await flush()
+    expect(reconcileAssetDescriptions).toHaveBeenCalledTimes(1)
   })
 })

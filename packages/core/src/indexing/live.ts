@@ -164,10 +164,11 @@ export function subscribeIndexChanges(
           onApplied?.(notes)
         }
         // Post-apply: the asset-description controller reads the now-settled
-        // index off this. Carries the full batch (notes + asset files); the
-        // consumer filters. Chained on the same queue, so any prior note apply
+        // index off this. Carries the full batch (notes + asset files) and the
+        // `generation` so a consumer can drop a stale emit from a graph it has
+        // switched away from. Chained on the same queue, so any prior note apply
         // is visible before an asset-only batch's gate runs.
-        emitIndexApplied(changes)
+        emitIndexApplied(changes, generation)
       })
       .catch((error) => {
         console.error('failed to apply watcher batch:', error)

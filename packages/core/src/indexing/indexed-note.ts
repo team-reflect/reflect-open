@@ -46,8 +46,12 @@ import { previewSnippet } from './snippet'
  * 9 — asset descriptions folded into `search_fts.body` (Plan 20 search
  * integration): existing notes carry no asset-description text in search until
  * reprojected, so the bump rebuilds them.
+ * 10 — asset reference paths fully canonicalized (`./`, `..`, empty segments
+ * collapsed, not just percent-decoded): the `assets` projection's keys change,
+ * so the bump rebuilds them — the privacy gate matches them against the
+ * canonical on-disk path.
  */
-export const PROJECTION_VERSION = 9
+export const PROJECTION_VERSION = 10
 
 export const indexedLinkSchema = z.object({
   kind: z.enum(['wiki', 'md']),

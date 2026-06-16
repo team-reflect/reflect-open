@@ -211,7 +211,10 @@ export function createAssetDescribeController(
     // already in the index, so the privacy gate can't race a just-written private
     // note's indexing. Carries the full batch — asset-file upserts (a dropped
     // image) and note upserts (which may newly reference an asset).
-    unlisten = subscribeIndexApplied((changes) => {
+    unlisten = subscribeIndexApplied((changes, generation) => {
+      if (generation !== options.generation) {
+        return // a delayed emit from a graph we've switched away from
+      }
       const newAssets: string[] = []
       const changedNotes: string[] = []
       for (const change of changes) {
