@@ -14,7 +14,7 @@ import { foldKey } from './keys'
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 /** Is `value` a real calendar day (not just `YYYY-MM-DD`-shaped)? */
-function isCalendarDate(value: string): boolean {
+export function isCalendarDate(value: string): boolean {
   const [year, month, day] = value.split('-').map(Number)
   if (month < 1 || month > 12) {
     return false

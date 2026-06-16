@@ -34,6 +34,27 @@ function sections(
 }
 
 describe('buildPaletteSections', () => {
+  it('appends generated date suggestions after real note matches', () => {
+    const generated: WikiSuggestion = {
+      target: '2020-01-06',
+      path: null,
+      title: '2020-01-06',
+      alias: null,
+      date: '2020-01-06',
+      phrase: 'This Monday',
+    }
+    const result = sections({
+      query: 'mon',
+      // Core returns dates first; the palette must push them behind real notes.
+      suggestions: [generated, suggestion('notes/monday-standup.md', 'Monday Standup')],
+    })
+    expect(result.notes.map((note) => note.path)).toEqual([
+      'notes/monday-standup.md',
+      'daily/2020-01-06.md',
+    ])
+    expect(result.notes.find((note) => note.date === '2020-01-06')?.phrase).toBe('This Monday')
+  })
+
   it('an empty query is the recall feed: suggestions only, no commands', () => {
     const result = sections({
       query: '',
@@ -89,7 +110,13 @@ describe('buildPaletteSections', () => {
       ],
     })
     expect(result.notes).toEqual([
-      { path: 'daily/2026-08-01.md', title: '2026-08-01', date: '2026-08-01', snippet: null },
+      {
+        path: 'daily/2026-08-01.md',
+        title: '2026-08-01',
+        date: '2026-08-01',
+        snippet: null,
+        phrase: null,
+      },
     ])
   })
 

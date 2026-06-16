@@ -8,7 +8,7 @@ import {
 import { hasBridge, suggestTags, suggestWikiTargets } from '@reflect/core'
 import { buildAutocompleteEntries } from '@/editor/wiki-autocomplete-entries'
 import { createNoteWithTitle } from '@/lib/create-note'
-import { formatDayLabel } from '@/lib/dates'
+import { formatDayLabel, todayIso } from '@/lib/dates'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
 
@@ -23,7 +23,8 @@ export interface EditorAutocomplete {
 /**
  * The editor's `[[` and `#` autocomplete, shared by every note editor (the
  * note pane and the Tasks view's inline editor). meowdown owns the menu UI and
- * hands us the (lowercased, punctuation-stripped) query; ranking stays the
+ * hands us the raw text typed after `[[` (case preserved, spaces and slashes
+ * intact — only `[`, `]`, and newlines close the menu); ranking stays the
  * index's job, so neither menu re-sorts what the host returns. Both handlers
  * are no-ops without a bridge or an open graph.
  *
@@ -52,7 +53,10 @@ export function useEditorAutocomplete(): EditorAutocomplete {
       if (!hasBridge() || graph === null) {
         return []
       }
-      const suggestions = await suggestWikiTargets(query)
+      const suggestions = await suggestWikiTargets(query, 8, {
+        today: todayIso(),
+        dateFormat: settings.dateFormat,
+      })
       return buildAutocompleteEntries(query, suggestions, { offerCreate: true }).map((entry) => {
         if (entry.kind === 'create') {
           return {
@@ -67,7 +71,12 @@ export function useEditorAutocomplete(): EditorAutocomplete {
             },
           }
         }
-        const { target, title, alias, date, path } = entry.suggestion
+        const { target, title, alias, date, path, phrase } = entry.suggestion
+        // A generated date leads with its phrase ("Next Friday"), resolved day
+        // as the detail; everything else keeps the title/alias/daily form.
+        if (phrase !== undefined && date !== null) {
+          return { target, label: phrase, detail: formatDayLabel(date, settings.dateFormat) }
+        }
         const label = date !== null ? formatDayLabel(date, settings.dateFormat) : title
         const detail =
           alias !== null

@@ -8,10 +8,12 @@ import {
   type Resolution,
   type TaskMarker,
 } from '../markdown'
+import { generateDateSuggestions, type DateSuggestionContext } from './date-suggestions'
 import { db } from './db'
 import { buildFtsMatch } from './search-query'
 import { lineSnippet } from './snippet'
 import {
+  mergeDateSuggestions,
   rankWikiSuggestions,
   type AliasCandidate,
   type TitleCandidate,
@@ -226,8 +228,18 @@ export async function suggestTags(query: string, limit = 8): Promise<TagSuggesti
  * titles before aliases, recent first); an empty query suggests recent notes.
  * A full `YYYY-MM-DD` query always yields that daily as the first candidate —
  * dailies are valid targets before their file exists (created lazily on write).
+ *
+ * Pass `dateGen` (the clock + date-format preference) to also synthesise
+ * date suggestions from fuzzy queries — "3 days ago", "next friday", "12/25",
+ * "December 2nd" — via {@link generateDateSuggestions}, merged ahead of the
+ * index matches. Omit it (e.g. legacy callers) to keep the plain title/alias
+ * behaviour with only the full-ISO daily injection.
  */
-export async function suggestWikiTargets(query: string, limit = 8): Promise<WikiSuggestion[]> {
+export async function suggestWikiTargets(
+  query: string,
+  limit = 8,
+  dateGen?: DateSuggestionContext,
+): Promise<WikiSuggestion[]> {
   const normalized = normalizeWikiTarget(query)
   const key = normalized.key
 
@@ -264,6 +276,12 @@ export async function suggestWikiTargets(query: string, limit = 8): Promise<Wiki
   }
 
   const ranked = rankWikiSuggestions(key, titles, aliases, limit)
+
+  // With a clock, the generator covers the full-ISO daily too (and more), so it
+  // supersedes the bare injection below.
+  if (dateGen !== undefined) {
+    return mergeDateSuggestions(ranked, generateDateSuggestions(query, dateGen), { key, limit })
+  }
 
   if (normalized.date !== undefined) {
     const date = normalized.date

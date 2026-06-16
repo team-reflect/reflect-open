@@ -181,10 +181,17 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
                           />
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm">
-                              {entry.date !== null
-                                ? formatDayLabel(entry.date, settings.dateFormat)
-                                : entry.title}
+                              {entry.phrase !== null
+                                ? entry.phrase
+                                : entry.date !== null
+                                  ? formatDayLabel(entry.date, settings.dateFormat)
+                                  : entry.title}
                             </span>
+                            {entry.phrase !== null && entry.date !== null ? (
+                              <span className="block truncate text-xs text-text-muted">
+                                {formatDayLabel(entry.date, settings.dateFormat)}
+                              </span>
+                            ) : null}
                             {entry.snippet !== null ? <Snippet snippet={entry.snippet} /> : null}
                           </span>
                         </span>

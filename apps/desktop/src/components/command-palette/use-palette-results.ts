@@ -8,6 +8,7 @@ import {
   suggestWikiTargets,
 } from '@reflect/core'
 import { listCommands } from '@/lib/commands/registry'
+import { todayIso } from '@/lib/dates'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useEmbedStatus } from '@/lib/use-embed-status'
 import { useGraph } from '@/providers/graph-provider'
@@ -55,8 +56,9 @@ export function usePaletteResults(open: boolean, query: string): PaletteResults 
     isLoading: suggestionsLoading,
     isError: suggestionsError,
   } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'palette-suggest', trimmed],
-    queryFn: () => suggestWikiTargets(trimmed, 8),
+    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'palette-suggest', trimmed, settings.dateFormat],
+    queryFn: () =>
+      suggestWikiTargets(trimmed, 8, { today: todayIso(), dateFormat: settings.dateFormat }),
     enabled: searching && !parsed.filtered,
   })
   const useHybrid = hybrid && !parsed.filtered

@@ -46,6 +46,19 @@ describe('buildAutocompleteEntries', () => {
     expect(buildAutocompleteEntries('  ', [])).toEqual([])
   })
 
+  it('does not offer create when a generated date suggestion is present', () => {
+    const entries = buildAutocompleteEntries('3 days ago', [
+      suggestion({
+        target: '2019-12-29',
+        title: '2019-12-29',
+        path: null,
+        date: '2019-12-29',
+        phrase: '3 days ago',
+      }),
+    ])
+    expect(entries.every((entry) => entry.kind === 'suggestion')).toBe(true)
+  })
+
   it('never offers create from unsettled (in-flight) suggestions', () => {
     // The visible list belongs to the previous query while fetching — a match
     // for the current text may be about to arrive.

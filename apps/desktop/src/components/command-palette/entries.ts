@@ -16,6 +16,8 @@ export interface NoteEntry {
   date: string | null
   /** Body snippet with highlight markers (search hits only). */
   snippet: string | null
+  /** Human label for a generated date suggestion ("Next Friday"); null otherwise. */
+  phrase: string | null
 }
 
 export interface PaletteSections {
@@ -82,6 +84,7 @@ export function buildPaletteSections(options: {
         title: hit.title,
         date: hit.dailyDate,
         snippet: hit.snippet,
+        phrase: null,
       })),
       commands: [],
     }
@@ -91,7 +94,14 @@ export function buildPaletteSections(options: {
   // the rest; one row per note, the stronger (title) form wins.
   const notes: NoteEntry[] = []
   const seen = new Set<string>()
-  for (const suggestion of suggestions) {
+  // Real note matches lead; generated date suggestions (they carry a phrase)
+  // trail them. In the global palette your existing notes should outrank
+  // "Next Monday" — the opposite of the `[[` menu, where dates lead.
+  const orderedSuggestions = [
+    ...suggestions.filter((suggestion) => suggestion.phrase === undefined),
+    ...suggestions.filter((suggestion) => suggestion.phrase !== undefined),
+  ]
+  for (const suggestion of orderedSuggestions) {
     // A pathless suggestion is a valid daily whose file doesn't exist yet
     // (the lazy contract) — it must still be jumpable: synthesize its daily
     // path, and routeForPath downstream yields the daily route, where the
@@ -105,6 +115,7 @@ export function buildPaletteSections(options: {
         title: suggestion.title,
         date: suggestion.date,
         snippet: null,
+        phrase: suggestion.phrase ?? null,
       })
     }
   }
@@ -113,7 +124,13 @@ export function buildPaletteSections(options: {
   for (const hit of bodyHits) {
     if (!seen.has(hit.path)) {
       seen.add(hit.path)
-      notes.push({ path: hit.path, title: hit.title, date: hit.dailyDate, snippet: hit.snippet })
+      notes.push({
+        path: hit.path,
+        title: hit.title,
+        date: hit.dailyDate,
+        snippet: hit.snippet,
+        phrase: null,
+      })
     }
   }
 

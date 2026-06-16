@@ -485,6 +485,7 @@ export {
   type TagSuggestion,
   type FileChange,
   type WikiSuggestion,
+  type DateSuggestionContext,
   type HighlightSegment,
   type ParsedSearchQuery,
   type SearchFilters,

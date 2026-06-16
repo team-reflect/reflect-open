@@ -90,7 +90,12 @@ export {
   type RecentNoteRow,
   type RecentNotesOptions,
 } from './note-list'
-export { rankWikiSuggestions, type WikiSuggestion } from './suggest'
+export { rankWikiSuggestions, mergeDateSuggestions, type WikiSuggestion } from './suggest'
+export {
+  generateDateSuggestions,
+  type DateSuggestion,
+  type DateSuggestionContext,
+} from './date-suggestions'
 export {
   parseHighlights,
   randomNotePath,

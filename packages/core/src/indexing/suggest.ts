@@ -6,6 +6,9 @@
  * lives here where it can be unit-tested without a database.
  */
 
+import { foldKey } from '../markdown/keys'
+import type { DateSuggestion } from './date-suggestions'
+
 /** A `[[` autocomplete candidate. */
 export interface WikiSuggestion {
   /** What `[[…]]` should contain when chosen (the canonical title, or an ISO date). */
@@ -18,6 +21,12 @@ export interface WikiSuggestion {
   alias: string | null
   /** Set on daily-note suggestions. */
   date: string | null
+  /**
+   * Human label for a generated date suggestion ("3 days ago", "Next Friday").
+   * Present only on rows synthesised by the date generator — its absence is how
+   * hosts tell a generated daily apart from a real note or an existing daily.
+   */
+  phrase?: string
 }
 
 /** One `notes` row considered for suggestion (a title match or recency fill). */
@@ -112,4 +121,60 @@ export function rankWikiSuggestions(
     }
   }
   return result
+}
+
+/**
+ * Fold generated date suggestions into the ranked index results for the `[[`
+ * menu. Dates lead the list — except an exact title/alias match keeps the very
+ * top slot, the way V1 lets a note literally titled "Today" outrank the
+ * generated *Today*. When a generated day already exists as an indexed daily,
+ * that real row is reused (so the link resolves to the existing file) but
+ * carries the phrase, and a day never appears twice.
+ *
+ * Pure so the ordering policy is unit-testable without a database; the only
+ * caller is {@link suggestWikiTargets}.
+ */
+export function mergeDateSuggestions(
+  ranked: WikiSuggestion[],
+  dates: readonly DateSuggestion[],
+  options: { key: string; limit: number },
+): WikiSuggestion[] {
+  if (dates.length === 0) {
+    return ranked.slice(0, options.limit)
+  }
+  const rankedByDate = new Map<string, WikiSuggestion>()
+  for (const suggestion of ranked) {
+    if (suggestion.date !== null) {
+      rankedByDate.set(suggestion.date, suggestion)
+    }
+  }
+
+  const reused = new Set<WikiSuggestion>()
+  const dateRows: WikiSuggestion[] = dates.map(({ date, phrase }) => {
+    const existing = rankedByDate.get(date)
+    if (existing !== undefined) {
+      reused.add(existing)
+      return phrase === null ? existing : { ...existing, phrase }
+    }
+    return {
+      target: date,
+      path: null,
+      title: date,
+      alias: null,
+      date,
+      ...(phrase === null ? {} : { phrase }),
+    }
+  })
+
+  const rest = ranked.filter((suggestion) => !reused.has(suggestion))
+  const exactIndex = rest.findIndex(
+    (suggestion) =>
+      foldKey(suggestion.target) === options.key ||
+      (suggestion.alias !== null && foldKey(suggestion.alias) === options.key),
+  )
+  const ordered =
+    exactIndex >= 0
+      ? [rest[exactIndex], ...dateRows, ...rest.filter((_, index) => index !== exactIndex)]
+      : [...dateRows, ...rest]
+  return ordered.slice(0, options.limit)
 }
