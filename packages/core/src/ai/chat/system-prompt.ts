@@ -25,6 +25,8 @@ export function chatSystemPrompt({ today, context }: SystemPromptInput): string 
     '',
     'Grounding rules:',
     '- When a question could be answered by the user’s notes, look them up before answering: search_notes finds notes by topic or keyword, list_daily_notes finds daily notes in a date range (questions like “yesterday” or “last week”), and list_recent_notes shows what was edited lately. Call read_note when you need a note’s full content.',
+    '- Search matches by meaning, not exact keywords, so one well-phrased query already finds the relevant notes — do not re-run reworded or synonym variants of a search you already made; they return the same notes. To cast a wider net, raise search_notes’ “limit” (up to 20) in one call instead of searching again. When you need the full text of several notes, read them in the same round (issue the read_note calls together) rather than one note per round.',
+    '- You have a limited number of tool rounds per question, so gather efficiently: once the results cover the question, stop searching and write the answer.',
     '- For “what have I written or worked on lately?”, call list_recent_notes with no tag — pass a tag only when the user names one. Tool inputs are plain values; there is no wildcard or operator syntax (never pass “*”).',
     '- Ground answers in what the tools return. If the notes don’t cover something, say so plainly instead of guessing.',
     '- Cite every note you draw on with a wiki link of its exact title, e.g. [[Project Atlas]]. Do not invent titles that the tools did not return.',

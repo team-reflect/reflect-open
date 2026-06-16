@@ -3,6 +3,7 @@ import type { ChatStreamEvent } from './stream-chat'
 import {
   appendEvent,
   buildHistory,
+  NO_REPLY_NOTICE,
   userMessage,
   type AssistantPart,
   type ChatAttachment,
@@ -105,6 +106,28 @@ describe('appendEvent', () => {
     expect(errored).toEqual([{ kind: 'notice', tone: 'error', text: 'auth failed' }])
 
     expect(appendEvent(errored, { type: 'complete', messages: [] })).toEqual(errored)
+  })
+
+  it('a turn that completes with only tool activity gets a reply notice', () => {
+    // The step-ceiling dead end: tools ran, the model never synthesized, and
+    // the turn settles. The user must see a notice, not silent tool chips.
+    const parts = fold([
+      { type: 'tool-call', call: { tool: 'read', toolCallId: 'tool-7', path: 'notes/a.md' } },
+      {
+        type: 'tool-result',
+        result: { tool: 'read', toolCallId: 'tool-7', path: 'notes/a.md', title: 'Atlas', error: null },
+      },
+      { type: 'complete', messages: [] },
+    ])
+    expect(parts.at(-1)).toEqual({ kind: 'notice', tone: 'info', text: NO_REPLY_NOTICE })
+  })
+
+  it('complete adds no notice once the turn has answered', () => {
+    const parts = fold([
+      { type: 'text-delta', text: 'Here it is.' },
+      { type: 'complete', messages: [] },
+    ])
+    expect(parts).toEqual([{ kind: 'text', text: 'Here it is.' }])
   })
 
   it('a terminal event settles tool calls still in flight — no eternal spinners', () => {

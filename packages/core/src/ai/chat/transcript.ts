@@ -51,6 +51,24 @@ export function isToolPending(part: Extract<AssistantPart, { kind: 'tool' }>): b
   return part.result === null && part.error === null
 }
 
+/**
+ * Shown when a turn settles with no reply for the user — neither answer text
+ * nor a notice of its own. The usual cause is the model spending its whole
+ * step budget on tool calls without ever synthesizing (the engine's
+ * `prepareStep` guards against this, so this is a backstop), but an empty
+ * provider response lands here too.
+ */
+export const NO_REPLY_NOTICE =
+  'I couldn’t finish answering — try narrowing your question or asking again.'
+
+/** Whether the parts already carry something the user can read as a reply. */
+function hasRenderableReply(parts: AssistantPart[]): boolean {
+  return parts.some(
+    (part) =>
+      (part.kind === 'text' && part.text.trim() !== '') || part.kind === 'notice',
+  )
+}
+
 /** Fold one stream event into an assistant message's parts (immutable). */
 export function appendEvent(parts: AssistantPart[], event: ChatStreamEvent): AssistantPart[] {
   switch (event.type) {
@@ -87,7 +105,12 @@ export function appendEvent(parts: AssistantPart[], event: ChatStreamEvent): Ass
         { kind: 'notice', tone: 'info', text: 'Stopped.' },
       ]
     case 'complete':
-      return parts
+      // A turn can settle with no reply — e.g. the model spent its whole step
+      // budget on tool calls and never synthesized. Rather than leave the user
+      // with tool chips and silence, surface a notice.
+      return hasRenderableReply(parts)
+        ? parts
+        : [...parts, { kind: 'notice', tone: 'info', text: NO_REPLY_NOTICE }]
   }
 }
 

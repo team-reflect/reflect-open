@@ -24,8 +24,14 @@ import {
  * shapes (and the only code that knows tool names) live in `./tools`.
  */
 
-/** Ceiling on model↔tool round-trips per user turn. */
-const MAX_STEPS = 8
+/**
+ * Ceiling on model↔tool round-trips per user turn. The model batches several
+ * tool calls into each step, so this is generous headroom for multi-note
+ * gathering rather than a tight budget — and the `prepareStep` hook below
+ * guarantees the turn still ends with a reply when the ceiling is reached
+ * mid-gather (see {@link streamChatTurn}).
+ */
+export const MAX_STEPS = 12
 
 export interface StreamChatOptions {
   /** The provider entry to call, with `model` set to the model id to use. */
@@ -127,6 +133,13 @@ export async function* streamChatTurn(
       messages: options.messages,
       tools,
       stopWhen: stepCountIs(MAX_STEPS),
+      // On the final permitted step, disable tools so the model must answer
+      // from what it has already gathered. Without this a turn still calling
+      // tools when the ceiling fires ends on a tool result with no reply — the
+      // user sees tool activity, then silence. `stepNumber` counts completed
+      // steps, so the last step that runs is `MAX_STEPS - 1`.
+      prepareStep: ({ stepNumber }) =>
+        stepNumber >= MAX_STEPS - 1 ? { toolChoice: 'none' } : {},
       ...(options.signal !== undefined ? { abortSignal: options.signal } : {}),
       onStepFinish: (step) => {
         stepMessages = [...step.response.messages]
