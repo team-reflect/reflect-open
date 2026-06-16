@@ -185,9 +185,9 @@ describe('BacklinksPanel', () => {
     )
     const headers = view.getAllByRole('button', { name: /Incoming backlink \(1\)/ })
 
-    await userEvent.click(headers[0])
-    expect(headers[0].getAttribute('aria-expanded')).toBe('false')
-    expect(headers[1].getAttribute('aria-expanded')).toBe('false')
+    await userEvent.click(headers[0]!)
+    expect(headers[0]!.getAttribute('aria-expanded')).toBe('false')
+    expect(headers[1]!.getAttribute('aria-expanded')).toBe('false')
     expect(view.queryByText('discussed [[Roadmap]] follow-ups')).toBeNull()
     view.unmount()
   })

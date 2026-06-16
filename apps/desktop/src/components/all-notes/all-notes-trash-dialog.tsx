@@ -30,10 +30,10 @@ interface AllNotesTrashDialogProps {
  * so the screen only tracks which paths to trash and whether the dialog is open.
  *
  * It always closes on confirm: on full success it clears the selection, and on
- * any failure it leaves the selection alone and lets {@link useNoteTrash} report
- * the reason through the operations toast — the app's standard channel for
- * background-work failures. There's no inline error or in-dialog retry; the
- * notes that didn't trash reappear in the list to be re-selected.
+ * any failure it leaves the selection alone — the notes that didn't trash stay
+ * in the list and selected, ready to retry — and lets {@link useNoteTrash}
+ * report the reason through the operations toast, the app's standard channel for
+ * background-work failures. No inline error, no in-dialog retry.
  */
 export function AllNotesTrashDialog({
   open,

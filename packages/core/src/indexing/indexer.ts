@@ -49,7 +49,7 @@ export const PROJECTION_VERSION_KEY = 'projection_version'
  */
 export async function indexNote(
   path: string,
-  options: { generation: number; content?: string; mtime?: number },
+  options: { generation: number; content?: string | undefined; mtime?: number | undefined },
 ): Promise<void> {
   const content = options.content ?? (await readNote(path))
   const parsed = parseNote({ path, source: content })
@@ -106,7 +106,7 @@ async function applyRebuildBatch(
       if (onSkippedNote === undefined) {
         throw cause
       }
-      onSkippedNote({ path: notes[0].path, message: errorMessage(cause) })
+      onSkippedNote({ path: notes[0]!.path, message: errorMessage(cause) })
       return
     }
     const midpoint = Math.ceil(notes.length / 2)

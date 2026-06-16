@@ -58,7 +58,7 @@ describe('estimateTokens', () => {
 
   it('counts tool results by their JSON encoding', () => {
     const [, result] = toolExchange('tool-1', 4_000)
-    const tokens = estimateTokens(result)
+    const tokens = estimateTokens(result!)
     expect(tokens).toBeGreaterThan(1_000)
     expect(tokens).toBeLessThan(1_100)
   })
@@ -108,13 +108,13 @@ describe('fitToContextWindow', () => {
 
     const toolMessages = fitted.filter((message) => message.role === 'tool')
     expect(toolMessages).toHaveLength(2)
-    expect(toolMessages[0].content[0]).toMatchObject({
+    expect(toolMessages[0]!.content[0]).toMatchObject({
       toolCallId: 'tool-old',
       output: { type: 'text', value: '[Old tool result elided to fit the context window.]' },
     })
     // The newest turns keep their results verbatim — the model may still be
     // working from them.
-    expect(toolMessages[1].content[0]).toMatchObject({
+    expect(toolMessages[1]!.content[0]).toMatchObject({
       toolCallId: 'tool-new',
       output: { type: 'json' },
     })

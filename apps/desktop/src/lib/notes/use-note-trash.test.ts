@@ -63,7 +63,7 @@ describe('useNoteTrash', () => {
 
   it('keeps going past a per-note failure and resolves false', async () => {
     mockInvoke.mockImplementation(async (command, args) => {
-      if (command === 'note_delete' && args.path === 'notes/b.md') {
+      if (command === 'note_delete' && args['path'] === 'notes/b.md') {
         throw new Error('locked')
       }
       return null

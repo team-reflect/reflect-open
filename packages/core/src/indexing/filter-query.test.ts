@@ -3,7 +3,7 @@ import { parseSearchQuery } from './filter-query'
 
 function startOfLocalDay(date: string, days = 0): number {
   const [year, month, day] = date.split('-').map(Number)
-  return new Date(year, month - 1, day + days).getTime()
+  return new Date(year!, month! - 1, day! + days).getTime()
 }
 
 describe('parseSearchQuery', () => {

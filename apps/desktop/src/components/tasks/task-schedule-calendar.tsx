@@ -92,7 +92,7 @@ export function TaskScheduleCalendar({
         </div>
         <div className="px-3 pb-1">
           {grid.weeks.map((week) => (
-            <div key={week[0].date} className="grid grid-cols-7 text-center">
+            <div key={week[0]!.date} className="grid grid-cols-7 text-center">
               {week.map((cell) => {
                 const isToday = cell.date === today
                 return (

@@ -148,7 +148,7 @@ describe('rename coordinator', () => {
     await coordinator.settled()
 
     expect(io.rewriteLinksForTitleChange).toHaveBeenCalledTimes(1)
-    const rewrite = io.rewriteLinksForTitleChange.mock.calls[0][0] as {
+    const rewrite = io.rewriteLinksForTitleChange.mock.calls[0]![0] as {
       path: string
       from: string
       to: string
@@ -206,7 +206,7 @@ describe('rename coordinator', () => {
 
     expect(io.readNote).not.toHaveBeenCalled()
     expect(io.writeNote).not.toHaveBeenCalled()
-    expect(operationLog.records[0].outcome).toBe('done')
+    expect(operationLog.records[0]!.outcome).toBe('done')
   })
 
   it('a failed rewrite still places the alias (the safety net) and says so', async () => {
@@ -218,9 +218,9 @@ describe('rename coordinator', () => {
 
     const expected = upsertFrontmatter('# New Title\n', { aliases: ['Old Title'] })
     expect(io.writeNote).toHaveBeenCalledWith(PATH, expected, 7)
-    expect(operationLog.records[0].outcome).toBe('failed')
-    expect(operationLog.records[0].message).toContain('index unavailable')
-    expect(operationLog.records[0].message).toContain('kept as an alias')
+    expect(operationLog.records[0]!.outcome).toBe('failed')
+    expect(operationLog.records[0]!.message).toContain('index unavailable')
+    expect(operationLog.records[0]!.message).toContain('kept as an alias')
   })
 
   it('a failed alias after a clean rewrite reports exactly that', async () => {
@@ -229,9 +229,9 @@ describe('rename coordinator', () => {
     const coordinator = makeCoordinator()
     await renameOnce(coordinator, 'Old Title', 'New Title')
 
-    expect(operationLog.records[0].outcome).toBe('failed')
-    expect(operationLog.records[0].message).toContain('links were rewritten')
-    expect(operationLog.records[0].message).toContain('read denied')
+    expect(operationLog.records[0]!.outcome).toBe('failed')
+    expect(operationLog.records[0]!.message).toContain('links were rewritten')
+    expect(operationLog.records[0]!.message).toContain('read denied')
   })
 
   it('both phases failing reports both, flagging links that may not resolve', async () => {
@@ -241,7 +241,7 @@ describe('rename coordinator', () => {
     const coordinator = makeCoordinator()
     await renameOnce(coordinator, 'Old Title', 'New Title')
 
-    const { message } = operationLog.records[0]
+    const { message } = operationLog.records[0]!
     expect(message).toContain('index unavailable')
     expect(message).toContain('read denied')
     expect(message).toContain('may no longer resolve')
@@ -299,7 +299,7 @@ describe('rename coordinator', () => {
       expect(openSession('notes/new-title.md')).toBe(session)
       expect(openSession(PATH)).toBeNull()
       expect(moves).toEqual([[PATH, 'notes/new-title.md']])
-      expect(operationLog.records[0].outcome).toBe('done')
+      expect(operationLog.records[0]!.outcome).toBe('done')
     } finally {
       unsubscribe()
       retargetOpenDocument('notes/new-title.md', PATH, session) // restore for other tests
@@ -338,9 +338,9 @@ describe('rename coordinator', () => {
       expect(session.retarget).toHaveBeenNthCalledWith(1, 'notes/new-title.md')
       expect(session.retarget).toHaveBeenNthCalledWith(2, PATH)
       expect(openSession(PATH)).toBe(session)
-      expect(operationLog.records[0].outcome).toBe('failed')
-      expect(operationLog.records[0].message).toContain('keeps its old name')
-      expect(operationLog.records[0].message).toContain('disk full')
+      expect(operationLog.records[0]!.outcome).toBe('failed')
+      expect(operationLog.records[0]!.message).toContain('keeps its old name')
+      expect(operationLog.records[0]!.message).toContain('disk full')
     } finally {
       unregister()
     }
@@ -370,7 +370,7 @@ describe('rename coordinator', () => {
     await coordinator.settled()
 
     // Both the rewrite and the second move key off the note's current path.
-    expect(io.rewriteLinksForTitleChange.mock.calls[1][0]).toMatchObject({
+    expect(io.rewriteLinksForTitleChange.mock.calls[1]![0]).toMatchObject({
       path: 'notes/b.md',
     })
     expect(io.slugPathForTitle).toHaveBeenLastCalledWith('notes/b.md', 'C')
@@ -389,8 +389,8 @@ describe('rename coordinator', () => {
     await coordinator.settled()
 
     expect(io.rewriteLinksForTitleChange).toHaveBeenCalledTimes(2)
-    expect(io.rewriteLinksForTitleChange.mock.calls[0][0]).toMatchObject({ from: 'A', to: 'B' })
-    expect(io.rewriteLinksForTitleChange.mock.calls[1][0]).toMatchObject({ from: 'B', to: 'C' })
+    expect(io.rewriteLinksForTitleChange.mock.calls[0]![0]).toMatchObject({ from: 'A', to: 'B' })
+    expect(io.rewriteLinksForTitleChange.mock.calls[1]![0]).toMatchObject({ from: 'B', to: 'C' })
     // A (the intermediate title) is pruned; B (the latest old title) joins.
     const secondAliasWrite = io.writeNote.mock.calls.filter((call) => call[0] === PATH).at(-1)
     expect(secondAliasWrite?.[1]).toBe(

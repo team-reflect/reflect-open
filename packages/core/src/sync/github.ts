@@ -286,7 +286,7 @@ export async function runDeviceFlow(options: RunDeviceFlowOptions): Promise<Gith
 
 function toAuth(
   accessToken: string,
-  parsed: { refresh_token?: string; expires_in?: number },
+  parsed: { refresh_token?: string | undefined; expires_in?: number | undefined },
   nowMs: number,
   clientId: string = GITHUB_APP_CLIENT_ID,
 ): GithubAuth {
@@ -460,7 +460,7 @@ export function parseGithubRemote(url: string): GithubRepoRef | null {
   if (match === null) {
     return null
   }
-  return { owner: match[1], name: match[2] }
+  return { owner: match[1]!, name: match[2]! }
 }
 
 /** The canonical HTTPS remote URL for a repo (token never embedded). */

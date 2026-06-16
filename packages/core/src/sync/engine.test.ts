@@ -79,8 +79,8 @@ describe('createSyncEngine', () => {
     await vi.runAllTimersAsync()
 
     expect(commandsOf(calls)).toEqual(['git_commit_all', 'git_push'])
-    expect(calls[0].args.generation).toBe(7)
-    expect(calls[1].args.token).toBe('tok')
+    expect(calls[0]!.args['generation']).toBe(7)
+    expect(calls[1]!.args['token']).toBe('tok')
     expect(statuses.map((status) => status.state)).toEqual(['syncing', 'idle'])
     engine.stop()
   })
@@ -496,7 +496,7 @@ describe('createSyncEngine', () => {
     await vi.runAllTimersAsync()
 
     const push = calls.find((call) => call.command === 'git_push')
-    expect(push?.args.token).toBeNull()
+    expect(push?.args['token']).toBeNull()
     expect(statuses.at(-1)).toMatchObject({ state: 'error', errorKind: 'auth' })
     engine.stop()
   })

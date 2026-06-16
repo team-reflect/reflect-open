@@ -188,11 +188,12 @@ function inAnyRange(index: number, ranges: Span[]): boolean {
 
 function collectTags(body: string, excluded: Span[], into: Map<string, string>): void {
   for (const match of body.matchAll(TAG_RE)) {
-    const hashIndex = (match.index ?? 0) + match[1].length
+    // Both groups are mandatory in TAG_RE, so a match always populates them.
+    const hashIndex = (match.index ?? 0) + match[1]!.length
     if (inAnyRange(hashIndex, excluded)) {
       continue
     }
-    const tag = match[2]
+    const tag = match[2]!
     const key = foldTag(tag)
     if (!into.has(key)) {
       into.set(key, tag) // dedupe case-insensitively, keep first-seen casing

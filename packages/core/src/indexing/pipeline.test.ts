@@ -18,7 +18,7 @@ beforeEach(() => {
   metaRows = []
   mockInvoke.mockReset()
   mockInvoke.mockImplementation(async (command, args) => {
-    const sql = String(args.sql ?? '')
+    const sql = String(args['sql'] ?? '')
     switch (command) {
       case 'note_read':
         return '# Hello\n\n[[World]]'
@@ -53,11 +53,11 @@ describe('indexNote', () => {
     expect(apply).toBeDefined()
     const args = apply![1] as { note: Record<string, unknown>; generation: number }
     expect(args.generation).toBe(7)
-    expect(args.note.path).toBe('notes/a.md')
-    expect(args.note.title).toBe('Hello')
-    expect(args.note.mtime).toBe(5)
-    expect(args.note.fileHash).toMatch(/^[0-9a-f]{64}$/)
-    expect((args.note.links as { targetKey: string }[]).map((link) => link.targetKey)).toContain('world')
+    expect(args.note['path']).toBe('notes/a.md')
+    expect(args.note['title']).toBe('Hello')
+    expect(args.note['mtime']).toBe(5)
+    expect(args.note['fileHash']).toMatch(/^[0-9a-f]{64}$/)
+    expect((args.note['links'] as { targetKey: string }[]).map((link) => link.targetKey)).toContain('world')
   })
 })
 
@@ -91,10 +91,10 @@ describe('rebuildIndex', () => {
         ]
       }
       if (command === 'note_read') {
-        return `# ${String(args.path)}\n`
+        return `# ${String(args['path'])}\n`
       }
       if (command === 'index_apply_batch') {
-        const notes = args.notes as Array<{ path: string }>
+        const notes = args['notes'] as Array<{ path: string }>
         if (notes.length > 1) {
           throw new Error('batch payload refused')
         }
@@ -124,7 +124,7 @@ describe('rebuildIndex', () => {
         return [{ path: 'notes/bad.md', size: 1, modifiedMs: 1 }]
       }
       if (command === 'note_read') {
-        return `# ${String(args.path)}\n`
+        return `# ${String(args['path'])}\n`
       }
       if (command === 'index_apply_batch') {
         throw { kind: 'parse', message: 'unexpected end of hex escape' }
@@ -147,7 +147,7 @@ describe('rebuildIndex', () => {
         return [{ path: 'notes/bad.md', size: 1, modifiedMs: 1 }]
       }
       if (command === 'note_read') {
-        return `# ${String(args.path)}\n`
+        return `# ${String(args['path'])}\n`
       }
       if (command === 'index_apply_batch') {
         throw new Error('single note refused')
@@ -251,12 +251,12 @@ describe('reconcileIndex move healing (Plan 17)', () => {
     const calls: Array<[string, Record<string, unknown>]> = []
     mockInvoke.mockImplementation(async (command, args) => {
       calls.push([command, args])
-      const sql = String(args.sql ?? '')
+      const sql = String(args['sql'] ?? '')
       if (command === 'list_files') {
         return [{ path: NEW, size: 1, modifiedMs: 9 }]
       }
       if (command === 'note_read') {
-        if (args.path === NEW) {
+        if (args['path'] === NEW) {
           return options.content ?? CONTENT
         }
         throw { kind: 'notFound', message: 'missing' }
@@ -265,7 +265,7 @@ describe('reconcileIndex move healing (Plan 17)', () => {
         if (sql.includes('file_hash')) {
           return [{ path: OLD, file_hash: options.storedHash }]
         }
-        if (((args.params as unknown[]) ?? []).includes(OLD)) {
+        if (((args['params'] as unknown[]) ?? []).includes(OLD)) {
           return [{ path: OLD, id: '01abcdefghjkmnpqrstvwxyz00' }]
         }
         return []
@@ -309,7 +309,7 @@ describe('reconcileIndex move healing (Plan 17)', () => {
     expect(commands).not.toContain('index_remove')
     const apply = calls.find(([command]) => command === 'index_apply')
     expect(apply).toBeDefined()
-    expect((apply![1].note as { path: string }).path).toBe(NEW)
+    expect((apply![1]['note'] as { path: string }).path).toBe(NEW)
   })
 
   it('a legacy file without an id still reconciles as delete+create', async () => {

@@ -7,7 +7,7 @@ const mockInvoke = vi.fn<(command: string, args: Record<string, unknown>) => Pro
 
 function startOfLocalDay(date: string): number {
   const [year, month, day] = date.split('-').map(Number)
-  return new Date(year, month - 1, day).getTime()
+  return new Date(year!, month! - 1, day!).getTime()
 }
 
 beforeEach(() => {
@@ -31,15 +31,15 @@ describe('searchWithFilters', () => {
       { path: 'notes/work.md', title: 'Work', dailyDate: null, snippet: null },
     ])
 
-    const [command, args] = mockInvoke.mock.calls[0]
+    const [command, args] = mockInvoke.mock.calls[0]!
     expect(command).toBe('db_query')
-    const sql = String(args.sql)
+    const sql = String(args['sql'])
     expect(sql).toContain('from "tags"')
     expect(sql).toContain('inner join "notes"')
     expect(sql).toContain('"tags"."tag_key"')
     expect(sql).not.toContain('search_fts')
     expect(sql).not.toContain('lower(')
-    expect(args.params).toEqual(['work', 12])
+    expect(args['params']).toEqual(['work', 12])
   })
 
   it('keeps additional tag filters as indexed existence checks', async () => {
@@ -49,14 +49,14 @@ describe('searchWithFilters', () => {
 
     await searchWithFilters(parseSearchQuery('#Work #Home'), 12)
 
-    const [, args] = mockInvoke.mock.calls[0]
-    const sql = String(args.sql)
+    const [, args] = mockInvoke.mock.calls[0]!
+    const sql = String(args['sql'])
     expect(sql).toContain('from "tags"')
     expect(sql).toContain('from "tags" as "filter_tags"')
     expect(sql).toContain('"filter_tags"."note_path" = "notes"."path"')
     expect(sql).toContain('"filter_tags"."tag_key"')
     expect(sql).not.toContain('search_fts')
-    expect(args.params).toEqual(['work', 'home', 12])
+    expect(args['params']).toEqual(['work', 'home', 12])
   })
 
   it('applies non-tag filters on the tag-first recall path', async () => {
@@ -75,13 +75,13 @@ describe('searchWithFilters', () => {
         snippet: null,
       },
     ])
-    const [, args] = mockInvoke.mock.calls[0]
-    const sql = String(args.sql)
+    const [, args] = mockInvoke.mock.calls[0]!
+    const sql = String(args['sql'])
     expect(sql).toContain('from "tags"')
     expect(sql).toContain('"notes"."daily_date" is not null')
     expect(sql).toContain('"notes"."is_pinned" =')
     expect(sql).toContain('"notes"."mtime" >=')
     expect(sql).not.toContain('search_fts')
-    expect(args.params).toEqual(['work', 1, startOfLocalDay('2026-01-01'), 12])
+    expect(args['params']).toEqual(['work', 1, startOfLocalDay('2026-01-01'), 12])
   })
 })

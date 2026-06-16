@@ -47,7 +47,7 @@ export function useActiveSettingsSection(
       const atBottom =
         container.scrollTop > 0 &&
         container.scrollTop + container.clientHeight >= container.scrollHeight - 1
-      setActiveId(atBottom ? SETTINGS_SECTIONS[SETTINGS_SECTIONS.length - 1].id : current)
+      setActiveId(atBottom ? SETTINGS_SECTIONS[SETTINGS_SECTIONS.length - 1]!.id : current)
     }
     compute()
     // ScrollRestored restores a saved scrollTop in its own effect, which runs

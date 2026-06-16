@@ -123,7 +123,7 @@ describe('DailyStream', () => {
 
     const expected = indexOfDate(createDayWindow(today), today) * ESTIMATED_DAY_HEIGHT
     expect(scrollToSpy.mock.calls.length).toBeGreaterThan(0)
-    expect(scrollToSpy.mock.calls[0][0]).toMatchObject({ top: expected })
+    expect(scrollToSpy.mock.calls[0]![0]).toMatchObject({ top: expected })
     view.unmount()
   })
 
@@ -143,7 +143,7 @@ describe('DailyStream', () => {
     )
 
     expect(scrollToSpy.mock.calls.length).toBeGreaterThan(0)
-    expect(scrollToSpy.mock.calls[0][0]).toMatchObject({ top: 4321 })
+    expect(scrollToSpy.mock.calls[0]![0]).toMatchObject({ top: 4321 })
     view.unmount()
   })
 
@@ -174,7 +174,7 @@ describe('DailyStream', () => {
 
     const expected = indexOfDate(createDayWindow(today), today) * ESTIMATED_DAY_HEIGHT
     expect(commandsDuringLayout).toBeGreaterThanOrEqual(2)
-    expect(scrollToSpy.mock.calls[commandsDuringLayout - 1][0]).toMatchObject({ top: expected })
+    expect(scrollToSpy.mock.calls[commandsDuringLayout - 1]![0]).toMatchObject({ top: expected })
     view.unmount()
   })
 

@@ -122,11 +122,15 @@ export function fitToContextWindow(
   const kept: ModelMessage[][] = []
   let used = 0
   for (let index = elided.length - 1; index >= 0; index -= 1) {
-    const cost = totalTokens(elided[index])
+    const segment = elided[index]
+    if (segment === undefined) {
+      continue
+    }
+    const cost = totalTokens(segment)
     if (kept.length > 0 && used + cost > budget) {
       break
     }
-    kept.unshift(elided[index])
+    kept.unshift(segment)
     used += cost
   }
   return kept.flat()

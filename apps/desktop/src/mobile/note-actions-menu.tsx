@@ -11,11 +11,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+  Drawer,
+  DrawerContent,
+  DrawerTitle,
+  DrawerTrigger,
+} from '@/components/ui/drawer'
 import { toggleNotePinned } from '@/lib/note-pin'
 import { deleteOpenNote } from '@/lib/note-delete'
 import { shareNote } from '@/mobile/share'
@@ -30,7 +30,7 @@ interface NoteActionsMenuProps {
 }
 
 /**
- * The note screen's "⋯" actions menu (Plan 19, V1 parity): pin/unpin, share,
+ * The note screen's "⋯" action sheet (Plan 19): pin/unpin, share,
  * and delete-to-trash. Pin reflects the index's pinned set; {@link shareNote}
  * hands the note's body to the OS share sheet via the Web Share API
  * (`navigator.share`); delete confirms first (it's destructive, even if
@@ -40,6 +40,7 @@ interface NoteActionsMenuProps {
 export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): ReactElement {
   const { graph } = useGraph()
   const isPinned = usePinnedNotes().some((note) => note.path === path)
+  const [actionsOpen, setActionsOpen] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -71,27 +72,54 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
+      <Drawer open={actionsOpen} onOpenChange={setActionsOpen}>
+        <DrawerTrigger asChild>
           <Button variant="ghost" size="icon" className="size-10" aria-label="Note actions">
             <MoreHorizontal />
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={pin}>
-            {isPinned ? <PinOff /> : <Pin />}
-            {isPinned ? 'Unpin' : 'Pin'}
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={share}>
-            <Share />
-            Share
-          </DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onSelect={() => setConfirmingDelete(true)}>
-            <Trash2 />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+        </DrawerTrigger>
+        <DrawerContent>
+          <DrawerTitle className="sr-only">Note actions</DrawerTitle>
+          <div className="flex flex-col gap-1">
+            <Button
+              variant="ghost"
+              size="lg"
+              className="h-12 justify-start gap-3 text-base"
+              onClick={() => {
+                pin()
+                setActionsOpen(false)
+              }}
+            >
+              {isPinned ? <PinOff /> : <Pin />}
+              {isPinned ? 'Unpin' : 'Pin'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="lg"
+              className="h-12 justify-start gap-3 text-base"
+              onClick={() => {
+                share()
+                setActionsOpen(false)
+              }}
+            >
+              <Share />
+              Share
+            </Button>
+            <Button
+              variant="ghost"
+              size="lg"
+              className="h-12 justify-start gap-3 text-base text-destructive hover:text-destructive"
+              onClick={() => {
+                setActionsOpen(false)
+                setConfirmingDelete(true)
+              }}
+            >
+              <Trash2 />
+              Delete
+            </Button>
+          </div>
+        </DrawerContent>
+      </Drawer>
 
       <Dialog open={confirmingDelete} onOpenChange={(open) => !busy && setConfirmingDelete(open)}>
         <DialogContent>

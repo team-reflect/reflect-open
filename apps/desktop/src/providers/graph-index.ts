@@ -127,7 +127,11 @@ export function createGraphIndex(options: GraphIndexOptions = {}): GraphIndex {
       // later step threw) is torn down in `finally` so listeners can't leak.
       let pending: (() => void) | null = null
       try {
-        await syncIndex({ generation, signal: controller.signal, onMoved })
+        await syncIndex({
+          generation,
+          signal: controller.signal,
+          ...(onMoved !== undefined ? { onMoved } : {}),
+        })
         if (isStale()) {
           return
         }

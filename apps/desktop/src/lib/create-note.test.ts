@@ -20,11 +20,11 @@ interface BridgeBehavior {
 function bindBridge({ occupied = [] }: BridgeBehavior = {}): ReturnType<typeof vi.fn> {
   const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
     if (command === 'db_query') {
-      const candidate = (args?.params as unknown[])?.[0]
+      const candidate = (args?.['params'] as unknown[])?.[0]
       return occupied.includes(String(candidate)) ? [{ path: candidate }] : []
     }
     if (command === 'note_exists') {
-      return occupied.includes(String(args?.path))
+      return occupied.includes(String(args?.['path']))
     }
     return null
   })

@@ -27,13 +27,13 @@ describe('applyIndexChanges', () => {
     const applied: string[] = []
     fakeBridge(async (command, args) => {
       if (command === 'note_read') {
-        if (args.path === 'notes/bad.md') {
+        if (args['path'] === 'notes/bad.md') {
           throw { kind: 'io', message: 'unreadable' }
         }
         return '# ok'
       }
       if (command === 'index_apply') {
-        applied.push((args.note as { path: string }).path)
+        applied.push((args['note'] as { path: string }).path)
       }
       return null
     })
@@ -88,8 +88,8 @@ describe('subscribeIndexChanges', () => {
     let releaseFirstRead: () => void = () => {}
     const { emitChanges } = fakeBridge(async (command, args) => {
       if (command === 'note_read') {
-        order.push(`read:${String(args.path)}`)
-        if (args.path === 'notes/slow.md') {
+        order.push(`read:${String(args['path'])}`)
+        if (args['path'] === 'notes/slow.md') {
           await new Promise<void>((resolve) => {
             releaseFirstRead = resolve
           })
@@ -97,7 +97,7 @@ describe('subscribeIndexChanges', () => {
         return '# content'
       }
       if (command === 'index_apply') {
-        order.push(`apply:${(args.note as { path: string }).path}`)
+        order.push(`apply:${(args['note'] as { path: string }).path}`)
       }
       return null
     })
@@ -130,7 +130,7 @@ describe('subscribeIndexChanges', () => {
         return '# content'
       }
       if (command === 'index_apply') {
-        order.push(`apply:${(args.note as { path: string }).path}`)
+        order.push(`apply:${(args['note'] as { path: string }).path}`)
       }
       return null
     })
@@ -158,7 +158,7 @@ describe('subscribeIndexChanges', () => {
         return '# content'
       }
       if (command === 'index_apply') {
-        mtimes.push((args.note as { mtime: number }).mtime)
+        mtimes.push((args['note'] as { mtime: number }).mtime)
       }
       return null
     })
@@ -201,13 +201,13 @@ describe('applyIndexChanges move healing (Plan 17)', () => {
     fakeBridge(async (command, args) => {
       calls.push([command, args])
       if (command === 'note_read') {
-        if (args.path === NEW) {
+        if (args['path'] === NEW) {
           return CONTENT
         }
         throw { kind: 'notFound', message: 'missing' }
       }
       if (command === 'db_query') {
-        const params = (args.params as unknown[]) ?? []
+        const params = (args['params'] as unknown[]) ?? []
         if (params.includes(OLD)) {
           return [{ path: OLD, id: options?.rowId === undefined ? '01abcdefghjkmnpqrstvwxyz00' : options.rowId }]
         }
@@ -235,8 +235,8 @@ describe('applyIndexChanges move healing (Plan 17)', () => {
     const move = calls.find(([command]) => command === 'index_move')
     expect(move?.[1]).toEqual({ from: OLD, to: NEW, generation: 7 })
     const apply = calls.find(([command]) => command === 'index_apply')
-    expect((apply?.[1].note as { path: string; mtime: number }).path).toBe(NEW)
-    expect((apply?.[1].note as { path: string; mtime: number }).mtime).toBe(42)
+    expect((apply?.[1]['note'] as { path: string; mtime: number }).path).toBe(NEW)
+    expect((apply?.[1]['note'] as { path: string; mtime: number }).mtime).toBe(42)
   })
 
   it('announces the heal via onMoved so the app can follow', async () => {

@@ -39,6 +39,6 @@ describe('pinned extension identity', () => {
 
     // The dev/unpacked ID derived from the committed key must be among the
     // allowlisted origins (the store ID joins the list after first publish).
-    expect(originMatches).toContain(extensionIdFromKey(keyMatch![1]))
+    expect(originMatches).toContain(extensionIdFromKey(keyMatch![1]!))
   })
 })

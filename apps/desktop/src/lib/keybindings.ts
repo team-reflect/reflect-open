@@ -64,10 +64,10 @@ export function formatBinding(binding: string, apple: boolean): string[] {
   return parts.map((part, index) => {
     const lower = part.toLowerCase()
     if (index < parts.length - 1 && lower in modifiers) {
-      return modifiers[lower]
+      return modifiers[lower]!
     }
     if (lower in KEY_SYMBOLS) {
-      return KEY_SYMBOLS[lower]
+      return KEY_SYMBOLS[lower]!
     }
     return part.length === 1 ? part.toUpperCase() : part
   })

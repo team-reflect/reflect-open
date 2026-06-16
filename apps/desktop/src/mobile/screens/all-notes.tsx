@@ -165,6 +165,9 @@ function NoteRows({
       <ul className="relative" style={{ height: virtualizer.getTotalSize() }}>
         {virtualizer.getVirtualItems().map((item) => {
           const note = rows[item.index]
+          if (note === undefined) {
+            return null
+          }
           return (
             <li
               key={note.path}

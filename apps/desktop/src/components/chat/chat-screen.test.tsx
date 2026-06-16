@@ -91,7 +91,7 @@ vi.mock('@/editor/markdown-preview', () => ({
     onWikiLinkClick?: (target: string) => void
   }) => {
     const wikiTargets = Array.from(content.matchAll(/\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g)).map(
-      (match) => match[1],
+      (match) => match[1]!,
     )
     return (
       <div data-testid="markdown-preview">

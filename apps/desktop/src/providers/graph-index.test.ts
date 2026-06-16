@@ -75,11 +75,11 @@ describe('createGraphIndex', () => {
     expect(onApplied).toHaveBeenCalledTimes(1)
     expect(mockWatchStart).toHaveBeenCalledTimes(1)
     // Sequenced: reconcile → subscribe → watchStart.
-    expect(mockSync.mock.invocationCallOrder[0]).toBeLessThan(
-      mockSubscribe.mock.invocationCallOrder[0],
+    expect(mockSync.mock.invocationCallOrder[0]!).toBeLessThan(
+      mockSubscribe.mock.invocationCallOrder[0]!,
     )
-    expect(mockSubscribe.mock.invocationCallOrder[0]).toBeLessThan(
-      mockWatchStart.mock.invocationCallOrder[0],
+    expect(mockSubscribe.mock.invocationCallOrder[0]!).toBeLessThan(
+      mockWatchStart.mock.invocationCallOrder[0]!,
     )
     expect(unlisten).not.toHaveBeenCalled() // retained as the active subscription
   })

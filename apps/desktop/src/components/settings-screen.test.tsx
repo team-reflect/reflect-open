@@ -45,7 +45,7 @@ function installFakeBridge(): void {
         case 'settings_load':
           return stored
         case 'settings_save':
-          saved.push(args.settings)
+          saved.push(args['settings'])
           return null
         case 'embed_status':
         case 'embed_ensure':

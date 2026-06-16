@@ -11,7 +11,7 @@ import {
   parseGithubRemote,
 } from '@reflect/core'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer'
 import { useAppVersion } from '@/hooks/use-app-version'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
@@ -71,18 +71,14 @@ export function SettingsSheet(): ReactElement {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <Drawer open={open} onOpenChange={setOpen}>
+      <DrawerTrigger asChild>
         <Button variant="ghost" size="icon" className="size-9" aria-label="Settings">
           <Settings />
         </Button>
-      </DialogTrigger>
-      <DialogContent
-        showCloseButton={false}
-        className="inset-x-0 bottom-0 top-auto left-0 max-w-none translate-x-0 translate-y-0 rounded-b-none data-closed:zoom-out-100 data-open:zoom-in-100"
-        style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 1rem)' }}
-      >
-        <DialogTitle>Settings</DialogTitle>
+      </DrawerTrigger>
+      <DrawerContent>
+        <DrawerTitle>Settings</DrawerTitle>
         <dl className="divide-y divide-border text-sm">
           <Row label="Graph" value={graph?.name ?? '—'} />
           <Row label="Notes" value={notes === undefined ? '…' : String(notes.length)} />
@@ -106,8 +102,8 @@ export function SettingsSheet(): ReactElement {
           ) : null}
           <Row label="Version" value={version ?? '…'} />
         </dl>
-      </DialogContent>
-    </Dialog>
+      </DrawerContent>
+    </Drawer>
   )
 }
 

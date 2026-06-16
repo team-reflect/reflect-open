@@ -95,7 +95,7 @@ export function pickTranscriptionConfig(state: AiProvidersState): TranscriptionC
     )
     if (candidates.length > 0) {
       return (
-        candidates.find((candidate) => candidate.id === state.defaultProviderId) ?? candidates[0]
+        candidates.find((candidate) => candidate.id === state.defaultProviderId) ?? candidates[0]!
       )
     }
   }

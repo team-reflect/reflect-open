@@ -46,7 +46,7 @@ export interface TitleRenameTrackerOptions {
    * ("keep mine"), while adopted external content clears it via `baseline`
    * ("load theirs") — exactly the two ways a conflict can end.
    */
-  canFire?: () => boolean
+  canFire?: (() => boolean) | undefined
   quietMs?: number
 }
 

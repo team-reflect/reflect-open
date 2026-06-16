@@ -26,11 +26,23 @@ import type { NoteRow } from '@reflect/core'
  * Index-row fields an action may assert ahead of the re-index. Publishing
  * yields a concrete `gistUrl` and a fresh `gistStale: false`; unpublishing
  * yields `gistUrl: null`. These overlays are short-lived read-model facts that
- * retire as soon as the index catches up.
+ * retire as soon as the index catches up. As a *stored* value every field is
+ * concrete — {@link definedFields} strips any `undefined` before it lands.
  */
 export interface NoteRowOverlay {
   readonly gistUrl?: string | null
   readonly gistStale?: boolean
+}
+
+/**
+ * The shape callers may hand {@link setNoteRowOverlay}: the same fields, but
+ * an explicit `undefined` is allowed (e.g. a conditionally-built patch). Such
+ * fields are dropped by {@link definedFields}, so an all-`undefined` patch is a
+ * no-op and `undefined` never reaches a stored {@link NoteRowOverlay}.
+ */
+export interface NoteRowOverlayPatch {
+  readonly gistUrl?: string | null | undefined
+  readonly gistStale?: boolean | undefined
 }
 
 type MutableNoteRowOverlay = {
@@ -60,7 +72,7 @@ function subscribe(listener: () => void): () => void {
 }
 
 /** Strip `undefined` fields — an all-`undefined` patch must never be stored. */
-function definedFields(patch: NoteRowOverlay): NoteRowOverlay {
+function definedFields(patch: NoteRowOverlayPatch): NoteRowOverlay {
   const result: MutableNoteRowOverlay = {}
   if (patch.gistUrl !== undefined) {
     result.gistUrl = patch.gistUrl
@@ -79,7 +91,7 @@ function definedFields(patch: NoteRowOverlay): NoteRowOverlay {
  * that is all `undefined`) is ignored — it would only leave a non-reconcilable
  * entry and leak `undefined` into merged rows.
  */
-export function setNoteRowOverlay(path: string, generation: number, patch: NoteRowOverlay): void {
+export function setNoteRowOverlay(path: string, generation: number, patch: NoteRowOverlayPatch): void {
   const defined = definedFields(patch)
   if (Object.keys(defined).length === 0) {
     return
@@ -130,9 +142,15 @@ export function reconcileNoteRowOverlay(path: string, generation: number, row: N
     if (row[key] === entry.overlay[key]) {
       retired = true
     } else if (key === 'gistUrl') {
-      remaining.gistUrl = entry.overlay.gistUrl
+      const gistUrl = entry.overlay.gistUrl
+      if (gistUrl !== undefined) {
+        remaining.gistUrl = gistUrl
+      }
     } else {
-      remaining.gistStale = entry.overlay.gistStale
+      const gistStale = entry.overlay.gistStale
+      if (gistStale !== undefined) {
+        remaining.gistStale = gistStale
+      }
     }
   }
   if (!retired) {

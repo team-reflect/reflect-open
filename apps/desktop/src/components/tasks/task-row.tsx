@@ -84,7 +84,9 @@ export function TaskRow({
         // write-back (and so focus can't drift off the editor onto it).
         disabled={task.checked || isPending || editing}
         onClick={complete}
-        className="mt-px shrink-0 text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none disabled:cursor-default"
+        // h-6 matches the text/editor's leading-6 line so the circle centers on
+        // the first line (items-start keeps it there when a task wraps).
+        className="flex h-6 shrink-0 items-center text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none disabled:cursor-default"
       >
         {done ? (
           <CircleCheck aria-hidden className="size-[18px] text-accent" strokeWidth={2} />

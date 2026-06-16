@@ -12,7 +12,7 @@ const TONE_CLASSES: Record<InlineAlertTone, string> = {
 interface InlineAlertProps {
   tone?: InlineAlertTone
   children: ReactNode
-  className?: string
+  className?: string | undefined
 }
 
 /**

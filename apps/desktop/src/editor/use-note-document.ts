@@ -57,7 +57,7 @@ export interface NoteDocumentOptions {
    * template). Requires `createIfMissing`; see `NoteSessionOptions.missingSeed`
    * for the lazy-contract semantics.
    */
-  missingSeed?: string
+  missingSeed?: string | undefined
 }
 
 /**

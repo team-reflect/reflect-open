@@ -54,9 +54,9 @@ describe('transcribeAudio (openai)', () => {
 
     expect(text).toBe('Hello world.')
     expect(calls).toHaveLength(1)
-    expect(calls[0].url).toBe('https://api.openai.com/v1/audio/transcriptions')
-    expect(calls[0].headers.Authorization).toBe('Bearer sk-test')
-    const form = calls[0].body as FormData
+    expect(calls[0]!.url).toBe('https://api.openai.com/v1/audio/transcriptions')
+    expect(calls[0]!.headers['Authorization']).toBe('Bearer sk-test')
+    const form = calls[0]!.body as FormData
     expect(form.get('model')).toBe(OPENAI_TRANSCRIPTION_MODEL)
     const file = form.get('file') as File
     // whisper-1 sniffs by extension: an audio-only MP4 must upload as .m4a.
@@ -71,7 +71,7 @@ describe('transcribeAudio (openai)', () => {
       request({ fetchFn, mimeType: 'audio/webm;codecs=opus', audio: new Blob(['abc']) }),
     )
 
-    const file = (calls[0].body as FormData).get('file') as File
+    const file = (calls[0]!.body as FormData).get('file') as File
     expect(file.name).toBe('memo.webm')
   })
 
@@ -87,7 +87,7 @@ describe('transcribeAudio (openai)', () => {
 
     expect(text).toBe('fallback worked')
     expect(calls).toHaveLength(2)
-    expect((calls[1].body as FormData).get('model')).toBe(OPENAI_TRANSCRIPTION_FALLBACK_MODEL)
+    expect((calls[1]!.body as FormData).get('model')).toBe(OPENAI_TRANSCRIPTION_FALLBACK_MODEL)
   })
 
   it('marks a refused recording as a rejection — retrying the same bytes cannot help', async () => {
@@ -183,16 +183,16 @@ describe('transcribeAudio (google)', () => {
     const text = await transcribeAudio(request({ provider: 'google', apiKey: 'AIza-test', fetchFn }))
 
     expect(text).toBe('transcript here')
-    expect(calls[0].url).toBe(
+    expect(calls[0]!.url).toBe(
       `https://generativelanguage.googleapis.com/v1beta/models/${GOOGLE_TRANSCRIPTION_MODEL}:generateContent`,
     )
-    expect(calls[0].headers['x-goog-api-key']).toBe('AIza-test')
-    const payload = JSON.parse(String(calls[0].body)) as {
+    expect(calls[0]!.headers['x-goog-api-key']).toBe('AIza-test')
+    const payload = JSON.parse(String(calls[0]!.body)) as {
       contents: { parts: { text?: string; inline_data?: { mime_type: string; data: string } }[] }[]
     }
-    const parts = payload.contents[0].parts
-    expect(parts[0].text).toContain('Transcribe')
-    expect(parts[1].inline_data).toEqual({ mime_type: 'audio/mp4', data: btoa('abc') })
+    const parts = payload.contents[0]!.parts
+    expect(parts[0]!.text).toContain('Transcribe')
+    expect(parts[1]!.inline_data).toEqual({ mime_type: 'audio/mp4', data: btoa('abc') })
   })
 
   it('strips codec parameters from the declared MIME type', async () => {
@@ -203,10 +203,10 @@ describe('transcribeAudio (google)', () => {
       request({ provider: 'google', fetchFn, mimeType: 'audio/webm;codecs=opus' }),
     )
 
-    const payload = JSON.parse(String(calls[0].body)) as {
+    const payload = JSON.parse(String(calls[0]!.body)) as {
       contents: { parts: { inline_data?: { mime_type: string } }[] }[]
     }
-    expect(payload.contents[0].parts[1].inline_data?.mime_type).toBe('audio/webm')
+    expect(payload.contents[0]!.parts[1]!.inline_data?.mime_type).toBe('audio/webm')
   })
 
   it('falls back to the stable model when the primary one is retired (404)', async () => {
@@ -221,8 +221,8 @@ describe('transcribeAudio (google)', () => {
 
     expect(text).toBe('fallback transcript')
     expect(calls).toHaveLength(2)
-    expect(calls[0].url).toContain(GOOGLE_TRANSCRIPTION_MODEL)
-    expect(calls[1].url).toContain(GOOGLE_TRANSCRIPTION_FALLBACK_MODEL)
+    expect(calls[0]!.url).toContain(GOOGLE_TRANSCRIPTION_MODEL)
+    expect(calls[1]!.url).toContain(GOOGLE_TRANSCRIPTION_FALLBACK_MODEL)
   })
 
   it('does not retry non-404 failures', async () => {

@@ -1,15 +1,16 @@
 {
-  // The extension extends the WXT-generated config, so it can't also extend
-  // ../../tsconfig.base.json. The strictness block below must be kept in sync
-  // with that base by hand.
-  "extends": "./.wxt/tsconfig.json",
   "compilerOptions": {
     "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "jsx": "react-jsx",
     "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
+
+    /* Strictness — shared across every TypeScript package. */
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,

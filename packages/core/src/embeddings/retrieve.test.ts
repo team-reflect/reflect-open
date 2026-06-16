@@ -50,8 +50,8 @@ describe('bestChunkPerNote', () => {
     ]
     const hits = bestChunkPerNote(rows, 12)
     expect(hits).toHaveLength(1)
-    expect(hits[0].snippet).toBe('best chunk')
-    expect(hits[0].score).toBeCloseTo(0.8)
+    expect(hits[0]!.snippet).toBe('best chunk')
+    expect(hits[0]!.score).toBeCloseTo(0.8)
   })
 
   it('excludes the seed note and respects the limit', () => {
@@ -62,8 +62,8 @@ describe('bestChunkPerNote', () => {
 
   it('trims snippets and converts the private flag', () => {
     const hits = bestChunkPerNote([row('notes/p.md', 0.1, { isPrivate: 1 })], 12)
-    expect(hits[0].snippet).toBe('about notes/p.md')
-    expect(hits[0].isPrivate).toBe(true)
+    expect(hits[0]!.snippet).toBe('about notes/p.md')
+    expect(hits[0]!.isPrivate).toBe(true)
   })
 })
 
@@ -92,8 +92,8 @@ describe('mergeNearestFirst (multi-seed related notes)', () => {
     const fromLaterChunk = [row('notes/both.md', 0.2, { text: 'near chunk' })]
     const hits = bestChunkPerNote(mergeNearestFirst([fromLeadChunk, fromLaterChunk]), 10)
     expect(hits).toHaveLength(1)
-    expect(hits[0].snippet).toBe('near chunk')
-    expect(hits[0].score).toBeCloseTo(0.8)
+    expect(hits[0]!.snippet).toBe('near chunk')
+    expect(hits[0]!.score).toBeCloseTo(0.8)
   })
 })
 
@@ -102,7 +102,7 @@ describe('fuseRanked (reciprocal rank fusion)', () => {
     const lexical = [hit('notes/both.md'), hit('notes/lex-only.md')]
     const semantic = [hit('notes/sem-only.md'), hit('notes/both.md')]
     const fused = fuseRanked([lexical, semantic], 10)
-    expect(fused[0].path).toBe('notes/both.md')
+    expect(fused[0]!.path).toBe('notes/both.md')
     expect(fused).toHaveLength(3)
   })
 
@@ -116,12 +116,12 @@ describe('fuseRanked (reciprocal rank fusion)', () => {
     const semantic = [hit('a', { snippet: '' })]
     const lexical = [hit('a', { snippet: 'lexical snippet' })]
     const fused = fuseRanked([semantic, lexical], 5)
-    expect(fused[0].snippet).toBe('lexical snippet')
+    expect(fused[0]!.snippet).toBe('lexical snippet')
     expect(fuseRanked([semantic, lexical], 5)).toEqual(fused)
   })
 
   it('keeps the private flag through fusion', () => {
     const fused = fuseRanked([[hit('p', { isPrivate: true })]], 5)
-    expect(fused[0].isPrivate).toBe(true)
+    expect(fused[0]!.isPrivate).toBe(true)
   })
 })

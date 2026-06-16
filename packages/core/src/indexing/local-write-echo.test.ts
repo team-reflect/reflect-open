@@ -29,8 +29,8 @@ describe('local write echo (Plan 19, decision 5)', () => {
     await writeNote('daily/2026-06-12.md', 'hello', 1)
 
     expect(seen).toHaveLength(1)
-    expect(seen[0][0]).toMatchObject({ path: 'daily/2026-06-12.md', kind: 'upsert' })
-    expect(seen[0][0].modifiedMs).toBeTypeOf('number')
+    expect(seen[0]![0]).toMatchObject({ path: 'daily/2026-06-12.md', kind: 'upsert' })
+    expect(seen[0]![0]!.modifiedMs).toBeTypeOf('number')
     unlisten()
   })
 

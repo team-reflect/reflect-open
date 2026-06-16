@@ -104,8 +104,8 @@ beforeEach(() => {
     if (command !== 'db_query') {
       return null
     }
-    const sql = String(args.sql)
-    const params = args.params as unknown[]
+    const sql = String(args['sql'])
+    const params = args['params'] as unknown[]
     if (sql.includes('group by')) {
       return facetRows
     }
@@ -193,7 +193,7 @@ describe('AllNotesScreen', () => {
       if (command !== 'db_query') {
         return null
       }
-      const sql = String(args.sql)
+      const sql = String(args['sql'])
       if (sql.includes('group by')) {
         return facetRows
       }
@@ -296,7 +296,7 @@ describe('AllNotesScreen', () => {
       if (command !== 'db_query') {
         return null
       }
-      const sql = String(args.sql)
+      const sql = String(args['sql'])
       if (sql.includes('"preview"')) {
         return many
       }
@@ -401,7 +401,7 @@ describe('AllNotesScreen — selection and bulk trash', () => {
       if (command !== 'db_query') {
         return null
       }
-      const sql = String(args.sql)
+      const sql = String(args['sql'])
       if (sql.includes('group by')) {
         return facetRows
       }
@@ -519,7 +519,7 @@ describe('AllNotesScreen — selection and bulk trash', () => {
       if (command !== 'db_query') {
         return null
       }
-      const sql = String(args.sql)
+      const sql = String(args['sql'])
       if (sql.includes('group by')) {
         return facetRows
       }
@@ -544,8 +544,10 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     await waitFor(() =>
       expect(view.getByTestId('operations').textContent).toContain('failed:disk on fire'),
     )
-    // The note wasn't actually trashed, so it reconciles back into the list.
-    await waitFor(() => expect(view.getByText('Health Stacked')).toBeDefined())
+    // The note that failed to trash is left in the list and stays selected, so
+    // the bulk action is still available for an immediate retry (no re-select).
+    expect(view.getByText('Health Stacked')).toBeDefined()
+    expect(view.getByRole('button', { name: /Trash \(1\)/ })).toBeDefined()
     view.unmount()
   })
 })

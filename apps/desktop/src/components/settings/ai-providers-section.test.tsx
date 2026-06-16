@@ -43,16 +43,16 @@ function installFakeBridge(): void {
           }
           return stored
         case 'settings_save':
-          saved.push(args.settings)
+          saved.push(args['settings'])
           return null
         case 'secret_set':
           if (failSecretSet) {
             throw { kind: 'io', message: 'keychain locked' }
           }
-          secrets.set(args.name as string, args.value as string)
+          secrets.set(args['name'] as string, args['value'] as string)
           return null
         case 'secret_delete':
-          secrets.delete(args.name as string)
+          secrets.delete(args['name'] as string)
           return null
         default:
           return null
@@ -162,14 +162,14 @@ describe('AiProvidersSection', () => {
       keyHint: 'wxyz1',
     })
     // The first entry becomes the default automatically.
-    expect(doc.defaultAiProviderId).toBe(added.id)
+    expect(doc.defaultAiProviderId).toBe(added!.id)
     // The key was verified against the provider before being stored.
     expect(providerFetchMock).toHaveBeenCalledWith(
       'https://api.anthropic.com/v1/models',
       expect.objectContaining({ method: 'GET' }),
     )
     // The full key reached the keychain (and only the keychain).
-    expect(secrets.get(`ai-api-key:${added.id}`)).toBe('sk-ant-test-wxyz1')
+    expect(secrets.get(`ai-api-key:${added!.id}`)).toBe('sk-ant-test-wxyz1')
     expect(JSON.stringify(saved)).not.toContain('sk-ant-test-wxyz1')
     expect(screen.queryByRole('dialog')).toBeNull()
   })

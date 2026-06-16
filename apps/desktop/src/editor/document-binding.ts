@@ -117,8 +117,9 @@ export function createDocumentBinding(): DocumentBinding {
       // quit-time flush, settle-time rename work, and reopened-note lookups.
       unregister = registerOpenDocument({
         session: bound,
-        settle: owner ? () => owner.settle() : undefined,
-        settled: owner ? () => owner.settled() : undefined,
+        ...(owner
+          ? { settle: () => owner.settle(), settled: () => owner.settled() }
+          : {}),
       })
       return { session: bound, coordinator: owner, created: adopted === null }
     },

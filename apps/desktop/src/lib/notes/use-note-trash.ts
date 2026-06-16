@@ -27,10 +27,11 @@ export interface NoteTrash {
  * - **Optimistic removal is required, not cosmetic.** On desktop the list only
  *   refreshes when the file watcher's reindex batch applies — a visible beat
  *   after the delete. The single-note action sidesteps this by navigating away;
- *   the bulk action stays on the screen, so it removes the rows from every
- *   cached list variant (the `all-notes` key prefix — a trashed note leaves
- *   every tag view) up front, then lets the watcher reconcile. On any failure
- *   it invalidates to refetch truth: notes that didn't trash reappear.
+ *   the bulk action stays on the screen, so it drops each row from every cached
+ *   list variant (the `all-notes` key prefix — a trashed note leaves every tag
+ *   view) as that note's delete lands. Removing per-success, not all up front,
+ *   keeps a failed note in the list — and therefore in the selection, which
+ *   prunes only vanished rows — so the user can retry it without re-selecting.
  * - **{@link deleteOpenNote}, not raw `deleteNote`.** It discards any open
  *   editor session for the note after the file is gone, so a teardown flush
  *   can't recreate the file. It also guards daily notes (which All Notes never
@@ -56,13 +57,8 @@ export function useNoteTrash(): NoteTrash {
         startOperation('Trashing notes').fail('No graph is open.')
         return false
       }
-      const removing = new Set(paths)
       const operation = startOperation('Trashing notes')
       setIsTrashing(true)
-      queryClient.setQueriesData<NoteListEntry[]>(
-        { queryKey: allNotesListPrefix(root) },
-        (rows) => rows?.filter((row) => !removing.has(row.path)),
-      )
       let failures = 0
       let lastError: unknown = null
       try {
@@ -71,6 +67,14 @@ export function useNoteTrash(): NoteTrash {
         for (const path of paths) {
           try {
             await deleteOpenNote(path, generation)
+            // Drop the row the moment it's actually gone — the desktop list
+            // otherwise waits on the watcher's reindex. Crucially, a note that
+            // *fails* is left in the list, so it keeps its place in the
+            // selection (which prunes only vanished rows) for an immediate retry.
+            queryClient.setQueriesData<NoteListEntry[]>(
+              { queryKey: allNotesListPrefix(root) },
+              (rows) => rows?.filter((row) => row.path !== path),
+            )
           } catch (cause) {
             failures += 1
             lastError = cause
@@ -80,8 +84,9 @@ export function useNoteTrash(): NoteTrash {
         }
         if (failures > 0) {
           operation.fail(errorMessage(lastError))
-          // Reconcile to truth: notes that failed (still on disk) reappear, the
-          // ones that were trashed stay gone.
+          // Reconcile in case a delete half-succeeded (file trashed but its
+          // session discard threw): the watcher's reindex is the source of
+          // record; this just doesn't wait for it.
           void queryClient.invalidateQueries({ queryKey: [INDEX_QUERY_SCOPE] })
           return false
         }

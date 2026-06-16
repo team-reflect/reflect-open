@@ -134,6 +134,16 @@ export function audioMemoFromPath(path: string): AudioMemoIdentity | null {
     return null
   }
   const [, base, date, hours, minutes, seconds, extension] = match
+  if (
+    base === undefined ||
+    date === undefined ||
+    hours === undefined ||
+    minutes === undefined ||
+    seconds === undefined ||
+    extension === undefined
+  ) {
+    return null
+  }
   if (Number(hours) > 23 || Number(minutes) > 59 || Number(seconds) > 59) {
     return null
   }
@@ -246,7 +256,7 @@ async function memoNoteBody(input: {
   memo: AudioMemoIdentity
   provider: TranscriptionProvider
   apiKey: string
-  fetchFn?: typeof fetch
+  fetchFn?: typeof fetch | undefined
 }): Promise<{ body: string; rejected: boolean }> {
   try {
     const text = await transcribeAudio({

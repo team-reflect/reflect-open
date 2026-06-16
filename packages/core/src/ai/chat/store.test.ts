@@ -83,7 +83,7 @@ describe('loadChatMessages', () => {
     const turns = await loadChatMessages('conv-1')
     expect(turns).toEqual([turn])
     // The query went through the read-only bridge with the conversation bound.
-    const [command, args] = invoke.mock.calls[0]
+    const [command, args] = invoke.mock.calls[0]!
     expect(command).toBe('db_query')
     expect(args).toMatchObject({ params: ['conv-1'] })
   })

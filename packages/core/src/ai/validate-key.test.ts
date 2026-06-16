@@ -24,13 +24,13 @@ describe('validateApiKey', () => {
     await validateApiKey('anthropic', 'sk-ant-test', recordingFetch)
     await validateApiKey('google', 'AIza-test', recordingFetch)
 
-    expect(calls[0].url).toBe('https://api.openai.com/v1/models')
-    expect(calls[0].headers.Authorization).toBe('Bearer sk-test')
-    expect(calls[1].url).toBe('https://api.anthropic.com/v1/models')
-    expect(calls[1].headers['x-api-key']).toBe('sk-ant-test')
-    expect(calls[1].headers['anthropic-version']).toBe('2023-06-01')
-    expect(calls[2].url).toBe('https://generativelanguage.googleapis.com/v1beta/models')
-    expect(calls[2].headers['x-goog-api-key']).toBe('AIza-test')
+    expect(calls[0]!.url).toBe('https://api.openai.com/v1/models')
+    expect(calls[0]!.headers['Authorization']).toBe('Bearer sk-test')
+    expect(calls[1]!.url).toBe('https://api.anthropic.com/v1/models')
+    expect(calls[1]!.headers['x-api-key']).toBe('sk-ant-test')
+    expect(calls[1]!.headers['anthropic-version']).toBe('2023-06-01')
+    expect(calls[2]!.url).toBe('https://generativelanguage.googleapis.com/v1beta/models')
+    expect(calls[2]!.headers['x-goog-api-key']).toBe('AIza-test')
   })
 
   it('reads an ok response as valid', async () => {

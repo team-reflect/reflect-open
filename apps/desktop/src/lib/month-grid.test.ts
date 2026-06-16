@@ -48,9 +48,9 @@ describe('buildMonthGrid', () => {
     // August 2026 starts on a Saturday.
     const grid = buildMonthGrid('2026-08')
     expect(grid.start).toBe('2026-07-27')
-    expect(grid.weeks[0].slice(0, 5).every((cell) => !cell.inMonth)).toBe(true)
-    expect(grid.weeks[0][5]).toEqual({ date: '2026-08-01', inMonth: true })
-    const lastWeek = grid.weeks[grid.weeks.length - 1]
+    expect(grid.weeks[0]!.slice(0, 5).every((cell) => !cell.inMonth)).toBe(true)
+    expect(grid.weeks[0]![5]).toEqual({ date: '2026-08-01', inMonth: true })
+    const lastWeek = grid.weeks[grid.weeks.length - 1]!
     expect(lastWeek[0]).toEqual({ date: '2026-08-31', inMonth: true })
     expect(lastWeek.slice(1).every((cell) => !cell.inMonth)).toBe(true)
   })
@@ -72,7 +72,7 @@ describe('buildMonthGrid', () => {
     const DAY_MILLIS = 86_400_000
     const utcMillis = (date: string): number => {
       const [year, monthPart, day] = date.split('-').map(Number)
-      return Date.UTC(year, monthPart - 1, day)
+      return Date.UTC(year!, monthPart! - 1, day!)
     }
 
     for (const { month, lastDay } of [
@@ -86,7 +86,7 @@ describe('buildMonthGrid', () => {
 
       const cells = grid.weeks.flat()
       for (let index = 1; index < cells.length; index += 1) {
-        expect(utcMillis(cells[index].date) - utcMillis(cells[index - 1].date)).toBe(
+        expect(utcMillis(cells[index]!.date) - utcMillis(cells[index - 1]!.date)).toBe(
           DAY_MILLIS,
         )
       }

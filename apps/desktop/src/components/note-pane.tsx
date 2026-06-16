@@ -85,7 +85,6 @@ export function NotePane({
   if (needsSeed && seed.path !== path) {
     setSeed({ path, seed: untitledNoteSeed() })
   }
-  const missingSeed = needsSeed ? seed.seed : undefined
   const document = useNoteDocument(path, generation, {
     createIfMissing: lazy,
     // Daily notes are excluded from rename tracking: their date labels are
@@ -96,7 +95,7 @@ export function NotePane({
     // caret lands in, ghosted "Untitled" by the title placeholder — only
     // reaches disk if the user edits, and typing names the note. Daily
     // notes stay unseeded — the date is their identity.
-    missingSeed,
+    ...(needsSeed ? { missingSeed: seed.seed } : {}),
   })
   const {
     resolveImageUrl,
@@ -220,7 +219,7 @@ export function NotePane({
         onTagSearch={onTagSearch}
         // Daily notes carry no title semantics (the date is their subject),
         // so an empty leading H1 there is just an empty heading.
-        titlePlaceholder={dailyNote ? undefined : 'Untitled'}
+        {...(dailyNote ? {} : { titlePlaceholder: 'Untitled' })}
         className={cn(gutterClassName, editorClassName)}
         handleRef={handleRef}
       />

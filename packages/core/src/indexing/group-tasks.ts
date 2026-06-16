@@ -104,8 +104,9 @@ function comparePinPrecedence(
  * note metadata is shared by all its tasks, so the first task carries the sort key.
  */
 function compareNoteGroups(left: TaskGroup, right: TaskGroup): number {
-  const first = left.tasks[0]
-  const second = right.tasks[0]
+  // Groups are never built empty, so each has a first task carrying the sort key.
+  const first = left.tasks[0]!
+  const second = right.tasks[0]!
   const byPin = comparePinPrecedence(first, second)
   if (byPin !== 0) {
     return byPin
@@ -163,8 +164,9 @@ export function groupTasks(tasks: readonly OpenTask[], today: string): TaskGroup
   const noteGroups: TaskGroup[] = [...byNote.values()]
     .map((noteTasks) => ({
       kind: 'note' as const,
-      label: noteTasks[0].noteTitle,
-      notePath: noteTasks[0].notePath,
+      // A `byNote` entry only exists once a task has been pushed into it.
+      label: noteTasks[0]!.noteTitle,
+      notePath: noteTasks[0]!.notePath,
       tasks: noteTasks.sort((left, right) => left.markerOffset - right.markerOffset),
     }))
     .sort(compareNoteGroups)

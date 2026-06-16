@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } 
 import { useQuery } from '@tanstack/react-query'
 import { Archive, CalendarClock, Search } from 'lucide-react'
 import { getCompletedTasks, getOpenTasks, groupTasks, hasBridge, type TaskGroup } from '@reflect/core'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useRecentlyCompleted } from '@/lib/tasks/recently-completed'
 import { sameTask, taskKey } from '@/lib/tasks/task-identity'
@@ -216,24 +217,17 @@ export function TasksScreen(): ReactElement {
             today={today}
             onSchedule={onSchedule}
           >
-            <button
-              type="button"
-              className="flex flex-none items-center gap-2 rounded-md px-2 py-1 text-sm text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none"
-            >
+            <Button type="button" variant="ghost" className="font-normal text-text-muted">
               <CalendarClock aria-hidden className="size-4" />
               Schedule ({selection.selectedCount})
-            </button>
+            </Button>
           </TaskScheduleCalendar>
         ) : null}
         {recentlyCompleted.length > 0 ? (
-          <button
-            type="button"
-            onClick={actions.archive}
-            className="flex flex-none items-center gap-2 rounded-md px-2 py-1 text-sm text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none"
-          >
+          <Button type="button" variant="ghost" onClick={actions.archive} className="font-normal text-text-muted">
             <Archive aria-hidden className="size-4" />
             Archive ({recentlyCompleted.length})
-          </button>
+          </Button>
         ) : null}
         <TaskFiltersMenu
           filters={filters}

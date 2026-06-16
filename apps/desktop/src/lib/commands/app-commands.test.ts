@@ -158,7 +158,7 @@ describe('app commands', () => {
     const { context, navigated } = fakeContext()
     await command('note.new').run(context)
     expect(navigated).toHaveLength(1)
-    const route = navigated[0]
+    const route = navigated[0]!
     expect(route.kind).toBe('note')
     expect((route as { kind: 'note'; path: string }).path).toMatch(/^notes\/[0-9a-z]+\.md$/)
   })

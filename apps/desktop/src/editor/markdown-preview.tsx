@@ -75,7 +75,7 @@ export function MarkdownPreview({
       readOnly
       initialMarkdown={content}
       resolveImageUrl={resolveImageUrlStable}
-      onWikilinkClick={navigates ? onWikilinkClickStable : undefined}
+      {...(navigates ? { onWikilinkClick: onWikilinkClickStable } : {})}
       editorClassName={cn('reflect-editor', className)}
     />
   )

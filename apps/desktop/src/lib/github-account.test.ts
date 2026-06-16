@@ -10,12 +10,12 @@ function fakeKeychain(initial: Record<string, string> = {}): Map<string, string>
   const store = new Map(Object.entries(initial))
   setBridge({
     invoke: async (command, args) => {
-      const name = args.name as string
+      const name = args['name'] as string
       if (command === 'secret_get') {
         return store.get(name) ?? null
       }
       if (command === 'secret_set') {
-        store.set(name, args.value as string)
+        store.set(name, args['value'] as string)
         return null
       }
       if (command === 'secret_delete') {

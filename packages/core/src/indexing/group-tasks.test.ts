@@ -52,8 +52,8 @@ describe('groupTasks', () => {
     )
     // No Overdue bucket: a daily-note task with no explicit due date is current.
     expect(groups.map((group) => group.kind)).toEqual(['current', 'upcoming'])
-    expect(groups[0].tasks.map((entry) => entry.text)).toEqual(['past', 'today'])
-    expect(groups[1].tasks.map((entry) => entry.text)).toEqual(['future'])
+    expect(groups[0]!.tasks.map((entry) => entry.text)).toEqual(['past', 'today'])
+    expect(groups[1]!.tasks.map((entry) => entry.text)).toEqual(['future'])
   })
 
   it('marks a task with an explicit past due date as Overdue', () => {
@@ -62,7 +62,7 @@ describe('groupTasks', () => {
       TODAY,
     )
     expect(groups.map((group) => group.kind)).toEqual(['overdue'])
-    expect(groups[0].tasks.map((entry) => entry.text)).toEqual(['late'])
+    expect(groups[0]!.tasks.map((entry) => entry.text)).toEqual(['late'])
   })
 
   it('lets the explicit due date override the note daily date, both directions', () => {
@@ -76,9 +76,9 @@ describe('groupTasks', () => {
       TODAY,
     )
     const byKind = Object.fromEntries(groups.map((group) => [group.kind, group.tasks.map((entry) => entry.text)]))
-    expect(byKind.overdue).toEqual(['pulled-in'])
-    expect(byKind.upcoming).toEqual(['pushed-out'])
-    expect(byKind.current).toBeUndefined()
+    expect(byKind['overdue']).toEqual(['pulled-in'])
+    expect(byKind['upcoming']).toEqual(['pushed-out'])
+    expect(byKind['current']).toBeUndefined()
   })
 
   it('puts a due-dated task from a regular note into a date bucket, not a note group', () => {
@@ -99,7 +99,7 @@ describe('groupTasks', () => {
     )
     expect(groups).toHaveLength(1)
     expect(groups[0]).toMatchObject({ kind: 'note', label: 'Project', notePath: 'notes/p.md' })
-    expect(groups[0].tasks.map((entry) => entry.text)).toEqual(['first', 'second'])
+    expect(groups[0]!.tasks.map((entry) => entry.text)).toEqual(['first', 'second'])
   })
 
   it('orders the display Current → Overdue → Upcoming → note groups', () => {
@@ -124,8 +124,8 @@ describe('groupTasks', () => {
       ],
       TODAY,
     )
-    expect(groups[0].kind).toBe('overdue')
-    expect(groups[0].tasks.map((entry) => entry.text)).toEqual(['a', 'c', 'b'])
+    expect(groups[0]!.kind).toBe('overdue')
+    expect(groups[0]!.tasks.map((entry) => entry.text)).toEqual(['a', 'c', 'b'])
   })
 
   it('orders note groups pinned-first, then most-recently edited', () => {

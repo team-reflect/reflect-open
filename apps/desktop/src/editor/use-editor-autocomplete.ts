@@ -77,7 +77,7 @@ export function useEditorAutocomplete(): EditorAutocomplete {
                 ? `${date} · new`
                 : date
               : undefined
-        return { target, label, detail }
+        return { target, label, ...(detail !== undefined ? { detail } : {}) }
       })
     },
     [graph, settings.dateFormat, createFromAutocomplete],

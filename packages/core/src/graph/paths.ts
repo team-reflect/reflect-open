@@ -21,8 +21,9 @@ export function dailyPath(date: string): string {
     throw new Error(`dailyPath expects an ISO YYYY-MM-DD date, got: ${date}`)
   }
   // Reject well-formatted but invalid dates (e.g. 2026-13-99, 2026-02-31) by
-  // round-tripping through UTC and comparing the components.
-  const [year, month, day] = date.split('-').map(Number)
+  // round-tripping through UTC and comparing the components. The regex above
+  // guarantees three numeric parts, so the destructure can't yield undefined.
+  const [year, month, day] = date.split('-').map(Number) as [number, number, number]
   const utc = new Date(Date.UTC(year, month - 1, day))
   if (
     utc.getUTCFullYear() !== year ||

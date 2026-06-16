@@ -35,7 +35,7 @@ describe('rankWikiSuggestions', () => {
     const viaAlias = alias(note('Acme Corp', 99), 'meetco')
     const result = rankWikiSuggestions('meetco', [note('Meetco', 1)], [viaAlias], 8)
     expect(result.map((s) => s.title)).toEqual(['Meetco', 'Acme Corp'])
-    expect(result[1].alias).toBe('meetco')
+    expect(result[1]!.alias).toBe('meetco')
   })
 
   it('ties break on recency, then title', () => {
@@ -53,7 +53,7 @@ describe('rankWikiSuggestions', () => {
     const target = note('Roadmap', 5)
     const result = rankWikiSuggestions('roadmap', [target], [alias(target, 'roadmap 2026')], 8)
     expect(result).toHaveLength(1)
-    expect(result[0].alias).toBeNull() // the exact title row won
+    expect(result[0]!.alias).toBeNull() // the exact title row won
   })
 
   it('an empty key is a recency feed (no match ranking)', () => {
@@ -64,8 +64,8 @@ describe('rankWikiSuggestions', () => {
   it('daily rows target their date, not their title', () => {
     const daily = note('2026-06-09', 1, { dailyDate: '2026-06-09' })
     const result = rankWikiSuggestions('2026', [daily], [], 8)
-    expect(result[0].target).toBe('2026-06-09')
-    expect(result[0].date).toBe('2026-06-09')
+    expect(result[0]!.target).toBe('2026-06-09')
+    expect(result[0]!.date).toBe('2026-06-09')
   })
 
   it('honours the limit after merging', () => {

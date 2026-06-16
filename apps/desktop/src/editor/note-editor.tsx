@@ -161,11 +161,11 @@ export function NoteEditor({
       initialMarkdown={initialContent}
       spellCheck={spellCheck}
       editorClassName={cn('reflect-editor', className)}
-      placeholder={titlePlaceholder}
+      {...(titlePlaceholder !== undefined ? { placeholder: titlePlaceholder } : {})}
       onDocChange={handleDocChange}
       onWikilinkClick={handleWikilinkClick}
-      onWikilinkSearch={onWikilinkSearch}
-      onTagSearch={onTagSearch}
+      {...(onWikilinkSearch !== undefined ? { onWikilinkSearch } : {})}
+      {...(onTagSearch !== undefined ? { onTagSearch } : {})}
       resolveImageUrl={handleResolveImageUrl}
       onImagePaste={handleImagePaste}
       onImageSaveError={handleImageSaveError}

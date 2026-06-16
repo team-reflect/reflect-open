@@ -68,6 +68,21 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             onClick={() => void runCommand('nav.today', context)}
           />
           <SidebarItem
+            icon={
+              <span className={lucideBox}>
+                <SquarePen aria-hidden strokeWidth={1.75} className="size-4" />
+              </span>
+            }
+            label="New note"
+            binding={keybindingFor('note.new') ?? undefined}
+            // Active while the open note is still on its ULID placeholder
+            // name — the state this row creates. The birth rename onto a
+            // title slug is also what hands the note off to ordinary
+            // navigation, releasing the highlight.
+            active={route.kind === 'note' && isUntitledNotePath(route.path)}
+            onClick={() => void runCommand('note.new', context)}
+          />
+          <SidebarItem
             icon={<ListIcon className="shrink-0" />}
             label="All notes"
             binding={keybindingFor('nav.allNotes') ?? undefined}
@@ -84,21 +99,6 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             binding={keybindingFor('nav.tasks') ?? undefined}
             active={route.kind === 'tasks'}
             onClick={() => void runCommand('nav.tasks', context)}
-          />
-          <SidebarItem
-            icon={
-              <span className={lucideBox}>
-                <SquarePen aria-hidden strokeWidth={1.75} className="size-4" />
-              </span>
-            }
-            label="New note"
-            binding={keybindingFor('note.new') ?? undefined}
-            // Active while the open note is still on its ULID placeholder
-            // name — the state this row creates. The birth rename onto a
-            // title slug is also what hands the note off to ordinary
-            // navigation, releasing the highlight.
-            active={route.kind === 'note' && isUntitledNotePath(route.path)}
-            onClick={() => void runCommand('note.new', context)}
           />
           <SidebarItem
             icon={

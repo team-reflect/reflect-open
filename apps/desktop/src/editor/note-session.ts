@@ -113,7 +113,7 @@ export interface NoteSessionOptions {
    * (including "load theirs"), or a landed save. `saved` is the only
    * user-driven origin — the title-rename tracker (Plan 07b) keys off it.
    */
-  onContent?: (content: string, origin: NoteContentOrigin) => void
+  onContent?: ((content: string, origin: NoteContentOrigin) => void) | undefined
   /**
    * Push content into the live editor (external reload / "load theirs"). The
    * editor's change handler may fire synchronously during this call; the
@@ -127,7 +127,7 @@ export interface NoteSessionOptions {
    * only to the initial load: a note deleted mid-session still reconciles to
    * a no-op rather than silently emptying the editor.
    */
-  createIfMissing?: boolean
+  createIfMissing?: boolean | undefined
   /**
    * Markdown to seed a **missing** note's buffer with (only meaningful with
    * `createIfMissing`) — the new-note title template. The seed is adopted as
@@ -136,7 +136,7 @@ export interface NoteSessionOptions {
    * rename tracker baselines on the real (empty) disk content, so the first
    * authored title stays a birth, not a rename.
    */
-  missingSeed?: string
+  missingSeed?: string | undefined
   saveDebounceMs?: number
 }
 
@@ -178,21 +178,21 @@ export interface FrontmatterPatch {
 export function frontmatterPatchToYaml(patch: FrontmatterPatch): Record<string, unknown> {
   const yaml: Record<string, unknown> = {}
   if (patch.aliases !== undefined) {
-    yaml.aliases = patch.aliases
+    yaml['aliases'] = patch.aliases
   }
   if (patch.pinned !== undefined) {
-    yaml.pinned = patch.pinned === false ? undefined : patch.pinned
+    yaml['pinned'] = patch.pinned === false ? undefined : patch.pinned
   }
   if (patch.private !== undefined) {
-    yaml.private = patch.private === false ? undefined : true
+    yaml['private'] = patch.private === false ? undefined : true
   }
   if (patch.gist !== undefined) {
     if (patch.gist === false) {
-      yaml.gist = undefined
+      yaml['gist'] = undefined
     } else {
       // Spelled out key-by-key so the YAML block's shape (and key order) is
       // this module's contract, not whatever object the caller happened to hold.
-      yaml.gist = {
+      yaml['gist'] = {
         id: patch.gist.id,
         url: patch.gist.url,
         file: patch.gist.file,

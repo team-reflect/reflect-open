@@ -53,7 +53,7 @@ describe('toAppError', () => {
     expect(toAppError(BigInt(1)).kind).toBe('unknown')
 
     const circular: Record<string, unknown> = {}
-    circular.self = circular
+    circular['self'] = circular
     expect(toAppError(circular).kind).toBe('unknown')
   })
 

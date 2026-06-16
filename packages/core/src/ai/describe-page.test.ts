@@ -84,9 +84,9 @@ describe('describePage', () => {
 
     expect(description).toBe('A concise description.')
     expect(calls).toHaveLength(1)
-    const [message] = calls[0].prompt
-    expect(message.role).toBe('user')
-    const parts = message.content as Array<{ type: string; mediaType?: string; text?: string }>
+    const [message] = calls[0]!.prompt
+    expect(message!.role).toBe('user')
+    const parts = message!.content as Array<{ type: string; mediaType?: string; text?: string }>
     const text = parts.find((part) => part.type === 'text')?.text ?? ''
     expect(text).toContain('https://example.com/article')
     expect(text).toContain('An article')
@@ -101,7 +101,7 @@ describe('describePage', () => {
 
     await request()
 
-    const parts = calls[0].prompt[0].content as Array<{ type: string }>
+    const parts = calls[0]!.prompt[0]!.content as Array<{ type: string }>
     expect(parts.map((part) => part.type)).toEqual(['text'])
   })
 
@@ -110,7 +110,7 @@ describe('describePage', () => {
 
     await request({ selection: 'x'.repeat(5_000) })
 
-    const parts = calls[0].prompt[0].content as Array<{ type: string; text?: string }>
+    const parts = calls[0]!.prompt[0]!.content as Array<{ type: string; text?: string }>
     const text = parts.find((part) => part.type === 'text')?.text ?? ''
     expect(text).not.toContain('x'.repeat(1_001))
   })
@@ -120,7 +120,7 @@ describe('describePage', () => {
 
     await request({ contentText: `Important opening paragraph.\n\n${'x'.repeat(7_000)}` })
 
-    const parts = calls[0].prompt[0].content as Array<{ type: string; text?: string }>
+    const parts = calls[0]!.prompt[0]!.content as Array<{ type: string; text?: string }>
     const text = parts.find((part) => part.type === 'text')?.text ?? ''
     expect(text).toContain('Extracted page text: Important opening paragraph.')
     expect(text).not.toContain('x'.repeat(6_001))

@@ -247,16 +247,16 @@ function parseDailyHeadingDate(line: string): string | null {
   if (parts.length !== 3) {
     return null
   }
-
-  if (parts[1] === undefined || parts[2] === undefined) {
+  const [first, second, third] = parts
+  if (first === undefined || second === undefined || third === undefined) {
     return null
   }
 
-  if (MONTHS.has(parts[0].toLowerCase())) {
-    return isoDate(parts[2], parts[0], parts[1].replace(/,$/, ''))
+  if (MONTHS.has(first.toLowerCase())) {
+    return isoDate(third, first, second.replace(/,$/, ''))
   }
 
-  return isoDate(parts[2], parts[1].replace(/,$/, ''), parts[0])
+  return isoDate(third, second.replace(/,$/, ''), first)
 }
 
 function isoDate(yearText: string, monthText: string, dayText: string): string | null {

@@ -125,7 +125,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
 
         <div className="px-4 py-2">
           {grid.weeks.map((week) => (
-            <div key={week[0].date} className="grid grid-cols-7 text-center">
+            <div key={week[0]!.date} className="grid grid-cols-7 text-center">
               {week.map((cell) => {
                 const isSelected = cell.date === selectedDate
                 const isToday = cell.date === today

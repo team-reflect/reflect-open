@@ -40,7 +40,7 @@ export interface TranscriptionRequest {
    * Host transport — the desktop app passes the Tauri HTTP plugin's fetch
    * (CORS-free); `@reflect/core` itself stays platform-agnostic.
    */
-  fetchFn?: typeof fetch
+  fetchFn?: typeof fetch | undefined
 }
 
 /**

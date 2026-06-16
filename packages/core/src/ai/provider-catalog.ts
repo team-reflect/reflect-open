@@ -1,5 +1,8 @@
 import type { AiProviderId } from '../settings/schema'
 
+/** A compile-time guarantee that an array has at least one element. */
+type NonEmptyArray<ElementType> = [ElementType, ...ElementType[]]
+
 /**
  * The static BYOK provider catalog (Plan 10): display names, key hints, and
  * the curated model list the settings UI offers per provider. This is policy
@@ -30,10 +33,10 @@ export interface AiProviderInfo {
   /** Placeholder illustrating the provider's API-key format. */
   keyPlaceholder: string
   /** Curated models, most capable first (the first is the picker default). */
-  models: AiModelOption[]
+  models: NonEmptyArray<AiModelOption>
 }
 
-export const AI_PROVIDERS: AiProviderInfo[] = [
+export const AI_PROVIDERS: NonEmptyArray<AiProviderInfo> = [
   {
     id: 'openai',
     label: 'OpenAI',

@@ -177,9 +177,10 @@ export function useTaskKeyboard({
         // in the focused editor; here it covers an unfocused single selection, and
         // lands on the previous row so the keyboard flow continues.
         const selected = selectedTasks()
-        if (selected.length === 1 && selected[0].text.trim() === '') {
+        const sole = selected.length === 1 ? selected[0] : undefined
+        if (sole !== undefined && sole.text.trim() === '') {
           event.preventDefault()
-          const previous = previousTaskKey(orderedTasks, selected[0])
+          const previous = previousTaskKey(orderedTasks, sole)
           actions.remove(selected)
           if (previous !== null) {
             selectExclusively(previous)
