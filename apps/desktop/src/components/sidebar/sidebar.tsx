@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import type { GraphInfo } from '@reflect/core'
-import { ListChecks, MessageSquare, Settings, SquarePen } from 'lucide-react'
+import { ListChecks, MessageSquare, SquarePen } from 'lucide-react'
 import { AudioMemoButton } from '@/components/audio-memo/audio-memo-button'
 import { ListIcon } from '@/components/icons/list-icon'
 import { PencilIcon } from '@/components/icons/pencil-icon'
@@ -34,8 +34,8 @@ interface SidebarProps {
 export function Sidebar({ graph, context }: SidebarProps): ReactElement {
   const { route } = useRouter()
 
-  // Wrap the 16px Lucide glyphs in the custom icons' 24px box so all four
-  // nav rows share one icon footprint.
+  // Wrap the 16px Lucide glyphs in the custom icons' 24px box so nav rows
+  // share one icon footprint.
   const lucideBox = 'flex size-6 shrink-0 items-center justify-center'
 
   return (
@@ -111,17 +111,6 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             active={route.kind === 'chat'}
             onClick={() => void runCommand('chat.open', context)}
           />
-          <SidebarItem
-            icon={
-              <span className={lucideBox}>
-                <Settings aria-hidden strokeWidth={1.75} className="size-4" />
-              </span>
-            }
-            label="Settings"
-            binding={keybindingFor('settings.open') ?? undefined}
-            active={route.kind === 'settings'}
-            onClick={() => void runCommand('settings.open', context)}
-          />
         </nav>
       </div>
 
@@ -130,7 +119,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
       </div>
 
       <UpdateNotice />
-      <GraphFooter graph={graph} />
+      <GraphFooter graph={graph} context={context} />
     </div>
   )
 }
