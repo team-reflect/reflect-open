@@ -307,15 +307,17 @@ body {
   letter-spacing: var(--tracking-snug, -0.01em);
   margin: 1.25em 0 0.4em;
 }
-/* Cap headings at --text-xl: the leading H1 is the note title and in-prose
-   `# headings` shouldn't tower over the body, so neither H1 nor H2 exceeds the
-   design-system "note title" size, matching the daily date heading
-   (.reflect-daily-subject) and the new-note "Untitled" ghost. */
+/* Keep the leading H1 note title at body size so regular note titles and the
+   new-note "Untitled" ghost match daily-note prose. Other headings stay capped
+   at the design-system note-title size rather than towering over the body. */
 .reflect-editor h1 { font-size: var(--text-xl, 1.25rem); }
 .reflect-editor h2 { font-size: var(--text-xl, 1.25rem); }
 .reflect-editor h3 { font-size: var(--text-lg, 1.125rem); }
-.reflect-editor h1:first-child { margin-top: 0; }
-.reflect-editor .reflect-note-title { font-size: var(--text-xl, 1.25rem); }
+.reflect-editor h1:first-child {
+  margin-top: 0;
+  font-size: var(--text-base, 1rem);
+}
+.reflect-editor .reflect-note-title { font-size: var(--text-base, 1rem); }
 
 /* The new-note flow's name field: ghost "Untitled" over the seeded empty H1
    (`editor/title-placeholder.ts`) without occupying layout, so the caret
