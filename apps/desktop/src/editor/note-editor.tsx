@@ -3,10 +3,12 @@ import {
   useEffect,
   useImperativeHandle,
   useRef,
+  type MutableRefObject,
   type ReactElement,
   type ReactNode,
   type Ref,
 } from 'react'
+import { openPath } from '@tauri-apps/plugin-opener'
 import { type MarkMode } from '@meowdown/core'
 import {
   MeowdownEditor,
@@ -16,6 +18,13 @@ import {
 } from '@meowdown/react'
 import '@meowdown/core/style.css'
 import '@meowdown/react/style.css'
+import { ImageClickExtension } from '@/editor/image-click-extension'
+import {
+  IMAGE_LIGHTBOX_TRANSITION_NAME,
+  ImageLightbox,
+  createLightboxImage,
+} from '@/editor/image-lightbox'
+import { useLightboxTransition } from '@/editor/use-lightbox-transition'
 import { cn } from '@/lib/utils'
 
 /**
@@ -57,6 +66,8 @@ interface NoteEditorProps {
   bulletAfterHeading?: boolean
   /** Resolve an image `![…](…)` source to a displayable URL; unresolved images are skipped. */
   resolveImageUrl?: (src: string) => string | null
+  /** Resolve an image `![…](…)` source to a native file path for Preview. */
+  resolveImageOpenPath?: (src: string) => string | null
   /** Persist a pasted/dropped image file and return its markdown `src`. */
   saveImage?: (file: File) => Promise<string | null>
   /** Called when persisting a pasted/dropped image throws. */
@@ -88,6 +99,14 @@ interface NoteEditorProps {
   children?: ReactNode
 }
 
+function useLatestRef<Value>(value: Value): MutableRefObject<Value> {
+  const ref = useRef(value)
+  useEffect(() => {
+    ref.current = value
+  })
+  return ref
+}
+
 export function NoteEditor({
   initialContent,
   onChange,
@@ -95,6 +114,7 @@ export function NoteEditor({
   spellCheck = true,
   bulletAfterHeading = false,
   resolveImageUrl,
+  resolveImageOpenPath,
   saveImage,
   onImageSaveError,
   onWikiLinkClick,
@@ -106,21 +126,24 @@ export function NoteEditor({
   handleRef,
 }: NoteEditorProps): ReactElement {
   const innerRef = useRef<EditorHandle>(null)
+  const imageOpenPathByUrlRef = useRef(new Map<string, string>())
 
   // Latest callbacks, read through refs so a changing prop identity never
   // rebuilds meowdown's extensions (the uncontrolled-editor contract).
-  // TODO: This violates "Rule of hooks". Refactor this later.
-  const onChangeRef = useRef(onChange)
-  const onWikiLinkClickRef = useRef(onWikiLinkClick)
-  const resolveImageUrlRef = useRef(resolveImageUrl)
-  const saveImageRef = useRef(saveImage)
-  const onImageSaveErrorRef = useRef(onImageSaveError)
-  useEffect(() => {
-    onChangeRef.current = onChange
-    onWikiLinkClickRef.current = onWikiLinkClick
-    resolveImageUrlRef.current = resolveImageUrl
-    saveImageRef.current = saveImage
-    onImageSaveErrorRef.current = onImageSaveError
+  const onChangeRef = useLatestRef(onChange)
+  const onWikiLinkClickRef = useLatestRef(onWikiLinkClick)
+  const resolveImageUrlRef = useLatestRef(resolveImageUrl)
+  const resolveImageOpenPathRef = useLatestRef(resolveImageOpenPath)
+  const saveImageRef = useLatestRef(saveImage)
+  const onImageSaveErrorRef = useLatestRef(onImageSaveError)
+  const createImageLightboxItem = useCallback(
+    (element: HTMLImageElement, transitionName: string) =>
+      createLightboxImage(element, transitionName, imageOpenPathByUrlRef.current),
+    [],
+  )
+  const imageLightbox = useLightboxTransition({
+    transitionName: IMAGE_LIGHTBOX_TRANSITION_NAME,
+    createItem: createImageLightboxItem,
   })
 
   useImperativeHandle(
@@ -135,42 +158,66 @@ export function NoteEditor({
 
   const handleDocChange = useCallback(() => {
     onChangeRef.current?.(innerRef.current?.getMarkdown() ?? '')
-  }, [])
+  }, [onChangeRef])
   const handleWikilinkClick = useCallback(
     (payload: { target: string }) => onWikiLinkClickRef.current?.(payload.target),
-    [],
+    [onWikiLinkClickRef],
   )
   const handleResolveImageUrl = useCallback(
-    (src: string) => resolveImageUrlRef.current?.(src) ?? undefined,
-    [],
+    (src: string) => {
+      const displayUrl = resolveImageUrlRef.current?.(src) ?? undefined
+      if (displayUrl !== undefined) {
+        const openPath = resolveImageOpenPathRef.current?.(src) ?? null
+        if (openPath === null) {
+          imageOpenPathByUrlRef.current.delete(displayUrl)
+        } else {
+          imageOpenPathByUrlRef.current.set(displayUrl, openPath)
+        }
+      }
+      return displayUrl
+    },
+    [resolveImageOpenPathRef, resolveImageUrlRef],
   )
   const handleImagePaste = useCallback(
     async (file: File) => (await saveImageRef.current?.(file)) ?? undefined,
-    [],
+    [saveImageRef],
   )
   const handleImageSaveError = useCallback(
     (error: unknown, file: File) => onImageSaveErrorRef.current?.(error, file),
-    [],
+    [onImageSaveErrorRef],
   )
+  const handleOpenLightboxImage = useCallback((image: { openPath: string | null }) => {
+    if (image.openPath !== null) {
+      void openPath(image.openPath, 'Preview').catch(() => {})
+    }
+  }, [])
 
   return (
-    <MeowdownEditor
-      handleRef={innerRef}
-      mode={markMode}
-      initialMarkdown={initialContent}
-      spellCheck={spellCheck}
-      bulletAfterHeading={bulletAfterHeading}
-      editorClassName={cn('reflect-editor', className)}
-      {...(titlePlaceholder !== undefined ? { placeholder: titlePlaceholder } : {})}
-      onDocChange={handleDocChange}
-      onWikilinkClick={handleWikilinkClick}
-      {...(onWikilinkSearch !== undefined ? { onWikilinkSearch } : {})}
-      {...(onTagSearch !== undefined ? { onTagSearch } : {})}
-      resolveImageUrl={handleResolveImageUrl}
-      onImagePaste={handleImagePaste}
-      onImageSaveError={handleImageSaveError}
-    >
-      {children}
-    </MeowdownEditor>
+    <>
+      <MeowdownEditor
+        handleRef={innerRef}
+        mode={markMode}
+        initialMarkdown={initialContent}
+        spellCheck={spellCheck}
+        bulletAfterHeading={bulletAfterHeading}
+        editorClassName={cn('reflect-editor', className)}
+        {...(titlePlaceholder !== undefined ? { placeholder: titlePlaceholder } : {})}
+        onDocChange={handleDocChange}
+        onWikilinkClick={handleWikilinkClick}
+        {...(onWikilinkSearch !== undefined ? { onWikilinkSearch } : {})}
+        {...(onTagSearch !== undefined ? { onTagSearch } : {})}
+        resolveImageUrl={handleResolveImageUrl}
+        onImagePaste={handleImagePaste}
+        onImageSaveError={handleImageSaveError}
+      >
+        <ImageClickExtension onImageClick={imageLightbox.open} />
+        {children}
+      </MeowdownEditor>
+      <ImageLightbox
+        image={imageLightbox.item}
+        onClose={imageLightbox.close}
+        onOpenImage={handleOpenLightboxImage}
+      />
+    </>
   )
 }

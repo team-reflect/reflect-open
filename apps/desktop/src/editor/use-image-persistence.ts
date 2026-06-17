@@ -34,6 +34,8 @@ function isSafeAssetSource(sourcePath: string): boolean {
 export interface ImagePersistence {
   /** Resolve an image source to a displayable URL (or null to skip). */
   resolveImageUrl: (src: string) => string | null
+  /** Resolve an image source to a local path that can be opened natively. */
+  resolveImageOpenPath: (src: string) => string | null
   /** Persist a pasted/dropped image, returning its graph-relative path (or null). */
   saveImage: (file: File) => Promise<string | null>
   /** Report a failed image save. */
@@ -68,6 +70,15 @@ export function useImagePersistence(
     },
     [graphRoot],
   )
+  const resolveOpenPath = useCallback(
+    (src: string): string | null => {
+      if (graphRoot && isSafeAssetSource(src)) {
+        return `${graphRoot}/${src}`
+      }
+      return null
+    },
+    [graphRoot],
+  )
 
   const saveImage = useCallback(
     async (file: File): Promise<string | null> => {
@@ -94,10 +105,11 @@ export function useImagePersistence(
   return useMemo<ImagePersistence>(
     () => ({
       resolveImageUrl: resolveUrl,
+      resolveImageOpenPath: resolveOpenPath,
       saveImage,
       onImageSaveError: onSaveError,
       saveError,
     }),
-    [resolveUrl, saveImage, onSaveError, saveError],
+    [resolveUrl, resolveOpenPath, saveImage, onSaveError, saveError],
   )
 }

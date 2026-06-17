@@ -99,6 +99,7 @@ export function NotePane({
   })
   const {
     resolveImageUrl,
+    resolveImageOpenPath,
     saveImage,
     onImageSaveError,
     saveError: imageSaveError,
@@ -212,6 +213,7 @@ export function NotePane({
         spellCheck={settings.editorSpellCheck}
         bulletAfterHeading={settings.editorBulletAfterHeading}
         resolveImageUrl={resolveImageUrl}
+        resolveImageOpenPath={resolveImageOpenPath}
         saveImage={saveImage}
         onImageSaveError={onImageSaveError}
         onWikiLinkClick={onWikiLinkClick}

@@ -409,6 +409,24 @@ body {
   max-width: 100%;
   max-height: 28rem;
   border-radius: var(--radius-md, 6px);
+  cursor: zoom-in;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0s;
+}
+
+::view-transition-group(reflect-image-lightbox) {
+  animation-duration: 180ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::view-transition-old(reflect-image-lightbox),
+::view-transition-new(reflect-image-lightbox) {
+  height: 100%;
+  object-fit: contain;
+  overflow: clip;
 }
 
 /* Read-only view for notes the editor can't faithfully round-trip yet. */
