@@ -1,7 +1,8 @@
 import type { Unlisten } from '../ipc/bridge'
-import { isNotePath } from '../graph/paths'
+import { isAssetPath, isNotePath } from '../graph/paths'
 import { moveIndexedRows, removeFromIndex } from './commands'
 import { subscribeFileChanges, type FileChange } from './file-changes'
+import { emitIndexApplied } from './index-applied'
 import { indexNote } from './indexer'
 import { detectExternalMoves } from './move-healing'
 import { getNoteIdsByPath } from './queries'
@@ -131,9 +132,16 @@ export async function applyIndexChanges(
  * unlisten function; call it (and resubscribe with the new generation) when the
  * active graph changes.
  *
- * `onApplied` fires after a batch has been written to the index — the hook for
- * cache invalidation (Plan 07's TanStack Query layer): invalidating on the raw
- * file event would refetch *before* the rows changed.
+ * `onApplied` fires after a batch's note rows have been written to the index —
+ * the hook for cache invalidation (Plan 07's TanStack Query layer): invalidating
+ * on the raw file event would refetch *before* the rows changed.
+ *
+ * After the same apply step, {@link emitIndexApplied} broadcasts the **full**
+ * batch (notes *and* asset-file changes) to its subscribers — the seam the
+ * asset-description controller (Plan 20) uses so its privacy gate always reads a
+ * settled index, never racing a just-written private note's indexing. Batches
+ * that touch neither notes nor assets (e.g. audio-memo recordings) are skipped
+ * entirely, as before.
  */
 export function subscribeIndexChanges(
   generation: number,
@@ -145,13 +153,22 @@ export function subscribeIndexChanges(
   let applyQueue: Promise<void> = Promise.resolve()
   return subscribeFileChanges((changes) => {
     const notes = changes.filter((change) => isNotePath(change.path))
-    if (notes.length === 0) {
+    const touchesAssets = changes.some((change) => isAssetPath(change.path))
+    if (notes.length === 0 && !touchesAssets) {
       return // e.g. a batch of audio-memo recordings — nothing the index tracks
     }
     applyQueue = applyQueue
-      .then(() => applyIndexChanges(notes, generation, undefined, onMoved))
+      .then(() => (notes.length > 0 ? applyIndexChanges(notes, generation, undefined, onMoved) : undefined))
       .then(() => {
-        onApplied?.(notes)
+        if (notes.length > 0) {
+          onApplied?.(notes)
+        }
+        // Post-apply: the asset-description controller reads the now-settled
+        // index off this. Carries the full batch (notes + asset files) and the
+        // `generation` so a consumer can drop a stale emit from a graph it has
+        // switched away from. Chained on the same queue, so any prior note apply
+        // is visible before an asset-only batch's gate runs.
+        emitIndexApplied(changes, generation)
       })
       .catch((error) => {
         console.error('failed to apply watcher batch:', error)

@@ -9,6 +9,7 @@ describe('settingsSchema', () => {
       editorDefaultBullet: true,
       editorBulletAfterHeading: true,
       semanticSearchEnabled: false,
+      describeAssets: true,
       mobileOnboarded: false,
       theme: 'system',
       timeFormat: '12h',
@@ -25,6 +26,7 @@ describe('settingsSchema', () => {
     expect(DEFAULT_SETTINGS.editorDefaultBullet).toBe(true)
     expect(DEFAULT_SETTINGS.editorBulletAfterHeading).toBe(true)
     expect(DEFAULT_SETTINGS.semanticSearchEnabled).toBe(false)
+    expect(DEFAULT_SETTINGS.describeAssets).toBe(true)
     expect(DEFAULT_SETTINGS.mobileOnboarded).toBe(false)
     expect(DEFAULT_SETTINGS.theme).toBe('system')
     expect(DEFAULT_SETTINGS.timeFormat).toBe('12h')
@@ -61,6 +63,8 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ weekStartDay: 'sunday' }).weekStartDay).toBe('sunday')
     expect(settingsSchema.parse({ semanticSearchEnabled: true }).semanticSearchEnabled).toBe(true)
     expect(settingsSchema.parse({ semanticSearchEnabled: false }).semanticSearchEnabled).toBe(false)
+    expect(settingsSchema.parse({ describeAssets: true }).describeAssets).toBe(true)
+    expect(settingsSchema.parse({ describeAssets: false }).describeAssets).toBe(false)
     expect(
       settingsSchema.parse({ allNotesFilterTags: ['meeting'] }).allNotesFilterTags,
     ).toEqual(['meeting'])
@@ -88,6 +92,10 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ weekStartDay: 42 }).weekStartDay).toBe('monday')
     expect(settingsSchema.parse({ semanticSearchEnabled: 'yes' }).semanticSearchEnabled).toBe(false)
     expect(settingsSchema.parse({ semanticSearchEnabled: 1 }).semanticSearchEnabled).toBe(false)
+    // `.catch(true)` keeps the resilient-degrade pattern: an invalid value falls
+    // back to the default rather than failing the whole settings load.
+    expect(settingsSchema.parse({ describeAssets: 'yes' }).describeAssets).toBe(true)
+    expect(settingsSchema.parse({ describeAssets: 0 }).describeAssets).toBe(true)
     expect(settingsSchema.parse({ allNotesFilterTags: 'book' }).allNotesFilterTags).toEqual([
       'book',
       'link',
@@ -108,6 +116,7 @@ describe('settingsSchema', () => {
       editorDefaultBullet: true,
       editorBulletAfterHeading: true,
       semanticSearchEnabled: false,
+      describeAssets: true,
       mobileOnboarded: false,
       theme: 'system',
       timeFormat: '12h',

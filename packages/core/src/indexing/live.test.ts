@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '../ipc/bridge'
-import { applyIndexChanges, subscribeIndexChanges } from './live'
 import type { FileChange } from './file-changes'
+import { subscribeIndexApplied } from './index-applied'
+import { applyIndexChanges, subscribeIndexChanges } from './live'
 
 afterEach(() => {
   setBridge(null)
@@ -149,6 +150,52 @@ describe('subscribeIndexChanges', () => {
       expect(order).toContain('applied:notes/a.md')
     })
     expect(order).toEqual(['apply:notes/a.md', 'applied:notes/a.md'])
+  })
+
+  it('emits index-applied to subscribers after the batch is written — notes settle first', async () => {
+    const order: string[] = []
+    const { emitChanges } = fakeBridge(async (command, args) => {
+      if (command === 'note_read') {
+        return '# content'
+      }
+      if (command === 'index_apply') {
+        order.push(`apply:${(args['note'] as { path: string }).path}`)
+      }
+      return null
+    })
+    const unsubscribe = subscribeIndexApplied((changes) => {
+      order.push(`applied:${changes.map((change) => change.path).join(',')}`)
+    })
+
+    await subscribeIndexChanges(1)
+    // A note batch, then an asset-only batch: the asset emit must follow the
+    // note's apply, so a gate reading the index off the asset emit sees the note.
+    emitChanges([{ path: 'notes/a.md', kind: 'upsert' }])
+    emitChanges([{ path: 'assets/x.png', kind: 'upsert' }])
+    await vi.waitFor(() => {
+      expect(order).toContain('applied:assets/x.png')
+    })
+
+    expect(order).toEqual(['apply:notes/a.md', 'applied:notes/a.md', 'applied:assets/x.png'])
+    unsubscribe()
+  })
+
+  it('does not emit index-applied for a recordings-only batch', async () => {
+    const seen: string[] = []
+    const { emitChanges } = fakeBridge(async () => null)
+    const unsubscribe = subscribeIndexApplied((changes) => {
+      seen.push(changes.map((change) => change.path).join(','))
+    })
+
+    await subscribeIndexChanges(1)
+    emitChanges([{ path: 'audio-memos/audio-memo-2026-06-12-090000-000.m4a', kind: 'upsert' }])
+    emitChanges([{ path: 'assets/y.png', kind: 'upsert' }]) // something to wait on
+    await vi.waitFor(() => {
+      expect(seen).toContain('assets/y.png')
+    })
+
+    expect(seen).toEqual(['assets/y.png']) // the recordings batch emitted nothing
+    unsubscribe()
   })
 
   it('stamps the indexed row with the modifiedMs carried by the event', async () => {

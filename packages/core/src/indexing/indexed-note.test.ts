@@ -54,6 +54,26 @@ describe('buildIndexedNote', () => {
     expect(indexed.tags).toEqual([{ tag: 'CAFÉ', tagKey: 'café' }])
   })
 
+  it('folds asset description text from meta, defaulting to empty', () => {
+    const source = '# Has image\n\n![p](assets/p.png)'
+    const withText = buildIndexedNote(parseNote({ path: 'notes/n.md', source }), {
+      fileHash: 'h',
+      mtime: 0,
+      source,
+      assetText: 'A flow diagram of the pipeline.',
+    })
+    expect(withText.assetText).toBe('A flow diagram of the pipeline.')
+    // Asset text enriches the FTS body only — never the All-Notes preview.
+    expect(withText.preview).not.toContain('flow diagram')
+
+    const withoutText = buildIndexedNote(parseNote({ path: 'notes/n.md', source }), {
+      fileHash: 'h',
+      mtime: 0,
+      source,
+    })
+    expect(withoutText.assetText).toBe('')
+  })
+
   it('marks daily notes with their date and carries no id', () => {
     const indexed = buildIndexedNote(parseNote({ path: 'daily/2026-06-09.md', source: 'today' }), {
       fileHash: 'h',

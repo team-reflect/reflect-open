@@ -6,9 +6,11 @@
 //! lives under `.reflect/`, which is filtered out here, so index writes can't
 //! loop back. The watcher reports `.md` under `daily/` and `notes/`, plus
 //! anything under `audio-memos/` (recordings feed the sync debounce and the
-//! transcription reconciler, not the index — frontend consumers filter by
-//! path). The frontend resolves create-vs-delete and re-indexes
-//! (content-hash gated).
+//! transcription reconciler, not the index) and eligible image/PDF files under
+//! `assets/` (which feed the asset-description controller — Plan 20 — not the
+//! index; the `.reflect.md` description files are excluded so a write can't loop
+//! back). Non-note consumers filter by path. The frontend resolves
+//! create-vs-delete and re-indexes (content-hash gated).
 
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -45,12 +47,30 @@ pub struct FileChange {
     pub modified_ms: Option<u64>,
 }
 
+/// Image and PDF extensions that earn an AI description file (Plan 20). Must
+/// stay in sync with `assetTypeFor` in `@reflect/core` (`actions/asset-description`).
+const ELIGIBLE_ASSET_EXTS: [&str; 7] = ["png", "jpg", "jpeg", "gif", "webp", "svg", "pdf"];
+
+/// Whether a graph-relative path is an asset the description controller handles:
+/// an eligible image/PDF under `assets/`, never a `.reflect.md` description file
+/// (which also lives there — tracking it would loop a write back into work).
+fn is_eligible_asset(rel_str: &str) -> bool {
+    if !rel_str.starts_with("assets/") || rel_str.ends_with(".reflect.md") {
+        return false;
+    }
+    rel_str
+        .rsplit('.')
+        .next()
+        .is_some_and(|ext| ELIGIBLE_ASSET_EXTS.contains(&ext.to_ascii_lowercase().as_str()))
+}
+
 /// Graph-relative path if `path` is tracked: a markdown note (`.md` under
 /// `daily/` or `notes/`), an audio-memo recording (anything under
-/// `audio-memos/`), or a spooled capture envelope (`.json` under
-/// `.reflect/inbox/` — the one carve-out from the `.reflect/` blackout; the
-/// envelope is the spool's commit point and triggers the capture drain), else
-/// `None`. Pure — the filtering rule, unit-tested.
+/// `audio-memos/`), a spooled capture envelope (`.json` under `.reflect/inbox/`
+/// — the one carve-out from the `.reflect/` blackout; the envelope is the
+/// spool's commit point and triggers the capture drain), or an eligible asset
+/// under `assets/` ({@link is_eligible_asset} — feeds the description controller),
+/// else `None`. Pure — the filtering rule, unit-tested.
 fn tracked_relpath(path: &Path, root: &Path) -> Option<String> {
     let rel = path.strip_prefix(root).ok()?;
     let rel_str = rel.to_string_lossy().replace('\\', "/");
@@ -58,7 +78,8 @@ fn tracked_relpath(path: &Path, root: &Path) -> Option<String> {
         && rel_str.ends_with(".md");
     let recording = rel_str.starts_with("audio-memos/");
     let capture = rel_str.starts_with(".reflect/inbox/") && rel_str.ends_with(".json");
-    (note || recording || capture).then_some(rel_str)
+    let asset = is_eligible_asset(&rel_str);
+    (note || recording || capture || asset).then_some(rel_str)
 }
 
 /// Reduce a debounced batch of paths to unique tracked changes (last kind wins).
@@ -202,17 +223,45 @@ mod tests {
             tracked_relpath(Path::new("/g/.reflect/inbox-rejected/bad.json"), root),
             None
         );
-        // Not tracked: the index, assets, non-markdown, dotfiles, outside root,
-        // or the audio-memos directory entry itself.
+        // Not tracked: the index, non-markdown, dotfiles, outside root, or the
+        // audio-memos directory entry itself. (Eligible assets ARE tracked — see
+        // the dedicated test below.)
         assert_eq!(
             tracked_relpath(Path::new("/g/.reflect/index.sqlite"), root),
             None
         );
-        assert_eq!(tracked_relpath(Path::new("/g/assets/x.png"), root), None);
         assert_eq!(tracked_relpath(Path::new("/g/notes/x.txt"), root), None);
         assert_eq!(tracked_relpath(Path::new("/g/README.md"), root), None);
         assert_eq!(tracked_relpath(Path::new("/g/audio-memos"), root), None);
         assert_eq!(tracked_relpath(Path::new("/other/notes/a.md"), root), None);
+    }
+
+    #[test]
+    fn tracks_eligible_assets_but_not_description_files_or_other_files() {
+        let root = Path::new("/g");
+        for ext in ELIGIBLE_ASSET_EXTS {
+            let path = format!("/g/assets/diagram.{ext}");
+            let expected = format!("assets/diagram.{ext}");
+            assert_eq!(
+                tracked_relpath(Path::new(&path), root).as_deref(),
+                Some(expected.as_str())
+            );
+        }
+        // Extension match is case-insensitive.
+        assert_eq!(
+            tracked_relpath(Path::new("/g/assets/PHOTO.PNG"), root).as_deref(),
+            Some("assets/PHOTO.PNG")
+        );
+        // The description file lives under assets/ too — tracking it would loop a
+        // write back into the controller, so it must never be tracked.
+        assert_eq!(
+            tracked_relpath(Path::new("/g/assets/diagram.png.reflect.md"), root),
+            None
+        );
+        // Ineligible types and stray markdown under assets/ are not tracked.
+        assert_eq!(tracked_relpath(Path::new("/g/assets/data.txt"), root), None);
+        assert_eq!(tracked_relpath(Path::new("/g/assets/notes.md"), root), None);
+        assert_eq!(tracked_relpath(Path::new("/g/assets/noext"), root), None);
     }
 
     #[test]

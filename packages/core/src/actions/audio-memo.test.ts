@@ -4,8 +4,10 @@ import {
   audioMemoFromPath,
   audioMemoIdentity,
   captureAudioMemo,
+  isSilentStop,
   reconcileAudioMemos,
   type ReconcileAudioMemosInput,
+  type ReconcileStop,
 } from './audio-memo'
 import {
   listDir,
@@ -437,5 +439,21 @@ describe('reconcileAudioMemos daily-note handling', () => {
 
     expect(outcome).toMatchObject({ stopped: { reason: 'io', message: 'disk gone' } })
     expect(writeNoteMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('isSilentStop', () => {
+  const stop = (reason: ReconcileStop['reason']): ReconcileStop => ({ reason, message: reason })
+
+  it('treats the self-healing reasons as silent', () => {
+    expect(isSilentStop(stop('network'))).toBe(true)
+    expect(isSilentStop(stop('config'))).toBe(true)
+    expect(isSilentStop(stop('stale'))).toBe(true)
+  })
+
+  it('treats unexpected reasons as worth surfacing', () => {
+    expect(isSilentStop(stop('auth'))).toBe(false)
+    expect(isSilentStop(stop('io'))).toBe(false)
+    expect(isSilentStop(stop('unknown'))).toBe(false)
   })
 })

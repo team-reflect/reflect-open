@@ -20,6 +20,7 @@ export {
   type FileChange,
 } from './file-changes'
 export { setLocalWriteEcho } from './local-write-echo'
+export { subscribeIndexApplied, type IndexAppliedListener } from './index-applied'
 export {
   subscribeIndexChanges,
   applyIndexChanges,
@@ -42,6 +43,7 @@ export {
 } from './indexed-note'
 export {
   indexNote,
+  reindexNotesReferencing,
   rebuildIndex,
   reconcileIndex,
   syncIndex,

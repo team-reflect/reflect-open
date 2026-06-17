@@ -43,8 +43,15 @@ import { previewSnippet } from './snippet'
  * rows until reprojected, so the bump backfills them ·
  * 8 — `tasks.due_date` (explicit `[[YYYY-MM-DD]]` per task, V1 Overdue semantics):
  * existing task rows have a null due date until reprojected.
+ * 9 — asset descriptions folded into `search_fts.body` (Plan 20 search
+ * integration): existing notes carry no asset-description text in search until
+ * reprojected, so the bump rebuilds them.
+ * 10 — asset reference paths fully canonicalized (`./`, `..`, empty segments
+ * collapsed, not just percent-decoded): the `assets` projection's keys change,
+ * so the bump rebuilds them — the privacy gate matches them against the
+ * canonical on-disk path.
  */
-export const PROJECTION_VERSION = 8
+export const PROJECTION_VERSION = 10
 
 export const indexedLinkSchema = z.object({
   kind: z.enum(['wiki', 'md']),
@@ -103,6 +110,12 @@ export const indexedNoteSchema = z.object({
   fileHash: z.string(),
   mtime: z.number(),
   text: z.string(),
+  /**
+   * Description text of the note's referenced assets (Plan 20), folded into the
+   * FTS `body` only — not the preview or AI-reachable text. Empty when the note
+   * has no described assets.
+   */
+  assetText: z.string(),
   /** The All Notes row snippet, derived once here rather than per query. */
   preview: z.string(),
   links: z.array(indexedLinkSchema),
@@ -121,7 +134,7 @@ export type IndexedNote = z.infer<typeof indexedNoteSchema>
  */
 export function buildIndexedNote(
   parsed: ParsedNote,
-  meta: { fileHash: string; mtime: number; source: string },
+  meta: { fileHash: string; mtime: number; source: string; assetText?: string },
 ): IndexedNote {
   const wikiLinks: IndexedLink[] = parsed.wikiLinks.map((link) => ({
     kind: 'wiki',
@@ -160,6 +173,7 @@ export function buildIndexedNote(
     fileHash: meta.fileHash,
     mtime: meta.mtime,
     text: parsed.text,
+    assetText: meta.assetText ?? '',
     preview: previewSnippet(parsed.text, parsed.title),
     links: [...wikiLinks, ...mdLinks],
     tags: parsed.tags.map((tag) => ({ tag, tagKey: foldTag(tag) })),

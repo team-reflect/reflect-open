@@ -11,6 +11,11 @@ import { AiProvidersSection } from './ai-providers-section'
 const { providerFetchMock } = vi.hoisted(() => ({ providerFetchMock: vi.fn() }))
 vi.mock('@/lib/provider-fetch', () => ({ providerFetch: providerFetchMock }))
 
+// The "Describe assets" field reads the open graph from a per-graph provider
+// this section test doesn't mount; with no graph the backfill button is just
+// disabled, which is all these tests need.
+vi.mock('@/providers/graph-provider', () => ({ useGraph: () => ({ graph: null }) }))
+
 // jsdom doesn't implement this; Radix Select scrolls the selected option into
 // view when the listbox opens.
 Element.prototype.scrollIntoView ??= () => {}

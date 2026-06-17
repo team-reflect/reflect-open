@@ -38,6 +38,7 @@ fn note(path: &str, title: &str, links: Vec<IndexedLink>) -> IndexedNote {
         file_hash: "h".to_string(),
         mtime: 0,
         text: format!("{title} body"),
+        asset_text: String::new(),
         preview: "body".to_string(),
         links,
         tags: vec![],
@@ -176,6 +177,61 @@ fn backlinks_resolve_by_title_at_query_time() {
     .unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0]["source_path"], Value::from("notes/a.md"));
+}
+
+#[test]
+fn asset_description_text_is_searchable_but_stays_out_of_preview_and_note_text() {
+    let conn = migrated();
+    // The note body says nothing about a waterfall; only the asset description
+    // (folded into the FTS body, Plan 20) does.
+    let mut sample = note("notes/a.md", "Trip", vec![]);
+    sample.text = "Trip planning".to_string();
+    sample.preview = "Trip planning".to_string();
+    sample.asset_text = "A photo of a waterfall in a green canyon.".to_string();
+    apply_note(&conn, &sample).unwrap();
+
+    // A query that appears only in the asset description surfaces the note.
+    let hits = run_query(
+        &conn,
+        "SELECT path FROM search_fts WHERE search_fts MATCH ?1",
+        &[Value::from("waterfall")],
+    )
+    .unwrap();
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0]["path"], Value::from("notes/a.md"));
+
+    // The note body is still searchable alongside it.
+    let body_hits = run_query(
+        &conn,
+        "SELECT path FROM search_fts WHERE search_fts MATCH ?1",
+        &[Value::from("planning")],
+    )
+    .unwrap();
+    assert_eq!(body_hits.len(), 1);
+
+    // The asset text never leaks into the preview or the AI-reachable note_text.
+    let preview: String = conn
+        .query_row(
+            "SELECT preview FROM notes WHERE path = 'notes/a.md'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(
+        !preview.contains("waterfall"),
+        "preview must not carry asset text"
+    );
+    let note_body: String = conn
+        .query_row(
+            "SELECT text FROM note_text WHERE note_path = 'notes/a.md'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(
+        !note_body.contains("waterfall"),
+        "note_text must not carry asset text"
+    );
 }
 
 #[test]

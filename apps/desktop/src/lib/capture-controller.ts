@@ -2,20 +2,21 @@ import {
   drainCaptureInbox,
   hasBridge,
   isCaptureSpoolPath,
+  isSilentStop,
   reconcileCaptureEnrichment,
   subscribeFileChanges,
   type AiProvidersState,
   type ReconcileStop,
-  type Unlisten,
 } from '@reflect/core'
+import { createBackgroundReconciler } from '@/lib/background-reconciler'
 import { startOperation } from '@/lib/operations'
 import { providerFetch } from '@/lib/provider-fetch'
 
 /**
- * The link-capture lifecycle for one graph session — the same shape as
- * `createTranscriptionReconciler`, for the same reason: the trigger plumbing
- * (launch pass, watcher events, focus/online retries) breeds bugs inside a
- * React effect seam, so it lives in one object with one `dispose()`.
+ * The link-capture lifecycle for one graph session. Built on
+ * {@link createBackgroundReconciler} (shared with transcription and asset
+ * descriptions): the single-flight loop, focus/online retries, and teardown live
+ * there; this supplies the capture-specific pass and triggers.
  *
  * Every pass runs the two capture phases in order: **drain** the spool inbox
  * (the durable raw save — works without any AI configured), then **enrich**
@@ -44,12 +45,6 @@ export interface CaptureControllerOptions {
 
 /** Build the controller for one graph session. `dispose()` is terminal. */
 export function createCaptureController(options: CaptureControllerOptions): CaptureController {
-  let disposed = false
-  let running = false
-  /** A trigger landed mid-pass; run exactly one follow-up after it. */
-  let queued = false
-  let unlisten: Unlisten | null = null
-  const domDisposers: Array<() => void> = []
   /** Last surfaced stop message — retries must not re-toast it. */
   let surfacedStop: string | null = null
 
@@ -58,72 +53,43 @@ export function createCaptureController(options: CaptureControllerOptions): Capt
       surfacedStop = null
       return
     }
-    // Self-healing stops stay silent: offline retries on the next trigger,
-    // config means no provider/key (enrichment waits; the raw save is done),
-    // stale is a graph switch tearing the pass down.
-    if (stopped.reason === 'network' || stopped.reason === 'config' || stopped.reason === 'stale') {
-      return
-    }
-    if (surfacedStop === stopped.message) {
+    // Self-healing stops (network/config/stale) stay silent: offline retries on
+    // the next trigger, config means no provider/key (enrichment waits; the raw
+    // save is done), stale is a graph switch tearing the pass down.
+    if (isSilentStop(stopped) || surfacedStop === stopped.message) {
       return
     }
     surfacedStop = stopped.message
     startOperation(label).fail(stopped.message)
   }
 
-  async function run(): Promise<void> {
-    if (running) {
-      queued = true
-      return
-    }
+  /** One pass: drain the spool inbox (no AI needed), then enrich pending captures. */
+  const reconcile = async (isStale: () => boolean): Promise<void> => {
     if (!hasBridge()) {
       return // browser dev: no inbox commands to drain against
     }
-    running = true
-    try {
-      do {
-        queued = false
-        const drained = await drainCaptureInbox({
-          generation: options.generation,
-          isStale: () => disposed,
-        })
-        surfaceStop('Saving link capture', drained.stopped)
-        if (disposed) {
-          return
-        }
-        const enriched = await reconcileCaptureEnrichment({
-          providers: options.getProviders(),
-          generation: options.generation,
-          fetchFn: providerFetch,
-          isStale: () => disposed,
-        })
-        surfaceStop('Enriching link capture', enriched.stopped)
-      } while (queued && !disposed)
-    } finally {
-      running = false
-    }
-  }
-
-  function schedule(): void {
-    if (!disposed) {
-      void run()
-    }
-  }
-
-  function start(): void {
-    if (disposed) {
+    const drained = await drainCaptureInbox({ generation: options.generation, isStale })
+    surfaceStop('Saving link capture', drained.stopped)
+    if (isStale()) {
       return
     }
-    schedule() // the launch pass: captures spooled while the app was closed
-    const onWake = (): void => {
-      schedule() // the network's natural retry signals (enrichment)
+    const enriched = await reconcileCaptureEnrichment({
+      providers: options.getProviders(),
+      generation: options.generation,
+      fetchFn: providerFetch,
+      isStale,
+    })
+    surfaceStop('Enriching link capture', enriched.stopped)
+  }
+
+  const loop = createBackgroundReconciler({ pass: reconcile })
+
+  function start(): void {
+    if (loop.isStale()) {
+      return
     }
-    window.addEventListener('focus', onWake)
-    window.addEventListener('online', onWake)
-    domDisposers.push(
-      () => window.removeEventListener('focus', onWake),
-      () => window.removeEventListener('online', onWake),
-    )
+    loop.schedule() // the launch pass: captures spooled while the app was closed
+    loop.retryOnWake() // the network's natural retry signals (enrichment)
     if (!hasBridge()) {
       return // browser dev: no watcher to follow
     }
@@ -132,16 +98,10 @@ export function createCaptureController(options: CaptureControllerOptions): Capt
         (change) => change.kind === 'upsert' && isCaptureSpoolPath(change.path),
       )
       if (hasNewCapture) {
-        schedule()
+        loop.schedule()
       }
     })
-      .then((stop) => {
-        if (disposed) {
-          stop() // teardown won the race against the subscribe
-        } else {
-          unlisten = stop
-        }
-      })
+      .then((stop) => loop.onDispose(stop)) // onDispose tears down now if we already disposed
       .catch((cause: unknown) => {
         // Degrades to the launch/focus/online triggers; surfaced for
         // diagnosis rather than left as an unhandled rejection.
@@ -149,16 +109,5 @@ export function createCaptureController(options: CaptureControllerOptions): Capt
       })
   }
 
-  return {
-    start,
-    schedule,
-    dispose: () => {
-      disposed = true
-      unlisten?.()
-      unlisten = null
-      for (const stop of domDisposers.splice(0)) {
-        stop()
-      }
-    },
-  }
+  return { start, schedule: loop.schedule, dispose: loop.dispose }
 }

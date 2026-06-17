@@ -109,6 +109,16 @@ export type AllNotesFilterTags = z.infer<typeof allNotesFilterTagsSchema>
 export const semanticSearchEnabledSchema = z.boolean().catch(false)
 
 /**
+ * Whether new eligible images/PDFs added under `assets/` are automatically
+ * described by the configured AI provider into a managed `.reflect.md` description
+ * (Plan 20). On by default — only new assets, gated to those referenced by
+ * public notes; existing assets are never auto-scanned (the Settings backfill
+ * action handles those, with a cost warning). Off disables the automatic path
+ * entirely.
+ */
+export const describeAssetsSchema = z.boolean().catch(true)
+
+/**
  * Whether the user has finished the mobile onboarding choice (Plan 19, step
  * 6): "Start fresh" or "Connect to GitHub". Off by default — a fresh install
  * shows the onboarding screen, which (for the GitHub path) clones into the
@@ -238,6 +248,7 @@ export const settingsSchema = z
     editorDefaultBullet: editorDefaultBulletSchema,
     editorBulletAfterHeading: editorBulletAfterHeadingSchema,
     semanticSearchEnabled: semanticSearchEnabledSchema,
+    describeAssets: describeAssetsSchema,
     mobileOnboarded: mobileOnboardedSchema,
     theme: themePreferenceSchema,
     timeFormat: timeFormatSchema,

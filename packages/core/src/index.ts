@@ -64,6 +64,8 @@ export {
   notePath,
   assetPath,
   audioMemoPath,
+  descriptionPathFor,
+  DESCRIPTION_SUFFIX,
   isDaily,
   isNotePath,
   dateFromDailyPath,
@@ -112,6 +114,7 @@ export {
   editorDefaultBulletSchema,
   editorBulletAfterHeadingSchema,
   semanticSearchEnabledSchema,
+  describeAssetsSchema,
   themePreferenceSchema,
   timeFormatSchema,
   dateFormatSchema,
@@ -251,6 +254,7 @@ export {
   audioMemoFromPath,
   audioMemoIdentity,
   captureAudioMemo,
+  isSilentStop,
   listPendingAudioMemos,
   reconcileAudioMemos,
   type AudioMemoIdentity,
@@ -295,6 +299,26 @@ export {
   DescriptionRejectedError,
   type DescribePageRequest,
 } from './ai/describe-page'
+
+// Asset descriptions (Plan 20)
+export {
+  isAssetDescriptionRejected,
+  AssetDescriptionRejectedError,
+  type AssetKind,
+  type DescribeAssetRequest,
+} from './ai/describe-asset'
+export {
+  buildDescriptionSource,
+  classifyAsset,
+  isEligibleAssetPath,
+  reconcileAssetDescriptions,
+  readManagedDescription,
+  type AssetDescriptionMeta,
+  type AssetDescriptionMode,
+  type AssetVerdict,
+  type ReconcileAssetDescriptionsInput,
+  type ReconcileAssetDescriptionsOutcome,
+} from './actions/asset-description'
 
 // Backup & sync (Plan 12)
 export {
@@ -422,6 +446,7 @@ export {
   watchStart,
   watchStop,
   subscribeIndexChanges,
+  subscribeIndexApplied,
   subscribeFileChanges,
   emitFileChanges,
   setLocalWriteEcho,
@@ -432,6 +457,7 @@ export {
   indexedLinkSchema,
   indexedAliasSchema,
   indexNote,
+  reindexNotesReferencing,
   rebuildIndex,
   reconcileIndex,
   syncIndex,

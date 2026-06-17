@@ -104,6 +104,40 @@ function isAssetHref(href: string): boolean {
   return /(^|\/)assets\//.test(href)
 }
 
+/**
+ * Canonicalize an asset href to the on-disk path. A note body may write the same
+ * file many ways — percent-encoded (`assets/my%20photo.png`), `./`-prefixed
+ * (`./assets/a.png`), with `..`/empty segments — while the file on disk (and the
+ * watcher / `dir_list` / `readAsset` paths) is the collapsed `assets/...` form.
+ * The index projection and the asset-description privacy gate key off this
+ * canonical form, so every spelling of one file collapses to one key — a private
+ * referer can't hide behind an alternate encoding *or* an alternate path shape.
+ *
+ * Decodes percent-escapes (a malformed escape keeps the raw href), then resolves
+ * `.`/`..`/empty segments. The `AssetRef` span still points at the raw body text;
+ * only the logical `path` is canonicalized.
+ */
+function decodeAssetPath(href: string): string {
+  let decoded: string
+  try {
+    decoded = decodeURIComponent(href)
+  } catch {
+    decoded = href
+  }
+  const segments: string[] = []
+  for (const segment of decoded.split('/')) {
+    if (segment === '' || segment === '.') {
+      continue
+    }
+    if (segment === '..') {
+      segments.pop()
+      continue
+    }
+    segments.push(segment)
+  }
+  return segments.join('/')
+}
+
 function stringField(frontmatter: Frontmatter, key: string): string | undefined {
   const value = (frontmatter as Record<string, unknown>)[key]
   return typeof value === 'string' ? value : undefined
@@ -293,7 +327,7 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
         const link = readLink(body, from, to, bodyOffset)
         if (link) {
           if (isAssetHref(link.href)) {
-            assets.push({ path: link.href, from: link.from, to: link.to })
+            assets.push({ path: decodeAssetPath(link.href), from: link.from, to: link.to })
           } else {
             links.push(link)
           }

@@ -303,6 +303,18 @@ export interface ReconcileStop {
   message: string
 }
 
+/**
+ * Whether a {@link ReconcileStop} is an expected, self-healing stop that a
+ * background controller should swallow rather than surface to the user:
+ * `network` (offline — retries on the next trigger), `config` (no provider/key
+ * yet — the work waits), or `stale` (a graph switch tore the pass down). Any
+ * other reason is an unexpected failure worth surfacing or logging. Shared by
+ * every background reconcile loop (capture, transcription, asset descriptions).
+ */
+export function isSilentStop(stopped: ReconcileStop): boolean {
+  return stopped.reason === 'network' || stopped.reason === 'config' || stopped.reason === 'stale'
+}
+
 export interface ReconcileAudioMemosInput {
   /** The configured-providers state — decides the provider and keychain entry. */
   providers: AiProvidersState

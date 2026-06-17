@@ -9,6 +9,8 @@ import {
   removeFromIndex,
   setIndexMeta,
 } from './commands'
+import { assetReferencingNotePaths } from './asset-refs'
+import { gatherAssetDescriptionText } from './asset-description-text'
 import { hashContent } from './hash'
 import { buildIndexedNote, PROJECTION_VERSION, type IndexedNote } from './indexed-note'
 import { detectExternalMoves } from './move-healing'
@@ -54,10 +56,46 @@ export async function indexNote(
   const content = options.content ?? (await readNote(path))
   const parsed = parseNote({ path, source: content })
   const fileHash = await hashContent(content)
+  const assetText = await gatherAssetDescriptionText(parsed.assets.map((asset) => asset.path))
   await applyIndexedNote(
-    buildIndexedNote(parsed, { fileHash, mtime: options.mtime ?? Date.now(), source: content }),
+    buildIndexedNote(parsed, {
+      fileHash,
+      mtime: options.mtime ?? Date.now(),
+      source: content,
+      assetText,
+    }),
     options.generation,
   )
+}
+
+/**
+ * Re-index every note referencing any of `assetPaths` (Plan 20 search
+ * integration). Asset descriptions are generated *after* their notes are
+ * indexed, so when one is written the referencing notes' search rows are stale;
+ * this folds the new description text into their FTS documents. `indexNote` is
+ * not hash-gated, so the unchanged note files re-index unconditionally. A note
+ * removed since it referenced the asset is skipped. Pinned to `generation`.
+ */
+export async function reindexNotesReferencing(
+  assetPaths: readonly string[],
+  generation: number,
+): Promise<void> {
+  const notePaths = new Set<string>()
+  for (const assetPath of assetPaths) {
+    for (const notePath of await assetReferencingNotePaths(assetPath)) {
+      notePaths.add(notePath)
+    }
+  }
+  for (const notePath of notePaths) {
+    try {
+      await indexNote(notePath, { generation })
+    } catch (cause) {
+      if (isAppError(cause) && cause.kind === 'notFound') {
+        continue // the note was removed since it referenced the asset
+      }
+      throw cause
+    }
+  }
 }
 
 /** Options for the long-running index passes. */
@@ -134,7 +172,8 @@ export async function rebuildIndex(options: IndexPassOptions): Promise<void> {
     const content = await readNote(file.path)
     const parsed = parseNote({ path: file.path, source: content })
     const fileHash = await hashContent(content)
-    batch.push(buildIndexedNote(parsed, { fileHash, mtime: file.modifiedMs, source: content }))
+    const assetText = await gatherAssetDescriptionText(parsed.assets.map((asset) => asset.path))
+    batch.push(buildIndexedNote(parsed, { fileHash, mtime: file.modifiedMs, source: content, assetText }))
     if (batch.length >= REBUILD_BATCH_SIZE) {
       await applyRebuildBatch(batch, generation, onSkippedNote)
       batch = []
@@ -248,8 +287,9 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
       return // re-check after the awaits — don't write for a superseded pass
     }
     const parsed = parseNote({ path: file.path, source: content })
+    const assetText = await gatherAssetDescriptionText(parsed.assets.map((asset) => asset.path))
     await applyIndexedNote(
-      buildIndexedNote(parsed, { fileHash, mtime: file.modifiedMs, source: content }),
+      buildIndexedNote(parsed, { fileHash, mtime: file.modifiedMs, source: content, assetText }),
       generation,
     )
   }

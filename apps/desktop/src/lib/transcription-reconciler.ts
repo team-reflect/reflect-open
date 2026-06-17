@@ -1,30 +1,25 @@
 import {
   audioMemoFromPath,
   hasBridge,
+  isSilentStop,
   pickTranscriptionConfig,
   reconcileAudioMemos,
   subscribeFileChanges,
   type AiProvidersState,
   type ReconcileStop,
-  type Unlisten,
 } from '@reflect/core'
+import { createBackgroundReconciler } from '@/lib/background-reconciler'
 import { startOperation } from '@/lib/operations'
 import { providerFetch } from '@/lib/provider-fetch'
 
 /**
- * The background-transcription lifecycle for one graph session, extracted
- * from React for the same reason as `createBackupController`: loop guards,
- * teardown, and trigger plumbing breed bugs in the provider's effect seam.
- * Here the lifecycle is one object with one `dispose()`, and the provider
- * shrinks to create/start/dispose plus a `schedule()` after its own captures.
- *
- * Owns: the single-flight pass loop (a trigger landing mid-pass queues at
- * most one follow-up), the config gate (no IO without a transcription-capable
- * model), the dispose-driven stale gate every pass checks between memos, the
- * `transcribing` flag the mic spinner reads, deduped stop surfacing, the
- * window focus/online retry listeners, and the file-change subscription that
- * picks up recordings the watcher reports — ours just captured, or one a
- * sync merge pulled from another device.
+ * The background-transcription lifecycle for one graph session. Built on
+ * {@link createBackgroundReconciler} (shared with capture and asset
+ * descriptions): the single-flight loop, focus/online retries, and teardown live
+ * there; this adds the transcription pass, the config gate (no IO without a
+ * transcription-capable model), and the `transcribing` flag the mic spinner
+ * reads. The provider shrinks to create/start/dispose plus a `schedule()` after
+ * its own captures.
  */
 export interface TranscriptionReconciler {
   /** Attach the triggers (focus, online, file changes) and run the launch pass. */
@@ -54,19 +49,13 @@ export interface TranscriptionReconcilerOptions {
 export function createTranscriptionReconciler(
   options: TranscriptionReconcilerOptions,
 ): TranscriptionReconciler {
-  let disposed = false
-  let running = false
-  /** A trigger landed mid-pass; run exactly one follow-up after it. */
-  let queued = false
   let transcribing = false
   const listeners = new Set<() => void>()
-  let unlisten: Unlisten | null = null
-  const domDisposers: Array<() => void> = []
   /** Last surfaced stop message — focus/online retries must not re-toast it. */
   let surfacedStop: string | null = null
 
   function setTranscribing(next: boolean): void {
-    if (disposed || transcribing === next) {
+    if (transcribing === next) {
       return
     }
     transcribing = next
@@ -80,68 +69,45 @@ export function createTranscriptionReconciler(
       surfacedStop = null
       return
     }
-    // Expected, self-healing stops stay silent: offline retries on the next
-    // trigger, and a missing provider/key already disables the mic with the
-    // reason as its tooltip.
-    if (stopped.reason === 'network' || stopped.reason === 'config' || stopped.reason === 'stale') {
-      return
-    }
-    if (surfacedStop === stopped.message) {
+    // Expected, self-healing stops (network/config/stale) stay silent: offline
+    // retries on the next trigger, and a missing provider/key already disables
+    // the mic with the reason as its tooltip.
+    if (isSilentStop(stopped) || surfacedStop === stopped.message) {
       return
     }
     surfacedStop = stopped.message
     startOperation('Transcribing audio memo').fail(stopped.message)
   }
 
-  async function run(): Promise<void> {
-    if (running) {
-      queued = true
-      return
-    }
+  /** One pass: transcribe pending memos, gated behind a transcription-capable model. */
+  const reconcile = async (isStale: () => boolean): Promise<void> => {
     // Gate before any IO: without a transcription-capable model every pass
     // would list the graph just to stop on `config`.
     if (pickTranscriptionConfig(options.getProviders()) === null) {
       return
     }
-    running = true
-    try {
-      do {
-        queued = false
-        const outcome = await reconcileAudioMemos({
-          providers: options.getProviders(),
-          generation: options.generation,
-          fetchFn: providerFetch,
-          isStale: () => disposed,
-          onPending: (count) => setTranscribing(count > 0),
-        })
-        surfaceStop(outcome.stopped)
-      } while (queued && !disposed)
-    } finally {
-      running = false
-      setTranscribing(false)
-    }
+    const outcome = await reconcileAudioMemos({
+      providers: options.getProviders(),
+      generation: options.generation,
+      fetchFn: providerFetch,
+      isStale,
+      onPending: (count) => setTranscribing(count > 0),
+    })
+    surfaceStop(outcome.stopped)
   }
 
-  function schedule(): void {
-    if (!disposed) {
-      void run()
-    }
-  }
+  const loop = createBackgroundReconciler({
+    pass: reconcile,
+    onSettled: () => setTranscribing(false),
+  })
 
   function start(): void {
-    if (disposed) {
+    if (loop.isStale()) {
       return
     }
-    schedule() // the launch pass: memos left pending by earlier sessions
-    const onWake = (): void => {
-      schedule() // the network's natural retry signals
-    }
-    window.addEventListener('focus', onWake)
-    window.addEventListener('online', onWake)
-    domDisposers.push(
-      () => window.removeEventListener('focus', onWake),
-      () => window.removeEventListener('online', onWake),
-    )
+    loop.schedule() // the launch pass: memos left pending by earlier sessions
+    loop.retryOnWake() // the network's natural retry signals
+    loop.onDispose(() => listeners.clear())
     if (!hasBridge()) {
       return // browser dev: no watcher to follow
     }
@@ -150,16 +116,10 @@ export function createTranscriptionReconciler(
         (change) => change.kind === 'upsert' && audioMemoFromPath(change.path) !== null,
       )
       if (hasNewRecording) {
-        schedule()
+        loop.schedule()
       }
     })
-      .then((stop) => {
-        if (disposed) {
-          stop() // teardown won the race against the subscribe
-        } else {
-          unlisten = stop
-        }
-      })
+      .then((stop) => loop.onDispose(stop)) // onDispose tears down now if we already disposed
       .catch((cause: unknown) => {
         // Degrades to the other triggers (focus/online/capture); surfaced
         // for diagnosis rather than left as an unhandled rejection.
@@ -169,7 +129,7 @@ export function createTranscriptionReconciler(
 
   return {
     start,
-    schedule,
+    schedule: loop.schedule,
     getTranscribing: () => transcribing,
     subscribe: (listener) => {
       listeners.add(listener)
@@ -177,14 +137,6 @@ export function createTranscriptionReconciler(
         listeners.delete(listener)
       }
     },
-    dispose: () => {
-      disposed = true
-      unlisten?.()
-      unlisten = null
-      for (const stop of domDisposers.splice(0)) {
-        stop()
-      }
-      listeners.clear()
-    },
+    dispose: loop.dispose,
   }
 }
