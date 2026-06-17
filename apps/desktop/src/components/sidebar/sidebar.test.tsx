@@ -247,6 +247,15 @@ describe('Sidebar', () => {
     expect(pickAndOpen).toHaveBeenCalled()
   })
 
+  it('the graph footer opens user settings from the graph menu', async () => {
+    const { view, navigate } = renderSidebar()
+
+    await userEvent.click(view.getByRole('button', { name: /Notes/ }))
+    await userEvent.click(view.getByRole('menuitem', { name: /user settings/i }))
+
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith({ kind: 'settings' }))
+  })
+
   it('the graph footer opens the current graph in the system file manager', async () => {
     const { view } = renderSidebar()
 

@@ -173,6 +173,13 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
             <FolderOpen aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
             <span className="min-w-0 flex-1 truncate">Open another graph…</span>
           </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={() => void runCommand('settings.open', context)}
+            className={MENU_ITEM_CLASS}
+          >
+            <Settings aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">User settings</span>
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <Tooltip>
