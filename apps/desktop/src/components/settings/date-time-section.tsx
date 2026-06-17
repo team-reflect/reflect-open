@@ -2,8 +2,10 @@ import type { ReactElement } from 'react'
 import {
   dateFormatSchema,
   timeFormatSchema,
+  weekStartDaySchema,
   type DateFormat,
   type TimeFormat,
+  type WeekStartDay,
 } from '@reflect/core'
 import {
   Select,
@@ -22,9 +24,19 @@ interface TimeFormatOption {
   label: string
 }
 
+interface WeekStartOption {
+  value: WeekStartDay
+  label: string
+}
+
 const TIME_FORMAT_OPTIONS: TimeFormatOption[] = [
   { value: '12h', label: '12-hour' },
   { value: '24h', label: '24-hour' },
+]
+
+const WEEK_START_OPTIONS: WeekStartOption[] = [
+  { value: 'monday', label: 'Monday' },
+  { value: 'sunday', label: 'Sunday' },
 ]
 
 // The options demonstrate themselves: each shows today's date in its format,
@@ -59,6 +71,30 @@ export function DateTimeSection(): ReactElement {
               {DATE_FORMAT_VALUES.map((value) => (
                 <SelectItem key={value} value={value}>
                   {formatFullDate(today, value)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </SettingsField>
+      <SettingsField
+        legend="Start week on"
+        description="The first day shown in calendars."
+      >
+        <div className="mt-3">
+          <Select
+            value={settings.weekStartDay}
+            onValueChange={(value) =>
+              updateSettings({ weekStartDay: weekStartDaySchema.parse(value) })
+            }
+          >
+            <SelectTrigger aria-label="Start week on" className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {WEEK_START_OPTIONS.map(({ value, label }) => (
+                <SelectItem key={value} value={value}>
+                  {label}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge, type EmbedStatus } from '@reflect/core'
@@ -324,6 +324,50 @@ describe('SettingsScreen', () => {
           timeFormat: '12h',
           dateFormat: 'dmy',
           weekStartDay: 'monday',
+          allNotesFilterTags: ['book', 'link', 'person'],
+          graphColors: {},
+          aiProviders: [],
+          defaultAiProviderId: null,
+          chatModelSelection: null,
+        },
+      ]),
+    )
+  })
+
+  it('shows the week start setting in Date & time', async () => {
+    renderScreen()
+    const dateTime = screen.getByRole('region', { name: 'Date & time' })
+    const appearance = screen.getByRole('region', { name: 'Appearance' })
+
+    await waitFor(() =>
+      expect(within(dateTime).getByRole('combobox', { name: 'Start week on' })).toBeTruthy(),
+    )
+    expect(within(appearance).queryByRole('combobox', { name: 'Start week on' })).toBeNull()
+  })
+
+  it('selecting Sunday persists the week start day', async () => {
+    renderScreen()
+    const trigger = screen.getByRole('combobox', { name: 'Start week on' })
+    await waitFor(() => expect(trigger.textContent).toContain('Monday'))
+
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    fireEvent.keyDown(await screen.findByRole('option', { name: 'Sunday' }), { key: 'Enter' })
+
+    expect(trigger.textContent).toContain('Sunday')
+    await waitFor(() =>
+      expect(saved).toEqual([
+        {
+          editorMarkdownSyntax: 'focus',
+          editorSpellCheck: true,
+          editorDefaultBullet: true,
+          editorBulletAfterHeading: true,
+          semanticSearchEnabled: false,
+          describeAssets: true,
+          mobileOnboarded: false,
+          theme: 'system',
+          timeFormat: '12h',
+          dateFormat: 'mdy',
+          weekStartDay: 'sunday',
           allNotesFilterTags: ['book', 'link', 'person'],
           graphColors: {},
           aiProviders: [],

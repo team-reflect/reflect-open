@@ -1,17 +1,6 @@
 import type { ReactElement } from 'react'
-import {
-  weekStartDaySchema,
-  type ThemePreference,
-  type WeekStartDay,
-} from '@reflect/core'
+import type { ThemePreference } from '@reflect/core'
 import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { useSettings } from '@/providers/settings-provider'
 import { SettingsField } from './field'
@@ -28,16 +17,6 @@ const THEME_OPTIONS: ThemeOption[] = [
   { value: 'system', label: 'System', icon: Monitor },
   { value: 'light', label: 'Light', icon: Sun },
   { value: 'dark', label: 'Dark', icon: Moon },
-]
-
-interface WeekStartOption {
-  value: WeekStartDay
-  label: string
-}
-
-const WEEK_START_OPTIONS: WeekStartOption[] = [
-  { value: 'monday', label: 'Monday' },
-  { value: 'sunday', label: 'Sunday' },
 ]
 
 /**
@@ -79,30 +58,6 @@ export function AppearanceSection(): ReactElement {
               </SettingsOptionCard>
             )
           })}
-        </div>
-      </SettingsField>
-      <SettingsField
-        legend="Start week on"
-        description="The first day shown in the daily notes calendar."
-      >
-        <div className="mt-3">
-          <Select
-            value={settings.weekStartDay}
-            onValueChange={(value) =>
-              updateSettings({ weekStartDay: weekStartDaySchema.parse(value) })
-            }
-          >
-            <SelectTrigger aria-label="Start week on" className="w-36">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {WEEK_START_OPTIONS.map(({ value, label }) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </SettingsField>
     </SettingsSection>
