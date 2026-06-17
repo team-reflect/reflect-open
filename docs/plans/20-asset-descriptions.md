@@ -386,38 +386,26 @@ assets" button that runs the backfill with a cost warning and progress.
 **Goal:** a query typed in ⌘K that matches an asset's AI description surfaces the
 note(s) that reference that asset, as ordinary hits.
 
-**Data model — a first-class `asset_descriptions` entity + the `assets` join.**
-Today's `assets(note_path, asset_path)` is the note→asset reference join. A new
-`asset_descriptions(asset_path PK, source_hash, source_size, description,
-provider, model, generated_at)` table (migration 0014) is the asset side: one row
-per asset with a managed `…​.reflect.md`, a rebuildable projection of the
-sidecars (`readDescriptionEntity` in `actions/asset-description.ts`;
-`indexing/asset-description-index.ts` maintains the rows via Rust
-`index_asset_description_apply`/`remove`). The sidecars stay the source of truth.
-
-**Fold reads from the entity, search-index-only.**
-- `IndexedNote` gains `assetText`. `gatherAssetDescriptionText`
-  (`indexing/asset-description-text.ts`) now reads each referenced asset's
-  description from the `asset_descriptions` entity in **one query** (no per-asset
-  sidecar file reads), in reference order, deduped, capped at 8 KB (D2). Stored
-  once per asset, not per referencing note. All three `buildIndexedNote` call
-  sites gather it. *(D1 revised: only **managed** descriptions are in the entity,
-  so a user-authored `…​.reflect.md` is no longer folded.)*
+**Design — fold into the note's FTS `body`, search-index-only.**
+- `IndexedNote` gains `assetText`. When a note is indexed, `gatherAssetDescriptionText`
+  (`indexing/asset-description-text.ts`) reads each referenced asset's
+  `…​.reflect.md` body (managed or user-authored — D1), strips frontmatter,
+  concatenates, and caps at 8 KB (D2). All three `buildIndexedNote` call sites
+  (`indexNote`, `rebuildIndex`, `reconcileIndex`) gather it.
 - Rust `apply_note` writes `search_fts.body = note.text + "\n" + asset_text`.
   **`notes.preview`, `note_text`, and AI-reachable text stay the note body
-  alone** — descriptions are locally searchable but never widen the All-Notes
-  preview or what is sent to a provider.
-- `PROJECTION_VERSION` → 11: a full rebuild first repopulates the entity from the
-  sidecars (`rebuildAssetDescriptions`, before notes are indexed), then folds.
+  alone** — so descriptions are locally searchable but never widen the All-Notes
+  preview or what is sent to a provider (those read the note body / live
+  markdown). That falls out of enriching only the FTS column.
+- `PROJECTION_VERSION` 8 → 9, so existing graphs rebuild and fold descriptions.
 
 **Async re-index seam.** Descriptions are written *after* a note is indexed and
 live in `assets/`, so the note's hash is unchanged and nothing re-indexes it on
-its own. `reconcileAssetDescriptions` returns `describedAssetPaths`; after a pass,
-both callers (the controller and the Settings backfill) call
-`reindexNotesReferencing(paths, generation)` (`indexing/indexer.ts`) — it first
-refreshes each asset's entity row from its sidecar, then looks up referencing
-notes via the `assets` join and `indexNote`s each (not hash-gated, so the
-unchanged files re-index and fold the now-current entity text). No loop:
+its own. `reconcileAssetDescriptions` now returns `describedAssetPaths`; after a
+pass, both callers (the controller and the Settings backfill) call
+`reindexNotesReferencing(paths, generation)` (`indexing/indexer.ts`) — it looks
+up referencing notes via the `assets` table and `indexNote`s each (not
+hash-gated, so the unchanged files re-index and pick up the new text). No loop:
 `indexNote` writes index rows, not note files.
 
 **Privacy.** None added — local lexical search already includes private notes,

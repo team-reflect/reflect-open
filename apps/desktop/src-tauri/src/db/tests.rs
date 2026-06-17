@@ -10,8 +10,7 @@ use super::embed_write::{apply_chunks, remove_chunks, EmbeddedChunk};
 use super::migrations::{migrate, migrate_to, open_in_memory, open_index_at, validate_migrations};
 use super::query::run_query;
 use super::write::{
-    apply_asset_description, apply_note, clear_index, move_note, remove_asset_description,
-    AssetDescriptionRow, IndexedLink, IndexedNote, IndexedTag, IndexedTask,
+    apply_note, clear_index, move_note, IndexedLink, IndexedNote, IndexedTag, IndexedTask,
 };
 
 fn migrated() -> Connection {
@@ -21,18 +20,6 @@ fn migrated() -> Connection {
     conn.execute_batch("PRAGMA foreign_keys=ON;").expect("fk");
     migrate(&mut conn).expect("migrate");
     conn
-}
-
-fn asset_description(asset_path: &str, description: &str) -> AssetDescriptionRow {
-    AssetDescriptionRow {
-        asset_path: asset_path.to_string(),
-        source_hash: "hash-1".to_string(),
-        source_size: 5,
-        description: description.to_string(),
-        provider: "anthropic".to_string(),
-        model: "claude-opus-4-8".to_string(),
-        generated_at: "2026-06-16T00:00:00.000Z".to_string(),
-    }
 }
 
 fn note(path: &str, title: &str, links: Vec<IndexedLink>) -> IndexedNote {
@@ -90,7 +77,7 @@ fn migrations_are_valid_and_idempotent() {
     let version: i64 = conn
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 14); // applied migrations (0001 through 0014)
+    assert_eq!(version, 13); // applied migrations (0001 through 0013)
     migrate(&mut conn).expect("re-running to_latest is a no-op");
 }
 
@@ -418,10 +405,8 @@ fn clear_cascades_to_child_tables() {
     let mut seeded = note("notes/a.md", "A", vec![wiki("X")]);
     seeded.tasks = vec![task(0, "buy milk", false)];
     apply_note(&conn, &seeded).unwrap();
-    apply_asset_description(&conn, &asset_description("assets/a.png", "desc")).unwrap();
     clear_index(&conn).unwrap();
-    // Deleting notes cascades to children; search_fts and asset_descriptions
-    // (no FK to notes) are cleared explicitly.
+    // Deleting notes cascades to children; search_fts is cleared explicitly.
     for table in [
         "notes",
         "note_text",
@@ -429,33 +414,12 @@ fn clear_cascades_to_child_tables() {
         "tags",
         "aliases",
         "assets",
-        "asset_descriptions",
         "tasks",
         "search_fts",
     ] {
         let rows = run_query(&conn, &format!("SELECT count(*) AS n FROM {table}"), &[]).unwrap();
         assert_eq!(rows[0]["n"], Value::from(0), "{table} should be empty");
     }
-}
-
-#[test]
-fn asset_descriptions_upsert_then_remove() {
-    let conn = migrated();
-    apply_asset_description(&conn, &asset_description("assets/a.png", "first")).unwrap();
-    // A second apply for the same asset overwrites (ON CONFLICT upsert).
-    apply_asset_description(&conn, &asset_description("assets/a.png", "second")).unwrap();
-    let rows = run_query(
-        &conn,
-        "SELECT description FROM asset_descriptions WHERE asset_path = 'assets/a.png'",
-        &[],
-    )
-    .unwrap();
-    assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0]["description"], Value::from("second"));
-
-    remove_asset_description(&conn, "assets/a.png").unwrap();
-    let rows = run_query(&conn, "SELECT count(*) AS n FROM asset_descriptions", &[]).unwrap();
-    assert_eq!(rows[0]["n"], Value::from(0));
 }
 
 #[test]
@@ -558,7 +522,7 @@ fn open_index_at_creates_migrates_and_reopens() {
     let version: i64 = conn
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 14);
+    assert_eq!(version, 13);
     let journal: String = conn
         .query_row("PRAGMA journal_mode", [], |row| row.get(0))
         .unwrap();

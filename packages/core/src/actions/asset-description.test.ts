@@ -13,7 +13,6 @@ import {
   buildDescriptionSource,
   classifyAsset,
   isEligibleAssetPath,
-  readDescriptionEntity,
   readManagedDescription,
   reconcileAssetDescriptions,
   type ReconcileAssetDescriptionsInput,
@@ -168,31 +167,6 @@ describe('pure helpers', () => {
     // A file the user wrote (no managed marker) is never claimed.
     expect(readManagedDescription('# My own notes about this image\n')).toBeNull()
     expect(readManagedDescription('---\ntitle: Hand written\n---\n\nbody\n')).toBeNull()
-  })
-
-  it('readDescriptionEntity projects a managed description into its index row', () => {
-    const built = buildDescriptionSource(
-      {
-        source: 'assets/a.png',
-        sourceHash: 'abc',
-        sourceSize: 5,
-        provider: 'anthropic',
-        model: 'claude-opus-4-8',
-        generatedAt: '2026-06-16T00:00:00.000Z',
-      },
-      'A flow diagram.',
-    )
-    expect(readDescriptionEntity(built)).toEqual({
-      sourceHash: 'abc',
-      sourceSize: 5,
-      provider: 'anthropic',
-      model: 'claude-opus-4-8',
-      generatedAt: '2026-06-16T00:00:00.000Z',
-      description: 'A flow diagram.',
-    })
-    // User-authored or empty files are not projected into the entity.
-    expect(readDescriptionEntity('# My own caption\n\nnotes\n')).toBeNull()
-    expect(readDescriptionEntity(built.replace('A flow diagram.', ''))).toBeNull()
   })
 })
 

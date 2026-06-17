@@ -236,53 +236,9 @@ pub(super) fn move_note(conn: &Connection, from: &str, to: &str) -> AppResult<()
 /// cleared explicitly. `index_meta` is intentionally preserved across a rebuild.
 pub(super) fn clear_index(conn: &Connection) -> AppResult<()> {
     conn.execute_batch(
-        "DELETE FROM notes; DELETE FROM search_fts; DELETE FROM asset_descriptions;
+        "DELETE FROM notes; DELETE FROM search_fts;
          DELETE FROM embedding_vectors; DELETE FROM embedding_chunks;",
     )?;
-    Ok(())
-}
-
-/// A managed asset description (Plan 20): the `asset_descriptions` entity row,
-/// projected from an `assets/<x>.reflect.md` sidecar. camelCase matches the
-/// payload; a change here must mirror the TS `AssetDescriptionRow`.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AssetDescriptionRow {
-    pub(super) asset_path: String,
-    pub(super) source_hash: String,
-    pub(super) source_size: i64,
-    pub(super) description: String,
-    pub(super) provider: String,
-    pub(super) model: String,
-    pub(super) generated_at: String,
-}
-
-/// Upsert an asset's description row (keyed by `asset_path`).
-pub(super) fn apply_asset_description(conn: &Connection, row: &AssetDescriptionRow) -> AppResult<()> {
-    conn.prepare_cached(
-        "INSERT INTO asset_descriptions(asset_path, source_hash, source_size, description, provider, model, generated_at)
-         VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)
-         ON CONFLICT(asset_path) DO UPDATE SET
-           source_hash = excluded.source_hash, source_size = excluded.source_size,
-           description = excluded.description, provider = excluded.provider,
-           model = excluded.model, generated_at = excluded.generated_at",
-    )?
-    .execute(params![
-        row.asset_path,
-        row.source_hash,
-        row.source_size,
-        row.description,
-        row.provider,
-        row.model,
-        row.generated_at,
-    ])?;
-    Ok(())
-}
-
-/// Drop an asset's description row (the sidecar was removed or is no longer managed).
-pub(super) fn remove_asset_description(conn: &Connection, asset_path: &str) -> AppResult<()> {
-    conn.prepare_cached("DELETE FROM asset_descriptions WHERE asset_path = ?1")?
-        .execute(params![asset_path])?;
     Ok(())
 }
 

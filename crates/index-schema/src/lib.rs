@@ -56,7 +56,6 @@ mod schema {
             M::up(include_str!("../migrations/0011_tasks.sql")),
             M::up(include_str!("../migrations/0012_task_due_date.sql")),
             M::up(include_str!("../migrations/0013_perf_indexes.sql")),
-            M::up(include_str!("../migrations/0014_asset_descriptions.sql")),
         ])
     });
 

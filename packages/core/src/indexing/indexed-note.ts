@@ -50,11 +50,8 @@ import { previewSnippet } from './snippet'
  * collapsed, not just percent-decoded): the `assets` projection's keys change,
  * so the bump rebuilds them — the privacy gate matches them against the
  * canonical on-disk path.
- * 11 — asset descriptions moved into the `asset_descriptions` entity (the note
- * fold reads from it): the rebuild populates the entity from the sidecars, so
- * existing indexes carry no folded text until reprojected.
  */
-export const PROJECTION_VERSION = 11
+export const PROJECTION_VERSION = 10
 
 export const indexedLinkSchema = z.object({
   kind: z.enum(['wiki', 'md']),

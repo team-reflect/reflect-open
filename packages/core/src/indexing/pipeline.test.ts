@@ -24,15 +24,11 @@ beforeEach(() => {
         return '# Hello\n\n[[World]]'
       case 'list_files':
         return [{ path: 'notes/a.md', size: 1, modifiedMs: 5 }]
-      case 'dir_list':
-        return [] // assets/ listing for the asset-description rebuild
       case 'index_apply':
       case 'index_apply_batch':
       case 'index_clear':
       case 'index_remove':
       case 'index_meta_set':
-      case 'index_asset_description_apply':
-      case 'index_asset_description_remove':
         return null
       case 'db_query':
         if (sql.includes('index_meta')) return metaRows
@@ -87,9 +83,6 @@ describe('rebuildIndex', () => {
 
   it('splits a failed rebuild batch and still applies the notes individually', async () => {
     mockInvoke.mockImplementation(async (command, args) => {
-      if (command === 'dir_list') {
-        return [] // assets/ listing for the asset-description rebuild step
-      }
       if (command === 'list_files') {
         return [
           { path: 'notes/a.md', size: 1, modifiedMs: 1 },
@@ -127,9 +120,6 @@ describe('rebuildIndex', () => {
 
   it('reports and skips a note whose projection cannot be written alone', async () => {
     mockInvoke.mockImplementation(async (command, args) => {
-      if (command === 'dir_list') {
-        return [] // assets/ listing for the asset-description rebuild step
-      }
       if (command === 'list_files') {
         return [{ path: 'notes/bad.md', size: 1, modifiedMs: 1 }]
       }
@@ -153,9 +143,6 @@ describe('rebuildIndex', () => {
 
   it('throws a single-note write failure when no skip callback is registered', async () => {
     mockInvoke.mockImplementation(async (command, args) => {
-      if (command === 'dir_list') {
-        return [] // assets/ listing for the asset-description rebuild step
-      }
       if (command === 'list_files') {
         return [{ path: 'notes/bad.md', size: 1, modifiedMs: 1 }]
       }

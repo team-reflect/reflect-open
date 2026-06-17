@@ -74,33 +74,6 @@ export async function clearIndex(generation: number): Promise<void> {
   await call('index_clear', { generation }, voidSchema)
 }
 
-/** One `asset_descriptions` entity row (Plan 20), mirroring the Rust struct. */
-export interface AssetDescriptionRow {
-  assetPath: string
-  sourceHash: string
-  sourceSize: number
-  description: string
-  provider: string
-  model: string
-  generatedAt: string
-}
-
-/** Upsert one asset-description entity row (for `generation`; a stale write drops). */
-export async function applyAssetDescription(
-  row: AssetDescriptionRow,
-  generation: number,
-): Promise<void> {
-  await call('index_asset_description_apply', { row, generation }, voidSchema)
-}
-
-/** Remove one asset-description entity row by asset path (for `generation`). */
-export async function removeAssetDescription(
-  assetPath: string,
-  generation: number,
-): Promise<void> {
-  await call('index_asset_description_remove', { assetPath, generation }, voidSchema)
-}
-
 /**
  * Upsert one `index_meta` key (for `generation`; a stale stamp is dropped).
  * Bookkeeping the TS policy layer owns — e.g. the projection-version stamp a

@@ -132,54 +132,6 @@ export function buildDescriptionSource(meta: AssetDescriptionMeta, body: string)
   })
 }
 
-/** The full provenance + body of a managed description, for the search-index entity. */
-export interface AssetDescriptionEntity {
-  sourceHash: string
-  sourceSize: number
-  provider: string
-  model: string
-  generatedAt: string
-  /** The description body (markdown), frontmatter stripped. */
-  description: string
-}
-
-/** The managed marker plus the full provenance the `asset_descriptions` row needs. */
-const descriptionEntitySchema = z.object({
-  reflectAsset: z.literal(true),
-  sourceHash: z.string(),
-  sourceSize: z.number(),
-  provider: z.string(),
-  model: z.string(),
-  generatedAt: z.string(),
-})
-
-/**
- * Project a description file into its search-index entity row, or `null` if it
- * isn't a Reflect-managed description (missing the `reflectAsset: true` marker
- * or its provenance) or carries no body. The inverse of
- * {@link buildDescriptionSource}; the `asset_descriptions` projection is built
- * from this, so a user-authored file at the sidecar path is never indexed.
- */
-export function readDescriptionEntity(source: string): AssetDescriptionEntity | null {
-  const { raw, body } = splitFrontmatter(source)
-  const parsed = descriptionEntitySchema.safeParse(parseFrontmatter(raw).data)
-  if (!parsed.success) {
-    return null
-  }
-  const description = body.trim()
-  if (description === '') {
-    return null
-  }
-  return {
-    sourceHash: parsed.data.sourceHash,
-    sourceSize: parsed.data.sourceSize,
-    provider: parsed.data.provider,
-    model: parsed.data.model,
-    generatedAt: parsed.data.generatedAt,
-    description,
-  }
-}
-
 /** Decoded byte length of a base64 payload, without materializing the bytes. */
 export function base64ByteLength(base64: string): number {
   const length = base64.length

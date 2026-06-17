@@ -30,7 +30,7 @@ use crate::fs::GraphState;
 
 pub use chat_write::{ChatConversation, ChatMessageRow};
 pub use embed_write::EmbeddedChunk;
-pub use write::{AssetDescriptionRow, IndexedNote};
+pub use write::IndexedNote;
 
 /// The open index connection plus its monotonic generation, kept **under one
 /// lock** so they swap atomically. `index_open` bumps the generation and rebinds
@@ -264,36 +264,6 @@ pub fn index_clear(generation: u64, index: State<IndexState>) -> AppResult<()> {
     }
     let conn = state.conn.as_ref().ok_or_else(AppError::no_graph)?;
     write::clear_index(conn)
-}
-
-/// Upsert one asset-description entity row (Plan 20; no-op if stale).
-#[tauri::command]
-pub fn index_asset_description_apply(
-    row: AssetDescriptionRow,
-    generation: u64,
-    index: State<IndexState>,
-) -> AppResult<()> {
-    let mut state = lock_state(&index)?;
-    if state.generation != generation {
-        return Ok(());
-    }
-    let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
-    write::apply_asset_description(conn, &row)
-}
-
-/// Drop one asset-description entity row by asset path (Plan 20; no-op if stale).
-#[tauri::command]
-pub fn index_asset_description_remove(
-    asset_path: String,
-    generation: u64,
-    index: State<IndexState>,
-) -> AppResult<()> {
-    let mut state = lock_state(&index)?;
-    if state.generation != generation {
-        return Ok(());
-    }
-    let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
-    write::remove_asset_description(conn, &asset_path)
 }
 
 /// Upsert one chat message and its conversation row in a single transaction

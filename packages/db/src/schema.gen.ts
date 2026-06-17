@@ -15,16 +15,6 @@ export interface Aliases {
   notePath: string;
 }
 
-export interface AssetDescriptions {
-  assetPath: string;
-  description: string;
-  generatedAt: string;
-  model: string;
-  provider: string;
-  sourceHash: string;
-  sourceSize: number;
-}
-
 export interface Assets {
   assetPath: string;
   notePath: string;
@@ -135,7 +125,6 @@ export interface Tasks {
 
 export interface DB {
   aliases: Aliases;
-  assetDescriptions: AssetDescriptions;
   assets: Assets;
   backlinks: Backlinks;
   chatConversations: ChatConversations;

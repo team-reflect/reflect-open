@@ -172,8 +172,6 @@ pub fn run() {
             db::index_remove,
             db::index_clear,
             db::index_move,
-            db::index_asset_description_apply,
-            db::index_asset_description_remove,
             db::note_move_indexed,
             db::index_meta_set,
             db::db_query,
