@@ -61,7 +61,7 @@ export function DescribeAssetsField(): ReactElement {
         />
         <span className="text-xs text-text-muted">OCR new assets automatically</span>
       </div>
-      <div className="mt-3 flex flex-col items-end">
+      <div className="mt-3 flex flex-col items-start">
         <Button
           type="button"
           variant="outline"
@@ -70,7 +70,7 @@ export function DescribeAssetsField(): ReactElement {
           onClick={() => setConfirming(true)}
           className="text-text-secondary"
         >
-          {running ? 'Backfilling…' : 'Backfill existing assets'}
+          {running ? 'Backfilling…' : 'Backfill assets'}
         </Button>
         {!hasProvider ? (
           <p className="mt-2 text-xs text-text-muted">Add an AI provider to enable this.</p>
@@ -80,7 +80,7 @@ export function DescribeAssetsField(): ReactElement {
         <Dialog open onOpenChange={(isOpen) => { if (!isOpen) setConfirming(false) }}>
           <DialogContent showCloseButton={false} className="max-w-sm">
             <DialogHeader>
-              <DialogTitle>Backfill existing assets?</DialogTitle>
+              <DialogTitle>Backfill assets?</DialogTitle>
               <DialogDescription>
                 Images and PDFs in non-private notes will be sent to your AI provider so their
                 text can appear in search. Assets that already have OCR are skipped.
@@ -91,7 +91,7 @@ export function DescribeAssetsField(): ReactElement {
                 Cancel
               </Button>
               <Button type="button" size="sm" onClick={() => void runBackfill()}>
-                Backfill existing assets
+                Backfill assets
               </Button>
             </DialogFooter>
           </DialogContent>

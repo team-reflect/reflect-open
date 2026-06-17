@@ -47,19 +47,19 @@ describe('DescribeAssetsField', () => {
   it('disables the backfill until an AI provider is configured', () => {
     settingsRef.current = { ...settingsRef.current, aiProviders: [], defaultAiProviderId: null }
     render(<DescribeAssetsField />)
-    expect(screen.getByRole('button', { name: /backfill existing assets/i }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: /backfill assets/i }).hasAttribute('disabled')).toBe(true)
     expect(screen.queryByText(/add an ai provider to enable this/i)).not.toBeNull()
   })
 
   it('confirms the cost before running the backfill, then runs it pinned to the graph', () => {
     render(<DescribeAssetsField />)
-    fireEvent.click(screen.getByRole('button', { name: /backfill existing assets/i }))
+    fireEvent.click(screen.getByRole('button', { name: /backfill assets/i }))
 
     // The cost warning appears; nothing is sent until the user confirms.
-    expect(screen.queryByText(/backfill existing assets\?/i)).not.toBeNull()
+    expect(screen.queryByText(/backfill assets\?/i)).not.toBeNull()
     expect(backfill).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: /^backfill existing assets$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^backfill assets$/i }))
     expect(backfill).toHaveBeenCalledWith(5, {
       providers: [PROVIDER],
       defaultProviderId: 'cfg',
@@ -68,7 +68,7 @@ describe('DescribeAssetsField', () => {
 
   it('cancels without sending anything', () => {
     render(<DescribeAssetsField />)
-    fireEvent.click(screen.getByRole('button', { name: /backfill existing assets/i }))
+    fireEvent.click(screen.getByRole('button', { name: /backfill assets/i }))
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
     expect(backfill).not.toHaveBeenCalled()
   })
