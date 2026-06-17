@@ -3,7 +3,7 @@ import { describeAsset, isAssetDescriptionRejected, type AssetKind } from '../ai
 import { defaultAiProvider, type AiProvidersState } from '../ai/provider-config'
 import { aiKeySecretName } from '../ai/secrets'
 import { base64ToBytes } from '../ai/transcribe'
-import { isAppError, toAppError } from '../errors'
+import { errorMessage, isAppError, toAppError } from '../errors'
 import { listDir, readAsset, readNote, writeNote } from '../graph/commands'
 import { ASSETS_DIR, DESCRIPTION_SUFFIX, descriptionPathFor } from '../graph/paths'
 import type { FileMeta } from '../graph/schemas'
@@ -229,15 +229,40 @@ export interface ReconcileAssetDescriptionsOutcome {
   stopped: ReconcileStop | null
 }
 
+/** Why an asset was skipped (no description written, nothing sent). */
+type AssetSkipReason = 'up-to-date' | 'unreferenced' | 'private' | 'user-authored' | 'oversize' | 'gone'
+
 /** Per-asset result; `stop` ends the whole pass, everything else is a tally. */
 type AssetStep =
   | { kind: 'described' }
-  | {
-      kind: 'skipped'
-      reason: 'up-to-date' | 'unreferenced' | 'private' | 'user-authored' | 'oversize' | 'gone'
-    }
+  | { kind: 'skipped'; reason: AssetSkipReason }
   | { kind: 'refused' }
   | { kind: 'stop'; stopped: ReconcileStop }
+
+/** The mutable counters a pass accumulates; spread verbatim into the outcome. */
+interface AssetTally {
+  described: number
+  skippedUpToDate: number
+  skippedUnreferenced: number
+  skippedPrivate: number
+  skippedUserAuthored: number
+  skippedOversize: number
+  refused: number
+}
+
+/**
+ * Which {@link AssetTally} counter each skip reason increments. `gone` (the asset
+ * vanished since it was observed, or an ineligible path slipped in) counts as
+ * unreferenced — either way nothing was read, hashed, or sent.
+ */
+const SKIP_COUNTER: Readonly<Record<AssetSkipReason, keyof AssetTally>> = {
+  'up-to-date': 'skippedUpToDate',
+  unreferenced: 'skippedUnreferenced',
+  gone: 'skippedUnreferenced',
+  private: 'skippedPrivate',
+  'user-authored': 'skippedUserAuthored',
+  oversize: 'skippedOversize',
+}
 
 interface AssetContext {
   config: AiProviderConfig
@@ -251,10 +276,6 @@ interface AssetContext {
 }
 
 const STALE: ReconcileStop = { reason: 'stale', message: 'the graph session ended mid-pass' }
-
-function errorMessage(value: unknown): string {
-  return value instanceof Error ? value.message : String(value)
-}
 
 function basename(path: string): string {
   return path.split('/').pop() ?? path
@@ -438,48 +459,31 @@ async function statMap(
 export async function reconcileAssetDescriptions(
   input: ReconcileAssetDescriptionsInput,
 ): Promise<ReconcileAssetDescriptionsOutcome> {
+  const tally: AssetTally = {
+    described: 0,
+    skippedUpToDate: 0,
+    skippedUnreferenced: 0,
+    skippedPrivate: 0,
+    skippedUserAuthored: 0,
+    skippedOversize: 0,
+    refused: 0,
+  }
+  const describedAssetPaths: string[] = []
+  const outcome = (
+    pending: number,
+    stopped: ReconcileStop | null,
+  ): ReconcileAssetDescriptionsOutcome => ({ pending, ...tally, describedAssetPaths, stopped })
+
   let candidate: AssetCandidates
   try {
     candidate = await candidateAssets(input)
   } catch (cause) {
-    return {
-      pending: 0,
-      described: 0,
-      skippedUpToDate: 0,
-      skippedUnreferenced: 0,
-      skippedPrivate: 0,
-      skippedUserAuthored: 0,
-      skippedOversize: 0,
-      refused: 0,
-      describedAssetPaths: [],
-      stopped: { reason: toAppError(cause).kind, message: errorMessage(cause) },
-    }
+    return outcome(0, { reason: toAppError(cause).kind, message: errorMessage(cause) })
   }
 
   const total = candidate.paths.length
-  let described = 0
-  const describedAssetPaths: string[] = []
-  let skippedUpToDate = 0
-  let skippedUnreferenced = 0
-  let skippedPrivate = 0
-  let skippedUserAuthored = 0
-  let skippedOversize = 0
-  let refused = 0
-  const outcome = (stopped: ReconcileStop | null): ReconcileAssetDescriptionsOutcome => ({
-    pending: total,
-    described,
-    skippedUpToDate,
-    skippedUnreferenced,
-    skippedPrivate,
-    skippedUserAuthored,
-    skippedOversize,
-    refused,
-    describedAssetPaths,
-    stopped,
-  })
-
   if (total === 0) {
-    return outcome(null)
+    return outcome(0, null)
   }
 
   // Re-resolved every pass: a provider added in Settings mid-session must be
@@ -487,11 +491,11 @@ export async function reconcileAssetDescriptions(
   // no provider means nothing can be described, so the pass stops.
   const config = defaultAiProvider(input.providers)
   if (config === null) {
-    return outcome({ reason: 'config', message: 'No AI provider is configured.' })
+    return outcome(total, { reason: 'config', message: 'No AI provider is configured.' })
   }
   const apiKey = await getSecret(aiKeySecretName(config.id)).catch(() => null)
   if (apiKey === null) {
-    return outcome({
+    return outcome(total, {
       reason: 'config',
       message: `The API key for the configured ${config.provider} model is missing from the keychain.`,
     })
@@ -510,44 +514,27 @@ export async function reconcileAssetDescriptions(
   let processed = 0
   for (const assetPath of candidate.paths) {
     if (ctx.isStale()) {
-      return outcome(STALE)
+      return outcome(total, STALE)
     }
     let step: AssetStep
     try {
       step = await processAsset(assetPath, ctx)
     } catch (cause) {
-      return outcome({ reason: toAppError(cause).kind, message: errorMessage(cause) })
+      return outcome(total, { reason: toAppError(cause).kind, message: errorMessage(cause) })
     }
     if (step.kind === 'stop') {
-      return outcome(step.stopped)
+      return outcome(total, step.stopped)
     }
     if (step.kind === 'described') {
-      described += 1
+      tally.described += 1
       describedAssetPaths.push(assetPath)
     } else if (step.kind === 'refused') {
-      refused += 1
+      tally.refused += 1
     } else {
-      switch (step.reason) {
-        case 'up-to-date':
-          skippedUpToDate += 1
-          break
-        case 'unreferenced':
-        case 'gone':
-          skippedUnreferenced += 1
-          break
-        case 'private':
-          skippedPrivate += 1
-          break
-        case 'user-authored':
-          skippedUserAuthored += 1
-          break
-        case 'oversize':
-          skippedOversize += 1
-          break
-      }
+      tally[SKIP_COUNTER[step.reason]] += 1
     }
     processed += 1
     input.onProgress?.(processed, total)
   }
-  return outcome(null)
+  return outcome(total, null)
 }
