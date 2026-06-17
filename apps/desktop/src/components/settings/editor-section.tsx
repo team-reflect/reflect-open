@@ -1,11 +1,11 @@
 import type { ReactElement } from 'react'
 import type { EditorMarkdownSyntax } from '@reflect/core'
-import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import { useSettings } from '@/providers/settings-provider'
 import { SettingsField } from './field'
 import { SettingsOptionCard } from './option-card'
 import { SettingsSection } from './section'
+import { SettingsSwitchField } from './switch-field'
 
 interface MarkdownSyntaxOption {
   value: EditorMarkdownSyntax
@@ -35,7 +35,7 @@ export function EditorSection(): ReactElement {
         legend="Markdown syntax"
         description="How literal markdown characters (#, **, [[ ]]) are displayed while editing."
       >
-        <div className="mt-3 flex flex-col gap-2">
+        <div className="mt-3 grid grid-cols-2 gap-2">
           {MARKDOWN_SYNTAX_OPTIONS.map((option) => {
             const selected = settings.editorMarkdownSyntax === option.value
             return (
@@ -71,44 +71,26 @@ export function EditorSection(): ReactElement {
         </div>
       </SettingsField>
 
-      <SettingsField
+      <SettingsSwitchField
         legend="Spell check"
         description="Underline misspelled words while you type."
-      >
-        <div className="mt-3 flex justify-end">
-          <Switch
-            aria-label="Spell check"
-            checked={settings.editorSpellCheck}
-            onCheckedChange={(checked) => updateSettings({ editorSpellCheck: checked })}
-          />
-        </div>
-      </SettingsField>
+        checked={settings.editorSpellCheck}
+        onCheckedChange={(checked) => updateSettings({ editorSpellCheck: checked })}
+      />
 
-      <SettingsField
+      <SettingsSwitchField
         legend="Start with a bullet"
         description="New and empty notes open with a single bullet point, ready to type."
-      >
-        <div className="mt-3 flex justify-end">
-          <Switch
-            aria-label="Start with a bullet"
-            checked={settings.editorDefaultBullet}
-            onCheckedChange={(checked) => updateSettings({ editorDefaultBullet: checked })}
-          />
-        </div>
-      </SettingsField>
+        checked={settings.editorDefaultBullet}
+        onCheckedChange={(checked) => updateSettings({ editorDefaultBullet: checked })}
+      />
 
-      <SettingsField
+      <SettingsSwitchField
         legend="Bullet after a heading"
         description="Pressing Return at the end of a heading starts a new bullet."
-      >
-        <div className="mt-3 flex justify-end">
-          <Switch
-            aria-label="Bullet after a heading"
-            checked={settings.editorBulletAfterHeading}
-            onCheckedChange={(checked) => updateSettings({ editorBulletAfterHeading: checked })}
-          />
-        </div>
-      </SettingsField>
+        checked={settings.editorBulletAfterHeading}
+        onCheckedChange={(checked) => updateSettings({ editorBulletAfterHeading: checked })}
+      />
     </SettingsSection>
   )
 }
