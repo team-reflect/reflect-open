@@ -1,4 +1,5 @@
 import { useState, type ReactElement } from 'react'
+import { Button } from '@/components/ui/button'
 import { rebuildIndexVisibly } from '@/lib/rebuild-index'
 import { useGraph } from '@/providers/graph-provider'
 import { SettingsField } from './field'
@@ -32,15 +33,17 @@ export function RebuildIndexField(): ReactElement {
       legend="Rebuild index"
       description="Reflect keeps a local index of your notes to power search and links. If results ever look stale or incomplete, rebuild it — your notes are never changed."
     >
-      <div className="mt-3 flex justify-end">
-        <button
+      <div className="mt-3 flex justify-start">
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           disabled={indexGeneration === null || rebuilding}
           onClick={() => void rebuild()}
-          className="shrink-0 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-text-secondary transition-colors duration-100 hover:bg-surface-hover disabled:pointer-events-none disabled:opacity-50"
+          className="text-text-secondary"
         >
           {rebuilding ? 'Rebuilding…' : 'Rebuild index'}
-        </button>
+        </Button>
       </div>
     </SettingsField>
   )
