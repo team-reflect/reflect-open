@@ -400,17 +400,12 @@ body {
   padding: 0;
 }
 
-/* Inline images: the literal `![alt](src)` text keeps a widget-rendered
-   preview directly beneath it (Plan 05b). */
-.reflect-editor .md-image {
-  -webkit-user-select: none;
-  user-select: none;
-  margin: 0.25em 0 0.5em;
-}
-.reflect-editor .md-image img {
-  max-width: 100%;
-  max-height: 28rem;
-  border-radius: var(--radius-md, 6px);
+/* Inline images: meowdown renders `![alt](src)` through a mark view
+   (`.md-image-preview`). Cap the height and round corners to Reflect's scale
+   via meowdown's theming variables. */
+.reflect-editor {
+  --meowdown-image-max-height: 28rem;
+  --meowdown-image-radius: var(--radius-md, 6px);
 }
 
 /* Read-only view for notes the editor can't faithfully round-trip yet. */
