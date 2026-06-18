@@ -1,5 +1,4 @@
 import { memo, type MouseEvent, type ReactElement } from 'react'
-import { Circle, CircleCheck } from 'lucide-react'
 import type { NoteListEntry } from '@reflect/core'
 import { formatRecencyLabel } from '@/lib/dates'
 import { cn } from '@/lib/utils'
@@ -46,7 +45,9 @@ export const AllNotesRow = memo(function AllNotesRow({ note, selected, onSelect,
       className={cn(
         'group/row relative h-12 cursor-default select-none transition-colors duration-100',
         ALL_NOTES_GRID,
-        selected ? 'bg-surface-hover ring-1 ring-inset ring-accent' : 'hover:bg-surface-hover',
+        selected
+          ? 'border-y border-accent/20 bg-accent-soft text-text dark:border-accent/10 dark:text-text'
+          : 'shadow-[var(--border-hairline)] hover:bg-surface-hover',
       )}
     >
       <button
@@ -58,15 +59,17 @@ export const AllNotesRow = memo(function AllNotesRow({ note, selected, onSelect,
           onToggle(note.path, event)
         }}
         className={cn(
-          'absolute left-4 top-1/2 flex size-[18px] -translate-y-1/2 items-center justify-center text-text-muted transition-opacity duration-100 hover:text-text focus-visible:opacity-100 focus-visible:outline-none',
+          'group absolute inset-y-0 left-0 flex w-12 items-center justify-center opacity-0 transition-opacity duration-100 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none',
           selected ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100',
         )}
       >
-        {selected ? (
-          <CircleCheck aria-hidden className="size-[18px] text-accent" strokeWidth={2} />
-        ) : (
-          <Circle aria-hidden className="size-[18px]" strokeWidth={2} />
-        )}
+        <span
+          aria-hidden
+          className={cn(
+            'size-2 rounded-full transition-transform duration-150 group-hover:scale-110',
+            selected ? 'bg-accent' : 'ring-1 ring-accent',
+          )}
+        />
       </button>
       <button
         type="button"
@@ -74,11 +77,16 @@ export const AllNotesRow = memo(function AllNotesRow({ note, selected, onSelect,
           event.stopPropagation()
           onOpen(note.path)
         }}
-        className="truncate text-left text-[13px] font-medium text-text focus-visible:outline-none"
+        className={cn(
+          'truncate text-left text-[13px] font-medium focus-visible:outline-none',
+          selected ? 'text-accent' : 'text-text',
+        )}
       >
         {note.title}
       </button>
-      <span className="truncate text-[13px] text-text-secondary">{note.snippet}</span>
+      <span className={cn('truncate text-[13px]', selected ? 'text-accent' : 'text-text-secondary')}>
+        {note.snippet}
+      </span>
       <span className="truncate text-right text-[13px] text-text-secondary">
         {note.tags.map((tag) => `#${tag}`).join(' ')}
       </span>

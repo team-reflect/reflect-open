@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } 
 import { useQuery } from '@tanstack/react-query'
 import { hasBridge, listNotes, listNoteTags } from '@reflect/core'
 import { Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { allNotesQueryKey, allNotesTagsQueryKey } from '@/lib/notes/all-notes-query'
 import { useListSelection } from '@/lib/selection/use-list-selection'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration'
@@ -121,14 +122,22 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
             onSelect={handleFilterSelect}
           />
           {selection.selectedCount > 0 ? (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              aria-label={`Trash (${selection.selectedCount})`}
               onClick={openTrashConfirm}
-              className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-medium text-text-secondary shadow-sm transition-colors duration-100 hover:bg-surface-hover hover:text-destructive"
+              className="text-text-secondary hover:text-destructive"
             >
-              <Trash2 aria-hidden className="size-4" />
-              Trash ({selection.selectedCount})
-            </button>
+              <Trash2 aria-hidden className="size-3.5" />
+              <span>Trash</span>
+              <span
+                aria-hidden
+                className="flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive/10 px-1 text-[10px] font-semibold leading-none tabular-nums text-destructive"
+              >
+                {selection.selectedCount}
+              </span>
+            </Button>
           ) : null}
           <NewNoteButton />
         </div>

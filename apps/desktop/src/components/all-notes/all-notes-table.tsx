@@ -28,7 +28,7 @@ interface AllNotesTableProps {
   registerScrollToIndex: (scrollToIndex: (index: number) => void) => void
 }
 
-const ESTIMATED_ROW_HEIGHT = 49
+const ESTIMATED_ROW_HEIGHT = 48
 
 /**
  * The All Notes table: a sticky header row over virtualized note rows. The
@@ -99,7 +99,7 @@ export function AllNotesTable({
                 key={note.path}
                 data-index={item.index}
                 ref={virtualizer.measureElement}
-                className="absolute inset-x-0 border-b border-border"
+                className="absolute inset-x-0"
                 style={{ transform: `translateY(${item.start}px)` }}
               >
                 <AllNotesRow

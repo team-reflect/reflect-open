@@ -41,7 +41,7 @@ export function TaskFiltersMenu({
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="window-drag-control text-xs font-normal text-text-muted">
-          <ListFilter aria-hidden className="size-4" />
+          <ListFilter aria-hidden className="size-3.5" />
           Task filters
         </Button>
       </DropdownMenuTrigger>
