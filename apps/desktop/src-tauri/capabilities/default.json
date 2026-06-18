@@ -8,6 +8,7 @@
     "core:window:allow-start-dragging",
     "core:window:allow-destroy",
     "opener:default",
+    "opener:allow-open-path",
     "dialog:default",
     {
       "identifier": "http:default",

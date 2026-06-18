@@ -400,17 +400,33 @@ body {
   padding: 0;
 }
 
-/* Inline images: the literal `![alt](src)` text keeps a widget-rendered
-   preview directly beneath it (Plan 05b). */
-.reflect-editor .md-image {
-  -webkit-user-select: none;
-  user-select: none;
-  margin: 0.25em 0 0.5em;
+/* Inline images: meowdown renders `![alt](src)` through a mark view
+   (`.md-image-preview`). Cap the height and round corners to Reflect's scale
+   via meowdown's theming variables. */
+.reflect-editor {
+  --meowdown-image-max-height: 28rem;
+  --meowdown-image-radius: var(--radius-md, 6px);
 }
-.reflect-editor .md-image img {
-  max-width: 100%;
-  max-height: 28rem;
-  border-radius: var(--radius-md, 6px);
+.reflect-editor .md-image-preview-img img {
+  cursor: zoom-in;
+}
+
+/* Editor image lightbox: zoom the clicked image into the full-window preview
+   and back via the View Transition API (an instant swap where unsupported).
+   The root snapshot is suppressed so only the image animates. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0s;
+}
+::view-transition-group(reflect-image-lightbox) {
+  animation-duration: 180ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+::view-transition-old(reflect-image-lightbox),
+::view-transition-new(reflect-image-lightbox) {
+  height: 100%;
+  object-fit: contain;
+  overflow: clip;
 }
 
 /* Read-only view for notes the editor can't faithfully round-trip yet. */
