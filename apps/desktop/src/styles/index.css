@@ -450,8 +450,12 @@ body {
 }
 
 /* Wiki links: chips over the engine's native `[[…]]` marks (the theme's
-   dashed underline reads as a draft affordance; V1 renders chips). */
-.reflect-editor .md-wikilink {
+   dashed underline reads as a draft affordance; V1 renders chips). meowdown
+   0.13.0 renders wikilinks as a mark view: the immutable `.md-wikilink-label`
+   stands in for the raw `.md-wikilink-source`, so chip both (one shows per
+   mark mode). */
+.reflect-editor .md-wikilink-label,
+.reflect-editor .md-wikilink-source {
   text-decoration: none;
   color: var(--accent-soft-text, var(--accent));
   background: var(--accent-soft, rgb(99 102 241 / 12%));
