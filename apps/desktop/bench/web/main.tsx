@@ -8,7 +8,14 @@
  * Benchmark-only. Served by `bench/web/vite.config.ts`; never part of the app.
  */
 
-import { Profiler, StrictMode, useState, type ProfilerOnRenderCallback, type ReactElement } from 'react'
+import {
+  Profiler,
+  StrictMode,
+  useEffect,
+  useState,
+  type ProfilerOnRenderCallback,
+  type ReactElement,
+} from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { setBridge } from '@reflect/core'
@@ -59,17 +66,21 @@ const paletteContext: CommandContext = {
 
 function OpenPalette(): null {
   const { openPalette } = usePalette()
-  useState(() => {
+  useEffect(() => {
     queueMicrotask(() => openPalette('a'))
-    return 0
-  })
+  }, [openPalette])
   return null
 }
 
 function SidebarHarness(): ReactElement {
   const [, setTick] = useState(0)
-  ;(window as unknown as { __bumpSidebar?: () => void }).__bumpSidebar = () =>
-    setTick((value) => value + 1)
+  useEffect(() => {
+    const benchWindow = window as unknown as { __bumpSidebar?: () => void }
+    benchWindow.__bumpSidebar = () => setTick((value) => value + 1)
+    return () => {
+      delete benchWindow.__bumpSidebar
+    }
+  }, [])
   return (
     <ul>
       {dataset.pinned.map((entry) => (

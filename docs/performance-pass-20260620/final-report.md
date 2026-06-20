@@ -109,7 +109,7 @@ Automated render-count and timing benchmarks were run after the initial pass.
 See **`docs/performance-pass-20260620/real-benchmarks.md`** for full methodology,
 dataset description, reproduction commands, and result interpretation.
 
-Raw Vitest output: `docs/performance-pass-20260620/artifacts/memoization-perf.txt`  
+Raw Vitest output: `docs/performance-pass-20260620/artifacts/memoization-perf.txt`
 Benchmark harness: `apps/desktop/bench/memoization-perf.bench.test.tsx` (9/9 PASS)
 
 Real before/after numbers (source files at `7225f2e` vs `1d08a2b`):

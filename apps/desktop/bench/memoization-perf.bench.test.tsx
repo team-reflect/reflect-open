@@ -14,13 +14,7 @@
  * Benchmark-only — never imported by the app.
  */
 
-import {
-  memo,
-  useMemo,
-  type ComponentType,
-  type ReactElement,
-  type ReactNode,
-} from 'react'
+import { memo, useMemo, type ReactElement, type ReactNode } from 'react'
 import { render, renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -499,18 +493,14 @@ describe('B5: NotePane — useGraph hook call count across 20 stream re-renders'
   })
 
   it('UN-MEMOIZED (baseline): 200 useGraph calls (2 per hook-chain per pane per re-render)', async () => {
-    const { NotePane } = await import('@/components/note-pane')
-    // Access the inner function from the memo wrapper — NotePane.type is the
-    // wrapped component function (React internals, stable across React 18/19).
-    type MemoRef<P> = { type: ComponentType<P> }
-    const NotePaneFn = (NotePane as unknown as MemoRef<{ path: string }>).type
+    const { NotePaneComponent } = await import('@/components/note-pane')
     const paths = DS.dailyPaths.slice(0, PANES)
 
     function StreamContainer({ tick }: { tick: number }): ReactElement {
       return (
         <div data-tick={tick}>
           {paths.map((path) => (
-            <NotePaneFn key={path} path={path} />
+            <NotePaneComponent key={path} path={path} />
           ))}
         </div>
       )

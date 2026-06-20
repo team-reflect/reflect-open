@@ -91,6 +91,12 @@ export function buildDataset(options: DatasetOptions = {}): BenchDataset {
   const noteCount = options.noteCount ?? 1_500
   const pinnedCount = options.pinnedCount ?? 40
   const paletteResultCount = options.paletteResultCount ?? 50
+  if (dailyCount < 1) {
+    throw new Error('benchmark dataset requires at least one daily note')
+  }
+  if (noteCount < 6) {
+    throw new Error('benchmark dataset requires at least six ordinary notes')
+  }
   const random = makePrng(0x9e3779b9)
 
   const dailyDates: string[] = []

@@ -1,9 +1,9 @@
 # Performance Pass (2026-06-20) — Real Benchmarks
 
-**Branch:** `claude/performance-pass-20260620`  
-**Commit measured (head):** `1d08a2b98d` (PR #294)  
-**Baseline commit:** `7225f2e` (parent of the perf commit, pre-memo)  
-**Benchmark run:** 2026-06-20  
+**Branch:** `claude/performance-pass-20260620`
+**Commit measured (head):** `1d08a2b98d` (PR #294)
+**Baseline commit:** `7225f2e` (parent of the perf commit, pre-memo)
+**Benchmark run:** 2026-06-20
 **Raw artifacts:** `docs/performance-pass-20260620/artifacts/`
 
 ---
@@ -201,6 +201,30 @@ All 9 tests pass; selected results from the run on 2026-06-20:
 | B3 DayCalendar Set × 100 re-renders | **0** new allocations | 100 |
 | B4 useSimilarNotes × 100 re-renders | **0** new allocations | new array/render |
 | B5 NotePane × 20 scroll events | **0** | 200 |
+
+---
+
+## Tier 2 — Real Chromium browser data (`artifacts/real-browser-chromium.json`)
+
+A prior benchmark pass served `apps/desktop/bench/web/` via Vite and drove the
+real `CommandPalette` and `SidebarNoteRow` in Google Chrome via Playwright
+(browser MCP). The same before/after git-checkout procedure was used (baseline
+at `7225f2e`). Three measured runs after one warm-up; React Profiler
+`actualDuration` is the primary signal.
+
+| Flow | Chrome actualDuration — baseline | Chrome actualDuration — memoized | Δ |
+|---|---|---|---|
+| Palette typing (10 keys, 50 results) | ~24.5 ms | ~20.1 ms | −18% |
+| Palette ↓ nav (15 arrows) | ~36 ms | ~29 ms | −20% |
+| Sidebar rerender (12×, 40 rows) | ~20 ms | ~18 ms | within noise |
+
+Deterministic counts (same as Tier 1) corroborate: palette typing 500→0
+`parseHighlights` calls; nav 15→0 `NotePreview` remounts; sidebar 480→0 row
+body executions.
+
+Note: for the sidebar scenario, the row-execution count (480→0) is the reliable
+signal; the Chrome actualDuration difference is within run-to-run variability at
+this scale.
 
 ---
 

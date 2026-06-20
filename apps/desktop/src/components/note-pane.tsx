@@ -61,7 +61,7 @@ interface NotePaneProps {
  * `useNoteDocument`/`note-session.ts`, link-click behavior in
  * `useWikiLinkNavigation`, and the banners are shared components.
  */
-export const NotePane = memo(function NotePane({
+export function NotePaneComponent({
   path,
   lazy = false,
   autoFocus = false,
@@ -233,4 +233,6 @@ export const NotePane = memo(function NotePane({
       </div>
     </div>
   )
-})
+}
+
+export const NotePane = memo(NotePaneComponent)

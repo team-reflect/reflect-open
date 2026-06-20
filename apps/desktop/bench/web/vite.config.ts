@@ -26,7 +26,8 @@ function redirectRelativeFakes(): Plugin {
       if (!resolved) {
         return null
       }
-      const match = map.find((entry) => resolved.id.replace(/\.(ts|tsx)$/, '').endsWith(entry.suffix))
+      const resolvedId = resolved.id.replaceAll('\\', '/').replace(/\.(ts|tsx)$/, '')
+      const match = map.find((entry) => resolvedId.endsWith(entry.suffix))
       return match ? match.to : null
     },
   }
