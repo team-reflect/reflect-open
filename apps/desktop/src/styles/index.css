@@ -302,9 +302,16 @@ body {
   margin-top: 0;
 }
 
-.reflect-editor h1,
-.reflect-editor h2,
-.reflect-editor h3 {
+/* Heading weight and size compete with meowdown's `.ProseMirror h*` theme
+   rules. That stylesheet is injected dynamically when the editor lazy-loads, so
+   it cascades *after* this file and wins equal-specificity (0-1-1) ties — left
+   plain, our H1 lost to the theme's 1.75rem and towered over the daily subject.
+   The `.ProseMirror` compound bumps these to 0-2-1 so our values hold; see the
+   note on `.reflect-stream-gutter`. (Margin and letter-spacing ride along; only
+   the size and weight actually clash with the theme.) */
+.reflect-editor.ProseMirror h1,
+.reflect-editor.ProseMirror h2,
+.reflect-editor.ProseMirror h3 {
   font-weight: 650;
   letter-spacing: var(--tracking-snug, -0.01em);
   margin: 1.25em 0 0.4em;
@@ -312,9 +319,9 @@ body {
 /* The leading H1 is the regular-note subject, matching the daily subject.
    Other headings stay capped at the same semantic size rather than towering
    over the body. */
-.reflect-editor h1 { @apply text-note-subject; }
-.reflect-editor h2 { @apply text-note-subject; }
-.reflect-editor h3 { font-size: var(--text-lg, 1.125rem); }
+.reflect-editor.ProseMirror h1 { @apply text-note-subject; }
+.reflect-editor.ProseMirror h2 { @apply text-note-subject; }
+.reflect-editor.ProseMirror h3 { font-size: var(--text-lg, 1.125rem); }
 .reflect-editor h1:first-child { margin-top: 0; }
 .reflect-editor .reflect-note-title { @apply text-note-subject; }
 
