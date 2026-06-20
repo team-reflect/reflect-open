@@ -1,0 +1,46 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies". See https://pnpm.io/settings for the new home of each setting.
+
+ RUN  v4.1.9 /Users/cloud/repos/team-reflect/reflect-open-worktrees/performance-pass-20260620/apps/desktop
+
+stdout | bench/memoization-perf.bench.test.tsx > B1: SidebarNoteRow — 40 pinned rows × 100 parent re-renders > MEMOIZED (current PR): 0 extra routeForPath calls across 100 route-change re-renders
+  [B1-memo]   routeForPath calls: 0 / 4000 potential   26.5ms
+
+stdout | bench/memoization-perf.bench.test.tsx > B1: SidebarNoteRow — 40 pinned rows × 100 parent re-renders > UN-MEMOIZED (baseline): 4 000 routeForPath calls (one per row per re-render)
+  [B1-plain]  routeForPath calls: 4000 / 4000 potential   47.3ms
+
+stdout | bench/memoization-perf.bench.test.tsx > B2: Snippet — 12 items × 50 query changes (snippet strings unchanged) > MEMOIZED (current PR): 0 extra parseHighlights calls for unchanged snippets
+  [B2-memo]   parseHighlights calls: 0 / 600 potential   3.4ms
+
+stdout | bench/memoization-perf.bench.test.tsx > B2: Snippet — 12 items × 50 query changes (snippet strings unchanged) > UN-MEMOIZED (baseline): 600 parseHighlights calls (one per snippet per keystroke)
+  [B2-plain]  parseHighlights calls: 600 / 600 potential   5.6ms
+
+ ✓ bench/memoization-perf.bench.test.tsx > B1: SidebarNoteRow — 40 pinned rows × 100 parent re-renders > MEMOIZED (current PR): 0 extra routeForPath calls across 100 route-change re-renders 43ms
+ ✓ bench/memoization-perf.bench.test.tsx > B1: SidebarNoteRow — 40 pinned rows × 100 parent re-renders > UN-MEMOIZED (baseline): 4 000 routeForPath calls (one per row per re-render) 50ms
+ ✓ bench/memoization-perf.bench.test.tsx > B2: Snippet — 12 items × 50 query changes (snippet strings unchanged) > MEMOIZED (current PR): 0 extra parseHighlights calls for unchanged snippets 5ms
+ ✓ bench/memoization-perf.bench.test.tsx > B2: Snippet — 12 items × 50 query changes (snippet strings unchanged) > UN-MEMOIZED (baseline): 600 parseHighlights calls (one per snippet per keystroke) 7ms
+stdout | bench/memoization-perf.bench.test.tsx > B3: DayCalendar Set — useMemo reference stability across 100 re-renders > MEMOIZED (current PR): same Set reference across all re-renders
+  [B3-memo]   Set re-allocations: 0 / 100   1.9ms
+
+stdout | bench/memoization-perf.bench.test.tsx > B3: DayCalendar Set — useMemo reference stability across 100 re-renders > UN-MEMOIZED (baseline): new Set allocated on every re-render
+  [B3-plain]  Set re-allocations: 100 / 100   1.4ms
+
+stdout | bench/memoization-perf.bench.test.tsx > B4: useSimilarNotes — useMemo array reference stability across 100 re-renders > MEMOIZED (current PR): same array reference across all stable re-renders
+  [B4-memo]   array re-allocations: 0 / 100   4.0ms   (6 hits)
+
+ ✓ bench/memoization-perf.bench.test.tsx > B3: DayCalendar Set — useMemo reference stability across 100 re-renders > MEMOIZED (current PR): same Set reference across all re-renders 3ms
+ ✓ bench/memoization-perf.bench.test.tsx > B3: DayCalendar Set — useMemo reference stability across 100 re-renders > UN-MEMOIZED (baseline): new Set allocated on every re-render 2ms
+ ✓ bench/memoization-perf.bench.test.tsx > B4: useSimilarNotes — useMemo array reference stability across 100 re-renders > MEMOIZED (current PR): same array reference across all stable re-renders 61ms
+stdout | bench/memoization-perf.bench.test.tsx > B5: NotePane — useGraph hook call count across 20 stream re-renders > MEMOIZED (current PR): 0 extra useGraph calls for stable-prop panes
+  [B5-memo]   useGraph calls: 0 / 200 potential   0.7ms
+
+stdout | bench/memoization-perf.bench.test.tsx > B5: NotePane — useGraph hook call count across 20 stream re-renders > UN-MEMOIZED (baseline): 200 useGraph calls (2 per hook-chain per pane per re-render)
+  [B5-plain]  useGraph calls: 200 / 200 potential   2.0ms
+
+ ✓ bench/memoization-perf.bench.test.tsx > B5: NotePane — useGraph hook call count across 20 stream re-renders > MEMOIZED (current PR): 0 extra useGraph calls for stable-prop panes 329ms
+ ✓ bench/memoization-perf.bench.test.tsx > B5: NotePane — useGraph hook call count across 20 stream re-renders > UN-MEMOIZED (baseline): 200 useGraph calls (2 per hook-chain per pane per re-render) 3ms
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Start at  15:43:12
+   Duration  1.63s (transform 243ms, setup 0ms, import 806ms, tests 503ms, environment 233ms)
+

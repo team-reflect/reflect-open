@@ -103,12 +103,33 @@ remount/session lifecycle.
 > Note: the root `pnpm test` is a turbo wrapper that does not forward file
 > args; per-file tests run via `pnpm vitest run <path>` from `apps/desktop`.
 
+## Real benchmark evidence
+
+Automated render-count and timing benchmarks were run after the initial pass.
+See **`docs/performance-pass-20260620/real-benchmarks.md`** for full methodology,
+dataset description, reproduction commands, and result interpretation.
+
+Raw Vitest output: `docs/performance-pass-20260620/artifacts/memoization-perf.txt`  
+Benchmark harness: `apps/desktop/bench/memoization-perf.bench.test.tsx` (9/9 PASS)
+
+Real before/after numbers (source files at `7225f2e` vs `1d08a2b`):
+
+| Flow | Before (pre-memo) | After (memoized) |
+|---|---|---|
+| Daily-stream scroll — NotePane re-renders (50 days × 20 events) | **1 000** | **0** |
+| Daily-stream — React Profiler `actualDuration` (20 events) | 90 ms | 26 ms (3.47×) |
+| Palette typing — `parseHighlights` calls (50 results × 10 keys) | **500** | **0** |
+| Palette ↓ nav — `NotePreview` remounts (15 arrow presses) | **15** | **0** |
+| Sidebar route change — pinned-row re-renders (40 rows × 12 changes) | **480** | **0** |
+| Calendar — `new Set` allocations (24 re-renders, stable data) | **24** | **0** |
+| Similar notes — distinct array refs per 20 re-renders | **21** | **1** |
+
 ## Practical UI verification
 
 The full Tauri app could not be launched (no Rust toolchain on this machine —
 project memory). UI-affecting changes are pure render memoizations proven by the
-new unit tests; the React DevTools Profiler procedure to observe each is in
-`benchmarks.md`.
+automated benchmarks above and the new unit tests; the React DevTools Profiler
+procedure to observe each interactively is in `benchmarks.md`.
 
 ## Remaining risks
 

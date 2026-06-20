@@ -1,0 +1,17 @@
+{
+  "rev": "baseline",
+  "flow": "flow-2-daily-stream-scroll",
+  "description": "NotePane body executions and editor-subtree renders across parent re-renders of a 50-day window with unchanged row props (20 re-renders).",
+  "metrics": {
+    "visibleDays": 50,
+    "parentRerenders": 20,
+    "mountNotePaneRenders": 50,
+    "mountEditorRenders": 50,
+    "rerenderNotePaneRenders": 1000,
+    "rerenderEditorRenders": 1000,
+    "totalNotePaneRenders": 1050,
+    "totalEditorRenders": 1050,
+    "profiledCommits": 21,
+    "profiledActualMs": 92.81
+  }
+}

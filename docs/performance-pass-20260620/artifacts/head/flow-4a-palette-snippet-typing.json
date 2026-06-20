@@ -1,0 +1,12 @@
+{
+  "rev": "head",
+  "flow": "flow-4a-palette-snippet-typing",
+  "description": "parseHighlights calls while typing 10 characters over a 50-result palette (mount vs typing).",
+  "metrics": {
+    "results": 50,
+    "keystrokes": 10,
+    "mountParseHighlightsCalls": 50,
+    "typingParseHighlightsCalls": 0,
+    "totalParseHighlightsCalls": 50
+  }
+}

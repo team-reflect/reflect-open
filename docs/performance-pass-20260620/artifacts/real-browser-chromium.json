@@ -1,0 +1,29 @@
+{
+  "surface": "Vite harness (apps/desktop/bench/web) mounting the real CommandPalette + SidebarNoteRow",
+  "engine": "Google Chrome / Chromium via Playwright (browser MCP)",
+  "metric": "React Profiler actualDuration (ms) summed over an interaction; wallMs includes requestAnimationFrame waits and is not the work cost",
+  "iterations": "3 measured runs after 1 warm-up; baseline via git checkout of the 5 source files at 7225f2e",
+  "flows": {
+    "palette-typing-10-keys-50-results": {
+      "deterministicCount": { "metric": "parseHighlights reruns", "baseline": 500, "memoized": 0 },
+      "head_memoized_actualMs": [17.9, 20.2, 20.1],
+      "baseline_prememo_actualMs": [24.8, 24.1, 24.5],
+      "commitsPerRun": 20,
+      "interpretation": "Real Chromium React commit time ~24.5ms -> ~20.1ms (~18% lower) because memoized Snippets skip parseHighlights within each commit."
+    },
+    "palette-arrowdown-15": {
+      "deterministicCount": { "metric": "NotePreview remounts", "baseline": 15, "memoized": 0 },
+      "head_memoized_actualMs_30commit_runs": [30.2, 27.9],
+      "baseline_prememo_actualMs_30commit_runs": [37.2, 35.4],
+      "note": "Runs where ArrowDown reached the list end commit fewer times (~8) and are excluded from the ms comparison.",
+      "interpretation": "Stable key updates the preview in place (~29ms) vs path key remounting it each arrow (~36ms); ~20% lower commit time."
+    },
+    "sidebar-rerender-12x40rows": {
+      "deterministicCount": { "metric": "pinned-row body executions", "baseline": 480, "memoized": 0 },
+      "head_memoized_actualMs": [12.3, 20.3, 21.3],
+      "baseline_prememo_actualMs": [17.9, 22.7, 19.9],
+      "commitsPerRun": 12,
+      "interpretation": "At 40 rows the per-commit cost is small; the real-browser wall-clock is within run-to-run noise, so the deterministic row-execution count (480 -> 0) is the reliable signal here."
+    }
+  }
+}

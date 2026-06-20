@@ -1,0 +1,10 @@
+{
+  "rev": "head",
+  "flow": "flow-5c-similar-notes-stability",
+  "description": "Distinct useSimilarNotes result references across 20 re-renders with a reference-stable query result.",
+  "metrics": {
+    "rerenders": 20,
+    "totalRenders": 21,
+    "distinctResultReferences": 1
+  }
+}

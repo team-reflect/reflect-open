@@ -1,0 +1,12 @@
+{
+  "rev": "head",
+  "flow": "flow-5a-sidebar-pinned",
+  "description": "SidebarNoteRow body executions across 12 route-change re-renders of a 40-row pinned shelf with unchanged row props.",
+  "metrics": {
+    "pinnedRows": 40,
+    "routeChanges": 12,
+    "mountRowRenders": 40,
+    "rerenderRowRenders": 0,
+    "totalRowRenders": 40
+  }
+}

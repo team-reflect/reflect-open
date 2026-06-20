@@ -1,0 +1,12 @@
+{
+  "rev": "head",
+  "flow": "flow-5b-day-calendar-set",
+  "description": "noted-dates Set constructions across 24 sidebar re-renders (stable query result of 23 dates).",
+  "metrics": {
+    "notedDates": 23,
+    "rerenders": 24,
+    "mountSetBuilds": 1,
+    "rerenderSetBuilds": 0,
+    "totalSetBuilds": 1
+  }
+}

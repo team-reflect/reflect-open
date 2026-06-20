@@ -1,0 +1,203 @@
+{
+  "generatedAt": null,
+  "baselineRev": "baseline",
+  "headRev": "head",
+  "rows": [
+    {
+      "flow": "flow-2-daily-stream-scroll",
+      "label": "Daily-stream scroll — NotePane re-renders avoided",
+      "metric": "rerenderNotePaneRenders",
+      "before": 1000,
+      "after": 0
+    },
+    {
+      "flow": "flow-4a-palette-snippet-typing",
+      "label": "Palette typing — parseHighlights reruns",
+      "metric": "typingParseHighlightsCalls",
+      "before": 500,
+      "after": 0
+    },
+    {
+      "flow": "flow-4b-palette-preview-nav",
+      "label": "Palette ↓ nav — NotePreview remounts",
+      "metric": "mountsDuringArrows",
+      "before": 15,
+      "after": 0
+    },
+    {
+      "flow": "flow-5a-sidebar-pinned",
+      "label": "Sidebar route change — pinned-row re-renders",
+      "metric": "rerenderRowRenders",
+      "before": 480,
+      "after": 0
+    },
+    {
+      "flow": "flow-5b-day-calendar-set",
+      "label": "Calendar re-render — noted-Set allocations",
+      "metric": "rerenderSetBuilds",
+      "before": 24,
+      "after": 0
+    },
+    {
+      "flow": "flow-5c-similar-notes-stability",
+      "label": "Similar-notes — distinct array refs / renders",
+      "metric": "distinctResultReferences",
+      "before": 21,
+      "after": 1
+    }
+  ],
+  "raw": {
+    "baseline": {
+      "flow-2-daily-stream-scroll": {
+        "rev": "baseline",
+        "flow": "flow-2-daily-stream-scroll",
+        "description": "NotePane body executions and editor-subtree renders across parent re-renders of a 50-day window with unchanged row props (20 re-renders).",
+        "metrics": {
+          "visibleDays": 50,
+          "parentRerenders": 20,
+          "mountNotePaneRenders": 50,
+          "mountEditorRenders": 50,
+          "rerenderNotePaneRenders": 1000,
+          "rerenderEditorRenders": 1000,
+          "totalNotePaneRenders": 1050,
+          "totalEditorRenders": 1050,
+          "profiledCommits": 21,
+          "profiledActualMs": 92.81
+        }
+      },
+      "flow-4a-palette-snippet-typing": {
+        "rev": "baseline",
+        "flow": "flow-4a-palette-snippet-typing",
+        "description": "parseHighlights calls while typing 10 characters over a 50-result palette (mount vs typing).",
+        "metrics": {
+          "results": 50,
+          "keystrokes": 10,
+          "mountParseHighlightsCalls": 100,
+          "typingParseHighlightsCalls": 500,
+          "totalParseHighlightsCalls": 600
+        }
+      },
+      "flow-4b-palette-preview-nav": {
+        "rev": "baseline",
+        "flow": "flow-4b-palette-preview-nav",
+        "description": "NotePreview mount count across 15 ArrowDown presses (remount-per-arrow vs update-in-place under a stable key).",
+        "metrics": {
+          "arrowPresses": 15,
+          "mountsAfterOpen": 1,
+          "mountsDuringArrows": 15,
+          "totalMounts": 16
+        }
+      },
+      "flow-5a-sidebar-pinned": {
+        "rev": "baseline",
+        "flow": "flow-5a-sidebar-pinned",
+        "description": "SidebarNoteRow body executions across 12 route-change re-renders of a 40-row pinned shelf with unchanged row props.",
+        "metrics": {
+          "pinnedRows": 40,
+          "routeChanges": 12,
+          "mountRowRenders": 40,
+          "rerenderRowRenders": 480,
+          "totalRowRenders": 520
+        }
+      },
+      "flow-5b-day-calendar-set": {
+        "rev": "baseline",
+        "flow": "flow-5b-day-calendar-set",
+        "description": "noted-dates Set constructions across 24 sidebar re-renders (stable query result of 23 dates).",
+        "metrics": {
+          "notedDates": 23,
+          "rerenders": 24,
+          "mountSetBuilds": 1,
+          "rerenderSetBuilds": 24,
+          "totalSetBuilds": 25
+        }
+      },
+      "flow-5c-similar-notes-stability": {
+        "rev": "baseline",
+        "flow": "flow-5c-similar-notes-stability",
+        "description": "Distinct useSimilarNotes result references across 20 re-renders with a reference-stable query result.",
+        "metrics": {
+          "rerenders": 20,
+          "totalRenders": 21,
+          "distinctResultReferences": 21
+        }
+      }
+    },
+    "head": {
+      "flow-2-daily-stream-scroll": {
+        "rev": "head",
+        "flow": "flow-2-daily-stream-scroll",
+        "description": "NotePane body executions and editor-subtree renders across parent re-renders of a 50-day window with unchanged row props (20 re-renders).",
+        "metrics": {
+          "visibleDays": 50,
+          "parentRerenders": 20,
+          "mountNotePaneRenders": 50,
+          "mountEditorRenders": 50,
+          "rerenderNotePaneRenders": 0,
+          "rerenderEditorRenders": 0,
+          "totalNotePaneRenders": 50,
+          "totalEditorRenders": 50,
+          "profiledCommits": 21,
+          "profiledActualMs": 26.63
+        }
+      },
+      "flow-4a-palette-snippet-typing": {
+        "rev": "head",
+        "flow": "flow-4a-palette-snippet-typing",
+        "description": "parseHighlights calls while typing 10 characters over a 50-result palette (mount vs typing).",
+        "metrics": {
+          "results": 50,
+          "keystrokes": 10,
+          "mountParseHighlightsCalls": 50,
+          "typingParseHighlightsCalls": 0,
+          "totalParseHighlightsCalls": 50
+        }
+      },
+      "flow-4b-palette-preview-nav": {
+        "rev": "head",
+        "flow": "flow-4b-palette-preview-nav",
+        "description": "NotePreview mount count across 15 ArrowDown presses (remount-per-arrow vs update-in-place under a stable key).",
+        "metrics": {
+          "arrowPresses": 15,
+          "mountsAfterOpen": 1,
+          "mountsDuringArrows": 0,
+          "totalMounts": 1
+        }
+      },
+      "flow-5a-sidebar-pinned": {
+        "rev": "head",
+        "flow": "flow-5a-sidebar-pinned",
+        "description": "SidebarNoteRow body executions across 12 route-change re-renders of a 40-row pinned shelf with unchanged row props.",
+        "metrics": {
+          "pinnedRows": 40,
+          "routeChanges": 12,
+          "mountRowRenders": 40,
+          "rerenderRowRenders": 0,
+          "totalRowRenders": 40
+        }
+      },
+      "flow-5b-day-calendar-set": {
+        "rev": "head",
+        "flow": "flow-5b-day-calendar-set",
+        "description": "noted-dates Set constructions across 24 sidebar re-renders (stable query result of 23 dates).",
+        "metrics": {
+          "notedDates": 23,
+          "rerenders": 24,
+          "mountSetBuilds": 1,
+          "rerenderSetBuilds": 0,
+          "totalSetBuilds": 1
+        }
+      },
+      "flow-5c-similar-notes-stability": {
+        "rev": "head",
+        "flow": "flow-5c-similar-notes-stability",
+        "description": "Distinct useSimilarNotes result references across 20 re-renders with a reference-stable query result.",
+        "metrics": {
+          "rerenders": 20,
+          "totalRenders": 21,
+          "distinctResultReferences": 1
+        }
+      }
+    }
+  }
+}

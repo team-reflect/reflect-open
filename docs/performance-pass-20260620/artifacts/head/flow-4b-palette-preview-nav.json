@@ -1,0 +1,11 @@
+{
+  "rev": "head",
+  "flow": "flow-4b-palette-preview-nav",
+  "description": "NotePreview mount count across 15 ArrowDown presses (remount-per-arrow vs update-in-place under a stable key).",
+  "metrics": {
+    "arrowPresses": 15,
+    "mountsAfterOpen": 1,
+    "mountsDuringArrows": 0,
+    "totalMounts": 1
+  }
+}
