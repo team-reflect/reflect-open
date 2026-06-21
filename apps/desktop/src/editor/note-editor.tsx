@@ -63,6 +63,13 @@ interface NoteEditorProps {
    * (the `editorBulletAfterHeading` setting). Off by default.
    */
   bulletAfterHeading?: boolean
+  /**
+   * Whether to show meowdown's per-block gutter handle: a grip to drag-reorder
+   * blocks and a "+" to insert a paragraph below. Off by default. The main note
+   * editor opts in; one-line surfaces like the inline task editor leave it off so
+   * no stray grip appears beside them.
+   */
+  blockHandle?: boolean
   /** Resolve an image `![…](…)` source to a displayable URL; unresolved images are skipped. */
   resolveImageUrl?: (src: string) => string | null
   /**
@@ -110,6 +117,7 @@ export function NoteEditor({
   markMode = 'focus',
   spellCheck = true,
   bulletAfterHeading = false,
+  blockHandle = false,
   resolveImageUrl,
   resolveImageOpenPath,
   openImage,
@@ -226,6 +234,7 @@ export function NoteEditor({
         initialMarkdown={initialContent}
         spellCheck={spellCheck}
         bulletAfterHeading={bulletAfterHeading}
+        blockHandle={blockHandle}
         editorClassName={cn('reflect-editor', className)}
         {...(titlePlaceholder !== undefined ? { placeholder: titlePlaceholder } : {})}
         onDocChange={handleDocChange}

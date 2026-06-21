@@ -213,6 +213,8 @@ export function NotePane({
         markMode={settings.editorMarkdownSyntax}
         spellCheck={settings.editorSpellCheck}
         bulletAfterHeading={settings.editorBulletAfterHeading}
+        // The grip drag-reorders blocks and the "+" inserts a paragraph below.
+        blockHandle={true}
         resolveImageUrl={resolveImageUrl}
         resolveImageOpenPath={resolveImageOpenPath}
         openImage={openImage}

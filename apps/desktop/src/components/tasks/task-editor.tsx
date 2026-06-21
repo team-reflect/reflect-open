@@ -196,6 +196,8 @@ export function TaskEditor({
         onChange={onChange}
         markMode={settings.editorMarkdownSyntax}
         spellCheck={settings.editorSpellCheck}
+        // A one-line editor has nothing to reorder, so keep the gutter grip off.
+        blockHandle={false}
         onWikiLinkClick={navigate}
         onWikilinkSearch={onWikilinkSearch}
         onTagSearch={onTagSearch}
