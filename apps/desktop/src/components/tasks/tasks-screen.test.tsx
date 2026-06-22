@@ -27,6 +27,27 @@ vi.mock('@/lib/use-today', () => ({ useToday: () => '2026-06-14' }))
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({ settings: { dateFormat: 'mdy' } }),
 }))
+vi.mock('@/editor/markdown-preview', () => ({
+  MarkdownPreview: ({ content, className }: { content: string; className?: string }) => {
+    const strong = /^(.*)\*\*([^*]+)\*\*(.*)$/u.exec(content)
+    const before = strong?.[1] ?? ''
+    const label = strong?.[2] ?? ''
+    const after = strong?.[3] ?? ''
+    return (
+      <span data-testid="markdown-preview" className={className}>
+        {strong === null ? (
+          content
+        ) : (
+          <>
+            {before}
+            <strong>{label}</strong>
+            {after}
+          </>
+        )}
+      </span>
+    )
+  },
+}))
 
 const toggleTask = vi.hoisted(() => vi.fn())
 const deleteTask = vi.hoisted(() => vi.fn())
@@ -310,6 +331,38 @@ describe('TasksScreen', () => {
     await view.findByText('project task')
     await userEvent.click(view.getByRole('button', { name: 'Open Project' }))
     expect(view.getByTestId('route').textContent).toContain('notes/p.md')
+    view.unmount()
+  })
+
+  it('renders unfocused task content through the markdown preview', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({
+        notePath: 'notes/p.md',
+        raw: '[ ] ship **bold** text',
+        text: 'ship bold text',
+        noteTitle: 'Project',
+      }),
+    ])
+    const view = renderScreen()
+
+    const row = await view.findByRole('button', { name: 'ship bold text' })
+    expect(row.querySelector('strong')?.textContent).toBe('bold')
+    expect(row.textContent).not.toContain('**bold**')
+    view.unmount()
+  })
+
+  it('selects a task when clicking the row outside the text control', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/p.md', markerOffset: 2, text: 'full row', noteTitle: 'Project' }),
+    ])
+    const view = renderScreen()
+
+    await view.findByRole('button', { name: 'full row' })
+    const row = view.container.querySelector('[data-task-key="notes/p.md:2"]')
+    expect(row).toBeInstanceOf(HTMLElement)
+    await userEvent.click(row as HTMLElement)
+
+    expect(view.getByTestId('task-editor').textContent).toContain('full row')
     view.unmount()
   })
 

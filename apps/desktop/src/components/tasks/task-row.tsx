@@ -1,4 +1,10 @@
-import { useRef, type MouseEvent, type MutableRefObject, type ReactElement } from 'react'
+import {
+  useRef,
+  type KeyboardEvent,
+  type MouseEvent,
+  type MutableRefObject,
+  type ReactElement,
+} from 'react'
 import { ArrowRight, Circle, CircleCheck } from 'lucide-react'
 import type { OpenTask } from '@reflect/core'
 import { formatDayLabel } from '@/lib/dates'
@@ -20,7 +26,7 @@ interface TaskRowProps {
   /** Whether a Tasks-view write is already in flight. */
   taskActionPending: boolean
   /** Select the row, honoring ⌘/Ctrl (toggle) and Shift (range) modifiers. */
-  onSelect: (event: MouseEvent) => void
+  onSelect: (event: Pick<MouseEvent, 'metaKey' | 'ctrlKey' | 'shiftKey'>) => void
   /** Persist an inline edit (content after the marker) and exit edit mode. */
   onEditCommit: (content: string) => void
   /** Enter in the editor: persist this row then add the next task (V1 continuous entry). */
@@ -81,12 +87,32 @@ export function TaskRow({
   const checkboxPending = isPending || taskActionPending
   const done = task.checked
   const label = task.text || 'Empty task'
+  const selectFromKeyboard = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return
+    }
+    event.preventDefault()
+    onSelect({ metaKey: event.metaKey, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey })
+  }
+  const selectFromRow = (event: MouseEvent<HTMLLIElement>): void => {
+    if (editing) {
+      return
+    }
+    // Shift-click selects a range; stop the browser turning that into a text
+    // selection across the rows.
+    if (event.shiftKey) {
+      event.preventDefault()
+    }
+    onSelect(event)
+  }
 
   return (
     <li
       data-task-key={taskKey(task)}
+      onClick={selectFromRow}
       className={cn(
         'group/task flex min-h-10 items-start gap-3 border-b border-border bg-surface px-4 py-2 transition-colors duration-100 lg:px-12',
+        !editing && 'cursor-pointer',
         selected
           ? 'bg-accent-soft ring-1 ring-inset ring-accent/20 dark:ring-accent/10'
           : 'hover:bg-surface-hover dark:bg-surface dark:hover:bg-surface-hover',
@@ -97,7 +123,8 @@ export function TaskRow({
         data-task-row
         aria-label={task.checked ? `Reopen: ${label}` : `Complete: ${label}`}
         disabled={checkboxPending}
-        onClick={() => {
+        onClick={(event) => {
+          event.stopPropagation()
           if (editing) {
             checkboxToggleControllerRef.current?.()
             return
@@ -131,24 +158,18 @@ export function TaskRow({
           convertControllerRef={convertControllerRef}
         />
       ) : (
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           aria-pressed={selected}
-          onClick={(event) => {
-            // Shift-click selects a range; stop the browser turning that into a
-            // text selection across the rows.
-            if (event.shiftKey) {
-              event.preventDefault()
-            }
-            onSelect(event)
-          }}
+          onKeyDown={selectFromKeyboard}
           className={cn(
             'min-w-0 flex-1 break-words text-left text-sm leading-6 text-text focus-visible:outline-none',
             task.checked && 'text-text-muted line-through',
           )}
         >
           <TaskText task={task} />
-        </button>
+        </div>
       )}
       {showSource && task.dailyDate !== null ? (
         <span className="mt-0.5 shrink-0 whitespace-nowrap text-xs text-text-muted">
@@ -160,7 +181,10 @@ export function TaskRow({
         aria-label={`Open ${task.noteTitle}`}
         // Hidden while editing: keep focus on the editor (Esc first to leave).
         disabled={editing}
-        onClick={() => onOpen(task.notePath)}
+        onClick={(event) => {
+          event.stopPropagation()
+          onOpen(task.notePath)
+        }}
         className={cn(
           'mt-0.5 shrink-0 text-text-muted/60 opacity-0 transition-opacity hover:text-text focus-visible:opacity-100 focus-visible:outline-none',
           !editing && 'group-hover/task:opacity-100',

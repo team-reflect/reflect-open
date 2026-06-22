@@ -366,6 +366,37 @@ html:root {
   margin: 0;
 }
 
+/* Unfocused task rows use the read-only markdown preview, but the row still owns
+   selection and checked styling. Keep the preview visually in the same compact
+   line box as the inline editor. */
+.reflect-task-preview {
+  color: inherit;
+  font-size: var(--text-sm, 0.875rem);
+  line-height: 1.5rem;
+}
+.reflect-task-preview p,
+.reflect-task-preview h1,
+.reflect-task-preview h2,
+.reflect-task-preview h3,
+.reflect-task-preview h4,
+.reflect-task-preview h5,
+.reflect-task-preview h6,
+.reflect-task-preview blockquote,
+.reflect-task-preview pre {
+  margin: 0;
+}
+.reflect-task-preview h1,
+.reflect-task-preview h2,
+.reflect-task-preview h3,
+.reflect-task-preview h4,
+.reflect-task-preview h5,
+.reflect-task-preview h6 {
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  letter-spacing: 0;
+}
+
 .reflect-editor blockquote {
   border-left: 2px solid var(--accent-soft, var(--border));
   color: var(--text-secondary);
