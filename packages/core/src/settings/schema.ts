@@ -12,14 +12,14 @@ import { z } from 'zod'
  */
 
 /**
- * How the editor renders markdown syntax characters. `focus` (the default)
- * hides them except near the caret; `show` always displays them.
+ * How the editor renders markdown syntax characters. `hide` (the default)
+ * hides them; `show` always displays them.
  *
  * The persisted name is implementation-neutral on purpose — it maps to
  * meowdown's "mark mode" at the editor boundary, but the settings document
  * must outlive any one editor library.
  */
-export const editorMarkdownSyntaxSchema = z.enum(['focus', 'show']).catch('focus')
+export const editorMarkdownSyntaxSchema = z.enum(['hide', 'show']).catch('hide')
 
 export type EditorMarkdownSyntax = z.infer<typeof editorMarkdownSyntaxSchema>
 

@@ -4,7 +4,7 @@ import { DEFAULT_SETTINGS, settingsSchema } from './schema'
 describe('settingsSchema', () => {
   it('defaults every key on an empty document (fresh install)', () => {
     expect(settingsSchema.parse({})).toEqual({
-      editorMarkdownSyntax: 'focus',
+      editorMarkdownSyntax: 'hide',
       editorSpellCheck: true,
       editorDefaultBullet: true,
       editorBulletAfterHeading: true,
@@ -21,7 +21,7 @@ describe('settingsSchema', () => {
       defaultAiProviderId: null,
       chatModelSelection: null,
     })
-    expect(DEFAULT_SETTINGS.editorMarkdownSyntax).toBe('focus')
+    expect(DEFAULT_SETTINGS.editorMarkdownSyntax).toBe('hide')
     expect(DEFAULT_SETTINGS.editorSpellCheck).toBe(true)
     expect(DEFAULT_SETTINGS.editorDefaultBullet).toBe(true)
     expect(DEFAULT_SETTINGS.editorBulletAfterHeading).toBe(true)
@@ -41,7 +41,7 @@ describe('settingsSchema', () => {
 
   it('accepts valid values', () => {
     expect(settingsSchema.parse({ editorMarkdownSyntax: 'show' }).editorMarkdownSyntax).toBe('show')
-    expect(settingsSchema.parse({ editorMarkdownSyntax: 'focus' }).editorMarkdownSyntax).toBe('focus')
+    expect(settingsSchema.parse({ editorMarkdownSyntax: 'hide' }).editorMarkdownSyntax).toBe('hide')
     expect(settingsSchema.parse({ editorSpellCheck: false }).editorSpellCheck).toBe(false)
     expect(settingsSchema.parse({ editorSpellCheck: true }).editorSpellCheck).toBe(true)
     expect(settingsSchema.parse({ editorDefaultBullet: false }).editorDefaultBullet).toBe(false)
@@ -72,8 +72,8 @@ describe('settingsSchema', () => {
   })
 
   it('degrades an invalid value to its default instead of failing the load', () => {
-    expect(settingsSchema.parse({ editorMarkdownSyntax: 'sideways' }).editorMarkdownSyntax).toBe('focus')
-    expect(settingsSchema.parse({ editorMarkdownSyntax: 42 }).editorMarkdownSyntax).toBe('focus')
+    expect(settingsSchema.parse({ editorMarkdownSyntax: 'sideways' }).editorMarkdownSyntax).toBe('hide')
+    expect(settingsSchema.parse({ editorMarkdownSyntax: 42 }).editorMarkdownSyntax).toBe('hide')
     expect(settingsSchema.parse({ editorSpellCheck: 'off' }).editorSpellCheck).toBe(true)
     expect(settingsSchema.parse({ editorSpellCheck: 0 }).editorSpellCheck).toBe(true)
     expect(settingsSchema.parse({ editorDefaultBullet: 'on' }).editorDefaultBullet).toBe(true)

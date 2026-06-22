@@ -64,7 +64,7 @@ vi.mock('@/providers/graph-provider', () => ({
 }))
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({
-    settings: { editorMarkdownSyntax: 'always', dateFormat: 'mdy', weekStartDay: 'monday' },
+    settings: { editorMarkdownSyntax: 'hide', dateFormat: 'mdy', weekStartDay: 'monday' },
     updateSettings: async () => {},
   }),
 }))
