@@ -16,8 +16,8 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@meowdown/core": "0.17.4",
-    "@meowdown/react": "0.17.4",
+    "@meowdown/core": "0.18.0",
+    "@meowdown/react": "0.18.0",
     "@reflect/core": "workspace:*",
     "@reflect/db": "workspace:*",
     "@reflect/design-system": "workspace:*",
