@@ -10,6 +10,9 @@ const host = process.env.TAURI_DEV_HOST
 export default defineConfig(async () => ({
   plugins: [reactWithCompiler(), tailwindcss()],
 
+  // If the target is below Safari 17.5, Lightning CSS downlevels `light-dark()` to a broken polyfill.
+  build: { cssTarget: 'safari17.5' },
+
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
