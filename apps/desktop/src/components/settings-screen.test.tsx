@@ -103,12 +103,12 @@ describe('SettingsScreen', () => {
     stored = { editorMarkdownSyntax: 'show' }
     renderScreen()
     await waitFor(() => expect(radio(/^show/i).checked).toBe(true))
-    expect(radio(/^focus/i).checked).toBe(false)
+    expect(radio(/^hide/i).checked).toBe(false)
   })
 
   it('selecting Show applies instantly and persists', async () => {
     renderScreen()
-    await waitFor(() => expect(radio(/^focus/i).checked).toBe(true))
+    await waitFor(() => expect(radio(/^hide/i).checked).toBe(true))
 
     fireEvent.click(radio(/^show/i))
 
@@ -135,7 +135,7 @@ describe('SettingsScreen', () => {
       ]),
     )
     expect(radio(/^show/i).checked).toBe(true)
-    expect(radio(/^focus/i).checked).toBe(false)
+    expect(radio(/^hide/i).checked).toBe(false)
   })
 
   it('reflects a persisted spell check opt-out', async () => {
@@ -157,7 +157,7 @@ describe('SettingsScreen', () => {
     await waitFor(() =>
       expect(saved).toEqual([
         {
-          editorMarkdownSyntax: 'focus',
+          editorMarkdownSyntax: 'hide',
           editorSpellCheck: false,
           editorDefaultBullet: true,
           editorBulletAfterHeading: true,
@@ -197,7 +197,7 @@ describe('SettingsScreen', () => {
     await waitFor(() =>
       expect(saved).toEqual([
         {
-          editorMarkdownSyntax: 'focus',
+          editorMarkdownSyntax: 'hide',
           editorSpellCheck: true,
           editorDefaultBullet: false,
           editorBulletAfterHeading: true,
@@ -236,7 +236,7 @@ describe('SettingsScreen', () => {
     await waitFor(() =>
       expect(saved).toEqual([
         {
-          editorMarkdownSyntax: 'focus',
+          editorMarkdownSyntax: 'hide',
           editorSpellCheck: true,
           editorDefaultBullet: true,
           editorBulletAfterHeading: false,
@@ -268,7 +268,7 @@ describe('SettingsScreen', () => {
     await waitFor(() =>
       expect(saved).toEqual([
         {
-          editorMarkdownSyntax: 'focus',
+          editorMarkdownSyntax: 'hide',
           editorSpellCheck: true,
           editorDefaultBullet: true,
           editorBulletAfterHeading: true,
@@ -313,7 +313,7 @@ describe('SettingsScreen', () => {
     await waitFor(() =>
       expect(saved).toEqual([
         {
-          editorMarkdownSyntax: 'focus',
+          editorMarkdownSyntax: 'hide',
           editorSpellCheck: true,
           editorDefaultBullet: true,
           editorBulletAfterHeading: true,
@@ -357,7 +357,7 @@ describe('SettingsScreen', () => {
     await waitFor(() =>
       expect(saved).toEqual([
         {
-          editorMarkdownSyntax: 'focus',
+          editorMarkdownSyntax: 'hide',
           editorSpellCheck: true,
           editorDefaultBullet: true,
           editorBulletAfterHeading: true,
@@ -398,7 +398,7 @@ describe('SettingsScreen', () => {
     await waitFor(() =>
       expect(saved).toEqual([
         {
-          editorMarkdownSyntax: 'focus',
+          editorMarkdownSyntax: 'hide',
           editorSpellCheck: true,
           editorDefaultBullet: true,
           editorBulletAfterHeading: true,
@@ -430,7 +430,7 @@ describe('SettingsScreen', () => {
     await waitFor(() =>
       expect(saved).toEqual([
         {
-          editorMarkdownSyntax: 'focus',
+          editorMarkdownSyntax: 'hide',
           editorSpellCheck: true,
           editorDefaultBullet: true,
           editorBulletAfterHeading: true,
@@ -494,7 +494,7 @@ describe('SettingsScreen', () => {
     await waitFor(() =>
       expect(saved).toEqual([
         {
-          editorMarkdownSyntax: 'focus',
+          editorMarkdownSyntax: 'hide',
           editorSpellCheck: true,
           editorDefaultBullet: true,
           editorBulletAfterHeading: true,
@@ -523,7 +523,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'focus', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, semanticSearchEnabled: true, describeAssets: true, mobileOnboarded: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
+        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, semanticSearchEnabled: true, describeAssets: true, mobileOnboarded: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
       ]),
     )
     // The control flips to the loading state (EmbeddingsSync owns the actual
@@ -552,7 +552,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'focus', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, semanticSearchEnabled: false, describeAssets: true, mobileOnboarded: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
+        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, semanticSearchEnabled: false, describeAssets: true, mobileOnboarded: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
       ]),
     )
     expect(screen.getByRole('button', { name: /enable semantic search/i })).toBeTruthy()
@@ -575,7 +575,7 @@ describe('SettingsScreen', () => {
     await waitFor(() => expect(invoked).toContain('embed_ensure'))
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'focus', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, semanticSearchEnabled: true, describeAssets: true, mobileOnboarded: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
+        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, semanticSearchEnabled: true, describeAssets: true, mobileOnboarded: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
       ]),
     )
   })
@@ -594,7 +594,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'focus', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, semanticSearchEnabled: false, describeAssets: true, mobileOnboarded: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
+        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, semanticSearchEnabled: false, describeAssets: true, mobileOnboarded: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
       ]),
     )
     expect(screen.getByRole('button', { name: /enable semantic search/i })).toBeTruthy()

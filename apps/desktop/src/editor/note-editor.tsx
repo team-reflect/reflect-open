@@ -54,7 +54,7 @@ interface NoteEditorProps {
   initialContent: string
   /** Called with the current markdown whenever the user edits the document. */
   onChange?: (markdown: string) => void
-  /** How markdown syntax characters are shown; `focus` reveals them near the caret. */
+  /** How markdown syntax characters are shown. */
   markMode?: MarkMode
   /** Whether the browser underlines misspelled words (default on). */
   spellCheck?: boolean
@@ -114,7 +114,7 @@ interface NoteEditorProps {
 export function NoteEditor({
   initialContent,
   onChange,
-  markMode = 'focus',
+  markMode = 'hide',
   spellCheck = true,
   bulletAfterHeading = false,
   blockHandle = false,

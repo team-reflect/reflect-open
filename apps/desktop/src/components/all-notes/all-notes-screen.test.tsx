@@ -23,7 +23,7 @@ vi.mock('@/providers/graph-provider', () => ({
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({
     settings: {
-      editorMarkdownSyntax: 'focus',
+      editorMarkdownSyntax: 'hide',
       theme: 'system',
       timeFormat: '12h',
       dateFormat: 'mdy',

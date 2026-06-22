@@ -15,9 +15,9 @@ interface MarkdownSyntaxOption {
 
 const MARKDOWN_SYNTAX_OPTIONS: MarkdownSyntaxOption[] = [
   {
-    value: 'focus',
-    label: 'Focus',
-    description: 'Markdown syntax stays hidden and is revealed around your cursor as you edit.',
+    value: 'hide',
+    label: 'Hide',
+    description: 'Markdown syntax characters stay hidden while you edit.',
   },
   {
     value: 'show',

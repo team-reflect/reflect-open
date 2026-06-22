@@ -71,7 +71,7 @@ vi.mock('@/providers/graph-provider', () => ({
 }))
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({
-    settings: { editorMarkdownSyntax: 'always', allNotesFilterTags: ['book', 'link', 'person'] },
+    settings: { editorMarkdownSyntax: 'hide', allNotesFilterTags: ['book', 'link', 'person'] },
     updateSettings: async () => {},
   }),
 }))

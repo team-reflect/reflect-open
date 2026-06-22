@@ -19,7 +19,7 @@ vi.mock('@/providers/theme-provider', () => ({
 }))
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({
-    settings: { editorMarkdownSyntax: 'focus', semanticSearchEnabled: false, theme: 'system' },
+    settings: { editorMarkdownSyntax: 'hide', semanticSearchEnabled: false, theme: 'system' },
     updateSettings: vi.fn(),
   }),
 }))

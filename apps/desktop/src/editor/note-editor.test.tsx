@@ -8,6 +8,7 @@ import { NoteEditor } from './note-editor'
 
 /** Props the mocked `<MeowdownEditor>` captures so the test can drive its callbacks. */
 interface CapturedEditorProps {
+  mode?: 'hide' | 'focus' | 'show' | 'source'
   editorClassName?: string
   children?: ReactNode
   resolveImageUrl?: (src: string) => string | undefined
@@ -110,6 +111,18 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+})
+
+describe('NoteEditor markdown syntax mode', () => {
+  it('passes hide to meowdown by default', () => {
+    renderEditor()
+    expect(captured.props?.mode).toBe('hide')
+  })
+
+  it('passes an explicit markdown syntax mode to meowdown', () => {
+    render(<NoteEditor initialContent="" markMode="show" />)
+    expect(captured.props?.mode).toBe('show')
+  })
 })
 
 describe('NoteEditor image lightbox', () => {
