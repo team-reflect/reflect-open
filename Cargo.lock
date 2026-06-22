@@ -4580,7 +4580,7 @@ dependencies = [
 
 [[package]]
 name = "reflect-open"
-version = "0.2.0-beta.28"
+version = "0.2.0-beta.29"
 dependencies = [
  "base64 0.22.1",
  "dirs",
