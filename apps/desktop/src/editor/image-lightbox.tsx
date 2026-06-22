@@ -53,14 +53,14 @@ export function ImageLightbox({
       <button
         type="button"
         aria-label="Close image preview"
-        className="flex max-h-full max-w-full cursor-zoom-out items-center justify-center bg-transparent p-0"
+        className="flex h-full w-full cursor-zoom-out items-center justify-center overflow-hidden bg-transparent p-0"
         onClick={onClose}
       >
         <img
           src={image.src}
           alt={image.alt}
           draggable={false}
-          className="max-h-full max-w-full select-none object-contain"
+          className="h-full w-full select-none object-contain"
           style={{ viewTransitionName: image.transitionName }}
         />
       </button>
