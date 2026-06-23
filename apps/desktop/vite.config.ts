@@ -21,7 +21,7 @@ export default defineConfig(async () => ({
 
   // Expose the Tauri CLI's build-time TAURI_ENV_* vars (e.g. the target
   // platform, which gates desktop-only surfaces like the updater).
-  envPrefix: ['VITE_', 'TAURI_ENV_*'],
+  envPrefix: ['VITE_', 'TAURI_ENV_'],
 
   // Vite options tailored for Tauri development, applied in `tauri dev`/`tauri build`.
   //

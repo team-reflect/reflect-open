@@ -99,6 +99,11 @@ afterEach(() => {
 })
 
 describe('SettingsScreen', () => {
+  it('shows update controls when the native bridge is available', () => {
+    renderScreen()
+    expect(screen.getByRole('button', { name: /check for updates/i })).toBeTruthy()
+  })
+
   it('reflects the persisted markdown syntax mode', async () => {
     stored = { editorMarkdownSyntax: 'show' }
     renderScreen()
