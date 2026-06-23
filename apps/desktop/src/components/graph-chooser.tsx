@@ -42,7 +42,8 @@ export function GraphChooser(): ReactElement {
             Open graph…
           </Button>
           <p className="text-center text-xs leading-5 text-text-muted">
-            Moving from Reflect V1? Export a Reflect Open folder, then open that folder here.
+            Moving from Reflect V1? In V1, go to Settings &gt; Graph &gt; Export,
+            export a "Reflect Open folder", then open it here.
           </p>
         </div>
 
