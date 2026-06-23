@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { setBridge, type EmbedStatus } from '@reflect/core'
+import { setBridge, type EmbedStatus, type GraphInfo } from '@reflect/core'
 import { formatFullDate } from '@/lib/dates'
 import { resetOperations } from '@/lib/operations'
 import { SettingsProvider } from '@/providers/settings-provider'
@@ -10,10 +10,18 @@ import { SettingsScreen } from './settings-screen'
 
 // The rebuild-index field reads the open index generation — and the Backup
 // section the open graph + sync state — from per-graph providers the screen
-// tests don't mount, so stub both hooks (no graph open, backup disconnected).
-const graph = vi.hoisted(() => ({ indexGeneration: 7 as number | null }))
+// tests don't mount, so stub both hooks (backup disconnected).
+const graph = vi.hoisted(() => ({
+  current: null as GraphInfo | null,
+  indexGeneration: 7 as number | null,
+  forget: vi.fn<(root: string) => Promise<void>>(async () => {}),
+}))
 vi.mock('@/providers/graph-provider', () => ({
-  useGraph: () => ({ graph: null, indexGeneration: graph.indexGeneration }),
+  useGraph: () => ({
+    graph: graph.current,
+    indexGeneration: graph.indexGeneration,
+    forget: graph.forget,
+  }),
 }))
 vi.mock('@/providers/sync-provider', () => ({
   useSync: () => ({
@@ -85,7 +93,9 @@ function radio(name: RegExp): HTMLInputElement {
 beforeEach(() => {
   stored = {}
   embedStatus = { status: 'uninitialized' }
+  graph.current = null
   graph.indexGeneration = 7
+  graph.forget.mockClear()
   queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   })
@@ -102,6 +112,16 @@ describe('SettingsScreen', () => {
   it('shows update controls when the native bridge is available', () => {
     renderScreen()
     expect(screen.getByRole('button', { name: /check for updates/i })).toBeTruthy()
+  })
+
+  it('forgets the open graph from saved graphs', async () => {
+    graph.current = { root: '/graphs/work', name: 'Work', cloudSync: null, generation: 1 }
+    renderScreen()
+
+    const section = screen.getByRole('region', { name: 'Destructive' })
+    fireEvent.click(within(section).getByRole('button', { name: /forget graph/i }))
+
+    await waitFor(() => expect(graph.forget).toHaveBeenCalledWith('/graphs/work'))
   })
 
   it('reflects the persisted markdown syntax mode', async () => {

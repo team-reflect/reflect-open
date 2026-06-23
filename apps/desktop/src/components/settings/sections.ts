@@ -13,6 +13,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'ai-providers', title: 'AI providers' },
   { id: 'keyboard', title: 'Keyboard shortcuts' },
   { id: 'about', title: 'About' },
+  { id: 'destructive', title: 'Destructive' },
 ] as const
 
 /** Identifier of one {@link SETTINGS_SECTIONS} entry. */

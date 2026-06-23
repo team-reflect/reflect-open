@@ -5,6 +5,7 @@ import { AllNotesSection } from './settings/all-notes-section'
 import { AppearanceSection } from './settings/appearance-section'
 import { BackupSection } from './settings/backup-section'
 import { DateTimeSection } from './settings/date-time-section'
+import { DestructiveSection } from './settings/destructive-section'
 import { EditorSection } from './settings/editor-section'
 import { KeyboardSection } from './settings/keyboard-section'
 import { SearchSection } from './settings/search-section'
@@ -28,6 +29,7 @@ export function SettingsScreen(): ReactElement {
         <AiProvidersSection />
         <KeyboardSection />
         <AboutSection />
+        <DestructiveSection />
       </div>
     </div>
   )
