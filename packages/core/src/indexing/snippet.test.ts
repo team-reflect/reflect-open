@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { lineSnippet, previewSnippet } from './snippet'
+import { lineAt, lineSnippet, previewSnippet } from './snippet'
 
 /** True when `text` contains a UTF-16 surrogate without its pair. */
 function hasLoneSurrogate(text: string): boolean {
@@ -50,6 +50,32 @@ describe('lineSnippet', () => {
   it('clamps an out-of-range position instead of throwing', () => {
     expect(lineSnippet('only line', 999)).toBe('only line')
     expect(lineSnippet('', 5)).toBe('')
+  })
+})
+
+describe('lineAt', () => {
+  it('returns the whole trimmed line containing the position', () => {
+    const content = 'first line\n   see [[Target]] here   \nlast line\n'
+    expect(lineAt(content, content.indexOf('[[Target]]'))).toBe('see [[Target]] here')
+  })
+
+  it('returns the full line untruncated even when very long', () => {
+    // A link past the 160-char window would be windowed (and possibly cut) by
+    // lineSnippet; lineAt keeps the whole line so the [[…]] token stays balanced.
+    const left = 'a'.repeat(300)
+    const content = `${left} [[Target]] tail`
+    const line = lineAt(content, content.indexOf('[[Target]]'))
+    expect(line).toBe(`${left} [[Target]] tail`)
+    expect(line).toContain('[[Target]]')
+    expect(line.startsWith('…')).toBe(false)
+  })
+
+  it('picks the correct line for first, last, and out-of-range positions', () => {
+    const content = 'alpha [[X]]\nomega [[Y]]'
+    expect(lineAt(content, content.indexOf('[[X]]'))).toBe('alpha [[X]]')
+    expect(lineAt(content, content.indexOf('[[Y]]'))).toBe('omega [[Y]]')
+    expect(lineAt('only line', 999)).toBe('only line')
+    expect(lineAt('', 5)).toBe('')
   })
 })
 

@@ -1,8 +1,11 @@
 import { useCallback, useMemo, type ReactElement } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
+import type { WikilinkClickHandler } from '@meowdown/core'
 import { getBacklinksWithContext, hasBridge } from '@reflect/core'
 import { BacklinkSourceGroup } from '@/components/backlink-source-group'
+import { useImagePersistence } from '@/editor/use-image-persistence'
+import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
 import { groupBacklinksBySource } from '@/lib/group-backlinks'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useSessionFlag } from '@/lib/use-session-flag'
@@ -47,6 +50,21 @@ export function BacklinksPanel({ path }: BacklinksPanelProps): ReactElement | nu
   const [expanded, setExpanded] = useSessionFlag(EXPANDED_STORAGE_KEY, true)
   const groups = useMemo(() => (data ? groupBacklinksBySource(data) : []), [data])
   const handleOpen = useCallback((target: string) => navigate(routeForPath(target)), [navigate])
+
+  // A wiki link clicked *inside* a snippet resolves its target the same way the
+  // editor does, distinct from `handleOpen` which opens an already-resolved
+  // source-note path. Images resolve through the same asset pipeline as the
+  // editor; both callbacks are stable so they never rebuild the snippet trees.
+  const navigateWikiLink = useWikiLinkNavigation(graph?.generation ?? null)
+  const { resolveImageUrl } = useImagePersistence(graph?.root ?? null, graph?.generation ?? null)
+  const handleWikilinkClick = useCallback<WikilinkClickHandler>(
+    ({ target }) => navigateWikiLink(target),
+    [navigateWikiLink],
+  )
+  const resolveImageUrlStable = useCallback(
+    (src: string) => resolveImageUrl(src) ?? undefined,
+    [resolveImageUrl],
+  )
 
   if (isError) {
     return (
@@ -103,6 +121,8 @@ export function BacklinksPanel({ path }: BacklinksPanelProps): ReactElement | nu
             first={index === 0}
             expanded={expanded}
             onOpen={handleOpen}
+            onWikilinkClick={handleWikilinkClick}
+            resolveImageUrl={resolveImageUrlStable}
           />
         ))}
       </div>

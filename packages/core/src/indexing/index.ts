@@ -110,7 +110,7 @@ export {
   HIGHLIGHT_END,
   type HighlightSegment,
 } from './search'
-export { lineSnippet, previewSnippet } from './snippet'
+export { lineAt, lineSnippet, previewSnippet } from './snippet'
 export { parseSearchQuery, type ParsedSearchQuery, type SearchFilters } from './filter-query'
 export { searchWithFilters, type FilteredSearchHit } from './filtered-search'
 export {

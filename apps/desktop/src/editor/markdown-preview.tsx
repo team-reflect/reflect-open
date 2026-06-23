@@ -1,19 +1,19 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react'
-import { MeowdownEditor, type EditorHandle } from '@meowdown/react'
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
+import { MarkdownView } from '@meowdown/react'
 import '@meowdown/core/style.css'
 import '@meowdown/react/style.css'
+import { openExternalLink } from '@/editor/open-external-link'
 import { cn } from '@/lib/utils'
 
 /**
- * A read-only rendering of note markdown via @meowdown/react's
- * `<MeowdownEditor>` in `hide` mark mode, so previews look exactly like the
- * note would in the editor — wiki-link chips, images, and headings included.
- * The view is never editable, so this can render any note (protected ones
- * included) without ever writing.
+ * A read-only rendering of note markdown via @meowdown/react's `<MarkdownView>`
+ * in `hide` mark mode, so previews look exactly like the note would in the
+ * editor (wiki-link chips, images, and headings included) but without mounting a
+ * ProseMirror editor. The view is never editable, so this can render any note
+ * (protected ones included) without ever writing.
  *
- * Unlike the uncontrolled note editor, `content` is **live**: the document is
- * replaced whenever it changes (silently, via the handle), so one mounted
- * preview can follow a moving selection (the ⌘K palette's preview pane).
+ * `content` is live: changing it re-renders the preview, so one mounted preview
+ * can follow a moving selection (the palette's preview pane).
  */
 
 interface MarkdownPreviewProps {
@@ -36,10 +36,9 @@ export function MarkdownPreview({
   onWikiLinkClick,
   className,
 }: MarkdownPreviewProps): ReactElement {
-  const handleRef = useRef<EditorHandle>(null)
-
   // The resolver and click handler are read through refs so a changing prop
-  // never rebuilds the editor's extensions.
+  // never gives MarkdownView a new callback identity (which would re-render its
+  // whole tree).
   const resolveRef = useRef(resolveImageUrl)
   const navigateRef = useRef(onWikiLinkClick)
   useEffect(() => {
@@ -47,10 +46,10 @@ export function MarkdownPreview({
     navigateRef.current = onWikiLinkClick
   })
 
-  // Whether wiki links navigate at all is fixed by the first render — hosts
+  // Whether wiki links navigate at all is fixed by the first render: hosts
   // either always pass the handler (chat) or never do (palette preview). An
-  // inert preview must not register a click handler, which would swallow chip
-  // clicks.
+  // inert preview omits the handler so a chip click is a no-op rather than a
+  // dead navigation.
   const [navigates] = useState(() => onWikiLinkClick != null)
 
   const resolveImageUrlStable = useCallback(
@@ -62,21 +61,14 @@ export function MarkdownPreview({
     [],
   )
 
-  // `content` is live; replace the document whenever it changes. `setMarkdown`
-  // is silent and applies to the read-only editor.
-  useLayoutEffect(() => {
-    handleRef.current?.setMarkdown(content)
-  }, [content])
-
   return (
-    <MeowdownEditor
-      handleRef={handleRef}
-      mode="hide"
-      readOnly
-      initialMarkdown={content}
+    <MarkdownView
+      markdown={content}
+      markMode="hide"
       resolveImageUrl={resolveImageUrlStable}
+      onLinkClick={openExternalLink}
       {...(navigates ? { onWikilinkClick: onWikilinkClickStable } : {})}
-      editorClassName={cn('reflect-editor', className)}
+      className={cn('reflect-editor', className)}
     />
   )
 }

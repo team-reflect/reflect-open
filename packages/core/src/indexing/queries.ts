@@ -12,7 +12,7 @@ import {
 import { generateDateSuggestions, type DateSuggestionContext } from './date-suggestions'
 import { db } from './db'
 import { buildFtsMatch } from './search-query'
-import { lineSnippet } from './snippet'
+import { lineAt } from './snippet'
 import {
   mergeDateSuggestions,
   rankWikiSuggestions,
@@ -46,7 +46,11 @@ export function getBacklinks(path: string): Promise<Backlink[]> {
 export interface BacklinkContext {
   sourcePath: string
   sourceTitle: string
-  /** The line of the source around the link (empty when the file is unreadable). */
+  /**
+   * The whole source line containing the link, as rich-text-renderable Markdown
+   * (empty when the file is unreadable). Not windowed: a half-cut Markdown token
+   * would garble the rendered snippet, so the panel clamps the line visually.
+   */
   snippet: string
   posFrom: number
 }
@@ -86,7 +90,7 @@ export async function getBacklinksWithContext(path: string): Promise<BacklinkCon
     return {
       sourcePath: row.sourcePath,
       sourceTitle: row.sourceTitle,
-      snippet: content == null ? '' : lineSnippet(content, row.posFrom),
+      snippet: content == null ? '' : lineAt(content, row.posFrom),
       posFrom: row.posFrom,
     }
   })

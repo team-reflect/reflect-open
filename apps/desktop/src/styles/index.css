@@ -403,6 +403,23 @@ html:root {
   text-decoration-line: line-through;
 }
 
+/* Incoming-backlink snippet (BacklinkSnippet): one referencing line rendered as
+   rich text through MarkdownView. The view carries `reflect-editor` so chips and
+   inline marks share the editor's styling; these rules keep it in the panel's
+   compact 12px line box (the wrapper clamps it to two lines). The `.ProseMirror`
+   compound matches meowdown's heading-rule specificity so our caps win the
+   later-source-order tie, the same trick as `.reflect-stream-gutter`. */
+.reflect-backlink-snippet .reflect-editor :is(p, ul, ol, blockquote, pre) {
+  margin: 0;
+}
+.reflect-backlink-snippet .reflect-editor.ProseMirror :is(h1, h2, h3, h4, h5, h6) {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  letter-spacing: 0;
+}
+
 .reflect-editor blockquote {
   border-left: 2px solid var(--accent-soft, var(--border));
   color: var(--text-secondary);

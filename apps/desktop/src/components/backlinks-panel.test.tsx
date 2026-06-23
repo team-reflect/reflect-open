@@ -7,10 +7,12 @@ import { RouterProvider, useRouter } from '@/routing/router'
 import { BacklinksPanel } from './backlinks-panel'
 
 const getBacklinksWithContext = vi.hoisted(() => vi.fn())
+const resolveWikiTarget = vi.hoisted(() => vi.fn())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
   getBacklinksWithContext,
+  resolveWikiTarget,
 }))
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', cloudSync: false, generation: 1 } }),
@@ -36,6 +38,7 @@ function renderPanel(path: string) {
 beforeEach(() => {
   window.sessionStorage.clear()
   getBacklinksWithContext.mockReset()
+  resolveWikiTarget.mockReset()
 })
 
 describe('BacklinksPanel', () => {
@@ -69,6 +72,30 @@ describe('BacklinksPanel', () => {
     view.unmount()
   })
 
+  it('renders a snippet wiki link as a clickable chip that navigates to its target', async () => {
+    getBacklinksWithContext.mockResolvedValue([
+      {
+        sourcePath: 'notes/meeting.md',
+        sourceTitle: 'Meeting Notes',
+        snippet: 'discussed [[Roadmap]] follow-ups',
+        posFrom: 12,
+      },
+    ])
+    resolveWikiTarget.mockResolvedValue({ kind: 'resolved', ref: 'notes/roadmap.md' })
+    const view = renderPanel('notes/source.md')
+
+    // The [[Roadmap]] source renders as a chip whose label is the bare target,
+    // not the raw bracket syntax.
+    const chip = await view.findByTestId('wikilink')
+    expect(chip.textContent).toBe('Roadmap')
+
+    await userEvent.click(chip)
+    await waitFor(() =>
+      expect(view.getByTestId('route').textContent).toContain('notes/roadmap.md'),
+    )
+    view.unmount()
+  })
+
   it('groups references by source note and navigates on title click', async () => {
     getBacklinksWithContext.mockResolvedValue([
       {
@@ -94,9 +121,12 @@ describe('BacklinksPanel', () => {
 
     await view.findByText('Incoming backlinks (3)')
     expect(view.getAllByText('Meeting Notes')).toHaveLength(1)
-    expect(view.getByText('discussed [[Roadmap]] follow-ups')).toBeDefined()
-    expect(view.getByText('revisit [[Roadmap]] next week')).toBeDefined()
-    expect(view.getByText('ship the [[Roadmap]]')).toBeDefined()
+    // Snippets render as rich text: the leading prose survives, the [[…]] source
+    // becomes a chip whose label shows the bare target.
+    expect(view.getByText(/discussed/)).toBeDefined()
+    expect(view.getByText(/revisit/)).toBeDefined()
+    expect(view.getByText(/ship the/)).toBeDefined()
+    expect(view.getAllByTestId('wikilink')).toHaveLength(3)
 
     await userEvent.click(view.getByText('Meeting Notes'))
     expect(view.getByTestId('route').textContent).toContain('notes/meeting.md')
@@ -120,7 +150,7 @@ describe('BacklinksPanel', () => {
     await userEvent.click(header)
     expect(header.getAttribute('aria-expanded')).toBe('false')
     expect(view.getByText('Meeting Notes')).toBeDefined()
-    expect(view.queryByText('discussed [[Roadmap]] follow-ups')).toBeNull()
+    expect(view.queryByText(/discussed/)).toBeNull()
     view.unmount()
 
     const reopened = renderPanel('notes/roadmap.md')
@@ -150,14 +180,14 @@ describe('BacklinksPanel', () => {
     )
     const view = render(panelFor('notes/a.md'))
 
-    await view.findByText('links [[A]] and [[B]]')
+    await view.findByText(/links and/)
     await userEvent.click(
       view.getByRole('button', { name: 'Collapse references from Shared Source' }),
     )
-    expect(view.queryByText('links [[A]] and [[B]]')).toBeNull()
+    expect(view.queryByText(/links and/)).toBeNull()
 
     view.rerender(panelFor('notes/b.md'))
-    await view.findByText('links [[A]] and [[B]]')
+    await view.findByText(/links and/)
     view.unmount()
   })
 
@@ -188,7 +218,7 @@ describe('BacklinksPanel', () => {
     await userEvent.click(headers[0]!)
     expect(headers[0]!.getAttribute('aria-expanded')).toBe('false')
     expect(headers[1]!.getAttribute('aria-expanded')).toBe('false')
-    expect(view.queryByText('discussed [[Roadmap]] follow-ups')).toBeNull()
+    expect(view.queryByText(/discussed/)).toBeNull()
     view.unmount()
   })
 
@@ -211,17 +241,17 @@ describe('BacklinksPanel', () => {
 
     const header = await view.findByRole('button', { name: /Incoming backlinks \(2\)/ })
     await userEvent.click(header)
-    expect(view.queryByText('discussed [[Roadmap]] follow-ups')).toBeNull()
-    expect(view.queryByText('ship the [[Roadmap]]')).toBeNull()
+    expect(view.queryByText(/discussed/)).toBeNull()
+    expect(view.queryByText(/ship the/)).toBeNull()
 
     await userEvent.click(
       view.getByRole('button', { name: 'Expand references from Meeting Notes' }),
     )
-    expect(view.getByText('discussed [[Roadmap]] follow-ups')).toBeDefined()
-    expect(view.queryByText('ship the [[Roadmap]]')).toBeNull()
+    expect(view.getByText(/discussed/)).toBeDefined()
+    expect(view.queryByText(/ship the/)).toBeNull()
 
     await userEvent.click(header)
-    expect(view.getByText('ship the [[Roadmap]]')).toBeDefined()
+    expect(view.getByText(/ship the/)).toBeDefined()
     view.unmount()
   })
 
@@ -246,8 +276,8 @@ describe('BacklinksPanel', () => {
     await userEvent.click(
       view.getByRole('button', { name: 'Collapse references from Meeting Notes' }),
     )
-    expect(view.queryByText('discussed [[Roadmap]] follow-ups')).toBeNull()
-    expect(view.getByText('ship the [[Roadmap]]')).toBeDefined()
+    expect(view.queryByText(/discussed/)).toBeNull()
+    expect(view.getByText(/ship the/)).toBeDefined()
     view.unmount()
   })
 })
