@@ -100,12 +100,6 @@ export {
   captureMetaFetch,
   promoteCaptureScreenshot,
 } from './graph/commands'
-export {
-  importReflectMarkdownZip,
-  type ReflectMarkdownImportOptions,
-  type ReflectMarkdownImportProgress,
-  type ReflectMarkdownImportResult,
-} from './import/v1-markdown'
 
 // User settings (config-dir JSON document; Rust persists, this layer validates)
 export {

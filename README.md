@@ -173,8 +173,8 @@ Closed by decision:
 - **Import / export surfaces**
   ([Plan 13](docs/plans/13-import-export-portability.md)): no dedicated
   import/export suite is planned. The graph folder itself is the portable
-  artifact; copy or zip the markdown files and assets directly. The existing
-  V1 Markdown ZIP importer remains a migration convenience.
+  artifact; copy or zip the markdown files and assets directly. Reflect V1
+  exports now use the same graph-compatible markdown shape.
 
 Designed or in progress, each with a written plan:
 

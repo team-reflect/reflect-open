@@ -14,12 +14,11 @@ messaging sidecar (`apps/native-host`), desktop capture commands
 `@reflect/core`.
 
 Plan 13 is **closed by product decision**: the graph folder itself is the portability
-surface, so no dedicated import/export suite is planned. A focused Reflect V1 Markdown
-ZIP importer exists in `packages/core/src/import/v1-markdown.ts`, using `fflate`, but it
-is a migration convenience rather than a broader roadmap commitment. Plan 18 remains an
-unbuilt add-on. Plan 19 is active implementation work, not just a future track: the
-existing Tauri app has a platform root gate, mobile UI tree, fixed-root onboarding,
-target-gated Rust capabilities, and the first-party iOS keyboard plugin;
+surface, so no dedicated import/export suite is planned. Reflect V1 exports now use a
+V2-compatible markdown graph shape, so there is no separate V1 import surface. Plan 18
+remains an unbuilt add-on. Plan 19 is active implementation work, not just a future
+track: the existing Tauri app has a platform root gate, mobile UI tree, fixed-root
+onboarding, target-gated Rust capabilities, and the first-party iOS keyboard plugin;
 physical-device validation and App Store/TestFlight hardening are still open.
 
 Two features landed beyond the original written plans: **audio memos** (raw-first

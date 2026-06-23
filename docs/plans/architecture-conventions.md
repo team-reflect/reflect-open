@@ -68,7 +68,7 @@ using picardo's fixed file vocabulary — reframed because Reflect's source of t
 markdown files, not a mutable DB.
 
 First-wave domains: `graph`, `notes`, `daily`, `backlinks`, `search`, `embeddings`,
-`ai`, `capture`, `sync`, `import-export`.
+`ai`, `capture`, `sync`.
 
 Each domain folder:
 

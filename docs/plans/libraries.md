@@ -34,7 +34,6 @@ and MIT-licensed, so there is no copyleft constraint.
 | Mobile day carousel (touch swipe, V1 parity) | `embla-carousel-react` | 19 |
 | AI provider (BYOK, streaming, multi-provider) | Vercel AI SDK (`ai` + `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google`) | 10 |
 | Diff / patch (patchsets, conflict diffs) | Not installed; patchsets remain deferred | 10 / 12 |
-| V1 migration import — ZIP | `fflate` (client-side; currently used by the V1 Markdown ZIP importer) | 13 |
 | Chrome extension framework | WXT | 11 |
 | Auto-update (JS API + relaunch) | `@tauri-apps/plugin-updater` + `@tauri-apps/plugin-process` | 15 |
 
@@ -66,9 +65,9 @@ and MIT-licensed, so there is no copyleft constraint.
 
 ## Notes & caveats
 
-- **Plan 13 is closed by product decision:** no ZIP, JSON, or HTML export dependencies are
-  planned. `fflate` remains only for the existing V1 Markdown ZIP migration importer. The
-  graph folder's markdown files and assets are the portability surface.
+- **Plan 13 is closed by product decision:** no ZIP, JSON, HTML export, or dedicated
+  Reflect V1 migration dependencies are planned. The graph folder's markdown files and
+  assets are the portability surface.
 - **The CLI (Plan 14) is a Rust binary** (superseding the earlier `cac` + `node:sqlite`
   Node-CLI choice): rusqlite `bundled` gives the same SQLite + FTS5 as the desktop app via
   one workspace lockfile, and the binary ships as a Tauri sidecar. `saphyr` is chosen for
