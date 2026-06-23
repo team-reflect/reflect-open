@@ -13,7 +13,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint:react": "eslint .",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
+    "tauri:build:dev": "tauri build --config src-tauri/tauri.dev.conf.json",
+    "tauri:build:beta": "tauri build --config src-tauri/tauri.beta.conf.json"
   },
   "dependencies": {
     "@meowdown/core": "0.21.1",
