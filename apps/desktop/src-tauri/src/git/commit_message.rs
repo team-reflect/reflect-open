@@ -1,4 +1,4 @@
-//! Derive concise backup commit subjects from staged graph paths.
+//! Derive concise backup commit subjects from staged graph note metadata.
 
 use std::path::Path;
 
@@ -28,8 +28,8 @@ struct NoteChange {
     old_label: Option<String>,
 }
 
-/// Return a path-derived commit subject, falling back when the staged tree is
-/// metadata-only or otherwise too noisy to summarize clearly.
+/// Return a staged-tree-derived commit subject, falling back when the staged
+/// tree is metadata-only or otherwise too noisy to summarize clearly.
 pub(super) fn message_for_commit(
     repo: &Repository,
     parent: Option<&Commit<'_>>,
@@ -37,7 +37,7 @@ pub(super) fn message_for_commit(
     fallback: &str,
 ) -> AppResult<String> {
     let changes = tree_changes(repo, parent, tree)?;
-    Ok(describe_changes(&changes).unwrap_or_else(|| fallback.to_string()))
+    Ok(describe_changes(repo, parent, tree, &changes).unwrap_or_else(|| fallback.to_string()))
 }
 
 fn tree_changes(
@@ -93,7 +93,12 @@ fn diff_path(path: Option<&Path>) -> Option<String> {
     path.map(|path| path.to_string_lossy().replace('\\', "/"))
 }
 
-fn describe_changes(changes: &[TreeChange]) -> Option<String> {
+fn describe_changes(
+    repo: &Repository,
+    parent: Option<&Commit<'_>>,
+    tree: &Tree<'_>,
+    changes: &[TreeChange],
+) -> Option<String> {
     let content_changes: Vec<&TreeChange> = changes
         .iter()
         .filter(|change| !is_backup_metadata_path(&change.path))
@@ -104,7 +109,7 @@ fn describe_changes(changes: &[TreeChange]) -> Option<String> {
 
     let note_changes: Vec<NoteChange> = content_changes
         .iter()
-        .filter_map(|change| note_change(change))
+        .filter_map(|change| note_change(repo, parent, tree, change))
         .collect();
     let attachment_changes: Vec<&TreeChange> = content_changes
         .iter()
@@ -193,14 +198,65 @@ impl ChangeAction {
     }
 }
 
-fn note_change(change: &TreeChange) -> Option<NoteChange> {
-    let label = note_label(&change.path)?;
-    let old_label = change.old_path.as_deref().and_then(note_label);
+fn note_change(
+    repo: &Repository,
+    parent: Option<&Commit<'_>>,
+    tree: &Tree<'_>,
+    change: &TreeChange,
+) -> Option<NoteChange> {
+    let label = staged_note_label(repo, parent, tree, change)?;
+    let old_label = change
+        .old_path
+        .as_deref()
+        .and_then(|old_path| old_note_label(repo, parent, old_path));
     Some(NoteChange {
         action: change.action,
         label,
         old_label,
     })
+}
+
+fn staged_note_label(
+    repo: &Repository,
+    parent: Option<&Commit<'_>>,
+    tree: &Tree<'_>,
+    change: &TreeChange,
+) -> Option<String> {
+    match change.action {
+        ChangeAction::Delete => old_note_label(repo, parent, &change.path),
+        _ => current_note_label(repo, tree, &change.path),
+    }
+}
+
+fn current_note_label(repo: &Repository, tree: &Tree<'_>, path: &str) -> Option<String> {
+    let fallback = note_label(path)?;
+    Some(note_title_from_tree(repo, tree, path).unwrap_or(fallback))
+}
+
+fn old_note_label(repo: &Repository, parent: Option<&Commit<'_>>, path: &str) -> Option<String> {
+    let fallback = note_label(path)?;
+    let parent_tree = parent.and_then(|parent| parent.tree().ok());
+    Some(
+        parent_tree
+            .as_ref()
+            .and_then(|tree| note_title_from_tree(repo, tree, path))
+            .unwrap_or(fallback),
+    )
+}
+
+fn note_title_from_tree(repo: &Repository, tree: &Tree<'_>, path: &str) -> Option<String> {
+    if daily_date(path).is_some() {
+        return None;
+    }
+    let source = blob_text(repo, tree, path)?;
+    authored_note_title(&source)
+}
+
+fn blob_text(repo: &Repository, tree: &Tree<'_>, path: &str) -> Option<String> {
+    let entry = tree.get_path(Path::new(path)).ok()?;
+    let object = entry.to_object(repo).ok()?;
+    let blob = object.as_blob()?;
+    std::str::from_utf8(blob.content()).ok().map(str::to_string)
 }
 
 fn note_label(path: &str) -> Option<String> {
@@ -215,6 +271,171 @@ fn note_label(path: &str) -> Option<String> {
         .next()?;
     let label = humanize_stem(stem);
     (!label.is_empty()).then_some(label)
+}
+
+fn authored_note_title(source: &str) -> Option<String> {
+    let split = split_frontmatter(source);
+    if split
+        .raw
+        .is_some_and(|frontmatter| frontmatter_private(frontmatter))
+    {
+        return None;
+    }
+    frontmatter_title(split.raw)
+        .or_else(|| first_h1(split.body))
+        .map(|title| collapse_spaces(&title))
+        .filter(|title| !title.is_empty())
+}
+
+struct FrontmatterSplit<'source> {
+    raw: Option<&'source str>,
+    body: &'source str,
+}
+
+fn split_frontmatter(source: &str) -> FrontmatterSplit<'_> {
+    let no_block = FrontmatterSplit {
+        raw: None,
+        body: source,
+    };
+    let Some(open_len) = fence_line_len(source) else {
+        return no_block;
+    };
+    let rest = &source[open_len..];
+    if let Some(close_len) = fence_line_len(rest) {
+        return FrontmatterSplit {
+            raw: Some(""),
+            body: &rest[close_len..],
+        };
+    }
+
+    let mut search_from = 0;
+    while let Some(newline_at) = rest[search_from..].find('\n').map(|at| search_from + at) {
+        let line_start = newline_at + 1;
+        if let Some(close_len) = fence_line_len(&rest[line_start..]) {
+            let raw_end = if newline_at > 0 && rest.as_bytes()[newline_at - 1] == b'\r' {
+                newline_at - 1
+            } else {
+                newline_at
+            };
+            return FrontmatterSplit {
+                raw: Some(&rest[..raw_end]),
+                body: &rest[line_start + close_len..],
+            };
+        }
+        search_from = line_start;
+    }
+    no_block
+}
+
+fn fence_line_len(text: &str) -> Option<usize> {
+    let rest = text.strip_prefix("---")?;
+    let bytes = rest.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() && (bytes[index] == b' ' || bytes[index] == b'\t') {
+        index += 1;
+    }
+    match bytes.get(index) {
+        None => Some(3 + index),
+        Some(b'\n') => Some(3 + index + 1),
+        Some(b'\r') if bytes.get(index + 1) == Some(&b'\n') => Some(3 + index + 2),
+        _ => None,
+    }
+}
+
+fn frontmatter_title(raw: Option<&str>) -> Option<String> {
+    frontmatter_scalar(raw?, "title").filter(|title| !title.trim().is_empty())
+}
+
+fn frontmatter_private(raw: &str) -> bool {
+    frontmatter_scalar(raw, "private")
+        .map(|value| {
+            matches!(
+                value.trim().to_lowercase().as_str(),
+                "true" | "yes" | "on" | "1"
+            )
+        })
+        .unwrap_or(false)
+}
+
+fn frontmatter_scalar(raw: &str, key: &str) -> Option<String> {
+    for line in raw.lines() {
+        let Some((candidate, value)) = line.split_once(':') else {
+            continue;
+        };
+        if candidate.trim() == key {
+            return Some(unquote_scalar(value.trim()));
+        }
+    }
+    None
+}
+
+fn unquote_scalar(value: &str) -> String {
+    let without_comment = value
+        .split_once(" #")
+        .map(|(head, _comment)| head)
+        .unwrap_or(value)
+        .trim();
+    if without_comment.len() >= 2 {
+        let bytes = without_comment.as_bytes();
+        let first = bytes[0];
+        let last = bytes[without_comment.len() - 1];
+        if (first == b'"' && last == b'"') || (first == b'\'' && last == b'\'') {
+            return without_comment[1..without_comment.len() - 1].to_string();
+        }
+    }
+    without_comment.to_string()
+}
+
+fn first_h1(body: &str) -> Option<String> {
+    let lines: Vec<&str> = body.lines().collect();
+    let mut in_fence = false;
+    for (index, line) in lines.iter().enumerate() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+        if let Some(heading) = atx_h1(trimmed) {
+            return Some(heading);
+        }
+        if index + 1 < lines.len() && is_setext_h1(lines[index + 1]) {
+            let heading = clean_heading_text(line);
+            if !heading.is_empty() {
+                return Some(heading);
+            }
+        }
+    }
+    None
+}
+
+fn atx_h1(line: &str) -> Option<String> {
+    let rest = line.strip_prefix('#')?;
+    if rest.starts_with('#') {
+        return None;
+    }
+    if !rest.is_empty() && !rest.starts_with([' ', '\t']) {
+        return None;
+    }
+    let heading = clean_heading_text(rest);
+    (!heading.is_empty()).then_some(heading)
+}
+
+fn is_setext_h1(line: &str) -> bool {
+    let trimmed = line.trim();
+    !trimmed.is_empty() && trimmed.chars().all(|character| character == '=')
+}
+
+fn clean_heading_text(raw: &str) -> String {
+    let text = raw
+        .trim()
+        .trim_end_matches('#')
+        .trim_end()
+        .trim_end_matches('#')
+        .trim();
+    text.to_string()
 }
 
 fn daily_date(path: &str) -> Option<&str> {

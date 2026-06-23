@@ -163,6 +163,46 @@ fn commit_describes_single_note_changes() {
 }
 
 #[test]
+fn commit_uses_authored_note_subjects() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+
+    write(
+        root,
+        "notes/01arz3ndektsv4rrffq69g5fav.md",
+        "---\ntitle: Project Atlas\n---\n# Ignored H1\n",
+    );
+    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert_eq!(head_message(root), "Add Project Atlas");
+
+    write(
+        root,
+        "notes/01arz3ndektsv4rrffq69g5fav.md",
+        "# Launch Review\n\n- agenda\n",
+    );
+    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert_eq!(head_message(root), "Update Launch Review");
+
+    fs::remove_file(root.join("notes/01arz3ndektsv4rrffq69g5fav.md")).unwrap();
+    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert_eq!(head_message(root), "Delete Launch Review");
+}
+
+#[test]
+fn commit_does_not_leak_private_authored_titles() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+
+    write(
+        root,
+        "notes/private-project.md",
+        "---\nprivate: true\ntitle: Secret Plan\n---\n# Secret Heading\n",
+    );
+    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert_eq!(head_message(root), "Add Private Project");
+}
+
+#[test]
 fn commit_summarizes_note_batches() {
     let fixture = fixture();
     let root = &fixture.graph_a;
