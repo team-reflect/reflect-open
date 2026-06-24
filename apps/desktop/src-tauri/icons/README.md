@@ -5,7 +5,7 @@ Three color sets, one per build flavor. Same gradient gem artwork, different hue
 | Dir           | Color        | Flavor        | productName  | modulate (B,S,H) |
 | ------------- | ------------ | ------------- | ------------ | ---------------- |
 | `icons/`      | blue/violet  | stable        | Reflect      | none (as shipped) |
-| `icons-beta/` | magenta/pink | beta (`next`) | Reflect Beta | `104,100,151`    |
+| `icons-beta/` | purple/violet | beta (`next`) | Reflect Beta | `104,100,120`    |
 | `icons-dev/`  | green        | dev (local)   | Reflect Dev  | `92,100,231`     |
 
 `icons/` is the shipped app icon and the default set Tauri uses with no `--config`;
@@ -23,7 +23,7 @@ ImageMagick on macOS has no ICNS writer, so recolor the rasters in place and reb
 `icon.icns` from a recolored master with the native tools:
 
 ```bash
-mod="104,100,151"           # the flavor's modulate (see table)
+mod="104,100,120"           # the flavor's modulate (see table)
 cp -R icons icons-<flavor>
 find icons-<flavor> -type f \( -iname '*.png' -o -iname '*.ico' \) -print0 \
   | while IFS= read -r -d '' f; do magick "$f" -modulate "$mod" "$f"; done
@@ -39,5 +39,6 @@ cp /tmp/recolored.png /tmp/set.iconset/icon_512x512@2x.png
 iconutil -c icns /tmp/set.iconset -o icons-<flavor>/icon.icns
 ```
 
-The hues were chosen from the 400-variant contact sheet: beta = id 387 (hue ≈ 342°),
-dev = id 149 (hue ≈ 126°). Eyeball any new pick.
+Dev's hue came from the 400-variant contact sheet (id 149, hue ≈ 126°). Beta was
+hand-tuned to a purple-violet (hue ≈ 286°) — distinct from the stable blue/violet but
+no longer the near-red magenta of the original contact-sheet pick. Eyeball any new pick.

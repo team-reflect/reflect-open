@@ -96,7 +96,7 @@ the original release scope and are **in** scope for the privacy/signing review.
     - **Channels:** start with a single stable channel; leave room for a beta channel later.
     - **Flavors (shipped):** three coexisting apps via `--config` overlays — Reflect
       (stable, `app.reflect.desktop`, shipped blue/violet icon), Reflect Beta (`…​.beta`,
-      magenta), Reflect Dev (`…​.dev`, green, no updates). Beta/dev icons are the stable
+      purple/violet), Reflect Dev (`…​.dev`, green, no updates). Beta/dev icons are the stable
       artwork recolored via `magick -modulate`. `release:macos` derives the flavor from the
       version channel. See docs/macos-distribution.md → Build flavors.
 
