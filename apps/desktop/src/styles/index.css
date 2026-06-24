@@ -574,6 +574,15 @@ html:root {
   border-width: 1px;
   border-color: var(--text-muted); /* crisper than the pale --border at 1px */
 }
+/* Widen the gap between a task checkbox and its label, for both the square
+   (`- [ ]`) and rounded (`+ [ ]`, data-list-marker="+") markers. Both render as
+   data-list-kind="task", so this covers them together. ProseKit/meowdown size
+   the marker box at 1lh and start `.list-content` flush against it (default
+   `margin-inline-start: 1lh`); nudge the content right for more breathing room.
+   At 0-4-0 this clears both base rules (each 0-2-0). */
+.reflect-editor .prosemirror-flat-list[data-list-kind='task'] > .list-content {
+  margin-inline-start: 1.25lh;
+}
 
 /* ---- shadcn inputs (components/ui/) -------------------------------------
    shadcn form controls carry their own focus-visible ring (border + ring
