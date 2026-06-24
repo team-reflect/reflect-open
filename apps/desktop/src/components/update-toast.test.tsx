@@ -77,6 +77,13 @@ describe('UpdateToast', () => {
       ),
     )
 
+    // The downloading toast must explicitly clear the action: Sonner merges
+    // options into the same-id toast, so without this the "Install" button
+    // from the `available` phase would linger as a clickable control.
+    const downloadingOptions = toast.loading.mock.lastCall?.[1]
+    expect(Object.hasOwn(downloadingOptions ?? {}, 'action')).toBe(true)
+    expect(downloadingOptions?.action).toBeUndefined()
+
     update.state = { phase: 'ready', version: '1.2.3' }
     rerender(<UpdateToast />)
     await waitFor(() =>

@@ -38,6 +38,12 @@ export function UpdateToast(): ReactElement | null {
           id: UPDATE_TOAST_ID,
           description: state.percent !== null ? `${state.percent}%` : 'Preparing…',
           duration: PERSISTENT_TOAST_MS,
+          // Sonner merges options into the existing toast by id, so the
+          // "Install" action from the `available` phase persists unless we
+          // clear it — otherwise a clickable Install button lingers over the
+          // download progress. The update only becomes installable once it has
+          // fully downloaded, surfaced as "Restart" in the `ready` phase.
+          action: undefined,
           ...NON_DISMISSIBLE_UPDATE_OPTIONS,
         })
         break
