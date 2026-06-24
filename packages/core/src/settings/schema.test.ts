@@ -42,6 +42,7 @@ describe('settingsSchema', () => {
   it('accepts valid values', () => {
     expect(settingsSchema.parse({ editorMarkdownSyntax: 'show' }).editorMarkdownSyntax).toBe('show')
     expect(settingsSchema.parse({ editorMarkdownSyntax: 'hide' }).editorMarkdownSyntax).toBe('hide')
+    expect(settingsSchema.parse({ editorMarkdownSyntax: 'hybrid' }).editorMarkdownSyntax).toBe('hybrid')
     expect(settingsSchema.parse({ editorSpellCheck: false }).editorSpellCheck).toBe(false)
     expect(settingsSchema.parse({ editorSpellCheck: true }).editorSpellCheck).toBe(true)
     expect(settingsSchema.parse({ editorDefaultBullet: false }).editorDefaultBullet).toBe(false)

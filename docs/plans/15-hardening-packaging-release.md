@@ -94,6 +94,11 @@ the original release scope and are **in** scope for the privacy/signing review.
       states (`Update available` → `Downloading` → `Restart to update`), download with
       progress, verify, install, and `relaunch()`. Never block the editor; let the user defer.
     - **Channels:** start with a single stable channel; leave room for a beta channel later.
+    - **Flavors (shipped):** three coexisting apps via `--config` overlays — Reflect
+      (stable, `app.reflect.desktop`, shipped blue/violet icon), Reflect Beta (`…​.beta`,
+      magenta), Reflect Dev (`…​.dev`, green, no updates). Beta/dev icons are the stable
+      artwork recolored via `magick -modulate`. `release:macos` derives the flavor from the
+      version channel. See docs/macos-distribution.md → Build flavors.
 
 11. **Definition-of-success walkthrough.** Manually verify the product-vision success
     list end-to-end (below) as the release checklist.

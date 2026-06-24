@@ -7,6 +7,7 @@
 //   pnpm release:macos verify         Re-run Gatekeeper checks on existing bundles
 //   pnpm release:macos publish        Build, then upload the DMG + updater artifacts to a new GitHub release
 //   pnpm release:macos --no-notarize  Signed-only build (won't pass Gatekeeper elsewhere)
+//   pnpm release:macos --flavor=beta  Build a specific flavor: stable | beta | dev (default: from the version)
 //
 // Signing configuration is intentionally not committed — contributors must be
 // able to build without Reflect's certificate. The Developer ID identity is
@@ -31,6 +32,20 @@ const APP_SPECIFIC_PASSWORD_URL = 'https://account.apple.com'
 const BETA_UPDATER_FEED_TAG = 'updater-beta'
 const STABLE_UPDATER_ENDPOINT = 'https://github.com/team-reflect/reflect-open/releases/latest/download/latest.json'
 const BETA_UPDATER_ENDPOINT = `https://github.com/team-reflect/reflect-open/releases/download/${BETA_UPDATER_FEED_TAG}/latest.json`
+
+/**
+ * Build flavors. Each ships as a distinct app (its own productName, identifier
+ * and icon) so all three coexist on one machine. `overlay` is a Tauri config
+ * merged on top of the base config via `--config`; null means the base config
+ * *is* the flavor (stable). The flavor is normally derived from the version
+ * (prerelease → beta), so a published build always matches the updater feed
+ * compiled into it.
+ */
+const FLAVOR_OVERLAYS = {
+  stable: null,
+  beta: 'src-tauri/tauri.beta.conf.json',
+  dev: 'src-tauri/tauri.dev.conf.json',
+}
 
 const here = dirname(fileURLToPath(import.meta.url))
 const appDir = join(here, '..')
@@ -175,14 +190,57 @@ function hostArch() {
   return arch
 }
 
-/** Parse tauri.conf.json — the source of truth for the bundle name and version. */
+/** Parse tauri.conf.json — the source of truth for the version and base bundle name. */
 function readTauriConf() {
   return JSON.parse(readFileSync(join(appDir, 'src-tauri', 'tauri.conf.json'), 'utf8'))
 }
 
-/** Derive bundle output paths from tauri.conf.json and cargo's target dir. */
-function bundlePaths() {
-  const conf = readTauriConf()
+/** Apply an RFC 7396 JSON Merge Patch — the same algorithm Tauri uses for `--config`. */
+function mergePatch(target, patch) {
+  if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) return patch
+  const out = target && typeof target === 'object' && !Array.isArray(target) ? { ...target } : {}
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null) delete out[key]
+    else out[key] = mergePatch(out[key], value)
+  }
+  return out
+}
+
+/**
+ * The resolved config for a flavor: the base config with the flavor overlay
+ * merged on top, exactly as `tauri build --config <overlay>` produces it. Bundle
+ * paths depend on the flavor's productName, so they read the merged config.
+ */
+function readFlavorConf(flavor) {
+  const base = readTauriConf()
+  const overlay = FLAVOR_OVERLAYS[flavor]
+  if (!overlay) return base
+  const patch = JSON.parse(readFileSync(join(appDir, overlay), 'utf8'))
+  return mergePatch(base, patch)
+}
+
+/**
+ * Pick the flavor. `publish` always derives it from the version channel so a
+ * build can never be published to a feed it wasn't compiled for; local builds
+ * may override with --flavor (including the never-published `dev`).
+ */
+function resolveFlavor({ flavorFlag, version, forPublish }) {
+  const byVersion = version.includes('-') ? 'beta' : 'stable'
+  if (forPublish) {
+    if (flavorFlag && flavorFlag !== byVersion) {
+      fail(
+        `--flavor=${flavorFlag} conflicts with version ${version} (channel ${byVersion}); ` +
+          'publish derives the flavor from the version',
+      )
+    }
+    return byVersion
+  }
+  return flavorFlag ?? byVersion
+}
+
+/** Derive bundle output paths from the flavor's resolved config and cargo's target dir. */
+function bundlePaths(flavor) {
+  const conf = readFlavorConf(flavor)
   const metadata = JSON.parse(
     capture('cargo', ['metadata', '--format-version', '1', '--no-deps'], { cwd: repoRoot }),
   )
@@ -204,16 +262,20 @@ function bundlePaths() {
  * so every published release must carry this file — it is how installed apps
  * discover the new version and verify its payload.
  */
-function writeUpdaterManifest({ version, tag }) {
-  const { updaterArchive, updaterSignature } = bundlePaths()
+function writeUpdaterManifest({ version, tag, flavor }) {
+  const { updaterArchive, updaterSignature } = bundlePaths(flavor)
   const slug = capture('gh', ['repo', 'view', '--json', 'nameWithOwner', '-q', '.nameWithOwner']).trim()
+  // GitHub rewrites spaces in uploaded asset names to dots, so a flavor whose
+  // productName has a space ("Reflect Beta") is served under a dotted name. The
+  // manifest URL must match the *uploaded* name or auto-update gets a 404.
+  const assetName = basename(updaterArchive).replace(/ /g, '.')
   const manifest = {
     version,
     pub_date: new Date().toISOString(),
     platforms: {
       [`darwin-${hostArch()}`]: {
         signature: readFileSync(updaterSignature, 'utf8').trim(),
-        url: `https://github.com/${slug}/releases/download/${tag}/${basename(updaterArchive)}`,
+        url: `https://github.com/${slug}/releases/download/${tag}/${assetName}`,
       },
     },
   }
@@ -280,8 +342,8 @@ function expectCheck(description, command, args, expected) {
 }
 
 /** Verify the built bundles match the expected distribution state. */
-function verify({ notarized }) {
-  const { app, dmg } = bundlePaths()
+function verify({ notarized, flavor }) {
+  const { app, dmg } = bundlePaths(flavor)
   if (!existsSync(app)) fail(`${app} does not exist — run \`pnpm release:macos\` first`)
   if (!existsSync(dmg)) fail(`${dmg} does not exist — run \`pnpm release:macos\` first`)
 
@@ -309,15 +371,15 @@ function verify({ notarized }) {
   expectCheck('stapled ticket (dmg)', 'xcrun', ['stapler', 'validate', dmg], ['The validate action worked!'])
 }
 
-function printArtifacts() {
-  const { app, dmg } = bundlePaths()
+function printArtifacts(flavor) {
+  const { app, dmg } = bundlePaths(flavor)
   const dmgSizeMb = (statSync(dmg).size / (1024 * 1024)).toFixed(1)
   log('distribution bundles:')
   console.log(`  ${app}`)
   console.log(`  ${dmg} (${dmgSizeMb} MB)`)
 }
 
-function build({ notarize, requireUpdater = false }) {
+function build({ notarize, requireUpdater = false, flavor }) {
   const identity = findSigningIdentity()
   log(`signing identity: ${identity}`)
 
@@ -377,6 +439,8 @@ function build({ notarize, requireUpdater = false }) {
   // `tauri build` hard-fails without the private key, which would break plain
   // contributor builds. The release script turns it on only when it can sign.
   const buildArgs = ['tauri', 'build']
+  const overlay = FLAVOR_OVERLAYS[flavor]
+  if (overlay) buildArgs.push('--config', overlay)
   if (updater) {
     buildArgs.push('--config', JSON.stringify({ bundle: { createUpdaterArtifacts: true } }))
   }
@@ -384,15 +448,15 @@ function build({ notarize, requireUpdater = false }) {
   if (result.status !== 0) fail('tauri build failed')
 
   if (updater) {
-    const { updaterArchive, updaterSignature } = bundlePaths()
+    const { updaterArchive, updaterSignature } = bundlePaths(flavor)
     if (!existsSync(updaterArchive) || !existsSync(updaterSignature)) {
       fail(`updater artifacts missing after build — expected ${updaterArchive} and its .sig`)
     }
   }
 
-  if (notarize) notarizeDmg(bundlePaths().dmg, credentials)
-  verify({ notarized: notarize })
-  printArtifacts()
+  if (notarize) notarizeDmg(bundlePaths(flavor).dmg, credentials)
+  verify({ notarized: notarize, flavor })
+  printArtifacts(flavor)
   log(notarize ? 'done — ready to distribute' : 'done — signed but NOT notarized')
 }
 
@@ -533,19 +597,21 @@ function updateBetaFeed({ commit, manifestPath }) {
  * pre-release. All preflight checks run before the build so a doomed publish
  * fails in seconds, not after notarization.
  */
-function publish({ draft }) {
+function publish({ draft, flavorFlag }) {
   ensureGhReady()
   const commit = ensurePublishableCommit()
-  const { productName, version } = readTauriConf()
+  const { version } = readTauriConf()
+  const flavor = resolveFlavor({ flavorFlag, version, forPublish: true })
+  const { productName } = readFlavorConf(flavor)
   const tag = `v${version}`
   ensureUpdaterEndpointMatchesVersion({ version })
   ensureReleaseIsNew(tag)
   ensureTagMatchesCommit(tag, commit)
 
-  build({ notarize: true, requireUpdater: true })
+  build({ notarize: true, requireUpdater: true, flavor })
 
-  const { dmg, updaterArchive, updaterSignature } = bundlePaths()
-  const manifestPath = writeUpdaterManifest({ version, tag })
+  const { dmg, updaterArchive, updaterSignature } = bundlePaths(flavor)
+  const manifestPath = writeUpdaterManifest({ version, tag, flavor })
   // Pre-releases are invisible to `releases/latest` — the committed updater
   // endpoint — so installed stable apps never see a beta.
   const prerelease = version.includes('-')
@@ -651,6 +717,9 @@ Commands:
 Flags:
   --no-notarize   Skip notarization (signed-only build/verify)
   --draft         Create the GitHub release as a draft (publish only)
+  --flavor=<name> Build a flavor: stable | beta | dev (default: derived from the
+                  version — prerelease → beta, else stable; publish ignores this
+                  and always uses the version's channel)
   --help          Show this help
 
 Docs: docs/macos-distribution.md`
@@ -659,8 +728,14 @@ async function main() {
   const argv = process.argv.slice(2)
   const flags = argv.filter((arg) => arg.startsWith('--'))
   const commands = argv.filter((arg) => !arg.startsWith('--'))
-  const unknownFlag = flags.find((flag) => !['--no-notarize', '--draft', '--help'].includes(flag))
+  const flavorFlag = flags.find((flag) => flag.startsWith('--flavor='))?.slice('--flavor='.length)
+  const unknownFlag = flags.find(
+    (flag) => !['--no-notarize', '--draft', '--help'].includes(flag) && !flag.startsWith('--flavor='),
+  )
   if (unknownFlag) fail(`unknown flag "${unknownFlag}"\n\n${USAGE}`)
+  if (flavorFlag && !Object.keys(FLAVOR_OVERLAYS).includes(flavorFlag)) {
+    fail(`unknown --flavor "${flavorFlag}" — one of: ${Object.keys(FLAVOR_OVERLAYS).join(', ')}`)
+  }
   if (flags.includes('--help')) {
     console.log(USAGE)
     return
@@ -671,18 +746,21 @@ async function main() {
   const notarize = !flags.includes('--no-notarize')
   if (command === 'publish' && !notarize) fail('publish always notarizes — drop --no-notarize')
   if (command !== 'publish' && flags.includes('--draft')) fail('--draft only applies to publish')
+  const { version } = readTauriConf()
   switch (command) {
     case 'build':
-      return build({ notarize })
+      return build({ notarize, flavor: resolveFlavor({ flavorFlag, version, forPublish: false }) })
     case 'setup':
       return setup()
     case 'setup-updater':
       return setupUpdater()
-    case 'verify':
-      verify({ notarized: notarize })
-      return printArtifacts()
+    case 'verify': {
+      const flavor = resolveFlavor({ flavorFlag, version, forPublish: false })
+      verify({ notarized: notarize, flavor })
+      return printArtifacts(flavor)
+    }
     case 'publish':
-      return publish({ draft: flags.includes('--draft') })
+      return publish({ draft: flags.includes('--draft'), flavorFlag })
     default:
       fail(`unknown command "${command}"\n\n${USAGE}`)
   }

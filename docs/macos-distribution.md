@@ -163,6 +163,53 @@ Cutting a beta is the normal release flow on `next`: `pnpm release:bump` (see
 version and pushes the tag that triggers the workflow. For a stable release, merge
 `next` into `master` and run `pnpm release:bump stable` there.
 
+## Build flavors (Reflect / Reflect Beta / Reflect Dev)
+
+Three flavors ship as distinct, coexisting apps:
+
+| Flavor       | Branch   | productName  | identifier                 | Icon         | Updater feed      |
+| ------------ | -------- | ------------ | -------------------------- | ------------ | ----------------- |
+| Reflect      | `master` | Reflect      | `app.reflect.desktop`      | blue/violet  | `releases/latest` |
+| Reflect Beta | `next`   | Reflect Beta | `app.reflect.desktop.beta` | magenta/pink | `updater-beta`    |
+| Reflect Dev  | local    | Reflect Dev  | `app.reflect.desktop.dev`  | green        | `updater-dev-noop` (no-op) |
+
+The base `tauri.conf.json` is the stable flavor and uses the shipped gradient icon
+(`icons/`). Beta and dev are config overlays (`src-tauri/tauri.beta.conf.json`,
+`src-tauri/tauri.dev.conf.json`) merged with `--config`; their icons are the same
+artwork recolored via `magick -modulate` (beta `104,100,151`, dev `92,100,231`; see
+`src-tauri/icons/README.md`). `release:macos` picks the flavor from the version
+(prerelease → beta, else stable), so a release always matches the updater feed compiled
+into it; `release.yml` needs no flavor knowledge and `release:bump` is unchanged.
+
+Each overlay pins its own updater feed so the flavor is self-consistent regardless of the
+base config's channel: beta → `updater-beta`, dev → a deliberately non-existent
+`updater-dev-noop` feed so dev builds never find an update (in `tauri dev` the updater is
+off anyway). The stable feed lives on the base config and is managed by `release:bump`.
+
+Distinct identifiers give each flavor its own webview storage and embeddings cache.
+Settings, recent graphs and keychain secrets are currently **shared** across flavors (the
+`reflect-open` config dir and keychain service are hardcoded, not derived from the
+identifier).
+
+Local builds:
+
+```bash
+pnpm tauri:dev                                   # run Reflect Dev (green), isolated identifier
+pnpm tauri:build:dev                             # bundle Reflect Dev
+pnpm tauri:build:beta                            # bundle Reflect Beta locally (unsigned)
+pnpm release:macos --flavor=beta --no-notarize   # signed-only beta, for local checks
+```
+
+Because GitHub rewrites spaces in uploaded asset names to dots, the updater manifest URL
+for "Reflect Beta" is sanitized to `Reflect.Beta.app.tar.gz` in `writeUpdaterManifest`.
+Do not "fix" the space back, or beta auto-update 404s.
+
+**Beta tester migration (one-time):** before flavors, beta builds were a plain "Reflect"
+(`app.reflect.desktop`) that merely polled the beta feed. The first flavored beta is a new
+app (`app.reflect.desktop.beta`, "Reflect Beta"), so existing beta installs do not migrate
+cleanly. Tell testers to delete the old "Reflect" beta and install "Reflect Beta" fresh.
+Stable installs are unaffected (same identifier and the shipped icon).
+
 ## Releasing from CI
 
 `.github/workflows/release.yml` runs `pnpm release:macos publish` on a GitHub-hosted

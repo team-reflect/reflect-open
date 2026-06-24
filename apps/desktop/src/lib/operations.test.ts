@@ -74,4 +74,51 @@ describe('operations store', () => {
     act(() => vi.advanceTimersByTime(1200))
     expect(result.current.map((operation) => operation.label)).toEqual(['second'])
   })
+
+  it('stores optional toast metadata and can dismiss immediately', () => {
+    const { result } = renderHook(() => useOperations())
+    const run = vi.fn()
+    let handle!: ReturnType<typeof startOperation>
+
+    act(() => {
+      handle = startOperation('Install update', {
+        description: 'Reflect 1.2.3 is ready.',
+        persistent: true,
+        action: { label: 'Install', run },
+      })
+    })
+
+    expect(result.current[0]).toMatchObject({
+      label: 'Install update',
+      description: 'Reflect 1.2.3 is ready.',
+      persistent: true,
+      action: { label: 'Install', run },
+    })
+
+    act(() => vi.advanceTimersByTime(30_000))
+    expect(result.current).toHaveLength(1)
+
+    act(() => handle.dismiss())
+    expect(result.current).toEqual([])
+  })
+
+  it('keeps persistent failures visible until dismissed', () => {
+    const { result } = renderHook(() => useOperations())
+    let handle!: ReturnType<typeof startOperation>
+
+    act(() => {
+      handle = startOperation('Install update', { persistent: true })
+    })
+    act(() => handle.fail('signature failed'))
+    act(() => vi.advanceTimersByTime(30_000))
+
+    expect(result.current[0]).toMatchObject({
+      label: 'Install update',
+      status: 'failed',
+      message: 'signature failed',
+    })
+
+    act(() => handle.dismiss())
+    expect(result.current).toEqual([])
+  })
 })

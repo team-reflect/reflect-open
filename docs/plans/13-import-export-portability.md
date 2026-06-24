@@ -15,11 +15,9 @@ surface without improving the core promise: the user's durable data is already p
 files they can copy, back up, edit, zip, inspect in GitHub, or open in another markdown
 tool.
 
-The focused Reflect V1 Markdown ZIP importer that exists today is treated as a migration
-convenience, not the start of a broader import/export suite. It lives at
-`packages/core/src/import/v1-markdown.ts`, uses `fflate`, preserves V1 IDs as
-frontmatter, normalizes task markers, routes daily notes into `daily/YYYY-MM-DD.md`, and
-writes collision-safe regular notes through the graph command layer.
+Reflect V1 exports are now emitted in Reflect V2's graph-compatible markdown shape, so
+there is no dedicated Reflect V1 import path. Users migrate by opening or copying the
+exported graph folder directly.
 
 ## Portability Contract
 
@@ -45,10 +43,8 @@ writes collision-safe regular notes through the graph command layer.
 
 ## What Remains
 
-Keep the existing V1 Markdown ZIP importer working while it is useful for migration. It
-accepts the old Reflect ZIP shape, skips unsafe paths, keeps existing graph files by
-choosing available note paths, and reports `{ imported, regular, daily, skipped,
-renamed }`.
+Keep the markdown graph contract boring and durable. Reflect-owned migration work should
+target the export shape at the source rather than adding one-off import surfaces here.
 
 Future migration tools can be considered case-by-case, but they should not reopen a
 general import/export product area unless the portability premise changes.

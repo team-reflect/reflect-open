@@ -14,6 +14,7 @@ interface CapturedEditorProps {
   resolveImageUrl?: (src: string) => string | undefined
   onImageClick?: (payload: { src: string; alt: string; event: MouseEvent }) => void
   onLinkClick?: (payload: { href: string; event: MouseEvent }) => void
+  onTagClick?: (payload: { tag: string; event: MouseEvent }) => void
 }
 
 const captured = vi.hoisted(() => ({ props: null as CapturedEditorProps | null }))
@@ -122,6 +123,18 @@ describe('NoteEditor markdown syntax mode', () => {
   it('passes an explicit markdown syntax mode to meowdown', () => {
     render(<NoteEditor initialContent="" markMode="show" />)
     expect(captured.props?.mode).toBe('show')
+  })
+})
+
+describe('NoteEditor tag click', () => {
+  it('forwards a clicked tag name, without the leading #', () => {
+    const onTagClick = vi.fn()
+    render(<NoteEditor initialContent="" onTagClick={onTagClick} />)
+    expect(captured.props?.onTagClick).toBeTypeOf('function')
+
+    const event = new MouseEvent('click', { bubbles: true })
+    act(() => captured.props?.onTagClick?.({ tag: 'book', event }))
+    expect(onTagClick).toHaveBeenCalledWith('book')
   })
 })
 

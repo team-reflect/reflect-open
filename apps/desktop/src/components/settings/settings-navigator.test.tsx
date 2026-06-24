@@ -113,9 +113,9 @@ describe('SettingsNavigator', () => {
   it('hands the last section the marker at the very bottom of the page', () => {
     const scroller = renderNavigatorPage()
     scrollPageTo(scroller, CONTENT_PX - VIEWPORT_PX)
-    // About's top never crosses the reading line, but the page can scroll no
+    // Danger zone's top never crosses the reading line, but the page can scroll no
     // further — the bottom override keeps the last entry reachable.
-    expect(activeEntry()).toBe('About')
+    expect(activeEntry()).toBe('Danger zone')
   })
 
   it('clicking an entry scrolls its section to the top of the page', () => {

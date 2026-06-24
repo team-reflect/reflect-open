@@ -204,6 +204,21 @@ export function TasksScreen(): ReactElement {
         .filter((task): task is OpenTask => task !== undefined),
     [selection, tasksByKey],
   )
+  const onSelectionCheckboxToggle = useCallback(
+    (task: OpenTask) => {
+      const tasks = selectedTasks()
+      if (tasks.length <= 1 || !tasks.some((selectedTask) => sameTask(selectedTask, task))) {
+        actions.checkboxToggle(task)
+        return
+      }
+      if (task.checked) {
+        actions.toggle(tasks.filter((selectedTask) => selectedTask.checked))
+      } else {
+        actions.complete(tasks)
+      }
+    },
+    [actions, selectedTasks],
+  )
   // Schedule the current selection (the calendar / ⌘⇧S), then deselect (V1).
   const onSchedule = useCallback(
     (isoDate: string | null) => {
@@ -336,6 +351,7 @@ export function TasksScreen(): ReactElement {
                 selection={selection}
                 editHandlers={editHandlers}
                 taskActionPending={actions.isPending}
+                onSelectionCheckboxToggle={onSelectionCheckboxToggle}
                 today={today}
                 onAdd={onAdd}
                 convertControllerRef={convertControllerRef}

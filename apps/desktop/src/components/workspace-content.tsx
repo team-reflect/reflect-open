@@ -10,7 +10,6 @@ import { type ContextSidebarTarget } from '@/components/context-sidebar/sidebar-
 import { EmbeddingsSync } from '@/components/embeddings-sync'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { OperationsStatus } from '@/components/operations-status'
 import { RouteContent } from '@/components/route-content'
 import { ShortcutsDialog } from '@/components/shortcuts-dialog'
 import { Sidebar } from '@/components/sidebar/sidebar'
@@ -92,7 +91,6 @@ export function WorkspaceContent({ graph }: WorkspaceContentProps): ReactElement
           <RouteContent />
         </div>
 
-        <OperationsStatus />
         <CommandPalette context={commandContext} />
         <ShortcutsDialog />
         <EmbeddingsSync />

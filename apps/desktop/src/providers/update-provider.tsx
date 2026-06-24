@@ -28,17 +28,6 @@ interface UpdateContextValue {
   restart: () => Promise<void>
 }
 
-const DESKTOP_PLATFORMS = new Set(['darwin', 'windows', 'linux'])
-
-/**
- * True when this bundle was built by the Tauri CLI for a desktop target.
- * `TAURI_ENV_PLATFORM` is the CLI's build-time platform (absent in plain Vite
- * builds and tests), so mobile bundles compile the update UI away from day one.
- */
-function isDesktopBuild(): boolean {
-  return DESKTOP_PLATFORMS.has(import.meta.env.TAURI_ENV_PLATFORM ?? '')
-}
-
 const UpdateContext = createContext<UpdateContextValue | null>(null)
 
 const IDLE: UpdateState = { phase: 'idle' }
@@ -60,7 +49,7 @@ interface UpdateProviderProps {
  * any graph is open.
  */
 export function UpdateProvider({ children, autoCheck }: UpdateProviderProps): ReactElement {
-  const supported = hasBridge() && isDesktopBuild()
+  const supported = hasBridge()
   const resolvedAutoCheck = autoCheck ?? (supported && !import.meta.env.DEV)
   const [controller, setController] = useState<UpdateController | null>(null)
 

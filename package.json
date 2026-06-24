@@ -14,7 +14,10 @@
     "check": "pnpm typecheck && pnpm lint",
     "tauri": "pnpm --filter @reflect/desktop tauri",
     "release:bump": "pnpm --filter @reflect/desktop release:bump",
-    "release:macos": "pnpm --filter @reflect/desktop release:macos"
+    "release:macos": "pnpm --filter @reflect/desktop release:macos",
+    "tauri:dev": "pnpm --filter @reflect/desktop tauri:dev",
+    "tauri:build:dev": "pnpm --filter @reflect/desktop tauri:build:dev",
+    "tauri:build:beta": "pnpm --filter @reflect/desktop tauri:build:beta"
   },
   "devDependencies": {
     "oxlint": "^1.70.0",

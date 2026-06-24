@@ -16,6 +16,8 @@ interface TaskGroupSectionProps {
   editHandlers: (task: OpenTask) => TaskRowEditHandlers
   /** Whether a Tasks-view write is already in flight. */
   taskActionPending: boolean
+  /** Complete/reopen the selected rows using the clicked task's next checkbox state. */
+  onSelectionCheckboxToggle: (task: OpenTask) => void
   /** Today's ISO date — the Current group's "+ Add" targets today's daily. */
   today: string
   /** Add a task to this group and open its editor (the header's "+ Add", V1). */
@@ -65,6 +67,7 @@ export function TaskGroupSection({
   selection,
   editHandlers,
   taskActionPending,
+  onSelectionCheckboxToggle,
   today,
   onAdd,
   convertControllerRef,
@@ -110,15 +113,18 @@ export function TaskGroupSection({
         ) : (
           group.tasks.map((task) => {
             const key = taskKey(task)
+            const selected = selection.isSelected(key)
             return (
               <TaskRow
                 key={key}
                 task={task}
                 showSource={showSource}
-                selected={selection.isSelected(key)}
+                selected={selected}
                 editing={selection.isSoleSelected(key)}
                 taskActionPending={taskActionPending}
+                togglesSelection={selected && selection.selectedCount > 1}
                 onSelect={(event) => selection.clickSelect(key, event)}
+                onSelectionCheckboxToggle={() => onSelectionCheckboxToggle(task)}
                 {...editHandlers(task)}
                 convertControllerRef={convertControllerRef}
                 onOpen={onOpen}

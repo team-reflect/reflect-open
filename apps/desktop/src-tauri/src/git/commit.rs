@@ -8,6 +8,7 @@ use serde::Serialize;
 
 use crate::error::AppResult;
 
+use super::commit_message::message_for_commit;
 use super::repo::{ensure_clean_state, open_existing, signature};
 
 /// A file whose *changes* were withheld from staging because it is at/above
@@ -41,7 +42,7 @@ pub struct CommitOutcome {
 /// safe: pull-applied writes match HEAD and produce no-ops.
 pub(super) fn commit_all(
     root: &Path,
-    message: &str,
+    fallback_message: &str,
     max_file_bytes: u64,
 ) -> AppResult<CommitOutcome> {
     let repo = open_existing(root)?;
@@ -73,9 +74,10 @@ pub(super) fn commit_all(
     }
 
     let tree = repo.find_tree(tree_id)?;
+    let message = message_for_commit(&repo, parent.as_ref(), &tree, fallback_message)?;
     let sig = signature(&repo)?;
     let parents: Vec<&git2::Commit> = parent.iter().collect();
-    let oid = repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &parents)?;
+    let oid = repo.commit(Some("HEAD"), &sig, &sig, &message, &tree, &parents)?;
     Ok(CommitOutcome {
         committed: true,
         sha: Some(oid.to_string()),

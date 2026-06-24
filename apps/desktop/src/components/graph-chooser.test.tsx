@@ -68,6 +68,18 @@ afterEach(() => {
 })
 
 describe('GraphChooser', () => {
+  it('explains how to open Reflect V1 folder exports', async () => {
+    render(<GraphChooser />, { wrapper })
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          'Moving from Reflect V1? In V1, go to Settings > Graph > Export, export a "Reflect Open folder", then open it here.',
+        ),
+      ).toBeInTheDocument(),
+    )
+  })
+
   // The provider auto-opens the most recent graph on mount, so the chooser's
   // own flows are exercised after that first open settles.
   it('lists recent graphs and reopens one on click', async () => {

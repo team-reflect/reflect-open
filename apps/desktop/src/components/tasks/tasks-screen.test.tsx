@@ -991,6 +991,85 @@ describe('TasksScreen', () => {
     view.unmount()
   })
 
+  it('completes every selected open task when a selected checkbox is clicked', async () => {
+    toggleTask.mockResolvedValue(undefined)
+    getOpenTasks.mockResolvedValue([
+      task({
+        notePath: 'notes/a.md',
+        markerOffset: 5,
+        raw: '[ ] first task',
+        text: 'first task',
+        noteTitle: 'A',
+      }),
+      task({
+        notePath: 'notes/b.md',
+        markerOffset: 9,
+        raw: '[ ] second task',
+        text: 'second task',
+        noteTitle: 'B',
+      }),
+    ])
+    const view = renderScreen()
+
+    await view.findByRole('button', { name: 'first task' })
+    await userEvent.keyboard('{Meta>}a{/Meta}')
+    await userEvent.click(view.getByRole('button', { name: 'Complete: first task' }))
+
+    await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(2))
+    expect(toggleTask).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ notePath: 'notes/a.md', markerOffset: 5, raw: '[ ] first task' }),
+      1,
+    )
+    expect(toggleTask).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ notePath: 'notes/b.md', markerOffset: 9, raw: '[ ] second task' }),
+      1,
+    )
+    await view.findByRole('button', { name: 'Reopen: first task' })
+    await view.findByRole('button', { name: 'Reopen: second task' })
+    view.unmount()
+  })
+
+  it('reopens selected checked tasks when a checked selected checkbox is clicked', async () => {
+    window.sessionStorage.setItem('reflect.tasks.filter.archived', 'true')
+    toggleTask.mockResolvedValue(undefined)
+    getOpenTasks.mockResolvedValue([
+      task({
+        notePath: 'notes/a.md',
+        markerOffset: 5,
+        raw: '[ ] open task',
+        text: 'open task',
+        noteTitle: 'A',
+      }),
+    ])
+    getCompletedTasks.mockResolvedValue([
+      task({
+        notePath: 'notes/b.md',
+        markerOffset: 9,
+        raw: '[x] done task',
+        text: 'done task',
+        checked: true,
+        noteTitle: 'B',
+      }),
+    ])
+    const view = renderScreen()
+
+    await view.findByRole('button', { name: 'open task' })
+    await view.findByRole('button', { name: 'done task' })
+    await userEvent.keyboard('{Meta>}a{/Meta}')
+    await userEvent.click(view.getByRole('button', { name: 'Reopen: done task' }))
+
+    await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
+    expect(toggleTask).toHaveBeenCalledWith(
+      expect.objectContaining({ notePath: 'notes/b.md', markerOffset: 9, raw: '[x] done task' }),
+      1,
+    )
+    await view.findByRole('button', { name: 'Complete: open task' })
+    await view.findByRole('button', { name: 'Complete: done task' })
+    view.unmount()
+  })
+
   it('saves an edited selected task before completing it from the checkbox', async () => {
     editTask.mockResolvedValue(undefined)
     toggleTask.mockResolvedValue(undefined)

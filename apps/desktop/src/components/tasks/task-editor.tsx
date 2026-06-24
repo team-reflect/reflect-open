@@ -9,8 +9,10 @@ import {
 import { Priority } from '@meowdown/core'
 import { useKeymap } from '@meowdown/react'
 import { type OpenTask } from '@reflect/core'
+import { markModeFromSyntax } from '@/editor/mark-mode'
 import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor'
 import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete'
+import { useTagNavigation } from '@/editor/use-tag-navigation'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
 import { taskContent } from '@/lib/tasks/task-content'
 import { useTaskEditorFinalizer, type TaskEditorApi } from '@/lib/tasks/use-task-editor-finalizer'
@@ -161,6 +163,7 @@ export function TaskEditor({
   const { settings } = useSettings()
   const generation = graph?.generation ?? null
   const navigate = useWikiLinkNavigation(generation)
+  const onTagClick = useTagNavigation()
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
 
   // Frozen at mount: the editor is seeded once (uncontrolled), so the commit
@@ -211,11 +214,12 @@ export function TaskEditor({
       <NoteEditor
         initialContent={initial}
         onChange={onChange}
-        markMode={settings.editorMarkdownSyntax}
+        markMode={markModeFromSyntax(settings.editorMarkdownSyntax)}
         spellCheck={settings.editorSpellCheck}
         // A one-line editor has nothing to reorder, so keep the gutter grip off.
         blockHandle={false}
         onWikiLinkClick={navigate}
+        onTagClick={onTagClick}
         onWikilinkSearch={onWikilinkSearch}
         onTagSearch={onTagSearch}
         className="reflect-task-editor text-sm leading-6"

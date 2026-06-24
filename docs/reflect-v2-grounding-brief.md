@@ -657,7 +657,7 @@ V2 considerations:
 - Data portability is an explicit value, not a checkbox.
 - V2 preserves portability by making markdown files and assets the source of truth.
 - No dedicated import/export suite is planned for V2; copying or zipping the graph folder is the export path.
-- The small V1 Markdown ZIP importer is a migration convenience, not the beginning of a broader importer framework.
+- Reflect V1 exports now use a V2-compatible graph shape, so no dedicated V1 importer is needed.
 - Backup and recovery need a clear architecture, especially with local-first files, GitHub backup, optional encrypted layers, and sync conflict recovery.
 
 ---
@@ -1047,7 +1047,7 @@ Minimum viable V2 portability:
 - Backlinks, tags, tasks, and daily-note dates remain readable in markdown.
 - `.reflect/` stays out of the durable portability contract except for deliberately documented durable local tables such as `chat_*`.
 - Users can copy or zip the graph folder directly.
-- The existing V1 Markdown ZIP importer remains a migration convenience while it is useful.
+- Reflect V1 migration relies on the V1 exporter producing a V2-compatible graph shape, not a separate V2 import surface.
 
 ### 9.9 Make Mobile Capture Excellent
 
@@ -1061,7 +1061,7 @@ Some earlier V2 questions have now been answered in the decision docs. This sect
 
 ### Resolved Direction
 
-- **V1 graph compatibility**: keep the existing V1 Markdown ZIP importer as a migration convenience. Do not build a generalized Obsidian/folder import surface unless the portability premise changes.
+- **V1 graph compatibility**: Reflect V1 exports should produce a V2-compatible graph shape. Do not build a generalized Obsidian/folder import surface unless the portability premise changes.
 - **Data model**: keep V2 note-first. Use readable markdown files, stable IDs, aliases, and case-insensitive backlink resolution.
 - **Entities**: do not introduce a typed entity layer in the first wave. Canonical people, companies, projects, and other entities can emerge later as projections over notes and aliases.
 - **AI model**: use BYOK/cloud generative AI first. Treat local generative models as a later possibility. Keep local embeddings separate from generative AI.

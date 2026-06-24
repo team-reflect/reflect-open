@@ -203,8 +203,8 @@ export function GraphProvider({
                 }
               })
           } else {
-            // No index — sync with null generation immediately.
-            index.sync(generation, () => seq !== openSeq.current)
+            // No index — tear down any live lifecycle left from the prior graph.
+            void index.close()
           }
         } catch (err) {
           if (seq !== openSeq.current) {
@@ -297,16 +297,30 @@ export function GraphProvider({
     }
   }, [openRecent])
 
+  const closeActiveGraph = useCallback(async (): Promise<void> => {
+    ++openSeq.current
+    await indexRef.current.close()
+    resetNoteRowOverlays()
+    setGraph(null)
+    setIndexGeneration(null)
+    setIndexing(false)
+    setError(null)
+    setStatus('choosing')
+  }, [])
+
   const forget = useCallback(
     async (root: string): Promise<void> => {
       try {
         await forgetRecent(root)
         await loadRecents()
+        if (graph?.root === root) {
+          await closeActiveGraph()
+        }
       } catch {
         // best-effort
       }
     },
-    [loadRecents],
+    [closeActiveGraph, graph, loadRecents],
   )
 
   const completeOnboarding = useCallback(async (): Promise<void> => {

@@ -86,6 +86,8 @@ interface NoteEditorProps {
   onImageSaveError?: (error: unknown, file: File) => void
   /** Click on a `[[wiki link]]`. */
   onWikiLinkClick?: (target: string) => void
+  /** Click on an inline `#tag`. The tag name arrives without the leading `#`. */
+  onTagClick?: (tag: string) => void
   /** Search notes for the `[[` autocomplete menu. */
   onWikilinkSearch?: WikilinkSearchHandler
   /** Search tags for the `#` autocomplete menu. */
@@ -124,6 +126,7 @@ export function NoteEditor({
   saveImage,
   onImageSaveError,
   onWikiLinkClick,
+  onTagClick,
   onWikilinkSearch,
   onTagSearch,
   children,
@@ -138,6 +141,7 @@ export function NoteEditor({
   // TODO: This violates "Rule of hooks". Refactor this later.
   const onChangeRef = useRef(onChange)
   const onWikiLinkClickRef = useRef(onWikiLinkClick)
+  const onTagClickRef = useRef(onTagClick)
   const resolveImageUrlRef = useRef(resolveImageUrl)
   const resolveImageOpenPathRef = useRef(resolveImageOpenPath)
   const openImageRef = useRef(openImage)
@@ -146,6 +150,7 @@ export function NoteEditor({
   useEffect(() => {
     onChangeRef.current = onChange
     onWikiLinkClickRef.current = onWikiLinkClick
+    onTagClickRef.current = onTagClick
     resolveImageUrlRef.current = resolveImageUrl
     resolveImageOpenPathRef.current = resolveImageOpenPath
     openImageRef.current = openImage
@@ -174,6 +179,10 @@ export function NoteEditor({
   }, [])
   const handleWikilinkClick = useCallback(
     (payload: { target: string }) => onWikiLinkClickRef.current?.(payload.target),
+    [],
+  )
+  const handleTagClick = useCallback(
+    (payload: { tag: string }) => onTagClickRef.current?.(payload.tag),
     [],
   )
   const handleResolveImageUrl = useCallback(
@@ -239,6 +248,7 @@ export function NoteEditor({
         {...(titlePlaceholder !== undefined ? { placeholder: titlePlaceholder } : {})}
         onDocChange={handleDocChange}
         onWikilinkClick={handleWikilinkClick}
+        onTagClick={handleTagClick}
         onLinkClick={handleLinkClick}
         onImageClick={handleImageClick}
         {...(onWikilinkSearch !== undefined ? { onWikilinkSearch } : {})}

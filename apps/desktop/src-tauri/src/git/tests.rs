@@ -36,6 +36,12 @@ fn read(root: &Path, rel: &str) -> String {
     fs::read_to_string(root.join(rel)).unwrap()
 }
 
+fn head_message(root: &Path) -> String {
+    let repo = Repository::open(root).unwrap();
+    let commit = repo.head().unwrap().peel_to_commit().unwrap();
+    commit.message().unwrap().trim().to_string()
+}
+
 /// A bare remote + a primary graph connected to it.
 struct Fixture {
     _dir: TempDir,
@@ -132,6 +138,141 @@ fn commit_excludes_reflect_and_skips_when_clean() {
 
     let second = commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
     assert!(!second.committed, "clean tree must not produce a commit");
+}
+
+#[test]
+fn commit_describes_single_note_changes() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+
+    write(root, "notes/project-atlas.md", "# Project Atlas\n");
+    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert_eq!(head_message(root), "Add Project Atlas");
+
+    write(
+        root,
+        "notes/project-atlas.md",
+        "# Project Atlas\n\nNext step\n",
+    );
+    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert_eq!(head_message(root), "Update Project Atlas");
+
+    fs::remove_file(root.join("notes/project-atlas.md")).unwrap();
+    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert_eq!(head_message(root), "Delete Project Atlas");
+}
+
+#[test]
+fn commit_uses_authored_note_subjects() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+
+    write(
+        root,
+        "notes/01arz3ndektsv4rrffq69g5fav.md",
+        "---\ntitle: \"Project #1\"\n---\n# Ignored H1\n",
+    );
+    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert_eq!(head_message(root), "Add Project #1");
+
+    write(
+        root,
+        "notes/01arz3ndektsv4rrffq69g5fav.md",
+        "# Launch Review\n\n- agenda\n",
+    );
+    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert_eq!(head_message(root), "Update Launch Review");
+
+    fs::remove_file(root.join("notes/01arz3ndektsv4rrffq69g5fav.md")).unwrap();
+    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert_eq!(head_message(root), "Delete Launch Review");
+}
+
+#[test]
+fn commit_describes_note_renames() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+
+    write(
+        root,
+        "notes/original.md",
+        "# Original Name\n\n- stable body line one\n- stable body line two\n- stable body line three\n",
+    );
+    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+
+    fs::remove_file(root.join("notes/original.md")).unwrap();
+    write(
+        root,
+        "notes/renamed.md",
+        "# Renamed Name\n\n- stable body line one\n- stable body line two\n- stable body line three\n",
+    );
+    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert_eq!(head_message(root), "Rename Original Name to Renamed Name");
+}
+
+#[test]
+fn commit_does_not_leak_private_authored_titles() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+
+    write(
+        root,
+        "notes/private-project.md",
+        "---\nprivate: true\ntitle: Secret Plan\n---\n# Secret Heading\n",
+    );
+    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert_eq!(head_message(root), "Add private note");
+}
+
+#[test]
+fn commit_summarizes_note_batches() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+
+    write(root, "daily/2026-06-23.md", "# Daily\n");
+    write(root, "notes/project-atlas.md", "# Project Atlas\n");
+    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert_eq!(head_message(root), "Add 2 notes");
+
+    write(root, "daily/2026-06-23.md", "# Daily\n\n- one\n");
+    write(
+        root,
+        "notes/project-atlas.md",
+        "# Project Atlas\n\nNext step\n",
+    );
+    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert_eq!(head_message(root), "Update 2 notes");
+}
+
+#[test]
+fn commit_mentions_note_and_attachment_batches() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+
+    write(root, "notes/capture.md", "# Capture\n");
+    write(root, "assets/screenshot.png", "not really a png\n");
+    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert_eq!(head_message(root), "Add 1 note and 1 attachment");
+}
+
+#[test]
+fn commit_describes_mixed_note_and_file_batches_by_action() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+
+    write(root, "notes/capture.md", "# Capture\n");
+    write(root, "books/book.json", "{}\n");
+    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert_eq!(head_message(root), "Add 1 note and 1 file");
+}
+
+#[test]
+fn commit_falls_back_for_metadata_only_changes() {
+    let fixture = fixture();
+    let root = &fixture.graph_a;
+
+    commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
+    assert_eq!(head_message(root), "Update notes");
 }
 
 #[test]

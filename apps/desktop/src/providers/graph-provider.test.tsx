@@ -59,6 +59,9 @@ function installFakeBridge(): void {
         }
         case 'recent_graphs':
           return storedRecents
+        case 'forget_recent':
+          storedRecents = storedRecents.filter((recent) => recent.root !== String(args['root']))
+          return null
         case 'mobile_graph_root':
           return MOBILE_ROOT
         case 'settings_load':
@@ -167,6 +170,26 @@ describe('GraphProvider open sequencing', () => {
 
     expect(result.current.status).toBe('choosing')
     expect(result.current.error).toMatch(/cannot open graph/)
+  })
+
+  it('forgets the open graph and returns to the chooser', async () => {
+    storedRecents = [{ root: '/known', name: 'known', openedMs: 1 }]
+    const { result } = renderHook(() => useGraph(), { wrapper })
+
+    await act(async () => {
+      await waitFor(() => expect(pendingOpens.has('/known')).toBe(true))
+      resolveOpen('/known')
+    })
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    await act(async () => {
+      await result.current.forget('/known')
+    })
+
+    expect(result.current.status).toBe('choosing')
+    expect(result.current.graph).toBeNull()
+    expect(result.current.indexGeneration).toBeNull()
+    expect(result.current.recents).toEqual([])
   })
 })
 

@@ -18,6 +18,7 @@ import {
  * const generation = await index.open()    // open the new graph's index
  * if (stale) return
  * index.sync(generation, () => stale)      // background reconcile + live watch
+ * await index.close()                      // no graph/index remains active
  * ```
  *
  * Every write carries the index `generation` returned by {@link GraphIndex.open};
@@ -31,6 +32,11 @@ export interface GraphIndex {
    */
   stop: () => Promise<void>
   /**
+   * Fully close the active index lifecycle: abort any reconcile, drop the live
+   * subscription, stop the file watcher, and report idle progress.
+   */
+  close: () => Promise<void>
+  /**
    * Open + migrate the index for the now-active graph and return its generation.
    * Best-effort: returns `null` (and reports via `onError`) if the open fails, so
    * a broken index never blocks editing.
@@ -42,11 +48,9 @@ export interface GraphIndex {
    * stale — `syncIndex` decides), then subscribe to live `index:changed`
    * events, then start the Rust watcher — sequenced so the passes never write
    * concurrently. `isStale` is checked between steps and bails when a newer
-   * open supersedes this one. When `generation` is `null` (open failed / no
-   * index), any previous watcher is stopped instead. Call only after the graph
-   * row is committed.
+   * open supersedes this one. Call only after the graph row is committed.
    */
-  sync: (generation: number | null, isStale: () => boolean) => void
+  sync: (generation: number, isStale: () => boolean) => void
 }
 
 /** Stage of the index lifecycle that failed, for `onError` reporting. */
@@ -97,6 +101,14 @@ export function createGraphIndex(options: GraphIndexOptions = {}): GraphIndex {
     await done.catch(() => {})
   }
 
+  async function close(): Promise<void> {
+    await stop()
+    live.unlisten?.()
+    live.unlisten = null
+    onProgress?.('idle')
+    await watchStop().catch(() => {})
+  }
+
   async function open(): Promise<number | null> {
     try {
       return await openIndex()
@@ -106,18 +118,11 @@ export function createGraphIndex(options: GraphIndexOptions = {}): GraphIndex {
     }
   }
 
-  function sync(generation: number | null, isStale: () => boolean): void {
+  function sync(generation: number, isStale: () => boolean): void {
     // Tear down the previous graph's live subscription unconditionally, so a
     // failed/absent open can't leave it bound to a different graph.
     live.unlisten?.()
     live.unlisten = null
-
-    if (generation === null) {
-      // No index for this graph — stop any watcher left from the previous one.
-      onProgress?.('idle')
-      void watchStop().catch(() => {})
-      return
-    }
 
     onProgress?.('reconciling')
     const controller = new AbortController()
@@ -159,5 +164,5 @@ export function createGraphIndex(options: GraphIndexOptions = {}): GraphIndex {
     })()
   }
 
-  return { stop, open, sync }
+  return { stop, close, open, sync }
 }

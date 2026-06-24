@@ -1,5 +1,8 @@
 import { type ReactElement } from 'react'
 import { App } from '@/app'
+import { OperationsStatus } from '@/components/operations-status'
+import { UpdateToast } from '@/components/update-toast'
+import { Toaster } from '@/components/ui/sonner'
 import { WindowDragRegion } from '@/components/window-drag-region'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { GraphProvider } from '@/providers/graph-provider'
@@ -17,6 +20,9 @@ export function DesktopRoot(): ReactElement {
         <TooltipProvider>
           <WindowDragRegion />
           <App />
+          <Toaster />
+          <OperationsStatus />
+          <UpdateToast />
         </TooltipProvider>
       </GraphProvider>
     </UpdateProvider>

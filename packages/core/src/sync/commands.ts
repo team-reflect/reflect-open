@@ -111,9 +111,15 @@ export async function gitClone(url: string, path: string, token: string | null):
   await call('git_clone', { url, path, token }, z.null())
 }
 
-/** Commit every pending change (no-op when the tree is clean). */
-export async function gitCommitAll(message: string, generation: number): Promise<CommitOutcome> {
-  return call('git_commit_all', { message, generation }, commitOutcomeSchema)
+/**
+ * Commit every pending change (no-op when the tree is clean). `fallbackMessage`
+ * is used only when Rust cannot derive a clearer subject from staged paths.
+ */
+export async function gitCommitAll(
+  fallbackMessage: string,
+  generation: number,
+): Promise<CommitOutcome> {
+  return call('git_commit_all', { message: fallbackMessage, generation }, commitOutcomeSchema)
 }
 
 /** Fetch `origin`; returns ahead/behind for the current branch. */

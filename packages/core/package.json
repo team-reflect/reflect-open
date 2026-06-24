@@ -21,7 +21,6 @@
     "@reflect/db": "workspace:*",
     "@reflect/utils": "workspace:*",
     "ai": "^6.0.208",
-    "fflate": "^0.8.3",
     "kysely": "^0.28.17",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"

@@ -16,7 +16,6 @@ import { NavigateArrows } from './navigate-arrows'
 import { SidebarItem } from './sidebar-item'
 import { SidebarPinned } from './sidebar-pinned'
 import { SidebarSearch } from './sidebar-search'
-import { UpdateNotice } from './update-notice'
 
 interface SidebarProps {
   graph: GraphInfo
@@ -118,7 +117,6 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
         <SidebarPinned />
       </div>
 
-      <UpdateNotice />
       <GraphFooter graph={graph} context={context} />
     </div>
   )

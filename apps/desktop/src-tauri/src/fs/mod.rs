@@ -334,17 +334,38 @@ pub(crate) fn move_note_file(root: &Path, from: &str, to: &str) -> AppResult<()>
 
 /// Send a note to the OS trash (recoverable), not a hard delete (pinned to
 /// `generation`). Mobile has no OS trash: the file moves into the graph-local
-/// `.reflect/trash/` instead (Plan 19) — the same recoverability promise, and
+/// `.reflect/trash/` instead (Plan 19), the same recoverability promise, and
 /// `.reflect/` is already excluded from sync and indexing.
 #[tauri::command]
 pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> AppResult<()> {
     let root = root_for_generation(&state, generation)?;
     let abs = resolve(&root, &path)?;
     #[cfg(desktop)]
-    trash::delete(abs).map_err(|err| AppError::io(err.to_string()))?;
+    os_trash_delete(&abs)?;
     #[cfg(mobile)]
     move_to_graph_trash(&root, &abs)?;
     Ok(())
+}
+
+/// Send a file to the OS trash. On macOS, use `NSFileManager.trashItemAtURL`
+/// (`DeleteMethod::NsFileManager`) instead of the `trash` crate default, which
+/// drives Finder over AppleScript and fails with `-10010` ("Handler can't
+/// handle objects of this class") when the graph lives on a cloud-synced or
+/// network volume. The NsFileManager path needs no Automation permission, makes
+/// no sound, and still lands the file in the system Trash for recovery.
+#[cfg(desktop)]
+fn os_trash_delete(abs: &Path) -> AppResult<()> {
+    #[cfg(target_os = "macos")]
+    let ctx = {
+        use trash::macos::{DeleteMethod, TrashContextExtMacos};
+        let mut ctx = trash::TrashContext::default();
+        ctx.set_delete_method(DeleteMethod::NsFileManager);
+        ctx
+    };
+    #[cfg(not(target_os = "macos"))]
+    let ctx = trash::TrashContext::default();
+
+    ctx.delete(abs).map_err(|err| AppError::io(err.to_string()))
 }
 
 /// Move a deleted file under `<graph>/.reflect/trash/`, stamping the name

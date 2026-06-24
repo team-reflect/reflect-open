@@ -25,8 +25,12 @@ interface TaskRowProps {
   editing: boolean
   /** Whether a Tasks-view write is already in flight. */
   taskActionPending: boolean
+  /** Whether this checkbox click should apply to the whole multi-selection. */
+  togglesSelection: boolean
   /** Select the row, honoring ⌘/Ctrl (toggle) and Shift (range) modifiers. */
   onSelect: (event: Pick<MouseEvent, 'metaKey' | 'ctrlKey' | 'shiftKey'>) => void
+  /** Checkbox click while part of a multi-selection: apply this row's next state to it. */
+  onSelectionCheckboxToggle: () => void
   /** Persist an inline edit (content after the marker) and exit edit mode. */
   onEditCommit: (content: string) => void
   /** Enter in the editor: persist this row then add the next task (V1 continuous entry). */
@@ -59,7 +63,8 @@ interface TaskRowProps {
  * arrow that opens the source note. Clicking the row body **selects** it (V1's
  * multi-select); a plain click selects exclusively, ⌘/Ctrl toggles, Shift
  * extends a range. Completing optimistically drops the row; an archived
- * (completed) row shows struck through.
+ * (completed) row shows struck through. A checkbox click on any selected row in
+ * a multi-selection completes or reopens the selected rows together.
  */
 export function TaskRow({
   task,
@@ -67,7 +72,9 @@ export function TaskRow({
   selected,
   editing,
   taskActionPending,
+  togglesSelection,
   onSelect,
+  onSelectionCheckboxToggle,
   onEditCommit,
   onEditContinue,
   onEditDelete,
@@ -127,6 +134,10 @@ export function TaskRow({
           event.stopPropagation()
           if (editing) {
             checkboxToggleControllerRef.current?.()
+            return
+          }
+          if (togglesSelection) {
+            onSelectionCheckboxToggle()
             return
           }
           toggle()

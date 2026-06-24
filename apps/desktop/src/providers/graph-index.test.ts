@@ -46,10 +46,9 @@ describe('createGraphIndex', () => {
     expect(onError).toHaveBeenCalledWith('open', expect.any(Error))
   })
 
-  it('sync(null) stops the watcher and does not reconcile', async () => {
+  it('close() stops the watcher and does not reconcile', async () => {
     const index = createGraphIndex()
-    index.sync(null, () => false)
-    await index.stop()
+    await index.close()
     expect(mockWatchStop).toHaveBeenCalledTimes(1)
     expect(mockSync).not.toHaveBeenCalled()
   })
@@ -84,7 +83,7 @@ describe('createGraphIndex', () => {
     expect(unlisten).not.toHaveBeenCalled() // retained as the active subscription
   })
 
-  it('reports progress: reconciling → live; idle when there is no index', async () => {
+  it('reports progress: reconciling → live; idle when closed', async () => {
     const onProgress = vi.fn()
     const index = createGraphIndex({ onProgress })
     index.sync(5, () => false)
@@ -92,7 +91,7 @@ describe('createGraphIndex', () => {
     expect(onProgress.mock.calls.map(([stage]) => stage)).toEqual(['reconciling', 'live'])
 
     onProgress.mockClear()
-    index.sync(null, () => false)
+    await index.close()
     expect(onProgress).toHaveBeenCalledWith('idle')
   })
 
@@ -160,5 +159,18 @@ describe('createGraphIndex', () => {
 
   it('stop() before any sync resolves immediately', async () => {
     await expect(createGraphIndex().stop()).resolves.toBeUndefined()
+  })
+
+  it('close() drops an active subscription', async () => {
+    const unlisten = vi.fn()
+    mockSubscribe.mockResolvedValue(unlisten)
+    const index = createGraphIndex()
+    index.sync(5, () => false)
+    await index.stop()
+
+    await index.close()
+
+    expect(unlisten).toHaveBeenCalledTimes(1)
+    expect(mockWatchStop).toHaveBeenCalledTimes(1)
   })
 })
