@@ -1,9 +1,10 @@
 import { useCallback, useRef, useState, type DragEvent } from 'react'
-import { errorMessage, importGraphFiles, importGraphZip } from '@reflect/core'
+import { errorMessage, importGraphFiles, importGraphZip, type ImportFile } from '@reflect/core'
 import {
   classifyDrop,
+  collectFolderFiles,
   looksLikeGraphPaths,
-  readDroppedFolder,
+  readFolderFile,
   zipFileToBase64,
   type DroppedImport,
 } from '@/lib/graph-import'
@@ -28,6 +29,8 @@ export interface GraphImport {
   importing: boolean
   /** A human-readable import failure, or null. */
   importError: string | null
+  /** Clear a lingering import error so a later open/picker error isn't masked. */
+  clearImportError: () => void
   handlers: GraphDropHandlers
 }
 
@@ -56,6 +59,8 @@ export function useGraphImport(): GraphImport {
   // Mirror `importing` for the synchronous drop guard (state would be stale).
   const busy = useRef(false)
 
+  const clearImportError = useCallback((): void => setImportError(null), [])
+
   const runImport = useCallback(
     async (dropped: DroppedImport): Promise<void> => {
       if (dropped.kind === 'none') {
@@ -70,10 +75,16 @@ export function useGraphImport(): GraphImport {
         if (dropped.kind === 'zip') {
           root = await importGraphZip(dropped.name, await zipFileToBase64(dropped.file))
         } else {
-          const files = await readDroppedFolder(dropped.entry)
-          if (!looksLikeGraphPaths(files.map((file) => file.path))) {
+          // Validate the folder's paths before reading any bytes, so a non-export
+          // directory is rejected without pulling its files into memory.
+          const folderFiles = await collectFolderFiles(dropped.entry)
+          if (!looksLikeGraphPaths(folderFiles.map((file) => file.path))) {
             setImportError(NOT_A_GRAPH)
             return
+          }
+          const files: ImportFile[] = []
+          for (const folderFile of folderFiles) {
+            files.push(await readFolderFile(folderFile))
           }
           root = await importGraphFiles(dropped.name, files)
         }
@@ -135,6 +146,7 @@ export function useGraphImport(): GraphImport {
     isDragging,
     importing,
     importError,
+    clearImportError,
     handlers: { onDragEnter, onDragOver, onDragLeave, onDrop },
   }
 }

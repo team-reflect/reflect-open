@@ -75,14 +75,23 @@ export function classifyDrop(transfer: DataTransfer): DroppedImport {
   return { kind: 'none' }
 }
 
+/** A file discovered under a dropped folder, paired with its (unread) entry. */
+export interface FolderFile {
+  /** Path relative to the dropped folder, forward-slashed. */
+  path: string
+  entry: FileSystemFileEntry
+}
+
 /**
- * Read every file under a dropped directory into {@link ImportFile}s, skipping
- * cruft ({@link shouldSkipImportEntry}). Paths are relative to `root` and
- * forward-slashed. WebKit's directory reader returns entries in batches, so each
- * directory is drained until `readEntries` yields nothing.
+ * Enumerate every file under a dropped directory — paths only, **no bytes read**
+ * — skipping cruft ({@link shouldSkipImportEntry}). Splitting discovery from
+ * reading lets the caller validate the paths ({@link looksLikeGraphPaths}) and
+ * bail on a non-export folder before pulling any file into memory. WebKit's
+ * directory reader returns entries in batches, so each directory is drained
+ * until `readEntries` yields nothing.
  */
-export async function readDroppedFolder(root: FileSystemDirectoryEntry): Promise<ImportFile[]> {
-  const files: ImportFile[] = []
+export async function collectFolderFiles(root: FileSystemDirectoryEntry): Promise<FolderFile[]> {
+  const files: FolderFile[] = []
   const walk = async (dir: FileSystemDirectoryEntry, prefix: string): Promise<void> => {
     for (const entry of await readAllEntries(dir)) {
       const path = prefix ? `${prefix}/${entry.name}` : entry.name
@@ -92,13 +101,18 @@ export async function readDroppedFolder(root: FileSystemDirectoryEntry): Promise
       if (isDirectoryEntry(entry)) {
         await walk(entry, path)
       } else if (isFileEntry(entry)) {
-        const file = await entryToFile(entry)
-        files.push({ path, contentsBase64: base64Of(await file.arrayBuffer()) })
+        files.push({ path, entry })
       }
     }
   }
   await walk(root, '')
   return files
+}
+
+/** Read one enumerated folder file into an {@link ImportFile} (bytes inlined). */
+export async function readFolderFile(file: FolderFile): Promise<ImportFile> {
+  const data = await entryToFile(file.entry)
+  return { path: file.path, contentsBase64: base64Of(await data.arrayBuffer()) }
 }
 
 /** Read a dropped `.zip` file into its base64 payload for the JSON IPC. */

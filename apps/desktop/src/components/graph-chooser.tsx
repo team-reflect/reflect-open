@@ -21,8 +21,19 @@ const V1_EXPORT_HELP =
 export function GraphChooser(): ReactElement {
   const { recents, error, pickAndOpen, openRecent, forget } = useGraph()
   const { colorFor } = useGraphColors()
-  const { isDragging, importing, importError, handlers } = useGraphImport()
+  const { isDragging, importing, importError, clearImportError, handlers } = useGraphImport()
   const [restoring, setRestoring] = useState(false)
+
+  // Starting any other open path drops a lingering import error, so a fresh
+  // picker/recent/restore failure (provider `error`) is never hidden behind it.
+  const openPicker = (): void => {
+    clearImportError()
+    void pickAndOpen()
+  }
+  const openRecentGraph = (root: string): void => {
+    clearImportError()
+    void openRecent(root)
+  }
 
   return (
     <div className="flex h-screen w-screen overflow-auto bg-surface-app p-8" {...handlers}>
@@ -40,11 +51,7 @@ export function GraphChooser(): ReactElement {
         </div>
 
         <div className="space-y-2">
-          <Button
-            type="button"
-            className="w-full"
-            onClick={() => void pickAndOpen()}
-          >
+          <Button type="button" className="w-full" onClick={openPicker}>
             <FolderPlus aria-hidden strokeWidth={1.75} />
             Open graph…
           </Button>
@@ -58,7 +65,10 @@ export function GraphChooser(): ReactElement {
             type="button"
             variant="outline"
             className="w-full"
-            onClick={() => setRestoring(true)}
+            onClick={() => {
+              clearImportError()
+              setRestoring(true)
+            }}
           >
             <CloudDownload aria-hidden strokeWidth={1.75} />
             Restore from GitHub…
@@ -88,7 +98,7 @@ export function GraphChooser(): ReactElement {
                   >
                     <button
                       type="button"
-                      onClick={() => void openRecent(recent.root)}
+                      onClick={() => openRecentGraph(recent.root)}
                       className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
                     >
                       <Folder
