@@ -164,11 +164,23 @@ describe('Sidebar', () => {
     ).toBeNull()
   })
 
-  it('All notes stays active while editing any non-daily note', () => {
+  it('All notes stays active while editing a slug-named note', () => {
     const { view } = renderSidebar(undefined, { kind: 'note', path: 'notes/meeting.md' })
     expect(
       view.getByRole('button', { name: /all notes/i }).getAttribute('aria-current'),
     ).toBe('page')
+  })
+
+  it('only "New note" — not "All notes" — lights for the untitled placeholder', () => {
+    // A brand-new note is still an untitled placeholder, so the two rows must
+    // never light at once.
+    const { view } = renderSidebar(undefined, { kind: 'note', path: untitledNotePath() })
+    expect(
+      view.getByRole('button', { name: /new note/i }).getAttribute('aria-current'),
+    ).toBe('page')
+    expect(
+      view.getByRole('button', { name: /all notes/i }).getAttribute('aria-current'),
+    ).toBeNull()
   })
 
   it('the search affordance opens the palette', async () => {
