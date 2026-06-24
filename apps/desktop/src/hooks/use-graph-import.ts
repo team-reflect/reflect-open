@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type DragEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react'
 import { errorMessage, importGraphFiles, importGraphZip, type ImportFile } from '@reflect/core'
 import {
   classifyDrop,
@@ -17,9 +17,16 @@ const NOT_A_GRAPH =
 export interface GraphDropHandlers {
   onDragEnter: (event: DragEvent) => void
   onDragOver: (event: DragEvent) => void
-  onDragLeave: (event: DragEvent) => void
   onDrop: (event: DragEvent) => void
 }
+
+/**
+ * How long after the last `dragover` to assume the drag has left and hide the
+ * overlay. `dragover` fires repeatedly (~every 350ms) while a drag is over the
+ * window, even when stationary, so a window comfortably above that interval
+ * keeps the overlay up for the whole drag without per-element bookkeeping.
+ */
+const DRAG_IDLE_MS = 700
 
 /** State + handlers for dropping a Reflect V1 export onto the chooser. */
 export interface GraphImport {
@@ -53,13 +60,33 @@ export function useGraphImport(): GraphImport {
   const [isDragging, setIsDragging] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importError, setImportError] = useState<string | null>(null)
-  // Nested children fire enter/leave as the cursor crosses them; count depth so
-  // the overlay clears only when the drag truly leaves the drop zone.
-  const dragDepth = useRef(0)
+  // Heartbeat timer: each `dragover` re-arms it, and it hides the overlay once
+  // the events stop (the drag left or dropped). This avoids the brittle
+  // dragenter/dragleave depth counting that misfires in WebKit when the pointer
+  // crosses onto child elements.
+  const dragIdle = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Mirror `importing` for the synchronous drop guard (state would be stale).
   const busy = useRef(false)
 
   const clearImportError = useCallback((): void => setImportError(null), [])
+
+  // Show the overlay and (re-)arm the idle timer that hides it.
+  const markDragging = useCallback((): void => {
+    setIsDragging(true)
+    if (dragIdle.current !== null) {
+      clearTimeout(dragIdle.current)
+    }
+    dragIdle.current = setTimeout(() => setIsDragging(false), DRAG_IDLE_MS)
+  }, [])
+
+  // Drop the idle timer on unmount so it can't set state on a gone component.
+  useEffect(() => {
+    return () => {
+      if (dragIdle.current !== null) {
+        clearTimeout(dragIdle.current)
+      }
+    }
+  }, [])
 
   const runImport = useCallback(
     async (dropped: DroppedImport): Promise<void> => {
@@ -99,30 +126,27 @@ export function useGraphImport(): GraphImport {
     [openRecent],
   )
 
-  const onDragEnter = useCallback((event: DragEvent): void => {
-    if (!carriesFiles(event.dataTransfer)) {
-      return
-    }
-    event.preventDefault()
-    dragDepth.current += 1
-    setIsDragging(true)
-  }, [])
+  const onDragEnter = useCallback(
+    (event: DragEvent): void => {
+      if (!carriesFiles(event.dataTransfer)) {
+        return
+      }
+      event.preventDefault()
+      markDragging()
+    },
+    [markDragging],
+  )
 
-  const onDragOver = useCallback((event: DragEvent): void => {
-    if (carriesFiles(event.dataTransfer)) {
+  const onDragOver = useCallback(
+    (event: DragEvent): void => {
+      if (!carriesFiles(event.dataTransfer)) {
+        return
+      }
       event.preventDefault() // permit the drop
-    }
-  }, [])
-
-  const onDragLeave = useCallback((event: DragEvent): void => {
-    if (!carriesFiles(event.dataTransfer)) {
-      return
-    }
-    dragDepth.current = Math.max(0, dragDepth.current - 1)
-    if (dragDepth.current === 0) {
-      setIsDragging(false)
-    }
-  }, [])
+      markDragging()
+    },
+    [markDragging],
+  )
 
   const onDrop = useCallback(
     (event: DragEvent): void => {
@@ -130,7 +154,10 @@ export function useGraphImport(): GraphImport {
         return
       }
       event.preventDefault()
-      dragDepth.current = 0
+      if (dragIdle.current !== null) {
+        clearTimeout(dragIdle.current)
+        dragIdle.current = null
+      }
       setIsDragging(false)
       if (busy.current) {
         return // already importing — ignore a second drop
@@ -147,6 +174,6 @@ export function useGraphImport(): GraphImport {
     importing,
     importError,
     clearImportError,
-    handlers: { onDragEnter, onDragOver, onDragLeave, onDrop },
+    handlers: { onDragEnter, onDragOver, onDrop },
   }
 }
