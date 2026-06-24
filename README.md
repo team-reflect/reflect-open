@@ -136,16 +136,6 @@ ProseMirror over a Lezer markdown parse, rendering markdown in place while
 round-tripping it byte-faithfully. Notes the editor cannot round-trip open
 read-only rather than ever being silently rewritten.
 
-### The plans
-
-Code and comments reference numbered plans (e.g. "Plan 04b"). These are the
-dependency-ordered design documents in [docs/plans/](docs/plans/).
-[00-overview.md](docs/plans/00-overview.md) is the roadmap and records what
-shipped in each release;
-[architecture-conventions.md](docs/plans/architecture-conventions.md) holds
-the cross-cutting decisions every plan assumes. A comment like "Plan 02"
-points at the design rationale for that subsystem.
-
 ## Development
 
 ```bash
@@ -166,23 +156,14 @@ contributor guide.
 
 ## Status & roadmap
 
-Reflect is early (`0.2.x` beta) but used daily. Shipped today: everything
+Reflect is early (`v0.2.2`) but used daily. Shipped today: everything
 listed above, plus browser link capture through the Chrome extension/native
-host pipeline described in [Plan 11](docs/plans/11-link-capture.md).
-
-Closed by decision:
-
-- **Import / export surfaces**
-  ([Plan 13](docs/plans/13-import-export-portability.md)): no dedicated
-  import/export suite is planned. The graph folder itself is the portable
-  artifact; copy or zip the markdown files and assets directly. Reflect V1
-  exports now use the same graph-compatible markdown shape.
+host pipeline described in the
+[link capture design](docs/plans/11-link-capture.md).
 
 Designed or in progress, each with a written plan:
 
-- **Tasks** ([Plan 18](docs/plans/18-tasks.md)): checkboxes in your notes,
-  collected into one Tasks view.
-- **Mobile companion** ([Plan 19](docs/plans/19-mobile.md)): iOS is in
+- **Mobile companion** ([mobile design](docs/plans/19-mobile.md)): iOS is in
   progress in the Tauri app, with Daily/All surfaces and editing foundations
   landed; device validation, sync hardening, and TestFlight/App Store release
   remain.

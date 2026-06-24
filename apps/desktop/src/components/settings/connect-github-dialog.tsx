@@ -57,10 +57,17 @@ const STEP_DESCRIPTIONS: Record<Step, string> = {
  * every note in the graph, including `private: true` ones, would be
  * world-readable.
  *
- * "Can't find the repo" keeps one remedy per credential kind: app sign-ins
- * route to the GitHub App install page (authorization ≠ installation — the
- * token only reaches repositories the app is installed on), PAT users get
- * token-scope guidance.
+ * Granting repository access is a first-class step, not an error. A GitHub App
+ * user token only reaches repositories the app is installed on (authorization
+ * ≠ installation), and a fresh install is on zero repos — so an app sign-in
+ * that can't yet see the repo lands on a plain "grant access" step that polls
+ * and connects the moment access is granted (no retry button to press). The
+ * step is skipped whenever the repo is already visible, so a graph whose repo
+ * the install already covers connects with no detour. The step steers users to
+ * grant access to *only the backup repository* — never "All repositories",
+ * which would hand the app every repo on the account for no reason. PAT users
+ * reach repos by token scope, not an installation, so they get token-scope
+ * guidance.
  */
 export function ConnectGithubDialog({
   suggestedRepoName,
@@ -78,20 +85,33 @@ export function ConnectGithubDialog({
   const [publicConfirm, setPublicConfirm] = useState<GithubRepoRef | null>(null)
   /** The finish step's "create it on GitHub" handoff (create-mode only). */
   const [showCreateGuide, setShowCreateGuide] = useState(false)
-  /** App sign-in couldn't see an existing repo → offer the install remedy. */
-  const [showGrantHint, setShowGrantHint] = useState(false)
+  /**
+   * App sign-in can't see the chosen repo yet (the app isn't installed on it).
+   * Show the "grant access" step and poll until access lands. Skipped when the
+   * repo is already visible — most installs need it, returning ones don't.
+   */
+  const [showGrantAccess, setShowGrantAccess] = useState(false)
 
   useRestoreFocus()
 
-  // While the create handoff is showing, poll for the repository instead of
-  // making the user click "I created it": the connect fires the moment the
-  // repo exists. A 404 just keeps waiting (for app sign-ins it can also mean
-  // access not granted yet — the guide's hint covers that); a public repo
-  // stops the poll for consent.
+  function targetRef(forUser: GithubUser): GithubRepoRef | null {
+    if (mode === 'existing') {
+      return parseRepoInput(existingRepo)
+    }
+    const name = repoName.trim()
+    return name.length === 0 ? null : { owner: forUser.login, name }
+  }
+
+  // The repo we're trying to reach, resolved from the verified sign-in (the
+  // owner is never typed). Drives both the poll and the grant-access copy.
+  const targetForUser = user !== null ? targetRef(user) : null
+
+  // While the create handoff or the grant-access step is showing, poll for the
+  // repository instead of making the user click a button: the connect fires the
+  // moment the repo exists and the app can see it. A 404 just keeps waiting; a
+  // public repo stops the poll for consent.
   const pollTarget =
-    showCreateGuide && publicConfirm === null && user !== null
-      ? { owner: user.login, name: repoName.trim() }
-      : null
+    (showCreateGuide || showGrantAccess) && publicConfirm === null ? targetForUser : null
   usePoll(pollTarget !== null, pollIntervalMs, async () => {
     if (pollTarget === null) {
       return 'stop'
@@ -108,14 +128,6 @@ export function ConnectGithubDialog({
     return 'continue'
   })
 
-  function targetRef(forUser: GithubUser): GithubRepoRef | null {
-    if (mode === 'existing') {
-      return parseRepoInput(existingRepo)
-    }
-    const name = repoName.trim()
-    return name.length === 0 ? null : { owner: forUser.login, name }
-  }
-
   async function finish(
     forUser: GithubUser,
     options: { allowPublic?: boolean; kind?: AuthKind } = {},
@@ -125,10 +137,10 @@ export function ConnectGithubDialog({
     const kind = options.kind ?? authKind
     await action.run(async () => {
       // Each attempt re-derives the guidance from its own outcome — a stale
-      // create guide or grant hint from an earlier path must not outlive the
-      // detour (e.g. consent → choose another repo).
+      // create guide or grant-access step from an earlier path must not outlive
+      // the detour (e.g. consent → choose another repo).
       setShowCreateGuide(false)
-      setShowGrantHint(false)
+      setShowGrantAccess(false)
       const ref = publicConfirm ?? targetRef(forUser)
       if (ref === null) {
         action.setError(
@@ -149,12 +161,14 @@ export function ConnectGithubDialog({
         return
       }
       if (mode === 'existing') {
-        // GitHub's 404 can't distinguish "doesn't exist" from "no access".
-        // App sign-ins almost always mean the latter (the app isn't
-        // installed on the repo), so that's the remedy they get.
+        // GitHub's 404 can't distinguish "doesn't exist" from "no access". App
+        // sign-ins almost always mean the latter — the app isn't installed on
+        // the repo yet — so granting access is the expected next step, not an
+        // error: show it plainly and let the poll connect the moment access
+        // lands. PAT users reach repos by token scope, not an installation, so
+        // they get token-scope guidance instead.
         if (kind === 'app') {
-          setShowGrantHint(true)
-          action.setError('Reflect can’t see that repository. Grant it access or check the name.')
+          setShowGrantAccess(true)
         } else {
           action.setError(
             'Repository not found. Check the name and your token’s repository access.',
@@ -201,7 +215,7 @@ export function ConnectGithubDialog({
     action.setError(null)
     setPublicConfirm(null)
     setShowCreateGuide(false)
-    setShowGrantHint(false)
+    setShowGrantAccess(false)
     setStep('repo')
   }
 
@@ -344,13 +358,38 @@ export function ConnectGithubDialog({
                     >
                       grant the Reflect app access
                     </button>{' '}
-                    to it.
+                    to just this repository.
                   </p>
                 ) : (
                   <p className="text-xs text-text-muted">
                     If it doesn’t connect, add it to your token’s repository access.
                   </p>
                 )}
+              </>
+            ) : showGrantAccess && targetForUser !== null ? (
+              <>
+                <p className="text-sm text-text">
+                  Give Reflect access to{' '}
+                  <strong>
+                    {targetForUser.owner}/{targetForUser.name}
+                  </strong>{' '}
+                  so it can back up here.
+                </p>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => openExternal(githubAppInstallUrl())}>
+                    Grant access on GitHub…
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={backToRepo}>
+                    Change repository
+                  </Button>
+                </div>
+                {/* Steer to per-repo selection: the backup needs exactly one
+                    repo, so "All repositories" is needless account-wide risk. */}
+                <p className="text-xs text-text-muted">
+                  On GitHub, choose <strong>Only select repositories</strong> — Reflect only needs
+                  this one.
+                </p>
+                <p className="text-xs text-text-muted">Waiting for access…</p>
               </>
             ) : action.pending ? (
               <p className="text-sm text-text-muted">Connecting…</p>
@@ -359,26 +398,14 @@ export function ConnectGithubDialog({
             {!action.pending && action.error !== null ? (
               <>
                 <InlineAlert tone="error">{action.error}</InlineAlert>
-                {publicConfirm === null && !showCreateGuide ? (
-                  // A failed connect must never strand the user here: change
-                  // the repository, or — for app sign-ins that can't see the
-                  // repo — grant the app access. (The create guide renders
-                  // its own escape, so it is excluded.)
-                  <div className="flex flex-wrap gap-2">
-                    {showGrantHint && user !== null ? (
-                      <>
-                        <Button size="sm" onClick={() => openExternal(githubAppInstallUrl())}>
-                          Grant access on GitHub…
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => void finish(user)}>
-                          I granted it — try again
-                        </Button>
-                      </>
-                    ) : null}
-                    <Button variant="outline" size="sm" onClick={backToRepo}>
-                      Change repository
-                    </Button>
-                  </div>
+                {publicConfirm === null && !showCreateGuide && !showGrantAccess ? (
+                  // A failed connect must never strand the user here — offer the
+                  // way back to a different repository. (The create guide and
+                  // grant-access step render their own escapes, so both are
+                  // excluded.)
+                  <Button variant="outline" size="sm" onClick={backToRepo}>
+                    Change repository
+                  </Button>
                 ) : null}
               </>
             ) : null}

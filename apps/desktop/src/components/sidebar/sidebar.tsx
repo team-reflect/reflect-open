@@ -85,7 +85,14 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             icon={<ListIcon className="shrink-0" />}
             label="All notes"
             binding={keybindingFor('nav.allNotes') ?? undefined}
-            active={route.kind === 'allNotes'}
+            // A named note lives in the All Notes collection, so keep this row
+            // lit while editing one. A brand-new note is still an untitled
+            // placeholder, though, and the "New note" row above owns that
+            // highlight until the birth rename — so the two never light at once.
+            active={
+              route.kind === 'allNotes' ||
+              (route.kind === 'note' && !isUntitledNotePath(route.path))
+            }
             onClick={() => void runCommand('nav.allNotes', context)}
           />
           <SidebarItem

@@ -268,12 +268,15 @@ describe('ConnectGithubDialog', () => {
     expect(screen.getByText(/github\.com\/new\?name=g-backup/)).toBeTruthy()
   })
 
-  it('routes an app sign-in that cannot see the repo to the install flow', async () => {
-    // GitHub's 404 can't distinguish "doesn't exist" from "no access", and
-    // for app sign-ins it's almost always the latter — so granting access
-    // is the remedy, with no token language anywhere.
+  it('routes an app sign-in that cannot see the repo to the grant-access step, then polls', async () => {
+    // A GitHub App user token only reaches repos the app is installed on, so a
+    // 404 for an app sign-in almost always means "not installed here": granting
+    // access is the expected step (not an error), and the poll connects once it
+    // lands — no retry button, no token language.
     storeCredential(appCredential())
-    sync.connectExistingRepo.mockResolvedValueOnce('notFound')
+    sync.connectExistingRepo
+      .mockResolvedValueOnce('notFound') // initial lookup: app can't see it yet
+      .mockResolvedValueOnce('notFound') // poll: access still not granted
     const onClose = renderWizard()
 
     fireEvent.click(screen.getByRole('radio', { name: /use an existing repository/i }))
@@ -282,23 +285,44 @@ describe('ConnectGithubDialog', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
 
-    expect(await screen.findByText(/grant it access/i)).toBeTruthy()
+    // A plain "give access" step that names the repo and steers to a per-repo
+    // grant (never "All repositories").
+    expect(await screen.findByText(/give reflect access to/i)).toBeTruthy()
+    expect(screen.getByText(/only select repositories/i)).toBeTruthy()
+    expect(screen.queryByText(/all repositories/i)).toBeNull()
     expect(screen.queryByText(/token/i)).toBeNull()
+    expect(screen.queryByRole('button', { name: /try again/i })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Grant access on GitHub…' }))
     expect(openedUrls).toHaveBeenCalledWith(
       'https://github.com/apps/reflect-github-app/installations/new',
     )
 
-    // Back from the browser with access granted: the retry connects.
-    fireEvent.click(screen.getByRole('button', { name: 'I granted it — try again' }))
+    // Back from the browser with access granted — the poll connects, no click.
     await waitFor(() =>
       expect(sync.connectExistingRepo).toHaveBeenLastCalledWith(
         { owner: 'alex', name: 'notes' },
         { allowPublic: false },
       ),
     )
-    expect(onClose).toHaveBeenCalled()
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(sync.connectExistingRepo.mock.calls.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('skips the grant-access step when an app sign-in can already see the repo', async () => {
+    // A returning user whose install already covers the repo: the first lookup
+    // succeeds, so there's no grant-access detour — the dialog just connects.
+    storeCredential(appCredential())
+    const onClose = renderWizard()
+
+    fireEvent.click(screen.getByRole('radio', { name: /use an existing repository/i }))
+    fireEvent.change(screen.getByLabelText('Existing repository'), {
+      target: { value: 'alex/notes' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(screen.queryByText(/give reflect access/i)).toBeNull()
   })
 
   it('points the app create guide at granting access, not token scope', async () => {
