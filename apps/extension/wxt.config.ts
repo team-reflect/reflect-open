@@ -3,16 +3,27 @@ import { defineConfig } from 'wxt'
 import { SAVE_CURRENT_PAGE_COMMAND } from './lib/commands'
 
 /**
- * Pins the extension ID (`dlbliojklpickgimjdmjjdnbjdiomjik`) for unpacked dev
- * builds AND the Chrome Web Store: the ID is the SHA-256 of this public key,
- * and the store keeps a `key`-pinned ID on first upload. The matching private
- * key is deliberately not kept — the store re-signs uploads, so only the
- * public half matters. The native-messaging host manifests written by the
- * desktop app (`src-tauri/src/capture.rs`, `EXTENSION_ORIGINS`) allowlist
- * this ID; the two must move together.
+ * Pins the extension ID (`dlbliojklpickgimjdmjjdnbjdiomjik`) for **unpacked**
+ * loads — `wxt dev` and a `wxt build` loaded by hand — so it matches the
+ * native-messaging host manifests the desktop app writes
+ * (`src-tauri/src/capture.rs`, `EXTENSION_ORIGINS`). The ID is the SHA-256 of
+ * this public key; the private half is deliberately not kept.
+ *
+ * The Chrome Web Store is different: it **rejects** a `key` in the uploaded
+ * package ("key field is not allowed in manifest") and mints its own permanent
+ * ID for the listing — which will NOT be the ID above. So the store artifact
+ * must omit `key` (see `WXT_STORE_BUILD` below), and once the listing exists
+ * its assigned ID has to be added to `EXTENSION_ORIGINS` for the native hop to
+ * work for store-installed users.
  */
 const PUBLIC_KEY =
   'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA7EMDbrG/PhZAaAz9GauuPizNI+98ua2aaI5yDgDEbXMk86Wm6LByEVD/ZVAJCa+Ic8xXeLw4GEDyNPPxM940eeoeDbU3KHWp1jl99WroEhMXFl1uYyXQ/0yFhZwIolDEt02uDCF+fDS93UMP8AJQKYxtLO2NH4wsv66gdRP1CEA82VUXiJV0R9b1BvIVVr8HJFHR4zmA9YsNbBTUQtkOGYuSz4mWrSZ7QKWP7RDdQcHFI6t9Y58+Bk8/4Ps1gmbGHPCWy5iURQ37m8ibPaVvrGOrAoS3n09E/4jP2OeCa2oM2gH3AcEz7T6daTdk+rzJ0VMbR4PNKLOiLYknxsigDQIDAQAB'
+
+/**
+ * `pnpm zip` sets this to strip the forbidden `key` from the store artifact.
+ * Every other build keeps the key so unpacked loads hold the pinned dev ID.
+ */
+const isStoreBuild = process.env['WXT_STORE_BUILD'] === 'true'
 
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
@@ -23,7 +34,8 @@ export default defineConfig({
     name: 'Reflect Capture',
     description: 'Save the page you are reading into Reflect.',
     homepage_url: 'https://github.com/team-reflect/reflect-open',
-    key: PUBLIC_KEY,
+    // Unpacked dev/CI loads pin the ID; the store rejects `key`, so drop it there.
+    ...(isStoreBuild ? {} : { key: PUBLIC_KEY }),
     // `activeTab` (granted by the action click / shortcut) covers the
     // screenshot and the selection grab — no broad host permissions.
     permissions: [

@@ -34,16 +34,25 @@ For the native hop to work, run the desktop app once (it writes the host
 manifests for detected browsers and the active-graph pointer file), then
 restart Chrome so it re-reads the manifests.
 
-## The extension ID is pinned — don't regenerate it casually
+## The unpacked ID is pinned — and the store ID is not the same
 
-`wxt.config.ts` carries a public `key`, which makes the extension ID
-`dlbliojklpickgimjdmjjdnbjdiomjik` everywhere: unpacked dev builds, CI, and
-the Chrome Web Store (the store keeps a key-pinned ID on first upload). The
-desktop app's host manifests (`apps/desktop/src-tauri/src/capture.rs`,
-`EXTENSION_ORIGINS`) allowlist exactly this origin — changing the key without
-updating that constant silently breaks the native hop. The private half of
-the key is deliberately discarded: unpacked loads and store uploads only need
-the public key, and the store re-signs every upload.
+`wxt.config.ts` carries a public `key`, which fixes the extension ID to
+`dlbliojklpickgimjdmjjdnbjdiomjik` for **unpacked** loads — `wxt dev`, CI, and a
+`wxt build` you load by hand. The desktop app's host manifests
+(`apps/desktop/src-tauri/src/capture.rs`, `EXTENSION_ORIGINS`) allowlist exactly
+this origin, so during development the native hop works. Changing the key without
+updating that constant silently breaks it. The private half of the key is
+deliberately discarded; unpacked loads only need the public key.
+
+**The Chrome Web Store does not use this key.** It rejects a `key` field in the
+uploaded package (`key field is not allowed in manifest`) and mints its own
+permanent ID for the listing — which will *not* be the ID above. So:
+
+- The store artifact must **omit** `key`. `pnpm zip` sets `WXT_STORE_BUILD=true`,
+  which drops it; every other build keeps it. (`manifest-key.test.ts` still pins
+  the dev key against `EXTENSION_ORIGINS`.)
+- After the listing is created, the native hop will **not** reach store-installed
+  users until the store's assigned ID is allowlisted too — see step 4 below.
 
 To derive an ID from a key (if it ever has to change):
 
@@ -56,24 +65,25 @@ openssl rsa -in key.pem -pubout -outform DER | shasum -a 256 \
 
 ## Releasing to the Chrome Web Store
 
-The build is store-ready as-is: `pnpm --filter @reflect/extension zip` produces a
-signed-on-upload package, the manifest declares only the permissions the code uses
-(see the justifications below), and the extension ID is pinned. The remaining work
-is the listing — the copy and disclosures below are written to be pasted straight
-into the [Developer Dashboard](https://chrome.google.com/webstore/devconsole).
+The build is store-ready: `pnpm --filter @reflect/extension zip` produces a
+key-stripped, signed-on-upload package whose manifest declares only the permissions
+the code uses (see the justifications below). The remaining work is the listing — the
+copy and disclosures below are written to be pasted straight into the
+[Developer Dashboard](https://chrome.google.com/webstore/devconsole).
 
 ### Build & upload
 
 1. `pnpm --filter @reflect/extension check` (typecheck + lint) and
    `pnpm --filter @reflect/extension test` — both must be green.
 2. `pnpm --filter @reflect/extension zip` → upload
-   `.output/reflect-capture-<version>-chrome.zip`.
-3. Confirm the store item ID matches `dlbliojklpickgimjdmjjdnbjdiomjik`
-   (it will, while the manifest `key` is unchanged).
-4. If the store ever assigns a different ID, append
-   `chrome-extension://<store-id>/` to `EXTENSION_ORIGINS` in
-   `apps/desktop/src-tauri/src/capture.rs` and ship a desktop release —
-   the native-messaging host manifests rewrite themselves on next launch.
+   `.output/reflect-capture-<version>-chrome.zip`. This artifact omits the manifest
+   `key` (the store rejects it); a plain `wxt build` keeps it for unpacked loads.
+3. After the listing is created, copy its **assigned item ID** from the dashboard
+   (it will not be `dlbliojklpickgimjdmjjdnbjdiomjik`).
+4. Append `chrome-extension://<store-id>/` to `EXTENSION_ORIGINS` in
+   `apps/desktop/src-tauri/src/capture.rs` (keep the dev ID) and ship a desktop
+   release — the native-messaging host manifests rewrite themselves on next launch.
+   Until that ships, capture works for unpacked dev loads but not for store installs.
 
 ### Listing copy
 
