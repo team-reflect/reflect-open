@@ -20,6 +20,7 @@
 // Full procedure and troubleshooting: docs/macos-distribution.md
 
 import { execFileSync, spawnSync } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
@@ -67,6 +68,15 @@ function capture(command, args, options = {}) {
 function run(command, args) {
   const result = spawnSync(command, args, { encoding: 'utf8' })
   return { status: result.status, output: `${result.stdout ?? ''}${result.stderr ?? ''}` }
+}
+
+/** Parse `security list-keychains` output into keychain paths. */
+export function parseKeychainList(output) {
+  return [...output.matchAll(/"([^"]+)"/g)].map((match) => match[1])
+}
+
+function listUserKeychains() {
+  return parseKeychainList(capture('security', ['list-keychains', '-d', 'user']))
 }
 
 /** Build the Tauri CLI arguments for release packaging. */
@@ -309,11 +319,64 @@ export function createDmgArgs({ dmg, sourceFolder, volumeName }) {
 }
 
 /** Build the codesign arguments used for the DMG container. */
-export function signDmgArgs({ dmg, identity }) {
-  return ['--force', '--sign', identity, '--timestamp', dmg]
+export function signDmgArgs({ dmg, identity, keychain }) {
+  const args = ['--force', '--sign', identity, '--timestamp']
+  if (keychain) args.push('--keychain', keychain)
+  args.push(dmg)
+  return args
 }
 
-function createDmg({ flavor, identity }) {
+function importSigningCertificate() {
+  const { APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD } = process.env
+  if (!APPLE_CERTIFICATE) return null
+  if (!APPLE_CERTIFICATE_PASSWORD) fail('APPLE_CERTIFICATE is set but APPLE_CERTIFICATE_PASSWORD is not')
+
+  const tempDir = mkdtempSync(join(tmpdir(), 'reflect-signing-'))
+  const certificatePath = join(tempDir, 'certificate.p12')
+  const keychainPath = join(tempDir, 'reflect-signing.keychain-db')
+  const keychainPassword = randomBytes(24).toString('hex')
+  const previousKeychains = listUserKeychains()
+
+  try {
+    writeFileSync(certificatePath, Buffer.from(APPLE_CERTIFICATE, 'base64'), { mode: 0o600 })
+    execFileSync('security', ['create-keychain', '-p', keychainPassword, keychainPath], { stdio: 'inherit' })
+    execFileSync('security', ['set-keychain-settings', '-lut', '21600', keychainPath], { stdio: 'inherit' })
+    execFileSync('security', ['unlock-keychain', '-p', keychainPassword, keychainPath], { stdio: 'inherit' })
+    execFileSync('security', ['list-keychains', '-d', 'user', '-s', keychainPath, ...previousKeychains], {
+      stdio: 'inherit',
+    })
+    execFileSync(
+      'security',
+      ['import', certificatePath, '-k', keychainPath, '-P', APPLE_CERTIFICATE_PASSWORD, '-T', '/usr/bin/codesign'],
+      { stdio: 'inherit' },
+    )
+    execFileSync(
+      'security',
+      ['set-key-partition-list', '-S', 'apple-tool:,apple:,codesign:', '-s', '-k', keychainPassword, keychainPath],
+      { stdio: 'inherit' },
+    )
+    rmSync(certificatePath, { force: true })
+    return { keychainPath, previousKeychains, tempDir }
+  } catch (error) {
+    cleanupSigningCertificate({ keychainPath, previousKeychains, tempDir })
+    throw error
+  }
+}
+
+function cleanupSigningCertificate(signingCertificate) {
+  if (!signingCertificate) return
+  if (signingCertificate.previousKeychains?.length) {
+    spawnSync('security', ['list-keychains', '-d', 'user', '-s', ...signingCertificate.previousKeychains], {
+      stdio: 'ignore',
+    })
+  }
+  if (existsSync(signingCertificate.keychainPath)) {
+    spawnSync('security', ['delete-keychain', signingCertificate.keychainPath], { stdio: 'ignore' })
+  }
+  rmSync(signingCertificate.tempDir, { recursive: true, force: true })
+}
+
+function createDmg({ flavor, identity, keychain }) {
   const conf = readFlavorConf(flavor)
   const { app, dmg } = bundlePaths(flavor)
   if (!existsSync(app)) fail(`${app} does not exist — tauri did not produce the app bundle`)
@@ -333,7 +396,7 @@ function createDmg({ flavor, identity }) {
       stdio: 'inherit',
     })
     log(`signing ${basename(dmg)}…`)
-    execFileSync('codesign', signDmgArgs({ dmg, identity }), { stdio: 'inherit' })
+    execFileSync('codesign', signDmgArgs({ dmg, identity, keychain }), { stdio: 'inherit' })
   } finally {
     rmSync(stagingRoot, { recursive: true, force: true })
   }
@@ -492,7 +555,12 @@ function build({ notarize, requireUpdater = false, flavor }) {
     }
   }
 
-  createDmg({ flavor, identity })
+  const signingCertificate = importSigningCertificate()
+  try {
+    createDmg({ flavor, identity, keychain: signingCertificate?.keychainPath })
+  } finally {
+    cleanupSigningCertificate(signingCertificate)
+  }
   if (notarize) notarizeDmg(bundlePaths(flavor).dmg, credentials)
   verify({ notarized: notarize, flavor })
   printArtifacts(flavor)

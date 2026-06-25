@@ -52,9 +52,11 @@ can still build unsigned bundles with plain `pnpm tauri build`.
 3. Runs `pnpm tauri build --bundles app`, which stages the `reflect` CLI sidecar, then
    signs inside-out (sidecar → main binary → `.app`) with hardened runtime, notarizes
    the `.app` via `notarytool`, and staples the ticket.
-4. Builds and signs the DMG directly from the notarized app. The release helper avoids
-   Tauri's generated Finder-layout DMG script because that script is brittle on
-   GitHub-hosted macOS images.
+4. Builds and signs the DMG directly from the notarized app. In CI, the release helper
+   imports `APPLE_CERTIFICATE` into its own temporary keychain for this DMG signing step;
+   Tauri's app-signing keychain is internal to `tauri build`. The helper avoids Tauri's
+   generated Finder-layout DMG script because that script is brittle on GitHub-hosted
+   macOS images.
 5. Notarizes and staples the **DMG** itself. Tauri only notarizes the `.app`; without its
    own ticket the DMG container fails `spctl --type open` and downloads can hit
    Gatekeeper friction.
@@ -231,7 +233,7 @@ under **Settings → Secrets and variables → Actions**:
 | Secret | Value |
 | --- | --- |
 | `APPLE_SIGNING_IDENTITY` | Full identity string, e.g. `Developer ID Application: … (TEAMID)` — from `security find-identity -v -p codesigning` |
-| `APPLE_CERTIFICATE` | The Developer ID certificate + private key: export a `.p12` from Keychain Access, then `base64 -i certificate.p12`. Tauri imports it into a temporary keychain on the runner |
+| `APPLE_CERTIFICATE` | The Developer ID certificate + private key: export a `.p12` from Keychain Access, then `base64 -i certificate.p12`. Tauri imports it for the `.app`; the release helper imports it again into a temporary keychain for DMG signing |
 | `APPLE_CERTIFICATE_PASSWORD` | The password set on that `.p12` export |
 | `APPLE_API_KEY` | App Store Connect API key ID, for notarization (preferred in CI — not tied to a personal Apple ID) |
 | `APPLE_API_ISSUER` | The API key's issuer UUID |
