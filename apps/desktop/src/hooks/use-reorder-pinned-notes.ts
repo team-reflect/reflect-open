@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { arrayMove } from '@dnd-kit/sortable'
 import type { PinnedNote } from '@reflect/core'
-import { movePinnedNote } from '@/lib/pinned-note-order'
 import { reorderPinnedNotes } from '@/lib/note-pin'
 import { useGraph } from '@/providers/graph-provider'
 import { pinnedNotesQueryKey } from './use-pinned-notes'
@@ -25,10 +25,12 @@ export function useReorderPinnedNotes(
         return
       }
 
-      const reordered = movePinnedNote(pinned, activePath, overPath)
-      if (reordered === null) {
+      const activeIndex = pinned.findIndex((note) => note.path === activePath)
+      const overIndex = pinned.findIndex((note) => note.path === overPath)
+      if (activeIndex === -1 || overIndex === -1 || activeIndex === overIndex) {
         return
       }
+      const reordered = arrayMove([...pinned], activeIndex, overIndex)
 
       const queryKey = pinnedNotesQueryKey(graph.root)
       const previous = queryClient.getQueryData<PinnedNote[]>(queryKey)
