@@ -31,7 +31,6 @@ const UPDATER_KEYCHAIN_SERVICE = 'reflect-updater'
 const APP_SPECIFIC_PASSWORD_URL = 'https://account.apple.com'
 const BETA_UPDATER_FEED_TAG = 'updater-beta'
 const STABLE_UPDATER_ENDPOINT = 'https://github.com/team-reflect/reflect-open/releases/latest/download/latest.json'
-const BETA_UPDATER_ENDPOINT = `https://github.com/team-reflect/reflect-open/releases/download/${BETA_UPDATER_FEED_TAG}/latest.json`
 
 /**
  * Build flavors. Each ships as a distinct app (its own productName, identifier
@@ -257,10 +256,10 @@ function bundlePaths(flavor) {
 }
 
 /**
- * Write the updater manifest next to the bundle and return its path. The
- * committed updater endpoint resolves `releases/latest/download/latest.json`,
- * so every published release must carry this file — it is how installed apps
- * discover the new version and verify its payload.
+ * Write the updater manifest next to the bundle and return its path. The stable
+ * updater feed resolves `releases/latest/download/latest.json`, so every
+ * published release must carry this file — it is how installed apps discover the
+ * new version and verify its payload.
  */
 function writeUpdaterManifest({ version, tag, flavor }) {
   const { updaterArchive, updaterSignature } = bundlePaths(flavor)
@@ -282,23 +281,6 @@ function writeUpdaterManifest({ version, tag, flavor }) {
   const manifestPath = join(dirname(updaterArchive), 'latest.json')
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
   return manifestPath
-}
-
-function updaterEndpointForVersion(version) {
-  return version.includes('-') ? BETA_UPDATER_ENDPOINT : STABLE_UPDATER_ENDPOINT
-}
-
-function ensureUpdaterEndpointMatchesVersion({ version }) {
-  const endpoint = readTauriConf().plugins?.updater?.endpoints?.[0]
-  const expected = updaterEndpointForVersion(version)
-  if (endpoint !== expected) {
-    fail(
-      `tauri.conf.json updater endpoint does not match version ${version}.\n` +
-        `  expected: ${expected}\n` +
-        `  found:    ${endpoint ?? '(missing)'}\n` +
-        '  Run `pnpm release:bump` for the target channel so installed apps poll the right feed.',
-    )
-  }
 }
 
 /**
@@ -441,6 +423,15 @@ function build({ notarize, requireUpdater = false, flavor }) {
   const buildArgs = ['tauri', 'build']
   const overlay = FLAVOR_OVERLAYS[flavor]
   if (overlay) buildArgs.push('--config', overlay)
+  // The beta and dev overlays pin their own updater feed; the stable flavor has
+  // no overlay, so without this it would inherit whatever endpoint is committed
+  // in the base tauri.conf.json — which on the `next` branch is the *beta* feed.
+  // Pin it at build time so a stable build always polls the stable feed, no
+  // matter which branch it was cut from. This is what makes releases
+  // branch-independent (release-bump.mjs no longer ties the channel to a branch).
+  if (flavor === 'stable') {
+    buildArgs.push('--config', JSON.stringify({ plugins: { updater: { endpoints: [STABLE_UPDATER_ENDPOINT] } } }))
+  }
   if (updater) {
     buildArgs.push('--config', JSON.stringify({ bundle: { createUpdaterArtifacts: true } }))
   }
@@ -604,7 +595,6 @@ function publish({ draft, flavorFlag }) {
   const flavor = resolveFlavor({ flavorFlag, version, forPublish: true })
   const { productName } = readFlavorConf(flavor)
   const tag = `v${version}`
-  ensureUpdaterEndpointMatchesVersion({ version })
   ensureReleaseIsNew(tag)
   ensureTagMatchesCommit(tag, commit)
 
@@ -612,8 +602,8 @@ function publish({ draft, flavorFlag }) {
 
   const { dmg, updaterArchive, updaterSignature } = bundlePaths(flavor)
   const manifestPath = writeUpdaterManifest({ version, tag, flavor })
-  // Pre-releases are invisible to `releases/latest` — the committed updater
-  // endpoint — so installed stable apps never see a beta.
+  // Pre-releases are invisible to `releases/latest` — the stable updater feed —
+  // so installed stable apps never see a beta.
   const prerelease = version.includes('-')
   log(`creating GitHub ${prerelease ? 'pre-release' : 'release'} ${tag} from commit ${commit.slice(0, 7)}…`)
   const releaseArgs = createReleaseArgs({

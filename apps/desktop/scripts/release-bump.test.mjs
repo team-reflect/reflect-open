@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 
-import { computeNextVersion, formatVersion, parseVersion, updaterEndpointForVersion } from './release-bump.mjs'
+import { computeNextVersion, formatVersion, parseVersion } from './release-bump.mjs'
 
 test('parseVersion splits a stable and a prerelease version', () => {
   expect(parseVersion('0.2.0')).toEqual({ major: 0, minor: 2, patch: 0, prerelease: null })
@@ -58,13 +58,4 @@ test('an explicit garbage version is rejected', () => {
 
 test('beta on a non-beta prerelease is rejected', () => {
   expect(() => computeNextVersion('0.2.0-rc.1', 'beta')).toThrow(/beta\.N/)
-})
-
-test('updater endpoint follows the release channel', () => {
-  expect(updaterEndpointForVersion('0.2.0')).toBe(
-    'https://github.com/team-reflect/reflect-open/releases/latest/download/latest.json',
-  )
-  expect(updaterEndpointForVersion('0.3.0-beta.1')).toBe(
-    'https://github.com/team-reflect/reflect-open/releases/download/updater-beta/latest.json',
-  )
 })

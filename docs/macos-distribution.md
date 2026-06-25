@@ -94,20 +94,20 @@ pnpm release:bump --tag-only     # recovery: push the tag for an already-merged 
 ```
 
 Default (no argument) is `beta`, the common case on `next`. The script refuses to run on
-a dirty tree or a branch out of sync with origin, refuses a version whose tag already
-exists, and locks each release to its branch — betas only from `next`, and stable
-versions only from `master` (a stable tag reaches `releases/latest` and auto-updates
-every stable install, so it must never be pushed from a branch whose code hasn't landed
-on `master`). It requires the GitHub CLI (`gh`) for the protected-branch PR flow, merges
-the release PR immediately with admin bypass instead of waiting for CI, prints the plan,
-and asks for confirmation (skip with `--yes`).
+a dirty tree or a branch out of sync with origin, and refuses a version whose tag already
+exists. Releases are branch-independent: the version string picks the channel (a
+`-beta.N` prerelease publishes to the beta feed, a plain version to the stable feed) and
+the build pins the matching updater feed (`release-macos.mjs`), so a stable release can be
+cut straight from `next` without ever polling the wrong feed. It requires the GitHub CLI
+(`gh`) for the protected-branch PR flow, merges the release PR immediately with admin
+bypass instead of waiting for CI, prints the plan, and asks for confirmation (skip with
+`--yes`).
 
-The typical flows:
+The typical flows, both on `next`:
 
-- **Beta** (on `next`): `pnpm release:bump`.
-- **Stable** (on `master`, after merging `next` → `master`): `pnpm release:bump stable`,
-  then switch back to `next` and use `pnpm release:bump preminor` to open the next beta
-  cycle.
+- **Beta**: `pnpm release:bump`.
+- **Stable**: `pnpm release:bump minor` (or `patch`/`major`), then `pnpm release:bump
+  preminor` to open the next beta cycle.
 
 `--direct` keeps the old direct-push behavior for repositories or maintainers that have
 an explicit ruleset bypass. With `--direct`, `--no-tag` bumps and pushes the branch

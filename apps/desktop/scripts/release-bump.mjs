@@ -25,9 +25,11 @@
 //   --yes       Skip the confirmation prompt
 //   --help
 //
-// Stable releases ship from `master`, betas from `next`; the script refuses to
-// create a stable (non-prerelease) version while on `next` so a beta branch
-// can't accidentally publish to the stable auto-update channel.
+// Releases are tag-driven and branch-independent: the version string picks the
+// channel (a `-beta.N` prerelease publishes to the beta feed, a plain version to
+// the stable feed) and the build pins the matching updater feed for that channel
+// (release-macos.mjs), so a release can be cut from any branch. By convention
+// betas come from `next` and stable from `master`, but neither is enforced here.
 
 import { execFileSync, spawnSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -49,8 +51,6 @@ const PREID = 'beta'
 /** Branches a release is normally cut from. */
 const STABLE_BRANCH = 'master'
 const BETA_BRANCH = 'next'
-const STABLE_UPDATER_ENDPOINT = 'https://github.com/team-reflect/reflect-open/releases/latest/download/latest.json'
-const BETA_UPDATER_ENDPOINT = 'https://github.com/team-reflect/reflect-open/releases/download/updater-beta/latest.json'
 
 /** Named bump levels; anything else on the command line is an explicit version. */
 const LEVELS = ['beta', 'stable', 'patch', 'minor', 'major', 'prepatch', 'preminor', 'premajor']
@@ -129,11 +129,6 @@ export function computeNextVersion(current, bump) {
   }
 }
 
-/** The updater feed this version should poll once shipped. */
-export function updaterEndpointForVersion(version) {
-  return parseVersion(version).prerelease ? BETA_UPDATER_ENDPOINT : STABLE_UPDATER_ENDPOINT
-}
-
 // ---------------------------------------------------------------------------
 // Git + filesystem side effects.
 // ---------------------------------------------------------------------------
@@ -195,12 +190,6 @@ function replaceOnce(path, find, replace, label) {
 /** Edit all three version sites to `next` (from `current`). */
 function writeVersion(current, next) {
   replaceOnce(tauriConfPath, `"version": "${current}"`, `"version": "${next}"`, 'tauri.conf.json')
-  replaceOnce(
-    tauriConfPath,
-    `"${updaterEndpointForVersion(current)}"`,
-    `"${updaterEndpointForVersion(next)}"`,
-    'tauri.conf.json updater endpoint',
-  )
   replaceOnce(cargoTomlPath, `version = "${current}"`, `version = "${next}"`, 'Cargo.toml')
   // cargo rewrites the lockfile's reflect-open entry from the new Cargo.toml.
   // --offline keeps it a pure version edit with no registry round-trip.
@@ -234,11 +223,6 @@ async function pushTagOnly({ skipPrompt }) {
   const tag = `v${current}`
   const isPrerelease = current.includes('-')
   const branch = currentBranch()
-  const requiredBranch = isPrerelease ? BETA_BRANCH : STABLE_BRANCH
-  if (branch !== requiredBranch) {
-    const channel = isPrerelease ? 'pre-release' : 'stable'
-    fail(`refusing to tag ${channel} ${current} from "${branch}" — switch to ${requiredBranch} first`)
-  }
   if (git(['status', '--porcelain']) !== '') {
     fail('the working tree has uncommitted changes — commit or stash them first')
   }
@@ -382,19 +366,9 @@ async function main() {
   const isPrerelease = next.includes('-')
   const tag = `v${next}`
 
-  // Guardrail: releases are locked to their branch. A stable version reaches
-  // `releases/latest` and auto-updates every stable install, so it must come
-  // from master and nowhere else — keying on the *required* branch (not just
-  // excluding next) stops a stable tag being pushed from any other synced
-  // branch whose code never landed on master. Betas come from next.
-  const requiredBranch = isPrerelease ? BETA_BRANCH : STABLE_BRANCH
-  if (branch !== requiredBranch) {
-    const channel = isPrerelease ? 'pre-release' : 'stable'
-    const hint = isPrerelease
-      ? `Betas ship from ${BETA_BRANCH} — switch there and run this.`
-      : `Stable releases ship from ${STABLE_BRANCH} — merge ${BETA_BRANCH} → ${STABLE_BRANCH} and run this there.`
-    fail(`refusing to cut ${channel} ${next} from "${branch}".\n  ${hint}`)
-  }
+  // Releases are branch-independent: the version's channel decides the updater
+  // feed (release-macos.mjs pins it at build time), so a release can be cut from
+  // any branch. The bump still goes through a PR into the current branch.
   const releaseBranch = releaseBranchName(tag)
 
   if (git(['status', '--porcelain']) !== '') {
@@ -523,7 +497,8 @@ Flags:
   --yes       skip the confirmation prompt
   --help      show this help
 
-Betas ship from ${BETA_BRANCH}; stable releases from ${STABLE_BRANCH}.
+By convention betas come from ${BETA_BRANCH} and stable from ${STABLE_BRANCH}, but a
+release can be cut from any branch — the version string picks the channel.
 Docs: docs/macos-distribution.md`
 
 // Only run when invoked directly (`node release-bump.mjs`), not when imported
