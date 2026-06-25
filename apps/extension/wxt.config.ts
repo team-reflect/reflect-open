@@ -17,9 +17,12 @@ const PUBLIC_KEY =
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   vite: () => ({ plugins: [tailwindcss()] }),
+  // A stable, human-readable store artifact: `reflect-capture-<version>-chrome.zip`.
+  zip: { name: 'reflect-capture' },
   manifest: {
     name: 'Reflect Capture',
     description: 'Save the page you are reading into Reflect.',
+    homepage_url: 'https://github.com/team-reflect/reflect-open',
     key: PUBLIC_KEY,
     // `activeTab` (granted by the action click / shortcut) covers the
     // screenshot and the selection grab — no broad host permissions.

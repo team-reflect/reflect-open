@@ -48,6 +48,26 @@ disk at call time), and it is covered by tests.
 - GitHub sign-in uses the OAuth device flow against `github.com`; the token is stored
   in the OS keychain.
 
+## Browser capture (the Chrome extension)
+
+- **Where:** nowhere on the network. The **Reflect Capture** extension hands each
+  capture to a local native-messaging host (`reflect-capture-host`) that the desktop
+  app registers on your machine; the host spools it to the capture inbox on disk
+  (`<graph>/.reflect/inbox/`) and the app drains it on next launch. **No Reflect-hosted
+  server, no third party, and no other destination is ever contacted** — the extension
+  stores no keys and makes no AI or network calls of its own.
+- **What:** only the page you explicitly capture (toolbar button or ⌘⇧K) — its URL,
+  title, your current text selection, a screenshot of the visible tab, and, only when
+  you tick "Capture page text", the page's extracted text. Nothing is read in the
+  background; the extension requests no broad host permissions and acts on the active
+  tab only at the moment you trigger it.
+- **When:** when you capture. If the desktop app isn't reachable yet, the capture is
+  held in the browser's local extension storage and retried automatically until it
+  spools — it is never sent anywhere else in the meantime.
+- Once a capture lands in your graph, the desktop app's rules above apply unchanged:
+  any BYOK AI enrichment of it honors `private: true`, and no content leaves the device
+  except through the calls listed here.
+
 ## Housekeeping calls
 
 - **API key validation:** adding a provider key sends one `GET /v1/models` to that
@@ -75,3 +95,4 @@ API keys and tokens live in the **OS keychain only** — never in markdown, neve
 | Backup | Your git repository | Yes — including private notes | Yes (needs connecting) |
 | Key validation | The provider | No | — (only when adding a key) |
 | Update check | GitHub Releases | No | On in packaged builds |
+| Browser capture | Nowhere (local host on disk) | — (stays on your machine) | — (only when you capture) |
