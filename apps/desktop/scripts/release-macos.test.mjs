@@ -5,6 +5,7 @@ import {
   createDmgArgs,
   createReleaseArgs,
   createTauriBuildArgs,
+  parseKeychainList,
   signDmgArgs,
   uploadBetaFeedArgs,
 } from './release-macos.mjs'
@@ -140,4 +141,30 @@ test('DMG signing timestamps the container', () => {
   expect(signDmgArgs({ dmg: 'Reflect.dmg', identity: 'Developer ID Application: Reflect App, LLC (789ULN5MZB)' })).toEqual(
     ['--force', '--sign', 'Developer ID Application: Reflect App, LLC (789ULN5MZB)', '--timestamp', 'Reflect.dmg'],
   )
+})
+
+test('DMG signing can target a temporary CI keychain', () => {
+  expect(
+    signDmgArgs({
+      dmg: 'Reflect.dmg',
+      identity: 'Developer ID Application: Reflect App, LLC (789ULN5MZB)',
+      keychain: '/tmp/reflect-signing.keychain-db',
+    }),
+  ).toEqual([
+    '--force',
+    '--sign',
+    'Developer ID Application: Reflect App, LLC (789ULN5MZB)',
+    '--timestamp',
+    '--keychain',
+    '/tmp/reflect-signing.keychain-db',
+    'Reflect.dmg',
+  ])
+})
+
+test('macOS keychain list output is parsed as paths', () => {
+  expect(
+    parseKeychainList(`    "/Users/runner/Library/Keychains/login.keychain-db"
+    "/Library/Keychains/System.keychain"
+`),
+  ).toEqual(['/Users/runner/Library/Keychains/login.keychain-db', '/Library/Keychains/System.keychain'])
 })
