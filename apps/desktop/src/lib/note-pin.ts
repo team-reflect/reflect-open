@@ -6,7 +6,7 @@ import { commitNoteFrontmatter, readNoteSource } from '@/lib/note-frontmatter'
  * the flag lands in the file, the watcher re-indexes it, and the sidebar's
  * Pinned section follows from the index — no UI-side pin state. Toggling off
  * always clears any explicit `pinned: <order>`; toggling on writes a bare
- * `pinned: true` (the reorder UI, when it lands, is what writes orders).
+ * `pinned: true`; dragging in the pinned shelf writes explicit numeric orders.
  *
  * Reads the current state and writes the flip through {@link readNoteSource} /
  * {@link commitNoteFrontmatter} — the shared session-or-disk channel that keeps

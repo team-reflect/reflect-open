@@ -34,7 +34,7 @@ function coercePrivate(value: unknown): boolean {
 
 /**
  * Coerce the pin value. `pinned: true` pins; a finite number pins **with an
- * explicit sidebar order** — the encoding the future reorder UI writes
+ * explicit sidebar order** — the encoding the pinned shelf reorder writes
  * (fractional ranks make an insertion a one-file write). Truthy words follow
  * `private`'s rules; anything unrecognized is unpinned.
  */

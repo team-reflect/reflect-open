@@ -312,7 +312,7 @@ export interface PinnedNote {
 
 /**
  * Every pinned note, in shelf order: explicit `pinned: <n>` orders first
- * (ascending — what the future reorder UI writes), bare `pinned: true` after,
+ * (ascending — what pinned shelf reorder writes), bare `pinned: true` after,
  * alphabetically by case-folded title (path as the tiebreak). Stable order is
  * the point of pinning: the list must not reshuffle as notes are edited.
  */

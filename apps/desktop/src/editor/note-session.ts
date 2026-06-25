@@ -152,7 +152,7 @@ export interface FrontmatterPatch {
   aliases?: string[]
   /**
    * Sidebar pin. `true` pins; a number pins with an explicit order (what the
-   * future reorder UI writes); `false` deletes the key rather than writing
+   * pinned shelf reorder writes); `false` deletes the key rather than writing
    * `pinned: false` — unpinned is the absence of the flag, and a note whose
    * only metadata was the pin returns to having no frontmatter at all.
    */
