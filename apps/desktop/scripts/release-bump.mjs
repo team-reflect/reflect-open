@@ -410,7 +410,6 @@ async function main() {
   log('plan:')
   if (!direct) console.log(`  - create ${releaseBranch} from ${branch}`)
   console.log('  - update tauri.conf.json, Cargo.toml, Cargo.lock')
-  console.log(`  - set updater feed to ${isPrerelease ? 'beta' : 'stable'}`)
   console.log(`  - commit "Release ${tag}"`)
   if (direct) {
     console.log(`  - push ${branch} to origin`)
