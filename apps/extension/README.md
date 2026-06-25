@@ -27,12 +27,36 @@ pnpm --filter @reflect/extension build   # production build → .output/chrome-m
 pnpm --filter @reflect/extension test    # vitest over lib/
 ```
 
-Load the production build via `chrome://extensions` → Developer mode →
-**Load unpacked** → `apps/extension/.output/chrome-mv3`.
+Load a build via `chrome://extensions` → Developer mode → **Load unpacked**.
+Prefer `pnpm … dev` (`.output/chrome-mv3-dev`) for development — it auto-reloads
+and always keeps the pinned `key`. You can also load the `pnpm … build` output
+(`.output/chrome-mv3`), but **do not load the `pnpm zip` output**: the store
+artifact omits `key`, so it loads under a random ID the host won't allowlist.
 
 For the native hop to work, run the desktop app once (it writes the host
 manifests for detected browsers and the active-graph pointer file), then
 restart Chrome so it re-reads the manifests.
+
+### Troubleshooting: "Install Reflect to finish saving…" while Reflect is installed
+
+That message is the `no-host` state — Chrome could not reach (or was not
+allowlisted by) the native-messaging host. Check, in order:
+
+1. **The extension's ID.** In `chrome://extensions`, the card must read
+   `dlbliojklpickgimjdmjjdnbjdiomjik`. Any other ID means you loaded a
+   **keyless** build (typically `.output/chrome-mv3` right after `pnpm zip`,
+   which builds with `WXT_STORE_BUILD=true`). Rebuild with `pnpm … dev` or
+   `pnpm … build`, then **Reload** the extension. The host allowlists only the
+   pinned ID, so a wrong ID is rejected as "forbidden" → this message.
+2. **The desktop app has run at least once** on this machine, so it has written
+   `~/Library/Application Support/<browser>/NativeMessagingHosts/app.reflect.capture.json`.
+   If Chrome was already open when that file appeared, restart Chrome.
+3. **A graph is selected** in the app. The `no-graph` variant of this message
+   ("Open Reflect and pick a graph first") means the host ran but has no active
+   graph to spool into.
+
+The capture is never lost while held — it stays queued and retries automatically
+once the host is reachable.
 
 ## The unpacked ID is pinned — and the store ID is not the same
 
