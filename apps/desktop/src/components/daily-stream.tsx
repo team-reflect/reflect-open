@@ -194,13 +194,16 @@ export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
     const restored = savedScroll()
     if (restored !== null) {
       // A restored arrival also cancels any focus still pending from a prior
-      // navigation the user backed out of before that day's editor mounted —
-      // the day would otherwise steal focus when its row scrolls into view.
+      // navigation the user backed out of before that day's editor mounted (both
+      // the ⌘D autofocus and a queued cross-note boundary focus). The day would
+      // otherwise steal focus when its row scrolls into view.
       focusPending.current = null
+      pendingFocusRef.current = null
       virtualizer.scrollToOffset(restored)
       return
     }
     const target = targetDateRef.current
+    pendingFocusRef.current = null
     focusPending.current = target
     virtualizer.scrollToIndex(indexOfDate(dayWindow, target), { align: 'start' })
   }, [arrivalSeq, entryId, dayWindow, virtualizer, savedScroll])
@@ -217,6 +220,7 @@ export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
       // still land focus in today once its editor mounts.
       onPointerDownCapture={() => {
         focusPending.current = null
+        pendingFocusRef.current = null
       }}
     >
       <div ref={virtualizer.containerRef} className="relative w-full">

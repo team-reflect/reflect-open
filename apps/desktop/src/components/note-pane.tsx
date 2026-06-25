@@ -1,4 +1,5 @@
 import { memo, useCallback, useMemo, useState, type ReactElement } from 'react'
+import type { ExitBoundaryHandler } from '@meowdown/core'
 import { isDaily } from '@reflect/core'
 import { BacklinksPanel } from '@/components/backlinks-panel'
 import { InlineAlert } from '@/components/inline-alert'
@@ -17,7 +18,6 @@ import { untitledNoteSeed } from '@/lib/create-note'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
-import type { ExitBoundaryHandler } from '@meowdown/core'
 
 interface NotePaneProps {
   /** Graph-relative path of the note to edit. */
@@ -155,10 +155,9 @@ export function NotePaneComponent({
     if (!dailyDate || !onExitBoundary) {
       return
     }
-
-      return ({ direction }) => {
-        return onExitBoundary(dailyDate, direction)
-      }
+    return ({ direction }) => {
+      return onExitBoundary(dailyDate, direction)
+    }
   }, [dailyDate, onExitBoundary])
 
   if (document.status === 'loading') {

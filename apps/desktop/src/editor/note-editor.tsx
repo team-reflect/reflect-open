@@ -274,7 +274,7 @@ export function NoteEditor({
         resolveImageUrl={handleResolveImageUrl}
         onImagePaste={handleImagePaste}
         onImageSaveError={handleImageSaveError}
-        onExitBoundary={ handleExitBoundary }
+        onExitBoundary={handleExitBoundary}
       >
         {children}
       </MeowdownEditor>
