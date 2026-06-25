@@ -1,4 +1,4 @@
-import { isPinned, parseNote } from '@reflect/core'
+import { isPinned, parseNote, type PinnedNote } from '@reflect/core'
 import { commitNoteFrontmatter, readNoteSource } from '@/lib/note-frontmatter'
 
 /**
@@ -22,4 +22,18 @@ export async function toggleNotePinned(path: string, generation: number): Promis
   const pinned = !isPinned(parseNote({ path, source }).frontmatter)
   await commitNoteFrontmatter(path, { pinned }, generation)
   return pinned
+}
+
+/**
+ * Persist the visible pinned shelf order back into note frontmatter. The shelf
+ * stores order in markdown (`pinned: 0`, `pinned: 1`, …), so sync/export/index
+ * rebuilds all preserve the user's manual sort.
+ */
+export async function reorderPinnedNotes(
+  notes: readonly PinnedNote[],
+  generation: number,
+): Promise<void> {
+  await Promise.all(
+    notes.map((note, order) => commitNoteFrontmatter(note.path, { pinned: order }, generation)),
+  )
 }

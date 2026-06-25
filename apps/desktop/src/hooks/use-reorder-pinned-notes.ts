@@ -1,0 +1,53 @@
+import { useCallback, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import type { PinnedNote } from '@reflect/core'
+import { movePinnedNote } from '@/lib/pinned-note-order'
+import { reorderPinnedNotes } from '@/lib/note-pin'
+import { useGraph } from '@/providers/graph-provider'
+import { pinnedNotesQueryKey } from './use-pinned-notes'
+
+/**
+ * Return a drag-end reorder action for the pinned notes shelf. It updates the
+ * query cache immediately, then serializes markdown writes so quick repeated
+ * drags cannot let an older order land after a newer one.
+ */
+export function useReorderPinnedNotes(
+  pinned: readonly PinnedNote[],
+): (activePath: string, overPath: string) => void {
+  const { graph } = useGraph()
+  const queryClient = useQueryClient()
+  const saveChain = useRef<Promise<void>>(Promise.resolve())
+  const mutationId = useRef(0)
+
+  return useCallback(
+    (activePath: string, overPath: string): void => {
+      if (graph === null) {
+        return
+      }
+
+      const reordered = movePinnedNote(pinned, activePath, overPath)
+      if (reordered === null) {
+        return
+      }
+
+      const queryKey = pinnedNotesQueryKey(graph.root)
+      const previous = queryClient.getQueryData<PinnedNote[]>(queryKey)
+      const currentMutation = mutationId.current + 1
+      mutationId.current = currentMutation
+
+      queryClient.setQueryData<PinnedNote[]>(queryKey, reordered)
+
+      saveChain.current = saveChain.current
+        .catch(() => undefined)
+        .then(() => reorderPinnedNotes(reordered, graph.generation))
+        .catch((error: unknown) => {
+          if (mutationId.current === currentMutation && previous !== undefined) {
+            queryClient.setQueryData<PinnedNote[]>(queryKey, previous)
+          }
+          void queryClient.invalidateQueries({ queryKey })
+          console.error('pinned note reorder failed:', error)
+        })
+    },
+    [graph, pinned, queryClient],
+  )
+}

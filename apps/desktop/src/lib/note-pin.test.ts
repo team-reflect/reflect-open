@@ -12,7 +12,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
 }))
 vi.mock('@/editor/open-documents', () => ({ openSession }))
 
-const { toggleNotePinned } = await import('./note-pin')
+const { reorderPinnedNotes, toggleNotePinned } = await import('./note-pin')
 
 beforeEach(() => {
   readNote.mockReset()
@@ -91,6 +91,33 @@ describe('toggleNotePinned', () => {
     openSession.mockReturnValue(null)
     readNote.mockRejectedValue({ kind: 'io', message: 'disk on fire' })
     await expect(toggleNotePinned('notes/a.md', 3)).rejects.toMatchObject({ kind: 'io' })
+    expect(writeNote).not.toHaveBeenCalled()
+  })
+})
+
+describe('reorderPinnedNotes', () => {
+  it('writes dense numeric pin orders to each pinned note', async () => {
+    readNote.mockResolvedValue('# A\n')
+
+    await reorderPinnedNotes(
+      [
+        { path: 'notes/c.md', title: 'C', dailyDate: null },
+        { path: 'notes/a.md', title: 'A', dailyDate: null },
+      ],
+      3,
+    )
+
+    expect(writeNote).toHaveBeenCalledWith('notes/c.md', '---\npinned: 0\n---\n# A\n', 3)
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\npinned: 1\n---\n# A\n', 3)
+  })
+
+  it('routes open notes through their sessions', async () => {
+    const { session, commitFrontmatter } = fakeSession('# A\n')
+    openSession.mockReturnValue(session)
+
+    await reorderPinnedNotes([{ path: 'notes/a.md', title: 'A', dailyDate: null }], 3)
+
+    expect(commitFrontmatter).toHaveBeenCalledWith({ pinned: 0 })
     expect(writeNote).not.toHaveBeenCalled()
   })
 })

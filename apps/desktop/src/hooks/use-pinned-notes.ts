@@ -4,6 +4,16 @@ import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 
 /**
+ * Query key for the graph's pinned shelf. Exported so reorder mutations update
+ * the same cache entry the sidebar and recents consume.
+ */
+export function pinnedNotesQueryKey(
+  graphRoot: string | undefined,
+): readonly [typeof INDEX_QUERY_SCOPE, string | undefined, 'pinned-notes'] {
+  return [INDEX_QUERY_SCOPE, graphRoot, 'pinned-notes']
+}
+
+/**
  * The pinned notes from the index, kept fresh by the usual index invalidation
  * (a pin lands in the file, the watcher re-indexes it, the query refetches).
  * Shared by the sidebar's Pinned section and the Recents dedup — one query
@@ -12,7 +22,7 @@ import { useGraph } from '@/providers/graph-provider'
 export function usePinnedNotes(): PinnedNote[] {
   const { graph } = useGraph()
   const { data } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'pinned-notes'],
+    queryKey: pinnedNotesQueryKey(graph?.root),
     queryFn: () => getPinnedNotes(),
     enabled: hasBridge() && graph !== null,
   })

@@ -1,6 +1,21 @@
-import type { ReactElement } from 'react'
+import { useCallback, useMemo, type ReactElement } from 'react'
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
 import { usePinnedNotes } from '@/hooks/use-pinned-notes'
-import { SidebarNoteRow } from './sidebar-note-row'
+import { useReorderPinnedNotes } from '@/hooks/use-reorder-pinned-notes'
+import { SidebarSortablePinnedRow } from './sidebar-sortable-pinned-row'
 
 /**
  * The sidebar's Pinned section (the original app's "Pinned notes" shelf):
@@ -10,6 +25,21 @@ import { SidebarNoteRow } from './sidebar-note-row'
  */
 export function SidebarPinned(): ReactElement | null {
   const pinned = usePinnedNotes()
+  const reorder = useReorderPinnedNotes(pinned)
+  const pinnedPaths = useMemo(() => pinned.map((note) => note.path), [pinned])
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent): void => {
+      if (event.over === null) {
+        return
+      }
+      reorder(String(event.active.id), String(event.over.id))
+    },
+    [reorder],
+  )
 
   if (pinned.length === 0) {
     return null
@@ -22,16 +52,15 @@ export function SidebarPinned(): ReactElement | null {
       <h2 className="pt-4 text-2xs font-medium leading-5 tracking-wide text-text-muted">
         Pinned notes
       </h2>
-      <ul className="mt-2 flex flex-col space-y-1">
-        {pinned.map((note) => (
-          <SidebarNoteRow
-            key={note.path}
-            path={note.path}
-            title={note.title}
-            date={note.dailyDate}
-          />
-        ))}
-      </ul>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={pinnedPaths} strategy={verticalListSortingStrategy}>
+          <ul className="mt-2 flex flex-col space-y-1">
+            {pinned.map((note) => (
+              <SidebarSortablePinnedRow key={note.path} note={note} />
+            ))}
+          </ul>
+        </SortableContext>
+      </DndContext>
     </section>
   )
 }
