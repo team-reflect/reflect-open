@@ -38,10 +38,12 @@ export function useReorderPinnedNotes(
         .catch(() => undefined)
         .then(() => reorderPinnedNotes(reordered, graph.generation))
         .catch((error: unknown) => {
-          if (mutationId.current === currentMutation && previous !== undefined) {
-            queryClient.setQueryData<PinnedNote[]>(queryKey, previous)
+          if (mutationId.current === currentMutation) {
+            if (previous !== undefined) {
+              queryClient.setQueryData<PinnedNote[]>(queryKey, previous)
+            }
+            void queryClient.invalidateQueries({ queryKey })
           }
-          void queryClient.invalidateQueries({ queryKey })
           console.error('pinned note reorder failed:', error)
         })
     },
