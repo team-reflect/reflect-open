@@ -101,6 +101,22 @@ describe('app shortcuts', () => {
     expect(result.current.palette.open).toBe(true)
   })
 
+  it('defers ⌘K to a focused editor that already handled it', () => {
+    const { result } = shortcutsHook()
+    // The editor (meowdown's Mod-k) sits below window: it consumes the keydown
+    // before it bubbles up, so the palette must stay closed.
+    const editor = document.createElement('div')
+    document.body.append(editor)
+    editor.addEventListener('keydown', (event) => event.preventDefault())
+    act(() => {
+      editor.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'k', metaKey: true, cancelable: true, bubbles: true }),
+      )
+    })
+    expect(result.current.palette.open).toBe(false)
+    editor.remove()
+  })
+
   it('⌘⇧A opens All notes', () => {
     const { result } = shortcutsHook()
 

@@ -146,6 +146,13 @@ export function useAppShortcuts(): CommandContext {
     }
 
     function onKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented) {
+        // The focused editor gets first refusal. meowdown's `Mod-k` consumes the
+        // keydown (preventDefault) only when it turns a selection or the link at
+        // the caret into a link; the palette must not also open. When the editor
+        // has nothing to do it leaves the event alone and `Mod-k` falls through.
+        return
+      }
       if (!isModKey(event) || event.altKey || event.repeat) {
         return // held keys must not spam navigations (e.g. a stack of new notes)
       }

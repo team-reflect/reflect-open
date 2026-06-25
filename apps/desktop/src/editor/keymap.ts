@@ -45,7 +45,21 @@ export function listRegisteredBindings(): ReadonlyMap<string, KeymapScope> {
  * editor's keymap lives in meowdown's engine; Reflect only claims those keys
  * editor-scope so no app binding can shadow them, and lists them in the
  * Keyboard settings section.
+ *
+ * `Mod-k` is the deliberate exception: it is shared, not reserved editor-scope.
+ * meowdown consumes it inside the editor only when there is a selection or a link
+ * at the caret (to insert or edit a link); otherwise it lets the keydown fall
+ * through to the app command palette, which claims `Mod-k` app-scope. The editor
+ * wins at run time by preventDefault-ing the keydown it handles, which
+ * `useAppShortcuts` checks before acting.
  */
-export const EDITOR_BINDING_DESCRIPTIONS: Record<string, string> = registerKeymap('editor', {
-  ...EDITOR_KEY_BINDINGS,
-})
+const SHARED_WITH_APP: ReadonlySet<string> = new Set(['Mod-k'])
+
+const EDITOR_BINDINGS = Object.fromEntries(
+  Object.entries(EDITOR_KEY_BINDINGS).filter(([key]) => !SHARED_WITH_APP.has(key)),
+)
+
+export const EDITOR_BINDING_DESCRIPTIONS: Record<string, string> = registerKeymap(
+  'editor',
+  EDITOR_BINDINGS,
+)
