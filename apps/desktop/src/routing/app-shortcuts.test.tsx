@@ -94,6 +94,19 @@ describe('app shortcuts', () => {
     expect(result.current.router.route).toEqual({ kind: 'today' })
   })
 
+  it('⌘N from today makes back re-anchor Daily instead of restoring stale scroll', () => {
+    const { result } = shortcutsHook()
+    act(() => result.current.router.saveScrollState(735))
+    expect(result.current.router.savedScroll()).toBe(735)
+
+    act(() => press('n'))
+    expect(result.current.router.route.kind).toBe('note')
+
+    act(() => press('['))
+    expect(result.current.router.route).toEqual({ kind: 'today' })
+    expect(result.current.router.savedScroll()).toBeNull()
+  })
+
   it('⌘K opens the palette', () => {
     const { result } = shortcutsHook()
     expect(result.current.palette.open).toBe(false)

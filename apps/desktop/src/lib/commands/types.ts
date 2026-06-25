@@ -20,6 +20,8 @@ export interface CommandContext {
   notePath: () => string | null
   back: () => void
   forward: () => void
+  /** Discard the current route's saved scroll offset. */
+  clearScrollState: () => void
   toggleTheme: () => void
   /** Collapse/expand the workspace sidebar. */
   toggleSidebar: () => void

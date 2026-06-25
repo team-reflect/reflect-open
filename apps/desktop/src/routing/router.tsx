@@ -40,6 +40,8 @@ interface RouterValue {
   canForward: boolean
   /** Record the active view's scroll offset on the current history entry. */
   saveScrollState: (offset: number) => void
+  /** Discard the active history entry's scroll offset so it re-anchors when revisited. */
+  clearScrollState: () => void
   /** The current entry's recorded offset (present when revisited), or `null`. */
   savedScroll: () => number | null
 }
@@ -146,6 +148,10 @@ export function RouterProvider({
     scrollById.current.set(currentId.current, offset)
   }, [])
 
+  const clearScrollState = useCallback(() => {
+    scrollById.current.delete(currentId.current)
+  }, [])
+
   const savedScroll = useCallback(
     () => scrollById.current.get(currentId.current) ?? null,
     [],
@@ -163,9 +169,19 @@ export function RouterProvider({
       canBack: history.index > 0,
       canForward: history.index < history.stack.length - 1,
       saveScrollState,
+      clearScrollState,
       savedScroll,
     }
-  }, [history, arrivalSeq, navigate, back, forward, saveScrollState, savedScroll])
+  }, [
+    history,
+    arrivalSeq,
+    navigate,
+    back,
+    forward,
+    saveScrollState,
+    clearScrollState,
+    savedScroll,
+  ])
 
   return <RouterContext.Provider value={value}>{children}</RouterContext.Provider>
 }

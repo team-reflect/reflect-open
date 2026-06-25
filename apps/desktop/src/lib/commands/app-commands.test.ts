@@ -65,6 +65,7 @@ function fakeContext(overrides?: Partial<CommandContext>) {
     notePath: () => notePathForRoute(route(), TODAY),
     back: vi.fn(),
     forward: vi.fn(),
+    clearScrollState: vi.fn(),
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
     newChat: vi.fn(),
@@ -154,13 +155,25 @@ describe('app commands', () => {
     expect(outsideChat.newChat).not.toHaveBeenCalled()
   })
 
-  it('note.new navigates to a fresh lazy ULID note path', async () => {
-    const { context, navigated } = fakeContext()
+  it('note.new clears daily scroll and navigates to a fresh lazy ULID note path', async () => {
+    const clearScrollState = vi.fn()
+    const { context, navigated } = fakeContext({ clearScrollState })
     await command('note.new').run(context)
+    expect(clearScrollState).toHaveBeenCalledTimes(1)
     expect(navigated).toHaveLength(1)
     const route = navigated[0]!
     expect(route.kind).toBe('note')
     expect((route as { kind: 'note'; path: string }).path).toMatch(/^notes\/[0-9a-z]+\.md$/)
+  })
+
+  it('note.new leaves non-daily route scroll restoration intact', async () => {
+    const clearScrollState = vi.fn()
+    const { context } = fakeContext({
+      clearScrollState,
+      route: () => ({ kind: 'allNotes', tag: null }),
+    })
+    await command('note.new').run(context)
+    expect(clearScrollState).not.toHaveBeenCalled()
   })
 
   it('note.random navigates to the picked note and no-ops on an empty graph', async () => {

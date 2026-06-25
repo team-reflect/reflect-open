@@ -14,7 +14,7 @@ import { startOperation } from '@/lib/operations'
 import { rebuildIndexVisibly } from '@/lib/rebuild-index'
 import { type Route } from '@/routing/route'
 import { registerCommands } from './registry'
-import type { AppCommand } from './types'
+import type { AppCommand, CommandContext } from './types'
 
 /**
  * The first-wave commands (Plan 08). Keybindings here replace the hardcoded
@@ -29,6 +29,14 @@ import type { AppCommand } from './types'
  */
 export function newNoteRoute(): Route {
   return { kind: 'note', path: untitledNotePath() }
+}
+
+function openNewNote(context: CommandContext): void {
+  const route = context.route()
+  if (route.kind === 'today' || route.kind === 'daily') {
+    context.clearScrollState()
+  }
+  context.navigate(newNoteRoute())
 }
 
 const APP_COMMANDS: AppCommand[] = [
@@ -58,7 +66,7 @@ const APP_COMMANDS: AppCommand[] = [
     title: 'New note',
     keywords: ['create'],
     keybinding: 'Mod-n',
-    run: (context) => context.navigate(newNoteRoute()),
+    run: openNewNote,
   },
   {
     id: 'chat.open',

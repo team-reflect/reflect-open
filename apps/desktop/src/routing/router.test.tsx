@@ -78,6 +78,20 @@ describe('router', () => {
     expect(result.current.savedScroll()).toBe(40) // the note's own offset
   })
 
+  it('can clear the active entry scroll offset without changing routes', () => {
+    const { result } = routerHook()
+    const entryId = result.current.entryId
+    const arrivals = result.current.arrivalSeq
+    act(() => result.current.saveScrollState(120))
+
+    act(() => result.current.clearScrollState())
+
+    expect(result.current.route).toEqual({ kind: 'today' })
+    expect(result.current.entryId).toBe(entryId)
+    expect(result.current.arrivalSeq).toBe(arrivals)
+    expect(result.current.savedScroll()).toBeNull()
+  })
+
   it('re-navigating to the current route clears its saved scroll (re-anchor intent)', () => {
     const { result } = routerHook()
     const seqBefore = result.current.arrivalSeq

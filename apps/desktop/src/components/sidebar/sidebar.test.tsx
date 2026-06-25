@@ -98,6 +98,7 @@ function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?: Route
     notePath: () => null,
     back: vi.fn(),
     forward: vi.fn(),
+    clearScrollState: vi.fn(),
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
     newChat: vi.fn(),
