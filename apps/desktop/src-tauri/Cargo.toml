@@ -1,6 +1,6 @@
 [package]
 name = "reflect-open"
-version = "0.3.3"
+version = "0.3.4-beta.1"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
