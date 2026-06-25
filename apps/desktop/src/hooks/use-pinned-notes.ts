@@ -3,10 +3,6 @@ import { getPinnedNotes, hasBridge, type PinnedNote } from '@reflect/core'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 
-/**
- * Query key for the graph's pinned shelf. Exported so reorder mutations update
- * the same cache entry the sidebar and recents consume.
- */
 export function pinnedNotesQueryKey(
   graphRoot: string | undefined,
 ): readonly [typeof INDEX_QUERY_SCOPE, string | undefined, 'pinned-notes'] {

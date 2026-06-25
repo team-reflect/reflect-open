@@ -12,10 +12,6 @@ interface SidebarSortablePinnedRowProps {
   note: PinnedNote
 }
 
-/**
- * One sortable row in the pinned shelf. Pointer dragging starts from anywhere
- * in the row; click activation still navigates to the note.
- */
 export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
   note,
 }: SidebarSortablePinnedRowProps): ReactElement {

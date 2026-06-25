@@ -20,10 +20,9 @@ import { SidebarPinnedRowPreview } from './sidebar-pinned-row-preview'
 import { SidebarSortablePinnedRow } from './sidebar-sortable-pinned-row'
 
 /**
- * The sidebar's Pinned section (the original app's "Pinned notes" shelf):
- * every note carrying `pinned: true` frontmatter, shelf-ordered above the
- * Recents feed. Hidden entirely while nothing is pinned — an empty shelf is
- * sidebar noise, not an affordance.
+ * The sidebar's Pinned section (the Mac app's "Pinned notes" shelf):
+ * every pinned note, shelf-ordered, above the Recents feed. Hidden entirely
+ * while nothing is pinned — an empty shelf is sidebar noise, not an affordance.
  */
 export function SidebarPinned(): ReactElement | null {
   const pinned = usePinnedNotes()

@@ -6,11 +6,6 @@ import { reorderPinnedNotes } from '@/lib/note-pin'
 import { useGraph } from '@/providers/graph-provider'
 import { pinnedNotesQueryKey } from './use-pinned-notes'
 
-/**
- * Return a drag-end reorder action for the pinned notes shelf. It updates the
- * query cache immediately, then serializes markdown writes so quick repeated
- * drags cannot let an older order land after a newer one.
- */
 export function useReorderPinnedNotes(
   pinned: readonly PinnedNote[],
 ): (activePath: string, overPath: string) => void {

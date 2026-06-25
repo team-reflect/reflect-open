@@ -8,9 +8,6 @@ interface SidebarPinnedRowPreviewProps {
   placeholder?: boolean
 }
 
-/**
- * Shared visual shell for a pinned note row, including the drag overlay copy.
- */
 export function SidebarPinnedRowPreview({
   active,
   label,
@@ -29,9 +26,6 @@ export function SidebarPinnedRowPreview({
     <span
       className={cn(
         'group flex w-full touch-none items-center rounded-md leading-5 transition-colors duration-[50ms]',
-        // No hover wash here: it flickered during drag-overlay teardown while reordering.
-        // During reorder, the dragged row becomes an empty placeholder, matching macOS sidebars.
-        // The empty selected-color placeholder mirrors macOS sidebar/table drop slots.
         stateClass,
         overlay && 'shadow-sm',
       )}
