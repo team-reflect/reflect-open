@@ -3,6 +3,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createOpenAI } from '@ai-sdk/openai'
 import type { LanguageModel } from 'ai'
 import type { AiProviderConfig } from '../settings/schema'
+import { anthropicDirectBrowserAccessHeaders } from './anthropic-headers'
 
 /**
  * Build the AI SDK model instance for a configured BYOK entry — the one place
@@ -19,7 +20,11 @@ export function languageModel(
     case 'openai':
       return createOpenAI({ apiKey, fetch: fetchFn })(config.model)
     case 'anthropic':
-      return createAnthropic({ apiKey, fetch: fetchFn })(config.model)
+      return createAnthropic({
+        apiKey,
+        fetch: fetchFn,
+        headers: anthropicDirectBrowserAccessHeaders(),
+      })(config.model)
     case 'google':
       return createGoogleGenerativeAI({ apiKey, fetch: fetchFn })(config.model)
   }

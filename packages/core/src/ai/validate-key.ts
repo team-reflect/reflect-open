@@ -1,4 +1,5 @@
 import type { AiProviderId } from '../settings/schema'
+import { anthropicDirectBrowserAccessHeaders } from './anthropic-headers'
 
 /**
  * BYOK key validation (Plan 10): one cheap authenticated probe against the
@@ -32,8 +33,7 @@ const PROBES: Record<AiProviderId, KeyProbe> = {
     headers: (key) => ({
       'x-api-key': key,
       'anthropic-version': '2023-06-01',
-      // Required for direct-from-browser calls; harmless elsewhere.
-      'anthropic-dangerous-direct-browser-access': 'true',
+      ...anthropicDirectBrowserAccessHeaders(),
     }),
     invalidStatuses: [401, 403],
   },
