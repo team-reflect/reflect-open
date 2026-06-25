@@ -19,8 +19,8 @@
     "tauri:build:beta": "tauri build --config src-tauri/tauri.beta.conf.json"
   },
   "dependencies": {
-    "@meowdown/core": "0.22.0",
-    "@meowdown/react": "0.22.0",
+    "@meowdown/core": "0.23.0",
+    "@meowdown/react": "0.23.0",
     "@reflect/core": "workspace:*",
     "@reflect/db": "workspace:*",
     "@reflect/design-system": "workspace:*",
