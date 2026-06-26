@@ -32,6 +32,8 @@ const MODEL_FILES: [&str; 5] = [
     "special_tokens_map.json",
     "tokenizer_config.json",
 ];
+#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+const ONNX_RUNTIME_DYLIB_RESOURCE: &str = "libonnxruntime.dylib";
 
 /// Byte counts for an active model download. Absent until the download
 /// starts (cache probing, or a cached model that skips downloading); after
@@ -241,6 +243,34 @@ fn download_model_files(app: &AppHandle, cache_dir: &Path) -> Result<(), String>
     Ok(())
 }
 
+fn configure_onnx_runtime(app: &AppHandle) -> Result<(), String> {
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    {
+        let dylib = app
+            .path()
+            .resource_dir()
+            .map_err(|err| format!("locating app resources: {err}"))?
+            .join(ONNX_RUNTIME_DYLIB_RESOURCE);
+        if !dylib.exists() {
+            return Err(format!(
+                "ONNX Runtime library is missing from app resources: {}",
+                dylib.display()
+            ));
+        }
+        let committed = ort::init_from(&dylib)
+            .map_err(|err| format!("loading ONNX Runtime from {}: {err}", dylib.display()))?
+            .commit();
+        if committed {
+            tracing::info!(path = %dylib.display(), "loaded bundled ONNX Runtime");
+        }
+    }
+    #[cfg(not(all(target_os = "macos", target_arch = "x86_64")))]
+    {
+        let _ = app;
+    }
+    Ok(())
+}
+
 /// Current runtime status (poll on startup; live changes arrive on
 /// `embed:status` events).
 #[tauri::command]
@@ -279,6 +309,7 @@ pub async fn embed_ensure(app: AppHandle, state: State<'_, EmbedState>) -> AppRe
     let app_for_progress = app.clone();
     let loaded: Result<TextEmbedding, String> =
         match tauri::async_runtime::spawn_blocking(move || {
+            configure_onnx_runtime(&app_for_progress)?;
             download_model_files(&app_for_progress, &cache_dir)?;
             TextEmbedding::try_new(
                 InitOptions::new(EmbeddingModel::AllMiniLML6V2).with_cache_dir(cache_dir),

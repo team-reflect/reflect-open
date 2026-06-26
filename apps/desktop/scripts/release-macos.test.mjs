@@ -9,6 +9,7 @@ import {
   createReleaseArgs,
   createTauriBuildArgs,
   createUpdaterManifest,
+  macosTargetResourceConfig,
   parseKeychainList,
   signDmgArgs,
   uploadBetaFeedArgs,
@@ -114,6 +115,22 @@ test('release builds ask Tauri for the app bundle only', () => {
       },
     }),
   )
+})
+
+test('Intel release builds include the bundled ONNX Runtime resource', () => {
+  const resourceConfig = macosTargetResourceConfig('x86_64-apple-darwin')
+  const args = createTauriBuildArgs({
+    flavor: 'stable',
+    hasUpdater: true,
+    resourceConfig,
+    target: 'x86_64-apple-darwin',
+  })
+
+  expect(args).toContain(JSON.stringify(resourceConfig))
+})
+
+test('Apple Silicon release builds do not include Intel-only runtime resources', () => {
+  expect(macosTargetResourceConfig('aarch64-apple-darwin')).toBeNull()
 })
 
 test('beta release builds keep the beta flavor overlay', () => {
