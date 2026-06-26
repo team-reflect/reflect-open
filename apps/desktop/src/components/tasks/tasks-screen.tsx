@@ -19,7 +19,10 @@ import {
 } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useRecentlyCompleted } from '@/lib/tasks/recently-completed'
+import {
+  forgetRecentlyCompletedNowOpen,
+  useRecentlyCompleted,
+} from '@/lib/tasks/recently-completed'
 import { sameTask, taskKey } from '@/lib/tasks/task-identity'
 import { type InsertTaskTarget } from '@/lib/tasks/task-insert-target'
 import { scrollTaskIntoView } from '@/lib/tasks/task-navigation'
@@ -119,9 +122,16 @@ export function TasksScreen(): ReactElement {
   // tasks to show." while the completed query is still loading.
   const ready = open !== undefined && (!filters.archived || completed !== undefined)
   const { onScroll } = useScrollRestoration(scrollElement, ready)
+  const graphRoot = graph?.root ?? null
 
   // This session's completed tasks, still showing struck until archived.
-  const recentlyCompleted = useRecentlyCompleted(graph?.root ?? null)
+  const recentlyCompleted = useRecentlyCompleted(graphRoot)
+  useEffect(() => {
+    if (open === undefined) {
+      return
+    }
+    forgetRecentlyCompletedNowOpen(graphRoot, open)
+  }, [graphRoot, open])
 
   const needle = query.trim().toLowerCase()
   const groups = useMemo(() => {

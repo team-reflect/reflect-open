@@ -4,6 +4,7 @@ import { type OpenTask } from '@reflect/core'
 import {
   archiveRecentlyCompleted,
   forgetRecentlyCompleted,
+  forgetRecentlyCompletedNowOpen,
   markRecentlyCompleted,
   resetRecentlyCompleted,
   useRecentlyCompleted,
@@ -65,6 +66,22 @@ describe('recently-completed', () => {
     expect(result.current.map((t) => t.notePath)).toEqual(['b.md'])
 
     act(() => archiveRecentlyCompleted('/g'))
+    expect(result.current).toEqual([])
+  })
+
+  it('forgets session completions only when a newer open index row appears', () => {
+    const { result } = renderHook(() => useRecentlyCompleted('/g'))
+    const completed = task({ notePath: 'a.md', markerOffset: 2, updatedAt: 10 })
+    act(() => markRecentlyCompleted('/g', [completed]))
+
+    act(() => forgetRecentlyCompletedNowOpen('/g', [{ ...completed, checked: false, raw: '[ ] do it' }]))
+    expect(result.current).toHaveLength(1)
+
+    act(() =>
+      forgetRecentlyCompletedNowOpen('/g', [
+        { ...completed, checked: false, raw: '[ ] do it', updatedAt: 11 },
+      ]),
+    )
     expect(result.current).toEqual([])
   })
 
