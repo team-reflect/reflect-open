@@ -6,8 +6,8 @@ Mac App Store.
 ```bash
 pnpm release:macos setup           # once: store notarization credentials in the keychain
 pnpm release:macos setup-updater   # once: generate the auto-update signing keypair
-pnpm release:macos                 # signed + notarized build, verified end to end
-pnpm release:macos publish         # the above, then upload the DMG + updater artifacts to a new GitHub release
+pnpm release:macos                 # signed + notarized build for this Mac's architecture
+pnpm release:macos publish         # build Apple Silicon + Intel, then publish both DMGs
 ```
 
 The helper lives at `apps/desktop/scripts/release-macos.mjs` and is exposed as
@@ -49,9 +49,9 @@ can still build unsigned bundles with plain `pnpm tauri build`.
 1. Auto-detects the Developer ID identity from the keychain and derives the team ID.
 2. Loads notarization credentials (keychain item, or environment variables — see
    [Releasing from CI](#releasing-from-ci) below).
-3. Runs `pnpm tauri build --bundles app`, which stages the `reflect` CLI sidecar, then
-   signs inside-out (sidecar → main binary → `.app`) with hardened runtime, notarizes
-   the `.app` via `notarytool`, and staples the ticket.
+3. Runs `pnpm tauri build --target <target> --bundles app`, which stages the `reflect`
+   CLI sidecar for that target, then signs inside-out (sidecar → main binary → `.app`)
+   with hardened runtime, notarizes the `.app` via `notarytool`, and staples the ticket.
 4. Builds and signs the DMG directly from the notarized app. In CI, the release helper
    imports `APPLE_CERTIFICATE` into its own temporary keychain for this DMG signing step;
    Tauri's app-signing keychain is internal to `tauri build`. The helper avoids Tauri's
@@ -64,19 +64,24 @@ can still build unsigned bundles with plain `pnpm tauri build`.
    the app and DMG (`accepted` / `source=Notarized Developer ID`), and stapled tickets —
    and fails loudly if any check is off.
 
-Bundles land in `target/release/bundle/macos/Reflect.app` and
-`target/release/bundle/dmg/Reflect_<version>_<arch>.dmg`.
+Bundles land under `target/<target-triple>/release/bundle/`, for example
+`target/aarch64-apple-darwin/release/bundle/macos/Reflect.app` and
+`target/x86_64-apple-darwin/release/bundle/dmg/Reflect_<version>_x86_64.dmg`.
 
 ## Commands and flags
 
 ```bash
 pnpm release:macos                 # build + notarize + verify (default)
+pnpm release:macos --target=x86_64-apple-darwin  # build + notarize + verify for Intel
 pnpm release:macos setup           # store Apple ID + app-specific password in the keychain
 pnpm release:macos verify          # re-run all checks on already-built bundles
 pnpm release:macos publish         # build + notarize + verify, then create a GitHub release
 pnpm release:macos publish --draft # same, but leave the release as a draft for review
 pnpm release:macos --no-notarize   # signed-only build (runs locally; Gatekeeper rejects it elsewhere)
 ```
+
+CI uses `build --target=<triple> --artifact-dir=<dir>` for each architecture, then
+`publish --from-artifacts=<dir>` after downloading both artifact sets.
 
 ## Cutting a release (`pnpm release:bump`)
 
@@ -121,11 +126,13 @@ without tagging, for when you want the version commit but aren't ready to releas
 
 ## Publishing to GitHub Releases
 
-`pnpm release:macos publish` runs the full build above, then creates a GitHub release
-tagged `v<version>` (the `version` in `apps/desktop/src-tauri/tauri.conf.json`) with the
-notarized DMG, the updater artifacts (`Reflect.app.tar.gz` + `.sig`), and the
-`latest.json` manifest attached, plus auto-generated release notes. Stable installs poll
-`releases/latest/download/latest.json`; beta installs poll
+`pnpm release:macos publish` runs the full build above for both supported macOS targets
+(`aarch64-apple-darwin` for Apple Silicon and `x86_64-apple-darwin` for Intel), then
+creates a GitHub release tagged `v<version>` (the `version` in
+`apps/desktop/src-tauri/tauri.conf.json`). The release carries two notarized DMGs, two
+updater archives (one per architecture, each with its `.sig`), and a single
+`latest.json` manifest with both `darwin-aarch64` and `darwin-x86_64` platform entries.
+Stable installs poll `releases/latest/download/latest.json`; beta installs poll
 `releases/download/updater-beta/latest.json`, a moving feed release that points at the
 newest published beta. Publish requires the updater key and always attaches the
 manifest — a release without it would stop existing installs from seeing any future
@@ -217,13 +224,19 @@ Stable installs are unaffected (same identifier and the shipped icon).
 
 ## Releasing from CI
 
-`.github/workflows/release.yml` runs `pnpm release:macos publish` on a GitHub-hosted
-macOS runner — the same pipeline as a local release, including DMG notarization, the
-Gatekeeper checks, and the updater artifacts. Trigger it from **Actions → Release →
-Run workflow** (tick *draft* to review the release before publishing), or by pushing
-the matching `v<version>` tag. The publish preflights apply unchanged, so bump
-`version` in `tauri.conf.json` (and `src-tauri/Cargo.toml`) on the released branch
-first.
+`.github/workflows/release.yml` first runs the publish preflights, then builds two
+signed/notarized macOS artifacts in parallel:
+
+- Apple Silicon: `macos-latest`, `--target=aarch64-apple-darwin`
+- Intel: `macos-15-intel`, `--target=x86_64-apple-darwin`
+
+Each build job runs the same DMG notarization, Gatekeeper checks, and updater artifact
+signing as a local release, then uploads its artifacts to the workflow. A final publish
+job downloads both sets, writes the combined `latest.json`, and creates the GitHub
+release. Trigger it from **Actions → Release → Run workflow** (tick *draft* to review
+the release before publishing), or by pushing the matching `v<version>` tag. The publish
+preflights apply unchanged, so bump `version` in `tauri.conf.json` (and
+`src-tauri/Cargo.toml`) on the released branch first.
 
 The script reads all signing material from environment variables, which take
 precedence over the keychain (exporting them works for local releases too); the
@@ -270,10 +283,5 @@ on the runner keychain setup.
 
 ## Current limitations
 
-- Builds target the host architecture only (Apple Silicon in practice). A universal
-  build needs the `x86_64-apple-darwin` rustup target, a universal sidecar from
-  `scripts/build-sidecar.mjs`, and `pnpm tauri build --target universal-apple-darwin`.
 - The iOS project template (`src-tauri/ios.project.yml`) still uses the pre-rename bundle
   identifier and needs its own provisioning pass.
-- `latest.json` only lists the host architecture, so auto-update serves the arch that was
-  built (Apple Silicon in practice); the universal-build work above lifts both limits.

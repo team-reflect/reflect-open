@@ -21,10 +21,9 @@ permissions:
   contents: write
 
 jobs:
-  macos:
-    name: Build · sign · notarize · publish (macOS)
-    runs-on: macos-latest
-    timeout-minutes: 120
+  preflight:
+    name: Preflight release
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -44,6 +43,31 @@ jobs:
             echo "::error::pushed tag ${GITHUB_REF_NAME} but tauri.conf.json says ${version} — fix the tag, or bump the version (and src-tauri/Cargo.toml)"
             exit 1
           fi
+
+      - name: Verify release can publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node apps/desktop/scripts/release-macos.mjs preflight
+
+  macos:
+    name: Build · sign · notarize (${{ matrix.name }})
+    needs: preflight
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Apple Silicon
+            runner: macos-latest
+            target: aarch64-apple-darwin
+          - name: Intel
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       # Without the certificate, signing only fails at codesign time — after
       # the whole Rust build. Check every required secret up front instead.
@@ -84,6 +108,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          targets: ${{ matrix.target }}
 
       - name: Cache cargo build
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
@@ -107,11 +133,9 @@ jobs:
 
       # Tauri imports APPLE_CERTIFICATE into a temporary keychain, signs and
       # notarizes the .app, and signs the updater archive; the script then
-      # notarizes + staples the DMG, runs the Gatekeeper checks, writes
-      # latest.json, and creates the GitHub release.
-      - name: Build, sign, notarize and publish
+      # notarizes + staples the DMG and runs the Gatekeeper checks.
+      - name: Build, sign and notarize
         env:
-          GH_TOKEN: ${{ github.token }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -122,7 +146,38 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: pnpm release:macos build --target=${{ matrix.target }} --artifact-dir="$RUNNER_TEMP/release-artifacts"
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: macos-release-${{ matrix.target }}
+          path: ${{ runner.temp }}/release-artifacts/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: macos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # Full history so the HEAD-is-on-an-origin-branch check passes on tag
+          # checkouts, and credentials stay for gh/git release preflights.
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: macos-release-*
+          path: ${{ runner.temp }}/release-artifacts
+          merge-multiple: true
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
           # Pass the boolean flag through an env variable so the shell never
           # interpolates ${{ }} expressions directly into the run command.
           DRAFT_FLAG: ${{ inputs.draft && '--draft' || '' }}
-        run: pnpm release:macos publish $DRAFT_FLAG
+        run: node apps/desktop/scripts/release-macos.mjs publish --from-artifacts="$RUNNER_TEMP/release-artifacts" $DRAFT_FLAG

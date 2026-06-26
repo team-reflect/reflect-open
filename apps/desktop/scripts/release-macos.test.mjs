@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { expect, test } from 'vitest'
 
 import {
@@ -5,6 +8,7 @@ import {
   createDmgArgs,
   createReleaseArgs,
   createTauriBuildArgs,
+  createUpdaterManifest,
   parseKeychainList,
   signDmgArgs,
   uploadBetaFeedArgs,
@@ -96,9 +100,9 @@ test('beta feed upload replaces the moving manifest', () => {
 })
 
 test('release builds ask Tauri for the app bundle only', () => {
-  const args = createTauriBuildArgs({ flavor: 'stable', hasUpdater: true })
+  const args = createTauriBuildArgs({ flavor: 'stable', hasUpdater: true, target: 'x86_64-apple-darwin' })
 
-  expect(args.slice(0, 4)).toEqual(['tauri', 'build', '--bundles', 'app'])
+  expect(args.slice(0, 6)).toEqual(['tauri', 'build', '--target', 'x86_64-apple-darwin', '--bundles', 'app'])
   expect(args).not.toContain('dmg')
   expect(args).toContain(JSON.stringify({ bundle: { createUpdaterArtifacts: true } }))
   expect(args).toContain(
@@ -113,14 +117,62 @@ test('release builds ask Tauri for the app bundle only', () => {
 })
 
 test('beta release builds keep the beta flavor overlay', () => {
-  expect(createTauriBuildArgs({ flavor: 'beta', hasUpdater: false })).toEqual([
+  expect(createTauriBuildArgs({ flavor: 'beta', hasUpdater: false, target: 'aarch64-apple-darwin' })).toEqual([
     'tauri',
     'build',
+    '--target',
+    'aarch64-apple-darwin',
     '--bundles',
     'app',
     '--config',
     'src-tauri/tauri.beta.conf.json',
   ])
+})
+
+test('updater manifest includes both macOS release targets', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'reflect-release-test-'))
+  try {
+    const appleSignature = join(tempDir, 'Reflect Beta_0.3.4_aarch64.app.tar.gz.sig')
+    const intelSignature = join(tempDir, 'Reflect Beta_0.3.4_x86_64.app.tar.gz.sig')
+    writeFileSync(appleSignature, 'apple-signature\n')
+    writeFileSync(intelSignature, 'intel-signature\n')
+
+    expect(
+      createUpdaterManifest({
+        artifacts: [
+          {
+            platform: 'darwin-aarch64',
+            updaterArchive: join(tempDir, 'Reflect Beta_0.3.4_aarch64.app.tar.gz'),
+            updaterSignature: appleSignature,
+          },
+          {
+            platform: 'darwin-x86_64',
+            updaterArchive: join(tempDir, 'Reflect Beta_0.3.4_x86_64.app.tar.gz'),
+            updaterSignature: intelSignature,
+          },
+        ],
+        pubDate: '2026-06-26T00:00:00.000Z',
+        slug: 'team-reflect/reflect-open',
+        tag: 'v0.3.4',
+        version: '0.3.4',
+      }),
+    ).toEqual({
+      version: '0.3.4',
+      pub_date: '2026-06-26T00:00:00.000Z',
+      platforms: {
+        'darwin-aarch64': {
+          signature: 'apple-signature',
+          url: 'https://github.com/team-reflect/reflect-open/releases/download/v0.3.4/Reflect.Beta_0.3.4_aarch64.app.tar.gz',
+        },
+        'darwin-x86_64': {
+          signature: 'intel-signature',
+          url: 'https://github.com/team-reflect/reflect-open/releases/download/v0.3.4/Reflect.Beta_0.3.4_x86_64.app.tar.gz',
+        },
+      },
+    })
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
 })
 
 test('DMG creation uses direct hdiutil packaging', () => {
