@@ -1,8 +1,19 @@
-import { memo, type CSSProperties, type ReactElement } from 'react'
+import { memo, useCallback, type CSSProperties, type MouseEvent, type ReactElement } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { useQueryClient } from '@tanstack/react-query'
+import { errorMessage } from '@reflect/core'
 import type { PinnedNote } from '@reflect/core'
+import {
+  invalidatePinnedNotesCache,
+  restorePinnedNotesCache,
+  updatePinnedNotesCache,
+} from '@/lib/notes/pinned-notes-cache'
 import { formatDayLabel } from '@/lib/dates'
+import { openPinnedNoteContextMenu } from '@/lib/native-menu/pinned-note-context-menu'
+import { unpinNote } from '@/lib/note-pin'
+import { startOperation } from '@/lib/operations'
+import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
 import { routeForPath, routesEqual } from '@/routing/route'
 import { useRouter } from '@/routing/router'
@@ -17,6 +28,8 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
 }: SidebarSortablePinnedRowProps): ReactElement {
   const { route, navigate } = useRouter()
   const { settings } = useSettings()
+  const { graph } = useGraph()
+  const queryClient = useQueryClient()
   const target = routeForPath(note.path)
   const active = routesEqual(route, target)
   const label =
@@ -32,6 +45,29 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
     transform: CSS.Transform.toString(transform),
     transition,
   }
+  const handleContextMenu = useCallback(
+    (event: MouseEvent<HTMLButtonElement>): void => {
+      event.preventDefault()
+      event.stopPropagation()
+      if (graph === null) {
+        return
+      }
+      void openPinnedNoteContextMenu(() => {
+        const snapshot = updatePinnedNotesCache(queryClient, graph.root, (current) =>
+          current?.filter((pinnedNote) => pinnedNote.path !== note.path),
+        )
+
+        void unpinNote(note.path, graph.generation).catch((cause: unknown) => {
+          restorePinnedNotesCache(queryClient, snapshot)
+          invalidatePinnedNotesCache(queryClient, snapshot)
+          startOperation('Unpinning note').fail(errorMessage(cause))
+        })
+      }).catch((cause: unknown) => {
+        startOperation('Opening note menu').fail(errorMessage(cause))
+      })
+    },
+    [graph, note.path, queryClient],
+  )
 
   return (
     <li className="-mx-2.5">
@@ -40,6 +76,7 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
         type="button"
         style={style}
         onClick={() => navigate(target)}
+        onContextMenu={handleContextMenu}
         aria-current={active ? 'page' : undefined}
         className="block w-full"
         {...listeners}

@@ -12,7 +12,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
 }))
 vi.mock('@/editor/open-documents', () => ({ openSession }))
 
-const { reorderPinnedNotes, toggleNotePinned } = await import('./note-pin')
+const { reorderPinnedNotes, toggleNotePinned, unpinNote } = await import('./note-pin')
 
 beforeEach(() => {
   readNote.mockReset()
@@ -92,6 +92,26 @@ describe('toggleNotePinned', () => {
     readNote.mockRejectedValue({ kind: 'io', message: 'disk on fire' })
     await expect(toggleNotePinned('notes/a.md', 3)).rejects.toMatchObject({ kind: 'io' })
     expect(writeNote).not.toHaveBeenCalled()
+  })
+})
+
+describe('unpinNote', () => {
+  it('unpins directly without reading the current pin state', async () => {
+    readNote.mockResolvedValue('---\npinned: true\n---\n# A\n')
+
+    await unpinNote('notes/a.md', 3)
+
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '# A\n', 3)
+  })
+
+  it('routes direct unpin through the live session', async () => {
+    const { session, commitFrontmatter } = fakeSession('---\npinned: 2\n---\n# A\n')
+    openSession.mockReturnValue(session)
+
+    await unpinNote('notes/a.md', 3)
+
+    expect(commitFrontmatter).toHaveBeenCalledWith({ pinned: false })
+    expect(readNote).not.toHaveBeenCalled()
   })
 })
 

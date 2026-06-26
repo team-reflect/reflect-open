@@ -1,4 +1,4 @@
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -14,6 +14,12 @@ const getPinnedNotes = vi.hoisted(() => vi.fn<() => Promise<PinnedNote[]>>(async
 const revealItemInDir = vi.hoisted(() => vi.fn<(path: string) => Promise<void>>(async () => {}))
 const openRecent = vi.hoisted(() => vi.fn())
 const pickAndOpen = vi.hoisted(() => vi.fn())
+const openPinnedNoteContextMenu = vi.hoisted(() =>
+  vi.fn(async (onUnpin: () => void) => {
+    onUnpin()
+  }),
+)
+const unpinNote = vi.hoisted(() => vi.fn(async () => {}))
 const updateSettingsWith = vi.hoisted(() =>
   vi.fn<(updater: (current: Settings) => Partial<Settings>) => void>(),
 )
@@ -24,6 +30,11 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   getPinnedNotes,
 }))
 vi.mock('@tauri-apps/plugin-opener', () => ({ revealItemInDir }))
+vi.mock('@/lib/native-menu/pinned-note-context-menu', () => ({ openPinnedNoteContextMenu }))
+vi.mock('@/lib/note-pin', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/note-pin')>()),
+  unpinNote,
+}))
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({
     graph: GRAPH,
@@ -85,6 +96,8 @@ beforeEach(() => {
   audioMemo.unavailableReason = null
   audioMemo.toggle.mockReset()
   revealItemInDir.mockClear()
+  openPinnedNoteContextMenu.mockClear()
+  unpinNote.mockClear()
 })
 
 afterEach(cleanup) // `globals: false` disables testing-library's automatic cleanup
@@ -229,6 +242,45 @@ describe('Sidebar', () => {
     const { view } = renderSidebar()
     await waitFor(() => expect(getPinnedNotes).toHaveBeenCalled())
     expect(view.queryByRole('region', { name: /pinned notes/i })).toBeNull()
+  })
+
+  it('pinned rows open the native note menu on right-click', async () => {
+    getPinnedNotes.mockResolvedValue([
+      { path: 'notes/rust.md', title: 'Rust', dailyDate: null },
+    ])
+    const { view } = renderSidebar()
+
+    fireEvent.contextMenu(await view.findByRole('button', { name: 'Rust' }))
+
+    await waitFor(() => expect(openPinnedNoteContextMenu).toHaveBeenCalled())
+    await waitFor(() => expect(unpinNote).toHaveBeenCalledWith('notes/rust.md', 1))
+  })
+
+  it('optimistically removes a right-click-unpinned row', async () => {
+    getPinnedNotes.mockResolvedValue([
+      { path: 'notes/rust.md', title: 'Rust', dailyDate: null },
+    ])
+    const { view } = renderSidebar()
+    const rust = await view.findByRole('button', { name: 'Rust' })
+
+    fireEvent.contextMenu(rust)
+
+    await waitFor(() => expect(view.queryByRole('button', { name: 'Rust' })).toBeNull())
+    expect(unpinNote).toHaveBeenCalledWith('notes/rust.md', 1)
+  })
+
+  it('restores an optimistically removed pinned row when unpin fails', async () => {
+    unpinNote.mockRejectedValueOnce(new Error('disk failed'))
+    getPinnedNotes.mockResolvedValue([
+      { path: 'notes/rust.md', title: 'Rust', dailyDate: null },
+    ])
+    const { view } = renderSidebar()
+    const rust = await view.findByRole('button', { name: 'Rust' })
+
+    fireEvent.contextMenu(rust)
+
+    await waitFor(() => expect(unpinNote).toHaveBeenCalledWith('notes/rust.md', 1))
+    await waitFor(() => expect(view.getByRole('button', { name: 'Rust' })).toBeTruthy())
   })
 
   it('history arrows walk the router stack and disable at its edges', async () => {

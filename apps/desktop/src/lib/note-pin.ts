@@ -24,6 +24,15 @@ export async function toggleNotePinned(path: string, generation: number): Promis
   return pinned
 }
 
+/**
+ * Remove a note from the pinned shelf without reading its current state.
+ * Directional UI, such as a native "Unpin Note" menu item, must not call the
+ * toggle path because a stale index could otherwise turn the action into a pin.
+ */
+export async function unpinNote(path: string, generation: number): Promise<void> {
+  await commitNoteFrontmatter(path, { pinned: false }, generation)
+}
+
 export async function reorderPinnedNotes(
   notes: readonly PinnedNote[],
   generation: number,

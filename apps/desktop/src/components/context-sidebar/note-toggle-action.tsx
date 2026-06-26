@@ -23,6 +23,8 @@ interface NoteToggleActionProps {
   keybinding?: string | null
   /** Optional tooltip explaining the flag's meaning. */
   tooltip?: string
+  /** Optional side-effect for surfaces that also expose this flag elsewhere. */
+  applyOptimistic?: (active: boolean) => (() => void) | void
 }
 
 /**
@@ -52,6 +54,7 @@ export function NoteToggleAction({
   operations,
   keybinding = null,
   tooltip,
+  applyOptimistic,
 }: NoteToggleActionProps): ReactElement {
   const { graph } = useGraph()
   // Guards against a double-click racing two read-patch-write toggles.
@@ -71,10 +74,20 @@ export function NoteToggleAction({
     if (generation === undefined) {
       return
     }
+    const optimisticActive = !isActive
+    const rollback = applyOptimistic?.(optimisticActive)
+    setPending({ path, active: optimisticActive })
     setIsToggling(true)
     try {
-      setPending({ path, active: await toggle(path, generation) })
+      const active = await toggle(path, generation)
+      if (active !== optimisticActive) {
+        rollback?.()
+        applyOptimistic?.(active)
+      }
+      setPending({ path, active })
     } catch (cause) {
+      rollback?.()
+      setPending({ path, active: isActive })
       startOperation(isActive ? operations.deactivate : operations.activate).fail(
         errorMessage(cause),
       )

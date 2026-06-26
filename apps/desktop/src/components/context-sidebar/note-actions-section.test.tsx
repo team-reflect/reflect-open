@@ -2,7 +2,9 @@ import { render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { PinnedNote } from '@reflect/core'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { pinnedNotesQueryKey } from '@/hooks/use-pinned-notes'
 import { RouterProvider } from '@/routing/router'
 import { NoteActionsSection } from './note-actions-section'
 
@@ -31,7 +33,7 @@ vi.mock('@/providers/graph-provider', () => ({
 
 function renderSection(path: string, showTrash = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
+  const view = render(
     <TooltipProvider>
       <QueryClientProvider client={client}>
         <RouterProvider initialRoute={{ kind: 'note', path }}>
@@ -40,6 +42,7 @@ function renderSection(path: string, showTrash = false) {
       </QueryClientProvider>
     </TooltipProvider>,
   )
+  return { ...view, client }
 }
 
 beforeEach(() => {
@@ -53,8 +56,8 @@ beforeEach(() => {
   operationFail.mockClear()
 })
 
-function noteRow(path: string, isPrivate: boolean) {
-  return { path, title: 'A', dailyDate: null, isPrivate }
+function noteRow(path: string, isPrivate: boolean, title = 'A') {
+  return { path, title, dailyDate: null, isPrivate }
 }
 
 describe('NoteActionsSection pin toggle', () => {
@@ -87,6 +90,93 @@ describe('NoteActionsSection pin toggle', () => {
     await userEvent.click(view.getByRole('button', { name: /Un-pin this note/ }))
     expect(await view.findByText('Pin this note')).toBeDefined()
     expect(toggleNotePinned).toHaveBeenCalledTimes(2)
+    view.unmount()
+  })
+
+  it('shows the pinned state while the pin write is still pending', async () => {
+    let resolveToggle!: (active: boolean) => void
+    toggleNotePinned.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveToggle = resolve
+        }),
+    )
+    const view = renderSection('notes/a.md')
+
+    await userEvent.click(view.getByRole('button', { name: /Pin this note/ }))
+
+    expect(view.getByText('Un-pin this note')).toBeDefined()
+    resolveToggle(true)
+    await waitFor(() => expect(toggleNotePinned).toHaveBeenCalledWith('notes/a.md', 7))
+    view.unmount()
+  })
+
+  it('inserts an optimistic pin in the same title order as the index', async () => {
+    getPinnedNotes.mockResolvedValue([
+      { path: 'notes/alpha.md', title: 'Alpha', dailyDate: null },
+      { path: 'notes/zeta.md', title: 'Zeta', dailyDate: null },
+    ])
+    getNote.mockResolvedValue(noteRow('notes/mid.md', false, 'Mid'))
+    const view = renderSection('notes/mid.md')
+    const queryKey = pinnedNotesQueryKey('/g')
+    await waitFor(() =>
+      expect(view.client.getQueryData<PinnedNote[]>(queryKey)?.map((note) => note.title)).toEqual([
+        'Alpha',
+        'Zeta',
+      ]),
+    )
+
+    await userEvent.click(view.getByRole('button', { name: /Pin this note/ }))
+
+    expect(view.client.getQueryData<PinnedNote[]>(queryKey)?.map((note) => note.title)).toEqual([
+      'Alpha',
+      'Mid',
+      'Zeta',
+    ])
+    view.unmount()
+  })
+
+  it('keeps explicitly reordered pins ahead of a new optimistic bare pin', async () => {
+    getPinnedNotes.mockResolvedValue([
+      { path: 'notes/zeta.md', title: 'Zeta', dailyDate: null, pinnedOrder: 0 },
+      { path: 'notes/alpha.md', title: 'Alpha', dailyDate: null, pinnedOrder: 1 },
+    ])
+    getNote.mockResolvedValue(noteRow('notes/mid.md', false, 'Mid'))
+    const view = renderSection('notes/mid.md')
+    const queryKey = pinnedNotesQueryKey('/g')
+    await waitFor(() =>
+      expect(view.client.getQueryData<PinnedNote[]>(queryKey)?.map((note) => note.title)).toEqual([
+        'Zeta',
+        'Alpha',
+      ]),
+    )
+
+    await userEvent.click(view.getByRole('button', { name: /Pin this note/ }))
+
+    expect(view.client.getQueryData<PinnedNote[]>(queryKey)?.map((note) => note.title)).toEqual([
+      'Zeta',
+      'Alpha',
+      'Mid',
+    ])
+    view.unmount()
+  })
+
+  it('restores the pin label when an optimistic pin fails', async () => {
+    let rejectToggle!: (cause: unknown) => void
+    toggleNotePinned.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((_resolve, reject) => {
+          rejectToggle = reject
+        }),
+    )
+    const view = renderSection('notes/a.md')
+
+    await userEvent.click(view.getByRole('button', { name: /Pin this note/ }))
+    expect(view.getByText('Un-pin this note')).toBeDefined()
+    rejectToggle({ kind: 'io', message: 'disk on fire' })
+
+    await waitFor(() => expect(view.getByText('Pin this note')).toBeDefined())
+    expect(startOperation).toHaveBeenCalledWith('Pinning note')
     view.unmount()
   })
 

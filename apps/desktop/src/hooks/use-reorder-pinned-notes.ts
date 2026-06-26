@@ -4,7 +4,11 @@ import { arrayMove } from '@dnd-kit/sortable'
 import type { PinnedNote } from '@reflect/core'
 import { reorderPinnedNotes } from '@/lib/note-pin'
 import { useGraph } from '@/providers/graph-provider'
-import { pinnedNotesQueryKey } from './use-pinned-notes'
+import {
+  invalidatePinnedNotesCache,
+  restorePinnedNotesCache,
+  updatePinnedNotesCache,
+} from '@/lib/notes/pinned-notes-cache'
 
 export function useReorderPinnedNotes(
   pinned: readonly PinnedNote[],
@@ -27,22 +31,18 @@ export function useReorderPinnedNotes(
       }
       const reordered = arrayMove([...pinned], activeIndex, overIndex)
 
-      const queryKey = pinnedNotesQueryKey(graph.root)
-      const previous = queryClient.getQueryData<PinnedNote[]>(queryKey)
       const currentMutation = mutationId.current + 1
       mutationId.current = currentMutation
 
-      queryClient.setQueryData<PinnedNote[]>(queryKey, reordered)
+      const snapshot = updatePinnedNotesCache(queryClient, graph.root, () => reordered)
 
       saveChain.current = saveChain.current
         .catch(() => undefined)
         .then(() => reorderPinnedNotes(reordered, graph.generation))
         .catch((error: unknown) => {
           if (mutationId.current === currentMutation) {
-            if (previous !== undefined) {
-              queryClient.setQueryData<PinnedNote[]>(queryKey, previous)
-            }
-            void queryClient.invalidateQueries({ queryKey })
+            restorePinnedNotesCache(queryClient, snapshot)
+            invalidatePinnedNotesCache(queryClient, snapshot)
           }
           console.error('pinned note reorder failed:', error)
         })

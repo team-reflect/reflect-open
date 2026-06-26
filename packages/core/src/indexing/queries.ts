@@ -308,6 +308,7 @@ export interface PinnedNote {
   path: string
   title: string
   dailyDate: string | null
+  pinnedOrder?: number | null
 }
 
 /**
@@ -320,7 +321,7 @@ export async function getPinnedNotes(): Promise<PinnedNote[]> {
   return db
     .selectFrom('notes')
     .where('isPinned', '=', 1)
-    .select(['path', 'title', 'dailyDate'])
+    .select(['path', 'title', 'dailyDate', 'pinnedOrder'])
     .orderBy(sql`pinned_order IS NULL`)
     .orderBy('pinnedOrder')
     .orderBy('titleKey')

@@ -6,6 +6,7 @@ import { usePinnedNotes } from '@/hooks/use-pinned-notes'
 import { keybindingFor } from '@/lib/commands/app-commands'
 import { toggleNotePinned } from '@/lib/note-pin'
 import { toggleNotePrivate } from '@/lib/note-private'
+import { useOptimisticPinToggle } from '@/lib/notes/use-optimistic-pin-toggle'
 import { NoteGistAction } from './note-gist-action'
 import { NoteTrashAction } from './note-trash-action'
 import { NoteToggleAction } from './note-toggle-action'
@@ -37,7 +38,9 @@ export function NoteActionsSection({
   showTrash = false,
 }: NoteActionsSectionProps): ReactElement {
   const isPinned = usePinnedNotes().some((note) => note.path === path)
-  const isPrivate = useNoteRow(path)?.isPrivate ?? false
+  const noteRow = useNoteRow(path)
+  const isPrivate = noteRow?.isPrivate ?? false
+  const applyOptimisticPin = useOptimisticPinToggle(path, noteRow)
 
   return (
     <SidebarSection storageKey="note-actions" title="Note actions">
@@ -49,6 +52,7 @@ export function NoteActionsSection({
         labels={{ active: 'Un-pin this note', inactive: 'Pin this note' }}
         operations={{ activate: 'Pinning note', deactivate: 'Unpinning note' }}
         keybinding={PIN_KEYBINDING}
+        applyOptimistic={applyOptimisticPin}
       />
       <NoteToggleAction
         path={path}

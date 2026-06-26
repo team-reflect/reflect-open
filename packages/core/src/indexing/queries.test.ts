@@ -94,15 +94,15 @@ describe('listDailyNotes', () => {
 describe('getPinnedNotes', () => {
   it('selects pinned rows: explicit orders first, then folded title', async () => {
     mockInvoke.mockResolvedValue([
-      { path: 'notes/a.md', title: 'Alpha', daily_date: null },
-      { path: 'notes/b.md', title: 'Beta', daily_date: null },
+      { path: 'notes/a.md', title: 'Alpha', daily_date: null, pinned_order: 0 },
+      { path: 'notes/b.md', title: 'Beta', daily_date: null, pinned_order: null },
     ])
 
     const pinned = await getPinnedNotes()
 
     expect(pinned).toEqual([
-      { path: 'notes/a.md', title: 'Alpha', dailyDate: null },
-      { path: 'notes/b.md', title: 'Beta', dailyDate: null },
+      { path: 'notes/a.md', title: 'Alpha', dailyDate: null, pinnedOrder: 0 },
+      { path: 'notes/b.md', title: 'Beta', dailyDate: null, pinnedOrder: null },
     ])
     const [command, args] = mockInvoke.mock.calls[0]!
     expect(command).toBe('db_query')
