@@ -1,6 +1,13 @@
 import { TaskStaleError } from '@reflect/core'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { convertTaskToBullet, deleteTask, editTask, NoteBusyError, toggleTask } from './note-task'
+import {
+  convertTaskToBullet,
+  deleteTask,
+  editTask,
+  insertTask,
+  NoteBusyError,
+  toggleTask,
+} from './note-task'
 
 const openSession = vi.hoisted(() => vi.fn())
 vi.mock('@/editor/open-documents', () => ({ openSession }))
@@ -13,7 +20,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   writeNote,
 }))
 
-// The marker `[` sits at offset 2 of `- [ ] do it`.
+// The marker `[` sits at offset 2 of `+ [ ] do it`.
 const task = { notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] do it' }
 
 beforeEach(() => {
@@ -27,7 +34,7 @@ const flushMicrotasks = () => new Promise((resolve) => setTimeout(resolve, 0))
 describe('write serialization', () => {
   it('serializes concurrent writes to the same note — no read/write interleave', async () => {
     openSession.mockReturnValue(null)
-    readNote.mockResolvedValue('- [ ] do it\n')
+    readNote.mockResolvedValue('+ [ ] do it\n')
     let releaseFirstWrite: () => void = () => {}
     let writes = 0
     writeNote.mockImplementation(() => {
@@ -56,7 +63,7 @@ describe('write serialization', () => {
 
   it('keeps the chain alive when a write fails', async () => {
     openSession.mockReturnValue(null)
-    readNote.mockResolvedValue('- [ ] do it\n')
+    readNote.mockResolvedValue('+ [ ] do it\n')
     writeNote.mockRejectedValueOnce(new Error('disk full')).mockResolvedValue(undefined)
 
     const first = toggleTask(task, 7)
@@ -69,11 +76,11 @@ describe('write serialization', () => {
 describe('toggleTask', () => {
   it('writes the toggled marker to disk when the note is not open', async () => {
     openSession.mockReturnValue(null)
-    readNote.mockResolvedValue('- [ ] do it\n')
+    readNote.mockResolvedValue('+ [ ] do it\n')
     writeNote.mockResolvedValue(undefined)
 
     await toggleTask(task, 7)
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '- [x] do it\n', 7)
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '+ [x] do it\n', 7)
   })
 
   it('routes through the live session whenever the note is open — never disk', async () => {
@@ -98,7 +105,7 @@ describe('toggleTask', () => {
 
   it('propagates TaskStaleError from the disk path when the index is stale', async () => {
     openSession.mockReturnValue(null)
-    readNote.mockResolvedValue('- [ ] something else entirely\n')
+    readNote.mockResolvedValue('+ [ ] something else entirely\n')
 
     await expect(toggleTask(task, 7)).rejects.toBeInstanceOf(TaskStaleError)
     expect(writeNote).not.toHaveBeenCalled()
@@ -108,11 +115,11 @@ describe('toggleTask', () => {
 describe('editTask', () => {
   it('writes the rewritten content to disk when the note is not open', async () => {
     openSession.mockReturnValue(null)
-    readNote.mockResolvedValue('- [ ] do it\n')
+    readNote.mockResolvedValue('+ [ ] do it\n')
     writeNote.mockResolvedValue(undefined)
 
     await editTask(task, 'do it well', 7)
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '- [ ] do it well\n', 7)
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '+ [ ] do it well\n', 7)
   })
 
   it('routes the new content through the live session when the note is open', async () => {
@@ -132,7 +139,7 @@ describe('editTask', () => {
 
   it('propagates TaskStaleError from the disk path when the index is stale', async () => {
     openSession.mockReturnValue(null)
-    readNote.mockResolvedValue('- [ ] something else entirely\n')
+    readNote.mockResolvedValue('+ [ ] something else entirely\n')
     await expect(editTask(task, 'x', 7)).rejects.toBeInstanceOf(TaskStaleError)
     expect(writeNote).not.toHaveBeenCalled()
   })
@@ -141,11 +148,11 @@ describe('editTask', () => {
 describe('deleteTask', () => {
   it('removes the task line on disk when the note is not open', async () => {
     openSession.mockReturnValue(null)
-    readNote.mockResolvedValue('- [ ] do it\n- [ ] keep\n')
+    readNote.mockResolvedValue('+ [ ] do it\n+ [ ] keep\n')
     writeNote.mockResolvedValue(undefined)
 
     await deleteTask(task, 7)
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '- [ ] keep\n', 7)
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '+ [ ] keep\n', 7)
   })
 
   it('routes through the live session when the note is open', async () => {
@@ -167,11 +174,11 @@ describe('deleteTask', () => {
 describe('convertTaskToBullet', () => {
   it('strips the marker to a plain bullet on disk when the note is not open', async () => {
     openSession.mockReturnValue(null)
-    readNote.mockResolvedValue('- [ ] do it\n- [ ] keep\n')
+    readNote.mockResolvedValue('+ [ ] do it\n+ [ ] keep\n')
     writeNote.mockResolvedValue(undefined)
 
     await convertTaskToBullet(task, 7)
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '- do it\n- [ ] keep\n', 7)
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '+ do it\n+ [ ] keep\n', 7)
   })
 
   it('routes through the live session when the note is open', async () => {
@@ -191,8 +198,28 @@ describe('convertTaskToBullet', () => {
 
   it('propagates TaskStaleError from the disk path when the index is stale', async () => {
     openSession.mockReturnValue(null)
-    readNote.mockResolvedValue('- [ ] something else entirely\n')
+    readNote.mockResolvedValue('+ [ ] something else entirely\n')
     await expect(convertTaskToBullet(task, 7)).rejects.toBeInstanceOf(TaskStaleError)
     expect(writeNote).not.toHaveBeenCalled()
+  })
+})
+
+describe('insertTask', () => {
+  it('writes round task syntax to an empty note', async () => {
+    openSession.mockReturnValue(null)
+    readNote.mockResolvedValue('')
+    writeNote.mockResolvedValue(undefined)
+
+    await expect(insertTask('notes/a.md', 7)).resolves.toBe(2)
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '+ [ ] \n', 7)
+  })
+
+  it('appends round task syntax after existing content', async () => {
+    openSession.mockReturnValue(null)
+    readNote.mockResolvedValue('# Notes\n\nbody\n')
+    writeNote.mockResolvedValue(undefined)
+
+    await expect(insertTask('notes/a.md', 7)).resolves.toBe('# Notes\n\nbody\n+ '.length)
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '# Notes\n\nbody\n+ [ ] \n', 7)
   })
 })

@@ -78,7 +78,7 @@ export function taskRawWithContent(task: OpenTask, content: string): string {
  * reindex will store, not the raw markdown the editor produced.
  */
 function plainTextOfTaskLine(raw: string): string {
-  return parseNote({ path: '', source: `- ${raw}` }).tasks[0]?.text ?? ''
+  return parseNote({ path: '', source: `+ ${raw}` }).tasks[0]?.text ?? ''
 }
 
 /**

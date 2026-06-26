@@ -167,10 +167,20 @@ function readLink(body: string, from: number, to: number, offset: number): Markd
 }
 
 /**
+ * A Reflect task is the round Meowdown checkbox syntax: optional indentation,
+ * then `+`, then whitespace, then the GFM marker. Square checklist items
+ * (`- [ ]`/`* [ ]`) are intentionally not projected into Tasks.
+ */
+function hasRoundTaskListMarker(body: string, markerStart: number): boolean {
+  const lineStart = body.lastIndexOf('\n', markerStart - 1) + 1
+  return /^[\t ]*\+[\t ]+$/.test(body.slice(lineStart, markerStart))
+}
+
+/**
  * Resolve a `Task` Lezer node (the marker starts at `from`) into a
- * {@link ParsedTask}, or `null` when the marker shape isn't a real GFM checkbox
- * (a defensive guard against parser surprises). `text` is the marker line minus
- * its syntax; `raw` is that physical line verbatim for the write-back guard.
+ * {@link ParsedTask}, or `null` when the marker shape isn't Reflect's task
+ * syntax. `text` is the marker line minus its syntax; `raw` is that physical
+ * line verbatim from the marker onward for the write-back guard.
  */
 function readTask(
   body: string,
@@ -181,6 +191,9 @@ function readTask(
   wikiLinks: WikiLink[],
 ): ParsedTask | null {
   const { from, to } = range
+  if (!hasRoundTaskListMarker(body, from)) {
+    return null
+  }
   const marker = parseTaskMarker(body.slice(from, from + 3))
   if (marker === null) {
     return null

@@ -664,7 +664,7 @@ describe('TasksScreen', () => {
     await userEvent.keyboard('{Enter}')
     await view.findByTestId('task-editor')
     // An empty Return-to-add row, left untouched, is removed rather than left as a
-    // blank `- [ ] ` line — the real editor routes that empty exit to delete (see
+    // blank `+ [ ] ` line — the real editor routes that empty exit to delete (see
     // the finalizer unit test); here we check the optimistic row's identity flows
     // through, deleting the freshly written daily-note line, not some other row.
     await userEvent.click(view.getByRole('button', { name: 'delete-edit' }))
@@ -744,7 +744,7 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     await view.findByTestId('task-editor')
     await userEvent.click(view.getByRole('button', { name: 'continue-empty' }))
-    // The cleared row is deleted (not edited to `- [ ]`); editTask is never called.
+    // The cleared row is deleted (not edited to `+ [ ]`); editTask is never called.
     await waitFor(() =>
       expect(deleteTask).toHaveBeenCalledWith(expect.objectContaining({ notePath: 'notes/a.md' }), 1),
     )

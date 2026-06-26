@@ -1,10 +1,8 @@
 /**
- * The GFM checkbox marker (Plan 18) — the one definition of "what is a task
- * marker", shared by extraction ({@link parseNote}, which finds task lines) and
- * the toggle ({@link toggleTaskMarker}, which rewrites them). Keeping it here
- * means the two can never disagree about which `[ ]`/`[x]` lines are tasks: a
- * marker the extractor accepts but the toggle rejects (or vice versa) would be a
- * silent stale read or a no-op write.
+ * The GFM checkbox state marker (Plan 18), shared by extraction ({@link parseNote})
+ * and the toggle ({@link toggleTaskMarker}). Extraction decides which list markers
+ * are Reflect tasks; this helper decides whether the three-character checkbox
+ * marker itself is valid and whether it is checked.
  */
 
 /** The three GFM checkbox markers a task line can carry (`[X]` is GitHub-valid). */

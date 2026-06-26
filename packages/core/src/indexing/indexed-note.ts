@@ -50,8 +50,10 @@ import { previewSnippet } from './snippet'
  * collapsed, not just percent-decoded): the `assets` projection's keys change,
  * so the bump rebuilds them — the privacy gate matches them against the
  * canonical on-disk path.
+ * 11 — `tasks` projection limited to round Meowdown task checkboxes (`+ [ ]` /
+ * `+ [x]`), excluding square checklist checkboxes from the aggregate Tasks view.
  */
-export const PROJECTION_VERSION = 10
+export const PROJECTION_VERSION = 11
 
 export const indexedLinkSchema = z.object({
   kind: z.enum(['wiki', 'md']),
@@ -122,7 +124,7 @@ export const indexedNoteSchema = z.object({
   tags: z.array(indexedTagSchema),
   aliases: z.array(indexedAliasSchema),
   assets: z.array(z.string()),
-  /** GFM checkbox rows for the Tasks projection (Plan 18). */
+  /** Reflect task rows for the Tasks projection (Plan 18). */
   tasks: z.array(indexedTaskSchema),
 })
 export type IndexedNote = z.infer<typeof indexedNoteSchema>

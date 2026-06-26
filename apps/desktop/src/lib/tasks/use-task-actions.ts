@@ -428,7 +428,7 @@ export function useTaskActions(): TaskActions {
       // Resolve the current row first and *await* it, so the append reads the
       // settled source — the new offset can't drift when the line above resized.
       // Emptied content (the row was cleared) deletes that row rather than leaving
-      // a bare `- [ ]` ghost; a real change persists; null (unchanged) is left be.
+      // a bare `+ [ ]` ghost; a real change persists; null (unchanged) is left be.
       try {
         if (content === '') {
           await deleteMutation.mutateAsync([task])

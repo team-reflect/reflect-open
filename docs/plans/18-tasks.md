@@ -3,8 +3,9 @@
 **Goal:** Port V1's third center of gravity — tasks embedded in notes, collected into
 one view — as a **lightweight markdown-backed projection**, per the decision docs
 (grounding brief §9.7 Option A: aggregate, schedule, complete; never a task manager).
-A task is a plain GFM checkbox in a note; the Tasks view is a projection over them,
-exactly like backlinks are a projection over `[[links]]`.
+A task is a round Meowdown checkbox in a note (`+ [ ]` / `+ [x]`); the Tasks view is
+a projection over those rows, exactly like backlinks are a projection over `[[links]]`.
+Square checklist checkboxes (`- [ ]` / `- [x]`) stay in the note and do not aggregate.
 
 **Status:** Add-on — not part of the first macOS release. Build after launch.
 
@@ -17,8 +18,8 @@ dates), Plan 08 (commands/palette), Plan 17 (path-keyed projections survive move
 ## What changed since tasks were deferred
 
 Tasks were deferred partly because meowdown's converter **lost task-item text**
-(`- [ ] todo` → empty list; Plan 05 step 8). That fix shipped: **meowdown 0.3.0
-round-trips task lists byte-faithfully** (verified 2026-06-12 — `- [ ] buy milk\n- [x]
+(`+ [ ] todo` → empty list; Plan 05 step 8). That fix shipped: **meowdown 0.3.0
+round-trips task lists byte-faithfully** (verified 2026-06-12 — `+ [ ] buy milk\n+ [x]
 call mum\n` round-trips unchanged, including wiki links and tags inside the item), and
 its ProseMirror schema already models tasks first-class: a `list` node with
 `kind: "task"` and a `checked` attr. Task notes no longer open protected. What's
@@ -30,7 +31,7 @@ missing is purely Reflect-side: interactivity, extraction, projection, and the v
 rebuildable `tasks` projection; a Tasks route/view grouping open tasks across the
 graph (Overdue / Today / Upcoming / Unscheduled, collapsed Completed); toggle-complete
 from the view with a guarded surgical write-back; date scheduling via `[[YYYY-MM-DD]]`
-links and daily-note inheritance; per-note `checklist: true` opt-out.
+links and daily-note inheritance; square checklist syntax excluded from aggregation.
 **Out (explicitly — grounding brief §9.7 calls half-building this the worst path):**
 recurrence, reminders, priorities, projects, statuses, dependencies, calendar sync,
 external task integrations, editing task *text* inside the Tasks view, archived-state
@@ -39,18 +40,14 @@ markers in markdown, AI task extraction (later, over this projection), CLI
 
 ## Key decisions / contracts
 
-- **A task is a GFM checkbox item.** `- [ ] text` / `- [x] text`. No invented syntax,
-  no typed-entity layer: the files stay meaningful in GitHub, Obsidian, and any
-  markdown tool. Lezer already parses these (`Task`/`TaskMarker` via the GFM
-  extension in `grammar.ts`).
-- **V1's task-vs-checklist distinction maps to note granularity.** V1 used round vs
-  square checkboxes — unrepresentable in GFM. Instead: every checkbox is a task by
-  default; a note flagged `checklist: true` in frontmatter keeps **all** its checkboxes
-  out of the Tasks view (shopping lists, packing lists). Reuses the established
-  frontmatter-flag machinery end-to-end: `model.ts` schema + coercion, indexer column,
-  `NoteToggleAction` + `toggleNoteChecklist` in the context sidebar (the
-  `note-private.ts` / `note-pin.ts` pattern), `commitFrontmatter` for the land-now
-  patch. Item-level opt-out is rejected — it would require invented syntax.
+- **A task is a round Meowdown checkbox item.** `+ [ ] text` / `+ [x] text`. No
+  typed-entity layer: the files stay meaningful in Meowdown and any markdown tool
+  that preserves list markers. Lezer parses these as `Task`/`TaskMarker` via the
+  GFM extension in `grammar.ts`; Reflect additionally checks the physical list marker.
+- **V1's task-vs-checklist distinction maps to marker shape.** Round task checkboxes
+  (`+ [ ]`) aggregate into Tasks. Square checklist checkboxes (`- [ ]`, `* [ ]`, and
+  ordered checkbox items) remain ordinary note checklists and are excluded from the
+  projection. No frontmatter opt-out or markdown migration is needed.
 - **Scheduling is association, not metadata** — V1's own mechanism (scheduling a task
   inserted a daily-note backlink) restated in markdown. Scheduled date resolution, in
   order: (1) the first `[[YYYY-MM-DD]]` wiki link inside the item; (2) for tasks in a
@@ -132,19 +129,18 @@ CREATE INDEX tasks_open_by_date ON tasks (checked, scheduled);
    here: first `[[YYYY-MM-DD]]` in the item, else `dateFromDailyPath`, else null.
 
 3. **Projection.** Migration `0009_tasks.sql` (above) + Kysely schema regen + the
-   Rust `index_apply` payload/write path (`db/write.rs`) + the `checklist` flag column
-   on `notes` (extracted in step 5; flagged notes index zero task rows — the flag
-   filters at *index* time so the view query stays trivial).
+   Rust `index_apply` payload/write path (`db/write.rs`). Only extracted `+ [ ]` task
+   rows enter the table; square checklist rows never reach the projection.
 
 4. **Toggle write path.** `toggleTaskMarker` in `markdown/edit.ts` (pure, tested);
    a core command (`indexing/commands.ts` family) doing read → toggle → `note_write`
    → reindex, surfacing `TaskStaleError` as a reviewable refusal. If the note is open
    in the editor, the existing external-change reconciliation picks the write up.
 
-5. **`checklist: true` flag.** Frontmatter schema + coercion in `model.ts`
-   (`.catch()` tolerance like `private`/`pinned`), `NoteToggleAction` entry
-   ("Mark as checklist" — short, action-first copy), `toggleNoteChecklist` via
-   `commitFrontmatter`, palette command, indexer respect (step 3).
+5. **Task vs checklist marker contract.** Extraction accepts only task-list rows whose
+   physical marker is `+`; `-`, `*`, ordered checkbox items, and fenced-code examples
+   stay out of `ParsedNote.tasks`. Bump extraction/projection versions whenever this
+   contract changes so unchanged notes rebuild correctly.
 
 6. **Tasks route + view.** `{ kind: 'tasks' }` route; sidebar entry; `⌘T` (free) +
    "Go to tasks" palette command. The view: TanStack Query over the projection,
@@ -162,12 +158,12 @@ CREATE INDEX tasks_open_by_date ON tasks (checked, scheduled);
 
 ## Acceptance criteria
 
-- `- [ ]` renders as a clickable checkbox in the editor; click and `⌘⏎` toggle it;
+- `+ [ ]` renders as a clickable task checkbox in the editor; click and `⌘⏎` toggle it;
   the file changes by exactly the marker characters; `pnpm typecheck` + targeted
   tests pass.
-- `⌘T` opens Tasks: every open checkbox across the graph except `checklist: true`
-  notes, grouped Overdue / Today / Upcoming / Unscheduled, with source-note context;
-  completed tasks sit collapsed below; the whole flow works without the mouse.
+- `⌘T` opens Tasks: every open `+ [ ]` task across the graph, excluding square
+  checklists, grouped Overdue / Today / Upcoming / Unscheduled, with source-note
+  context; completed tasks sit collapsed below; the whole flow works without the mouse.
 - A task containing `[[2026-07-01]]` schedules for that date; a bare task in
   `daily/2026-06-12.md` schedules for 2026-06-12 and turns Overdue the next day; a
   bare task in a regular note is Unscheduled.
@@ -196,6 +192,7 @@ CREATE INDEX tasks_open_by_date ON tasks (checked, scheduled);
 - **Scope creep is the historical failure mode** (grounding brief §9.7): V1 grew
   task editing inside the view, pending inline task documents, and archive state.
   Everything in **Out** stays out until a deliberate later plan.
-- **Daily-date inheritance might over-schedule** for users who journal checkboxes in
-  daily notes without meaning "due today". Escape hatches: `checklist: true` on the
-  note, or an explicit future `[[date]]` on the item. Revisit only with real usage.
+- **Daily-date inheritance might over-schedule** for users who journal tasks in daily
+  notes without meaning "due today". Escape hatches: use square checklist syntax for
+  non-task lists, or an explicit future `[[date]]` on the item. Revisit only with real
+  usage.

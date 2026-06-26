@@ -521,7 +521,7 @@ These may come later, but should not define the first wave:
 
 | Feature                  | V2 stance                                                                                                          |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| Tasks                    | Defer from the first release; now planned as a post-release add-on (Plan 18): GFM-checkbox tasks as a lightweight markdown-backed projection. |
+| Tasks                    | Defer from the first release; now planned as a post-release add-on (Plan 18): round-checkbox (`+ [ ]`) tasks as a lightweight markdown-backed projection. |
 | Audio transcription      | **Shipped early** (despite this table): raw-first audio memos with async BYOK cloud transcription and `private: true` lockouts. |
 | Full browser clipper     | Defer beyond launch link capture. Article extraction, read-later state, and broad clipping can come later.         |
 | Graph/map view           | Defer. Keep backlink graph data, but visual map is not first-wave.                                                 |

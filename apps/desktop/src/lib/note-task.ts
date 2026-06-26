@@ -149,7 +149,7 @@ export function convertTaskToBullet(task: TaskRef, generation: number): Promise<
 }
 
 /**
- * Insert a new empty `- [ ] ` task at the end of `notePath` (Plan 18's Return-to-
+ * Insert a new empty `+ [ ] ` task at the end of `notePath` (Plan 18's Return-to-
  * add) and return its marker offset, so the Tasks view can select the new row and
  * open its inline editor. A missing note — today's daily not yet created — starts
  * empty. Refuses an **open** note via {@link NoteBusyError}: appending through

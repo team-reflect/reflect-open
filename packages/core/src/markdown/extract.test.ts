@@ -143,8 +143,8 @@ describe('parseNote — links, assets, tags, text', () => {
 })
 
 describe('parseNote — tasks', () => {
-  it('extracts open and checked checkboxes with text, raw, marker offset', () => {
-    const note = parse('- [ ] buy milk\n- [x] call mum\n')
+  it('extracts open and checked round task checkboxes with text, raw, marker offset', () => {
+    const note = parse('+ [ ] buy milk\n+ [x] call mum\n')
     expect(note.tasks).toEqual([
       { text: 'buy milk', raw: '[ ] buy milk', checked: false, markerOffset: 2, dueDate: null },
       { text: 'call mum', raw: '[x] call mum', checked: true, markerOffset: 17, dueDate: null },
@@ -152,14 +152,14 @@ describe('parseNote — tasks', () => {
   })
 
   it('treats an uppercase [X] marker as checked', () => {
-    const note = parse('- [X] done\n')
+    const note = parse('+ [X] done\n')
     expect(note.tasks).toEqual([
       { text: 'done', raw: '[X] done', checked: true, markerOffset: 2, dueDate: null },
     ])
   })
 
   it('strips inline syntax from text but keeps it verbatim in raw', () => {
-    const note = parse('- [ ] call [[Bob]] about **billing**\n')
+    const note = parse('+ [ ] call [[Bob]] about **billing**\n')
     const item = note.tasks[0]!
     expect(item.text).toBe('call Bob about billing')
     expect(item.raw).toBe('[ ] call [[Bob]] about **billing**')
@@ -169,7 +169,7 @@ describe('parseNote — tasks', () => {
   })
 
   it('offsets the marker past frontmatter', () => {
-    const source = '---\nid: abc\n---\n- [ ] later\n'
+    const source = '---\nid: abc\n---\n+ [ ] later\n'
     const note = parse(source)
     const item = note.tasks[0]!
     expect(item.markerOffset).toBe(source.indexOf('[ ]'))
@@ -177,7 +177,7 @@ describe('parseNote — tasks', () => {
   })
 
   it('captures nested sub-tasks as their own rows', () => {
-    const note = parse('- [ ] parent\n  - [x] child\n')
+    const note = parse('+ [ ] parent\n  + [x] child\n')
     expect(note.tasks.map((task) => ({ text: task.text, checked: task.checked }))).toEqual([
       { text: 'parent', checked: false },
       { text: 'child', checked: true },
@@ -185,10 +185,15 @@ describe('parseNote — tasks', () => {
   })
 
   it('ignores checkboxes inside fenced code', () => {
-    const note = parse('- [ ] real\n\n```\n- [ ] not a task\n```\n')
+    const note = parse('+ [ ] real\n\n```\n+ [ ] not a task\n```\n')
     expect(note.tasks).toEqual([
       { text: 'real', raw: '[ ] real', checked: false, markerOffset: 2, dueDate: null },
     ])
+  })
+
+  it('ignores square checklist and ordered checkbox items', () => {
+    const note = parse('- [ ] checklist\n* [x] checklist\n1. [ ] ordered\n')
+    expect(note.tasks).toEqual([])
   })
 
   it('yields no tasks for a plain bullet list', () => {
@@ -197,17 +202,17 @@ describe('parseNote — tasks', () => {
   })
 
   it('reads the first calendar [[YYYY-MM-DD]] link in the item as the due date', () => {
-    const note = parse('- [ ] ship it [[2026-07-01]] and review [[2026-08-01]]\n')
+    const note = parse('+ [ ] ship it [[2026-07-01]] and review [[2026-08-01]]\n')
     expect(note.tasks[0]!.dueDate).toBe('2026-07-01') // first date link wins
   })
 
   it('ignores an impossible date as a due date', () => {
-    const note = parse('- [ ] not a real day [[2026-02-31]]\n')
+    const note = parse('+ [ ] not a real day [[2026-02-31]]\n')
     expect(note.tasks[0]!.dueDate).toBeNull()
   })
 
   it('does not borrow a due-date link from a neighbouring task', () => {
-    const note = parse('- [ ] no date here\n- [ ] dated [[2026-07-01]]\n')
+    const note = parse('+ [ ] no date here\n+ [ ] dated [[2026-07-01]]\n')
     expect(note.tasks.map((task) => task.dueDate)).toEqual([null, '2026-07-01'])
   })
 })

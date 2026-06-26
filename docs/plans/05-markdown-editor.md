@@ -87,7 +87,7 @@ they are Reflect's organizing primitive.
 - **05b** — step 7 (images/assets, incl. a Rust binary asset-write command), heading
   toggles from step 9, a **round-trip safety guard** (see below), and the step 10
   basics. **Task checkboxes (step 8) were blocked upstream** — meowdown's converter
-  *lost task-item text entirely* (`- [ ] todo` → empty list), discovered while
+  *lost task-item text entirely* (`+ [ ] todo` → empty list), discovered while
   building 05b. **The blocker is cleared:** meowdown 0.3.0 round-trips task lists
   byte-faithfully (verified 2026-06-12) and models them as `list` nodes with
   `kind: "task"` + `checked`. Interactive checkboxes now land with
@@ -142,9 +142,11 @@ they are Reflect's organizing primitive.
    `Image`). Paste/drop an image → write to `assets/` (Plan 02) → insert a relative
    markdown link → render inline. Large-file guardrail hook for Plan 12.
 
-8. **Task checkboxes.** Add an interactive checkbox node mapped to `- [ ]`/`- [x]` (Lezer
-   emits `Task`/`TaskMarker`) that toggles the underlying markdown. (This step now
-   ships as [Plan 18 (Tasks)](18-tasks.md) step 1, where tasks-as-a-feature land too.)
+8. **Task checkboxes.** Add an interactive checkbox node mapped to `+ [ ]`/`+ [x]`
+   tasks (Lezer emits `Task`/`TaskMarker`) that toggles the underlying markdown.
+   Square `- [ ]` checklist checkboxes may render through the same editor affordance
+   but do not aggregate into Tasks. (This step now ships as
+   [Plan 18 (Tasks)](18-tasks.md) step 1, where tasks-as-a-feature land too.)
 
 9. **Keyboard ergonomics (product identity).** meowdown ships base keymap/commands/
    history. Layer Reflect shortcuts (bold/italic, toggle heading, toggle checkbox, indent/
