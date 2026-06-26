@@ -576,14 +576,28 @@ html:root {
   border-width: 1px;
   border-color: var(--text-muted); /* crisper than the pale --border at 1px */
 }
-/* Widen the gap between a task checkbox and its label, for both the square
-   (`- [ ]`) and rounded (`+ [ ]`, data-list-marker="+") markers. Both render as
-   data-list-kind="task", so this covers them together. ProseKit/meowdown size
-   the marker box at 1lh and start `.list-content` flush against it (default
-   `margin-inline-start: 1lh`); nudge the content right for more breathing room.
-   At 0-4-0 this clears both base rules (each 0-2-0). */
+/* Task checkbox spacing. Two rules work together to give the checkbox breathing
+   room from its label (PR #373's goal) WITHOUT moving the label — moving it
+   misaligns the label from sibling bullets and makes bullet<->task conversion
+   jump sideways (the `1.25lh` content nudge #373 originally shipped did exactly
+   that).
+
+   1. Content keeps meowdown's default 1lh (the value bullets use), so a
+      checkbox's label lines up with bullet text and converting a line between
+      bullet (`- `) and task (`- [ ]`) doesn't shift it.
+   2. The checkbox is pinned to the start of its 1lh marker box instead of
+      centered (meowdown defaults task markers to `justify-content: center`). A
+      `.95rem` checkbox flush-left lands its right edge ~where a centered bullet
+      dot's sits, so the checkbox<->label gap matches a bullet's. The breathing
+      room comes from the marker, not from indenting the text.
+
+   Both selectors add `.reflect-editor` to reach 0-4-0, clearing meowdown's
+   0-3-0 base rules (which inject after this file). */
 .reflect-editor .prosemirror-flat-list[data-list-kind='task'] > .list-content {
-  margin-inline-start: 1.25lh;
+  margin-inline-start: 1lh;
+}
+.reflect-editor .prosemirror-flat-list[data-list-kind='task'] > .list-marker {
+  justify-content: start;
 }
 
 /* ---- shadcn inputs (components/ui/) -------------------------------------
