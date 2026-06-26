@@ -54,6 +54,11 @@ jobs:
     needs: preflight
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
+    env:
+      # Cargo registry fetches can intermittently fail on GitHub macOS runners
+      # with curl HTTP/2 framing errors. HTTP/1.1 is slower but steadier for
+      # release builds, where determinism matters more than a small fetch win.
+      CARGO_HTTP_MULTIPLEXING: false
     strategy:
       fail-fast: false
       matrix:

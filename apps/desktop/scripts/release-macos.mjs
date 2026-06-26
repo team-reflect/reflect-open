@@ -42,6 +42,14 @@ const UPDATER_KEYCHAIN_SERVICE = 'reflect-updater'
 const APP_SPECIFIC_PASSWORD_URL = 'https://account.apple.com'
 const BETA_UPDATER_FEED_TAG = 'updater-beta'
 const STABLE_UPDATER_ENDPOINT = 'https://github.com/team-reflect/reflect-open/releases/latest/download/latest.json'
+const INTEL_MAC_TARGET = 'x86_64-apple-darwin'
+const INTEL_ONNX_RUNTIME_VERSION = '1.23.2'
+const INTEL_ONNX_RUNTIME_ARCHIVE_ROOT = `onnxruntime-osx-x86_64-${INTEL_ONNX_RUNTIME_VERSION}`
+const INTEL_ONNX_RUNTIME_URL =
+  `https://github.com/microsoft/onnxruntime/releases/download/v${INTEL_ONNX_RUNTIME_VERSION}/` +
+  `${INTEL_ONNX_RUNTIME_ARCHIVE_ROOT}.tgz`
+const ONNX_RUNTIME_DYLIB_RESOURCE = 'libonnxruntime.dylib'
+const INTEL_ONNX_RUNTIME_RESOURCE_SOURCE = `resources/onnxruntime/${ONNX_RUNTIME_DYLIB_RESOURCE}`
 
 /**
  * Build flavors. Each ships as a distinct app (its own productName, identifier
@@ -104,7 +112,7 @@ function listUserKeychains() {
 }
 
 /** Build the Tauri CLI arguments for release packaging. */
-export function createTauriBuildArgs({ flavor, hasUpdater, target }) {
+export function createTauriBuildArgs({ flavor, hasUpdater, resourceConfig = null, target }) {
   const buildArgs = ['tauri', 'build', '--target', target, '--bundles', 'app']
   const overlay = FLAVOR_OVERLAYS[flavor]
   if (overlay) buildArgs.push('--config', overlay)
@@ -120,7 +128,60 @@ export function createTauriBuildArgs({ flavor, hasUpdater, target }) {
   if (hasUpdater) {
     buildArgs.push('--config', JSON.stringify({ bundle: { createUpdaterArtifacts: true } }))
   }
+  if (resourceConfig) {
+    buildArgs.push('--config', JSON.stringify(resourceConfig))
+  }
   return buildArgs
+}
+
+export function macosTargetResourceConfig(target) {
+  if (target !== INTEL_MAC_TARGET) return null
+  return {
+    bundle: {
+      resources: {
+        [INTEL_ONNX_RUNTIME_RESOURCE_SOURCE]: ONNX_RUNTIME_DYLIB_RESOURCE,
+        'resources/onnxruntime/LICENSE': 'onnxruntime/LICENSE',
+        'resources/onnxruntime/ThirdPartyNotices.txt': 'onnxruntime/ThirdPartyNotices.txt',
+      },
+    },
+  }
+}
+
+function stageIntelOnnxRuntime() {
+  const resourceDir = join(appDir, 'src-tauri', 'resources', 'onnxruntime')
+  const dylib = join(resourceDir, ONNX_RUNTIME_DYLIB_RESOURCE)
+  const license = join(resourceDir, 'LICENSE')
+  const notices = join(resourceDir, 'ThirdPartyNotices.txt')
+  if (existsSync(dylib) && existsSync(license) && existsSync(notices)) {
+    return
+  }
+
+  const tempDir = mkdtempSync(join(tmpdir(), 'reflect-onnxruntime-'))
+  try {
+    const archive = join(tempDir, `${INTEL_ONNX_RUNTIME_ARCHIVE_ROOT}.tgz`)
+    log(`downloading ONNX Runtime ${INTEL_ONNX_RUNTIME_VERSION} for Intel macOS…`)
+    execFileSync(
+      'curl',
+      ['-fL', '--retry', '3', '--retry-delay', '2', '-o', archive, INTEL_ONNX_RUNTIME_URL],
+      { stdio: 'inherit' },
+    )
+    execFileSync('tar', ['-xzf', archive, '-C', tempDir], { stdio: 'inherit' })
+
+    const root = join(tempDir, INTEL_ONNX_RUNTIME_ARCHIVE_ROOT)
+    mkdirSync(resourceDir, { recursive: true })
+    copyFileSync(join(root, 'lib', ONNX_RUNTIME_DYLIB_RESOURCE), dylib)
+    copyFileSync(join(root, 'LICENSE'), license)
+    copyFileSync(join(root, 'ThirdPartyNotices.txt'), notices)
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+}
+
+function prepareTargetResources(target) {
+  const resourceConfig = macosTargetResourceConfig(target)
+  if (!resourceConfig) return null
+  stageIntelOnnxRuntime()
+  return resourceConfig
 }
 
 /**
@@ -693,7 +754,8 @@ function build({ artifactDir, notarize, requireUpdater = false, flavor, target }
   // script depends on Finder automation and has proven brittle on GitHub-hosted
   // macOS images; create the DMG directly below and keep the same notarization
   // and Gatekeeper checks around the final artifact.
-  const buildArgs = createTauriBuildArgs({ flavor, hasUpdater: Boolean(updater), target })
+  const resourceConfig = prepareTargetResources(target)
+  const buildArgs = createTauriBuildArgs({ flavor, hasUpdater: Boolean(updater), resourceConfig, target })
   const result = spawnSync('pnpm', buildArgs, { cwd: appDir, stdio: 'inherit', env: buildEnv })
   if (result.status !== 0) fail('tauri build failed')
 

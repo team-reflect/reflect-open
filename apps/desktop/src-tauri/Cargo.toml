@@ -69,10 +69,27 @@ tauri-plugin-window-state = "2"
 trash = "5.2.6"
 notify = "8.2.0"
 notify-debouncer-full = "0.7.0"
-fastembed = "5"
 # Direct dependency on fastembed's own downloader, used to pre-fetch the
 # embedding model with byte-level progress (fastembed downloads silently).
 hf-hub = { version = "0.5.0", default-features = false, features = ["ureq", "native-tls"] }
+
+[target.'cfg(all(not(any(target_os = "android", target_os = "ios")), not(all(target_os = "macos", target_arch = "x86_64"))))'.dependencies]
+fastembed = "5"
+
+[target.'cfg(all(target_os = "macos", target_arch = "x86_64"))'.dependencies]
+# fastembed 5.14+ pins ONNX Runtime API 24, but upstream ONNX Runtime 1.24
+# no longer ships macOS x86_64 binaries. Stay on API 23 for Intel until the
+# upstream binary set comes back or we replace the backend.
+fastembed = { version = ">=5.13.0, <5.14.0", default-features = false, features = [
+  "hf-hub-native-tls",
+  "image-models",
+  "ort-load-dynamic",
+] }
+ort = { version = "=2.0.0-rc.11", default-features = false, features = [
+  "ndarray",
+  "std",
+  "load-dynamic",
+] }
 
 # Mobile-only capabilities (Plan 19): the first-party keyboard bridge — no
 # software keyboard on desktop. (Sharing uses the webview's Web Share API,
@@ -82,4 +99,3 @@ tauri-plugin-keyboard = { path = "../../../plugins/tauri-plugin-keyboard" }
 
 [dev-dependencies]
 tauri = { version = "2", features = ["test"] }
-
