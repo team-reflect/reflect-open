@@ -40,7 +40,7 @@ export function NoteActionsSection({
   const isPinned = usePinnedNotes().some((note) => note.path === path)
   const noteRow = useNoteRow(path)
   const isPrivate = noteRow?.isPrivate ?? false
-  const applyOptimisticPin = useOptimisticPinToggle(path, noteRow)
+  const { applyOptimisticPin, invalidateOptimisticPin } = useOptimisticPinToggle(path, noteRow)
 
   return (
     <SidebarSection storageKey="note-actions" title="Note actions">
@@ -50,9 +50,9 @@ export function NoteActionsSection({
         toggle={toggleNotePinned}
         icon={<PinIcon width={20} height={20} />}
         labels={{ active: 'Un-pin this note', inactive: 'Pin this note' }}
-        operations={{ activate: 'Pinning note', deactivate: 'Unpinning note' }}
         keybinding={PIN_KEYBINDING}
         applyOptimistic={applyOptimisticPin}
+        onFailure={invalidateOptimisticPin}
       />
       <NoteToggleAction
         path={path}
@@ -62,10 +62,6 @@ export function NoteActionsSection({
         labels={{
           active: 'Unlock note',
           inactive: 'Lock note',
-        }}
-        operations={{
-          activate: 'Locking note',
-          deactivate: 'Unlocking note',
         }}
         keybinding={PRIVATE_KEYBINDING}
         tooltip="Locks this note out of AI. Backup and sync still include it."

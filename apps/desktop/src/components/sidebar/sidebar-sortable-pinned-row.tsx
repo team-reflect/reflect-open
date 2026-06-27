@@ -6,7 +6,6 @@ import { errorMessage } from '@reflect/core'
 import type { PinnedNote } from '@reflect/core'
 import {
   invalidatePinnedNotesCache,
-  restorePinnedNotesCache,
   updatePinnedNotesCache,
 } from '@/lib/notes/pinned-notes-cache'
 import { formatDayLabel } from '@/lib/dates'
@@ -53,14 +52,12 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
         return
       }
       void openPinnedNoteContextMenu(() => {
-        const snapshot = updatePinnedNotesCache(queryClient, graph.root, (current) =>
+        updatePinnedNotesCache(queryClient, graph.root, (current) =>
           current?.filter((pinnedNote) => pinnedNote.path !== note.path),
         )
 
-        void unpinNote(note.path, graph.generation).catch((cause: unknown) => {
-          restorePinnedNotesCache(queryClient, snapshot)
-          invalidatePinnedNotesCache(queryClient, snapshot)
-          startOperation('Unpinning note').fail(errorMessage(cause))
+        void unpinNote(note.path, graph.generation).catch(() => {
+          invalidatePinnedNotesCache(queryClient, graph.root)
         })
       }).catch((cause: unknown) => {
         startOperation('Opening note menu').fail(errorMessage(cause))

@@ -13,9 +13,8 @@ const getNote = vi.hoisted(() => vi.fn())
 const toggleNotePinned = vi.hoisted(() => vi.fn(async () => true))
 const toggleNotePrivate = vi.hoisted(() => vi.fn(async () => true))
 const deleteOpenNote = vi.hoisted(() => vi.fn(async () => {}))
-const operationFail = vi.hoisted(() => vi.fn())
 const startOperation = vi.hoisted(() =>
-  vi.fn(() => ({ progress: vi.fn(), done: vi.fn(), fail: operationFail })),
+  vi.fn(() => ({ progress: vi.fn(), done: vi.fn(), fail: vi.fn() })),
 )
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
@@ -53,7 +52,6 @@ beforeEach(() => {
   toggleNotePrivate.mockReset().mockResolvedValue(true)
   deleteOpenNote.mockReset().mockResolvedValue(undefined)
   startOperation.mockClear()
-  operationFail.mockClear()
 })
 
 function noteRow(path: string, isPrivate: boolean, title = 'A') {
@@ -161,7 +159,7 @@ describe('NoteActionsSection pin toggle', () => {
     view.unmount()
   })
 
-  it('restores the pin label when an optimistic pin fails', async () => {
+  it('invalidates pinned notes when an optimistic pin fails', async () => {
     let rejectToggle!: (cause: unknown) => void
     toggleNotePinned.mockImplementationOnce(
       () =>
@@ -170,13 +168,14 @@ describe('NoteActionsSection pin toggle', () => {
         }),
     )
     const view = renderSection('notes/a.md')
+    await waitFor(() => expect(getPinnedNotes).toHaveBeenCalledTimes(1))
 
     await userEvent.click(view.getByRole('button', { name: /Pin this note/ }))
     expect(view.getByText('Un-pin this note')).toBeDefined()
     rejectToggle({ kind: 'io', message: 'disk on fire' })
 
     await waitFor(() => expect(view.getByText('Pin this note')).toBeDefined())
-    expect(startOperation).toHaveBeenCalledWith('Pinning note')
+    await waitFor(() => expect(getPinnedNotes).toHaveBeenCalledTimes(2))
     view.unmount()
   })
 
@@ -186,25 +185,6 @@ describe('NoteActionsSection pin toggle', () => {
     await waitFor(() => expect(getPinnedNotes).toHaveBeenCalled())
     expect(view.getByText('Pin this note')).toBeDefined()
     expect(view.queryByText('Un-pin this note')).toBeNull()
-    view.unmount()
-  })
-
-  it('surfaces a toggle failure through the operations status', async () => {
-    toggleNotePinned.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
-    const view = renderSection('notes/a.md')
-    await userEvent.click(view.getByRole('button', { name: /Pin this note/ }))
-    expect(startOperation).toHaveBeenCalledWith('Pinning note')
-    expect(operationFail).toHaveBeenCalled()
-    view.unmount()
-  })
-
-  it('labels a failed unpin as unpinning', async () => {
-    getPinnedNotes.mockResolvedValue([{ path: 'notes/a.md', title: 'A', dailyDate: null }])
-    toggleNotePinned.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
-    const view = renderSection('notes/a.md')
-    await userEvent.click(await view.findByRole('button', { name: /Un-pin this note/ }))
-    expect(startOperation).toHaveBeenCalledWith('Unpinning note')
-    expect(operationFail).toHaveBeenCalled()
     view.unmount()
   })
 })
@@ -246,22 +226,20 @@ describe('NoteActionsSection private toggle', () => {
     view.unmount()
   })
 
-  it('surfaces a toggle failure through the operations status', async () => {
+  it('restores the private label when a write fails', async () => {
     toggleNotePrivate.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
     const view = renderSection('notes/a.md')
     await userEvent.click(view.getByRole('button', { name: /Lock note/ }))
-    expect(startOperation).toHaveBeenCalledWith('Locking note')
-    expect(operationFail).toHaveBeenCalled()
+    await waitFor(() => expect(view.getByText('Lock note')).toBeDefined())
     view.unmount()
   })
 
-  it('labels a failed un-mark as un-marking', async () => {
+  it('restores the private unlock label when an unlock write fails', async () => {
     getNote.mockResolvedValue(noteRow('notes/a.md', true))
     toggleNotePrivate.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
     const view = renderSection('notes/a.md')
     await userEvent.click(await view.findByRole('button', { name: /Unlock note/ }))
-    expect(startOperation).toHaveBeenCalledWith('Unlocking note')
-    expect(operationFail).toHaveBeenCalled()
+    await waitFor(() => expect(view.getByText('Unlock note')).toBeDefined())
     view.unmount()
   })
 })

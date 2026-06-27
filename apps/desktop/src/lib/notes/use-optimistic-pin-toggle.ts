@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import { dateFromDailyPath, type NoteRow, type PinnedNote } from '@reflect/core'
 import { useQueryClient } from '@tanstack/react-query'
 import {
-  restorePinnedNotesCache,
+  invalidatePinnedNotesCache,
   updatePinnedNotesCache,
 } from '@/lib/notes/pinned-notes-cache'
 import { useGraph } from '@/providers/graph-provider'
@@ -41,6 +41,13 @@ function insertPinnedNote(pinned: readonly PinnedNote[], note: PinnedNote): Pinn
   return [...ordered, ...bare]
 }
 
+export interface OptimisticPinToggle {
+  /** Mirror a pin state into the pinned-notes cache before the index catches up. */
+  readonly applyOptimisticPin: (active: boolean) => void
+  /** Refetch pinned notes after a failed write. */
+  readonly invalidateOptimisticPin: () => void
+}
+
 /**
  * Optimistically mirror the context-sidebar pin toggle into the pinned shelf.
  * The frontmatter write still owns truth; this only hides watcher/index latency.
@@ -48,25 +55,32 @@ function insertPinnedNote(pinned: readonly PinnedNote[], note: PinnedNote): Pinn
 export function useOptimisticPinToggle(
   path: string,
   row: NoteRow | null,
-): (active: boolean) => (() => void) | undefined {
+): OptimisticPinToggle {
   const { graph } = useGraph()
   const queryClient = useQueryClient()
 
-  return useCallback(
-    (active: boolean): (() => void) | undefined => {
+  const applyOptimisticPin = useCallback(
+    (active: boolean): void => {
       if (graph === null) {
-        return undefined
+        return
       }
       const optimisticPinnedNote = pinnedNoteFor(path, row)
-      const snapshot = updatePinnedNotesCache(queryClient, graph.root, (current) => {
+      updatePinnedNotesCache(queryClient, graph.root, (current) => {
         const pinned = current ?? []
         if (!active) {
           return pinned.filter((note) => note.path !== path)
         }
         return insertPinnedNote(pinned, optimisticPinnedNote)
       })
-      return () => restorePinnedNotesCache(queryClient, snapshot)
     },
     [graph, path, queryClient, row],
   )
+
+  const invalidateOptimisticPin = useCallback((): void => {
+    if (graph !== null) {
+      invalidatePinnedNotesCache(queryClient, graph.root)
+    }
+  }, [graph, queryClient])
+
+  return { applyOptimisticPin, invalidateOptimisticPin }
 }

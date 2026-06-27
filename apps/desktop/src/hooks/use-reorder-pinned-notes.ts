@@ -6,7 +6,6 @@ import { reorderPinnedNotes } from '@/lib/note-pin'
 import { useGraph } from '@/providers/graph-provider'
 import {
   invalidatePinnedNotesCache,
-  restorePinnedNotesCache,
   updatePinnedNotesCache,
 } from '@/lib/notes/pinned-notes-cache'
 
@@ -34,17 +33,15 @@ export function useReorderPinnedNotes(
       const currentMutation = mutationId.current + 1
       mutationId.current = currentMutation
 
-      const snapshot = updatePinnedNotesCache(queryClient, graph.root, () => reordered)
+      updatePinnedNotesCache(queryClient, graph.root, () => reordered)
 
       saveChain.current = saveChain.current
         .catch(() => undefined)
         .then(() => reorderPinnedNotes(reordered, graph.generation))
-        .catch((error: unknown) => {
+        .catch(() => {
           if (mutationId.current === currentMutation) {
-            restorePinnedNotesCache(queryClient, snapshot)
-            invalidatePinnedNotesCache(queryClient, snapshot)
+            invalidatePinnedNotesCache(queryClient, graph.root)
           }
-          console.error('pinned note reorder failed:', error)
         })
     },
     [graph, pinned, queryClient],

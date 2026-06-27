@@ -1,8 +1,6 @@
 import { useState, type ReactElement, type ReactNode } from 'react'
-import { errorMessage } from '@reflect/core'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { startOperation } from '@/lib/operations'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
 
@@ -17,14 +15,14 @@ interface NoteToggleActionProps {
   icon: ReactNode
   /** Button label for each flag state (the action offered, not the state). */
   labels: { active: string; inactive: string }
-  /** Operation names for failure surfacing, per toggle direction. */
-  operations: { activate: string; deactivate: string }
   /** Keybinding hint, from the matching command definition. */
   keybinding?: string | null
   /** Optional tooltip explaining the flag's meaning. */
   tooltip?: string
   /** Optional side-effect for surfaces that also expose this flag elsewhere. */
-  applyOptimistic?: (active: boolean) => (() => void) | void
+  applyOptimistic?: (active: boolean) => void
+  /** Optional reconciliation for optimistic side effects after a failed write. */
+  onFailure?: () => void
 }
 
 /**
@@ -51,10 +49,10 @@ export function NoteToggleAction({
   toggle,
   icon,
   labels,
-  operations,
   keybinding = null,
   tooltip,
   applyOptimistic,
+  onFailure,
 }: NoteToggleActionProps): ReactElement {
   const { graph } = useGraph()
   // Guards against a double-click racing two read-patch-write toggles.
@@ -75,22 +73,18 @@ export function NoteToggleAction({
       return
     }
     const optimisticActive = !isActive
-    const rollback = applyOptimistic?.(optimisticActive)
+    applyOptimistic?.(optimisticActive)
     setPending({ path, active: optimisticActive })
     setIsToggling(true)
     try {
       const active = await toggle(path, generation)
       if (active !== optimisticActive) {
-        rollback?.()
         applyOptimistic?.(active)
       }
       setPending({ path, active })
-    } catch (cause) {
-      rollback?.()
+    } catch {
       setPending({ path, active: isActive })
-      startOperation(isActive ? operations.deactivate : operations.activate).fail(
-        errorMessage(cause),
-      )
+      onFailure?.()
     } finally {
       setIsToggling(false)
     }
