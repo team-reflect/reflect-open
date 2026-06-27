@@ -7,5 +7,4 @@ allowBuilds:
   esbuild: true
   spawn-sync: true
 minimumReleaseAgeExclude:
-  - '@meowdown/core@0.25.0'
-  - '@meowdown/react@0.25.0'
+  - '@meowdown/*'
