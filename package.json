@@ -22,6 +22,6 @@
   "devDependencies": {
     "oxlint": "^1.70.0",
     "turbo": "^2.9.18",
-    "typescript": "~5.8.3"
+    "typescript": "~6.0.3"
   }
 }

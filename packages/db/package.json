@@ -20,7 +20,7 @@
     "better-sqlite3": "^12.11.1",
     "kysely-codegen": "^0.20.0",
     "sqlite-vec": "^0.1.9",
-    "typescript": "~5.8.3",
+    "typescript": "~6.0.3",
     "vitest": "^4.1.9"
   }
 }
