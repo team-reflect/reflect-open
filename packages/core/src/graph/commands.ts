@@ -29,6 +29,8 @@ export async function createGraph(path: string): Promise<GraphInfo> {
  * span a graph switch must pin every read; UI reads of the open graph omit it.
  */
 export async function readNote(path: string, generation?: number): Promise<string> {
+  // TODO: remove this debug sleep
+  await new Promise((resolve) => setTimeout(resolve, Math.random() * 4000))
   return call('note_read', { path, generation }, z.string())
 }
 

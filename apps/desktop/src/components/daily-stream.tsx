@@ -41,17 +41,31 @@ export const ESTIMATED_DAY_HEIGHT = 220
  * Compensate the scroll position whenever a row **above** the viewport changes
  * size, unconditionally. Days mount as a short loading placeholder and grow
  * when their note arrives, so every load above the anchor would otherwise push
- * the viewport's content down the stream — a fresh "Today" navigation lands
- * days off target. The library default skips compensation while the last
- * scroll direction is backward, which is exactly the state the anchor scroll's
- * own downward adjustments leave us in when those loads complete.
+ * the viewport's content down the stream (a fresh "Today" navigation lands days
+ * off target). The library default skips compensation while the last scroll
+ * direction is backward, which is exactly the state the anchor scroll's own
+ * downward adjustments leave us in when those loads complete, so we drop that
+ * guard.
+ *
+ * The viewport top is read from the live `scrollElement.scrollTop`, not the
+ * virtualizer's `scrollOffset`. `scrollOffset` only updates on async scroll
+ * events, so within a single ResizeObserver batch (several rows above the target
+ * growing at once) it is stale: an earlier row's compensation has already
+ * scrolled the DOM and pushed the later rows' `start` down, but `scrollOffset`
+ * still holds the pre-batch value, so `item.start < scrollOffset` wrongly judges
+ * those later rows as below the viewport and skips their compensation, leaving
+ * the target day off by the skipped delta. `scrollElement.scrollTop` reflects
+ * every compensation applied so far this batch (the library default adds
+ * `scrollAdjustments` to `scrollOffset` for the same reason; that field is not
+ * public, so we read the live scroll position instead).
  */
 function adjustScrollForResizeAboveViewport(
   item: VirtualItem,
   _delta: number,
   instance: Virtualizer<HTMLDivElement, Element>,
 ): boolean {
-  return item.start < (instance.scrollOffset ?? 0)
+  const viewportTop = instance.scrollElement?.scrollTop ?? instance.scrollOffset ?? 0
+  return item.start < viewportTop
 }
 
 /**
