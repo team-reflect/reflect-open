@@ -1,0 +1,13 @@
+diff --git a/lib/index.js b/lib/index.js
+index 76feb0ffe34ebaa48d410ce9c9ea0c93154ce907..abd06a1bb370fd33c8d818a318582d0e3b60b826 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -126,7 +126,7 @@ const d = null, {min: a, max: h, abs: p, floor: g} = Math, v = (e, t, o) => a(o,
+                         let n;
+                         if (2 === w) n = !0; else if (S && 1 === w) n = t < S[0]; else {
+                             const e = E(), o = J(t), r = A(t);
+-                            n = 1 !== _ && 0 === w ? o + r < e : o < e && o + r < e + l;
++                            n = 1 !== _ && 0 === w ? o + r <= e : o < e && o + r < e + l; // See https://github.com/inokawa/virtua/pull/894
+                         }
+                         return n && (e += o - A(t)), e;
+                     }, 0));
