@@ -181,6 +181,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
         data={data}
         itemSize={ESTIMATED_DAY_HEIGHT}
         bufferSize={2 * ESTIMATED_DAY_HEIGHT}
+        shift={true}
       >
         {(_, index) => {
           const date = dateAtIndex(dayWindow, index)
@@ -221,8 +222,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
           )
         }}
       </Virtualizer>
-      {/* Trailing room so the last day isn't pinned to the viewport bottom
-          (virtua has no `paddingEnd`; this stands in for it). */}
+      {/* Trailing room so the last day isn't pinned to the viewport bottom */}
       <div aria-hidden className="h-60" />
     </div>
   )
