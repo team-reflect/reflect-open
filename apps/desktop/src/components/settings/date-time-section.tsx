@@ -41,7 +41,7 @@ const WEEK_START_OPTIONS: WeekStartOption[] = [
 
 // The options demonstrate themselves: each shows today's date in its format,
 // so the day/month order is visible rather than described.
-const DATE_FORMAT_VALUES: DateFormat[] = ['mdy', 'dmy']
+const DATE_FORMAT_VALUES: DateFormat[] = ['mdy', 'dmy', 'iso']
 
 /**
  * Date & time display preferences. Both formats feed every date and time the
@@ -57,7 +57,7 @@ export function DateTimeSection(): ReactElement {
     <SettingsSection id="date-time">
       <SettingsField
         legend="Date format"
-        description="The day and month order for dates shown throughout Reflect."
+        description="The style for dates shown throughout Reflect, including daily note titles."
       >
         <div className="mt-3">
           <Select

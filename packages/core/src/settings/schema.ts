@@ -85,12 +85,12 @@ export const timeFormatSchema = z.enum(['12h', '24h']).catch('12h')
 export type TimeFormat = z.infer<typeof timeFormatSchema>
 
 /**
- * How calendar dates are ordered when displayed throughout the app:
- * `mdy` (the default) renders `June 10th, 2026`; `dmy` renders
- * `10th June 2026`. Display-only — daily-note filenames and stored dates
+ * How calendar dates are displayed throughout the app: `mdy` (the default)
+ * renders `June 10th, 2026`, `dmy` renders `10th June 2026`, and `iso`
+ * renders `2026-06-10`. Display-only — daily-note filenames and stored dates
  * stay ISO `YYYY-MM-DD` regardless.
  */
-export const dateFormatSchema = z.enum(['mdy', 'dmy']).catch('mdy')
+export const dateFormatSchema = z.enum(['mdy', 'dmy', 'iso']).catch('mdy')
 
 export type DateFormat = z.infer<typeof dateFormatSchema>
 

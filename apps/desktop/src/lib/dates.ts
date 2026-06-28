@@ -25,33 +25,51 @@ export function todayIso(): string {
 }
 
 /**
- * Human label for an ISO date per the user's date-format setting, in the
- * original app's daily-subject form: `Tue, June 9th, 2026` for `mdy`
- * (V1's `weekMonthDayYear`), `Tue, 9th June, 2026` for `dmy`
- * (V1's `weekDayMonthYear`).
+ * Label for an ISO date per the user's date-format setting. `mdy` and `dmy`
+ * keep the original app's daily-subject form (`Tue, June 9th, 2026` /
+ * `Tue, 9th June, 2026`); `iso` renders the daily-note key itself.
  */
 export function formatDayLabel(date: string, dateFormat: DateFormat): string {
-  return format(
-    parseIsoDate(date),
-    dateFormat === 'dmy' ? 'EEE, do MMMM, yyyy' : 'EEE, MMMM do, yyyy',
-  )
+  switch (dateFormat) {
+    case 'dmy':
+      return format(parseIsoDate(date), 'EEE, do MMMM, yyyy')
+    case 'iso':
+      return date
+    case 'mdy':
+      return format(parseIsoDate(date), 'EEE, MMMM do, yyyy')
+  }
 }
 
 /**
- * Compact numeric date for inline chips (the Tasks view's `[[YYYY-MM-DD]]` due
- * link, V1's blue date): `12/31/2025` for `mdy`, `31/12/2025` for `dmy`.
+ * Compact date for inline chips (the Tasks view's `[[YYYY-MM-DD]]` due link,
+ * V1's blue date): `12/31/2025` for `mdy`, `31/12/2025` for `dmy`, and
+ * `2025-12-31` for `iso`.
  */
 export function formatShortDate(date: string, dateFormat: DateFormat): string {
-  return format(parseIsoDate(date), dateFormat === 'dmy' ? 'd/M/yyyy' : 'M/d/yyyy')
+  switch (dateFormat) {
+    case 'dmy':
+      return format(parseIsoDate(date), 'd/M/yyyy')
+    case 'iso':
+      return date
+    case 'mdy':
+      return format(parseIsoDate(date), 'M/d/yyyy')
+  }
 }
 
 /**
- * A date spelled out in full per the date-format setting: `June 10th, 2026`
- * for `mdy`, `10th June, 2026` for `dmy` (the forms the settings screen shows
- * as the options themselves).
+ * A date label per the date-format setting: `June 10th, 2026` for `mdy`,
+ * `10th June, 2026` for `dmy`, and `2026-06-10` for `iso` (the forms the
+ * settings screen shows as the options themselves).
  */
 export function formatFullDate(date: Date, dateFormat: DateFormat): string {
-  return format(date, dateFormat === 'dmy' ? 'do MMMM, yyyy' : 'MMMM do, yyyy')
+  switch (dateFormat) {
+    case 'dmy':
+      return format(date, 'do MMMM, yyyy')
+    case 'iso':
+      return format(date, ISO_DATE_FORMAT)
+    case 'mdy':
+      return format(date, 'MMMM do, yyyy')
+  }
 }
 
 /**
@@ -74,8 +92,8 @@ export interface DateTimePrefs {
 /**
  * Compact recency label for list rows (the original app's Updated column):
  * the time for today (per `timeFormat`), the weekday within the current week
- * (`Mon`), the short date otherwise (`6/3/2026`, or `3/6/2026` for `dmy`).
- * `now` is injectable for tests.
+ * (`Mon`), the short date otherwise (`6/3/2026`, `3/6/2026`, or
+ * `2026-06-03`). `now` is injectable for tests.
  */
 export function formatRecencyLabel(
   epochMs: number,
@@ -89,5 +107,12 @@ export function formatRecencyLabel(
   if (isSameWeek(date, now)) {
     return format(date, 'EEE')
   }
-  return format(date, prefs.dateFormat === 'dmy' ? 'd/M/yyyy' : 'M/d/yyyy')
+  switch (prefs.dateFormat) {
+    case 'dmy':
+      return format(date, 'd/M/yyyy')
+    case 'iso':
+      return format(date, ISO_DATE_FORMAT)
+    case 'mdy':
+      return format(date, 'M/d/yyyy')
+  }
 }

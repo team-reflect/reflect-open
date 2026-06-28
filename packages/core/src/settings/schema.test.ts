@@ -63,6 +63,7 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ theme: 'system' }).theme).toBe('system')
     expect(settingsSchema.parse({ timeFormat: '24h' }).timeFormat).toBe('24h')
     expect(settingsSchema.parse({ timeFormat: '12h' }).timeFormat).toBe('12h')
+    expect(settingsSchema.parse({ dateFormat: 'iso' }).dateFormat).toBe('iso')
     expect(settingsSchema.parse({ dateFormat: 'dmy' }).dateFormat).toBe('dmy')
     expect(settingsSchema.parse({ dateFormat: 'mdy' }).dateFormat).toBe('mdy')
     expect(settingsSchema.parse({ weekStartDay: 'monday' }).weekStartDay).toBe('monday')

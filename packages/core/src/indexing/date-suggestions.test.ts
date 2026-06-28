@@ -135,6 +135,13 @@ describe('generateDateSuggestions', () => {
       expect(gen('12/25', 'dmy')).toEqual([{ date: '2020-12-25', phrase: '12/25' }])
     })
 
+    it('keeps month-day slash shorthand first for ISO display', () => {
+      expect(gen('1/2', 'iso')).toEqual([
+        { date: '2020-01-02', phrase: '1/2' },
+        { date: '2020-02-01', phrase: '1/2' },
+      ])
+    })
+
     it('parses a full slash date and offers only the valid reading', () => {
       expect(gen('23/2/2023', 'dmy')).toEqual([{ date: '2023-02-23', phrase: '23/2/2023' }])
     })

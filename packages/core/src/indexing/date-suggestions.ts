@@ -30,7 +30,10 @@ export interface DateSuggestion {
 export interface DateSuggestionContext {
   /** Today's local calendar date, ISO `YYYY-MM-DD`. */
   today: string
-  /** Reading order for ambiguous typed slash-dates (`mdy` → M/D, `dmy` → D/M). */
+  /**
+   * Reading order for ambiguous typed slash-dates (`mdy` → M/D, `dmy` → D/M).
+   * `iso` has no slash-date order, so it keeps the default M/D reading.
+   */
   dateFormat: DateFormat
   /** Which day "this/next/last week" (and weekend) anchor to. */
   weekStartDay: WeekStartDay
@@ -344,7 +347,8 @@ function typedDateSuggestions(
   const first = Number(firstPart)
   const second = Number(secondPart)
   const year = yearPart !== undefined ? Number(yearPart) : Number(context.today.slice(0, 4))
-  // The preferred reading follows the date-format setting; the swapped reading
+  // The preferred reading follows the date-format setting; ISO display has no
+  // slash-date order, so it keeps the default M/D reading. The swapped reading
   // is offered only for bare shorthand, where "12/10" is genuinely ambiguous.
   const readings =
     context.dateFormat === 'dmy'

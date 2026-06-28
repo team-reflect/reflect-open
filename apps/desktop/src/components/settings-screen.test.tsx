@@ -411,6 +411,41 @@ describe('SettingsScreen', () => {
     )
   })
 
+  it('selecting ISO persists the date format', async () => {
+    renderScreen()
+    const trigger = screen.getByRole('combobox', { name: 'Date format' })
+    const isoLabel = formatFullDate(new Date(), 'iso')
+    await waitFor(() => expect(trigger.textContent).toContain(formatFullDate(new Date(), 'mdy')))
+
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+    fireEvent.keyDown(await screen.findByRole('option', { name: isoLabel }), { key: 'Enter' })
+
+    expect(trigger.textContent).toContain(isoLabel)
+    await waitFor(() =>
+      expect(saved).toEqual([
+        {
+          editorMarkdownSyntax: 'hide',
+          editorSpellCheck: true,
+          editorDefaultBullet: true,
+          editorBulletAfterHeading: true,
+          editorTextSize: 'small',
+          semanticSearchEnabled: false,
+          describeAssets: true,
+          mobileOnboarded: false,
+          theme: 'system',
+          timeFormat: '12h',
+          dateFormat: 'iso',
+          weekStartDay: 'monday',
+          allNotesFilterTags: ['book', 'link', 'person'],
+          graphColors: {},
+          aiProviders: [],
+          defaultAiProviderId: null,
+          chatModelSelection: null,
+        },
+      ]),
+    )
+  })
+
   it('shows the week start setting in Date & time', async () => {
     renderScreen()
     const dateTime = screen.getByRole('region', { name: 'Date & time' })
