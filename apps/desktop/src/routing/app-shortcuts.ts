@@ -37,9 +37,24 @@ export const APP_BINDINGS = registerKeymap(
 )
 
 const BINDING_TO_ID = new Map(BOUND_COMMANDS.map(({ binding, command }) => [binding, command.id]))
+const HISTORY_COMMAND_IDS = new Set(['history.back', 'history.forward'])
+
+const CODE_TO_BINDING_KEY: Record<string, string> = {
+  BracketLeft: '[',
+  BracketRight: ']',
+}
 
 function isModKey(event: KeyboardEvent): boolean {
   return event.metaKey || event.ctrlKey
+}
+
+function idForKeyDown(event: KeyboardEvent): string | null {
+  if (!isModKey(event) || event.altKey || event.repeat) {
+    return null // held keys must not spam navigations (e.g. a stack of new notes)
+  }
+  const key = CODE_TO_BINDING_KEY[event.code] ?? event.key.toLowerCase()
+  const bindingKey = event.shiftKey ? `Mod-Shift-${key}` : `Mod-${key}`
+  return BINDING_TO_ID.get(bindingKey) ?? null
 }
 
 /**
@@ -145,6 +160,18 @@ export function useAppShortcuts(): CommandContext {
       return true
     }
 
+    function onHistoryKeyDownCapture(event: KeyboardEvent) {
+      const id = idForKeyDown(event)
+      if (id === null || !HISTORY_COMMAND_IDS.has(id)) {
+        return
+      }
+      if (triggerCommand(id)) {
+        // History navigation is app chrome, so it wins even when the focused
+        // editor would otherwise consume the bracket chord while bubbling.
+        event.preventDefault()
+      }
+    }
+
     function onKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented) {
         // The focused editor gets first refusal. meowdown's `Mod-k` consumes the
@@ -153,14 +180,8 @@ export function useAppShortcuts(): CommandContext {
         // has nothing to do it leaves the event alone and `Mod-k` falls through.
         return
       }
-      if (!isModKey(event) || event.altKey || event.repeat) {
-        return // held keys must not spam navigations (e.g. a stack of new notes)
-      }
-      const bindingKey = event.shiftKey
-        ? `Mod-Shift-${event.key.toLowerCase()}`
-        : `Mod-${event.key.toLowerCase()}`
-      const id = BINDING_TO_ID.get(bindingKey)
-      if (id === undefined) {
+      const id = idForKeyDown(event)
+      if (id === null) {
         return
       }
       if (triggerCommand(id)) {
@@ -171,9 +192,11 @@ export function useAppShortcuts(): CommandContext {
     }
 
     setMenuCommandDispatch(triggerCommand)
+    window.addEventListener('keydown', onHistoryKeyDownCapture, true)
     window.addEventListener('keydown', onKeyDown)
     return () => {
       setMenuCommandDispatch(null)
+      window.removeEventListener('keydown', onHistoryKeyDownCapture, true)
       window.removeEventListener('keydown', onKeyDown)
     }
   }, [context, closeShortcuts])

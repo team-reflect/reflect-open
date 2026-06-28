@@ -60,6 +60,18 @@ function press(key: string, options: KeyboardEventInit = {}) {
   )
 }
 
+function pressFrom(target: EventTarget, key: string, options: KeyboardEventInit = {}) {
+  target.dispatchEvent(
+    new KeyboardEvent('keydown', {
+      key,
+      metaKey: true,
+      cancelable: true,
+      bubbles: true,
+      ...options,
+    }),
+  )
+}
+
 describe('app shortcuts', () => {
   it('registers the command keybindings in the central keymap registry', () => {
     const bindings = listRegisteredBindings()
@@ -92,6 +104,25 @@ describe('app shortcuts', () => {
 
     act(() => press(']'))
     expect(result.current.router.route).toEqual({ kind: 'today' })
+  })
+
+  it('⌘[ and ⌘] still traverse when the focused editor consumes the keydown', () => {
+    const { result } = shortcutsHook()
+    act(() => press('n'))
+    act(() => press('d'))
+    expect(result.current.router.route).toEqual({ kind: 'today' })
+
+    const editor = document.createElement('div')
+    document.body.append(editor)
+    editor.addEventListener('keydown', (event) => event.preventDefault())
+
+    act(() => pressFrom(editor, 'Unidentified', { code: 'BracketLeft' }))
+    expect(result.current.router.route.kind).toBe('note')
+
+    act(() => pressFrom(editor, 'Unidentified', { code: 'BracketRight' }))
+    expect(result.current.router.route).toEqual({ kind: 'today' })
+
+    editor.remove()
   })
 
   it('⌘K opens the palette', () => {
