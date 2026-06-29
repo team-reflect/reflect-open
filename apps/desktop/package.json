@@ -57,21 +57,20 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.1",
     "@tauri-apps/cli": "^2.11.3",
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
+    "@vitest/browser-playwright": "^4.1.9",
     "babel-plugin-react-compiler": "^1.0.0",
     "eslint": "^10.5.0",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "jsdom": "^29.1.1",
+    "playwright": "^1.61.0",
     "shadcn": "^4.11.0",
     "tailwindcss": "^4.3.1",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.62.0",
     "vite": "^8.1.0",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.9",
+    "vitest-browser-react": "^2.2.0"
   }
 }
