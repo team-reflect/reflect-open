@@ -111,6 +111,9 @@ vi.mock('@/lib/provider-fetch', () => ({ providerFetch: vi.fn() }))
 // jsdom doesn't implement this; Radix Select scrolls the selected option into
 // view when the listbox opens.
 Element.prototype.scrollIntoView ??= () => {}
+// shadcn's MessageScroller drives the viewport with scrollTo; jsdom has no
+// layout engine, so the browser API is stubbed for interaction tests.
+Element.prototype.scrollTo ??= () => {}
 
 const { ChatScreen } = await import('./chat-screen')
 

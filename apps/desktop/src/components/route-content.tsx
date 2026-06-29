@@ -7,7 +7,6 @@ import { SearchRoute } from '@/components/search-route'
 import { SettingsNavigator } from '@/components/settings/settings-navigator'
 import { SettingsScreen } from '@/components/settings-screen'
 import { TasksScreen } from '@/components/tasks/tasks-screen'
-import { useToday } from '@/lib/use-today'
 import { useRouter } from '@/routing/router'
 import { ScrollRestored } from '@/routing/scroll-restore'
 
@@ -17,19 +16,19 @@ import { ScrollRestored } from '@/routing/scroll-restore'
  * `note` route renders one ordinary note as a first-class editable pane (lazy,
  * so ⌘N's fresh path opens before any file exists). Extracted from the
  * workspace shell so this seam — the contract that non-daily notes are just as
- * editable as daily ones — is directly testable. `today` tracks the live
- * clock — midnight re-renders it.
+ * editable as daily ones — is directly testable. The daily stream owns live
+ * today tracking so route arrivals and the highlighted current day use the
+ * same clock.
  */
 export function RouteContent(): ReactElement {
   const { route } = useRouter()
-  const today = useToday()
   switch (route.kind) {
     case 'today':
-      return <DailyStream targetDate={today} />
+      return <DailyStream target={{ kind: 'today' }} />
     case 'daily':
       // The router normalizes daily routes (see normalizeRoute), so the date
       // is a real calendar day by the time it reaches a view.
-      return <DailyStream targetDate={route.date} />
+      return <DailyStream target={{ kind: 'date', date: route.date }} />
     case 'note':
       // The vertical padding lives on the inner column (not the scroll
       // container) so `min-h-full` fills the viewport exactly; the flex chain
@@ -57,7 +56,7 @@ export function RouteContent(): ReactElement {
       // ScrollRestored wrapper — same shape as All Notes.
       return <TasksScreen />
     case 'search':
-      return <SearchRoute query={route.query} today={today} />
+      return <SearchRoute query={route.query} />
     case 'chat':
       // Owns its scroll container (the message list pins to the bottom while
       // streaming), so no ScrollRestored wrapper — same shape as All Notes.

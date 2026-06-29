@@ -1,6 +1,6 @@
-import { useMemo, useState, type ReactElement } from 'react'
+import { type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useVirtualizer } from '@tanstack/react-virtual'
+import { Virtualizer } from 'virtua'
 import {
   hasBridge,
   listNotes,
@@ -143,14 +143,7 @@ function NoteRows({
   onOpen: (path: string) => void
 }): ReactElement {
   const { settings } = useSettings()
-  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
-  const rows = useMemo(() => notes ?? [], [notes])
-  const virtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => scrollElement,
-    estimateSize: () => 64,
-    overscan: 10,
-  })
+  const rows = notes ?? []
 
   if (notes !== undefined && notes.length === 0) {
     return <Empty message="No notes yet" />
@@ -158,43 +151,29 @@ function NoteRows({
 
   return (
     <div
-      ref={setScrollElement}
       className="min-h-0 flex-1 overflow-y-auto"
       style={{ paddingBottom: 'max(env(safe-area-inset-bottom), var(--keyboard-height, 0px))' }}
     >
-      <ul className="relative" style={{ height: virtualizer.getTotalSize() }}>
-        {virtualizer.getVirtualItems().map((item) => {
-          const note = rows[item.index]
-          if (note === undefined) {
-            return null
-          }
-          return (
-            <li
-              key={note.path}
-              data-index={item.index}
-              ref={virtualizer.measureElement}
-              className="absolute inset-x-0"
-              style={{ transform: `translateY(${item.start}px)` }}
-            >
-              <button
-                type="button"
-                onClick={() => onOpen(note.path)}
-                className="flex w-full flex-col gap-0.5 border-b border-border px-4 py-2.5 text-left"
-              >
-                <span className="flex items-baseline justify-between gap-2">
-                  <span className="min-w-0 truncate text-sm font-medium">{note.title}</span>
-                  <span className="shrink-0 text-xs text-text-muted">
-                    {formatRecencyLabel(note.mtime, settings)}
-                  </span>
-                </span>
-                {note.snippet !== '' && (
-                  <span className="line-clamp-2 text-xs text-text-muted">{note.snippet}</span>
-                )}
-              </button>
-            </li>
-          )
-        })}
-      </ul>
+      <Virtualizer as="ul" item="li" data={rows} itemSize={64} bufferSize={640}>
+        {(note) => (
+          <button
+            key={note.path}
+            type="button"
+            onClick={() => onOpen(note.path)}
+            className="flex w-full flex-col gap-0.5 border-b border-border px-4 py-2.5 text-left"
+          >
+            <span className="flex items-baseline justify-between gap-2">
+              <span className="min-w-0 truncate text-sm font-medium">{note.title}</span>
+              <span className="shrink-0 text-xs text-text-muted">
+                {formatRecencyLabel(note.mtime, settings)}
+              </span>
+            </span>
+            {note.snippet !== '' && (
+              <span className="line-clamp-2 text-xs text-text-muted">{note.snippet}</span>
+            )}
+          </button>
+        )}
+      </Virtualizer>
     </div>
   )
 }

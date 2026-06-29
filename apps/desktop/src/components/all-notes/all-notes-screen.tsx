@@ -39,13 +39,11 @@ interface AllNotesScreenProps {
 export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   const { graph } = useGraph()
   const { navigate } = useRouter()
-  // The scroll container lives in state, not a ref: the virtualizer down in
-  // AllNotesTable reads it via getScrollElement, and a plain ref would be null
-  // during the table's mount-time layout effect (refs on ancestor DOM nodes
-  // attach after a child component's effects). With a warm query cache that
-  // mount is the only render, so the virtualizer would never acquire the
-  // element and the list would stay blank. State forces the post-attach
-  // re-render that hands the element over.
+  // The scroll container lives in state, not a ref, so scroll restoration
+  // re-runs its restore once the element attaches (a callback ref re-renders;
+  // a plain ref would still be null during the restore effect on the first,
+  // warm-cache-only mount). The table virtualizes against this container as its
+  // parent, so it no longer needs the element handed down.
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
   // The surface, so the keyboard shortcuts can scope to it (and focus it on mount).
   const rootRef = useRef<HTMLDivElement>(null)
@@ -153,7 +151,6 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
           tag={tag}
           selection={selection}
           onOpen={openNote}
-          scrollElement={scrollElement}
           registerScrollToIndex={registerScrollToIndex}
         />
       </div>

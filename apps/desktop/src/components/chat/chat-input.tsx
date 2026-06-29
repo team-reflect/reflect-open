@@ -2,6 +2,13 @@ import { useMemo, useState, type ReactElement } from 'react'
 import { aiProvider, type AiProviderConfig, type ChatModelOption } from '@reflect/core'
 import { ArrowUp, Plus, Square, X } from 'lucide-react'
 import { ShortcutKeys } from '@/components/shortcut-keys'
+import {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentGroup,
+  AttachmentMedia,
+} from '@/components/ui/attachment'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -109,25 +116,29 @@ export function ChatInput(): ReactElement {
     <div className="flex-none px-6 pb-6">
       <div className="mx-auto w-full max-w-2xl rounded-xl border border-border bg-surface focus-within:border-ring">
         {attachments.length > 0 ? (
-          <div className="flex flex-wrap gap-2 px-3.5 pt-3">
+          <AttachmentGroup className="flex-wrap gap-2 overflow-visible px-3.5 pt-3 pb-0">
             {attachments.map((attachment) => (
-              <div key={attachment.id} className="relative">
-                <img
-                  src={attachment.dataUrl}
-                  alt={attachment.name}
-                  className="size-14 rounded-lg border border-border object-cover"
-                />
-                <button
-                  type="button"
-                  aria-label={`Remove ${attachment.name}`}
-                  onClick={() => removeAttachment(attachment.id)}
-                  className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full border border-border bg-surface text-text-muted hover:text-text"
-                >
-                  <X aria-hidden className="size-3" />
-                </button>
-              </div>
+              <Attachment
+                key={attachment.id}
+                orientation="vertical"
+                size="sm"
+                className="w-16 bg-surface"
+              >
+                <AttachmentMedia variant="image" className="w-14">
+                  <img src={attachment.dataUrl} alt={attachment.name} />
+                </AttachmentMedia>
+                <AttachmentActions className="!top-0 !right-0 -translate-y-1/2 translate-x-1/2">
+                  <AttachmentAction
+                    aria-label={`Remove ${attachment.name}`}
+                    className="size-4 rounded-full border border-border bg-surface p-0 text-text-muted hover:text-text"
+                    onClick={() => removeAttachment(attachment.id)}
+                  >
+                    <X aria-hidden className="size-3" />
+                  </AttachmentAction>
+                </AttachmentActions>
+              </Attachment>
             ))}
-          </div>
+          </AttachmentGroup>
         ) : null}
         <textarea
           value={text}

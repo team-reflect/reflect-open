@@ -1,19 +1,20 @@
 import type { ReactElement } from 'react'
-import { MarkdownPreview } from '@/editor/markdown-preview'
-import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
 import type { ChatTurn as ChatTurnModel } from '@reflect/core'
-import { cn } from '@/lib/utils'
-import { ChatToolChip } from './chat-tool-chip'
+import { Bubble, BubbleContent } from '@/components/ui/bubble'
+import { Marker, MarkerContent } from '@/components/ui/marker'
+import { Message, MessageContent, MessageGroup } from '@/components/ui/message'
+import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
+import { ChatAssistantPart } from './chat-assistant-part'
+import { ChatUserAttachments } from './chat-user-attachments'
 
 interface ChatTurnProps {
   turn: ChatTurnModel
 }
 
 /**
- * One conversation turn: the user's message as a compact right-aligned
- * bubble — attached images above the text, which a photo-only message
- * omits — then the assistant's parts in order: text interleaved with the
- * tool activity that grounded it.
+ * One conversation turn: the user's message and images render through
+ * shadcn chat primitives, followed by assistant text, tool markers, and
+ * notices in the order the engine produced them.
  *
  * Text still streaming renders as plain text; once it settles it re-renders
  * through the same read-only markdown preview the palette uses (so
@@ -29,64 +30,39 @@ export function ChatTurn({ turn }: ChatTurnProps): ReactElement {
   const lastIndex = turn.parts.length - 1
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex justify-end">
-        <div className="flex max-w-[85%] flex-col items-end gap-2">
-          {turn.attachments.map((attachment) => (
-            <img
-              key={attachment.id}
-              src={attachment.dataUrl}
-              alt={attachment.name}
-              className="max-h-48 max-w-full rounded-2xl"
+    <MessageGroup className="gap-6">
+      <Message align="end">
+        <MessageContent className="items-end gap-2">
+          <ChatUserAttachments attachments={turn.attachments} />
+          {turn.userText !== '' ? (
+            <Bubble align="end" variant="muted" className="max-w-[85%]">
+              <BubbleContent className="reflect-chat-message !bg-surface-hover px-4 py-2 leading-normal whitespace-pre-wrap !text-text">
+                {turn.userText}
+              </BubbleContent>
+            </Bubble>
+          ) : null}
+        </MessageContent>
+      </Message>
+
+      <Message align="start">
+        <MessageContent className="gap-2">
+          {turn.parts.length === 0 && turn.status === 'streaming' ? (
+            <Marker className="animate-pulse text-sm text-text-muted">
+              <MarkerContent>Thinking…</MarkerContent>
+            </Marker>
+          ) : null}
+          {turn.parts.map((part, index) => (
+            <ChatAssistantPart
+              key={index}
+              index={index}
+              lastIndex={lastIndex}
+              part={part}
+              status={turn.status}
+              onWikiLinkClick={navigateWikiLink}
             />
           ))}
-          {turn.userText !== '' ? (
-            <div className="reflect-chat-message rounded-2xl bg-surface-hover px-4 py-2 text-sm whitespace-pre-wrap text-text">
-              {turn.userText}
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        {turn.parts.length === 0 && turn.status === 'streaming' ? (
-          <span className="animate-pulse text-sm text-text-muted">Thinking…</span>
-        ) : null}
-        {turn.parts.map((part, index) => {
-          switch (part.kind) {
-            case 'text':
-              return turn.status === 'streaming' && index === lastIndex ? (
-                <div
-                  key={index}
-                  className="reflect-chat-message text-sm whitespace-pre-wrap text-text"
-                >
-                  {part.text}
-                </div>
-              ) : (
-                <MarkdownPreview
-                  key={index}
-                  content={part.text}
-                  onWikiLinkClick={navigateWikiLink}
-                  className="reflect-chat-message text-sm"
-                />
-              )
-            case 'tool':
-              return <ChatToolChip key={index} part={part} />
-            case 'notice':
-              return (
-                <p
-                  key={index}
-                  className={cn(
-                    'reflect-chat-message text-sm',
-                    part.tone === 'error' ? 'text-destructive' : 'text-text-muted italic',
-                  )}
-                >
-                  {part.text}
-                </p>
-              )
-          }
-        })}
-      </div>
-    </div>
+        </MessageContent>
+      </Message>
+    </MessageGroup>
   )
 }

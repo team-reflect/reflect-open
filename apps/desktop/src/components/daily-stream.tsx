@@ -1,5 +1,5 @@
-import { useCallback, useLayoutEffect, useRef, useState, type ReactElement } from 'react'
-import { useVirtualizer, type VirtualItem, type Virtualizer } from '@tanstack/react-virtual'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import { Virtualizer, type VirtualizerHandle } from 'virtua'
 import { dailyPath } from '@reflect/core'
 import { NotePane } from '@/components/note-pane'
 import type { NoteEditorHandle } from '@/editor/note-editor'
@@ -12,8 +12,8 @@ import { useSetFocusedDailyDate } from '@/providers/focused-daily-provider'
 import { useRouter } from '@/routing/router'
 
 interface DailyStreamProps {
-  /** The day to anchor/scroll to (from the `today` or `daily/:date` route). */
-  targetDate: string
+  /** The day to anchor/scroll to, or the live local day for the `today` route. */
+  target: { kind: 'today' } | { kind: 'date'; date: string }
 }
 
 /**
@@ -30,29 +30,8 @@ interface DailyStreamProps {
  */
 const STREAM_GUTTER = 'reflect-stream-gutter'
 
-/**
- * The size guess for unmounted rows — also the unit for the mount-time anchor
- * offset, so `initialOffset` lands exactly where `scrollToIndex` would before
- * any row has been measured.
- */
+/** The size guess virtua uses for a row it has not measured yet. */
 export const ESTIMATED_DAY_HEIGHT = 220
-
-/**
- * Compensate the scroll position whenever a row **above** the viewport changes
- * size, unconditionally. Days mount as a short loading placeholder and grow
- * when their note arrives, so every load above the anchor would otherwise push
- * the viewport's content down the stream — a fresh "Today" navigation lands
- * days off target. The library default skips compensation while the last
- * scroll direction is backward, which is exactly the state the anchor scroll's
- * own downward adjustments leave us in when those loads complete.
- */
-function adjustScrollForResizeAboveViewport(
-  item: VirtualItem,
-  _delta: number,
-  instance: Virtualizer<HTMLDivElement, Element>,
-): boolean {
-  return item.start < (instance.scrollOffset ?? 0)
-}
 
 /**
  * The daily stream (Plan 06b): a virtualized chronological run of days — past
@@ -63,46 +42,27 @@ function adjustScrollForResizeAboveViewport(
  * (virtual rows are free), so there is no bidirectional infinite-scroll
  * bookkeeping; index↔date is pure offset math.
  */
-export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
+export function DailyStream({ target }: DailyStreamProps): ReactElement {
   const { arrivalSeq, entryId, saveScrollState, savedScroll } = useRouter()
-  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const virtualizerRef = useRef<VirtualizerHandle>(null)
   // The window anchors at today-on-mount and stays stable for the view's life.
   // (`dayWindow`, not `window` — shadowing the DOM global here was a footgun.)
   const [dayWindow] = useState(() => createDayWindow(todayIso()))
+  // Per-row data is unused (the date is derived from the index); a stable array
+  // of the window's length just tells virtua how many rows exist.
+  const data = useMemo(() => Array.from({ length: dayWindow.count }), [dayWindow.count])
   const today = useToday()
+  const targetDate = target.kind === 'today' ? today : target.date
   const { settings } = useSettings()
 
-  // targetDate is read at arrival time, not reacted to: on the `today` route
-  // it drifts when local midnight passes (`todayIso()` per render), and that
-  // drift is not a navigation — re-running the anchor effect then would
-  // misread the entry's continuously-saved offset as a back/forward restore.
-  // The next real arrival (⌘D, a link) reads the fresh value and anchors to
-  // the new today.
+  // targetDate is read at arrival time, not reacted to. On the `today` route
+  // it follows this component's live clock — the same value that paints the
+  // today highlight — but midnight drift alone is not a navigation. The next
+  // real arrival (⌘D, a link) reads the fresh value and anchors to the new day.
   const targetDateRef = useRef(targetDate)
-  targetDateRef.current = targetDate
-
-  const virtualizer = useVirtualizer({
-    count: dayWindow.count,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => ESTIMATED_DAY_HEIGHT,
-    overscan: 2,
-    paddingEnd: 240,
-    // Write each row's transform and the sizer's height straight to the DOM
-    // inside the virtualizer's `onChange`, synchronously, in the same tick as
-    // the scroll compensation a resize triggers.
-    directDomUpdates: true,
-    directDomUpdatesMode: 'transform',
-    // The mount-time anchor. The virtualizer applies this to the scroll
-    // element inside its own layout effect — before first paint — so the
-    // stream never paints the top of the window and then visibly lurches
-    // down to the target day, and it decides which rows the first render
-    // mounts at all. A remount of an entry the user navigated back to
-    // restores its saved offset the same jump-free way.
-    initialOffset: () =>
-      savedScroll() ?? indexOfDate(dayWindow, targetDateRef.current) * ESTIMATED_DAY_HEIGHT,
-  })
-  // An instance field, not an option — reassigning every render is idempotent.
-  virtualizer.shouldAdjustScrollPositionOnItemSizeChange = adjustScrollForResizeAboveViewport
+  useLayoutEffect(() => {
+    targetDateRef.current = targetDate
+  }, [targetDate])
 
   // Only the day navigated to receives focus, once per navigation — a row that
   // scrolls offscreen and back must not steal focus from wherever the user is.
@@ -166,12 +126,12 @@ export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
       // The neighbor is virtualized away: queue the focus, then scroll its row
       // into the rendered range so it mounts and `registerHandle` applies it.
       pendingFocusRef.current = { date: target, position }
-      virtualizer.scrollToIndex(indexOfDate(dayWindow, target), {
+      virtualizerRef.current?.scrollToIndex(indexOfDate(dayWindow, target), {
         align: direction === 'up' ? 'end' : 'start',
       })
       return true
     },
-    [dayWindow, virtualizer, focusDay],
+    [dayWindow, focusDay],
   )
 
   // Re-anchor on every explicit arrival (`arrivalSeq` bumps even when ⌘D is
@@ -180,16 +140,10 @@ export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
   // routes resolve to the same day). A back/forward-restored entry carries its
   // offset; a fresh navigation anchors to the target day.
   //
-  // A layout effect, not a passive one: rows measure during the mount commit
-  // itself — their `measureElement` refs fire before the virtualizer's own
-  // layout effect has attached the scroll element, so its above-viewport
-  // resize compensation is a silent no-op — and that moves the target day's
-  // true start away from the estimate-derived `initialOffset` before first
-  // paint. A post-paint anchor let that mis-anchored frame become visible: a
-  // one-frame flicker on every entry into the stream. Anchoring in the layout
-  // phase installs `scrollToIndex`'s index-pinning reconcile (rAF, still
-  // pre-paint), which pins the target day to the viewport top before the
-  // frame is shown and holds it there while the surrounding rows measure in.
+  // A layout effect, not a passive one: virtua applies an imperative scroll in a
+  // pre-paint microtask, so anchoring here pins the target day to the viewport
+  // top before the first frame is shown, instead of painting the top of the
+  // five-year window and then lurching down.
   useLayoutEffect(() => {
     const restored = savedScroll()
     if (restored !== null) {
@@ -199,18 +153,17 @@ export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
       // otherwise steal focus when its row scrolls into view.
       focusPending.current = null
       pendingFocusRef.current = null
-      virtualizer.scrollToOffset(restored)
+      virtualizerRef.current?.scrollTo(restored)
       return
     }
     const target = targetDateRef.current
     pendingFocusRef.current = null
     focusPending.current = target
-    virtualizer.scrollToIndex(indexOfDate(dayWindow, target), { align: 'start' })
-  }, [arrivalSeq, entryId, dayWindow, virtualizer, savedScroll])
+    virtualizerRef.current?.scrollToIndex(indexOfDate(dayWindow, target), { align: 'start' })
+  }, [arrivalSeq, entryId, dayWindow, savedScroll])
 
   return (
     <div
-      ref={scrollRef}
       data-testid="daily-stream"
       className="h-full overflow-auto"
       onScroll={(event) => saveScrollState(event.currentTarget.scrollTop)}
@@ -223,9 +176,15 @@ export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
         pendingFocusRef.current = null
       }}
     >
-      <div ref={virtualizer.containerRef} className="relative w-full">
-        {virtualizer.getVirtualItems().map((item) => {
-          const date = dateAtIndex(dayWindow, item.index)
+      <Virtualizer
+        ref={virtualizerRef}
+        data={data}
+        itemSize={ESTIMATED_DAY_HEIGHT}
+        bufferSize={2 * ESTIMATED_DAY_HEIGHT}
+        shift={true}
+      >
+        {(_, index) => {
+          const date = dateAtIndex(dayWindow, index)
           const isToday = date === today
           // V1's daily-note sizing: past days hug their content (an empty day
           // collapses to a short row), while today and future days reserve
@@ -233,43 +192,38 @@ export function DailyStream({ targetDate }: DailyStreamProps): ReactElement {
           const isPast = date < today
           const autoFocus = focusPending.current === date
           return (
-            <div
+            <section
               key={date}
-              data-index={item.index}
-              ref={virtualizer.measureElement}
-              className="absolute inset-x-0 top-0"
+              data-index={index}
+              className="border-b border-border py-6"
               // Focus entering this row (clicking its editor, tabbing in) makes
               // it the day the sidebar describes.
               onFocusCapture={() => setFocusedDailyDate(date)}
             >
-              <section className="border-b border-border py-6">
-                {/* V1 renders the date as the note's H1-sized subject, with
-                    today's tinted brand (its `highlightSubject`). */}
-                <h2
-                  className={cn(
-                    'reflect-daily-subject mb-3',
-                    STREAM_GUTTER,
-                    isToday && 'text-accent',
-                  )}
-                >
-                  {formatDayLabel(date, settings.dateFormat)}
-                </h2>
-                <NotePane
-                  path={dailyPath(date)}
-                  dailyDate={date}
-                  registerHandle={registerHandle}
-                  onExitBoundary={handleExitBoundary}
-                  lazy
-                  autoFocus={autoFocus}
-                  onAutoFocused={consumeFocus}
-                  gutterClassName={STREAM_GUTTER}
-                  editorClassName={isPast ? 'min-h-[100px]' : 'min-h-[60vh]'}
-                />
-              </section>
-            </div>
+              {/* V1 renders the date as the note's H1-sized subject, with
+                  today's tinted brand (its `highlightSubject`). */}
+              <h2
+                className={cn('reflect-daily-subject mb-3', STREAM_GUTTER, isToday && 'text-accent')}
+              >
+                {formatDayLabel(date, settings.dateFormat)}
+              </h2>
+              <NotePane
+                path={dailyPath(date)}
+                dailyDate={date}
+                registerHandle={registerHandle}
+                onExitBoundary={handleExitBoundary}
+                lazy
+                autoFocus={autoFocus}
+                onAutoFocused={consumeFocus}
+                gutterClassName={STREAM_GUTTER}
+                editorClassName={isPast ? 'min-h-[100px]' : 'min-h-[60vh]'}
+              />
+            </section>
           )
-        })}
-      </div>
+        }}
+      </Virtualizer>
+      {/* Trailing room so the last day isn't pinned to the viewport bottom */}
+      <div aria-hidden className="h-60" />
     </div>
   )
 }

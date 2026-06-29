@@ -6,15 +6,13 @@ import { useRouter } from '@/routing/router'
 interface SearchRouteProps {
   /** The query carried by the `search/:query` route. */
   query: string
-  /** The current day, anchoring the stream rendered behind the palette. */
-  today: string
 }
 
 /**
  * `search/:query` is a deep-link target, not a second search surface (decided
  * 2026-06-09): arriving opens the ⌘K palette pre-filled over the stream.
  */
-export function SearchRoute({ query, today }: SearchRouteProps): ReactElement {
+export function SearchRoute({ query }: SearchRouteProps): ReactElement {
   const { openPalette } = usePalette()
   const { arrivalSeq, entryId } = useRouter()
   // Keyed on the *arrival*, not just the value (the daily stream's lesson):
@@ -24,5 +22,5 @@ export function SearchRoute({ query, today }: SearchRouteProps): ReactElement {
   useEffect(() => {
     openPalette(query)
   }, [query, arrivalSeq, entryId, openPalette])
-  return <DailyStream targetDate={today} />
+  return <DailyStream target={{ kind: 'today' }} />
 }
