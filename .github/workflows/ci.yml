@@ -79,6 +79,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Playwright Chromium
+        run: pnpm --filter @reflect/desktop exec playwright install --with-deps chromium
+
       - name: Test desktop shard
         run: pnpm --filter @reflect/desktop exec vitest run --shard=${{ matrix.shard }}/3
 
