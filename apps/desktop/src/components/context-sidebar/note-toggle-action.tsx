@@ -1,6 +1,8 @@
 import { useState, type ReactElement, type ReactNode } from 'react'
+import { errorMessage } from '@reflect/core'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { startOperation } from '@/lib/operations'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
 
@@ -15,6 +17,8 @@ interface NoteToggleActionProps {
   icon: ReactNode
   /** Button label for each flag state (the action offered, not the state). */
   labels: { active: string; inactive: string }
+  /** Operation label used when the frontmatter write fails. */
+  failureLabel: string
   /** Keybinding hint, from the matching command definition. */
   keybinding?: string | null
   /** Optional tooltip explaining the flag's meaning. */
@@ -49,6 +53,7 @@ export function NoteToggleAction({
   toggle,
   icon,
   labels,
+  failureLabel,
   keybinding = null,
   tooltip,
   applyOptimistic,
@@ -82,9 +87,10 @@ export function NoteToggleAction({
         applyOptimistic?.(active)
       }
       setPending({ path, active })
-    } catch {
-      setPending({ path, active: isActive })
+    } catch (cause) {
+      setPending(null)
       onFailure?.()
+      startOperation(failureLabel).fail(errorMessage(cause))
     } finally {
       setIsToggling(false)
     }

@@ -50,6 +50,7 @@ export function NoteActionsSection({
         toggle={toggleNotePinned}
         icon={<PinIcon width={20} height={20} />}
         labels={{ active: 'Un-pin this note', inactive: 'Pin this note' }}
+        failureLabel="Updating pin"
         keybinding={PIN_KEYBINDING}
         applyOptimistic={applyOptimisticPin}
         onFailure={invalidateOptimisticPin}
@@ -63,6 +64,7 @@ export function NoteActionsSection({
           active: 'Unlock note',
           inactive: 'Lock note',
         }}
+        failureLabel="Updating privacy"
         keybinding={PRIVATE_KEYBINDING}
         tooltip="Locks this note out of AI. Backup and sync still include it."
       />

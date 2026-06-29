@@ -13,8 +13,9 @@ const getNote = vi.hoisted(() => vi.fn())
 const toggleNotePinned = vi.hoisted(() => vi.fn(async () => true))
 const toggleNotePrivate = vi.hoisted(() => vi.fn(async () => true))
 const deleteOpenNote = vi.hoisted(() => vi.fn(async () => {}))
+const operationFail = vi.hoisted(() => vi.fn())
 const startOperation = vi.hoisted(() =>
-  vi.fn(() => ({ progress: vi.fn(), done: vi.fn(), fail: vi.fn() })),
+  vi.fn(() => ({ progress: vi.fn(), done: vi.fn(), fail: operationFail })),
 )
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
@@ -52,6 +53,7 @@ beforeEach(() => {
   toggleNotePrivate.mockReset().mockResolvedValue(true)
   deleteOpenNote.mockReset().mockResolvedValue(undefined)
   startOperation.mockClear()
+  operationFail.mockClear()
 })
 
 function noteRow(path: string, isPrivate: boolean, title = 'A') {
@@ -133,6 +135,8 @@ describe('NoteActionsSection pin toggle', () => {
 
     await waitFor(() => expect(view.getByText('Pin this note')).toBeDefined())
     await waitFor(() => expect(getPinnedNotes).toHaveBeenCalledTimes(2))
+    expect(startOperation).toHaveBeenCalledWith('Updating pin')
+    expect(operationFail).toHaveBeenCalled()
     view.unmount()
   })
 
@@ -171,6 +175,8 @@ describe('NoteActionsSection private toggle', () => {
     const view = renderSection('notes/a.md')
     await userEvent.click(view.getByRole('button', { name: /Lock note/ }))
     await waitFor(() => expect(view.getByText('Lock note')).toBeDefined())
+    expect(startOperation).toHaveBeenCalledWith('Updating privacy')
+    expect(operationFail).toHaveBeenCalled()
     view.unmount()
   })
 
