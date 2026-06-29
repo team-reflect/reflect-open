@@ -804,7 +804,7 @@ describe('TasksScreen', () => {
 
     await view.findByText('plan')
     await userEvent.keyboard('{Meta>}a{/Meta}') // select both (no editor)
-    await userEvent.click(view.getByRole('button', { name: /Schedule \(2\)/ }))
+    await userEvent.click(view.getByRole('button', { name: /Schedule 2/ }))
     // Pick June 20 in the calendar (today mock = 2026-06-14, so it opens on June).
     await userEvent.click(await view.findByText('20'))
 
@@ -826,7 +826,7 @@ describe('TasksScreen', () => {
 
     await view.findByText('plan')
     await userEvent.keyboard('{Meta>}a{/Meta}') // select both (no editor mounts)
-    await userEvent.click(view.getByRole('button', { name: /Convert to bullet \(2\)/ }))
+    await userEvent.click(view.getByRole('button', { name: /Convert to bullet 2/ }))
 
     await waitFor(() => expect(convertTaskToBullet).toHaveBeenCalledTimes(2))
     expect(convertTaskToBullet).toHaveBeenCalledWith(expect.objectContaining({ notePath: 'notes/a.md' }), 1)
@@ -863,7 +863,7 @@ describe('TasksScreen', () => {
     const view = renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'plan' })) // sole → editor mounts
-    await userEvent.click(view.getByRole('button', { name: /Convert to bullet \(1\)/ }))
+    await userEvent.click(view.getByRole('button', { name: /Convert to bullet 1/ }))
 
     // Edit first (persist the draft), then convert the rewritten line.
     await waitFor(() =>
@@ -1384,8 +1384,8 @@ describe('TasksScreen', () => {
     const view = renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
-    // The row lingers struck and an Archive (1) action appears.
-    const archive = await view.findByRole('button', { name: /Archive \(1\)/ })
+    // The row lingers struck and an Archive 1 action appears.
+    const archive = await view.findByRole('button', { name: /Archive 1/ })
     expect(view.getByText('project task')).toBeDefined()
 
     await userEvent.click(archive)

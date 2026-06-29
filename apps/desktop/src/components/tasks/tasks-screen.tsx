@@ -37,6 +37,7 @@ import { useRouter } from '@/routing/router'
 import { TaskFiltersMenu } from './task-filters-menu'
 import { TaskGroupSection } from './task-group-section'
 import { TaskScheduleCalendar } from './task-schedule-calendar'
+import { TaskToolbarCountBadge } from './task-toolbar-count-badge'
 
 /** Keep only the groups the active filters allow (V1's per-bucket toggles). */
 function visibleGroups(groups: TaskGroup[], filters: TaskFilters): TaskGroup[] {
@@ -293,9 +294,15 @@ export function TasksScreen(): ReactElement {
             today={today}
             onSchedule={onSchedule}
           >
-            <Button type="button" variant="ghost" className="window-drag-control text-xs text-text-muted">
+            <Button
+              type="button"
+              variant="ghost"
+              aria-label={`Schedule ${selection.selectedCount}`}
+              className="window-drag-control text-xs text-text-muted"
+            >
               <CalendarClock aria-hidden className="size-3.5" />
-              Schedule ({selection.selectedCount})
+              Schedule
+              <TaskToolbarCountBadge count={selection.selectedCount} />
             </Button>
           </TaskScheduleCalendar>
         ) : null}
@@ -303,23 +310,27 @@ export function TasksScreen(): ReactElement {
           <Button
             type="button"
             variant="ghost"
+            aria-label={`Convert to bullet ${selection.selectedCount}`}
             onClick={onConvertToBullet}
             title="Drop the checkbox, keeping the line as a plain bullet — leaves the Tasks list"
             className="window-drag-control text-xs text-text-muted"
           >
             <List aria-hidden className="size-3.5" />
-            Convert to bullet ({selection.selectedCount})
+            Convert to bullet
+            <TaskToolbarCountBadge count={selection.selectedCount} />
           </Button>
         ) : null}
         {recentlyCompleted.length > 0 ? (
           <Button
             type="button"
             variant="ghost"
+            aria-label={`Archive ${recentlyCompleted.length}`}
             onClick={actions.archive}
             className="window-drag-control text-xs text-text-muted"
           >
             <Archive aria-hidden className="size-3.5" />
-            Archive ({recentlyCompleted.length})
+            Archive
+            <TaskToolbarCountBadge count={recentlyCompleted.length} />
           </Button>
         ) : null}
         <TaskFiltersMenu
