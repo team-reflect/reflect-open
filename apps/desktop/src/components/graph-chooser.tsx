@@ -1,5 +1,5 @@
 import { type ReactElement, type ReactNode } from 'react'
-import { Folder, FolderInput, FolderPlus } from 'lucide-react'
+import { Folder, FolderInput, FolderPlus, Lightbulb } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useGraphColors } from '@/hooks/use-graph-colors'
 import { graphColorCss } from '@/lib/graph-colors'
@@ -104,6 +104,14 @@ export function GraphChooser(): ReactElement {
               Open exported folder…
             </Button>
           </section>
+        </div>
+
+        <div className="mx-auto flex max-w-xl gap-2.5 text-sm leading-5 text-text-secondary">
+          <Lightbulb aria-hidden className="mt-0.5 size-4 shrink-0 text-text-muted" />
+          <p>
+            <span className="font-medium text-text">Tip:</span> choose a folder in iCloud Drive if
+            you want your notes backed up automatically.
+          </p>
         </div>
 
         {error ? (

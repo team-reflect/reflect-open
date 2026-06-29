@@ -75,6 +75,7 @@ describe('GraphChooser', () => {
       expect(screen.getByRole('heading', { name: 'New to Reflect' })).toBeInTheDocument(),
     )
     expect(screen.getByRole('button', { name: /Choose a folder/ })).toBeInTheDocument()
+    expect(screen.getByText(/choose a folder in iCloud Drive/)).toBeInTheDocument()
 
     // The V1 path keeps the export → unzip → open guidance, now as numbered steps.
     expect(screen.getByRole('heading', { name: 'Coming from Reflect v1' })).toBeInTheDocument()
