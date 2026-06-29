@@ -4,7 +4,7 @@ const isTauri = vi.hoisted(() => vi.fn(() => true))
 const popup = vi.hoisted(() => vi.fn(async () => {}))
 interface NativeMenuItemForTest {
   text: string
-  action?: (id: string) => void
+  action?: () => void
 }
 
 interface NativeMenuOptionsForTest {
@@ -24,7 +24,7 @@ const menuNew = vi.hoisted(() =>
 vi.mock('@tauri-apps/api/core', () => ({ isTauri }))
 vi.mock('@tauri-apps/api/menu', () => ({ Menu: { new: menuNew } }))
 
-const { openPinnedNoteContextMenu } = await import('./pinned-note-context-menu')
+const { openNativeContextMenu } = await import('./context-menu')
 
 beforeEach(() => {
   isTauri.mockReset().mockReturnValue(true)
@@ -40,21 +40,21 @@ function firstMenuItem(): NativeMenuItemForTest {
   return item
 }
 
-describe('openPinnedNoteContextMenu', () => {
+describe('openNativeContextMenu', () => {
   it('does nothing outside Tauri', async () => {
     isTauri.mockReturnValue(false)
-    const onUnpin = vi.fn()
+    const onSelect = vi.fn()
 
-    await openPinnedNoteContextMenu(onUnpin)
+    await openNativeContextMenu({ items: [{ text: 'Unpin Note', action: onSelect }] })
 
     expect(menuNew).not.toHaveBeenCalled()
-    expect(onUnpin).not.toHaveBeenCalled()
+    expect(onSelect).not.toHaveBeenCalled()
   })
 
-  it('opens a native menu whose item runs the active unpin callback', async () => {
-    const onUnpin = vi.fn()
+  it('opens a native menu whose items run their actions', async () => {
+    const onSelect = vi.fn()
 
-    await openPinnedNoteContextMenu(onUnpin)
+    await openNativeContextMenu({ items: [{ text: 'Unpin Note', action: onSelect }] })
 
     expect(menuNew).toHaveBeenCalledWith({
       items: [
@@ -65,7 +65,7 @@ describe('openPinnedNoteContextMenu', () => {
     })
     expect(popup).toHaveBeenCalled()
     const item = firstMenuItem()
-    item.action?.('pinned-note.unpin')
-    expect(onUnpin).toHaveBeenCalled()
+    item.action?.()
+    expect(onSelect).toHaveBeenCalled()
   })
 })

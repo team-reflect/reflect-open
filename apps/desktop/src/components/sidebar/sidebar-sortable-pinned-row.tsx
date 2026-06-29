@@ -9,7 +9,7 @@ import {
   updatePinnedNotesCache,
 } from '@/lib/notes/pinned-notes-cache'
 import { formatDayLabel } from '@/lib/dates'
-import { openPinnedNoteContextMenu } from '@/lib/native-menu/pinned-note-context-menu'
+import { openNativeContextMenu } from '@/lib/native-menu/context-menu'
 import { unpinNote } from '@/lib/note-pin'
 import { startOperation } from '@/lib/operations'
 import { useGraph } from '@/providers/graph-provider'
@@ -51,14 +51,21 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
       if (graph === null) {
         return
       }
-      void openPinnedNoteContextMenu(() => {
-        updatePinnedNotesCache(queryClient, graph.root, (current) =>
-          current?.filter((pinnedNote) => pinnedNote.path !== note.path),
-        )
+      void openNativeContextMenu({
+        items: [
+          {
+            text: 'Unpin Note',
+            action: () => {
+              updatePinnedNotesCache(queryClient, graph.root, (current) =>
+                current?.filter((pinnedNote) => pinnedNote.path !== note.path),
+              )
 
-        void unpinNote(note.path, graph.generation).catch(() => {
-          invalidatePinnedNotesCache(queryClient, graph.root)
-        })
+              void unpinNote(note.path, graph.generation).catch(() => {
+                invalidatePinnedNotesCache(queryClient, graph.root)
+              })
+            },
+          },
+        ],
       }).catch((cause: unknown) => {
         startOperation('Opening note menu').fail(errorMessage(cause))
       })

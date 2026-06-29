@@ -14,9 +14,18 @@ const getPinnedNotes = vi.hoisted(() => vi.fn<() => Promise<PinnedNote[]>>(async
 const revealItemInDir = vi.hoisted(() => vi.fn<(path: string) => Promise<void>>(async () => {}))
 const openRecent = vi.hoisted(() => vi.fn())
 const pickAndOpen = vi.hoisted(() => vi.fn())
-const openPinnedNoteContextMenu = vi.hoisted(() =>
-  vi.fn(async (onUnpin: () => void) => {
-    onUnpin()
+interface NativeContextMenuItemForTest {
+  text: string
+  action: () => void
+}
+
+interface NativeContextMenuOptionsForTest {
+  items: NativeContextMenuItemForTest[]
+}
+
+const openNativeContextMenu = vi.hoisted(() =>
+  vi.fn(async (options: NativeContextMenuOptionsForTest) => {
+    options.items[0]?.action()
   }),
 )
 const unpinNote = vi.hoisted(() => vi.fn(async () => {}))
@@ -30,7 +39,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   getPinnedNotes,
 }))
 vi.mock('@tauri-apps/plugin-opener', () => ({ revealItemInDir }))
-vi.mock('@/lib/native-menu/pinned-note-context-menu', () => ({ openPinnedNoteContextMenu }))
+vi.mock('@/lib/native-menu/context-menu', () => ({ openNativeContextMenu }))
 vi.mock('@/lib/note-pin', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/note-pin')>()),
   unpinNote,
@@ -96,7 +105,7 @@ beforeEach(() => {
   audioMemo.unavailableReason = null
   audioMemo.toggle.mockReset()
   revealItemInDir.mockClear()
-  openPinnedNoteContextMenu.mockClear()
+  openNativeContextMenu.mockClear()
   unpinNote.mockClear()
 })
 
@@ -252,7 +261,13 @@ describe('Sidebar', () => {
 
     fireEvent.contextMenu(await view.findByRole('button', { name: 'Rust' }))
 
-    await waitFor(() => expect(openPinnedNoteContextMenu).toHaveBeenCalled())
+    await waitFor(() => expect(openNativeContextMenu).toHaveBeenCalledWith({
+      items: [
+        expect.objectContaining({
+          text: 'Unpin Note',
+        }),
+      ],
+    }))
     await waitFor(() => expect(unpinNote).toHaveBeenCalledWith('notes/rust.md', 1))
   })
 
