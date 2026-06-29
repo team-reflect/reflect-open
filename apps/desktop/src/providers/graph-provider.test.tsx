@@ -55,7 +55,7 @@ function installFakeBridge(): void {
             pendingOpens.set(root, resolve)
           })
           generation += 1
-          return { root, name: root.slice(1), generation }
+          return { root, name: root.split('/').filter(Boolean).at(-1) ?? '', generation }
         }
         case 'recent_graphs':
           return storedRecents
