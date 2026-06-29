@@ -253,25 +253,7 @@ describe('Sidebar', () => {
     expect(view.queryByRole('region', { name: /pinned notes/i })).toBeNull()
   })
 
-  it('pinned rows open the native note menu on right-click', async () => {
-    getPinnedNotes.mockResolvedValue([
-      { path: 'notes/rust.md', title: 'Rust', dailyDate: null },
-    ])
-    const { view } = renderSidebar()
-
-    fireEvent.contextMenu(await view.findByRole('button', { name: 'Rust' }))
-
-    await waitFor(() => expect(openNativeContextMenu).toHaveBeenCalledWith({
-      items: [
-        expect.objectContaining({
-          text: 'Unpin Note',
-        }),
-      ],
-    }))
-    await waitFor(() => expect(unpinNote).toHaveBeenCalledWith('notes/rust.md', 1))
-  })
-
-  it('optimistically removes a right-click-unpinned row', async () => {
+  it('right-click unpins a pinned row through the native context menu', async () => {
     getPinnedNotes.mockResolvedValue([
       { path: 'notes/rust.md', title: 'Rust', dailyDate: null },
     ])
@@ -280,6 +262,13 @@ describe('Sidebar', () => {
 
     fireEvent.contextMenu(rust)
 
+    await waitFor(() => expect(openNativeContextMenu).toHaveBeenCalledWith({
+      items: [
+        expect.objectContaining({
+          text: 'Unpin Note',
+        }),
+      ],
+    }))
     await waitFor(() => expect(view.queryByRole('button', { name: 'Rust' })).toBeNull())
     expect(unpinNote).toHaveBeenCalledWith('notes/rust.md', 1)
   })

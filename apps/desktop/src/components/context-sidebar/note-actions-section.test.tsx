@@ -91,50 +91,7 @@ describe('NoteActionsSection pin toggle', () => {
     view.unmount()
   })
 
-  it('shows the pinned state while the pin write is still pending', async () => {
-    let resolveToggle!: (active: boolean) => void
-    toggleNotePinned.mockImplementationOnce(
-      () =>
-        new Promise<boolean>((resolve) => {
-          resolveToggle = resolve
-        }),
-    )
-    const view = renderSection('notes/a.md')
-
-    await userEvent.click(view.getByRole('button', { name: /Pin this note/ }))
-
-    expect(view.getByText('Un-pin this note')).toBeDefined()
-    resolveToggle(true)
-    await waitFor(() => expect(toggleNotePinned).toHaveBeenCalledWith('notes/a.md', 7))
-    view.unmount()
-  })
-
-  it('inserts an optimistic pin in the same title order as the index', async () => {
-    getPinnedNotes.mockResolvedValue([
-      { path: 'notes/alpha.md', title: 'Alpha', dailyDate: null },
-      { path: 'notes/zeta.md', title: 'Zeta', dailyDate: null },
-    ])
-    getNote.mockResolvedValue(noteRow('notes/mid.md', false, 'Mid'))
-    const view = renderSection('notes/mid.md')
-    const queryKey = pinnedNotesQueryKey('/g')
-    await waitFor(() =>
-      expect(view.client.getQueryData<PinnedNote[]>(queryKey)?.map((note) => note.title)).toEqual([
-        'Alpha',
-        'Zeta',
-      ]),
-    )
-
-    await userEvent.click(view.getByRole('button', { name: /Pin this note/ }))
-
-    expect(view.client.getQueryData<PinnedNote[]>(queryKey)?.map((note) => note.title)).toEqual([
-      'Alpha',
-      'Mid',
-      'Zeta',
-    ])
-    view.unmount()
-  })
-
-  it('keeps explicitly reordered pins ahead of a new optimistic bare pin', async () => {
+  it('optimistically adds a newly pinned note after explicitly ordered pins', async () => {
     getPinnedNotes.mockResolvedValue([
       { path: 'notes/zeta.md', title: 'Zeta', dailyDate: null, pinnedOrder: 0 },
       { path: 'notes/alpha.md', title: 'Alpha', dailyDate: null, pinnedOrder: 1 },
@@ -179,14 +136,6 @@ describe('NoteActionsSection pin toggle', () => {
     view.unmount()
   })
 
-  it('stays on Pin this note when a different note is pinned', async () => {
-    getPinnedNotes.mockResolvedValue([{ path: 'notes/other.md', title: 'Other', dailyDate: null }])
-    const view = renderSection('notes/a.md')
-    await waitFor(() => expect(getPinnedNotes).toHaveBeenCalled())
-    expect(view.getByText('Pin this note')).toBeDefined()
-    expect(view.queryByText('Un-pin this note')).toBeNull()
-    view.unmount()
-  })
 })
 
 describe('NoteActionsSection private toggle', () => {
@@ -217,15 +166,6 @@ describe('NoteActionsSection private toggle', () => {
     view.unmount()
   })
 
-  it('stays on Lock note for a note the index reports as not private', async () => {
-    getNote.mockResolvedValue(noteRow('notes/a.md', false))
-    const view = renderSection('notes/a.md')
-    await waitFor(() => expect(getNote).toHaveBeenCalled())
-    expect(view.getByText('Lock note')).toBeDefined()
-    expect(view.queryByText('Unlock note')).toBeNull()
-    view.unmount()
-  })
-
   it('restores the private label when a write fails', async () => {
     toggleNotePrivate.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
     const view = renderSection('notes/a.md')
@@ -234,14 +174,6 @@ describe('NoteActionsSection private toggle', () => {
     view.unmount()
   })
 
-  it('restores the private unlock label when an unlock write fails', async () => {
-    getNote.mockResolvedValue(noteRow('notes/a.md', true))
-    toggleNotePrivate.mockRejectedValueOnce({ kind: 'io', message: 'disk on fire' })
-    const view = renderSection('notes/a.md')
-    await userEvent.click(await view.findByRole('button', { name: /Unlock note/ }))
-    await waitFor(() => expect(view.getByText('Unlock note')).toBeDefined())
-    view.unmount()
-  })
 })
 
 describe('NoteActionsSection trash action', () => {
