@@ -81,6 +81,7 @@ registerAppCommands()
 beforeEach(() => {
   // The hoisted mock is shared module state — restore it so mic-related cases
   // can't inherit mutations from earlier tests.
+  getPinnedNotes.mockReset().mockResolvedValue([])
   audioMemo.available = true
   audioMemo.unavailableReason = null
   audioMemo.toggle.mockReset()
@@ -222,6 +223,19 @@ describe('Sidebar', () => {
     expect(pinnedSection.contains(roadmap)).toBe(true)
     await userEvent.click(roadmap)
     await waitFor(() => expect(roadmap.getAttribute('aria-current')).toBe('page'))
+  })
+
+  it('All notes is inactive while the active note is pinned', async () => {
+    getPinnedNotes.mockResolvedValue([
+      { path: 'notes/roadmap.md', title: 'Roadmap', dailyDate: null },
+    ])
+    const { view } = renderSidebar(undefined, { kind: 'note', path: 'notes/roadmap.md' })
+
+    const roadmap = await view.findByRole('button', { name: 'Roadmap' })
+    await waitFor(() => expect(roadmap.getAttribute('aria-current')).toBe('page'))
+    expect(
+      view.getByRole('button', { name: /all notes/i }).getAttribute('aria-current'),
+    ).toBeNull()
   })
 
   it('the pinned section is hidden while nothing is pinned', async () => {

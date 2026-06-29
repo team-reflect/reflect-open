@@ -4,12 +4,15 @@ import { ListChecks, MessageSquare, SquarePen } from 'lucide-react'
 import { AudioMemoButton } from '@/components/audio-memo/audio-memo-button'
 import { ListIcon } from '@/components/icons/list-icon'
 import { PencilIcon } from '@/components/icons/pencil-icon'
+import { usePinnedNotes } from '@/hooks/use-pinned-notes'
 import { keybindingFor } from '@/lib/commands/app-commands'
 import { runCommand } from '@/lib/commands/registry'
 import { isUntitledNotePath } from '@/lib/create-note'
+import { useToday } from '@/lib/use-today'
 import type { CommandContext } from '@/lib/commands/types'
 import { hasMacosTitleBarOverlay } from '@/lib/window-chrome'
 import { cn } from '@/lib/utils'
+import { notePathForRoute } from '@/routing/route'
 import { useRouter } from '@/routing/router'
 import { GraphFooter } from './graph-footer'
 import { NavigateArrows } from './navigate-arrows'
@@ -32,6 +35,11 @@ interface SidebarProps {
  */
 export function Sidebar({ graph, context }: SidebarProps): ReactElement {
   const { route } = useRouter()
+  const today = useToday()
+  const pinned = usePinnedNotes()
+  const currentNotePath = notePathForRoute(route, today)
+  const hasActivePinnedNote =
+    currentNotePath !== null && pinned.some((note) => note.path === currentNotePath)
 
   // Wrap the 16px Lucide glyphs in the custom icons' 24px box so nav rows
   // share one icon footprint.
@@ -63,7 +71,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             icon={<PencilIcon className="shrink-0" />}
             label="Daily notes"
             binding={keybindingFor('nav.today') ?? undefined}
-            active={route.kind === 'today' || route.kind === 'daily'}
+            active={(route.kind === 'today' || route.kind === 'daily') && !hasActivePinnedNote}
             onClick={() => void runCommand('nav.today', context)}
           />
           <SidebarItem
@@ -91,7 +99,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             // highlight until the birth rename — so the two never light at once.
             active={
               route.kind === 'allNotes' ||
-              (route.kind === 'note' && !isUntitledNotePath(route.path))
+              (route.kind === 'note' && !isUntitledNotePath(route.path) && !hasActivePinnedNote)
             }
             onClick={() => void runCommand('nav.allNotes', context)}
           />
