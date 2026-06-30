@@ -5,15 +5,6 @@
       "binaries/reflect",
       "binaries/reflect-capture-host"
     ],
-    "fileAssociations": [
-      {
-        "ext": [],
-        "contentTypes": ["public.folder"],
-        "name": "Reflect Graph Folder",
-        "role": "Editor",
-        "rank": "None"
-      }
-    ],
     "macOS": {
       "entitlements": "Entitlements.plist"
     }
