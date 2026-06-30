@@ -231,7 +231,11 @@ export function GraphProvider({
     [loadRecents],
   )
 
-  const drainDockGraphOpenRequests = useDockGraphOpenRequests({ platform, openRecent })
+  const { drainDockGraphOpenRequests, hasOpenedDockGraphOpenRequest } =
+    useDockGraphOpenRequests({
+      platform,
+      openRecent,
+    })
 
   useEffect(() => {
     let active = true
@@ -271,7 +275,7 @@ export function GraphProvider({
       if (!active) {
         return
       }
-      if (await drainDockGraphOpenRequests()) {
+      if ((await drainDockGraphOpenRequests()) || hasOpenedDockGraphOpenRequest()) {
         return
       }
       if (list.length > 0) {
@@ -283,7 +287,13 @@ export function GraphProvider({
     return () => {
       active = false
     }
-  }, [drainDockGraphOpenRequests, loadRecents, openRecent, platform])
+  }, [
+    drainDockGraphOpenRequests,
+    hasOpenedDockGraphOpenRequest,
+    loadRecents,
+    openRecent,
+    platform,
+  ])
 
   const pickAndOpen = useCallback(async (): Promise<void> => {
     let selected: string | null = null

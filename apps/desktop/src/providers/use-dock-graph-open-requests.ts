@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import {
   errorMessage,
   hasBridge,
@@ -13,6 +13,11 @@ interface DockGraphOpenRequestsOptions {
   openRecent: (root: string) => Promise<boolean>
 }
 
+interface DockGraphOpenRequests {
+  drainDockGraphOpenRequests: () => Promise<boolean>
+  hasOpenedDockGraphOpenRequest: () => boolean
+}
+
 /**
  * Drains graph folders dropped on the macOS Dock icon.
  *
@@ -24,7 +29,9 @@ interface DockGraphOpenRequestsOptions {
 export function useDockGraphOpenRequests({
   platform,
   openRecent,
-}: DockGraphOpenRequestsOptions): () => Promise<boolean> {
+}: DockGraphOpenRequestsOptions): DockGraphOpenRequests {
+  const hasOpenedDockGraphOpenRequestRef = useRef(false)
+
   const drainDockGraphOpenRequests = useCallback(async (): Promise<boolean> => {
     if (!hasBridge() || isMobilePlatform(platform)) {
       return false
@@ -37,9 +44,14 @@ export function useDockGraphOpenRequests({
         return opened
       }
       opened = true
+      hasOpenedDockGraphOpenRequestRef.current = true
       await openRecent(root)
     }
   }, [openRecent, platform])
+
+  const hasOpenedDockGraphOpenRequest = useCallback((): boolean => {
+    return hasOpenedDockGraphOpenRequestRef.current
+  }, [])
 
   useEffect(() => {
     if (!hasBridge() || isMobilePlatform(platform)) {
@@ -56,6 +68,7 @@ export function useDockGraphOpenRequests({
       .then((unsubscribe) => {
         if (active) {
           unlisten = unsubscribe
+          void drainDockGraphOpenRequests()
         } else {
           unsubscribe()
         }
@@ -70,5 +83,8 @@ export function useDockGraphOpenRequests({
     }
   }, [drainDockGraphOpenRequests, platform])
 
-  return drainDockGraphOpenRequests
+  return useMemo(
+    () => ({ drainDockGraphOpenRequests, hasOpenedDockGraphOpenRequest }),
+    [drainDockGraphOpenRequests, hasOpenedDockGraphOpenRequest],
+  )
 }
