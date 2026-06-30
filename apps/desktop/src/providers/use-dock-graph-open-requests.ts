@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import {
   errorMessage,
   hasBridge,
@@ -13,9 +13,8 @@ interface DockGraphOpenRequestsOptions {
   openRecent: (root: string) => Promise<boolean>
 }
 
-interface DockGraphOpenRequests {
-  drainDockGraphOpenRequests: () => Promise<boolean>
-  hasOpenedDockGraphOpenRequest: () => boolean
+interface DockGraphOpenRequestDrainOptions {
+  includeAlreadyOpened?: boolean
 }
 
 /**
@@ -29,29 +28,33 @@ interface DockGraphOpenRequests {
 export function useDockGraphOpenRequests({
   platform,
   openRecent,
-}: DockGraphOpenRequestsOptions): DockGraphOpenRequests {
+}: DockGraphOpenRequestsOptions): (
+  options?: DockGraphOpenRequestDrainOptions,
+) => Promise<boolean> {
   const hasOpenedDockGraphOpenRequestRef = useRef(false)
 
-  const drainDockGraphOpenRequests = useCallback(async (): Promise<boolean> => {
-    if (!hasBridge() || isMobilePlatform(platform)) {
-      return false
-    }
-
-    let opened = false
-    for (;;) {
-      const root = await takeGraphOpenRequest()
-      if (root === null) {
-        return opened
+  const drainDockGraphOpenRequests = useCallback(
+    async (options?: DockGraphOpenRequestDrainOptions): Promise<boolean> => {
+      if (!hasBridge() || isMobilePlatform(platform)) {
+        return false
       }
-      opened = true
-      hasOpenedDockGraphOpenRequestRef.current = true
-      await openRecent(root)
-    }
-  }, [openRecent, platform])
 
-  const hasOpenedDockGraphOpenRequest = useCallback((): boolean => {
-    return hasOpenedDockGraphOpenRequestRef.current
-  }, [])
+      let opened = false
+      for (;;) {
+        const root = await takeGraphOpenRequest()
+        if (root === null) {
+          return (
+            opened ||
+            (options?.includeAlreadyOpened === true && hasOpenedDockGraphOpenRequestRef.current)
+          )
+        }
+        opened = true
+        hasOpenedDockGraphOpenRequestRef.current = true
+        await openRecent(root)
+      }
+    },
+    [openRecent, platform],
+  )
 
   useEffect(() => {
     if (!hasBridge() || isMobilePlatform(platform)) {
@@ -83,8 +86,5 @@ export function useDockGraphOpenRequests({
     }
   }, [drainDockGraphOpenRequests, platform])
 
-  return useMemo(
-    () => ({ drainDockGraphOpenRequests, hasOpenedDockGraphOpenRequest }),
-    [drainDockGraphOpenRequests, hasOpenedDockGraphOpenRequest],
-  )
+  return drainDockGraphOpenRequests
 }
