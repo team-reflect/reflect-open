@@ -64,7 +64,7 @@
 
   /* shadcn semantic tokens (added by `shadcn init`, values rewired below in
      :root to reference DS tokens). Note `--color-accent` above stays the DS
-     brand color — shadcn components that want the subtle hover wash use
+     brand color, so shadcn components that want the subtle hover wash use
      `bg-surface-hover` instead (adjusted per component under ui/). */
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -123,7 +123,7 @@
 /* shadcn semantic tokens, bridged onto the DS tokens so both vocabularies
    describe one theme and `.dark` / `.reflect-space` keep working untouched.
    `--accent`, `--border`, `--destructive`, and `--radius` are NOT redefined
-   here — the DS already owns those names (and `--accent` is the brand color,
+   here: the DS already owns those names (and `--accent` is the brand color,
    not shadcn's hover wash; see the @theme note above). Chart colors have no
    DS equivalent and keep the generated neutral ramp. */
 :root {
@@ -163,8 +163,8 @@ body,
   height: 100%;
 }
 
-/* The app frame (AppShell) never scrolls — every route mounts its own scroll
-   container — so the document scroller must never engage. Without this,
+/* The app frame (AppShell) never scrolls (every route mounts its own scroll
+   container), so the document scroller must never engage. Without this,
    reaching an inner pane's scroll boundary chains the gesture up to <body>
    and WKWebView elastically bounces the entire window (macOS rubber-banding). */
 html,
@@ -194,8 +194,8 @@ body {
   }
 
   /* The * rule above applies none to every element explicitly, so it also
-     hits children inside selectable roots. Restore text selection — and the
-     long-press callout (the iOS selection magnifier) — on those roots AND
+     hits children inside selectable roots. Restore text selection, and the
+     long-press callout (the iOS selection magnifier), on those roots AND
      their descendants so editing text still works. */
   input,
   textarea,
@@ -225,7 +225,7 @@ body {
 }
 
 /* One keyboard-focus treatment everywhere. Zero-specificity (`:where`) so any
-   component rule below — the editor's `outline: none`, the palette input —
+   component rule below (the editor's `outline: none`, the palette input)
    can still opt out. */
 :where(button, a, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--focus-ring);
@@ -237,9 +237,11 @@ body {
    Reflect tokens. This lives on `html:root`, not `.reflect-editor`: meowdown
    renders the block handle and slash/tag/wikilink menus as DOM siblings of the
    editable element (menus hoist into the top layer via the Popover API), so
-   element-scoped vars never reach them and they fall back to meowdown's
-   `light-dark()` defaults (unstyled in dark mode). `html:root` outranks
-   meowdown's own `:root` defaults and loads after them, so our values win. */
+   element-scoped vars never reach them, which is why the popover surface vars
+   (`--meowdown-popover-*`) must live here too. `html:root` is unlayered, so it
+   beats meowdown's now-layered (`@layer meowdown`) `:root` defaults regardless
+   of load order; the accent stays Reflect purple, so meowdown's orange default
+   never shows here. */
 
 html:root {
   --meowdown-text: var(--text);
@@ -250,11 +252,15 @@ html:root {
   --meowdown-border: var(--border);
   --meowdown-code-bg: var(--surface-sunken, rgb(0 0 0 / 5%));
   --meowdown-font-mono: var(--font-mono, monospace);
+  /* Selection: meowdown defaults warm; Reflect keeps its blue-violet accent. */
   --meowdown-node-outline: var(--accent);
   --meowdown-node-selection: var(--accent-soft, rgb(99 102 241 / 12%));
   --meowdown-selection: var(--accent-soft, rgb(99 102 241 / 12%));
-  --meowdown-autocomplete-bg: var(--surface);
-  --meowdown-autocomplete-highlight-bg: var(--accent-soft);
+  /* Floating menus (top layer): background is Reflect's surface; the highlighted
+     row uses accent-soft, matching the ⌘K palette's selected item. */
+  --meowdown-popover-bg: var(--surface);
+  --meowdown-popover-hover-bg: var(--accent-soft);
+  --meowdown-danger: var(--destructive);
 }
 
 /* Editor reading size (Settings → Editor → "Text size"). The size lives in a
@@ -282,42 +288,28 @@ html:root {
      inherit so the compact read-only MarkdownView surfaces that also carry
      `reflect-editor` (backlink snippets, palette previews, task rows) keep
      their context's smaller size; the primary note editor opts into the
-     reading size via `.reflect-note-surface` below. The matching
-     .reflect-editor.ProseMirror block re-states these with 0-2-0 specificity;
-     see the note on .reflect-stream-gutter for why. */
+     reading size via `.reflect-note-surface` below. meowdown is layered
+     (`@layer meowdown`), so this unlayered rule wins with no `.ProseMirror`
+     compound. */
   padding: 0;
   font-size: inherit;
   font-family: var(--font-reading, var(--font-sans));
 }
 
-.reflect-editor.ProseMirror {
-  padding: 0;
-  font-size: inherit;
-}
-
-/* The primary note editor — the note pane and every daily-stream row, both via
-   NotePane — reads at the user's chosen text size (Settings → Editor → "Text
-   size"; default 16px) instead of inheriting <body>'s 14px chrome size. Scoped
-   to this class, never bare `.reflect-editor`, so read-only previews keep their
-   own compact sizes. The `.ProseMirror` compound sits after the inherit rule
-   above so its 0-2-0 selector wins the source-order tie (and beats meowdown's
-   later-injected `.ProseMirror`). */
-.reflect-note-surface,
-.reflect-note-surface.ProseMirror {
+/* The primary note editor (the note pane and every daily-stream row, both via
+   NotePane) reads at the user's chosen text size (Settings, Editor, "Text size";
+   default 16px) instead of inheriting <body>'s 14px chrome size. Scoped to this
+   class, never bare `.reflect-editor`, so read-only previews keep their own
+   compact sizes. */
+.reflect-note-surface {
   font-size: var(--editor-font-size, var(--text-base));
 }
 
 /* The daily stream's horizontal gutter (STREAM_GUTTER in daily-stream.tsx),
    shared by each row's day label, pane chrome, and the editor itself so they
-   align. Un-layered so it beats the un-layered `padding: 0` reset above by
-   source order. The `.ProseMirror` compound bumps specificity to 0-2-0:
-   meowdown's stylesheet is injected dynamically when the editor lazy-loads,
-   so its `.ProseMirror { padding }` rule arrives after this file and wins
-   equal-specificity ties; the compound restores our rule's priority. */
+   align. Un-layered, so it beats both the `padding: 0` reset above and
+   meowdown's layered gutter. */
 .reflect-stream-gutter {
-  padding-inline: max(1.5rem, calc((100% - 42rem) / 2));
-}
-.reflect-stream-gutter.ProseMirror {
   padding-inline: max(1.5rem, calc((100% - 42rem) / 2));
 }
 
@@ -328,27 +320,24 @@ html:root {
 }
 
 /* Heading weight and size compete with meowdown's `.ProseMirror h*` theme
-   rules. That stylesheet is injected dynamically when the editor lazy-loads, so
-   it cascades *after* this file and wins equal-specificity (0-1-1) ties — left
-   plain, our H1 lost to the theme's 1.75rem and towered over the daily subject.
-   The `.ProseMirror` compound bumps these to 0-2-1 so our values hold; see the
-   note on `.reflect-stream-gutter`. (Margin and letter-spacing ride along; only
+   rules. meowdown is layered (`@layer meowdown`), so these unlayered rules win
+   without a `.ProseMirror` compound. (Margin and letter-spacing ride along; only
    the size and weight actually clash with the theme.) */
-.reflect-editor.ProseMirror h1,
-.reflect-editor.ProseMirror h2,
-.reflect-editor.ProseMirror h3 {
+.reflect-editor h1,
+.reflect-editor h2,
+.reflect-editor h3 {
   font-weight: 650;
   letter-spacing: var(--tracking-snug, -0.01em);
   margin: 1.25em 0 0.4em;
 }
-/* The leading H1 is the document title — the regular-note subject, matching
+/* The leading H1 is the document title: the regular-note subject, matching
    the daily date subject. H2 and H3 step down the type scale so a section
    heading reads as subordinate to the title, not a second one: auto-appended
    sections (`## Links`, `## Audio memos`) land at H2, one size below the
    subject; H3 sits at body size, carried by weight rather than scale. */
-.reflect-editor.ProseMirror h1 { @apply text-note-subject; } /* text-xl, 20px */
-.reflect-editor.ProseMirror h2 { font-size: var(--text-lg, 1.125rem); } /* 18px */
-.reflect-editor.ProseMirror h3 { font-size: var(--text-base, 1rem); } /* 16px */
+.reflect-editor h1 { @apply text-note-subject; } /* text-xl, 20px */
+.reflect-editor h2 { font-size: var(--text-lg, 1.125rem); } /* 18px */
+.reflect-editor h3 { font-size: var(--text-base, 1rem); } /* 16px */
 .reflect-editor h1:first-child { margin-top: 0; }
 .reflect-editor .reflect-note-title { @apply text-note-subject; }
 
@@ -375,8 +364,8 @@ html:root {
 /* NotePane's loading placeholder: hold the editor's reserved space silently,
    revealing the hint text only when a load is genuinely slow. Local note
    reads resolve in milliseconds, and "Loading note…" flashing on every
-   daily-stream row reads as flicker while the stream anchors. Opacity only —
-   the placeholder must keep its layout size either way. */
+   daily-stream row reads as flicker while the stream anchors. Opacity only,
+   so the placeholder must keep its layout size either way. */
 .reflect-note-loading {
   opacity: 0;
   animation: reflect-note-loading-reveal var(--duration-slow, 300ms)
@@ -434,22 +423,20 @@ html:root {
   letter-spacing: 0;
 }
 .line-through .reflect-task-preview .md-link,
-.line-through .reflect-task-preview .md-wikilink-label,
-.line-through .reflect-task-preview .md-wikilink-source,
-.line-through .reflect-task-preview .reflect-tag-link {
+.line-through .reflect-task-preview .md-wikilink-view-label,
+.line-through .reflect-task-preview .md-tag {
   text-decoration-line: line-through;
 }
 
 /* Incoming-backlink snippet (BacklinkSnippet): one referencing line rendered as
    rich text through MarkdownView. The view carries `reflect-editor` so chips and
    inline marks share the editor's styling; these rules keep it in the panel's
-   compact 12px line box (the wrapper clamps it to two lines). The `.ProseMirror`
-   compound matches meowdown's heading-rule specificity so our caps win the
-   later-source-order tie, the same trick as `.reflect-stream-gutter`. */
+   compact 12px line box (the wrapper clamps it to two lines). meowdown is
+   layered, so these unlayered rules win without a `.ProseMirror` compound. */
 .reflect-backlink-snippet .reflect-editor :is(p, ul, ol, blockquote, pre) {
   margin: 0;
 }
-.reflect-backlink-snippet .reflect-editor.ProseMirror :is(h1, h2, h3, h4, h5, h6) {
+.reflect-backlink-snippet .reflect-editor :is(h1, h2, h3, h4, h5, h6) {
   margin: 0;
   font-size: inherit;
   font-weight: inherit;
@@ -457,44 +444,32 @@ html:root {
   letter-spacing: 0;
 }
 
+/* meowdown's blockquote is now upright and themed via `--meowdown-blockquote-border`
+   by default; we only restate the border color, text color, and the block
+   margin (the per-element spacing the `> * + *` reset above relies on). */
 .reflect-editor blockquote {
   border-left: 2px solid var(--accent-soft, var(--border));
   color: var(--text-secondary);
-  font-style: normal; /* the theme italicizes quotes; V1 keeps them upright */
   margin: 0.6em 0;
   padding-left: 1em;
 }
 
-.reflect-editor code {
-  font-family: var(--font-mono, monospace);
-  font-size: 0.9em;
-  color: inherit; /* the theme tints code toward the accent; V1 keeps text color */
-  background: var(--surface-sunken, rgb(0 0 0 / 5%));
-  border-radius: var(--radius-sm, 4px);
-  padding: 0.1em 0.3em;
-}
-
+/* Inline code now inherits meowdown's neutral default (text color + the
+   `--meowdown-code-bg` surface we map below), so it needs no override. The code
+   block keeps Reflect's radius/padding and its block margin. */
 .reflect-editor pre {
-  font-family: var(--font-mono, monospace);
-  font-size: 0.875em;
-  background: var(--surface-sunken, rgb(0 0 0 / 5%));
   border-radius: var(--radius-md, 6px);
   margin: 0.6em 0;
   padding: 0.75em 1em;
 }
-.reflect-editor pre code {
-  background: none;
-  padding: 0;
-}
 
 /* Inline images: meowdown renders `![alt](src)` through a mark view
-   (`.md-image-preview`). Cap the height and round corners to Reflect's scale
-   via meowdown's theming variables. */
+   (`.md-image-view-preview`). Round corners to Reflect's scale via meowdown's
+   theming variable. */
 .reflect-editor {
-  --meowdown-image-max-height: 28rem;
   --meowdown-image-radius: var(--radius-md, 6px);
 }
-.reflect-editor .md-image-preview-img img {
+.reflect-editor .md-image-view-preview img {
   cursor: zoom-in;
 }
 
@@ -536,13 +511,10 @@ html:root {
   }
 }
 
-/* Wiki links: chips over the engine's native `[[…]]` marks (the theme's
-   dashed underline reads as a draft affordance; V1 renders chips). meowdown
-   0.13.0 renders wikilinks as a mark view: the immutable `.md-wikilink-label`
-   stands in for the raw `.md-wikilink-source`, so chip both (one shows per
-   mark mode). */
-.reflect-editor .md-wikilink-label,
-.reflect-editor .md-wikilink-source {
+/* Wiki links: a chip over meowdown's `[[…]]` mark view (the theme's dashed
+   underline reads as a draft affordance; V1 renders chips). meowdown renders the
+   immutable label as `.md-wikilink-view-label`. */
+.reflect-editor .md-wikilink-view-label {
   text-decoration: none;
   color: var(--accent-soft-text, var(--accent));
   background: var(--accent-soft, rgb(99 102 241 / 12%));
@@ -551,36 +523,14 @@ html:root {
   cursor: pointer;
 }
 
-.reflect-editor .reflect-tag-link {
-  color: var(--accent-soft-text, var(--accent));
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.16em;
-  cursor: pointer;
-}
+/* Tags render via meowdown's `.md-tag` (an accent pill, our purple); bullets and
+   the task checkbox border now come from meowdown's defaults (muted `::marker`,
+   1px muted border). Only the checkbox-to-label gap stays a Reflect override. */
 
-/* ---- List markers (V1-parity) ---------------------------------------------
-   meowdown paints bullets in `currentColor` (the full body-text color, which
-   reads heavy) and gives task checkboxes a 1.5px border. V1 used a quiet gray
-   bullet and a 1px hairline. Restore both. Specificity has to clear meowdown's
-   own rules, which inject after this file (see .reflect-stream-gutter): the
-   bullet selector lands at 0-4-0 vs meowdown's 0-3-0, and the checkbox selector
-   adds the `.ProseMirror` compound to reach 0-6-1 vs meowdown's 0-5-1. */
-.reflect-editor .prosemirror-flat-list[data-list-kind='bullet'] > .list-marker {
-  background-color: var(--text-muted);
-}
-.reflect-editor.ProseMirror
-  .prosemirror-flat-list[data-list-kind='task']
-  > .list-marker
-  input[type='checkbox'] {
-  border-width: 1px;
-  border-color: var(--text-muted); /* crisper than the pale --border at 1px */
-}
 /* Task checkbox spacing. Two rules work together to give the checkbox breathing
-   room from its label (PR #373's goal) WITHOUT moving the label — moving it
+   room from its label (PR #373's goal) WITHOUT moving the label (moving it
    misaligns the label from sibling bullets and makes bullet<->task conversion
-   jump sideways (the `1.25lh` content nudge #373 originally shipped did exactly
-   that).
+   jump sideways, the way the `1.25lh` content nudge #373 originally shipped did).
 
    1. Content keeps meowdown's default 1lh (the value bullets use), so a
       checkbox's label lines up with bullet text and converting a line between
@@ -591,8 +541,8 @@ html:root {
       dot's sits, so the checkbox<->label gap matches a bullet's. The breathing
       room comes from the marker, not from indenting the text.
 
-   Both selectors add `.reflect-editor` to reach 0-4-0, clearing meowdown's
-   0-3-0 base rules (which inject after this file). */
+   meowdown does not fold this gap into its default yet, so it stays a Reflect
+   override; meowdown is layered, so the unlayered `.reflect-editor` rules win. */
 .reflect-editor .prosemirror-flat-list[data-list-kind='task'] > .list-content {
   margin-inline-start: 1lh;
 }
@@ -603,7 +553,7 @@ html:root {
 /* ---- shadcn inputs (components/ui/) -------------------------------------
    shadcn form controls carry their own focus-visible ring (border + ring
    utilities), so the global outline above would stack a second ring on top.
-   Its rule is unlayered, so a Tailwind utility can't opt out — do it here. */
+   Its rule is unlayered, so a Tailwind utility can't opt out, so do it here. */
 :where([data-slot='input'], [data-slot='textarea'], [cmdk-input]):focus-visible {
   outline: none;
 }
