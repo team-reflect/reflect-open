@@ -36,10 +36,10 @@ text editor.
   enforced in code and covered by tests.
 - **Talk instead of type.** Record an audio memo; it's saved instantly and
   transcribed into your daily note with your own key.
-- **Free backup, full history.** Connect GitHub in-app (or
-  [any git host you run](docs/generic-git-remotes.md)) and every change is
-  versioned in a repository you own. Conflicts show up as plain choices
-  instead of merge jargon.
+- **Simple sync, optional history.** Put your graph in iCloud Drive for the
+  easiest Mac/iOS file sync, or connect GitHub in-app (or
+  [any git host you run](docs/generic-git-remotes.md)) for versioned backup
+  in a repository you own.
 - **Keyboard-native and light.** Every core action has a shortcut (`⌘/` shows
   them all). The app itself is Tauri rather than Electron: native, signed,
   notarized, and auto-updating.
@@ -90,6 +90,30 @@ from the files on demand; deleting it loses nothing. Frontmatter stays
 minimal: a stable `id`, optional `aliases`, and the `private` / `pinned`
 flags. Edit your notes with any other tool while Reflect runs; the file
 watcher picks up external changes and re-indexes.
+
+## Sync
+
+The recommended default is to create your graph inside an iCloud-synced
+directory, for example `iCloud Drive/ReflectGraph`. Reflect still reads and
+writes ordinary local markdown files; iCloud handles moving those files between
+your devices.
+
+If you want versioned backup, restore history, or sync through a provider you
+control, Reflect also supports git sync. Connect GitHub from the app, or use
+[any SSH git remote](docs/generic-git-remotes.md) by adding it as the graph's
+`origin`. Git sync stores every change in a repository you own and keeps
+Reflect's local `.reflect/` index out of the backup because it can be rebuilt
+from the markdown files.
+
+iCloud Drive encryption depends on the user's iCloud settings. Standard iCloud
+data protection encrypts files in transit and at rest; end-to-end encryption
+for iCloud Drive requires
+[Advanced Data Protection](https://support.apple.com/en-us/108756), Apple's
+opt-in mode that makes iCloud Drive contents decryptable only by trusted
+devices. Turn it on from iPhone, iPad, or Mac settings by opening your Apple
+Account, choosing iCloud → Advanced Data Protection, setting up account
+recovery if prompted, and enabling it. iCloud Mail, Contacts, Calendars, and
+some metadata remain outside Advanced Data Protection.
 
 ## Privacy model
 
