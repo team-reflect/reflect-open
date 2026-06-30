@@ -17,6 +17,7 @@ mod error;
 mod fs;
 mod git;
 mod graph_gitignore;
+mod graph_open_request;
 mod quit;
 mod recents;
 mod secrets;
@@ -141,6 +142,7 @@ pub fn run() {
 
     builder
         .manage(fs::GraphState::default())
+        .manage(graph_open_request::GraphOpenRequestState::default())
         .manage(db::IndexState::default())
         .manage(watcher::WatcherState::default())
         .manage(quit::QuitState::default())
@@ -151,6 +153,7 @@ pub fn run() {
             mobile_graph_root,
             fs::graph_open,
             fs::graph_create,
+            graph_open_request::graph_open_request_take,
             fs::note_read,
             fs::note_write,
             fs::asset_write,
@@ -206,6 +209,11 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = &event {
+                let state = app.state::<graph_open_request::GraphOpenRequestState>();
+                graph_open_request::queue_opened_urls(app, &state, urls);
+            }
             if let tauri::RunEvent::ExitRequested { code, api, .. } = &event {
                 // A user/OS-initiated quit (⌘Q — no exit code) with a live
                 // webview defers once so the frontend can flush dirty note

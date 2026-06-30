@@ -18,6 +18,8 @@ import {
   mobileGraphRoot,
   openGraph,
   recentGraphs,
+  subscribeGraphOpenRequested,
+  takeGraphOpenRequest,
   type AppPlatform,
   type GraphInfo,
   type RecentGraph,
@@ -230,6 +232,22 @@ export function GraphProvider({
     [loadRecents],
   )
 
+  const drainGraphOpenRequests = useCallback(async (): Promise<boolean> => {
+    if (!hasBridge() || isMobilePlatform(platform)) {
+      return false
+    }
+
+    let opened = false
+    for (;;) {
+      const root = await takeGraphOpenRequest()
+      if (root === null) {
+        return opened
+      }
+      opened = true
+      await openRecent(root)
+    }
+  }, [openRecent, platform])
+
   useEffect(() => {
     let active = true
     void (async () => {
@@ -268,6 +286,9 @@ export function GraphProvider({
       if (!active) {
         return
       }
+      if (await drainGraphOpenRequests()) {
+        return
+      }
       if (list.length > 0) {
         await openRecent(list[0]!.root)
       } else {
@@ -277,7 +298,36 @@ export function GraphProvider({
     return () => {
       active = false
     }
-  }, [loadRecents, openRecent, platform])
+  }, [drainGraphOpenRequests, loadRecents, openRecent, platform])
+
+  useEffect(() => {
+    if (!hasBridge() || isMobilePlatform(platform)) {
+      return
+    }
+
+    let active = true
+    let unlisten: (() => void) | null = null
+    void subscribeGraphOpenRequested(() => {
+      if (active) {
+        void drainGraphOpenRequests()
+      }
+    })
+      .then((unsubscribe) => {
+        if (active) {
+          unlisten = unsubscribe
+        } else {
+          unsubscribe()
+        }
+      })
+      .catch((err: unknown) => {
+        console.error('graph open request subscription failed:', errorMessage(err))
+      })
+
+    return () => {
+      active = false
+      unlisten?.()
+    }
+  }, [drainGraphOpenRequests, platform])
 
   const pickAndOpen = useCallback(async (): Promise<void> => {
     let selected: string | null = null

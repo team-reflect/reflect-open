@@ -100,6 +100,11 @@ export {
   captureMetaFetch,
   promoteCaptureScreenshot,
 } from './graph/commands'
+export {
+  GRAPH_OPEN_REQUESTED_EVENT,
+  takeGraphOpenRequest,
+  subscribeGraphOpenRequested,
+} from './graph/open-requests'
 
 // User settings (config-dir JSON document; Rust persists, this layer validates)
 export {
