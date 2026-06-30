@@ -4,8 +4,11 @@ import { join } from 'node:path'
 import { expect, test } from 'vitest'
 
 import {
+  appendMacDownloadNotice,
   createBetaFeedReleaseArgs,
   createDmgArgs,
+  createGenerateReleaseNotesArgs,
+  createMacDownloadNotice,
   createReleaseArgs,
   createTauriBuildArgs,
   createUpdaterManifest,
@@ -19,10 +22,11 @@ const baseInput = {
   assets: ['Reflect.dmg', 'Reflect.app.tar.gz', 'Reflect.app.tar.gz.sig', 'latest.json'],
   commit: 'abc123',
   draft: false,
+  notesPath: 'release-notes.md',
   productName: 'Reflect',
 }
 
-test('pre-release publish opts out of GitHub latest heuristics', () => {
+test('pre-release publish uses prepared notes and opts out of GitHub latest heuristics', () => {
   const args = createReleaseArgs({
     ...baseInput,
     prerelease: true,
@@ -42,7 +46,8 @@ test('pre-release publish opts out of GitHub latest heuristics', () => {
     'Reflect 0.2.0-beta.14',
     '--target',
     'abc123',
-    '--generate-notes',
+    '--notes-file',
+    'release-notes.md',
     '--prerelease',
     '--latest=false',
   ])
@@ -59,6 +64,7 @@ test('stable publish marks the release as latest', () => {
   expect(args).toContain('--latest')
   expect(args).not.toContain('--prerelease')
   expect(args).not.toContain('--latest=false')
+  expect(args).not.toContain('--generate-notes')
 })
 
 test('draft publish keeps the draft flag last', () => {
@@ -71,6 +77,56 @@ test('draft publish keeps the draft flag last', () => {
   })
 
   expect(args.at(-1)).toBe('--draft')
+})
+
+test('generated release notes API targets the release tag and commit', () => {
+  expect(createGenerateReleaseNotesArgs({ commit: 'abc123', tag: 'v0.4.0' })).toEqual([
+    'api',
+    'repos/{owner}/{repo}/releases/generate-notes',
+    '--method',
+    'POST',
+    '-f',
+    'tag_name=v0.4.0',
+    '-f',
+    'target_commitish=abc123',
+  ])
+})
+
+test('Mac download notice points each processor at the matching DMG', () => {
+  const notice = createMacDownloadNotice({ productName: 'Reflect Beta', version: '0.4.0-beta.8' })
+
+  expect(notice).toContain('`Reflect.Beta_0.4.0-beta.8_aarch64.dmg`')
+  expect(notice).toContain('`Reflect.Beta_0.4.0-beta.8_x86_64.dmg`')
+  expect(notice).toContain('Apple Silicon (M-series Macs)')
+  expect(notice).toContain('Apple menu -> About This Mac')
+})
+
+test('Mac download notice is appended after generated release notes', () => {
+  const notes = appendMacDownloadNotice({
+    body: "## What's Changed\n\n- Fixed sync\n\n**Full Changelog**: v0.3.6...v0.3.7\n",
+    productName: 'Reflect',
+    version: '0.3.7',
+  })
+
+  expect(notes).toBe(
+    "## What's Changed\n\n" +
+      '- Fixed sync\n\n' +
+      '**Full Changelog**: v0.3.6...v0.3.7\n\n' +
+      '## Which Mac download should I choose?\n\n' +
+      '- **Apple Silicon (M-series Macs):** download `Reflect_0.3.7_aarch64.dmg`.\n' +
+      '- **Intel Macs:** download `Reflect_0.3.7_x86_64.dmg`.\n\n' +
+      'To check your Mac, open **Apple menu -> About This Mac**. If it shows **Chip** with M1, M2, M3, M4, or newer, choose Apple Silicon. If it shows **Processor** with Intel, choose Intel.\n',
+  )
+})
+
+test('Mac download notice is not duplicated when release notes are regenerated', () => {
+  const notes = appendMacDownloadNotice({
+    body: createMacDownloadNotice({ productName: 'Reflect', version: '0.3.7' }),
+    productName: 'Reflect',
+    version: '0.3.7',
+  })
+
+  expect(notes.match(/Which Mac download should I choose/g)).toHaveLength(1)
 })
 
 test('beta feed release is a non-latest prerelease pointer', () => {

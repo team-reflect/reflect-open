@@ -42,6 +42,7 @@ const UPDATER_KEYCHAIN_SERVICE = 'reflect-updater'
 const APP_SPECIFIC_PASSWORD_URL = 'https://account.apple.com'
 const BETA_UPDATER_FEED_TAG = 'updater-beta'
 const STABLE_UPDATER_ENDPOINT = 'https://github.com/team-reflect/reflect-open/releases/latest/download/latest.json'
+const APPLE_SILICON_MAC_TARGET = 'aarch64-apple-darwin'
 const INTEL_MAC_TARGET = 'x86_64-apple-darwin'
 const INTEL_ONNX_RUNTIME_VERSION = '1.23.2'
 const INTEL_ONNX_RUNTIME_ARCHIVE_ROOT = `onnxruntime-osx-x86_64-${INTEL_ONNX_RUNTIME_VERSION}`
@@ -50,6 +51,8 @@ const INTEL_ONNX_RUNTIME_URL =
   `${INTEL_ONNX_RUNTIME_ARCHIVE_ROOT}.tgz`
 const ONNX_RUNTIME_DYLIB_RESOURCE = 'libonnxruntime.dylib'
 const INTEL_ONNX_RUNTIME_RESOURCE_SOURCE = `resources/onnxruntime/${ONNX_RUNTIME_DYLIB_RESOURCE}`
+const RELEASE_NOTES_FILENAME = 'release-notes.md'
+const MAC_DOWNLOAD_NOTICE_HEADING = '## Which Mac download should I choose?'
 
 /**
  * Build flavors. Each ships as a distinct app (its own productName, identifier
@@ -66,18 +69,18 @@ const FLAVOR_OVERLAYS = {
 }
 
 const MACOS_RELEASE_TARGETS = {
-  'aarch64-apple-darwin': {
+  [APPLE_SILICON_MAC_TARGET]: {
     arch: 'aarch64',
     label: 'Apple Silicon',
     platform: 'darwin-aarch64',
   },
-  'x86_64-apple-darwin': {
+  [INTEL_MAC_TARGET]: {
     arch: 'x86_64',
     label: 'Intel',
     platform: 'darwin-x86_64',
   },
 }
-const DEFAULT_PUBLISH_TARGETS = ['aarch64-apple-darwin', 'x86_64-apple-darwin']
+const DEFAULT_PUBLISH_TARGETS = [APPLE_SILICON_MAC_TARGET, INTEL_MAC_TARGET]
 
 const here = dirname(fileURLToPath(import.meta.url))
 const appDir = join(here, '..')
@@ -391,7 +394,7 @@ export function createUpdaterManifest({ artifacts, pubDate, slug, tag, version }
     // GitHub rewrites spaces in uploaded asset names to dots, so a flavor whose
     // productName has a space ("Reflect Beta") is served under a dotted name.
     // The manifest URL must match the uploaded name or auto-update gets a 404.
-    const assetName = basename(artifact.updaterArchive).replace(/ /g, '.')
+    const assetName = githubAssetName(basename(artifact.updaterArchive))
     platforms[artifact.platform] = {
       signature: readFileSync(artifact.updaterSignature, 'utf8').trim(),
       url: `https://github.com/${slug}/releases/download/${tag}/${assetName}`,
@@ -585,6 +588,7 @@ function printArtifacts(flavor, target) {
   console.log(`  ${dmg} (${dmgSizeMb} MB)`)
 }
 
+/** Build the uploaded file name for a target-specific release artifact. */
 function releaseAssetName({ productName, version, target, type }) {
   const { arch } = releaseTargetConfig(target)
   const prefix = `${productName}_${version}_${arch}`
@@ -598,6 +602,11 @@ function releaseAssetName({ productName, version, target, type }) {
     default:
       fail(`unknown release asset type "${type}"`)
   }
+}
+
+/** Match GitHub's release asset URL/display rewrite for uploaded file names. */
+function githubAssetName(fileName) {
+  return fileName.replace(/ /g, '.')
 }
 
 function exportReleaseArtifacts({ artifactDir, flavor, target }) {
@@ -838,8 +847,79 @@ function ensureTagMatchesCommit(tag, commit) {
   }
 }
 
+/** Build the GitHub API args that generate the standard release notes body. */
+export function createGenerateReleaseNotesArgs({ commit, tag }) {
+  return [
+    'api',
+    'repos/{owner}/{repo}/releases/generate-notes',
+    '--method',
+    'POST',
+    '-f',
+    `tag_name=${tag}`,
+    '-f',
+    `target_commitish=${commit}`,
+  ]
+}
+
+/** Create the release-note footer that maps Mac CPU families to the right DMG. */
+export function createMacDownloadNotice({ productName, version }) {
+  const appleSiliconDmg = githubAssetName(
+    releaseAssetName({ productName, version, target: APPLE_SILICON_MAC_TARGET, type: 'dmg' }),
+  )
+  const intelDmg = githubAssetName(releaseAssetName({ productName, version, target: INTEL_MAC_TARGET, type: 'dmg' }))
+
+  return [
+    MAC_DOWNLOAD_NOTICE_HEADING,
+    '',
+    `- **Apple Silicon (M-series Macs):** download \`${appleSiliconDmg}\`.`,
+    `- **Intel Macs:** download \`${intelDmg}\`.`,
+    '',
+    'To check your Mac, open **Apple menu -> About This Mac**. If it shows **Chip** with M1, M2, M3, M4, or newer, choose Apple Silicon. If it shows **Processor** with Intel, choose Intel.',
+  ].join('\n')
+}
+
+/** Append Reflect's Mac download guidance after GitHub's generated notes. */
+export function appendMacDownloadNotice({ body, productName, version }) {
+  const trimmedBody = body.trimEnd()
+  if (trimmedBody.includes(MAC_DOWNLOAD_NOTICE_HEADING)) return `${trimmedBody}\n`
+
+  const notice = createMacDownloadNotice({ productName, version })
+  return `${trimmedBody ? `${trimmedBody}\n\n` : ''}${notice}\n`
+}
+
+/** Fetch GitHub's generated release notes body before creating the release. */
+function generateReleaseNotesBody({ commit, tag }) {
+  const result = spawnSync('gh', createGenerateReleaseNotesArgs({ commit, tag }), { encoding: 'utf8' })
+  if (result.status !== 0) {
+    const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim()
+    fail(`generating GitHub release notes failed${output ? `\n${output}` : ''}`)
+  }
+
+  let generated
+  try {
+    generated = JSON.parse(result.stdout)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    fail(`GitHub release notes response was not JSON: ${message}`)
+  }
+
+  if (!generated || typeof generated !== 'object' || typeof generated.body !== 'string') {
+    fail('GitHub release notes response did not include a markdown body')
+  }
+  return generated.body
+}
+
+/** Write generated release notes plus Reflect's Mac download footer to disk. */
+function writeReleaseNotes({ commit, outputDir, productName, tag, version }) {
+  log('generating GitHub release notes…')
+  const body = generateReleaseNotesBody({ commit, tag })
+  const releaseNotesPath = join(outputDir, RELEASE_NOTES_FILENAME)
+  writeFileSync(releaseNotesPath, appendMacDownloadNotice({ body, productName, version }))
+  return releaseNotesPath
+}
+
 /** Build the GitHub CLI args that publish the release and upload artifacts. */
-export function createReleaseArgs({ assets, commit, draft, prerelease, productName, tag, version }) {
+export function createReleaseArgs({ assets, commit, draft, notesPath, prerelease, productName, tag, version }) {
   const releaseArgs = [
     'release',
     'create',
@@ -849,7 +929,8 @@ export function createReleaseArgs({ assets, commit, draft, prerelease, productNa
     `${productName} ${version}`,
     '--target',
     commit,
-    '--generate-notes',
+    '--notes-file',
+    notesPath,
   ]
   if (prerelease) {
     releaseArgs.push('--prerelease', '--latest=false')
@@ -928,11 +1009,13 @@ function ensurePublishableRelease({ flavorFlag }) {
   return { commit, flavor, productName, tag, version }
 }
 
+/** Run release publish checks without building artifacts or creating a release. */
 function preflight({ flavorFlag }) {
   const { commit, tag } = ensurePublishableRelease({ flavorFlag })
   log(`${tag} is publishable from ${commit.slice(0, 7)}`)
 }
 
+/** Create the GitHub release from freshly built or pre-staged macOS artifacts. */
 function publish({ draft, flavorFlag, fromArtifacts }) {
   const { commit, flavor, productName, tag, version } = ensurePublishableRelease({ flavorFlag })
   const artifactDir = fromArtifacts ?? mkdtempSync(join(tmpdir(), 'reflect-release-assets-'))
@@ -951,6 +1034,13 @@ function publish({ draft, flavorFlag, fromArtifacts }) {
     version,
   })
   const manifestPath = writeUpdaterManifest({ artifacts, outputDir: artifactDir, tag, version })
+  const releaseNotesPath = writeReleaseNotes({
+    commit,
+    outputDir: artifactDir,
+    productName,
+    tag,
+    version,
+  })
   // Pre-releases are invisible to `releases/latest` — the stable updater feed —
   // so installed stable apps never see a beta.
   const prerelease = version.includes('-')
@@ -962,6 +1052,7 @@ function publish({ draft, flavorFlag, fromArtifacts }) {
     ],
     commit,
     draft,
+    notesPath: releaseNotesPath,
     prerelease,
     productName,
     tag,

@@ -236,7 +236,10 @@ signed/notarized macOS artifacts in parallel:
 Each build job runs the same DMG notarization, Gatekeeper checks, and updater artifact
 signing as a local release, then uploads its artifacts to the workflow. A final publish
 job downloads both sets, writes the combined `latest.json`, and creates the GitHub
-release. Trigger it from **Actions → Release → Run workflow** (tick *draft* to review
+release. The publish step asks GitHub for generated release notes, appends the Mac
+download chooser that maps Apple Silicon to `_aarch64.dmg` and Intel to
+`_x86_64.dmg`, then creates the release with that complete notes file. Trigger it from
+**Actions → Release → Run workflow** (tick *draft* to review
 the release before publishing), or by pushing the matching `v<version>` tag. The publish
 preflights apply unchanged, so bump `version` in `tauri.conf.json` (and
 `src-tauri/Cargo.toml`) on the released branch first.
