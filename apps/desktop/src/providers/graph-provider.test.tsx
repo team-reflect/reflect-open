@@ -111,7 +111,7 @@ function installFakeBridge(): void {
 function queueGraphOpenRequest(root: string): void {
   queuedGraphOpenRequests.push(root)
   for (const handler of graphOpenRequestHandlers) {
-    handler({ queued: queuedGraphOpenRequests.length })
+    handler(null)
   }
 }
 

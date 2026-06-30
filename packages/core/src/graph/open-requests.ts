@@ -5,9 +5,7 @@ import { getBridge, type Unlisten } from '../ipc/bridge'
 /** Event emitted by the native shell when a Dock/Finder graph-open request is queued. */
 export const GRAPH_OPEN_REQUESTED_EVENT = 'graph:open-requested'
 
-const graphOpenRequestedPayloadSchema = z.object({
-  queued: z.number().int().nonnegative(),
-})
+const graphOpenRequestedPayloadSchema = z.null()
 
 /** Pop the oldest native graph-open request, or `null` when none is queued. */
 export async function takeGraphOpenRequest(): Promise<string | null> {

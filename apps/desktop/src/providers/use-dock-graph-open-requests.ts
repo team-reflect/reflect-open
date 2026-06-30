@@ -8,7 +8,7 @@ import {
   type AppPlatform,
 } from '@reflect/core'
 
-interface PropsUseDockGraphOpenRequests {
+interface DockGraphOpenRequestsOptions {
   platform: AppPlatform
   openRecent: (root: string) => Promise<boolean>
 }
@@ -24,7 +24,7 @@ interface PropsUseDockGraphOpenRequests {
 export function useDockGraphOpenRequests({
   platform,
   openRecent,
-}: PropsUseDockGraphOpenRequests): () => Promise<boolean> {
+}: DockGraphOpenRequestsOptions): () => Promise<boolean> {
   const drainDockGraphOpenRequests = useCallback(async (): Promise<boolean> => {
     if (!hasBridge() || isMobilePlatform(platform)) {
       return false

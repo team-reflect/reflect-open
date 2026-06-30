@@ -9,7 +9,6 @@ use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use serde::Serialize;
 use tauri::{AppHandle, Emitter, State, Url};
 
 /// Event emitted when at least one graph-open request is waiting in Rust.
@@ -19,12 +18,6 @@ pub const GRAPH_OPEN_REQUESTED_EVENT: &str = "graph:open-requested";
 #[derive(Default)]
 pub struct GraphOpenRequestState(Mutex<VecDeque<String>>);
 
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct GraphOpenRequestedPayload {
-    queued: usize,
-}
-
 /// Queue a graph-open request from native "open document" URLs.
 ///
 /// Exactly one item must be present and it must be a folder. Multi-item drops
@@ -32,20 +25,16 @@ struct GraphOpenRequestedPayload {
 pub fn queue_opened_urls(app: &AppHandle, state: &State<GraphOpenRequestState>, urls: &[Url]) {
     match folder_path_from_urls(urls) {
         Ok(Some(path)) => {
-            let queued = match state.0.lock() {
+            match state.0.lock() {
                 Ok(mut pending) => {
                     pending.push_back(path.to_string_lossy().into_owned());
-                    pending.len()
                 }
                 Err(err) => {
                     tracing::error!(?err, "graph open request queue lock poisoned");
                     return;
                 }
             };
-            let _ = app.emit(
-                GRAPH_OPEN_REQUESTED_EVENT,
-                GraphOpenRequestedPayload { queued },
-            );
+            let _ = app.emit(GRAPH_OPEN_REQUESTED_EVENT, ());
         }
         Ok(None) => {}
         Err(message) => tracing::warn!(%message, "ignored graph open request"),
