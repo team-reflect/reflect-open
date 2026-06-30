@@ -6,9 +6,11 @@ import type { RetrievalHit } from '@reflect/core'
 import { useSimilarNotes } from './use-similar-notes'
 
 const relatedNotes = vi.hoisted(() => vi.fn())
+const readNote = vi.hoisted(() => vi.fn())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
+  readNote,
   relatedNotes,
 }))
 vi.mock('@/providers/graph-provider', () => ({
@@ -34,6 +36,7 @@ function wrapper(client: QueryClient) {
 
 beforeEach(() => {
   semanticSetting.enabled = true
+  readNote.mockReset().mockResolvedValue('- real entry\n')
   relatedNotes.mockReset().mockResolvedValue([hit('notes/a.md'), hit('notes/b.md')])
 })
 
@@ -69,5 +72,30 @@ describe('useSimilarNotes', () => {
     // The disabled path is stable too.
     rerender()
     expect(result.current).toBe(first)
+  })
+
+  it('returns an empty array and never queries related notes for an empty daily note', async () => {
+    readNote.mockResolvedValue('- \n')
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { result } = renderHook(() => useSimilarNotes('daily/2026-06-09.md'), {
+      wrapper: wrapper(client),
+    })
+
+    await waitFor(() => expect(readNote).toHaveBeenCalledWith('daily/2026-06-09.md'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(relatedNotes).not.toHaveBeenCalled()
+    expect(result.current).toEqual([])
+  })
+
+  it('queries related notes for a daily note once it has authored content', async () => {
+    readNote.mockResolvedValue('- real entry\n')
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { result } = renderHook(() => useSimilarNotes('daily/2026-06-09.md'), {
+      wrapper: wrapper(client),
+    })
+
+    await waitFor(() => expect(result.current.length).toBe(2))
+    expect(readNote).toHaveBeenCalledWith('daily/2026-06-09.md')
+    expect(relatedNotes).toHaveBeenCalledWith('daily/2026-06-09.md', 6)
   })
 })
