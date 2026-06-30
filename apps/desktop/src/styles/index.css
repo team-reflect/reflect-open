@@ -523,9 +523,18 @@ html:root {
   cursor: pointer;
 }
 
-/* Tags render via meowdown's `.md-tag` (an accent pill, our purple); bullets and
-   the task checkbox border now come from meowdown's defaults (muted `::marker`,
-   1px muted border). Only the checkbox-to-label gap stays a Reflect override. */
+/* Tags render via meowdown's `.md-tag` (an accent pill, our purple); the task
+   checkbox border comes from meowdown's default (1px muted). */
+
+/* Bullet dot: meowdown colors the masked `.list-marker` with `--meowdown-muted`
+   and themes it (the fold color) when collapsed. We nudge the resting dot one
+   step lighter (text-muted), but leave the collapsed dot alone so it stays
+   themed purple (a saturated target inside the halo). */
+.reflect-editor
+  .prosemirror-flat-list[data-list-kind='bullet']:not([data-list-collapsed])
+  > .list-marker {
+  background-color: var(--text-muted);
+}
 
 /* Task checkbox spacing. Two rules work together to give the checkbox breathing
    room from its label (PR #373's goal) WITHOUT moving the label (moving it
