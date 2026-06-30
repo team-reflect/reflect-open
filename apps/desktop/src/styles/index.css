@@ -445,12 +445,12 @@ html:root {
   letter-spacing: 0;
 }
 
-/* meowdown's blockquote is now upright and themed via `--meowdown-blockquote-border`
-   by default; we only restate the border color, text color, and the block
-   margin (the per-element spacing the `> * + *` reset above relies on). */
+/* meowdown's blockquote is now upright, muted, and themed by default; we only
+   restate the thinner accent border and the block margin (the per-element spacing
+   the `> * + *` reset above relies on). meowdown's muted text already matches
+   `--text-secondary`, so we no longer set the color. */
 .reflect-editor blockquote {
   border-left: 2px solid var(--accent-soft, var(--border));
-  color: var(--text-secondary);
   margin: 0.6em 0;
   padding-left: 1em;
 }
@@ -527,7 +527,7 @@ html:root {
 /* Tags render via meowdown's `.md-tag` (an accent pill, our purple); the task
    checkbox border comes from meowdown's default (1px muted). The resting bullet
    dot is a lighter gray via `--meowdown-bullet` on `html:root` above; a collapsed
-   bullet keeps meowdown's themed (purple) fold color. */
+   bullet keeps meowdown's themed purple dot. */
 
 /* Task checkbox spacing. Two rules work together to give the checkbox breathing
    room from its label (PR #373's goal) WITHOUT moving the label (moving it
