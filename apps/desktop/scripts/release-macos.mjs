@@ -603,6 +603,7 @@ function releaseAssetName({ productName, version, target, type }) {
   }
 }
 
+/** Match GitHub's release asset URL/display rewrite for uploaded file names. */
 function githubAssetName(fileName) {
   return fileName.replace(/ /g, '.')
 }
@@ -885,6 +886,7 @@ export function appendMacDownloadNotice({ body, productName, version }) {
   return `${trimmedBody ? `${trimmedBody}\n\n` : ''}${notice}\n`
 }
 
+/** Fetch GitHub's generated release notes body before creating the release. */
 function generateReleaseNotesBody({ commit, tag }) {
   const result = spawnSync('gh', createGenerateReleaseNotesArgs({ commit, tag }), { encoding: 'utf8' })
   if (result.status !== 0) {
@@ -906,6 +908,7 @@ function generateReleaseNotesBody({ commit, tag }) {
   return generated.body
 }
 
+/** Write generated release notes plus Reflect's Mac download footer to disk. */
 function writeReleaseNotes({ commit, outputDir, productName, tag, version }) {
   log('generating GitHub release notes…')
   const body = generateReleaseNotesBody({ commit, tag })
