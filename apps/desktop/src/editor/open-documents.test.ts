@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { NoteSession } from './note-session'
-import {
-  flushOpenDocuments,
-  notifyOpenDocumentChanged,
-  openSession,
-  registerOpenDocument,
-  subscribeOpenDocumentChanges,
-} from './open-documents'
+import { flushOpenDocuments, openSession, registerOpenDocument } from './open-documents'
 
 function fakeSession(path: string, log: string[]): NoteSession {
   return {
@@ -40,19 +34,6 @@ describe('open documents', () => {
     expect(openSession('notes/a.md')).toBe(session)
     unregister()
     expect(openSession('notes/a.md')).toBeNull()
-  })
-
-  it('notifies path-scoped subscribers when the open document snapshot changes', () => {
-    const seen: string[] = []
-    const unsubscribe = subscribeOpenDocumentChanges('notes/a.md', () => {
-      seen.push(openSession('notes/a.md')?.path ?? 'closed')
-    })
-    const unregister = registerOpenDocument({ session: fakeSession('notes/a.md', []) })
-    notifyOpenDocumentChanged('notes/a.md')
-    unregister()
-    unsubscribe()
-
-    expect(seen).toEqual(['notes/a.md', 'notes/a.md', 'closed'])
   })
 
   it('a reopened path replaces the entry; the old unregister cannot evict it', () => {

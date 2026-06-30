@@ -1,13 +1,8 @@
-import { act, renderHook, waitFor } from '@testing-library/react'
+import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import type { RetrievalHit } from '@reflect/core'
-import {
-  notifyOpenDocumentChanged,
-  registerOpenDocument,
-} from '@/editor/open-documents'
-import type { NoteSession } from '@/editor/note-session'
 import { useSimilarNotes } from './use-similar-notes'
 
 const relatedNotes = vi.hoisted(() => vi.fn())
@@ -31,29 +26,6 @@ vi.mock('@/providers/settings-provider', () => ({
 
 function hit(path: string): RetrievalHit {
   return { path, title: path, score: 0.9, snippet: '', heading: null, isPrivate: false }
-}
-
-function openSessionFor(path: string, liveContent: () => string | null): NoteSession {
-  return {
-    path,
-    retarget: () => {},
-    load: () => {},
-    editorChanged: () => {},
-    externalChanged: () => {},
-    flush: async () => {},
-    keepMine: () => {},
-    loadTheirs: () => {},
-    commitFrontmatter: async () => true,
-    content: () => liveContent() ?? '',
-    liveContent,
-    updateFrontmatter: () => true,
-    commitTaskToggle: async () => false,
-    commitTaskEdit: async () => false,
-    commitTaskRemove: async () => false,
-    commitTaskToBullet: async () => false,
-    dispose: () => {},
-    discard: () => {},
-  }
 }
 
 function wrapper(client: QueryClient) {
@@ -125,37 +97,5 @@ describe('useSimilarNotes', () => {
     await waitFor(() => expect(result.current.length).toBe(2))
     expect(readNote).toHaveBeenCalledWith('daily/2026-06-09.md')
     expect(relatedNotes).toHaveBeenCalledWith('daily/2026-06-09.md', 6)
-  })
-
-  it('tracks live daily-note edits without waiting for index invalidation', async () => {
-    const path = 'daily/2026-06-09.md'
-    let source = '- \n'
-    const unregister = registerOpenDocument({
-      session: openSessionFor(path, () => source),
-    })
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    const view = renderHook(() => useSimilarNotes(path), { wrapper: wrapper(client) })
-
-    try {
-      expect(view.result.current).toEqual([])
-      expect(readNote).not.toHaveBeenCalled()
-      expect(relatedNotes).not.toHaveBeenCalled()
-
-      act(() => {
-        source = '- real entry\n'
-        notifyOpenDocumentChanged(path)
-      })
-      await waitFor(() => expect(view.result.current.length).toBe(2))
-      expect(relatedNotes).toHaveBeenCalledWith(path, 6)
-
-      act(() => {
-        source = '- \n'
-        notifyOpenDocumentChanged(path)
-      })
-      await waitFor(() => expect(view.result.current).toEqual([]))
-    } finally {
-      view.unmount()
-      unregister()
-    }
   })
 })

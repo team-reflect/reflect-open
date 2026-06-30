@@ -26,11 +26,6 @@ export interface OpenDocument {
 }
 
 const documents = new Map<string, OpenDocument>()
-const listeners = new Map<string, Set<() => void>>()
-
-function emitOpenDocumentChanged(path: string): void {
-  listeners.get(path)?.forEach((listener) => listener())
-}
 
 /**
  * Register an open document (keyed by its session's path); returns the
@@ -40,12 +35,10 @@ function emitOpenDocumentChanged(path: string): void {
  */
 export function registerOpenDocument(document: OpenDocument): () => void {
   documents.set(document.session.path, document)
-  emitOpenDocumentChanged(document.session.path)
   return () => {
     for (const [key, registered] of documents) {
       if (registered === document) {
         documents.delete(key)
-        emitOpenDocumentChanged(key)
         return
       }
     }
@@ -55,31 +48,6 @@ export function registerOpenDocument(document: OpenDocument): () => void {
 /** The live session for `path`, if that note is open in some pane. */
 export function openSession(path: string): NoteSession | null {
   return documents.get(path)?.session ?? null
-}
-
-/**
- * Subscribe to the open-session presence or live-content snapshot for `path`.
- * Consumers still read through {@link openSession}; this only provides the
- * invalidation signal when an editor changes, loads, closes, or retargets.
- */
-export function subscribeOpenDocumentChanges(path: string, listener: () => void): () => void {
-  const existing = listeners.get(path)
-  const scoped = existing ?? new Set<() => void>()
-  scoped.add(listener)
-  if (existing === undefined) {
-    listeners.set(path, scoped)
-  }
-  return () => {
-    scoped.delete(listener)
-    if (scoped.size === 0) {
-      listeners.delete(path)
-    }
-  }
-}
-
-/** Notify subscribers that `path`'s open-session snapshot may have changed. */
-export function notifyOpenDocumentChanged(path: string): void {
-  emitOpenDocumentChanged(path)
 }
 
 /**
@@ -97,8 +65,6 @@ export function retargetOpenDocument(from: string, to: string, session: NoteSess
   if (document !== undefined && document.session === session) {
     documents.delete(from)
     documents.set(to, document)
-    emitOpenDocumentChanged(from)
-    emitOpenDocumentChanged(to)
   }
 }
 

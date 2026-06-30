@@ -1,7 +1,6 @@
-import { useCallback, useMemo, useSyncExternalStore } from 'react'
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { hasBridge, isDaily, relatedNotes, type RetrievalHit } from '@reflect/core'
-import { openSession, subscribeOpenDocumentChanges } from '@/editor/open-documents'
 import { readNoteSource } from '@/lib/note-frontmatter'
 import { isOstensiblyEmptyNoteSource } from '@/lib/note-emptiness'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
@@ -9,19 +8,6 @@ import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
 
 const SIMILAR_NOTES_LIMIT = 6
-
-function useOpenNoteSource(path: string, enabled: boolean): string | null {
-  const subscribe = useCallback(
-    (listener: () => void) =>
-      enabled ? subscribeOpenDocumentChanges(path, listener) : () => {},
-    [enabled, path],
-  )
-  const getSnapshot = useCallback(
-    () => (enabled ? openSession(path)?.liveContent() ?? null : null),
-    [enabled, path],
-  )
-  return useSyncExternalStore(subscribe, getSnapshot, () => null)
-}
 
 /**
  * The note's semantic neighbors ("Similar notes"), one query shared by every
@@ -40,21 +26,16 @@ export function useSimilarNotes(path: string): RetrievalHit[] {
   const { settings } = useSettings()
   const bridgeAvailable = hasBridge()
   const dailyNote = isDaily(path)
-  const shouldCheckDailyEmptiness =
-    bridgeAvailable && graph !== null && dailyNote && settings.semanticSearchEnabled
-  const openSource = useOpenNoteSource(path, shouldCheckDailyEmptiness)
   const { data: dailyNoteIsEmpty } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'daily-empty', path],
     queryFn: async () => isOstensiblyEmptyNoteSource(await readNoteSource(path)),
-    enabled: shouldCheckDailyEmptiness && openSource === null,
+    enabled: bridgeAvailable && graph !== null && dailyNote && settings.semanticSearchEnabled,
   })
-  const openDailyNoteIsEmpty =
-    openSource === null ? null : isOstensiblyEmptyNoteSource(openSource)
   const enabled =
     bridgeAvailable &&
     graph !== null &&
     settings.semanticSearchEnabled &&
-    (!dailyNote || (openDailyNoteIsEmpty ?? dailyNoteIsEmpty) === false)
+    (!dailyNote || dailyNoteIsEmpty === false)
   const { data } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'related', path],
     queryFn: () => relatedNotes(path, SIMILAR_NOTES_LIMIT),
