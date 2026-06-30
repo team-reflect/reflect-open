@@ -17,7 +17,7 @@ minimumReleaseAgeExclude:
   - '@prosekit/*'
   - virtua@0.49.2
 
-# Enable "blockExoticSubdeps" and "overrides" to install packages from pkg.pr.new
+# Uncomment the  "blockExoticSubdeps" and "overrides" below to install packages from pkg.pr.new
 blockExoticSubdeps: false
 overrides:
   '@meowdown/core': 'https://pkg.pr.new/prosekit/meowdown/@meowdown/core@8d52df6'
