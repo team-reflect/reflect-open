@@ -306,12 +306,17 @@ html:root {
   font-size: var(--editor-font-size, var(--text-base));
 }
 
-/* The daily stream's horizontal gutter (STREAM_GUTTER in daily-stream.tsx),
-   shared by each row's day label, pane chrome, and the editor itself so they
-   align. Un-layered, so it beats both the `padding: 0` reset above and
-   meowdown's layered gutter. */
-.reflect-stream-gutter {
-  padding-inline: max(1.5rem, calc((100% - 42rem) / 2));
+/* The reading gutter: pads content into a centered ~42rem column while the element
+   itself spans the pane's full width. Two uses:
+   - On a normal note's editor (route-content.tsx) so the editor stretches edge to
+     edge and its side gutters are part of it; pointer events there (block-handle
+     hover, click-to-focus) land on the editor even over the blank margin.
+   - In the daily stream, on each row's day label, editor, and pane chrome, so they
+     share one column and line up.
+   Un-layered, so it beats both the `padding: 0` reset above and meowdown's layered
+   `--meowdown-gutter` padding. */
+.reflect-content-gutter {
+  padding-inline: max(2rem, calc((100% - 42rem) / 2));
 }
 
 /* Block spacing comes from the element margins below, not the theme's

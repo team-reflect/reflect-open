@@ -9,6 +9,7 @@ import { SettingsScreen } from '@/components/settings-screen'
 import { TasksScreen } from '@/components/tasks/tasks-screen'
 import { useRouter } from '@/routing/router'
 import { ScrollRestored } from '@/routing/scroll-restore'
+import { cn } from '@/lib/utils'
 
 /**
  * The route → view mapping (Plan 06): the single place a {@link Route} kind
@@ -32,16 +33,19 @@ export function RouteContent(): ReactElement {
     case 'note':
       // The vertical padding lives on the inner column (not the scroll
       // container) so `min-h-full` fills the viewport exactly; the flex chain
-      // stretches the editor over any leftover space, making the whole note
-      // body click-to-focus.
+      // stretches the editor over any leftover vertical space. `gutterClassName`
+      // does the same horizontally: the editor spans the full width with its
+      // reading gutter as its own padding, so clicking anywhere in the note body
+      // (even the blank side margins) focuses the editor.
       return (
-        <ScrollRestored className="h-full overflow-auto px-6">
-          <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col py-8">
+        <ScrollRestored className="h-full overflow-auto px-0">
+          <div className={cn("mx-auto flex min-h-full w-full max-w-full flex-col py-8", )}>
             <NotePane
               path={route.path}
               lazy
               autoFocus
               className="flex grow flex-col"
+              gutterClassName="reflect-content-gutter"
               editorClassName="grow"
             />
           </div>
