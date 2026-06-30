@@ -17,18 +17,19 @@ interface DailyStreamProps {
 }
 
 /**
- * The stream's horizontal gutter: the old scroll-container `px-6` and centered
- * `max-w-2xl` column folded into one `padding-inline`, applied *inside* each
- * row's elements (day label, editor, pane chrome) instead of around the rows.
- * Rows and the dividers between them span the pane's full width, and because
- * the editor's share of the gutter is its own padding, clicking anywhere
- * across the row focuses that day's note.
+ * The reading gutter (`.reflect-content-gutter` in styles/index.css): the old
+ * scroll-container `px-6` and centered `max-w-2xl` column folded into one
+ * `padding-inline` applied *inside* an element instead of around it. The element
+ * spans the pane's full width with its content in a centered column, so the side
+ * gutters belong to the element: clicking anywhere across a daily row focuses that
+ * day's note. The normal-note editor reuses the same class (route-content.tsx) so a
+ * click anywhere in the note body, even the blank margin, still hits the editor.
  *
- * An ordinary class (styles/index.css), not a `px-*` utility: on the editor it
- * must out-cascade the un-layered `.reflect-editor` padding reset, which every
- * `@layer utilities` rule loses to regardless of order.
+ * An ordinary class, not a `px-*` utility: on the editor it must out-cascade the
+ * un-layered `.reflect-editor` padding reset, which every `@layer utilities` rule
+ * loses to regardless of order.
  */
-const STREAM_GUTTER = 'reflect-stream-gutter'
+const CONTENT_GUTTER = 'reflect-content-gutter'
 
 /** The size guess virtua uses for a row it has not measured yet. */
 export const ESTIMATED_DAY_HEIGHT = 220
@@ -203,7 +204,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
               {/* V1 renders the date as the note's H1-sized subject, with
                   today's tinted brand (its `highlightSubject`). */}
               <h2
-                className={cn('reflect-daily-subject mb-3', STREAM_GUTTER, isToday && 'text-accent')}
+                className={cn('reflect-daily-subject mb-3', CONTENT_GUTTER, isToday && 'text-accent')}
               >
                 {formatDayLabel(date, settings.dateFormat)}
               </h2>
@@ -215,7 +216,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
                 lazy
                 autoFocus={autoFocus}
                 onAutoFocused={consumeFocus}
-                gutterClassName={STREAM_GUTTER}
+                gutterClassName={CONTENT_GUTTER}
                 editorClassName={isPast ? 'min-h-[100px]' : 'min-h-[60vh]'}
               />
             </section>
