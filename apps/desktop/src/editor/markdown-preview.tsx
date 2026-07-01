@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import { MarkdownView } from '@meowdown/react'
-import '@meowdown/core/style.css'
-import '@meowdown/react/style.css'
 import { openExternalLink } from '@/editor/open-external-link'
 import { cn } from '@/lib/utils'
 

@@ -1,7 +1,6 @@
 import type { ReactElement } from 'react'
 import { MarkdownView } from '@meowdown/react'
 import type { WikilinkClickHandler } from '@meowdown/core'
-import '@meowdown/core/style.css'
 import { openExternalLink } from '@/editor/open-external-link'
 
 interface BacklinkSnippetProps {

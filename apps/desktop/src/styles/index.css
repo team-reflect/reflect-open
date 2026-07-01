@@ -1,10 +1,20 @@
 /* Design-system tokens + fonts (the single source of truth for theme), then
    Tailwind v4. The DS sets :root / .dark CSS variables that utilities and
    components read; keep Tailwind layered on top so shadcn and the DS agree. */
-@import '@reflect/design-system/styles.css';
-@import 'tailwindcss';
+
+/*
+Cascade layer order, low to high priority.
+"theme", "base", "components", "utilities" are Tailwind v4 layers;
+"meowdown" last so editor styles beat the design-system resets.
+*/
+@layer theme, base, components, utilities, design, meowdown;
+
+@import 'tailwindcss' ;
+@import '@reflect/design-system/styles.css' layer(design);
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
+@import "@meowdown/core/style.css";
+@import "@meowdown/react/style.css";
 
 /* Tailwind v4 dark variant keyed to the design-system `.dark` scope set by the
    ThemeProvider on <html>. */

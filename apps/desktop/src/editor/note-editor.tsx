@@ -16,8 +16,6 @@ import {
   type TagSearchHandler,
   type WikilinkSearchHandler,
 } from '@meowdown/react'
-import '@meowdown/core/style.css'
-import '@meowdown/react/style.css'
 import {
   IMAGE_LIGHTBOX_TRANSITION_NAME,
   ImageLightbox,
