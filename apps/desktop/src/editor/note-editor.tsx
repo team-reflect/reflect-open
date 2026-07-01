@@ -9,10 +9,16 @@ import {
 } from 'react'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { errorMessage } from '@reflect/core'
-import { type ExitBoundaryHandler, type MarkMode } from '@meowdown/core'
+import {
+  type ExitBoundaryHandler,
+  type MarkMode,
+  type StartPendingReplacementOptions,
+} from '@meowdown/core'
 import {
   MeowdownEditor,
   type EditorHandle,
+  type PendingReplacementResolveHandler,
+  type SelectionMenuSearchHandler,
   type TagSearchHandler,
   type WikilinkSearchHandler,
 } from '@meowdown/react'
@@ -51,6 +57,18 @@ export interface NoteEditorHandle {
    * previous day / the start of the next day).
    */
   setSelection(position: 'start' | 'end'): void
+  /** The current selection's text (blocks separated by blank lines). */
+  getSelectedText(): string
+  /** Open the selection AI menu (no-op on an empty selection). */
+  openSelectionMenu(): void
+  /** Stage a pending replacement over a range; false when the range is invalid. */
+  startPendingReplacement(options: StartPendingReplacementOptions): boolean
+  /** Append streamed text to the staged replacement's preview. */
+  appendPendingReplacementText(text: string): void
+  /** Apply the staged replacement to the document as one edit. */
+  acceptPendingReplacement(): void
+  /** Clear the staged replacement without touching the document. */
+  discardPendingReplacement(): void
 }
 
 interface NoteEditorProps {
@@ -96,6 +114,15 @@ interface NoteEditorProps {
   onWikilinkSearch?: WikilinkSearchHandler
   /** Search tags for the `#` autocomplete menu. */
   onTagSearch?: TagSearchHandler
+  /**
+   * Search prompts for the selection AI menu. Omitting it disables the menu
+   * and its selection affordance entirely (e.g. for `private: true` notes).
+   */
+  onSelectionMenuSearch?: SelectionMenuSearchHandler
+  /** Extra controls in the pending-replacement preview footer (e.g. Retry). */
+  pendingReplacementActions?: ReactNode
+  /** Called when a staged replacement is accepted or discarded. */
+  onPendingReplacementResolve?: PendingReplacementResolveHandler
   /** Handler when pressing ArrowUp/ArrowDown at the document edge. */
   onExitBoundary?: ExitBoundaryHandler | undefined
   /**
@@ -135,6 +162,9 @@ export function NoteEditor({
   onTagClick,
   onWikilinkSearch,
   onTagSearch,
+  onSelectionMenuSearch,
+  pendingReplacementActions,
+  onPendingReplacementResolve,
   onExitBoundary,
   children,
   titlePlaceholder,
@@ -180,6 +210,14 @@ export function NoteEditor({
       setMarkdown: (markdown) => innerRef.current?.setMarkdown(markdown),
       focus: () => innerRef.current?.focus(),
       setSelection: (position) => innerRef.current?.setSelection(position),
+      getSelectedText: () => innerRef.current?.getSelectedText() ?? '',
+      openSelectionMenu: () => innerRef.current?.openSelectionMenu(),
+      startPendingReplacement: (options) =>
+        innerRef.current?.startPendingReplacement(options) ?? false,
+      appendPendingReplacementText: (text) =>
+        innerRef.current?.appendPendingReplacementText(text),
+      acceptPendingReplacement: () => innerRef.current?.acceptPendingReplacement(),
+      discardPendingReplacement: () => innerRef.current?.discardPendingReplacement(),
     }),
     [],
   )
@@ -269,6 +307,9 @@ export function NoteEditor({
         onImageClick={handleImageClick}
         {...(onWikilinkSearch !== undefined ? { onWikilinkSearch } : {})}
         {...(onTagSearch !== undefined ? { onTagSearch } : {})}
+        {...(onSelectionMenuSearch !== undefined ? { onSelectionMenuSearch } : {})}
+        {...(pendingReplacementActions !== undefined ? { pendingReplacementActions } : {})}
+        {...(onPendingReplacementResolve !== undefined ? { onPendingReplacementResolve } : {})}
         resolveImageUrl={handleResolveImageUrl}
         onImagePaste={handleImagePaste}
         onImageSaveError={handleImageSaveError}

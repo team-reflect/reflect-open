@@ -124,6 +124,9 @@ export {
   aiProvidersSchema,
   defaultAiProviderIdSchema,
   chatModelSelectionSchema,
+  aiPromptModeSchema,
+  aiPromptSchema,
+  aiPromptsSchema,
   DEFAULT_SETTINGS,
   type Settings,
   type EditorMarkdownSyntax,
@@ -137,6 +140,8 @@ export {
   type GraphColors,
   type AiProviderId,
   type AiProviderConfig,
+  type AiPrompt,
+  type AiPromptMode,
 } from './settings/schema'
 export { loadSettings, saveSettings } from './settings/commands'
 
@@ -177,6 +182,7 @@ export {
   cloudSafeNoteContent,
   cloudSafeNoteListings,
   cloudSafeSearchHits,
+  cloudSafeSelection,
   isPrivateNoteError,
   PrivateNoteError,
   type CloudGraphContext,
@@ -214,6 +220,16 @@ export {
   type ChatStreamEvent,
   type StreamChatOptions,
 } from './ai/chat/stream-chat'
+export {
+  BUILT_IN_AI_PROMPTS,
+  filterAiPrompts,
+  renderSelectionPrompt,
+} from './ai/selection-prompts'
+export {
+  transformSelection,
+  type TransformSelectionOptions,
+  type TransformStreamEvent,
+} from './ai/transform-selection'
 export {
   appendEvent,
   buildHistory,

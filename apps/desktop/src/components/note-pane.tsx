@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useState, type ReactElement } from 'react'
+import { memo, useCallback, useMemo, useRef, useState, type ReactElement } from 'react'
 import type { ExitBoundaryHandler } from '@meowdown/core'
 import { isDaily } from '@reflect/core'
 import { BacklinksPanel } from '@/components/backlinks-panel'
@@ -6,6 +6,8 @@ import { InlineAlert } from '@/components/inline-alert'
 import { NoteConflictBanner } from '@/components/note-conflict-banner'
 import { ProtectedNoteView } from '@/components/protected-note-view'
 import { SyncConflictNotice } from '@/components/sync-conflict-notice'
+import { EditorAiKeymap } from '@/editor/ai-menu/editor-ai-keymap'
+import { useEditorAiMenu } from '@/editor/ai-menu/use-editor-ai-menu'
 import { editorBodyWithDefaultBullet } from '@/editor/default-bullet'
 import { markModeFromSyntax } from '@/editor/mark-mode'
 import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor'
@@ -134,9 +136,11 @@ export function NotePaneComponent({
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
 
   const bindEditor = document.bindEditor
+  const aiEditorRef = useRef<NoteEditorHandle | null>(null)
   const handleRef = useCallback(
     (handle: NoteEditorHandle | null) => {
       bindEditor(handle)
+      aiEditorRef.current = handle
       if (dailyDate !== undefined) {
         registerHandle?.(dailyDate, handle)
       }
@@ -149,6 +153,8 @@ export function NotePaneComponent({
     },
     [bindEditor, dailyDate, registerHandle, autoFocus, onAutoFocused],
   )
+
+  const aiMenu = useEditorAiMenu({ path, editorRef: aiEditorRef })
 
 
   const handleExitBoundary: ExitBoundaryHandler | undefined = useMemo(() => {
@@ -262,6 +268,11 @@ export function NotePaneComponent({
         onTagClick={onTagClick}
         onWikilinkSearch={onWikilinkSearch}
         onTagSearch={onTagSearch}
+        {...(aiMenu.onSelectionMenuSearch !== undefined
+          ? { onSelectionMenuSearch: aiMenu.onSelectionMenuSearch }
+          : {})}
+        pendingReplacementActions={aiMenu.pendingReplacementActions}
+        onPendingReplacementResolve={aiMenu.onPendingReplacementResolve}
         // Daily notes carry no title semantics (the date is their subject),
         // so an empty leading H1 there is just an empty heading.
         {...(dailyNote ? {} : { titlePlaceholder: 'Untitled' })}
@@ -271,7 +282,9 @@ export function NotePaneComponent({
         className={cn('reflect-note-surface', gutterClassName, editorClassName)}
         handleRef={handleRef}
         onExitBoundary={handleExitBoundary}
-      />
+      >
+        <EditorAiKeymap onTrigger={aiMenu.openMenu} />
+      </NoteEditor>
 
       <div className={gutterClassName}>
         <BacklinksPanel path={path} />

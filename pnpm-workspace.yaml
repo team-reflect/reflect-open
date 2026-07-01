@@ -19,7 +19,10 @@ minimumReleaseAgeExclude:
   - virtua@0.49.2
 
 # Uncomment the "blockExoticSubdeps" and "overrides" sections below to install packages from pkg.pr.new
-# blockExoticSubdeps: false
-# overrides:
-#   '@meowdown/core': 'https://pkg.pr.new/prosekit/meowdown/@meowdown/core@5a4a25a'
-#   '@meowdown/react': 'https://pkg.pr.new/prosekit/meowdown/@meowdown/react@5a4a25a'
+# TODO(ai-menu): temporary snapshot of prosekit/meowdown#191 (selection menu +
+# pending replacement); drop once a meowdown release ships and the
+# apps/desktop dependency is bumped instead.
+blockExoticSubdeps: false
+overrides:
+  '@meowdown/core': 'https://pkg.pr.new/prosekit/meowdown/@meowdown/core@de92b1f'
+  '@meowdown/react': 'https://pkg.pr.new/prosekit/meowdown/@meowdown/react@de92b1f'

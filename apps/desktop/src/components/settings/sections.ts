@@ -11,6 +11,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'search', title: 'Search' },
   { id: 'backup', title: 'Backup' },
   { id: 'ai-providers', title: 'AI providers' },
+  { id: 'ai-prompts', title: 'AI prompts' },
   { id: 'keyboard', title: 'Keyboard shortcuts' },
   { id: 'about', title: 'About' },
   { id: 'destructive', title: 'Danger zone' },

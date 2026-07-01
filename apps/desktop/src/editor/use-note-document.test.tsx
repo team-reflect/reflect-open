@@ -33,6 +33,12 @@ function fakeEditor(): NoteEditorHandle & { applied: string[] } {
     getMarkdown: () => '',
     focus: () => {},
     setSelection: () => {},
+    getSelectedText: () => '',
+    openSelectionMenu: () => {},
+    startPendingReplacement: () => false,
+    appendPendingReplacementText: () => {},
+    acceptPendingReplacement: () => {},
+    discardPendingReplacement: () => {},
   }
 }
 

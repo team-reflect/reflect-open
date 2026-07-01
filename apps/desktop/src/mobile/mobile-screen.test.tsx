@@ -64,8 +64,16 @@ vi.mock('@/providers/graph-provider', () => ({
 }))
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({
-    settings: { editorMarkdownSyntax: 'hide', dateFormat: 'mdy', weekStartDay: 'monday' },
+    settings: {
+      editorMarkdownSyntax: 'hide',
+      dateFormat: 'mdy',
+      weekStartDay: 'monday',
+      aiProviders: [],
+      defaultAiProviderId: null,
+      aiPrompts: [],
+    },
     updateSettings: async () => {},
+    updateSettingsWith: () => {},
   }),
 }))
 

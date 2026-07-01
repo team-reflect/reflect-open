@@ -253,6 +253,47 @@ export const aiProvidersSchema = z
     }),
   )
 
+/**
+ * Where an AI selection prompt's accepted result lands: `replace` swaps the
+ * selection for the result; `append` inserts the result after the selection's
+ * block (e.g. "Continue writing"). An invalid value degrades to `replace`.
+ */
+export const aiPromptModeSchema = z.enum(['replace', 'append']).catch('replace')
+
+export type AiPromptMode = z.infer<typeof aiPromptModeSchema>
+
+/**
+ * One saved AI selection prompt: a label for the picker and a body sent to
+ * the provider. The body may reference the selection with the
+ * `{{selectedText}}` placeholder (old Reflect's syntax, so saved v1 prompts
+ * port over verbatim); a body without the placeholder gets the selection
+ * appended after it.
+ */
+export const aiPromptSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  body: z.string().min(1),
+  mode: aiPromptModeSchema,
+})
+
+export type AiPrompt = z.infer<typeof aiPromptSchema>
+
+/**
+ * The user's saved AI selection prompts, shown in the editor's AI menu after
+ * the built-in set. Global across graphs — prompts are workflow, not note
+ * content. Resilience is per entry: a corrupt entry is dropped while the rest
+ * load, and a non-array value degrades to the empty list.
+ */
+export const aiPromptsSchema = z
+  .array(z.unknown())
+  .catch([])
+  .transform((entries) =>
+    entries.flatMap((entry) => {
+      const parsed = aiPromptSchema.safeParse(entry)
+      return parsed.success ? [parsed.data] : []
+    }),
+  )
+
 export const settingsSchema = z
   .looseObject({
     editorMarkdownSyntax: editorMarkdownSyntaxSchema,
@@ -272,6 +313,7 @@ export const settingsSchema = z
     aiProviders: aiProvidersSchema,
     defaultAiProviderId: defaultAiProviderIdSchema,
     chatModelSelection: chatModelSelectionSchema,
+    aiPrompts: aiPromptsSchema,
   })
 
 export type Settings = z.infer<typeof settingsSchema>

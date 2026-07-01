@@ -4,6 +4,7 @@ import {
   assertCloudAllowed,
   cloudSafeNoteContent,
   cloudSafeSearchHits,
+  cloudSafeSelection,
   isPrivateNoteError,
   PrivateNoteError,
 } from './checkers'
@@ -122,6 +123,20 @@ describe('cloudSafeNoteContent', () => {
         content: PRIVATE_BODY,
         truncated: false,
       }),
+    ).toThrow(PrivateNoteError)
+  })
+})
+
+describe('cloudSafeSelection', () => {
+  it('mints a selection from a non-private note', () => {
+    expect(cloudSafeSelection({ path: 'notes/a.md', isPrivate: false }, 'selected text')).toBe(
+      'selected text',
+    )
+  })
+
+  it('refuses to mint a selection from a private note', () => {
+    expect(() =>
+      cloudSafeSelection({ path: PRIVATE_PATH, isPrivate: true }, PRIVATE_BODY),
     ).toThrow(PrivateNoteError)
   })
 })

@@ -42,6 +42,12 @@ vi.mock('@/editor/note-editor', async () => {
           getMarkdown: () => '',
           focus: () => editorProbe.focusCalls.push('focus'),
           setSelection: () => {},
+          getSelectedText: () => '',
+          openSelectionMenu: () => {},
+          startPendingReplacement: () => false,
+          appendPendingReplacementText: () => {},
+          acceptPendingReplacement: () => {},
+          discardPendingReplacement: () => {},
         })
         return () => handleRef?.(null)
       }, [handleRef])
@@ -72,8 +78,15 @@ vi.mock('@/providers/graph-provider', () => ({
 }))
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({
-    settings: { editorMarkdownSyntax: 'hide', allNotesFilterTags: ['book', 'link', 'person'] },
+    settings: {
+      editorMarkdownSyntax: 'hide',
+      allNotesFilterTags: ['book', 'link', 'person'],
+      aiProviders: [],
+      defaultAiProviderId: null,
+      aiPrompts: [],
+    },
     updateSettings: async () => {},
+    updateSettingsWith: () => {},
   }),
 }))
 vi.mock('@/components/settings-screen', () => ({

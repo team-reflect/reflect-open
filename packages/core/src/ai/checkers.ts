@@ -189,3 +189,16 @@ export function cloudSafeNoteContent(
     truncated: note.truncated,
   })
 }
+
+/**
+ * Gate a text selection (the AI menu's editor selection) for an outbound
+ * payload. The selection is note content, so the same contract as
+ * {@link cloudSafeNoteContent} applies: callers pass the source note's **live**
+ * privacy flag, and a private note throws {@link PrivateNoteError} before the
+ * text is minted. `transformSelection` only accepts the minted value, so an
+ * unchecked selection cannot typecheck its way to a provider.
+ */
+export function cloudSafeSelection(note: CloudSendable, selectedText: string): CloudSafe<string> {
+  assertCloudAllowed(note)
+  return mint(selectedText)
+}

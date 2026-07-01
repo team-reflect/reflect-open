@@ -1,9 +1,14 @@
 # Porting the AI menu and prompts
 
-**Status: planned.** v2 has the ⌘J copilot (chat grounded in your notes) but
-no way to act on **selected text** inside the editor. This doc plans that
-port: select text, pick a prompt ("Fix spelling and grammar", "Write a short
-summary", or one you saved), and the transformation streams in.
+**Status: implemented.** The meowdown primitives (selection command menu +
+pending-replacement preview) landed via
+[prosekit/meowdown#191](https://github.com/prosekit/meowdown/pull/191); until
+a meowdown release ships, the app pins pkg.pr.new snapshot builds via the
+`pnpm-workspace.yaml` overrides. Select text and press ⌘⇧J (or the sparkle
+affordance on the selection), pick a prompt ("Fix spelling and grammar",
+"Write a short summary", or one saved in Settings → AI prompts), and the
+transformation streams into a preview with Accept / Discard / Retry (with a
+one-shot model switch).
 
 ## What v1 did
 

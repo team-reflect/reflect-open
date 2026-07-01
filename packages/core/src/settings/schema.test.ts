@@ -21,6 +21,7 @@ describe('settingsSchema', () => {
       aiProviders: [],
       defaultAiProviderId: null,
       chatModelSelection: null,
+      aiPrompts: [],
     })
     expect(DEFAULT_SETTINGS.editorMarkdownSyntax).toBe('hide')
     expect(DEFAULT_SETTINGS.editorSpellCheck).toBe(true)
@@ -39,6 +40,7 @@ describe('settingsSchema', () => {
     expect(DEFAULT_SETTINGS.aiProviders).toEqual([])
     expect(DEFAULT_SETTINGS.defaultAiProviderId).toBeNull()
     expect(DEFAULT_SETTINGS.chatModelSelection).toBeNull()
+    expect(DEFAULT_SETTINGS.aiPrompts).toEqual([])
   })
 
   it('accepts valid values', () => {
@@ -137,6 +139,7 @@ describe('settingsSchema', () => {
       aiProviders: [],
       defaultAiProviderId: null,
       chatModelSelection: null,
+      aiPrompts: [],
       futureKey: true,
     })
   })
@@ -189,6 +192,41 @@ describe('settingsSchema', () => {
     it('degrades a non-array value to the empty list', () => {
       expect(settingsSchema.parse({ aiProviders: 'nope' }).aiProviders).toEqual([])
       expect(settingsSchema.parse({ aiProviders: { id: 'x' } }).aiProviders).toEqual([])
+    })
+  })
+
+  describe('aiPrompts', () => {
+    const valid = {
+      id: 'prompt-1',
+      label: 'Translate to French',
+      body: 'Translate the following text to French.\n\n{{selectedText}}',
+      mode: 'replace',
+    }
+
+    it('passes valid entries through', () => {
+      expect(settingsSchema.parse({ aiPrompts: [valid] }).aiPrompts).toEqual([valid])
+    })
+
+    it('defaults an invalid mode to replace', () => {
+      const entry = { ...valid, mode: 'sideways' }
+      expect(settingsSchema.parse({ aiPrompts: [entry] }).aiPrompts).toEqual([
+        { ...valid, mode: 'replace' },
+      ])
+    })
+
+    it('drops a corrupt entry without losing the rest', () => {
+      const parsed = settingsSchema.parse({
+        aiPrompts: [valid, { label: 'no body' }, 42],
+      })
+      expect(parsed.aiPrompts).toEqual([valid])
+    })
+
+    it('degrades a non-array value to the empty list', () => {
+      expect(settingsSchema.parse({ aiPrompts: 'nope' }).aiPrompts).toEqual([])
+    })
+
+    it('defaults to the empty list (built-ins live in code)', () => {
+      expect(settingsSchema.parse({}).aiPrompts).toEqual([])
     })
   })
 
