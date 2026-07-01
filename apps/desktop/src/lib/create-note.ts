@@ -20,9 +20,14 @@ export function newNoteId(): string {
   return ulid().toLowerCase()
 }
 
-/** The on-disk source for a brand-new note: `id:` frontmatter + H1 title. */
-export function newNoteSource(title: string): string {
-  return upsertFrontmatter(`# ${title.trim()}\n`, { id: newNoteId() })
+/**
+ * The on-disk source for a brand-new note: `id:` frontmatter + H1 title,
+ * plus an optional body block under the title (e.g. the add-meeting action's
+ * `- Type: #person` line).
+ */
+export function newNoteSource(title: string, body?: string): string {
+  const content = body ? `# ${title.trim()}\n\n${body.trim()}\n` : `# ${title.trim()}\n`
+  return upsertFrontmatter(content, { id: newNoteId() })
 }
 
 /**
@@ -65,8 +70,12 @@ export function isUntitledNotePath(path: string): boolean {
  * carries `generation`, so a create racing a graph switch is rejected loudly
  * instead of landing in the wrong graph.
  */
-export async function createNoteWithTitle(title: string, generation: number): Promise<string> {
+export async function createNoteWithTitle(
+  title: string,
+  generation: number,
+  body?: string,
+): Promise<string> {
   const path = await availableNotePath(slugForTitle(title))
-  await writeNote(path, newNoteSource(title), generation)
+  await writeNote(path, newNoteSource(title, body), generation)
   return path
 }

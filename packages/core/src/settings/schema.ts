@@ -141,6 +141,24 @@ export const describeAssetsSchema = z.boolean().catch(true)
 export const mobileOnboardedSchema = z.boolean().catch(false)
 
 /**
+ * Whether the Apple Calendar integration is on. Off by default — turning it
+ * on triggers the macOS calendar-permission prompt, and that is the user's
+ * call. Access is read-only and entirely local (EventKit); see
+ * docs/porting/calendar-meetings-integration.md.
+ */
+export const calendarEnabledSchema = z.boolean().catch(false)
+
+/**
+ * EventKit identifiers of the calendars whose events appear beside the daily
+ * note. Empty (the default) shows nothing — the Settings section lists every
+ * calendar on the Mac for opt-in. Identifiers for since-removed accounts are
+ * harmless: the Rust side skips ones it can't resolve.
+ */
+export const calendarIdsSchema = z.array(z.string()).catch([])
+
+export type CalendarIds = z.infer<typeof calendarIdsSchema>
+
+/**
  * The preset palette for a graph's identity color (the swatch shown next to
  * the graph name). A closed set of named ids — not raw hex — so the UI can
  * map each id to values that read well in both light and dark themes.
@@ -268,6 +286,8 @@ export const settingsSchema = z
     dateFormat: dateFormatSchema,
     weekStartDay: weekStartDaySchema,
     allNotesFilterTags: allNotesFilterTagsSchema,
+    calendarEnabled: calendarEnabledSchema,
+    calendarIds: calendarIdsSchema,
     graphColors: graphColorsSchema,
     aiProviders: aiProvidersSchema,
     defaultAiProviderId: defaultAiProviderIdSchema,

@@ -17,6 +17,8 @@ describe('settingsSchema', () => {
       dateFormat: 'mdy',
       weekStartDay: 'monday',
       allNotesFilterTags: ['book', 'link', 'person'],
+      calendarEnabled: false,
+      calendarIds: [],
       graphColors: {},
       aiProviders: [],
       defaultAiProviderId: null,
@@ -35,6 +37,8 @@ describe('settingsSchema', () => {
     expect(DEFAULT_SETTINGS.dateFormat).toBe('mdy')
     expect(DEFAULT_SETTINGS.weekStartDay).toBe('monday')
     expect(DEFAULT_SETTINGS.allNotesFilterTags).toEqual(['book', 'link', 'person'])
+    expect(DEFAULT_SETTINGS.calendarEnabled).toBe(false)
+    expect(DEFAULT_SETTINGS.calendarIds).toEqual([])
     expect(DEFAULT_SETTINGS.graphColors).toEqual({})
     expect(DEFAULT_SETTINGS.aiProviders).toEqual([])
     expect(DEFAULT_SETTINGS.defaultAiProviderId).toBeNull()
@@ -76,6 +80,13 @@ describe('settingsSchema', () => {
       settingsSchema.parse({ allNotesFilterTags: ['meeting'] }).allNotesFilterTags,
     ).toEqual(['meeting'])
     expect(settingsSchema.parse({ allNotesFilterTags: [] }).allNotesFilterTags).toEqual([])
+    expect(settingsSchema.parse({ calendarEnabled: true }).calendarEnabled).toBe(true)
+    expect(settingsSchema.parse({ calendarEnabled: false }).calendarEnabled).toBe(false)
+    expect(settingsSchema.parse({ calendarIds: ['cal-1', 'cal-2'] }).calendarIds).toEqual([
+      'cal-1',
+      'cal-2',
+    ])
+    expect(settingsSchema.parse({ calendarIds: [] }).calendarIds).toEqual([])
   })
 
   it('degrades an invalid value to its default instead of failing the load', () => {
@@ -115,6 +126,10 @@ describe('settingsSchema', () => {
       'link',
       'person',
     ])
+    expect(settingsSchema.parse({ calendarEnabled: 'yes' }).calendarEnabled).toBe(false)
+    expect(settingsSchema.parse({ calendarEnabled: 1 }).calendarEnabled).toBe(false)
+    expect(settingsSchema.parse({ calendarIds: 'cal-1' }).calendarIds).toEqual([])
+    expect(settingsSchema.parse({ calendarIds: [7] }).calendarIds).toEqual([])
   })
 
   it('preserves unknown keys so newer-version settings survive a round trip', () => {
@@ -133,6 +148,8 @@ describe('settingsSchema', () => {
       dateFormat: 'mdy',
       weekStartDay: 'monday',
       allNotesFilterTags: ['book', 'link', 'person'],
+      calendarEnabled: false,
+      calendarIds: [],
       graphColors: {},
       aiProviders: [],
       defaultAiProviderId: null,

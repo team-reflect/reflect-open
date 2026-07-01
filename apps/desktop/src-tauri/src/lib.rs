@@ -8,8 +8,10 @@
 //! [`recents`] (recent-graphs store), [`settings`] (user settings store),
 //! [`secrets`] (OS keychain), [`git`] (backup/sync primitives),
 //! [`capture`] (link-capture inbox + native-messaging host plumbing),
+//! [`calendar`] (read-only Apple Calendar access),
 //! [`error`] (the shared error contract).
 
+mod calendar;
 mod capture;
 mod db;
 mod devtools;
@@ -185,6 +187,10 @@ pub fn run() {
             embed::embed_texts,
             watcher::watch_start,
             watcher::watch_stop,
+            calendar::calendar_authorization_status,
+            calendar::calendar_request_access,
+            calendar::calendar_list_calendars,
+            calendar::calendar_list_events,
             capture::capture_host_register,
             capture::capture_inbox_list,
             capture::capture_inbox_read,

@@ -40,6 +40,7 @@ export {
   appendBlock,
   appendUnderHeading,
   appendTaskLine,
+  wikiLinkSafe,
   editTaskLine,
   removeTaskLine,
   renameWikiLink,

@@ -160,6 +160,8 @@ describe('SettingsScreen', () => {
           dateFormat: 'mdy',
           weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
+          calendarEnabled: false,
+          calendarIds: [],
           graphColors: {},
           aiProviders: [],
           defaultAiProviderId: null,
@@ -200,6 +202,8 @@ describe('SettingsScreen', () => {
           dateFormat: 'mdy',
           weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
+          calendarEnabled: false,
+          calendarIds: [],
           graphColors: {},
           aiProviders: [],
           defaultAiProviderId: null,
@@ -243,6 +247,8 @@ describe('SettingsScreen', () => {
           dateFormat: 'mdy',
           weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
+          calendarEnabled: false,
+          calendarIds: [],
           graphColors: {},
           aiProviders: [],
           defaultAiProviderId: null,
@@ -284,6 +290,8 @@ describe('SettingsScreen', () => {
           dateFormat: 'mdy',
           weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
+          calendarEnabled: false,
+          calendarIds: [],
           graphColors: {},
           aiProviders: [],
           defaultAiProviderId: null,
@@ -324,6 +332,8 @@ describe('SettingsScreen', () => {
           dateFormat: 'mdy',
           weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
+          calendarEnabled: false,
+          calendarIds: [],
           graphColors: {},
           aiProviders: [],
           defaultAiProviderId: null,
@@ -357,6 +367,8 @@ describe('SettingsScreen', () => {
           dateFormat: 'mdy',
           weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
+          calendarEnabled: false,
+          calendarIds: [],
           graphColors: {},
           aiProviders: [],
           defaultAiProviderId: null,
@@ -403,6 +415,8 @@ describe('SettingsScreen', () => {
           dateFormat: 'dmy',
           weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
+          calendarEnabled: false,
+          calendarIds: [],
           graphColors: {},
           aiProviders: [],
           defaultAiProviderId: null,
@@ -442,6 +456,8 @@ describe('SettingsScreen', () => {
           dateFormat: 'iso',
           weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
+          calendarEnabled: false,
+          calendarIds: [],
           graphColors: {},
           aiProviders: [],
           defaultAiProviderId: null,
@@ -487,6 +503,8 @@ describe('SettingsScreen', () => {
           dateFormat: 'mdy',
           weekStartDay: 'sunday',
           allNotesFilterTags: ['book', 'link', 'person'],
+          calendarEnabled: false,
+          calendarIds: [],
           graphColors: {},
           aiProviders: [],
           defaultAiProviderId: null,
@@ -529,6 +547,8 @@ describe('SettingsScreen', () => {
           dateFormat: 'mdy',
           weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person'],
+          calendarEnabled: false,
+          calendarIds: [],
           graphColors: {},
           aiProviders: [],
           defaultAiProviderId: null,
@@ -562,6 +582,8 @@ describe('SettingsScreen', () => {
           dateFormat: 'mdy',
           weekStartDay: 'monday',
           allNotesFilterTags: ['book', 'link', 'person', 'meeting'],
+          calendarEnabled: false,
+          calendarIds: [],
           graphColors: {},
           aiProviders: [],
           defaultAiProviderId: null,
@@ -627,6 +649,8 @@ describe('SettingsScreen', () => {
           dateFormat: 'mdy',
           weekStartDay: 'monday',
           allNotesFilterTags: ['person'],
+          calendarEnabled: false,
+          calendarIds: [],
           graphColors: {},
           aiProviders: [],
           defaultAiProviderId: null,
@@ -644,7 +668,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorTextSize: 'small', semanticSearchEnabled: true, describeAssets: true, mobileOnboarded: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
+        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorTextSize: 'small', semanticSearchEnabled: true, describeAssets: true, mobileOnboarded: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
       ]),
     )
     // The control flips to the loading state (EmbeddingsSync owns the actual
@@ -673,7 +697,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorTextSize: 'small', semanticSearchEnabled: false, describeAssets: true, mobileOnboarded: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
+        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorTextSize: 'small', semanticSearchEnabled: false, describeAssets: true, mobileOnboarded: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
       ]),
     )
     expect(screen.getByRole('button', { name: /enable semantic search/i })).toBeTruthy()
@@ -696,7 +720,7 @@ describe('SettingsScreen', () => {
     await waitFor(() => expect(invoked).toContain('embed_ensure'))
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorTextSize: 'small', semanticSearchEnabled: true, describeAssets: true, mobileOnboarded: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
+        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorTextSize: 'small', semanticSearchEnabled: true, describeAssets: true, mobileOnboarded: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
       ]),
     )
   })
@@ -715,7 +739,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorTextSize: 'small', semanticSearchEnabled: false, describeAssets: true, mobileOnboarded: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
+        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorTextSize: 'small', semanticSearchEnabled: false, describeAssets: true, mobileOnboarded: false, theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null },
       ]),
     )
     expect(screen.getByRole('button', { name: /enable semantic search/i })).toBeTruthy()

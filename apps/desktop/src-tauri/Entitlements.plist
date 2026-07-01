@@ -8,5 +8,10 @@
 <dict>
 	<key>com.apple.security.device.audio-input</key>
 	<true/>
+	<!-- Read-only Apple Calendar access for the daily-note events panel
+	     (src/calendar.rs); without it the hardened runtime blocks EventKit
+	     in notarized builds. -->
+	<key>com.apple.security.personal-information.calendars</key>
+	<true/>
 </dict>
 </plist>
