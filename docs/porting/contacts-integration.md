@@ -60,7 +60,8 @@ macOS.
   the matching logic (which note titles count as person-like, how attendee
   emails map to person notes); the suggested-contact card and the meeting
   flow consume them. Per-note "ignore" dismissals persist in the note's
-  frontmatter or the settings file — small, explicit state either way.
+  frontmatter, so the dismissal travels with the note like any other
+  note state — not machine-local in the settings file.
 - **Packaging.** `com.apple.security.personal-information.addressbook`
   entitlement plus an `NSContactsUsageDescription` string. iOS uses the
   same framework, so mobile inherits the integration (v1 had contact sync

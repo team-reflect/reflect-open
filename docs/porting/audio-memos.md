@@ -27,7 +27,10 @@ touches a Reflect server, because there isn't one.
   (`apps/desktop/src/lib/transcription-reconciler.ts`) writes the transcript
   into the daily note and retries pending memos in the background.
 - **No key configured.** The mic button is disabled with a tooltip pointing
-  at Settings — there is no metered fallback tier to fall back to.
+  at Settings — the app won't record audio it can never transcribe, and
+  there is no metered fallback tier. Offline is the different case: with a
+  key configured, recording works without a network and transcription
+  catches up later.
 
 ## v1 → v2 mapping
 

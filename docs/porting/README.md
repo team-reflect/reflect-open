@@ -17,9 +17,10 @@ designs simply don't survive the move:
   credentials in a cloud account. v2 has no backend: everything lives in
   plain files in the graph, in the local settings file, or in the OS
   keychain.
-- **No provider OAuth.** v1 connected to Google and Microsoft via OAuth,
-  which requires a confidential client secret held on a server. An
-  open-source, client-only app cannot ship one. Instead, v2 integrates with
+- **No provider OAuth.** v1 connected to Google and Microsoft through
+  server-mediated OAuth: Reflect's server held the app credentials, the
+  redirect endpoints, and the refresh tokens. An open-source, client-only
+  app has no trustworthy place for any of that. Instead, v2 integrates with
   the **OS-native stores** — Apple Calendar (EventKit) and Apple Contacts —
   which already aggregate the user's Google, Microsoft, and iCloud accounts
   if they are added to macOS.

@@ -33,9 +33,11 @@ aliases:
 - The `aliases` field is a plain YAML string array
   (`packages/core/src/markdown/model.ts`); malformed values degrade to an
   empty list rather than breaking the note.
-- `[[` autocomplete and link resolution treat titles, aliases, and daily
-  dates uniformly through the `note_keys` view in the SQLite index
-  (`crates/index-schema/migrations/0001_initial.sql`).
+- `[[` autocomplete matches titles, aliases, and daily dates alike through
+  the `note_keys` view in the SQLite index
+  (`crates/index-schema/migrations/0001_initial.sql`); link resolution
+  checks the same keys with an explicit precedence — date, then title,
+  then alias.
 - Renames are **stronger than v1**: the rename coordinator
   (`apps/desktop/src/editor/rename-coordinator.ts`) rewrites known
   `[[old title]]` links across the graph, then records the old title as an

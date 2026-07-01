@@ -52,13 +52,15 @@ reflect://today                     { kind: 'today' }
 reflect://daily/2026-07-01          { kind: 'daily', date }
 reflect://note/<target>             { kind: 'note', path }  — see resolution
 reflect://search?q=meeting          { kind: 'search', query }
+reflect://tag/<name>                { kind: 'allNotes', tag }
 reflect://tasks                     { kind: 'tasks' }
 ```
 
 `<target>` resolves exactly like the CLI's `<note>` argument and the
 `note_keys` view: frontmatter `id` first (stable across renames — the
 reason ids exist), then date, title, or alias. "Copy deep link" therefore
-prefers the id form, so a link outlives any rename; a human-written
+prefers the id form, so a link outlives any rename — within the graph it
+was copied from; see graph addressing below. A human-written
 `reflect://note/Project%20X` still works via title resolution.
 
 A "Copy deep link" entry joins the command palette and the note context
@@ -100,6 +102,7 @@ three front doors (palette, CLI, links).
 | `reflect://?command=append-to-daily-note`       | `reflect://append?text=…` via the capture inbox       |
 | `reflect://?command=create-task`                | `reflect://task?text=…` via the capture inbox         |
 | Web URLs (`reflect.app/g/…`)                    | Not ported — no server; `reflect://` + file paths     |
+| Tag URLs (`…/g/<id>/tag/<name>`)                | `reflect://tag/<name>` (All Notes filtered by tag)    |
 | "Copy link to note" (`alt+mod+l`)               | "Copy deep link" (palette + context menu)             |
 | Published `reflect.site` pages                  | Not ported here (a publishing story is separate)      |
 | REST API create/append                          | CLI + capture inbox + plain files                     |

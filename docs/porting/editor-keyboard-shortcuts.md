@@ -105,10 +105,13 @@ Ordered by value. The first item is the reason this doc exists.
 ## Conflicts to watch
 
 - `mod+[` / `mod+]` are **back/forward** at app scope, while the prosekit
-  list keymap also binds `mod+[` to outdent inside the editor. Today the
-  editor wins when focused; any new bindings must go through the keymap
-  registry (`apps/desktop/src/editor/keymap.ts`), which rejects duplicates,
-  and be listed in the `mod+/` cheat-sheet.
+  list keymap also binds `mod+[` to outdent inside the editor. The
+  ownership rule: `editor`-scope bindings win while focus is in the
+  editor; `app`-scope bindings apply everywhere else; and the registry
+  (`apps/desktop/src/editor/keymap.ts`) rejects duplicates only *within*
+  a scope — so a chord shared across scopes is a deliberate decision, not
+  an accident. New bindings go through that registry and get listed in
+  the `mod+/` cheat-sheet.
 - v1 resolved `alt`-combos through `keyboard-layout-map` for non-US
   layouts; `alt+↑`/`alt+↓` are layout-safe (no printable character), which
   is another reason to prefer them for list moves.
