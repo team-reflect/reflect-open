@@ -1,6 +1,8 @@
 import {
   appendContactDetails,
   contactDetailsMarkdown,
+  matchContactForTitle,
+  parseNote,
   writeNote,
   type ContactMatch,
 } from '@reflect/core'
@@ -29,11 +31,19 @@ export async function addContactToNote(
   contact: ContactMatch,
   generation: number,
 ): Promise<void> {
+  const source = await readNoteSource(path)
+  // Action-time revalidation: the card's suggestion is a cached query, but
+  // the title may have been edited (even unsaved) since it resolved — never
+  // merge a contact into a note that no longer carries its name.
+  const title = parseNote({ path, source }).title
+  if (matchContactForTitle(title, [contact]) === null) {
+    throw new Error('The note title no longer matches this contact.')
+  }
   const details = contactDetailsMarkdown(contact)
   // Idempotency guard: the append and the mark are two writes, so a retry
   // after a failed mark (details landed, card still up) must not append the
   // same bullets again.
-  const alreadyAdded = details === '' || (await readNoteSource(path)).includes(details)
+  const alreadyAdded = details === '' || source.includes(details)
   if (!alreadyAdded) {
     const owner = openSession(path)
     if (owner !== null) {

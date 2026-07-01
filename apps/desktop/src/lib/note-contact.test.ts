@@ -86,6 +86,20 @@ describe('addContactToNote', () => {
     )
   })
 
+  it('refuses when the title no longer matches the contact (stale card)', async () => {
+    // The suggestion resolved against the old title; an (even unsaved) edit
+    // since then must not get another contact's details merged in.
+    const { session, commitBodyAppend, commitFrontmatter } = fakeSession('# Grace Hopper\n')
+    openSession.mockReturnValue(session)
+
+    await expect(addContactToNote('notes/Ada Lovelace.md', ADA, 3)).rejects.toThrow(
+      /no longer matches/,
+    )
+    expect(commitBodyAppend).not.toHaveBeenCalled()
+    expect(commitFrontmatter).not.toHaveBeenCalled()
+    expect(writeNote).not.toHaveBeenCalled()
+  })
+
   it('does not append the bullets twice when a retry follows a failed mark', async () => {
     // First Add landed the details but the mark write failed — the card is
     // still up, so a second Add must only write the mark.
