@@ -31,6 +31,7 @@ function fakeEditor(): NoteEditorHandle & { applied: string[] } {
       applied.push(markdown)
     },
     getMarkdown: () => '',
+    insertMarkdown: () => {},
     focus: () => {},
     setSelection: () => {},
   }

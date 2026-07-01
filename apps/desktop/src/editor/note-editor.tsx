@@ -44,6 +44,13 @@ export interface NoteEditorHandle {
   getMarkdown(): string
   /** Replace the document (note switch / external reload). */
   setMarkdown(markdown: string): void
+  /**
+   * Insert markdown text at the caret (replacing any selection) as a normal
+   * undoable edit — unlike {@link setMarkdown}, this fires `onDocChange`, so
+   * the insertion flows into the save pipeline like typing. Used by commands
+   * that add content to the focused note (Attach file…).
+   */
+  insertMarkdown(markdown: string): void
   focus(): void
   /**
    * Move the caret to a document edge and scroll it into view. Used for
@@ -88,6 +95,13 @@ interface NoteEditorProps {
   saveImage?: (file: File) => Promise<string | null>
   /** Called when persisting a pasted/dropped image throws. */
   onImageSaveError?: (error: unknown, file: File) => void
+  /**
+   * Persist a pasted/dropped non-image file and return its markdown link
+   * destination (or null to decline). Inserted as `[name](destination)`.
+   */
+  saveAttachment?: (file: File) => Promise<string | null>
+  /** Called when persisting a pasted/dropped non-image file throws. */
+  onAttachmentSaveError?: (error: unknown, file: File) => void
   /** Click on a `[[wiki link]]`. */
   onWikiLinkClick?: (target: string) => void
   /** Click on an inline `#tag`. The tag name arrives without the leading `#`. */
@@ -131,6 +145,8 @@ export function NoteEditor({
   openImage,
   saveImage,
   onImageSaveError,
+  saveAttachment,
+  onAttachmentSaveError,
   onWikiLinkClick,
   onTagClick,
   onWikilinkSearch,
@@ -154,6 +170,8 @@ export function NoteEditor({
   const openImageRef = useRef(openImage)
   const saveImageRef = useRef(saveImage)
   const onImageSaveErrorRef = useRef(onImageSaveError)
+  const saveAttachmentRef = useRef(saveAttachment)
+  const onAttachmentSaveErrorRef = useRef(onAttachmentSaveError)
   const onExitBoundaryRef = useRef(onExitBoundary)
   useLayoutEffect(() => {
     onChangeRef.current = onChange
@@ -164,6 +182,8 @@ export function NoteEditor({
     openImageRef.current = openImage
     saveImageRef.current = saveImage
     onImageSaveErrorRef.current = onImageSaveError
+    saveAttachmentRef.current = saveAttachment
+    onAttachmentSaveErrorRef.current = onAttachmentSaveError
     onExitBoundaryRef.current = onExitBoundary
   })
 
@@ -178,6 +198,14 @@ export function NoteEditor({
     (): NoteEditorHandle => ({
       getMarkdown: () => innerRef.current?.getMarkdown() ?? '',
       setMarkdown: (markdown) => innerRef.current?.setMarkdown(markdown),
+      insertMarkdown: (markdown) => {
+        // Through meowdown's ProseKit escape hatch: a plain text insertion is
+        // a markdown insertion in this schema (syntax lives in the text).
+        innerRef.current?.editor?.exec((state, dispatch) => {
+          dispatch?.(state.tr.insertText(markdown).scrollIntoView())
+          return true
+        })
+      },
       focus: () => innerRef.current?.focus(),
       setSelection: (position) => innerRef.current?.setSelection(position),
     }),
@@ -209,12 +237,33 @@ export function NoteEditor({
     async (file: File) => (await saveImageRef.current?.(file)) ?? undefined,
     [],
   )
-  const handleImageSaveError = useCallback(
-    (error: unknown, file: File) => onImageSaveErrorRef.current?.(error, file),
+  const handleFilePaste = useCallback(
+    async (file: File) => (await saveAttachmentRef.current?.(file)) ?? undefined,
     [],
   )
+  // meowdown funnels save errors for images and attachments through one
+  // callback; split them back apart by kind so each surface keeps its own
+  // error message.
+  const handleFileSaveError = useCallback((error: unknown, file: File) => {
+    if (file.type.startsWith('image/')) {
+      onImageSaveErrorRef.current?.(error, file)
+    } else {
+      onAttachmentSaveErrorRef.current?.(error, file)
+    }
+  }, [])
   const handleLinkClick = useCallback(
     ({ href }: { href: string; event: MouseEvent }) => {
+      // A graph-relative `assets/…` href (an attachment link) opens through
+      // the generation-pinned asset command, never the URL opener — which
+      // would receive a meaningless relative string. `resolveImageOpenPath`
+      // vets the path exactly as it does for image sources.
+      const assetPath = resolveImageOpenPathRef.current?.(href) ?? null
+      if (assetPath !== null) {
+        void Promise.resolve(openImageRef.current?.(assetPath)).catch((cause) => {
+          console.error('open asset failed:', errorMessage(cause))
+        })
+        return
+      }
       void openUrl(href).catch((cause) => {
         console.error('open link failed:', errorMessage(cause))
       })
@@ -271,7 +320,8 @@ export function NoteEditor({
         {...(onTagSearch !== undefined ? { onTagSearch } : {})}
         resolveImageUrl={handleResolveImageUrl}
         onImagePaste={handleImagePaste}
-        onImageSaveError={handleImageSaveError}
+        onFilePaste={handleFilePaste}
+        onImageSaveError={handleFileSaveError}
         onExitBoundary={handleExitBoundary}
       >
         {children}

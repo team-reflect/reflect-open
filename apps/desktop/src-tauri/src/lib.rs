@@ -141,6 +141,7 @@ pub fn run() {
 
     builder
         .manage(fs::GraphState::default())
+        .manage(fs::assets::AssetUploads::default())
         .manage(db::IndexState::default())
         .manage(watcher::WatcherState::default())
         .manage(quit::QuitState::default())
@@ -156,6 +157,11 @@ pub fn run() {
             fs::asset_write,
             fs::asset_read,
             fs::asset_open,
+            fs::assets::asset_upload_begin,
+            fs::assets::asset_upload_append,
+            fs::assets::asset_upload_commit,
+            fs::assets::asset_upload_abort,
+            fs::assets::asset_import,
             fs::dir_list,
             fs::note_exists,
             fs::note_delete,

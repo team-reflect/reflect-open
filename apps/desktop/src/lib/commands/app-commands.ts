@@ -6,6 +6,7 @@ import {
   randomNotePath,
   toggleDevtools,
 } from '@reflect/core'
+import { attachFilesToNote } from '@/lib/attach-files'
 import { untitledNotePath } from '@/lib/create-note'
 import { runGistPublish } from '@/lib/note-gist'
 import { toggleNotePinned } from '@/lib/note-pin'
@@ -168,6 +169,16 @@ const APP_COMMANDS: AppCommand[] = [
       }
       await runGistPublish(path, generation)
     },
+  },
+  {
+    id: 'note.attachFile',
+    title: 'Attach file…',
+    keywords: ['upload', 'attachment', 'import', 'pdf', 'document', 'insert'],
+    // Native file picker → copies into the graph's `assets/` → a markdown
+    // link per file at the caret (the keyboard-native twin of dropping a
+    // file on the note). No default keybinding: the palette keeps it
+    // keyboard-reachable without spending a shortcut.
+    run: (context) => attachFilesToNote(context),
   },
   {
     id: 'note.random',

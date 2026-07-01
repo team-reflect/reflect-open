@@ -23,3 +23,10 @@ minimumReleaseAgeExclude:
 # overrides:
 #   '@meowdown/core': 'https://pkg.pr.new/prosekit/meowdown/@meowdown/core@5a4a25a'
 #   '@meowdown/react': 'https://pkg.pr.new/prosekit/meowdown/@meowdown/react@5a4a25a'
+
+# TEMPORARY pin to the unreleased meowdown onFilePaste build
+# (prosekit/meowdown#190). Remove and bump @meowdown/* once released.
+blockExoticSubdeps: false
+overrides:
+  '@meowdown/core': 'https://pkg.pr.new/prosekit/meowdown/@meowdown/core@af04d0d'
+  '@meowdown/react': 'https://pkg.pr.new/prosekit/meowdown/@meowdown/react@af04d0d'

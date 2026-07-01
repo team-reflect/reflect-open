@@ -1,14 +1,20 @@
-import { memo, useCallback, useMemo, useState, type ReactElement } from 'react'
+import { memo, useCallback, useMemo, useRef, useState, type ReactElement } from 'react'
 import type { ExitBoundaryHandler } from '@meowdown/core'
 import { isDaily } from '@reflect/core'
 import { BacklinksPanel } from '@/components/backlinks-panel'
 import { InlineAlert } from '@/components/inline-alert'
+import { LargeAttachmentDialog } from '@/components/large-attachment-dialog'
 import { NoteConflictBanner } from '@/components/note-conflict-banner'
 import { ProtectedNoteView } from '@/components/protected-note-view'
 import { SyncConflictNotice } from '@/components/sync-conflict-notice'
 import { editorBodyWithDefaultBullet } from '@/editor/default-bullet'
+import {
+  registerNoteEditorHandle,
+  unregisterNoteEditorHandle,
+} from '@/editor/editor-handle-registry'
 import { markModeFromSyntax } from '@/editor/mark-mode'
 import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor'
+import { useAttachmentPersistence } from '@/editor/use-attachment-persistence'
 import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete'
 import { useImagePersistence } from '@/editor/use-image-persistence'
 import { useNoteDocument } from '@/editor/use-note-document'
@@ -129,14 +135,35 @@ export function NotePaneComponent({
     onImageSaveError,
     saveError: imageSaveError,
   } = useImagePersistence(graphRoot, generation)
+  const {
+    saveAttachment,
+    onAttachmentSaveError,
+    saveError: attachmentSaveError,
+    pendingLargeAttachment,
+  } = useAttachmentPersistence(generation)
   const onWikiLinkClick = useWikiLinkNavigation(generation)
   const onTagClick = useTagNavigation()
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
 
   const bindEditor = document.bindEditor
+  // The registry entry this pane made, so unmount removes exactly it (a
+  // remount of the same path may already have re-registered).
+  const registeredHandle = useRef<{ path: string; handle: NoteEditorHandle } | null>(null)
   const handleRef = useCallback(
     (handle: NoteEditorHandle | null) => {
       bindEditor(handle)
+      if (handle === null) {
+        if (registeredHandle.current !== null) {
+          unregisterNoteEditorHandle(
+            registeredHandle.current.path,
+            registeredHandle.current.handle,
+          )
+          registeredHandle.current = null
+        }
+      } else {
+        registerNoteEditorHandle(path, handle)
+        registeredHandle.current = { path, handle }
+      }
       if (dailyDate !== undefined) {
         registerHandle?.(dailyDate, handle)
       }
@@ -147,7 +174,7 @@ export function NotePaneComponent({
         onAutoFocused?.()
       }
     },
-    [bindEditor, dailyDate, registerHandle, autoFocus, onAutoFocused],
+    [bindEditor, path, dailyDate, registerHandle, autoFocus, onAutoFocused],
   )
 
 
@@ -231,6 +258,13 @@ export function NotePaneComponent({
           </InlineAlert>
         ) : null}
 
+        {attachmentSaveError !== null ? (
+          <InlineAlert tone="error" className="mb-4">
+            Couldn’t save the dropped file: {attachmentSaveError}. It was not added to the
+            note.
+          </InlineAlert>
+        ) : null}
+
         {document.conflict !== null ? (
           <NoteConflictBanner
             onKeepMine={document.keepMine}
@@ -258,6 +292,8 @@ export function NotePaneComponent({
         openImage={openImage}
         saveImage={saveImage}
         onImageSaveError={onImageSaveError}
+        saveAttachment={saveAttachment}
+        onAttachmentSaveError={onAttachmentSaveError}
         onWikiLinkClick={onWikiLinkClick}
         onTagClick={onTagClick}
         onWikilinkSearch={onWikilinkSearch}
@@ -276,6 +312,8 @@ export function NotePaneComponent({
       <div className={gutterClassName}>
         <BacklinksPanel path={path} />
       </div>
+
+      <LargeAttachmentDialog pending={pendingLargeAttachment} />
     </div>
   )
 }

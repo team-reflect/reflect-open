@@ -40,6 +40,7 @@ vi.mock('@/editor/note-editor', async () => {
         handleRef?.({
           setMarkdown: () => {},
           getMarkdown: () => '',
+          insertMarkdown: () => {},
           focus: () => editorProbe.focusCalls.push('focus'),
           setSelection: () => {},
         })
