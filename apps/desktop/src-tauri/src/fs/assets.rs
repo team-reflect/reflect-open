@@ -162,10 +162,7 @@ pub fn asset_upload_begin(
 /// body** (`InvokeBody::Raw`) — never JSON — and the upload id arrives in the
 /// `x-upload-id` header, since a raw-body invoke carries no args.
 #[tauri::command]
-pub fn asset_upload_append(
-    request: Request<'_>,
-    uploads: State<AssetUploads>,
-) -> AppResult<()> {
+pub fn asset_upload_append(request: Request<'_>, uploads: State<AssetUploads>) -> AppResult<()> {
     let id = request
         .headers()
         .get(UPLOAD_ID_HEADER)
