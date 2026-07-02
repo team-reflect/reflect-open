@@ -158,7 +158,7 @@ describe('ignoreContactSuggestion', () => {
     const { session, commitBodyAppend, commitFrontmatter } = fakeSession('# Ada Lovelace\n')
     openSession.mockReturnValue(session)
 
-    await ignoreContactSuggestion('notes/Ada Lovelace.md', 3)
+    await ignoreContactSuggestion('notes/Ada Lovelace.md', ADA, 3)
 
     expect(commitFrontmatter).toHaveBeenCalledWith({ contactSuggestion: 'ignored' })
     expect(commitBodyAppend).not.toHaveBeenCalled()
@@ -167,12 +167,24 @@ describe('ignoreContactSuggestion', () => {
   it('marks a closed note on disk', async () => {
     readNote.mockResolvedValue('# Ada Lovelace\n')
 
-    await ignoreContactSuggestion('notes/Ada Lovelace.md', 3)
+    await ignoreContactSuggestion('notes/Ada Lovelace.md', ADA, 3)
 
     expect(writeNote).toHaveBeenCalledWith(
       'notes/Ada Lovelace.md',
       '---\ncontactSuggestion: ignored\n---\n# Ada Lovelace\n',
       3,
     )
+  })
+
+  it('skips the mark when the title no longer matches (stale card)', async () => {
+    // The user wanted the stale card gone; the new title must stay eligible
+    // for its own suggestion, so nothing is written.
+    const { session, commitFrontmatter } = fakeSession('# Grace Hopper\n')
+    openSession.mockReturnValue(session)
+
+    await ignoreContactSuggestion('notes/Ada Lovelace.md', ADA, 3)
+
+    expect(commitFrontmatter).not.toHaveBeenCalled()
+    expect(writeNote).not.toHaveBeenCalled()
   })
 })

@@ -26,17 +26,29 @@ import { readNoteOrEmpty } from '@/lib/note-read'
  * than clobber when the session can't take it (loading, protected, or a
  * parked conflict). A closed note is patched on disk.
  */
+/**
+ * Action-time revalidation: the card's suggestion is a cached query, but the
+ * title may have been edited (even unsaved) since it resolved. Returns the
+ * live source when the note still carries the contact's name, else null —
+ * a stale card must neither merge the wrong details nor mark the new title
+ * as handled.
+ */
+async function sourceIfStillMatching(
+  path: string,
+  contact: ContactMatch,
+): Promise<string | null> {
+  const source = await readNoteSource(path)
+  const title = parseNote({ path, source }).title
+  return matchContactForTitle(title, [contact]) === null ? null : source
+}
+
 export async function addContactToNote(
   path: string,
   contact: ContactMatch,
   generation: number,
 ): Promise<void> {
-  const source = await readNoteSource(path)
-  // Action-time revalidation: the card's suggestion is a cached query, but
-  // the title may have been edited (even unsaved) since it resolved — never
-  // merge a contact into a note that no longer carries its name.
-  const title = parseNote({ path, source }).title
-  if (matchContactForTitle(title, [contact]) === null) {
+  const source = await sourceIfStillMatching(path, contact)
+  if (source === null) {
     throw new Error('The note title no longer matches this contact.')
   }
   const details = contactDetailsMarkdown(contact)
@@ -58,10 +70,19 @@ export async function addContactToNote(
   await commitNoteFrontmatter(path, { contactSuggestion: 'added' }, generation)
 }
 
-/** Dismiss the suggestion for this note: mark it `ignored`, write nothing else. */
+/**
+ * Dismiss the suggestion for this note: mark it `ignored`, write nothing
+ * else. A stale card (the title no longer matches `contact`) skips the mark
+ * silently — the user wanted the card gone, and the new title must stay
+ * eligible for its own suggestion.
+ */
 export async function ignoreContactSuggestion(
   path: string,
+  contact: ContactMatch,
   generation: number,
 ): Promise<void> {
+  if ((await sourceIfStillMatching(path, contact)) === null) {
+    return
+  }
   await commitNoteFrontmatter(path, { contactSuggestion: 'ignored' }, generation)
 }

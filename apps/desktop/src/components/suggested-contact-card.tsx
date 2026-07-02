@@ -77,7 +77,7 @@ export function SuggestedContactCard({ path, className }: SuggestedContactCardPr
         size="xs"
         variant="ghost"
         disabled={isBusy}
-        onClick={() => void resolve(() => ignoreContactSuggestion(path, generation))}
+        onClick={() => void resolve(() => ignoreContactSuggestion(path, contact, generation))}
       >
         Ignore
       </Button>
