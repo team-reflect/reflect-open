@@ -63,14 +63,18 @@ export function useAttachmentPersistence(
   useEffect(() => {
     return () => {
       // The pane outlives the note it shows: a note switch reuses this hook
-      // while the editor remounts. Whatever the previous note had in flight
-      // — a visible confirm, confirms queued behind it, an error banner —
-      // must not leak into the next note: decline and clear it all.
+      // while the editor remounts — and a graph switch can keep the very
+      // same routed path (daily notes exist in every graph). Whatever the
+      // previous note had in flight — a visible confirm, confirms queued
+      // behind it, an error banner — must not leak into the next one:
+      // decline and clear it all. (An approved-but-unsent save would be
+      // rejected by the stale generation pin anyway; declining here spares
+      // the user that confusing error.)
       noteEpoch.current += 1
       pendingRef.current?.respond(false)
       setSaveError(null)
     }
-  }, [path])
+  }, [path, generation])
 
   const confirmLargeFile = useCallback((file: File): Promise<boolean> => {
     const epoch = noteEpoch.current

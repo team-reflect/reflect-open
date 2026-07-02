@@ -177,6 +177,29 @@ describe('useAttachmentPersistence', () => {
     expect(invoke).not.toHaveBeenCalledWith('asset_upload_begin', expect.anything())
   })
 
+  it('declines a pending confirm when the graph switches under the same path', async () => {
+    const invoke = installUploadBridge()
+    const view = render(<Host generation={3} path="daily/2026-07-02.md" />)
+
+    let pathPromise: Promise<string | null> | null = null
+    act(() => {
+      pathPromise = persistence!.saveAttachment(
+        fileOfSize('one.mov', LARGE_ATTACHMENT_BYTES + 1),
+      )
+    })
+    expect(persistence!.pendingLargeAttachment).not.toBeNull()
+
+    // Same routed note, different graph session (daily paths exist in every
+    // graph): the confirm belongs to the old graph and must not survive.
+    await act(async () => {
+      view.rerender(<Host generation={4} path="daily/2026-07-02.md" />)
+    })
+
+    await expect(pathPromise).resolves.toBeNull()
+    expect(persistence!.pendingLargeAttachment).toBeNull()
+    expect(invoke).not.toHaveBeenCalledWith('asset_upload_begin', expect.anything())
+  })
+
   it('surfaces reported save errors and clears them on the next success', async () => {
     installUploadBridge()
     render(<Host generation={3} />)
