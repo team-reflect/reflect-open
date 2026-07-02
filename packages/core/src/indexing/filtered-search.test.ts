@@ -216,6 +216,79 @@ describe('searchWithFilters', () => {
     )
   })
 
+  it('resolves links: tokens by title before filtering (token behavior unchanged)', async () => {
+    mockInvoke.mockResolvedValueOnce([{ path: 'notes/alpha-1.md' }])
+    mockInvoke.mockResolvedValueOnce([])
+
+    await searchWithFilters(parseSearchQuery('links:Alpha'))
+
+    expect(mockInvoke).toHaveBeenCalledTimes(2)
+    const [, args] = mockInvoke.mock.calls[1]!
+    const sql = String(args['sql'])
+    expect(sql).toContain('"backlinks"."source_path" = "notes"."path"')
+    expect(sql).toContain('"backlinks"."target_path" = ?')
+    expect(args['params']).toContain('notes/alpha-1.md')
+  })
+
+  it('filters by a picker-exact link target without resolving titles', async () => {
+    mockInvoke.mockResolvedValueOnce([])
+
+    const parsed = parseSearchQuery('')
+    parsed.filters.linksToPath = 'notes/project-2.md'
+    await searchWithFilters(parsed)
+
+    // One query only: the exact path never round-trips through the resolver.
+    expect(mockInvoke).toHaveBeenCalledTimes(1)
+    const [, args] = mockInvoke.mock.calls[0]!
+    const sql = String(args['sql'])
+    expect(sql).toContain('"backlinks"."source_path" = "notes"."path"')
+    expect(sql).toContain('"backlinks"."target_path" = ?')
+    expect(args['params']).toContain('notes/project-2.md')
+  })
+
+  it('filters by a picker-exact link source without resolving titles', async () => {
+    mockInvoke.mockResolvedValueOnce([])
+
+    const parsed = parseSearchQuery('')
+    parsed.filters.linkedFromPath = 'notes/hub-2.md'
+    await searchWithFilters(parsed)
+
+    expect(mockInvoke).toHaveBeenCalledTimes(1)
+    const [, args] = mockInvoke.mock.calls[0]!
+    const sql = String(args['sql'])
+    expect(sql).toContain('"backlinks"."target_path" = "notes"."path"')
+    expect(sql).toContain('"backlinks"."source_path" = ?')
+    expect(args['params']).toContain('notes/hub-2.md')
+  })
+
+  it('lets an exact path win over a title target (duplicate titles cannot retarget)', async () => {
+    mockInvoke.mockResolvedValueOnce([])
+
+    const parsed = parseSearchQuery('links:Alpha')
+    parsed.filters.linksToPath = 'notes/alpha-2.md'
+    await searchWithFilters(parsed)
+
+    expect(mockInvoke).toHaveBeenCalledTimes(1)
+    const [, args] = mockInvoke.mock.calls[0]!
+    expect(args['params']).toContain('notes/alpha-2.md')
+    expect(args['params']).not.toContain('notes/alpha-1.md')
+  })
+
+  it('applies picker-exact link targets on the tag-first recall path', async () => {
+    mockInvoke.mockResolvedValueOnce([])
+
+    const parsed = parseSearchQuery('#Work')
+    parsed.filters.linkedFromPath = 'notes/hub.md'
+    await searchWithFilters(parsed)
+
+    expect(mockInvoke).toHaveBeenCalledTimes(1)
+    const [, args] = mockInvoke.mock.calls[0]!
+    const sql = String(args['sql'])
+    expect(sql).toContain('from "tags"')
+    expect(sql).toContain('"backlinks"."source_path" = ?')
+    expect(args['params']).toContain('notes/hub.md')
+  })
+
   it('restricts the population to regular notes with notesOnly', async () => {
     mockInvoke.mockResolvedValueOnce([])
 

@@ -89,17 +89,19 @@ export async function searchWithFilters(
 
   // Link filters name a note by title/alias/date; resolve it once up front.
   // An unresolvable target matches nothing (the filter is explicit — silently
-  // ignoring it would show results the user just excluded).
-  let linksToPath: string | null = null
-  if (filters.linksTo !== null) {
+  // ignoring it would show results the user just excluded). Picker-set exact
+  // paths skip resolution entirely — the caller already holds the note, and
+  // resolving its title could land on a duplicate.
+  let linksToPath: string | null = filters.linksToPath ?? null
+  if (linksToPath === null && filters.linksTo !== null) {
     const resolution = await resolveWikiTarget(filters.linksTo)
     if (resolution.kind !== 'resolved') {
       return []
     }
     linksToPath = resolution.ref
   }
-  let linkedFromPath: string | null = null
-  if (filters.linkedFrom !== null) {
+  let linkedFromPath: string | null = filters.linkedFromPath ?? null
+  if (linkedFromPath === null && filters.linkedFrom !== null) {
     const resolution = await resolveWikiTarget(filters.linkedFrom)
     if (resolution.kind !== 'resolved') {
       return []

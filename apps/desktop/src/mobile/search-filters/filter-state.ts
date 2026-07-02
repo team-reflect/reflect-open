@@ -18,12 +18,9 @@ import {
 
 /** A note chosen in a link-filter picker. */
 export interface NoteFilterRef {
+  /** The picked note's exact path — what the link filter targets, so a duplicated title can never retarget it. */
   path: string
-  /**
-   * The note's title — how the link filter names its target. Resolution runs
-   * through the wiki-link resolver, so a duplicated title picks the same note
-   * a `[[Title]]` link would.
-   */
+  /** The note's title — the chip's label. */
   title: string
 }
 
@@ -142,8 +139,12 @@ export function buildAllNotesSearch(
       tags,
       dailyOnly: parsed.filters.dailyOnly || filters.daily,
       pinnedOnly: parsed.filters.pinnedOnly || filters.pinned,
-      linksTo: parsed.filters.linksTo ?? filters.linkedTo?.title ?? null,
-      linkedFrom: parsed.filters.linkedFrom ?? filters.linkedBy?.title ?? null,
+      // Badges carry the picked note's exact path (a typed token still wins
+      // the dimension); titles resolve, and duplicates could retarget.
+      linksTo: parsed.filters.linksTo,
+      linksToPath: parsed.filters.linksTo === null ? (filters.linkedTo?.path ?? null) : null,
+      linkedFrom: parsed.filters.linkedFrom,
+      linkedFromPath: parsed.filters.linkedFrom === null ? (filters.linkedBy?.path ?? null) : null,
       updatedAfterMs: laterBound(parsed.filters.updatedAfterMs, filters.updated?.afterMs ?? null),
       updatedBeforeMs: earlierBound(
         parsed.filters.updatedBeforeMs,

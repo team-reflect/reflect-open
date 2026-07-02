@@ -29,6 +29,18 @@ export interface SearchFilters {
   linksTo: string | null
   /** Title/alias/date of the note results must be linked from. */
   linkedFrom: string | null
+  /**
+   * Exact path of the note results must link to. Never produced by the parser
+   * (there is no token for it) — set by UI pickers that already hold the note,
+   * so the filter targets that exact note even when titles are duplicated.
+   * When set it takes precedence over {@link linksTo}.
+   */
+  linksToPath?: string | null
+  /**
+   * Exact path of the note results must be linked from — the picker-set
+   * counterpart of {@link linkedFrom} (see {@link linksToPath}).
+   */
+  linkedFromPath?: string | null
   /** Inclusive lower bound on `mtime`, epoch ms (local day start). */
   updatedAfterMs: number | null
   /** Exclusive upper bound on `mtime`, epoch ms (local day start). */

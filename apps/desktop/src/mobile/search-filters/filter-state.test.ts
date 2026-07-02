@@ -65,11 +65,20 @@ describe('buildAllNotesSearch', () => {
       tags: ['book'],
       dailyOnly: true,
       pinnedOnly: true,
-      linksTo: 'Project X',
-      linkedFrom: 'Hub',
+      linksTo: null,
+      linksToPath: 'notes/project.md',
+      linkedFrom: null,
+      linkedFromPath: 'notes/hub.md',
       updatedAfterMs: 1000,
       updatedBeforeMs: null,
     })
+  })
+
+  it('targets link badges by picked path, so a duplicated title cannot retarget them', () => {
+    const filters = filtersWith({ linkedTo: { path: 'notes/alpha-2.md', title: 'Alpha' } })
+    const parsed = buildAllNotesSearch('', filters, null)
+    expect(parsed.filters.linksTo).toBeNull()
+    expect(parsed.filters.linksToPath).toBe('notes/alpha-2.md')
   })
 
   it('folds the route tag in without duplicating a typed #tag', () => {
@@ -82,6 +91,7 @@ describe('buildAllNotesSearch', () => {
     const filters = filtersWith({ linkedTo: { path: 'notes/a.md', title: 'A' } })
     const parsed = buildAllNotesSearch('links:B', filters, null)
     expect(parsed.filters.linksTo).toBe('B')
+    expect(parsed.filters.linksToPath).toBeNull()
   })
 
   it('intersects typed and badge date bounds (AND semantics)', () => {
