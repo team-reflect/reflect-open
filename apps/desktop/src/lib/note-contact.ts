@@ -8,7 +8,6 @@ import {
 } from '@reflect/core'
 import { openSession } from '@/editor/open-documents'
 import { commitNoteFrontmatter, readNoteSource } from '@/lib/note-frontmatter'
-import { readNoteOrEmpty } from '@/lib/note-read'
 
 /**
  * The suggested-contact card's two resolutions (the contacts-integration
@@ -63,8 +62,10 @@ export async function addContactToNote(
         throw new Error('This note can’t be updated right now — try again in a moment.')
       }
     } else {
-      const onDisk = await readNoteOrEmpty(path)
-      await writeNote(path, appendContactDetails(onDisk, contact), generation)
+      // Reuse the validated snapshot — with no session, `source` came from
+      // disk. A second read here would reopen the window between the
+      // idempotency check and the write.
+      await writeNote(path, appendContactDetails(source, contact), generation)
     }
   }
   await commitNoteFrontmatter(path, { contactSuggestion: 'added' }, generation)
