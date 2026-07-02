@@ -51,6 +51,9 @@ export function DaySlide({
   // True while a remount restore is converging on the saved offset — scroll
   // events it causes must not overwrite the memory with clamped values.
   const restoringRef = useRef(false)
+  // Cancels the in-flight restore, if any — a jump-to-top reset must not race
+  // an observer still re-applying the old offset as content grows.
+  const stopRestoringRef = useRef<(() => void) | null>(null)
 
   useLayoutEffect(() => {
     const container = containerRef.current
@@ -67,12 +70,16 @@ export function DaySlide({
     let deadline: ReturnType<typeof setTimeout> | null = null
     const stop = (): void => {
       restoringRef.current = false
+      if (stopRestoringRef.current === stop) {
+        stopRestoringRef.current = null
+      }
       if (deadline !== null) {
         clearTimeout(deadline)
       }
       observer?.disconnect()
       container.removeEventListener('pointerdown', stop)
     }
+    stopRestoringRef.current = stop
     const apply = (): void => {
       container.scrollTop = saved
       if (container.scrollTop >= saved - 1) {
@@ -98,6 +105,7 @@ export function DaySlide({
     if (!selected) {
       return
     }
+    stopRestoringRef.current?.()
     scrollMemory.delete(day)
     if (containerRef.current) {
       containerRef.current.scrollTop = 0
