@@ -64,7 +64,7 @@ function renderSection(): void {
 }
 
 function calendarSwitch(): HTMLElement {
-  return screen.getByRole('switch', { name: /show calendar events/i })
+  return screen.getByRole('switch', { name: /calendar events/i })
 }
 
 beforeEach(() => {

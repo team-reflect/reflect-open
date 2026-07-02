@@ -4,7 +4,6 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { canReadCalendars, requestCalendarAccess, type CalendarInfo } from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Switch } from '@/components/ui/switch'
 import { isMacosDesktop } from '@/lib/platform'
 import {
   CALENDAR_QUERY_PREFIX,
@@ -13,8 +12,8 @@ import {
   useCalendars,
 } from '@/lib/use-calendar'
 import { useSettings } from '@/providers/settings-provider'
-import { SettingsField } from './field'
 import { SettingsSection } from './section'
+import { SettingsSwitchField } from './switch-field'
 
 /** The macOS privacy pane where a revoked calendar grant is flipped back on. */
 const CALENDAR_PRIVACY_PANE =
@@ -164,19 +163,15 @@ export function CalendarSection(): ReactElement | null {
 
   return (
     <SettingsSection id="calendar">
-      <SettingsField
-        legend="Calendar events"
-        description="The day's meetings from Apple Calendar, beside the daily note. Read-only and local — nothing leaves this Mac."
-      >
-        <div className="mt-3">
-          <Switch
-            checked={settings.calendarEnabled}
-            onCheckedChange={handleToggle}
-            aria-label="Show calendar events"
-          />
-        </div>
-        {detail !== null && <div className="mt-3">{detail}</div>}
-      </SettingsField>
+      <div>
+        <SettingsSwitchField
+          legend="Calendar events"
+          description="Show the day's meetings from Apple Calendar beside the daily note."
+          checked={settings.calendarEnabled}
+          onCheckedChange={handleToggle}
+        />
+        {detail !== null && <div className="px-4 pb-3.5">{detail}</div>}
+      </div>
     </SettingsSection>
   )
 }
