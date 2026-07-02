@@ -57,6 +57,18 @@ describe('deep-link intake', () => {
     expect(onOpenUrlMock).toHaveBeenCalledTimes(2)
   })
 
+  it('unlatches even when the teardown itself throws, keeping the original error', async () => {
+    onOpenUrlMock.mockResolvedValueOnce(() => {
+      throw new Error('unlisten blew up')
+    })
+    getCurrentMock.mockRejectedValueOnce(new Error('ipc failure'))
+
+    await expect(startDeepLinkListener()).rejects.toThrow('ipc failure')
+
+    await startDeepLinkListener()
+    expect(onOpenUrlMock).toHaveBeenCalledTimes(2)
+  })
+
   it('tears down the subscription when getCurrent fails, so a retry cannot double-deliver', async () => {
     const unlisten = vi.fn()
     onOpenUrlMock.mockResolvedValue(unlisten)

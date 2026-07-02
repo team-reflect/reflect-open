@@ -59,16 +59,19 @@ export async function handleDeepLink(url: string, io: DeepLinkIo): Promise<void>
       return
     }
     case 'capture': {
-      const envelope = textCaptureEnvelopeSchema.parse({
-        version: 1,
-        id: crypto.randomUUID(),
-        kind: link.capture,
-        text: link.text,
-        capturedAt: new Date().toISOString(),
-        source: 'deep-link',
-      })
       const label = link.capture === 'task' ? 'Task added to today' : 'Added to today'
       try {
+        // The URL parser enforces the same text constraints, so this parse is
+        // belt-and-braces — but it is fallible, and a schema tightening must
+        // surface like every other failure here, not escape the handler.
+        const envelope = textCaptureEnvelopeSchema.parse({
+          version: 1,
+          id: crypto.randomUUID(),
+          kind: link.capture,
+          text: link.text,
+          capturedAt: new Date().toISOString(),
+          source: 'deep-link',
+        })
         await captureInboxSpool(`${envelope.id}.json`, JSON.stringify(envelope), io.generation)
       } catch (cause) {
         startOperation('Saving capture').fail(errorMessage(cause))

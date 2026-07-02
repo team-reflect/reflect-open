@@ -64,12 +64,18 @@ export async function startDeepLinkListener(): Promise<void> {
       deliverDeepLink(url)
     }
   } catch (cause) {
-    // Unlatch so a later call can retry — a failed start must not disable
-    // deep links for the rest of the app run. If the subscription itself
-    // succeeded (`getCurrent` failed), tear it down first, or the retry
-    // would stack a second subscription and double-deliver every URL.
-    unlisten?.()
+    // Unlatch FIRST so a later call can retry — a failed start must not
+    // disable deep links for the rest of the app run. If the subscription
+    // itself succeeded (`getCurrent` failed), tear it down too, or the retry
+    // would stack a second subscription and double-deliver every URL; the
+    // teardown is best-effort, so a throwing unlisten can neither re-latch
+    // nor mask the original failure.
     started = false
+    try {
+      unlisten?.()
+    } catch {
+      // the original `cause` is the story
+    }
     throw cause
   }
 }
