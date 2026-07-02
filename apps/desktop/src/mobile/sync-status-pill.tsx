@@ -1,12 +1,7 @@
 import type { ReactElement } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { getConflictedNotes, hasBridge } from '@reflect/core'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { cn } from '@/lib/utils'
 import { useKeyboardVisible } from '@/mobile/use-keyboard'
-import { mobileSyncStatus } from '@/mobile/sync-status'
-import { useGraph } from '@/providers/graph-provider'
-import { useSync } from '@/providers/sync-provider'
+import { useMobileSyncStatus } from '@/mobile/use-sync-status'
 
 /**
  * The floating sync-status pill (Plan 19, step 10): a small viewport-anchored
@@ -17,17 +12,9 @@ import { useSync } from '@/providers/sync-provider'
  * never intercepts touches, and it yields to the software keyboard.
  */
 export function SyncStatusPill(): ReactElement | null {
-  const { graph } = useGraph()
-  const { backup } = useSync()
+  const status = useMobileSyncStatus()
   const keyboardVisible = useKeyboardVisible()
 
-  const { data: conflicted } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'conflicted-notes'],
-    queryFn: getConflictedNotes,
-    enabled: hasBridge() && graph !== null && backup.phase === 'connected',
-  })
-
-  const status = mobileSyncStatus(backup, conflicted?.length ?? 0)
   if (status === null || status.tone === 'ok' || keyboardVisible) {
     return null
   }

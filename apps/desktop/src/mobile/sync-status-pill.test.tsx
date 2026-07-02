@@ -24,7 +24,7 @@ vi.mock('@/providers/graph-provider', () => ({ useGraph: () => graphState }))
 
 const sync = vi.hoisted(() => ({ backup: { phase: 'loading' } as BackupState }))
 vi.mock('@/providers/sync-provider', () => ({
-  useSync: () => ({ backup: sync.backup }),
+  useSyncContext: () => ({ backup: sync.backup }),
 }))
 
 function connected(status: Extract<BackupState, { phase: 'connected' }>['status']): BackupState {
@@ -67,11 +67,22 @@ describe('SyncStatusPill', () => {
     expect(screen.queryByRole('status')).toBeNull()
   })
 
-  it('shows Syncing while a cycle runs', () => {
+  it('shows Syncing while a cycle runs', async () => {
     sync.backup = connected({ state: 'syncing' })
     mount()
 
-    expect(screen.getByRole('status').textContent).toBe('Syncing')
+    expect((await screen.findByRole('status')).textContent).toBe('Syncing')
+  })
+
+  it('claims nothing until the conflict count is known', async () => {
+    // A pill shown before the count resolves could flip from hidden
+    // (reads as Backed up) to Needs review.
+    sync.backup = connected({ state: 'offline', message: 'Offline' })
+    vi.mocked(getConflictedNotes).mockReturnValue(new Promise(() => {}))
+    mount()
+
+    await Promise.resolve()
+    expect(screen.queryByRole('status')).toBeNull()
   })
 
   it('shows Needs review while conflicted notes exist', async () => {
@@ -83,11 +94,12 @@ describe('SyncStatusPill', () => {
     })
   })
 
-  it('yields to the software keyboard', () => {
+  it('yields to the software keyboard', async () => {
     sync.backup = connected({ state: 'syncing' })
     publishKeyboardHeight(300)
     mount()
 
+    await Promise.resolve()
     expect(screen.queryByRole('status')).toBeNull()
   })
 })

@@ -114,6 +114,35 @@ describe('installBackgroundFlush', () => {
     expect(seams.flushBackup).toHaveBeenCalledTimes(1)
   })
 
+  it('coalesces simultaneous triggers into one flush chain', async () => {
+    // iOS fires visibilitychange AND pagehide on one backgrounding; two
+    // chains would race the same buffers and git index.
+    let landBuffers: () => void = () => {}
+    seams.flushOpenDocuments.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          landBuffers = resolve
+        }),
+    )
+    dispose = installBackgroundFlush()
+
+    goHidden()
+    window.dispatchEvent(new Event('pagehide'))
+    landBuffers()
+    await settleMicrotasks()
+
+    expect(seams.flushOpenDocuments).toHaveBeenCalledTimes(1)
+    expect(seams.flushBackup).toHaveBeenCalledTimes(1)
+
+    // A later, separate backgrounding flushes again (once the first chain
+    // has fully settled and released the in-flight slot).
+    await settleMicrotasks()
+    seams.flushOpenDocuments.mockImplementation(async () => {})
+    window.dispatchEvent(new Event('pagehide'))
+    await settleMicrotasks()
+    expect(seams.flushBackup).toHaveBeenCalledTimes(2)
+  })
+
   it('stops listening after dispose', async () => {
     dispose = installBackgroundFlush()
     dispose()

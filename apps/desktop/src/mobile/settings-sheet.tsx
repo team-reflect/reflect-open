@@ -1,12 +1,12 @@
 import { useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Settings } from 'lucide-react'
-import { errorMessage, getConflictedNotes, hasBridge, listNotes } from '@reflect/core'
+import { errorMessage, hasBridge, listNotes } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer'
 import { useAppVersion } from '@/hooks/use-app-version'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
-import { mobileSyncStatus } from '@/mobile/sync-status'
+import { useMobileSyncStatus } from '@/mobile/use-sync-status'
 import { useGraph } from '@/providers/graph-provider'
 import { useSyncContext } from '@/providers/sync-provider'
 
@@ -33,16 +33,10 @@ export function SettingsSheet(): ReactElement {
 
   const backup = sync?.backup ?? null
   const connected = backup !== null && backup.phase === 'connected'
-
-  // Same key as the status pill's query — the cache is shared, and keeping it
-  // live while the sheet is closed means the status never flashes on open.
-  const { data: conflicted } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'conflicted-notes'],
-    queryFn: getConflictedNotes,
-    enabled: hasBridge() && graph !== null && connected,
-  })
-
-  const status = backup === null ? null : mobileSyncStatus(backup, conflicted?.length ?? 0)
+  // Shared with the status pill (one hook, one query cache entry) — and null
+  // until the conflict count is known, so the row never claims `Backed up`
+  // over conflict markers already on disk and then flips.
+  const status = useMobileSyncStatus()
   const repo = connected ? backup.repo : null
 
   // Stop backing this graph up and forget the GitHub credential (one graph

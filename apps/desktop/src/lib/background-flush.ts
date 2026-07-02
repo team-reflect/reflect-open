@@ -19,11 +19,22 @@ import { flushSettings } from '@/lib/settings-flush'
  * - `pagehide`: webview teardown (dev reloads; some termination paths).
  */
 export function installBackgroundFlush(): () => void {
+  // One backgrounding fires several triggers at once (iOS emits both
+  // `visibilitychange` and `pagehide`); a second chain would race the first
+  // on the same buffers and git index, so triggers coalesce while one runs.
+  let inFlight: Promise<void> | null = null
   const flush = (): void => {
+    if (inFlight !== null) {
+      return
+    }
     // Buffers and settings land first so the commit captures them. Failures
     // are surfaced by the save pipeline / next launch's sync — backgrounding
     // must never be blocked on them.
-    void Promise.allSettled([flushOpenDocuments(), flushSettings()]).then(() => flushBackup())
+    inFlight = Promise.allSettled([flushOpenDocuments(), flushSettings()])
+      .then(() => flushBackup())
+      .finally(() => {
+        inFlight = null
+      })
   }
   const onVisibilityChange = (): void => {
     if (document.visibilityState === 'hidden') {

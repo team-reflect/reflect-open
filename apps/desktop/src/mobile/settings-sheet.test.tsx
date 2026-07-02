@@ -86,9 +86,17 @@ describe('SettingsSheet', () => {
     mount()
 
     expect(await screen.findByText('alex/notes')).toBeTruthy()
-    expect(screen.getByText('Backed up')).toBeTruthy()
+    expect(await screen.findByText('Backed up')).toBeTruthy()
     // Never git terms.
     expect(screen.queryByText(/commit|branch|merge|push|pull/i)).toBeNull()
+  })
+
+  it('shows no status until the conflict count is known — never a flip', async () => {
+    vi.mocked(getConflictedNotes).mockReturnValue(new Promise(() => {}))
+    mount()
+
+    expect(await screen.findByText('alex/notes')).toBeTruthy()
+    expect(screen.queryByText('Backed up')).toBeNull()
   })
 
   it('shows Needs review with its desktop pointer when notes conflict', async () => {
