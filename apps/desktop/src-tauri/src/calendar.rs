@@ -129,8 +129,7 @@ mod platform {
         EKParticipantStatus, EKParticipantType,
     };
     use objc2_foundation::{
-        NSArray, NSDate, NSError, NSNotification, NSNotificationCenter, NSObjectProtocol,
-        NSString,
+        NSArray, NSDate, NSError, NSNotification, NSNotificationCenter, NSObjectProtocol, NSString,
     };
     use tauri::Emitter;
 
@@ -138,8 +137,7 @@ mod platform {
     use crate::error::{AppError, AppResult};
 
     pub fn authorization_status() -> AppResult<String> {
-        let status =
-            unsafe { EKEventStore::authorizationStatusForEntityType(EKEntityType::Event) };
+        let status = unsafe { EKEventStore::authorizationStatusForEntityType(EKEntityType::Event) };
         let name = match status {
             EKAuthorizationStatus::NotDetermined => "notDetermined",
             EKAuthorizationStatus::Restricted => "restricted",
@@ -228,7 +226,7 @@ mod platform {
             return;
         }
         let handle = app.clone();
-        let _ = app.run_on_main_thread(move || {
+        let scheduled = app.run_on_main_thread(move || {
             let store = unsafe { EKEventStore::new() };
             let store_object: &AnyObject = &store;
             let block = RcBlock::new(move |_notification: NonNull<NSNotification>| {
@@ -246,6 +244,11 @@ mod platform {
             std::mem::forget(token);
             std::mem::forget(store);
         });
+        // A failed dispatch (e.g. mid-shutdown) must not mark the observer
+        // installed, or the next read would never retry attaching it.
+        if scheduled.is_err() {
+            OBSERVER_INSTALLED.store(false, Ordering::SeqCst);
+        }
     }
 
     fn describe_calendar(calendar: &EKCalendar) -> CalendarInfo {
@@ -316,8 +319,12 @@ mod platform {
             .map(|name| name.to_string())
             .or_else(|| {
                 let url = unsafe { attendee.URL() };
-                url.absoluteString()
-                    .map(|address| address.to_string().trim_start_matches("mailto:").to_string())
+                url.absoluteString().map(|address| {
+                    address
+                        .to_string()
+                        .trim_start_matches("mailto:")
+                        .to_string()
+                })
             })
             .unwrap_or_default();
         let status = match unsafe { attendee.participantStatus() } {

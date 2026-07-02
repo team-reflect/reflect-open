@@ -57,14 +57,22 @@ export function CalendarSection(): ReactElement | null {
     return null
   }
 
+  const requestAccess = (): void => {
+    // Resolves instantly when the OS already remembers an answer; prompts
+    // only on the very first request. Either way the queries re-check.
+    void requestCalendarAccess()
+      .catch((cause: unknown) => {
+        console.error('calendar access request failed:', cause)
+      })
+      .finally(() => {
+        void queryClient.invalidateQueries({ queryKey: CALENDAR_QUERY_PREFIX })
+      })
+  }
+
   const handleToggle = (checked: boolean): void => {
     updateSettings({ calendarEnabled: checked })
     if (checked) {
-      // Resolves instantly when the OS already remembers an answer; prompts
-      // only on the very first enable.
-      void requestCalendarAccess().finally(() => {
-        void queryClient.invalidateQueries({ queryKey: CALENDAR_QUERY_PREFIX })
-      })
+      requestAccess()
     }
   }
 
@@ -87,15 +95,7 @@ export function CalendarSection(): ReactElement | null {
         </InlineAlert>
         <div className="mt-2">
           {status === 'notDetermined' ? (
-            <button
-              type="button"
-              onClick={() => {
-                void requestCalendarAccess().finally(() => {
-                  void queryClient.invalidateQueries({ queryKey: CALENDAR_QUERY_PREFIX })
-                })
-              }}
-              className={ACTION_BUTTON_CLASS}
-            >
+            <button type="button" onClick={requestAccess} className={ACTION_BUTTON_CLASS}>
               Grant access
             </button>
           ) : (

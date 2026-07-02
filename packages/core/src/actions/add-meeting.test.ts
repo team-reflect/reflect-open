@@ -77,6 +77,21 @@ describe('addMeetingToDaily', () => {
     expect(writeNoteMock).not.toHaveBeenCalled()
   })
 
+  it('treats case-different and aliased Meetings links as already linked', async () => {
+    readNoteMock.mockResolvedValue('## Meetings\n\n- [[STANDUP|Daily sync]]\n')
+    const outcome = await addMeetingToDaily(input())
+    expect(outcome.appended).toBe(false)
+    expect(writeNoteMock).not.toHaveBeenCalled()
+  })
+
+  it('still appends when the title is only linked outside the Meetings section', async () => {
+    readNoteMock.mockResolvedValue('Prep notes for [[Standup]] tomorrow.\n')
+    const outcome = await addMeetingToDaily(input())
+    expect(outcome.appended).toBe(true)
+    const written = writeNoteMock.mock.calls[0]?.[1]
+    expect(written).toContain('## Meetings\n\n- [[Standup]]')
+  })
+
   it('creates the meeting note only when asked and missing', async () => {
     const createNote = vi.fn(async () => 'notes/standup.md')
     await addMeetingToDaily(input({ createNote }))

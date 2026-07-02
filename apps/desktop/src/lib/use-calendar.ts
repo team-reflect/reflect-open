@@ -77,7 +77,13 @@ export function useDayEvents(date: string): CalendarEvent[] {
     enabled,
     staleTime: 60_000,
   })
-  return useMemo(() => displayEvents(query.data ?? []), [query.data])
+  // Gate on `enabled`, not just the cache: the query keeps its last payload
+  // after the integration is switched off, and stale meetings must not
+  // linger in the sidebar.
+  return useMemo(
+    () => (enabled ? displayEvents(query.data ?? []) : []),
+    [enabled, query.data],
+  )
 }
 
 /**

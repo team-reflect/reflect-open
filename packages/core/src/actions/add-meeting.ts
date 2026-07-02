@@ -3,6 +3,8 @@ import { noteExists, readNote, writeNote } from '../graph/commands'
 import { dailyPath, notePath } from '../graph/paths'
 import { resolveWikiTarget } from '../indexing/queries'
 import { appendUnderHeading, wikiLinkSafe } from '../markdown/edit'
+import { parseNote } from '../markdown/extract'
+import { foldKey } from '../markdown/keys'
 import { slugForTitle } from '../markdown/slug'
 
 /**
@@ -84,6 +86,32 @@ async function titleHasNote(title: string): Promise<boolean> {
   return noteExists(notePath(slugForTitle(title)))
 }
 
+/**
+ * Is `title` already linked under the daily note's `## Meetings` section?
+ * The check mirrors wiki-link resolution: parsed links only, case-insensitive
+ * (`foldKey`), and alias forms (`[[Standup|Daily sync]]`) count. Links
+ * elsewhere in the note deliberately don't — mentioning a meeting in prose
+ * must not swallow the calendar entry.
+ */
+function meetingAlreadyLinked(source: string, title: string): boolean {
+  const { headings, wikiLinks } = parseNote({ path: '', source })
+  const heading = headings.find(
+    (candidate) => candidate.text.toLowerCase() === MEETINGS_HEADING.toLowerCase(),
+  )
+  if (!heading) {
+    return false
+  }
+  const sectionEnd =
+    headings.find(
+      (candidate) => candidate.from > heading.from && candidate.level <= heading.level,
+    )?.from ?? source.length
+  const titleKey = foldKey(title)
+  return wikiLinks.some(
+    (link) =>
+      link.from >= heading.to && link.from < sectionEnd && foldKey(link.target) === titleKey,
+  )
+}
+
 /** Sanitized, case-insensitively deduplicated attendee names, order kept. */
 function normalizeAttendees(attendees: string[]): string[] {
   const seen = new Set<string>()
@@ -129,7 +157,7 @@ export async function addMeetingToDaily(input: AddMeetingInput): Promise<AddMeet
 
   const daily = dailyPath(input.date)
   const source = await noteSource(daily, input.generation)
-  const alreadyLinked = source.includes(`[[${title}]]`)
+  const alreadyLinked = meetingAlreadyLinked(source, title)
   if (!alreadyLinked) {
     await writeNote(
       daily,

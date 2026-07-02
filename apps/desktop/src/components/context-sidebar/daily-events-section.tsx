@@ -47,7 +47,10 @@ export function DailyEventsSection({ date }: DailyEventsSectionProps): ReactElem
               <span className="min-w-0 flex-1 truncate text-left text-xs font-medium">
                 {event.title !== '' ? event.title : 'Untitled event'}
               </span>
-              <span aria-hidden className="flex-none opacity-0 transition-opacity group-hover:opacity-100">
+              <span
+                aria-hidden
+                className="flex-none opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+              >
                 <Plus className="size-3.5" strokeWidth={1.75} />
               </span>
             </button>
