@@ -204,13 +204,16 @@ function RouteProbe(): ReactNode {
 
 function renderScreen() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
-    <QueryClientProvider client={client}>
-      <RouterProvider>
-        <TasksScreen />
-        <RouteProbe />
-      </RouterProvider>
-    </QueryClientProvider>,
+  return Object.assign(
+    render(
+      <QueryClientProvider client={client}>
+        <RouterProvider>
+          <TasksScreen />
+          <RouteProbe />
+        </RouterProvider>
+      </QueryClientProvider>,
+    ),
+    { client },
   )
 }
 
@@ -1373,6 +1376,36 @@ describe('TasksScreen', () => {
     // Flipped to completed in place — still on screen, now marked done.
     await view.findByRole('button', { name: 'Reopen: project task' })
     expect(view.getByText('project task')).toBeDefined()
+    view.unmount()
+  })
+
+  it('syncs a recently completed row back to open when the note reports it reopened', async () => {
+    toggleTask.mockResolvedValue(undefined)
+    let indexedOpen = task({
+      notePath: 'notes/p.md',
+      markerOffset: 5,
+      raw: '[ ] project task',
+      text: 'project task',
+      noteTitle: 'P',
+      updatedAt: 1,
+    })
+    getOpenTasks.mockImplementation(async () => [indexedOpen])
+    const view = renderScreen()
+
+    await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
+    await view.findByRole('button', { name: 'Reopen: project task' })
+
+    indexedOpen = { ...indexedOpen, updatedAt: 2 }
+    await view.client.invalidateQueries()
+
+    await view.findByRole('button', { name: 'Complete: project task' })
+    await userEvent.click(view.getByRole('button', { name: 'Complete: project task' }))
+
+    await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(2))
+    expect(toggleTask).toHaveBeenLastCalledWith(
+      expect.objectContaining({ notePath: 'notes/p.md', markerOffset: 5, raw: '[ ] project task' }),
+      1,
+    )
     view.unmount()
   })
 

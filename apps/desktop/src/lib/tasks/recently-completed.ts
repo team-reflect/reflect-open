@@ -71,6 +71,29 @@ export function forgetRecentlyCompleted(root: string | null, keys: readonly stri
   }
 }
 
+/**
+ * Reconcile the session-completed set after the indexed open-task query changes.
+ * If the index now reports a newer version of the same checkbox as open, the
+ * note was reopened somewhere else (for example in the daily note), so the
+ * struck Tasks-view copy must stop shadowing the real open row.
+ */
+export function forgetRecentlyCompletedNowOpen(
+  root: string | null,
+  openTasks: readonly OpenTask[],
+): void {
+  if (root !== graphRoot || tasks.length === 0 || openTasks.length === 0) {
+    return
+  }
+  const openByKey = new Map(openTasks.map((task) => [taskKey(task), task]))
+  const reopenedKeys = tasks
+    .filter((task) => {
+      const openTask = openByKey.get(taskKey(task))
+      return openTask !== undefined && openTask.updatedAt > task.updatedAt
+    })
+    .map(taskKey)
+  forgetRecentlyCompleted(root, reopenedKeys)
+}
+
 /** Whether a task is currently being kept visible by the session's struck set. */
 export function hasRecentlyCompleted(root: string | null, key: string): boolean {
   return root === graphRoot && tasks.some((task) => taskKey(task) === key)
