@@ -1,5 +1,5 @@
 import { generateText } from 'ai'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AiProviderConfig } from '../settings/schema'
 import {
   ANTHROPIC_DIRECT_BROWSER_ACCESS_HEADER,
@@ -41,6 +41,10 @@ function recordingAnthropicFetch(calls: RecordedCall[]): typeof fetch {
   }
 }
 
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
+
 describe('languageModel', () => {
   it('adds Anthropic direct-browser access to model calls', async () => {
     const calls: RecordedCall[] = []
@@ -56,5 +60,21 @@ describe('languageModel', () => {
     expect(calls[0]!.headers.get(ANTHROPIC_DIRECT_BROWSER_ACCESS_HEADER)).toBe(
       ANTHROPIC_DIRECT_BROWSER_ACCESS_VALUE,
     )
+  })
+
+  it('ignores ambient *_BASE_URL environment variables', async () => {
+    // The SDK factories read these when no baseURL is passed — a stray
+    // variable in whatever shell launched the app (Claude Code exports
+    // ANTHROPIC_BASE_URL, for one) must not reroute BYOK traffic.
+    vi.stubEnv('ANTHROPIC_BASE_URL', 'https://reroute.example')
+    const calls: RecordedCall[] = []
+
+    await generateText({
+      model: languageModel(ANTHROPIC_CONFIG, 'sk-ant-test', recordingAnthropicFetch(calls)),
+      prompt: 'hello',
+      maxRetries: 0,
+    })
+
+    expect(calls[0]!.url).toBe('https://api.anthropic.com/v1/messages')
   })
 })
