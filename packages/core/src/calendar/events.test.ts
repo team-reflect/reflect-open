@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { CalendarAttendee, CalendarEvent } from './commands'
-import { dayRange, defaultAttendeeNames, displayEvents, isDeclinedByUser } from './events'
+import { dayRange, defaultAttendees, displayEvents, isDeclinedByUser } from './events'
 
 function attendee(overrides: Partial<CalendarAttendee> = {}): CalendarAttendee {
   return {
     name: 'Ada Lovelace',
+    email: null,
     isCurrentUser: false,
     isPerson: true,
     status: 'accepted',
@@ -91,9 +92,9 @@ describe('displayEvents', () => {
   })
 })
 
-describe('defaultAttendeeNames', () => {
+describe('defaultAttendees', () => {
   it('suggests human, non-declined attendees, excluding the user', () => {
-    const names = defaultAttendeeNames(
+    const attendees = defaultAttendees(
       event({
         attendees: [
           attendee({ name: 'Ada Lovelace' }),
@@ -104,11 +105,26 @@ describe('defaultAttendeeNames', () => {
         ],
       }),
     )
-    expect(names).toEqual(['Ada Lovelace'])
+    expect(attendees).toEqual([{ name: 'Ada Lovelace' }])
+  })
+
+  it('carries the invite email for the contacts lookup', () => {
+    const attendees = defaultAttendees(
+      event({
+        attendees: [
+          attendee({ name: 'Ada Lovelace', email: 'ada@example.com' }),
+          attendee({ name: 'Grace Hopper' }),
+        ],
+      }),
+    )
+    expect(attendees).toEqual([
+      { name: 'Ada Lovelace', email: 'ada@example.com' },
+      { name: 'Grace Hopper' },
+    ])
   })
 
   it('deduplicates case-insensitively, keeping first spelling and order', () => {
-    const names = defaultAttendeeNames(
+    const attendees = defaultAttendees(
       event({
         attendees: [
           attendee({ name: 'Ada Lovelace' }),
@@ -117,7 +133,7 @@ describe('defaultAttendeeNames', () => {
         ],
       }),
     )
-    expect(names).toEqual(['Ada Lovelace', 'Grace Hopper'])
+    expect(attendees).toEqual([{ name: 'Ada Lovelace' }, { name: 'Grace Hopper' }])
   })
 })
 

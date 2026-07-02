@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { noteExists, readNote, writeNote } from '../graph/commands'
 import { createNoteWithTitle } from '../graph/create-note'
 import { resolveWikiTarget } from '../indexing/queries'
+import { setBridge } from '../ipc/bridge'
 import { resolved, unresolved } from '../markdown/resolve'
 import { addMeetingToDaily, meetingLine, type AddMeetingInput } from './add-meeting'
 
@@ -83,7 +84,7 @@ describe('meetingLine', () => {
 describe('addMeetingToDaily', () => {
   it('appends the meeting under ## Meetings, creating the section on a fresh daily', async () => {
     const outcome = await addMeetingToDaily(
-      input({ attendees: ['Ada Lovelace'], startTime: '9:00am' }),
+      input({ attendees: [{ name: 'Ada Lovelace' }], startTime: '9:00am' }),
     )
     expect(outcome.appended).toBe(true)
     expect(writeNoteMock).toHaveBeenCalledWith(
@@ -103,7 +104,7 @@ describe('addMeetingToDaily', () => {
 
   it('is idempotent: a day that already links the meeting is a full no-op', async () => {
     readNoteMock.mockResolvedValue('## Meetings\n\n- 9:00am met with [[Ada Lovelace]] for [[Standup]]\n')
-    const outcome = await addMeetingToDaily(input({ attendees: ['Carol'] }))
+    const outcome = await addMeetingToDaily(input({ attendees: [{ name: 'Carol' }] }))
     expect(outcome).toEqual({ appended: false, createdNotes: [] })
     expect(writeNoteMock).not.toHaveBeenCalled()
     // No invisible side effects either — a re-add must not mint notes the
@@ -161,7 +162,7 @@ describe('addMeetingToDaily', () => {
         : unresolved(target),
     )
     const outcome = await addMeetingToDaily(
-      input({ attendees: ['Ada Lovelace', 'Grace Hopper'] }),
+      input({ attendees: [{ name: 'Ada Lovelace' }, { name: 'Grace Hopper' }] }),
     )
     expect(createNoteMock).toHaveBeenCalledTimes(1)
     expect(createNoteMock).toHaveBeenCalledWith('Ada Lovelace', GENERATION, '- Type: #person')
@@ -170,7 +171,7 @@ describe('addMeetingToDaily', () => {
 
   it('skips creation when the slug path already exists (index lag backstop)', async () => {
     noteExistsMock.mockImplementation(async (path) => path === 'notes/ada-lovelace.md')
-    await addMeetingToDaily(input({ attendees: ['Ada Lovelace'], backlinkMeeting: false }))
+    await addMeetingToDaily(input({ attendees: [{ name: 'Ada Lovelace' }], backlinkMeeting: false }))
     expect(createNoteMock).not.toHaveBeenCalled()
   })
 
@@ -178,7 +179,12 @@ describe('addMeetingToDaily', () => {
     await addMeetingToDaily(
       input({
         title: '  Stand|up [v2]  ',
-        attendees: ['Ada Lovelace', 'ada lovelace', '', 'Stand up v2'],
+        attendees: [
+          { name: 'Ada Lovelace' },
+          { name: 'ada lovelace' },
+          { name: '' },
+          { name: 'Stand up v2' },
+        ],
       }),
     )
     // `Stand up v2` also names the meeting itself, so it drops out of the
@@ -194,7 +200,7 @@ describe('addMeetingToDaily', () => {
     resolveMock.mockImplementation(async (target) =>
       target === 'Standup' ? resolved('notes/standup.md') : unresolved(target),
     )
-    await addMeetingToDaily(input({ attendees: ['Standup'] }))
+    await addMeetingToDaily(input({ attendees: [{ name: 'Standup' }] }))
     expect(createNoteMock).not.toHaveBeenCalled()
   })
 
@@ -203,5 +209,71 @@ describe('addMeetingToDaily', () => {
       'a meeting needs a name',
     )
     expect(writeNoteMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('addMeetingToDaily contact pre-fill', () => {
+  const ADA = { name: 'Ada Lovelace', email: 'ada@example.com' }
+
+  function installContactsBridge(contacts: unknown[]): ReturnType<typeof vi.fn> {
+    const invoke = vi.fn(async () => contacts)
+    setBridge({ invoke, listen: async () => () => {} })
+    return invoke
+  }
+
+  afterEach(() => {
+    setBridge(null)
+  })
+
+  it('pre-fills a created person note from the matching contact', async () => {
+    const invoke = installContactsBridge([
+      {
+        fullName: 'Ada Lovelace',
+        givenName: 'Ada',
+        familyName: 'Lovelace',
+        emails: ['ada@example.com'],
+        phones: ['+1 555-0100'],
+      },
+    ])
+    await addMeetingToDaily(input({ attendees: [ADA], lookupContacts: true }))
+    expect(invoke).toHaveBeenCalledWith('contacts_lookup_by_email', { email: 'ada@example.com' })
+    expect(createNoteMock).toHaveBeenCalledWith(
+      'Ada Lovelace',
+      GENERATION,
+      '- Type: #person\n- Email: ada@example.com\n- Phone: +1 555-0100',
+    )
+  })
+
+  it('creates the bare typed note on a lookup miss, as v1 did', async () => {
+    installContactsBridge([])
+    await addMeetingToDaily(input({ attendees: [ADA], lookupContacts: true }))
+    expect(createNoteMock).toHaveBeenCalledWith('Ada Lovelace', GENERATION, '- Type: #person')
+  })
+
+  it('never touches the bridge while the contacts gate is off', async () => {
+    const invoke = installContactsBridge([])
+    await addMeetingToDaily(input({ attendees: [ADA] }))
+    expect(invoke).not.toHaveBeenCalled()
+    expect(createNoteMock).toHaveBeenCalledWith('Ada Lovelace', GENERATION, '- Type: #person')
+  })
+
+  it('skips the lookup for attendees without an invite email', async () => {
+    const invoke = installContactsBridge([])
+    await addMeetingToDaily(
+      input({ attendees: [{ name: 'Grace Hopper' }], lookupContacts: true }),
+    )
+    expect(invoke).not.toHaveBeenCalled()
+    expect(createNoteMock).toHaveBeenCalledWith('Grace Hopper', GENERATION, '- Type: #person')
+  })
+
+  it('does not look up attendees whose note already exists', async () => {
+    const invoke = installContactsBridge([])
+    resolveMock.mockImplementation(async (target) =>
+      target === 'Ada Lovelace' ? resolved('notes/ada-lovelace.md') : unresolved(target),
+    )
+    await addMeetingToDaily(input({ attendees: [ADA], lookupContacts: true }))
+    expect(invoke).not.toHaveBeenCalled()
+    expect(createNoteMock).toHaveBeenCalledTimes(1)
+    expect(createNoteMock).toHaveBeenCalledWith('Standup', GENERATION, '- Type: #meeting')
   })
 })

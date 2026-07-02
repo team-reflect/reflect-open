@@ -36,6 +36,9 @@ pub struct CalendarInfo {
 pub struct CalendarAttendee {
     /// Display name, falling back to the address in the participant URL.
     pub name: String,
+    /// The invite email, when the participant URL is a `mailto:` — what the
+    /// contacts integration resolves person notes by.
+    pub email: Option<String>,
     pub is_current_user: bool,
     /// Whether this attendee is a person (as opposed to a room or resource).
     pub is_person: bool,
@@ -318,17 +321,18 @@ mod platform {
     }
 
     fn describe_attendee(attendee: &EKParticipant) -> CalendarAttendee {
+        let address = unsafe { attendee.URL() }
+            .absoluteString()
+            .map(|absolute| absolute.to_string());
+        let email = address
+            .as_deref()
+            .and_then(|absolute| absolute.strip_prefix("mailto:"))
+            .filter(|candidate| !candidate.is_empty())
+            .map(str::to_string);
         let name = unsafe { attendee.name() }
             .map(|name| name.to_string())
-            .or_else(|| {
-                let url = unsafe { attendee.URL() };
-                url.absoluteString().map(|address| {
-                    address
-                        .to_string()
-                        .trim_start_matches("mailto:")
-                        .to_string()
-                })
-            })
+            .or_else(|| email.clone())
+            .or(address)
             .unwrap_or_default();
         let status = match unsafe { attendee.participantStatus() } {
             EKParticipantStatus::Accepted => "accepted",
@@ -339,6 +343,7 @@ mod platform {
         };
         CalendarAttendee {
             name,
+            email,
             is_current_user: unsafe { attendee.isCurrentUser() },
             is_person: unsafe { attendee.participantType() } == EKParticipantType::Person,
             status: status.to_string(),

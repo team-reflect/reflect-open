@@ -43,6 +43,12 @@ export type CalendarInfo = z.infer<typeof calendarInfoSchema>
 
 export const calendarAttendeeSchema = z.object({
   name: z.string(),
+  /**
+   * The invite email, when the participant URL carried one — what the
+   * contacts integration resolves person notes by. `catch` because an
+   * attendee without one must not fail the whole event list.
+   */
+  email: z.string().nullable().catch(null),
   isCurrentUser: z.boolean(),
   /** People, as opposed to rooms and other booked resources. */
   isPerson: z.boolean(),
