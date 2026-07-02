@@ -26,6 +26,16 @@ function normalizeName(value: string): string {
 }
 
 /**
+ * Do two person names count as the same under the matching rule? The
+ * `ignoredContacts` dismissal list compares through this, so a dismissal
+ * recorded as "Ada Lovelace" also covers a lookup answering "ada lovelace".
+ */
+export function contactNamesEqual(left: string, right: string): boolean {
+  const normalized = normalizeName(left)
+  return normalized !== '' && normalized === normalizeName(right)
+}
+
+/**
  * The candidate whose full name exactly equals `title`, or null.
  *
  * The framework's name predicate is word-prefix based (searching "Ada" also

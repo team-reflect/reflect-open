@@ -19,11 +19,17 @@ Decisions taken at implementation time:
   whitespace-collapsed, mirroring the framework predicate's own folding — with
   no `#person` tag required, and word-prefix hits from the framework's name
   predicate discarded (`matchContactForTitle`).
-- **No photos in v1.** Add writes the primary email and phone as plain
-  markdown bullets; photos (binary → `assets/`) can follow without rework.
-- **Resolutions live in frontmatter.** Add and Ignore both write
-  `contactSuggestion: added | ignored`, so a handled note never re-suggests
-  and the state travels with the note through sync and export.
+- **No photos in v1.** Add writes a `- Type: #person` typing line (v1's Type
+  field, the same convention the meeting flow uses) plus every email and
+  phone as plain markdown bullets; photos (binary → `assets/`) can follow
+  without rework.
+- **Suppression is content-based, dismissals per contact — v1's exact
+  model.** A note whose body already carries contact details (an email, an
+  `Email:`/`Phone:` bullet) gets no card, which is also what hides the card
+  after Add — a single write, no frontmatter mark. Ignore records the
+  contact's name in the note's `ignoredContacts` frontmatter list (v1's
+  `ignoredContactNames`), so a retitled note stays eligible for its own
+  suggestion and the state travels with the note through sync and export.
 
 ## What v1 did
 

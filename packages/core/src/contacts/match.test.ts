@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '../ipc/bridge'
 import type { ContactMatch } from './commands'
-import { matchContactForTitle, suggestContactForTitle } from './match'
+import { contactNamesEqual, matchContactForTitle, suggestContactForTitle } from './match'
 
 function contact(overrides: Partial<ContactMatch>): ContactMatch {
   return {
@@ -62,6 +62,15 @@ describe('matchContactForTitle', () => {
       phones: ['+1 555 0100'],
     })
     expect(matchContactForTitle('Ada Lovelace', [empty, detailed])).toBe(detailed)
+  })
+})
+
+describe('contactNamesEqual', () => {
+  it('compares names under the matching rule (case, diacritics, whitespace)', () => {
+    expect(contactNamesEqual('Ada Lovelace', 'ada  lovelace')).toBe(true)
+    expect(contactNamesEqual('René Descartes', 'Rene Descartes')).toBe(true)
+    expect(contactNamesEqual('Ada Lovelace', 'Grace Hopper')).toBe(false)
+    expect(contactNamesEqual('', '')).toBe(false)
   })
 })
 

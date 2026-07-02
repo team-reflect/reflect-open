@@ -1,6 +1,7 @@
 import {
   appendContactDetails,
   contactDetailsMarkdown,
+  contactNamesEqual,
   matchContactForTitle,
   parseNote,
   writeNote,
@@ -11,26 +12,21 @@ import { commitNoteFrontmatter, readNoteSource } from '@/lib/note-frontmatter'
 
 /**
  * The suggested-contact card's two resolutions (the contacts-integration
- * port). Both leave a `contactSuggestion` frontmatter mark so the card never
- * reappears for a handled note; **Add** additionally lands the contact's
- * details in the body as plain markdown — ordinary note content owned by the
- * graph from that moment on, never synced back to the address book.
+ * port), with v1's suppression model: **Add** lands the contact's details in
+ * the body as plain markdown — the details themselves then hide the card
+ * (`noteHasContactDetails`), so Add is a single write with no frontmatter
+ * mark. **Ignore** records the contact's name in the note's
+ * `ignoredContacts` frontmatter list — per contact, so a retitled note stays
+ * eligible for its own suggestion. Nothing ever syncs back to the address
+ * book.
  */
 
-/**
- * Merge `contact`'s details into the note (primary email/phone bullets,
- * appended as their own block) and mark the suggestion `added`. Routes the
- * body edit through the live session when the note is open — the card sits
- * above an open editor, so unsaved edits must survive — and refuses rather
- * than clobber when the session can't take it (loading, protected, or a
- * parked conflict). A closed note is patched on disk.
- */
 /**
  * Action-time revalidation: the card's suggestion is a cached query, but the
  * title may have been edited (even unsaved) since it resolved. Returns the
  * live source when the note still carries the contact's name, else null —
- * a stale card must neither merge the wrong details nor mark the new title
- * as handled.
+ * a stale card must neither merge the wrong details nor dismiss the new
+ * title's own suggestion.
  */
 async function sourceIfStillMatching(
   path: string,
@@ -41,6 +37,15 @@ async function sourceIfStillMatching(
   return matchContactForTitle(title, [contact]) === null ? null : source
 }
 
+/**
+ * Merge `contact`'s details into the note: the `- Type: #person` typing line
+ * plus every email and phone, appended as their own block. Routes through
+ * the live session when the note is open — the card sits above an open
+ * editor, so unsaved edits must survive — and refuses rather than clobber
+ * when the session can't take it (loading, protected, or a parked conflict).
+ * A closed note is patched on disk. Retry-safe: a body that already carries
+ * the details is left alone.
+ */
 export async function addContactToNote(
   path: string,
   contact: ContactMatch,
@@ -51,39 +56,44 @@ export async function addContactToNote(
     throw new Error('The note title no longer matches this contact.')
   }
   const details = contactDetailsMarkdown(contact)
-  // Idempotency guard: the append and the mark are two writes, so a retry
-  // after a failed mark (details landed, card still up) must not append the
-  // same bullets again.
-  const alreadyAdded = details === '' || source.includes(details)
-  if (!alreadyAdded) {
-    const owner = openSession(path)
-    if (owner !== null) {
-      if (!(await owner.commitBodyAppend(details))) {
-        throw new Error('This note can’t be updated right now — try again in a moment.')
-      }
-    } else {
-      // Reuse the validated snapshot — with no session, `source` came from
-      // disk. A second read here would reopen the window between the
-      // idempotency check and the write.
-      await writeNote(path, appendContactDetails(source, contact), generation)
-    }
+  if (details === '' || source.includes(details)) {
+    return
   }
-  await commitNoteFrontmatter(path, { contactSuggestion: 'added' }, generation)
+  const owner = openSession(path)
+  if (owner !== null) {
+    if (!(await owner.commitBodyAppend(details))) {
+      throw new Error('This note can’t be updated right now — try again in a moment.')
+    }
+    return
+  }
+  // Reuse the validated snapshot — with no session, `source` came from disk.
+  // A second read here would reopen the window between the check and the write.
+  await writeNote(path, appendContactDetails(source, contact), generation)
 }
 
 /**
- * Dismiss the suggestion for this note: mark it `ignored`, write nothing
- * else. A stale card (the title no longer matches `contact`) skips the mark
- * silently — the user wanted the card gone, and the new title must stay
- * eligible for its own suggestion.
+ * Dismiss the suggestion for this note: record `contact`'s name in the
+ * `ignoredContacts` frontmatter list, write nothing else. A stale card (the
+ * title no longer matches `contact`) skips the write silently — the user
+ * wanted the card gone, and the new title must stay eligible for its own
+ * suggestion.
  */
 export async function ignoreContactSuggestion(
   path: string,
   contact: ContactMatch,
   generation: number,
 ): Promise<void> {
-  if ((await sourceIfStillMatching(path, contact)) === null) {
+  const source = await sourceIfStillMatching(path, contact)
+  if (source === null) {
     return
   }
-  await commitNoteFrontmatter(path, { contactSuggestion: 'ignored' }, generation)
+  const ignored = parseNote({ path, source }).frontmatter.ignoredContacts
+  if (ignored.some((name) => contactNamesEqual(name, contact.fullName))) {
+    return
+  }
+  await commitNoteFrontmatter(
+    path,
+    { ignoredContacts: [...ignored, contact.fullName] },
+    generation,
+  )
 }

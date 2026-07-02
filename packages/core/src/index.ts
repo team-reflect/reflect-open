@@ -153,8 +153,16 @@ export {
   type ContactsAuthorization,
   type ContactMatch,
 } from './contacts/commands'
-export { matchContactForTitle, suggestContactForTitle } from './contacts/match'
-export { contactDetailsMarkdown, appendContactDetails } from './contacts/markdown'
+export {
+  contactNamesEqual,
+  matchContactForTitle,
+  suggestContactForTitle,
+} from './contacts/match'
+export {
+  contactDetailsMarkdown,
+  appendContactDetails,
+  noteHasContactDetails,
+} from './contacts/markdown'
 export { pickContactForEmail, resolveAttendeeContact } from './contacts/resolve'
 
 // AI providers & keychain secrets (Plan 10)

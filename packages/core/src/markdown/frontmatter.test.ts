@@ -44,7 +44,7 @@ describe('parseFrontmatter', () => {
   it('degrades broken YAML to defaults + a warning, never throwing', () => {
     const { data, warning } = parseFrontmatter('foo: [unclosed')
     expect(warning).toMatch(/invalid YAML/i)
-    expect(data).toEqual({ aliases: [], private: false, pinned: false })
+    expect(data).toEqual({ aliases: [], private: false, pinned: false, ignoredContacts: [] })
   })
 
   it('treats non-mapping frontmatter as ignored + a warning', () => {
@@ -72,12 +72,14 @@ describe('parseFrontmatter', () => {
     expect(parseFrontmatter('pinned: .nan').data.pinned).toBe(false)
   })
 
-  it('reads the contact-suggestion resolution; junk degrades to absent', () => {
-    expect(parseFrontmatter('contactSuggestion: added').data.contactSuggestion).toBe('added')
-    expect(parseFrontmatter('contactSuggestion: ignored').data.contactSuggestion).toBe('ignored')
-    expect(parseFrontmatter('contactSuggestion: banana').data.contactSuggestion).toBeUndefined()
-    expect(parseFrontmatter('contactSuggestion: true').data.contactSuggestion).toBeUndefined()
-    expect(parseFrontmatter('id: x').data.contactSuggestion).toBeUndefined()
+  it('reads the ignored-contacts list; junk degrades to empty', () => {
+    expect(
+      parseFrontmatter('ignoredContacts:\n  - Ada Lovelace\n  - Grace Hopper').data
+        .ignoredContacts,
+    ).toEqual(['Ada Lovelace', 'Grace Hopper'])
+    expect(parseFrontmatter('ignoredContacts: banana').data.ignoredContacts).toEqual([])
+    expect(parseFrontmatter('ignoredContacts:\n  - 42').data.ignoredContacts).toEqual([])
+    expect(parseFrontmatter('id: x').data.ignoredContacts).toEqual([])
   })
 
   it('isPinned/pinnedOrder read the pin value — `pinned: 0` is order 0, pinned', () => {

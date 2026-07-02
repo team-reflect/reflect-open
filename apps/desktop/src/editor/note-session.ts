@@ -171,11 +171,11 @@ export interface FrontmatterPatch {
    */
   gist?: GistFrontmatter | false
   /**
-   * How the suggested-contact card was resolved for this note: `added` (the
-   * details were merged in) or `ignored` (dismissed). `false` deletes the key
-   * — like the pin, "may suggest" is the absence of the flag.
+   * Contact names whose suggested-contact card was dismissed on this note —
+   * written whole, like `aliases`. The empty list deletes the key: with no
+   * dismissals the frontmatter carries nothing.
    */
-  contactSuggestion?: 'added' | 'ignored' | false
+  ignoredContacts?: string[]
 }
 
 /**
@@ -194,9 +194,9 @@ export function frontmatterPatchToYaml(patch: FrontmatterPatch): Record<string, 
   if (patch.private !== undefined) {
     yaml['private'] = patch.private === false ? undefined : true
   }
-  if (patch.contactSuggestion !== undefined) {
-    yaml['contactSuggestion'] =
-      patch.contactSuggestion === false ? undefined : patch.contactSuggestion
+  if (patch.ignoredContacts !== undefined) {
+    yaml['ignoredContacts'] =
+      patch.ignoredContacts.length === 0 ? undefined : patch.ignoredContacts
   }
   if (patch.gist !== undefined) {
     if (patch.gist === false) {

@@ -2,28 +2,51 @@ import { appendBlock } from '../markdown/edit'
 import type { ContactMatch } from './commands'
 
 /**
- * What the suggested-contact card's **Add** writes: the contact's primary
- * details as plain markdown bullets, owned by the graph from that moment on.
- * Nothing links back to the address book — later corrections happen in the
- * note, exactly like any other markdown.
+ * What the suggested-contact card's **Add** writes: the contact's details as
+ * plain markdown bullets, owned by the graph from that moment on. Nothing
+ * links back to the address book — later corrections happen in the note,
+ * exactly like any other markdown.
+ *
+ * The block follows v1's person template (and the meeting flow's convention):
+ * a `- Type: #person` line typing the note for the All Notes person filter,
+ * then every email and phone. Suppression after Add is content-based, like
+ * v1: {@link noteHasContactDetails} hides the card once details exist, so no
+ * frontmatter mark is needed and Add is a single write.
  */
 
+/** Case-insensitive dedup that keeps first occurrence and original casing. */
+function uniqueValues(values: readonly string[]): string[] {
+  const seen = new Set<string>()
+  const unique: string[] = []
+  for (const value of values) {
+    const trimmed = value.trim()
+    const key = trimmed.toLowerCase()
+    if (trimmed === '' || seen.has(key)) {
+      continue
+    }
+    seen.add(key)
+    unique.push(trimmed)
+  }
+  return unique
+}
+
 /**
- * The details block for `contact`: primary email and phone as bullets, in
- * that order. A contact with neither yields the empty string (the card
- * should not offer Add in that case).
+ * The details block for `contact`: the `- Type: #person` typing line, then
+ * every email and phone as bullets (deduped, address-book order — primary
+ * values come first). A contact with no email and no phone yields the empty
+ * string: there is nothing to add, so the card should not offer Add.
  */
 export function contactDetailsMarkdown(contact: ContactMatch): string {
-  const lines: string[] = []
-  const email = contact.emails[0]
-  if (email !== undefined && email.trim() !== '') {
-    lines.push(`- Email: ${email.trim()}`)
+  const emails = uniqueValues(contact.emails)
+  const phones = uniqueValues(contact.phones)
+  if (emails.length === 0 && phones.length === 0) {
+    return ''
   }
-  const phone = contact.phones[0]
-  if (phone !== undefined && phone.trim() !== '') {
-    lines.push(`- Phone: ${phone.trim()}`)
-  }
-  return lines.join('\n')
+  return [
+    '- Type: #person',
+    ...emails.map((email) => `- Email: ${email}`),
+    ...phones.map((phone) => `- Phone: ${phone}`),
+  ].join('\n')
 }
 
 /**
@@ -38,4 +61,21 @@ export function appendContactDetails(source: string, contact: ContactMatch): str
     return source
   }
   return appendBlock(source, details)
+}
+
+/** An email address anywhere in the body. */
+const EMAIL_PATTERN = /[^\s@]+@[^\s@]+\.[^\s@]+/
+/** A `- Email:` / `- Phone:` field bullet (any list marker, any case). */
+const FIELD_LINE_PATTERN = /^[ \t]*[-+*][ \t]+(?:email|phone):/im
+
+/**
+ * Does the note body already carry contact details — an email address, or an
+ * `Email:`/`Phone:` field bullet? v1's suppression rule: such a note gets no
+ * suggested-contact card, whether the details came from Add or were typed by
+ * hand. Self-healing by construction — delete the details and the card may
+ * return. Run this on the **body** (frontmatter split off), not the full
+ * source.
+ */
+export function noteHasContactDetails(body: string): boolean {
+  return EMAIL_PATTERN.test(body) || FIELD_LINE_PATTERN.test(body)
 }

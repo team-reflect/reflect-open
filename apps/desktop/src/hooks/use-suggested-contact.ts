@@ -1,10 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import {
   contactDetailsMarkdown,
+  contactNamesEqual,
   hasBridge,
   isContactsReadable,
   isDaily,
+  noteHasContactDetails,
   parseNote,
+  splitFrontmatter,
   suggestContactForTitle,
   type ContactMatch,
 } from '@reflect/core'
@@ -25,9 +28,13 @@ export function suggestedContactQueryKey(
  * The Apple Contact this note's title exactly matches, or `null` — the
  * suggested-contact card renders on a non-null answer. Gated hard: the
  * integration must be enabled, the permission readable, and the note a
- * non-daily one; a note whose suggestion was already resolved (the
- * `contactSuggestion` frontmatter mark, written by Add and Ignore) answers
- * `null` without a lookup.
+ * non-daily one. Suppression follows v1's model:
+ *
+ * - **content** — a body that already carries contact details (an email, an
+ *   `Email:`/`Phone:` bullet) gets no card, whether Add wrote them or the
+ *   user typed them. This is also what hides the card after Add.
+ * - **dismissals** — a contact named in the note's `ignoredContacts`
+ *   frontmatter list never re-suggests; other contacts still may.
  *
  * Keyed under the `index` scope on purpose: resolving the card writes the
  * note, the watcher re-indexes it, and the usual index invalidation refetches
@@ -44,13 +51,19 @@ export function useSuggestedContact(path: string): ContactMatch | null {
     queryKey: suggestedContactQueryKey(graph?.root, path),
     queryFn: async () => {
       const source = await readNoteSource(path)
-      const note = parseNote({ path, source })
-      if (note.frontmatter.contactSuggestion !== undefined) {
+      if (noteHasContactDetails(splitFrontmatter(source).body)) {
         return null
       }
+      const note = parseNote({ path, source })
       const match = await suggestContactForTitle(note.title)
       // A match with nothing to add (no email, no phone) has no card to offer.
-      return match !== null && contactDetailsMarkdown(match) !== '' ? match : null
+      if (match === null || contactDetailsMarkdown(match) === '') {
+        return null
+      }
+      const dismissed = note.frontmatter.ignoredContacts.some((name) =>
+        contactNamesEqual(name, match.fullName),
+      )
+      return dismissed ? null : match
     },
     enabled,
   })

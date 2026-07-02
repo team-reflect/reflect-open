@@ -107,12 +107,14 @@ export const frontmatterSchema = z
      */
     gist: gistFrontmatterSchema.optional().catch(undefined),
     /**
-     * Whether the suggested-contact card has been resolved for this note:
-     * `added` (the details were merged in) or `ignored` (dismissed). Absent
-     * means the card may appear when the title matches an Apple Contact.
-     * A mangled value degrades to absent — the card reappears, nothing breaks.
+     * Contact names whose suggested-contact card was dismissed on this note
+     * (v1's `ignoredContactNames`). Per contact, not per note: ignoring "Ada"
+     * must not suppress a later "Grace" suggestion after a retitle. An added
+     * contact needs no mark — the details it writes into the body suppress
+     * the card by content. A mangled value degrades to the empty list; the
+     * card reappears, nothing breaks.
      */
-    contactSuggestion: z.enum(['added', 'ignored']).optional().catch(undefined),
+    ignoredContacts: z.array(z.string()).catch([]).default([]),
   })
 export type Frontmatter = z.infer<typeof frontmatterSchema>
 
