@@ -5,18 +5,17 @@
  */
 export const SETTINGS_SECTIONS = [
   { id: 'appearance', title: 'Appearance' },
-  { id: 'date-time', title: 'Date & time' },
   { id: 'editor', title: 'Editor' },
+  { id: 'date-time', title: 'Date & time' },
   { id: 'templates', title: 'Note templates' },
   { id: 'all-notes', title: 'All notes' },
   { id: 'search', title: 'Search' },
-  { id: 'calendar', title: 'Calendar' },
-  { id: 'backup', title: 'Backup' },
   { id: 'ai-providers', title: 'AI providers' },
   { id: 'ai-prompts', title: 'AI prompts' },
+  { id: 'calendar', title: 'Calendar' },
   // Only shown where the OS frameworks exist — see use-visible-settings-sections.
   { id: 'integrations', title: 'System integrations' },
-  { id: 'keyboard', title: 'Keyboard shortcuts' },
+  { id: 'backup', title: 'Backup' },
   { id: 'about', title: 'About' },
   { id: 'destructive', title: 'Danger zone' },
 ] as const

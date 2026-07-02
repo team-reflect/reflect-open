@@ -3,6 +3,7 @@ import type { EditorMarkdownSyntax, EditorTextSize } from '@reflect/core'
 import { cn } from '@/lib/utils'
 import { useSettings } from '@/providers/settings-provider'
 import { SettingsField } from './field'
+import { KeyboardShortcutsField } from './keyboard-shortcuts-field'
 import { SettingsOptionCard } from './option-card'
 import { SettingsSection } from './section'
 import { SettingsSwitchField } from './switch-field'
@@ -164,6 +165,8 @@ export function EditorSection(): ReactElement {
         checked={settings.editorBulletAfterHeading}
         onCheckedChange={(checked) => updateSettings({ editorBulletAfterHeading: checked })}
       />
+
+      <KeyboardShortcutsField />
     </SettingsSection>
   )
 }

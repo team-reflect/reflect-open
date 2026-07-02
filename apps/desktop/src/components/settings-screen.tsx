@@ -10,7 +10,6 @@ import { DateTimeSection } from './settings/date-time-section'
 import { DestructiveSection } from './settings/destructive-section'
 import { EditorSection } from './settings/editor-section'
 import { IntegrationsSection } from './settings/integrations-section'
-import { KeyboardSection } from './settings/keyboard-section'
 import { SearchSection } from './settings/search-section'
 import { TemplatesSection } from './settings/templates-section'
 
@@ -25,17 +24,16 @@ export function SettingsScreen(): ReactElement {
       <h1 className="text-lg font-semibold text-text">Settings</h1>
       <div className="mt-6">
         <AppearanceSection />
-        <DateTimeSection />
         <EditorSection />
+        <DateTimeSection />
         <TemplatesSection />
         <AllNotesSection />
         <SearchSection />
-        <CalendarSection />
-        <BackupSection />
         <AiProvidersSection />
         <AiPromptsSection />
+        <CalendarSection />
         <IntegrationsSection />
-        <KeyboardSection />
+        <BackupSection />
         <AboutSection />
         <DestructiveSection />
       </div>

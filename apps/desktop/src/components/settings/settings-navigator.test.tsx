@@ -110,8 +110,8 @@ describe('SettingsNavigator', () => {
     const scroller = renderNavigatorPage()
     expect(activeEntry()).toBe('Appearance')
 
-    // Scroll until the Editor section (index 2) sits at the jump offset.
-    scrollPageTo(scroller, sectionTop(2) - PAGE_PADDING_PX)
+    // Scroll until the Editor section (index 1) sits at the jump offset.
+    scrollPageTo(scroller, sectionTop(1) - PAGE_PADDING_PX)
     expect(activeEntry()).toBe('Editor')
 
     scrollPageTo(scroller, 0)
@@ -134,7 +134,7 @@ describe('SettingsNavigator', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Editor' }))
 
     expect(scrollTo).toHaveBeenCalledWith({
-      top: sectionTop(2) - PAGE_PADDING_PX,
+      top: sectionTop(1) - PAGE_PADDING_PX,
       behavior: 'smooth',
     })
   })

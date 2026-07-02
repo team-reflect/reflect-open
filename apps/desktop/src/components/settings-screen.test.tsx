@@ -5,9 +5,11 @@ import { setBridge, type EmbedStatus, type GraphInfo } from '@reflect/core'
 import { formatFullDate } from '@/lib/dates'
 import { resetOperations } from '@/lib/operations'
 import { NoteTemplatesProvider } from '@/providers/note-templates-provider'
+import { ShortcutsProvider } from '@/providers/shortcuts-provider'
 import { SettingsProvider } from '@/providers/settings-provider'
 import { UpdateProvider } from '@/providers/update-provider'
 import { RouterProvider } from '@/routing/router'
+import { ShortcutsDialog } from './shortcuts-dialog'
 import { SettingsScreen } from './settings-screen'
 
 // The rebuild-index field reads the open index generation — and the Backup
@@ -82,9 +84,12 @@ function renderScreen(): void {
           {/* The Note templates section opens files (router) and shares the
               "New template" dialog state (templates provider). */}
           <RouterProvider>
-            <NoteTemplatesProvider>
-              <SettingsScreen />
-            </NoteTemplatesProvider>
+            <ShortcutsProvider>
+              <NoteTemplatesProvider>
+                <SettingsScreen />
+                <ShortcutsDialog />
+              </NoteTemplatesProvider>
+            </ShortcutsProvider>
           </RouterProvider>
         </UpdateProvider>
       </SettingsProvider>
@@ -802,15 +807,20 @@ describe('SettingsScreen', () => {
     expect(button.hasAttribute('disabled')).toBe(true)
   })
 
-  it('lists registered shortcuts from both keymap scopes', () => {
+  it('opens the global shortcuts dialog from the editor settings row', async () => {
     renderScreen()
-    // App scope (command titles) and editor scope (binding descriptions) —
-    // including Reflect's own editor bindings, not just meowdown's.
-    expect(screen.getByText('Toggle sidebar')).toBeTruthy()
-    expect(screen.getByText('Go to today')).toBeTruthy()
-    expect(screen.getByText('Bold')).toBeTruthy()
-    expect(screen.getByText('Heading 1')).toBeTruthy()
-    expect(screen.getByText('Open the AI menu on the selection')).toBeTruthy()
+    const section = screen.getByRole('region', { name: 'Editor' })
+
+    fireEvent.click(within(section).getByRole('button', { name: /show all/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Keyboard shortcuts' })
+    // App scope (command titles) and editor scope (binding descriptions) still
+    // come from the global cheat-sheet, not from a duplicated settings list.
+    expect(within(dialog).getByText('Toggle sidebar')).toBeTruthy()
+    expect(within(dialog).getByText('Go to today')).toBeTruthy()
+    expect(within(dialog).getByText('Bold')).toBeTruthy()
+    expect(within(dialog).getByText('Heading 1')).toBeTruthy()
+    expect(within(dialog).getByText('Open the AI menu on the selection')).toBeTruthy()
   })
 
   it('adding an AI prompt persists the full document', async () => {
