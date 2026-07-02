@@ -388,9 +388,7 @@ fn daily_auto_merge(
 /// A blob's content as text, or `None` when it does not decode as UTF-8.
 fn utf8_blob(repo: &Repository, id: git2::Oid) -> AppResult<Option<String>> {
     let blob = repo.find_blob(id)?;
-    Ok(std::str::from_utf8(blob.content())
-        .ok()
-        .map(str::to_string))
+    Ok(std::str::from_utf8(blob.content()).ok().map(str::to_string))
 }
 
 /// One side edited what the other deleted (either direction): restore and

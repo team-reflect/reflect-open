@@ -56,7 +56,8 @@ pub(super) fn merge_appends(base: &str, ours: &str, theirs: &str) -> Option<Stri
         return None;
     }
 
-    let mut merged = String::with_capacity(base.len() + ours_suffix.len() + theirs_suffix.len() + 1);
+    let mut merged =
+        String::with_capacity(base.len() + ours_suffix.len() + theirs_suffix.len() + 1);
     merged.push_str(base);
     merged.push_str(ours_suffix);
     let Some(mut theirs_kept) = dedup_against(theirs_suffix, ours_suffix) else {
