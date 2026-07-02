@@ -239,10 +239,13 @@ function nextSectionStart(headings: Heading[], target: Heading, eof: number): nu
 }
 
 /**
- * Insert `block` at the end of the section under the first heading whose text
- * matches `heading` (case-insensitive). If no such heading exists, append a new
- * `## heading` section at end of file. Used by capture (Plan 11).
+ * `[[…]]` has no escaping — strip the characters that would corrupt a link
+ * before embedding untrusted text (a page title, a meeting name) in one.
  */
+export function wikiLinkSafe(text: string): string {
+  return text.replace(/[[\]|\r\n]/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
 /**
  * Append `block` as its own paragraph at the end of the note, one blank line
  * after the existing content (none for an empty note). The flat variant of
@@ -255,6 +258,12 @@ export function appendBlock(source: string, block: string): string {
   return `${prefix}${block.trim()}\n`
 }
 
+/**
+ * Insert `block` at the end of the section under the first heading whose text
+ * matches `heading` (case-insensitive). If no such heading exists, append a new
+ * `## heading` section at end of file. Used by capture (Plan 11) and the
+ * add-meeting action.
+ */
 export function appendUnderHeading(source: string, heading: string, block: string): string {
   const headingKey = heading.trim().toLowerCase()
   const { headings } = parseNote({ path: '', source })

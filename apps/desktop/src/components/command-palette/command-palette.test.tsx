@@ -86,6 +86,7 @@ function renderPalette(query: string, context?: Partial<CommandContext>) {
     notePath: () => null,
     back: vi.fn(),
     forward: vi.fn(),
+    clearScrollState: vi.fn(),
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
     newChat: vi.fn(),

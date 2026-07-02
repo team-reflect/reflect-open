@@ -2,9 +2,14 @@ import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULT_SETTINGS, type GraphInfo, type PinnedNote, type Settings } from '@reflect/core'
+import {
+  DEFAULT_SETTINGS,
+  untitledNotePath,
+  type GraphInfo,
+  type PinnedNote,
+  type Settings,
+} from '@reflect/core'
 import type { CommandContext } from '@/lib/commands/types'
-import { untitledNotePath } from '@/lib/create-note'
 import type { Route } from '@/routing/route'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { UpdateProvider } from '@/providers/update-provider'
@@ -121,6 +126,7 @@ function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?: Route
     notePath: () => null,
     back: vi.fn(),
     forward: vi.fn(),
+    clearScrollState: vi.fn(),
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
     newChat: vi.fn(),
@@ -149,11 +155,16 @@ function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?: Route
 }
 
 describe('Sidebar', () => {
-  it('nav rows run their registered commands', async () => {
+  it('nav rows navigate, with Daily notes restoring its surface scroll', async () => {
     const { view, navigate } = renderSidebar()
 
     await userEvent.click(view.getByRole('button', { name: /daily notes/i }))
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith({ kind: 'today' }))
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith(
+        { kind: 'today' },
+        { restoreSurfaceScroll: true },
+      ),
+    )
 
     await userEvent.click(view.getByRole('button', { name: /settings/i }))
     await waitFor(() => expect(navigate).toHaveBeenCalledWith({ kind: 'settings' }))

@@ -4,9 +4,11 @@ import { AiProvidersSection } from './settings/ai-providers-section'
 import { AllNotesSection } from './settings/all-notes-section'
 import { AppearanceSection } from './settings/appearance-section'
 import { BackupSection } from './settings/backup-section'
+import { CalendarSection } from './settings/calendar-section'
 import { DateTimeSection } from './settings/date-time-section'
 import { DestructiveSection } from './settings/destructive-section'
 import { EditorSection } from './settings/editor-section'
+import { IntegrationsSection } from './settings/integrations-section'
 import { KeyboardSection } from './settings/keyboard-section'
 import { SearchSection } from './settings/search-section'
 import { TemplatesSection } from './settings/templates-section'
@@ -27,8 +29,10 @@ export function SettingsScreen(): ReactElement {
         <TemplatesSection />
         <AllNotesSection />
         <SearchSection />
+        <CalendarSection />
         <BackupSection />
         <AiProvidersSection />
+        <IntegrationsSection />
         <KeyboardSection />
         <AboutSection />
         <DestructiveSection />

@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { WikilinkClickHandler } from '@meowdown/core'
 import { getBacklinksWithContext, hasBridge } from '@reflect/core'
 import { BacklinkSourceGroup } from '@/components/backlink-source-group'
-import { useImagePersistence } from '@/editor/use-image-persistence'
+import { useAssetPersistence } from '@/editor/use-asset-persistence'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
 import { groupBacklinksBySource } from '@/lib/group-backlinks'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
@@ -56,7 +56,7 @@ export function BacklinksPanel({ path }: BacklinksPanelProps): ReactElement | nu
   // source-note path. Images resolve through the same asset pipeline as the
   // editor; both callbacks are stable so they never rebuild the snippet trees.
   const navigateWikiLink = useWikiLinkNavigation(graph?.generation ?? null)
-  const { resolveImageUrl } = useImagePersistence(graph?.root ?? null, graph?.generation ?? null)
+  const { resolveImageUrl } = useAssetPersistence(graph?.root ?? null, graph?.generation ?? null)
   const handleWikilinkClick = useCallback<WikilinkClickHandler>(
     ({ target }) => navigateWikiLink(target),
     [navigateWikiLink],

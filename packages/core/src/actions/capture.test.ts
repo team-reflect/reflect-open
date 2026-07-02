@@ -22,7 +22,7 @@ import {
   reconcileCaptureEnrichment,
   type ReconcileCaptureEnrichmentInput,
 } from './capture'
-import type { CaptureEnvelope } from './capture-envelope'
+import type { CaptureEnvelope, TextCaptureEnvelope } from './capture-envelope'
 import { scrapePageMeta } from './meta-scrape'
 
 vi.mock('../graph/commands', () => ({
@@ -459,6 +459,111 @@ describe('drainCaptureInbox', () => {
 
     expect(outcome.stopped).toEqual({ reason: 'io', message: 'disk full' })
     expect(spool.size).toBe(2) // nothing removed — the capture is retryable
+  })
+})
+
+describe('drainCaptureInbox (text captures)', () => {
+  function textEnvelope(overrides: Partial<TextCaptureEnvelope> = {}): TextCaptureEnvelope {
+    return {
+      version: 1,
+      id: 'a1b2c3d4-0000-4000-8000-000000000001',
+      kind: 'append',
+      text: 'call the bank',
+      capturedAt: CAPTURED_AT.toISOString(),
+      source: 'deep-link',
+      ...overrides,
+    }
+  }
+
+  function addTextSpool(capture: TextCaptureEnvelope): void {
+    spool.set(`${capture.id}.json`, { contents: JSON.stringify(capture), modifiedMs: 0 })
+  }
+
+  it('appends a bullet to the capture-day daily and removes the spool', async () => {
+    addTextSpool(textEnvelope())
+
+    const outcome = await drain()
+
+    expect(outcome).toEqual({ pending: 1, drained: 1, deduped: 0, invalid: 0, stopped: null })
+    expect(files.get(DAILY)).toBe('- call the bank\n')
+    expect(spool.size).toBe(0)
+  })
+
+  it('appends a task envelope as an open GFM checkbox', async () => {
+    addTextSpool(textEnvelope({ kind: 'task', text: 'buy milk' }))
+
+    await drain()
+
+    expect(files.get(DAILY)).toBe('- [ ] buy milk\n')
+  })
+
+  it('appends after existing daily content as its own block', async () => {
+    files.set(DAILY, '- morning standup\n')
+    addTextSpool(textEnvelope())
+
+    await drain()
+
+    expect(files.get(DAILY)).toBe('- morning standup\n\n- call the bank\n')
+  })
+
+  it('still appends when an existing line merely contains the capture as a substring', async () => {
+    files.set(DAILY, '- call the bank tomorrow morning\n')
+    addTextSpool(textEnvelope())
+
+    const outcome = await drain()
+
+    expect(outcome.deduped).toBe(0)
+    expect(files.get(DAILY)).toBe('- call the bank tomorrow morning\n\n- call the bank\n')
+  })
+
+  it('dedupes against a CRLF daily — a carriage return must not defeat the line match', async () => {
+    files.set(DAILY, '- morning standup\r\n- call the bank\r\n')
+    addTextSpool(textEnvelope())
+
+    const outcome = await drain()
+
+    expect(outcome).toEqual({ pending: 1, drained: 1, deduped: 1, invalid: 0, stopped: null })
+    expect(files.get(DAILY)).toBe('- morning standup\r\n- call the bank\r\n')
+  })
+
+  it('re-draining after a crash between append and removal cannot double-append', async () => {
+    files.set(DAILY, '- call the bank\n')
+    addTextSpool(textEnvelope())
+
+    const outcome = await drain()
+
+    expect(outcome).toEqual({ pending: 1, drained: 1, deduped: 1, invalid: 0, stopped: null })
+    expect(files.get(DAILY)).toBe('- call the bank\n')
+    expect(spool.size).toBe(0)
+  })
+
+  it('still appends to a private daily — the write is entirely local', async () => {
+    files.set(DAILY, '---\nprivate: true\n---\n\n- secret plans\n')
+    addTextSpool(textEnvelope())
+
+    await drain()
+
+    expect(files.get(DAILY)).toContain('- call the bank')
+    expect(scrapeMock).not.toHaveBeenCalled()
+    expect(describeMock).not.toHaveBeenCalled()
+  })
+
+  it('quarantines a text envelope that fails validation', async () => {
+    addTextSpool(textEnvelope({ text: 'line one\nline two' }))
+
+    const outcome = await drain()
+
+    expect(outcome.invalid).toBe(1)
+    expect(rejected.has('a1b2c3d4-0000-4000-8000-000000000001.json')).toBe(true)
+    expect(files.has(DAILY)).toBe(false)
+  })
+
+  it('never writes a capture note for a text envelope', async () => {
+    addTextSpool(textEnvelope())
+
+    await drain()
+
+    expect([...files.keys()]).toEqual([DAILY])
   })
 })
 

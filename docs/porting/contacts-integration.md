@@ -1,9 +1,46 @@
 # Porting contacts integration
 
-**Status: planned.** In v1, contacts turned meeting attendees and name-like
-notes into real person notes without manual data entry. v2 keeps that role
-but reads the **Apple Contacts** store instead of syncing provider address
-books through a server.
+**Status: shipped (contacts standalone).** In v1, contacts turned meeting
+attendees and name-like notes into real person notes without manual data
+entry. v2 keeps that role but reads the **Apple Contacts** store instead of
+syncing provider address books through a server.
+
+Shipped: the Rust `contacts` capability (`CNContactStore` via `objc2`), the
+Settings → System integrations switch with the permission flow, the
+suggested-contact card, and contacts in the `[[` link menu. The
+meeting-attendee half waits on the
+[calendar flow](./calendar-meetings-integration.md) — its resolution policy
+(`resolveAttendeeContact` in `@reflect/core`) is already in place for it to
+consume.
+
+Decisions taken at implementation time:
+
+- **Person-note matching is exact.** The card appears only when the note
+  title equals a contact's full name — case- and diacritic-insensitive,
+  whitespace-collapsed, mirroring the framework predicate's own folding — with
+  no `#person` tag required, and word-prefix hits from the framework's name
+  predicate discarded (`matchContactForTitle`).
+- **No photos in v1.** Add writes a `- Type: #person` typing line (v1's Type
+  field, the same convention the meeting flow uses) plus every email and
+  phone as plain markdown bullets; photos (binary → `assets/`) can follow
+  without rework.
+- **Suppression is content-based, dismissals per contact — v1's exact
+  model.** A note whose body already carries contact details (an email, an
+  `Email:`/`Phone:` bullet) gets no card, which is also what hides the card
+  after Add — a single write, no frontmatter mark. Ignore records the
+  contact's name in the note's `ignoredContacts` frontmatter list (v1's
+  `ignoredContactNames`), so a retitled note stays eligible for its own
+  suggestion and the state travels with the note through sync and export.
+- **Contacts join the `[[` link menu, like v1's backlink menu.** Word-prefix
+  matches (min two typed characters, capped, deduped against notes the link
+  would resolve to) appear after note suggestions; selecting one inserts the
+  link and creates the person note prefilled with the same details block Add
+  writes. A contact row for the exact typed name replaces the bare Create
+  row.
+- **No `mailto:`/`tel:` links.** v1's rich editor hid link URLs; v2 notes are
+  markdown the user owns, where the syntax would double every value — and the
+  editor's link opener is scoped to `https`. Plain values keep the files
+  clean; autolinking can make them clickable without markup.
 
 ## What v1 did
 
@@ -28,9 +65,9 @@ macOS.
 ### User experience
 
 1. **Enabling.** A **Contacts** switch in Settings (paired with Calendar —
-   likely one "Apple integrations" section). Turning it on triggers the
-   macOS contacts permission prompt; denial shows an inline pointer to
-   System Settings.
+   one "System integrations" section). Turning it on triggers the macOS
+   contacts permission prompt; denial shows an inline pointer to System
+   Settings.
 2. **Meeting attendees become person notes.** When a meeting is added from
    the [calendar flow](./calendar-meetings-integration.md), each attendee
    email is looked up in Apple Contacts. On a match, the created person note
@@ -84,15 +121,14 @@ macOS.
 - v1's non-features stay non-features: no CSV/vCard bulk import, no AI
   enrichment, no write-back to providers.
 
-## Open questions
+## Resolved questions
 
-- **Person-note matching.** v1 matched "notes whose subject looks like a
-  person's name". v2 needs a concrete rule — likely a `#person` tag and/or
-  a fuzzy title match against contacts, tuned to avoid false positives on
-  two-word note titles.
-- **Photos.** Contact photos are binary; if person notes should show them,
-  they'd be written into `assets/` on explicit add (never automatically).
-- **Privacy-doc wording.** Nothing leaves the device, but reading the
-  address book is exactly the kind of access
-  [docs/privacy.md](../privacy.md) exists to spell out; it needs a section
-  even though the network inventory is unchanged.
+- **Person-note matching.** Exact title ↔ full-name equality (see the
+  decisions above). Fuzzy matching and a `#person` opt-in were considered and
+  dropped: exactness alone kills the two-word-title false positives.
+- **Photos.** Deferred — Add writes text fields only. If person notes grow
+  photos, they'd be written into `assets/` on explicit add (never
+  automatically).
+- **Privacy-doc wording.** [docs/privacy.md](../privacy.md) has an Apple
+  Contacts section: on-device reads, no mirror, details enter a note only on
+  explicit Add.

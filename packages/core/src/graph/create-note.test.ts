@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { setBridge } from '@reflect/core'
+import { setBridge } from '../ipc/bridge'
 import {
   createNoteWithTitle,
   isUntitledNotePath,
@@ -51,6 +51,18 @@ describe('createNoteWithTitle', () => {
     bindBridge({ occupied: ['notes/new-idea.md'] })
 
     await expect(createNoteWithTitle('New Idea', 7)).resolves.toBe('notes/new-idea-2.md')
+  })
+
+  it('places an optional body block under the H1', async () => {
+    const invoke = bindBridge()
+
+    await createNoteWithTitle('Ada Lovelace', 7, '- Type: #person')
+
+    const write = invoke.mock.calls.find(([command]) => command === 'note_write')
+    const args = write?.[1] as { contents: string }
+    expect(args.contents).toMatch(
+      /^---\nid: [0-9a-z]{26}\n---\n# Ada Lovelace\n\n- Type: #person\n$/,
+    )
   })
 })
 

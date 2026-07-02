@@ -215,6 +215,35 @@ pub fn capture_inbox_list(generation: u64, state: State<GraphState>) -> AppResul
     Ok(out)
 }
 
+/// Envelopes this app spools itself (deep-link captures) are one short text
+/// payload — anything near this cap is not a capture, it's smuggling.
+const INBOX_SPOOL_MAX_BYTES: usize = 64 * 1024;
+
+fn ensure_spool_size(json: &str) -> AppResult<()> {
+    if json.len() > INBOX_SPOOL_MAX_BYTES {
+        return Err(AppError::parse(format!(
+            "envelope exceeds the {INBOX_SPOOL_MAX_BYTES}-byte spool cap"
+        )));
+    }
+    Ok(())
+}
+
+/// Spool an envelope this app produced (deep-link `append`/`task` URLs) into
+/// the same inbox the native-messaging host writes, so it flows through the
+/// one drain path. The frontend owns the envelope shape; this only moves
+/// bytes — atomically, so a half-written file can never be drained.
+#[tauri::command]
+pub fn capture_inbox_spool(
+    name: String,
+    json: String,
+    generation: u64,
+    state: State<GraphState>,
+) -> AppResult<()> {
+    ensure_spool_size(&json)?;
+    let root = root_for_generation(&state, generation)?;
+    atomic_write_to(&inbox_file(&root, &name)?, &json)
+}
+
 /// Read one spooled envelope's JSON text by spool filename.
 #[tauri::command]
 pub fn capture_inbox_read(
@@ -455,6 +484,15 @@ mod tests {
             serde_json::from_str(&pointer_json(Path::new("/graphs/personal"))).unwrap();
         assert_eq!(parsed["version"], 1);
         assert_eq!(parsed["graphRoot"], "/graphs/personal");
+    }
+
+    #[test]
+    fn spool_size_cap_refuses_oversized_envelopes() {
+        assert!(ensure_spool_size("{\"small\":true}").is_ok());
+        assert!(matches!(
+            ensure_spool_size(&"x".repeat(INBOX_SPOOL_MAX_BYTES + 1)),
+            Err(AppError::Parse { .. })
+        ));
     }
 
     #[test]

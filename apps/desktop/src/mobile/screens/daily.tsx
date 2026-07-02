@@ -1,7 +1,7 @@
 import { type ReactElement } from 'react'
+import { untitledNotePath } from '@reflect/core'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { untitledNotePath } from '@/lib/create-note'
 import { useToday } from '@/lib/use-today'
 import { CalendarStrip } from '@/mobile/calendar-strip'
 import { DayCarousel } from '@/mobile/day-carousel'

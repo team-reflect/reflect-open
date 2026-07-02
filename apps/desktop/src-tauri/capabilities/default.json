@@ -8,6 +8,10 @@
     "core:window:allow-start-dragging",
     "core:window:allow-destroy",
     "opener:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "x-apple.systempreferences:*" }]
+    },
     "dialog:default",
     {
       "identifier": "http:default",

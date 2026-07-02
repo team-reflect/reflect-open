@@ -1,9 +1,18 @@
 # Porting calendar / meetings integration
 
-**Status: planned.** The v1 feature — the day's meetings beside the daily
-note, one action to turn a meeting into a backlinked note — is one of
-Reflect's defining loops and ports to v2 with the same shape. What changes
-completely is how calendars are reached.
+**Status: shipped (macOS desktop).** The v1 feature — the day's meetings
+beside the daily note, one action to turn a meeting into a backlinked note —
+is one of Reflect's defining loops and ports to v2 with the same shape. What
+changes completely is how calendars are reached.
+
+Landed as: the `calendar` Rust module
+(`apps/desktop/src-tauri/src/calendar.rs`), typed bindings + display policy
+in `packages/core/src/calendar/`, the `addMeetingToDaily` action
+(`packages/core/src/actions/add-meeting.ts`), the Settings **Calendar**
+section, and the Events section in the daily context sidebar with its
+add-meeting dialog. iOS still inherits the EventKit approach later (its
+Info.plist/entitlements live in the generated Xcode project, not this
+bundle config).
 
 ## What v1 did
 
@@ -99,12 +108,22 @@ is added to [docs/privacy.md](../privacy.md)'s inventory.
 - Meeting location / organizer / conference links (v1 didn't surface them
   either; can be revisited since EventKit exposes them).
 
-## Open questions
+## Decisions (were open questions)
 
-- Whether the events panel is a sidebar section or part of the daily-note
-  header area — a design decision once the daily surface's layout settles.
-- Recurring-event default for "create backlinked note?" (v1 defaulted it on
-  for recurring events; worth keeping, but needs EventKit's recurrence
-  info plumbed through).
-- Whether to surface a subtle "connect your work calendar in macOS" hint
-  for users expecting a Google OAuth button.
+- The events panel is a **context-sidebar section** on the daily note,
+  tracking the focused day; it can move into the daily-note header once that
+  layout settles.
+- "Create backlinked note?" **defaults on for recurring events** (v1's
+  behavior — EventKit's `hasRecurrenceRules` is plumbed through as
+  `recurring`), off otherwise. Meeting notes are reused per title: a
+  recurring "Standup" links one `[[Standup]]` note from every day.
+- The daily-note markdown lands under a `## Meetings` heading
+  (`appendUnderHeading`), one bullet per meeting in v1's exact line shape:
+  `- 9:00am met with [[Person A]], [[Person B]] for [[Meeting]]`. As in v1,
+  an unchecked "create backlinked note" writes the meeting name as plain
+  text, and untitled / "block" / "busy" events never reach the panel. Two
+  deliberate v1 deviations: no nested empty bullet under the line (the v2
+  serializer drops empty list items), and re-adding a backlinked meeting is
+  idempotent instead of appending a duplicate.
+- No Google-OAuth-shaped hint; the Settings copy points at
+  System Settings → Internet Accounts when no calendars are found.

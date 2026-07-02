@@ -18,6 +18,18 @@ export interface IpcBridge {
   invoke: (command: string, args: Record<string, unknown>) => Promise<unknown>
   /** Subscribe to a native event stream, resolving with an unlisten function. */
   listen: (event: string, handler: (payload: unknown) => void) => Promise<Unlisten>
+  /**
+   * Invoke a native command with a **raw binary body** instead of JSON args —
+   * asset bytes cross the IPC without base64 inflation. Since a raw body
+   * carries no args, per-call metadata travels in `headers`. Optional: hosts
+   * without a binary transport simply don't stream assets; `callBinary`
+   * throws loudly rather than degrading.
+   */
+  invokeBinary?: (
+    command: string,
+    body: Uint8Array,
+    headers: Record<string, string>,
+  ) => Promise<unknown>
 }
 
 let activeBridge: IpcBridge | null = null

@@ -1,6 +1,7 @@
 {
   "notes": {
     "daily/2026-01-02.md": {
+      "id": null,
       "title": "2026-01-02",
       "titleKey": "2026-01-02",
       "aliases": [],
@@ -9,6 +10,7 @@
       "fileHash": "62fa1d37b9117ff9c8b06bbe2238e328847ee93596166a792a5b5a5320a98e2e"
     },
     "daily/not-a-date.md": {
+      "id": null,
       "title": "not-a-date",
       "titleKey": "not-a-date",
       "aliases": [],
@@ -17,6 +19,7 @@
       "fileHash": "d108c5b255bc773645f74c54f8a498c5a8d4aaf750bccb3c4e5a3569031008c3"
     },
     "notes/Fancy Name.md": {
+      "id": null,
       "title": "Fancy Name",
       "titleKey": "fancy name",
       "aliases": [],
@@ -25,6 +28,7 @@
       "fileHash": "1998e1121758efc6cde0d945f8e0c9d44dce58a972d96bd8ebc36f4f111f490d"
     },
     "notes/aliases-invalid.md": {
+      "id": null,
       "title": "Bad Aliases",
       "titleKey": "bad aliases",
       "aliases": [],
@@ -33,6 +37,7 @@
       "fileHash": "9542d8a3d64afef23223f8d1f2834a81a255f8fc305b7a67829840d3398dcc66"
     },
     "notes/aliases-nested.md": {
+      "id": null,
       "title": "Nested Aliases",
       "titleKey": "nested aliases",
       "aliases": [],
@@ -41,6 +46,7 @@
       "fileHash": "908fa211637831cc52411262f3d69d49eccd706efeb36b01f8eba7f98ff8c826"
     },
     "notes/broken-yaml.md": {
+      "id": null,
       "title": "Broken Yaml Fallback",
       "titleKey": "broken yaml fallback",
       "aliases": [],
@@ -49,6 +55,7 @@
       "fileHash": "fc884af78bfb872cfd0c3eed62903ea5f20e117fc6f2767341d7752ac00ff01f"
     },
     "notes/closing-hashes.md": {
+      "id": null,
       "title": "Spaced Out",
       "titleKey": "spaced out",
       "aliases": [],
@@ -57,6 +64,7 @@
       "fileHash": "059fbbc0b6288a7c0658c9cc853e6878c1ef6cf34eb6d047ba510122eb23a72a"
     },
     "notes/crlf.md": {
+      "id": null,
       "title": "Windows Note",
       "titleKey": "windows note",
       "aliases": [],
@@ -65,6 +73,7 @@
       "fileHash": "3b5cda541ec39c2c23eb4c8dc4632abce5da3815f9d5656b905f77336cd60937"
     },
     "notes/empty-frontmatter.md": {
+      "id": null,
       "title": "After Empty Block",
       "titleKey": "after empty block",
       "aliases": [],
@@ -73,6 +82,7 @@
       "fileHash": "f3d9caa4f93b889a114dd83a0766a1ad588537818ff8bfe5c2381387c779f4c3"
     },
     "notes/empty-h1-then-real.md": {
+      "id": null,
       "title": "Real Title",
       "titleKey": "real title",
       "aliases": [],
@@ -81,6 +91,7 @@
       "fileHash": "1d3abfd2d69d349ca1e22b30ee94803031b240d50968c791d770a235980df848"
     },
     "notes/fm-title-non-string.md": {
+      "id": null,
       "title": "Numeric Title Fallback",
       "titleKey": "numeric title fallback",
       "aliases": [],
@@ -89,6 +100,7 @@
       "fileHash": "4bd09f083ec1bd08f58c5f9a1890712908b7af157e2a60b323790667f5505018"
     },
     "notes/fm-title-whitespace.md": {
+      "id": null,
       "title": "Padded",
       "titleKey": "padded",
       "aliases": [],
@@ -97,6 +109,7 @@
       "fileHash": "dd2f361735950a0ea9cb918d6e0b2e5aa9cca391acb6728259d926e2ba19cdcf"
     },
     "notes/fm-title-wins.md": {
+      "id": null,
       "title": "FM Title",
       "titleKey": "fm title",
       "aliases": [
@@ -110,7 +123,30 @@
       "private": false,
       "fileHash": "0682cdb53f7fb3cd5cdc9df0ff653301fabed8ed82e200a6331237ba53f137af"
     },
+    "notes/frontmatter-id-number.md": {
+      "id": null,
+      "title": "Numeric Id Is No Id",
+      "titleKey": "numeric id is no id",
+      "aliases": [],
+      "aliasKeys": [],
+      "private": false,
+      "fileHash": "49a8ae9fd78d833c25f8b34058b96384ea30d5ca9d0a9b697e6d26583c970c00"
+    },
+    "notes/frontmatter-id.md": {
+      "id": "01hzy3v9k2m4n6p8q0r2s4t6vw",
+      "title": "Carries An Id",
+      "titleKey": "carries an id",
+      "aliases": [
+        "With Id"
+      ],
+      "aliasKeys": [
+        "with id"
+      ],
+      "private": false,
+      "fileHash": "3cf0d98e4c2d173ba03df92f4b9183b11627f917dc97dc409b3fed7de916bce0"
+    },
     "notes/h1-in-code-fence.md": {
+      "id": null,
       "title": "h1-in-code-fence",
       "titleKey": "h1-in-code-fence",
       "aliases": [],
@@ -119,6 +155,7 @@
       "fileHash": "2514bfc7bfd365bcd14eaf83cea441be889207510768ca51fda42c1f25031d0c"
     },
     "notes/h1-inline-markup.md": {
+      "id": null,
       "title": "The *Heading* [[Link]]",
       "titleKey": "the *heading* [[link]]",
       "aliases": [],
@@ -127,6 +164,7 @@
       "fileHash": "b6b9e67480f08bd54378318c1e8b39999cc4027cec24dcaf7b68a19afaf2c4a9"
     },
     "notes/h2-only.md": {
+      "id": null,
       "title": "h2-only",
       "titleKey": "h2-only",
       "aliases": [],
@@ -135,6 +173,7 @@
       "fileHash": "5e1864d606bce4f8f23c6d147d4d01f89ea5be325631a02f7ddbce6a2ff44281"
     },
     "notes/non-mapping-frontmatter.md": {
+      "id": null,
       "title": "List Frontmatter",
       "titleKey": "list frontmatter",
       "aliases": [],
@@ -143,6 +182,7 @@
       "fileHash": "cd7fc018e2b41b6e98a25f7241afbeb256c2df3b1adbaf31e00bed91e86a011e"
     },
     "notes/private-false.md": {
+      "id": null,
       "title": "private-false",
       "titleKey": "private-false",
       "aliases": [],
@@ -151,6 +191,7 @@
       "fileHash": "868340dff9d704b9e88435447159ca8d279a7ce775361421b3648f62a40c2d6c"
     },
     "notes/private-float-one.md": {
+      "id": null,
       "title": "private-float-one",
       "titleKey": "private-float-one",
       "aliases": [],
@@ -159,6 +200,7 @@
       "fileHash": "2264a8b6ab3094b1315a575d26c337b34667fca664354fb544f0ab2f7e52e834"
     },
     "notes/private-list.md": {
+      "id": null,
       "title": "private-list",
       "titleKey": "private-list",
       "aliases": [],
@@ -167,6 +209,7 @@
       "fileHash": "aa3910f50fbd9c4d02361468b1912be3c8ecdef2586a99c8eb5a9dc242ea176e"
     },
     "notes/private-numeric-one.md": {
+      "id": null,
       "title": "private-numeric-one",
       "titleKey": "private-numeric-one",
       "aliases": [],
@@ -175,6 +218,7 @@
       "fileHash": "ecce28254bbef7ed757f0fd134dbedeb17735d3c1f53ec8a0d8eef97b5a17bae"
     },
     "notes/private-on.md": {
+      "id": null,
       "title": "private-on",
       "titleKey": "private-on",
       "aliases": [],
@@ -183,6 +227,7 @@
       "fileHash": "0525882d00c147377fdd30d95d39f64ca4f384d160171de46565c1c6e6cdf025"
     },
     "notes/private-true.md": {
+      "id": null,
       "title": "private-true",
       "titleKey": "private-true",
       "aliases": [],
@@ -191,6 +236,7 @@
       "fileHash": "012abdcdbcbb0ea2448a12224338988d1d1980122067f0bf14015bdb02ce6231"
     },
     "notes/private-two.md": {
+      "id": null,
       "title": "private-two",
       "titleKey": "private-two",
       "aliases": [],
@@ -199,6 +245,7 @@
       "fileHash": "57f80adbe986f4f91714ba7baa8c3f1f9e1009fa535c4318b25a8d51a8d3c12f"
     },
     "notes/private-word.md": {
+      "id": null,
       "title": "private-word",
       "titleKey": "private-word",
       "aliases": [],
@@ -207,6 +254,7 @@
       "fileHash": "6226f525fdcba9cd5678d8cf8253346d93e4e2765ef15f293ac8028bc8c40cb0"
     },
     "notes/private-yes-string.md": {
+      "id": null,
       "title": "private-yes-string",
       "titleKey": "private-yes-string",
       "aliases": [],
@@ -215,6 +263,7 @@
       "fileHash": "6aab2434b92b9f9fa1e4e517573411cb57880051eb5a45f801a196e502dc3858"
     },
     "notes/setext-h1.md": {
+      "id": null,
       "title": "Setext Title",
       "titleKey": "setext title",
       "aliases": [],
@@ -223,6 +272,7 @@
       "fileHash": "f9f8e690366a9e93c182db9b49a5748de8ce921c839528a20fc532ae65c8ecbc"
     },
     "notes/sub/nested-note.md": {
+      "id": null,
       "title": "nested-note",
       "titleKey": "nested-note",
       "aliases": [],
@@ -231,6 +281,7 @@
       "fileHash": "8316729753b63c608eeb3536369bb26ea37bb3ae519b18f58c85966a8452ac8b"
     },
     "notes/unicode-title.md": {
+      "id": null,
       "title": "Café ÉTÉ",
       "titleKey": "café été",
       "aliases": [],
@@ -239,6 +290,7 @@
       "fileHash": "721130eb619d3c4a5430f9a25f36f8af4ba742f2aa056c7ffe137896fbe1516f"
     },
     "notes/unterminated-fence.md": {
+      "id": null,
       "title": "unterminated-fence",
       "titleKey": "unterminated-fence",
       "aliases": [],

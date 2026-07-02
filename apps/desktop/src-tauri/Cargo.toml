@@ -59,6 +59,50 @@ reqwest = { version = "0.12.28", default-features = false, features = ["rustls-t
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = "0.10.1"
 xattr = "1.6.1"
+# Apple Calendar read-only bridge (`src/calendar.rs`): EventKit through the
+# objc2 bindings, trimmed to the classes the module touches. objc2-app-kit is
+# only here for EKCalendar's NSColor → hex conversion.
+objc2 = "0.6.3"
+block2 = "0.6.2"
+objc2-foundation = { version = "0.3.2", default-features = false, features = [
+  "std",
+  "NSArray",
+  "NSDate",
+  "NSEnumerator",
+  "NSError",
+  "NSNotification",
+  "NSObject",
+  "NSOperation",
+  "NSString",
+  "block2",
+] }
+objc2-event-kit = { version = "0.3.2", default-features = false, features = [
+  "std",
+  "EKCalendar",
+  "EKCalendarItem",
+  "EKEvent",
+  "EKEventStore",
+  "EKObject",
+  "EKParticipant",
+  "EKSource",
+  "EKTypes",
+  "block2",
+  "objc2-app-kit",
+] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = [
+  "std",
+  "NSColor",
+  "NSColorSpace",
+] }
+
+# Apple Contacts integration (`contacts.rs`): live CNContactStore lookups on
+# macOS and iOS — never a mirrored copy of the address book. block2 bridges the
+# requestAccessForEntityType completion handler back into blocking Rust.
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+objc2 = "0.6.4"
+objc2-foundation = "0.3.2"
+objc2-contacts = "0.3.2"
+block2 = "0.6.1"
 
 # Desktop-only capabilities (Plan 19): auto-update (mobile updates go through
 # the app stores), window-state (no windows to restore on mobile), the file
@@ -76,6 +120,8 @@ notify-debouncer-full = "0.7.0"
 # Direct dependency on fastembed's own downloader, used to pre-fetch the
 # embedding model with byte-level progress (fastembed downloads silently).
 hf-hub = { version = "0.5.0", default-features = false, features = ["ureq", "native-tls"] }
+tauri-plugin-deep-link = "2.4.9"
+tauri-plugin-single-instance = { version = "2.4.2", features = ["deep-link"] }
 
 [target.'cfg(all(not(any(target_os = "android", target_os = "ios")), not(all(target_os = "macos", target_arch = "x86_64"))))'.dependencies]
 fastembed = "5.13.0"

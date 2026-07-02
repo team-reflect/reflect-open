@@ -47,7 +47,7 @@ designs simply don't survive the move:
 | [Calendar / meetings](./calendar-meetings-integration.md)           | Google/MS/iCloud OAuth   | Planned — Apple Calendar (EventKit)              |
 | [Contacts](./contacts-integration.md)                               | Google/MS/iCloud OAuth   | Planned — Apple Contacts                         |
 | [Assets](./assets.md)                                               | Encrypted uploads + CDN  | Half ported — images done; attachments planned   |
-| [Deep links](./deep-links.md)                                       | `reflect://` + web URLs  | Planned — route-shaped `reflect://` scheme       |
+| [Deep links](./deep-links.md)                                       | `reflect://` + web URLs  | **Ported** (route-shaped `reflect://` scheme)    |
 | [Editor keyboard shortcuts](./editor-keyboard-shortcuts.md)         | reflect-editor keymaps   | Planned — gap list for meowdown + app            |
 
 ## Conventions

@@ -5,10 +5,18 @@ import {
   type WikilinkItem,
   type WikilinkSearchHandler,
 } from '@meowdown/react'
-import { hasBridge, suggestTags, suggestWikiTargets } from '@reflect/core'
+import {
+  contactLinkSuggestions,
+  createNoteWithTitle,
+  hasBridge,
+  isContactsReadable,
+  suggestTags,
+  suggestWikiTargets,
+} from '@reflect/core'
 import { buildAutocompleteEntries } from '@/editor/wiki-autocomplete-entries'
-import { createNoteWithTitle } from '@/lib/create-note'
+import { useContactsAuthorization } from '@/hooks/use-contacts-authorization'
 import { formatDayLabel, todayIso } from '@/lib/dates'
+import { createPersonNoteFromContact } from '@/lib/note-contact'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
 
@@ -35,7 +43,12 @@ export interface EditorAutocomplete {
 export function useEditorAutocomplete(): EditorAutocomplete {
   const { graph } = useGraph()
   const { settings } = useSettings()
+  const authorization = useContactsAuthorization()
   const generation = graph?.generation ?? null
+  // Contacts join the `[[` menu (v1's backlink-menu behavior) only while the
+  // integration is on and the permission readable.
+  const contactsInMenu =
+    settings.contactsEnabled && authorization !== null && isContactsReadable(authorization)
 
   // The `[[` autocomplete's create row: make the file; the menu inserts the
   // link text either way (a failed create just leaves an unresolved link).
@@ -53,12 +66,25 @@ export function useEditorAutocomplete(): EditorAutocomplete {
       if (!hasBridge() || graph === null) {
         return []
       }
-      const suggestions = await suggestWikiTargets(query, 8, {
-        today: todayIso(),
-        dateFormat: settings.dateFormat,
-        weekStartDay: settings.weekStartDay,
-      })
-      return buildAutocompleteEntries(query, suggestions, { offerCreate: true }).map((entry) => {
+      const [suggestions, contacts] = await Promise.all([
+        suggestWikiTargets(query, 8, {
+          today: todayIso(),
+          dateFormat: settings.dateFormat,
+          weekStartDay: settings.weekStartDay,
+        }),
+        // A contacts hiccup (permission revoked mid-session, store error)
+        // must cost only its own rows, never the note suggestions.
+        contactsInMenu
+          ? contactLinkSuggestions(query).catch((error: unknown) => {
+              console.error('contact link suggestions failed:', error)
+              return []
+            })
+          : Promise.resolve([]),
+      ])
+      return buildAutocompleteEntries(query, suggestions, {
+        offerCreate: true,
+        contacts,
+      }).map((entry) => {
         if (entry.kind === 'create') {
           return {
             target: entry.title,
@@ -69,6 +95,25 @@ export function useEditorAutocomplete(): EditorAutocomplete {
               void createFromAutocomplete(entry.title).catch((error: unknown) => {
                 console.error('create-from-autocomplete failed:', error)
               })
+            },
+          }
+        }
+        if (entry.kind === 'contact') {
+          const { contact } = entry
+          return {
+            target: contact.fullName,
+            label: contact.fullName,
+            detail: contact.emails[0] ?? contact.phones[0] ?? 'Contact',
+            // Like the create row: the menu inserts the link text; the person
+            // note is born in the background, prefilled from the contact.
+            onSelect: () => {
+              if (generation !== null) {
+                void createPersonNoteFromContact(contact, generation).catch(
+                  (error: unknown) => {
+                    console.error('create-person-note failed:', error)
+                  },
+                )
+              }
             },
           }
         }
@@ -90,7 +135,14 @@ export function useEditorAutocomplete(): EditorAutocomplete {
         return { target, label, ...(detail !== undefined ? { detail } : {}) }
       })
     },
-    [graph, settings.dateFormat, settings.weekStartDay, createFromAutocomplete],
+    [
+      graph,
+      settings.dateFormat,
+      settings.weekStartDay,
+      createFromAutocomplete,
+      contactsInMenu,
+      generation,
+    ],
   )
 
   const onTagSearch = useCallback(

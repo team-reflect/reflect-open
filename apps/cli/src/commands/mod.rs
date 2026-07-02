@@ -1,7 +1,9 @@
-//! The four commands. Shared rules live here: stdout carries only data,
-//! warnings go to stderr, and `show`/`path` degrade to a file scan when the
-//! index is missing or unusable (`search` is the one command that requires it).
+//! The five commands. Shared rules live here: stdout carries only data,
+//! warnings go to stderr, and `show`/`path`/`open` degrade to a file scan
+//! when the index is missing or unusable (`search` is the one command that
+//! requires it).
 
+pub mod open;
 pub mod path;
 pub mod search;
 pub mod show;

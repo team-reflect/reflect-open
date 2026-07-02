@@ -78,6 +78,20 @@ describe('router', () => {
     expect(result.current.savedScroll()).toBe(40) // the note's own offset
   })
 
+  it('can clear the active entry scroll offset without changing routes', () => {
+    const { result } = routerHook()
+    const entryId = result.current.entryId
+    const arrivals = result.current.arrivalSeq
+    act(() => result.current.saveScrollState(120))
+
+    act(() => result.current.clearScrollState())
+
+    expect(result.current.route).toEqual({ kind: 'today' })
+    expect(result.current.entryId).toBe(entryId)
+    expect(result.current.arrivalSeq).toBe(arrivals)
+    expect(result.current.savedScroll()).toBeNull()
+  })
+
   it('re-navigating to the current route clears its saved scroll (re-anchor intent)', () => {
     const { result } = routerHook()
     const seqBefore = result.current.arrivalSeq
@@ -85,6 +99,61 @@ describe('router', () => {
     act(() => result.current.navigate({ kind: 'today' })) // ⌘D while on today
     expect(result.current.savedScroll()).toBeNull() // re-anchor, don't restore
     expect(result.current.arrivalSeq).toBe(seqBefore + 1) // views are notified
+  })
+
+  it('can restore the daily surface scroll when a tab switch returns to today', () => {
+    const { result } = routerHook()
+    act(() => result.current.saveScrollState(500)) // user scrolled the daily stream
+    act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }))
+    act(() => result.current.navigate({ kind: 'today' }, { restoreSurfaceScroll: true }))
+
+    expect(result.current.route).toEqual({ kind: 'today' })
+    expect(result.current.savedScroll()).toBe(500)
+  })
+
+  it('keeps default fresh navigations to daily routes anchor-only', () => {
+    const { result } = routerHook()
+    act(() => result.current.saveScrollState(500))
+    act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }))
+    act(() => result.current.navigate({ kind: 'today' }))
+
+    expect(result.current.savedScroll()).toBeNull()
+  })
+
+  it('a surface-scroll return from within the surface re-anchors instead', () => {
+    const { result } = routerHook({ kind: 'daily', date: '2026-06-08' })
+    act(() => result.current.saveScrollState(500)) // scrolled the stream on a dated day
+    act(() => result.current.navigate({ kind: 'today' }, { restoreSurfaceScroll: true }))
+    expect(result.current.savedScroll()).toBeNull() // Daily tab on-stream = ⌘D re-anchor
+
+    act(() => result.current.saveScrollState(300))
+    act(() => result.current.navigate({ kind: 'today' }, { restoreSurfaceScroll: true }))
+    expect(result.current.savedScroll()).toBeNull() // same while already on today
+  })
+
+  it('an explicit re-anchor arrival drops the daily surface offset too', () => {
+    const { result } = routerHook()
+    act(() => result.current.saveScrollState(500)) // user scrolled away on today
+    act(() => result.current.navigate({ kind: 'today' })) // ⌘D re-anchors the stream
+    act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }))
+    act(() => result.current.navigate({ kind: 'today' }, { restoreSurfaceScroll: true }))
+
+    expect(result.current.savedScroll()).toBeNull() // the tab can't resurrect pre-⌘D scroll
+  })
+
+  it('clearScrollState drops the daily surface offset too (new-note interaction)', () => {
+    const { result } = routerHook()
+    act(() => result.current.saveScrollState(500)) // scrolled the stream before ⌘N
+    act(() => result.current.clearScrollState()) // note.new discards the stream offsets
+    act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }))
+
+    act(() => result.current.back())
+    expect(result.current.savedScroll()).toBeNull() // ⌘[ re-anchors to today
+
+    act(() => result.current.saveScrollState(120)) // post-clear scrolling
+    act(() => result.current.forward())
+    act(() => result.current.navigate({ kind: 'today' }, { restoreSurfaceScroll: true }))
+    expect(result.current.savedScroll()).toBe(120) // the tab restores only the new offset
   })
 
   it('entryId is stable per entry and changes across back/forward', () => {

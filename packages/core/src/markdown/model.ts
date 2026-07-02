@@ -106,6 +106,15 @@ export const frontmatterSchema = z
      * publish then creates a fresh gist and rewrites it whole.
      */
     gist: gistFrontmatterSchema.optional().catch(undefined),
+    /**
+     * Contact names whose suggested-contact card was dismissed on this note
+     * (v1's `ignoredContactNames`). Per contact, not per note: ignoring "Ada"
+     * must not suppress a later "Grace" suggestion after a retitle. An added
+     * contact needs no mark — the details it writes into the body suppress
+     * the card by content. A mangled value degrades to the empty list; the
+     * card reappears, nothing breaks.
+     */
+    ignoredContacts: z.array(z.string()).catch([]).default([]),
   })
 export type Frontmatter = z.infer<typeof frontmatterSchema>
 

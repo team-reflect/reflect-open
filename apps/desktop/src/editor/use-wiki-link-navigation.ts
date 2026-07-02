@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { resolveWikiTarget } from '@reflect/core'
-import { createNoteWithTitle } from '@/lib/create-note'
+import { createNoteWithTitle, resolveWikiTarget } from '@reflect/core'
 import { isIsoDate } from '@/lib/dates'
 import { routeForPath } from '@/routing/route'
 import { useRouter } from '@/routing/router'

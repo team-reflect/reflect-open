@@ -68,6 +68,22 @@ disk at call time), and it is covered by tests.
   any BYOK AI enrichment of it honors `private: true`, and no content leaves the device
   except through the calls listed here.
 
+## Apple Contacts (off by default)
+
+- **Where:** nowhere on the network. Enabling the Contacts integration reads the
+  **macOS/iOS contacts store on-device** (the same store System Settings governs),
+  behind the standard OS permission prompt. There is no Reflect copy of your address
+  book: lookups are live queries, nothing is mirrored into `.reflect/`, and Reflect
+  never writes back to Contacts.
+- **What:** a note title or a meeting attendee's email is matched against your
+  contacts; a match's name, email, and phone are shown on a suggestion card. Contact
+  details enter a note **only when you click Add**, at which point they are ordinary
+  markdown you own — covered by the same rules as anything else you type (including
+  `private: true` and backup).
+- **When:** only while the integration is on, and only for the note being viewed (or
+  the meeting being added). Turning it off — in Settings or in the OS privacy pane —
+  stops all reads immediately.
+
 ## Housekeeping calls
 
 - **API key validation:** adding a provider key sends one `GET /v1/models` to that
@@ -96,3 +112,4 @@ API keys and tokens live in the **OS keychain only** — never in markdown, neve
 | Key validation | The provider | No | — (only when adding a key) |
 | Update check | GitHub Releases | No | On in packaged builds |
 | Browser capture | Nowhere (local host on disk) | — (stays on your machine) | — (only when you capture) |
+| Contacts lookup | Nowhere (on-device OS store) | — (stays on your machine) | Yes (opt-in) |

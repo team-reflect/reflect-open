@@ -1,8 +1,13 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "desktop",
-  "description": "Desktop-only capabilities: auto-update checks, the post-install relaunch, and window-state restore",
+  "description": "Desktop-only capabilities: auto-update checks, the post-install relaunch, window-state restore, and deep-link events",
   "platforms": ["macOS", "windows", "linux"],
   "windows": ["main"],
-  "permissions": ["updater:default", "process:default", "window-state:default"]
+  "permissions": [
+    "updater:default",
+    "process:default",
+    "window-state:default",
+    "deep-link:default"
+  ]
 }

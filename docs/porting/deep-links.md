@@ -1,8 +1,32 @@
 # Porting deep links
 
-**Status: planned.** v1 was addressable from outside: a `reflect://` URL
+**Status: shipped.** The scheme, note resolution, write links, and "Copy
+deep link" all landed as designed below — see [docs/deep-links.md](../deep-links.md)
+for the user-facing grammar reference. Decisions made at implementation
+time:
+
+- **Id minting on first copy.** "Copy deep link" (`⌥⌘L`) writes a ULID `id:`
+  into the frontmatter of a note that has none (pre-Plan-17 notes, files
+  created outside Reflect), through the same session-or-disk channel as pin
+  and private — so the copied link always survives renames.
+- **Append lands as a daily bullet.** `reflect://append` / `reflect://task`
+  spool a size-capped, single-line text envelope into `.reflect/inbox/`; the
+  existing capture drain appends `- <text>` / `- [ ] <text>` to the
+  capture-day daily note (exact-line-deduplicated, so re-drains are safe).
+  Provenance is the envelope; no capture note is created for one line.
+- **All flavors register `reflect://`** (Reflect, Beta, Dev); macOS picks a
+  handler when several are installed. Links stay portable across flavors.
+- **Graph addressing** shipped as "links resolve in the open graph", per the
+  open question below. URLs that arrive with no graph open buffer until one
+  opens.
+
+The original plan follows.
+
+---
+
+v1 was addressable from outside: a `reflect://` URL
 scheme for actions, web URLs for every note, and a "copy link" action. v2
-has none of that yet — but the seams were built for it: the typed route
+had none of that — but the seams were built for it: the typed route
 model (`apps/desktop/src/routing/route.ts`) and the command registry's
 stable ids (`apps/desktop/src/lib/commands/types.ts`) both name "later deep
 links" as their integration point. This doc is that later.

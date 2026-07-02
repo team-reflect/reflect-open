@@ -75,6 +75,72 @@ export const captureWireMessageSchema = z.object({
 export type CaptureWireMessage = z.infer<typeof captureWireMessageSchema>
 
 /**
+ * Cap on a text capture's payload. A `reflect://` URL is a world-invokable
+ * surface, so its writes stay short and plain; the desktop's deep-link parser
+ * enforces the same number before an envelope is ever spooled.
+ */
+export const TEXT_CAPTURE_MAX_LENGTH = 10_000
+
+/**
+ * What a text capture materializes as on the capture-day daily note. One
+ * vocabulary end-to-end: the `reflect://append`/`reflect://task` URL verb IS
+ * the envelope kind IS the drain behavior (`- ` bullet / `- [ ]` task).
+ */
+export const textCaptureKindSchema = z.enum(['append', 'task'])
+
+/**
+ * Where a text capture originated. Deliberately separate from
+ * {@link captureSourceSchema} and from the envelope *shape*: provenance and
+ * shape are different axes, so a future producer (an iOS share sheet, a
+ * widget) joins by adding a member here — never by growing a new envelope
+ * variant.
+ */
+export const textCaptureSourceSchema = z.enum(['deep-link'])
+
+/**
+ * A text write (`reflect://append?text=…` / `reflect://task?text=…`),
+ * spooled into the same capture inbox the native-messaging host writes. One
+ * single line of plain text — the drain appends it to the capture-day daily
+ * note as a bullet (`append`) or an open task (`task`), so an envelope can
+ * never smuggle extra markdown blocks into the graph.
+ */
+export const textCaptureEnvelopeSchema = z.object({
+  /** Envelope format version; bump on breaking changes. */
+  version: z.literal(1),
+  /** Producer-generated UUID — names the spool file (same rule as link captures). */
+  id: z.guid(),
+  /** Discriminates from link envelopes, which carry no `kind`. */
+  kind: textCaptureKindSchema,
+  /** The payload, already whitespace-folded to one line by the URL parser. */
+  text: z
+    .string()
+    .trim()
+    .min(1)
+    .max(TEXT_CAPTURE_MAX_LENGTH)
+    .regex(/^[^\r\n]+$/, 'must be a single line'),
+  /** When the link fired, ISO-8601 — decides the daily note it lands on. */
+  capturedAt: z.iso.datetime({ offset: true }),
+  /** Where the capture came from. */
+  source: textCaptureSourceSchema,
+})
+
+export type TextCaptureEnvelope = z.infer<typeof textCaptureEnvelopeSchema>
+export type TextCaptureKind = z.infer<typeof textCaptureKindSchema>
+export type TextCaptureSource = z.infer<typeof textCaptureSourceSchema>
+
+/**
+ * Anything the capture inbox can legally hold: a link capture from the
+ * browser extension, or a text capture. Dispatch is by **shape** — the
+ * `kind` discriminator text envelopes carry and link envelopes lack (they
+ * predate it on the wire) — never by `source`, which names provenance and
+ * widens independently of shape. Text envelopes parse first so `kind` is
+ * honored before the link shape gets a say.
+ */
+export const inboxEnvelopeSchema = z.union([textCaptureEnvelopeSchema, captureEnvelopeSchema])
+
+export type InboxEnvelope = z.infer<typeof inboxEnvelopeSchema>
+
+/**
  * The host's reply to the extension. `queued` is the only success state the
  * host can honestly claim — it spools and exits, and never observes the
  * desktop app draining the inbox.

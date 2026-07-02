@@ -43,7 +43,7 @@ impl Fixture {
             conn.execute(
                 "INSERT INTO notes(path, id, title, title_key, daily_date, is_private, is_pinned,
                                    pinned_order, file_hash, mtime, updated_at, preview)
-                 VALUES(?1, NULL, ?2, ?3, ?4, ?5, 0, NULL, ?6, ?7, ?7, '')",
+                 VALUES(?1, ?8, ?2, ?3, ?4, ?5, 0, NULL, ?6, ?7, ?7, '')",
                 params![
                     note.rel_path,
                     meta.title,
@@ -52,6 +52,7 @@ impl Fixture {
                     i64::from(meta.private),
                     hash_content(&content),
                     note.mtime_ms as i64,
+                    meta.id,
                 ],
             )
             .unwrap();
@@ -466,4 +467,117 @@ fn path_resolves_notes_and_would_be_dailies() {
     ));
     assert_eq!(existing["exists"], true);
     assert!(existing.get("date").is_none());
+}
+
+// ---- open -----------------------------------------------------------------------
+
+#[test]
+fn open_print_prefers_the_frontmatter_id() {
+    let fixture = graph();
+    fixture.write_note(
+        "notes/project-x.md",
+        "---\nid: 01hzy3v9k2m4n6p8q0r2s4t6vw\n---\n# Project X\n",
+    );
+    fixture.build_index();
+
+    let output = reflect(&fixture, &["open", "Project X", "--print"]);
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    assert_eq!(
+        stdout(&output),
+        "reflect://note/01hzy3v9k2m4n6p8q0r2s4t6vw\n"
+    );
+}
+
+#[test]
+fn open_print_falls_back_to_the_encoded_path_without_an_id() {
+    let fixture = graph();
+    fixture.write_note("notes/no id here.md", "# No Id Here\n");
+    fixture.build_index();
+
+    let output = reflect(&fixture, &["open", "No Id Here", "--print"]);
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    assert_eq!(
+        stdout(&output),
+        "reflect://note/notes%2Fno%20id%20here.md\n"
+    );
+}
+
+#[test]
+fn open_print_gives_dailies_the_date_form_even_before_the_file_exists() {
+    let fixture = graph();
+
+    let would_be = reflect(&fixture, &["open", "2099-01-01", "--print"]);
+    assert!(would_be.status.success(), "stderr: {}", stderr(&would_be));
+    assert_eq!(stdout(&would_be), "reflect://daily/2099-01-01\n");
+
+    // An existing daily resolved by explicit path gets the date form too.
+    fixture.write_note("daily/2026-01-02.md", "daily body\n");
+    let by_path = reflect(&fixture, &["open", "daily/2026-01-02.md", "--print"]);
+    assert_eq!(stdout(&by_path), "reflect://daily/2026-01-02\n");
+}
+
+#[test]
+fn open_resolves_by_title_and_alias_without_an_index() {
+    let fixture = graph();
+    fixture.write_note(
+        "notes/project-x.md",
+        "---\nid: 01hzy3v9k2m4n6p8q0r2s4t6vw\naliases: [PX]\n---\n# Project X\n",
+    );
+
+    for arg in ["project x", "PX"] {
+        let output = reflect(&fixture, &["open", arg, "--print"]);
+        assert!(output.status.success(), "open {arg}: {}", stderr(&output));
+        assert_eq!(
+            stdout(&output),
+            "reflect://note/01hzy3v9k2m4n6p8q0r2s4t6vw\n",
+            "open {arg}"
+        );
+    }
+}
+
+#[test]
+fn open_refuses_private_notes_and_unknown_targets() {
+    let fixture = graph();
+    fixture.write_note("notes/a.md", "---\nprivate: true\n---\n# Alpha\n");
+    fixture.build_index();
+
+    let private = reflect(&fixture, &["open", "notes/a.md", "--print"]);
+    assert_eq!(private.status.code(), Some(3));
+    assert_eq!(
+        stdout(&private),
+        "",
+        "a private note's address must not leak"
+    );
+    assert!(stderr(&private).contains("private"));
+
+    let unknown = reflect(&fixture, &["open", "No Such Note", "--print"]);
+    assert_eq!(unknown.status.code(), Some(3));
+    assert!(stderr(&unknown).contains("no note matching"));
+}
+
+#[test]
+fn open_json_shape() {
+    let fixture = graph();
+    fixture.write_note(
+        "notes/project-x.md",
+        "---\nid: 01hzy3v9k2m4n6p8q0r2s4t6vw\n---\n# Project X\n",
+    );
+    fixture.build_index();
+
+    let note = json(&reflect(
+        &fixture,
+        &["open", "Project X", "--print", "--json"],
+    ));
+    assert_eq!(note["path"], "notes/project-x.md");
+    assert_eq!(note["url"], "reflect://note/01hzy3v9k2m4n6p8q0r2s4t6vw");
+    assert_eq!(note["launched"], false);
+    assert!(note.get("date").is_none());
+
+    let daily = json(&reflect(
+        &fixture,
+        &["open", "2026-01-02", "--json", "--print"],
+    ));
+    assert_eq!(daily["date"], "2026-01-02");
+    assert_eq!(daily["path"], "daily/2026-01-02.md");
+    assert_eq!(daily["url"], "reflect://daily/2026-01-02");
 }

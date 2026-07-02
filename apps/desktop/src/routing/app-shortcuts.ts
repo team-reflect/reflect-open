@@ -49,13 +49,31 @@ function isModKey(event: KeyboardEvent): boolean {
   return event.metaKey || event.ctrlKey
 }
 
+function bindingKeyFor(event: KeyboardEvent): string {
+  const fromCode = CODE_TO_BINDING_KEY[event.code]
+  if (fromCode !== undefined) {
+    return fromCode
+  }
+  // Alt rewrites `event.key` on macOS (⌥L reports "Ò"), so alt chords match
+  // letters and digits by physical code instead.
+  if (event.altKey) {
+    const code = /^(?:Key([A-Z])|Digit([0-9]))$/.exec(event.code)
+    if (code !== null) {
+      return (code[1] ?? code[2] ?? '').toLowerCase()
+    }
+  }
+  return event.key.toLowerCase()
+}
+
 function idForKeyDown(event: KeyboardEvent): string | null {
-  if (!isModKey(event) || event.altKey || event.repeat) {
+  if (!isModKey(event) || event.repeat) {
     return null // held keys must not spam navigations (e.g. a stack of new notes)
   }
-  const key = CODE_TO_BINDING_KEY[event.code] ?? event.key.toLowerCase()
-  const bindingKey = event.shiftKey ? `Mod-Shift-${key}` : `Mod-${key}`
-  return BINDING_TO_ID.get(bindingKey) ?? null
+  // Alt participates in the lookup rather than being rejected, so `Alt-Mod-l`
+  // can bind while an alt chord still never fires a plain `Mod-` command.
+  const alt = event.altKey ? 'Alt-' : ''
+  const shift = event.shiftKey ? 'Shift-' : ''
+  return BINDING_TO_ID.get(`${alt}Mod-${shift}${bindingKeyFor(event)}`) ?? null
 }
 
 /**
@@ -66,7 +84,7 @@ function idForKeyDown(event: KeyboardEvent): string | null {
  * mounted (`setMenuCommandDispatch`).
  */
 export function useAppShortcuts(): CommandContext {
-  const { route, navigate, back, forward } = useRouter()
+  const { route, navigate, back, forward, clearScrollState } = useRouter()
   const focusedDailyDate = useFocusedDailyDate()
   const { resolvedTheme, setTheme } = useTheme()
   const { graph } = useGraph()
@@ -123,6 +141,7 @@ export function useAppShortcuts(): CommandContext {
       },
       back,
       forward,
+      clearScrollState,
       toggleTheme: () => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark'),
       toggleSidebar,
       newChat,
@@ -143,6 +162,7 @@ export function useAppShortcuts(): CommandContext {
       navigate,
       back,
       forward,
+      clearScrollState,
       resolvedTheme,
       setTheme,
       openPalette,

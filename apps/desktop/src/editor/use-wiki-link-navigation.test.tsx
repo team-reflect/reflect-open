@@ -5,13 +5,12 @@ import { RouterProvider, useRouter } from '@/routing/router'
 import { useWikiLinkNavigation } from './use-wiki-link-navigation'
 
 const resolveWikiTarget = vi.hoisted(() => vi.fn())
+const createNoteWithTitle = vi.hoisted(() => vi.fn())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   resolveWikiTarget,
+  createNoteWithTitle,
 }))
-
-const createNoteWithTitle = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/create-note', () => ({ createNoteWithTitle }))
 
 let lastHandler: ((target: string) => void) | null = null
 

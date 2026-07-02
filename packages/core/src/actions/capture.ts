@@ -16,12 +16,17 @@ import {
 } from '../graph/commands'
 import { assetPath, dailyPath, notePath } from '../graph/paths'
 import { hashContent } from '../indexing/hash'
-import { appendUnderHeading } from '../markdown/edit'
+import { appendBlock, appendUnderHeading, wikiLinkSafe } from '../markdown/edit'
 import { parseNote } from '../markdown/extract'
 import { parseFrontmatter, splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter'
 import type { Frontmatter } from '../markdown/model'
 import { getSecret } from '../secrets/keychain'
-import { captureEnvelopeSchema, type CaptureEnvelope } from './capture-envelope'
+import {
+  inboxEnvelopeSchema,
+  type CaptureEnvelope,
+  type InboxEnvelope,
+  type TextCaptureEnvelope,
+} from './capture-envelope'
 import { scrapePageMeta, type PageMeta } from './meta-scrape'
 import type { ReconcileStop } from './audio-memo'
 
@@ -52,6 +57,11 @@ import type { ReconcileStop } from './audio-memo'
  * `captureStatus: skipped` — no meta fetch, no provider call, ever. The
  * enrichment pass re-checks both the capture note's and the daily note's
  * flags live before any outbound traffic.
+ *
+ * The inbox also carries **text captures** — deep-link writes
+ * (`reflect://append` / `reflect://task`) spooled by the desktop app itself.
+ * Those skip the capture-note machinery entirely: the drain appends the one
+ * line to the capture-day daily note and stops ({@link drainTextCapture}).
  */
 
 /** Where the daily-note entry lands (`appendUnderHeading` creates it). */
@@ -91,6 +101,14 @@ function pad(value: number, width: number): string {
   return String(value).padStart(width, '0')
 }
 
+/**
+ * The **local** calendar day of a capture — the daily note it lands on, per
+ * the audio-memo convention: the day the user experienced, not UTC's.
+ */
+function captureLocalDate(capturedAt: Date): string {
+  return `${capturedAt.getFullYear()}-${pad(capturedAt.getMonth() + 1, 2)}-${pad(capturedAt.getDate(), 2)}`
+}
+
 function buildIdentity(base: string, date: string): CaptureIdentity {
   return {
     base,
@@ -110,7 +128,7 @@ function buildIdentity(base: string, date: string): CaptureIdentity {
  * once) from colliding onto one note path.
  */
 export function captureIdentity(capturedAt: Date, envelopeId: string): CaptureIdentity {
-  const date = `${capturedAt.getFullYear()}-${pad(capturedAt.getMonth() + 1, 2)}-${pad(capturedAt.getDate(), 2)}`
+  const date = captureLocalDate(capturedAt)
   const stamp = `${pad(capturedAt.getHours(), 2)}${pad(capturedAt.getMinutes(), 2)}${pad(capturedAt.getSeconds(), 2)}`
   const suffix = envelopeId.slice(0, 4).toLowerCase()
   const base = `capture-${date}-${stamp}-${pad(capturedAt.getMilliseconds(), 3)}-${suffix}`
@@ -172,11 +190,6 @@ export type CaptureNoteMeta = z.infer<typeof captureNoteMetaSchema>
 export function captureNoteMeta(frontmatter: Frontmatter): CaptureNoteMeta | null {
   const parsed = captureNoteMetaSchema.safeParse(frontmatter)
   return parsed.success ? parsed.data : null
-}
-
-/** `[[…]]` has no escaping — strip the characters that would corrupt a link. */
-function wikiLinkSafe(text: string): string {
-  return text.replace(/[[\]|\r\n]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 function urlHost(url: string): string {
@@ -417,6 +430,17 @@ export async function drainCaptureInbox(
         continue
       }
 
+      // Dispatch by shape: `kind` is what makes a text capture, whoever
+      // produced it (deep link today, a share sheet tomorrow).
+      if ('kind' in envelope) {
+        if (await drainTextCapture(envelope, input.generation)) {
+          deduped += 1
+        }
+        await captureInboxRemove(name, input.generation)
+        drained += 1
+        continue
+      }
+
       const fresh = captureIdentity(new Date(envelope.capturedAt), envelope.id)
       const daily = dailyPath(fresh.date)
       const dailySource = await noteSource(daily, input.generation)
@@ -500,15 +524,43 @@ export async function drainCaptureInbox(
   return outcome(null)
 }
 
-function parseEnvelope(raw: string): CaptureEnvelope | null {
+function parseEnvelope(raw: string): InboxEnvelope | null {
   let json: unknown
   try {
     json = JSON.parse(raw)
   } catch {
     return null
   }
-  const parsed = captureEnvelopeSchema.safeParse(json)
+  const parsed = inboxEnvelopeSchema.safeParse(json)
   return parsed.success ? parsed.data : null
+}
+
+/**
+ * Materialize a text capture: append the payload to the capture-day daily
+ * note as a plain bullet (`append`) or an open task (`task`), creating the
+ * daily lazily like the link path does. Presence-guarded on the exact line —
+ * that is both the crash-safety story (a re-drain after a crash between the
+ * append and the spool removal cannot double-append) and the dedupe rule.
+ * Entirely local: no enrichment, no outbound traffic, so a private daily
+ * needs no gate. Returns whether the line was already present.
+ */
+async function drainTextCapture(envelope: TextCaptureEnvelope, generation: number): Promise<boolean> {
+  const daily = dailyPath(captureLocalDate(new Date(envelope.capturedAt)))
+  const dailySource = await noteSource(daily, generation)
+  const line = envelope.kind === 'task' ? `- [ ] ${envelope.text}` : `- ${envelope.text}`
+  // Whole-line equality, not `includes`: "- buy milk" is a substring of an
+  // unrelated "- buy milk and eggs", and a false match here would remove the
+  // spool file without ever writing the capture. Trailing `\r` is stripped so
+  // a CRLF daily (external editors; the parity corpus's crlf.md case) dedupes
+  // like an LF one.
+  const present = dailySource
+    .split('\n')
+    .some((existing) => existing.replace(/\r$/, '') === line)
+  if (present) {
+    return true
+  }
+  await writeNote(daily, appendBlock(dailySource, line), generation)
+  return false
 }
 
 /**

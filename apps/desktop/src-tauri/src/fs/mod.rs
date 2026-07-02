@@ -6,6 +6,7 @@
 //! (path-traversal guard, [`resolve`]). Writes are atomic (temp file + rename,
 //! [`io`]) and deletes go to the OS trash. Parsing/indexing live in later plans.
 
+pub mod assets;
 mod io;
 mod resolve;
 

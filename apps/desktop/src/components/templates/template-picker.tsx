@@ -10,7 +10,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command'
-import { getNoteEditor } from '@/editor/editor-registry'
+import { noteEditorHandleFor } from '@/editor/editor-handle-registry'
 import type { CommandContext } from '@/lib/commands/types'
 import { insertTemplate } from '@/lib/note-templates'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
@@ -51,7 +51,7 @@ export function TemplatePicker({ context }: TemplatePickerProps): ReactElement |
     }
     // `insertTemplate` owns all feedback — a missing editor (protected or
     // still-loading note) and a failed read both surface as failed operations.
-    void insertTemplate(path, getNoteEditor(target))
+    void insertTemplate(path, noteEditorHandleFor(target))
   }
 
   return (

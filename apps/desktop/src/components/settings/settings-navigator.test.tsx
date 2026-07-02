@@ -1,7 +1,12 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SETTINGS_SECTIONS, settingsSectionDomId } from './sections'
 import { SettingsNavigator } from './settings-navigator'
+
+// No bridge is installed here, so the platform-gated System integrations entry
+// is hidden — the navigator lists the sections every platform shows.
+const VISIBLE_SECTIONS = SETTINGS_SECTIONS.filter((section) => section.id !== 'integrations')
 
 // jsdom implements neither; the navigator re-measures its marker on resize,
 // and the jump checks the reduced-motion preference.
@@ -38,15 +43,18 @@ function sectionTop(index: number): number {
 }
 
 function renderNavigatorPage(): HTMLElement {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const view = render(
-    <div data-testid="scroller" style={{ overflowY: 'auto' }}>
-      <div>
-        <SettingsNavigator />
-        {SETTINGS_SECTIONS.map((section) => (
-          <section key={section.id} id={settingsSectionDomId(section.id)} />
-        ))}
+    <QueryClientProvider client={queryClient}>
+      <div data-testid="scroller" style={{ overflowY: 'auto' }}>
+        <div>
+          <SettingsNavigator />
+          {VISIBLE_SECTIONS.map((section) => (
+            <section key={section.id} id={settingsSectionDomId(section.id)} />
+          ))}
+        </div>
       </div>
-    </div>,
+    </QueryClientProvider>,
   )
   const scroller = view.getByTestId('scroller')
 
@@ -62,7 +70,7 @@ function renderNavigatorPage(): HTMLElement {
   Object.defineProperty(scroller, 'scrollHeight', { configurable: true, get: () => CONTENT_PX })
   scroller.getBoundingClientRect = () => new DOMRect(0, 0, VIEWPORT_PX, VIEWPORT_PX)
 
-  SETTINGS_SECTIONS.forEach((section, index) => {
+  VISIBLE_SECTIONS.forEach((section, index) => {
     const element = document.getElementById(settingsSectionDomId(section.id))
     if (!element) {
       throw new Error(`missing section element for ${section.id}`)
@@ -92,10 +100,10 @@ afterEach(() => {
 })
 
 describe('SettingsNavigator', () => {
-  it('lists every registered section in order', () => {
+  it('lists every visible section in order', () => {
     renderNavigatorPage()
     const labels = screen.getAllByRole('button').map((button) => button.textContent)
-    expect(labels).toEqual(SETTINGS_SECTIONS.map((section) => section.title))
+    expect(labels).toEqual(VISIBLE_SECTIONS.map((section) => section.title))
   })
 
   it('marks the section under the reading line as the page scrolls', () => {

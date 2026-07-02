@@ -1,11 +1,15 @@
 # Porting assets (images and file attachments)
 
-**Status: half ported.** Pasting or dropping an **image** into a v2 note
-already works: it's written into the graph's `assets/` folder and linked
-relatively. What's missing is the other half of v1's story — **arbitrary
-file attachments** (PDFs, docs, archives) via drag/drop and paste, and
-dropping files straight from Finder without a round-trip through browser
-memory.
+**Status: ported.** Pasting or dropping an **image** into a v2 note writes
+it into the graph's `assets/` folder and links it relatively. Arbitrary
+**file attachments** (PDFs, docs, archives) now take the same trip: paste
+or drop inserts a plain `[name](assets/…)` link (meowdown's `onFilePaste`,
+prosekit/meowdown#190), an **Attach file…** command (palette + File menu)
+covers the keyboard-native path, clicking an `assets/` link opens the file
+through the OS, and files over ~25 MB get a non-blocking status-line
+warning about the git-history cost after they land. One deviation from the plan below: dropped files stream
+over **chunked raw-binary IPC** rather than arriving as OS paths — see
+"Finder drops" for why.
 
 ## What v1 did
 
@@ -74,17 +78,28 @@ else as `[…](…)`, in one drop). Rendering needs nothing new: it's a link;
   meaningful name). Attachments keep their **original filename** —
   it's the visible link text — sanitized to the graph's readable-filename
   rules, with `-2`-style suffixes on collision.
-- **Finder drops bypass the browser.** Today's path reads the file into
-  JS and ships base64 over IPC — fine for a pasted screenshot, wrong for
-  a 300 MB video. Tauri's native drag-drop event carries real OS paths, so
-  dropped files take a new Rust command (`asset_import(sourcePath, …)`)
-  that copies file-to-file under the same traversal/generation guards.
-  Clipboard data (no OS path exists) keeps the base64 route.
+- **Finder drops stream, they don't buffer.** The plan above assumed
+  Tauri's native drag-drop event would supply real OS paths — but that
+  event only fires with `dragDropEnabled: true`, which is deliberately
+  **false** (it's window-global and kills the HTML5 drops the chat
+  composer and editor target on). So drops stay HTML5 `File`s (no OS
+  path exists in the webview) and the fix targets the transport instead:
+  bytes cross the IPC as **chunked raw binary bodies** (4 MB chunks, no
+  base64, no JSON) via `asset_upload_begin`/`_append`/`_commit`, staged
+  under `.reflect/tmp/` (excluded from indexing/sync) and renamed into
+  `assets/` on commit — webview memory holds one chunk, never the file.
+  `asset_import(sourcePath, …)` exists as planned for sources that *do*
+  have real paths — the **Attach file…** file-picker command — copying
+  file-to-file under the same traversal/generation guards. Collision
+  suffixes (`-2`, `-3`, …) are resolved in Rust at write time
+  (`persist_noclobber`), so two concurrent intakes can never clobber.
 - **Size is a warning, not a wall.** It's the user's disk, but git backup
   is the quiet constraint: every large binary lives in history forever,
-  and GitHub hard-rejects files over 100 MB. Above a threshold
-  (~25 MB), confirm with that context instead of refusing; v1's flat
-  "50mb is the max" alert is not ported.
+  and GitHub hard-rejects files over 100 MB. Above a threshold (~25 MB),
+  a non-blocking status-line warning carries that context after the save
+  lands — never a modal (the drop already said what the user wants), and
+  v1's flat "50mb is the max" alert is not ported. (A confirm-dialog cut
+  was built and removed as an unnecessary interruption.)
 - **No type policing.** v1 accepted effectively everything; v2 does too.
   Nothing executes an asset — links open through the OS.
 
@@ -112,10 +127,14 @@ else as `[…](…)`, in one drop). Rendering needs nothing new: it's a link;
 
 - **Orphan report.** Deleting a link leaves the file (v1 behaved the same,
   invisibly). A palette command listing unreferenced `assets/` files —
-  with delete as an explicit choice — fits the files-first ethos; decide
-  whether it's part of this work or a follow-up.
+  with delete as an explicit choice — fits the files-first ethos.
+  *Decided: follow-up, not part of this work* (a first cut was built and
+  removed as a superfluous surface; the index `assets` projection makes
+  the query a set difference against `dir_list` when it's wanted).
 - **Paste-of-copied-file** from Finder (clipboard carries a file
   reference, not bytes) — worth verifying what the Tauri webview exposes
-  on macOS; if it surfaces as a path, route it through `asset_import` too.
+  on macOS; if it surfaces as a `File` with bytes it already works via
+  `onFilePaste`; if not, a pasteboard peek + `asset_import` is the
+  follow-up.
 - **Inline PDF preview** (v1 had none; Plan 20 descriptions may be enough
   context) — explicitly out of scope here.

@@ -36,7 +36,15 @@ export async function call<TOutput>(
   } catch (error) {
     throw toAppError(error)
   }
+  return parseResponse(command, raw, schema)
+}
 
+/** Validate a raw IPC response, shared by {@link call} and {@link callBinary}. */
+function parseResponse<TOutput>(
+  command: string,
+  raw: unknown,
+  schema: ZodType<TOutput, unknown>,
+): TOutput {
   const result = schema.safeParse(raw)
   if (!result.success) {
     const appError: AppError = {
@@ -46,4 +54,34 @@ export async function call<TOutput>(
     throw appError
   }
   return result.data
+}
+
+/**
+ * {@link call}'s binary sibling: invoke a command whose payload is a **raw
+ * byte body** (asset upload chunks) with per-call metadata in `headers`.
+ * Throws an {@link AppError} when the installed bridge has no binary
+ * transport — a host that can't stream must fail loudly, not silently write
+ * nothing.
+ */
+export async function callBinary<TOutput>(
+  command: string,
+  body: Uint8Array,
+  headers: Record<string, string>,
+  schema: ZodType<TOutput, unknown>,
+): Promise<TOutput> {
+  const bridge = getBridge()
+  if (bridge.invokeBinary === undefined) {
+    const appError: AppError = {
+      kind: 'io',
+      message: `the installed IPC bridge has no binary transport for "${command}"`,
+    }
+    throw appError
+  }
+  let raw: unknown
+  try {
+    raw = await bridge.invokeBinary(command, body, headers)
+  } catch (error) {
+    throw toAppError(error)
+  }
+  return parseResponse(command, raw, schema)
 }

@@ -1,8 +1,8 @@
 import { type ReactElement } from 'react'
+import { isUntitledNotePath } from '@reflect/core'
 import { ChevronLeft } from 'lucide-react'
 import { NotePane } from '@/components/note-pane'
 import { Button } from '@/components/ui/button'
-import { isUntitledNotePath } from '@/lib/create-note'
 import { NoteActionsMenu } from '@/mobile/note-actions-menu'
 import { useRouter } from '@/routing/router'
 

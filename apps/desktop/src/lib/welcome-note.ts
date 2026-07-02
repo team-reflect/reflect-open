@@ -1,13 +1,13 @@
 import {
   getIndexMeta,
   listFiles,
+  newNoteId,
   notePath,
   setIndexMeta,
   slugForTitle,
   upsertFrontmatter,
   writeNote,
 } from '@reflect/core'
-import { newNoteId } from '@/lib/create-note'
 
 /**
  * The first-run seed (Plan 15 step 1): a brand-new graph gets one short,

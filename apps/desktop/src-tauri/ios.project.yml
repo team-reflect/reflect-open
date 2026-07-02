@@ -50,6 +50,9 @@ targets:
         # user can see, copy, and back up their markdown (Plan 19).
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true
+        # Apple Contacts integration: read-only CNContactStore lookups for
+        # person notes; the string is shown on the iOS permission prompt.
+        NSContactsUsageDescription: Reflect reads your contacts to suggest details for person notes. Nothing is stored or sent anywhere.
         UILaunchStoryboardName: LaunchScreen
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:
@@ -90,6 +93,8 @@ targets:
       # xcodebuild. iconv backs libgit2's Apple filename-precompose support.
       - sdk: libz.tbd
       - sdk: libiconv.tbd
+      # objc2-contacts' link directive doesn't reach xcodebuild either.
+      - sdk: Contacts.framework
       - sdk: CoreGraphics.framework
       - sdk: Metal.framework
       - sdk: MetalKit.framework

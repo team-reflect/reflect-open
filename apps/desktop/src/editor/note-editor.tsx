@@ -46,10 +46,12 @@ export interface NoteEditorHandle {
   /** Replace the document (note switch / external reload). */
   setMarkdown(markdown: string): void
   /**
-   * Insert a parsed markdown fragment at the cursor, replacing any selection,
-   * as one undoable edit — how "Insert template…" pastes a template body.
-   * Unlike {@link setMarkdown}, this **is** an edit: it fires `onChange` and
-   * dirties the document. Empty/whitespace-only markdown is a no-op.
+   * Insert a parsed markdown fragment at the cursor as one undoable edit —
+   * how commands add content to the focused note (Insert template…,
+   * Attach file…). An active selection collapses first and is never deleted:
+   * these are host-initiated inserts, not pastes. Unlike {@link setMarkdown},
+   * this fires `onChange`, so the insertion flows into the save pipeline like
+   * typing. Empty/whitespace-only markdown is a no-op.
    */
   insertMarkdown(markdown: string): void
   focus(): void
@@ -85,17 +87,18 @@ interface NoteEditorProps {
   /** Resolve an image `![…](…)` source to a displayable URL; unresolved images are skipped. */
   resolveImageUrl?: (src: string) => string | null
   /**
-   * Resolve an image `![…](…)` source to the path passed to {@link openImage},
-   * so the lightbox can offer to open it in the OS image viewer. Returns null
-   * for remote images.
+   * Vet a source (an image `src` or a link `href`) as a graph-relative asset
+   * path for {@link openAsset}. Returns null for remote or unsafe sources.
    */
-  resolveImageOpenPath?: (src: string) => string | null
-  /** Open a resolved image path in the OS default viewer. */
-  openImage?: (path: string) => Promise<void> | void
-  /** Persist a pasted/dropped image file and return its markdown `src`. */
-  saveImage?: (file: File) => Promise<string | null>
-  /** Called when persisting a pasted/dropped image throws. */
-  onImageSaveError?: (error: unknown, file: File) => void
+  resolveAssetOpenPath?: (src: string) => string | null
+  /** Open a vetted graph-relative asset path in the OS default application. */
+  openAsset?: (path: string) => Promise<void> | void
+  /**
+   * Persist a pasted/dropped file (any kind) and return its markdown
+   * destination, or null to decline. meowdown inserts `![](dest)` for images
+   * and `[name](dest)` for everything else.
+   */
+  saveFile?: (file: File) => Promise<string | null>
   /** Click on a `[[wiki link]]`. */
   onWikiLinkClick?: (target: string) => void
   /** Click on an inline `#tag`. The tag name arrives without the leading `#`. */
@@ -137,10 +140,9 @@ export function NoteEditor({
   bulletAfterHeading = false,
   blockHandle = false,
   resolveImageUrl,
-  resolveImageOpenPath,
-  openImage,
-  saveImage,
-  onImageSaveError,
+  resolveAssetOpenPath,
+  openAsset,
+  saveFile,
   onWikiLinkClick,
   onTagClick,
   onWikilinkSearch,
@@ -161,20 +163,18 @@ export function NoteEditor({
   const onWikiLinkClickRef = useRef(onWikiLinkClick)
   const onTagClickRef = useRef(onTagClick)
   const resolveImageUrlRef = useRef(resolveImageUrl)
-  const resolveImageOpenPathRef = useRef(resolveImageOpenPath)
-  const openImageRef = useRef(openImage)
-  const saveImageRef = useRef(saveImage)
-  const onImageSaveErrorRef = useRef(onImageSaveError)
+  const resolveAssetOpenPathRef = useRef(resolveAssetOpenPath)
+  const openAssetRef = useRef(openAsset)
+  const saveFileRef = useRef(saveFile)
   const onExitBoundaryRef = useRef(onExitBoundary)
   useLayoutEffect(() => {
     onChangeRef.current = onChange
     onWikiLinkClickRef.current = onWikiLinkClick
     onTagClickRef.current = onTagClick
     resolveImageUrlRef.current = resolveImageUrl
-    resolveImageOpenPathRef.current = resolveImageOpenPath
-    openImageRef.current = openImage
-    saveImageRef.current = saveImage
-    onImageSaveErrorRef.current = onImageSaveError
+    resolveAssetOpenPathRef.current = resolveAssetOpenPath
+    openAssetRef.current = openAsset
+    saveFileRef.current = saveFile
     onExitBoundaryRef.current = onExitBoundary
   })
 
@@ -195,8 +195,8 @@ export function NoteEditor({
           return
         }
         // Interim shim until prosekit/meowdown#206 ships: collapse an active
-        // selection first — inserting a template is a host-initiated action,
-        // not a paste, and must never delete selected text (v1 parity).
+        // selection first — a host-initiated insert is not a paste, and must
+        // never delete selected text (v1 parity).
         const selection = inner.getSelection()
         if (selection.anchor !== selection.head) {
           const caret = Math.min(selection.anchor, selection.head)
@@ -231,16 +231,22 @@ export function NoteEditor({
     (src: string) => resolveImageUrlRef.current?.(src) ?? undefined,
     [],
   )
-  const handleImagePaste = useCallback(
-    async (file: File) => (await saveImageRef.current?.(file)) ?? undefined,
-    [],
-  )
-  const handleImageSaveError = useCallback(
-    (error: unknown, file: File) => onImageSaveErrorRef.current?.(error, file),
+  const handleFilePaste = useCallback(
+    async (file: File) => (await saveFileRef.current?.(file)) ?? undefined,
     [],
   )
   const handleLinkClick = useCallback(
     ({ href }: { href: string; event: MouseEvent }) => {
+      // A graph-relative `assets/…` href (an attachment link) opens through
+      // the generation-pinned asset command, never the URL opener — which
+      // would receive a meaningless relative string.
+      const assetPath = resolveAssetOpenPathRef.current?.(href) ?? null
+      if (assetPath !== null) {
+        void Promise.resolve(openAssetRef.current?.(assetPath)).catch((cause) => {
+          console.error('open asset failed:', errorMessage(cause))
+        })
+        return
+      }
       void openUrl(href).catch((cause) => {
         console.error('open link failed:', errorMessage(cause))
       })
@@ -262,8 +268,8 @@ export function NoteEditor({
       openLightbox(sourceImage, {
         src: displayUrl,
         alt,
-        openPath: resolveImageOpenPathRef.current?.(src) ?? null,
-        openImage: openImageRef.current ?? null,
+        openPath: resolveAssetOpenPathRef.current?.(src) ?? null,
+        openImage: openAssetRef.current ?? null,
         transitionName: IMAGE_LIGHTBOX_TRANSITION_NAME,
       })
     },
@@ -297,8 +303,7 @@ export function NoteEditor({
         {...(onTagSearch !== undefined ? { onTagSearch } : {})}
         {...(onSlashMenuSearch !== undefined ? { onSlashMenuSearch } : {})}
         resolveImageUrl={handleResolveImageUrl}
-        onImagePaste={handleImagePaste}
-        onImageSaveError={handleImageSaveError}
+        onFilePaste={handleFilePaste}
         onExitBoundary={handleExitBoundary}
       >
         {children}

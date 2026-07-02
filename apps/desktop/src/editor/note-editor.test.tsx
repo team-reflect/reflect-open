@@ -15,6 +15,7 @@ interface CapturedEditorProps {
   onImageClick?: (payload: { src: string; alt: string; event: MouseEvent }) => void
   onLinkClick?: (payload: { href: string; event: MouseEvent }) => void
   onTagClick?: (payload: { tag: string; event: MouseEvent }) => void
+  onFilePaste?: (file: File) => Promise<string | undefined>
 }
 
 const captured = vi.hoisted(() => ({ props: null as CapturedEditorProps | null }))
@@ -44,16 +45,16 @@ vi.mock('@meowdown/react', () => ({
 }))
 
 function renderEditor(
-  openImage: (path: string) => Promise<void> | void = vi.fn(async () => {}),
+  openAsset: (path: string) => Promise<void> | void = vi.fn(async () => {}),
 ): ReturnType<typeof render> {
   return render(
     <NoteEditor
       initialContent={'A photo\n\n![Cat](assets/cat.png)'}
       resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : null)}
-      resolveImageOpenPath={(src) =>
+      resolveAssetOpenPath={(src) =>
         src === 'assets/cat.png' ? 'assets/cat.png' : null
       }
-      openImage={openImage}
+      openAsset={openAsset}
     />,
   )
 }
@@ -186,8 +187,8 @@ describe('NoteEditor image lightbox', () => {
       <NoteEditor
         initialContent={'A photo\n\n![Cat](assets/cat.png)'}
         resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : null)}
-        resolveImageOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
-        openImage={secondOpenImage}
+        resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
+        openAsset={secondOpenImage}
       />,
     )
 
@@ -201,7 +202,7 @@ describe('NoteEditor image lightbox', () => {
       <NoteEditor
         initialContent={'A photo\n\n![Cat](assets/cat.png)'}
         resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : null)}
-        resolveImageOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
+        resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
       />,
     )
 
@@ -229,5 +230,33 @@ describe('NoteEditor link opening', () => {
     act(() => captured.props?.onLinkClick?.({ href: 'https://example.com', event }))
 
     expect(openUrl).toHaveBeenCalledWith('https://example.com')
+  })
+
+  it('opens an assets/ link through the graph asset opener, not the URL opener', () => {
+    const openImage = vi.fn(async () => {})
+    renderEditor(openImage)
+
+    const event = new MouseEvent('click')
+    act(() => captured.props?.onLinkClick?.({ href: 'assets/cat.png', event }))
+
+    expect(openImage).toHaveBeenCalledWith('assets/cat.png')
+    expect(openUrl).not.toHaveBeenCalled()
+  })
+})
+
+describe('NoteEditor file paste', () => {
+  it('forwards meowdown paste to saveFile and returns its destination', async () => {
+    const saveFile = vi.fn(async () => 'assets/report.pdf')
+    render(<NoteEditor initialContent="" saveFile={saveFile} />)
+
+    const pasted = new File([new Uint8Array(4)], 'q3.pdf', { type: 'application/pdf' })
+    await expect(captured.props?.onFilePaste?.(pasted)).resolves.toBe('assets/report.pdf')
+    expect(saveFile).toHaveBeenCalledExactlyOnceWith(pasted)
+  })
+
+  it('declines the paste (undefined) when saveFile returns null', async () => {
+    render(<NoteEditor initialContent="" saveFile={async () => null} />)
+    const pasted = new File([], 'q3.pdf', { type: 'application/pdf' })
+    await expect(captured.props?.onFilePaste?.(pasted)).resolves.toBeUndefined()
   })
 })

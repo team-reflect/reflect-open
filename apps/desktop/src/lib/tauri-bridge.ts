@@ -9,6 +9,9 @@ import { setBridge, type IpcBridge } from '@reflect/core'
  */
 export const tauriBridge: IpcBridge = {
   invoke: (command, args) => invoke(command, args),
+  // A Uint8Array payload rides Tauri's raw-body IPC path (no JSON, no
+  // base64); metadata travels in headers since a raw body has no args.
+  invokeBinary: (command, body, headers) => invoke(command, body, { headers }),
   listen: async (event, handler) => {
     const unlisten = await listen(event, (incoming) => handler(incoming.payload))
     return () => {
