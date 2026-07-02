@@ -30,9 +30,17 @@ beforeEach(() => {
   openSession.mockReturnValue(null)
 })
 
-function fakeSession(content: string, { canAppend = true, canCommit = true } = {}) {
+function fakeSession(
+  content: string,
+  { canAppend = true, canCommit = true, commitError = null as Error | null } = {},
+) {
   const commitBodyAppend = vi.fn(async () => canAppend)
-  const commitFrontmatter = vi.fn(async () => canCommit)
+  const commitFrontmatter = vi.fn(async () => {
+    if (commitError !== null) {
+      throw commitError
+    }
+    return canCommit
+  })
   const session = {
     content: () => content,
     liveContent: () => content,
@@ -98,6 +106,19 @@ describe('addContactToNote', () => {
     expect(commitBodyAppend).not.toHaveBeenCalled()
     expect(commitFrontmatter).not.toHaveBeenCalled()
     expect(writeNote).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a failed mark after a successful append (the retry-risk path)', async () => {
+    const { session, commitBodyAppend } = fakeSession('# Ada Lovelace\n', {
+      commitError: new Error('disk on fire'),
+    })
+    openSession.mockReturnValue(session)
+
+    await expect(addContactToNote('notes/Ada Lovelace.md', ADA, 3)).rejects.toThrow(
+      'disk on fire',
+    )
+    // The append landed; the retry (next test) must then skip it.
+    expect(commitBodyAppend).toHaveBeenCalledTimes(1)
   })
 
   it('does not append the bullets twice when a retry follows a failed mark', async () => {

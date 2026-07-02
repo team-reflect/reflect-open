@@ -64,7 +64,13 @@ export function SuggestedContactCard({ path, className }: SuggestedContactCardPr
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium text-text">{contact.fullName}</div>
         <div className="truncate text-xs text-text-muted">
-          {error !== null ? <span className="text-red-500">{error}</span> : details}
+          {error !== null ? (
+            <span role="alert" className="text-red-500">
+              {error}
+            </span>
+          ) : (
+            details
+          )}
         </div>
       </div>
       <Button
