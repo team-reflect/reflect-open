@@ -132,6 +132,8 @@ All UI work should follow the Reflect design system documented in [`design-syste
 
 ```bash
 pnpm dev              # turbo dev across packages (Vite on http://localhost:1420)
+                      #   add ?platform=ios to the URL to preview the MOBILE tree in a
+                      #   plain browser (dev-only in-memory bridge + seeded demo graph)
 pnpm tauri dev        # Full Tauri app with hot reload (stages the CLI sidecar first)
 pnpm tauri:dev        # `pnpm tauri dev` with the dev overlay → the "Reflect Dev" flavor (green icon, own identifier; coexists with Reflect / Reflect Beta)
 pnpm build            # turbo build pipeline → apps/desktop/dist/

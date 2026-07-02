@@ -23,6 +23,13 @@ export default defineConfig(async () => ({
   // platform, which gates desktop-only surfaces like the updater).
   envPrefix: ['VITE_', 'TAURI_ENV_'],
 
+  // The dev bridge's SQLite (dev-only, behind `?platform=ios`) locates its
+  // .wasm relative to its own module URL; esbuild pre-bundling would relocate
+  // the module into .vite/deps and break that lookup.
+  optimizeDeps: {
+    exclude: ['@sqlite.org/sqlite-wasm'],
+  },
+
   // Vite options tailored for Tauri development, applied in `tauri dev`/`tauri build`.
   //
   // 1. prevent Vite from obscuring Rust errors
