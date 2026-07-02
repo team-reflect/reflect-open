@@ -1,3 +1,4 @@
+import type { MeetingAttendee } from '../actions/add-meeting'
 import type { CalendarAttendee, CalendarEvent } from './commands'
 
 /**
@@ -58,14 +59,15 @@ function isSuggestedAttendee(attendee: CalendarAttendee): boolean {
 }
 
 /**
- * Attendee names to prefill the add-meeting dialog: human attendees who
- * haven't declined, excluding the user (a person note for yourself is noise).
- * Deduplicated case-insensitively, original order kept — the list is fully
- * editable in the dialog, so this is a starting point, not policy.
+ * Attendees to prefill the add-meeting dialog: human attendees who haven't
+ * declined, excluding the user (a person note for yourself is noise), each
+ * carrying the invite email the contacts integration resolves by.
+ * Deduplicated case-insensitively by name, original order kept — the list is
+ * fully editable in the dialog, so this is a starting point, not policy.
  */
-export function defaultAttendeeNames(event: CalendarEvent): string[] {
+export function defaultAttendees(event: CalendarEvent): MeetingAttendee[] {
   const seen = new Set<string>()
-  const names: string[] = []
+  const attendees: MeetingAttendee[] = []
   for (const attendee of event.attendees) {
     if (!isSuggestedAttendee(attendee)) {
       continue
@@ -76,9 +78,9 @@ export function defaultAttendeeNames(event: CalendarEvent): string[] {
       continue
     }
     seen.add(key)
-    names.push(name)
+    attendees.push(attendee.email === null ? { name } : { name, email: attendee.email })
   }
-  return names
+  return attendees
 }
 
 /**

@@ -1,17 +1,18 @@
 # Porting contacts integration
 
-**Status: shipped (contacts standalone).** In v1, contacts turned meeting
+**Status: shipped.** In v1, contacts turned meeting
 attendees and name-like notes into real person notes without manual data
 entry. v2 keeps that role but reads the **Apple Contacts** store instead of
 syncing provider address books through a server.
 
 Shipped: the Rust `contacts` capability (`CNContactStore` via `objc2`), the
 Settings → System integrations switch with the permission flow, the
-suggested-contact card, and contacts in the `[[` link menu. The
-meeting-attendee half waits on the
-[calendar flow](./calendar-meetings-integration.md) — its resolution policy
-(`resolveAttendeeContact` in `@reflect/core`) is already in place for it to
-consume.
+suggested-contact card, contacts in the `[[` link menu, and the
+meeting-attendee half: the
+[calendar flow](./calendar-meetings-integration.md)'s add-meeting action
+resolves each attendee's invite email through `resolveAttendeeContact`
+(gated on the integration being enabled and readable) and pre-fills the
+person notes it creates; on a miss the note is created bare, as v1 did.
 
 Decisions taken at implementation time:
 

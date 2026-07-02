@@ -2,9 +2,12 @@ import { useEffect, useState, type ReactElement } from 'react'
 import { X } from 'lucide-react'
 import {
   addMeetingToDaily,
-  defaultAttendeeNames,
+  contactsAuthorizationStatus,
+  defaultAttendees,
   errorMessage,
+  isContactsReadable,
   type CalendarEvent,
+  type MeetingAttendee,
 } from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert'
 import { Button } from '@/components/ui/button'
@@ -38,13 +41,14 @@ const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
  * events, as v1 did — a recurring meeting's shared note is where its notes
  * accumulate). Submitting writes `- [[Meeting]] with [[Person]]…` under the
  * daily note's `## Meetings` heading and creates missing notes; after that
- * nothing stays tied to the calendar.
+ * nothing stays tied to the calendar. With the contacts integration on,
+ * fresh person notes are pre-filled from Apple Contacts by attendee email.
  */
 export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps): ReactElement {
   const { settings } = useSettings()
   const { graph } = useGraph()
   const [name, setName] = useState(event.title)
-  const [attendees, setAttendees] = useState<string[]>(() => defaultAttendeeNames(event))
+  const [attendees, setAttendees] = useState<MeetingAttendee[]>(() => defaultAttendees(event))
   const [newAttendee, setNewAttendee] = useState('')
   const [createNote, setCreateNote] = useState(event.recurring)
   const [submitting, setSubmitting] = useState(false)
@@ -62,20 +66,20 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
   }, [])
 
   const addAttendee = (): void => {
-    const attendee = newAttendee.trim()
-    if (attendee === '') {
+    const attendeeName = newAttendee.trim()
+    if (attendeeName === '') {
       return
     }
     setAttendees((current) =>
-      current.some((existing) => existing.toLowerCase() === attendee.toLowerCase())
+      current.some((existing) => existing.name.toLowerCase() === attendeeName.toLowerCase())
         ? current
-        : [...current, attendee],
+        : [...current, { name: attendeeName }],
     )
     setNewAttendee('')
   }
 
-  const removeAttendee = (attendee: string): void => {
-    setAttendees((current) => current.filter((existing) => existing !== attendee))
+  const removeAttendee = (attendeeName: string): void => {
+    setAttendees((current) => current.filter((existing) => existing.name !== attendeeName))
   }
 
   const canSubmit = graph !== null && name.trim() !== '' && !submitting
@@ -87,11 +91,17 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
     setSubmitting(true)
     setError(null)
     try {
+      // The permission state is read at submit time, not dialog mount — the
+      // cached query may still be in flight (or stale after a System
+      // Settings trip), and a quick submit must not skip the pre-fill.
+      const lookupContacts =
+        settings.contactsEnabled && isContactsReadable(await contactsAuthorizationStatus())
       await addMeetingToDaily({
         date,
         title: name,
         attendees,
         backlinkMeeting: createNote,
+        lookupContacts,
         startTime: formatTimeOfDay(new Date(event.startsAt), settings.timeFormat),
         generation: graph.generation,
       })
@@ -144,14 +154,14 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
               <ul className="flex flex-wrap gap-1.5">
                 {attendees.map((attendee) => (
                   <li
-                    key={attendee}
+                    key={attendee.name}
                     className="flex items-center gap-1 rounded-md bg-surface-sunken px-2 py-0.5 text-xs text-text-secondary"
                   >
-                    <span className="max-w-40 truncate">{attendee}</span>
+                    <span className="max-w-40 truncate">{attendee.name}</span>
                     <button
                       type="button"
-                      onClick={() => removeAttendee(attendee)}
-                      aria-label={`Remove ${attendee}`}
+                      onClick={() => removeAttendee(attendee.name)}
+                      aria-label={`Remove ${attendee.name}`}
                       className="text-text-muted transition-colors hover:text-text"
                     >
                       <X className="size-3" />

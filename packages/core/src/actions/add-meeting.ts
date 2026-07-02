@@ -1,3 +1,5 @@
+import { contactDetailsMarkdown } from '../contacts/markdown'
+import { resolveAttendeeContact } from '../contacts/resolve'
 import { isAppError } from '../errors'
 import { noteExists, readNote, writeNote } from '../graph/commands'
 import { createNoteWithTitle } from '../graph/create-note'
@@ -18,9 +20,12 @@ import { slugForTitle } from '../markdown/slug'
  *
  * and creates the notes those links resolve to when they don't exist yet.
  * With "Create backlinked note" off, the meeting name is plain text (as in
- * v1), not a link — only attendees get `[[Person]]` links and notes. After
- * that, they are ordinary notes; nothing stays tied to the calendar, and no
- * event metadata is persisted beyond this markdown.
+ * v1), not a link — only attendees get `[[Person]]` links and notes. With the
+ * contacts integration on (docs/porting/contacts-integration.md), a fresh
+ * person note is pre-filled from the Apple Contacts entry matching the
+ * attendee's invite email. After that, they are ordinary notes; nothing stays
+ * tied to the calendar, and no event metadata is persisted beyond this
+ * markdown.
  *
  * Wiki links resolve by title, so "one note per meeting title" holds by
  * construction: a recurring "Standup" links the same `[[Standup]]` note from
@@ -39,19 +44,35 @@ export const MEETINGS_HEADING = 'Meetings'
 const MEETING_NOTE_BODY = '- Type: #meeting'
 const PERSON_NOTE_BODY = '- Type: #person'
 
+/** One attendee entering the flow: the display name that becomes the
+ * `[[Person]]` link, plus the invite email (when the calendar knew it) that
+ * the contacts lookup resolves by. */
+export interface MeetingAttendee {
+  name: string
+  email?: string | undefined
+}
+
 export interface AddMeetingInput {
   /** ISO `YYYY-MM-DD` day of the daily note receiving the entry. */
   date: string
   /** Meeting name — becomes the `[[Meeting]]` link text and note title. */
   title: string
-  /** Attendee names — each becomes a `[[Person]]` link and (maybe) a note. */
-  attendees: string[]
+  /** Attendees — each becomes a `[[Person]]` link and (maybe) a note. */
+  attendees: MeetingAttendee[]
   /**
    * The dialog's "Create backlinked note?" choice (v1's `backlinkMeeting`):
    * on links the meeting name and creates its note when missing; off writes
    * the name as plain text and creates nothing for it.
    */
   backlinkMeeting: boolean
+  /**
+   * The contacts gate, computed by the caller at submit time
+   * (`settings.contactsEnabled && isContactsReadable(authorization)`). On,
+   * a missing person note is pre-filled from the Apple Contacts entry
+   * matching the attendee's invite email; off — or on a lookup miss — the
+   * note is created bare, as v1 did.
+   */
+  lookupContacts?: boolean
   /**
    * The event's start time, already formatted for display (the caller owns
    * the time-format preference, as v1 did). Omitted, the line starts at
@@ -132,20 +153,39 @@ function meetingAlreadyLinked(source: string, title: string): boolean {
   })
 }
 
-/** Sanitized, case-insensitively deduplicated attendee names, order kept. */
-function normalizeAttendees(attendees: string[]): string[] {
+/** Attendees with sanitized names, case-insensitively name-deduplicated, order kept. */
+function normalizeAttendees(attendees: MeetingAttendee[]): MeetingAttendee[] {
   const seen = new Set<string>()
-  const names: string[] = []
+  const normalized: MeetingAttendee[] = []
   for (const attendee of attendees) {
-    const name = wikiLinkSafe(attendee)
+    const name = wikiLinkSafe(attendee.name)
     const key = name.toLowerCase()
     if (name === '' || seen.has(key)) {
       continue
     }
     seen.add(key)
-    names.push(name)
+    normalized.push(attendee.email === undefined ? { name } : { name, email: attendee.email })
   }
-  return names
+  return normalized
+}
+
+/**
+ * The body a fresh person note is born with. On the contacts path — gate on
+ * and an invite email known — a matched contact's details block (typed
+ * `- Type: #person` by {@link contactDetailsMarkdown}); in every other case
+ * (gate off, no email, lookup miss, or a contact with nothing to write),
+ * v1's bare typing line.
+ */
+async function personNoteBody(attendee: MeetingAttendee, lookupContacts: boolean): Promise<string> {
+  if (!lookupContacts || attendee.email === undefined) {
+    return PERSON_NOTE_BODY
+  }
+  const contact = await resolveAttendeeContact(attendee.email)
+  if (contact === null) {
+    return PERSON_NOTE_BODY
+  }
+  const details = contactDetailsMarkdown(contact)
+  return details === '' ? PERSON_NOTE_BODY : details
 }
 
 /**
@@ -187,7 +227,7 @@ export async function addMeetingToDaily(input: AddMeetingInput): Promise<AddMeet
   // An attendee spelled like the meeting itself (a shared mailbox, a 1:1
   // named after the person) would just duplicate the link — drop it.
   const attendees = normalizeAttendees(input.attendees).filter(
-    (name) => name.toLowerCase() !== title.toLowerCase(),
+    (attendee) => attendee.name.toLowerCase() !== title.toLowerCase(),
   )
 
   const daily = dailyPath(input.date)
@@ -202,7 +242,7 @@ export async function addMeetingToDaily(input: AddMeetingInput): Promise<AddMeet
   }
   const line = meetingLine({
     title,
-    attendees,
+    attendees: attendees.map((attendee) => attendee.name),
     backlinkMeeting: input.backlinkMeeting,
     startTime: input.startTime,
   })
@@ -213,12 +253,13 @@ export async function addMeetingToDaily(input: AddMeetingInput): Promise<AddMeet
     await createNoteWithTitle(title, input.generation, MEETING_NOTE_BODY)
     createdNotes.push(title)
   }
-  for (const name of attendees) {
-    if (await titleHasNote(name)) {
+  for (const attendee of attendees) {
+    if (await titleHasNote(attendee.name)) {
       continue
     }
-    await createNoteWithTitle(name, input.generation, PERSON_NOTE_BODY)
-    createdNotes.push(name)
+    const body = await personNoteBody(attendee, input.lookupContacts ?? false)
+    await createNoteWithTitle(attendee.name, input.generation, body)
+    createdNotes.push(attendee.name)
   }
 
   return { appended: true, createdNotes }

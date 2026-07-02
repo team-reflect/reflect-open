@@ -49,6 +49,7 @@ function eventAt(hour: number, overrides: Record<string, unknown> = {}): Record<
 
 let stored: Record<string, unknown>
 let events: Array<Record<string, unknown>>
+let contactsAuthorization: string
 
 function installFakeBridge(): void {
   setBridge({
@@ -60,6 +61,8 @@ function installFakeBridge(): void {
           return null
         case 'calendar_list_events':
           return events
+        case 'contacts_authorization_status':
+          return contactsAuthorization
         default:
           return null
       }
@@ -83,6 +86,7 @@ function renderSection(): void {
 beforeEach(() => {
   stored = { calendarEnabled: true, calendarIds: ['cal-work'] }
   events = []
+  contactsAuthorization = 'unavailable'
   addMeetingToDaily.mockClear()
   addMeetingToDaily.mockResolvedValue({ appended: true, createdNotes: [] })
   window.sessionStorage.clear()
@@ -181,13 +185,47 @@ describe('DailyEventsSection', () => {
       expect(addMeetingToDaily).toHaveBeenCalledWith({
         date: DATE,
         title: 'Standup',
-        attendees: ['Grace Hopper'],
+        attendees: [{ name: 'Grace Hopper' }],
         backlinkMeeting: false,
+        lookupContacts: false,
         startTime: '9:00am',
         generation: 3,
       }),
     )
     await waitFor(() => expect(screen.queryByLabelText('Meeting name')).toBeNull())
+  })
+
+  it('passes invite emails and the contacts gate through to the action', async () => {
+    stored = { calendarEnabled: true, calendarIds: ['cal-work'], contactsEnabled: true }
+    contactsAuthorization = 'authorized'
+    events = [
+      eventAt(9, {
+        title: 'Standup',
+        attendees: [
+          {
+            name: 'Ada Lovelace',
+            email: 'ada@example.com',
+            isCurrentUser: false,
+            isPerson: true,
+            status: 'accepted',
+          },
+        ],
+      }),
+    ]
+    renderSection()
+    fireEvent.click(await screen.findByRole('button', { name: /standup/i }))
+
+    await screen.findByText('Ada Lovelace')
+    fireEvent.click(screen.getByRole('button', { name: /add to daily note/i }))
+
+    await waitFor(() =>
+      expect(addMeetingToDaily).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attendees: [{ name: 'Ada Lovelace', email: 'ada@example.com' }],
+          lookupContacts: true,
+        }),
+      ),
+    )
   })
 
   it('a removed attendee chip stays out of the submission', async () => {

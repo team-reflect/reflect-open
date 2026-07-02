@@ -379,7 +379,7 @@ export {
 export {
   displayEvents,
   isDeclinedByUser,
-  defaultAttendeeNames,
+  defaultAttendees,
   dayRange,
 } from './calendar/events'
 export {
@@ -388,6 +388,7 @@ export {
   MEETINGS_HEADING,
   type AddMeetingInput,
   type AddMeetingOutcome,
+  type MeetingAttendee,
 } from './actions/add-meeting'
 export {
   describePage,

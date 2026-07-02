@@ -64,8 +64,11 @@ is added to [docs/privacy.md](../privacy.md)'s inventory.
    the v1 modal: editable meeting name, editable attendee list, and a
    "create backlinked note?" choice. Submitting writes plain markdown into
    the daily note — a `[[Meeting name]]` link and `[[Person]]` links per
-   attendee — and creates the meeting/person notes if missing. After that,
-   they are ordinary notes; nothing about them stays tied to the calendar.
+   attendee — and creates the meeting/person notes if missing. With the
+   [contacts integration](./contacts-integration.md) on, a fresh person note
+   is pre-filled from the Apple Contacts entry matching the attendee's
+   invite email. After that, they are ordinary notes; nothing about them
+   stays tied to the calendar.
 
 ### Architecture
 
