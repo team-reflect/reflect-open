@@ -18,6 +18,12 @@ vi.mock('@/mobile/note-actions-menu', () => ({
   NoteActionsMenu: () => null,
 }))
 
+// The backlinks section has its own suite (incoming-backlinks.test.tsx) and
+// needs the query/graph providers this focus-contract harness doesn't mount.
+vi.mock('@/mobile/incoming-backlinks', () => ({
+  IncomingBacklinks: () => null,
+}))
+
 /**
  * Navigates to the note once (a real arrival, so the router's focus intent
  * is set exactly as a wiki-link tap would) and renders the screen the way

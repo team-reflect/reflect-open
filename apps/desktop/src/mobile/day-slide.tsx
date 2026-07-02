@@ -3,6 +3,7 @@ import { dailyPath } from '@reflect/core'
 import { NotePane } from '@/components/note-pane'
 import { formatDayLabel } from '@/lib/dates'
 import { cn } from '@/lib/utils'
+import { IncomingBacklinks } from '@/mobile/incoming-backlinks'
 import { useScrollRestore } from '@/mobile/use-scroll-restore'
 import { useSettings } from '@/providers/settings-provider'
 
@@ -83,9 +84,14 @@ export function DaySlide({
         <NotePane
           path={dailyPath(day)}
           lazy
+          showBacklinks={false}
           gutterClassName="px-4"
           editorClassName="min-h-[60dvh]"
         />
+        {/* The mobile section (touch chrome) replaces NotePane's built-in
+            desktop panel; a daily-note backlink swipes the carousel to that
+            date rather than pushing a screen. */}
+        <IncomingBacklinks path={dailyPath(day)} className="px-4 pb-4" />
       </div>
     </div>
   )

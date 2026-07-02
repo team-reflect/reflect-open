@@ -58,6 +58,12 @@ interface NotePaneProps {
    */
   gutterClassName?: string
   /**
+   * Render the built-in desktop backlinks panel below the note (default).
+   * The mobile surfaces pass `false` and mount their own touch-chrome
+   * `IncomingBacklinks` section over the same data layer.
+   */
+  showBacklinks?: boolean
+  /**
    * The daily stream's day key for this pane (omitted by non-daily callers).
    * Required for {@link registerHandle} and {@link onExitBoundary} to identify
    * which day fired.
@@ -97,6 +103,7 @@ export function NotePaneComponent({
   className,
   editorClassName,
   gutterClassName,
+  showBacklinks = true,
   dailyDate,
   registerHandle,
   onExitBoundary,
@@ -242,7 +249,7 @@ export function NotePaneComponent({
       <div className={cn(gutterClassName, className)}>
         <SyncConflictNotice path={path} className="mb-4" />
         <ProtectedNoteView content={document.initialContent} />
-        <BacklinksPanel path={path} />
+        {showBacklinks ? <BacklinksPanel path={path} /> : null}
       </div>
     )
   }
@@ -328,9 +335,11 @@ export function NotePaneComponent({
         <EditorAiKeymap onTrigger={aiMenu.openMenu} />
       </NoteEditor>
 
-      <div className={gutterClassName}>
-        <BacklinksPanel path={path} />
-      </div>
+      {showBacklinks ? (
+        <div className={gutterClassName}>
+          <BacklinksPanel path={path} />
+        </div>
+      ) : null}
     </div>
   )
 }

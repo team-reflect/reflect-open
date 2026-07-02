@@ -1,25 +1,14 @@
-import { useCallback, useMemo, type ReactElement } from 'react'
+import { type ReactElement } from 'react'
 import { ChevronRight } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
-import type { WikilinkClickHandler } from '@meowdown/core'
-import { getBacklinksWithContext, hasBridge } from '@reflect/core'
 import { BacklinkSourceGroup } from '@/components/backlink-source-group'
-import { useAssetPersistence } from '@/editor/use-asset-persistence'
-import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
-import { groupBacklinksBySource } from '@/lib/group-backlinks'
-import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
-import { useSessionFlag } from '@/lib/use-session-flag'
-import { useGraph } from '@/providers/graph-provider'
-import { routeForPath } from '@/routing/route'
-import { useRouter } from '@/routing/router'
+import { useBacklinkNavigation } from '@/hooks/use-backlink-navigation'
+import { useBacklinkSources } from '@/hooks/use-backlink-sources'
+import { useBacklinksExpanded } from '@/hooks/use-backlinks-expanded'
 
 interface BacklinksPanelProps {
   /** Graph-relative path of the note whose inbound links to show. */
   path: string
 }
-
-/** Session-wide (all notes) expanded state, old Reflect's `backlinks-expanded`. */
-const EXPANDED_STORAGE_KEY = 'reflect.backlinks-expanded'
 
 /**
  * Incoming backlinks at the bottom of every note — daily and ordinary — in
@@ -28,51 +17,18 @@ const EXPANDED_STORAGE_KEY = 'reflect.backlinks-expanded'
  * dividers between groups. The header toggle collapses the linking lines while the
  * source titles stay visible, and the choice persists for the session
  * across all notes. Ambient and always-available — the associative recall
- * the product is built on — and cheap: one indexed query per visible note,
- * kept fresh by the index invalidation hook (no polling). Renders nothing
- * when the note has no inbound links, but a failed query surfaces as an
- * alert — this is the only backlinks surface, and a failing query means the
+ * the product is built on — and cheap: one indexed query per visible note
+ * ({@link useBacklinkSources}). Renders nothing when the note has no inbound
+ * links, but a failed query surfaces as an alert — a failing query means the
  * index is broken, not that the note is unlinked.
+ *
+ * Desktop chrome (hover-revealed group chevrons, hover-sized targets); the
+ * mobile surfaces render `IncomingBacklinks` over the same data layer.
  */
 export function BacklinksPanel({ path }: BacklinksPanelProps): ReactElement | null {
-  const { navigate } = useRouter()
-  const { graph } = useGraph()
-  // The graph root is part of the key: index rows belong to one graph, and a
-  // graph switch must never serve the previous graph's cached rows (the cache
-  // outlives the workspace remount; invalidation alone lags the reconcile).
-  const { data, isError } = useQuery({
-    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'backlinks', path],
-    queryFn: () => getBacklinksWithContext(path),
-    enabled: hasBridge() && graph !== null,
-  })
-  // Shared across every mounted panel: the daily stream shows one per day,
-  // and the header toggle must move them together, not just this instance.
-  const [expanded, setExpanded] = useSessionFlag(EXPANDED_STORAGE_KEY, true)
-  const groups = useMemo(() => (data ? groupBacklinksBySource(data) : []), [data])
-  const handleOpen = useCallback(
-    (target: string) => {
-      const route = routeForPath(target)
-      // A backlink tap restores focus on the destination (the mobile focus
-      // contract); desktop autofocuses note arrivals anyway.
-      navigate(route, { focusEditor: route.kind === 'note' })
-    },
-    [navigate],
-  )
-
-  // A wiki link clicked *inside* a snippet resolves its target the same way the
-  // editor does, distinct from `handleOpen` which opens an already-resolved
-  // source-note path. Images resolve through the same asset pipeline as the
-  // editor; both callbacks are stable so they never rebuild the snippet trees.
-  const navigateWikiLink = useWikiLinkNavigation(graph?.generation ?? null)
-  const { resolveImageUrl } = useAssetPersistence(graph?.root ?? null, graph?.generation ?? null)
-  const handleWikilinkClick = useCallback<WikilinkClickHandler>(
-    ({ target }) => navigateWikiLink(target),
-    [navigateWikiLink],
-  )
-  const resolveImageUrlStable = useCallback(
-    (src: string) => resolveImageUrl(src) ?? undefined,
-    [resolveImageUrl],
-  )
+  const { groups, count, isError } = useBacklinkSources(path)
+  const [expanded, setExpanded] = useBacklinksExpanded()
+  const { openSource, onWikilinkClick, resolveImageUrl } = useBacklinkNavigation()
 
   if (isError) {
     return (
@@ -84,15 +40,13 @@ export function BacklinksPanel({ path }: BacklinksPanelProps): ReactElement | nu
     )
   }
 
-  if (!data || data.length === 0) {
+  if (count === 0) {
     return null
   }
 
   const toggleExpanded = (): void => {
     setExpanded(!expanded)
   }
-
-  const count = data.length
 
   return (
     <section aria-label="Incoming backlinks" className="mt-8">
@@ -128,9 +82,9 @@ export function BacklinksPanel({ path }: BacklinksPanelProps): ReactElement | nu
             source={group}
             first={index === 0}
             expanded={expanded}
-            onOpen={handleOpen}
-            onWikilinkClick={handleWikilinkClick}
-            resolveImageUrl={resolveImageUrlStable}
+            onOpen={openSource}
+            onWikilinkClick={onWikilinkClick}
+            resolveImageUrl={resolveImageUrl}
           />
         ))}
       </div>
