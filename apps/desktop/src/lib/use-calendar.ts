@@ -48,14 +48,26 @@ export function useCalendarAuthorization(enabled: boolean): CalendarAuthorizatio
   return query.data
 }
 
+export interface CalendarsResult {
+  calendars: CalendarInfo[]
+  /**
+   * True once a fetch has succeeded — an empty `calendars` only means "none
+   * on this Mac" when this is set, not "still loading".
+   */
+  isLoaded: boolean
+}
+
 /** Every calendar on the Mac, for the Settings section's checkbox list. */
-export function useCalendars(enabled: boolean): CalendarInfo[] {
+export function useCalendars(enabled: boolean): CalendarsResult {
   const query = useQuery({
     queryKey: CALENDAR_LIST_QUERY_KEY,
     queryFn: listCalendars,
     enabled: enabled && calendarAvailable(),
   })
-  return useMemo(() => query.data ?? [], [query.data])
+  return useMemo(
+    () => ({ calendars: query.data ?? [], isLoaded: query.isSuccess }),
+    [query.data, query.isSuccess],
+  )
 }
 
 /**

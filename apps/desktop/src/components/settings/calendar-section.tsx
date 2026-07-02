@@ -37,7 +37,7 @@ export function CalendarSection(): ReactElement | null {
   const queryClient = useQueryClient()
   const status = useCalendarAuthorization(settings.calendarEnabled)
   const canRead = status !== undefined && canReadCalendars(status)
-  const calendars = useCalendars(settings.calendarEnabled && canRead)
+  const { calendars, isLoaded } = useCalendars(settings.calendarEnabled && canRead)
   useCalendarChangeInvalidation(settings.calendarEnabled)
 
   const groups = useMemo(() => {
@@ -114,7 +114,12 @@ export function CalendarSection(): ReactElement | null {
         </div>
       </div>
     )
-  } else if (settings.calendarEnabled && canRead) {
+  } else if (settings.calendarEnabled && canRead && isLoaded) {
+    // Count only ids the Mac still knows — settings may hold identifiers
+    // from since-removed accounts, and "3/2 calendars" would be nonsense.
+    const enabledCount = calendars.filter((calendar) =>
+      settings.calendarIds.includes(calendar.id),
+    ).length
     detail =
       groups.length === 0 ? (
         <p className="text-xs text-text-muted">
@@ -123,7 +128,7 @@ export function CalendarSection(): ReactElement | null {
       ) : (
         <div>
           <p className="text-xs text-text-muted">
-            {settings.calendarIds.length}/{calendars.length} calendars
+            {enabledCount}/{calendars.length} calendars
           </p>
           <div className="mt-2 space-y-3">
             {groups.map(([source, group]) => (

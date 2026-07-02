@@ -80,9 +80,12 @@ pub async fn calendar_request_access() -> AppResult<bool> {
     run_blocking(platform::request_access).await
 }
 
-/// Command: every event calendar on this Mac, across all accounts.
+/// Command: every event calendar on this Mac, across all accounts. Like the
+/// events listing, installs the change observer — the Settings section
+/// subscribes to `calendar:changed` before any events are ever fetched.
 #[tauri::command]
-pub async fn calendar_list_calendars() -> AppResult<Vec<CalendarInfo>> {
+pub async fn calendar_list_calendars(app: tauri::AppHandle) -> AppResult<Vec<CalendarInfo>> {
+    platform::ensure_change_observer(&app);
     run_blocking(platform::list_calendars).await
 }
 
