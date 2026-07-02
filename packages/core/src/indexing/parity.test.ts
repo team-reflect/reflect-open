@@ -32,6 +32,8 @@ const expectedFile = join(corpusDir, 'expected.json')
 
 /** Expectations for one fixture note — the derivations both sides must agree on. */
 interface ExpectedNote {
+  /** Frontmatter `id`, string-only like `title` (null when absent/non-string). */
+  id: string | null
   title: string
   titleKey: string
   aliases: string[]
@@ -84,6 +86,7 @@ async function deriveExpectations(): Promise<ExpectedParity> {
       source,
     })
     notes[relPath] = {
+      id: indexed.id,
       title: indexed.title,
       titleKey: indexed.titleKey,
       aliases: indexed.aliases.map((alias) => alias.alias),

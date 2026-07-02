@@ -70,6 +70,9 @@ drain re-runs cleanly.
 
 The scheme and the [CLI](cli.md) stay complementary: the CLI reads and
 resolves for scripts (`reflect show`, `reflect path`); the scheme navigates
-and captures. The scheme's resolution is the CLI's order with the
-frontmatter `id` step in front — the CLI does not resolve ids yet; a
-`reflect open <note>` verb is the natural place for it to pick that up.
+and captures. `reflect open <note>` bridges the two — it resolves like
+`reflect show` and shells out to the scheme URL, preferring the frontmatter
+`id` form (never minting one; the CLI doesn't write), the date form for
+dailies, and the path form otherwise. `--print` emits the URL without
+launching. The scheme's own resolution is the CLI's order with the
+frontmatter `id` step in front.

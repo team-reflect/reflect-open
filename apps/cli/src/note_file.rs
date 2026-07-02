@@ -16,6 +16,8 @@ use crate::paths::{date_from_daily_path, NOTE_DIRS};
 /// A note's derived metadata, as the TS indexer would compute it.
 #[derive(Debug)]
 pub struct NoteMeta {
+    /// The frontmatter `id` (Plan 17's ULID), when the note carries one.
+    pub id: Option<String>,
     pub title: String,
     pub aliases: Vec<String>,
     pub private: bool,
@@ -106,6 +108,7 @@ pub fn parse_note_meta(rel_path: &str, source: &str) -> NoteMeta {
     let frontmatter = parse_frontmatter(split.raw);
     let title = derive_title(rel_path, &frontmatter, split.body);
     NoteMeta {
+        id: frontmatter.id,
         title,
         aliases: frontmatter.aliases,
         private: frontmatter.private,

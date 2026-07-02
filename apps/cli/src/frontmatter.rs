@@ -1,8 +1,8 @@
 //! Tolerant, read-only frontmatter — the Rust mirror of
 //! `packages/core/src/markdown/frontmatter.ts` (split semantics) and
 //! `model.ts` (field coercions), restricted to the fields the CLI needs:
-//! `title`, `aliases`, `private`. Broken YAML degrades to "no frontmatter",
-//! never an unreadable note. The CLI never writes frontmatter.
+//! `id`, `title`, `aliases`, `private`. Broken YAML degrades to "no
+//! frontmatter", never an unreadable note. The CLI never writes frontmatter.
 
 use saphyr::{LoadableYamlNode, Scalar, Yaml};
 
@@ -10,6 +10,8 @@ use saphyr::{LoadableYamlNode, Scalar, Yaml};
 /// rules exactly — it is the hard privacy block and must never drift.
 #[derive(Debug, Default, PartialEq)]
 pub struct Frontmatter {
+    /// The durable note identity (Plan 17's ULID); string-only, like `title`.
+    pub id: Option<String>,
     pub title: Option<String>,
     pub aliases: Vec<String>,
     pub private: bool,
@@ -131,7 +133,12 @@ pub fn parse_frontmatter(raw: Option<&str>) -> Frontmatter {
         return Frontmatter::default();
     };
     Frontmatter {
-        // `title` must be a string (the TS `stringField`); other types are ignored.
+        // `id` and `title` must be strings (the TS `stringField`); other
+        // types are ignored.
+        id: document
+            .as_mapping_get("id")
+            .and_then(|node| node.as_str())
+            .map(str::to_string),
         title: document
             .as_mapping_get("title")
             .and_then(|node| node.as_str())
@@ -152,6 +159,16 @@ mod tests {
 
     fn parse(source: &str) -> Frontmatter {
         parse_frontmatter(split_frontmatter(source).raw)
+    }
+
+    #[test]
+    fn id_is_string_only_like_title() {
+        let parsed = parse("---\nid: 01hzy3v9k2m4n6p8q0r2s4t6vw\n---\n");
+        assert_eq!(parsed.id.as_deref(), Some("01hzy3v9k2m4n6p8q0r2s4t6vw"));
+
+        // The TS `stringField` ignores non-strings; a numeric id is no id.
+        assert_eq!(parse("---\nid: 42\n---\n").id, None);
+        assert_eq!(parse("---\ntitle: no id here\n---\n").id, None);
     }
 
     #[test]
