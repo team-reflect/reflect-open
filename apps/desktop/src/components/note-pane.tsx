@@ -172,7 +172,11 @@ export function NotePaneComponent({
     [bindEditor, path, dailyDate, registerHandle, autoFocus, onAutoFocused],
   )
 
-  const aiMenu = useEditorAiMenu({ path, editorRef: aiEditorRef })
+  const aiMenu = useEditorAiMenu({
+    path,
+    sessionEpoch: document.sessionEpoch,
+    editorRef: aiEditorRef,
+  })
 
 
   const handleExitBoundary: ExitBoundaryHandler | undefined = useMemo(() => {

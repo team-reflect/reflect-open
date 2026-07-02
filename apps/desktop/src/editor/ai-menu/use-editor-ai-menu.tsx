@@ -46,6 +46,12 @@ import { useRouter } from '@/routing/router'
 interface EditorAiMenuOptions {
   /** Graph-relative path of the note being edited (the privacy subject). */
   path: string
+  /**
+   * The editor-session identity (`useNoteDocument().sessionEpoch`) — bumps
+   * when a new session is created, not when a rename retargets one, so a
+   * title-driven rename never tears down a run under its live preview.
+   */
+  sessionEpoch: number
   /** The mounted editor's handle (staging, streaming, and accept live there). */
   editorRef: RefObject<NoteEditorHandle | null>
 }
@@ -72,7 +78,11 @@ interface ActiveRun {
   context: SelectionMenuContext
 }
 
-export function useEditorAiMenu({ path, editorRef }: EditorAiMenuOptions): EditorAiMenuValue {
+export function useEditorAiMenu({
+  path,
+  sessionEpoch,
+  editorRef,
+}: EditorAiMenuOptions): EditorAiMenuValue {
   const noteRow = useNoteRow(path)
   // Fail closed: an unresolved row counts as private, so the menu (and the
   // CloudSafe mint below) never treats a not-yet-loaded note as sendable. The
@@ -88,16 +98,19 @@ export function useEditorAiMenu({ path, editorRef }: EditorAiMenuOptions): Edito
   // preview's alternate-placement button can label itself.
   const [runMode, setRunMode] = useState<AiPromptMode | null>(null)
 
-  // A run belongs to one note: switching notes (or unmounting) mid-stream
-  // aborts the provider call and drops the run, so a stale stream can never
-  // append into — or Retry restage ranges against — a different document.
+  // A run belongs to one editor session: switching notes (or unmounting)
+  // mid-stream aborts the provider call and drops the run, so a stale stream
+  // can never append into — or Retry restage ranges against — a different
+  // document. Keyed on the session, not the path: a title-driven rename
+  // retargets the live session (Plan 17) and must keep the run alive under
+  // its still-visible preview.
   useEffect(() => {
     return () => {
       runRef.current?.controller.abort()
       runRef.current = null
       setRunMode(null)
     }
-  }, [path])
+  }, [sessionEpoch])
 
   const streamRun = useCallback(
     async (
