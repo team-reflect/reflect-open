@@ -63,8 +63,10 @@ export interface NavigateOptions {
   /**
    * Seed the new history entry with the last saved scroll position of the
    * target route's surface. Primary nav tabs use this so switching away and
-   * back does not reset long-lived list surfaces; ordinary command/navigation
-   * arrivals omit it and re-anchor as before.
+   * back does not reset long-lived list surfaces. Only a genuine return
+   * honors it: when the current route already sits on the target's surface
+   * the arrival re-anchors like any other explicit navigation, and ordinary
+   * command arrivals omit it and re-anchor as before.
    */
   restoreSurfaceScroll?: boolean
 }
@@ -131,10 +133,14 @@ export function RouterProvider({
   const navigate = useCallback((route: Route, options?: NavigateOptions) => {
     const target = normalizeRoute(route)
     const surface = scrollSurfaceForRoute(target)
-    const restored =
-      options?.restoreSurfaceScroll === true && surface !== null
-        ? scrollBySurface.current.get(surface)
-        : undefined
+    // A surface restore only means something when coming from OFF the surface;
+    // the Daily tab clicked while already on the stream is an explicit
+    // re-anchor request, exactly like ⌘D.
+    const returning =
+      options?.restoreSurfaceScroll === true &&
+      surface !== null &&
+      scrollSurfaceForRoute(currentRoute.current) !== surface
+    const restored = returning ? scrollBySurface.current.get(surface) : undefined
     if (surface !== null && restored === undefined) {
       // An explicit arrival re-anchors the surface, making its saved offset
       // stale — drop it so a later nav-tab return re-anchors too instead of

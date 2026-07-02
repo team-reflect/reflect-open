@@ -120,6 +120,17 @@ describe('router', () => {
     expect(result.current.savedScroll()).toBeNull()
   })
 
+  it('a surface-scroll return from within the surface re-anchors instead', () => {
+    const { result } = routerHook({ kind: 'daily', date: '2026-06-08' })
+    act(() => result.current.saveScrollState(500)) // scrolled the stream on a dated day
+    act(() => result.current.navigate({ kind: 'today' }, { restoreSurfaceScroll: true }))
+    expect(result.current.savedScroll()).toBeNull() // Daily tab on-stream = ⌘D re-anchor
+
+    act(() => result.current.saveScrollState(300))
+    act(() => result.current.navigate({ kind: 'today' }, { restoreSurfaceScroll: true }))
+    expect(result.current.savedScroll()).toBeNull() // same while already on today
+  })
+
   it('an explicit re-anchor arrival drops the daily surface offset too', () => {
     const { result } = routerHook()
     act(() => result.current.saveScrollState(500)) // user scrolled away on today

@@ -31,9 +31,9 @@ interface SidebarProps {
  * right, search, primary navigation with hover-revealed shortcut keycaps, the
  * Pinned shelf, and the graph switcher footer. Most nav rows run registered
  * commands so a binding and its behavior stay one definition; the Daily notes
- * row restores the stream's surface scroll on click, while its `Mod-D` binding
- * still runs the command and re-anchors to today. (Sidebar collapse stays on
- * `Mod-\` via the command registry.)
+ * row restores the stream's surface scroll when clicked from another surface
+ * (the router re-anchors it, like `Mod-D`, when the stream is already
+ * showing). (Sidebar collapse stays on `Mod-\` via the command registry.)
  */
 export function Sidebar({ graph, context }: SidebarProps): ReactElement {
   const { route } = useRouter()
