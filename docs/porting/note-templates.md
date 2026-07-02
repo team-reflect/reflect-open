@@ -1,15 +1,11 @@
 # Porting note templates
 
 **Status: shipped.** The editor slash-menu entry point rides meowdown's
-host-items API (landed upstream as
-[#197](https://github.com/prosekit/meowdown/pull/197)/[#198](https://github.com/prosekit/meowdown/pull/198),
-released in 0.31.0), currently consumed via a pkg.pr.new pin in
-`pnpm-workspace.yaml`; the bump to ^0.31.0 rides the `onFilePaste`
-adaptation (PR #457). Two v1-parity refinements are pending upstream in
-[#206](https://github.com/prosekit/meowdown/pull/206): insert-collapses-
-selection (shimmed locally in `note-editor.tsx` meanwhile) and slash-menu
-`keywords` (the `/template` affordance — TODO in
-`use-template-slash-items.ts`).
+host-items API (`insertMarkdown` + `onSlashMenuSearch`, upstream
+[#197](https://github.com/prosekit/meowdown/pull/197)/[#198](https://github.com/prosekit/meowdown/pull/198)),
+with two v1-parity refinements — insert-never-deletes-a-selection and the
+slash-menu `keywords` behind the `/template` affordance — landed in
+meowdown 0.33.0 ([#208](https://github.com/prosekit/meowdown/pull/208)/[#209](https://github.com/prosekit/meowdown/pull/209)).
 The [product vision](../reflect-v2-product-vision.md) deferred templates
 with "markdown snippets may be enough" — and that is exactly the design:
 templates are markdown files in the graph.

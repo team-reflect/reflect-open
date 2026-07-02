@@ -42,9 +42,12 @@ describe('useTemplateSlashItems', () => {
     const { result } = renderHook(() => useTemplateSlashItems(() => editor))
 
     const items = await result.current('jour')
-    expect(items.map((item) => ({ id: item.id, label: item.label }))).toEqual([
-      { id: 'templates/journal.md', label: 'Journal' },
-      { id: 'templates/person.md', label: 'Person' },
+    expect(
+      items.map((item) => ({ id: item.id, label: item.label, keywords: item.keywords })),
+    ).toEqual([
+      // The shared "template" keyword is the v1 `/template` affordance.
+      { id: 'templates/journal.md', label: 'Journal', keywords: ['template'] },
+      { id: 'templates/person.md', label: 'Person', keywords: ['template'] },
     ])
 
     items[0]!.onSelect()

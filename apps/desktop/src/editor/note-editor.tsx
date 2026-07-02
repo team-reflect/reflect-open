@@ -189,21 +189,9 @@ export function NoteEditor({
     (): NoteEditorHandle => ({
       getMarkdown: () => innerRef.current?.getMarkdown() ?? '',
       setMarkdown: (markdown) => innerRef.current?.setMarkdown(markdown),
-      insertMarkdown: (markdown) => {
-        const inner = innerRef.current
-        if (inner === null) {
-          return
-        }
-        // Interim shim until prosekit/meowdown#206 ships: collapse an active
-        // selection first — a host-initiated insert is not a paste, and must
-        // never delete selected text (v1 parity).
-        const selection = inner.getSelection()
-        if (selection.anchor !== selection.head) {
-          const caret = Math.min(selection.anchor, selection.head)
-          inner.setSelection({ type: 'text', anchor: caret, head: caret })
-        }
-        inner.insertMarkdown(markdown)
-      },
+      // meowdown ≥0.33 collapses an active selection itself, so an insert
+      // can never delete selected text — plain delegation is the whole story.
+      insertMarkdown: (markdown) => innerRef.current?.insertMarkdown(markdown),
       focus: () => innerRef.current?.focus(),
       setSelection: (position) => innerRef.current?.setSelection(position),
     }),
@@ -236,7 +224,9 @@ export function NoteEditor({
     [],
   )
   const handleLinkClick = useCallback(
-    ({ href }: { href: string; event: MouseEvent }) => {
+    // The event may also be the Mod-Enter key press that followed the link
+    // (meowdown ≥0.33); only the href matters here.
+    ({ href }: { href: string; event: MouseEvent | KeyboardEvent }) => {
       // A graph-relative `assets/…` href (an attachment link) opens through
       // the generation-pinned asset command, never the URL opener — which
       // would receive a meaningless relative string.

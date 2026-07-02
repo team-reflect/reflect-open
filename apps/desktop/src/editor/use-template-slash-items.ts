@@ -27,11 +27,11 @@ export function useTemplateSlashItems(
         return []
       }
       const templates = await listTemplates()
-      // TODO(prosekit/meowdown#206): add `keywords: ['template']` per row once
-      // released, so typing `/template` lists every template (v1 parity).
       return templates.map((template) => ({
         id: template.path,
         label: template.title,
+        // v1 parity: typing `/template` lists every template, whatever its name.
+        keywords: ['template'],
         onSelect: () => {
           void insertTemplate(template.path, getEditor())
         },
