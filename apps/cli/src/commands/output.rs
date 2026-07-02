@@ -30,6 +30,19 @@ pub struct PathJson<'a> {
     pub exists: bool,
 }
 
+/// `open`: the deep link handed to the OS opener (or just printed).
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenJson<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date: Option<&'a str>,
+    pub path: &'a str,
+    /// The `reflect://` URL (docs/deep-links.md).
+    pub url: &'a str,
+    /// False under `--print` — the URL was emitted, not handed to the OS.
+    pub launched: bool,
+}
+
 /// `search`: the ranked hits plus the staleness signal.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

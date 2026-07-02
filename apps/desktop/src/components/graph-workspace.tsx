@@ -7,6 +7,7 @@ import { AudioMemoProvider } from '@/providers/audio-memo-provider'
 import { FocusedDailyProvider } from '@/providers/focused-daily-provider'
 import { CaptureProvider } from '@/providers/capture-provider'
 import { ChatProvider } from '@/providers/chat-provider'
+import { DeepLinkProvider } from '@/providers/deep-link-provider'
 import { ShortcutsProvider } from '@/providers/shortcuts-provider'
 import { SidebarProvider } from '@/providers/sidebar-provider'
 import { SyncProvider } from '@/providers/sync-provider'
@@ -34,15 +35,19 @@ export function GraphWorkspace({ graph }: GraphWorkspaceProps): ReactElement {
                   mic button) unmounting on collapse. */}
               <AudioMemoProvider graph={graph}>
                 <CaptureProvider graph={graph}>
-                  <AssetDescribeProvider graph={graph}>
-                    <ChatProvider graph={graph}>
-                      {/* Tracks the focused day in the daily stream so the right
-                          sidebar describes it, not just the routed day. */}
-                      <FocusedDailyProvider>
-                        <WorkspaceContent graph={graph} />
-                      </FocusedDailyProvider>
-                    </ChatProvider>
-                  </AssetDescribeProvider>
+                  {/* Inside the router (deep links navigate) and beside capture
+                      (deep-link writes spool into the same inbox drain). */}
+                  <DeepLinkProvider graph={graph}>
+                    <AssetDescribeProvider graph={graph}>
+                      <ChatProvider graph={graph}>
+                        {/* Tracks the focused day in the daily stream so the right
+                            sidebar describes it, not just the routed day. */}
+                        <FocusedDailyProvider>
+                          <WorkspaceContent graph={graph} />
+                        </FocusedDailyProvider>
+                      </ChatProvider>
+                    </AssetDescribeProvider>
+                  </DeepLinkProvider>
                 </CaptureProvider>
               </AudioMemoProvider>
             </SidebarProvider>

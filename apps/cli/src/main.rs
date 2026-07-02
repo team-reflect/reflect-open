@@ -56,6 +56,14 @@ enum Command {
         /// A YYYY-MM-DD date, graph-relative path, note title, or alias
         note: String,
     },
+    /// Open a note in the Reflect app via its reflect:// deep link
+    Open {
+        /// A YYYY-MM-DD date, graph-relative path, note title, or alias
+        note: String,
+        /// Print the URL without launching the app
+        #[arg(long)]
+        print: bool,
+    },
 }
 
 fn run(cli: &Cli) -> Result<(), CliError> {
@@ -65,6 +73,7 @@ fn run(cli: &Cli) -> Result<(), CliError> {
         Command::Search { query, limit } => commands::search::run(&graph, cli.json, query, *limit),
         Command::Show { note } => commands::show::run(&graph, cli.json, note),
         Command::Path { note } => commands::path::run(&graph, cli.json, note),
+        Command::Open { note, print } => commands::open::run(&graph, cli.json, note, *print),
     }
 }
 

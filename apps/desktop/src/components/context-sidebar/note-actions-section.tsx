@@ -7,6 +7,7 @@ import { keybindingFor } from '@/lib/commands/app-commands'
 import { toggleNotePinned } from '@/lib/note-pin'
 import { toggleNotePrivate } from '@/lib/note-private'
 import { useOptimisticPinToggle } from '@/lib/notes/use-optimistic-pin-toggle'
+import { NoteDeepLinkAction } from './note-deep-link-action'
 import { NoteGistAction } from './note-gist-action'
 import { NoteTrashAction } from './note-trash-action'
 import { NoteToggleAction } from './note-toggle-action'
@@ -24,6 +25,7 @@ interface NoteActionsSectionProps {
 const PIN_KEYBINDING = keybindingFor('note.togglePin')
 const PRIVATE_KEYBINDING = keybindingFor('note.togglePrivate')
 const GIST_KEYBINDING = keybindingFor('note.publishGist')
+const DEEP_LINK_KEYBINDING = keybindingFor('note.copyDeepLink')
 
 /**
  * "Note actions" as a context-sidebar section: mouse-reachable counterparts
@@ -68,6 +70,7 @@ export function NoteActionsSection({
         keybinding={PRIVATE_KEYBINDING}
         tooltip="Locks this note out of AI. Backup and sync still include it."
       />
+      <NoteDeepLinkAction path={path} keybinding={DEEP_LINK_KEYBINDING} />
       <NoteGistAction path={path} keybinding={GIST_KEYBINDING} />
       {showTrash ? <NoteTrashAction path={path} /> : null}
     </SidebarSection>

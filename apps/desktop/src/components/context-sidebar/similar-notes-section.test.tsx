@@ -7,9 +7,11 @@ import { RouterProvider, useRouter } from '@/routing/router'
 import { SimilarNotesSection } from './similar-notes-section'
 
 const relatedNotes = vi.hoisted(() => vi.fn())
+const readNote = vi.hoisted(() => vi.fn())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
+  readNote,
   relatedNotes,
 }))
 vi.mock('@/providers/graph-provider', () => ({
@@ -43,6 +45,7 @@ function renderSimilar(path: string, probe: boolean = true) {
 beforeEach(() => {
   window.sessionStorage.clear()
   semanticSetting.enabled = true
+  readNote.mockReset().mockResolvedValue('- daily entry\n')
   relatedNotes.mockReset().mockResolvedValue([])
 })
 

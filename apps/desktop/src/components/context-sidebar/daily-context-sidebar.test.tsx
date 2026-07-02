@@ -12,11 +12,13 @@ import { DailyContextSidebar } from './daily-context-sidebar'
 
 const dailyDatesInRange = vi.hoisted(() => vi.fn())
 const relatedNotes = vi.hoisted(() => vi.fn())
+const readNote = vi.hoisted(() => vi.fn())
 const useNoteRow = vi.hoisted(() => vi.fn<(path: string) => NoteRow | null>(() => null))
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
   dailyDatesInRange,
+  readNote,
   relatedNotes,
 }))
 vi.mock('@/hooks/use-note-row', () => ({ useNoteRow }))
@@ -65,6 +67,7 @@ function noteRow(overrides: Partial<NoteRow> = {}): NoteRow {
 beforeEach(() => {
   window.sessionStorage.clear()
   dailyDatesInRange.mockReset().mockResolvedValue([])
+  readNote.mockReset().mockResolvedValue('- daily entry\n')
   relatedNotes.mockReset().mockResolvedValue([])
   useNoteRow.mockReset().mockReturnValue(null)
 })
@@ -129,6 +132,16 @@ describe('DailyContextSidebar related notes', () => {
   it('renders no Similar notes section without results', async () => {
     const view = renderSidebar('2026-06-09')
     await waitFor(() => expect(relatedNotes).toHaveBeenCalledWith('daily/2026-06-09.md', 6))
+    expect(view.queryByText('Similar notes')).toBeNull()
+    view.unmount()
+  })
+
+  it('does not calculate Similar notes for an empty-bullet daily note', async () => {
+    readNote.mockResolvedValue('- \n')
+    const view = renderSidebar('2026-06-09')
+    await waitFor(() => expect(readNote).toHaveBeenCalledWith('daily/2026-06-09.md'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(relatedNotes).not.toHaveBeenCalled()
     expect(view.queryByText('Similar notes')).toBeNull()
     view.unmount()
   })

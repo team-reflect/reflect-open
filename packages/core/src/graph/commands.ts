@@ -129,6 +129,20 @@ export async function captureInboxRead(name: string, generation: number): Promis
   return call('capture_inbox_read', { name, generation }, z.string())
 }
 
+/**
+ * Spool an envelope this app produced (deep-link text captures) into the
+ * inbox, atomically — it then flows through the same watcher-triggered drain
+ * as browser captures. The caller validates the envelope shape; the Rust side
+ * only moves bytes (with a defensive size cap).
+ */
+export async function captureInboxSpool(
+  name: string,
+  json: string,
+  generation: number,
+): Promise<void> {
+  await call('capture_inbox_spool', { name, json, generation }, voidSchema)
+}
+
 /** Remove a spool file by filename. Idempotent — crash re-drains re-remove. */
 export async function captureInboxRemove(name: string, generation: number): Promise<void> {
   await call('capture_inbox_remove', { name, generation }, voidSchema)

@@ -63,6 +63,7 @@ fn note_derivations_match_the_ts_pipeline() {
         let content = fs::read_to_string(corpus.join(rel_path)).unwrap();
         let meta = parse_note_meta(rel_path, &content);
 
+        assert_eq!(meta.id.as_deref(), want["id"].as_str(), "{rel_path}: id");
         assert_eq!(
             meta.title,
             want["title"].as_str().unwrap(),

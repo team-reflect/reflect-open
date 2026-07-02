@@ -9,6 +9,7 @@ import {
 import { openUnusedAssetsDialog } from '@/components/unused-assets-dialog'
 import { attachFilesToNote } from '@/lib/attach-files'
 import { untitledNotePath } from '@/lib/create-note'
+import { runCopyDeepLink } from '@/lib/note-deep-link'
 import { runGistPublish } from '@/lib/note-gist'
 import { toggleNotePinned } from '@/lib/note-pin'
 import { toggleNotePrivate } from '@/lib/note-private'
@@ -188,6 +189,24 @@ const APP_COMMANDS: AppCommand[] = [
     // Lists assets/ files no note links to (deleting a link leaves the file),
     // with delete as an explicit per-file choice — never automatic GC.
     run: () => openUnusedAssetsDialog(),
+  },
+  {
+    id: 'note.copyDeepLink',
+    title: 'Copy deep link',
+    keywords: ['url', 'share', 'clipboard', 'reflect://', 'address'],
+    // The original app's copy-link shortcut. Copies a `reflect://` address for
+    // the note the current route edits — id-shaped so it survives renames,
+    // minting the frontmatter id on first copy. `runCopyDeepLink` owns all
+    // feedback (the "Deep link copied" status line and failure surfaces).
+    keybinding: 'Alt-Mod-l',
+    run: async (context) => {
+      const generation = context.generation()
+      const path = context.notePath()
+      if (generation === null || path === null) {
+        return
+      }
+      await runCopyDeepLink(path, generation)
+    },
   },
   {
     id: 'note.random',

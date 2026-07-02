@@ -99,10 +99,44 @@ fn init_tracing() {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     init_tracing();
-    let builder = tauri::Builder::default()
+    let builder = tauri::Builder::default();
+
+    // Single-instance must be the first plugin so a second launch is caught
+    // before any other state spins up: its `deep-link` feature hands the
+    // launching instance's `reflect://` URL to the deep-link plugin, and the
+    // callback re-focuses the running window. macOS delivers scheme opens to
+    // the running app natively; this is the Windows/Linux equivalent.
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    }));
+
+    let builder = builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init());
+
+    // Deep links (`reflect://`) are desktop-only for now: the scheme is
+    // registered at bundle time (`plugins.deep-link` in tauri.conf.json) and
+    // the frontend consumes URLs through `onOpenUrl`.
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_deep_link::init());
+
+    // Where the bundle doesn't register the scheme, do it at runtime: Linux
+    // desktop entries, and Windows dev builds (the installer writes the
+    // registry keys in production; macOS reads CFBundleURLTypes). Best-effort
+    // — a headless Linux box without xdg-mime must not fail the launch.
+    #[cfg(any(target_os = "linux", all(windows, debug_assertions)))]
+    let builder = builder.setup(|app| {
+        use tauri_plugin_deep_link::DeepLinkExt;
+        if let Err(err) = app.deep_link().register_all() {
+            tracing::warn!(error = %err, "deep-link scheme registration failed");
+        }
+        Ok(())
+    });
 
     // Auto-update is desktop-only: updates verify against the minisign pubkey
     // in tauri.conf.json (`plugins.updater`), and `process` provides the
@@ -193,6 +227,7 @@ pub fn run() {
             watcher::watch_stop,
             capture::capture_host_register,
             capture::capture_inbox_list,
+            capture::capture_inbox_spool,
             capture::capture_inbox_read,
             capture::capture_inbox_remove,
             capture::capture_inbox_reject,
