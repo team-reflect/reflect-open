@@ -78,7 +78,7 @@ fn migrations_are_valid_and_idempotent() {
     let version: i64 = conn
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 14); // applied migrations (0001 through 0014)
+    assert_eq!(version, 15); // applied migrations (0001 through 0015)
     migrate(&mut conn).expect("re-running to_latest is a no-op");
 }
 
@@ -497,7 +497,8 @@ fn open_tasks_read_includes_private_notes_and_excludes_completed() {
     // to note context, completed tasks excluded, and `private: true` notes' tasks
     // INCLUDED (the Tasks view is a local-only surface, like local search).
     let conn = migrated();
-    let mut public = note("notes/a.md", "A", vec![]);
+    let mut public = note("daily/2026-06-10.md", "A", vec![]);
+    public.kind = "daily".to_string();
     public.daily_date = Some("2026-06-10".to_string());
     public.tasks = vec![task(2, "open a", false)];
     apply_note(&conn, &public).unwrap();
@@ -517,7 +518,7 @@ fn open_tasks_read_includes_private_notes_and_excludes_completed() {
     .unwrap();
 
     assert_eq!(rows.len(), 2); // both open tasks; the completed one is gone
-    assert_eq!(rows[0]["note_path"], Value::from("notes/a.md"));
+    assert_eq!(rows[0]["note_path"], Value::from("daily/2026-06-10.md"));
     assert_eq!(rows[0]["text"], Value::from("open a"));
     assert_eq!(rows[0]["note_title"], Value::from("A"));
     assert_eq!(rows[0]["daily_date"], Value::from("2026-06-10"));
@@ -542,6 +543,134 @@ fn link_kind_check_rejects_unknown_kinds() {
 }
 
 #[test]
+fn note_kind_daily_date_invariant_is_enforced() {
+    // `kind` and `daily_date` both derive from the path in `buildIndexedNote`,
+    // so they agree by construction — the 0015 CHECK makes SQLite reject any
+    // writer that drifts: kind = 'daily' iff daily_date is set.
+    let conn = migrated();
+
+    let note_with_date = conn.execute(
+        "INSERT INTO notes(path, title, title_key, kind, daily_date, file_hash)
+         VALUES('notes/a.md', 'A', 'a', 'note', '2026-07-01', 'h')",
+        [],
+    );
+    assert!(
+        note_with_date.is_err(),
+        "CHECK should reject kind='note' with a daily_date"
+    );
+
+    let daily_without_date = conn.execute(
+        "INSERT INTO notes(path, title, title_key, kind, daily_date, file_hash)
+         VALUES('daily/2026-07-01.md', 'July 1st, 2026', 'july 1st, 2026', 'daily', NULL, 'h')",
+        [],
+    );
+    assert!(
+        daily_without_date.is_err(),
+        "CHECK should reject kind='daily' without a daily_date"
+    );
+
+    let template_with_date = conn.execute(
+        "INSERT INTO notes(path, title, title_key, kind, daily_date, file_hash)
+         VALUES('templates/j.md', 'J', 'j', 'template', '2026-07-01', 'h')",
+        [],
+    );
+    assert!(
+        template_with_date.is_err(),
+        "CHECK should reject kind='template' with a daily_date"
+    );
+
+    // The three shapes buildIndexedNote actually emits all pass.
+    conn.execute_batch(
+        "INSERT INTO notes(path, title, title_key, kind, daily_date, file_hash) VALUES
+           ('daily/2026-07-01.md', 'July 1st, 2026', 'july 1st, 2026', 'daily', '2026-07-01', 'h'),
+           ('notes/a.md', 'A', 'a', 'note', NULL, 'h'),
+           ('templates/j.md', 'J', 'j', 'template', NULL, 'h');",
+    )
+    .expect("consistent rows insert");
+}
+
+#[test]
+fn kind_invariant_migration_wipes_the_projection_for_reindex() {
+    // 0015 drops and recreates `notes` (a table-level CHECK cannot be ADDed)
+    // while six child tables reference it ON DELETE CASCADE. The projection
+    // is wiped children-first (so the DROP's implicit DELETE cascades over
+    // empty tables even with enforcement on) and the next open re-indexes.
+    let mut conn = open_in_memory().expect("open");
+    conn.execute_batch("PRAGMA foreign_keys=ON;").expect("fk");
+    migrate_to(&mut conn, 14).expect("migrate to v14");
+    conn.execute_batch(
+        "INSERT INTO notes(path, title, title_key, kind, daily_date, file_hash) VALUES
+           ('daily/2026-07-01.md', 'July 1st, 2026', 'july 1st, 2026', 'daily', '2026-07-01', 'h1'),
+           ('notes/a.md', 'A', 'a', 'note', NULL, 'h2');
+         INSERT INTO note_text(note_path, text) VALUES('notes/a.md', 'A body');
+         INSERT INTO links(source_path, kind, target_raw, target_key, pos_from, pos_to)
+           VALUES('notes/a.md', 'wiki', 'July 1st, 2026', 'july 1st, 2026', 0, 0);
+         INSERT INTO tags(note_path, tag, tag_key) VALUES('notes/a.md', 'X', 'x');
+         INSERT INTO tasks(note_path, marker_offset, text, raw, checked)
+           VALUES('notes/a.md', 0, 'buy milk', '[ ] buy milk', 0);
+         INSERT INTO search_fts(path, title, body) VALUES('notes/a.md', 'A', 'A body');
+         INSERT INTO index_meta(key, value) VALUES('k', 'v');",
+    )
+    .expect("stage v14 rows");
+
+    migrate(&mut conn).expect("migrate to latest");
+
+    for table in ["notes", "note_text", "links", "tags", "tasks", "search_fts"] {
+        let count: i64 = conn
+            .query_row(&format!("SELECT count(*) FROM {table}"), [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(count, 0, "{table} should be wiped for the re-index");
+    }
+    // Bookkeeping outlives the wipe (same contract as index_clear).
+    let meta: i64 = conn
+        .query_row("SELECT count(*) FROM index_meta", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(meta, 1);
+
+    // Every notes index came back with the recreated table.
+    for index in [
+        "notes_title_key",
+        "notes_daily_date",
+        "notes_id",
+        "notes_daily_date_mtime_path",
+        "notes_non_daily_mtime",
+        "notes_pinned",
+        "notes_has_conflict",
+    ] {
+        let exists: bool = conn
+            .prepare("SELECT 1 FROM pragma_index_list('notes') WHERE name = ?1")
+            .unwrap()
+            .exists([index])
+            .unwrap();
+        assert!(exists, "index {index} must be recreated with the table");
+    }
+
+    // The write path, the views, and the child cascades all bind to `notes`
+    // by name — prove they resolve against the recreated table.
+    apply_note(&conn, &note("notes/a.md", "A", vec![wiki("Target")])).unwrap();
+    apply_note(&conn, &note("notes/target.md", "Target", vec![])).unwrap();
+    let backlink_sources: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM backlinks WHERE target_path = 'notes/target.md'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(backlink_sources, 1);
+    conn.execute("DELETE FROM notes WHERE path = 'notes/a.md'", [])
+        .unwrap();
+    let orphans: i64 = conn
+        .query_row("SELECT count(*) FROM links", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(
+        orphans, 0,
+        "ON DELETE CASCADE must target the recreated table"
+    );
+}
+
+#[test]
 fn open_index_at_creates_migrates_and_reopens() {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path();
@@ -551,7 +680,7 @@ fn open_index_at_creates_migrates_and_reopens() {
     let version: i64 = conn
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 14);
+    assert_eq!(version, 15);
     let journal: String = conn
         .query_row("PRAGMA journal_mode", [], |row| row.get(0))
         .unwrap();
