@@ -252,7 +252,8 @@ export function NoteEditor({
     [],
   )
   const handleLinkClick = useCallback(
-    ({ href }: { href: string; event: MouseEvent }) => {
+    // The event may be a KeyboardEvent: meowdown also follows links on Mod-Enter.
+    ({ href }: { href: string; event: MouseEvent | KeyboardEvent }) => {
       void openUrl(href).catch((cause) => {
         console.error('open link failed:', errorMessage(cause))
       })

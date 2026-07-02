@@ -6,8 +6,8 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@meowdown/core': https://pkg.pr.new/prosekit/meowdown/@meowdown/core@3819bce
-  '@meowdown/react': https://pkg.pr.new/prosekit/meowdown/@meowdown/react@3819bce
+  '@meowdown/core': https://pkg.pr.new/prosekit/meowdown/@meowdown/core@5073906
+  '@meowdown/react': https://pkg.pr.new/prosekit/meowdown/@meowdown/react@5073906
 
 importers:
 
@@ -38,11 +38,11 @@ importers:
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.7)
       '@meowdown/core':
-        specifier: https://pkg.pr.new/prosekit/meowdown/@meowdown/core@3819bce
-        version: https://pkg.pr.new/prosekit/meowdown/@meowdown/core@3819bce(@shikijs/types@4.2.0)(@types/hast@3.0.4)(prosemirror-model@1.25.9)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.41.9)
+        specifier: https://pkg.pr.new/prosekit/meowdown/@meowdown/core@5073906
+        version: https://pkg.pr.new/prosekit/meowdown/@meowdown/core@5073906(@shikijs/types@4.2.0)(@types/hast@3.0.4)(prosemirror-model@1.25.9)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.41.9)
       '@meowdown/react':
-        specifier: https://pkg.pr.new/prosekit/meowdown/@meowdown/react@3819bce
-        version: https://pkg.pr.new/prosekit/meowdown/@meowdown/react@3819bce(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.2.0)(@types/hast@3.0.4)(@types/react@19.2.17)(date-fns@4.4.0)(prosemirror-model@1.25.9)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.41.9)(react-dom@19.2.7)(react@19.2.7)
+        specifier: https://pkg.pr.new/prosekit/meowdown/@meowdown/react@5073906
+        version: https://pkg.pr.new/prosekit/meowdown/@meowdown/react@5073906(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.2.0)(@types/hast@3.0.4)(@types/react@19.2.17)(date-fns@4.4.0)(prosemirror-model@1.25.9)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.41.9)(react-dom@19.2.7)(react@19.2.7)
       '@reflect/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -1044,12 +1044,12 @@ packages:
   '@marijn/find-cluster-break@1.0.2':
     resolution: {integrity: sha512-l0h88YhZFyKdXIFNfSWpyjStDjGHwZ/U7iobcK1cQQD8sejsONdQtTVU+1wVN1PBw40PiiHB1vA5S7VTfQiP9g==}
 
-  '@meowdown/core@https://pkg.pr.new/prosekit/meowdown/@meowdown/core@3819bce':
-    resolution: {integrity: sha512-rSYIfp/yW93ztra4roVTUZWitnURkK+x9cRDJ7tUF/7LloJjq89RW3TL/dbv0WYxAPwTMx+UA9kdyzQttvp3oA==, tarball: https://pkg.pr.new/prosekit/meowdown/@meowdown/core@3819bce}
+  '@meowdown/core@https://pkg.pr.new/prosekit/meowdown/@meowdown/core@5073906':
+    resolution: {integrity: sha512-mkx4VQ/Q5i/IvxgilBgmXN4q9U5AHaVbM4p+z+6KIuXZENJ/zSApuGviQuGRUz4udGnKcNFQ8XTVUnGGJ4GQtQ==, tarball: https://pkg.pr.new/prosekit/meowdown/@meowdown/core@5073906}
     version: 0.31.0
 
-  '@meowdown/react@https://pkg.pr.new/prosekit/meowdown/@meowdown/react@3819bce':
-    resolution: {integrity: sha512-rt/bYLLH4iIXKZsBypbyHmBdn7MIwAqi8JIIS73fW019jcPPlqLCoryCMT0Xg0n+rIkc+lM9RAkDkb8QAnzbtA==, tarball: https://pkg.pr.new/prosekit/meowdown/@meowdown/react@3819bce}
+  '@meowdown/react@https://pkg.pr.new/prosekit/meowdown/@meowdown/react@5073906':
+    resolution: {integrity: sha512-9kdB1H0YR34QXWJRVyohlMymih91rp/NYhVzepGJLobCe9MAw4YruzhDbTt2ItrzUaLqQcDox4OLw8jdWdIGgg==, tarball: https://pkg.pr.new/prosekit/meowdown/@meowdown/react@5073906}
     version: 0.31.0
     peerDependencies:
       react: ^19.0.0
@@ -6994,7 +6994,7 @@ snapshots:
 
   '@marijn/find-cluster-break@1.0.2': {}
 
-  '@meowdown/core@https://pkg.pr.new/prosekit/meowdown/@meowdown/core@3819bce(@shikijs/types@4.2.0)(@types/hast@3.0.4)(prosemirror-model@1.25.9)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.41.9)':
+  '@meowdown/core@https://pkg.pr.new/prosekit/meowdown/@meowdown/core@5073906(@shikijs/types@4.2.0)(@types/hast@3.0.4)(prosemirror-model@1.25.9)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.41.9)':
     dependencies:
       '@codemirror/language': 6.12.3
       '@codemirror/language-data': 6.5.2
@@ -7031,10 +7031,10 @@ snapshots:
       - y-prosemirror
       - yjs
 
-  '@meowdown/react@https://pkg.pr.new/prosekit/meowdown/@meowdown/react@3819bce(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.2.0)(@types/hast@3.0.4)(@types/react@19.2.17)(date-fns@4.4.0)(prosemirror-model@1.25.9)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.41.9)(react-dom@19.2.7)(react@19.2.7)':
+  '@meowdown/react@https://pkg.pr.new/prosekit/meowdown/@meowdown/react@5073906(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.2.0)(@types/hast@3.0.4)(@types/react@19.2.17)(date-fns@4.4.0)(prosemirror-model@1.25.9)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.41.9)(react-dom@19.2.7)(react@19.2.7)':
     dependencies:
       '@base-ui/react': 1.6.0(@types/react@19.2.17)(date-fns@4.4.0)(react-dom@19.2.7)(react@19.2.7)
-      '@meowdown/core': https://pkg.pr.new/prosekit/meowdown/@meowdown/core@3819bce(@shikijs/types@4.2.0)(@types/hast@3.0.4)(prosemirror-model@1.25.9)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.41.9)
+      '@meowdown/core': https://pkg.pr.new/prosekit/meowdown/@meowdown/core@5073906(@shikijs/types@4.2.0)(@types/hast@3.0.4)(prosemirror-model@1.25.9)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.41.9)
       '@ocavue/utils': 1.7.0
       '@prosekit/core': 0.13.0-beta.4(prosemirror-model@1.25.9)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)
       '@prosekit/pm': 0.1.19-beta.1
