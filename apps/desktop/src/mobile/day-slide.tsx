@@ -1,8 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, type ReactElement } from 'react'
+import { useEffect, useRef, type ReactElement } from 'react'
 import { dailyPath } from '@reflect/core'
 import { NotePane } from '@/components/note-pane'
 import { formatDayLabel } from '@/lib/dates'
 import { cn } from '@/lib/utils'
+import { useScrollRestore } from '@/mobile/use-scroll-restore'
 import { useSettings } from '@/providers/settings-provider'
 
 interface DaySlideProps {
@@ -25,18 +26,14 @@ interface DaySlideProps {
   scrollResetSeq: number
 }
 
-/** How long a remount keeps chasing its saved scroll offset. Local note reads
- *  resolve in milliseconds; past this the offset is treated as unreachable
- *  (the note shrank since it was saved) and the user's scrolling takes over. */
-const RESTORE_DEADLINE_MS = 2000
-
 /**
  * One mounted day of the carousel: the date heading (the daily note's subject —
  * chrome, not content, so it is never editable) over the note editor, in its
  * own scroll container. The container records its offset into the carousel's
- * {@link DaySlideProps.scrollMemory} and restores it on remount — the note
- * body loads asynchronously, so restoration re-applies on content growth until
- * the saved offset is reachable, the user takes over, or the deadline passes.
+ * {@link DaySlideProps.scrollMemory} and restores it on remount via
+ * {@link useScrollRestore} — the note body loads asynchronously, so
+ * restoration re-applies on content growth until the saved offset is
+ * reachable, the user takes over, or the deadline passes.
  */
 export function DaySlide({
   day,
@@ -48,53 +45,12 @@ export function DaySlide({
   const { settings } = useSettings()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
-  // True while a remount restore is converging on the saved offset — scroll
-  // events it causes must not overwrite the memory with clamped values.
-  const restoringRef = useRef(false)
-  // Cancels the in-flight restore, if any — a jump-to-top reset must not race
-  // an observer still re-applying the old offset as content grows.
-  const stopRestoringRef = useRef<(() => void) | null>(null)
-
-  useLayoutEffect(() => {
-    const container = containerRef.current
-    const content = contentRef.current
-    if (container === null || content === null) {
-      return
-    }
-    const saved = scrollMemory.get(day) ?? 0
-    if (saved <= 0) {
-      return
-    }
-    restoringRef.current = true
-    let observer: ResizeObserver | null = null
-    let deadline: ReturnType<typeof setTimeout> | null = null
-    const stop = (): void => {
-      restoringRef.current = false
-      if (stopRestoringRef.current === stop) {
-        stopRestoringRef.current = null
-      }
-      if (deadline !== null) {
-        clearTimeout(deadline)
-      }
-      observer?.disconnect()
-      container.removeEventListener('pointerdown', stop)
-    }
-    stopRestoringRef.current = stop
-    const apply = (): void => {
-      container.scrollTop = saved
-      if (container.scrollTop >= saved - 1) {
-        stop()
-      }
-    }
-    apply()
-    if (restoringRef.current) {
-      observer = new ResizeObserver(apply)
-      observer.observe(content)
-      container.addEventListener('pointerdown', stop, { passive: true })
-      deadline = setTimeout(stop, RESTORE_DEADLINE_MS)
-    }
-    return stop
-  }, [day, scrollMemory])
+  const { handleScroll, resetToTop } = useScrollRestore({
+    key: day,
+    memory: scrollMemory,
+    containerRef,
+    contentRef,
+  })
 
   const lastResetSeq = useRef(scrollResetSeq)
   useEffect(() => {
@@ -105,12 +61,8 @@ export function DaySlide({
     if (!selected) {
       return
     }
-    stopRestoringRef.current?.()
-    scrollMemory.delete(day)
-    if (containerRef.current) {
-      containerRef.current.scrollTop = 0
-    }
-  }, [scrollResetSeq, selected, day, scrollMemory])
+    resetToTop()
+  }, [scrollResetSeq, selected, resetToTop])
 
   return (
     <div
@@ -119,11 +71,7 @@ export function DaySlide({
       style={{
         paddingBottom: 'max(env(safe-area-inset-bottom), var(--keyboard-height, 0px))',
       }}
-      onScroll={(event) => {
-        if (!restoringRef.current) {
-          scrollMemory.set(day, event.currentTarget.scrollTop)
-        }
-      }}
+      onScroll={handleScroll}
     >
       <div ref={contentRef}>
         {/* The date is the daily note's subject (V1 / desktop parity) —
