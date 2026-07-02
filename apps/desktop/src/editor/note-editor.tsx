@@ -198,14 +198,7 @@ export function NoteEditor({
     (): NoteEditorHandle => ({
       getMarkdown: () => innerRef.current?.getMarkdown() ?? '',
       setMarkdown: (markdown) => innerRef.current?.setMarkdown(markdown),
-      insertMarkdown: (markdown) => {
-        // Through meowdown's ProseKit escape hatch: a plain text insertion is
-        // a markdown insertion in this schema (syntax lives in the text).
-        innerRef.current?.editor?.exec((state, dispatch) => {
-          dispatch?.(state.tr.insertText(markdown).scrollIntoView())
-          return true
-        })
-      },
+      insertMarkdown: (markdown) => innerRef.current?.insertMarkdown(markdown),
       focus: () => innerRef.current?.focus(),
       setSelection: (position) => innerRef.current?.setSelection(position),
     }),
@@ -233,14 +226,15 @@ export function NoteEditor({
     (src: string) => resolveImageUrlRef.current?.(src) ?? undefined,
     [],
   )
-  const handleImagePaste = useCallback(
-    async (file: File) => (await saveImageRef.current?.(file)) ?? undefined,
-    [],
-  )
-  const handleFilePaste = useCallback(
-    async (file: File) => (await saveAttachmentRef.current?.(file)) ?? undefined,
-    [],
-  )
+  // meowdown 0.31's single paste callback covers every file kind (it picks
+  // `![](src)` vs `[name](src)` itself); the host routes by MIME so images
+  // and attachments keep their separate persistence and naming.
+  const handleFilePaste = useCallback(async (file: File) => {
+    const save = file.type.startsWith('image/')
+      ? saveImageRef.current
+      : saveAttachmentRef.current
+    return (await save?.(file)) ?? undefined
+  }, [])
   // meowdown funnels save errors for images and attachments through one
   // callback; split them back apart by kind so each surface keeps its own
   // error message.
@@ -319,9 +313,8 @@ export function NoteEditor({
         {...(onWikilinkSearch !== undefined ? { onWikilinkSearch } : {})}
         {...(onTagSearch !== undefined ? { onTagSearch } : {})}
         resolveImageUrl={handleResolveImageUrl}
-        onImagePaste={handleImagePaste}
         onFilePaste={handleFilePaste}
-        onImageSaveError={handleFileSaveError}
+        onFileSaveError={handleFileSaveError}
         onExitBoundary={handleExitBoundary}
       >
         {children}
