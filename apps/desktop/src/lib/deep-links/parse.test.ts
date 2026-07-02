@@ -80,7 +80,7 @@ describe('parseDeepLink', () => {
   it('parses write links into capture payloads', () => {
     expect(parseDeepLink('reflect://append?text=hello%20world')).toEqual({
       kind: 'capture',
-      capture: 'text',
+      capture: 'append',
       text: 'hello world',
     })
     expect(parseDeepLink('reflect://task?text=Buy+milk')).toEqual({
@@ -93,7 +93,7 @@ describe('parseDeepLink', () => {
   it('folds capture text to a single trimmed line', () => {
     expect(parseDeepLink('reflect://append?text=%20line%20one%0A%0A%23%20line%20two%20')).toEqual({
       kind: 'capture',
-      capture: 'text',
+      capture: 'append',
       text: 'line one # line two',
     })
   })

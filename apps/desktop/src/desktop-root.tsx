@@ -6,7 +6,7 @@ import { UpdateToast } from '@/components/update-toast'
 import { Toaster } from '@/components/ui/sonner'
 import { WindowDragRegion } from '@/components/window-drag-region'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { startDeepLinkListener } from '@/lib/deep-links/intents'
+import { startDeepLinkListener } from '@/lib/deep-links/intake'
 import { GraphProvider } from '@/providers/graph-provider'
 import { UpdateProvider } from '@/providers/update-provider'
 
@@ -18,7 +18,7 @@ import { UpdateProvider } from '@/providers/update-provider'
 export function DesktopRoot(): ReactElement {
   // Deep-link intake starts with the surface, not the workspace: a
   // `reflect://` URL that launched the app (or arrived on the graph chooser)
-  // buffers in `intents.ts` until a graph opens. Browser dev has no plugin.
+  // buffers in `intake.ts` until a graph opens. Browser dev has no plugin.
   useEffect(() => {
     if (!hasBridge()) {
       return

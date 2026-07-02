@@ -467,7 +467,7 @@ describe('drainCaptureInbox (text captures)', () => {
     return {
       version: 1,
       id: 'a1b2c3d4-0000-4000-8000-000000000001',
-      kind: 'text',
+      kind: 'append',
       text: 'call the bank',
       capturedAt: CAPTURED_AT.toISOString(),
       source: 'deep-link',

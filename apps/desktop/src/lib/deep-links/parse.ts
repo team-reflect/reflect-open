@@ -1,9 +1,9 @@
+import type { TextCaptureKind } from '@reflect/core'
 import { isIsoDate } from '@/lib/dates'
 import {
   DEEP_LINK_SCHEME,
   DEEP_LINK_TEXT_MAX_LENGTH,
   type DeepLink,
-  type DeepLinkCaptureKind,
 } from '@/lib/deep-links/deep-link'
 
 /**
@@ -43,7 +43,7 @@ export function parseDeepLink(raw: string): DeepLink | null {
     case 'note':
       return argument === '' ? null : { kind: 'openNote', target: argument }
     case 'append':
-      return captureLink('text', url, argument)
+      return captureLink('append', url, argument)
     case 'task':
       return captureLink('task', url, argument)
     default:
@@ -80,7 +80,7 @@ function decodedPathRemainder(url: URL): string | null {
  * exactly one daily-note line, so a URL can never smuggle extra markdown
  * blocks (headings, frontmatter fences) into the graph.
  */
-function captureLink(capture: DeepLinkCaptureKind, url: URL, argument: string): DeepLink | null {
+function captureLink(capture: TextCaptureKind, url: URL, argument: string): DeepLink | null {
   if (argument !== '') {
     return null
   }

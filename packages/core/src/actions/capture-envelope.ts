@@ -81,14 +81,27 @@ export type CaptureWireMessage = z.infer<typeof captureWireMessageSchema>
  */
 export const TEXT_CAPTURE_MAX_LENGTH = 10_000
 
-/** What a text capture materializes as: a plain bullet or an open task. */
-export const textCaptureKindSchema = z.enum(['text', 'task'])
+/**
+ * What a text capture materializes as on the capture-day daily note. One
+ * vocabulary end-to-end: the `reflect://append`/`reflect://task` URL verb IS
+ * the envelope kind IS the drain behavior (`- ` bullet / `- [ ]` task).
+ */
+export const textCaptureKindSchema = z.enum(['append', 'task'])
 
 /**
- * A deep-link write (`reflect://append?text=…` / `reflect://task?text=…`),
+ * Where a text capture originated. Deliberately separate from
+ * {@link captureSourceSchema} and from the envelope *shape*: provenance and
+ * shape are different axes, so a future producer (an iOS share sheet, a
+ * widget) joins by adding a member here — never by growing a new envelope
+ * variant.
+ */
+export const textCaptureSourceSchema = z.enum(['deep-link'])
+
+/**
+ * A text write (`reflect://append?text=…` / `reflect://task?text=…`),
  * spooled into the same capture inbox the native-messaging host writes. One
  * single line of plain text — the drain appends it to the capture-day daily
- * note as a bullet (`text`) or an open task (`task`), so an envelope can
+ * note as a bullet (`append`) or an open task (`task`), so an envelope can
  * never smuggle extra markdown blocks into the graph.
  */
 export const textCaptureEnvelopeSchema = z.object({
@@ -107,22 +120,23 @@ export const textCaptureEnvelopeSchema = z.object({
     .regex(/^[^\r\n]+$/, 'must be a single line'),
   /** When the link fired, ISO-8601 — decides the daily note it lands on. */
   capturedAt: z.iso.datetime({ offset: true }),
-  /** Text captures only ever come from the URL scheme. */
-  source: z.literal('deep-link'),
+  /** Where the capture came from. */
+  source: textCaptureSourceSchema,
 })
 
 export type TextCaptureEnvelope = z.infer<typeof textCaptureEnvelopeSchema>
 export type TextCaptureKind = z.infer<typeof textCaptureKindSchema>
+export type TextCaptureSource = z.infer<typeof textCaptureSourceSchema>
 
 /**
  * Anything the capture inbox can legally hold: a link capture from the
- * browser extension, or a text capture from a deep link — dispatched on the
- * `source` literal both shapes carry.
+ * browser extension, or a text capture. Dispatch is by **shape** — the
+ * `kind` discriminator text envelopes carry and link envelopes lack (they
+ * predate it on the wire) — never by `source`, which names provenance and
+ * widens independently of shape. Text envelopes parse first so `kind` is
+ * honored before the link shape gets a say.
  */
-export const inboxEnvelopeSchema = z.discriminatedUnion('source', [
-  textCaptureEnvelopeSchema,
-  captureEnvelopeSchema,
-])
+export const inboxEnvelopeSchema = z.union([textCaptureEnvelopeSchema, captureEnvelopeSchema])
 
 export type InboxEnvelope = z.infer<typeof inboxEnvelopeSchema>
 

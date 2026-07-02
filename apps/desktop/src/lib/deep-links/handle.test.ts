@@ -113,7 +113,7 @@ describe('handleDeepLink', () => {
     const [name, json, generation] = spoolMock.mock.calls[0]!
     const envelope = textCaptureEnvelopeSchema.parse(JSON.parse(json))
     expect(name).toBe(`${envelope.id}.json`)
-    expect(envelope.kind).toBe('text')
+    expect(envelope.kind).toBe('append')
     expect(envelope.text).toBe('call the bank')
     expect(generation).toBe(3)
     expect(navigate).not.toHaveBeenCalled()

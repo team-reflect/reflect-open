@@ -435,7 +435,9 @@ export async function drainCaptureInbox(
         continue
       }
 
-      if (envelope.source === 'deep-link') {
+      // Dispatch by shape: `kind` is what makes a text capture, whoever
+      // produced it (deep link today, a share sheet tomorrow).
+      if ('kind' in envelope) {
         if (await drainTextCapture(envelope, input.generation)) {
           deduped += 1
         }
@@ -539,8 +541,8 @@ function parseEnvelope(raw: string): InboxEnvelope | null {
 }
 
 /**
- * Materialize a deep-link text capture: append the payload to the capture-day
- * daily note as a plain bullet (`text`) or an open task (`task`), creating the
+ * Materialize a text capture: append the payload to the capture-day daily
+ * note as a plain bullet (`append`) or an open task (`task`), creating the
  * daily lazily like the link path does. Presence-guarded on the exact line —
  * that is both the crash-safety story (a re-drain after a crash between the
  * append and the spool removal cannot double-append) and the dedupe rule.

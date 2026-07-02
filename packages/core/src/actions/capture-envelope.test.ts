@@ -92,7 +92,7 @@ describe('captureAckSchema', () => {
 const VALID_TEXT = {
   version: 1,
   id: 'a1b2c3d4-0000-4000-8000-000000000001',
-  kind: 'text',
+  kind: 'append',
   text: 'call the bank',
   capturedAt: '2026-06-12T15:30:22.845Z',
   source: 'deep-link',
@@ -112,7 +112,7 @@ describe('textCaptureEnvelopeSchema', () => {
     ['multi-line text', { ...VALID_TEXT, text: 'one\ntwo' }],
     ['over-cap text', { ...VALID_TEXT, text: 'a'.repeat(TEXT_CAPTURE_MAX_LENGTH + 1) }],
     ['unknown kind', { ...VALID_TEXT, kind: 'note' }],
-    ['extension source', { ...VALID_TEXT, source: 'extension' }],
+    ['unknown source', { ...VALID_TEXT, source: 'carrier-pigeon' }],
     ['non-uuid id', { ...VALID_TEXT, id: 'nope' }],
   ])('rejects %s', (_label, candidate) => {
     expect(textCaptureEnvelopeSchema.safeParse(candidate).success).toBe(false)
@@ -120,7 +120,7 @@ describe('textCaptureEnvelopeSchema', () => {
 })
 
 describe('inboxEnvelopeSchema', () => {
-  it('routes link envelopes and text envelopes to their shapes', () => {
+  it('dispatches on shape: `kind` makes a text envelope, its absence a link one', () => {
     expect(inboxEnvelopeSchema.parse(VALID)).toEqual(VALID)
     expect(inboxEnvelopeSchema.parse(VALID_TEXT)).toEqual(VALID_TEXT)
   })

@@ -1,4 +1,4 @@
-import { TEXT_CAPTURE_MAX_LENGTH } from '@reflect/core'
+import { TEXT_CAPTURE_MAX_LENGTH, type TextCaptureKind } from '@reflect/core'
 import type { Route } from '@/routing/route'
 
 /**
@@ -18,9 +18,6 @@ export const DEEP_LINK_SCHEME = 'reflect'
  */
 export const DEEP_LINK_TEXT_MAX_LENGTH = TEXT_CAPTURE_MAX_LENGTH
 
-/** The two write verbs — both land in the capture inbox, never in a note directly. */
-export type DeepLinkCaptureKind = 'text' | 'task'
-
 /**
  * A parsed deep link:
  *
@@ -29,8 +26,10 @@ export type DeepLinkCaptureKind = 'text' | 'task'
  * - `openNote` — `note/<target>`, where `<target>` still needs resolution
  *   (frontmatter id → date → title → alias) against the open graph's index.
  * - `capture` — `append`/`task` write links, spooled into `.reflect/inbox/`.
+ *   The capture kind is core's {@link TextCaptureKind} — the URL verb, the
+ *   envelope kind, and the drain behavior share the one vocabulary.
  */
 export type DeepLink =
   | { kind: 'navigate'; route: Route }
   | { kind: 'openNote'; target: string }
-  | { kind: 'capture'; capture: DeepLinkCaptureKind; text: string }
+  | { kind: 'capture'; capture: TextCaptureKind; text: string }

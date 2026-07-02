@@ -271,6 +271,8 @@ export {
   captureWireMessageSchema,
   inboxEnvelopeSchema,
   textCaptureEnvelopeSchema,
+  textCaptureKindSchema,
+  textCaptureSourceSchema,
   TEXT_CAPTURE_MAX_LENGTH,
   type CaptureAck,
   type CaptureEnvelope,
@@ -279,6 +281,7 @@ export {
   type InboxEnvelope,
   type TextCaptureEnvelope,
   type TextCaptureKind,
+  type TextCaptureSource,
 } from './actions/capture-envelope'
 export {
   captureFromPath,
