@@ -3,7 +3,6 @@ import { hasBridge } from '@reflect/core'
 import { App } from '@/app'
 import { LargeAttachmentDialog } from '@/components/large-attachment-dialog'
 import { OperationsStatus } from '@/components/operations-status'
-import { UnusedAssetsDialog } from '@/components/unused-assets-dialog'
 import { UpdateToast } from '@/components/update-toast'
 import { Toaster } from '@/components/ui/sonner'
 import { WindowDragRegion } from '@/components/window-drag-region'
@@ -39,7 +38,6 @@ export function DesktopRoot(): ReactElement {
           <Toaster />
           <OperationsStatus />
           <LargeAttachmentDialog />
-          <UnusedAssetsDialog />
           <UpdateToast />
         </TooltipProvider>
       </GraphProvider>

@@ -52,16 +52,6 @@ export async function createAsset(
 }
 
 /**
- * Send an asset file to the OS trash (recoverable), pinned to `generation`.
- * The Rust command trashes any traversal-guarded graph-relative file — its
- * `note_` name predates assets. Assets aren't indexed as documents, so no
- * index echo is needed.
- */
-export async function deleteAsset(path: string, generation: number): Promise<void> {
-  await call('note_delete', { path, generation }, voidSchema)
-}
-
-/**
  * Copy a file the OS handed us a real path for (file picker) into the graph's
  * `assets/` folder as `desiredName`, with the same collision policy and
  * return value as {@link createAsset}. The copy happens file-to-file in Rust;

@@ -7,7 +7,6 @@ import {
   toggleDevtools,
   untitledNotePath,
 } from '@reflect/core'
-import { openUnusedAssetsDialog } from '@/components/unused-assets-dialog'
 import { attachFilesToNote } from '@/lib/attach-files'
 import { runCopyDeepLink } from '@/lib/note-deep-link'
 import { runGistPublish } from '@/lib/note-gist'
@@ -181,14 +180,6 @@ const APP_COMMANDS: AppCommand[] = [
     // file on the note). No default keybinding: the palette keeps it
     // keyboard-reachable without spending a shortcut.
     run: (context) => attachFilesToNote(context),
-  },
-  {
-    id: 'graph.unusedAssets',
-    title: 'Find unused assets',
-    keywords: ['orphan', 'attachments', 'cleanup', 'storage', 'files'],
-    // Lists assets/ files no note links to (deleting a link leaves the file),
-    // with delete as an explicit per-file choice — never automatic GC.
-    run: () => openUnusedAssetsDialog(),
   },
   {
     id: 'note.copyDeepLink',
