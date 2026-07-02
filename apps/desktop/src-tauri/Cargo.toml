@@ -62,7 +62,7 @@ xattr = "1.6.1"
 # Apple Calendar read-only bridge (`src/calendar.rs`): EventKit through the
 # objc2 bindings, trimmed to the classes the module touches. objc2-app-kit is
 # only here for EKCalendar's NSColor → hex conversion.
-objc2 = "0.6.3"
+objc2 = "0.6.4"
 block2 = "0.6.2"
 objc2-foundation = { version = "0.3.2", default-features = false, features = [
   "std",
@@ -102,7 +102,7 @@ objc2-app-kit = { version = "0.3.2", default-features = false, features = [
 objc2 = "0.6.4"
 objc2-foundation = "0.3.2"
 objc2-contacts = "0.3.2"
-block2 = "0.6.1"
+block2 = "0.6.2"
 
 # Desktop-only capabilities (Plan 19): auto-update (mobile updates go through
 # the app stores), window-state (no windows to restore on mobile), the file
@@ -124,18 +124,18 @@ tauri-plugin-deep-link = "2.4.9"
 tauri-plugin-single-instance = { version = "2.4.2", features = ["deep-link"] }
 
 [target.'cfg(all(not(any(target_os = "android", target_os = "ios")), not(all(target_os = "macos", target_arch = "x86_64"))))'.dependencies]
-fastembed = "5.13.0"
+fastembed = "5.17.2"
 
 [target.'cfg(all(target_os = "macos", target_arch = "x86_64"))'.dependencies]
 # fastembed 5.14+ pins ONNX Runtime API 24, but upstream ONNX Runtime 1.24
 # no longer ships macOS x86_64 binaries. Stay on API 23 for Intel until the
 # upstream binary set comes back or we replace the backend.
-fastembed = { version = ">=5.13.0, <5.14.0", default-features = false, features = [
+fastembed = { version = ">=5.17.2, <5.18.0", default-features = false, features = [
   "hf-hub-native-tls",
   "image-models",
   "ort-load-dynamic",
 ] }
-ort = { version = "=2.0.0-rc.11", default-features = false, features = [
+ort = { version = "=2.0.0-rc.12", default-features = false, features = [
   "ndarray",
   "std",
   "load-dynamic",
