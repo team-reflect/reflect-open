@@ -6,11 +6,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { dispatchDeepLink } from '@/lib/deep-links/intake'
 import { NoteEditor } from './note-editor'
+import { setTouchEditorSurface } from './touch-surface'
 
 /** Props the mocked `<MeowdownEditor>` captures so the test can drive its callbacks. */
 interface CapturedEditorProps {
   mode?: 'hide' | 'focus' | 'show' | 'source'
   editorClassName?: string
+  spellCheck?: boolean
   children?: ReactNode
   resolveImageUrl?: (src: string) => string | undefined
   onImageClick?: (payload: { src: string; alt: string; event: MouseEvent }) => void
@@ -20,6 +22,12 @@ interface CapturedEditorProps {
 }
 
 const captured = vi.hoisted(() => ({ props: null as CapturedEditorProps | null }))
+
+/** The stub editor `useEditor` hands `EditorInputTraits` (see the mock below). */
+const editorStub = vi.hoisted(() => ({
+  mounted: true,
+  view: { dom: document.createElement('div') },
+}))
 
 vi.mock('@tauri-apps/plugin-opener', () => ({
   openUrl: vi.fn(async () => {}),
@@ -31,7 +39,9 @@ vi.mock('@/lib/deep-links/intake', () => ({
 
 // Stub the editor: capture its props and render the image-preview DOM shape
 // meowdown produces, so the source element lookup in `onImageClick` resolves.
+// `useEditor` backs `EditorInputTraits` (mounted inside the editor).
 vi.mock('@meowdown/react', () => ({
+  useEditor: () => editorStub,
   MeowdownEditor: (props: CapturedEditorProps) => {
     captured.props = props
     return (
@@ -129,6 +139,50 @@ describe('NoteEditor markdown syntax mode', () => {
   it('passes an explicit markdown syntax mode to meowdown', () => {
     render(<NoteEditor initialContent="" markMode="show" />)
     expect(captured.props?.mode).toBe('show')
+  })
+})
+
+describe('NoteEditor touch-surface input hygiene', () => {
+  afterEach(() => {
+    setTouchEditorSurface(false)
+    editorStub.mounted = true
+    editorStub.view.dom = document.createElement('div')
+  })
+
+  it('passes the spellcheck setting through on desktop', () => {
+    render(<NoteEditor initialContent="" spellCheck={true} />)
+    expect(captured.props?.spellCheck).toBe(true)
+  })
+
+  it('pins spellcheck off on the touch surface (iOS smart-punctuation gate)', () => {
+    setTouchEditorSurface(true)
+    render(<NoteEditor initialContent="" spellCheck={true} />)
+    expect(captured.props?.spellCheck).toBe(false)
+  })
+
+  it('sets explicit input traits on the contenteditable on the touch surface', () => {
+    setTouchEditorSurface(true)
+    render(<NoteEditor initialContent="" />)
+    expect(editorStub.view.dom.getAttribute('autocapitalize')).toBe('sentences')
+    expect(editorStub.view.dom.getAttribute('autocorrect')).toBe('on')
+  })
+
+  it('retries until the editor view mounts (traits are never silently skipped)', async () => {
+    setTouchEditorSurface(true)
+    editorStub.mounted = false
+    render(<NoteEditor initialContent="" />)
+    expect(editorStub.view.dom.hasAttribute('autocapitalize')).toBe(false)
+
+    editorStub.mounted = true
+    await waitFor(() => {
+      expect(editorStub.view.dom.getAttribute('autocapitalize')).toBe('sentences')
+    })
+  })
+
+  it('leaves the contenteditable untouched on desktop', () => {
+    render(<NoteEditor initialContent="" />)
+    expect(editorStub.view.dom.hasAttribute('autocapitalize')).toBe(false)
+    expect(editorStub.view.dom.hasAttribute('autocorrect')).toBe(false)
   })
 })
 

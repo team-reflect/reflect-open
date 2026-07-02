@@ -143,7 +143,8 @@ ort = { version = "=2.0.0-rc.11", default-features = false, features = [
 
 # Mobile-only capabilities (Plan 19): the first-party keyboard bridge — no
 # software keyboard on desktop. (Sharing uses the webview's Web Share API,
-# `navigator.share`, so it needs no native plugin.)
+# `navigator.share`, so it needs no native plugin; haptics ride the keyboard
+# plugin's `impact_light` command.)
 [target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
 tauri-plugin-keyboard = { path = "../../../plugins/tauri-plugin-keyboard" }
 

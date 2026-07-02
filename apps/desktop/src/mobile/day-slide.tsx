@@ -68,9 +68,9 @@ export function DaySlide({
     <div
       ref={containerRef}
       className="h-full overflow-y-auto"
-      style={{
-        paddingBottom: 'max(env(safe-area-inset-bottom), var(--keyboard-height, 0px))',
-      }}
+      // Keyboard avoidance is the shell root's job (it ends at the keyboard's
+      // top); this only clears the home indicator when the keyboard is down.
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       onScroll={handleScroll}
     >
       <div ref={contentRef}>

@@ -5,6 +5,7 @@ import {
   EMPTY_ALL_NOTES_FILTERS,
   type AllNotesFilters,
 } from '@/mobile/search-filters/filter-state'
+import { useKeyboardVisible } from '@/mobile/use-keyboard'
 import { useWakeToToday } from '@/mobile/use-wake-to-today'
 import { useRouter } from '@/routing/router'
 
@@ -20,6 +21,7 @@ export function MobileShell(): ReactElement {
   const [allQuery, setAllQuery] = useState('')
   const [allFilters, setAllFilters] = useState<AllNotesFilters>(EMPTY_ALL_NOTES_FILTERS)
   const [lastTab, setLastTab] = useState<MobileTab>('daily')
+  const keyboardVisible = useKeyboardVisible()
   // V1's wake-to-today: foregrounding on a new calendar date lands on today.
   useWakeToToday()
 
@@ -47,7 +49,15 @@ export function MobileShell(): ReactElement {
   }
 
   return (
-    <div className="flex h-dvh w-screen flex-col">
+    // The shell yields to the software keyboard by height (Plan 19,
+    // decision 8): the root ends at the keyboard's top, so every screen's
+    // layout — and floating-ui's positioning boundary (`body`), which sizes
+    // the editor's autocomplete menus — sees the true visible viewport.
+    // Only `position: fixed` elements need `--keyboard-height` themselves.
+    <div
+      className="flex w-screen flex-col"
+      style={{ height: 'calc(100dvh - var(--keyboard-height, 0px))' }}
+    >
       <div className="min-h-0 flex-1">
         <MobileScreen
           allQuery={allQuery}
@@ -56,12 +66,16 @@ export function MobileShell(): ReactElement {
           onAllFiltersChange={setAllFilters}
         />
       </div>
-      <MobileTabBar
-        tab={tab}
-        onSelect={(next) =>
-          navigate(next === 'daily' ? { kind: 'today' } : { kind: 'allNotes', tag: null })
-        }
-      />
+      {/* V1 lets the keyboard cover the tab bar; with the root shrunk it
+          would ride above the keyboard instead, so it hides while typing. */}
+      {keyboardVisible ? null : (
+        <MobileTabBar
+          tab={tab}
+          onSelect={(next) =>
+            navigate(next === 'daily' ? { kind: 'today' } : { kind: 'allNotes', tag: null })
+          }
+        />
+      )}
     </div>
   )
 }

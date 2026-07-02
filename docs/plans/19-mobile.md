@@ -253,6 +253,17 @@ tested with the editor spike. No accessory-bar class-swizzling (a V1-mobile
 lesson — that path was brittle); a webview-drawn formatting bar can come
 later on the height events.
 
+> **Refined 2026-07-02 (PR #477): the shell yields by height, not padding.**
+> Per-container `max(safe-area, keyboard)` padding fixed scroll reach but
+> left the *layout* (and floating-ui's positioning boundary) extending under
+> the keyboard, so every floating surface — the `[[` autocomplete first —
+> needed its own fitting workaround. Instead, the mobile shell root is
+> `calc(100dvh - var(--keyboard-height))`: one yield point, correct popup
+> positioning for free, containers keep plain safe-area padding, and only
+> `position: fixed` elements (viewport-anchored) read the variable directly.
+> The tab bar hides while the keyboard is up — V1 let the keyboard cover it,
+> and above the keyboard it would just eat typing space.
+
 ### 9. App identity & store
 
 The bundle identifier and `ios.project.yml` predate this plan

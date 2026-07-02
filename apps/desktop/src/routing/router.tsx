@@ -39,6 +39,15 @@ interface RouterValue {
    * while already on today re-scrolls the stream to today).
    */
   arrivalSeq: number
+  /**
+   * True when the latest arrival asked the destination to focus its editor
+   * (`navigate(route, { focusEditor: true })`) — the mobile focus contract
+   * (Plan 19): a wiki-link or backlink tap restores focus (and the keyboard)
+   * on the destination note, while plain arrivals and back/forward stay calm.
+   * One-shot by construction: the next navigate overwrites it and history
+   * moves clear it, so it can never leak onto a later, unrelated arrival.
+   */
+  arrivalFocusEditor: boolean
   navigate: (route: Route, options?: NavigateOptions) => void
   back: () => void
   forward: () => void
@@ -69,6 +78,12 @@ export interface NavigateOptions {
    * command arrivals omit it and re-anchor as before.
    */
   restoreSurfaceScroll?: boolean
+  /**
+   * Ask the destination to focus its editor on arrival — see
+   * {@link RouterValue.arrivalFocusEditor}. Consumed by the mobile note
+   * screen; desktop's note route autofocuses every arrival and ignores it.
+   */
+  focusEditor?: boolean
 }
 
 /**
@@ -112,6 +127,7 @@ export function RouterProvider({
     index: 0,
   })
   const [arrivalSeq, setArrivalSeq] = useState(0)
+  const [arrivalFocusEditor, setArrivalFocusEditor] = useState(false)
   const nextId = useRef(1)
   /** Scroll offsets by entry id — a ref so scroll reporting never re-renders. */
   const scrollById = useRef(new Map<number, number>())
@@ -173,15 +189,18 @@ export function RouterProvider({
       return { stack, index: stack.length - 1 }
     })
     setArrivalSeq((seq) => seq + 1)
+    setArrivalFocusEditor(options?.focusEditor === true)
   }, [])
 
   const back = useCallback(() => {
+    setArrivalFocusEditor(false) // history moves are never focus arrivals
     setHistory((current) =>
       current.index > 0 ? { ...current, index: current.index - 1 } : current,
     )
   }, [])
 
   const forward = useCallback(() => {
+    setArrivalFocusEditor(false)
     setHistory((current) =>
       current.index < current.stack.length - 1 ? { ...current, index: current.index + 1 } : current,
     )
@@ -236,6 +255,7 @@ export function RouterProvider({
       route: entry.route,
       entryId: entry.id,
       arrivalSeq,
+      arrivalFocusEditor,
       navigate,
       back,
       forward,
@@ -248,6 +268,7 @@ export function RouterProvider({
   }, [
     history,
     arrivalSeq,
+    arrivalFocusEditor,
     navigate,
     back,
     forward,

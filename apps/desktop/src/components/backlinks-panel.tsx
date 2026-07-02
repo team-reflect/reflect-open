@@ -49,7 +49,15 @@ export function BacklinksPanel({ path }: BacklinksPanelProps): ReactElement | nu
   // and the header toggle must move them together, not just this instance.
   const [expanded, setExpanded] = useSessionFlag(EXPANDED_STORAGE_KEY, true)
   const groups = useMemo(() => (data ? groupBacklinksBySource(data) : []), [data])
-  const handleOpen = useCallback((target: string) => navigate(routeForPath(target)), [navigate])
+  const handleOpen = useCallback(
+    (target: string) => {
+      const route = routeForPath(target)
+      // A backlink tap restores focus on the destination (the mobile focus
+      // contract); desktop autofocuses note arrivals anyway.
+      navigate(route, { focusEditor: route.kind === 'note' })
+    },
+    [navigate],
+  )
 
   // A wiki link clicked *inside* a snippet resolves its target the same way the
   // editor does, distinct from `handleOpen` which opens an already-resolved

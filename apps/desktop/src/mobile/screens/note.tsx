@@ -1,4 +1,4 @@
-import { type ReactElement } from 'react'
+import { useState, type ReactElement } from 'react'
 import { isUntitledNotePath } from '@reflect/core'
 import { ChevronLeft } from 'lucide-react'
 import { NotePane } from '@/components/note-pane'
@@ -11,12 +11,19 @@ import { useRouter } from '@/routing/router'
  * (Plan 19). Lazy like the desktop note route, so a link to a not-yet-created
  * note opens an empty editor and the file is born on the first keystroke; a
  * fresh untitled note (`+`, V1 parity) autofocuses so the keyboard is up and
- * typing names it via the ghost-title flow. Back pops the history stack; a
- * cold entry (nothing to pop) lands on today instead.
+ * typing names it via the ghost-title flow. A wiki-link or backlink tap
+ * arrives with the router's `focusEditor` intent, so the destination restores
+ * focus too (the mobile focus contract) — while a plain arrival (All list,
+ * back) never raises the keyboard. Back pops the history stack; a cold entry
+ * (nothing to pop) lands on today instead.
  */
 export function MobileNote({ path }: { path: string }): ReactElement {
-  const { back, canBack, navigate } = useRouter()
+  const { back, canBack, navigate, arrivalFocusEditor } = useRouter()
   const untitled = isUntitledNotePath(path)
+  // Latched at mount (the screen is keyed by path, so a mount IS the
+  // arrival): the editor appears only after the document loads, and by then
+  // a background navigation could have rewritten the arrival intent.
+  const [focusRequested] = useState(arrivalFocusEditor)
 
   return (
     <div className="flex h-full w-screen flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
@@ -40,12 +47,15 @@ export function MobileNote({ path }: { path: string }): ReactElement {
       </header>
       <main
         className="min-h-0 flex-1 overflow-y-auto"
-        style={{ paddingBottom: 'max(env(safe-area-inset-bottom), var(--keyboard-height, 0px))' }}
+        // Keyboard avoidance is the shell root's job (it ends at the
+        // keyboard's top); this only clears the home indicator when the
+        // keyboard is down.
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <NotePane
           path={path}
           lazy
-          autoFocus={untitled}
+          autoFocus={untitled || focusRequested}
           gutterClassName="px-4"
           editorClassName="min-h-[60dvh]"
         />

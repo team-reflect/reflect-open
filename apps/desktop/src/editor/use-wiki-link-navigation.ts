@@ -42,13 +42,17 @@ export function useWikiLinkNavigation(generation: number | null): (target: strin
             return
           }
           if (resolution.kind === 'resolved') {
-            navigate(routeForPath(resolution.ref))
+            const route = routeForPath(resolution.ref)
+            // A link tap is an intent to keep writing there: the arrival
+            // carries a focus request the mobile note screen consumes (Plan 19
+            // focus contract). Desktop autofocuses note arrivals anyway.
+            navigate(route, { focusEditor: route.kind === 'note' })
           } else if (isIsoDate(resolution.text)) {
             navigate({ kind: 'daily', date: resolution.text })
           } else if (generation !== null && resolution.text.trim() !== '') {
             const created = await createNoteWithTitle(resolution.text, generation)
             if (!unmountedRef.current) {
-              navigate({ kind: 'note', path: created })
+              navigate({ kind: 'note', path: created }, { focusEditor: true })
             }
           }
         } catch (err) {

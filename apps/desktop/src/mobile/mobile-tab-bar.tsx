@@ -12,9 +12,10 @@ interface MobileTabBarProps {
 
 /**
  * The V1-parity bottom tab bar: Daily (the chronological spine) and All
- * (every note + search). It sits at the very bottom of the shell — the
- * software keyboard simply covers it, as in V1; screens pad their own scroll
- * containers via `--keyboard-height` instead.
+ * (every note + search). It sits at the very bottom of the shell. In V1 the
+ * software keyboard simply covered it; the shell root now ends at the
+ * keyboard's top, so the shell hides the bar while the keyboard is up to
+ * keep that behavior.
  */
 export function MobileTabBar({ tab, onSelect }: MobileTabBarProps): ReactElement {
   return (

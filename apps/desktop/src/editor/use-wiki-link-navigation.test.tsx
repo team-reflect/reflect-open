@@ -20,8 +20,12 @@ function Host({ generation }: { generation: number | null }): ReactNode {
 }
 
 function RouteProbe(): ReactNode {
-  const { route } = useRouter()
-  return <output data-testid="route">{JSON.stringify(route)}</output>
+  const { route, arrivalFocusEditor } = useRouter()
+  return (
+    <output data-testid="route" data-focus={String(arrivalFocusEditor)}>
+      {JSON.stringify(route)}
+    </output>
+  )
 }
 
 function renderHost(generation: number | null = 1) {
@@ -53,23 +57,34 @@ describe('useWikiLinkNavigation', () => {
     view.unmount()
   })
 
-  it('treats an unresolved ISO date as a daily target', async () => {
+  it('arrives at a resolved note with the focus intent (the mobile focus contract)', async () => {
+    resolveWikiTarget.mockResolvedValue({ kind: 'resolved', ref: 'notes/target.md' })
+    const view = renderHost()
+    lastHandler?.('Target')
+    await waitFor(() => expect(currentRoute(view)).toContain('notes/target.md'))
+    expect(view.getByTestId('route').getAttribute('data-focus')).toBe('true')
+    view.unmount()
+  })
+
+  it('treats an unresolved ISO date as a daily target, without a focus intent', async () => {
     resolveWikiTarget.mockResolvedValue({ kind: 'unresolved', text: '2026-06-09' })
     const view = renderHost()
     lastHandler?.('2026-06-09')
     await waitFor(() => expect(currentRoute(view)).toContain('"daily"'))
     expect(currentRoute(view)).toContain('2026-06-09')
+    expect(view.getByTestId('route').getAttribute('data-focus')).toBe('false')
     expect(createNoteWithTitle).not.toHaveBeenCalled()
     view.unmount()
   })
 
-  it('creates and opens an unresolved title', async () => {
+  it('creates and opens an unresolved title, arriving with the focus intent', async () => {
     resolveWikiTarget.mockResolvedValue({ kind: 'unresolved', text: 'Brand New' })
     createNoteWithTitle.mockResolvedValue('notes/created.md')
     const view = renderHost(7)
     lastHandler?.('Brand New')
     await waitFor(() => expect(currentRoute(view)).toContain('notes/created.md'))
     expect(createNoteWithTitle).toHaveBeenCalledWith('Brand New', 7)
+    expect(view.getByTestId('route').getAttribute('data-focus')).toBe('true')
     view.unmount()
   })
 

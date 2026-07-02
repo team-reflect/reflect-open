@@ -156,6 +156,30 @@ describe('router', () => {
     expect(result.current.savedScroll()).toBe(120) // the tab restores only the new offset
   })
 
+  it('carries the focusEditor intent on the arrival that asked for it, one-shot', () => {
+    const { result } = routerHook()
+    expect(result.current.arrivalFocusEditor).toBe(false)
+
+    act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }, { focusEditor: true }))
+    expect(result.current.arrivalFocusEditor).toBe(true)
+
+    // The next arrival overwrites the intent — it can never leak onto a
+    // later, unrelated visit (the staleness class a keyed request store had).
+    act(() => result.current.navigate({ kind: 'note', path: 'notes/b.md' }))
+    expect(result.current.arrivalFocusEditor).toBe(false)
+  })
+
+  it('clears the focusEditor intent on history moves', () => {
+    const { result } = routerHook()
+    act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }, { focusEditor: true }))
+    act(() => result.current.back())
+    expect(result.current.arrivalFocusEditor).toBe(false)
+
+    act(() => result.current.forward())
+    expect(result.current.route).toEqual({ kind: 'note', path: 'notes/a.md' })
+    expect(result.current.arrivalFocusEditor).toBe(false)
+  })
+
   it('entryId is stable per entry and changes across back/forward', () => {
     const { result } = routerHook()
     const todayId = result.current.entryId

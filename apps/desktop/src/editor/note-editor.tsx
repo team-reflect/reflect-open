@@ -24,11 +24,13 @@ import {
   type TagSearchHandler,
   type WikilinkSearchHandler,
 } from '@meowdown/react'
+import { EditorInputTraits } from '@/editor/editor-input-traits'
 import {
   IMAGE_LIGHTBOX_TRANSITION_NAME,
   ImageLightbox,
   type LightboxImage,
 } from '@/editor/image-lightbox'
+import { isTouchEditorSurface } from '@/editor/touch-surface'
 import { useLightboxTransition } from '@/editor/use-lightbox-transition'
 import { dispatchDeepLink } from '@/lib/deep-links/intake'
 import { isDeepLinkUrl } from '@/lib/deep-links/parse'
@@ -327,7 +329,12 @@ export function NoteEditor({
         handleRef={innerRef}
         mode={markMode}
         initialMarkdown={initialContent}
-        spellCheck={spellCheck}
+        // On the touch surface spellcheck is pinned off regardless of the
+        // setting: iOS derives the keyboard's smart-quotes/smart-dashes traits
+        // from it at focus time, and smart punctuation corrupts markdown
+        // syntax ([[ wiki links, code spans, --- fences) — Plan 19 gate.
+        // Autocorrect is independent and stays on (EditorInputTraits).
+        spellCheck={isTouchEditorSurface() ? false : spellCheck}
         bulletAfterHeading={bulletAfterHeading}
         blockHandle={blockHandle}
         editorClassName={cn('reflect-editor', className)}
@@ -347,6 +354,7 @@ export function NoteEditor({
         onFilePaste={handleFilePaste}
         onExitBoundary={handleExitBoundary}
       >
+        <EditorInputTraits />
         {children}
       </MeowdownEditor>
       <ImageLightbox

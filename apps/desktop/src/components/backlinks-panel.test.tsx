@@ -19,8 +19,12 @@ vi.mock('@/providers/graph-provider', () => ({
 }))
 
 function RouteProbe(): ReactNode {
-  const { route } = useRouter()
-  return <output data-testid="route">{JSON.stringify(route)}</output>
+  const { route, arrivalFocusEditor } = useRouter()
+  return (
+    <output data-testid="route" data-focus={String(arrivalFocusEditor)}>
+      {JSON.stringify(route)}
+    </output>
+  )
 }
 
 function renderPanel(path: string) {
@@ -130,6 +134,9 @@ describe('BacklinksPanel', () => {
 
     await userEvent.click(view.getByText('Meeting Notes'))
     expect(view.getByTestId('route').textContent).toContain('notes/meeting.md')
+    // A backlink tap restores focus on the destination (the mobile focus
+    // contract) — the arrival carries the router's focusEditor intent.
+    expect(view.getByTestId('route').getAttribute('data-focus')).toBe('true')
     view.unmount()
   })
 

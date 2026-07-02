@@ -1,4 +1,4 @@
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,6 +10,7 @@ import type { Route } from '@/routing/route'
 import { addDaysIso, formatDayLabel, parseIsoDate, todayIso } from '@/lib/dates'
 import { monthLabel, weekOf } from './calendar'
 import { MobileShell } from './mobile-shell'
+import { publishKeyboardHeight } from './use-keyboard'
 
 // jsdom implements none of these; Embla (the day carousel) needs them to init.
 class ObserverStub {
@@ -42,11 +43,53 @@ globalThis.matchMedia ??= ((query: string) => ({
  * mirroring `route-content.test.tsx`.
  */
 
-vi.mock('@/editor/note-editor', () => ({
-  NoteEditor: ({ initialContent }: { initialContent: string }) => (
-    <div data-testid="fake-editor">{initialContent}</div>
-  ),
+const editorProbe = vi.hoisted(() => ({
+  focusCalls: 0,
 }))
+
+vi.mock('@/editor/note-editor', async () => {
+  const { useEffect } = await import('react')
+  return {
+    NoteEditor: ({
+      initialContent,
+      onWikiLinkClick,
+      handleRef,
+    }: {
+      initialContent: string
+      onWikiLinkClick?: (target: string) => void
+      handleRef?: (handle: import('@/editor/note-editor').NoteEditorHandle | null) => void
+    }) => {
+      useEffect(() => {
+        handleRef?.({
+          setMarkdown: () => {},
+          getMarkdown: () => '',
+          insertMarkdown: () => {},
+          focus: () => {
+            editorProbe.focusCalls += 1
+          },
+          setSelection: () => {},
+          getSelectedText: () => '',
+          openSelectionMenu: () => {},
+          startPendingReplacement: () => false,
+          appendPendingReplacementText: () => {},
+          acceptPendingReplacement: () => {},
+          discardPendingReplacement: () => {},
+        })
+        return () => handleRef?.(null)
+      }, [handleRef])
+      return (
+        <div data-testid="fake-editor">
+          {initialContent}
+          {onWikiLinkClick ? (
+            <button type="button" onClick={() => onWikiLinkClick('Target Note')}>
+              fake-wikilink
+            </button>
+          ) : null}
+        </div>
+      )
+    },
+  }
+})
 
 const indexFns = vi.hoisted(() => ({
   getBacklinksWithContext: vi.fn(async () => []),
@@ -86,10 +129,14 @@ setBridge({
   listen: async () => () => {},
 })
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  publishKeyboardHeight(0)
+})
 
 beforeEach(() => {
   files = {}
+  editorProbe.focusCalls = 0
   mockInvoke.mockReset()
   mockInvoke.mockImplementation(async (command, args) => {
     if (command === 'note_read') {
@@ -103,6 +150,9 @@ beforeEach(() => {
       const { path, contents } = args as { path: string; contents: string }
       files[path] = contents
       return null
+    }
+    if (command === 'note_exists') {
+      return (args as { path: string }).path in files
     }
     if (command === 'db_query') {
       return []
@@ -242,6 +292,31 @@ describe('MobileShell', () => {
     expect(view.getByRole('heading', { level: 1 }).textContent).toBe(monthLabel(todayIso()))
   })
 
+  it('restores editor focus on the destination of a wiki-link tap, but not on plain arrivals', async () => {
+    const user = userEvent.setup()
+    files['notes/source.md'] = 'see [[Target Note]]'
+    const view = mount({ kind: 'note', path: 'notes/source.md' })
+
+    // A plain arrival (cold entry, All list, back-nav) must not focus — on
+    // touch that would raise the keyboard while browsing.
+    await waitFor(() => {
+      expect(view.getByTestId('fake-editor').textContent).toContain('see [[Target Note]]')
+    })
+    expect(editorProbe.focusCalls).toBe(0)
+
+    // The tap resolves (unresolved title → create-from-unresolved), navigates,
+    // and the destination consumes the focus request when its editor mounts —
+    // the whole Plan 19 focus contract, end to end through the real router,
+    // NotePane, and document pipeline.
+    await user.click(view.getByRole('button', { name: 'fake-wikilink' }))
+    await waitFor(() => {
+      expect(view.getByRole('heading').textContent).not.toContain('source')
+    })
+    await waitFor(() => {
+      expect(editorProbe.focusCalls).toBe(1)
+    })
+  })
+
   it('switches tabs: All shows the searchable list, Daily returns to today', async () => {
     const user = userEvent.setup()
     const view = mount({ kind: 'today' })
@@ -252,6 +327,17 @@ describe('MobileShell', () => {
 
     await user.click(view.getByRole('button', { name: 'Daily' }))
     expect(view.getByRole('heading', { level: 1 }).textContent).toBe(monthLabel(todayIso()))
+  })
+
+  it('hides the tab bar while the software keyboard is up (V1: the keyboard covered it)', () => {
+    const view = mount({ kind: 'today' })
+    expect(view.getByRole('navigation', { name: 'Sections' })).toBeTruthy()
+
+    act(() => publishKeyboardHeight(316))
+    expect(view.queryByRole('navigation', { name: 'Sections' })).toBeNull()
+
+    act(() => publishKeyboardHeight(0))
+    expect(view.getByRole('navigation', { name: 'Sections' })).toBeTruthy()
   })
 
   it('renders a search entry as the All tab with the query seeded', async () => {

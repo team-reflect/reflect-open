@@ -10,6 +10,30 @@ later. This doc records what V1's editor did on mobile — most importantly
 the toolbar item set, which is the requirements list for that later
 toolbar — and the hard-won keyboard/focus lessons.
 
+> **Status (2026-07-02, PR #477): the code-side parity items shipped.**
+> Input hygiene: `spellcheck` is pinned off on the touch surface — WebKit
+> derives the keyboard's smart-quotes/smart-dashes traits from it at focus
+> time (not from `autocorrect`, which stays on for typo fixing) — and
+> `autocapitalize`/`autocorrect` are set explicitly (`EditorInputTraits`).
+> Focus contract: wiki-link taps and backlink rows navigate with the
+> router's one-shot `focusEditor` arrival intent, which the mobile note
+> screen consumes into `autoFocus`; plain arrivals and back/forward never
+> raise the keyboard; no V1-style 500 ms timer (focus fires on editor
+> mount, after the async document load). Keyboard avoidance is by
+> **layout, in one place**: the mobile shell root is
+> `calc(100dvh - var(--keyboard-height))`, so scroll containers, the
+> editor, and floating-ui's positioning boundary (`body`) all end at the
+> keyboard's top — the `[[`/`#`/`/` menus position inside the visible
+> viewport with no per-popup fitting, and only `position: fixed` elements
+> (the `+` button) read the variable themselves. The tab bar hides while
+> the keyboard is up (V1 let the keyboard cover it). Checkbox-toggle
+> haptics ride the keyboard plugin's `impact_light` command like the
+> date/tab taps. **Still owed to the spike-B gate:** the simulator/
+> on-device pass — smart-punctuation typing test, whether programmatic
+> `focus()` raises the keyboard in wry's WKWebView, menu tappability,
+> caret visibility, haptic feel — plus focus restore for wiki links
+> resolving to *daily* notes (the daily surface owns that).
+
 ## What V1 mobile does
 
 ### Editor configuration

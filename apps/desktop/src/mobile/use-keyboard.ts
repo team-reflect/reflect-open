@@ -1,10 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import { addPluginListener, invoke } from '@tauri-apps/api/core'
 import { z } from 'zod'
 
 const keyboardStateSchema = z.object({ height: z.number(), duration: z.number() })
 
 let currentKeyboardHeight = 0
+const keyboardListeners = new Set<() => void>()
 
 /**
  * The last published keyboard overlap in px — `0` when the keyboard is closed.
@@ -21,7 +22,34 @@ export function getKeyboardHeight(): number {
  * without the Tauri bridge.
  */
 export function publishKeyboardHeight(height: number): void {
+  if (height === currentKeyboardHeight) {
+    return
+  }
   currentKeyboardHeight = height
+  for (const listener of keyboardListeners) {
+    listener()
+  }
+}
+
+function subscribeKeyboard(listener: () => void): () => void {
+  keyboardListeners.add(listener)
+  return () => {
+    keyboardListeners.delete(listener)
+  }
+}
+
+function keyboardVisibleSnapshot(): boolean {
+  return currentKeyboardHeight > 0
+}
+
+/**
+ * Whether the software keyboard is up, as reactive state. The tab bar hides
+ * on it — with the shell root sized to end at the keyboard's top (decision 8),
+ * the bar would otherwise ride up above the keyboard, and V1 lets the
+ * keyboard cover it instead.
+ */
+export function useKeyboardVisible(): boolean {
+  return useSyncExternalStore(subscribeKeyboard, keyboardVisibleSnapshot, keyboardVisibleSnapshot)
 }
 
 /**
@@ -29,9 +57,12 @@ export function publishKeyboardHeight(height: number): void {
  * the document root (Plan 19, decision 8). The Swift half of
  * `tauri-plugin-keyboard` keeps the webview at its full-screen frame and
  * disables the system's scroll nudging, so layout owns keyboard avoidance:
- * containers pad their bottom by the variable to keep content reachable. The
- * height is also published to {@link getKeyboardHeight} for non-layout
- * consumers (the day carousel disables swiping while the keyboard is up).
+ * the mobile shell root sizes itself to `calc(100dvh - var(--keyboard-height))`,
+ * ending the layout — and floating-ui's positioning boundary (`body`) — at
+ * the keyboard's top. Only viewport-anchored (`position: fixed`) elements
+ * still read the variable directly. The height is also published to
+ * {@link getKeyboardHeight} / {@link useKeyboardVisible} for non-layout
+ * consumers (the carousel's swipe guard, the tab bar hiding).
  */
 export function useKeyboardHeightVar(): void {
   useEffect(() => {
