@@ -20,12 +20,20 @@ export function DeepLinkProvider({ graph, children }: DeepLinkProviderProps): Re
   const { navigate } = useRouter()
 
   useEffect(() => {
+    // Flips on teardown (graph switch): a note resolution still in flight then
+    // answers against the wrong graph's index and must not navigate.
+    let stale = false
     setDeepLinkHandler((url) => {
-      handleDeepLink(url, { navigate, generation: graph.generation }).catch((cause: unknown) => {
+      handleDeepLink(url, {
+        navigate,
+        generation: graph.generation,
+        isStale: () => stale,
+      }).catch((cause: unknown) => {
         console.error('deep link failed:', url, cause)
       })
     })
     return () => {
+      stale = true
       setDeepLinkHandler(null)
     }
   }, [navigate, graph.generation])

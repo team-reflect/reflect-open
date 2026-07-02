@@ -116,10 +116,13 @@ export type TextCaptureKind = z.infer<typeof textCaptureKindSchema>
 
 /**
  * Anything the capture inbox can legally hold: a link capture from the
- * browser extension, or a text capture from a deep link. Text envelopes are
- * tried first — they carry the `kind` discriminator link envelopes lack.
+ * browser extension, or a text capture from a deep link — dispatched on the
+ * `source` literal both shapes carry.
  */
-export const inboxEnvelopeSchema = z.union([textCaptureEnvelopeSchema, captureEnvelopeSchema])
+export const inboxEnvelopeSchema = z.discriminatedUnion('source', [
+  textCaptureEnvelopeSchema,
+  captureEnvelopeSchema,
+])
 
 export type InboxEnvelope = z.infer<typeof inboxEnvelopeSchema>
 

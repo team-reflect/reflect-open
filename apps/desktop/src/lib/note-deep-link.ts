@@ -1,5 +1,6 @@
 import { dateFromDailyPath, errorMessage, isDaily, parseNote } from '@reflect/core'
 import { newNoteId } from '@/lib/create-note'
+import { isIsoDate } from '@/lib/dates'
 import { dailyDeepLink, noteDeepLink } from '@/lib/deep-links/format'
 import { commitNoteFrontmatter, readNoteSource } from '@/lib/note-frontmatter'
 import { startOperation } from '@/lib/operations'
@@ -15,11 +16,12 @@ import { startOperation } from '@/lib/operations'
 export async function deepLinkForNote(path: string, generation: number): Promise<string> {
   if (isDaily(path)) {
     const date = dateFromDailyPath(path)
-    if (date !== null) {
+    // Calendar-validated like `routeForPath`: a daily/ file with an impossible
+    // date (2026-02-31) routes as a plain note everywhere else, so it gets a
+    // note address too — a date form would be a link the parser rejects.
+    if (date !== null && isIsoDate(date)) {
       return dailyDeepLink(date)
     }
-    // A daily/ file with an impossible calendar date routes as a plain note
-    // everywhere else (routeForPath), so give it a note address too.
   }
   const source = await readNoteSource(path)
   const existing = parseNote({ path, source }).frontmatter.id

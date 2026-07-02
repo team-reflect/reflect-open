@@ -32,6 +32,17 @@ describe('deepLinkForNote', () => {
     expect(writeNote).not.toHaveBeenCalled()
   })
 
+  it('addresses an impossible-date daily file like a plain note (mints an id)', async () => {
+    // `routeForPath` opens daily/2026-02-31.md as a plain note; a date-form
+    // link would be one the parser rejects.
+    readNote.mockResolvedValue('# Not a real day\n')
+
+    const url = await deepLinkForNote('daily/2026-02-31.md', 3)
+
+    expect(url.startsWith('reflect://note/')).toBe(true)
+    expect(writeNote).toHaveBeenCalled()
+  })
+
   it('uses the existing frontmatter id without writing', async () => {
     readNote.mockResolvedValue('---\nid: 01hzy3v9k2m4n6p8q0r2s4t6vw\n---\n# A\n')
 

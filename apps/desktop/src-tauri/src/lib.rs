@@ -125,6 +125,19 @@ pub fn run() {
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_deep_link::init());
 
+    // Where the bundle doesn't register the scheme, do it at runtime: Linux
+    // desktop entries, and Windows dev builds (the installer writes the
+    // registry keys in production; macOS reads CFBundleURLTypes). Best-effort
+    // — a headless Linux box without xdg-mime must not fail the launch.
+    #[cfg(any(target_os = "linux", all(windows, debug_assertions)))]
+    let builder = builder.setup(|app| {
+        use tauri_plugin_deep_link::DeepLinkExt;
+        if let Err(err) = app.deep_link().register_all() {
+            tracing::warn!(error = %err, "deep-link scheme registration failed");
+        }
+        Ok(())
+    });
+
     // Auto-update is desktop-only: updates verify against the minisign pubkey
     // in tauri.conf.json (`plugins.updater`), and `process` provides the
     // post-install relaunch. Mobile updates go through the app stores.

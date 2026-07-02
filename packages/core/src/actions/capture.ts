@@ -551,7 +551,10 @@ async function drainTextCapture(envelope: TextCaptureEnvelope, generation: numbe
   const daily = dailyPath(captureLocalDate(new Date(envelope.capturedAt)))
   const dailySource = await noteSource(daily, generation)
   const line = envelope.kind === 'task' ? `- [ ] ${envelope.text}` : `- ${envelope.text}`
-  if (dailySource.includes(line)) {
+  // Whole-line equality, not `includes`: "- buy milk" is a substring of an
+  // unrelated "- buy milk and eggs", and a false match here would remove the
+  // spool file without ever writing the capture.
+  if (dailySource.split('\n').some((existing) => existing === line)) {
     return true
   }
   await writeNote(daily, appendBlock(dailySource, line), generation)

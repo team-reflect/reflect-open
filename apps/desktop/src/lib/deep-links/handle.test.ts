@@ -72,6 +72,29 @@ describe('handleDeepLink', () => {
     expect(operationHandle.fail).toHaveBeenCalledWith('Note not found: ghost')
   })
 
+  it('surfaces a resolution failure instead of rejecting the handler', async () => {
+    resolveMock.mockRejectedValue(new Error('index unavailable'))
+
+    await expect(handle('reflect://note/Project%20X')).resolves.toBeUndefined()
+
+    expect(navigate).not.toHaveBeenCalled()
+    expect(startOperationMock).toHaveBeenCalledWith('Opening link')
+    expect(operationHandle.fail).toHaveBeenCalled()
+  })
+
+  it('drops a resolution that finished after the graph session ended', async () => {
+    resolveMock.mockResolvedValue('notes/project-x.md')
+
+    await handleDeepLink('reflect://note/Project%20X', {
+      navigate,
+      generation: 3,
+      isStale: () => true,
+    })
+
+    expect(navigate).not.toHaveBeenCalled()
+    expect(startOperationMock).not.toHaveBeenCalled()
+  })
+
   it('surfaces a failure on a URL the grammar rejects', async () => {
     await handle('reflect://edit-notes?content=evil')
 

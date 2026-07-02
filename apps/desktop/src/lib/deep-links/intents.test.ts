@@ -48,6 +48,15 @@ describe('deep-link intake', () => {
     expect(handler).toHaveBeenCalledWith('reflect://note/launch-target')
   })
 
+  it('retries after a failed subscription instead of latching disabled', async () => {
+    onOpenUrlMock.mockRejectedValueOnce(new Error('plugin not ready'))
+
+    await expect(startDeepLinkListener()).rejects.toThrow('plugin not ready')
+    await startDeepLinkListener()
+
+    expect(onOpenUrlMock).toHaveBeenCalledTimes(2)
+  })
+
   it('delivers straight to an attached handler', async () => {
     await startDeepLinkListener()
     const handler = vi.fn()

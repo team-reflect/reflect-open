@@ -506,6 +506,16 @@ describe('drainCaptureInbox (text captures)', () => {
     expect(files.get(DAILY)).toBe('- morning standup\n\n- call the bank\n')
   })
 
+  it('still appends when an existing line merely contains the capture as a substring', async () => {
+    files.set(DAILY, '- call the bank tomorrow morning\n')
+    addTextSpool(textEnvelope())
+
+    const outcome = await drain()
+
+    expect(outcome.deduped).toBe(0)
+    expect(files.get(DAILY)).toBe('- call the bank tomorrow morning\n\n- call the bank\n')
+  })
+
   it('re-draining after a crash between append and removal cannot double-append', async () => {
     files.set(DAILY, '- call the bank\n')
     addTextSpool(textEnvelope())
