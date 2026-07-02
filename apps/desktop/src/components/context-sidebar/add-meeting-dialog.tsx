@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactElement } from 'react'
 import { X } from 'lucide-react'
 import {
   addMeetingToDaily,
+  contactsAuthorizationStatus,
   defaultAttendees,
   errorMessage,
   isContactsReadable,
@@ -20,7 +21,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { useContactsAuthorization } from '@/hooks/use-contacts-authorization'
 import { formatTimeOfDay } from '@/lib/dates'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
@@ -47,7 +47,6 @@ const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
 export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps): ReactElement {
   const { settings } = useSettings()
   const { graph } = useGraph()
-  const contactsAuthorization = useContactsAuthorization()
   const [name, setName] = useState(event.title)
   const [attendees, setAttendees] = useState<MeetingAttendee[]>(() => defaultAttendees(event))
   const [newAttendee, setNewAttendee] = useState('')
@@ -92,15 +91,17 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
     setSubmitting(true)
     setError(null)
     try {
+      // The permission state is read at submit time, not dialog mount — the
+      // cached query may still be in flight (or stale after a System
+      // Settings trip), and a quick submit must not skip the pre-fill.
+      const lookupContacts =
+        settings.contactsEnabled && isContactsReadable(await contactsAuthorizationStatus())
       await addMeetingToDaily({
         date,
         title: name,
         attendees,
         backlinkMeeting: createNote,
-        lookupContacts:
-          settings.contactsEnabled &&
-          contactsAuthorization !== null &&
-          isContactsReadable(contactsAuthorization),
+        lookupContacts,
         startTime: formatTimeOfDay(new Date(event.startsAt), settings.timeFormat),
         generation: graph.generation,
       })

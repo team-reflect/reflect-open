@@ -216,10 +216,6 @@ describe('DailyEventsSection', () => {
     fireEvent.click(await screen.findByRole('button', { name: /standup/i }))
 
     await screen.findByText('Ada Lovelace')
-    // The gate reads the authorization query; submit only after it settles.
-    await waitFor(() =>
-      expect(queryClient.getQueryData(['contacts', 'authorization'])).toBe('authorized'),
-    )
     fireEvent.click(screen.getByRole('button', { name: /add to daily note/i }))
 
     await waitFor(() =>
