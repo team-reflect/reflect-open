@@ -42,14 +42,22 @@ export function NotePickerDrawer({
     enabled: open && hasBridge() && graph !== null,
   })
 
+  // Closing always drops the picker's search text — a dismissed search must
+  // not resurface on the next open.
+  const setOpen = (nextOpen: boolean): void => {
+    if (!nextOpen) {
+      setQuery('')
+    }
+    onOpenChange(nextOpen)
+  }
+
   const pick = (note: NoteFilterRef | null): void => {
     onPick(note)
-    setQuery('')
-    onOpenChange(false)
+    setOpen(false)
   }
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer open={open} onOpenChange={setOpen}>
       <DrawerContent>
         <DrawerTitle>{title}</DrawerTitle>
         <Input

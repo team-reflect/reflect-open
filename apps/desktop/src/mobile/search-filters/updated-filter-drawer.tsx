@@ -31,17 +31,25 @@ export function UpdatedFilterDrawer({
   const [fromIso, setFromIso] = useState('')
   const [toIso, setToIso] = useState('')
 
+  // Closing always drops the date inputs — a dismissed half-typed range must
+  // not resurface on the next open as if it were still intended.
+  const setOpen = (nextOpen: boolean): void => {
+    if (!nextOpen) {
+      setFromIso('')
+      setToIso('')
+    }
+    onOpenChange(nextOpen)
+  }
+
   const apply = (filter: UpdatedFilter | null): void => {
     onApply(filter)
-    setFromIso('')
-    setToIso('')
-    onOpenChange(false)
+    setOpen(false)
   }
 
   const range = updatedRangeFilter(fromIso, toIso)
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer open={open} onOpenChange={setOpen}>
       <DrawerContent>
         <DrawerTitle>Updated</DrawerTitle>
         <div className="flex flex-col">
