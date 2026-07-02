@@ -85,6 +85,16 @@ describe('SyncStatusPill', () => {
     expect(screen.queryByRole('status')).toBeNull()
   })
 
+  it('still shows engine states when the conflict count fails to load', async () => {
+    // Loading hides; a failed count must not — Offline/Needs attention are
+    // engine truth and would otherwise blank forever.
+    sync.backup = connected({ state: 'offline', message: 'Offline' })
+    vi.mocked(getConflictedNotes).mockRejectedValue(new Error('index unavailable'))
+    mount()
+
+    expect((await screen.findByRole('status')).textContent).toBe('Offline')
+  })
+
   it('shows Needs review while conflicted notes exist', async () => {
     vi.mocked(getConflictedNotes).mockResolvedValue([{ path: 'notes/a.md', title: 'A' }])
     mount()

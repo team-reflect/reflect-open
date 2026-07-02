@@ -22,13 +22,18 @@ export function useMobileSyncStatus(): MobileSyncStatus | null {
   const backup = sync?.backup ?? null
   const connected = backup !== null && backup.phase === 'connected'
 
-  const { data: conflicted } = useQuery({
+  const { data: conflicted, isError: countUnavailable } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'conflicted-notes'],
     queryFn: getConflictedNotes,
     enabled: hasBridge() && graph !== null && connected,
   })
 
-  if (backup === null || (connected && conflicted === undefined)) {
+  // Loading hides the status (no flip); a *failed* count must not — the
+  // engine-driven states (Syncing, Offline, Needs attention) don't depend on
+  // it, and blanking them over an unreadable index would hide real signal.
+  // The degradation is losing the Needs-review headline until the index
+  // recovers.
+  if (backup === null || (connected && conflicted === undefined && !countUnavailable)) {
     return null
   }
   return mobileSyncStatus(backup, conflicted?.length ?? 0)
