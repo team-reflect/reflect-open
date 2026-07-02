@@ -72,7 +72,14 @@ export function useEditorAutocomplete(): EditorAutocomplete {
           dateFormat: settings.dateFormat,
           weekStartDay: settings.weekStartDay,
         }),
-        contactsInMenu ? contactLinkSuggestions(query) : Promise.resolve([]),
+        // A contacts hiccup (permission revoked mid-session, store error)
+        // must cost only its own rows, never the note suggestions.
+        contactsInMenu
+          ? contactLinkSuggestions(query).catch((error: unknown) => {
+              console.error('contact link suggestions failed:', error)
+              return []
+            })
+          : Promise.resolve([]),
       ])
       return buildAutocompleteEntries(query, suggestions, {
         offerCreate: true,
