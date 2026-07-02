@@ -1,6 +1,8 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { hasBridge, relatedNotes, type RetrievalHit } from '@reflect/core'
+import { hasBridge, isDaily, relatedNotes, type RetrievalHit } from '@reflect/core'
+import { readNoteSource } from '@/lib/note-frontmatter'
+import { isOstensiblyEmptyNoteSource } from '@/lib/note-emptiness'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
@@ -22,16 +24,28 @@ const SIMILAR_NOTES_LIMIT = 6
 export function useSimilarNotes(path: string): RetrievalHit[] {
   const { graph } = useGraph()
   const { settings } = useSettings()
+  const bridgeAvailable = hasBridge()
+  const dailyNote = isDaily(path)
+  const { data: dailyNoteIsEmpty } = useQuery({
+    queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'daily-empty', path],
+    queryFn: async () => isOstensiblyEmptyNoteSource(await readNoteSource(path)),
+    enabled: bridgeAvailable && graph !== null && dailyNote && settings.semanticSearchEnabled,
+  })
+  const enabled =
+    bridgeAvailable &&
+    graph !== null &&
+    settings.semanticSearchEnabled &&
+    (!dailyNote || dailyNoteIsEmpty === false)
   const { data } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'related', path],
     queryFn: () => relatedNotes(path, SIMILAR_NOTES_LIMIT),
-    enabled: hasBridge() && graph !== null && settings.semanticSearchEnabled,
+    enabled,
   })
   // Slice off the query result (reference-stable via structural sharing) only
   // when it or the gate changes, so consumers get a stable array across the
   // sidebar's frequent re-renders instead of a fresh one every call.
   return useMemo(
-    () => (settings.semanticSearchEnabled ? (data ?? []).slice(0, SIMILAR_NOTES_LIMIT) : []),
-    [data, settings.semanticSearchEnabled],
+    () => (enabled ? (data ?? []).slice(0, SIMILAR_NOTES_LIMIT) : []),
+    [data, enabled],
   )
 }
