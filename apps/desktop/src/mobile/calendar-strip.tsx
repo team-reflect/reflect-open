@@ -1,10 +1,10 @@
-import { useMemo, type ReactElement } from 'react'
-import { format } from 'date-fns'
+import { useEffect, useRef, type ReactElement } from 'react'
 import { Button } from '@/components/ui/button'
-import { parseIsoDate } from '@/lib/dates'
-import { monthLabel, weekOf } from '@/mobile/calendar'
+import { addDaysIso } from '@/lib/dates'
+import { monthLabel, weekAtIndex, weekStartOf } from '@/mobile/calendar'
 import { SettingsSheet } from '@/mobile/settings-sheet'
-import { cn } from '@/lib/utils'
+import { useWeekStrip } from '@/mobile/use-week-strip'
+import { WeekRow } from '@/mobile/week-row'
 import { useSettings } from '@/providers/settings-provider'
 
 interface CalendarStripProps {
@@ -13,20 +13,56 @@ interface CalendarStripProps {
   /** Today's live ISO date — owned by the parent so the strip and the
    *  parent's select logic share one value (no midnight-rollover skew). */
   today: string
+  /**
+   * Bumped on an explicit re-arrival at the shown day (Daily tab / title tap
+   * while already there): re-center the strip on the selection even though
+   * `date` didn't change.
+   */
+  resetSeq: number
   /** Select a day — drives the carousel and the route. */
   onSelect: (date: string) => void
 }
 
 /**
- * V1's calendar strip: a month header and the selected day's week as seven
- * day-of-week / day-number cells, the selected day circled. Tapping a cell
- * selects that day; the week shown always contains the selection, so the
- * strip and the carousel stay in lockstep through the parent's `date`. A
- * **Today** affordance appears in the header when the selection has wandered.
+ * V1's calendar strip: a month header over a **pageable** week row — seven
+ * day-of-week / day-number cells per week, swipe left/right to browse whole
+ * weeks, tap a cell to select that day. Browsing moves the header month with
+ * the visible week; the strip snaps back to the selection's week whenever the
+ * selection itself changes, so strip and carousel stay in lockstep through
+ * the parent's `date`. The tappable month title jumps back to today (V1), and
+ * a **Today** affordance appears in the header when the selection has
+ * wandered off today.
  */
-export function CalendarStrip({ date, today, onSelect }: CalendarStripProps): ReactElement {
+export function CalendarStrip({ date, today, resetSeq, onSelect }: CalendarStripProps): ReactElement {
   const { settings } = useSettings()
-  const week = useMemo(() => weekOf(date, settings.weekStartDay), [date, settings.weekStartDay])
+  const { emblaRef, weekWindow, displayedWeekStart, showWeekOf } = useWeekStrip(
+    date,
+    settings.weekStartDay,
+  )
+
+  // Header month: the selection's own month while its week is on screen;
+  // while browsing, the visible week's dominant (middle-day) month.
+  const selectionWeekStart = weekStartOf(date, settings.weekStartDay)
+  const headerDate =
+    displayedWeekStart === selectionWeekStart ? date : addDaysIso(displayedWeekStart, 3)
+
+  const jumpToToday = (): void => {
+    onSelect(today)
+    // Selecting today only moves the strip when `date` changes — re-center
+    // explicitly so a browse-away strip snaps back even when already on today.
+    showWeekOf(today)
+  }
+
+  // An explicit re-arrival doesn't change `date`, so the follow effect won't
+  // move a browsed-away strip — re-center it here.
+  const lastResetSeq = useRef(resetSeq)
+  useEffect(() => {
+    if (resetSeq === lastResetSeq.current) {
+      return
+    }
+    lastResetSeq.current = resetSeq
+    showWeekOf(date)
+  }, [resetSeq, date, showWeekOf])
 
   return (
     <header
@@ -39,53 +75,36 @@ export function CalendarStrip({ date, today, onSelect }: CalendarStripProps): Re
         <div className="justify-self-start">
           <SettingsSheet />
         </div>
-        <h1 className="min-w-0 truncate text-center text-base font-semibold">{monthLabel(date)}</h1>
+        <h1 className="min-w-0 truncate text-center text-base font-semibold">
+          <button type="button" aria-label="Jump to today" onClick={jumpToToday}>
+            {monthLabel(headerDate)}
+          </button>
+        </h1>
         <div className="justify-self-end">
           {date !== today && (
-            <Button variant="ghost" size="sm" onClick={() => onSelect(today)}>
+            <Button variant="ghost" size="sm" onClick={jumpToToday}>
               Today
             </Button>
           )}
         </div>
       </div>
-      <div className="flex">
-        {week.map((day) => {
-          const selected = day === date
-          const isToday = day === today
-          return (
-            <button
-              key={day}
-              type="button"
-              aria-label={format(parseIsoDate(day), 'EEEE, MMMM do')}
-              aria-current={selected ? 'date' : undefined}
-              onClick={() => onSelect(day)}
-              className="flex flex-1 flex-col items-center gap-0.5 py-1"
-            >
-              <span className="text-[11px] font-medium text-text-muted">
-                {format(parseIsoDate(day), 'EEEEE')}
-              </span>
-              <span
-                className={cn(
-                  'flex size-8 items-center justify-center rounded-full text-sm tabular-nums',
-                  selected && 'bg-primary font-semibold text-primary-foreground',
-                  !selected && isToday && 'font-semibold text-primary',
-                  !selected && !isToday && 'text-text',
-                )}
-              >
-                {format(parseIsoDate(day), 'd')}
-              </span>
-              {/* Today dot (V1) — a fixed-height slot so cells stay aligned;
-                  shown only when today isn't the selected (circled) day. */}
-              <span
-                aria-hidden
-                className={cn(
-                  'size-1 rounded-full',
-                  !selected && isToday ? 'bg-primary' : 'bg-transparent',
-                )}
+      <div className="overflow-hidden" ref={emblaRef}>
+        <div className="flex">
+          {Array.from({ length: weekWindow.count }, (_, index) => {
+            const weekStart = weekAtIndex(weekWindow, index)
+            const weekEnd = addDaysIso(weekStart, 6)
+            const contains = (day: string): boolean => day >= weekStart && day <= weekEnd
+            return (
+              <WeekRow
+                key={weekStart}
+                weekStart={weekStart}
+                selectedDay={contains(date) ? date : null}
+                todayDay={contains(today) ? today : null}
+                onSelect={onSelect}
               />
-            </button>
-          )
-        })}
+            )
+          })}
+        </div>
       </div>
     </header>
   )

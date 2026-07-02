@@ -85,17 +85,23 @@ Very little, by design — this surface is the one V1 got most right:
 
 The v2 Daily screen should have all of:
 
-- [ ] Virtual day window, re-centered near edges; past and future both
+- [x] Virtual day window, re-centered near edges; past and future both
       reachable; swiping past a day creates no file.
-- [ ] Carousel ↔ calendar-strip two-way sync; week paging on the strip;
+- [x] Carousel ↔ calendar-strip two-way sync; week paging on the strip;
       month header.
-- [ ] Per-slide scroll preservation; screen never remounts on a date
+- [x] Per-slide scroll preservation; screen never remounts on a date
       change.
-- [ ] Swipe disabled while the keyboard is up.
-- [ ] Open-to-today; re-navigate to today on foreground date change;
-      title-tap and Daily-tab double-tap jump to today.
-- [ ] Week-start setting respected; today visibly marked.
-- [ ] Daily subject not editable; the date is the title.
-- [ ] Collapsible incoming-backlinks section below content; daily-note
+- [x] Swipe disabled while the keyboard is up.
+- [x] Open-to-today; re-navigate to today on foreground date change;
+      title-tap and Daily-tab double-tap jump to today. (v2 note: *any*
+      Daily-tab tap navigates to today; a repeat arrival on the shown day —
+      V1's double-tap — re-anchors the slide's scroll and re-centers the
+      strip, via the router's `arrivalSeq` explicit-intent signal.)
+- [x] Week-start setting respected; today visibly marked.
+- [x] Daily subject not editable; the date is the title.
+- [x] Collapsible incoming-backlinks section below content; daily-note
       backlinks swipe the carousel instead of pushing a screen.
-- [ ] Haptic on date selection.
+- [ ] Haptic on date selection. **Follow-up:** no haptics mechanism exists
+      in the repo yet (WKWebView has no `navigator.vibrate`); needs the
+      official `tauri-plugin-haptics` or a small addition to the first-party
+      keyboard plugin — deliberately not built as part of Daily parity.

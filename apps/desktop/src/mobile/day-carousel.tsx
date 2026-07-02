@@ -1,17 +1,18 @@
-import { type ReactElement } from 'react'
-import { dailyPath } from '@reflect/core'
-import { NotePane } from '@/components/note-pane'
-import { formatDayLabel } from '@/lib/dates'
+import { useState, type ReactElement } from 'react'
 import { dateAtIndex } from '@/lib/day-window'
-import { cn } from '@/lib/utils'
+import { DaySlide } from '@/mobile/day-slide'
 import { useDayCarousel } from '@/mobile/use-day-carousel'
-import { useSettings } from '@/providers/settings-provider'
 
 interface DayCarouselProps {
   /** The selected day (from the route). Drives the carousel position. */
   date: string
   /** Today's live ISO date — tints today's date heading, as on desktop. */
   today: string
+  /**
+   * Bumped on an explicit re-arrival at the shown day (Daily tab / title tap
+   * while already there): the selected slide re-anchors to the top.
+   */
+  scrollResetSeq: number
   /** Settle on a day — the parent turns this into a daily-route navigation. */
   onSelect: (date: string) => void
 }
@@ -23,12 +24,21 @@ const MOUNT_RADIUS = 1
 /**
  * V1's swipeable day carousel: horizontal paging between daily notes. The slide
  * window, Embla wiring, and route↔slide sync all live in {@link useDayCarousel};
- * this component just renders the slides, mounting a `NotePane` only near the
- * selection and leaving the rest as empty spacers.
+ * this component just renders the slides, mounting a {@link DaySlide} only near
+ * the selection and leaving the rest as empty spacers. Each day's scroll offset
+ * lives in a carousel-owned map so it survives its slide unmounting (V1's
+ * per-slide scroll preservation).
  */
-export function DayCarousel({ date, today, onSelect }: DayCarouselProps): ReactElement {
+export function DayCarousel({
+  date,
+  today,
+  scrollResetSeq,
+  onSelect,
+}: DayCarouselProps): ReactElement {
   const { emblaRef, dayWindow, selectedIndex } = useDayCarousel(date, onSelect)
-  const { settings } = useSettings()
+  // One mutable map for the carousel's life; the identity never changes, so
+  // holding it in state (read during render) rather than a ref is safe.
+  const [scrollMemory] = useState(() => new Map<string, number>())
 
   return (
     <div className="min-h-0 flex-1 overflow-hidden" ref={emblaRef}>
@@ -39,25 +49,13 @@ export function DayCarousel({ date, today, onSelect }: DayCarouselProps): ReactE
           return (
             <div key={day} className="min-w-0 flex-[0_0_100%]">
               {mounted ? (
-                <div
-                  className="h-full overflow-y-auto"
-                  style={{
-                    paddingBottom: 'max(env(safe-area-inset-bottom), var(--keyboard-height, 0px))',
-                  }}
-                >
-                  {/* The date is the daily note's subject (V1 / desktop parity) —
-                      chrome above the editor, formatted per the user's setting,
-                      tinted on today. Shares the note body's px-4 gutter. */}
-                  <h2 className={cn('reflect-daily-subject px-4 pt-4 pb-1', day === today && 'text-accent')}>
-                    {formatDayLabel(day, settings.dateFormat)}
-                  </h2>
-                  <NotePane
-                    path={dailyPath(day)}
-                    lazy
-                    gutterClassName="px-4"
-                    editorClassName="min-h-[60dvh]"
-                  />
-                </div>
+                <DaySlide
+                  day={day}
+                  today={today}
+                  selected={index === selectedIndex}
+                  scrollMemory={scrollMemory}
+                  scrollResetSeq={scrollResetSeq}
+                />
               ) : null}
             </div>
           )

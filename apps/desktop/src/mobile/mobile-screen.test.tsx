@@ -180,6 +180,40 @@ describe('MobileShell', () => {
     )
   })
 
+  it('selects a day in another week straight from the pageable strip', async () => {
+    const user = userEvent.setup()
+    const today = todayIso()
+    // Two weeks out: its cell lives on a different week slide of the strip,
+    // which the strip renders (and Embla pages) rather than a single week.
+    const nextFortnight = addDaysIso(today, 14)
+    const view = mount({ kind: 'today' })
+
+    await user.click(view.getByRole('button', { name: dayCellLabel(nextFortnight) }))
+    expect(
+      view.getByRole('button', { name: dayCellLabel(nextFortnight) }).getAttribute('aria-current'),
+    ).toBe('date')
+    expect(view.getByRole('heading', { level: 1 }).textContent).toBe(monthLabel(nextFortnight))
+    expect(view.getByRole('button', { name: 'Today' })).toBeTruthy()
+  })
+
+  it('jumps back to today from the tappable month title', async () => {
+    const user = userEvent.setup()
+    const today = todayIso()
+    const other = otherDayInWeek(today)
+    const view = mount({ kind: 'today' })
+
+    await user.click(view.getByRole('button', { name: dayCellLabel(other) }))
+    expect(view.getByRole('button', { name: dayCellLabel(other) }).getAttribute('aria-current')).toBe(
+      'date',
+    )
+
+    await user.click(view.getByRole('button', { name: 'Jump to today' }))
+    expect(view.getByRole('button', { name: dayCellLabel(today) }).getAttribute('aria-current')).toBe(
+      'date',
+    )
+    expect(view.queryByRole('button', { name: 'Today' })).toBeNull()
+  })
+
   it('re-anchors the carousel when a date link lands outside its window', async () => {
     const user = userEvent.setup()
     // Beyond the ±366-day window — only reachable as a date-link navigation,

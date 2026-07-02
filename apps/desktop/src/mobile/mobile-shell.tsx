@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { MobileScreen } from '@/mobile/mobile-screen'
 import { MobileTabBar, type MobileTab } from '@/mobile/mobile-tab-bar'
+import { useWakeToToday } from '@/mobile/use-wake-to-today'
 import { useRouter } from '@/routing/router'
 
 /**
@@ -14,6 +15,8 @@ export function MobileShell(): ReactElement {
   const { route, navigate, entryId } = useRouter()
   const [allQuery, setAllQuery] = useState('')
   const [lastTab, setLastTab] = useState<MobileTab>('daily')
+  // V1's wake-to-today: foregrounding on a new calendar date lands on today.
+  useWakeToToday()
 
   // A `search` history entry seeds the live query — once per entry, so the
   // user can keep typing without the effect snapping the text back.

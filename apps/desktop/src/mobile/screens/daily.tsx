@@ -1,4 +1,4 @@
-import { type ReactElement } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import { untitledNotePath } from '@reflect/core'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -19,20 +19,39 @@ import { useRouter } from '@/routing/router'
  * day change scrolls the carousel rather than remounting it.
  */
 export function MobileDaily({ date }: { date: string }): ReactElement {
-  const { navigate } = useRouter()
+  const { navigate, arrivalSeq } = useRouter()
   // One live `today` for the whole surface: the strip marks today's cell and
   // the `select` below decide "is this today?" from the *same* value, so they
   // can't disagree across the midnight rollover (which would otherwise route a
   // tap on the highlighted today cell to a frozen `daily` date). Selecting
   // today routes to the live `today` route, keeping the spine rolling over.
   const today = useToday()
-  const select = (day: string): void =>
-    navigate(day === today ? { kind: 'today' } : { kind: 'daily', date: day })
+  const select = useCallback(
+    (day: string): void =>
+      navigate(day === today ? { kind: 'today' } : { kind: 'daily', date: day }),
+    [navigate, today],
+  )
+
+  // An explicit re-arrival at the day already shown — the Daily tab or the
+  // month title tapped while on today (V1's double-tap-to-today lands here as
+  // two such arrivals) — re-anchors the surface: the selected slide scrolls
+  // to the top and the strip re-centers. The router bumps `arrivalSeq` for
+  // every navigate, but a swipe's own echo also changes `date`, so only
+  // date-preserving arrivals count.
+  const [resetSeq, setResetSeq] = useState(0)
+  const lastArrival = useRef({ seq: arrivalSeq, date })
+  useEffect(() => {
+    const last = lastArrival.current
+    lastArrival.current = { seq: arrivalSeq, date }
+    if (arrivalSeq !== last.seq && date === last.date) {
+      setResetSeq((seq) => seq + 1)
+    }
+  }, [arrivalSeq, date])
 
   return (
     <div className="flex h-full w-screen flex-col">
-      <CalendarStrip date={date} today={today} onSelect={select} />
-      <DayCarousel date={date} today={today} onSelect={select} />
+      <CalendarStrip date={date} today={today} resetSeq={resetSeq} onSelect={select} />
+      <DayCarousel date={date} today={today} scrollResetSeq={resetSeq} onSelect={select} />
       <Button
         size="icon"
         aria-label="New note"

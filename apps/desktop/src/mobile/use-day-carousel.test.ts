@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { reconcileCarousel, type ReconcileInput } from './use-day-carousel'
+import { createDayWindow } from '@/lib/day-window'
+import { reconcileCarousel, shouldRecenter, type ReconcileInput } from './use-day-carousel'
 
 /**
  * The carousel's follow-the-route decision in isolation — Embla pointer
@@ -57,5 +58,23 @@ describe('reconcileCarousel', () => {
     expect(reconcileCarousel({ ...base, index: -1, lastWindowStart: '2024-01-01' })).toEqual({
       action: 'none',
     })
+  })
+})
+
+describe('shouldRecenter', () => {
+  // 21 slides around the anchor; margin 5 → indices 0–4 and 16–20 trigger.
+  const window = createDayWindow('2026-06-12', { past: 10, future: 10 })
+
+  it('leaves the middle of the window alone', () => {
+    expect(shouldRecenter(window, 10, 5)).toBe(false)
+    expect(shouldRecenter(window, 5, 5)).toBe(false)
+    expect(shouldRecenter(window, 15, 5)).toBe(false)
+  })
+
+  it('re-centers within the margin of either edge', () => {
+    expect(shouldRecenter(window, 4, 5)).toBe(true)
+    expect(shouldRecenter(window, 0, 5)).toBe(true)
+    expect(shouldRecenter(window, 16, 5)).toBe(true)
+    expect(shouldRecenter(window, 20, 5)).toBe(true)
   })
 })
