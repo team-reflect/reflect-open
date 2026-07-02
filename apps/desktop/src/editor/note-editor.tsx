@@ -270,8 +270,8 @@ export function NoteEditor({
         {...(onWikilinkSearch !== undefined ? { onWikilinkSearch } : {})}
         {...(onTagSearch !== undefined ? { onTagSearch } : {})}
         resolveImageUrl={handleResolveImageUrl}
-        onImagePaste={handleImagePaste}
-        onImageSaveError={handleImageSaveError}
+        onFilePaste={handleImagePaste}
+        onFileSaveError={handleImageSaveError}
         onExitBoundary={handleExitBoundary}
       >
         {children}
