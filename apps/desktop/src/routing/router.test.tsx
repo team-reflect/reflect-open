@@ -1,9 +1,9 @@
-import { act, renderHook } from '@testing-library/react'
+import { act, render, renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import type { ReactNode } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { emitNoteMoved } from '@/lib/note-moves'
 import type { Route } from './route'
-import { RouterProvider, useRouter } from './router'
+import { RouterFreeze, RouterProvider, useRouter } from './router'
 
 function routerHook(initialRoute?: Route) {
   return renderHook(() => useRouter(), {
@@ -190,6 +190,42 @@ describe('router', () => {
     expect(result.current.entryId).toBe(todayId)
     act(() => result.current.forward())
     expect(result.current.entryId).toBe(noteId)
+  })
+
+  it('RouterFreeze pins what a background subtree sees until it surfaces', () => {
+    let router: ReturnType<typeof useRouter> | null = null
+    function Capture(): null {
+      router = useRouter()
+      return null
+    }
+    function Probe(): ReactElement {
+      const { route, arrivalSeq } = useRouter()
+      return <div data-testid="frozen-probe">{`${route.kind}:${arrivalSeq}`}</div>
+    }
+    function Harness({ frozen }: { frozen: boolean }): ReactElement {
+      return (
+        <RouterProvider>
+          <Capture />
+          <RouterFreeze frozen={frozen}>
+            <Probe />
+          </RouterFreeze>
+        </RouterProvider>
+      )
+    }
+
+    const view = render(<Harness frozen={false} />)
+    expect(view.getByTestId('frozen-probe').textContent).toBe('today:0')
+
+    // Covered by a pushed note (the mobile stack hides it): navigations must
+    // not reach it — the daily surface would read the arrivalSeq bump as a
+    // re-arrival and re-anchor its scroll while hidden.
+    view.rerender(<Harness frozen={true} />)
+    act(() => router!.navigate({ kind: 'note', path: 'notes/a.md' }))
+    expect(view.getByTestId('frozen-probe').textContent).toBe('today:0')
+
+    // Surfacing again resumes the live value.
+    view.rerender(<Harness frozen={false} />)
+    expect(view.getByTestId('frozen-probe').textContent).toBe('note:1')
   })
 
   it('exposes the route back() would land on (the mobile stack peeks it)', () => {

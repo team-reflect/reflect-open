@@ -4,7 +4,7 @@ import type { AllNotesFilters } from '@/mobile/search-filters/filter-state'
 import { BACK_SWIPE_SETTLE_MS, useBackSwipe, type BackSwipeState } from '@/mobile/use-back-swipe'
 import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion'
 import type { Route } from '@/routing/route'
-import { useRouter } from '@/routing/router'
+import { RouterFreeze, useRouter } from '@/routing/router'
 import './mobile-stack.css'
 
 /** Mirrors the animation durations in mobile-stack.css. */
@@ -247,23 +247,24 @@ export function MobileStack(props: MobileStackProps): ReactElement {
   // synthetic animation/transition events register vendor-detected names and
   // never fire in some hosts. Both events bubble; the class guard keeps
   // animations inside a screen (editor UI etc.) from ending a navigation.
+  // Layers only, never the scrim: exactly one layer animates per transition,
+  // so the layer's own end is the single source of truth — the scrim's
+  // ending first must not cut the card's slide short.
   const { finishSettle } = swipe
   useEffect(() => {
     const node = containerRef.current
     if (!node) {
       return
     }
-    const isStackChrome = (target: EventTarget | null): boolean =>
-      target instanceof HTMLElement &&
-      (target.classList.contains('mobile-stack-layer') ||
-        target.classList.contains('mobile-stack-scrim'))
+    const isStackLayer = (target: EventTarget | null): boolean =>
+      target instanceof HTMLElement && target.classList.contains('mobile-stack-layer')
     const onAnimationEnd = (event: Event): void => {
-      if (isStackChrome(event.target)) {
+      if (isStackLayer(event.target)) {
         finishTransition()
       }
     }
     const onTransitionEnd = (event: Event): void => {
-      if (isStackChrome(event.target)) {
+      if (isStackLayer(event.target)) {
         finishSettle()
       }
     }
@@ -314,7 +315,12 @@ export function MobileStack(props: MobileStackProps): ReactElement {
             aria-hidden={hidden || undefined}
             inert={hidden}
           >
-            <MobileScreen route={layer.route} {...props} />
+            {/* Background layers must not observe navigation: a push bumps
+                arrivalSeq, which the daily surface under the note would read
+                as a re-arrival and re-anchor its scroll while hidden. */}
+            <RouterFreeze frozen={hidden}>
+              <MobileScreen route={layer.route} {...props} />
+            </RouterFreeze>
           </div>
         )
       })}
