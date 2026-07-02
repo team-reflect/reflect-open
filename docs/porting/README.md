@@ -24,7 +24,7 @@ designs simply don't survive the move:
   which already aggregate the user's Google, Microsoft, and iCloud accounts
   if they are added to macOS.
 - **Bring your own key.** v1 bundled metered AI access with per-plan quotas.
-  v2 talks directly to OpenAI, Anthropic, or Google with the user's own key
+  v2 talks directly to OpenAI, Anthropic, Google, or OpenRouter with the user's own key
   (stored in the keychain), so quota tiers, upgrade prompts, and usage
   metering disappear entirely.
 - **Files first.** Anything that is user content (templates, notes created

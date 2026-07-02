@@ -4,6 +4,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import type { LanguageModel } from 'ai'
 import type { AiProviderConfig } from '../settings/schema'
 import { anthropicDirectBrowserAccessHeaders } from './anthropic-headers'
+import { OPENROUTER_BASE_URL, openRouterAttributionHeaders } from './openrouter'
 
 /**
  * Build the AI SDK model instance for a configured BYOK entry — the one place
@@ -27,5 +28,13 @@ export function languageModel(
       })(config.model)
     case 'google':
       return createGoogleGenerativeAI({ apiKey, fetch: fetchFn })(config.model)
+    case 'openrouter':
+      return createOpenAI({
+        apiKey,
+        fetch: fetchFn,
+        baseURL: OPENROUTER_BASE_URL,
+        headers: openRouterAttributionHeaders(),
+        name: 'openrouter',
+      }).chat(config.model)
   }
 }

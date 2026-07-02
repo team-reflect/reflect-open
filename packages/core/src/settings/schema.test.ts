@@ -199,6 +199,16 @@ describe('settingsSchema', () => {
       expect(settingsSchema.parse({ aiProviders: [valid] }).aiProviders).toEqual([valid])
     })
 
+    it('accepts OpenRouter entries', () => {
+      const entry = {
+        id: 'openrouter',
+        provider: 'openrouter',
+        model: 'openrouter/auto',
+        keyHint: 'wxyz1',
+      }
+      expect(settingsSchema.parse({ aiProviders: [entry] }).aiProviders).toEqual([entry])
+    })
+
     it('defaults the per-entry display fields', () => {
       const entry = { id: 'abc', provider: 'openai', model: 'gpt-5.1' }
       expect(settingsSchema.parse({ aiProviders: [entry] }).aiProviders).toEqual([

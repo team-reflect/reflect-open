@@ -63,7 +63,7 @@ Reflect Open is a local-first, open-source Tauri 2 note-taking app.  Notes are p
 `script-src 'self'` (without `'unsafe-inline'`) blocks `javascript:` href execution in WKWebView/WebView2/webkitgtk per the W3C spec. The IPC, asset protocol, external fetch (via the HTTP plugin), and inline styles are all allowed.
 
 ```json
-"csp": "default-src 'self' ipc: http://ipc.localhost; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: asset: https:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://github.com https://api.github.com"
+"csp": "default-src 'self' ipc: http://ipc.localhost; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: asset: https:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://openrouter.ai https://github.com https://api.github.com"
 ```
 
 **Regression risk:** Low. The app's bundled JS is served from `'self'`; the HTTP plugin's fetch is already capability-gated at the Rust level; inline styles (`'unsafe-inline'` in `style-src`) are preserved for ProseMirror/meowdown.

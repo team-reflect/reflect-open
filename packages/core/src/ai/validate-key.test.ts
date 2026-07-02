@@ -23,6 +23,7 @@ describe('validateApiKey', () => {
     await validateApiKey('openai', 'sk-test', recordingFetch)
     await validateApiKey('anthropic', 'sk-ant-test', recordingFetch)
     await validateApiKey('google', 'AIza-test', recordingFetch)
+    await validateApiKey('openrouter', 'sk-or-v1-test', recordingFetch)
 
     expect(calls[0]!.url).toBe('https://api.openai.com/v1/models')
     expect(calls[0]!.headers['Authorization']).toBe('Bearer sk-test')
@@ -31,6 +32,8 @@ describe('validateApiKey', () => {
     expect(calls[1]!.headers['anthropic-version']).toBe('2023-06-01')
     expect(calls[2]!.url).toBe('https://generativelanguage.googleapis.com/v1beta/models')
     expect(calls[2]!.headers['x-goog-api-key']).toBe('AIza-test')
+    expect(calls[3]!.url).toBe('https://openrouter.ai/api/v1/key')
+    expect(calls[3]!.headers['Authorization']).toBe('Bearer sk-or-v1-test')
   })
 
   it('reads an ok response as valid', async () => {
@@ -42,6 +45,9 @@ describe('validateApiKey', () => {
     expect(await validateApiKey('anthropic', 'sk-test', fetchReturning(403))).toBe('invalid')
     // Gemini reports malformed keys as 400.
     expect(await validateApiKey('google', 'bad', fetchReturning(400))).toBe('invalid')
+    expect(await validateApiKey('openrouter', 'sk-or-v1-test', fetchReturning(401))).toBe(
+      'invalid',
+    )
   })
 
   it('reads anything that is not an auth decision as unreachable', async () => {

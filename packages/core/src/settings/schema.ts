@@ -215,7 +215,7 @@ export const graphColorsSchema = z
  * The cloud AI providers Reflect can call directly (BYOK — the user's own
  * keys, no Reflect-hosted proxy).
  */
-export const aiProviderIdSchema = z.enum(['openai', 'anthropic', 'google'])
+export const aiProviderIdSchema = z.enum(['openai', 'anthropic', 'google', 'openrouter'])
 
 export type AiProviderId = z.infer<typeof aiProviderIdSchema>
 
