@@ -25,13 +25,18 @@ interface DaySlideProps {
   scrollResetSeq: number
 }
 
+/** How long a remount keeps chasing its saved scroll offset. Local note reads
+ *  resolve in milliseconds; past this the offset is treated as unreachable
+ *  (the note shrank since it was saved) and the user's scrolling takes over. */
+const RESTORE_DEADLINE_MS = 2000
+
 /**
  * One mounted day of the carousel: the date heading (the daily note's subject —
  * chrome, not content, so it is never editable) over the note editor, in its
  * own scroll container. The container records its offset into the carousel's
  * {@link DaySlideProps.scrollMemory} and restores it on remount — the note
  * body loads asynchronously, so restoration re-applies on content growth until
- * the saved offset is reachable or the user takes over.
+ * the saved offset is reachable, the user takes over, or the deadline passes.
  */
 export function DaySlide({
   day,
@@ -59,8 +64,12 @@ export function DaySlide({
     }
     restoringRef.current = true
     let observer: ResizeObserver | null = null
+    let deadline: ReturnType<typeof setTimeout> | null = null
     const stop = (): void => {
       restoringRef.current = false
+      if (deadline !== null) {
+        clearTimeout(deadline)
+      }
       observer?.disconnect()
       container.removeEventListener('pointerdown', stop)
     }
@@ -75,6 +84,7 @@ export function DaySlide({
       observer = new ResizeObserver(apply)
       observer.observe(content)
       container.addEventListener('pointerdown', stop, { passive: true })
+      deadline = setTimeout(stop, RESTORE_DEADLINE_MS)
     }
     return stop
   }, [day, scrollMemory])
