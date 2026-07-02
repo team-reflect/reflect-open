@@ -37,13 +37,14 @@ through the **Rust** HTTP plugin, not webview `fetch`:
   ([`apps/desktop/src/lib/provider-fetch.ts`](../../apps/desktop/src/lib/provider-fetch.ts)),
   which is `@tauri-apps/plugin-http`'s `fetch`, wired into the AI SDK as
   `fetchFn` ([`apps/desktop/src/providers/chat-provider.tsx:307`](../../apps/desktop/src/providers/chat-provider.tsx)
-  → `createOpenAI/Anthropic/GoogleGenerativeAI({ fetch })` in
+  → `createOpenAI/Anthropic/GoogleGenerativeAI({ fetch })`, with OpenRouter using
+  the OpenAI-compatible provider at a custom base URL, in
   [`packages/core/src/ai/chat/stream-chat.ts`](../../packages/core/src/ai/chat/stream-chat.ts)).
 - GitHub calls use the same plugin.
 - The allowed hosts are already enumerated in
   [`capabilities/default.json`](../../apps/desktop/src-tauri/capabilities/default.json)
   (`api.openai.com`, `api.anthropic.com`, `generativelanguage.googleapis.com`,
-  `github.com`, `api.github.com`).
+  `openrouter.ai`, `github.com`, `api.github.com`).
 
 Because the webview itself doesn't need to reach those hosts directly, its
 `connect-src` can be **very tight**. A policy roughly like:

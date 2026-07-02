@@ -13,8 +13,8 @@ disk at call time), and it is covered by tests.
 
 ## AI chat (off until you add a key)
 
-- **Where:** directly to the provider whose API key *you* added — OpenAI, Anthropic, or
-  Google. Keys are bring-your-own; Reflect proxies nothing.
+- **Where:** directly to the provider whose API key *you* added — OpenAI, Anthropic,
+  Google, or OpenRouter. Keys are bring-your-own; Reflect proxies nothing.
 - **What:** your chat messages, plus what the model's tools read from your graph:
   search snippets, note content, and note listings. Private notes are dropped from
   every tool result, and reading one is refused outright — the model sees a refusal,
@@ -86,8 +86,8 @@ disk at call time), and it is covered by tests.
 
 ## Housekeeping calls
 
-- **API key validation:** adding a provider key sends one `GET /v1/models` to that
-  provider to test it. No content.
+- **API key validation:** adding a provider key sends one cheap authenticated probe to
+  that provider to test it. No content.
 - **Update check:** the packaged app fetches a release manifest (`latest.json`) from
   this repository's GitHub Releases on launch and every six hours. Stable builds check
   the latest stable release; beta builds check the beta feed. The app downloads the

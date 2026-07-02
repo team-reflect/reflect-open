@@ -70,8 +70,8 @@ export function defaultAiProvider(state: AiProvidersState): AiProviderConfig | n
 }
 
 /**
- * Providers with a speech-to-text path, in preference order (Anthropic has
- * no audio API).
+ * Providers with a speech-to-text path, in preference order. Anthropic and
+ * OpenRouter have no dedicated transcription path in this app.
  */
 export const TRANSCRIPTION_PROVIDERS = ['openai', 'google'] as const
 

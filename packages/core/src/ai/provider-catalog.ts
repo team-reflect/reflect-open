@@ -70,6 +70,21 @@ export const AI_PROVIDERS: NonEmptyArray<AiProviderInfo> = [
       { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', contextWindow: 1_000_000 },
     ],
   },
+  {
+    id: 'openrouter',
+    label: 'OpenRouter',
+    keyPlaceholder: 'sk-or-v1-…',
+    models: [
+      { id: 'openrouter/auto', label: 'Auto Router', contextWindow: 128_000 },
+      { id: '~openai/gpt-latest', label: 'OpenAI GPT Latest', contextWindow: 128_000 },
+      {
+        id: '~anthropic/claude-sonnet-latest',
+        label: 'Claude Sonnet Latest',
+        contextWindow: 128_000,
+      },
+      { id: 'openai/gpt-5.2', label: 'GPT-5.2', contextWindow: 400_000 },
+    ],
+  },
 ]
 
 /** The catalog entry for `id` (every `AiProviderId` is in the catalog). */

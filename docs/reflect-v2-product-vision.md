@@ -315,7 +315,7 @@ Notes with `private: true` are hard-blocked from cloud AI. They may remain local
 
 ### BYOK First
 
-V2 should start with bring-your-own-key AI. (As shipped: OpenAI, Anthropic, and Google keys, stored in the OS keychain.)
+V2 should start with bring-your-own-key AI. (As shipped: OpenAI, Anthropic, Google, and OpenRouter keys, stored in the OS keychain.)
 
 The architecture should leave room for:
 

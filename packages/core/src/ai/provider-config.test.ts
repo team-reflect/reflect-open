@@ -93,8 +93,11 @@ describe('pickTranscriptionConfig', () => {
     expect(pickTranscriptionConfig(state(providers, 'claude'))?.id).toBe('gemini')
   })
 
-  it('returns null when only anthropic entries exist', () => {
-    const providers = [config({ id: 'claude', provider: 'anthropic', model: 'claude-fable-5' })]
+  it('returns null when only non-transcription providers exist', () => {
+    const providers = [
+      config({ id: 'claude', provider: 'anthropic', model: 'claude-fable-5' }),
+      config({ id: 'openrouter', provider: 'openrouter', model: 'openrouter/auto' }),
+    ]
     expect(pickTranscriptionConfig(state(providers, 'claude'))).toBeNull()
   })
 

@@ -174,6 +174,16 @@ describe('AiProvidersSection', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
+  it('offers OpenRouter in the provider picker', async () => {
+    renderSection()
+    await waitFor(() => expect(screen.getByText(/No AI providers configured/)).toBeTruthy())
+
+    const dialog = openDialog()
+    fireEvent.keyDown(dialog.getByRole('combobox', { name: 'Provider' }), { key: 'ArrowDown' })
+
+    expect(await screen.findByRole('option', { name: 'OpenRouter' })).toBeTruthy()
+  })
+
   it('rejects a key the provider turns down, storing nothing', async () => {
     providerFetchMock.mockResolvedValue(new Response(null, { status: 401 }))
     renderSection()

@@ -24,7 +24,7 @@ BYOK API keys, or calls `invoke('note_write', ...)` to overwrite arbitrary notes
 - `script-src 'self'` blocks `javascript:` URI execution (W3C spec: CSP applies to `javascript:` navigation)
 - `style-src 'self' 'unsafe-inline'` allows ProseMirror/meowdown's inline styles
 - `img-src 'self' blob: data: asset: https:` allows graph images via the asset protocol
-- `connect-src` restricted to Tauri IPC and the four AI/GitHub endpoints already gated by the HTTP capability
+- `connect-src` restricted to Tauri IPC and the AI/GitHub endpoints already gated by the HTTP capability
 
 ---
 

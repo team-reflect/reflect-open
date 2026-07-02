@@ -1,11 +1,12 @@
 import type { AiProviderId } from '../settings/schema'
 import { anthropicDirectBrowserAccessHeaders } from './anthropic-headers'
+import { OPENROUTER_BASE_URL } from './openrouter'
 
 /**
  * BYOK key validation (Plan 10): one cheap authenticated probe against the
- * provider's model-listing endpoint, so a typo'd or wrong-provider key is
- * caught at entry instead of failing later inside an AI call. Only the
- * response status is read — no body parsing, no data retained.
+ * provider, so a typo'd or wrong-provider key is caught at entry instead of
+ * failing later inside an AI call. Only the response status is read — no body
+ * parsing, no data retained.
  */
 
 /**
@@ -42,6 +43,11 @@ const PROBES: Record<AiProviderId, KeyProbe> = {
     headers: (key) => ({ 'x-goog-api-key': key }),
     // Gemini reports a malformed key as 400 INVALID_ARGUMENT.
     invalidStatuses: [400, 401, 403],
+  },
+  openrouter: {
+    url: `${OPENROUTER_BASE_URL}/key`,
+    headers: (key) => ({ Authorization: `Bearer ${key}` }),
+    invalidStatuses: [401, 403],
   },
 }
 
