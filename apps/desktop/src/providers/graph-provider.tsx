@@ -28,6 +28,7 @@ import { invalidateIndexQueries } from '@/lib/query-client'
 import { ensureWelcomeNote } from '@/lib/welcome-note'
 import { useSettings } from '@/providers/settings-provider'
 import { createGraphIndex } from './graph-index'
+import { useDockGraphOpenRequests } from './use-dock-graph-open-requests'
 
 /** Lifecycle of the active graph (Plan 02 loading gate). */
 export type GraphStatus = 'loading' | 'choosing' | 'opening' | 'ready'
@@ -230,6 +231,8 @@ export function GraphProvider({
     [loadRecents],
   )
 
+  const drainDockGraphOpenRequests = useDockGraphOpenRequests({ platform, openRecent })
+
   useEffect(() => {
     let active = true
     void (async () => {
@@ -268,6 +271,9 @@ export function GraphProvider({
       if (!active) {
         return
       }
+      if (await drainDockGraphOpenRequests({ includeAlreadyOpened: true })) {
+        return
+      }
       if (list.length > 0) {
         await openRecent(list[0]!.root)
       } else {
@@ -277,7 +283,7 @@ export function GraphProvider({
     return () => {
       active = false
     }
-  }, [loadRecents, openRecent, platform])
+  }, [drainDockGraphOpenRequests, loadRecents, openRecent, platform])
 
   const pickAndOpen = useCallback(async (): Promise<void> => {
     let selected: string | null = null

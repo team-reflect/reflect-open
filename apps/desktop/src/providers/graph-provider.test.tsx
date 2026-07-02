@@ -27,6 +27,11 @@ let storedFiles: Array<{ path: string; size: number; modifiedMs: number }>
 let metaStore: Record<string, string>
 /** The fake settings document (`mobileOnboarded` lives here). */
 let settingsStore: Record<string, unknown>
+/** Queued native graph-open requests, as if received from a Dock drop. */
+let queuedGraphOpenRequests: string[]
+let graphOpenRequestHandlers: Set<(payload: unknown) => void>
+let deferGraphOpenListener: boolean
+let resolveGraphOpenListener: (() => void) | null
 /** A fresh QueryClient per test — the settings provider reads through it. */
 let queryClient: QueryClient
 
@@ -41,6 +46,10 @@ function installFakeBridge(): void {
   storedFiles = []
   metaStore = {}
   settingsStore = {}
+  queuedGraphOpenRequests = []
+  graphOpenRequestHandlers = new Set()
+  deferGraphOpenListener = false
+  resolveGraphOpenListener = null
   let generation = 0
   setBridge({
     invoke: async (command, args) => {
@@ -57,6 +66,8 @@ function installFakeBridge(): void {
           generation += 1
           return { root, name: root.split('/').filter(Boolean).at(-1) ?? '', generation }
         }
+        case 'graph_open_request_take':
+          return queuedGraphOpenRequests.shift() ?? null
         case 'recent_graphs':
           return storedRecents
         case 'forget_recent':
@@ -89,8 +100,33 @@ function installFakeBridge(): void {
           return null
       }
     },
-    listen: async () => () => {},
+    listen: async (event, handler) => {
+      if (event === 'graph:open-requested') {
+        if (deferGraphOpenListener) {
+          return await new Promise<() => void>((resolve) => {
+            resolveGraphOpenListener = () => {
+              graphOpenRequestHandlers.add(handler)
+              resolve(() => {
+                graphOpenRequestHandlers.delete(handler)
+              })
+            }
+          })
+        }
+        graphOpenRequestHandlers.add(handler)
+        return () => {
+          graphOpenRequestHandlers.delete(handler)
+        }
+      }
+      return () => {}
+    },
   })
+}
+
+function queueGraphOpenRequest(root: string): void {
+  queuedGraphOpenRequests.push(root)
+  for (const handler of graphOpenRequestHandlers) {
+    handler(null)
+  }
 }
 
 function resolveOpen(root: string): void {
@@ -190,6 +226,58 @@ describe('GraphProvider open sequencing', () => {
     expect(result.current.graph).toBeNull()
     expect(result.current.indexGeneration).toBeNull()
     expect(result.current.recents).toEqual([])
+  })
+
+  it('opens a queued native folder request instead of the most recent graph on launch', async () => {
+    storedRecents = [{ root: '/recent', name: 'recent', openedMs: 1 }]
+    queueGraphOpenRequest('/dropped')
+
+    const { result } = renderHook(() => useGraph(), { wrapper })
+
+    await act(async () => {
+      await waitFor(() => expect(pendingOpens.has('/dropped')).toBe(true))
+      resolveOpen('/dropped')
+    })
+
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    expect(result.current.graph?.root).toBe('/dropped')
+    expect(invokeLog).not.toContain('graph_open:/recent')
+  })
+
+  it('opens a native folder request while the app is running', async () => {
+    const { result } = renderHook(() => useGraph(), { wrapper })
+    await waitFor(() => expect(result.current.status).toBe('choosing'))
+
+    act(() => {
+      queueGraphOpenRequest('/live-drop')
+    })
+
+    await act(async () => {
+      await waitFor(() => expect(pendingOpens.has('/live-drop')).toBe(true))
+      resolveOpen('/live-drop')
+    })
+
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    expect(result.current.graph?.root).toBe('/live-drop')
+  })
+
+  it('drains a queued native folder once the Dock listener is ready', async () => {
+    deferGraphOpenListener = true
+    storedRecents = [{ root: '/recent', name: 'recent', openedMs: 1 }]
+    const { result } = renderHook(() => useGraph(), { wrapper })
+
+    await waitFor(() => expect(pendingOpens.has('/recent')).toBe(true))
+    queueGraphOpenRequest('/dropped-before-listener-ready')
+
+    await act(async () => {
+      resolveGraphOpenListener?.()
+      resolveOpen('/recent')
+      await waitFor(() => expect(pendingOpens.has('/dropped-before-listener-ready')).toBe(true))
+      resolveOpen('/dropped-before-listener-ready')
+    })
+
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+    expect(result.current.graph?.root).toBe('/dropped-before-listener-ready')
   })
 })
 
