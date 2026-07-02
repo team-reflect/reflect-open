@@ -101,7 +101,8 @@ The v2 Daily screen should have all of:
 - [x] Daily subject not editable; the date is the title.
 - [x] Collapsible incoming-backlinks section below content; daily-note
       backlinks swipe the carousel instead of pushing a screen.
-- [ ] Haptic on date selection. **Follow-up:** no haptics mechanism exists
-      in the repo yet (WKWebView has no `navigator.vibrate`); needs the
-      official `tauri-plugin-haptics` or a small addition to the first-party
-      keyboard plugin — deliberately not built as part of Daily parity.
+- [x] Haptic on date selection — a light `UIImpactFeedbackGenerator` tap
+      via the first-party keyboard plugin's `impact_light` command
+      (WKWebView has no `navigator.vibrate`), fired fail-soft from
+      `src/mobile/haptics.ts` on day-cell taps (and tab presses, per
+      [app-shell-and-navigation](./app-shell-and-navigation.md)).

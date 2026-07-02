@@ -18,4 +18,9 @@ impl<R: Runtime> Keyboard<R> {
     pub fn current_height(&self) -> crate::Result<KeyboardState> {
         Ok(KeyboardState::default())
     }
+
+    /// Desktop stand-in: no haptic engine, so a successful no-op.
+    pub fn impact_light(&self) -> crate::Result<()> {
+        Ok(())
+    }
 }

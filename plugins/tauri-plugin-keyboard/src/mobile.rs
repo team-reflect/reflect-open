@@ -34,4 +34,11 @@ impl<R: Runtime> Keyboard<R> {
             .run_mobile_plugin("currentHeight", ())
             .map_err(Into::into)
     }
+
+    /// Fire a light impact haptic (`UIImpactFeedbackGenerator` on iOS).
+    pub fn impact_light(&self) -> crate::Result<()> {
+        self.0
+            .run_mobile_plugin("impactLight", ())
+            .map_err(Into::into)
+    }
 }

@@ -10,3 +10,10 @@ use crate::Result;
 pub(crate) async fn current_height<R: Runtime>(app: AppHandle<R>) -> Result<KeyboardState> {
     app.keyboard().current_height()
 }
+
+/// Fire a light impact haptic — the app's single haptic strength (date
+/// selection, tab presses). A no-op wherever there is no haptic engine.
+#[command]
+pub(crate) async fn impact_light<R: Runtime>(app: AppHandle<R>) -> Result<()> {
+    app.keyboard().impact_light()
+}

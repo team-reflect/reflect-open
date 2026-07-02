@@ -87,8 +87,9 @@ not already present:
 - Tab-bar hide on keyboard (drive it from the `--keyboard-height` CSS
   variable set by `plugins/tauri-plugin-keyboard`).
 - Double-tap-tab → scroll-to-top (+ re-center Daily on today).
-- Light haptics on tab presses and date selection (a small addition to
-  the first-party plugin, or a Tauri haptics plugin).
+- ~~Light haptics on tab presses and date selection~~ — done: the keyboard
+  plugin's `impact_light` command (`UIImpactFeedbackGenerator`), fired from
+  `src/mobile/haptics.ts` in the tab bar and the calendar strip.
 - Wake-to-today on foreground date change.
 - Back-swipe and stack transitions on the note detail screen.
 - Status-bar-tap scroll-to-top, if reachable from the Tauri shell.

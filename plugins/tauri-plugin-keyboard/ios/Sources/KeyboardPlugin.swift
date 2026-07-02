@@ -21,9 +21,17 @@ struct KeyboardState: Encodable {
 /// disabled, and the keyboard's overlap height streams to JS as
 /// `keyboardChange` events so the layout can make room (a CSS variable, a
 /// pinned toolbar, caret scroll-into-view).
+///
+/// As Reflect's only native UIKit touch bridge, it also carries the app's
+/// tiny haptics surface (`impactLight`) — WKWebView has no
+/// `navigator.vibrate`, so JS cannot fire haptics on its own.
 class KeyboardPlugin: Plugin {
   private weak var webView: WKWebView?
   private var currentState = KeyboardState(height: 0, duration: 0)
+  // Lazy so the generator is created on the main thread, inside the first
+  // `impactLight` dispatch; kept alive across taps to skip re-allocating
+  // the underlying haptic engine on every press.
+  private lazy var lightImpactGenerator = UIImpactFeedbackGenerator(style: .light)
 
   @objc public override func load(webview: WKWebView) {
     self.webView = webview
@@ -84,6 +92,18 @@ class KeyboardPlugin: Plugin {
   /// when a screen mounts and subscribes).
   @objc public func currentHeight(_ invoke: Invoke) {
     invoke.resolve(currentState)
+  }
+
+  /// Fire a light impact haptic — V1 parity for date-selection and tab
+  /// taps. `UIFeedbackGenerator` is main-thread-only; resolve immediately
+  /// rather than after the dispatch since the tap has already happened and
+  /// callers are fire-and-forget. Silently does nothing on hardware
+  /// without a haptic engine (iPads, the simulator).
+  @objc public func impactLight(_ invoke: Invoke) {
+    DispatchQueue.main.async {
+      self.lightImpactGenerator.impactOccurred()
+    }
+    invoke.resolve()
   }
 
   /// `WKContentView` (the webview's private first responder) returns the

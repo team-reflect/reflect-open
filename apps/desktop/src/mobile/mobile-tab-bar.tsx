@@ -1,6 +1,7 @@
 import { type ReactElement } from 'react'
 import { Files, SquarePen } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { hapticImpactLight } from '@/mobile/haptics'
 
 export type MobileTab = 'daily' | 'all'
 
@@ -54,7 +55,12 @@ function TabButton({
       type="button"
       aria-label={label}
       aria-current={active ? 'page' : undefined}
-      onClick={onClick}
+      // V1 parity: a light haptic on every tab press — including a re-press
+      // of the active tab, which is the jump-to-today gesture on Daily.
+      onClick={() => {
+        hapticImpactLight()
+        onClick()
+      }}
       className={cn(
         'flex flex-1 flex-col items-center gap-0.5 pb-1 pt-2 text-[11px] font-medium',
         active ? 'text-primary' : 'text-text-muted',

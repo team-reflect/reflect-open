@@ -1,10 +1,11 @@
 ## Default Permission
 
-Read the keyboard state and subscribe to keyboard-change events
+Read the keyboard state, subscribe to keyboard-change events, and fire light impact haptics
 
 #### This default permission set includes the following:
 
 - `allow-current-height`
+- `allow-impact-light`
 - `allow-registerListener`
 - `allow-remove-listener`
 
@@ -39,6 +40,32 @@ Enables the current_height command without any pre-configured scope.
 <td>
 
 Denies the current_height command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`keyboard:allow-impact-light`
+
+</td>
+<td>
+
+Enables the impact_light command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`keyboard:deny-impact-light`
+
+</td>
+<td>
+
+Denies the impact_light command without any pre-configured scope.
 
 </td>
 </tr>

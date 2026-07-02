@@ -307,6 +307,18 @@
           "markdownDescription": "Denies the current_height command without any pre-configured scope."
         },
         {
+          "description": "Enables the impact_light command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-impact-light",
+          "markdownDescription": "Enables the impact_light command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the impact_light command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-impact-light",
+          "markdownDescription": "Denies the impact_light command without any pre-configured scope."
+        },
+        {
           "description": "Enables the registerListener command without any pre-configured scope.",
           "type": "string",
           "const": "allow-registerListener",
@@ -331,10 +343,10 @@
           "markdownDescription": "Denies the remove_listener command without any pre-configured scope."
         },
         {
-          "description": "Read the keyboard state and subscribe to keyboard-change events\n#### This default permission set includes:\n\n- `allow-current-height`\n- `allow-registerListener`\n- `allow-remove-listener`",
+          "description": "Read the keyboard state, subscribe to keyboard-change events, and fire light impact haptics\n#### This default permission set includes:\n\n- `allow-current-height`\n- `allow-impact-light`\n- `allow-registerListener`\n- `allow-remove-listener`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Read the keyboard state and subscribe to keyboard-change events\n#### This default permission set includes:\n\n- `allow-current-height`\n- `allow-registerListener`\n- `allow-remove-listener`"
+          "markdownDescription": "Read the keyboard state, subscribe to keyboard-change events, and fire light impact haptics\n#### This default permission set includes:\n\n- `allow-current-height`\n- `allow-impact-light`\n- `allow-registerListener`\n- `allow-remove-listener`"
         }
       ]
     }

@@ -2,6 +2,7 @@ import { memo, type ReactElement } from 'react'
 import { format } from 'date-fns'
 import { addDaysIso, parseIsoDate } from '@/lib/dates'
 import { cn } from '@/lib/utils'
+import { hapticImpactLight } from '@/mobile/haptics'
 
 interface WeekRowProps {
   /** The ISO date of this week's first day (per the week-start setting). */
@@ -37,7 +38,10 @@ function WeekRowComponent({
             type="button"
             aria-label={format(parseIsoDate(day), 'EEEE, MMMM do')}
             aria-current={selected ? 'date' : undefined}
-            onClick={() => onSelect(day)}
+            onClick={() => {
+              hapticImpactLight()
+              onSelect(day)
+            }}
             className="flex flex-1 flex-col items-center gap-0.5 py-1"
           >
             <span className="text-[11px] font-medium text-text-muted">

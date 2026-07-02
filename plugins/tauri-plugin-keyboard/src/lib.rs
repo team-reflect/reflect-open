@@ -35,7 +35,10 @@ impl<R: Runtime, T: Manager<R>> crate::KeyboardExt<R> for T {
 /// Initializes the plugin.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("keyboard")
-        .invoke_handler(tauri::generate_handler![commands::current_height])
+        .invoke_handler(tauri::generate_handler![
+            commands::current_height,
+            commands::impact_light
+        ])
         .setup(|app, api| {
             #[cfg(mobile)]
             let keyboard = mobile::init(app, api)?;
