@@ -52,7 +52,7 @@ let events: Array<Record<string, unknown>>
 
 function installFakeBridge(): void {
   setBridge({
-    invoke: async (command, args) => {
+    invoke: async (command) => {
       switch (command) {
         case 'settings_load':
           return stored
@@ -63,7 +63,6 @@ function installFakeBridge(): void {
         default:
           return null
       }
-      void args
     },
     listen: async () => () => {},
   })

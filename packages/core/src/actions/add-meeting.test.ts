@@ -101,11 +101,14 @@ describe('addMeetingToDaily', () => {
     expect(written).toContain('## Later')
   })
 
-  it('is idempotent: a day that already links the meeting is not rewritten', async () => {
+  it('is idempotent: a day that already links the meeting is a full no-op', async () => {
     readNoteMock.mockResolvedValue('## Meetings\n\n- 9:00am met with [[Ada Lovelace]] for [[Standup]]\n')
-    const outcome = await addMeetingToDaily(input())
-    expect(outcome.appended).toBe(false)
+    const outcome = await addMeetingToDaily(input({ attendees: ['Carol'] }))
+    expect(outcome).toEqual({ appended: false, createdNotes: [] })
     expect(writeNoteMock).not.toHaveBeenCalled()
+    // No invisible side effects either — a re-add must not mint notes the
+    // daily line never gained.
+    expect(createNoteMock).not.toHaveBeenCalled()
   })
 
   it('treats case-different and aliased Meetings links as already linked', async () => {

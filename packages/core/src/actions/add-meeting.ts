@@ -192,18 +192,21 @@ export async function addMeetingToDaily(input: AddMeetingInput): Promise<AddMeet
 
   const daily = dailyPath(input.date)
   const source = await noteSource(daily, input.generation)
-  // A plain-text line (backlink off) carries no link to match against, so —
-  // like v1, which never deduplicated — it always appends.
-  const alreadyLinked = input.backlinkMeeting && meetingAlreadyLinked(source, title)
-  if (!alreadyLinked) {
-    const line = meetingLine({
-      title,
-      attendees,
-      backlinkMeeting: input.backlinkMeeting,
-      startTime: input.startTime,
-    })
-    await writeNote(daily, appendUnderHeading(source, MEETINGS_HEADING, line), input.generation)
+  // An already-linked meeting makes the whole call a no-op — appending
+  // nothing but still creating notes would be surprising. A run that failed
+  // between the append and note creation still heals: the line's unresolved
+  // links create their notes on click. (A plain-text line — backlink off —
+  // carries no link to match against, so, like v1, it always appends.)
+  if (input.backlinkMeeting && meetingAlreadyLinked(source, title)) {
+    return { appended: false, createdNotes: [] }
   }
+  const line = meetingLine({
+    title,
+    attendees,
+    backlinkMeeting: input.backlinkMeeting,
+    startTime: input.startTime,
+  })
+  await writeNote(daily, appendUnderHeading(source, MEETINGS_HEADING, line), input.generation)
 
   const createdNotes: string[] = []
   if (input.backlinkMeeting && !(await titleHasNote(title))) {
@@ -218,5 +221,5 @@ export async function addMeetingToDaily(input: AddMeetingInput): Promise<AddMeet
     createdNotes.push(name)
   }
 
-  return { appended: !alreadyLinked, createdNotes }
+  return { appended: true, createdNotes }
 }
