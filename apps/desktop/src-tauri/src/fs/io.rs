@@ -35,6 +35,7 @@ pub(super) fn bootstrap(root: &Path) -> AppResult<()> {
     for dir in TOP_LEVEL_DIRS {
         fs::create_dir_all(root.join(dir))?;
     }
+    sweep_upload_staging(root);
     mark_reflect_dir_local_only(&root.join(REFLECT_DIR));
     let gitignore = root.join(".gitignore");
     if !gitignore.exists() {
@@ -48,6 +49,21 @@ pub(super) fn bootstrap(root: &Path) -> AppResult<()> {
         )?;
     }
     Ok(())
+}
+
+/// Drop leftover upload staging files (`.reflect/tmp/`, see `fs::assets`) —
+/// a crash mid-upload strands its temp file, and nothing else ever reclaims
+/// it. Opening the graph is the natural sweep point: a generation bump
+/// rejects any commit that was still in flight, so nothing live is removed.
+/// Best-effort — a locked file must not fail the open.
+fn sweep_upload_staging(root: &Path) {
+    let staging = root.join(REFLECT_DIR).join("tmp");
+    if !staging.exists() {
+        return;
+    }
+    if let Err(err) = fs::remove_dir_all(&staging) {
+        tracing::warn!(path = %staging.display(), %err, "failed to sweep upload staging");
+    }
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -235,6 +251,18 @@ mod tests {
         let reflect_dir = dir.path().join(REFLECT_DIR);
         fs::create_dir_all(&reflect_dir).unwrap();
         assert!(set_apple_sync_exclusions(&reflect_dir).is_empty());
+    }
+
+    #[test]
+    fn bootstrap_sweeps_stale_upload_staging() {
+        let dir = tempdir().unwrap();
+        bootstrap(dir.path()).unwrap();
+        let staging = dir.path().join(".reflect/tmp");
+        fs::create_dir_all(&staging).unwrap();
+        fs::write(staging.join(".tmpAbC123"), b"stranded upload").unwrap();
+        // Re-opening the graph re-bootstraps; the stranded file goes away.
+        bootstrap(dir.path()).unwrap();
+        assert!(!staging.exists());
     }
 
     #[test]

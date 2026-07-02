@@ -1,4 +1,5 @@
 import {
+  appendBlock,
   editTaskLine,
   errorMessage,
   isAppError,
@@ -176,6 +177,12 @@ export interface FrontmatterPatch {
    * the user unpublishes the link.
    */
   gist?: GistFrontmatter | false
+  /**
+   * Contact names whose suggested-contact card was dismissed on this note —
+   * written whole, like `aliases`. The empty list deletes the key: with no
+   * dismissals the frontmatter carries nothing.
+   */
+  ignoredContacts?: string[]
 }
 
 /**
@@ -196,6 +203,10 @@ export function frontmatterPatchToYaml(patch: FrontmatterPatch): Record<string, 
   }
   if (patch.private !== undefined) {
     yaml['private'] = patch.private === false ? undefined : true
+  }
+  if (patch.ignoredContacts !== undefined) {
+    yaml['ignoredContacts'] =
+      patch.ignoredContacts.length === 0 ? undefined : patch.ignoredContacts
   }
   if (patch.gist !== undefined) {
     if (patch.gist === false) {
@@ -309,6 +320,15 @@ export interface NoteSession {
    * transactional revert, and `TaskStaleError` propagation as {@link commitTaskToggle}.
    */
   commitTaskToBullet: (task: TaskMarker) => Promise<boolean>
+  /**
+   * Append a markdown block to the end of the body (own paragraph, blank-line
+   * separated — `appendBlock`) from an out-of-editor action like the
+   * suggested-contact card's Add, applied to the live buffer so unsaved edits
+   * survive, reflected in the open editor, and flushed now. Same gating,
+   * `false`-when-busy, and transactional revert as {@link commitTaskToggle}.
+   * A blank block is refused (`false`) — there is nothing to write.
+   */
+  commitBodyAppend: (block: string) => Promise<boolean>
   /** Flush pending edits and detach: no further snapshots are emitted. */
   dispose: () => void
   /**
@@ -706,7 +726,8 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   }
 
   /**
-   * Apply a Tasks-view body edit (toggle / edit / delete, Plan 18) transactionally:
+   * Apply an out-of-editor body edit (the Tasks view's toggle / edit / delete,
+   * the suggested-contact card's append) transactionally:
    * `transform` rewrites the live document — header plus the unsaved buffer, so
    * concurrent editor edits survive — then we land it now so the Tasks view
    * refreshes promptly. Returns false when the session can't safely take a body
@@ -764,6 +785,13 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     return commitBodyEdit((full) => taskLineToBullet(full, task))
   }
 
+  function commitBodyAppend(block: string): Promise<boolean> {
+    if (block.trim() === '') {
+      return Promise.resolve(false)
+    }
+    return commitBodyEdit((full) => appendBlock(full, block))
+  }
+
   function dispose(): void {
     // A discarded session must not write: its file is being deleted, and a
     // flush would recreate it. Otherwise flush first — the queued save step
@@ -802,6 +830,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
     commitTaskEdit,
     commitTaskRemove,
     commitTaskToBullet,
+    commitBodyAppend,
     dispose,
     discard,
   }

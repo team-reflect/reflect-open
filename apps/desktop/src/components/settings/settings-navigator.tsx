@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react'
 import { cn } from '@/lib/utils'
 import { scrollToSettingsSection } from './section-scrolling'
-import { SETTINGS_SECTIONS, type SettingsSectionId } from './sections'
+import { type SettingsSectionId } from './sections'
 import { useActiveSettingsSection } from './use-active-settings-section'
+import { useVisibleSettingsSections } from './use-visible-settings-sections'
 
 /** Where the sliding marker sits, in the rail's own coordinates. */
 interface MarkerPosition {
@@ -27,6 +28,7 @@ export function SettingsNavigator({ className }: SettingsNavigatorProps): ReactE
   const navRef = useRef<HTMLElement | null>(null)
   const itemRefs = useRef(new Map<SettingsSectionId, HTMLButtonElement>())
   const activeId = useActiveSettingsSection(navRef)
+  const sections = useVisibleSettingsSections()
   const [marker, setMarker] = useState<MarkerPosition | null>(null)
 
   const measure = useCallback((): void => {
@@ -62,7 +64,7 @@ export function SettingsNavigator({ className }: SettingsNavigatorProps): ReactE
             style={{ transform: `translateY(${marker.top}px)`, height: `${marker.height}px` }}
           />
         )}
-        {SETTINGS_SECTIONS.map((section) => {
+        {sections.map((section) => {
           const isActive = section.id === activeId
           return (
             <button

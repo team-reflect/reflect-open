@@ -3661,6 +3661,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "objc2-contacts"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b034b578389f89a85c055eacc8d8b368be5f04a6c1b07f672bf3aec21d0ef621"
+dependencies = [
+ "block2",
+ "objc2",
+ "objc2-foundation",
+]
+
+[[package]]
 name = "objc2-core-data"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4746,6 +4757,7 @@ dependencies = [
  "notify-debouncer-full",
  "objc2",
  "objc2-app-kit",
+ "objc2-contacts",
  "objc2-event-kit",
  "objc2-foundation",
  "ort",

@@ -9,10 +9,12 @@
 //! [`secrets`] (OS keychain), [`git`] (backup/sync primitives),
 //! [`capture`] (link-capture inbox + native-messaging host plumbing),
 //! [`calendar`] (read-only Apple Calendar access),
+//! [`contacts`] (live Apple Contacts lookups),
 //! [`error`] (the shared error contract).
 
 mod calendar;
 mod capture;
+mod contacts;
 mod db;
 mod devtools;
 mod error;
@@ -177,6 +179,7 @@ pub fn run() {
 
     builder
         .manage(fs::GraphState::default())
+        .manage(fs::assets::AssetUploads::default())
         .manage(db::IndexState::default())
         .manage(watcher::WatcherState::default())
         .manage(quit::QuitState::default())
@@ -192,6 +195,11 @@ pub fn run() {
             fs::asset_write,
             fs::asset_read,
             fs::asset_open,
+            fs::assets::asset_upload_begin,
+            fs::assets::asset_upload_append,
+            fs::assets::asset_upload_commit,
+            fs::assets::asset_upload_abort,
+            fs::assets::asset_import,
             fs::dir_list,
             fs::note_exists,
             fs::note_delete,
@@ -225,6 +233,10 @@ pub fn run() {
             calendar::calendar_request_access,
             calendar::calendar_list_calendars,
             calendar::calendar_list_events,
+            contacts::contacts_authorization_status,
+            contacts::contacts_request_access,
+            contacts::contacts_lookup_by_email,
+            contacts::contacts_lookup_by_name,
             capture::capture_host_register,
             capture::capture_inbox_list,
             capture::capture_inbox_spool,

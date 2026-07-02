@@ -2,7 +2,7 @@ import { type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { isAppError, readNote, splitFrontmatter } from '@reflect/core'
 import { MarkdownPreview } from '@/editor/markdown-preview'
-import { useImagePersistence } from '@/editor/use-image-persistence'
+import { useAssetPersistence } from '@/editor/use-asset-persistence'
 import { formatDayLabel } from '@/lib/dates'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
@@ -37,7 +37,7 @@ async function readNoteForPreview(path: string): Promise<string | null> {
 export function NotePreview({ entry }: NotePreviewProps): ReactElement {
   const { graph } = useGraph()
   const { settings } = useSettings()
-  const { resolveImageUrl } = useImagePersistence(graph?.root ?? null, graph?.generation ?? null)
+  const { resolveImageUrl } = useAssetPersistence(graph?.root ?? null, graph?.generation ?? null)
   const { data, isError } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'note-preview', entry.path],
     queryFn: () => readNoteForPreview(entry.path),

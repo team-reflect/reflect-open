@@ -12,5 +12,7 @@
 	<!-- Pre-Sonoma systems prompt with the legacy key. -->
 	<key>NSCalendarsUsageDescription</key>
 	<string>Reflect reads your calendar to show the day's meetings beside your daily note. Access is read-only and stays on this Mac.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Reflect reads your contacts to suggest details for person notes. Nothing is stored or sent anywhere.</string>
 </dict>
 </plist>

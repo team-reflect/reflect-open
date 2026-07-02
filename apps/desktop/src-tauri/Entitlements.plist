@@ -13,5 +13,10 @@
 	     in notarized builds. -->
 	<key>com.apple.security.personal-information.calendars</key>
 	<true/>
+	<!-- Apple Contacts integration: read-only CNContactStore lookups for
+	     person notes. Without this the hardened runtime blocks the contacts
+	     permission prompt in notarized builds. -->
+	<key>com.apple.security.personal-information.addressbook</key>
+	<true/>
 </dict>
 </plist>

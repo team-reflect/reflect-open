@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { WikiSuggestion } from '@reflect/core'
+import type { ContactMatch, WikiSuggestion } from '@reflect/core'
 import { buildAutocompleteEntries } from './wiki-autocomplete-entries'
 
 function suggestion(overrides: Partial<WikiSuggestion>): WikiSuggestion {
@@ -9,6 +9,17 @@ function suggestion(overrides: Partial<WikiSuggestion>): WikiSuggestion {
     title: 'Note',
     alias: null,
     date: null,
+    ...overrides,
+  }
+}
+
+function contact(overrides: Partial<ContactMatch>): ContactMatch {
+  return {
+    fullName: 'Ada Lovelace',
+    givenName: 'Ada',
+    familyName: 'Lovelace',
+    emails: ['ada@example.com'],
+    phones: [],
     ...overrides,
   }
 }
@@ -74,5 +85,44 @@ describe('buildAutocompleteEntries', () => {
     )
     expect(entries).toHaveLength(1)
     expect(entries[0]!.kind).toBe('suggestion')
+  })
+
+  it('places contact rows after suggestions and before the create row', () => {
+    const ada = contact({})
+    const entries = buildAutocompleteEntries(
+      'Ada L',
+      [suggestion({ target: 'Ada Lovelace Notes', title: 'Ada Lovelace Notes' })],
+      { offerCreate: true, contacts: [ada] },
+    )
+    expect(entries.map((entry) => entry.kind)).toEqual(['suggestion', 'contact', 'create'])
+    expect(entries[1]).toEqual({ kind: 'contact', contact: ada })
+  })
+
+  it('drops a contact whose name already resolves to a suggestion', () => {
+    const entries = buildAutocompleteEntries(
+      'ada',
+      [suggestion({ target: 'Ada Lovelace', title: 'Ada Lovelace' })],
+      { offerCreate: true, contacts: [contact({})] },
+    )
+    expect(entries.filter((entry) => entry.kind === 'contact')).toEqual([])
+  })
+
+  it('drops a contact covered by a suggestion alias', () => {
+    const entries = buildAutocompleteEntries(
+      'ada',
+      [suggestion({ target: 'People/Ada', title: 'People/Ada', alias: 'Ada Lovelace' })],
+      { offerCreate: true, contacts: [contact({})] },
+    )
+    expect(entries.filter((entry) => entry.kind === 'contact')).toEqual([])
+  })
+
+  it('suppresses the create row when a contact covers the exact query', () => {
+    // The contact row IS the create action (prefilled) — a bare Create row
+    // beside it would just be the worse duplicate.
+    const entries = buildAutocompleteEntries('ada lovelace', [], {
+      offerCreate: true,
+      contacts: [contact({})],
+    })
+    expect(entries.map((entry) => entry.kind)).toEqual(['contact'])
   })
 })

@@ -5,14 +5,19 @@ import { BacklinksPanel } from '@/components/backlinks-panel'
 import { InlineAlert } from '@/components/inline-alert'
 import { NoteConflictBanner } from '@/components/note-conflict-banner'
 import { ProtectedNoteView } from '@/components/protected-note-view'
+import { SuggestedContactCard } from '@/components/suggested-contact-card'
 import { SyncConflictNotice } from '@/components/sync-conflict-notice'
 import { EditorAiKeymap } from '@/editor/ai-menu/editor-ai-keymap'
 import { useEditorAiMenu } from '@/editor/ai-menu/use-editor-ai-menu'
 import { editorBodyWithDefaultBullet } from '@/editor/default-bullet'
+import {
+  registerNoteEditorHandle,
+  unregisterNoteEditorHandle,
+} from '@/editor/editor-handle-registry'
 import { markModeFromSyntax } from '@/editor/mark-mode'
 import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor'
+import { useAssetPersistence } from '@/editor/use-asset-persistence'
 import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete'
-import { useImagePersistence } from '@/editor/use-image-persistence'
 import { useNoteDocument } from '@/editor/use-note-document'
 import { useTagNavigation } from '@/editor/use-tag-navigation'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
@@ -124,22 +129,36 @@ export function NotePaneComponent({
   })
   const {
     resolveImageUrl,
-    resolveImageOpenPath,
-    openImage,
-    saveImage,
-    onImageSaveError,
-    saveError: imageSaveError,
-  } = useImagePersistence(graphRoot, generation)
+    resolveAssetOpenPath,
+    openAsset,
+    saveFile,
+    saveError,
+  } = useAssetPersistence(graphRoot, generation, path)
   const onWikiLinkClick = useWikiLinkNavigation(generation)
   const onTagClick = useTagNavigation()
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
 
   const bindEditor = document.bindEditor
   const aiEditorRef = useRef<NoteEditorHandle | null>(null)
+  // The registry entry this pane made, so unmount removes exactly it (a
+  // remount of the same path may already have re-registered).
+  const registeredHandle = useRef<{ path: string; handle: NoteEditorHandle } | null>(null)
   const handleRef = useCallback(
     (handle: NoteEditorHandle | null) => {
       bindEditor(handle)
       aiEditorRef.current = handle
+      if (handle === null) {
+        if (registeredHandle.current !== null) {
+          unregisterNoteEditorHandle(
+            registeredHandle.current.path,
+            registeredHandle.current.handle,
+          )
+          registeredHandle.current = null
+        }
+      } else {
+        registerNoteEditorHandle(path, handle)
+        registeredHandle.current = { path, handle }
+      }
       if (dailyDate !== undefined) {
         registerHandle?.(dailyDate, handle)
       }
@@ -150,7 +169,7 @@ export function NotePaneComponent({
         onAutoFocused?.()
       }
     },
-    [bindEditor, dailyDate, registerHandle, autoFocus, onAutoFocused],
+    [bindEditor, path, dailyDate, registerHandle, autoFocus, onAutoFocused],
   )
 
   const aiMenu = useEditorAiMenu({ path, editorRef: aiEditorRef })
@@ -230,9 +249,10 @@ export function NotePaneComponent({
           </InlineAlert>
         ) : null}
 
-        {imageSaveError !== null ? (
+        {saveError !== null ? (
           <InlineAlert tone="error" className="mb-4">
-            Couldn’t save the pasted image: {imageSaveError}. It was not added to the note.
+            Couldn’t save the {saveError.kind === 'image' ? 'pasted image' : 'file'}:{' '}
+            {saveError.message}. It was not added to the note.
           </InlineAlert>
         ) : null}
 
@@ -244,6 +264,12 @@ export function NotePaneComponent({
         ) : null}
 
         <SyncConflictNotice path={path} className="mb-4" />
+
+        {/* Daily notes are date-titled, so a contact can never match one —
+            the hook gates on it, and skipping the mount keeps the stream lean.
+            Keyed by path: a note switch must not carry one card's busy/error
+            state into the next note's card. */}
+        {!dailyNote ? <SuggestedContactCard key={path} path={path} /> : null}
       </div>
 
       <NoteEditor
@@ -259,10 +285,9 @@ export function NotePaneComponent({
         // The grip drag-reorders blocks and the "+" inserts a paragraph below.
         blockHandle={true}
         resolveImageUrl={resolveImageUrl}
-        resolveImageOpenPath={resolveImageOpenPath}
-        openImage={openImage}
-        saveImage={saveImage}
-        onImageSaveError={onImageSaveError}
+        resolveAssetOpenPath={resolveAssetOpenPath}
+        openAsset={openAsset}
+        saveFile={saveFile}
         onWikiLinkClick={onWikiLinkClick}
         onTagClick={onTagClick}
         onWikilinkSearch={onWikilinkSearch}

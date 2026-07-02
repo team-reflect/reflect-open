@@ -95,6 +95,15 @@ objc2-app-kit = { version = "0.3.2", default-features = false, features = [
   "NSColorSpace",
 ] }
 
+# Apple Contacts integration (`contacts.rs`): live CNContactStore lookups on
+# macOS and iOS — never a mirrored copy of the address book. block2 bridges the
+# requestAccessForEntityType completion handler back into blocking Rust.
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+objc2 = "0.6.4"
+objc2-foundation = "0.3.2"
+objc2-contacts = "0.3.2"
+block2 = "0.6.1"
+
 # Desktop-only capabilities (Plan 19): auto-update (mobile updates go through
 # the app stores), window-state (no windows to restore on mobile), the file
 # watcher (nothing else writes the mobile sandbox; local writes notify

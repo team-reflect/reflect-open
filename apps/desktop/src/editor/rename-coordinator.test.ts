@@ -112,6 +112,7 @@ function fakeSession(content: string): NoteSession & {
     commitTaskEdit: async () => false,
     commitTaskRemove: async () => false,
     commitTaskToBullet: async () => false,
+    commitBodyAppend: async () => false,
     dispose: () => {},
     discard: () => {},
   }
