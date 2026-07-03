@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AiProvidersState } from '../ai/provider-config'
+import type { GenerateAudioMemoTitleRequest } from '../ai/audio-memo-title'
 import {
   audioMemoFromPath,
   audioMemoIdentity,
@@ -20,6 +21,10 @@ import {
 import { transcribeAudio, TranscriptionRejectedError } from '../ai/transcribe'
 import { getSecret } from '../secrets/keychain'
 
+const generateAudioMemoTitleMock = vi.hoisted(() =>
+  vi.fn<(request: GenerateAudioMemoTitleRequest) => Promise<string>>(),
+)
+
 vi.mock('../graph/commands', () => ({
   listDir: vi.fn(),
   listFiles: vi.fn(),
@@ -31,6 +36,9 @@ vi.mock('../graph/commands', () => ({
 vi.mock('../ai/transcribe', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../ai/transcribe')>()),
   transcribeAudio: vi.fn(),
+}))
+vi.mock('../ai/audio-memo-title', () => ({
+  generateAudioMemoTitle: generateAudioMemoTitleMock,
 }))
 vi.mock('../secrets/keychain', () => ({
   getSecret: vi.fn(),
@@ -72,6 +80,7 @@ beforeEach(() => {
   writeNoteMock.mockResolvedValue(undefined)
   getSecretMock.mockResolvedValue('sk-live-key')
   transcribeMock.mockResolvedValue('memo transcript')
+  generateAudioMemoTitleMock.mockResolvedValue('Memo Transcript')
 })
 
 describe('audioMemoIdentity', () => {
@@ -181,15 +190,22 @@ describe('reconcileAudioMemos', () => {
     expect(writeNoteMock.mock.calls).toEqual([
       [
         MEMO.notePath,
-        '---\naliases: [audio-memo-2026-06-11-153022-845]\n---\n\n# Audio memo 2026-06-11 15:30:22\n\n[Recording](audio-memos/audio-memo-2026-06-11-153022-845.webm)\n\nmemo transcript\n',
+        '---\naliases: [audio-memo-2026-06-11-153022-845]\n---\n\n# Memo Transcript\n\n[Recording](audio-memos/audio-memo-2026-06-11-153022-845.webm)\n\nmemo transcript\n',
         3,
       ],
       [
         'daily/2026-06-11.md',
-        'morning thoughts\n\n## Audio memos\n\n[[audio-memo-2026-06-11-153022-845|Audio memo 15:30]]\n',
+        'morning thoughts\n\n## Audio memos\n\n- [[audio-memo-2026-06-11-153022-845|Memo Transcript]]\n',
         3,
       ],
     ])
+    expect(generateAudioMemoTitleMock).toHaveBeenCalledWith({
+      config: PROVIDERS.providers[0],
+      apiKey: 'sk-live-key',
+      fetchFn: undefined,
+      transcript: 'memo transcript',
+      fallbackTitle: 'Audio memo 2026-06-11 15:30:22',
+    })
   })
 
   it('a provider-refused recording is tombstoned with a failure note; the pass continues', async () => {
@@ -244,7 +260,7 @@ describe('reconcileAudioMemos', () => {
 
     expect(writeNoteMock).toHaveBeenCalledWith(
       'daily/2026-06-11.md',
-      '## Audio memos\n\n[[audio-memo-2026-06-11-153022-845|Audio memo 15:30]]\n',
+      '## Audio memos\n\n- [[audio-memo-2026-06-11-153022-845|Memo Transcript]]\n',
       3,
     )
   })
@@ -347,7 +363,27 @@ describe('reconcileAudioMemos', () => {
     )
     expect(writeNoteMock).toHaveBeenCalledWith(
       'daily/2026-06-11.md',
-      expect.stringContaining('[[audio-memo-2026-06-11-153022-845|Audio memo 15:30]]'),
+      expect.stringContaining('- [[audio-memo-2026-06-11-153022-845|Memo Transcript]]'),
+      3,
+    )
+  })
+
+  it('uses the timestamp fallback name for silence', async () => {
+    listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
+    transcribeMock.mockResolvedValue('')
+
+    const outcome = await reconcile()
+
+    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, stopped: null })
+    expect(generateAudioMemoTitleMock).not.toHaveBeenCalled()
+    expect(writeNoteMock).toHaveBeenCalledWith(
+      MEMO.notePath,
+      expect.stringContaining('# Audio memo 2026-06-11 15:30:22'),
+      3,
+    )
+    expect(writeNoteMock).toHaveBeenCalledWith(
+      'daily/2026-06-11.md',
+      expect.stringContaining('- [[audio-memo-2026-06-11-153022-845|Audio memo 2026-06-11 15:30:22]]'),
       3,
     )
   })
