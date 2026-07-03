@@ -223,6 +223,50 @@ describe('useAssetPersistence resolveFileInfo', () => {
     await expect(persistence!.resolveFileInfo('assets/q3.pdf')).resolves.toBeUndefined()
     expect(invoke).not.toHaveBeenCalled()
   })
+
+  it('degrades to no size when the assets listing fails', async () => {
+    setBridge({
+      invoke: async () => {
+        throw { kind: 'io', message: 'bridge down' }
+      },
+      invokeBinary: async () => null,
+      listen: async () => () => {},
+    })
+    render(<Host generation={3} />)
+
+    await expect(persistence!.resolveFileInfo('assets/q3.pdf')).resolves.toBeUndefined()
+  })
+
+  it('never serves a listing that lands after the graph session switched', async () => {
+    let resolveListing: ((entries: unknown) => void) | null = null
+    setBridge({
+      invoke: (command: string) =>
+        command === 'dir_list'
+          ? new Promise((resolve) => {
+              resolveListing = resolve
+            })
+          : Promise.resolve(null),
+      invokeBinary: async () => null,
+      listen: async () => () => {},
+    })
+    const view = render(<Host generation={3} />)
+
+    const staleLookup = persistence!.resolveFileInfo('assets/q3.pdf')
+    await waitFor(() => expect(resolveListing).not.toBeNull())
+    const resolveStale = resolveListing!
+    resolveListing = null
+
+    // The user switches graphs; the old graph's listing then lands.
+    view.rerender(<Host generation={4} />)
+    resolveStale([{ path: 'assets/q3.pdf', size: 999, modifiedMs: 0 }])
+    await staleLookup
+
+    // The new session lists afresh instead of serving the stale size.
+    const freshLookup = persistence!.resolveFileInfo('assets/q3.pdf')
+    await waitFor(() => expect(resolveListing).not.toBeNull())
+    resolveListing!([{ path: 'assets/q3.pdf', size: 111, modifiedMs: 0 }])
+    await expect(freshLookup).resolves.toEqual({ size: 111 })
+  })
 })
 
 /** A bridge whose appends fail until `heal()` is called. */

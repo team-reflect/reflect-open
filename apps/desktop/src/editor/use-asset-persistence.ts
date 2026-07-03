@@ -129,9 +129,11 @@ export function useAssetPersistence(
   }, [path, generation])
 
   useEffect(() => {
-    const cache = sizeByAssetPath.current
     return () => {
-      cache.clear()
+      // Replace the map rather than clearing it: a listing or save still in
+      // flight for the old graph session writes into the orphaned instance,
+      // never into the next session's cache.
+      sizeByAssetPath.current = new Map()
       pendingAssetListing.current = null
     }
   }, [generation])
@@ -182,9 +184,12 @@ export function useAssetPersistence(
       const desiredName = imageExtension
         ? `pasted-${Date.now()}.${imageExtension}`
         : assetFileName(file.name)
+      // Captured before the await: a save resolving after a graph switch
+      // seeds the orphaned session's cache, not the next graph's.
+      const sizeCache = sizeByAssetPath.current
       try {
         const saved = await createAsset(desiredName, file, generation)
-        sizeByAssetPath.current.set(saved, file.size)
+        sizeCache.set(saved, file.size)
         if (file.size > LARGE_FILE_BYTES) {
           startOperation('Large file added').warn(
             `“${file.name}” is ${formatBytes(file.size)}. Git keeps every version forever; GitHub rejects files over 100 MB.`,
@@ -217,14 +222,22 @@ export function useAssetPersistence(
       if (generation === null || !isSafeAssetSource(href)) {
         return undefined
       }
+      // Captured before the await for the same session-scoping reason as in
+      // saveFile.
       const cache = sizeByAssetPath.current
       if (!cache.has(href)) {
         pendingAssetListing.current ??= listDir('assets', generation).finally(() => {
           pendingAssetListing.current = null
         })
-        const entries = await pendingAssetListing.current
-        for (const entry of entries) {
-          cache.set(entry.path, entry.size)
+        try {
+          const entries = await pendingAssetListing.current
+          for (const entry of entries) {
+            cache.set(entry.path, entry.size)
+          }
+        } catch {
+          // A failed listing degrades to a pill without a size, per the
+          // documented contract (undefined, never a rejection).
+          return undefined
         }
       }
       const size = cache.get(href)
