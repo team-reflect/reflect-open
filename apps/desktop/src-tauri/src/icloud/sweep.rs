@@ -523,6 +523,18 @@ fn fold_duplicate(
         // independent creation, and merging against a dead lineage's
         // ancestor would poison a later diff3. Drop it deliberately.
         shadow.forget(canonical_rel);
+        // Then record the adopted content as the canonical's base, exactly
+        // as the occupied-path fold records its merged result. Peers record
+        // one when the rename syncs over (external ingest), but this
+        // device's own sweep writes echo back as own-writes — without the
+        // record here it alone would stay baseless, and a later concurrent
+        // edit would diff3 on one device and fall to markers on the other.
+        // Marker content stays unrecorded on every device alike.
+        if !markers::contains_conflict_markers(&dup_content) {
+            if let Err(err) = shadow.record(canonical_rel, &dup_content) {
+                tracing::warn!(path = %canonical_rel, ?err, "failed to record adopted collision base");
+            }
+        }
         outcome.changed.push(remove_change(&file.path));
         outcome.changed.push(SweepChange {
             path: canonical_rel.to_string(),
@@ -758,7 +770,12 @@ mod tests {
         assert!(root.path().join("daily/2026-07-04.md").exists());
         assert!(!root.path().join("daily/2026-07-04 2.md").exists());
         assert_eq!(outcome.needs_review.len(), 0);
-        assert_eq!(shadow.base("daily/2026-07-04.md"), None);
+        // The dead lineage's ancestor is gone — the adopted content is the
+        // base now, matching what peers record when the rename syncs over.
+        assert_eq!(
+            shadow.base("daily/2026-07-04.md"),
+            Some("- phone only\n".to_string())
+        );
     }
 
     #[test]
