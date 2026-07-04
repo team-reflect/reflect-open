@@ -374,10 +374,9 @@ fn archived_sides(
     rel: &str,
     original: &str,
     file_modified_ms: u64,
-    mut versions: Vec<VersionRef>,
+    versions: Vec<VersionRef>,
 ) -> AppResult<Vec<ConflictSide>> {
     archive::archive_version(root, rel, None, file_modified_ms, original.as_bytes())?;
-    versions.sort_by_key(|version| version.modified_ms);
     let mut sides: Vec<ConflictSide> = Vec::new();
     for version in &versions {
         let content = fs::read_to_string(&version.store_path)
@@ -398,6 +397,12 @@ fn archived_sides(
             modified_ms: version.modified_ms,
         });
     }
+    // The ladder's ordering rule, applied to the *fold sequence* too: a
+    // timestamp tie must not fall back to platform listing order, or two
+    // devices folding the same versions could interleave them differently
+    // and write different bytes forever. Contents are read above, so the
+    // tiebreak has something to compare.
+    sides.sort_by(|a, b| (a.modified_ms, &a.content).cmp(&(b.modified_ms, &b.content)));
     Ok(sides)
 }
 
@@ -418,6 +423,12 @@ fn apply_file_resolution(
             tracing::warn!(path = rel, ?err, "failed to write conflict resolution");
             return; // versions stay unresolved; next sweep retries
         }
+    }
+    if resolution.changed || resolution.marked {
+        // Marked-but-unchanged is defensive (the ladder's marker rules make
+        // it near-unreachable today): if it ever happens, the controller
+        // must still reindex so `has_conflict` and the notice reflect the
+        // markers — content-hash gating makes a redundant reindex free.
         outcome.changed.push(SweepChange {
             path: rel.to_string(),
             kind: "upsert".to_string(),
@@ -1064,6 +1075,31 @@ mod tests {
         }
         // Two stacked blocks for three sides — flat, never nested.
         assert_eq!(resolution.final_content.matches("<<<<<<< ").count(), 2);
+    }
+
+    #[test]
+    fn multi_version_folds_are_order_independent_even_on_timestamp_ties() {
+        // Two conflict versions sharing one modification time: whichever
+        // order the platform lists them in, the fold must emit identical
+        // bytes — the tiebreak is content, exactly like the ladder's rule.
+        fn run(root: &Path, first: &str, second: &str) -> String {
+            fs::write(root.join("daily/2026-07-04.md"), "- seed\n- mac\n").unwrap();
+            let shadow = ShadowStore::new(root);
+            shadow.record("daily/2026-07-04.md", "- seed\n").unwrap();
+            let versions = vec![
+                fake_version(root, "va.md", first, 1_000, "iPhone"),
+                fake_version(root, "vb.md", second, 1_000, "iPad"),
+            ];
+            resolve_file(root, "daily/2026-07-04.md", 2_000, versions, &shadow)
+                .unwrap()
+                .final_content
+        }
+
+        let one_root = graph();
+        let one = run(one_root.path(), "- seed\n- phone\n", "- seed\n- pad\n");
+        let two_root = graph();
+        let two = run(two_root.path(), "- seed\n- pad\n", "- seed\n- phone\n");
+        assert_eq!(one, two);
     }
 
     #[test]
