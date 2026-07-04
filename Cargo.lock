@@ -4742,7 +4742,7 @@ dependencies = [
 
 [[package]]
 name = "reflect-open"
-version = "0.4.0-beta.16"
+version = "0.4.0-beta.17"
 dependencies = [
  "base64 0.22.1",
  "block2",
