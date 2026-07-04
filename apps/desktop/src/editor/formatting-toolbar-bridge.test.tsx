@@ -23,33 +23,18 @@ function makeCommand(): FakeCommand {
 function makeFakeEditor() {
   const dom = document.createElement('div')
   document.body.appendChild(dom)
-  const insertedText = Object.assign(vi.fn(), { scrollIntoView: vi.fn() })
-  const transaction = {
-    insertText: vi.fn(() => {
-      return { scrollIntoView: () => 'dispatched-transaction' }
-    }),
-  }
   return {
     mounted: true,
     focused: false,
     blur: vi.fn(),
-    insertedText,
-    view: {
-      dom,
-      dispatch: vi.fn(),
-      state: {
-        get tr() {
-          return transaction
-        },
-      },
-    },
+    view: { dom },
     commands: {
       toggleList: makeCommand(),
       indentList: makeCommand(),
       dedentList: makeCommand(),
       moveList: makeCommand(),
+      insertTrigger: makeCommand(),
     },
-    transaction,
   }
 }
 
@@ -163,14 +148,13 @@ describe('FormattingToolbarBridge', () => {
     expect(store.result.current?.capabilities.canDedent).toBe(false)
   })
 
-  it('types autocomplete triggers through a dispatched transaction', () => {
+  it("types autocomplete triggers through the editor's insertTrigger command", () => {
     const store = renderHook(() => useFormattingToolbar())
     render(<FormattingToolbarBridge />)
     focusIn()
 
     store.result.current!.commands.insertTrigger('[[')
-    expect(editor.transaction.insertText).toHaveBeenCalledWith('[[')
-    expect(editor.view.dispatch).toHaveBeenCalledWith('dispatched-transaction')
+    expect(editor.commands.insertTrigger).toHaveBeenCalledWith('[[')
   })
 
   it('dismisses the keyboard by blurring the editor', () => {

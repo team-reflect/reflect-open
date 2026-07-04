@@ -74,10 +74,7 @@ export function FormattingToolbarBridge(): null {
         moveUp: () => run(() => editor.commands.moveList('up')),
         moveDown: () => run(() => editor.commands.moveList('down')),
         insertTrigger: (text: FormattingTriggerText) =>
-          run(() => {
-            const view = editor.view
-            view.dispatch(view.state.tr.insertText(text).scrollIntoView())
-          }),
+          run(() => editor.commands.insertTrigger(text)),
         dismissKeyboard: () => editor.blur(),
       }
 
