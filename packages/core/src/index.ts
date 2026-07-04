@@ -88,13 +88,17 @@ export {
   graphInfoSchema,
   recentGraphSchema,
   fileMetaSchema,
+  graphImportSummarySchema,
   type GraphInfo,
   type RecentGraph,
   type FileMeta,
+  type GraphImportSummary,
 } from './graph/schemas'
 export {
   openGraph,
   createGraph,
+  importReflectV1Zip,
+  markReflectV1ImportOwnWrites,
   readNote,
   writeNote,
   writeAsset,

@@ -40,3 +40,14 @@ export const fileMetaSchema = z.object({
   placeholder: z.boolean().optional(),
 })
 export type FileMeta = z.infer<typeof fileMetaSchema>
+
+/** Result of importing a Reflect V1 graph-shaped zip into the open graph. */
+export const graphImportSummarySchema = z.object({
+  /** Files newly written to the open graph. */
+  importedFiles: z.number(),
+  /** Files already present with identical bytes, left untouched. */
+  skippedFiles: z.number(),
+  /** Graph-relative paths newly written to the open graph. */
+  changedPaths: z.array(z.string()),
+})
+export type GraphImportSummary = z.infer<typeof graphImportSummarySchema>
