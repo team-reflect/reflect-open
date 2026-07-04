@@ -25,6 +25,29 @@ Drawn from the product docs — read these for deeper context:
 - **No Electron.** Desktop shell is Tauri.
 - **MIT open-source core.** Write as if the code is public and will be critiqued.
 
+### Agent workflow
+
+- **Verify before answering.** When answering factual questions about what the code
+  does, read the relevant source first and trace behavior to the final output. If
+  you have not verified something, say so instead of guessing.
+- **Plan proportionally.** For non-trivial, ambiguous, or high-risk changes, form a
+  short plan before editing and ask for sign-off when the direction affects public
+  APIs, migrations, release behavior, or broad UX. Simple localized fixes can
+  proceed once the relevant context is understood.
+- **Use a dedicated worktree or branch.** Check `git status` before editing and
+  before staging. Preserve unrelated user changes; ask before publishing if the
+  worktree is dirty, the PR scope is ambiguous, or staging would include changes
+  you did not make.
+- **Prefer the clean design.** Optimize for the correct open-source shape rather
+  than the smallest diff. Avoid compatibility shims, dual paths, or legacy behavior
+  unless the product/release context requires them.
+- **Verify locally.** Run typecheck, lint, and targeted tests for the code you
+  touched. If a required check cannot run, report the reason and the residual risk.
+- **Publish completed work.** When a requested implementation is complete and
+  verified, create or use an appropriate branch, commit the intended changes, push,
+  open a normal ready-for-review PR, and wait for CI/checks, Bugbot, review
+  comments, merge conflicts, and other blockers to settle.
+
 ### Development workflow
 
 Development happens on `next` (the default branch); branch from it and target it with
@@ -32,9 +55,6 @@ PRs. `master` is the public-release branch and only advances when `next` is merg
 into it for a stable release. Versions on `next` carry a prerelease suffix
 (`0.2.0-beta.1`), which the release pipeline publishes as GitHub pre-releases — see
 [docs/macos-distribution.md](docs/macos-distribution.md).
-
-When a requested change is complete and verified, proactively create a PR unless
-the user has asked you not to.
 
 1. Make your changes
 2. Run typecheck (`pnpm typecheck`)
@@ -172,111 +192,77 @@ keychain fallback (`reflect-notary`), API key CI secrets, and troubleshooting.
 
 # Code Conventions
 
-When writing or modifying code in this project, please adhere to the following conventions:
+Write code as if this open-source repository will be reviewed closely by other
+engineers. Favor small, composable modules, explicit contracts, tests that
+document behavior, and the existing local patterns over new abstractions.
 
-1.  **TypeScript Best Practices**: Follow standard, idiomatic TypeScript coding practices for structure, naming, and types, unless otherwise overridden.
-2.  **Minimal Comments**: Avoid adding comments unless they explain complex logic or non-obvious decisions. Well-written, self-explanatory code is preferred. Do not add comments that merely restate what the code does.
-3.  **Tests as Documentation**: Rely on comprehensive tests (which will be added later if not present) to document the behavior and usage of the code, rather than extensive comments within the code itself.
-4.  **File naming conventions**: Use kebab-case when naming directories, TypeScript, and other files.
-5.  **Type checking**: after major modifications run `pnpm typecheck` and fix any errors.
-6.  **UX/UI** We are using Tailwind CSS, React, shadcn/ui components and Lucide React icons. Generate responsive designs. Provide default props for React Components. **Always check `apps/desktop/src/components/ui/` first before building any custom UI.** For any popup, popover, dropdown, dialog, tooltip, menu, or overlay — use the existing shadcn component from that directory. If shadcn already covers the needed primitive but it is not in `components/ui`, install or generate it there and use it. Never build a custom implementation when a shadcn primitive already exists.
-7.  **Models/db/tables** When pulling in a database type, Kysely.
-8.  **Open-source conventions** Pretend you are writing code for a open-source project. Write best-in-class code.
+## Structured Code Style
 
-# Style
+- Keep files focused and single-responsibility. Split out helpers, hooks, and
+  components when a module starts doing more than one thing.
+- Use kebab-case for directories, TypeScript files, and React component files.
+- Prefer `@/` imports where the project already uses them.
+- Avoid comments unless they explain non-obvious decisions or complex logic.
+  Do not add comments that merely restate the code.
+- Always write documentation for public APIs.
+- Never use single-character variable names.
+- Always run build/typecheck/lint before declaring implementation work done.
 
-- Conventions: small files, single-responsibility, testable interfaces, providers+hooks for state, one component per file, '@/' imports, zod for parsing/validation, no any.
-- Pretend you are going to open source the code, so write extremely high quality code that's documented - you don't want to be embarrassed when it's critiqued by other engineers.
+## TypeScript
 
-Do this:
+- Prefer interfaces for object definitions.
+- Use type aliases for unions, intersections, and mapped types.
+- Never use `any` or `as any`.
+- Avoid type assertions unless they are genuinely necessary.
+- Use strict, idiomatic TypeScript with proper null handling.
+- Use discriminated unions and type guards for variant data. Export helper
+  predicates when they clarify a public contract.
+- Use readonly fields for immutable data.
+- Use generics for reusable type patterns.
+- Keep shared types in `types.ts` files or close to their consumers when local.
+- Use explicit return types for public functions.
+- Prefer function declarations for named functions and arrow functions for
+  callbacks.
+- Prefer async/await over Promise chains.
+- Prefer functional patterns over classes.
 
-- Keep modules small and composable.
-- Add zod schemas for all incoming data; normalize to camelCase once in a bridge layer.
-- Use discriminated unions and type guards; export helper predicates (e.g., isTerminalEvent).
+## Data Boundaries
 
-Non-negotiables:
+- Use Zod for all incoming or untrusted data, including JSON, IPC payloads,
+  external API responses, file-derived metadata, and worker payloads.
+- Normalize casing once at the boundary; TypeScript types should be camelCase.
+- Do not use type assertions to parse JSON.
+- When pulling database types from Kysely, use the appropriate helper type such
+  as `Selectable<T>`, `Insertable<T>`, or `Updateable<T>` instead of raw table
+  types in public function parameters or returns.
+- Handle Promise rejections properly, but do not add broad defensive error
+  handling unless the call site needs it.
 
-- No any. Use zod for runtime validation.
-- Normalize casing at boundaries; TS types are camelCase.
-- Small, testable modules; clear public APIs.
-- Don’t call hooks conditionally.
-- Prefer to split out logic into smaller files.
-- Never use `any` or `as any` in Typescript.
-- Never use single character variable names.
-- Always write documentation for all public APIs.
-- Always run build/typecheck/lint before declaring done.
+## React
 
-# TypeScript Best Practices
+- Favor named exports for components.
+- Keep one React component per file unless a tiny private helper component is
+  inseparable from its parent.
+- Name React props interfaces with the component name plus `Props`, for example
+  `ButtonProps`.
+- Do not add `use client` or `use server` directives.
+- Do not `import * as React from 'react'`; import the specific React APIs.
+- Never call hooks conditionally.
+- Keep logic as low as possible in the tree. Prefer providers and small hooks for
+  shared state.
+- Move large mutation handlers, parsing, persistence, and business logic into
+  helpers or hooks instead of embedding them inside components.
+- `zod` and `react-hook-form` are available; use them for validated forms.
 
-## Type System
+## UI and Styling
 
-- Prefer interfaces over types for object definitions
-- Use type for unions, intersections, and mapped types
-- NEVER use `any` or `as any` types or coercion
-- Use strict TypeScript configuration
-- Leverage TypeScript's built-in utility types
-- Use generics for reusable type patterns
-- Always use Zod for parsing JSON. It's installed.
-
-## Naming Conventions
-
-- Use PascalCase for type names and interfaces
-- Use camelCase for variables and functions
-- Use UPPER_CASE for constants
-- Use descriptive names with auxiliary verbs (e.g., isLoading, hasError)
-- Prefix interfaces for React props with 'Props' (e.g., ButtonProps)
-
-## Code Organization
-
-- Keep type definitions close to where they're used
-- Export types and interfaces from dedicated type files when shared
-- Use barrel exports (index.ts) for organizing exports
-- Place shared types in a `types.ts` file
-- Co-locate component props with their components
-
-## Functions
-
-- Use explicit return types for public functions
-- Use arrow functions for callbacks and methods
-- Implement proper error handling with custom error types
-- Use function overloads for complex type scenarios
-- Prefer async/await over Promises
-- Prefer function declarations over function expressions.
-- Prefer functional programming over classes.
-
-## Best Practices
-
-- Enable strict mode in tsconfig.json
-- Use readonly for immutable properties
-- Leverage discriminated unions for type safety
-- Use type guards for runtime type checking
-- Implement proper null checking
-- Avoid type assertions unless necessary
-
-## Error Handling
-
-- Do not proactively add error handling
-- Handle Promise rejections properly
-
-# React Naming Conventions:
-
-- Use kebab-case for files and directories.
-
-# React Components
-
-- DO not use 'use client' or 'use server' statements
-- Favor named exports for components
-- Ensure components are modular, reusable, and maintain a clear separation of concerns.
-- Always split React components out so there is only ever one per file
-- Keep logic as low as possible. For example a PostItem should handling its own deletion, rather than passing the logic up in a property callback.
-- Rather than have a large function, like a TRPC mutation handler, inside the component, refactor and split it out into a generic helper or hooks lib.
-- Prefer the hooks pattern for complex logic, or the mobx view model pattern. Look at existing examples in the project.
-- DO NOT `import * as React from 'react'`, import each React function specifically
-- `zod` and `react-hook-form` packages are installed - use them.
-- In React, create a provider and a small hook for state; avoid conditional hooks.
-
-# React UI and Styling
-
-- Use Shadcn UI, Radix, and Tailwind Aria for components and styling
-- **Always use the shadcn component from `apps/desktop/src/components/ui/` for any interactive or overlay UI** — dropdown menus, popovers, dialogs, tooltips, comboboxes, etc. If shadcn already covers the needed primitive but it is missing locally, install or generate it into `components/ui` and use it. Never hand-roll these.
-- Implement responsive design with Tailwind CSS to cater for smaller screens.
+- Use Tailwind CSS, React, shadcn/ui components, Radix, Tailwind Aria, and
+  Lucide React icons.
+- Generate responsive designs and provide default props for reusable React
+  components.
+- Always check `apps/desktop/src/components/ui/` before building custom UI.
+- For popups, popovers, dropdowns, dialogs, tooltips, menus, comboboxes, and
+  other overlays, use the existing shadcn component from
+  `apps/desktop/src/components/ui/`. If the shadcn primitive is missing locally,
+  install or generate it there and use it. Never hand-roll an overlay primitive
+  when shadcn already covers it.

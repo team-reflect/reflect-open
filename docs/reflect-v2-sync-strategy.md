@@ -15,6 +15,10 @@ It complements [Reflect V2 Product Vision](./reflect-v2-product-vision.md).
 > - **File-sync folder providers (iCloud Drive/Dropbox/Drive) are unsupported for
 >   sync by design** in the first wave — not adapters-in-waiting. The adapter
 >   sections below are preserved as long-term direction only.
+>   **Update (2026-07-04):** [Plan 21](./plans/21-icloud-drive-sync.md)
+>   revises this — iCloud Drive is promoted to the primary consumer sync
+>   path (app container + iCloud-first onboarding, marker-based conflict
+>   surface); the AI-assisted resolution below remains deferred.
 > - **AI-assisted conflict resolution did not ship.** Conflicts surface as standard
 >   conflict markers; conflicted notes open protected, with a reviewable
 >   mine/theirs/both resolution flow and a `has_conflict` "Needs review" projection.

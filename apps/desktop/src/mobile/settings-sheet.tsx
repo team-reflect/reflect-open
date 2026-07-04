@@ -19,7 +19,7 @@ import { useSyncContext } from '@/providers/sync-provider'
  * connecting happens in onboarding.
  */
 export function SettingsSheet(): ReactElement {
-  const { graph } = useGraph()
+  const { graph, mobileStorageKind } = useGraph()
   const version = useAppVersion()
   const sync = useSyncContext()
   const [open, setOpen] = useState(false)
@@ -69,6 +69,12 @@ export function SettingsSheet(): ReactElement {
         <DrawerTitle>Settings</DrawerTitle>
         <dl className="divide-y divide-border text-sm">
           <Row label="Graph" value={graph?.name ?? '—'} />
+          {mobileStorageKind !== null ? (
+            <Row
+              label="Storage"
+              value={mobileStorageKind === 'icloud' ? 'iCloud Drive' : 'This device'}
+            />
+          ) : null}
           <Row label="Notes" value={notes === undefined ? '…' : String(notes.length)} />
           {repo !== null ? (
             <div className="flex items-center justify-between gap-3 py-2.5">

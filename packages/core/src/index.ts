@@ -17,8 +17,11 @@ export {
   getAppVersion,
   getAppPlatform,
   isMobilePlatform,
-  mobileGraphRoot,
+  mobileStorage,
+  icloudDownloadPending,
   type AppPlatform,
+  type MobileStorageInfo,
+  type MobileStorageKind,
 } from './ipc/commands'
 export { confirmQuit, subscribeQuitRequested } from './app/quit'
 export { toggleDevtools } from './app/devtools'

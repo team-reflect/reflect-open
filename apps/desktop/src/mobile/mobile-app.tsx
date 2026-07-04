@@ -4,6 +4,7 @@ import { MobileErrorBoundary } from '@/mobile/mobile-error-boundary'
 import { MobileOnboardingScreen } from '@/mobile/onboarding-screen'
 import { MobileShell } from '@/mobile/mobile-shell'
 import { SyncStatusPill } from '@/mobile/sync-status-pill'
+import { useICloudRefresh } from '@/mobile/use-icloud-refresh'
 import { useKeyboardHeightVar } from '@/mobile/use-keyboard'
 import { useTaskCheckboxHaptics } from '@/mobile/use-task-haptics'
 import { useGraph } from '@/providers/graph-provider'
@@ -26,6 +27,9 @@ export function MobileApp(): ReactElement {
   const { status, graph, error, needsOnboarding } = useGraph()
   useKeyboardHeightVar()
   useTaskCheckboxHaptics()
+  // iCloud graphs have an out-of-process writer (the OS syncing files in):
+  // nudge downloads + re-reconcile on resume. Inert for local/git graphs.
+  useICloudRefresh()
 
   // Flush-on-background (Plan 19, decision 6): iOS may suspend or kill the
   // process soon after backgrounding, so every hide lands dirty note buffers

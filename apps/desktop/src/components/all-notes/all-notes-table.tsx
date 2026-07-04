@@ -40,16 +40,17 @@ export function AllNotesTable({
   registerScrollToIndex,
 }: AllNotesTableProps): ReactElement | null {
   const rows = notes ?? []
+  const { clickSelect, isSelected } = selection
   const virtualizerRef = useRef<VirtualizerHandle>(null)
   const handleToggle = useCallback(
     (path: string, event: Pick<MouseEvent, 'shiftKey'>) =>
-      selection.clickSelect(
+      clickSelect(
         path,
         event.shiftKey
           ? { metaKey: false, ctrlKey: false, shiftKey: true }
           : { metaKey: true, ctrlKey: false, shiftKey: false },
       ),
-    [selection.clickSelect],
+    [clickSelect],
   )
 
   useEffect(() => {
@@ -93,8 +94,8 @@ export function AllNotesTable({
             <AllNotesRow
               key={note.path}
               note={note}
-              selected={selection.isSelected(note.path)}
-              onSelect={selection.clickSelect}
+              selected={isSelected(note.path)}
+              onSelect={clickSelect}
               onToggle={handleToggle}
               onOpen={onOpen}
             />

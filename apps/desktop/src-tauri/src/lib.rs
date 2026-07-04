@@ -22,6 +22,7 @@ mod error;
 mod fs;
 mod git;
 mod graph_gitignore;
+mod icloud;
 mod quit;
 mod recents;
 mod secrets;
@@ -67,29 +68,6 @@ fn app_platform() -> &'static str {
         "android"
     } else {
         "desktop"
-    }
-}
-
-/// The fixed mobile graph root (Plan 19): the app's `Documents/` directory,
-/// exposed in the iOS Files app. Derived fresh on every call — iOS container
-/// paths embed a UUID that changes across restore/update, so the frontend
-/// must never persist the absolute path it gets back.
-#[tauri::command]
-fn mobile_graph_root(app: tauri::AppHandle) -> Result<String, error::AppError> {
-    #[cfg(mobile)]
-    {
-        let dir = app
-            .path()
-            .document_dir()
-            .map_err(|err| error::AppError::io(format!("no documents directory: {err}")))?;
-        Ok(dir.to_string_lossy().into_owned())
-    }
-    #[cfg(desktop)]
-    {
-        let _ = app; // desktop picks graph folders; there is no fixed root
-        Err(error::AppError::Unknown {
-            message: "mobile_graph_root is mobile-only".into(),
-        })
     }
 }
 
@@ -189,7 +167,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             app_version,
             app_platform,
-            mobile_graph_root,
+            icloud::mobile_storage,
+            icloud::icloud_download_pending,
             fs::graph_open,
             fs::graph_create,
             fs::note_read,

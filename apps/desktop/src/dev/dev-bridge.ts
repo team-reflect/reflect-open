@@ -8,7 +8,7 @@ import { z } from 'zod'
 import type { DevFileStore } from '@/dev/dev-file-store'
 import type { DevIndexDb } from '@/dev/dev-index-db'
 
-/** The fixed fake graph root the dev bridge reports (mirrors `mobile_graph_root`). */
+/** The fixed fake graph root the dev bridge reports (mirrors `mobile_storage`). */
 export const DEV_GRAPH_ROOT = '/dev-graph'
 
 /** Everything the command router needs; assembled by `installDevBridge`. */
@@ -50,8 +50,13 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         return '0.0.0-dev'
       case 'app_platform':
         return platform
-      case 'mobile_graph_root':
-        return DEV_GRAPH_ROOT
+      case 'mobile_storage':
+        // No iCloud in a plain browser — the dev harness exercises the
+        // local-storage path (and, via `mobileOnboarded` above, skips
+        // onboarding entirely).
+        return { localRoot: DEV_GRAPH_ROOT, icloudRoot: null, icloudHasGraph: false }
+      case 'icloud_download_pending':
+        return 0
       case 'graph_open':
       case 'graph_create':
         return graphInfo

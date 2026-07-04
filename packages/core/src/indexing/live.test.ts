@@ -282,8 +282,13 @@ describe('applyIndexChanges move healing (Plan 17)', () => {
     const move = calls.find(([command]) => command === 'index_move')
     expect(move?.[1]).toEqual({ from: OLD, to: NEW, generation: 7 })
     const apply = calls.find(([command]) => command === 'index_apply')
-    expect((apply?.[1]['note'] as { path: string; mtime: number }).path).toBe(NEW)
-    expect((apply?.[1]['note'] as { path: string; mtime: number }).mtime).toBe(42)
+    expect(apply).toBeDefined()
+    if (apply === undefined) {
+      throw new Error('Expected rename heal to apply the renamed note')
+    }
+    const note = apply[1]['note'] as { path: string; mtime: number }
+    expect(note.path).toBe(NEW)
+    expect(note.mtime).toBe(42)
   })
 
   it('announces the heal via onMoved so the app can follow', async () => {

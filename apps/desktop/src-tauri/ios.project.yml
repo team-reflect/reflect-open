@@ -68,6 +68,15 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
+        # iCloud Drive document storage (Plan 21): the graph can live in the
+        # app's iCloud container so notes sync across devices. Public document
+        # scope surfaces it as "Reflect" in the Files app and in Finder's
+        # iCloud Drive, where the desktop app opens the same folder.
+        NSUbiquitousContainers:
+          iCloud.app.reflect.ios:
+            NSUbiquitousContainerIsDocumentScopePublic: true
+            NSUbiquitousContainerName: Reflect
+            NSUbiquitousContainerSupportedFolderLevels: Any
         # Rendered by Tauri from `version` in tauri.conf.json (the prerelease
         # tag is stripped — Apple requires three dot-separated integers), so the
         # version lives in one place and never drifts. Do not hardcode a literal.

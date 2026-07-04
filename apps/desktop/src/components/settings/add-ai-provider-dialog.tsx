@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactElement } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import {
   AI_PROVIDERS,
   aiProvider,
@@ -55,7 +55,7 @@ const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
  * dialog open with the typed key intact so the user can retry.
  */
 export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps): ReactElement {
-  const { register, handleSubmit, watch, setValue, formState } = useForm<AddAiProviderForm>({
+  const { register, control, handleSubmit, setValue, formState } = useForm<AddAiProviderForm>({
     defaultValues: {
       provider: AI_PROVIDERS[0].id,
       model: AI_PROVIDERS[0].models[0].id,
@@ -82,7 +82,9 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
     }
   }, [])
 
-  const provider = aiProvider(watch('provider'))
+  const providerId = useWatch({ control, name: 'provider' })
+  const selectedModel = useWatch({ control, name: 'model' })
+  const provider = aiProvider(providerId)
 
   const submit = handleSubmit(async (values) => {
     setSubmitError(null)
@@ -153,7 +155,7 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
           <div className="flex flex-col gap-1">
             <span className={FIELD_LABEL_CLASS}>Default model</span>
             <ModelCombobox
-              value={watch('model')}
+              value={selectedModel}
               provider={provider.id}
               models={provider.models}
               onChange={(modelId) => setValue('model', modelId)}

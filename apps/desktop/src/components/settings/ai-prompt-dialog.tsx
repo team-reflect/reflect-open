@@ -1,5 +1,5 @@
 import { useEffect, type ReactElement } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import type { AiPrompt, AiPromptMode } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import {
@@ -37,13 +37,14 @@ const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
  * or is inserted below it.
  */
 export function AiPromptDialog({ prompt, onSave, onClose }: AiPromptDialogProps): ReactElement {
-  const { register, handleSubmit, watch, setValue, formState } = useForm<AiPromptDraft>({
+  const { register, control, handleSubmit, setValue, formState } = useForm<AiPromptDraft>({
     defaultValues: {
       label: prompt?.label ?? '',
       body: prompt?.body ?? '',
       mode: prompt?.mode ?? 'replace',
     },
   })
+  const mode = useWatch({ control, name: 'mode' })
 
   // The dialog is conditionally mounted by its parent, so Radix's close-focus
   // path is bypassed when Cancel or a successful submit calls onClose()
@@ -105,7 +106,7 @@ export function AiPromptDialog({ prompt, onSave, onClose }: AiPromptDialogProps)
           <label className="flex flex-col gap-1.5">
             <span className={FIELD_LABEL_CLASS}>Result</span>
             <Select
-              value={watch('mode')}
+              value={mode}
               onValueChange={(value) => setValue('mode', value as AiPromptMode)}
             >
               <SelectTrigger>

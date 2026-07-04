@@ -12,20 +12,18 @@ import { useCapturedPage } from './use-captured-page'
 
 /**
  * The capture popup: a snapshot of the page, an optional note, one Save.
- * Status is honest — the extension can only ever claim **queued** (spooled
- * for Reflect, or held for retry), never "saved": it cannot observe the
- * desktop app draining the inbox.
+ * On success it closes as soon as the native host has accepted the capture.
+ * Hold and failure states stay visible because they require the user's
+ * attention.
  */
 
 type SaveState =
   | { phase: 'idle' }
   | { phase: 'saving' }
-  | { phase: 'queued' }
   | { phase: 'held'; result: FlushResult }
   | { phase: 'failed'; message: string }
 
 const RELEASES_URL = 'https://github.com/team-reflect/reflect-open/releases/latest'
-const CLOSE_DELAY_MS = 900
 
 function holdMessage(result: FlushResult): string {
   switch (result.holdReason) {
@@ -74,21 +72,12 @@ export function CapturePopup(): ReactElement {
     }
   }, [])
 
-  useEffect(() => {
-    if (save.phase !== 'queued') {
-      return
-    }
-    const timer = window.setTimeout(() => window.close(), CLOSE_DELAY_MS)
-    return () => window.clearTimeout(timer)
-  }, [save.phase])
-
   async function onSubmit(event: FormEvent): Promise<void> {
     event.preventDefault()
     if (
       captured.status !== 'ready' ||
       !includePageTextPreferenceLoaded ||
-      save.phase === 'saving' ||
-      save.phase === 'queued'
+      save.phase === 'saving'
     ) {
       return
     }
@@ -108,7 +97,7 @@ export function CapturePopup(): ReactElement {
         () => browser.runtime.sendMessage({ type: 'flush' }),
       )
       if (outcome.fate === 'queued') {
-        setSave({ phase: 'queued' })
+        window.close()
       } else if (outcome.fate === 'held') {
         setSave({ phase: 'held', result: outcome.result })
         setHeldCount(outcome.result.held)
@@ -129,8 +118,7 @@ export function CapturePopup(): ReactElement {
 
   const { page } = captured
   const host = new URL(page.url).host
-  const busy =
-    save.phase === 'saving' || save.phase === 'queued' || !includePageTextPreferenceLoaded
+  const busy = save.phase === 'saving' || !includePageTextPreferenceLoaded
 
   function onIncludePageTextChange(checked: boolean): void {
     includePageTextTouched.current = true
@@ -183,7 +171,7 @@ export function CapturePopup(): ReactElement {
         disabled={busy}
         className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-text-on-brand hover:bg-accent-hover disabled:opacity-60"
       >
-        {save.phase === 'queued' ? 'Queued' : save.phase === 'saving' ? 'Saving…' : 'Save to Reflect'}
+        {save.phase === 'saving' ? 'Saving…' : 'Save to Reflect'}
       </button>
       {save.phase === 'held' ? (
         <p className="text-xs text-text-muted">

@@ -116,7 +116,8 @@ export function GraphChooser(): ReactElement {
             <Lightbulb aria-hidden className="mt-0.5 size-4 shrink-0 text-text-muted" />
             <p>
               <span className="font-medium text-text">Tip:</span> choose a folder in iCloud Drive
-              if you want your notes backed up automatically.
+              and your notes back up automatically. On iPhone? Pick your notes folder inside{' '}
+              <Emphasis>iCloud Drive → Reflect</Emphasis> to share notes with the iOS app.
             </p>
           </div>
         ) : null}

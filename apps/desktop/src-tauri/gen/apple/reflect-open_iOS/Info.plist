@@ -26,6 +26,18 @@
 	<false/>
 	<key>NSContactsUsageDescription</key>
 	<string>Reflect reads your contacts to suggest details for person notes. Nothing is stored or sent anywhere.</string>
+	<key>NSUbiquitousContainers</key>
+	<dict>
+		<key>iCloud.app.reflect.ios</key>
+		<dict>
+			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
+			<true/>
+			<key>NSUbiquitousContainerName</key>
+			<string>Reflect</string>
+			<key>NSUbiquitousContainerSupportedFolderLevels</key>
+			<string>Any</string>
+		</dict>
+	</dict>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

@@ -32,12 +32,39 @@ export function isMobilePlatform(platform: AppPlatform): boolean {
   return platform !== 'desktop'
 }
 
+const mobileStorageInfoSchema = z.object({
+  localRoot: z.string(),
+  icloudRoot: z.string().nullable(),
+  icloudHasGraph: z.boolean(),
+})
+
 /**
- * The fixed mobile graph root: the app's `Documents/` directory (Plan 19).
- * Mobile-only — the desktop shell rejects it (graphs are user-picked there).
- * iOS container paths change across restore/update; resolve this fresh every
- * launch and never persist the returned path.
+ * Where the mobile graph can live (Plan 21): the app-sandbox `Documents/`
+ * directory (always present, never synced) and the app's iCloud Drive
+ * container when iCloud is usable — plus whether the container already holds
+ * notes from another device.
  */
-export async function mobileGraphRoot(): Promise<string> {
-  return call('mobile_graph_root', {}, z.string())
+export type MobileStorageInfo = z.infer<typeof mobileStorageInfoSchema>
+
+/** Which of the {@link MobileStorageInfo} roots the graph lives in. */
+export type MobileStorageKind = 'icloud' | 'local'
+
+/**
+ * Resolves the mobile storage roots (Plan 21). Mobile-only — the desktop
+ * shell rejects it (graphs are user-picked there). iOS container paths change
+ * across restore/update; resolve this fresh every launch and never persist
+ * the returned paths.
+ */
+export async function mobileStorage(): Promise<MobileStorageInfo> {
+  return call('mobile_storage', {}, mobileStorageInfoSchema)
+}
+
+/**
+ * Asks iCloud to download every not-yet-local file under `root`, returning
+ * how many placeholders were found. iOS does not pull container files down
+ * eagerly; call this on open/resume for iCloud graphs and re-reconcile the
+ * index while the count stays above zero.
+ */
+export async function icloudDownloadPending(root: string): Promise<number> {
+  return call('icloud_download_pending', { root }, z.number().int().nonnegative())
 }

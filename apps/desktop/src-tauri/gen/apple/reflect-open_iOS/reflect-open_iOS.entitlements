@@ -1,5 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<dict/>
+<dict>
+	<!-- iCloud Drive document storage (Plan 21). CloudDocuments only: the
+	     graph is plain markdown files in the app's container; there is no
+	     CloudKit database. Xcode's automatic signing registers the container
+	     against the App ID on the first entitled build. -->
+	<key>com.apple.developer.icloud-container-identifiers</key>
+	<array>
+		<string>iCloud.app.reflect.ios</string>
+	</array>
+	<key>com.apple.developer.icloud-services</key>
+	<array>
+		<string>CloudDocuments</string>
+	</array>
+	<key>com.apple.developer.ubiquity-container-identifiers</key>
+	<array>
+		<string>iCloud.app.reflect.ios</string>
+	</array>
+</dict>
 </plist>

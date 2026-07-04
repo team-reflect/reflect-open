@@ -78,6 +78,8 @@ describe('GraphChooser', () => {
     )
     expect(screen.getByRole('button', { name: /Choose a folder/ })).toBeInTheDocument()
     expect(screen.getByText(/choose a folder in iCloud Drive/)).toBeInTheDocument()
+    // The tip routes iPhone users to the folder the iOS app syncs (Plan 21).
+    expect(screen.getByText(/share notes with the iOS app/)).toBeInTheDocument()
 
     // The V1 path keeps the export → unzip → open guidance, now as numbered steps.
     expect(screen.getByRole('heading', { name: 'Coming from Reflect v1' })).toBeInTheDocument()
