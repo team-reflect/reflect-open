@@ -4748,6 +4748,7 @@ dependencies = [
  "block2",
  "core-foundation 0.10.1",
  "dirs",
+ "dispatch2",
  "fastembed",
  "git2",
  "hf-hub 0.5.0",

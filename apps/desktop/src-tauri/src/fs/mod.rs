@@ -345,6 +345,9 @@ pub(crate) fn move_note_file(root: &Path, from: &str, to: &str) -> AppResult<()>
         fs::create_dir_all(parent)?;
     }
     fs::rename(from_abs, to_abs)?;
+    // Carry the note's sync ancestor across the rename (Plan 21) — a missed
+    // move only degrades one future merge, never blocks the rename.
+    crate::conflict::shadow::ShadowStore::new(root).record_move(from, to);
     Ok(())
 }
 
@@ -360,6 +363,8 @@ pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> A
     os_trash_delete(&abs)?;
     #[cfg(mobile)]
     move_to_graph_trash(&root, &abs)?;
+    // A deleted note's sync ancestor is meaningless — drop it (Plan 21).
+    crate::conflict::shadow::ShadowStore::new(&root).forget(&path);
     Ok(())
 }
 
@@ -428,9 +433,15 @@ fn move_to_graph_trash(root: &Path, abs: &Path) -> AppResult<()> {
 #[tauri::command]
 pub fn list_files(generation: Option<u64>, state: State<GraphState>) -> AppResult<Vec<FileMeta>> {
     let root = root_for(&state, generation)?;
+    note_files(&root)
+}
+
+/// The same note listing as [`list_files`], callable with a plain root —
+/// the iCloud conflict sweep walks the graph outside any Tauri state.
+pub(crate) fn note_files(root: &Path) -> AppResult<Vec<FileMeta>> {
     let mut out = Vec::new();
     for dir in NOTE_DIRS {
-        collect_files(&root, dir, Some("md"), &mut out)?;
+        collect_files(root, dir, Some("md"), &mut out)?;
     }
     Ok(out)
 }

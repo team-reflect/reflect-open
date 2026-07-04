@@ -167,8 +167,11 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             app_version,
             app_platform,
-            icloud::mobile_storage,
-            icloud::icloud_download_pending,
+            icloud::storage::mobile_storage,
+            icloud::storage::icloud_download_pending,
+            icloud::sweep::icloud_conflicts_scan,
+            icloud::watch::icloud_watch_start,
+            icloud::watch::icloud_watch_stop,
             fs::graph_open,
             fs::graph_create,
             fs::note_read,

@@ -99,8 +99,11 @@ objc2-app-kit = { version = "0.3.2", default-features = false, features = [
 # requestAccessForEntityType completion handler back into blocking Rust.
 # core-foundation backs the iCloud/backup sync-exclusion resource keys on
 # `.reflect/` and `.git/` (`fs/io.rs`), which matter on both Apple targets.
+# dispatch2 supplies MainThreadBound, keeping the iCloud metadata query's
+# non-Send Objective-C handles pinned to the main thread (`icloud/watch.rs`).
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 core-foundation = "0.10.1"
+dispatch2 = "0.3.1"
 objc2 = "0.6.4"
 objc2-foundation = "0.3.2"
 objc2-contacts = "0.3.2"
