@@ -169,6 +169,9 @@ export async function rebuildIndex(options: IndexPassOptions): Promise<void> {
   const files = await listFiles()
   let batch: IndexedNote[] = []
   for (const file of files) {
+    if (file.placeholder === true) {
+      continue // evicted to iCloud — unreadable until re-download, indexed then
+    }
     const content = await readNote(file.path)
     const parsed = parseNote({ path: file.path, source: content })
     const fileHash = await hashContent(content)
@@ -226,7 +229,11 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
   // survive. Best-effort throughout: any failure degrades to the plain pass
   // below (the arrival is indexed fresh, the cleanup loop drops the orphan).
   const orphanPaths = [...stored.keys()].filter((path) => !onDisk.has(path))
-  const arrivalPaths = files.filter((file) => !stored.has(file.path)).map((file) => file.path)
+  // Placeholders can't be arrivals: their content is unreadable until iCloud
+  // re-downloads them, so move pairing has nothing to match on.
+  const arrivalPaths = files
+    .filter((file) => !stored.has(file.path) && file.placeholder !== true)
+    .map((file) => file.path)
   /** Arrival content read for pairing — the main pass below reuses it. */
   let arrivalContent = new Map<string, string>()
   try {
@@ -264,6 +271,13 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
   for (const file of files) {
     if (signal?.aborted) {
       return
+    }
+    if (file.placeholder === true) {
+      // Evicted to iCloud: present but unreadable until re-download. Keep the
+      // stored row (its path is in `onDisk`, so the cleanup loop skips it) —
+      // reading would land in the notFound arm below and delete the note from
+      // the index, turning eviction into disappearance.
+      continue
     }
     let content = arrivalContent.get(file.path)
     if (content === undefined) {

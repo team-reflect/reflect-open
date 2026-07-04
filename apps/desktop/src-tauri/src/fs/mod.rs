@@ -26,6 +26,15 @@ use self::resolve::resolve;
 // Consumed by the watcher (desktop) and the capture inbox (all platforms),
 // so the re-export is no longer desktop-gated.
 pub(crate) use self::io::modified_ms;
+/// iCloud eviction-placeholder name mapping, shared with the watcher (which
+/// must treat an evicted note as present, not deleted — Plan 21). Desktop-only
+/// like the watcher itself; mobile's change source is the Plan 21 Phase 2
+/// metadata query, which maps placeholders on its own side.
+#[cfg(desktop)]
+pub(crate) use self::io::icloud_placeholder_target;
+/// Sync-exclusion marking, shared with `git::repo` (a freshly initialized
+/// backup repo must never ride a file-sync provider — Plan 21).
+pub(crate) use self::io::mark_dir_local_only;
 /// The traversal guard, shared with sibling modules that address graph files
 /// (capture promotes screenshots into `assets/`).
 pub(crate) use self::resolve::resolve as resolve_in_graph;
@@ -66,6 +75,12 @@ pub struct FileMeta {
     pub size: u64,
     /// Last-modified time in epoch milliseconds.
     pub modified_ms: u64,
+    /// True when the file is an iCloud eviction placeholder: the note exists
+    /// but its content is not on disk until re-downloaded. Consumers must not
+    /// read it — and must not treat it as deleted (Plan 21). `size` and
+    /// `modified_ms` describe the placeholder stub, not the real file.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub placeholder: bool,
 }
 
 // ---- state accessors --------------------------------------------------------
@@ -224,7 +239,7 @@ pub fn note_write(
     state: State<GraphState>,
 ) -> AppResult<()> {
     let root = root_for_generation(&state, generation)?;
-    atomic_write(&resolve(&root, &path)?, &contents)
+    atomic_write(&root, &resolve(&root, &path)?, &contents)
 }
 
 /// Atomically write a binary asset (pasted/dropped image) by graph-relative
@@ -242,7 +257,7 @@ pub fn asset_write(
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(contents_base64.as_bytes())
         .map_err(|err| AppError::io(format!("invalid base64 asset payload: {err}")))?;
-    atomic_write_bytes(&resolve(&root, &path)?, &bytes)
+    atomic_write_bytes(&root, &resolve(&root, &path)?, &bytes)
 }
 
 /// Read a binary asset's bytes, base64-encoded for the JSON IPC (e.g. audio

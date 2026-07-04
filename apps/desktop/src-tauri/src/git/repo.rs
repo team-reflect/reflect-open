@@ -20,7 +20,12 @@ pub(super) fn open_or_init(root: &Path) -> AppResult<Repository> {
     }
     let mut opts = RepositoryInitOptions::new();
     opts.initial_head(DEFAULT_BRANCH);
-    Ok(Repository::init_opts(root, &opts)?)
+    let repo = Repository::init_opts(root, &opts)?;
+    // A repo created inside a file-sync folder (iCloud Drive) must not sync
+    // through it — two devices' object stores merging file-by-file corrupts
+    // the repository (Plan 21). Pre-existing repos are marked at graph open.
+    crate::fs::mark_dir_local_only(&root.join(".git"));
+    Ok(repo)
 }
 
 /// Open the graph's repository; errors if backup was never set up.

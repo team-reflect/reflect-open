@@ -57,7 +57,6 @@ image = { version = "0.25.10", default-features = false, features = ["jpeg", "pn
 reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-core-foundation = "0.10.1"
 xattr = "1.6.1"
 # Apple Calendar read-only bridge (`src/calendar.rs`): EventKit through the
 # objc2 bindings, trimmed to the classes the module touches. objc2-app-kit is
@@ -98,7 +97,10 @@ objc2-app-kit = { version = "0.3.2", default-features = false, features = [
 # Apple Contacts integration (`contacts.rs`): live CNContactStore lookups on
 # macOS and iOS — never a mirrored copy of the address book. block2 bridges the
 # requestAccessForEntityType completion handler back into blocking Rust.
+# core-foundation backs the iCloud/backup sync-exclusion resource keys on
+# `.reflect/` and `.git/` (`fs/io.rs`), which matter on both Apple targets.
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
+core-foundation = "0.10.1"
 objc2 = "0.6.4"
 objc2-foundation = "0.3.2"
 objc2-contacts = "0.3.2"

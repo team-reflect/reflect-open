@@ -31,5 +31,12 @@ export const fileMetaSchema = z.object({
   size: z.number(),
   /** Last-modified time in epoch milliseconds. */
   modifiedMs: z.number(),
+  /**
+   * True when the file is an iCloud eviction placeholder (Plan 21): the file
+   * exists but its content is offloaded until re-download. It must not be
+   * read — and must not be treated as deleted. Rust omits the field for
+   * regular files.
+   */
+  placeholder: z.boolean().optional(),
 })
 export type FileMeta = z.infer<typeof fileMetaSchema>

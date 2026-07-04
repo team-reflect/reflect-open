@@ -339,3 +339,78 @@ describe('reconcileIndex move healing (Plan 17)', () => {
     expect(commands).toContain('index_remove')
   })
 })
+
+describe('iCloud eviction placeholders (Plan 21)', () => {
+  /** A graph whose listing carries `files`; every note_read throws notFound. */
+  function evictedFake(files: Array<Record<string, unknown>>, storedPaths: string[]) {
+    mockInvoke.mockImplementation(async (command, args) => {
+      const sql = String(args['sql'] ?? '')
+      if (command === 'list_files') {
+        return files
+      }
+      if (command === 'note_read') {
+        throw { kind: 'notFound', message: 'evicted' }
+      }
+      if (command === 'db_query') {
+        if (sql.includes('file_hash')) {
+          return storedPaths.map((path) => ({ path, file_hash: 'stored-hash' }))
+        }
+        return []
+      }
+      return null
+    })
+  }
+
+  it('reconcile keeps the stored row for an evicted note instead of deleting it', async () => {
+    evictedFake([{ path: 'notes/a.md', size: 1, modifiedMs: 5, placeholder: true }], ['notes/a.md'])
+
+    await reconcileIndex({ generation: 5 })
+
+    const commands = mockInvoke.mock.calls.map(([cmd]) => cmd)
+    // Present-but-offloaded: never read (unreadable), never removed (not deleted).
+    expect(commands).not.toContain('note_read')
+    expect(commands).not.toContain('index_remove')
+    expect(commands).not.toContain('index_apply')
+  })
+
+  it('placeholders are not move-healing arrivals, and true orphans still drop', async () => {
+    evictedFake(
+      [{ path: 'notes/arrived.md', size: 1, modifiedMs: 5, placeholder: true }],
+      ['notes/gone-for-real.md'],
+    )
+
+    await reconcileIndex({ generation: 5 })
+
+    const commands = mockInvoke.mock.calls.map(([cmd]) => cmd)
+    // Nothing pairs against unreadable content…
+    expect(commands).not.toContain('note_read')
+    expect(commands).not.toContain('index_move')
+    // …and a row whose file is gone *without* a placeholder is still removed.
+    const remove = mockInvoke.mock.calls.find(([cmd]) => cmd === 'index_remove')
+    expect(remove?.[1]).toMatchObject({ path: 'notes/gone-for-real.md', generation: 5 })
+  })
+
+  it('rebuild indexes readable files and skips evicted ones', async () => {
+    mockInvoke.mockImplementation(async (command, args) => {
+      if (command === 'list_files') {
+        return [
+          { path: 'notes/real.md', size: 1, modifiedMs: 5 },
+          { path: 'notes/evicted.md', size: 1, modifiedMs: 5, placeholder: true },
+        ]
+      }
+      if (command === 'note_read') {
+        if (args['path'] === 'notes/real.md') {
+          return '# Real\n'
+        }
+        throw { kind: 'notFound', message: 'evicted' }
+      }
+      return null
+    })
+
+    await rebuildIndex({ generation: 6 })
+
+    const batch = mockInvoke.mock.calls.find(([cmd]) => cmd === 'index_apply_batch')
+    const notes = (batch![1] as { notes: { path: string }[] }).notes
+    expect(notes.map((note) => note.path)).toEqual(['notes/real.md'])
+  })
+})

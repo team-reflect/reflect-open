@@ -209,6 +209,7 @@ pub fn capture_inbox_list(generation: u64, state: State<GraphState>) -> AppResul
             path: format!("{INBOX_DIR}/{name}"),
             size: meta.len(),
             modified_ms: modified_ms(&meta).unwrap_or(0),
+            placeholder: false, // the inbox lives under `.reflect/`, never synced/evicted
         });
     }
     out.sort_by(|first, second| first.path.cmp(&second.path));

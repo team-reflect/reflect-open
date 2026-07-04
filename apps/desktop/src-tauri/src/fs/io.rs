@@ -1,12 +1,14 @@
 //! Disk primitives: graph bootstrap, atomic writes, and markdown listing.
 //!
 //! Pure IO — no Tauri state, no path policy (that's [`super::resolve`]). Writes
-//! are atomic (temp file in the target dir + rename) so a crash mid-write can
-//! never truncate a note.
+//! are atomic (temp file + rename) so a crash mid-write can never truncate a
+//! note. Temp files are staged under `.reflect/tmp/` — the same volume, so the
+//! rename stays atomic, but excluded from cloud sync so a crash-stranded temp
+//! can never replicate to another device (Plan 21).
 
 use std::fs;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 use crate::error::{AppError, AppResult};
@@ -17,7 +19,7 @@ use super::FileMeta;
 pub(super) const REFLECT_DIR: &str = ".reflect";
 const META_SCHEMA_VERSION: u32 = 1;
 pub(super) const TOP_LEVEL_DIRS: [&str; 4] = ["daily", "notes", "assets", REFLECT_DIR];
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 const APPLE_EXCLUSION_KEYS: [&str; 2] = [
     "NSURLUbiquitousItemIsExcludedFromSyncKey",
     "NSURLIsExcludedFromBackupKey",
@@ -37,7 +39,14 @@ pub(super) fn bootstrap(root: &Path) -> AppResult<()> {
         fs::create_dir_all(root.join(dir))?;
     }
     sweep_upload_staging(root);
-    mark_reflect_dir_local_only(&root.join(REFLECT_DIR));
+    mark_dir_local_only(&root.join(REFLECT_DIR));
+    // A backup repo must never ride a file-sync provider: two devices' object
+    // stores merging file-by-file is repository corruption (Plan 21). New
+    // repos are marked at init (`git::repo`); this covers pre-existing ones.
+    let git_dir = root.join(".git");
+    if git_dir.exists() {
+        mark_dir_local_only(&git_dir);
+    }
     let gitignore = root.join(".gitignore");
     if !gitignore.exists() {
         fs::write(&gitignore, graph_gitignore::default_contents())?;
@@ -52,11 +61,11 @@ pub(super) fn bootstrap(root: &Path) -> AppResult<()> {
     Ok(())
 }
 
-/// Drop leftover upload staging files (`.reflect/tmp/`, see `fs::assets`) —
-/// a crash mid-upload strands its temp file, and nothing else ever reclaims
-/// it. Opening the graph is the natural sweep point: a generation bump
-/// rejects any commit that was still in flight, so nothing live is removed.
-/// Best-effort — a locked file must not fail the open.
+/// Drop leftover staging files (`.reflect/tmp/`: asset uploads, `fs::assets`,
+/// and atomic-write temps) — a crash mid-write strands its temp file, and
+/// nothing else ever reclaims it. Opening the graph is the natural sweep
+/// point: a generation bump rejects any commit that was still in flight, so
+/// nothing live is removed. Best-effort — a locked file must not fail the open.
 fn sweep_upload_staging(root: &Path) {
     let staging = root.join(REFLECT_DIR).join("tmp");
     if !staging.exists() {
@@ -67,35 +76,44 @@ fn sweep_upload_staging(root: &Path) {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
-fn mark_reflect_dir_local_only(_reflect_dir: &Path) {}
+/// Keep `dir` out of every file-sync pipeline (best-effort, idempotent).
+///
+/// On Apple targets the `NSURL` resource keys exclude the directory from
+/// iCloud Drive sync and device backups — load-bearing once the graph lives in
+/// the iCloud container (Plan 21), where `.reflect/` (live SQLite + WAL) and
+/// `.git/` syncing would mean corruption. macOS additionally sets the
+/// provider-ignore xattrs that third-party sync clients (Dropbox, File
+/// Provider extensions) honor for graphs kept in such folders.
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+pub(crate) fn mark_dir_local_only(_dir: &Path) {}
 
-#[cfg(target_os = "macos")]
-fn mark_reflect_dir_local_only(reflect_dir: &Path) {
-    for err in set_apple_sync_exclusions(reflect_dir) {
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+pub(crate) fn mark_dir_local_only(dir: &Path) {
+    for err in set_apple_sync_exclusions(dir) {
         tracing::warn!(
-            path = %reflect_dir.display(),
+            path = %dir.display(),
             %err,
-            "failed to mark .reflect as excluded from Apple sync"
+            "failed to mark directory as excluded from Apple sync"
         );
     }
-    for err in set_local_only_xattrs(reflect_dir) {
+    #[cfg(target_os = "macos")]
+    for err in set_local_only_xattrs(dir) {
         tracing::warn!(
-            path = %reflect_dir.display(),
+            path = %dir.display(),
             %err,
-            "failed to mark .reflect with provider ignore attributes"
+            "failed to mark directory with provider ignore attributes"
         );
     }
 }
 
-#[cfg(target_os = "macos")]
-fn set_apple_sync_exclusions(reflect_dir: &Path) -> Vec<String> {
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+fn set_apple_sync_exclusions(dir: &Path) -> Vec<String> {
     use core_foundation::base::TCFType;
     use core_foundation::{number, string, url};
     use std::ptr;
 
-    let Some(reflect_url) = url::CFURL::from_path(reflect_dir, true) else {
-        return vec![format!("invalid path: {}", reflect_dir.display())];
+    let Some(dir_url) = url::CFURL::from_path(dir, true) else {
+        return vec![format!("invalid path: {}", dir.display())];
     };
     let mut errors = Vec::new();
 
@@ -106,7 +124,7 @@ fn set_apple_sync_exclusions(reflect_dir: &Path) -> Vec<String> {
         };
         let ok = unsafe {
             url::CFURLSetResourcePropertyForKey(
-                reflect_url.as_concrete_TypeRef(),
+                dir_url.as_concrete_TypeRef(),
                 key.as_concrete_TypeRef(),
                 number::kCFBooleanTrue as *const _,
                 ptr::null_mut(),
@@ -121,11 +139,11 @@ fn set_apple_sync_exclusions(reflect_dir: &Path) -> Vec<String> {
 }
 
 #[cfg(target_os = "macos")]
-fn set_local_only_xattrs(reflect_dir: &Path) -> Vec<String> {
+fn set_local_only_xattrs(dir: &Path) -> Vec<String> {
     let mut errors = Vec::new();
 
     for (name, value) in LOCAL_ONLY_XATTRS {
-        if let Err(err) = xattr::set(reflect_dir, name, value) {
+        if let Err(err) = xattr::set(dir, name, value) {
             errors.push(format!("failed to set {name}: {err}"));
         }
     }
@@ -133,18 +151,26 @@ fn set_local_only_xattrs(reflect_dir: &Path) -> Vec<String> {
     errors
 }
 
-/// Atomically write `contents` to `target` (temp file in the same dir + rename).
-pub(super) fn atomic_write(target: &Path, contents: &str) -> AppResult<()> {
-    atomic_write_bytes(target, contents.as_bytes())
+/// Atomically write `contents` to `target` inside the graph at `root`.
+pub(super) fn atomic_write(root: &Path, target: &Path, contents: &str) -> AppResult<()> {
+    atomic_write_bytes(root, target, contents.as_bytes())
 }
 
 /// Byte-level atomic write — shared by notes (text) and assets (binary).
-pub(super) fn atomic_write_bytes(target: &Path, contents: &[u8]) -> AppResult<()> {
+///
+/// The temp file is staged under `.reflect/tmp/`, not next to `target`: the
+/// note directories may live inside a file-sync folder (iCloud Drive —
+/// Plan 21), and a temp created there is synced and, after a crash, stranded
+/// on every device. `.reflect/` is excluded from sync and swept on graph open,
+/// and it shares `target`'s volume, so the final rename stays atomic.
+pub(super) fn atomic_write_bytes(root: &Path, target: &Path, contents: &[u8]) -> AppResult<()> {
     let dir = target
         .parent()
         .ok_or_else(|| AppError::io(format!("no parent directory for {}", target.display())))?;
     fs::create_dir_all(dir)?;
-    let mut tmp = tempfile::NamedTempFile::new_in(dir)?;
+    let staging = root.join(REFLECT_DIR).join("tmp");
+    fs::create_dir_all(&staging)?;
+    let mut tmp = tempfile::NamedTempFile::new_in(&staging)?;
     tmp.write_all(contents)?;
     tmp.as_file().sync_all()?;
     tmp.persist(target)
@@ -162,9 +188,21 @@ pub(crate) fn modified_ms(meta: &fs::Metadata) -> Option<u64> {
         .map(|dur| dur.as_millis() as u64)
 }
 
+/// The logical file name behind an iCloud eviction placeholder:
+/// `".<name>.icloud"` → `Some("<name>")`, anything else → `None`. Optimize
+/// Storage replaces a not-downloaded file with such a stub; to the rest of the
+/// app the file still exists — it just isn't readable until re-downloaded
+/// (Plan 21: eviction must never read as deletion).
+pub(crate) fn icloud_placeholder_target(file_name: &str) -> Option<&str> {
+    let name = file_name.strip_prefix('.')?.strip_suffix(".icloud")?;
+    (!name.is_empty()).then_some(name)
+}
+
 /// Collect files under `root/dir` into `out` (recursive). `extension` filters
 /// by file extension when set (`Some("md")` for notes); `None` collects every
-/// regular file (assets).
+/// regular file (assets). An iCloud eviction placeholder lists as its
+/// *logical* file (same extension rules) with `placeholder: true`, so an
+/// evicted note stays present to reconcile instead of looking deleted.
 pub(super) fn collect_files(
     root: &Path,
     dir: &str,
@@ -175,6 +213,9 @@ pub(super) fn collect_files(
     if !base.is_dir() {
         return Ok(());
     }
+    let extension_matches = |path: &Path| {
+        extension.is_none_or(|ext| path.extension().and_then(|found| found.to_str()) == Some(ext))
+    };
     let mut stack = vec![base];
     while let Some(current) = stack.pop() {
         for entry in fs::read_dir(&current)? {
@@ -189,24 +230,46 @@ pub(super) fn collect_files(
                 stack.push(path);
                 continue;
             }
-            let matches = extension
-                .is_none_or(|ext| path.extension().and_then(|found| found.to_str()) == Some(ext));
-            if file_type.is_file() && matches {
-                // Skip anything that isn't actually under the root rather than
-                // leaking an absolute path.
-                let Ok(rel) = path.strip_prefix(root) else {
-                    continue;
-                };
-                let meta = entry.metadata()?;
-                out.push(FileMeta {
-                    path: rel.to_string_lossy().replace('\\', "/"),
-                    size: meta.len(),
-                    modified_ms: modified_ms(&meta).unwrap_or(0),
-                });
+            if !file_type.is_file() {
+                continue;
             }
+            let listed = match evicted_logical_path(&path) {
+                // A placeholder stands in for its logical file: apply the
+                // extension rules to that file, and drop the stub when the
+                // real file is (again) present so a note never lists twice.
+                Some(logical) if extension_matches(&logical) && !logical.exists() => {
+                    Some((logical, true))
+                }
+                Some(_) => None,
+                None if extension_matches(&path) => Some((path.clone(), false)),
+                None => None,
+            };
+            let Some((listed_path, placeholder)) = listed else {
+                continue;
+            };
+            // Skip anything that isn't actually under the root rather than
+            // leaking an absolute path.
+            let Ok(rel) = listed_path.strip_prefix(root) else {
+                continue;
+            };
+            let meta = entry.metadata()?;
+            out.push(FileMeta {
+                path: rel.to_string_lossy().replace('\\', "/"),
+                size: meta.len(),
+                modified_ms: modified_ms(&meta).unwrap_or(0),
+                placeholder,
+            });
         }
     }
     Ok(())
+}
+
+/// If `path` is an eviction placeholder, the sibling path of the file it
+/// stands in for (`notes/.a.md.icloud` → `notes/a.md`).
+fn evicted_logical_path(path: &Path) -> Option<PathBuf> {
+    let name = path.file_name()?.to_str()?;
+    let logical = icloud_placeholder_target(name)?;
+    Some(path.with_file_name(logical))
 }
 
 #[cfg(test)]
@@ -247,6 +310,18 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
+    fn bootstrap_marks_a_present_git_dir_local_only() {
+        let dir = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join(".git")).unwrap();
+        bootstrap(dir.path()).unwrap();
+        assert_eq!(
+            xattr::get(dir.path().join(".git"), "com.apple.fileprovider.ignore#P").unwrap(),
+            Some(b"1".to_vec())
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
     fn apple_sync_exclusion_accepts_reflect_dir() {
         let dir = tempdir().unwrap();
         let reflect_dir = dir.path().join(REFLECT_DIR);
@@ -271,18 +346,33 @@ mod tests {
         let dir = tempdir().unwrap();
         bootstrap(dir.path()).unwrap();
         let target = dir.path().join("notes/hello.md");
-        atomic_write(&target, "# Hello\n\nworld\n").unwrap();
+        atomic_write(dir.path(), &target, "# Hello\n\nworld\n").unwrap();
         assert_eq!(fs::read_to_string(&target).unwrap(), "# Hello\n\nworld\n");
+    }
+
+    #[test]
+    fn atomic_write_leaves_no_temp_litter_in_the_target_dir() {
+        // Temps stage under `.reflect/tmp/` — a note directory inside a synced
+        // folder must only ever contain the notes themselves.
+        let dir = tempdir().unwrap();
+        bootstrap(dir.path()).unwrap();
+        atomic_write(dir.path(), &dir.path().join("notes/a.md"), "a").unwrap();
+        let entries: Vec<String> = fs::read_dir(dir.path().join("notes"))
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(entries, vec!["a.md".to_string()]);
+        assert!(dir.path().join(".reflect/tmp").is_dir());
     }
 
     #[test]
     fn list_finds_only_markdown_under_note_dirs() {
         let dir = tempdir().unwrap();
         bootstrap(dir.path()).unwrap();
-        atomic_write(&dir.path().join("notes/a.md"), "a").unwrap();
-        atomic_write(&dir.path().join("daily/2026-06-09.md"), "b").unwrap();
-        atomic_write(&dir.path().join("templates/journal.md"), "t").unwrap();
-        atomic_write(&dir.path().join("notes/skip.txt"), "c").unwrap();
+        atomic_write(dir.path(), &dir.path().join("notes/a.md"), "a").unwrap();
+        atomic_write(dir.path(), &dir.path().join("daily/2026-06-09.md"), "b").unwrap();
+        atomic_write(dir.path(), &dir.path().join("templates/journal.md"), "t").unwrap();
+        atomic_write(dir.path(), &dir.path().join("notes/skip.txt"), "c").unwrap();
 
         let mut out = Vec::new();
         for d in NOTE_DIRS {
@@ -296,13 +386,65 @@ mod tests {
     }
 
     #[test]
+    fn evicted_placeholders_list_as_their_logical_note() {
+        let dir = tempdir().unwrap();
+        bootstrap(dir.path()).unwrap();
+        fs::write(dir.path().join("notes/.a.md.icloud"), b"stub").unwrap();
+
+        let mut out = Vec::new();
+        collect_files(dir.path(), "notes", Some("md"), &mut out).unwrap();
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].path, "notes/a.md");
+        assert!(out[0].placeholder);
+    }
+
+    #[test]
+    fn placeholders_are_skipped_when_the_real_file_exists() {
+        // Transiently both can exist mid-download; the readable file wins and
+        // the listing must not carry the same note twice.
+        let dir = tempdir().unwrap();
+        bootstrap(dir.path()).unwrap();
+        atomic_write(dir.path(), &dir.path().join("notes/a.md"), "a").unwrap();
+        fs::write(dir.path().join("notes/.a.md.icloud"), b"stub").unwrap();
+
+        let mut out = Vec::new();
+        collect_files(dir.path(), "notes", Some("md"), &mut out).unwrap();
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].path, "notes/a.md");
+        assert!(!out[0].placeholder);
+    }
+
+    #[test]
+    fn placeholders_respect_the_extension_filter() {
+        let dir = tempdir().unwrap();
+        bootstrap(dir.path()).unwrap();
+        fs::write(dir.path().join("notes/.data.txt.icloud"), b"stub").unwrap();
+
+        let mut out = Vec::new();
+        collect_files(dir.path(), "notes", Some("md"), &mut out).unwrap();
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn placeholder_names_parse_only_the_icloud_shape() {
+        assert_eq!(icloud_placeholder_target(".a.md.icloud"), Some("a.md"));
+        assert_eq!(icloud_placeholder_target(".noext.icloud"), Some("noext"));
+        // Not placeholders: no leading dot, no suffix, or nothing in between.
+        assert_eq!(icloud_placeholder_target("a.md.icloud"), None);
+        assert_eq!(icloud_placeholder_target(".a.md"), None);
+        assert_eq!(icloud_placeholder_target(".icloud"), None);
+    }
+
+    #[test]
     fn unfiltered_collect_lists_every_file_in_a_dir() {
         let dir = tempdir().unwrap();
         bootstrap(dir.path()).unwrap();
         // `audio-memos/` is not bootstrapped — the first write creates it.
-        atomic_write_bytes(&dir.path().join("audio-memos/memo.webm"), b"audio").unwrap();
-        atomic_write_bytes(&dir.path().join("audio-memos/memo.m4a"), b"audio").unwrap();
-        atomic_write(&dir.path().join("notes/a.md"), "a").unwrap();
+        atomic_write_bytes(dir.path(), &dir.path().join("audio-memos/memo.webm"), b"audio")
+            .unwrap();
+        atomic_write_bytes(dir.path(), &dir.path().join("audio-memos/memo.m4a"), b"audio")
+            .unwrap();
+        atomic_write(dir.path(), &dir.path().join("notes/a.md"), "a").unwrap();
 
         let mut out = Vec::new();
         collect_files(dir.path(), "audio-memos", None, &mut out).unwrap();
