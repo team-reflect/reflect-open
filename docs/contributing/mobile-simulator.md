@@ -30,6 +30,15 @@ lines from `spike_mobile.rs`:
 [plan19-spike] PASS: libgit2 init+commit
 ```
 
+## The software keyboard
+
+The simulator hides the software keyboard whenever "Connect Hardware
+Keyboard" is enabled (I/O → Keyboard, ⇧⌘K) — focusing the editor then
+types through the Mac keyboard with no on-screen keyboard and no
+`keyboardChange` events, which looks like a keyboard bug but isn't. Turn
+that setting off (or press ⌘K with the app focused) to exercise the real
+keyboard-avoidance path.
+
 `tauri ios dev` may normalize generated files under
 `apps/desktop/src-tauri/gen/apple/`, including `project.pbxproj` quoting and
 merged `Info.plist` usage descriptions. Inspect those diffs before committing;

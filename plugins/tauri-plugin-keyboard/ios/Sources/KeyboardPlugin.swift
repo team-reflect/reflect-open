@@ -18,7 +18,9 @@ struct KeyboardState: Encodable {
 /// nudges the webview's scroll view around when the keyboard animates in,
 /// occluding whatever the caret is in. This plugin takes manual control —
 /// the webview keeps its full-screen frame, scroll-view auto-adjustment is
-/// disabled, and the keyboard's overlap height streams to JS as
+/// disabled, its scroll offset is pinned to zero (WebKit's caret-reveal
+/// scroll would otherwise push the page out of the window on focus), and
+/// the keyboard's overlap height streams to JS as
 /// `keyboardChange` events so the layout can make room (a CSS variable, a
 /// pinned toolbar, caret scroll-into-view).
 ///
@@ -28,6 +30,7 @@ struct KeyboardState: Encodable {
 class KeyboardPlugin: Plugin {
   private weak var webView: WKWebView?
   private var currentState = KeyboardState(height: 0, duration: 0)
+  private var scrollOffsetObservation: NSKeyValueObservation?
   // Lazy so the generator is created on the main thread, inside the first
   // `impactLight` dispatch; kept alive across taps to skip re-allocating
   // the underlying haptic engine on every press.
@@ -38,6 +41,17 @@ class KeyboardPlugin: Plugin {
     // The system's automatic inset adjustment is the source of the jump:
     // page layout owns keyboard avoidance instead (via the events below).
     webview.scrollView.contentInsetAdjustmentBehavior = .never
+    // That flag alone doesn't stop WebKit's own keyboard avoidance: on focus
+    // it scrolls the *native* scroll view to reveal the caret, not knowing
+    // the page layout already made room — shoving the whole app upward out
+    // of the window. The page is always exactly viewport-sized here (inner
+    // elements own all scrolling, pinch zoom is disabled by the viewport
+    // meta), so any native offset is that nudge. Pin it back to zero.
+    scrollOffsetObservation = webview.scrollView.observe(\.contentOffset, options: [.new]) {
+      scrollView, _ in
+      guard scrollView.contentOffset != .zero else { return }
+      scrollView.setContentOffset(.zero, animated: false)
+    }
     // iOS injects a form-assistant bar (‹ › field stepper + Done) above the
     // keyboard for any focused field or contenteditable. Reflect edits one
     // continuous document, so the bar is meaningless chrome — strip it.

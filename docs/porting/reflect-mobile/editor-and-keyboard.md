@@ -33,6 +33,16 @@ toolbar — and the hard-won keyboard/focus lessons.
 > `focus()` raises the keyboard in wry's WKWebView, menu tappability,
 > caret visibility, haptic feel — plus focus restore for wiki links
 > resolving to *daily* notes (the daily surface owns that).
+>
+> **On-device finding (2026-07-04):** `contentInsetAdjustmentBehavior =
+> .never` was not enough — on focus, WebKit still scrolls the *native*
+> scroll view to reveal the caret (it cannot know the page layout already
+> made room), pushing the entire app upward out of the window. The plugin
+> now pins `scrollView.contentOffset` to zero via KVO; the page is always
+> exactly viewport-sized on mobile, so any native offset is that nudge.
+> In the simulator, note that the software keyboard stays hidden while
+> "Connect Hardware Keyboard" is on (⇧⌘K; ⌘K toggles the software
+> keyboard) — that is a simulator setting, not an app bug.
 
 ## What V1 mobile does
 

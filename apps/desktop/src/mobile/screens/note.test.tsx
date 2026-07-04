@@ -7,12 +7,22 @@ import { MobileNote } from './note'
 
 const paneProps = vi.hoisted(() => ({
   autoFocus: null as boolean | null,
+  className: null as string | null,
   gutterClassName: null as string | null,
 }))
 
 vi.mock('@/components/note-pane', () => ({
-  NotePane: ({ autoFocus, gutterClassName }: { autoFocus?: boolean; gutterClassName?: string }) => {
+  NotePane: ({
+    autoFocus,
+    className,
+    gutterClassName,
+  }: {
+    autoFocus?: boolean
+    className?: string
+    gutterClassName?: string
+  }) => {
     paneProps.autoFocus = autoFocus ?? false
+    paneProps.className = className ?? null
     paneProps.gutterClassName = gutterClassName ?? null
     return <div data-testid="fake-pane" />
   },
@@ -62,6 +72,7 @@ function renderArrival(path: string, options?: NavigateOptions): ReturnType<type
 afterEach(() => {
   cleanup()
   paneProps.autoFocus = null
+  paneProps.className = null
   paneProps.gutterClassName = null
 })
 
@@ -74,6 +85,11 @@ describe('MobileNote focus contract', () => {
   it('uses the mobile note-body gutter for the editor surface', () => {
     renderArrival('notes/target.md')
     expect(paneProps.gutterClassName).toBe('reflect-mobile-content-gutter')
+  })
+
+  it('gives the pane a top inset (no date header above a plain note)', () => {
+    renderArrival('notes/target.md')
+    expect(paneProps.className).toContain('pt-4')
   })
 
   it('autofocuses a fresh untitled note (the + flow)', () => {
