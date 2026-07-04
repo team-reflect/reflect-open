@@ -4,6 +4,13 @@
   "extends": ["github>ocavue/config-renovate"],
   "packageRules": [
     {
+      "description": "fastembed 5.14+ pins ONNX Runtime API 24, but upstream ONNX Runtime 1.24 no longer ships macOS x86_64 binaries. Keep fastembed and ort pinned until upstream binary support returns or we replace the backend.",
+      "matchManagers": ["cargo"],
+      "matchDatasources": ["crate"],
+      "matchPackageNames": ["fastembed", "ort"],
+      "enabled": false
+    },
+    {
       "matchPackageNames": ["@meowdown/*"],
       "groupName": "meowdown",
       "groupSlug": "meowdown",
