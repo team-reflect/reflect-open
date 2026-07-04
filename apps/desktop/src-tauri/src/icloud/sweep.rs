@@ -101,6 +101,14 @@ fn run_sweep(
     let mut outcome = SweepOutcome::default();
 
     for rel in ingested_paths {
+        // A dirty open session may still overwrite this file with content
+        // derived from an *older* state — advancing the base to the external
+        // revision now would make a later diff3 read that overwrite as "we
+        // deleted the other device's lines" and drop them. Stale is the safe
+        // direction; the base advances once the session settles.
+        if skip.contains(rel.as_str()) {
+            continue;
+        }
         advance_base_if_clean(root, rel, &shadow, false);
     }
 
@@ -108,6 +116,9 @@ fn run_sweep(
 
     if record_baseline {
         for file in &files {
+            if skip.contains(file.path.as_str()) {
+                continue; // same dirty-session rule as ingests above
+            }
             if !file.placeholder {
                 // Fill-only: adoption snapshots notes that have no base yet.
                 // Overwriting an existing base here would advance it past
@@ -602,6 +613,25 @@ mod tests {
 
         assert_eq!(outcome.deferred, vec!["daily/2026-07-04 2.md".to_string()]);
         assert!(root.path().join("daily/2026-07-04 2.md").exists());
+    }
+
+    #[test]
+    fn dirty_paths_never_advance_the_base() {
+        // A dirty open session may overwrite the file with pre-external
+        // content; recording the external revision as the base would turn
+        // that overwrite into a phantom deletion in a later three-way merge.
+        let root = graph();
+        write(root.path(), "notes/open.md", "# external revision\n");
+
+        run_sweep(
+            root.path(),
+            &["notes/open.md".to_string()],
+            &["notes/open.md".to_string()],
+            true, // even an adoption baseline must respect the dirty skip
+        )
+        .unwrap();
+
+        assert_eq!(ShadowStore::new(root.path()).base("notes/open.md"), None);
     }
 
     #[test]
