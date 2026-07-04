@@ -98,30 +98,51 @@ mod platform {
         modified_ms: Option<u64>,
     }
 
+    /// Lifecycle epoch: every `start`/`stop` bumps it, and a queued install
+    /// only proceeds when its epoch is still current. Commands run off the
+    /// main thread while installs run *on* it, so without this a second
+    /// `start` could slip in before the first's install executed — `stop`
+    /// would find `ACTIVE` still empty, and the first query would leak,
+    /// its observers emitting events for the wrong graph root forever
+    /// (dropping observer tokens does not deregister them).
+    static EPOCH: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
     pub fn start(app: tauri::AppHandle, root: String, emit_file_changes: bool) -> AppResult<()> {
-        stop(app.clone())?;
-        SNAPSHOT.lock().expect("snapshot lock").clear();
+        use std::sync::atomic::Ordering;
+        let epoch = EPOCH.fetch_add(1, Ordering::SeqCst) + 1;
         let handle = app.clone();
-        app.run_on_main_thread(move || install(handle, root, emit_file_changes))
+        app.run_on_main_thread(move || install(handle, root, emit_file_changes, epoch))
             .map_err(|err| AppError::io(format!("failed to reach the main thread: {err}")))
     }
 
     pub fn stop(app: tauri::AppHandle) -> AppResult<()> {
-        let Some(bound) = ACTIVE.lock().expect("watch lock").take() else {
-            return Ok(());
-        };
+        use std::sync::atomic::Ordering;
+        // Invalidate any queued-but-not-yet-run install…
+        EPOCH.fetch_add(1, Ordering::SeqCst);
+        // …and tear down whatever is actually live, on the main thread —
+        // where installs also run, so the two can never interleave.
         app.run_on_main_thread(move || {
             let mtm = MainThreadMarker::new().expect("run_on_main_thread is the main thread");
-            let watch = bound.into_inner(mtm);
-            watch.query.stopQuery();
-            let center = NSNotificationCenter::defaultCenter();
-            for token in &watch.tokens {
-                unsafe {
-                    let _: () = msg_send![&center, removeObserver: &**token];
-                }
-            }
+            teardown_active(mtm);
         })
         .map_err(|err| AppError::io(format!("failed to reach the main thread: {err}")))
+    }
+
+    /// Stop and deregister the live watch, if any. Main thread only — every
+    /// caller is a main-thread closure, which is what serializes teardown
+    /// against installs.
+    fn teardown_active(mtm: MainThreadMarker) {
+        let Some(bound) = ACTIVE.lock().expect("watch lock").take() else {
+            return;
+        };
+        let watch = bound.into_inner(mtm);
+        watch.query.stopQuery();
+        let center = NSNotificationCenter::defaultCenter();
+        for token in &watch.tokens {
+            unsafe {
+                let _: () = msg_send![&center, removeObserver: &**token];
+            }
+        }
     }
 
     /// The root plus its canonicalized twin, both slash-terminated. Spotlight
@@ -142,9 +163,19 @@ mod platform {
         variants
     }
 
-    /// Build, wire, and start the query. Main thread only.
-    fn install(app: tauri::AppHandle, root: String, emit_file_changes: bool) {
+    /// Build, wire, and start the query. Main thread only. Tears down any
+    /// live watch first (installs and stops all run here, serially), and
+    /// aborts when a later `start`/`stop` has superseded this one's epoch —
+    /// so rapid graph switches can never leave two queries running or
+    /// install a watch after its graph closed.
+    fn install(app: tauri::AppHandle, root: String, emit_file_changes: bool, epoch: u64) {
+        use std::sync::atomic::Ordering;
         let mtm = MainThreadMarker::new().expect("run_on_main_thread is the main thread");
+        teardown_active(mtm);
+        if EPOCH.load(Ordering::SeqCst) != epoch {
+            return; // superseded while queued — a newer install/stop owns the lifecycle
+        }
+        SNAPSHOT.lock().expect("snapshot lock").clear();
         let query = NSMetadataQuery::new();
 
         let scope: Retained<NSString> = unsafe { NSMetadataQueryUbiquitousDocumentsScope.copy() };
