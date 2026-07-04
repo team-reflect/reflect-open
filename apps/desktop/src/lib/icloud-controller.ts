@@ -7,6 +7,7 @@ import {
   isNotePath,
   subscribeFileChanges,
   subscribeIcloudConflicts,
+  subscribeIcloudWatchFailed,
   subscribeOwnWrites,
   type FileChange,
   type GraphInfo,
@@ -219,6 +220,19 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
           if (!disposed) {
             scheduleScan()
           }
+        }),
+      )
+      disposers.push(
+        await subscribeIcloudWatchFailed(() => {
+          if (disposed) {
+            return
+          }
+          // The live watch never started (fire-and-forget install failed
+          // after the command returned). Freshness now rides file-change
+          // batches and the resume sweeps — say so loudly for debugging
+          // stale-state reports, and sweep once right away.
+          console.error('iCloud watch failed to start; relying on resume-triggered sweeps')
+          scheduleScan()
         }),
       )
     } catch (err) {

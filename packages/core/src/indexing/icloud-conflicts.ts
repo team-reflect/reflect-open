@@ -27,3 +27,21 @@ export function subscribeIcloudConflicts(
     }
   })
 }
+
+/** The Rust iCloud watch's install-failure event (Plan 21). */
+const ICLOUD_WATCH_FAILED_EVENT = 'icloud:watch-failed'
+
+/**
+ * Subscribe to the watch's install-failure signal. `icloud_watch_start`
+ * schedules its native install onto the main thread and returns before it
+ * runs, so a failed `startQuery` can't surface through the command's result
+ * — it arrives here instead. Rare by construction (Apple documents failure
+ * as "already running" or "no predicate", neither possible for a fresh
+ * predicated query), but on iOS the query is the sole live change source,
+ * so the subscriber should fall back to sweep-based freshness loudly.
+ */
+export function subscribeIcloudWatchFailed(handler: () => void): Promise<Unlisten> {
+  return getBridge().listen(ICLOUD_WATCH_FAILED_EVENT, () => {
+    handler()
+  })
+}

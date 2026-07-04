@@ -20,7 +20,7 @@ export {
   type FileChange,
 } from './file-changes'
 export { setLocalWriteEcho, subscribeOwnWrites } from './local-write-echo'
-export { subscribeIcloudConflicts } from './icloud-conflicts'
+export { subscribeIcloudConflicts, subscribeIcloudWatchFailed } from './icloud-conflicts'
 export { subscribeIndexApplied, type IndexAppliedListener } from './index-applied'
 export {
   subscribeIndexChanges,

@@ -213,6 +213,7 @@ mod platform {
         unsafe { query.setOperationQueue(Some(&queue)) };
 
         let handler_roots = roots.clone();
+        let emit_app = app.clone();
         let block = RcBlock::new(move |notification: NonNull<NSNotification>| {
             handle_notification(&app, &handler_roots, emit_file_changes, notification);
         });
@@ -251,6 +252,12 @@ mod platform {
                     let _: () = msg_send![&center, removeObserver: &**token];
                 }
             }
+            // The command returned long ago (this closure is fire-and-forget
+            // on the main thread), so surface the failure as an event: the
+            // controller logs it loudly and runs an immediate fallback sweep
+            // — on iOS the query is the sole live change source, and a
+            // silently dead watch would otherwise read as "no changes".
+            let _ = emit_app.emit("icloud:watch-failed", ());
             return;
         }
         *ACTIVE.lock().expect("watch lock") = Some(MainThreadBound::new(

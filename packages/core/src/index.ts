@@ -564,6 +564,7 @@ export {
   setLocalWriteEcho,
   subscribeOwnWrites,
   subscribeIcloudConflicts,
+  subscribeIcloudWatchFailed,
   applyIndexChanges,
   hashContent,
   buildIndexedNote,
