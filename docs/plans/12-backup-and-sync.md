@@ -134,7 +134,9 @@ present) · `Backup failed` (action needed). Git mechanics never surface.
      external-change reconciliation (clean buffer reloads; dirty buffer prompts).
    - **Daily notes are the common collision** (two devices, same day). Markers +
      keep-both cover it first wave; future: a custom merge driver (libgit2 registers
-     them in code) for append-friendly merging of `daily/*.md`.
+     them in code) for append-friendly merging of `daily/*.md`. *(That future work
+     shipped via [Plan 21](./21-icloud-drive-sync.md) as the resolution ladder's
+     append-union rung — on the iCloud path, not as a libgit2 merge driver.)*
 
 5. **Guardrails:**
    - Default to **creating a private repo**; choosing a public repo blocks on an explicit

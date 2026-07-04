@@ -75,9 +75,11 @@ export, recovery-kit creation, sign out, delete account.
   clone, and initial index progress) and graph open.
 - **Settings sheet replaces the profile modal**
   (`apps/desktop/src/mobile/settings-sheet.tsx`), in V1's avatar spot:
-  graph name, note count, GitHub connect/disconnect, sync status, version.
-  No graph switcher (one graph per device in v1), no account rows, no JSON
-  export (the workspace is already Files-app-visible markdown).
+  graph name, storage kind, note count, GitHub connect/disconnect, sync
+  status, version — and, since Plan 21, a **Switch graph** section (other
+  iCloud-container graphs + the on-device root; one graph open at a time).
+  No account rows, no JSON export (the workspace is already
+  Files-app-visible markdown).
 
 ## Worth porting deliberately
 
@@ -108,6 +110,6 @@ not already present:
 | FAB → create note / record                  | `+` button → untitled note; record arrives with audio wave   |
 | Boot gates (auth/unlock/version/sync)       | Onboarding (fresh / GitHub clone) + graph open only          |
 | Profile card modal                          | Settings sheet (graph, GitHub, sync status, version)         |
-| Graph switcher                              | Dropped in v1 — one graph per device                         |
+| Graph switcher                              | Shipped via Plan 21 — settings-sheet Switch graph across container graphs |
 | `useHideTabBar` (Capacitor keyboard events) | `--keyboard-height` from the first-party keyboard plugin     |
 | Sync spinner badge on the avatar            | Sync status pill / settings-sheet status ("Backed up …")     |

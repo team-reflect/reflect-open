@@ -69,7 +69,7 @@ before the editor, and the editor lands before search/AI.
 | 09 | [Semantic search & local embeddings](09-semantic-search-and-embeddings.md) | Local embedding runtime (Rust), chunking, `sqlite-vec`, incremental re-embed, retrieval layer |
 | 10 | [AI copilot sidebar](10-ai-copilot-sidebar.md) | BYOK providers, keychain secrets, read-only chat route over `search_notes`/`read_note`, durable chat history, `private: true` hard-block; patchsets deferred |
 | 11 | [Link capture](11-link-capture.md) | Chrome extension → native-messaging sidecar → desktop capture inbox, screenshots, meta/BYOK enrichment, dedicated capture notes + daily-note `[[Links]]` |
-| 12 | [Backup & sync (GitHub-only)](12-backup-and-sync.md) | GitHub/Git backup + restore (the only supported remote), Git-native conflict surface, manual review, checkpoints; file-sync providers unsupported |
+| 12 | [Backup & sync (GitHub-only)](12-backup-and-sync.md) | GitHub/Git backup + restore, Git-native conflict surface, manual review, checkpoints. Written when file-sync providers were unsupported — Plan 21 later shipped iCloud Drive as the primary sync path; Git remains the self-managed alternative (never both on one graph) |
 | 13 | [Import / export / portability](13-import-export-portability.md) | **Closed by decision.** Markdown files are the portability surface; no JSON/HTML/ZIP export or Obsidian/folder import suite is planned |
 | 14 | [CLI (read/discovery)](14-cli-read-discovery.md) | `reflect today`, `reflect search`, `reflect show`, path lookup |
 | 15 | [Hardening, packaging & OSS release](15-hardening-packaging-release.md) | a11y, perf budgets, signing/notarization, MIT + docs, onboarding, release pipeline |
@@ -78,7 +78,7 @@ before the editor, and the editor lands before search/AI.
 | 18 | [Tasks](18-tasks.md) | **Post-release add-on.** Round-checkbox (`+ [ ]`) tasks as a rebuildable projection: interactive editor checkboxes, Tasks view (Overdue/Today/Upcoming), `[[date]]`/daily scheduling, guarded toggle write-back, square checklists excluded |
 | 19 | [Mobile companion](19-mobile.md) | **In progress.** iOS target of the existing Tauri app: mobile root gate, fixed graph root, onboarding, Daily/All shell, editable notes, keyboard plugin; device validation + store hardening remain |
 | 20 | [Asset descriptions](20-asset-descriptions.md) | **Post-release add-on.** AI-generated `.reflect.md` description files for referenced, non-private images/PDFs under `assets/`; BYOK, privacy-gated, manual backfill |
-| 21 | [iCloud Drive sync](21-icloud-drive-sync.md) | **In progress.** iCloud Drive as the primary consumer sync path: graphs in the app's iCloud container, one marker-based conflict surface with a deterministic resolution ladder, `.reflect/`/`.git/` sync-exclusion, iCloud-first mobile onboarding; git remotes stay the power-user/backup path |
+| 21 | [iCloud Drive sync](21-icloud-drive-sync.md) | **Shipped (2026-07-04).** iCloud Drive as the primary consumer sync path: graphs in the app's iCloud container, deterministic resolution ladder over per-device shadow bases (markers as the fallback), `.reflect/`/`.git/` sync-exclusion, iCloud-first onboarding on both platforms with multi-graph lists + the mobile switcher; git remotes stay the self-managed path. AI-assisted resolution deferred |
 
 ## Milestone map
 
@@ -125,12 +125,13 @@ The highest-severity risks surfaced reviewing this plan, with where they're hand
    ([docs/spikes/meowdown-wiki-links.md](../spikes/meowdown-wiki-links.md)). Residual: it's
    pre-1.0 (we own the extension code, pin versions); CodeMirror-6 live-preview stays the
    documented fallback. *Licensing is resolved — meowdown is first-party MIT.*
-2. **A graph inside a cloud-sync folder corrupts the index and fights GitHub.** Remote
-   sync is **GitHub-only** (file-sync providers are unsupported by design — Plan 12); but a
-   user may still *place* their graph in iCloud/Dropbox, which can replace the SQLite
-   `-wal`/`-shm` mid-write. Mitigation: detect cloud roots + warn/recommend a non-synced
-   path, exclude `.reflect/`, and relocate the index to app-data as an escape hatch
-   (Plan 04; detection in Plan 02).
+2. **A cloud-sync folder can corrupt the index or fight a Git remote.** Originally
+   mitigated by refusing file-sync providers outright; since Plan 21 shipped, iCloud
+   Drive is the *supported primary* path and the risk is managed instead of avoided:
+   `.reflect/` (and `.git/`) are sync-excluded so the SQLite `-wal`/`-shm` never ride
+   the provider, atomic-write temps stage inside `.reflect/tmp/`, and **iCloud and a
+   Git remote are mutually exclusive per graph**. Third-party folder sync (Dropbox et
+   al.) remains unsupported: same hazards, none of Plan 21's machinery.
 3. **Durable macOS folder access** (TCC prompts; security-scoped bookmarks if sandboxed) —
    the in-graph decision depends on it; spike + handle in Plans 01/02/15.
 4. **Bespoke Kysely-over-IPC dialect** is non-trivial; keep zod to real boundaries and keep
@@ -152,8 +153,8 @@ they are not re-litigated per phase:
 - **Secrets live in the OS keychain.** Never in markdown, Git, or `.reflect/`.
 - **Keyboard-native.** Every core workflow reachable from the keyboard.
 - **Portable data from day one.** The graph folder itself is the export; backup must be
-  free, via **GitHub only**. File-sync providers (iCloud/Dropbox/Drive) are unsupported
-  for sync by design.
+  free. Sync is iCloud Drive (the primary path since Plan 21) or a Git remote — one per
+  graph, never both; other file-sync providers (Dropbox/Drive) remain unsupported.
 - **No Electron, no web app, Mac-first.** Tauri shell; iOS/Windows later.
 - **MIT open-source core.** Write as if the code is public and will be critiqued. The
   editor [meowdown](https://github.com/prosekit/meowdown) is **first-party** (owned by the

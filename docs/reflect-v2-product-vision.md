@@ -445,6 +445,13 @@ Windows and Android should remain possible. The implementation should avoid choi
 > (see Plan 12); the adapter list below is the long-term direction. AI-assisted conflict
 > resolution did not ship — conflicts surface as reviewable conflict markers with
 > mine/theirs/both resolution.
+>
+> **Update (2026-07-04):** [Plan 21](./plans/21-icloud-drive-sync.md) shipped
+> **iCloud Drive as the primary consumer sync path** — the app's own container,
+> iCloud-first onboarding on macOS and iOS, and deterministic on-device conflict
+> resolution (see [icloud-sync.md](./icloud-sync.md)). Git remains the
+> self-managed adapter; a graph syncs via iCloud *or* a Git remote, never both.
+> AI-assisted resolution stays deferred.
 
 V2 should make backup free and understandable.
 

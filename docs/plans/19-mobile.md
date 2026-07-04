@@ -24,6 +24,16 @@ fallback with explicit triggers.
 > note actions, share helper, and settings sheet exist. Still open: physical-device
 > editing validation, full GitHub-connect restore polish on mobile, foreground-sync
 > product hardening, TestFlight/App Store packaging, and Android follow-through.
+>
+> **Update (2026-07-05):** several scope lines below were superseded by later ships.
+> [Plan 21](./21-icloud-drive-sync.md) made iCloud Drive the primary storage/sync
+> path: onboarding is now iCloud-first (lists every container graph; keep-on-device
+> and GitHub behind it), `mobile_storage` replaced `mobile_graph_root`, and the
+> settings sheet grew a **Switch graph** section — so "one graph per device / no
+> iCloud containers" no longer holds (one graph *open* at a time still does). The
+> formatting toolbar shipped **webview-drawn** (decision 8), spike B passed with
+> meowdown on device, mobile conflict resolution shipped (mine/theirs/both), and
+> the TestFlight flow exists ([docs/ios-testflight.md](../ios-testflight.md)).
 
 **Depends on:** Plans 02–05 (graph/storage, document model, index, **editor**),
 06 (daily notes/route model), 07 (backlinks/autocomplete), 08 (lexical

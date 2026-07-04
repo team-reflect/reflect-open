@@ -16,9 +16,13 @@ It complements [Reflect V2 Product Vision](./reflect-v2-product-vision.md).
 >   sync by design** in the first wave — not adapters-in-waiting. The adapter
 >   sections below are preserved as long-term direction only.
 >   **Update (2026-07-04):** [Plan 21](./plans/21-icloud-drive-sync.md)
->   revises this — iCloud Drive is promoted to the primary consumer sync
->   path (app container + iCloud-first onboarding, marker-based conflict
->   surface); the AI-assisted resolution below remains deferred.
+>   revises this — iCloud Drive **shipped** as the primary consumer sync
+>   path (app container, iCloud-first onboarding on both platforms, and a
+>   deterministic on-device resolution ladder over per-device shadow bases
+>   with labeled markers as the fallback — see
+>   [icloud-sync.md](./icloud-sync.md)). A graph syncs via iCloud *or* a
+>   Git remote, never both. The AI-assisted resolution below remains
+>   deferred.
 > - **AI-assisted conflict resolution did not ship.** Conflicts surface as standard
 >   conflict markers; conflicted notes open protected, with a reviewable
 >   mine/theirs/both resolution flow and a `has_conflict` "Needs review" projection.
@@ -186,6 +190,8 @@ Reflect should create automatic checkpoints opportunistically after meaningful c
 GitHub credentials should live in per-device OS keychain or secure storage. They must not be written to markdown files, committed to Git, or stored in the ignored `.reflect/` directory unless a later security design explicitly replaces this default.
 
 ## iCloud Drive Adapter
+
+> **Shipped (2026-07-04):** this section's direction became [Plan 21](./plans/21-icloud-drive-sync.md), now merged — the shipped design resolves most conflicts deterministically on-device (diff3 over shadow bases, daily append-union) before falling back to the marker surface, with the AI layer still deferred. [icloud-sync.md](./icloud-sync.md) is the current contract; this section is preserved as the original reasoning.
 
 iCloud Drive is attractive for Apple-first sync because it works with normal files and is built into macOS and iOS. Its conflict behavior is file-level, not markdown-aware.
 

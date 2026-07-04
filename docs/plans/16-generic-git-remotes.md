@@ -23,8 +23,10 @@ started.
 
 **Explicitly not in scope:** host pickers, a "custom remote" wizard, per-host settings
 UI, or per-host REST sugar (repo creation, visibility checks, install links — those
-stay GitHub-only conveniences). File-sync providers (iCloud/Dropbox) remain unsupported
-by design; this plan is about other *git hosts*, not other *sync mechanisms*.
+stay GitHub-only conveniences). File-sync providers were unsupported by design when
+this was written — [Plan 21](./21-icloud-drive-sync.md) has since shipped iCloud Drive
+as the primary sync path (Dropbox et al. remain unsupported); either way, this plan is
+about other *git hosts*, not other *sync mechanisms*.
 
 ## Where we stand (why it doesn't work today)
 
