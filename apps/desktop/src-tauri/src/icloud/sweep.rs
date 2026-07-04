@@ -164,7 +164,16 @@ fn run_sweep(
 
     // External deletions never route through the store's `forget` — drop
     // bases for notes that no longer exist so the store tracks the graph.
-    let live: BTreeSet<&str> = files.iter().map(|file| file.path.as_str()).collect();
+    // The keep-set starts from the listing captured at sweep start, plus
+    // every path this sweep itself wrote: collision folding can create a
+    // canonical file (and record its base) *after* that listing, and pruning
+    // must not eat a base recorded moments earlier in the same pass.
+    let mut live: BTreeSet<&str> = files.iter().map(|file| file.path.as_str()).collect();
+    for change in &outcome.changed {
+        if change.kind == "upsert" {
+            live.insert(change.path.as_str());
+        }
+    }
     shadow.prune_orphans(&live);
 
     archive::prune(root);
@@ -181,6 +190,13 @@ fn run_sweep(
 /// non-UTF-8/missing files. `fill_only` restricts the write to notes without
 /// a base (the adoption case).
 fn advance_base_if_clean(root: &Path, rel: &str, shadow: &ShadowStore, fill_only: bool) {
+    // `ingested_paths` arrive over IPC — refuse traversal shapes before any
+    // filesystem access, like every other IPC-supplied graph path. (The
+    // shadow store would reject the *write*, but the read must not happen
+    // either.)
+    if crate::fs::ensure_relative(rel).is_err() {
+        return;
+    }
     if fill_only && shadow.base(rel).is_some() {
         return;
     }
@@ -483,6 +499,11 @@ fn fold_duplicate(
         if fs::rename(&dup_abs, &canonical_abs).is_err() {
             return;
         }
+        // Any lingering base under the canonical path belongs to the *old*
+        // note that used to live there — the adopted duplicate is an
+        // independent creation, and merging against a dead lineage's
+        // ancestor would poison a later diff3. Drop it deliberately.
+        shadow.forget(canonical_rel);
         outcome.changed.push(remove_change(&file.path));
         outcome.changed.push(SweepChange {
             path: canonical_rel.to_string(),
@@ -688,18 +709,32 @@ mod tests {
             .collect();
         assert!(kinds.contains(&("daily/2026-07-04 2.md", "remove")));
         assert!(kinds.contains(&("daily/2026-07-04.md", "upsert")));
+        // The base the fold just recorded survives the same pass's orphan
+        // pruning (the keep-set includes this sweep's own upserts).
+        assert_eq!(
+            ShadowStore::new(root.path()).base("daily/2026-07-04.md"),
+            Some("# Day\n\n- from mac\n- from phone\n".to_string())
+        );
     }
 
     #[test]
     fn an_orphaned_duplicate_takes_the_free_canonical_name() {
         let root = graph();
         write(root.path(), "daily/2026-07-04 2.md", "- phone only\n");
+        // A base lingering from the canonical path's previous life belongs to
+        // a dead lineage — adopting the duplicate must drop it, or a later
+        // diff3 would merge against the wrong ancestor.
+        let shadow = ShadowStore::new(root.path());
+        shadow
+            .record("daily/2026-07-04.md", "- old lineage\n")
+            .unwrap();
 
         let outcome = run_sweep(root.path(), &[], &[], false).unwrap();
 
         assert!(root.path().join("daily/2026-07-04.md").exists());
         assert!(!root.path().join("daily/2026-07-04 2.md").exists());
         assert_eq!(outcome.needs_review.len(), 0);
+        assert_eq!(shadow.base("daily/2026-07-04.md"), None);
     }
 
     #[test]
@@ -799,6 +834,25 @@ mod tests {
         .unwrap();
 
         assert_eq!(ShadowStore::new(root.path()).base("notes/open.md"), None);
+    }
+
+    #[test]
+    fn traversal_shaped_ingest_paths_are_refused() {
+        let root = graph();
+        // A file *outside* the graph that a traversal shape would reach.
+        let parent = root.path().parent().unwrap();
+        fs::write(parent.join("evil.md"), "outside\n").unwrap();
+
+        run_sweep(
+            root.path(),
+            &[],
+            &["../evil.md".to_string(), "/etc/hosts".to_string()],
+            false,
+        )
+        .unwrap();
+
+        // Nothing was recorded anywhere in the store.
+        assert!(!root.path().join(".reflect/sync-base").exists());
     }
 
     #[test]
