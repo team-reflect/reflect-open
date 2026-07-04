@@ -78,7 +78,13 @@ export function IcloudSection(): ReactElement | null {
       setConfirmOpen(false)
       const opened = await openRecent(newRoot)
       if (!opened) {
-        setError('The copy landed in iCloud but could not be opened — open it from Saved graphs.')
+        // Append rather than replace: a disconnect failure above must stay
+        // visible alongside this one — both tell the user something distinct.
+        setError((previous) =>
+          [previous, 'The copy landed in iCloud but could not be opened — open it from Saved graphs.']
+            .filter(Boolean)
+            .join(' '),
+        )
       }
     } catch (caught) {
       setError(errorMessage(caught))
