@@ -60,6 +60,10 @@ export function MobileNote({ path }: { path: string }): ReactElement {
           lazy
           autoFocus={untitled || focusRequested}
           showBacklinks={false}
+          // The daily surface gets its top inset from the date header; a
+          // plain note has no chrome between the header bar and the body,
+          // so the pane carries the vertical breathing room itself.
+          className="pt-4"
           gutterClassName={MOBILE_CONTENT_GUTTER}
           editorClassName="min-h-[60dvh]"
         />
