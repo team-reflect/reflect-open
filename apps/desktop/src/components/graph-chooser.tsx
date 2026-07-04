@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useGraphColors } from '@/hooks/use-graph-colors'
+import { cleanGraphName, graphNameFromRoot, isGraphNameTaken } from '@/lib/graph-names'
 import { graphColorCss } from '@/lib/graph-colors'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
@@ -13,26 +14,6 @@ import { useGraph } from '@/providers/graph-provider'
 /** iCloud is a real option only in the macOS shell. */
 function isIcloudCapablePlatform(): boolean {
   return import.meta.env.TAURI_ENV_PLATFORM === 'darwin'
-}
-
-/** `/…/Documents/My Notes` → `My Notes`. */
-function graphNameFromRoot(root: string): string {
-  return root.split('/').filter(Boolean).at(-1) ?? 'your notes'
-}
-
-/**
- * A folder name safe to create inside the container: no separators, no
- * leading dot, trimmed. Anything else disables Create rather than guessing.
- */
-function cleanGraphName(raw: string): string | null {
-  const trimmed = raw.trim()
-  if (trimmed.length === 0 || trimmed.startsWith('.')) {
-    return null
-  }
-  if (/[/\\:]/.test(trimmed)) {
-    return null
-  }
-  return trimmed
 }
 
 /**
@@ -182,9 +163,7 @@ function IcloudCard({
   const cleanName = cleanGraphName(name)
   // macOS folder names are case-insensitive — a same-named create would
   // land inside the existing graph instead of next to it.
-  const nameTaken =
-    cleanName !== null &&
-    existing.some((root) => graphNameFromRoot(root).toLowerCase() === cleanName.toLowerCase())
+  const nameTaken = cleanName !== null && isGraphNameTaken(cleanName, existing)
 
   async function create(): Promise<void> {
     if (status?.documentsRoot == null || cleanName === null || nameTaken) {
@@ -232,7 +211,7 @@ function IcloudCard({
                 onClick={() => open(root)}
               >
                 <Cloud aria-hidden strokeWidth={1.75} />
-                <span className="truncate">{graphNameFromRoot(root)}</span>
+                <span className="truncate">{graphNameFromRoot(root, 'your notes')}</span>
               </Button>
             </li>
           ))}

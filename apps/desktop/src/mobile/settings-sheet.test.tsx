@@ -182,6 +182,26 @@ describe('SettingsSheet', () => {
     )
   })
 
+  it('creates a new iCloud graph through the switcher', async () => {
+    graphState.mobileStorageKind = 'local'
+    storageInfo.current = {
+      localRoot: '/Documents',
+      icloudDocumentsRoot: '/iCloud/Documents',
+      icloudGraphRoots: [],
+    }
+    const user = userEvent.setup()
+    mount()
+
+    expect(await screen.findByText('Switch graph')).toBeTruthy()
+    await user.clear(screen.getByLabelText('New iCloud graph'))
+    await user.type(screen.getByLabelText('New iCloud graph'), 'Journal')
+    await user.click(screen.getByRole('button', { name: 'Create' }))
+
+    await waitFor(() =>
+      expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal'),
+    )
+  })
+
   it('offers no switcher when there is nowhere else to go', async () => {
     // A local graph with an empty container: the open graph is the only one.
     graphState.mobileStorageKind = 'local'

@@ -7,7 +7,7 @@ import { MobileOnboardingScreen } from './onboarding-screen'
 vi.mock('@tauri-apps/plugin-http', () => ({ fetch: vi.fn() }))
 const httpFetch = vi.mocked(tauriFetch)
 
-const completeOnboarding = vi.hoisted(() => vi.fn(async (_kind: string) => {}))
+const completeOnboarding = vi.hoisted(() => vi.fn(async (_kind: string, _root?: string) => {}))
 const storageInfo = vi.hoisted<{ current: unknown }>(() => ({ current: null }))
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ mobileStorageInfo: storageInfo.current, completeOnboarding }),
@@ -62,16 +62,19 @@ afterEach(() => {
 })
 
 describe('MobileOnboardingScreen', () => {
-  it('leads with iCloud Drive and creates the container graph', async () => {
+  it('leads with iCloud Drive and creates the named container graph', async () => {
     render(<MobileOnboardingScreen />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Store in iCloud Drive' }))
+    expect(screen.getByRole('heading', { name: 'iCloud Drive' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
 
-    await waitFor(() => expect(completeOnboarding).toHaveBeenCalledWith('icloud'))
+    await waitFor(() =>
+      expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Notes'),
+    )
     expect(cloned).toEqual([])
   })
 
-  it('lists every container graph and opens the tapped one', async () => {
+  it('lists every container graph while keeping create available', async () => {
     setStorage({
       localRoot: '/Documents',
       icloudDocumentsRoot: '/iCloud/Documents',
@@ -79,14 +82,31 @@ describe('MobileOnboardingScreen', () => {
     })
     render(<MobileOnboardingScreen />)
 
-    expect(screen.getByText('We found these notes in your iCloud Drive.')).toBeTruthy()
-    // Existing graphs replace the create action — a fresh directory next to
-    // your notes is a desktop decision, not a first-run tap.
-    expect(screen.queryByRole('button', { name: 'Store in iCloud Drive' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Open “Work”' }))
+    expect(screen.getByText('Open an existing set of notes, or create another.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Notes' })).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Create' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Work' }))
 
     await waitFor(() =>
       expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Work'),
+    )
+  })
+
+  it('creates a new iCloud graph alongside existing ones', async () => {
+    setStorage({
+      localRoot: '/Documents',
+      icloudDocumentsRoot: '/iCloud/Documents',
+      icloudGraphRoots: ['/iCloud/Documents/Notes'],
+    })
+    render(<MobileOnboardingScreen />)
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Journal' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+
+    await waitFor(() =>
+      expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal'),
     )
   })
 
@@ -103,7 +123,7 @@ describe('MobileOnboardingScreen', () => {
     setStorage({ localRoot: '/Documents', icloudDocumentsRoot: null, icloudGraphRoots: [] })
     render(<MobileOnboardingScreen />)
 
-    expect(screen.queryByRole('button', { name: 'Store in iCloud Drive' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'iCloud Drive' })).toBeNull()
     expect(
       screen.getByText('Sign in to iCloud on this device to sync notes with iCloud Drive.'),
     ).toBeTruthy()

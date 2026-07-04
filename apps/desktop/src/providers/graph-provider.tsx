@@ -474,6 +474,11 @@ export function GraphProvider({
             : 'No graph folder available.',
         )
       }
+      const shouldCreateIcloudRoot =
+        kind === 'icloud' && mobileStorageInfo?.icloudGraphRoots.includes(root) !== true
+      if (shouldCreateIcloudRoot) {
+        await createGraph(root)
+      }
       // Keep the onboarding gate up while the open runs — `openRecent` moves the
       // status to 'opening' synchronously and the onboarding screen shows its own
       // pending state, so the shell never flashes. On failure throw rather than
