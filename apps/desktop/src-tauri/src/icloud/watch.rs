@@ -286,30 +286,7 @@ mod platform {
 
         let mut snapshot = SNAPSHOT.lock().expect("snapshot lock");
         if emit_file_changes {
-            let mut changes: Vec<FileChange> = Vec::new();
-            for (rel, state) in &current {
-                let Some(mtime) = state else {
-                    continue; // not downloaded: bytes aren't local, never an upsert
-                };
-                if snapshot.get(rel).copied().flatten() != Some(*mtime) {
-                    changes.push(FileChange {
-                        path: rel.clone(),
-                        kind: "upsert".to_string(),
-                        modified_ms: Some(*mtime),
-                    });
-                }
-            }
-            for rel in snapshot.keys() {
-                // Absent from the listing entirely = deleted. (Evicted items
-                // stay listed with a non-current status — not removes.)
-                if !current.contains_key(rel) {
-                    changes.push(FileChange {
-                        path: rel.clone(),
-                        kind: "remove".to_string(),
-                        modified_ms: None,
-                    });
-                }
-            }
+            let changes = snapshot_changes(&snapshot, &current);
             if !changes.is_empty() {
                 let _ = app.emit("index:changed", changes);
             }
@@ -321,6 +298,44 @@ mod platform {
             conflicts.sort();
             let _ = app.emit("icloud:conflicts", conflicts);
         }
+    }
+
+    /// Diff one results listing against the previous snapshot (the pure heart
+    /// of [`handle_notification`], kept free of Objective-C so it is unit
+    /// testable). Upserts only for content that is **local** (downloaded) and
+    /// new or mtime-changed; removes only for paths gone from the listing
+    /// entirely. An evicted item stays listed in a placeholder state (`None`)
+    /// and produces no event in either direction — eviction is not deletion,
+    /// and its bytes aren't local to upsert — until iCloud downloads it again.
+    fn snapshot_changes(
+        previous: &HashMap<String, Option<u64>>,
+        current: &HashMap<String, Option<u64>>,
+    ) -> Vec<FileChange> {
+        let mut changes: Vec<FileChange> = Vec::new();
+        for (rel, state) in current {
+            let Some(mtime) = state else {
+                continue; // not downloaded: bytes aren't local, never an upsert
+            };
+            if previous.get(rel).copied().flatten() != Some(*mtime) {
+                changes.push(FileChange {
+                    path: rel.clone(),
+                    kind: "upsert".to_string(),
+                    modified_ms: Some(*mtime),
+                });
+            }
+        }
+        for rel in previous.keys() {
+            // Absent from the listing entirely = deleted. (Evicted items
+            // stay listed with a non-current status — not removes.)
+            if !current.contains_key(rel) {
+                changes.push(FileChange {
+                    path: rel.clone(),
+                    kind: "remove".to_string(),
+                    modified_ms: None,
+                });
+            }
+        }
+        changes
     }
 
     /// The watcher's note-tracking rule, over absolute metadata paths:
@@ -340,11 +355,13 @@ mod platform {
         tracked.then(|| rel.to_string())
     }
 
+    /// A metadata attribute as a string; `None` when absent or another type.
     fn attr_string(item: &NSMetadataItem, key: &NSString) -> Option<String> {
         let value = item.valueForAttribute(key)?;
         value.downcast::<NSString>().ok().map(|s| s.to_string())
     }
 
+    /// A boolean metadata attribute; absent or non-numeric reads as `false`.
     fn attr_bool(item: &NSMetadataItem, key: &NSString) -> bool {
         item.valueForAttribute(key)
             .and_then(|value| value.downcast::<NSNumber>().ok())
@@ -352,6 +369,7 @@ mod platform {
             .unwrap_or(false)
     }
 
+    /// A date metadata attribute as epoch ms, clamped at 0 for pre-epoch dates.
     fn attr_date_ms(item: &NSMetadataItem, key: &NSString) -> Option<u64> {
         let date = item.valueForAttribute(key)?.downcast::<NSDate>().ok()?;
         let seconds = date.timeIntervalSince1970();
@@ -363,7 +381,81 @@ mod platform {
 
     #[cfg(test)]
     mod tests {
-        use super::tracked_note_relpath;
+        use super::{root_variants, snapshot_changes, tracked_note_relpath};
+        use std::collections::HashMap;
+
+        fn state(entries: &[(&str, Option<u64>)]) -> HashMap<String, Option<u64>> {
+            entries
+                .iter()
+                .map(|(rel, mtime)| (rel.to_string(), *mtime))
+                .collect()
+        }
+
+        fn shapes(changes: &[super::FileChange]) -> Vec<(String, String, Option<u64>)> {
+            let mut shapes: Vec<_> = changes
+                .iter()
+                .map(|change| (change.path.clone(), change.kind.clone(), change.modified_ms))
+                .collect();
+            shapes.sort();
+            shapes
+        }
+
+        #[test]
+        fn upserts_need_local_bytes_and_a_new_mtime() {
+            let previous = state(&[("notes/same.md", Some(1))]);
+            let current = state(&[
+                ("notes/same.md", Some(1)),    // unchanged: no event
+                ("notes/changed.md", Some(2)), // new content: upsert
+                ("notes/stub.md", None),       // listed but not downloaded: no event
+            ]);
+            assert_eq!(
+                shapes(&snapshot_changes(&previous, &current)),
+                vec![(
+                    "notes/changed.md".to_string(),
+                    "upsert".to_string(),
+                    Some(2)
+                )]
+            );
+        }
+
+        #[test]
+        fn eviction_is_not_deletion_but_disappearance_is() {
+            let previous = state(&[("notes/evicted.md", Some(1)), ("notes/deleted.md", Some(1))]);
+            // The evicted note stays listed placeholder-state; the deleted one
+            // is gone from the listing entirely.
+            let current = state(&[("notes/evicted.md", None)]);
+            assert_eq!(
+                shapes(&snapshot_changes(&previous, &current)),
+                vec![("notes/deleted.md".to_string(), "remove".to_string(), None)]
+            );
+        }
+
+        #[test]
+        fn a_finished_download_upserts_the_note() {
+            let previous = state(&[("notes/a.md", None)]);
+            let current = state(&[("notes/a.md", Some(5))]);
+            assert_eq!(
+                shapes(&snapshot_changes(&previous, &current)),
+                vec![("notes/a.md".to_string(), "upsert".to_string(), Some(5))]
+            );
+        }
+
+        #[test]
+        fn root_variants_are_slash_terminated_and_include_the_canonical_twin() {
+            let dir = tempfile::tempdir().expect("tempdir");
+            let root = dir.path().to_string_lossy().into_owned();
+            let variants = root_variants(&root);
+            assert_eq!(variants[0], format!("{root}/"));
+            assert!(variants.iter().all(|variant| variant.ends_with('/')));
+            // macOS tempdirs live behind the /var → /private/var symlink; the
+            // canonical twin must be present (deduped when root is already
+            // canonical).
+            let canonical = std::fs::canonicalize(dir.path()).expect("canonicalize");
+            let canonical = format!("{}/", canonical.to_string_lossy());
+            assert!(variants.contains(&canonical));
+            let unique: std::collections::BTreeSet<&String> = variants.iter().collect();
+            assert_eq!(unique.len(), variants.len(), "variants must not repeat");
+        }
 
         #[test]
         fn tracks_notes_relative_to_any_root_variant() {

@@ -138,7 +138,12 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
     }
   }
 
-  /** Fan sweep rewrites out exactly like the backup controller's pull path. */
+  /**
+   * Fan sweep rewrites out to every file-change subscriber (open sessions
+   * reconcile from these) *and* reindex them under the open index session,
+   * exactly like the backup controller's pull path — the sweep must never
+   * wait on the watcher to notice its own writes.
+   */
   function applySweepChanges(changes: FileChange[]): void {
     applyingSweepResult = true
     try {
@@ -209,29 +214,7 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
     } catch (err) {
       console.error('iCloud change subscriptions failed to start:', err)
     }
-    // Resume triggers (same shape as the backup controller's): focus for a
-    // desktop refocus, visibility → visible for mobile resume and desktop
-    // unminimize. Deduped — one transition fires both events.
-    let lastResumeScanAt = 0
-    const onResume = (): void => {
-      const now = Date.now()
-      if (disposed || now - lastResumeScanAt < RESUME_SCAN_DEDUPE_MS) {
-        return
-      }
-      lastResumeScanAt = now
-      scheduleScan()
-    }
-    const onVisibilityChange = (): void => {
-      if (document.visibilityState === 'visible') {
-        onResume()
-      }
-    }
-    window.addEventListener('focus', onResume)
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    disposers.push(
-      () => window.removeEventListener('focus', onResume),
-      () => document.removeEventListener('visibilitychange', onVisibilityChange),
-    )
+    disposers.push(...attachResumeListeners(scheduleScan))
     // The adoption baseline + any conflicts that accrued while closed.
     scheduleScan()
   }
@@ -251,4 +234,34 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
   }
 
   return { start, dispose }
+}
+
+/**
+ * Wire the resume triggers (same shape as the backup controller's): `focus`
+ * for a desktop refocus, visibility → visible for mobile resume and desktop
+ * unminimize. One transition can fire both events, so `onResume` calls are
+ * deduped within {@link RESUME_SCAN_DEDUPE_MS}. Returns the listeners'
+ * disposers.
+ */
+function attachResumeListeners(onResume: () => void): Array<() => void> {
+  let lastResumeAt = 0
+  const resume = (): void => {
+    const now = Date.now()
+    if (now - lastResumeAt < RESUME_SCAN_DEDUPE_MS) {
+      return
+    }
+    lastResumeAt = now
+    onResume()
+  }
+  const onVisibilityChange = (): void => {
+    if (document.visibilityState === 'visible') {
+      resume()
+    }
+  }
+  window.addEventListener('focus', resume)
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  return [
+    () => window.removeEventListener('focus', resume),
+    () => document.removeEventListener('visibilitychange', onVisibilityChange),
+  ]
 }

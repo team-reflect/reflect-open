@@ -59,6 +59,8 @@ export async function mobileStorage(): Promise<MobileStorageInfo> {
   return call('mobile_storage', {}, mobileStorageInfoSchema)
 }
 
+const icloudDownloadPendingSchema = z.number().int().nonnegative()
+
 /**
  * Asks iCloud to download every not-yet-local file under `root`, returning
  * how many placeholders were found. iOS does not pull container files down
@@ -66,7 +68,7 @@ export async function mobileStorage(): Promise<MobileStorageInfo> {
  * index while the count stays above zero.
  */
 export async function icloudDownloadPending(root: string): Promise<number> {
-  return call('icloud_download_pending', { root }, z.number().int().nonnegative())
+  return call('icloud_download_pending', { root }, icloudDownloadPendingSchema)
 }
 
 const icloudStatusSchema = z.object({
@@ -86,6 +88,8 @@ export async function icloudStatus(): Promise<IcloudStatus> {
   return call('icloud_status', {}, icloudStatusSchema)
 }
 
+const icloudAdoptedRootSchema = z.string()
+
 /**
  * Copy the open graph into the iCloud container and return the new root
  * (Plan 21 Phase 1 move-in). The copy is count+byte verified; the original
@@ -93,7 +97,7 @@ export async function icloudStatus(): Promise<IcloudStatus> {
  * re-opens the graph at the returned root and runs a baseline conflict scan.
  */
 export async function icloudAdoptGraph(generation: number): Promise<string> {
-  return call('icloud_adopt_graph', { generation }, z.string())
+  return call('icloud_adopt_graph', { generation }, icloudAdoptedRootSchema)
 }
 
 const icloudSweepChangeSchema = z.object({
@@ -148,6 +152,8 @@ export async function icloudConflictsScan(options: IcloudScanOptions): Promise<I
   )
 }
 
+const voidResponseSchema = z.null()
+
 /**
  * Start the iCloud metadata-query watch over `root` (Plan 21 Phase 2).
  * `emitFileChanges` turns its snapshot diffs into `index:changed` events —
@@ -155,10 +161,10 @@ export async function icloudConflictsScan(options: IcloudScanOptions): Promise<I
  * paths always emit as `icloud:conflicts`.
  */
 export async function icloudWatchStart(root: string, emitFileChanges: boolean): Promise<void> {
-  await call('icloud_watch_start', { root, emitFileChanges }, z.null())
+  await call('icloud_watch_start', { root, emitFileChanges }, voidResponseSchema)
 }
 
 /** Stop the active iCloud watch (graph switch). Idempotent. */
 export async function icloudWatchStop(): Promise<void> {
-  await call('icloud_watch_stop', {}, z.null())
+  await call('icloud_watch_stop', {}, voidResponseSchema)
 }

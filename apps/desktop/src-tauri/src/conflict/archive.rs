@@ -88,17 +88,10 @@ fn prune_dir(dir: &Path, now_ms: u64) {
 }
 
 /// `notes/a.md` → `<root>/.reflect/conflict-archive/notes/a.md/` (the note
-/// path becomes a directory). Refuses traversal shapes.
+/// path becomes a directory). Refuses whatever the shared traversal guard
+/// refuses ([`crate::fs::ensure_relative`]).
 fn note_archive_dir(root: &Path, rel: &str) -> Option<PathBuf> {
-    if rel.is_empty() || rel.starts_with('/') || rel.contains('\\') {
-        return None;
-    }
-    if rel
-        .split('/')
-        .any(|part| part.is_empty() || part == "." || part == "..")
-    {
-        return None;
-    }
+    crate::fs::ensure_relative(rel).ok()?;
     Some(root.join(".reflect").join(ARCHIVE_DIR).join(rel))
 }
 

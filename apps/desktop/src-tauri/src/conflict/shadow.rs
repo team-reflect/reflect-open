@@ -29,11 +29,14 @@ use std::path::{Path, PathBuf};
 use crate::error::{AppError, AppResult};
 
 /// Content identity for merge-pair tracking, via the vendored libgit2
-/// (no extra hashing dependency).
-pub fn content_hash(content: &str) -> String {
+/// (no extra hashing dependency). A hashing failure is an error, not a
+/// degraded hash: a silent fallback value would blind
+/// [`ShadowStore::is_repeated_merge`] to a real merge loop — the caller
+/// defers the file instead (the sweep retries it next round).
+pub fn content_hash(content: &str) -> AppResult<String> {
     git2::Oid::hash_object(git2::ObjectType::Blob, content.as_bytes())
         .map(|oid| oid.to_string())
-        .unwrap_or_default()
+        .map_err(|err| AppError::io(format!("content hash failed: {err}")))
 }
 
 /// The per-graph shadow base store.
@@ -137,18 +140,11 @@ impl ShadowStore {
         prune_orphan_dir(&self.dir, &self.dir, keep);
     }
 
-    /// Map a graph-relative note path into the store, refusing anything that
-    /// could escape it. Store paths mirror note paths one-to-one.
+    /// Map a graph-relative note path into the store, refusing anything the
+    /// shared traversal guard would ([`crate::fs::ensure_relative`]). Store
+    /// paths mirror note paths one-to-one.
     fn entry_path(&self, rel: &str, suffix: &str) -> Option<PathBuf> {
-        if rel.is_empty() || rel.starts_with('/') || rel.contains('\\') {
-            return None;
-        }
-        if rel
-            .split('/')
-            .any(|part| part.is_empty() || part == "." || part == "..")
-        {
-            return None;
-        }
+        crate::fs::ensure_relative(rel).ok()?;
         Some(self.dir.join(format!("{rel}{suffix}")))
     }
 }
@@ -210,12 +206,12 @@ mod tests {
     #[test]
     fn merge_pairs_match_in_either_order_and_clear() {
         let (_dir, store) = store();
-        let (a, b) = (content_hash("one"), content_hash("two"));
+        let (a, b) = (content_hash("one").unwrap(), content_hash("two").unwrap());
         assert!(!store.is_repeated_merge("notes/a.md", &a, &b));
         store.record_merge_pair("notes/a.md", &a, &b).unwrap();
         assert!(store.is_repeated_merge("notes/a.md", &a, &b));
         assert!(store.is_repeated_merge("notes/a.md", &b, &a));
-        assert!(!store.is_repeated_merge("notes/a.md", &a, &content_hash("three")));
+        assert!(!store.is_repeated_merge("notes/a.md", &a, &content_hash("three").unwrap()));
         store.clear_merge_pair("notes/a.md");
         assert!(!store.is_repeated_merge("notes/a.md", &a, &b));
     }
@@ -250,8 +246,11 @@ mod tests {
 
     #[test]
     fn content_hashes_are_stable_and_distinct() {
-        assert_eq!(content_hash("same"), content_hash("same"));
-        assert_ne!(content_hash("same"), content_hash("different"));
-        assert_eq!(content_hash("same").len(), 40);
+        assert_eq!(content_hash("same").unwrap(), content_hash("same").unwrap());
+        assert_ne!(
+            content_hash("same").unwrap(),
+            content_hash("different").unwrap()
+        );
+        assert_eq!(content_hash("same").unwrap().len(), 40);
     }
 }

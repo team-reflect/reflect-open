@@ -25,7 +25,7 @@ use tauri::State;
 
 use crate::conflict::ladder::{self, ConflictInput};
 use crate::conflict::shadow::{content_hash, ShadowStore};
-use crate::conflict::{archive, ConflictSide, Resolution};
+use crate::conflict::{archive, markers, ConflictSide, Resolution};
 use crate::error::{AppError, AppResult};
 use crate::fs::GraphState;
 
@@ -200,41 +200,20 @@ struct FileResolution {
 }
 
 /// Fold a note's unresolved versions through the ladder, oldest first.
-/// Archives every side before anything else. Does not touch the provider's
-/// version state — the caller does, after the resolved write lands.
+/// Archives every side before anything else ([`archived_sides`]). Does not
+/// touch the provider's version state — the caller does, after the resolved
+/// write lands.
 fn resolve_file(
     root: &Path,
     rel: &str,
     file_modified_ms: u64,
-    mut versions: Vec<VersionRef>,
+    versions: Vec<VersionRef>,
     shadow: &ShadowStore,
 ) -> AppResult<FileResolution> {
     let abs = root.join(rel);
     let original = fs::read_to_string(&abs)
         .map_err(|err| AppError::io(format!("unreadable conflicted note {rel}: {err}")))?;
-
-    archive::archive_version(root, rel, None, file_modified_ms, original.as_bytes())?;
-    versions.sort_by_key(|version| version.modified_ms);
-    let mut sides: Vec<ConflictSide> = Vec::new();
-    for version in &versions {
-        let content = fs::read_to_string(&version.store_path)
-            .map_err(|err| AppError::io(format!("unreadable conflict version for {rel}: {err}")))?;
-        archive::archive_version(
-            root,
-            rel,
-            version.device.as_deref(),
-            version.modified_ms,
-            content.as_bytes(),
-        )?;
-        sides.push(ConflictSide {
-            content,
-            label: version
-                .device
-                .clone()
-                .unwrap_or_else(|| "other device".to_string()),
-            modified_ms: version.modified_ms,
-        });
-    }
+    let sides = archived_sides(root, rel, &original, file_modified_ms, versions)?;
 
     let base = shadow.base(rel);
     let mut current = ConflictSide {
@@ -242,10 +221,22 @@ fn resolve_file(
         label: LOCAL_LABEL.to_string(),
         modified_ms: file_modified_ms,
     };
+
+    // With MULTIPLE versions, the pairwise loop below is unsound: an
+    // intermediate step's marker output would meet the ladder's marked-side
+    // rule on the next step, which keeps the newest raw side whole — the
+    // earlier versions' content would survive only in the archive, not the
+    // note. Multi-version folds therefore auto-merge only while every step
+    // stays clean, and the first overlap abandons the fold for one flat
+    // marker file carrying every side.
+    if sides.len() >= 2 {
+        return resolve_many(rel, base.as_deref(), current, sides, shadow, &original);
+    }
+
     let mut marked = false;
     for side in sides {
-        let current_hash = content_hash(&current.content);
-        let side_hash = content_hash(&side.content);
+        let current_hash = content_hash(&current.content)?;
+        let side_hash = content_hash(&side.content)?;
         let input = ConflictInput {
             path: rel,
             base: base.as_deref(),
@@ -276,6 +267,115 @@ fn resolve_file(
         final_content: current.content,
         marked,
     })
+}
+
+/// The three-plus-way fold (two or more conflict versions — three or more
+/// devices edited apart). Auto-merges pairwise only while every step stays
+/// clean; any overlap yields **flat stacked markers over every side**
+/// ([`markers::stacked_whole_note_markers`]) so no resolution choice can
+/// lose a side. A side that already carries markers can't be stacked
+/// (nesting corrupts the grammar) — the two-way marked-side rule extends to
+/// n sides: the deterministically newest survives whole, the rest stay in
+/// the archive.
+fn resolve_many(
+    rel: &str,
+    base: Option<&str>,
+    current: ConflictSide,
+    sides: Vec<ConflictSide>,
+    shadow: &ShadowStore,
+    original: &str,
+) -> AppResult<FileResolution> {
+    let all = || std::iter::once(&current).chain(sides.iter());
+    if all().any(|side| markers::contains_conflict_markers(&side.content)) {
+        let newest = all()
+            .max_by(|a, b| (a.modified_ms, &a.content).cmp(&(b.modified_ms, &b.content)))
+            .expect("the current side always exists");
+        return Ok(FileResolution {
+            changed: newest.content != original,
+            marked: markers::contains_conflict_markers(&newest.content),
+            final_content: newest.content.clone(),
+        });
+    }
+
+    let mut folded = current.clone();
+    let mut clean = true;
+    for side in &sides {
+        let folded_hash = content_hash(&folded.content)?;
+        let side_hash = content_hash(&side.content)?;
+        let input = ConflictInput {
+            path: rel,
+            base,
+            sides: (folded.clone(), side.clone()),
+            creation_collision: false,
+            merge_loop_detected: shadow.is_repeated_merge(rel, &folded_hash, &side_hash),
+        };
+        match ladder::resolve(input)? {
+            Resolution::AlreadyResolved => {}
+            Resolution::Merged { content } => {
+                if content != folded.content {
+                    let _ = shadow.record_merge_pair(rel, &folded_hash, &side_hash);
+                }
+                folded.content = content;
+            }
+            Resolution::Marked { .. } => {
+                clean = false;
+                break;
+            }
+        }
+    }
+    if clean {
+        return Ok(FileResolution {
+            changed: folded.content != original,
+            final_content: folded.content,
+            marked: false,
+        });
+    }
+
+    let mut ordered: Vec<ConflictSide> = std::iter::once(current).chain(sides).collect();
+    ordered.sort_by(|a, b| (a.modified_ms, &a.content).cmp(&(b.modified_ms, &b.content)));
+    let content = markers::stacked_whole_note_markers(&ordered);
+    Ok(FileResolution {
+        changed: content != original,
+        final_content: content,
+        marked: true,
+    })
+}
+
+/// Read and archive **every** involved version — the current file, then the
+/// provider's conflict versions — and return the version sides sorted oldest
+/// first, ready for the ladder. The archive-before-anything invariant lives
+/// here: a resolution must never become the only copy-holder of content it
+/// consumed.
+fn archived_sides(
+    root: &Path,
+    rel: &str,
+    original: &str,
+    file_modified_ms: u64,
+    mut versions: Vec<VersionRef>,
+) -> AppResult<Vec<ConflictSide>> {
+    archive::archive_version(root, rel, None, file_modified_ms, original.as_bytes())?;
+    versions.sort_by_key(|version| version.modified_ms);
+    let mut sides: Vec<ConflictSide> = Vec::new();
+    for version in &versions {
+        let content = fs::read_to_string(&version.store_path)
+            .map_err(|err| AppError::io(format!("unreadable conflict version for {rel}: {err}")))?;
+        archive::archive_version(
+            root,
+            rel,
+            version.device.as_deref(),
+            version.modified_ms,
+            content.as_bytes(),
+        )?;
+        sides.push(ConflictSide {
+            content,
+            label: version
+                .device
+                .clone()
+                .unwrap_or_else(|| "other device".to_string()),
+            modified_ms: version.modified_ms,
+        });
+    }
+    Ok(sides)
 }
 
 /// Write a resolution to disk, settle the provider's version state, and do
@@ -339,112 +439,127 @@ fn fold_collision_duplicates(
             outcome.deferred.push(file.path.clone());
             continue;
         }
-        let dup_abs = root.join(&file.path);
-        let canonical_abs = root.join(&canonical_rel);
-        let Ok(dup_content) = fs::read_to_string(&dup_abs) else {
-            continue;
-        };
-        if !crate::fs::file_occupied(&canonical_abs) {
-            // The canonical name is genuinely free (the winner was
-            // deleted/renamed — and not merely evicted, which `file_occupied`
-            // sees through): the duplicate simply takes its place.
-            if fs::rename(&dup_abs, &canonical_abs).is_err() {
-                continue;
-            }
-            outcome.changed.push(remove_change(&file.path));
-            outcome.changed.push(SweepChange {
-                path: canonical_rel.clone(),
-                kind: "upsert".to_string(),
-                modified_ms: modified_ms_of(&canonical_abs),
-            });
-            continue;
+        fold_duplicate(root, file, &canonical_rel, shadow, outcome);
+    }
+}
+
+/// Fold one duplicate into its canonical note: adopt a genuinely free
+/// canonical name outright, otherwise archive the duplicate, merge the pair
+/// through the ladder, and remove the duplicate. Every early return leaves
+/// the duplicate in place for the next sweep to retry.
+fn fold_duplicate(
+    root: &Path,
+    file: &crate::fs::FileMeta,
+    canonical_rel: &str,
+    shadow: &ShadowStore,
+    outcome: &mut SweepOutcome,
+) {
+    let dup_abs = root.join(&file.path);
+    let canonical_abs = root.join(canonical_rel);
+    let Ok(dup_content) = fs::read_to_string(&dup_abs) else {
+        return;
+    };
+    if !crate::fs::file_occupied(&canonical_abs) {
+        // The canonical name is genuinely free (the winner was
+        // deleted/renamed — and not merely evicted, which `file_occupied`
+        // sees through): the duplicate simply takes its place.
+        if fs::rename(&dup_abs, &canonical_abs).is_err() {
+            return;
         }
-        let Ok(canonical_content) = fs::read_to_string(&canonical_abs) else {
-            continue; // occupied but unreadable (evicted): retry once downloaded
-        };
-        if let Err(err) = archive::archive_version(
-            root,
-            &file.path,
-            None,
-            file.modified_ms,
-            dup_content.as_bytes(),
-        ) {
-            tracing::warn!(path = %file.path, ?err, "failed to archive collision duplicate");
-            continue;
+        outcome.changed.push(remove_change(&file.path));
+        outcome.changed.push(SweepChange {
+            path: canonical_rel.to_string(),
+            kind: "upsert".to_string(),
+            modified_ms: modified_ms_of(&canonical_abs),
+        });
+        return;
+    }
+    let Ok(canonical_content) = fs::read_to_string(&canonical_abs) else {
+        return; // occupied but unreadable (evicted): retry once downloaded
+    };
+    if let Err(err) = archive::archive_version(
+        root,
+        &file.path,
+        None,
+        file.modified_ms,
+        dup_content.as_bytes(),
+    ) {
+        tracing::warn!(path = %file.path, ?err, "failed to archive collision duplicate");
+        return;
+    }
+    let input = ConflictInput {
+        path: canonical_rel,
+        base: None, // independent creations share no ancestor
+        sides: (
+            ConflictSide {
+                content: canonical_content.clone(),
+                label: canonical_rel.to_string(),
+                modified_ms: modified_ms_of(&canonical_abs).unwrap_or(0),
+            },
+            ConflictSide {
+                content: dup_content,
+                label: file.path.clone(),
+                modified_ms: file.modified_ms,
+            },
+        ),
+        creation_collision: true,
+        merge_loop_detected: false,
+    };
+    let resolution = match ladder::resolve(input) {
+        Ok(resolution) => resolution,
+        Err(err) => {
+            tracing::warn!(path = %file.path, ?err, "collision merge failed");
+            return;
         }
-        let input = ConflictInput {
-            path: &canonical_rel,
-            base: None, // independent creations share no ancestor
-            sides: (
-                ConflictSide {
-                    content: canonical_content.clone(),
-                    label: canonical_rel.clone(),
-                    modified_ms: modified_ms_of(&canonical_abs).unwrap_or(0),
-                },
-                ConflictSide {
-                    content: dup_content,
-                    label: file.path.clone(),
-                    modified_ms: file.modified_ms,
-                },
-            ),
-            creation_collision: true,
-            merge_loop_detected: false,
-        };
-        let resolution = match ladder::resolve(input) {
-            Ok(resolution) => resolution,
-            Err(err) => {
-                tracing::warn!(path = %file.path, ?err, "collision merge failed");
-                continue;
-            }
-        };
-        let (merged, is_marked) = match resolution {
-            Resolution::AlreadyResolved => (canonical_content.clone(), false),
-            Resolution::Merged { content } => (content, false),
-            Resolution::Marked { content } => (content, true),
-        };
-        if merged != canonical_content
-            && crate::fs::atomic_write_bytes(root, &canonical_abs, merged.as_bytes()).is_err()
-        {
-            continue; // duplicate stays; next sweep retries
+    };
+    let (merged, is_marked) = match resolution {
+        Resolution::AlreadyResolved => (canonical_content.clone(), false),
+        Resolution::Merged { content } => (content, false),
+        Resolution::Marked { content } => (content, true),
+    };
+    if merged != canonical_content {
+        if crate::fs::atomic_write_bytes(root, &canonical_abs, merged.as_bytes()).is_err() {
+            return; // duplicate stays; next sweep retries
         }
-        if merged != canonical_content {
-            outcome.changed.push(SweepChange {
-                path: canonical_rel.clone(),
-                kind: "upsert".to_string(),
-                modified_ms: modified_ms_of(&canonical_abs),
-            });
-        }
-        // The canonical rewrite above is real either way, but the duplicate's
-        // disappearance must only be reported when it actually happened — a
-        // phantom `remove` would drop the index row while the file remains.
-        // The merged canonical already contains the duplicate's content, so
-        // the retry next sweep is an AlreadyResolved fold + remove.
-        if fs::remove_file(&dup_abs).is_ok() {
-            outcome.changed.push(remove_change(&file.path));
-        } else {
-            tracing::warn!(path = %file.path, "failed to remove folded collision duplicate");
-        }
-        if is_marked {
-            outcome.needs_review.push(canonical_rel.clone());
-            shadow.clear_merge_pair(&canonical_rel);
-        } else {
-            outcome.auto_resolved += 1;
-            if let Err(err) = shadow.record(&canonical_rel, &merged) {
-                tracing::warn!(path = %canonical_rel, ?err, "failed to advance shadow base");
-            }
+        outcome.changed.push(SweepChange {
+            path: canonical_rel.to_string(),
+            kind: "upsert".to_string(),
+            modified_ms: modified_ms_of(&canonical_abs),
+        });
+    }
+    // The canonical rewrite above is real either way, but the duplicate's
+    // disappearance must only be reported when it actually happened — a
+    // phantom `remove` would drop the index row while the file remains.
+    // The merged canonical already contains the duplicate's content, so
+    // the retry next sweep is an AlreadyResolved fold + remove.
+    if fs::remove_file(&dup_abs).is_ok() {
+        outcome.changed.push(remove_change(&file.path));
+    } else {
+        tracing::warn!(path = %file.path, "failed to remove folded collision duplicate");
+    }
+    if is_marked {
+        outcome.needs_review.push(canonical_rel.to_string());
+        shadow.clear_merge_pair(canonical_rel);
+    } else {
+        outcome.auto_resolved += 1;
+        if let Err(err) = shadow.record(canonical_rel, &merged) {
+            tracing::warn!(path = %canonical_rel, ?err, "failed to advance shadow base");
         }
     }
 }
 
 /// `daily/2026-07-04 2.md` → `Some("daily/2026-07-04.md")`; `None` for
-/// anything that isn't an iCloud collision name. Deliberately strict — a
-/// single digit 2–9 — because ` <number>` endings are common in real note
-/// titles ("top 10", "chapter 1") while an iCloud collision reaching double
-/// digits would take nine simultaneous same-name creations.
+/// anything else. **Daily notes only, with a strict date stem**: their
+/// filenames are machine-chosen dates, so a ` <digit>` suffix there can only
+/// be iCloud's collision rename (two devices creating the same day offline —
+/// the most common conflict shape). Everywhere else the same pattern is
+/// indistinguishable from a user-authored title (`notes/chapter 2.md`), and
+/// folding one of those would merge two intentional notes — titled notes'
+/// same-name collisions simply coexist until the user merges them.
 fn collision_canonical(rel: &str) -> Option<String> {
-    let stem = rel.strip_suffix(".md")?;
-    let (base, suffix) = stem.rsplit_once(' ')?;
-    if base.is_empty() || base.ends_with('/') {
+    let stem = rel.strip_prefix("daily/")?.strip_suffix(".md")?;
+    let (date, suffix) = stem.rsplit_once(' ')?;
+    if !is_daily_date_stem(date) {
         return None;
     }
     let mut digits = suffix.chars();
@@ -454,7 +569,18 @@ fn collision_canonical(rel: &str) -> Option<String> {
     if !('2'..='9').contains(&digit) {
         return None;
     }
-    Some(format!("{base}.md"))
+    Some(format!("daily/{date}.md"))
+}
+
+/// Exactly `YYYY-MM-DD` — the shape the app names daily notes with.
+fn is_daily_date_stem(stem: &str) -> bool {
+    let bytes = stem.as_bytes();
+    bytes.len() == 10
+        && bytes[4] == b'-'
+        && bytes[7] == b'-'
+        && [0, 1, 2, 3, 5, 6, 8, 9]
+            .iter()
+            .all(|&index| bytes[index].is_ascii_digit())
 }
 
 fn remove_change(rel: &str) -> SweepChange {
@@ -497,16 +623,20 @@ mod tests {
             Some("daily/2026-07-04.md".to_string())
         );
         assert_eq!(
-            collision_canonical("notes/meeting 9.md"),
-            Some("notes/meeting.md".to_string())
+            collision_canonical("daily/2026-07-04 9.md"),
+            Some("daily/2026-07-04.md".to_string())
         );
-        // Not collisions: Plan 17 hyphen suffixes, plain names, and the
-        // number-bearing titles users actually write.
-        assert_eq!(collision_canonical("notes/meeting-2.md"), None);
-        assert_eq!(collision_canonical("notes/meeting.md"), None);
-        assert_eq!(collision_canonical("notes/top 10.md"), None);
-        assert_eq!(collision_canonical("notes/chapter 1.md"), None);
-        assert_eq!(collision_canonical("notes/version 02.md"), None);
+        // Titled notes never fold — `notes/chapter 2.md` is indistinguishable
+        // from a user-authored title, and merging intentional notes is worse
+        // than leaving a real collision pair side by side.
+        assert_eq!(collision_canonical("notes/meeting 9.md"), None);
+        assert_eq!(collision_canonical("notes/chapter 2.md"), None);
+        // Inside daily/, only the strict machine date-stem shape qualifies.
+        assert_eq!(collision_canonical("daily/2026-07-04-2.md"), None);
+        assert_eq!(collision_canonical("daily/2026-07-04.md"), None);
+        assert_eq!(collision_canonical("daily/2026-07-04 10.md"), None);
+        assert_eq!(collision_canonical("daily/journal 2.md"), None);
+        assert_eq!(collision_canonical("daily/2026-7-04 2.md"), None);
     }
 
     #[test]
@@ -580,21 +710,41 @@ mod tests {
         // the labels are the two filenames the content came from.
         write(
             root.path(),
-            "notes/topic.md",
+            "daily/2026-07-04.md",
             "- shared\n- mac wording\n- common tail\n",
         );
         write(
             root.path(),
-            "notes/topic 2.md",
+            "daily/2026-07-04 2.md",
             "- shared\n- phone wording\n- common tail\n",
         );
 
         let outcome = run_sweep(root.path(), &[], &[], false).unwrap();
 
-        assert_eq!(outcome.needs_review, vec!["notes/topic.md".to_string()]);
-        let merged = fs::read_to_string(root.path().join("notes/topic.md")).unwrap();
+        assert_eq!(
+            outcome.needs_review,
+            vec!["daily/2026-07-04.md".to_string()]
+        );
+        let merged = fs::read_to_string(root.path().join("daily/2026-07-04.md")).unwrap();
         assert!(markers::contains_conflict_markers(&merged));
-        assert!(merged.contains("notes/topic.md") && merged.contains("notes/topic 2.md"));
+        assert!(merged.contains("daily/2026-07-04.md") && merged.contains("daily/2026-07-04 2.md"));
+    }
+
+    #[test]
+    fn titled_note_number_suffixes_are_left_alone() {
+        // "chapter.md" and "chapter 2.md" are two intentional notes, not an
+        // iCloud collision — the sweep must not merge or rename them.
+        let root = graph();
+        write(root.path(), "notes/chapter.md", "# Chapter\n");
+        write(root.path(), "notes/chapter 2.md", "# Chapter 2\n");
+
+        let outcome = run_sweep(root.path(), &[], &[], false).unwrap();
+
+        assert!(outcome.changed.is_empty());
+        assert_eq!(
+            fs::read_to_string(root.path().join("notes/chapter 2.md")).unwrap(),
+            "# Chapter 2\n"
+        );
     }
 
     #[test]
@@ -719,5 +869,137 @@ mod tests {
         ));
         assert!(resolution.final_content.contains("Alex's iPhone"));
         assert!(resolution.final_content.contains(LOCAL_LABEL));
+    }
+
+    fn fake_version(
+        root: &Path,
+        name: &str,
+        content: &str,
+        modified_ms: u64,
+        device: &str,
+    ) -> VersionRef {
+        let store = root.join(".reflect").join(name);
+        fs::write(&store, content).unwrap();
+        VersionRef {
+            store_path: store,
+            modified_ms,
+            device: Some(device.to_string()),
+        }
+    }
+
+    #[test]
+    fn multi_version_clean_folds_keep_every_side() {
+        // Three devices appended apart: both fold steps stay clean, all
+        // three tails land, and nothing is marked.
+        let root = graph();
+        write(root.path(), "daily/2026-07-04.md", "- seed\n- mac line\n");
+        let shadow = ShadowStore::new(root.path());
+        shadow.record("daily/2026-07-04.md", "- seed\n").unwrap();
+
+        let resolution = resolve_file(
+            root.path(),
+            "daily/2026-07-04.md",
+            3_000,
+            vec![
+                fake_version(
+                    root.path(),
+                    "v-phone.md",
+                    "- seed\n- phone line\n",
+                    1_000,
+                    "iPhone",
+                ),
+                fake_version(
+                    root.path(),
+                    "v-ipad.md",
+                    "- seed\n- ipad line\n",
+                    2_000,
+                    "iPad",
+                ),
+            ],
+            &shadow,
+        )
+        .unwrap();
+
+        assert!(!resolution.marked);
+        for line in ["- mac line", "- phone line", "- ipad line"] {
+            assert!(
+                resolution.final_content.contains(line),
+                "lost {line} in: {}",
+                resolution.final_content
+            );
+        }
+    }
+
+    #[test]
+    fn multi_version_overlap_stacks_every_side_instead_of_dropping_one() {
+        // Overlapping edits across three devices: the fold must not let an
+        // intermediate marker result meet the marked-side rule (which would
+        // keep only the newest raw side) — every side stays in the note, as
+        // stacked blocks the existing splice grammar can resolve.
+        let root = graph();
+        write(root.path(), "notes/a.md", "wording from mac\n");
+        let shadow = ShadowStore::new(root.path());
+        shadow.record("notes/a.md", "original wording\n").unwrap();
+
+        let resolution = resolve_file(
+            root.path(),
+            "notes/a.md",
+            3_000,
+            vec![
+                fake_version(
+                    root.path(),
+                    "v1.md",
+                    "wording from phone\n",
+                    1_000,
+                    "iPhone",
+                ),
+                fake_version(root.path(), "v2.md", "wording from ipad\n", 2_000, "iPad"),
+            ],
+            &shadow,
+        )
+        .unwrap();
+
+        assert!(resolution.marked);
+        assert!(markers::contains_conflict_markers(
+            &resolution.final_content
+        ));
+        for wording in [
+            "wording from mac",
+            "wording from phone",
+            "wording from ipad",
+        ] {
+            assert!(
+                resolution.final_content.contains(wording),
+                "lost {wording} in: {}",
+                resolution.final_content
+            );
+        }
+        // Two stacked blocks for three sides — flat, never nested.
+        assert_eq!(resolution.final_content.matches("<<<<<<< ").count(), 2);
+    }
+
+    #[test]
+    fn multi_version_with_a_marked_side_keeps_the_deterministic_newest() {
+        // A side already carrying markers can't be stacked (nesting corrupts
+        // the grammar): the two-way marked-side rule extends to n sides.
+        let root = graph();
+        let marked = "<<<<<<< Mac\nmine\n=======\ntheirs\n>>>>>>> iPhone\n";
+        write(root.path(), "notes/a.md", "current clean\n");
+        let shadow = ShadowStore::new(root.path());
+
+        let resolution = resolve_file(
+            root.path(),
+            "notes/a.md",
+            2_000,
+            vec![
+                fake_version(root.path(), "v1.md", marked, 1_000, "iPhone"),
+                fake_version(root.path(), "v2.md", "newest clean\n", 3_000, "iPad"),
+            ],
+            &shadow,
+        )
+        .unwrap();
+
+        assert_eq!(resolution.final_content, "newest clean\n");
+        assert!(!resolution.marked);
     }
 }

@@ -110,9 +110,19 @@ async function pickerDefaultPath(hasRecents: boolean): Promise<{ defaultPath: st
   try {
     const home = await homeDir()
     return { defaultPath: await join(home, 'Library', 'Mobile Documents', 'com~apple~CloudDocs') }
-  } catch {
+  } catch (err) {
+    console.warn('iCloud Drive picker suggestion failed:', errorMessage(err))
     return null
   }
+}
+
+/**
+ * The absolute root for a mobile storage kind, or null when that root is
+ * unavailable (an `'icloud'` kind with iCloud signed out / off). The one
+ * mapping from the persisted *kind* to a launch-derived path.
+ */
+function storageRoot(info: MobileStorageInfo, kind: MobileStorageKind): string | null {
+  return kind === 'icloud' ? info.icloudRoot : info.localRoot
 }
 
 /**
@@ -298,7 +308,7 @@ export function GraphProvider({
           }
           if (settings.mobileOnboarded === true) {
             const kind = settings.mobileStorage
-            const root = kind === 'icloud' ? storage.icloudRoot : storage.localRoot
+            const root = storageRoot(storage, kind)
             if (root === null) {
               // The graph lives in iCloud but the account is gone (signed
               // out, iCloud Drive off). Opening the empty local root instead
@@ -386,8 +396,7 @@ export function GraphProvider({
 
   const completeOnboarding = useCallback(
     async (kind: MobileStorageKind): Promise<void> => {
-      const root =
-        kind === 'icloud' ? (mobileStorageInfo?.icloudRoot ?? null) : (mobileStorageInfo?.localRoot ?? null)
+      const root = mobileStorageInfo === null ? null : storageRoot(mobileStorageInfo, kind)
       if (root === null) {
         throw new Error(
           kind === 'icloud'

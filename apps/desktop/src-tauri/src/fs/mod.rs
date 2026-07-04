@@ -28,8 +28,6 @@ use self::resolve::resolve;
 /// the same crash-safe, sync-clean path.
 pub(crate) use self::io::atomic_write_bytes;
 
-// Consumed by the watcher (desktop) and the capture inbox (all platforms),
-// so the re-export is no longer desktop-gated.
 /// iCloud eviction-placeholder name mapping, shared with the watcher (which
 /// must treat an evicted note as present, not deleted — Plan 21). Desktop-only
 /// like the watcher itself; mobile's change source is the Plan 21 Phase 2
@@ -40,14 +38,18 @@ pub(crate) use self::io::eviction_placeholder;
 /// iCloud sweep's collision folding — an evicted canonical note must not be
 /// treated as a free slot (Plan 21).
 pub(crate) use self::io::file_occupied;
-#[cfg(desktop)]
+/// The one home of the `.{name}.icloud` placeholder grammar, shared with the
+/// desktop watcher and the iCloud container discovery (`icloud::storage`).
 pub(crate) use self::io::icloud_placeholder_target;
 /// Sync-exclusion marking, shared with `git::repo` (a freshly initialized
 /// backup repo must never ride a file-sync provider — Plan 21).
 pub(crate) use self::io::mark_dir_local_only;
 pub(crate) use self::io::modified_ms;
-/// The traversal guard, shared with sibling modules that address graph files
-/// (capture promotes screenshots into `assets/`).
+/// The lexical traversal guard, shared with the conflict stores that mirror
+/// note paths under `.reflect/` (shadow bases, conflict archive).
+pub(crate) use self::resolve::ensure_relative;
+/// The full traversal guard, shared with sibling modules that address graph
+/// files (capture promotes screenshots into `assets/`).
 pub(crate) use self::resolve::resolve as resolve_in_graph;
 
 /// The open graph root plus a monotonic generation, kept **under one lock** so

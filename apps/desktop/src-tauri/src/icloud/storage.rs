@@ -125,12 +125,13 @@ fn find_graph_dir(documents: &Path) -> Option<PathBuf> {
     dirs.into_iter().find(|dir| dir_has_notes(dir))
 }
 
-/// True when `root` already contains note files (downloaded or placeholder).
+/// True when `root` already contains note files (downloaded, or eviction
+/// placeholders per `crate::fs::icloud_placeholder_target` — the one home of
+/// that grammar).
 ///
 /// Looks one level into the standard note directories rather than requiring
 /// `.reflect/meta.json`: the index directory is excluded from sync on
 /// purpose, so a synced-down graph arrives as bare `daily/`/`notes/` content.
-#[cfg_attr(desktop, allow(dead_code))]
 fn dir_has_notes(root: &Path) -> bool {
     const NOTE_DIRS: [&str; 3] = ["daily", "notes", "templates"];
     NOTE_DIRS.iter().any(|dir| {
@@ -140,21 +141,9 @@ fn dir_has_notes(root: &Path) -> bool {
         entries.flatten().any(|entry| {
             let name = entry.file_name();
             let name = name.to_string_lossy();
-            name.ends_with(".md") || is_icloud_placeholder(&name)
+            name.ends_with(".md") || crate::fs::icloud_placeholder_target(&name).is_some()
         })
     })
-}
-
-/// iCloud represents a not-downloaded file as a hidden `.{name}.icloud` stub.
-#[cfg_attr(desktop, allow(dead_code))]
-fn is_icloud_placeholder(name: &str) -> bool {
-    name.starts_with('.') && name.ends_with(".icloud")
-}
-
-/// Strip the placeholder mangling: `.note.md.icloud` → `note.md`.
-#[cfg_attr(desktop, allow(dead_code))]
-fn placeholder_target(name: &str) -> Option<&str> {
-    name.strip_prefix('.')?.strip_suffix(".icloud")
 }
 
 #[cfg(any(target_os = "ios", target_os = "macos"))]
@@ -162,8 +151,6 @@ mod platform {
     use std::path::{Path, PathBuf};
 
     use objc2_foundation::{NSFileManager, NSString, NSURL};
-
-    use super::{is_icloud_placeholder, placeholder_target};
 
     /// The container's `Documents/` directory, created if missing. `None`
     /// when iCloud Drive is unavailable (signed out, entitlement missing).
@@ -207,15 +194,13 @@ mod platform {
                 }
                 let name = entry.file_name();
                 let name = name.to_string_lossy();
-                if !is_icloud_placeholder(&name) {
+                let Some(target) = crate::fs::icloud_placeholder_target(&name) else {
                     continue;
-                }
+                };
                 pending += 1;
                 if !start_download(&manager, &path) {
                     // Some iOS releases want the logical URL, not the stub.
-                    if let Some(target) = placeholder_target(&name) {
-                        start_download(&manager, &dir.join(target));
-                    }
+                    start_download(&manager, &dir.join(target));
                 }
             }
         }
@@ -392,17 +377,6 @@ fn count_graph_tree(root: &Path) -> AppResult<(u64, u64)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn placeholder_names_round_trip() {
-        assert!(is_icloud_placeholder(".2026-07-04.md.icloud"));
-        assert!(!is_icloud_placeholder("2026-07-04.md"));
-        assert!(!is_icloud_placeholder(".hidden"));
-        assert_eq!(
-            placeholder_target(".2026-07-04.md.icloud"),
-            Some("2026-07-04.md")
-        );
-    }
 
     #[test]
     fn find_graph_dir_picks_the_first_directory_with_notes() {
