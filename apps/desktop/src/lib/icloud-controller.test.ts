@@ -162,7 +162,12 @@ describe('createIcloudController', () => {
     await icloud.start()
     await settleScan()
 
-    // The rewrite reindexes directly under the index generation…
+    // The rewrite reindexes directly under the index generation. The reindex
+    // chain hashes via crypto.subtle (real thread-pool async) — poll for its
+    // arrival instead of counting event-loop yields, which is CI-speed flaky.
+    await vi.waitFor(() => {
+      expect(invoked.some(([command]) => command === 'index_apply')).toBe(true)
+    })
     const apply = invoked.find(([command]) => command === 'index_apply')
     expect(apply?.[1]).toMatchObject({ generation: 3 })
     // …and the controller's own fan-out must not come back as an ingest.

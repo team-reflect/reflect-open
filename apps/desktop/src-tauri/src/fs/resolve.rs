@@ -12,8 +12,11 @@ use crate::error::{AppError, AppResult};
 
 /// Reject a relative path that is absolute, contains `..`/root components, or is
 /// empty/dot-only (which would target the graph root itself). Requires at least
-/// one real path segment. The primary, lexical path-traversal guard.
-fn ensure_relative(rel: &str) -> AppResult<PathBuf> {
+/// one real path segment. The primary, lexical path-traversal guard — and the
+/// only applicable one for the conflict stores under `.reflect/` (shadow bases,
+/// conflict archive), whose directories don't exist until first write and so
+/// can't anchor the symlink-aware [`resolve`].
+pub(crate) fn ensure_relative(rel: &str) -> AppResult<PathBuf> {
     let path = Path::new(rel);
     let mut has_segment = false;
     for component in path.components() {
