@@ -62,7 +62,7 @@ xattr = "1.6.1"
 # Apple Calendar read-only bridge (`src/calendar.rs`): EventKit through the
 # objc2 bindings, trimmed to the classes the module touches. objc2-app-kit is
 # only here for EKCalendar's NSColor → hex conversion.
-objc2 = "0.6.3"
+objc2 = "0.6.4"
 block2 = "0.6.2"
 objc2-foundation = { version = "0.3.2", default-features = false, features = [
   "std",
@@ -102,7 +102,7 @@ objc2-app-kit = { version = "0.3.2", default-features = false, features = [
 objc2 = "0.6.4"
 objc2-foundation = "0.3.2"
 objc2-contacts = "0.3.2"
-block2 = "0.6.1"
+block2 = "0.6.2"
 
 # Desktop-only capabilities (Plan 19): auto-update (mobile updates go through
 # the app stores), window-state (no windows to restore on mobile), the file
