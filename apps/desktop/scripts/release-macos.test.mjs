@@ -5,13 +5,16 @@ import { expect, test } from 'vitest'
 
 import {
   appendMacDownloadNotice,
+  canLaunchTarget,
   createBetaFeedReleaseArgs,
   createDmgArgs,
   createGenerateReleaseNotesArgs,
   createMacDownloadNotice,
   createReleaseArgs,
   createTauriBuildArgs,
+  createUpdaterArchiveArgs,
   createUpdaterManifest,
+  macosEntitlementsPath,
   macosTargetResourceConfig,
   parseKeychainList,
   signDmgArgs,
@@ -157,11 +160,11 @@ test('beta feed upload replaces the moving manifest', () => {
 })
 
 test('release builds ask Tauri for the app bundle only', () => {
-  const args = createTauriBuildArgs({ flavor: 'stable', hasUpdater: true, target: 'x86_64-apple-darwin' })
+  const args = createTauriBuildArgs({ flavor: 'stable', target: 'x86_64-apple-darwin' })
 
   expect(args.slice(0, 6)).toEqual(['tauri', 'build', '--target', 'x86_64-apple-darwin', '--bundles', 'app'])
   expect(args).not.toContain('dmg')
-  expect(args).toContain(JSON.stringify({ bundle: { createUpdaterArtifacts: true } }))
+  expect(args).not.toContain(JSON.stringify({ bundle: { createUpdaterArtifacts: true } }))
   expect(args).toContain(
     JSON.stringify({
       plugins: {
@@ -177,7 +180,6 @@ test('Intel release builds include the bundled ONNX Runtime resource', () => {
   const resourceConfig = macosTargetResourceConfig('x86_64-apple-darwin')
   const args = createTauriBuildArgs({
     flavor: 'stable',
-    hasUpdater: true,
     resourceConfig,
     target: 'x86_64-apple-darwin',
   })
@@ -190,7 +192,7 @@ test('Apple Silicon release builds do not include Intel-only runtime resources',
 })
 
 test('beta release builds keep the beta flavor overlay', () => {
-  expect(createTauriBuildArgs({ flavor: 'beta', hasUpdater: false, target: 'aarch64-apple-darwin' })).toEqual([
+  expect(createTauriBuildArgs({ flavor: 'beta', target: 'aarch64-apple-darwin' })).toEqual([
     'tauri',
     'build',
     '--target',
@@ -199,6 +201,31 @@ test('beta release builds keep the beta flavor overlay', () => {
     'app',
     '--config',
     'src-tauri/tauri.beta.conf.json',
+  ])
+})
+
+test('macOS entitlements resolve through platform and flavor overlays', () => {
+  const srcTauri = join(process.cwd(), 'src-tauri')
+
+  expect(macosEntitlementsPath('stable')).toBe(join(srcTauri, 'Entitlements.plist'))
+  expect(macosEntitlementsPath('beta')).toBe(join(srcTauri, 'Entitlements.plist'))
+  expect(macosEntitlementsPath('dev')).toBe(join(srcTauri, 'Entitlements.dev.plist'))
+})
+
+test('sidecar launch checks cover native targets and Intel under Rosetta', () => {
+  expect(canLaunchTarget('aarch64-apple-darwin', 'arm64')).toBe(true)
+  expect(canLaunchTarget('aarch64-apple-darwin', 'x64')).toBe(false)
+  expect(canLaunchTarget('x86_64-apple-darwin', 'x64')).toBe(true)
+  expect(canLaunchTarget('x86_64-apple-darwin', 'arm64')).toBe(true)
+})
+
+test('updater archive is created from the finalized app bundle', () => {
+  expect(createUpdaterArchiveArgs({ app: '/tmp/build/Reflect.app', archive: '/tmp/build/Reflect.app.tar.gz' })).toEqual([
+    '-czf',
+    '/tmp/build/Reflect.app.tar.gz',
+    '-C',
+    '/tmp/build',
+    'Reflect.app',
   ])
 })
 

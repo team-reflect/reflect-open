@@ -53,6 +53,15 @@ const ONNX_RUNTIME_DYLIB_RESOURCE = 'libonnxruntime.dylib'
 const INTEL_ONNX_RUNTIME_RESOURCE_SOURCE = `resources/onnxruntime/${ONNX_RUNTIME_DYLIB_RESOURCE}`
 const RELEASE_NOTES_FILENAME = 'release-notes.md'
 const MAC_DOWNLOAD_NOTICE_HEADING = '## Which Mac download should I choose?'
+const MACOS_SIDECARS = ['reflect', 'reflect-capture-host']
+const NOTARIZATION_ENV_VARS = [
+  'APPLE_ID',
+  'APPLE_PASSWORD',
+  'APPLE_TEAM_ID',
+  'APPLE_API_KEY',
+  'APPLE_API_ISSUER',
+  'APPLE_API_KEY_PATH',
+]
 
 /**
  * Build flavors. Each ships as a distinct app (its own productName, identifier
@@ -115,7 +124,7 @@ function listUserKeychains() {
 }
 
 /** Build the Tauri CLI arguments for release packaging. */
-export function createTauriBuildArgs({ flavor, hasUpdater, resourceConfig = null, target }) {
+export function createTauriBuildArgs({ flavor, resourceConfig = null, target }) {
   const buildArgs = ['tauri', 'build', '--target', target, '--bundles', 'app']
   const overlay = FLAVOR_OVERLAYS[flavor]
   if (overlay) buildArgs.push('--config', overlay)
@@ -127,9 +136,6 @@ export function createTauriBuildArgs({ flavor, hasUpdater, resourceConfig = null
   // branch-independent (release-bump.mjs no longer ties the channel to a branch).
   if (flavor === 'stable') {
     buildArgs.push('--config', JSON.stringify({ plugins: { updater: { endpoints: [STABLE_UPDATER_ENDPOINT] } } }))
-  }
-  if (hasUpdater) {
-    buildArgs.push('--config', JSON.stringify({ bundle: { createUpdaterArtifacts: true } }))
   }
   if (resourceConfig) {
     buildArgs.push('--config', JSON.stringify(resourceConfig))
@@ -238,9 +244,7 @@ function readKeychainCredentials() {
 /**
  * Resolve notarization credentials in precedence order: App Store Connect API
  * key env vars, Apple ID env vars, then the keychain item from `setup`.
- * Returns { buildEnv, notarytoolArgs, source } or null when nothing is found.
- * buildEnv is merged into `tauri build`'s environment (Tauri notarizes the
- * .app itself); notarytoolArgs are used for the separate DMG submission.
+ * Returns { notarytoolArgs, source } or null when nothing is found.
  */
 function resolveNotaryCredentials(identity) {
   const { APPLE_API_KEY, APPLE_API_ISSUER, APPLE_API_KEY_PATH, APPLE_ID, APPLE_PASSWORD } = process.env
@@ -248,7 +252,6 @@ function resolveNotaryCredentials(identity) {
   if (APPLE_API_KEY && APPLE_API_ISSUER) {
     if (!APPLE_API_KEY_PATH) fail('APPLE_API_KEY is set but APPLE_API_KEY_PATH (path to the .p8 file) is not')
     return {
-      buildEnv: {},
       notarytoolArgs: ['--key', APPLE_API_KEY_PATH, '--key-id', APPLE_API_KEY, '--issuer', APPLE_API_ISSUER],
       source: 'App Store Connect API key (environment)',
     }
@@ -257,7 +260,6 @@ function resolveNotaryCredentials(identity) {
   if (APPLE_ID && APPLE_PASSWORD) {
     const teamId = resolveTeamId(identity)
     return {
-      buildEnv: { APPLE_TEAM_ID: teamId },
       notarytoolArgs: ['--apple-id', APPLE_ID, '--password', APPLE_PASSWORD, '--team-id', teamId],
       source: `Apple ID ${APPLE_ID} (environment)`,
     }
@@ -267,7 +269,6 @@ function resolveNotaryCredentials(identity) {
   if (!stored) return null
   const teamId = resolveTeamId(identity)
   return {
-    buildEnv: { APPLE_ID: stored.account, APPLE_PASSWORD: stored.password, APPLE_TEAM_ID: teamId },
     notarytoolArgs: ['--apple-id', stored.account, '--password', stored.password, '--team-id', teamId],
     source: `Apple ID ${stored.account} (keychain item "${KEYCHAIN_SERVICE}")`,
   }
@@ -321,6 +322,12 @@ function readTauriConf() {
   return JSON.parse(readFileSync(join(appDir, 'src-tauri', 'tauri.conf.json'), 'utf8'))
 }
 
+function readPlatformConf(platform) {
+  const path = join(appDir, 'src-tauri', `tauri.${platform}.conf.json`)
+  if (!existsSync(path)) return {}
+  return JSON.parse(readFileSync(path, 'utf8'))
+}
+
 /** Apply an RFC 7396 JSON Merge Patch — the same algorithm Tauri uses for `--config`. */
 function mergePatch(target, patch) {
   if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) return patch
@@ -338,7 +345,7 @@ function mergePatch(target, patch) {
  * paths depend on the flavor's productName, so they read the merged config.
  */
 function readFlavorConf(flavor) {
-  const base = readTauriConf()
+  const base = mergePatch(readTauriConf(), readPlatformConf('macos'))
   const overlay = FLAVOR_OVERLAYS[flavor]
   if (!overlay) return base
   const patch = JSON.parse(readFileSync(join(appDir, overlay), 'utf8'))
@@ -421,6 +428,35 @@ function writeUpdaterManifest({ artifacts, outputDir, tag, version }) {
   return manifestPath
 }
 
+/** Build the tar arguments used for the macOS updater payload. */
+export function createUpdaterArchiveArgs({ app, archive }) {
+  return ['-czf', archive, '-C', dirname(app), basename(app)]
+}
+
+function writeUpdaterArtifacts({ flavor, target, updater }) {
+  const { app, updaterArchive, updaterSignature } = bundlePaths(flavor, target)
+  if (!existsSync(app)) fail(`${app} does not exist — Tauri did not produce the app bundle`)
+
+  rmSync(updaterArchive, { force: true })
+  rmSync(updaterSignature, { force: true })
+  log(`creating updater archive ${basename(updaterArchive)} from finalized ${basename(app)}…`)
+  execFileSync('tar', createUpdaterArchiveArgs({ app, archive: updaterArchive }), { stdio: 'inherit' })
+
+  log(`signing updater archive ${basename(updaterArchive)}…`)
+  const result = spawnSync('pnpm', ['tauri', 'signer', 'sign', updaterArchive], {
+    cwd: appDir,
+    encoding: 'utf8',
+    env: { ...process.env, ...updater.env },
+  })
+  if (result.status !== 0) {
+    const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim()
+    fail(`signing updater archive failed${output ? `\n${output}` : ''}`)
+  }
+  if (!existsSync(updaterSignature)) {
+    fail(`updater signature missing after signing — expected ${updaterSignature}`)
+  }
+}
+
 /** Build the hdiutil arguments used to create the release DMG. */
 export function createDmgArgs({ dmg, sourceFolder, volumeName }) {
   return ['create', '-volname', volumeName, '-srcfolder', sourceFolder, '-ov', '-format', 'UDZO', dmg]
@@ -432,6 +468,42 @@ export function signDmgArgs({ dmg, identity, keychain }) {
   if (keychain) args.push('--keychain', keychain)
   args.push(dmg)
   return args
+}
+
+function codesignArgs({ entitlements, identity, keychain, path }) {
+  const args = ['--force', '--sign', identity, '--options', 'runtime', '--timestamp']
+  if (entitlements) args.push('--entitlements', entitlements)
+  if (keychain) args.push('--keychain', keychain)
+  args.push(path)
+  return args
+}
+
+export function macosEntitlementsPath(flavor) {
+  const entitlements = readFlavorConf(flavor).bundle?.macOS?.entitlements
+  if (typeof entitlements !== 'string') {
+    fail(`macOS flavor "${flavor}" has no bundle.macOS.entitlements`)
+  }
+  return join(appDir, 'src-tauri', entitlements)
+}
+
+function macosSidecarPaths(app) {
+  return MACOS_SIDECARS.map((binary) => join(app, 'Contents', 'MacOS', binary))
+}
+
+function resignMacosApp({ flavor, identity, keychain, target }) {
+  const { app } = bundlePaths(flavor, target)
+  const entitlements = macosEntitlementsPath(flavor)
+  for (const sidecar of macosSidecarPaths(app)) {
+    if (!existsSync(sidecar)) fail(`${sidecar} does not exist — Tauri did not bundle the sidecar`)
+  }
+
+  log('re-signing macOS sidecars without app entitlements…')
+  for (const sidecar of macosSidecarPaths(app)) {
+    execFileSync('codesign', codesignArgs({ identity, keychain, path: sidecar }), { stdio: 'inherit' })
+  }
+
+  log(`re-signing ${basename(app)} with ${basename(entitlements)}…`)
+  execFileSync('codesign', codesignArgs({ entitlements, identity, keychain, path: app }), { stdio: 'inherit' })
 }
 
 function importSigningCertificate() {
@@ -510,16 +582,11 @@ function createDmg({ flavor, identity, keychain, target }) {
   }
 }
 
-/**
- * Notarize and staple the DMG. Tauri notarizes the .app during the build but
- * not the DMG wrapped around it afterwards; without its own ticket the DMG is
- * rejected by `spctl --type open` and downloads get Gatekeeper friction.
- */
-function notarizeDmg(dmg, credentials) {
-  log(`submitting ${basename(dmg)} to Apple's notary service (typically 1-10 minutes)…`)
+function submitNotarization({ credentials, label, path }) {
+  log(`submitting ${basename(path)} to Apple's notary service (typically 1-10 minutes)…`)
   const submit = spawnSync(
     'xcrun',
-    ['notarytool', 'submit', dmg, ...credentials.notarytoolArgs, '--wait', '--output-format', 'json'],
+    ['notarytool', 'submit', path, ...credentials.notarytoolArgs, '--wait', '--output-format', 'json'],
     { encoding: 'utf8' },
   )
   let verdict = {}
@@ -536,18 +603,81 @@ function notarizeDmg(dmg, credentials) {
     } else {
       console.error(submit.stderr ?? '')
     }
-    fail(`DMG notarization ${verdict.status ?? 'failed'}`)
+    fail(`${label} notarization ${verdict.status ?? 'failed'}`)
   }
+  return verdict
+}
+
+function notarizeApp(app, credentials) {
+  const tempDir = mkdtempSync(join(tmpdir(), 'reflect-app-notary-'))
+  try {
+    const zip = join(tempDir, `${basename(app)}.zip`)
+    log(`creating ${basename(zip)} for app notarization…`)
+    execFileSync('ditto', ['-c', '-k', '--keepParent', app, zip], { stdio: 'inherit' })
+    const verdict = submitNotarization({ credentials, label: 'app', path: zip })
+    log(`app notarization accepted (submission ${verdict.id}); stapling…`)
+    execFileSync('xcrun', ['stapler', 'staple', app], { stdio: 'inherit' })
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+}
+
+/**
+ * Notarize and staple the DMG. The app has its own ticket already; without a
+ * separate ticket for the DMG, downloads still get Gatekeeper friction.
+ */
+function notarizeDmg(dmg, credentials) {
+  const verdict = submitNotarization({ credentials, label: 'DMG', path: dmg })
   log(`DMG notarization accepted (submission ${verdict.id}); stapling…`)
   execFileSync('xcrun', ['stapler', 'staple', dmg], { stdio: 'inherit' })
 }
 
 /** Assert one Gatekeeper/codesign check, failing loudly with its output. */
 function expectCheck(description, command, args, expected) {
-  const { output } = run(command, args)
-  const passed = expected.every((needle) => output.includes(needle))
+  const { output, status } = run(command, args)
+  const passed = status === 0 && expected.every((needle) => output.includes(needle))
   if (!passed) fail(`${description} failed:\n${output.trim()}`)
   log(`${description}: ok`)
+}
+
+export function canLaunchTarget(target, processArch = process.arch) {
+  if (target === APPLE_SILICON_MAC_TARGET) return processArch === 'arm64'
+  if (target === INTEL_MAC_TARGET) return processArch === 'x64' || processArch === 'arm64'
+  return true
+}
+
+function verifySidecarsLaunch({ flavor, target }) {
+  if (!canLaunchTarget(target)) {
+    log(`skipping sidecar launch checks for ${target} on ${process.arch}`)
+    return
+  }
+
+  const { app } = bundlePaths(flavor, target)
+  const checks = [
+    {
+      args: ['--version'],
+      binary: join(app, 'Contents', 'MacOS', 'reflect'),
+      description: 'reflect CLI launch',
+      outputPattern: /^reflect \d/,
+    },
+    {
+      args: [],
+      binary: join(app, 'Contents', 'MacOS', 'reflect-capture-host'),
+      description: 'reflect capture host launch',
+      outputPattern: null,
+    },
+  ]
+
+  for (const check of checks) {
+    const result = spawnSync(check.binary, check.args, { encoding: 'utf8', input: '' })
+    const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim()
+    if (result.error) fail(`${check.description} failed:\n${result.error.message}`)
+    if (result.status !== 0) fail(`${check.description} exited ${result.status ?? 'without a status'}:\n${output}`)
+    if (check.outputPattern && !check.outputPattern.test(output)) {
+      fail(`${check.description} printed unexpected output:\n${output}`)
+    }
+    log(`${check.description}: ok`)
+  }
 }
 
 /** Verify the built bundles match the expected distribution state. */
@@ -560,6 +690,7 @@ function verify({ notarized, flavor, target }) {
     'valid on disk',
     'satisfies its Designated Requirement',
   ])
+  verifySidecarsLaunch({ flavor, target })
 
   if (!notarized) {
     log('signed-only verification passed (not notarized: Gatekeeper will reject this bundle on other Macs)')
@@ -738,45 +869,26 @@ function build({ artifactDir, notarize, requireUpdater = false, flavor, target }
   const buildEnv = {
     ...process.env,
     APPLE_SIGNING_IDENTITY: identity,
-    ...credentials?.buildEnv,
-    ...updater?.env,
   }
-  if (!notarize) {
-    // Tauri notarizes the .app whenever these are present, so inherited shell
-    // exports would silently override --no-notarize.
-    for (const name of [
-      'APPLE_ID',
-      'APPLE_PASSWORD',
-      'APPLE_TEAM_ID',
-      'APPLE_API_KEY',
-      'APPLE_API_ISSUER',
-      'APPLE_API_KEY_PATH',
-    ]) {
-      delete buildEnv[name]
-    }
+  // Tauri notarizes the .app whenever these are present. The release helper
+  // now notarizes after repairing sidecar entitlements, so keep Tauri to
+  // build/sign only even for notarized releases.
+  for (const name of NOTARIZATION_ENV_VARS) {
+    delete buildEnv[name]
   }
-  // createUpdaterArtifacts stays out of the committed config: with it on,
-  // `tauri build` hard-fails without the private key, which would break plain
-  // contributor builds. The release script turns it on only when it can sign.
-  //
-  // Build only the signed/notarized .app with Tauri. The generated Tauri DMG
-  // script depends on Finder automation and has proven brittle on GitHub-hosted
-  // macOS images; create the DMG directly below and keep the same notarization
-  // and Gatekeeper checks around the final artifact.
+  // Build only the signed .app with Tauri. The generated Tauri DMG script is
+  // brittle on GitHub-hosted macOS images, and updater archives must be made
+  // after the sidecar signatures are repaired below.
   const resourceConfig = prepareTargetResources(target)
-  const buildArgs = createTauriBuildArgs({ flavor, hasUpdater: Boolean(updater), resourceConfig, target })
+  const buildArgs = createTauriBuildArgs({ flavor, resourceConfig, target })
   const result = spawnSync('pnpm', buildArgs, { cwd: appDir, stdio: 'inherit', env: buildEnv })
   if (result.status !== 0) fail('tauri build failed')
 
-  if (updater) {
-    const { updaterArchive, updaterSignature } = bundlePaths(flavor, target)
-    if (!existsSync(updaterArchive) || !existsSync(updaterSignature)) {
-      fail(`updater artifacts missing after build — expected ${updaterArchive} and its .sig`)
-    }
-  }
-
   const signingCertificate = importSigningCertificate()
   try {
+    resignMacosApp({ flavor, identity, keychain: signingCertificate?.keychainPath, target })
+    if (notarize) notarizeApp(bundlePaths(flavor, target).app, credentials)
+    if (updater) writeUpdaterArtifacts({ flavor, target, updater })
     createDmg({ flavor, identity, keychain: signingCertificate?.keychainPath, target })
   } finally {
     cleanupSigningCertificate(signingCertificate)

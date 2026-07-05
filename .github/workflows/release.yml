@@ -136,9 +136,9 @@ jobs:
             echo "APPLE_API_KEY_PATH=$RUNNER_TEMP/apple-api-key.p8" >> "$GITHUB_ENV"
           fi
 
-      # Tauri imports APPLE_CERTIFICATE into a temporary keychain, signs and
-      # notarizes the .app, and signs the updater archive; the script then
-      # notarizes + staples the DMG and runs the Gatekeeper checks.
+      # Tauri signs the .app; the script then repairs sidecar signatures,
+      # notarizes + staples the app and DMG, signs the updater archive, and
+      # runs the Gatekeeper checks.
       - name: Build, sign and notarize
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}

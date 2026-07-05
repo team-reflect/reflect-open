@@ -50,22 +50,25 @@ can still build unsigned bundles with plain `pnpm tauri build`.
 2. Loads notarization credentials (keychain item, or environment variables — see
    [Releasing from CI](#releasing-from-ci) below).
 3. Runs `pnpm tauri build --target <target> --bundles app`, which stages the `reflect`
-   CLI sidecar for that target, then signs inside-out (sidecar → main binary → `.app`)
-   with hardened runtime, notarizes the `.app` via `notarytool`, and staples the ticket.
+   CLI sidecar for that target and signs the app bundle. The release helper then
+   re-signs the bundled sidecars without the app's restricted entitlements, re-signs the
+   `.app` with its entitlement file, notarizes the finalized `.app` via `notarytool`,
+   staples the ticket, and verifies the sidecars launch.
    Intel builds also download Microsoft's official ONNX Runtime macOS x86_64 archive
    into `src-tauri/resources/onnxruntime/` and bundle `libonnxruntime.dylib` as a
    Tauri resource before signing; that directory is generated and gitignored.
-4. Builds and signs the DMG directly from the notarized app. In CI, the release helper
-   imports `APPLE_CERTIFICATE` into its own temporary keychain for this DMG signing step;
-   Tauri's app-signing keychain is internal to `tauri build`. The helper avoids Tauri's
-   generated Finder-layout DMG script because that script is brittle on GitHub-hosted
-   macOS images.
-5. Notarizes and staples the **DMG** itself. Tauri only notarizes the `.app`; without its
+4. Creates the updater `.app.tar.gz` from the finalized app and signs it with the Tauri
+   updater key.
+5. Builds and signs the DMG directly from the notarized app. In CI, the release helper
+   imports `APPLE_CERTIFICATE` into its own temporary keychain for the final app and DMG
+   signing steps. The helper avoids Tauri's generated Finder-layout DMG script because
+   that script is brittle on GitHub-hosted macOS images.
+6. Notarizes and staples the **DMG** itself. Without its
    own ticket the DMG container fails `spctl --type open` and downloads can hit
    Gatekeeper friction.
-6. Verifies everything — `codesign --verify --deep --strict`, Gatekeeper assessment of
-   the app and DMG (`accepted` / `source=Notarized Developer ID`), and stapled tickets —
-   and fails loudly if any check is off.
+7. Verifies everything — `codesign --verify --deep --strict`, sidecar launch, Gatekeeper
+   assessment of the app and DMG (`accepted` / `source=Notarized Developer ID`), and
+   stapled tickets — and fails loudly if any check is off.
 
 Bundles land under `target/<target-triple>/release/bundle/`, for example
 `target/aarch64-apple-darwin/release/bundle/macos/Reflect.app` and
@@ -282,6 +285,13 @@ on the runner keychain setup.
 - **Notarization fails (`status: Invalid`)** — the script automatically prints the notary
   log, which lists each offending file. Common cause: a binary that wasn't signed with
   hardened runtime.
+- **Bundled `reflect` or `reflect-capture-host` exits `Killed: 9`** — check its
+  entitlements with `codesign -d --entitlements :- Reflect.app/Contents/MacOS/reflect`.
+  Sidecars must not carry the app's restricted iCloud entitlements; the release verifier
+  launches both sidecars to catch this.
+- **Intel sidecar launch fails on Apple Silicon with `Bad CPU type in executable`** —
+  install Rosetta (`softwareupdate --install-rosetta`) or verify the Intel target on an
+  Intel runner.
 - **`rejected, source=Unnotarized Developer ID`** — signing worked but the artifact has no
   notarization ticket; rerun without `--no-notarize`.
 - **Notarization hangs** — Apple's service occasionally queues submissions for a long
