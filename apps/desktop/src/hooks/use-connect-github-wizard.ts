@@ -17,6 +17,22 @@ export type ConnectWizardStep = 'repo' | 'auth' | 'finish'
 /** Which credential the sign-in stored — decides the can't-find-repo remedy. */
 export type ConnectAuthKind = 'app' | 'pat' | null
 
+/**
+ * What the finish step shows — exactly one at a time, precedence encoded
+ * here so no shell can order the branches differently. `publicConfirm` is
+ * the consent gate for a public repo; `createGuide` is the github.com/new
+ * handoff (a poll connects once the repo exists); `grantAccess` is the
+ * GitHub-App installation handoff (same poll); `connecting` is the in-flight
+ * connect; `idle` is where a failure's inline error (and its escape back to
+ * the repo step) renders.
+ */
+export type ConnectFinishView =
+  | { kind: 'publicConfirm'; repo: GithubRepoRef }
+  | { kind: 'createGuide'; owner: string; name: string }
+  | { kind: 'grantAccess'; repo: GithubRepoRef }
+  | { kind: 'connecting' }
+  | { kind: 'idle' }
+
 export interface ConnectGithubWizardOptions {
   /** A suggested name for a newly created backup repo. */
   suggestedRepoName: string
@@ -37,14 +53,8 @@ export interface ConnectGithubWizard {
   /** The verified sign-in shown on the finish step; null before auth. */
   user: GithubUser | null
   authKind: ConnectAuthKind
-  /** Set when the chosen repo is public and needs explicit consent. */
-  publicConfirm: GithubRepoRef | null
-  /** The finish step's "create it on GitHub" handoff (create-mode only). */
-  showCreateGuide: boolean
-  /** App sign-in can't see the repo yet — the "grant access" handoff. */
-  showGrantAccess: boolean
-  /** The repo being targeted, resolved from the verified sign-in. */
-  targetForUser: GithubRepoRef | null
+  /** The finish step's current view — shells render it, never re-derive it. */
+  finishView: ConnectFinishView
   pending: boolean
   error: string | null
   /** Validate the repo step and advance to sign-in. */
@@ -239,6 +249,19 @@ export function useConnectGithubWizard({
     })
   }
 
+  // The parked handoffs outrank the transient states: a consent question or
+  // an open poll must never be painted over by "Connecting…".
+  const finishView: ConnectFinishView =
+    publicConfirm !== null
+      ? { kind: 'publicConfirm', repo: publicConfirm }
+      : showCreateGuide && user !== null
+        ? { kind: 'createGuide', owner: user.login, name: repoName.trim() }
+        : showGrantAccess && targetForUser !== null
+          ? { kind: 'grantAccess', repo: targetForUser }
+          : action.pending
+            ? { kind: 'connecting' }
+            : { kind: 'idle' }
+
   return {
     step,
     mode,
@@ -249,10 +272,7 @@ export function useConnectGithubWizard({
     setExistingRepo,
     user,
     authKind,
-    publicConfirm,
-    showCreateGuide,
-    showGrantAccess,
-    targetForUser,
+    finishView,
     pending: action.pending,
     error: action.error,
     continueFromRepo,

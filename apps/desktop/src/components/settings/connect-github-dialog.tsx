@@ -1,5 +1,6 @@
 import { type ReactElement } from 'react'
 import { InlineAlert } from '@/components/inline-alert'
+import { ConnectGithubFinishStep } from '@/components/settings/connect-github-finish-step'
 import { GithubAuthStep } from '@/components/settings/github-auth-step'
 import { Button } from '@/components/ui/button'
 import {
@@ -113,114 +114,7 @@ export function ConnectGithubDialog({
         ) : null}
 
         {wizard.step === 'finish' ? (
-          <div className="flex flex-col gap-3">
-            {wizard.user !== null ? (
-              <p className="text-xs text-text-muted">
-                Signed in as <strong className="text-text">{wizard.user.login}</strong>
-              </p>
-            ) : null}
-
-            {wizard.publicConfirm !== null ? (
-              <>
-                <InlineAlert tone="error">
-                  <strong>
-                    {wizard.publicConfirm.owner}/{wizard.publicConfirm.name} is public.
-                  </strong>{' '}
-                  Anyone on the internet can read everything in this graph, including notes
-                  marked private.
-                </InlineAlert>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={wizard.backToRepo}>
-                    Choose another repo
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={wizard.pending || wizard.user === null}
-                    onClick={wizard.confirmPublic}
-                  >
-                    Back up to a public repo
-                  </Button>
-                </div>
-              </>
-            ) : wizard.showCreateGuide && wizard.user !== null ? (
-              <>
-                <p className="text-sm text-text">
-                  Create{' '}
-                  <strong>
-                    {wizard.user.login}/{wizard.repoName.trim()}
-                  </strong>{' '}
-                  on GitHub. Reflect will connect it as soon as it exists.
-                </p>
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={wizard.openCreatePage}>
-                    Create on GitHub…
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={wizard.backToRepo}>
-                    Change repository
-                  </Button>
-                </div>
-                <p className="text-xs text-text-muted">Waiting for the repository…</p>
-                {wizard.authKind === 'app' ? (
-                  <p className="text-xs text-text-muted">
-                    If it doesn’t connect,{' '}
-                    <button type="button" className="underline" onClick={wizard.openInstallPage}>
-                      grant the Reflect app access
-                    </button>{' '}
-                    to just this repository.
-                  </p>
-                ) : (
-                  <p className="text-xs text-text-muted">
-                    If it doesn’t connect, add it to your token’s repository access.
-                  </p>
-                )}
-              </>
-            ) : wizard.showGrantAccess && wizard.targetForUser !== null ? (
-              <>
-                <p className="text-sm text-text">
-                  Give Reflect access to{' '}
-                  <strong>
-                    {wizard.targetForUser.owner}/{wizard.targetForUser.name}
-                  </strong>{' '}
-                  so it can back up here.
-                </p>
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={wizard.openInstallPage}>
-                    Grant access on GitHub…
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={wizard.backToRepo}>
-                    Change repository
-                  </Button>
-                </div>
-                {/* Steer to per-repo selection: the backup needs exactly one
-                    repo, so "All repositories" is needless account-wide risk. */}
-                <p className="text-xs text-text-muted">
-                  On GitHub, choose <strong>Only select repositories</strong> — Reflect only needs
-                  this one.
-                </p>
-                <p className="text-xs text-text-muted">Waiting for access…</p>
-              </>
-            ) : wizard.pending ? (
-              <p className="text-sm text-text-muted">Connecting…</p>
-            ) : null}
-
-            {!wizard.pending && wizard.error !== null ? (
-              <>
-                <InlineAlert tone="error">{wizard.error}</InlineAlert>
-                {wizard.publicConfirm === null &&
-                !wizard.showCreateGuide &&
-                !wizard.showGrantAccess ? (
-                  // A failed connect must never strand the user here — offer the
-                  // way back to a different repository. (The create guide and
-                  // grant-access step render their own escapes, so both are
-                  // excluded.)
-                  <Button variant="outline" size="sm" onClick={wizard.backToRepo}>
-                    Change repository
-                  </Button>
-                ) : null}
-              </>
-            ) : null}
-          </div>
+          <ConnectGithubFinishStep wizard={wizard} layout="row" />
         ) : null}
 
         {wizard.step !== 'finish' && wizard.error !== null ? (
