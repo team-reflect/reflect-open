@@ -143,9 +143,13 @@ export interface IndexPassOptions {
    * break and once at the end — so a first index over thousands of notes can
    * show real progress instead of a frozen shell. `done` counts every listed
    * file the pass has moved past (skipped or indexed); `total` is the listing
-   * size.
+   * size; `worked` counts the files actually *read* so far (not skipped
+   * read-free by the mtime layer). `worked` is what distinguishes a genuine
+   * first index from a routine repeat pass that skips everything — the
+   * progress UI must gate on it, or a healthy sub-second pass flashes a
+   * "preparing" surface on every open.
    */
-  onFileProgress?: (done: number, total: number) => void
+  onFileProgress?: (done: number, total: number, worked: number) => void
 }
 
 /** One note omitted from a rebuild because its projection could not be written. */
@@ -288,21 +292,23 @@ export async function rebuildIndex(options: IndexPassOptions): Promise<void> {
   const files = await listFiles()
   const batch = createIndexApplyBatch(generation, onSkippedNote)
   let done = 0
+  let worked = 0
   for (const file of files) {
     done += 1
     if (done % INDEX_PASS_YIELD_EVERY === 0) {
-      onFileProgress?.(done, files.length)
+      onFileProgress?.(done, files.length, worked)
       await yieldToEventLoop()
     }
     if (file.placeholder === true) {
       continue // evicted to iCloud — unreadable until re-download, indexed then
     }
+    worked += 1
     const content = await readNote(file.path)
     const fileHash = await hashContent(content)
     await batch.add(await buildNoteProjection(file.path, content, { fileHash, mtime: file.modifiedMs }))
   }
   await batch.flush()
-  onFileProgress?.(files.length, files.length)
+  onFileProgress?.(files.length, files.length, worked)
   // The rows now match the current projection — stamp it so `syncIndex` can
   // reconcile cheaply from here on. A superseded pass stamps into a stale
   // generation, which Rust drops: the next open then rebuilds again, which is
@@ -323,6 +329,13 @@ export async function syncIndex(options: IndexPassOptions): Promise<void> {
   if (stamped === String(PROJECTION_VERSION)) {
     return reconcileIndex(options)
   }
+  // Loud on purpose: a rebuild is expected once per projection bump or fresh
+  // graph. Seeing this on *every* open means the stamp (or the whole index
+  // file) isn't persisting between launches — a pathology that would
+  // otherwise be indistinguishable from a slow reconcile.
+  console.warn(
+    `index: stored projection version ${stamped === null ? 'none' : `"${stamped}"`} ≠ ${PROJECTION_VERSION} — full rebuild`,
+  )
   return rebuildIndex(options)
 }
 
@@ -400,13 +413,14 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
   const batch = createIndexApplyBatch(generation, onSkippedNote)
   const touches = createMtimeTouchBatch(generation)
   let done = 0
+  let worked = 0
   for (const file of files) {
     if (signal?.aborted) {
       return
     }
     done += 1
     if (done % INDEX_PASS_YIELD_EVERY === 0) {
-      onFileProgress?.(done, files.length)
+      onFileProgress?.(done, files.length, worked)
       await yieldToEventLoop()
     }
     if (file.placeholder === true) {
@@ -420,6 +434,7 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
     if (matchesTrustedMtime(facts?.mtime, file.modifiedMs, now)) {
       continue // untouched since it was indexed — skip the read entirely
     }
+    worked += 1
     let content = arrivalContent.get(file.path)
     if (content === undefined) {
       try {
@@ -451,7 +466,7 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
   }
   await batch.flush()
   await touches.flush()
-  onFileProgress?.(files.length, files.length)
+  onFileProgress?.(files.length, files.length, worked)
 
   for (const path of stored.keys()) {
     if (signal?.aborted) {

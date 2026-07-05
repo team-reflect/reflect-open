@@ -94,10 +94,12 @@ export interface GraphIndexOptions {
   onMoved?: (from: string, to: string) => void
   /**
    * Called as a sync pass advances through the file listing (`done`,
-   * `total`) — the substrate for a "Preparing your notes… 400 of 3,000"
-   * surface during a first index. Superseded passes stop reporting.
+   * `total`, `worked`) — the substrate for a "Preparing your notes… 400 of
+   * 3,000" surface during a first index. `worked` counts files the pass has
+   * actually read (vs skipped read-free); the UI gates on it so a routine
+   * skip-everything pass never surfaces. Superseded passes stop reporting.
    */
-  onFileProgress?: (done: number, total: number) => void
+  onFileProgress?: (done: number, total: number, worked: number) => void
 }
 
 /**
@@ -160,9 +162,9 @@ export function createGraphIndex(options: GraphIndexOptions = {}): GraphIndex {
           ...(onMoved !== undefined ? { onMoved } : {}),
           ...(onFileProgress !== undefined
             ? {
-                onFileProgress: (progressDone: number, total: number) => {
+                onFileProgress: (progressDone: number, total: number, worked: number) => {
                   if (!isStale()) {
-                    onFileProgress(progressDone, total)
+                    onFileProgress(progressDone, total, worked)
                   }
                 },
               }

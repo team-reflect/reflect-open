@@ -63,7 +63,13 @@ describe('indexNote', () => {
 
 describe('rebuildIndex', () => {
   it('clears, lists, applies every file in one batch, then stamps the projection version', async () => {
-    await rebuildIndex({ generation: 1 })
+    const progress: Array<[number, number, number]> = []
+    await rebuildIndex({
+      generation: 1,
+      onFileProgress: (done, total, worked) => progress.push([done, total, worked]),
+    })
+    // A rebuild reads everything: worked tracks done, so the pill surfaces.
+    expect(progress.at(-1)).toEqual([1, 1, 1])
     const commands = mockInvoke.mock.calls.map(([cmd]) => cmd)
     expect(commands[0]).toBe('index_clear')
     expect(commands).toContain('list_files')
@@ -460,13 +466,20 @@ describe('reconcileIndex mtime skip', () => {
       }
       return null
     })
+    const progress: Array<[number, number, number]> = []
 
-    await reconcileIndex({ generation: 4 })
+    await reconcileIndex({
+      generation: 4,
+      onFileProgress: (done, total, worked) => progress.push([done, total, worked]),
+    })
 
     const commands = mockInvoke.mock.calls.map(([cmd]) => cmd)
     expect(commands).not.toContain('note_read')
     expect(commands).not.toContain('index_apply_batch')
     expect(commands).not.toContain('index_touch')
+    // A skip-everything pass reports zero worked files — the pill gates on
+    // this, so a routine open never flashes "Preparing notes".
+    expect(progress.at(-1)).toEqual([1, 1, 0])
   })
 
   it('reads (and hash-skips) when the stored mtime differs — providers rewrite mtimes', async () => {
@@ -488,7 +501,12 @@ describe('reconcileIndex mtime skip', () => {
       return null
     })
 
-    await reconcileIndex({ generation: 4 })
+    const progress: Array<[number, number, number]> = []
+
+    await reconcileIndex({
+      generation: 4,
+      onFileProgress: (done, total, worked) => progress.push([done, total, worked]),
+    })
 
     const commands = mockInvoke.mock.calls.map(([cmd]) => cmd)
     expect(commands).toContain('note_read')
@@ -501,6 +519,8 @@ describe('reconcileIndex mtime skip', () => {
       entries: [{ path: 'notes/a.md', mtime: 2_000 }],
       generation: 4,
     })
+    // The read counts as worked even though nothing was re-applied.
+    expect(progress.at(-1)).toEqual([1, 1, 1])
   })
 })
 
