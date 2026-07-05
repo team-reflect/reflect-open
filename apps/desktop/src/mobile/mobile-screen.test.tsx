@@ -358,16 +358,65 @@ describe('MobileShell', () => {
     })
   })
 
-  it('switches tabs: All shows the searchable list, Daily returns to today', async () => {
+  it('switches tabs: All shows the searchable list, Daily returns to the last-open day', async () => {
     const user = userEvent.setup()
+    const today = todayIso()
+    const other = otherDayInWeek(today)
     const view = mount({ kind: 'today' })
+
+    await user.click(view.getByRole('button', { name: dayCellLabel(other) }))
+    expect(view.getByRole('button', { name: dayCellLabel(other) }).getAttribute('aria-current')).toBe(
+      'date',
+    )
 
     await user.click(view.getByRole('button', { name: 'All' }))
     expect(view.getByRole('searchbox', { name: 'Search notes' })).toBeTruthy()
     expect((await view.findByText('No notes yet')).textContent).toBe('No notes yet')
 
     await user.click(view.getByRole('button', { name: 'Daily' }))
-    expect(view.getByRole('heading', { level: 1 }).textContent).toBe(monthLabel(todayIso()))
+    expect(view.getByRole('button', { name: dayCellLabel(other) }).getAttribute('aria-current')).toBe(
+      'date',
+    )
+  })
+
+  it('double-tapping Daily opens today and focuses the daily editor', async () => {
+    const user = userEvent.setup()
+    const today = todayIso()
+    const other = otherDayInWeek(today)
+    const view = mount({ kind: 'today' })
+
+    await user.click(view.getByRole('button', { name: dayCellLabel(other) }))
+    await user.click(view.getByRole('button', { name: 'All' }))
+    await view.findByRole('searchbox', { name: 'Search notes' })
+
+    await user.click(view.getByRole('button', { name: 'Daily' }))
+    expect(view.getByRole('button', { name: dayCellLabel(other) }).getAttribute('aria-current')).toBe(
+      'date',
+    )
+
+    await user.click(view.getByRole('button', { name: 'Daily' }))
+    expect(view.getByRole('button', { name: dayCellLabel(today) }).getAttribute('aria-current')).toBe(
+      'date',
+    )
+    await waitFor(() => {
+      expect(editorProbe.focusCalls).toBe(1)
+    })
+  })
+
+  it('does not jump to today on a single tap of the active Daily tab', async () => {
+    const user = userEvent.setup()
+    const today = todayIso()
+    const other = otherDayInWeek(today)
+    const view = mount({ kind: 'daily', date: other })
+
+    await user.click(view.getByRole('button', { name: 'Daily' }))
+    expect(view.getByRole('button', { name: dayCellLabel(other) }).getAttribute('aria-current')).toBe(
+      'date',
+    )
+    expect(view.getByRole('button', { name: dayCellLabel(today) }).getAttribute('aria-current')).not.toBe(
+      'date',
+    )
+    expect(editorProbe.focusCalls).toBe(0)
   })
 
   it('switches to the Tasks tab, which renders the grouped task list', async () => {

@@ -19,7 +19,7 @@ import { useRouter } from '@/routing/router'
  * day change scrolls the carousel rather than remounting it.
  */
 export function MobileDaily({ date }: { date: string }): ReactElement {
-  const { navigate, arrivalSeq } = useRouter()
+  const { navigate, arrivalSeq, arrivalFocusEditor } = useRouter()
   // One live `today` for the whole surface: the strip marks today's cell and
   // the `select` below decide "is this today?" from the *same* value, so they
   // can't disagree across the midnight rollover (which would otherwise route a
@@ -39,19 +39,36 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
   // every navigate, but a swipe's own echo also changes `date`, so only
   // date-preserving arrivals count.
   const [resetSeq, setResetSeq] = useState(0)
+  const [focusDate, setFocusDate] = useState<string | null>(null)
   const lastArrival = useRef({ seq: arrivalSeq, date })
   useEffect(() => {
     const last = lastArrival.current
     lastArrival.current = { seq: arrivalSeq, date }
+    if (arrivalSeq !== last.seq && arrivalFocusEditor) {
+      setFocusDate(date)
+    } else if (arrivalSeq !== last.seq) {
+      setFocusDate(null)
+    }
     if (arrivalSeq !== last.seq && date === last.date) {
       setResetSeq((seq) => seq + 1)
     }
-  }, [arrivalSeq, date])
+  }, [arrivalSeq, arrivalFocusEditor, date])
+
+  const consumeFocus = useCallback((): void => {
+    setFocusDate(null)
+  }, [])
 
   return (
     <div className="flex h-full w-screen flex-col">
       <CalendarStrip date={date} today={today} resetSeq={resetSeq} onSelect={select} />
-      <DayCarousel date={date} today={today} scrollResetSeq={resetSeq} onSelect={select} />
+      <DayCarousel
+        date={date}
+        today={today}
+        scrollResetSeq={resetSeq}
+        focusDate={focusDate}
+        onFocusConsumed={consumeFocus}
+        onSelect={select}
+      />
       <Button
         size="icon"
         aria-label="New note"

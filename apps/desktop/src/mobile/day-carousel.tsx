@@ -13,6 +13,10 @@ interface DayCarouselProps {
    * while already there): the selected slide re-anchors to the top.
    */
   scrollResetSeq: number
+  /** The selected daily note that should receive editor focus, if any. */
+  focusDate: string | null
+  /** Called once the requested daily editor has focused. */
+  onFocusConsumed: () => void
   /** Settle on a day — the parent turns this into a daily-route navigation. */
   onSelect: (date: string) => void
 }
@@ -33,6 +37,8 @@ export function DayCarousel({
   date,
   today,
   scrollResetSeq,
+  focusDate,
+  onFocusConsumed,
   onSelect,
 }: DayCarouselProps): ReactElement {
   const { emblaRef, dayWindow, selectedIndex } = useDayCarousel(date, onSelect)
@@ -55,6 +61,8 @@ export function DayCarousel({
                   selected={index === selectedIndex}
                   scrollMemory={scrollMemory}
                   scrollResetSeq={scrollResetSeq}
+                  focusRequested={focusDate === day && index === selectedIndex}
+                  onFocusConsumed={onFocusConsumed}
                 />
               ) : null}
             </div>

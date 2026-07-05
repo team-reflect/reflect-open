@@ -1,6 +1,7 @@
-import { useEffect, useRef, type ReactElement } from 'react'
+import { useCallback, useEffect, useRef, type ReactElement } from 'react'
 import { dailyPath } from '@reflect/core'
 import { NotePane } from '@/components/note-pane'
+import type { NoteEditorHandle } from '@/editor/note-editor'
 import { formatDayLabel } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 import { IncomingBacklinks } from '@/mobile/incoming-backlinks'
@@ -26,6 +27,10 @@ interface DaySlideProps {
    * tapped while already there): the selected slide re-anchors to the top.
    */
   scrollResetSeq: number
+  /** True when this slide's editor should focus as soon as its handle exists. */
+  focusRequested: boolean
+  /** Called after the focus request has been applied. */
+  onFocusConsumed: () => void
 }
 
 /**
@@ -43,10 +48,14 @@ export function DaySlide({
   selected,
   scrollMemory,
   scrollResetSeq,
+  focusRequested,
+  onFocusConsumed,
 }: DaySlideProps): ReactElement {
   const { settings } = useSettings()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
+  const editorHandleRef = useRef<NoteEditorHandle | null>(null)
+  const focusConsumedRef = useRef(false)
   const { handleScroll, resetToTop } = useScrollRestore({
     key: day,
     memory: scrollMemory,
@@ -65,6 +74,37 @@ export function DaySlide({
     }
     resetToTop()
   }, [scrollResetSeq, selected, resetToTop])
+
+  const focusIfRequested = useCallback(
+    (handle: NoteEditorHandle | null = editorHandleRef.current): void => {
+      if (!focusRequested || focusConsumedRef.current || handle === null) {
+        return
+      }
+      focusConsumedRef.current = true
+      handle.focus()
+      onFocusConsumed()
+    },
+    [focusRequested, onFocusConsumed],
+  )
+
+  useEffect(() => {
+    if (!focusRequested) {
+      focusConsumedRef.current = false
+      return
+    }
+    focusIfRequested()
+  }, [focusRequested, focusIfRequested])
+
+  const registerEditorHandle = useCallback(
+    (registeredDay: string, handle: NoteEditorHandle | null): void => {
+      if (registeredDay !== day) {
+        return
+      }
+      editorHandleRef.current = handle
+      focusIfRequested(handle)
+    },
+    [day, focusIfRequested],
+  )
 
   return (
     <div
@@ -90,6 +130,8 @@ export function DaySlide({
         </h2>
         <NotePane
           path={dailyPath(day)}
+          dailyDate={day}
+          registerHandle={registerEditorHandle}
           lazy
           showBacklinks={false}
           gutterClassName={MOBILE_CONTENT_GUTTER}
