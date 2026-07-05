@@ -111,8 +111,10 @@ export function useICloudRefresh(): void {
 
     const refresh = async (options: { reconcile: boolean }): Promise<void> => {
       let pending = 0
+      let nudged = false
       try {
         pending = await icloudDownloadPending(root, 'notes')
+        nudged = true
       } catch (err) {
         // Best-effort: reconcile anyway — already-downloaded changes still land.
         console.error('iCloud download nudge failed:', errorMessage(err))
@@ -125,7 +127,10 @@ export function useICloudRefresh(): void {
       }
       if (pending > 0) {
         pollPending(Date.now())
-      } else {
+      } else if (nudged) {
+        // A confirmed-empty note count — never a failed nudge, which would
+        // start the bulk while notes may still be pending. The next resume
+        // retries the whole sequence.
         requestRemainingDownloads()
       }
     }

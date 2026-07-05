@@ -159,6 +159,29 @@ describe('useICloudRefresh', () => {
     expect(allScopeDownloadCalls).toHaveLength(0)
   })
 
+  it('a failed nudge never starts the bulk download', async () => {
+    // `pending` defaulting to 0 on error must not read as "notes are in".
+    setBridge({
+      invoke: async (command) => {
+        if (command === 'icloud_download_pending') {
+          throw { kind: 'io', message: 'container hiccup' }
+        }
+        return null
+      },
+      listen: async () => () => {},
+    })
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      renderHook(() => useICloudRefresh())
+      await flush()
+
+      expect(allScopeDownloadCalls).toHaveLength(0)
+      expect(errorSpy).toHaveBeenCalled()
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+
   it('collapses the resume event burst into one refresh — which reconciles', async () => {
     renderHook(() => useICloudRefresh())
     await flush()
