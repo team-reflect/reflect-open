@@ -1,6 +1,14 @@
 import { useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { errorMessage, hasBridge, icloudAdoptGraph, icloudStatus } from '@reflect/core'
+import {
+  errorMessage,
+  getConflictedNotes,
+  getDuplicateNoteIds,
+  hasBridge,
+  icloudAdoptGraph,
+  icloudPendingCount,
+  icloudStatus,
+} from '@reflect/core'
 import { SettingsField } from '@/components/settings/field'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,10 +22,43 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { isICloudRoot } from '@/lib/icloud-controller'
-import { ICLOUD_STATUS_QUERY_KEY } from '@/lib/query-client'
+import { ICLOUD_STATUS_QUERY_KEY, INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { isMacosDesktop } from '@/lib/platform'
 import { useGraph } from '@/providers/graph-provider'
 import { useSync } from '@/providers/sync-provider'
+
+const ICLOUD_PENDING_NOTES_QUERY_KEY = 'icloud-pending-notes'
+const PENDING_NOTES_REFETCH_MS = 5_000
+
+function graphCountLine(count: number): string {
+  if (count === 0) {
+    return 'No graphs in iCloud Drive yet.'
+  }
+  return count === 1 ? '1 graph in iCloud Drive.' : `${count} graphs in iCloud Drive.`
+}
+
+function pendingNotesLine(count: number): string {
+  if (count === 0) {
+    return 'All note files are downloaded.'
+  }
+  return count === 1
+    ? '1 note is still downloading from iCloud.'
+    : `${count} notes are still downloading from iCloud.`
+}
+
+function reviewLine(conflictCount: number, forkCount: number): string {
+  if (conflictCount === 0 && forkCount === 0) {
+    return 'No notes need review.'
+  }
+  const parts: string[] = []
+  if (conflictCount > 0) {
+    parts.push(conflictCount === 1 ? '1 note needs review' : `${conflictCount} notes need review`)
+  }
+  if (forkCount > 0) {
+    parts.push(forkCount === 1 ? '1 sync fork' : `${forkCount} sync forks`)
+  }
+  return parts.join(', ')
+}
 
 /**
  * Settings → Sync → iCloud Drive (Plan 21 Phase 1, the desktop leg): see
@@ -39,10 +80,32 @@ export function IcloudSettingsField(): ReactElement | null {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const bridgeAvailable = hasBridge()
+  const hosted = graph !== null && isICloudRoot(graph.root)
   const { data: status } = useQuery({
     queryKey: ICLOUD_STATUS_QUERY_KEY,
     queryFn: icloudStatus,
-    enabled: hasBridge() && isMacosDesktop,
+    enabled: bridgeAvailable && isMacosDesktop,
+  })
+  const pendingNotes = useQuery({
+    queryKey: [ICLOUD_PENDING_NOTES_QUERY_KEY, graph?.root],
+    queryFn: () => (graph === null ? Promise.resolve(0) : icloudPendingCount(graph.root, 'notes')),
+    enabled: bridgeAvailable && isMacosDesktop && hosted,
+    staleTime: PENDING_NOTES_REFETCH_MS,
+    refetchInterval: (query) => {
+      const count = query.state.data
+      return typeof count === 'number' && count > 0 ? PENDING_NOTES_REFETCH_MS : false
+    },
+  })
+  const conflicted = useQuery({
+    queryKey: [INDEX_QUERY_SCOPE, 'conflicted-notes', graph?.root],
+    queryFn: () => getConflictedNotes(),
+    enabled: bridgeAvailable && hosted,
+  })
+  const duplicateIds = useQuery({
+    queryKey: [INDEX_QUERY_SCOPE, 'duplicate-note-ids', graph?.root],
+    queryFn: () => getDuplicateNoteIds(),
+    enabled: bridgeAvailable && hosted,
   })
 
   // The navigator hides the entry off macOS through the same gate — the two
@@ -50,8 +113,13 @@ export function IcloudSettingsField(): ReactElement | null {
   if (!isMacosDesktop || graph === null) {
     return null
   }
-  const hosted = isICloudRoot(graph.root)
   const backupConnected = backup.phase === 'connected'
+  const conflictCount = conflicted.data?.length
+  const forkCount = duplicateIds.data?.length
+  const hasReviewIssues =
+    conflictCount !== undefined &&
+    forkCount !== undefined &&
+    (conflictCount > 0 || forkCount > 0)
 
   async function moveToICloud(): Promise<void> {
     if (graph === null) {
@@ -105,6 +173,21 @@ export function IcloudSettingsField(): ReactElement | null {
               : 'iCloud Drive isn’t reachable from this app — sign in to iCloud, or use a build with iCloud enabled.'
         }
       >
+        {hosted ? (
+          <div className="mt-3 flex flex-col gap-1 text-xs text-text-muted">
+            {pendingNotes.isPending ? <p>Checking downloaded notes...</p> : null}
+            {pendingNotes.data !== undefined ? <p>{pendingNotesLine(pendingNotes.data)}</p> : null}
+            {conflictCount !== undefined && forkCount !== undefined ? (
+              <p className={hasReviewIssues ? 'text-amber-700 dark:text-amber-300' : undefined}>
+                {reviewLine(conflictCount, forkCount)}
+              </p>
+            ) : null}
+          </div>
+        ) : status?.available === true ? (
+          <p className="mt-3 text-xs text-text-muted">
+            {graphCountLine(status.existingGraphRoots.length)}
+          </p>
+        ) : null}
         {hosted ? null : (
           <div className="mt-2">
             <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>

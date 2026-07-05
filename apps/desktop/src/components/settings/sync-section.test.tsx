@@ -5,6 +5,17 @@ import type { GraphInfo } from '@reflect/core'
 import type { BackupState } from '@/lib/backup-controller'
 import { SyncSection } from './sync-section'
 
+const core = vi.hoisted(() => ({
+  status: {
+    available: true,
+    documentsRoot: '/Users/alex/Library/Mobile Documents/iCloud~app/Documents',
+    existingGraphRoots: [] as string[],
+  },
+  pendingNotes: 0,
+  conflictedNotes: [] as Array<{ path: string; title: string }>,
+  duplicateIds: [] as Array<{ id: string; paths: string[] }>,
+}))
+
 const graph = vi.hoisted(() => ({
   current: null as GraphInfo | null,
   openRecent: vi.fn<(root: string) => Promise<boolean>>(async () => true),
@@ -17,6 +28,14 @@ const sync = vi.hoisted(() => ({
   backUpNow: vi.fn(async () => {}),
 }))
 
+vi.mock('@reflect/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@reflect/core')>()),
+  hasBridge: () => true,
+  icloudStatus: vi.fn(async () => core.status),
+  icloudPendingCount: vi.fn(async () => core.pendingNotes),
+  getConflictedNotes: vi.fn(async () => core.conflictedNotes),
+  getDuplicateNoteIds: vi.fn(async () => core.duplicateIds),
+}))
 vi.mock('@/lib/platform', () => ({ isMacosDesktop: true }))
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: graph.current, openRecent: graph.openRecent }),
@@ -37,6 +56,14 @@ beforeEach(() => {
     name: 'Notes',
     generation: 1,
   }
+  core.status = {
+    available: true,
+    documentsRoot: '/Users/alex/Library/Mobile Documents/iCloud~app/Documents',
+    existingGraphRoots: ['/Users/alex/Library/Mobile Documents/iCloud~app/Documents/Personal'],
+  }
+  core.pendingNotes = 0
+  core.conflictedNotes = []
+  core.duplicateIds = []
   sync.backup = { phase: 'disconnected' }
 })
 
@@ -46,16 +73,17 @@ afterEach(() => {
 })
 
 describe('SyncSection', () => {
-  it('combines iCloud Drive and GitHub backup under Sync for local graphs', () => {
+  it('combines iCloud Drive and GitHub backup under Sync for local graphs', async () => {
     renderSection()
 
     const section = screen.getByRole('region', { name: 'Sync' })
     expect(within(section).getByText('iCloud Drive', { selector: 'legend' })).toBeTruthy()
+    expect(await within(section).findByText('1 graph in iCloud Drive.')).toBeTruthy()
     expect(within(section).getByText('GitHub backup', { selector: 'legend' })).toBeTruthy()
     expect(within(section).getByRole('button', { name: /connect github/i })).toBeTruthy()
   })
 
-  it('hides GitHub backup when the graph syncs through iCloud', () => {
+  it('hides GitHub backup when the graph syncs through iCloud', async () => {
     graph.current = {
       root: '/Users/alex/Library/Mobile Documents/iCloud~app/Documents/Notes',
       name: 'Notes',
@@ -66,7 +94,28 @@ describe('SyncSection', () => {
 
     const section = screen.getByRole('region', { name: 'Sync' })
     expect(within(section).getByText('iCloud Drive', { selector: 'legend' })).toBeTruthy()
+    expect(await within(section).findByText('All note files are downloaded.')).toBeTruthy()
+    expect(within(section).getByText('No notes need review.')).toBeTruthy()
     expect(within(section).queryByText('GitHub backup')).toBeNull()
     expect(within(section).queryByRole('button', { name: /connect github/i })).toBeNull()
+  })
+
+  it('surfaces iCloud download and review counts', async () => {
+    graph.current = {
+      root: '/Users/alex/Library/Mobile Documents/iCloud~app/Documents/Notes',
+      name: 'Notes',
+      generation: 1,
+    }
+    core.pendingNotes = 2
+    core.conflictedNotes = [{ path: 'notes/a.md', title: 'A' }]
+    core.duplicateIds = [{ id: 'note-1', paths: ['notes/a.md', 'notes/a 2.md'] }]
+
+    renderSection()
+
+    const section = screen.getByRole('region', { name: 'Sync' })
+    expect(
+      await within(section).findByText('2 notes are still downloading from iCloud.'),
+    ).toBeTruthy()
+    expect(within(section).getByText('1 note needs review, 1 sync fork')).toBeTruthy()
   })
 })
