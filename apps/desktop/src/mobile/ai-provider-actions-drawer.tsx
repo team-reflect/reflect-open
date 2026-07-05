@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react'
-import { aiProvider, type AiProviderConfig } from '@reflect/core'
+import { aiProvider, errorMessage, type AiProviderConfig } from '@reflect/core'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { SettingsActionRow, SettingsGroup } from '@/mobile/settings-list'
 
@@ -31,11 +31,15 @@ export function AiProviderActionsDrawer({
 }: AiProviderActionsDrawerProps): ReactElement {
   const [removing, setRemoving] = useState(false)
 
+  // A failed removal (keychain write, settings store) keeps the sheet open —
+  // closing would read as success — and logs; the row is still there to retry.
   const remove = async (id: string): Promise<void> => {
     setRemoving(true)
     try {
       await onRemove(id)
       onOpenChange(false)
+    } catch (cause) {
+      console.error('AI provider removal failed:', errorMessage(cause))
     } finally {
       setRemoving(false)
     }

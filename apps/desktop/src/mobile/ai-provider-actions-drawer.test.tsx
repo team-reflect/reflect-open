@@ -71,4 +71,20 @@ describe('AiProviderActionsDrawer', () => {
     await waitFor(() => expect(onRemove).toHaveBeenCalledWith('p1'))
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
   })
+
+  it('a failed removal keeps the sheet open for a retry', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    onRemove.mockRejectedValue(new Error('keychain unavailable'))
+    renderSheet()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove provider' }))
+
+    await waitFor(() => expect(consoleError).toHaveBeenCalled())
+    expect(onOpenChange).not.toHaveBeenCalled()
+    // The pending spinner cleared — the row is pressable again.
+    expect(
+      (screen.getByRole('button', { name: 'Remove provider' }) as HTMLButtonElement).disabled,
+    ).toBe(false)
+    consoleError.mockRestore()
+  })
 })

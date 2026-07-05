@@ -1,6 +1,6 @@
 import { useMemo, type ReactElement } from 'react'
-import { groupModelOptions } from '@/components/chat/chat-input'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
+import { groupModelOptions } from '@/lib/chat-model-groups'
 import { SettingsGroup, SettingsSelectRow } from '@/mobile/settings-list'
 import { useChatSession } from '@/providers/chat-provider'
 
