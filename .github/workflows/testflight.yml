@@ -33,7 +33,7 @@ permissions:
 jobs:
   testflight:
     name: Build and upload iOS
-    runs-on: macos-latest
+    runs-on: macos-26
     timeout-minutes: 120
     env:
       CARGO_HTTP_MULTIPLEXING: false
