@@ -13,6 +13,7 @@ import {
   createTauriBuildArgs,
   createUpdaterArchiveArgs,
   createUpdaterManifest,
+  macosEntitlementsPath,
   macosTargetResourceConfig,
   parseKeychainList,
   signDmgArgs,
@@ -200,6 +201,14 @@ test('beta release builds keep the beta flavor overlay', () => {
     '--config',
     'src-tauri/tauri.beta.conf.json',
   ])
+})
+
+test('macOS entitlements resolve through platform and flavor overlays', () => {
+  const srcTauri = join(process.cwd(), 'src-tauri')
+
+  expect(macosEntitlementsPath('stable')).toBe(join(srcTauri, 'Entitlements.plist'))
+  expect(macosEntitlementsPath('beta')).toBe(join(srcTauri, 'Entitlements.plist'))
+  expect(macosEntitlementsPath('dev')).toBe(join(srcTauri, 'Entitlements.dev.plist'))
 })
 
 test('updater archive is created from the finalized app bundle', () => {

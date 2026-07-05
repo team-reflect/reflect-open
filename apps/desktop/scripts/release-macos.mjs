@@ -322,6 +322,12 @@ function readTauriConf() {
   return JSON.parse(readFileSync(join(appDir, 'src-tauri', 'tauri.conf.json'), 'utf8'))
 }
 
+function readPlatformConf(platform) {
+  const path = join(appDir, 'src-tauri', `tauri.${platform}.conf.json`)
+  if (!existsSync(path)) return {}
+  return JSON.parse(readFileSync(path, 'utf8'))
+}
+
 /** Apply an RFC 7396 JSON Merge Patch — the same algorithm Tauri uses for `--config`. */
 function mergePatch(target, patch) {
   if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) return patch
@@ -339,7 +345,7 @@ function mergePatch(target, patch) {
  * paths depend on the flavor's productName, so they read the merged config.
  */
 function readFlavorConf(flavor) {
-  const base = readTauriConf()
+  const base = mergePatch(readTauriConf(), readPlatformConf('macos'))
   const overlay = FLAVOR_OVERLAYS[flavor]
   if (!overlay) return base
   const patch = JSON.parse(readFileSync(join(appDir, overlay), 'utf8'))
@@ -472,7 +478,7 @@ function codesignArgs({ entitlements, identity, keychain, path }) {
   return args
 }
 
-function macosEntitlementsPath(flavor) {
+export function macosEntitlementsPath(flavor) {
   const entitlements = readFlavorConf(flavor).bundle?.macOS?.entitlements
   if (typeof entitlements !== 'string') {
     fail(`macOS flavor "${flavor}" has no bundle.macOS.entitlements`)
