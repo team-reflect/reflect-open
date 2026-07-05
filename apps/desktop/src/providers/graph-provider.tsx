@@ -378,13 +378,16 @@ export function GraphProvider({
         await forgetRecent(root)
         await loadRecents()
         if (graph?.root === root) {
+          // Forgetting the ACTIVE graph ends the session its note windows
+          // adopted — same close-first rule as switch/delete.
+          await closeSecondaryWindows(platform)
           await closeActiveGraph()
         }
       } catch {
         // best-effort
       }
     },
-    [closeActiveGraph, graph, loadRecents],
+    [closeActiveGraph, graph, loadRecents, platform],
   )
 
   const deleteGraph = useCallback(async (): Promise<void> => {
