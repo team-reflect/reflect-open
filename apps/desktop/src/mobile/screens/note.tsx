@@ -1,10 +1,9 @@
 import { useState, type ReactElement } from 'react'
 import { isUntitledNotePath } from '@reflect/core'
-import { ChevronLeft } from 'lucide-react'
 import { NotePane } from '@/components/note-pane'
-import { Button } from '@/components/ui/button'
 import { IncomingBacklinks } from '@/mobile/incoming-backlinks'
 import { MOBILE_CONTENT_GUTTER } from '@/mobile/mobile-content-gutter'
+import { MobileScreenHeader } from '@/mobile/screen-header'
 import { NoteActionsMenu } from '@/mobile/note-actions-menu'
 import { cn } from '@/lib/utils'
 import { useRouter } from '@/routing/router'
@@ -30,24 +29,16 @@ export function MobileNote({ path }: { path: string }): ReactElement {
 
   return (
     <div className="flex h-full w-screen flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-      <header className="flex shrink-0 items-center gap-1 border-b border-border px-1 pb-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-10"
-          aria-label="Back"
-          onClick={() => (canBack ? back() : navigate({ kind: 'today' }))}
-        >
-          <ChevronLeft />
-        </Button>
-        <h1 className="min-w-0 flex-1 truncate text-base font-semibold">
-          {untitled ? 'New note' : noteTitleFromPath(path)}
-        </h1>
-        <NoteActionsMenu
-          path={path}
-          onDeleted={() => (canBack ? back() : navigate({ kind: 'today' }))}
-        />
-      </header>
+      <MobileScreenHeader
+        title={untitled ? 'New note' : 'Edit note'}
+        onBack={() => (canBack ? back() : navigate({ kind: 'today' }))}
+        trailing={
+          <NoteActionsMenu
+            path={path}
+            onDeleted={() => (canBack ? back() : navigate({ kind: 'today' }))}
+          />
+        }
+      />
       <main
         className="min-h-0 flex-1 overflow-y-auto"
         // Keyboard avoidance is the shell root's job (it ends at the
@@ -74,10 +65,4 @@ export function MobileNote({ path }: { path: string }): ReactElement {
       </main>
     </div>
   )
-}
-
-/** Readable filenames (Plan 17) make the basename the working title. */
-function noteTitleFromPath(path: string): string {
-  const base = path.slice(path.lastIndexOf('/') + 1)
-  return base.endsWith('.md') ? base.slice(0, -'.md'.length) : base
 }

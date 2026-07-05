@@ -500,6 +500,20 @@ describe('MobileTasks', () => {
     view.unmount()
   })
 
+  it('adds a task to today’s daily from the floating plus button', async () => {
+    getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
+    const user = userEvent.setup()
+    const view = renderScreen()
+
+    await view.findByText('buy milk')
+    await user.click(view.getByRole('button', { name: 'New task' }))
+
+    await waitFor(() => expect(insertTask).toHaveBeenCalledWith('daily/2026-06-14.md', 1))
+    const input = asTextArea(await view.findByRole('textbox', { name: 'Task text' }))
+    expect(input.value).toBe('')
+    view.unmount()
+  })
+
   it('focuses the editor when "+" adds a new task', async () => {
     getOpenTasks.mockResolvedValue([
       task({ text: 'jotted today', dailyDate: '2026-06-14', notePath: 'daily/2026-06-14.md' }),

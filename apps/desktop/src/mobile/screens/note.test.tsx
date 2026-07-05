@@ -1,4 +1,4 @@
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useEffect, useRef, type ReactElement } from 'react'
 import { untitledNotePath } from '@reflect/core'
@@ -77,6 +77,11 @@ afterEach(() => {
 })
 
 describe('MobileNote focus contract', () => {
+  it('labels an existing note screen as edit note', () => {
+    renderArrival('notes/target.md')
+    expect(screen.getByRole('heading', { name: 'Edit note' })).toBeTruthy()
+  })
+
   it('does not autofocus a plain arrival (no keyboard on browse)', () => {
     renderArrival('notes/target.md')
     expect(paneProps.autoFocus).toBe(false)
@@ -94,6 +99,7 @@ describe('MobileNote focus contract', () => {
 
   it('autofocuses a fresh untitled note (the + flow)', () => {
     renderArrival(untitledNotePath())
+    expect(screen.getByRole('heading', { name: 'New note' })).toBeTruthy()
     expect(paneProps.autoFocus).toBe(true)
   })
 

@@ -324,7 +324,7 @@ describe('MobileShell', () => {
     const view = mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
 
     await user.click(view.getByRole('button', { name: 'probe-navigate' }))
-    expect(view.getByRole('heading').textContent).toContain('meeting-notes')
+    expect(view.getByRole('heading').textContent).toBe('Edit note')
 
     await user.click(view.getByRole('button', { name: 'Back' }))
     expect(view.getByRole('heading', { level: 1 }).textContent).toBe(monthLabel(todayIso()))
@@ -358,16 +358,72 @@ describe('MobileShell', () => {
     })
   })
 
-  it('switches tabs: All shows the searchable list, Daily returns to today', async () => {
+  it('switches tabs: All shows the searchable list, Daily returns to the last-open day', async () => {
     const user = userEvent.setup()
+    const today = todayIso()
+    const other = otherDayInWeek(today)
     const view = mount({ kind: 'today' })
+
+    await user.click(view.getByRole('button', { name: dayCellLabel(other) }))
+    expect(view.getByRole('button', { name: dayCellLabel(other) }).getAttribute('aria-current')).toBe(
+      'date',
+    )
 
     await user.click(view.getByRole('button', { name: 'All' }))
     expect(view.getByRole('searchbox', { name: 'Search notes' })).toBeTruthy()
     expect((await view.findByText('No notes yet')).textContent).toBe('No notes yet')
 
     await user.click(view.getByRole('button', { name: 'Daily' }))
-    expect(view.getByRole('heading', { level: 1 }).textContent).toBe(monthLabel(todayIso()))
+    expect(view.getByRole('button', { name: dayCellLabel(other) }).getAttribute('aria-current')).toBe(
+      'date',
+    )
+  })
+
+  it('double-tapping Daily opens today and focuses the daily editor', async () => {
+    const user = userEvent.setup()
+    const today = todayIso()
+    const other = otherDayInWeek(today)
+    const view = mount({ kind: 'today' })
+
+    await user.click(view.getByRole('button', { name: dayCellLabel(other) }))
+    await user.click(view.getByRole('button', { name: 'All' }))
+    await view.findByRole('searchbox', { name: 'Search notes' })
+
+    let fakeNow = 1_000
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => fakeNow)
+
+    fireEvent.click(view.getByRole('button', { name: 'Daily' }))
+    expect(view.getByRole('button', { name: dayCellLabel(other) }).getAttribute('aria-current')).toBe(
+      'date',
+    )
+
+    fakeNow = 1_100
+    fireEvent.click(view.getByRole('button', { name: 'Daily' }))
+    now.mockRestore()
+    await waitFor(() => {
+      expect(
+        view.getByRole('button', { name: dayCellLabel(today) }).getAttribute('aria-current'),
+      ).toBe('date')
+    })
+    await waitFor(() => {
+      expect(editorProbe.focusCalls).toBe(1)
+    })
+  })
+
+  it('does not jump to today on a single tap of the active Daily tab', async () => {
+    const user = userEvent.setup()
+    const today = todayIso()
+    const other = otherDayInWeek(today)
+    const view = mount({ kind: 'daily', date: other })
+
+    await user.click(view.getByRole('button', { name: 'Daily' }))
+    expect(view.getByRole('button', { name: dayCellLabel(other) }).getAttribute('aria-current')).toBe(
+      'date',
+    )
+    expect(view.getByRole('button', { name: dayCellLabel(today) }).getAttribute('aria-current')).not.toBe(
+      'date',
+    )
+    expect(editorProbe.focusCalls).toBe(0)
   })
 
   it('switches to the Tasks tab, which renders the grouped task list', async () => {
@@ -441,7 +497,7 @@ describe('MobileShell', () => {
     files['notes/meeting-notes.md'] = 'agenda'
     const view = mount({ kind: 'note', path: 'notes/meeting-notes.md' })
 
-    expect(view.getByRole('heading').textContent).toContain('meeting-notes')
+    expect(view.getByRole('heading').textContent).toBe('Edit note')
     await waitFor(() => {
       expect(within(visibleLayer(view)).getByTestId('fake-editor').textContent).toContain('agenda')
     })
@@ -541,7 +597,7 @@ describe('MobileStack transitions & back-swipe', () => {
     const layers = stackLayers(view)
     expect(layers).toHaveLength(3)
     expect(layers.at(-1)!.className).toContain('mobile-stack-slide-out')
-    expect(within(visibleLayer(view)).getByRole('heading').textContent).toContain('source')
+    expect(within(visibleLayer(view)).getByRole('heading').textContent).toBe('Edit note')
     fireEvent.animationEnd(layers.at(-1)!)
     expect(stackLayers(view)).toHaveLength(2)
   })
@@ -665,7 +721,7 @@ describe('MobileStack transitions & back-swipe', () => {
       expect(card.style.transform).toBe('translate3d(0, 0, 0)')
 
       fireEvent.transitionEnd(card)
-      expect(view.getByRole('heading').textContent).toContain('meeting-notes')
+      expect(view.getByRole('heading').textContent).toBe('Edit note')
       expect(stackLayers(view)).toHaveLength(2)
     } finally {
       nowSpy.mockRestore()

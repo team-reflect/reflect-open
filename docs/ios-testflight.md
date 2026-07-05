@@ -3,9 +3,9 @@
 How to build Reflect's Tauri iOS target and upload it to TestFlight.
 
 ```bash
-pnpm release:ios preflight --build-number=123
-pnpm release:ios build --build-number=123
-pnpm release:ios testflight --build-number=123 --wait
+pnpm release:ios preflight
+pnpm release:ios build --build-number="$(date -u +%Y%m%d%H%M)"
+pnpm release:ios testflight --wait
 ```
 
 The helper lives at `apps/desktop/scripts/release-ios.mjs` and is exposed as
@@ -61,10 +61,13 @@ for `pnpm release:ios testflight`.
    through `@env:APPLE_PASSWORD`.
 
 4. **A monotonically increasing build number.** TestFlight rejects duplicate
-   `CFBundleVersion` values for the same marketing version. Pass
-   `--build-number=<number>` locally; the helper injects it as
-   `bundle.iOS.bundleVersion` so beta versions still produce a clean numeric
-   build version. The GitHub Action defaults this to the workflow run number.
+   `CFBundleVersion` values for the same marketing version. The GitHub Action
+   always generates a UTC timestamp in `YYYYMMDDHHmm` format. Local `preflight`
+   and `testflight` commands generate the same timestamp when `--build-number`
+   and `BUILD_NUMBER` are omitted. `--build-number=<number>` exists only as a
+   local debugging override. Do not use `github.run_number` for TestFlight
+   builds: a lower `CFBundleVersion` can upload successfully while TestFlight
+   still appears to show the previous timestamp build as the latest.
 
 5. **Xcode on macOS.** The workflow and local script use `xcodebuild`, Tauri's
    iOS build command, and `xcrun altool`.
@@ -72,7 +75,7 @@ for `pnpm release:ios testflight`.
 ## Commands
 
 ```bash
-pnpm release:ios preflight --build-number=123
+pnpm release:ios preflight
 ```
 
 Checks Xcode/altool, the build number, signing auth, and upload auth before
@@ -80,7 +83,7 @@ spending time on the native archive. It also verifies that App Store Connect has
 a separate app record for `app.reflect.ios`.
 
 ```bash
-pnpm release:ios build --build-number=123
+pnpm release:ios build --build-number="$(date -u +%Y%m%d%H%M)"
 ```
 
 Runs `pnpm tauri ios build --export-method app-store-connect --ci`, using the
@@ -90,11 +93,13 @@ when the key is configured. The build number is merged into the Tauri config as
 `apps/desktop/src-tauri/gen/apple/build/`.
 
 ```bash
-pnpm release:ios testflight --build-number=123 --wait
+pnpm release:ios testflight --wait
 ```
 
 Builds the IPA, uploads it with `xcrun altool --upload-package`, and optionally
-waits for App Store Connect processing to finish.
+waits for App Store Connect processing to finish. If `--build-number` and
+`BUILD_NUMBER` are both omitted, the helper generates a UTC timestamp build
+number before archiving.
 
 ```bash
 pnpm release:ios upload --ipa=apps/desktop/src-tauri/gen/apple/build/arm64/Reflect.ipa --wait
@@ -124,8 +129,11 @@ Configure these repository secrets:
 | `APPLE_API_ISSUER` | App Store Connect issuer UUID |
 | `APPLE_API_KEY_CONTENT` | Contents of `AuthKey_<KEY>.p8` |
 
-The workflow's build number defaults to `github.run_number`. Override the input
-only when retrying a run that already uploaded a build.
+The workflow does not accept a build-number input. Each run resolves one UTC
+timestamp build number, logs it, and passes the same value to both `preflight`
+and `testflight`. If you need a one-off custom value while debugging, run the
+local package command with `--build-number=<number>` instead of changing the
+workflow.
 
 ## Troubleshooting
 
@@ -137,9 +145,14 @@ only when retrying a run that already uploaded a build.
   bundle id exists for signing, but no App Store Connect app record exists yet.
   Create a new iOS app in App Store Connect for `app.reflect.ios`; do not reuse
   the old Capacitor app record (`app.reflect.ReflectMobile`).
-- **Duplicate build number**: rerun with a larger `--build-number`. TestFlight
-  build numbers are per marketing version; `0.4.0` build `123` can only be
-  uploaded once.
+- **Duplicate build number**: rerun the GitHub Action so it stamps a fresh
+  timestamp. For local debugging commands, pass a larger `--build-number`.
+  TestFlight build numbers are per marketing version; `0.4.0` build `123` can
+  only be uploaded once.
+- **TestFlight still shows an older build as latest**: inspect the GitHub Action
+  log for `bundle-version`. If the uploaded value is lower than the latest
+  TestFlight build (for example a small GitHub run number), rerun the workflow
+  so it stamps a fresh timestamp.
 - **Missing `.p8` file**: set `APPLE_API_KEY_CONTENT`, set `APPLE_API_KEY_PATH`,
   or place `AuthKey_<KEY>.p8` in `~/.appstoreconnect/private_keys/`.
 - **Multiple providers**: if using the Apple ID fallback for upload-only

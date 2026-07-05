@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react'
 import { MobileFormattingToolbar } from '@/mobile/formatting-toolbar'
 import { MobileStack } from '@/mobile/mobile-stack'
 import { MobileTabBar, type MobileTab } from '@/mobile/mobile-tab-bar'
@@ -8,7 +8,16 @@ import {
 } from '@/mobile/search-filters/filter-state'
 import { useKeyboardVisible } from '@/mobile/use-keyboard'
 import { useWakeToToday } from '@/mobile/use-wake-to-today'
+import { routesEqual, type Route } from '@/routing/route'
 import { useRouter } from '@/routing/router'
+
+const DAILY_DOUBLE_TAP_MS = 450
+
+type DailyRoute = Extract<Route, { kind: 'today' }> | Extract<Route, { kind: 'daily' }>
+
+function dailyRouteFrom(route: Route): DailyRoute | null {
+  return route.kind === 'today' || route.kind === 'daily' ? route : null
+}
 
 /**
  * The tabbed mobile shell (Plan 19, V1 parity): screens above, the
@@ -22,6 +31,8 @@ export function MobileShell(): ReactElement {
   const [allQuery, setAllQuery] = useState('')
   const [allFilters, setAllFilters] = useState<AllNotesFilters>(EMPTY_ALL_NOTES_FILTERS)
   const [lastTab, setLastTab] = useState<MobileTab>('daily')
+  const [lastDailyRoute, setLastDailyRoute] = useState<DailyRoute>({ kind: 'today' })
+  const lastDailyTapAt = useRef<number | null>(null)
   const keyboardVisible = useKeyboardVisible()
   // V1's wake-to-today: foregrounding on a new calendar date lands on today.
   useWakeToToday()
@@ -47,8 +58,45 @@ export function MobileShell(): ReactElement {
         : route.kind === 'today' || route.kind === 'daily'
           ? 'daily'
           : lastTab
+  const currentDailyRoute = dailyRouteFrom(route)
   if (tab !== lastTab) {
     setLastTab(tab)
+  }
+  if (currentDailyRoute !== null && !routesEqual(currentDailyRoute, lastDailyRoute)) {
+    setLastDailyRoute(currentDailyRoute)
+  }
+
+  useLayoutEffect(() => {
+    if (currentDailyRoute === null) {
+      lastDailyTapAt.current = null
+    }
+  }, [currentDailyRoute])
+
+  const handleTabSelect = (next: MobileTab): void => {
+    if (next !== 'daily') {
+      lastDailyTapAt.current = null
+      navigate(
+        next === 'tasks'
+          ? { kind: 'tasks' }
+          : { kind: 'allNotes', tag: null },
+      )
+      return
+    }
+
+    const now = Date.now()
+    const doubleTap =
+      lastDailyTapAt.current !== null && now - lastDailyTapAt.current <= DAILY_DOUBLE_TAP_MS
+    lastDailyTapAt.current = now
+
+    if (doubleTap) {
+      navigate({ kind: 'today' }, { focusEditor: true })
+      return
+    }
+
+    if (currentDailyRoute !== null) {
+      return
+    }
+    navigate(lastDailyRoute, { restoreSurfaceScroll: true })
   }
 
   return (
@@ -77,18 +125,7 @@ export function MobileShell(): ReactElement {
       {keyboardVisible ? (
         <MobileFormattingToolbar />
       ) : (
-        <MobileTabBar
-          tab={tab}
-          onSelect={(next) =>
-            navigate(
-              next === 'daily'
-                ? { kind: 'today' }
-                : next === 'tasks'
-                  ? { kind: 'tasks' }
-                  : { kind: 'allNotes', tag: null },
-            )
-          }
-        />
+        <MobileTabBar tab={tab} onSelect={handleTabSelect} />
       )}
     </div>
   )

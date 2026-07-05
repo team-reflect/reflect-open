@@ -12,7 +12,6 @@ import {
   Slash,
 } from 'lucide-react'
 import { useFormattingToolbar } from '@/editor/formatting-toolbar-store'
-import { cn } from '@/lib/utils'
 import { hapticImpactLight } from '@/mobile/haptics'
 
 /**
@@ -30,6 +29,9 @@ import { hapticImpactLight } from '@/mobile/haptics'
  * `contenteditable` no Done key. Renders nothing while no editor is focused:
  * the All-tab search field raises the keyboard too, and formatting buttons
  * would be dead weight there.
+ *
+ * The dismiss button is pinned outside the scrollable region so it stays
+ * visible even when the formatting buttons overflow on narrow screens.
  */
 export function MobileFormattingToolbar(): ReactElement | null {
   const toolbar = useFormattingToolbar()
@@ -41,63 +43,66 @@ export function MobileFormattingToolbar(): ReactElement | null {
     <div
       role="toolbar"
       aria-label="Formatting"
-      className="flex shrink-0 items-center gap-0.5 overflow-x-auto border-t border-border px-1"
+      className="flex shrink-0 items-center border-t border-border"
     >
-      <ToolbarButton
-        label="Slash command"
-        icon={<Slash className="size-5" />}
-        onPress={() => commands.insertTrigger('/')}
-      />
-      <ToolbarButton
-        label="Bullet list"
-        icon={<List className="size-5" />}
-        onPress={commands.toggleBulletList}
-      />
-      <ToolbarButton
-        label="Task list"
-        icon={<ListTodo className="size-5" />}
-        onPress={commands.toggleTaskList}
-      />
-      <ToolbarButton
-        label="Link note"
-        icon={<Brackets className="size-5" />}
-        onPress={() => commands.insertTrigger('[[')}
-      />
-      <ToolbarButton
-        label="Tag"
-        icon={<Hash className="size-5" />}
-        onPress={() => commands.insertTrigger('#')}
-      />
-      <ToolbarButton
-        label="Outdent"
-        icon={<IndentDecrease className="size-5" />}
-        disabled={!capabilities.canDedent}
-        onPress={commands.dedent}
-      />
-      <ToolbarButton
-        label="Indent"
-        icon={<IndentIncrease className="size-5" />}
-        disabled={!capabilities.canIndent}
-        onPress={commands.indent}
-      />
-      <ToolbarButton
-        label="Move up"
-        icon={<ArrowUp className="size-5" />}
-        disabled={!capabilities.canMoveUp}
-        onPress={commands.moveUp}
-      />
-      <ToolbarButton
-        label="Move down"
-        icon={<ArrowDown className="size-5" />}
-        disabled={!capabilities.canMoveDown}
-        onPress={commands.moveDown}
-      />
-      <ToolbarButton
-        label="Hide keyboard"
-        icon={<ChevronDown className="size-5" />}
-        className="ml-auto"
-        onPress={commands.dismissKeyboard}
-      />
+      <div className="flex min-w-0 flex-1 items-center overflow-x-auto px-1">
+        <ToolbarButton
+          label="Slash command"
+          icon={<Slash className="size-5" />}
+          onPress={() => commands.insertTrigger('/')}
+        />
+        <ToolbarButton
+          label="Bullet list"
+          icon={<List className="size-5" />}
+          onPress={commands.toggleBulletList}
+        />
+        <ToolbarButton
+          label="Task list"
+          icon={<ListTodo className="size-5" />}
+          onPress={commands.toggleTaskList}
+        />
+        <ToolbarButton
+          label="Link note"
+          icon={<Brackets className="size-5" />}
+          onPress={() => commands.insertTrigger('[[')}
+        />
+        <ToolbarButton
+          label="Tag"
+          icon={<Hash className="size-5" />}
+          onPress={() => commands.insertTrigger('#')}
+        />
+        <ToolbarButton
+          label="Outdent"
+          icon={<IndentDecrease className="size-5" />}
+          disabled={!capabilities.canDedent}
+          onPress={commands.dedent}
+        />
+        <ToolbarButton
+          label="Indent"
+          icon={<IndentIncrease className="size-5" />}
+          disabled={!capabilities.canIndent}
+          onPress={commands.indent}
+        />
+        <ToolbarButton
+          label="Move up"
+          icon={<ArrowUp className="size-5" />}
+          disabled={!capabilities.canMoveUp}
+          onPress={commands.moveUp}
+        />
+        <ToolbarButton
+          label="Move down"
+          icon={<ArrowDown className="size-5" />}
+          disabled={!capabilities.canMoveDown}
+          onPress={commands.moveDown}
+        />
+      </div>
+      <div className="shrink-0 border-l border-border px-1">
+        <ToolbarButton
+          label="Hide keyboard"
+          icon={<ChevronDown className="size-5" />}
+          onPress={commands.dismissKeyboard}
+        />
+      </div>
     </div>
   )
 }
@@ -106,13 +111,11 @@ function ToolbarButton({
   label,
   icon,
   disabled = false,
-  className,
   onPress,
 }: {
   label: string
   icon: ReactElement
   disabled?: boolean
-  className?: string
   onPress: () => void
 }): ReactElement {
   return (
@@ -130,10 +133,7 @@ function ToolbarButton({
         hapticImpactLight()
         onPress()
       }}
-      className={cn(
-        'flex size-11 shrink-0 items-center justify-center rounded-md text-text-muted disabled:opacity-40',
-        className,
-      )}
+      className="flex h-11 w-10 shrink-0 items-center justify-center rounded-md text-text-muted disabled:opacity-40"
     >
       {icon}
     </button>

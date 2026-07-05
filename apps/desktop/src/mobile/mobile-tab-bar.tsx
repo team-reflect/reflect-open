@@ -90,8 +90,8 @@ function TabButton({
       type="button"
       aria-label={label}
       aria-current={active ? 'page' : undefined}
-      // V1 parity: a light haptic on every tab press — including a re-press
-      // of the active tab, which is the jump-to-today gesture on Daily.
+      // V1 parity: a light haptic on every tab press, including the two taps
+      // that make Daily's double-tap-to-today gesture.
       onClick={() => {
         hapticImpactLight()
         onClick()

@@ -239,6 +239,20 @@ describe('NoteEditor image lightbox', () => {
     expect(openImage).toHaveBeenCalledWith('assets/cat.png')
   })
 
+  it('keeps the image opener inside iOS safe-area bounds', async () => {
+    renderEditor()
+
+    act(() => captured.props?.onImageClick?.(imageClick('assets/cat.png', 'Cat')))
+
+    const opener = await screen.findByRole('button', { name: 'Open' })
+    expect(opener.parentElement?.className).toContain(
+      'top-[max(env(safe-area-inset-top),1rem)]',
+    )
+    expect(opener.parentElement?.className).toContain(
+      'right-[max(env(safe-area-inset-right),1rem)]',
+    )
+  })
+
   it('uses the opener captured when the lightbox opens', async () => {
     const firstOpenImage = vi.fn(async () => {})
     const secondOpenImage = vi.fn(async () => {})

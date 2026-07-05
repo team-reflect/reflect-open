@@ -1,6 +1,6 @@
 import { useDeferredValue, useMemo, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Archive, CircleCheck, SlidersHorizontal } from 'lucide-react'
+import { Archive, CircleCheck, Plus, SlidersHorizontal } from 'lucide-react'
 import {
   getCompletedTasks,
   getOpenTasks,
@@ -174,7 +174,7 @@ export function MobileTasks(): ReactElement {
           ) : null}
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto pb-8">
+        <div className="min-h-0 flex-1 overflow-y-auto pb-24">
           {groups.map((group) => (
             <MobileTaskGroup
               key={group.kind === 'note' ? `note:${group.notePath}` : group.kind}
@@ -187,6 +187,15 @@ export function MobileTasks(): ReactElement {
           ))}
         </div>
       )}
+      <Button
+        size="icon"
+        aria-label="New task"
+        className="fixed right-4 z-40 size-12 rounded-full shadow-lg"
+        style={{ bottom: 'calc(max(env(safe-area-inset-bottom), var(--keyboard-height, 0px)) + 4.25rem)' }}
+        onClick={() => onAdd(todaysDailyTarget(today))}
+      >
+        <Plus className="size-6" />
+      </Button>
       {liveEditingTask !== null ? (
         <MobileTaskEditSheet
           key={taskKey(liveEditingTask)}

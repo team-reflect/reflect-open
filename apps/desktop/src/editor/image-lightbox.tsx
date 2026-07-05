@@ -37,7 +37,7 @@ export function ImageLightbox({
   return (
     <LightboxDialog open title="Image preview" onClose={onClose}>
       {canOpenImage ? (
-        <div className="absolute top-4 right-4 z-10">
+        <div className="absolute top-[max(env(safe-area-inset-top),1rem)] right-[max(env(safe-area-inset-right),1rem)] z-10">
           <Button
             type="button"
             variant="ghost"
