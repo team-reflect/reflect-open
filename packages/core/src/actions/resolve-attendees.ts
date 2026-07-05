@@ -1,5 +1,6 @@
 import { resolveAttendeeContact } from '../contacts/resolve'
 import { noteTitleOwningEmail } from '../indexing/queries'
+import { wikiLinkSafe } from '../markdown/edit'
 import { foldEmail } from '../markdown/email-fields'
 import type { MeetingAttendee } from './add-meeting'
 
@@ -44,7 +45,12 @@ async function resolveAttendee(
     return attendee
   }
   const ownerTitle = await noteTitleOwningEmail(attendee.email)
-  if (ownerTitle !== null && ownerTitle.trim() !== '') {
+  // The rename must be lossless: `[[…]]` has no escaping, so a title that
+  // wikiLinkSafe would alter (brackets, pipes, doubled spaces) can't be
+  // linked verbatim — the sanitized form would miss the owner in the index
+  // and mint the very duplicate this resolution exists to prevent. Such an
+  // owner falls through to the later steps instead.
+  if (ownerTitle !== null && ownerTitle !== '' && wikiLinkSafe(ownerTitle) === ownerTitle) {
     return { name: ownerTitle, email: attendee.email }
   }
   if (lookupContacts && foldEmail(attendee.name) === foldEmail(attendee.email)) {

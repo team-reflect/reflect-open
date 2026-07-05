@@ -79,6 +79,18 @@ describe('resolveMeetingAttendees', () => {
     expect(contactMock).not.toHaveBeenCalled()
   })
 
+  it('skips an owner whose title cannot be wiki-linked verbatim', async () => {
+    // `[[Jane [Doe]]]` would corrupt the link, and the sanitized form would
+    // miss the owner in the index — so the rename must not happen at all.
+    owningNoteMock.mockResolvedValue('Jane [Doe]')
+    contactMock.mockResolvedValue(contact('Jane Doe'))
+    const resolved = await resolveMeetingAttendees(
+      [{ name: 'jane@corp.com', email: 'jane@corp.com' }],
+      true,
+    )
+    expect(resolved).toEqual([{ name: 'Jane Doe', email: 'jane@corp.com' }])
+  })
+
   it('falls through on a nameless contact or blank-titled owner', async () => {
     owningNoteMock.mockResolvedValue('   ')
     contactMock.mockResolvedValue(contact('  '))
