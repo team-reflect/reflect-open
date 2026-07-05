@@ -11,6 +11,7 @@ import {
 import { homeDir, join } from '@tauri-apps/api/path'
 import { open } from '@tauri-apps/plugin-dialog'
 import {
+  deleteGraph as deleteGraphCommand,
   errorMessage,
   forgetRecent,
   hasBridge,
@@ -65,6 +66,12 @@ interface GraphContextValue {
   openRecent: (root: string) => Promise<boolean>
   /** Drop a graph from the recents list. */
   forget: (root: string) => Promise<void>
+  /**
+   * Move the open graph's directory to the OS trash (recoverable), drop it
+   * from recents, and return to the chooser. Throws when the delete fails so
+   * the settings confirm dialog can surface the error. Desktop-only.
+   */
+  deleteGraph: () => Promise<void>
   /**
    * Mobile only (Plan 19, step 6): the user hasn't yet chosen how to start
    * (iCloud Drive / this device / GitHub), so both fixed roots are left
@@ -458,6 +465,17 @@ export function GraphProvider({
     [closeActiveGraph, graph, loadRecents],
   )
 
+  const deleteGraph = useCallback(async (): Promise<void> => {
+    if (graph === null) {
+      return
+    }
+    // Trash + forget happen in Rust while the session pin is still valid;
+    // only a confirmed delete tears the UI down to the chooser.
+    await deleteGraphCommand(graph.generation)
+    await closeActiveGraph()
+    await loadRecents()
+  }, [closeActiveGraph, graph, loadRecents])
+
   const completeOnboarding = useCallback(
     async (kind: MobileStorageKind, chosenRoot?: string): Promise<void> => {
       // An explicit root comes from the onboarding graph list or the settings
@@ -538,6 +556,7 @@ export function GraphProvider({
       createAt,
       openRecent,
       forget,
+      deleteGraph,
       needsOnboarding,
       mobileStorageInfo,
       mobileStorageKind,
@@ -556,6 +575,7 @@ export function GraphProvider({
       createAt,
       openRecent,
       forget,
+      deleteGraph,
       needsOnboarding,
       mobileStorageInfo,
       mobileStorageKind,

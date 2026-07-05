@@ -19,12 +19,14 @@ const graph = vi.hoisted(() => ({
   current: null as GraphInfo | null,
   indexGeneration: 7 as number | null,
   forget: vi.fn<(root: string) => Promise<void>>(async () => {}),
+  deleteGraph: vi.fn<() => Promise<void>>(async () => {}),
 }))
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({
     graph: graph.current,
     indexGeneration: graph.indexGeneration,
     forget: graph.forget,
+    deleteGraph: graph.deleteGraph,
   }),
 }))
 vi.mock('@/providers/sync-provider', () => ({
@@ -111,6 +113,7 @@ beforeEach(() => {
   graph.current = null
   graph.indexGeneration = 7
   graph.forget.mockClear()
+  graph.deleteGraph.mockClear()
   queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   })
@@ -144,6 +147,32 @@ describe('SettingsScreen', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /forget graph/i }))
 
     await waitFor(() => expect(graph.forget).toHaveBeenCalledWith('/graphs/work'))
+  })
+
+  it('requires typing the graph name before deleting the graph', async () => {
+    graph.current = { root: '/graphs/work', name: 'Work', generation: 1 }
+    renderScreen()
+
+    const section = screen.getByRole('region', { name: 'Danger zone' })
+    fireEvent.click(within(section).getByRole('button', { name: /delete graph/i }))
+
+    const dialog = screen.getByRole('dialog', { name: /delete graph/i })
+    expect(within(dialog).getByText('/graphs/work')).toBeTruthy()
+    const confirm = within(dialog).getByRole('button', { name: /delete graph/i })
+    expect(confirm.hasAttribute('disabled')).toBe(true)
+
+    const nameInput = within(dialog).getByLabelText('Graph name')
+    fireEvent.change(nameInput, { target: { value: 'Wor' } })
+    expect(confirm.hasAttribute('disabled')).toBe(true)
+    // Enter with a mismatched name must not delete either.
+    fireEvent.keyDown(nameInput, { key: 'Enter' })
+    expect(graph.deleteGraph).not.toHaveBeenCalled()
+
+    fireEvent.change(nameInput, { target: { value: 'Work' } })
+    expect(confirm.hasAttribute('disabled')).toBe(false)
+    fireEvent.click(confirm)
+
+    await waitFor(() => expect(graph.deleteGraph).toHaveBeenCalledTimes(1))
   })
 
   it('reflects the persisted markdown syntax mode', async () => {

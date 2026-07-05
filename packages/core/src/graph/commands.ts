@@ -188,3 +188,12 @@ export async function recentGraphs(): Promise<RecentGraph[]> {
 export async function forgetRecent(root: string): Promise<void> {
   await call('forget_recent', { root }, voidSchema)
 }
+
+/**
+ * Move the open graph's whole directory to the OS trash (recoverable) and
+ * drop it from recents. Pinned to `generation` so a delete can never race a
+ * graph switch and trash the newly opened graph. Desktop-only.
+ */
+export async function deleteGraph(generation: number): Promise<void> {
+  await call('graph_delete', { generation }, voidSchema)
+}
