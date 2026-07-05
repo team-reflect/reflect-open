@@ -7,11 +7,13 @@ import {
   createAltoolUploadArgs,
   createAltoolValidateArgs,
   createApiKeyAltoolArgs,
+  createTimestampBuildNumber,
   createTauriIosBuildEnv,
   createTauriIosBuildArgs,
   findIpaInfoPlistPath,
   isFalsePlistValue,
   normalizeApiKeyContent,
+  resolveBuildNumber,
 } from './release-ios.mjs'
 
 test('iOS release builds pass App Store Connect export and build number through Tauri', () => {
@@ -41,6 +43,35 @@ test('iOS release builds can rely on local Xcode accounts when no API key is sup
     'release-testing',
     '--ci',
   ])
+})
+
+test('timestamp build numbers use UTC YYYYMMDDHHmm format', () => {
+  expect(createTimestampBuildNumber(new Date('2026-07-05T09:04:30Z'))).toBe('202607050904')
+})
+
+test('required iOS release commands generate timestamp build numbers instead of using GitHub run numbers', () => {
+  const previousBuildNumber = process.env.BUILD_NUMBER
+  const previousRunNumber = process.env.GITHUB_RUN_NUMBER
+
+  try {
+    delete process.env.BUILD_NUMBER
+    process.env.GITHUB_RUN_NUMBER = '10'
+
+    expect(resolveBuildNumber(null, { required: true, now: new Date('2026-07-05T09:04:30Z') })).toBe(
+      '202607050904',
+    )
+  } finally {
+    if (previousBuildNumber === undefined) {
+      delete process.env.BUILD_NUMBER
+    } else {
+      process.env.BUILD_NUMBER = previousBuildNumber
+    }
+    if (previousRunNumber === undefined) {
+      delete process.env.GITHUB_RUN_NUMBER
+    } else {
+      process.env.GITHUB_RUN_NUMBER = previousRunNumber
+    }
+  }
 })
 
 test('iOS release builds expose the staged API key path to Tauri signing', () => {

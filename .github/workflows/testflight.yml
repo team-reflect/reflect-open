@@ -3,10 +3,6 @@ name: TestFlight
 on:
   workflow_dispatch:
     inputs:
-      build_number:
-        description: CFBundleVersion build number. Defaults to the GitHub run number.
-        required: false
-        type: string
       export_method:
         description: Xcode export method for the IPA.
         required: true
@@ -79,12 +75,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Resolve build number
+        run: |
+          build_number="$(date -u +%Y%m%d%H%M)"
+          echo "BUILD_NUMBER=$build_number" >> "$GITHUB_ENV"
+          echo "Using TestFlight CFBundleVersion $build_number"
+
       - name: Build and upload to TestFlight
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
-          BUILD_NUMBER: ${{ inputs.build_number || github.run_number }}
           EXPORT_METHOD: ${{ inputs.export_method }}
           WAIT_FLAG: ${{ inputs.wait_for_processing && '--wait' || '' }}
         run: |

@@ -2,7 +2,7 @@
 //
 // Usage:
 //   pnpm release:ios build --build-number=123
-//   pnpm release:ios testflight --build-number=123 --wait
+//   pnpm release:ios testflight --wait
 //   pnpm release:ios upload --ipa=apps/desktop/src-tauri/gen/apple/build/arm64/Reflect.ipa
 //
 // The App Store Connect API key is used twice when present:
@@ -137,13 +137,23 @@ function ensureTool(command, args, installHint) {
   if (result.status !== 0) fail(`${command} is not available. ${installHint}\n${result.output.trim()}`)
 }
 
-function ensureBuildNumber(buildNumber, { required }) {
+export function createTimestampBuildNumber(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, '0')
+  return [
+    date.getUTCFullYear(),
+    pad(date.getUTCMonth() + 1),
+    pad(date.getUTCDate()),
+    pad(date.getUTCHours()),
+    pad(date.getUTCMinutes()),
+  ].join('')
+}
+
+function ensureBuildNumber(buildNumber, { required, now = new Date() }) {
   if (!buildNumber) {
     if (required) {
-      fail(
-        'missing build number. Pass --build-number=<number> or set BUILD_NUMBER/GITHUB_RUN_NUMBER.\n' +
-          '  TestFlight requires each upload for the same marketing version to have a new CFBundleVersion.',
-      )
+      const generatedBuildNumber = createTimestampBuildNumber(now)
+      log(`generated UTC timestamp build number: ${generatedBuildNumber}`)
+      return generatedBuildNumber
     }
     return null
   }
@@ -151,8 +161,8 @@ function ensureBuildNumber(buildNumber, { required }) {
   return buildNumber
 }
 
-function resolveBuildNumber(buildNumberFlag, { required }) {
-  return ensureBuildNumber(buildNumberFlag ?? process.env.BUILD_NUMBER ?? process.env.GITHUB_RUN_NUMBER, { required })
+export function resolveBuildNumber(buildNumberFlag, { required, now = new Date() }) {
+  return ensureBuildNumber(buildNumberFlag ?? process.env.BUILD_NUMBER, { required, now })
 }
 
 function resolveExportMethod(exportMethod) {
@@ -531,8 +541,9 @@ Commands:
 
 Flags:
   --build-number=<number>
-              CFBundleVersion build number. Required for preflight/testflight.
-              Defaults to BUILD_NUMBER or GITHUB_RUN_NUMBER when set.
+              CFBundleVersion build number. Defaults to BUILD_NUMBER when set.
+              Required preflight/testflight commands generate a UTC timestamp
+              (YYYYMMDDHHmm) when omitted.
   --export-method=<name>
               Tauri/Xcode export method: app-store-connect | release-testing |
               debugging | validation (default: app-store-connect)
