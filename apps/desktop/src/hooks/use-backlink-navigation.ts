@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import type { WikilinkClickHandler } from '@meowdown/core'
 import { useAssetPersistence } from '@/editor/use-asset-persistence'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
@@ -41,6 +41,17 @@ export function useBacklinkNavigation(): BacklinkNavigation {
   const { navigate } = useRouter()
   const { graph } = useGraph()
 
+  // The new-window fallback below resolves async — a late in-window
+  // navigation must not yank a surface the user already left (the same
+  // lifetime guard as useWikiLinkNavigation's).
+  const unmountedRef = useRef(false)
+  useEffect(() => {
+    unmountedRef.current = false
+    return () => {
+      unmountedRef.current = true
+    }
+  }, [])
+
   const openSource = useCallback(
     (target: string, event?: NewWindowClickEvent) => {
       const route = routeForPath(target)
@@ -49,7 +60,7 @@ export function useBacklinkNavigation(): BacklinkNavigation {
         // Degrade a declined/failed open to in-window navigation so the
         // modifier can never make the click do nothing.
         void openRouteInNewWindow(route).then((opened) => {
-          if (!opened) {
+          if (!opened && !unmountedRef.current) {
             arrive()
           }
         })
