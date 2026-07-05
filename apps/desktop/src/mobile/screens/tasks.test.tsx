@@ -314,6 +314,46 @@ describe('MobileTasks', () => {
     view.unmount()
   })
 
+  it('deletes an emptied draft on Complete instead of resurrecting the text', async () => {
+    getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
+    const user = userEvent.setup()
+    const view = renderScreen()
+
+    await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
+    await user.clear(view.getByRole('textbox', { name: 'Task text' }))
+    await user.click(view.getByRole('button', { name: 'Complete' }))
+
+    await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(1))
+    expect(toggleTask).not.toHaveBeenCalled()
+    view.unmount()
+  })
+
+  it('deletes an emptied draft on Convert instead of resurrecting the text', async () => {
+    getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
+    const user = userEvent.setup()
+    const view = renderScreen()
+
+    await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
+    await user.clear(view.getByRole('textbox', { name: 'Task text' }))
+    await user.click(view.getByRole('button', { name: 'Convert to bullet' }))
+
+    await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(1))
+    expect(convertTaskToBullet).not.toHaveBeenCalled()
+    view.unmount()
+  })
+
+  it('keeps open tasks visible while the archived history is still loading', async () => {
+    window.sessionStorage.setItem('reflect.tasks.filter.archived', 'true')
+    getOpenTasks.mockResolvedValue([task({ text: 'still open' })])
+    getCompletedTasks.mockReturnValue(new Promise<OpenTask[]>(() => {}))
+    const view = renderScreen()
+
+    // The open groups render; the pending completed query must not blank them.
+    await view.findByText('still open')
+    expect(view.queryByLabelText('Loading tasks')).toBeNull()
+    view.unmount()
+  })
+
   it('opens the source note from the sheet', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
     const user = userEvent.setup()

@@ -107,9 +107,11 @@ export function MobileTaskEditSheet({
     const result = resolveTaskEdit(initial, draft)
     if (result.type === 'commit') {
       actions.editAndToggle(task, result.content)
+    } else if (result.type === 'delete') {
+      // Emptied then completed: delete, like desktop's ⌘↵ on an emptied row —
+      // never toggle text the user just cleared back into the note.
+      actions.remove([task])
     } else {
-      // Unchanged or emptied: toggle the task as it stands — emptying the text
-      // then completing shouldn't silently delete it.
       actions.checkboxToggle(task)
     }
     close()
@@ -119,6 +121,10 @@ export function MobileTaskEditSheet({
     const result = resolveTaskEdit(initial, draft)
     if (result.type === 'commit') {
       actions.editAndConvertToBullet(task, result.content)
+    } else if (result.type === 'delete') {
+      // Emptied then converted: delete, like desktop's ⌘⇧K on an emptied row —
+      // converting would resurrect the cleared text as a bullet.
+      actions.remove([task])
     } else {
       actions.convertToBullet([task])
     }

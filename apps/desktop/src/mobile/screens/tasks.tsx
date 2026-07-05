@@ -144,14 +144,17 @@ export function MobileTasks(): ReactElement {
           <SlidersHorizontal />
         </Button>
       </header>
-      {enabled && !ready && !isError ? (
-        <div className="flex flex-1 items-center justify-center" aria-label="Loading tasks">
-          <Spinner className="size-5 text-text-muted" />
-        </div>
-      ) : isError ? (
+      {isError ? (
         <p role="alert" className="px-4 py-6 text-sm text-text-muted">
           Couldn’t load tasks.
         </p>
+      ) : enabled && !ready && groups.length === 0 ? (
+        // Loading only gates what would otherwise be a false empty state: with
+        // archived flipping on, the open groups keep showing while the
+        // completed history loads (desktop likewise gates only the message).
+        <div className="flex flex-1 items-center justify-center" aria-label="Loading tasks">
+          <Spinner className="size-5 text-text-muted" />
+        </div>
       ) : groups.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-text-muted">
           <CircleCheck className="size-6" />
