@@ -124,7 +124,8 @@ describe('GraphChooser', () => {
     render(<GraphChooser />, { wrapper })
 
     await screen.findByRole('button', { name: 'Notes' })
-    expect(screen.getByText('Your notes are already in iCloud.')).toBeInTheDocument()
+    expect(screen.getByText('Open an existing graph from iCloud Drive.')).toBeInTheDocument()
+    expect(screen.getByText('or create new graph')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Work' }))
 
     await waitFor(() =>

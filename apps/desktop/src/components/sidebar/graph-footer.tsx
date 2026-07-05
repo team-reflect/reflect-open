@@ -76,15 +76,16 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
         <Tooltip delayDuration={700}>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>
-              <button
+              <Button
                 type="button"
-                className="flex min-w-0 flex-1 items-center space-x-2.5 text-left"
+                variant="ghost"
+                className="group h-auto min-w-0 flex-1 justify-start gap-2.5 px-1.5 py-1 text-left"
               >
                 <GraphSwatch
                   color={colorFor(graph.root)}
                   className={cn('h-5 w-5', indexing && 'motion-safe:animate-pulse')}
                 />
-                <span className="min-w-0 truncate text-xs font-medium text-text-secondary">
+                <span className="min-w-0 truncate text-xs font-medium text-text-secondary transition-colors duration-100 group-hover:text-text">
                   {graph.name}
                 </span>
                 {dot !== null ? (
@@ -103,7 +104,7 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
                     Indexing
                   </span>
                 ) : null}
-              </button>
+              </Button>
             </DropdownMenuTrigger>
           </TooltipTrigger>
           <TooltipContent>{graph.root}</TooltipContent>

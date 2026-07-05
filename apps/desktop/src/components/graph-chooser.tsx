@@ -23,10 +23,11 @@ function isIcloudCapablePlatform(): boolean {
  * plainly: where do your notes live? iCloud is the recommended default —
  * every graph already in the container is listed to open, and a name field
  * creates a new one right there. Choosing a folder yourself is the
- * self-managed path (Git sync, local-only).
+ * self-managed path.
  *
- * "Graph" is deliberately absent — newcomers don't know the word yet; the
- * iCloud card asks for a "name" and the folder card talks about folders.
+ * The iCloud card uses "graph" only where the user is deciding between
+ * existing containers and creating another one; the folder card talks about
+ * folders.
  */
 export function GraphChooser(): ReactElement {
   const { recents, error, pickAndOpen, openRecent, createAt, forget } = useGraph()
@@ -56,8 +57,7 @@ export function GraphChooser(): ReactElement {
             icon={<Folder aria-hidden className="size-4" strokeWidth={1.75} />}
             title="A folder you choose"
           >
-            Keep notes in any folder on this {icloudCapable ? 'Mac' : 'computer'}. Sync with
-            GitHub from Settings, or keep them local.
+            Keep notes in any folder on this {icloudCapable ? 'Mac' : 'computer'}.
           </CardHeader>
           <Button
             type="button"
@@ -242,7 +242,7 @@ function IcloudCard({
         tinted
       >
         {existing.length > 0
-          ? 'Your notes are already in iCloud.'
+          ? 'Open an existing graph from iCloud Drive.'
           : available
             ? 'Syncs across your Mac and iPhone. Backed up automatically.'
             : status === undefined
@@ -274,7 +274,8 @@ function IcloudCard({
       {existing.length > 0 ? (
         // Compact create row under the list: a new graph next to the
         // existing ones is the secondary action here, not the headline.
-        <div className="mt-auto space-y-1.5">
+        <div className="mt-auto space-y-2">
+          <ChooserDivider>or create new graph</ChooserDivider>
           <div className="flex gap-2">
             <Input
               aria-label="Name"
@@ -334,5 +335,15 @@ function IcloudCard({
         </div>
       )}
     </section>
+  )
+}
+
+function ChooserDivider({ children }: { children: string }): ReactElement {
+  return (
+    <div className="flex items-center gap-3 py-1">
+      <span aria-hidden className="h-px flex-1 bg-border" />
+      <span className="text-2xs font-medium text-text-muted">{children}</span>
+      <span aria-hidden className="h-px flex-1 bg-border" />
+    </div>
   )
 }
