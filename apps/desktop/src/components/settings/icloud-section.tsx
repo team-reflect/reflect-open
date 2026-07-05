@@ -63,13 +63,11 @@ function reviewLine(conflictCount: number, forkCount: number): string {
 /**
  * Settings → Sync → iCloud Drive (Plan 21 Phase 1, the desktop leg): see
  * whether the graph syncs through iCloud Drive, and move a local graph into the
- * container. The move copies (count+byte verified), then disconnects the
- * Git backup remote (iCloud sync and a Git remote are mutually exclusive per
- * graph — two merge machines over the same files would fight; the iCloud
- * copy carries no `.git`, so the exclusion holds structurally), then reopens
- * the graph at its iCloud home. Ordered copy-first so a failed copy leaves
- * everything — including the backup — exactly as it was; the original folder
- * stays on disk untouched as the recovery copy either way.
+ * container. The move copies (count+byte verified), then disconnects the old
+ * folder's Git backup remote before reopening the graph at its iCloud home.
+ * Ordered copy-first so a failed copy leaves everything — including the backup
+ * — exactly as it was; the original folder stays on disk untouched as the
+ * recovery copy either way.
  *
  * macOS only — Windows/Linux have no iCloud Drive, and mobile chooses its
  * storage in onboarding.
@@ -203,7 +201,7 @@ export function IcloudSettingsField(): ReactElement | null {
                     Your notes are copied into iCloud Drive and the graph reopens there. The
                     current folder stays on disk, untouched, as a recovery copy.
                     {backupConnected
-                      ? ' GitHub backup is disconnected first — a graph syncs through iCloud or a Git remote, not both.'
+                      ? ' GitHub backup is disconnected from the recovery copy; you can reconnect backup after the iCloud graph opens.'
                       : ''}
                   </DialogDescription>
                 </DialogHeader>

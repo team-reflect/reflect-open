@@ -90,7 +90,7 @@ describe('SyncSection', () => {
     expect(within(section).getByRole('button', { name: /connect github/i })).toBeTruthy()
   })
 
-  it('hides GitHub backup when the graph syncs through iCloud', async () => {
+  it('keeps GitHub backup visible when the graph syncs through iCloud', async () => {
     graph.current = {
       root: '/Users/alex/Library/Mobile Documents/iCloud~app/Documents/Notes',
       name: 'Notes',
@@ -103,8 +103,8 @@ describe('SyncSection', () => {
     expect(within(section).getByText('iCloud Drive', { selector: 'legend' })).toBeTruthy()
     expect(await within(section).findByText('All note files are downloaded.')).toBeTruthy()
     expect(within(section).getByText('No notes need review.')).toBeTruthy()
-    expect(within(section).queryByText('GitHub backup')).toBeNull()
-    expect(within(section).queryByRole('button', { name: /connect github/i })).toBeNull()
+    expect(within(section).getByText('GitHub backup', { selector: 'legend' })).toBeTruthy()
+    expect(within(section).getByRole('button', { name: /connect github/i })).toBeTruthy()
   })
 
   it('surfaces iCloud download and review counts', async () => {
