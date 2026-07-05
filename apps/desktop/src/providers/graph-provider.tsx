@@ -322,6 +322,12 @@ export function GraphProvider({
    */
   const createAt = useCallback(
     async (root: string): Promise<boolean> => {
+      // Guarded BEFORE createGraph: graph_create activates the shared Rust
+      // session, so off-main it would re-root every window even though the
+      // openRecent below refuses.
+      if (!requireMainWindow('creating a graph')) {
+        return false
+      }
       try {
         await createGraph(root)
       } catch (err) {
