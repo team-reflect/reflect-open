@@ -6,6 +6,7 @@ import {
   defaultAttendees,
   errorMessage,
   isContactsReadable,
+  resolveMeetingAttendees,
   type CalendarEvent,
   type MeetingAttendee,
 } from '@reflect/core'
@@ -65,6 +66,48 @@ export function AddMeetingDialog({ date, event, onClose }: AddMeetingDialogProps
       }
     }
   }, [])
+
+  // Upgrade the prefilled chips once attendee resolution answers: an invite
+  // email an existing note owns swaps the calendar's spelling for the note
+  // title, so the chip shows exactly what submit will link. Chips are merged
+  // by their prefill name — anything the user removed stays removed, anything
+  // they added is untouched. Submit re-resolves authoritatively either way,
+  // so a failure (or a submit that beats this) only costs display polish.
+  useEffect(() => {
+    let cancelled = false
+    const upgradeAttendees = async (): Promise<void> => {
+      const lookupContacts =
+        settings.contactsEnabled && isContactsReadable(await contactsAuthorizationStatus())
+      const prefilled = defaultAttendees(event)
+      const resolved = await resolveMeetingAttendees(prefilled, lookupContacts)
+      if (cancelled) {
+        return
+      }
+      const upgrades = new Map(
+        prefilled.map((original, index) => [original.name, resolved[index] ?? original]),
+      )
+      setAttendees((current) => {
+        const seen = new Set<string>()
+        const merged: MeetingAttendee[] = []
+        for (const attendee of current) {
+          const upgraded = upgrades.get(attendee.name) ?? attendee
+          const key = upgraded.name.toLowerCase()
+          if (seen.has(key)) {
+            continue
+          }
+          seen.add(key)
+          merged.push(upgraded)
+        }
+        return merged
+      })
+    }
+    upgradeAttendees().catch((cause: unknown) => {
+      console.error('attendee resolution failed:', cause)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [event, settings.contactsEnabled])
 
   const addAttendee = (attendee: MeetingAttendee): void => {
     setAttendees((current) =>

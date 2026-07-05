@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { noteExists, readNote, writeNote } from '../graph/commands'
 import { createNoteWithTitle } from '../graph/create-note'
-import { resolveWikiTarget } from '../indexing/queries'
+import { noteTitleOwningEmail, resolveWikiTarget } from '../indexing/queries'
 import { setBridge } from '../ipc/bridge'
 import { resolved, unresolved } from '../markdown/resolve'
 import { addMeetingToDaily, meetingLine, type AddMeetingInput } from './add-meeting'
@@ -15,6 +15,7 @@ vi.mock('../graph/create-note', () => ({
   createNoteWithTitle: vi.fn(),
 }))
 vi.mock('../indexing/queries', () => ({
+  noteTitleOwningEmail: vi.fn(),
   resolveWikiTarget: vi.fn(),
 }))
 
@@ -23,6 +24,7 @@ const readNoteMock = vi.mocked(readNote)
 const writeNoteMock = vi.mocked(writeNote)
 const createNoteMock = vi.mocked(createNoteWithTitle)
 const resolveMock = vi.mocked(resolveWikiTarget)
+const owningNoteMock = vi.mocked(noteTitleOwningEmail)
 
 const DAILY = 'daily/2026-07-01.md'
 const GENERATION = 3
@@ -46,6 +48,7 @@ beforeEach(() => {
   noteExistsMock.mockResolvedValue(false)
   createNoteMock.mockImplementation(async (title: string) => `notes/${title.toLowerCase()}.md`)
   resolveMock.mockImplementation(async (target) => unresolved(target))
+  owningNoteMock.mockResolvedValue(null)
 })
 
 describe('meetingLine', () => {
@@ -212,6 +215,59 @@ describe('addMeetingToDaily', () => {
   })
 })
 
+describe('addMeetingToDaily attendee resolution', () => {
+  it('links the note owning the invite email instead of minting a duplicate', async () => {
+    owningNoteMock.mockImplementation(async (email) =>
+      email === 'jane@corp.com' ? 'Jane Doe' : null,
+    )
+    resolveMock.mockImplementation(async (target) =>
+      target === 'Jane Doe' ? resolved('notes/jane-doe.md') : unresolved(target),
+    )
+    const outcome = await addMeetingToDaily(
+      input({
+        attendees: [{ name: 'jane@corp.com', email: 'jane@corp.com' }],
+        backlinkMeeting: false,
+      }),
+    )
+    expect(writeNoteMock).toHaveBeenCalledWith(
+      DAILY,
+      '## Meetings\n\n- Met with [[Jane Doe]] for Standup\n',
+      GENERATION,
+    )
+    expect(createNoteMock).not.toHaveBeenCalled()
+    expect(outcome.createdNotes).toEqual([])
+  })
+
+  it('collapses two spellings of one person once their emails resolve to the same note', async () => {
+    owningNoteMock.mockResolvedValue('Jane Doe')
+    resolveMock.mockImplementation(async (target) =>
+      target === 'Jane Doe' ? resolved('notes/jane-doe.md') : unresolved(target),
+    )
+    await addMeetingToDaily(
+      input({
+        attendees: [
+          { name: 'jane@corp.com', email: 'jane@corp.com' },
+          { name: 'Doe, Jane', email: 'jane.doe@home.example' },
+        ],
+        backlinkMeeting: false,
+      }),
+    )
+    expect(writeNoteMock).toHaveBeenCalledWith(
+      DAILY,
+      '## Meetings\n\n- Met with [[Jane Doe]] for Standup\n',
+      GENERATION,
+    )
+  })
+
+  it('resolution errors fail the call loudly rather than writing a duplicate-prone line', async () => {
+    owningNoteMock.mockRejectedValue(new Error('index unavailable'))
+    await expect(
+      addMeetingToDaily(input({ attendees: [{ name: 'Jane', email: 'jane@corp.com' }] })),
+    ).rejects.toThrow('index unavailable')
+    expect(createNoteMock).not.toHaveBeenCalled()
+  })
+})
+
 describe('addMeetingToDaily contact pre-fill', () => {
   const ADA = { name: 'Ada Lovelace', email: 'ada@example.com' }
 
@@ -242,6 +298,35 @@ describe('addMeetingToDaily contact pre-fill', () => {
       GENERATION,
       '- Type: #person\n- Email: ada@example.com\n- Phone: +1 555-0100',
     )
+  })
+
+  it('names and pre-fills the created note from the contact when the calendar only knew the address', async () => {
+    installContactsBridge([
+      {
+        fullName: 'Ada Lovelace',
+        givenName: 'Ada',
+        familyName: 'Lovelace',
+        emails: ['ada@example.com'],
+        phones: [],
+      },
+    ])
+    const outcome = await addMeetingToDaily(
+      input({
+        attendees: [{ name: 'ada@example.com', email: 'ada@example.com' }],
+        lookupContacts: true,
+      }),
+    )
+    expect(writeNoteMock).toHaveBeenCalledWith(
+      DAILY,
+      expect.stringContaining('[[Ada Lovelace]]'),
+      GENERATION,
+    )
+    expect(createNoteMock).toHaveBeenCalledWith(
+      'Ada Lovelace',
+      GENERATION,
+      '- Type: #person\n- Email: ada@example.com',
+    )
+    expect(outcome.createdNotes).toContain('Ada Lovelace')
   })
 
   it('creates the bare typed note on a lookup miss, as v1 did', async () => {

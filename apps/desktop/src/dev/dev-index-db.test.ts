@@ -33,6 +33,7 @@ function sampleNote(overrides: Partial<IndexedNote> = {}): IndexedNote {
     ],
     tags: [{ tag: 'book', tagKey: 'book' }],
     aliases: [],
+    emails: [{ email: 'Sample@Example.com', emailKey: 'sample@example.com' }],
     assets: [],
     tasks: [{ markerOffset: 40, text: 'Do the thing', raw: '- [ ] Do the thing', checked: false, dueDate: null }],
     ...overrides,
@@ -66,6 +67,11 @@ describe('createDevIndexDb', () => {
     const tasks = db.query('SELECT text, checked FROM tasks', [])
     expect(tasks).toEqual([{ text: 'Do the thing', checked: 0 }])
 
+    const emails = db.query('SELECT email, email_key FROM note_emails', [])
+    expect(emails).toEqual([
+      { email: 'Sample@Example.com', email_key: 'sample@example.com' },
+    ])
+
     const hits = db.query("SELECT path FROM search_fts WHERE search_fts MATCH 'sync'", [])
     expect(hits).toEqual([{ path: 'notes/sample.md' }])
   })
@@ -88,6 +94,9 @@ describe('createDevIndexDb', () => {
 
     expect(db.query('SELECT path FROM notes', [])).toEqual([{ path: 'notes/renamed.md' }])
     expect(db.query('SELECT note_path FROM tags', [])).toEqual([
+      { note_path: 'notes/renamed.md' },
+    ])
+    expect(db.query('SELECT note_path FROM note_emails', [])).toEqual([
       { note_path: 'notes/renamed.md' },
     ])
 

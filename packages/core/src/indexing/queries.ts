@@ -2,6 +2,7 @@ import type { Database } from '@reflect/db'
 import { sql, type Selectable } from 'kysely'
 import { readNote } from '../graph/commands'
 import {
+  foldEmail,
   foldKey,
   foldTag,
   normalizeWikiTarget,
@@ -597,6 +598,29 @@ export async function getNoteIdsByPath(paths: string[]): Promise<Map<string, str
     }
   }
   return ids
+}
+
+/**
+ * The title of the note that owns `email` through a `- Email:` contact-field
+ * bullet (the `note_emails` projection), or null. Regular notes only: a daily
+ * note or template quoting an address must never become a `[[Person]]` link
+ * target. Several notes claiming one address resolve to the first path
+ * alphabetically, the resolver's rule everywhere else.
+ */
+export async function noteTitleOwningEmail(email: string): Promise<string | null> {
+  const key = foldEmail(email)
+  if (key === '') {
+    return null
+  }
+  const owner = await db
+    .selectFrom('noteEmails')
+    .innerJoin('notes', 'notes.path', 'noteEmails.notePath')
+    .where('noteEmails.emailKey', '=', key)
+    .where('notes.kind', '=', 'note')
+    .select('notes.title as title')
+    .orderBy('notes.path')
+    .executeTakeFirst()
+  return owner?.title ?? null
 }
 
 /**
