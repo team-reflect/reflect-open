@@ -27,6 +27,7 @@ export {
   icloudWatchStart,
   icloudWatchStop,
   type AppPlatform,
+  type IcloudDownloadScope,
   type IcloudScanOptions,
   type IcloudStatus,
   type IcloudSweepOutcome,

@@ -30,7 +30,7 @@ import { invalidateGithubAuth } from '@/lib/github-auth-state'
 import { startOperation } from '@/lib/operations'
 import { isMobileSurface } from '@/lib/platform-surface'
 import { providerFetch } from '@/lib/provider-fetch'
-import { invalidateIndexQueries } from '@/lib/query-client'
+import { throttledInvalidateIndexQueries } from '@/lib/query-client'
 
 /**
  * Backup state as the UI sees it. `connected` means the graph has a repo and
@@ -171,7 +171,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
     if (indexGeneration !== null && indexable.length > 0) {
       void applyIndexChanges(indexable, indexGeneration).then((mutations) => {
         if (mutations > 0) {
-          invalidateIndexQueries()
+          throttledInvalidateIndexQueries()
         }
       })
     }

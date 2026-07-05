@@ -13,7 +13,7 @@ import {
   type GraphInfo,
 } from '@reflect/core'
 import { dirtyOpenPaths } from '@/editor/open-documents'
-import { invalidateIndexQueries } from '@/lib/query-client'
+import { throttledInvalidateIndexQueries } from '@/lib/query-client'
 
 /**
  * Whether a graph root lives under iCloud Drive: the app's container and the
@@ -36,6 +36,16 @@ const SCAN_DEBOUNCE_MS = 1_000
  * the shorter window — and an earlier-due request always wins.
  */
 const INGEST_SCAN_DEBOUNCE_MS = 5_000
+/**
+ * Minimum gap between the end of one sweep and the start of the next
+ * *arrival-triggered* one. The debounce alone still ran a full-graph sweep
+ * every ~5s for the length of an initial download — each one a tree walk
+ * plus a per-file version query, contending with the downloads themselves.
+ * Base advances are not latency-sensitive (the ingest set just accumulates),
+ * so a bulk sync gets a handful of sweeps instead of dozens. Conflict
+ * signals and resumes are unaffected.
+ */
+const INGEST_SCAN_MIN_SPACING_MS = 30_000
 /**
  * Resume-trigger dedupe: one transition can fire `focus` and
  * `visibilitychange` together (the backup controller's window, same value).
@@ -96,6 +106,7 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
   let scanTimerDue = 0
   let scanRunning = false
   let scanQueued = false
+  let lastScanEndedAt = 0
 
   function scheduleScan(delayMs: number = SCAN_DEBOUNCE_MS): void {
     if (disposed) {
@@ -113,6 +124,13 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
       scanTimer = null
       void runScan()
     }, delayMs)
+  }
+
+  /** Arrival-triggered sweeps: the wide debounce, stretched further to keep
+   * {@link INGEST_SCAN_MIN_SPACING_MS} from the previous sweep's end. */
+  function scheduleIngestScan(): void {
+    const sinceLastScan = Date.now() - lastScanEndedAt
+    scheduleScan(Math.max(INGEST_SCAN_DEBOUNCE_MS, INGEST_SCAN_MIN_SPACING_MS - sinceLastScan))
   }
 
   async function runScan(): Promise<void> {
@@ -148,6 +166,7 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
         baselinePending = true // the adoption baseline must survive a failed first sweep
       }
     } finally {
+      lastScanEndedAt = Date.now()
       scanRunning = false
       if (scanQueued) {
         scanQueued = false
@@ -183,7 +202,7 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
     if (indexGeneration !== null && indexable.length > 0) {
       void applyIndexChanges(indexable, indexGeneration).then((mutations) => {
         if (mutations > 0) {
-          invalidateIndexQueries()
+          throttledInvalidateIndexQueries()
         }
       })
     }
@@ -233,9 +252,10 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
             }
             pendingIngest.add(change.path)
           }
-          // Arrival-driven: the wide window, so a download burst folds into
-          // few sweeps instead of one per watch batch.
-          scheduleScan(INGEST_SCAN_DEBOUNCE_MS)
+          // Arrival-driven: the wide window plus the minimum spacing, so a
+          // download burst folds into a handful of sweeps rather than one
+          // per watch batch.
+          scheduleIngestScan()
         }),
       )
       disposers.push(

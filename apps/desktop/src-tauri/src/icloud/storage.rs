@@ -97,11 +97,20 @@ pub async fn mobile_storage(app: tauri::AppHandle) -> AppResult<MobileStorage> {
 /// `.name.md.icloud` stub until something requests it. The frontend calls
 /// this once per open/resume for iCloud graphs; while the count stays above
 /// zero it polls [`icloud_pending_count`], which never re-requests.
+///
+/// `notes_only` restricts the request (and the count) to markdown under the
+/// note directories. A first sync sequences its downloads through this:
+/// requesting everything at once puts thousands of concurrent downloads —
+/// assets are most of the bytes — under the first index pass, and the app
+/// crawls until they drain. Notes first, then one `notes_only: false` call
+/// for the rest once the note count reaches zero.
 #[tauri::command]
-pub async fn icloud_download_pending(root: String) -> AppResult<u32> {
-    tauri::async_runtime::spawn_blocking(move || Ok(platform::pending_walk(Path::new(&root), true)))
-        .await
-        .map_err(|err| AppError::io(err.to_string()))?
+pub async fn icloud_download_pending(root: String, notes_only: bool) -> AppResult<u32> {
+    tauri::async_runtime::spawn_blocking(move || {
+        Ok(platform::pending_walk(Path::new(&root), true, notes_only))
+    })
+    .await
+    .map_err(|err| AppError::io(err.to_string()))?
 }
 
 /// Command: the app-sandbox `Documents/` root alone — the cheap half of
@@ -134,14 +143,31 @@ pub fn mobile_storage_local(app: tauri::AppHandle) -> AppResult<String> {
 /// anything. The poll loop that waits for a download burst to settle calls
 /// this every second — re-*requesting* thousands of in-flight downloads on
 /// every tick is wasted `NSFileManager` traffic (the open/resume nudge and
-/// the metadata watch already own the requests).
+/// the metadata watch already own the requests). `notes_only` matches the
+/// scope the nudge requested, so the poll drains when the *notes* are in.
 #[tauri::command]
-pub async fn icloud_pending_count(root: String) -> AppResult<u32> {
+pub async fn icloud_pending_count(root: String, notes_only: bool) -> AppResult<u32> {
     tauri::async_runtime::spawn_blocking(move || {
-        Ok(platform::pending_walk(Path::new(&root), false))
+        Ok(platform::pending_walk(Path::new(&root), false, notes_only))
     })
     .await
     .map_err(|err| AppError::io(err.to_string()))?
+}
+
+/// The graph's note directories — the download-scope filter and the
+/// graph-detection probe share one list.
+const NOTE_DIRS: [&str; 3] = ["daily", "notes", "templates"];
+
+/// Whether a placeholder found under `rel_dir` (the stub's directory,
+/// graph-relative) standing for `target` falls in the notes-only download
+/// scope: markdown under one of the note directories. Assets, audio memos,
+/// and anything else wait for the follow-up full-scope request.
+fn placeholder_in_note_scope(rel_dir: &Path, target: &str) -> bool {
+    let Some(first) = rel_dir.components().next() else {
+        return false; // a stray placeholder at the graph root is not a note
+    };
+    let first = first.as_os_str().to_string_lossy();
+    NOTE_DIRS.iter().any(|dir| *dir == first) && target.ends_with(".md")
 }
 
 /// Every existing graph among the container `Documents/` subdirectories
@@ -169,7 +195,6 @@ fn find_graph_dirs(documents: &Path) -> Vec<PathBuf> {
 /// `.reflect/meta.json`: the index directory is excluded from sync on
 /// purpose, so a synced-down graph arrives as bare `daily/`/`notes/` content.
 fn dir_has_notes(root: &Path) -> bool {
-    const NOTE_DIRS: [&str; 3] = ["daily", "notes", "templates"];
     NOTE_DIRS.iter().any(|dir| {
         let Ok(entries) = std::fs::read_dir(root.join(dir)) else {
             return false;
@@ -214,9 +239,11 @@ mod platform {
     }
 
     /// Walk `root` counting `.icloud` placeholders; with `nudge`, request a
-    /// download for each. Individual failures are logged and skipped — one
-    /// undownloadable file must not stop the rest.
-    pub fn pending_walk(root: &Path, nudge: bool) -> u32 {
+    /// download for each. `notes_only` restricts both the count and the
+    /// requests to markdown under the note directories
+    /// ([`super::placeholder_in_note_scope`]). Individual failures are logged
+    /// and skipped — one undownloadable file must not stop the rest.
+    pub fn pending_walk(root: &Path, nudge: bool, notes_only: bool) -> u32 {
         let manager = NSFileManager::defaultManager();
         let mut pending = 0;
         let mut stack = vec![root.to_path_buf()];
@@ -244,6 +271,14 @@ mod platform {
                 let Some(target) = crate::fs::icloud_placeholder_target(&name) else {
                     continue;
                 };
+                if notes_only {
+                    let in_scope = dir
+                        .strip_prefix(root)
+                        .is_ok_and(|rel_dir| super::placeholder_in_note_scope(rel_dir, target));
+                    if !in_scope {
+                        continue;
+                    }
+                }
                 pending += 1;
                 if nudge && !start_download(&manager, &path) {
                     // Some iOS releases want the logical URL, not the stub.
@@ -277,7 +312,7 @@ mod platform {
     }
 
     /// Nothing to download without a container.
-    pub fn pending_walk(_root: &Path, _nudge: bool) -> u32 {
+    pub fn pending_walk(_root: &Path, _nudge: bool, _notes_only: bool) -> u32 {
         0
     }
 }
@@ -591,5 +626,32 @@ mod tests {
         std::fs::create_dir_all(downloaded.path().join("notes")).expect("mkdir");
         std::fs::write(downloaded.path().join("notes/idea.md"), b"# hi").expect("write");
         assert!(dir_has_notes(downloaded.path()));
+    }
+
+    #[test]
+    fn note_scope_covers_markdown_under_note_dirs_only() {
+        // Markdown in the tracked directories (nested included) is in scope.
+        assert!(placeholder_in_note_scope(
+            Path::new("daily"),
+            "2026-07-04.md"
+        ));
+        assert!(placeholder_in_note_scope(Path::new("notes"), "idea.md"));
+        assert!(placeholder_in_note_scope(
+            Path::new("templates"),
+            "meeting.md"
+        ));
+        assert!(placeholder_in_note_scope(
+            Path::new("notes/archive"),
+            "old.md"
+        ));
+        // Assets, recordings, non-markdown, and root strays wait for the
+        // full-scope follow-up request.
+        assert!(!placeholder_in_note_scope(Path::new("assets"), "photo.png"));
+        assert!(!placeholder_in_note_scope(
+            Path::new("audio-memos"),
+            "memo.m4a"
+        ));
+        assert!(!placeholder_in_note_scope(Path::new("notes"), "photo.png"));
+        assert!(!placeholder_in_note_scope(Path::new(""), "stray.md"));
     }
 }

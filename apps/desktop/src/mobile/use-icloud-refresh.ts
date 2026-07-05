@@ -37,6 +37,11 @@ const PENDING_POLL_LIMIT_MS = 20_000
  * against local disk, so an immediate second full pass would repeat that
  * work — on a first sync of a large graph, at the worst possible moment.
  *
+ * Downloads are sequenced notes-first: the nudge and the poll cover only
+ * markdown under the note directories, and the full-scope request (assets,
+ * recordings) fires once the note count drains — so a first sync's bulk
+ * bytes never compete with the first index pass.
+ *
  * Inert unless an iCloud graph is open (`mobileStorageKind === 'icloud'`).
  */
 export function useICloudRefresh(): void {
@@ -51,6 +56,19 @@ export function useICloudRefresh(): void {
     let lastRefreshAt = 0
     let retryTimer: ReturnType<typeof setTimeout> | null = null
 
+    // Notes download first; everything else (assets are most of the bytes)
+    // is requested only once the note placeholders drain. Kicking thousands
+    // of concurrent downloads at open put the whole first sync — network,
+    // disk, file coordination — under the first index pass, and the app
+    // crawled until it finished. Fire-and-forget: nothing polls or
+    // reconciles for assets (they aren't indexed; images appear as they
+    // land), and a failed request is retried by the next resume's drain.
+    const requestRemainingDownloads = (): void => {
+      void icloudDownloadPending(root, 'all').catch((err: unknown) => {
+        console.error('iCloud asset download request failed:', errorMessage(err))
+      })
+    }
+
     const pollPending = (startedAt: number): void => {
       if (retryTimer !== null) {
         return
@@ -60,14 +78,22 @@ export function useICloudRefresh(): void {
         if (disposed) {
           return
         }
-        void icloudPendingCount(root).then(
+        void icloudPendingCount(root, 'notes').then(
           (pending) => {
             if (disposed) {
               return
             }
-            if (pending === 0 || Date.now() - startedAt >= PENDING_POLL_LIMIT_MS) {
-              // Everything landed (or we're done waiting) — one reconcile
-              // picks the batch up together.
+            if (pending === 0) {
+              // The notes landed — one reconcile picks the batch up
+              // together, and the deferred bulk (assets) may start.
+              refreshIndex()
+              requestRemainingDownloads()
+              return
+            }
+            if (Date.now() - startedAt >= PENDING_POLL_LIMIT_MS) {
+              // Done waiting (a slow link): index what landed. The asset
+              // request stays deferred — it would compete with the notes
+              // still downloading; the next resume retries the sequence.
               refreshIndex()
               return
             }
@@ -86,7 +112,7 @@ export function useICloudRefresh(): void {
     const refresh = async (options: { reconcile: boolean }): Promise<void> => {
       let pending = 0
       try {
-        pending = await icloudDownloadPending(root)
+        pending = await icloudDownloadPending(root, 'notes')
       } catch (err) {
         // Best-effort: reconcile anyway — already-downloaded changes still land.
         console.error('iCloud download nudge failed:', errorMessage(err))
@@ -99,6 +125,8 @@ export function useICloudRefresh(): void {
       }
       if (pending > 0) {
         pollPending(Date.now())
+      } else {
+        requestRemainingDownloads()
       }
     }
 

@@ -64,22 +64,45 @@ export async function mobileStorage(): Promise<MobileStorageInfo> {
 const icloudDownloadPendingSchema = z.number().int().nonnegative()
 
 /**
- * Asks iCloud to download every not-yet-local file under `root`, returning
- * how many placeholders were found. iOS does not pull container files down
- * eagerly; call this once per open/resume for iCloud graphs, then poll
- * {@link icloudPendingCount} while the count stays above zero.
+ * Which placeholders a pending-download call covers: `'notes'` is markdown
+ * under the note directories — what an open/resume requests first, so a
+ * first sync isn't crushed under thousands of concurrent asset downloads —
+ * and `'all'` is everything, requested once the notes have drained.
  */
-export async function icloudDownloadPending(root: string): Promise<number> {
-  return call('icloud_download_pending', { root }, icloudDownloadPendingSchema)
+export type IcloudDownloadScope = 'notes' | 'all'
+
+/**
+ * Asks iCloud to download every not-yet-local file in `scope` under `root`,
+ * returning how many placeholders were found. iOS does not pull container
+ * files down eagerly; call this once per open/resume for iCloud graphs, then
+ * poll {@link icloudPendingCount} while the count stays above zero.
+ */
+export async function icloudDownloadPending(
+  root: string,
+  scope: IcloudDownloadScope,
+): Promise<number> {
+  return call(
+    'icloud_download_pending',
+    { root, notesOnly: scope === 'notes' },
+    icloudDownloadPendingSchema,
+  )
 }
 
 /**
- * Counts the not-yet-local placeholders under `root` without requesting
- * anything — the poll half of {@link icloudDownloadPending}: re-requesting
- * thousands of in-flight downloads every tick is wasted traffic.
+ * Counts the not-yet-local placeholders in `scope` under `root` without
+ * requesting anything — the poll half of {@link icloudDownloadPending}:
+ * re-requesting thousands of in-flight downloads every tick is wasted
+ * traffic.
  */
-export async function icloudPendingCount(root: string): Promise<number> {
-  return call('icloud_pending_count', { root }, icloudDownloadPendingSchema)
+export async function icloudPendingCount(
+  root: string,
+  scope: IcloudDownloadScope,
+): Promise<number> {
+  return call(
+    'icloud_pending_count',
+    { root, notesOnly: scope === 'notes' },
+    icloudDownloadPendingSchema,
+  )
 }
 
 /**

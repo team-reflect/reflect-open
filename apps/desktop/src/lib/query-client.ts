@@ -28,6 +28,43 @@ export function invalidateIndexQueries(): void {
   void queryClient.invalidateQueries({ queryKey: [INDEX_QUERY_SCOPE] })
 }
 
+/**
+ * Minimum spacing between full index-query refetch rounds on the batch
+ * paths. During an initial iCloud sync the watch applies a batch every
+ * couple of seconds for minutes; refetching every mounted index query per
+ * batch is a large share of what makes a first sync feel slow.
+ */
+const INVALIDATE_THROTTLE_MS = 3_000
+
+let lastInvalidateAt = 0
+let invalidateTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * {@link invalidateIndexQueries} with leading+trailing throttling, for the
+ * *streaming* callers (applied watcher batches, sweep/pull reindexes): an
+ * isolated call fires immediately — a single save keeps its instant refresh
+ * — while a burst collapses to one refetch per window, none dropped (the
+ * trailing edge always runs). Direct user-action invalidations should keep
+ * calling the unthrottled function.
+ */
+export function throttledInvalidateIndexQueries(): void {
+  const now = Date.now()
+  const elapsed = now - lastInvalidateAt
+  if (elapsed >= INVALIDATE_THROTTLE_MS) {
+    lastInvalidateAt = now
+    invalidateIndexQueries()
+    return
+  }
+  if (invalidateTimer !== null) {
+    return // a trailing refetch is already on its way
+  }
+  invalidateTimer = setTimeout(() => {
+    invalidateTimer = null
+    lastInvalidateAt = Date.now()
+    invalidateIndexQueries()
+  }, INVALIDATE_THROTTLE_MS - elapsed)
+}
+
 /** The iCloud container listing (`icloud_status`) — read by the graph chooser and Settings → iCloud. */
 export const ICLOUD_STATUS_QUERY_KEY = ['icloud-status'] as const
 

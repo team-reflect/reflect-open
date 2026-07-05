@@ -14,10 +14,12 @@ import { createIcloudController, isICloudRoot } from './icloud-controller'
 const seams = vi.hoisted(() => ({
   dirtyOpenPaths: vi.fn<() => string[]>(() => []),
   invalidateIndexQueries: vi.fn(),
+  throttledInvalidateIndexQueries: vi.fn(),
 }))
 vi.mock('@/editor/open-documents', () => ({ dirtyOpenPaths: seams.dirtyOpenPaths }))
 vi.mock('@/lib/query-client', () => ({
   invalidateIndexQueries: seams.invalidateIndexQueries,
+  throttledInvalidateIndexQueries: seams.throttledInvalidateIndexQueries,
 }))
 
 interface ScanCall {
@@ -95,9 +97,13 @@ function controller(overrides: { emit?: boolean } = {}) {
   return active
 }
 
+/** Covers the arrival-driven path end to end: the 5s ingest debounce plus
+ * the 30s minimum spacing from the previous sweep's end. */
+const INGEST_SETTLE_MS = 31_000
+
 /** Fire the debounce and let the async scan settle. Signal-triggered scans
- * fire on the 1s window (the default); arrival-driven ingest scans use the
- * wide 5s window — pass `5_100` to fire those. */
+ * fire on the 1s window (the default); arrival-driven ingest scans need
+ * {@link INGEST_SETTLE_MS}. */
 async function settleScan(advanceMs = 1_100): Promise<void> {
   await vi.advanceTimersByTimeAsync(advanceMs)
   // The post-scan fan-out (emit → reindex → invalidate) continues past the
@@ -146,7 +152,7 @@ describe('createIcloudController', () => {
       { path: 'notes/external.md', kind: 'upsert', modifiedMs: 2 },
       { path: 'notes/gone.md', kind: 'remove' },
     ])
-    await settleScan(5_100) // arrival-driven: the wide ingest window
+    await settleScan(INGEST_SETTLE_MS) // arrival-driven: debounce + minimum spacing
 
     expect(scanCalls).toHaveLength(2)
     expect(scanCalls[1]?.ingestedPaths).toEqual(['notes/external.md'])
@@ -179,7 +185,7 @@ describe('createIcloudController', () => {
       { path: 'notes/merged.md', kind: 'upsert', modifiedMs: 6 }, // watcher echo
       { path: 'notes/other.md', kind: 'upsert', modifiedMs: 9 },
     ])
-    await settleScan(5_100) // arrival-driven: the wide ingest window
+    await settleScan(INGEST_SETTLE_MS) // arrival-driven: debounce + minimum spacing
     expect(scanCalls[1]?.ingestedPaths).toEqual(['notes/other.md'])
   })
 
@@ -192,12 +198,34 @@ describe('createIcloudController', () => {
     await settleScan() // scan #1 (the sooner baseline timer wins): baseline + ingest — fails
 
     emitFileChanges([{ path: 'notes/external.md', kind: 'upsert', modifiedMs: 3 }])
-    await settleScan(5_100) // scan #2 retries both, on the ingest window
+    await settleScan(INGEST_SETTLE_MS) // scan #2 retries both, on the ingest window
 
     expect(scanCalls).toHaveLength(2)
     expect(scanCalls[0]?.recordBaseline).toBe(true)
     expect(scanCalls[1]?.recordBaseline).toBe(true)
     expect(scanCalls[1]?.ingestedPaths).toContain('notes/external.md')
+  })
+
+  it('spaces arrival-driven sweeps apart during a download stream', async () => {
+    const icloud = controller()
+    await icloud.start()
+    await settleScan() // baseline ends ≈ t1
+
+    // A first-sync shape: batches keep arriving. The first arrival lands
+    // just after the baseline sweep — the debounce alone would sweep again
+    // at +5s, but the minimum spacing holds it back…
+    emitFileChanges([{ path: 'notes/one.md', kind: 'upsert', modifiedMs: 1 }])
+    await settleScan(5_100)
+    expect(scanCalls).toHaveLength(1)
+
+    // …so a later batch folds into the SAME deferred sweep, which fires once
+    // the spacing from the baseline's end has elapsed, carrying both ingests.
+    emitFileChanges([{ path: 'notes/two.md', kind: 'upsert', modifiedMs: 2 }])
+    await settleScan(26_000)
+    expect(scanCalls).toHaveLength(2)
+    expect(scanCalls[1]?.ingestedPaths).toEqual(
+      expect.arrayContaining(['notes/one.md', 'notes/two.md']),
+    )
   })
 
   it('conflict signals and resume events schedule deduped sweeps', async () => {

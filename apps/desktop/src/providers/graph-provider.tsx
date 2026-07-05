@@ -26,7 +26,7 @@ import {
 import { followHealedMove } from '@/editor/move-note'
 import { resetNoteRowOverlays } from '@/hooks/note-row-overlay'
 import { setIndexProgress } from '@/lib/index-progress'
-import { dropIcloudStatusQuery, invalidateIndexQueries } from '@/lib/query-client'
+import { dropIcloudStatusQuery, throttledInvalidateIndexQueries } from '@/lib/query-client'
 import { ensureWelcomeNote } from '@/lib/welcome-note'
 import { createGraphIndex } from './graph-index'
 import { useMobileGraphBoot, type MobileGraphBoot } from './use-mobile-graph-boot'
@@ -151,7 +151,10 @@ export function GraphProvider({
           setIndexProgress(null) // the pass finished (or went idle) — clear the pill
         }
       },
-      onApplied: invalidateIndexQueries,
+      // Applied watcher batches stream every couple of seconds during a bulk
+      // sync — the throttled variant collapses them to one refetch round per
+      // window (an isolated batch still invalidates immediately).
+      onApplied: throttledInvalidateIndexQueries,
       onFileProgress: (done, total) => setIndexProgress({ done, total }),
       // External renames healed by id follow through to sessions and routes,
       // exactly as for an in-app rename (Plan 17).
