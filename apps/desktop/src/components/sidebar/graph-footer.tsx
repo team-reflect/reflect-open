@@ -76,9 +76,10 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
         <Tooltip delayDuration={700}>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>
-              <button
+              <Button
                 type="button"
-                className="group flex min-w-0 flex-1 items-center space-x-2.5 rounded-md px-1.5 py-1 text-left transition-colors duration-100 hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                variant="ghost"
+                className="group h-auto min-w-0 flex-1 justify-start gap-2.5 px-1.5 py-1 text-left"
               >
                 <GraphSwatch
                   color={colorFor(graph.root)}
@@ -103,7 +104,7 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
                     Indexing
                   </span>
                 ) : null}
-              </button>
+              </Button>
             </DropdownMenuTrigger>
           </TooltipTrigger>
           <TooltipContent>{graph.root}</TooltipContent>

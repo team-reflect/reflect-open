@@ -13,9 +13,6 @@ import { graphColorCss } from '@/lib/graph-colors'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
 
-const CHOOSER_BUTTON_CLASS =
-  'transition-[background-color,border-color,box-shadow,transform,color] duration-150 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-surface-hover hover:shadow-sm'
-
 /** iCloud is a real option only in the macOS shell. */
 function isIcloudCapablePlatform(): boolean {
   return import.meta.env.TAURI_ENV_PLATFORM === 'darwin'
@@ -65,7 +62,7 @@ export function GraphChooser(): ReactElement {
           <Button
             type="button"
             variant={icloudCapable ? 'outline' : 'default'}
-            className={cn('mt-auto w-full', CHOOSER_BUTTON_CLASS)}
+            className="mt-auto w-full"
             onClick={() => void pickAndOpen()}
           >
             <FolderPlus aria-hidden strokeWidth={1.75} />
@@ -259,7 +256,7 @@ function IcloudCard({
               <Button
                 type="button"
                 variant="outline"
-                className={cn('w-full justify-start', CHOOSER_BUTTON_CLASS)}
+                className="w-full justify-start"
                 disabled={pending}
                 onClick={() => open(root)}
               >
@@ -296,7 +293,7 @@ function IcloudCard({
             <Button
               type="button"
               variant="outline"
-              className={cn('shrink-0', CHOOSER_BUTTON_CLASS)}
+              className="shrink-0"
               disabled={pending || cleanName === null || nameTaken}
               onClick={() => void create()}
             >
@@ -328,7 +325,7 @@ function IcloudCard({
           </div>
           <Button
             type="button"
-            className={cn('w-full', CHOOSER_BUTTON_CLASS)}
+            className="w-full"
             disabled={!available || pending || cleanName === null}
             onClick={() => void create()}
           >

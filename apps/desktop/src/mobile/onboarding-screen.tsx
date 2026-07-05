@@ -13,9 +13,6 @@ import {
 } from '@/lib/graph-names'
 import { useGraph } from '@/providers/graph-provider'
 
-const MOBILE_ACTION_BUTTON_CLASS =
-  'transition-[background-color,border-color,box-shadow,transform,color] duration-150 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-surface-hover hover:shadow-sm'
-
 /** Which control kicked off the in-flight choice, so only that one shows the
  * spinner/pending label (every button still disables). Container graph roots
  * are absolute paths, so the fixed tags can never collide with one. */
@@ -121,7 +118,7 @@ export function MobileOnboardingScreen(): ReactElement {
                         <Button
                           type="button"
                           variant="outline"
-                          className={`w-full justify-start ${MOBILE_ACTION_BUTTON_CLASS}`}
+                          className="w-full justify-start"
                           onClick={() => openIcloudGraph(root)}
                           disabled={action.pending}
                         >
@@ -160,7 +157,7 @@ export function MobileOnboardingScreen(): ReactElement {
                   />
                   <Button
                     type="button"
-                    className={`shrink-0 ${MOBILE_ACTION_BUTTON_CLASS}`}
+                    className="shrink-0"
                     onClick={createIcloudGraph}
                     disabled={action.pending || cleanIcloudName === null || icloudNameTaken}
                   >
@@ -183,7 +180,6 @@ export function MobileOnboardingScreen(): ReactElement {
 
           <Button
             variant={icloudReady ? 'outline' : 'default'}
-            className={MOBILE_ACTION_BUTTON_CLASS}
             onClick={keepOnDevice}
             disabled={action.pending}
           >
