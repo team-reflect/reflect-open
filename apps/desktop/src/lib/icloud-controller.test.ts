@@ -32,7 +32,9 @@ const GRAPH = { root: '/Users/alex/Library/Mobile Documents/iCloud~app/Documents
 
 let invoked: Array<[string, Record<string, unknown>]>
 let scanCalls: ScanCall[]
-let scanResults: Array<Record<string, unknown> | Error>
+/** Scripted sweep outcomes; `'hang'` parks the sweep until {@link releaseScan}. */
+let scanResults: Array<Record<string, unknown> | Error | 'hang'>
+let releaseScan: (() => void) | null
 let listeners: Map<string, (payload: unknown) => void>
 
 beforeEach(() => {
@@ -45,6 +47,7 @@ beforeEach(() => {
   invoked = []
   scanCalls = []
   scanResults = []
+  releaseScan = null
   listeners = new Map()
   seams.dirtyOpenPaths.mockReturnValue([])
   setBridge({
@@ -60,6 +63,12 @@ beforeEach(() => {
           const scripted = scanResults.shift()
           if (scripted instanceof Error) {
             throw scripted
+          }
+          if (scripted === 'hang') {
+            return new Promise((resolve) => {
+              releaseScan = () =>
+                resolve({ changed: [], needsReview: [], deferred: [], autoResolved: 0 })
+            })
           }
           return (
             scripted ?? { changed: [], needsReview: [], deferred: [], autoResolved: 0 }
@@ -226,6 +235,43 @@ describe('createIcloudController', () => {
     expect(scanCalls[1]?.ingestedPaths).toEqual(
       expect.arrayContaining(['notes/one.md', 'notes/two.md']),
     )
+  })
+
+  it('a conflict signal caught mid-sweep replays on the prompt window', async () => {
+    scanResults.push('hang')
+    const icloud = controller()
+    await icloud.start()
+    await settleScan() // the baseline sweep starts — and hangs
+    expect(scanCalls).toHaveLength(1)
+
+    // A conflict arrives while the sweep is still running: no timer arms,
+    // the class is remembered.
+    listeners.get('icloud:conflicts')?.(['notes/a.md'])
+    await settleScan()
+    expect(scanCalls).toHaveLength(1)
+
+    // The sweep ends → the queued conflict replays promptly (1s), never on
+    // the wide ingest window.
+    releaseScan?.()
+    await settleScan()
+    expect(scanCalls).toHaveLength(2)
+  })
+
+  it('an arrival caught mid-sweep replays on the ingest spacing', async () => {
+    scanResults.push('hang')
+    const icloud = controller()
+    await icloud.start()
+    await settleScan() // the baseline sweep starts — and hangs
+    expect(scanCalls).toHaveLength(1)
+
+    emitFileChanges([{ path: 'notes/late.md', kind: 'upsert', modifiedMs: 2 }])
+    releaseScan?.()
+    await settleScan() // prompt window only — a long sweep must not chain
+    expect(scanCalls).toHaveLength(1)
+
+    await settleScan(INGEST_SETTLE_MS)
+    expect(scanCalls).toHaveLength(2)
+    expect(scanCalls[1]?.ingestedPaths).toEqual(['notes/late.md'])
   })
 
   it('conflict signals and resume events schedule deduped sweeps', async () => {

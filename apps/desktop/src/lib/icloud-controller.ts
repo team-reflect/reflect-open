@@ -105,11 +105,25 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
   let scanTimer: ReturnType<typeof setTimeout> | null = null
   let scanTimerDue = 0
   let scanRunning = false
-  let scanQueued = false
+  /**
+   * The most urgent trigger class that arrived while a sweep was running,
+   * replayed on its own window once the sweep ends: `'prompt'` (conflict
+   * signal, resume) reschedules on {@link SCAN_DEBOUNCE_MS}; `'ingest'`
+   * (arrival batches) respects the full ingest spacing. Requests that land
+   * mid-sweep don't arm a timer — the class survives instead, so a long
+   * sweep neither chains straight into the next one (ingest) nor delays
+   * conflict handling by the wide window (prompt).
+   */
+  let queuedScan: 'prompt' | 'ingest' | null = null
   let lastScanEndedAt = 0
 
   function scheduleScan(delayMs: number = SCAN_DEBOUNCE_MS): void {
     if (disposed) {
+      return
+    }
+    if (scanRunning) {
+      const requested = delayMs <= SCAN_DEBOUNCE_MS ? 'prompt' : 'ingest'
+      queuedScan = requested === 'prompt' ? 'prompt' : (queuedScan ?? 'ingest')
       return
     }
     const due = Date.now() + delayMs
@@ -138,7 +152,9 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
       return
     }
     if (scanRunning) {
-      scanQueued = true
+      // Unreachable in the current shape (mid-run requests never arm a
+      // timer), kept as a safe fallback: replay promptly.
+      queuedScan = 'prompt'
       return
     }
     scanRunning = true
@@ -168,13 +184,14 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
     } finally {
       lastScanEndedAt = Date.now()
       scanRunning = false
-      if (scanQueued) {
-        scanQueued = false
-        // A trigger fired while this sweep ran. During a bulk sync that is
-        // almost always another arrival batch — respect the ingest spacing,
-        // or a long sweep chains straight into the next one. Conflict
-        // signals caught in this window are backstopped by resume sweeps.
-        scheduleIngestScan()
+      if (queuedScan !== null) {
+        const replay = queuedScan
+        queuedScan = null
+        if (replay === 'prompt') {
+          scheduleScan()
+        } else {
+          scheduleIngestScan()
+        }
       }
     }
   }
