@@ -11,6 +11,7 @@ import {
 import { homeDir, join } from '@tauri-apps/api/path'
 import { open } from '@tauri-apps/plugin-dialog'
 import {
+  deleteGraph as deleteGraphCommand,
   errorMessage,
   forgetRecent,
   hasBridge,
@@ -65,6 +66,12 @@ interface GraphContextValue {
   openRecent: (root: string) => Promise<boolean>
   /** Drop a graph from the recents list. */
   forget: (root: string) => Promise<void>
+  /**
+   * Move the open graph's directory to the OS trash (recoverable), drop it
+   * from recents, and return to the chooser. Throws when the delete fails so
+   * the settings confirm dialog can surface the error. Desktop-only.
+   */
+  deleteGraph: () => Promise<void>
   /**
    * Mobile only (Plan 19, step 6): the user hasn't yet chosen how to start
    * (iCloud Drive / this device / GitHub), so both fixed roots are left
@@ -458,6 +465,33 @@ export function GraphProvider({
     [closeActiveGraph, graph, loadRecents],
   )
 
+  const deleteGraph = useCallback(async (): Promise<void> => {
+    if (graph === null) {
+      return
+    }
+    const { root, generation } = graph
+    // A newer open while the delete is in flight supersedes it (the Rust
+    // side already refuses the stale generation) — never tear down or
+    // re-open the graph the user switched to.
+    const seq = openSeq.current
+    try {
+      await deleteGraphCommand(generation)
+    } catch (err) {
+      // The command invalidates the Rust session before touching the
+      // filesystem, so a failed trash leaves the directory intact but the
+      // session pin dead — re-open the graph to restore a writable session,
+      // then let the confirm dialog surface the error.
+      if (seq === openSeq.current) {
+        await openRecent(root)
+      }
+      throw err
+    }
+    if (seq === openSeq.current) {
+      await closeActiveGraph()
+    }
+    await loadRecents()
+  }, [closeActiveGraph, graph, loadRecents, openRecent])
+
   const completeOnboarding = useCallback(
     async (kind: MobileStorageKind, chosenRoot?: string): Promise<void> => {
       // An explicit root comes from the onboarding graph list or the settings
@@ -538,6 +572,7 @@ export function GraphProvider({
       createAt,
       openRecent,
       forget,
+      deleteGraph,
       needsOnboarding,
       mobileStorageInfo,
       mobileStorageKind,
@@ -556,6 +591,7 @@ export function GraphProvider({
       createAt,
       openRecent,
       forget,
+      deleteGraph,
       needsOnboarding,
       mobileStorageInfo,
       mobileStorageKind,

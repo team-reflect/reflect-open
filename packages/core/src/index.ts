@@ -117,6 +117,7 @@ export {
   listFiles,
   recentGraphs,
   forgetRecent,
+  deleteGraph,
   captureHostRegister,
   captureInboxList,
   captureInboxRead,
