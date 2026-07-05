@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '../ipc/bridge'
 import {
   dailyDatesInRange,
+  getBacklinksWithContext,
   getDuplicateNoteIds,
   getNoteIdsByPath,
   getOpenTasks,
@@ -89,6 +90,39 @@ describe('listDailyNotes', () => {
     await expect(
       listDailyNotes({ start: '2025-01-01', end: '2025-01-31', limit: 32 }),
     ).resolves.toEqual([])
+  })
+})
+
+describe('getBacklinksWithContext', () => {
+  it('orders sources most recent first — daily date for dailies, edit time otherwise (V1 parity)', async () => {
+    mockInvoke.mockImplementation(async (command) => {
+      if (command === 'db_query') {
+        return [
+          { source_path: 'daily/2026-07-01.md', pos_from: 4, source_title: '2026-07-01' },
+          { source_path: 'notes/older.md', pos_from: 9, source_title: 'Older' },
+        ]
+      }
+      return 'a line with a [[target]] link'
+    })
+
+    const rows = await getBacklinksWithContext('notes/target.md')
+
+    expect(rows.map((row) => row.sourcePath)).toEqual([
+      'daily/2026-07-01.md',
+      'notes/older.md',
+    ])
+    const [command, args] = mockInvoke.mock.calls[0]!
+    expect(command).toBe('db_query')
+    const sql = String(args['sql'])
+    // Recency interleaves dailies (calendar date) with regular notes (edit
+    // time); title must not be the sort key.
+    expect(sql).toContain(
+      'order by coalesce(strftime(\'%s\', "notes"."daily_date") * 1000, "notes"."updated_at") desc',
+    )
+    expect(sql).not.toContain('order by "notes"."title"')
+    // Groups stay contiguous and links keep document order.
+    expect(sql).toContain('"backlinks"."source_path"')
+    expect(sql).toContain('"backlinks"."pos_from"')
   })
 })
 

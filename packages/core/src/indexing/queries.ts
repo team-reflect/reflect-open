@@ -59,6 +59,12 @@ export interface BacklinkContext {
  * Backlinks of `path` with source titles and line snippets. One read per
  * distinct source; a source that vanished between query and read keeps its row
  * with an empty snippet (the index lags deletes only briefly).
+ *
+ * Ordered like V1's incoming backlinks: most recent source note first, where a
+ * daily note's date is its calendar date and a regular note's is its edit time
+ * (V1 used creation time, which the index does not carry — `updated_at` is the
+ * closest substrate). Links within one source keep document order, so the
+ * panel's per-source groups render snippets as they appear in the note.
  */
 export async function getBacklinksWithContext(path: string): Promise<BacklinkContext[]> {
   const rows = await db
@@ -69,7 +75,12 @@ export async function getBacklinksWithContext(path: string): Promise<BacklinkCon
     // The view's generated types are nullable (SQLite views lose NOT NULL),
     // but these columns come from NOT NULL `links` columns via an inner join.
     .$narrowType<{ sourcePath: string; posFrom: number }>()
-    .orderBy('notes.title')
+    // Daily dates are UTC-midnight seconds scaled to ms so they interleave
+    // with `updated_at` (epoch ms) on one axis.
+    .orderBy(
+      sql`coalesce(strftime('%s', "notes"."daily_date") * 1000, "notes"."updated_at")`,
+      'desc',
+    )
     .orderBy('backlinks.sourcePath')
     .orderBy('backlinks.posFrom')
     .execute()
