@@ -389,15 +389,22 @@ describe('MobileShell', () => {
     await user.click(view.getByRole('button', { name: 'All' }))
     await view.findByRole('searchbox', { name: 'Search notes' })
 
-    await user.click(view.getByRole('button', { name: 'Daily' }))
+    let fakeNow = 1_000
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => fakeNow)
+
+    fireEvent.click(view.getByRole('button', { name: 'Daily' }))
     expect(view.getByRole('button', { name: dayCellLabel(other) }).getAttribute('aria-current')).toBe(
       'date',
     )
 
-    await user.click(view.getByRole('button', { name: 'Daily' }))
-    expect(view.getByRole('button', { name: dayCellLabel(today) }).getAttribute('aria-current')).toBe(
-      'date',
-    )
+    fakeNow = 1_100
+    fireEvent.click(view.getByRole('button', { name: 'Daily' }))
+    now.mockRestore()
+    await waitFor(() => {
+      expect(
+        view.getByRole('button', { name: dayCellLabel(today) }).getAttribute('aria-current'),
+      ).toBe('date')
+    })
     await waitFor(() => {
       expect(editorProbe.focusCalls).toBe(1)
     })

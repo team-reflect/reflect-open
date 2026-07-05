@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactElement } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react'
 import { MobileFormattingToolbar } from '@/mobile/formatting-toolbar'
 import { MobileStack } from '@/mobile/mobile-stack'
 import { MobileTabBar, type MobileTab } from '@/mobile/mobile-tab-bar'
@@ -66,7 +66,7 @@ export function MobileShell(): ReactElement {
     setLastDailyRoute(currentDailyRoute)
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (currentDailyRoute === null) {
       lastDailyTapAt.current = null
     }
