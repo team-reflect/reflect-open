@@ -92,6 +92,9 @@ export function MobileOnboardingScreen(): ReactElement {
   }
 
   function downloadAndOpen(): void {
+    if (action.pending) {
+      return // Enter in the repo field must not overlap a running clone.
+    }
     // A bare name belongs to the signed-in account — the common case never
     // needs the owner typed (mirrors the desktop restore dialog).
     const trimmed = repoInput.trim()
@@ -272,6 +275,7 @@ export function MobileOnboardingScreen(): ReactElement {
               <Input
                 autoFocus
                 value={repoInput}
+                disabled={action.pending}
                 onChange={(event) => setRepoInput(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
