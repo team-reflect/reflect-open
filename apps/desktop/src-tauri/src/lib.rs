@@ -178,6 +178,7 @@ pub fn run() {
             icloud::watch::icloud_watch_stop,
             fs::graph_open,
             fs::graph_create,
+            fs::graph_import_reflect_v1_zip,
             fs::note_read,
             fs::note_write,
             fs::asset_write,

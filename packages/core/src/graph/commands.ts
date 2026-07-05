@@ -3,9 +3,11 @@ import { echoLocalWrite } from '../indexing/local-write-echo'
 import { call } from '../ipc/invoke'
 import {
   fileMetaSchema,
+  graphImportSummarySchema,
   graphInfoSchema,
   recentGraphSchema,
   type FileMeta,
+  type GraphImportSummary,
   type GraphInfo,
   type RecentGraph,
 } from './schemas'
@@ -21,6 +23,31 @@ export async function openGraph(path: string): Promise<GraphInfo> {
 /** Create a new graph at `path` and open it. */
 export async function createGraph(path: string): Promise<GraphInfo> {
   return call('graph_create', { path }, graphInfoSchema)
+}
+
+/**
+ * Import a Reflect V1 export `.zip` into the open graph. V1 exports already use
+ * Reflect Open's graph-folder layout; Rust extracts safe entries under the
+ * active graph root and refuses to overwrite different existing files.
+ */
+export async function importReflectV1Zip(
+  path: string,
+  generation: number,
+): Promise<GraphImportSummary> {
+  return call('graph_import_reflect_v1_zip', { path, generation }, graphImportSummarySchema)
+}
+
+/**
+ * Mark files imported by {@link importReflectV1Zip} as this device's writes.
+ * Call only after the UI confirms the imported graph is still the active graph:
+ * these paths are graph-relative and the own-write channel is scoped to the
+ * currently running iCloud controller.
+ */
+export function markReflectV1ImportOwnWrites(summary: GraphImportSummary): void {
+  const modifiedMs = Date.now()
+  for (const changedPath of summary.changedPaths) {
+    echoLocalWrite({ path: changedPath, kind: 'upsert', modifiedMs })
+  }
 }
 
 /**
