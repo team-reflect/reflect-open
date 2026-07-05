@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { useGraphColors } from '@/hooks/use-graph-colors'
 import { cleanGraphName, graphNameFromRoot, isGraphNameTaken } from '@/lib/graph-names'
+import { ICLOUD_STATUS_QUERY_KEY } from '@/lib/query-client'
 import { graphColorCss } from '@/lib/graph-colors'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
@@ -198,7 +199,7 @@ function IcloudCard({
   const [busy, setBusy] = useState<IcloudBusy>(null)
   const nameId = useId()
   const { data: status } = useQuery({
-    queryKey: ['icloud-status'],
+    queryKey: ICLOUD_STATUS_QUERY_KEY,
     queryFn: icloudStatus,
     enabled: hasBridge(),
   })

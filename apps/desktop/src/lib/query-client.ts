@@ -28,6 +28,19 @@ export function invalidateIndexQueries(): void {
   void queryClient.invalidateQueries({ queryKey: [INDEX_QUERY_SCOPE] })
 }
 
+/** The iCloud container listing (`icloud_status`) — read by the graph chooser and Settings → iCloud. */
+export const ICLOUD_STATUS_QUERY_KEY = ['icloud-status'] as const
+
+/**
+ * Forget the cached iCloud container listing after its contents change (a
+ * graph delete trashes a container directory). Removal rather than
+ * invalidation: with an invalidated cache the chooser would render the stale
+ * list — deleted graph included — while the refetch runs.
+ */
+export function dropIcloudStatusQuery(): void {
+  queryClient.removeQueries({ queryKey: ICLOUD_STATUS_QUERY_KEY })
+}
+
 /** Chat-history queries nest under this key (e.g. `['chat', 'conversations', root]`). */
 export const CHAT_QUERY_SCOPE = 'chat'
 

@@ -15,6 +15,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { isICloudRoot } from '@/lib/icloud-controller'
+import { ICLOUD_STATUS_QUERY_KEY } from '@/lib/query-client'
 import { isMacosDesktop } from '@/lib/platform'
 import { useGraph } from '@/providers/graph-provider'
 import { useSync } from '@/providers/sync-provider'
@@ -40,7 +41,7 @@ export function IcloudSection(): ReactElement | null {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { data: status } = useQuery({
-    queryKey: ['icloud-status'],
+    queryKey: ICLOUD_STATUS_QUERY_KEY,
     queryFn: icloudStatus,
     enabled: hasBridge() && isMacosDesktop,
   })

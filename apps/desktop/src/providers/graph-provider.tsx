@@ -29,7 +29,7 @@ import {
 } from '@reflect/core'
 import { followHealedMove } from '@/editor/move-note'
 import { resetNoteRowOverlays } from '@/hooks/note-row-overlay'
-import { invalidateIndexQueries } from '@/lib/query-client'
+import { dropIcloudStatusQuery, invalidateIndexQueries } from '@/lib/query-client'
 import { ensureWelcomeNote } from '@/lib/welcome-note'
 import { useSettings } from '@/providers/settings-provider'
 import { createGraphIndex } from './graph-index'
@@ -486,6 +486,10 @@ export function GraphProvider({
       }
       throw err
     }
+    // The delete trashed a directory the chooser may list — drop the cached
+    // iCloud listing so the chooser refetches it rather than showing the
+    // deleted graph (queries never go stale on their own, see query-client).
+    dropIcloudStatusQuery()
     if (seq === openSeq.current) {
       await closeActiveGraph()
     }
