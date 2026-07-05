@@ -170,7 +170,11 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
       scanRunning = false
       if (scanQueued) {
         scanQueued = false
-        scheduleScan()
+        // A trigger fired while this sweep ran. During a bulk sync that is
+        // almost always another arrival batch — respect the ingest spacing,
+        // or a long sweep chains straight into the next one. Conflict
+        // signals caught in this window are backstopped by resume sweeps.
+        scheduleIngestScan()
       }
     }
   }

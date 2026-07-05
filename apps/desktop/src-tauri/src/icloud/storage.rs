@@ -162,6 +162,10 @@ const NOTE_DIRS: [&str; 3] = ["daily", "notes", "templates"];
 /// graph-relative) standing for `target` falls in the notes-only download
 /// scope: markdown under one of the note directories. Assets, audio memos,
 /// and anything else wait for the follow-up full-scope request.
+///
+/// Compiled off Apple targets only for tests: its sole production caller is
+/// the platform walk, which has no non-Apple twin.
+#[cfg(any(target_os = "ios", target_os = "macos", test))]
 fn placeholder_in_note_scope(rel_dir: &Path, target: &str) -> bool {
     let Some(first) = rel_dir.components().next() else {
         return false; // a stray placeholder at the graph root is not a note
