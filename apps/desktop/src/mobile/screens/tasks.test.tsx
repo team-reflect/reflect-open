@@ -366,6 +366,21 @@ describe('MobileTasks', () => {
     view.unmount()
   })
 
+  it('opens the source note of an untouched empty task without deleting it', async () => {
+    getOpenTasks.mockResolvedValue([task({ text: '', raw: '[ ] ' })])
+    const user = userEvent.setup()
+    const view = renderScreen()
+
+    await user.click(await view.findByRole('button', { name: 'Edit: Empty task' }))
+    await user.click(view.getByRole('button', { name: 'Open note' }))
+
+    // Navigates to the line's note — deleting it out from under the visit
+    // would be wrong; only dismissal treats an abandoned empty row as delete.
+    expect(view.getByTestId('route').textContent).toContain('notes/n.md')
+    expect(deleteTask).not.toHaveBeenCalled()
+    view.unmount()
+  })
+
   it('deletes from the sheet', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
     const user = userEvent.setup()

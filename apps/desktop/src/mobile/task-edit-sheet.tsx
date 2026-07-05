@@ -55,23 +55,29 @@ export function MobileTaskEditSheet({
   onOpenNote,
 }: MobileTaskEditSheetProps): ReactElement {
   const { settings } = useSettings()
-  const initial = taskContent(task.raw)
-  const [draft, setDraft] = useState(initial)
+  const liveContent = taskContent(task.raw)
+  // The edit baseline is frozen at open (desktop's inline editor does the
+  // same at mount): `task` is the live row, and if a reindex rewrites it while
+  // the sheet is up, comparing the untouched draft against the *new* content
+  // would read as an edit and commit stale text over the external change.
+  const [initial, setInitial] = useState(liveContent)
+  const [draft, setDraft] = useState(liveContent)
   const [showCalendar, setShowCalendar] = useState(false)
   // Set once an action button has already written/closed, so the dismissal
   // commit doesn't double-write on the close that follows.
   const [handled, setHandled] = useState(false)
   // The sheet stays mounted after closing (the exit animation needs content),
-  // so re-opening it for the same task must reseed everything: the draft from
-  // the row's current raw (an action may have rewritten it), the calendar
-  // collapsed, and the handled flag cleared — else a visit after Complete/
-  // Convert/Open note would silently drop its edits on dismiss.
+  // so re-opening it for the same task must reseed everything: the baseline
+  // and draft from the row's current raw (an action may have rewritten it),
+  // the calendar collapsed, and the handled flag cleared — else a visit after
+  // Complete/Convert/Open note would silently drop its edits on dismiss.
   const [wasOpen, setWasOpen] = useState(open)
   if (open !== wasOpen) {
     setWasOpen(open)
     if (open) {
       setHandled(false)
-      setDraft(initial)
+      setInitial(liveContent)
+      setDraft(liveContent)
       setShowCalendar(false)
     }
   }
@@ -82,22 +88,29 @@ export function MobileTaskEditSheet({
     onOpenChange(false)
   }
 
+  /** Persist the draft: a real change commits, an emptied draft deletes. */
   const commitDraft = (): void => {
     const result = resolveTaskEdit(initial, draft)
     if (result.type === 'commit') {
       actions.edit(task, result.content)
-    } else if (result.type === 'delete' || draft.trim() === '') {
-      // `delete` is an emptied draft; the second arm is a task that was already
-      // empty and stayed empty — a "+"-added row abandoned without typing.
-      // Both leave rather than ghost a bare `+ [ ]` in the note (V1's
-      // empty-task rule, desktop's editor-finalizer auto-delete).
+    } else if (result.type === 'delete') {
       actions.remove([task])
     }
   }
 
   const handleOpenChange = (nextOpen: boolean): void => {
     if (!nextOpen && !handled) {
-      commitDraft()
+      // Dismissal (drag down / tap outside) additionally treats a task that
+      // was already empty and stayed empty — a "+"-added row abandoned
+      // without typing — as a delete, so no bare `+ [ ]` ghosts in the note
+      // (V1's empty-task rule, desktop's editor-finalizer auto-delete).
+      // Only here: "Open note" on an untouched empty task must not delete
+      // the very line it navigates to.
+      if (resolveTaskEdit(initial, draft).type === 'cancel' && draft.trim() === '') {
+        actions.remove([task])
+      } else {
+        commitDraft()
+      }
     }
     onOpenChange(nextOpen)
   }
