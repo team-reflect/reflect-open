@@ -229,6 +229,39 @@ pub fn index_move(
     move_rows(conn, &from, &to)
 }
 
+/// One `index_touch` entry: re-stamp `path`'s stored mtime to `mtime`
+/// (epoch ms, as listed by `list_files`).
+#[derive(Debug, serde::Deserialize)]
+pub struct IndexTouch {
+    path: String,
+    mtime: i64,
+}
+
+/// Re-stamp stored mtimes for notes whose content already matches disk (the
+/// reconcile's hash-match skip, no-op if stale). Rows written from a local
+/// write echo carry an echo-time stamp that never equals the listed on-disk
+/// mtime, so without this repair those files are re-read and re-hashed on
+/// every pass forever. One transaction for the batch; a path whose row
+/// vanished in between updates nothing.
+#[tauri::command]
+pub fn index_touch(
+    entries: Vec<IndexTouch>,
+    generation: u64,
+    index: State<IndexState>,
+) -> AppResult<()> {
+    let mut state = lock_state(&index)?;
+    if state.generation != generation {
+        return Ok(());
+    }
+    let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
+    let tx = conn.transaction()?;
+    for entry in &entries {
+        write::touch_note(&tx, &entry.path, entry.mtime)?;
+    }
+    tx.commit()?;
+    Ok(())
+}
+
 /// Upsert one `index_meta` key (no-op if stale). The table is bookkeeping the
 /// TS policy layer owns — e.g. `syncIndex` stamps the projection version after
 /// a rebuild — and `index_clear` deliberately preserves it, so a marker can

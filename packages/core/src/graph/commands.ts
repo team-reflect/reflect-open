@@ -63,10 +63,16 @@ export async function readNote(path: string, generation?: number): Promise<strin
  * Atomically write a note's markdown by graph-relative path. `generation` (from
  * `GraphInfo`) pins the write to the graph it was issued for — Rust rejects it
  * if the graph switched in between.
+ *
+ * The echo carries the file's on-disk mtime, which Rust returns from the
+ * write: the index row it produces must compare equal to a later `listFiles`
+ * mtime, or the reconcile's read-free skip never fires and the note is
+ * re-read on every pass. `Date.now()` is a fallback for a platform that
+ * can't report one.
  */
 export async function writeNote(path: string, contents: string, generation: number): Promise<void> {
-  await call('note_write', { path, contents, generation }, voidSchema)
-  echoLocalWrite({ path, kind: 'upsert', modifiedMs: Date.now() })
+  const modifiedMs = await call('note_write', { path, contents, generation }, z.number().nullable())
+  echoLocalWrite({ path, kind: 'upsert', modifiedMs: modifiedMs ?? Date.now() })
 }
 
 /**

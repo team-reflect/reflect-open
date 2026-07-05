@@ -65,7 +65,8 @@ impl ShadowStore {
         let path = self
             .entry_path(rel, "")
             .ok_or_else(|| AppError::io(format!("invalid shadow path: {rel}")))?;
-        crate::fs::atomic_write_bytes(&self.root, &path, content.as_bytes())
+        crate::fs::atomic_write_bytes(&self.root, &path, content.as_bytes())?;
+        Ok(())
     }
 
     /// Drop a note's base and merge-pair record (deletion, or corrupt state).
@@ -112,7 +113,8 @@ impl ShadowStore {
             .entry_path(rel, ".pair")
             .ok_or_else(|| AppError::io(format!("invalid shadow path: {rel}")))?;
         let (low, high) = if a <= b { (a, b) } else { (b, a) };
-        crate::fs::atomic_write_bytes(&self.root, &path, format!("{low}\n{high}\n").as_bytes())
+        crate::fs::atomic_write_bytes(&self.root, &path, format!("{low}\n{high}\n").as_bytes())?;
+        Ok(())
     }
 
     /// Does the incoming conflict repeat the last auto-merged pair?

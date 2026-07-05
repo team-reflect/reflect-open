@@ -48,6 +48,25 @@ describe('local write echo (Plan 19, decision 5)', () => {
     unlisten()
   })
 
+  it('stamps the echo with the on-disk mtime the write returned', async () => {
+    // The reconcile's read-free skip compares the stored row's mtime against
+    // the file listing — only the write's own on-disk stamp can ever match.
+    setBridge({
+      invoke: async (command) => (command === 'note_write' ? 1_234 : null),
+      listen: async () => () => {},
+    })
+    setLocalWriteEcho(true)
+    const seen: FileChange[][] = []
+    const unlisten = await subscribeFileChanges((changes) => {
+      seen.push(changes)
+    })
+
+    await writeNote('notes/a.md', 'hello', 1)
+
+    expect(seen).toEqual([[{ path: 'notes/a.md', kind: 'upsert', modifiedMs: 1_234 }]])
+    unlisten()
+  })
+
   it('stays silent when disabled (the desktop default — the watcher covers it)', async () => {
     fakeBridge()
     const handler = vi.fn()

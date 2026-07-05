@@ -39,7 +39,8 @@ pub fn archive_version(
         attempt += 1;
         target = dir.join(format!("{stem}-{attempt}.{ext}"));
     }
-    crate::fs::atomic_write_bytes(root, &target, bytes)
+    crate::fs::atomic_write_bytes(root, &target, bytes)?;
+    Ok(())
 }
 
 /// Prune the archive: per note, keep the newest [`MAX_PER_NOTE`] versions and
