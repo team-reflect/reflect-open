@@ -108,8 +108,8 @@ pub async fn icloud_download_pending(root: String) -> AppResult<u32> {
 /// [`mobile_storage`]. Resolving the iCloud container can take a long time on
 /// a fresh install (the first `URLForUbiquityContainerIdentifier` call
 /// provisions it and may touch the network); the local root needs none of
-/// that, and the onboarding screen's on-device and GitHub paths only need
-/// this. Same persistence rule as every container path: derive fresh, never
+/// that, and the onboarding screen's on-device fallback only needs this. Same
+/// persistence rule as every container path: derive fresh, never
 /// persist.
 #[tauri::command]
 pub fn mobile_storage_local(app: tauri::AppHandle) -> AppResult<String> {

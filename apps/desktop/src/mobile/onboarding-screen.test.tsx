@@ -84,6 +84,8 @@ describe('MobileOnboardingScreen', () => {
   it('keeps notes on this device without cloning', async () => {
     render(<MobileOnboardingScreen />)
 
+    expect(screen.getByRole('heading', { name: 'This device' })).toBeTruthy()
+    expect(screen.getByText('Stored locally in Reflect on this device.')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Keep notes on this device' }))
 
     await waitFor(() => expect(completeOnboarding).toHaveBeenCalledWith('local'))
@@ -114,6 +116,7 @@ describe('MobileOnboardingScreen', () => {
     expect(
       screen.getByText('Sign in to iCloud on this device to sync notes with iCloud Drive.'),
     ).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'This device' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Keep notes on this device' })).toBeTruthy()
   })
 

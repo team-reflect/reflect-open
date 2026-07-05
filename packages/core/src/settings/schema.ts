@@ -132,11 +132,10 @@ export const describeAssetsSchema = z.boolean().catch(true)
 
 /**
  * Whether the user has finished the mobile onboarding choice (Plan 19, step
- * 6): "Start fresh" or "Connect to GitHub". Off by default — a fresh install
- * shows the onboarding screen, which (for the GitHub path) clones into the
- * still-empty graph root before anything seeds it. Once set, later launches
- * open the fixed root directly. Mobile-only; desktop has its own chooser, so
- * this key is simply never read there.
+ * 6): iCloud Drive or this device. Off by default — a fresh install shows
+ * the onboarding screen before anything seeds a graph. Once set, later
+ * launches open the chosen storage root directly. Mobile-only; desktop has
+ * its own chooser, so this key is simply never read there.
  */
 export const mobileOnboardedSchema = z.boolean().catch(false)
 

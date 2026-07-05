@@ -77,63 +77,63 @@ export function OnboardingIcloudSection(props: OnboardingIcloudSectionProps): Re
       ) : (
         <>
           {graphs.length > 0 ? (
-            <>
-              <ul className="flex flex-col gap-1.5">
-                {graphs.map((root) => (
-                  <li key={root}>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full justify-start"
-                      onClick={() => onOpen(root)}
-                      disabled={busy}
-                    >
-                      {pendingChoice === root ? (
-                        <Spinner />
-                      ) : (
-                        <FolderOpen aria-hidden strokeWidth={1.75} />
-                      )}
-                      <span className="truncate">{graphNameFromRoot(root, root)}</span>
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-              <MobileDivider>or create new graph</MobileDivider>
-            </>
+            <ul className="flex flex-col gap-1.5">
+              {graphs.map((root) => (
+                <li key={root}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => onOpen(root)}
+                    disabled={busy}
+                  >
+                    {pendingChoice === root ? (
+                      <Spinner />
+                    ) : (
+                      <FolderOpen aria-hidden strokeWidth={1.75} />
+                    )}
+                    <span className="truncate">{graphNameFromRoot(root, root)}</span>
+                  </Button>
+                </li>
+              ))}
+            </ul>
           ) : null}
 
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor={nameId} className="text-xs font-medium text-text-secondary">
-              Name
-            </label>
-            <div className="flex gap-2">
-              <Input
-                id={nameId}
-                value={name}
-                placeholder={graphs.length > 0 ? 'New name' : undefined}
-                enterKeyHint="go"
-                onChange={(event) => setTypedName(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    create()
-                  }
-                }}
-                aria-invalid={nameTaken}
-                disabled={busy}
-              />
-              <Button
-                type="button"
-                className="shrink-0"
-                onClick={create}
-                disabled={busy || cleanName === null || nameTaken}
-              >
-                {pendingChoice === 'icloud-create' ? (
-                  <Spinner />
-                ) : (
-                  <Plus aria-hidden strokeWidth={1.75} />
-                )}
-                {pendingChoice === 'icloud-create' ? 'Setting up…' : 'Create'}
-              </Button>
+          <div className="space-y-2">
+            {graphs.length > 0 ? <MobileDivider>or create new graph</MobileDivider> : null}
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor={nameId} className="text-xs font-medium text-text-secondary">
+                Name
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  id={nameId}
+                  value={name}
+                  placeholder={graphs.length > 0 ? 'New name' : undefined}
+                  enterKeyHint="go"
+                  onChange={(event) => setTypedName(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      create()
+                    }
+                  }}
+                  aria-invalid={nameTaken}
+                  disabled={busy}
+                />
+                <Button
+                  type="button"
+                  className="shrink-0"
+                  onClick={create}
+                  disabled={busy || cleanName === null || nameTaken}
+                >
+                  {pendingChoice === 'icloud-create' ? (
+                    <Spinner />
+                  ) : (
+                    <Plus aria-hidden strokeWidth={1.75} />
+                  )}
+                  {pendingChoice === 'icloud-create' ? 'Setting up…' : 'Create'}
+                </Button>
+              </div>
             </div>
           </div>
           {nameTaken ? (
