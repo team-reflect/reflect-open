@@ -1,10 +1,12 @@
-import { useState, type ReactElement, type ReactNode } from 'react'
+import { useId, useState, type ReactElement, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { hasBridge, icloudStatus } from '@reflect/core'
 import { Cloud, Folder, FolderPlus } from 'lucide-react'
+import { InlineAlert } from '@/components/inline-alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
 import { useGraphColors } from '@/hooks/use-graph-colors'
 import { cleanGraphName, graphNameFromRoot, isGraphNameTaken } from '@/lib/graph-names'
 import { graphColorCss } from '@/lib/graph-colors'
@@ -34,7 +36,7 @@ export function GraphChooser(): ReactElement {
   return (
     <ChooserShell>
       <div className="space-y-1.5 text-center">
-        <h1 className="text-2xl font-semibold text-text">Welcome to Reflect</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-text">Welcome to Reflect</h1>
         <p className="text-sm text-text-secondary">
           Your notes are plain markdown files. Choose where to keep them.
         </p>
@@ -50,13 +52,13 @@ export function GraphChooser(): ReactElement {
 
         {/* The self-managed path: any folder, synced however the user likes. */}
         <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-sm">
-          <div className="space-y-1.5">
-            <h2 className="text-base font-semibold text-text">A folder you choose</h2>
-            <p className="text-sm text-text-secondary">
-              Keep notes in any folder on this Mac. Sync with GitHub from Settings, or keep them
-              local.
-            </p>
-          </div>
+          <CardHeader
+            icon={<Folder aria-hidden className="size-4" strokeWidth={1.75} />}
+            title="A folder you choose"
+          >
+            Keep notes in any folder on this {icloudCapable ? 'Mac' : 'computer'}. Sync with
+            GitHub from Settings, or keep them local.
+          </CardHeader>
           <Button
             type="button"
             variant={icloudCapable ? 'outline' : 'default'}
@@ -70,16 +72,14 @@ export function GraphChooser(): ReactElement {
       </div>
 
       {error ? (
-        <p role="alert" className="text-center text-sm text-destructive">
+        <InlineAlert tone="error" className="mx-auto w-full max-w-sm text-center">
           {error}
-        </p>
+        </InlineAlert>
       ) : null}
 
       {recents.length > 0 ? (
         <div className="mx-auto w-full max-w-sm space-y-2">
-          <p className="px-2 text-[11px] font-semibold tracking-[0.08em] text-text-muted uppercase">
-            Recent
-          </p>
+          <p className="px-2 text-2xs font-medium tracking-wide text-text-muted">Recent</p>
           <ul className="space-y-px">
             {recents.map((recent) => {
               const color = colorFor(recent.root)
@@ -138,6 +138,50 @@ function ChooserShell({ children }: { children: ReactNode }): ReactElement {
 }
 
 /**
+ * The icon-chip card header shared by both storage cards — the same visual
+ * language as the mobile onboarding screen. A primary-tinted chip marks the
+ * recommended path; the neutral chip is the default.
+ */
+function CardHeader({
+  icon,
+  title,
+  badge,
+  tinted = false,
+  children,
+}: {
+  icon: ReactNode
+  title: string
+  badge?: ReactNode
+  tinted?: boolean
+  children: ReactNode
+}): ReactElement {
+  return (
+    <div className="flex items-start gap-3">
+      <div
+        className={cn(
+          'flex size-9 shrink-0 items-center justify-center rounded-lg',
+          tinted ? 'bg-primary/10 text-primary' : 'bg-muted text-text-secondary',
+        )}
+      >
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-semibold text-text">{title}</h2>
+          {badge}
+        </div>
+        <p className="text-sm text-text-secondary">{children}</p>
+      </div>
+    </div>
+  )
+}
+
+/** What the iCloud card is busy doing: opening one listed graph (its root) or
+ * creating a new one — so only the pressed control shows the spinner. Roots
+ * are absolute paths, so `'create'` can never collide with one. */
+type IcloudBusy = string | 'create' | null
+
+/**
  * The recommended path. Lists every graph already in the container (a user
  * can keep several) with one-click Open, plus a name field to create a new
  * one; with no container (signed out / unentitled build) the copy is honest
@@ -150,16 +194,23 @@ function IcloudCard({
   openRecent: (root: string) => Promise<boolean>
   createAt: (root: string) => Promise<boolean>
 }): ReactElement {
-  const [name, setName] = useState('Notes')
-  const [busy, setBusy] = useState(false)
+  const [typedName, setTypedName] = useState<string | null>(null)
+  const [busy, setBusy] = useState<IcloudBusy>(null)
+  const nameId = useId()
   const { data: status } = useQuery({
     queryKey: ['icloud-status'],
     queryFn: icloudStatus,
     enabled: hasBridge(),
   })
 
+  const pending = busy !== null
   const available = status?.available === true
   const existing = status?.existingGraphRoots ?? []
+  // "Notes" pre-fills only the fresh-container form. Next to an existing
+  // list the row starts empty — a prefilled default would collide with the
+  // usual first graph ("Notes") and paint the screen invalid before the
+  // user touched it.
+  const name = typedName ?? (existing.length > 0 ? '' : 'Notes')
   const cleanName = cleanGraphName(name)
   // macOS folder names are case-insensitive — a same-named create would
   // land inside the existing graph instead of next to it.
@@ -169,36 +220,35 @@ function IcloudCard({
     if (status?.documentsRoot == null || cleanName === null || nameTaken) {
       return
     }
-    setBusy(true)
+    setBusy('create')
     try {
       await createAt(`${status.documentsRoot}/${cleanName}`)
     } finally {
-      setBusy(false)
+      setBusy(null)
     }
   }
 
   function open(root: string): void {
-    setBusy(true)
-    void openRecent(root).finally(() => setBusy(false))
+    setBusy(root)
+    void openRecent(root).finally(() => setBusy(null))
   }
 
   return (
     <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-sm">
-      <div className="space-y-1.5">
-        <div className="flex items-center gap-2">
-          <h2 className="text-base font-semibold text-text">iCloud</h2>
-          <Badge variant="secondary">Recommended</Badge>
-        </div>
-        <p className="text-sm text-text-secondary">
-          {existing.length > 0
-            ? 'Your notes are already in iCloud.'
-            : available
-              ? 'Syncs across your Mac and iPhone. Backed up automatically.'
-              : status === undefined
-                ? 'Checking iCloud…'
-                : 'Sign in to iCloud on this Mac to sync your notes across devices.'}
-        </p>
-      </div>
+      <CardHeader
+        icon={<Cloud aria-hidden className="size-4" strokeWidth={1.75} />}
+        title="iCloud"
+        badge={<Badge variant="secondary">Recommended</Badge>}
+        tinted
+      >
+        {existing.length > 0
+          ? 'Your notes are already in iCloud.'
+          : available
+            ? 'Syncs across your Mac and iPhone. Backed up automatically.'
+            : status === undefined
+              ? 'Checking iCloud…'
+              : 'Sign in to iCloud on this Mac to sync your notes across devices.'}
+      </CardHeader>
       {existing.length > 0 ? (
         <ul className="space-y-1.5">
           {existing.map((root) => (
@@ -207,10 +257,14 @@ function IcloudCard({
                 type="button"
                 variant="outline"
                 className="w-full justify-start"
-                disabled={busy}
+                disabled={pending}
                 onClick={() => open(root)}
               >
-                <Cloud aria-hidden strokeWidth={1.75} />
+                {busy === root ? (
+                  <Spinner />
+                ) : (
+                  <Cloud aria-hidden strokeWidth={1.75} />
+                )}
                 <span className="truncate">{graphNameFromRoot(root, 'your notes')}</span>
               </Button>
             </li>
@@ -220,50 +274,62 @@ function IcloudCard({
       {existing.length > 0 ? (
         // Compact create row under the list: a new graph next to the
         // existing ones is the secondary action here, not the headline.
-        <div className="mt-auto flex gap-2">
-          <Input
-            aria-label="Name"
-            placeholder="New name"
-            value={name}
-            disabled={busy}
-            onChange={(event) => setName(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                void create()
-              }
-            }}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            className="shrink-0"
-            disabled={busy || cleanName === null || nameTaken}
-            onClick={() => void create()}
-          >
-            Create
-          </Button>
+        <div className="mt-auto space-y-1.5">
+          <div className="flex gap-2">
+            <Input
+              aria-label="Name"
+              placeholder="New name"
+              value={name}
+              disabled={pending}
+              aria-invalid={nameTaken}
+              onChange={(event) => setTypedName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  void create()
+                }
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              className="shrink-0"
+              disabled={pending || cleanName === null || nameTaken}
+              onClick={() => void create()}
+            >
+              {busy === 'create' ? <Spinner /> : null}
+              Create
+            </Button>
+          </div>
+          {nameTaken ? (
+            <p className="text-xs text-destructive">That name already exists in iCloud Drive.</p>
+          ) : null}
         </div>
       ) : (
         <div className="mt-auto space-y-2">
-          <Input
-            aria-label="Name"
-            value={name}
-            disabled={!available || busy}
-            onChange={(event) => setName(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                void create()
-              }
-            }}
-          />
+          <div className="space-y-1.5">
+            <label htmlFor={nameId} className="text-xs font-medium text-text-secondary">
+              Name
+            </label>
+            <Input
+              id={nameId}
+              value={name}
+              disabled={!available || pending}
+              onChange={(event) => setTypedName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  void create()
+                }
+              }}
+            />
+          </div>
           <Button
             type="button"
             className="w-full"
-            disabled={!available || busy || cleanName === null}
+            disabled={!available || pending || cleanName === null}
             onClick={() => void create()}
           >
-            <Cloud aria-hidden strokeWidth={1.75} />
-            Create
+            {busy === 'create' ? <Spinner /> : <Cloud aria-hidden strokeWidth={1.75} />}
+            {busy === 'create' ? 'Setting up…' : 'Create'}
           </Button>
         </div>
       )}

@@ -11,6 +11,7 @@ import { InlineAlert } from '@/components/inline-alert'
 import { GithubAuthStep } from '@/components/settings/github-auth-step'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
 import { useAsyncAction } from '@/hooks/use-async-action'
 import {
   cleanGraphName,
@@ -23,6 +24,11 @@ import { providerFetch } from '@/lib/provider-fetch'
 import { useGraph } from '@/providers/graph-provider'
 
 type Step = 'choose' | 'auth' | 'repo'
+
+/** Which control kicked off the in-flight choice, so only that one shows the
+ * spinner/pending label (every button still disables). Container graph roots
+ * are absolute paths, so the fixed tags can never collide with one. */
+type PendingChoice = string | 'icloud-create' | 'local' | 'clone' | null
 
 /**
  * The mobile first-run screen (Plans 19/21) — shown until the user picks
@@ -46,7 +52,8 @@ export function MobileOnboardingScreen(): ReactElement {
   const { mobileStorageInfo, completeOnboarding } = useGraph()
   const action = useAsyncAction()
   const [step, setStep] = useState<Step>('choose')
-  const [icloudName, setIcloudName] = useState('Notes')
+  const [pendingChoice, setPendingChoice] = useState<PendingChoice>(null)
+  const [typedIcloudName, setTypedIcloudName] = useState<string | null>(null)
   const [repoInput, setRepoInput] = useState('')
   const [user, setUser] = useState<GithubUser | null>(null)
   const icloudNameId = useId()
@@ -54,25 +61,34 @@ export function MobileOnboardingScreen(): ReactElement {
   const icloudDocumentsRoot = mobileStorageInfo?.icloudDocumentsRoot ?? null
   const icloudReady = icloudDocumentsRoot !== null
   const icloudGraphs = mobileStorageInfo?.icloudGraphRoots ?? []
+  // "Notes" pre-fills only a fresh container. Next to an existing list the
+  // row starts empty — a prefilled default would collide with the usual
+  // first graph ("Notes") and paint the screen invalid before any input.
+  const icloudName = typedIcloudName ?? (icloudGraphs.length > 0 ? '' : 'Notes')
   const cleanIcloudName = cleanGraphName(icloudName)
   const icloudNameTaken =
     cleanIcloudName !== null && isGraphNameTaken(cleanIcloudName, icloudGraphs)
 
+  function runChoice(choice: Exclude<PendingChoice, null>, task: () => Promise<void>): void {
+    setPendingChoice(choice)
+    void action.run(task).finally(() => setPendingChoice(null))
+  }
+
   function openIcloudGraph(root: string): void {
-    void action.run(() => completeOnboarding('icloud', root))
+    runChoice(root, () => completeOnboarding('icloud', root))
   }
 
   function createIcloudGraph(): void {
     if (icloudDocumentsRoot === null || cleanIcloudName === null || icloudNameTaken) {
       return
     }
-    void action.run(() =>
+    runChoice('icloud-create', () =>
       completeOnboarding('icloud', graphRootForName(icloudDocumentsRoot, cleanIcloudName)),
     )
   }
 
   function keepOnDevice(): void {
-    void action.run(() => completeOnboarding('local'))
+    runChoice('local', () => completeOnboarding('local'))
   }
 
   function downloadAndOpen(): void {
@@ -93,7 +109,7 @@ export function MobileOnboardingScreen(): ReactElement {
       action.setError('No graph folder available.')
       return
     }
-    void action.run(async () => {
+    runChoice('clone', async () => {
       const token = await getGithubToken(providerFetch)
       if (token === null) {
         throw new ReflectError('auth', 'Sign in to GitHub first')
@@ -114,7 +130,7 @@ export function MobileOnboardingScreen(): ReactElement {
     >
       <div className="my-auto flex w-full flex-col gap-6">
         <div className="flex flex-col gap-1.5 text-center">
-          <h1 className="text-lg font-semibold">Welcome to Reflect</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Welcome to Reflect</h1>
           <p className="text-sm text-text-muted">
             {step === 'choose'
               ? 'Your notes are plain markdown files. Choose where to keep them.'
@@ -156,7 +172,11 @@ export function MobileOnboardingScreen(): ReactElement {
                           onClick={() => openIcloudGraph(root)}
                           disabled={action.pending}
                         >
-                          <FolderOpen aria-hidden strokeWidth={1.75} />
+                          {pendingChoice === root ? (
+                            <Spinner />
+                          ) : (
+                            <FolderOpen aria-hidden strokeWidth={1.75} />
+                          )}
                           <span className="truncate">{graphNameFromRoot(root, root)}</span>
                         </Button>
                       </li>
@@ -172,7 +192,9 @@ export function MobileOnboardingScreen(): ReactElement {
                     <Input
                       id={icloudNameId}
                       value={icloudName}
-                      onChange={(event) => setIcloudName(event.target.value)}
+                      placeholder={icloudGraphs.length > 0 ? 'New name' : undefined}
+                      enterKeyHint="go"
+                      onChange={(event) => setTypedIcloudName(event.target.value)}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter') {
                           createIcloudGraph()
@@ -187,8 +209,12 @@ export function MobileOnboardingScreen(): ReactElement {
                       onClick={createIcloudGraph}
                       disabled={action.pending || cleanIcloudName === null || icloudNameTaken}
                     >
-                      <Plus aria-hidden strokeWidth={1.75} />
-                      {action.pending ? 'Setting up…' : 'Create'}
+                      {pendingChoice === 'icloud-create' ? (
+                        <Spinner />
+                      ) : (
+                        <Plus aria-hidden strokeWidth={1.75} />
+                      )}
+                      {pendingChoice === 'icloud-create' ? 'Setting up…' : 'Create'}
                     </Button>
                   </div>
                 </div>
@@ -205,8 +231,12 @@ export function MobileOnboardingScreen(): ReactElement {
               onClick={keepOnDevice}
               disabled={action.pending}
             >
-              <HardDrive aria-hidden strokeWidth={1.75} />
-              {action.pending ? 'Setting up…' : 'Keep notes on this device'}
+              {pendingChoice === 'local' ? (
+                <Spinner />
+              ) : (
+                <HardDrive aria-hidden strokeWidth={1.75} />
+              )}
+              {pendingChoice === 'local' ? 'Setting up…' : 'Keep notes on this device'}
             </Button>
             {!icloudReady ? (
               <p className="text-center text-xs text-text-muted">
@@ -243,12 +273,25 @@ export function MobileOnboardingScreen(): ReactElement {
                 autoFocus
                 value={repoInput}
                 onChange={(event) => setRepoInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    downloadAndOpen()
+                  }
+                }}
                 placeholder={user !== null ? `${user.login}/…` : 'owner/name'}
+                enterKeyHint="go"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
               />
             </label>
             <Button onClick={downloadAndOpen} disabled={action.pending}>
-              <GitBranch aria-hidden strokeWidth={1.75} />
-              {action.pending ? 'Downloading…' : 'Download & open'}
+              {pendingChoice === 'clone' ? (
+                <Spinner />
+              ) : (
+                <GitBranch aria-hidden strokeWidth={1.75} />
+              )}
+              {pendingChoice === 'clone' ? 'Downloading…' : 'Download & open'}
             </Button>
             <LinkButton onClick={() => setStep('choose')} disabled={action.pending}>
               Back
