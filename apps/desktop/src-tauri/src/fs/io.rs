@@ -152,18 +152,27 @@ fn set_local_only_xattrs(dir: &Path) -> Vec<String> {
 }
 
 /// Atomically write `contents` to `target` inside the graph at `root`.
-pub(super) fn atomic_write(root: &Path, target: &Path, contents: &str) -> AppResult<()> {
+/// Returns the persisted file's mtime (see [`atomic_write_bytes`]).
+pub(super) fn atomic_write(root: &Path, target: &Path, contents: &str) -> AppResult<Option<u64>> {
     atomic_write_bytes(root, target, contents.as_bytes())
 }
 
 /// Byte-level atomic write — shared by notes (text) and assets (binary).
+/// Returns the persisted file's mtime in epoch milliseconds (`None` when the
+/// platform can't provide one), read from the file handle itself — the index
+/// stamps its rows with this so a later listing compares equal and skips the
+/// re-read.
 ///
 /// The temp file is staged under `.reflect/tmp/`, not next to `target`: the
 /// note directories may live inside a file-sync folder (iCloud Drive —
 /// Plan 21), and a temp created there is synced and, after a crash, stranded
 /// on every device. `.reflect/` is excluded from sync and swept on graph open,
 /// and it shares `target`'s volume, so the final rename stays atomic.
-pub(crate) fn atomic_write_bytes(root: &Path, target: &Path, contents: &[u8]) -> AppResult<()> {
+pub(crate) fn atomic_write_bytes(
+    root: &Path,
+    target: &Path,
+    contents: &[u8],
+) -> AppResult<Option<u64>> {
     let dir = target
         .parent()
         .ok_or_else(|| AppError::io(format!("no parent directory for {}", target.display())))?;
@@ -173,9 +182,10 @@ pub(crate) fn atomic_write_bytes(root: &Path, target: &Path, contents: &[u8]) ->
     let mut tmp = tempfile::NamedTempFile::new_in(&staging)?;
     tmp.write_all(contents)?;
     tmp.as_file().sync_all()?;
-    tmp.persist(target)
+    let file = tmp
+        .persist(target)
         .map_err(|err| AppError::io(err.to_string()))?;
-    Ok(())
+    Ok(file.metadata().ok().as_ref().and_then(modified_ms))
 }
 
 /// Last-modified time in epoch milliseconds, or `None` when the platform

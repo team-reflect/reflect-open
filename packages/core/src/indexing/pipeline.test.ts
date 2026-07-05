@@ -242,6 +242,39 @@ describe('applyIndexChanges (watcher dispatch)', () => {
     const commands = mockInvoke.mock.calls.map(([cmd]) => cmd)
     expect(commands).not.toContain('note_read')
     expect(commands).not.toContain('index_apply_batch')
+    expect(commands).not.toContain('index_touch')
+  })
+
+  it('re-stamps the stored mtime when content is unchanged but the mtime moved', async () => {
+    const content = '# same content\n'
+    mockInvoke.mockImplementation(async (command, args) => {
+      const sql = String(args['sql'] ?? '')
+      if (command === 'db_query' && sql.includes('file_hash')) {
+        return [{ path: 'notes/a.md', file_hash: await hashContent(content), mtime: 1_000 }]
+      }
+      if (command === 'db_query') {
+        return []
+      }
+      if (command === 'note_read') {
+        return content
+      }
+      return null
+    })
+
+    const mutations = await applyIndexChanges(
+      [{ path: 'notes/a.md', kind: 'upsert', modifiedMs: 2_000 }],
+      9,
+    )
+
+    // The re-stamp counts as a mutation: `updated_at` moved, so
+    // recency-ordered queries must be invalidated.
+    expect(mutations).toBe(1)
+    const touch = mockInvoke.mock.calls.find(([cmd]) => cmd === 'index_touch')
+    expect(touch![1]).toEqual({
+      entries: [{ path: 'notes/a.md', mtime: 2_000 }],
+      generation: 9,
+    })
+    expect(mockInvoke.mock.calls.map(([cmd]) => cmd)).not.toContain('index_apply_batch')
   })
 
   it('still reads when the reported mtime is too fresh to trust', async () => {
@@ -433,6 +466,7 @@ describe('reconcileIndex mtime skip', () => {
     const commands = mockInvoke.mock.calls.map(([cmd]) => cmd)
     expect(commands).not.toContain('note_read')
     expect(commands).not.toContain('index_apply_batch')
+    expect(commands).not.toContain('index_touch')
   })
 
   it('reads (and hash-skips) when the stored mtime differs — providers rewrite mtimes', async () => {
@@ -460,6 +494,13 @@ describe('reconcileIndex mtime skip', () => {
     expect(commands).toContain('note_read')
     // Identical content under a rewritten mtime: the hash still gates the write.
     expect(commands).not.toContain('index_apply_batch')
+    // The self-heal: the row is re-stamped with the listed mtime, so the next
+    // pass skips the read entirely instead of re-hashing forever.
+    const touch = mockInvoke.mock.calls.find(([cmd]) => cmd === 'index_touch')
+    expect(touch![1]).toEqual({
+      entries: [{ path: 'notes/a.md', mtime: 2_000 }],
+      generation: 4,
+    })
   })
 })
 

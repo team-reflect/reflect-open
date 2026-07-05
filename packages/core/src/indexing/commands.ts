@@ -69,6 +69,32 @@ export async function moveNoteIndexed(
   await call('note_move_indexed', { from, to, generation }, voidSchema)
 }
 
+/** One {@link touchIndexedNotes} entry: re-stamp `path`'s stored mtime. */
+export interface IndexedNoteTouch {
+  /** Graph-relative markdown path. */
+  readonly path: string
+  /** The file's listed on-disk mtime (epoch ms). */
+  readonly mtime: number
+}
+
+/**
+ * Re-stamp stored mtimes for notes whose content already matches disk (for
+ * `generation`). The reconcile's self-heal: a row written from a local write
+ * echo carries an echo-time stamp that never equals the listed mtime, and a
+ * hash-match skip leaves it in place — without this repair the file is
+ * re-read and re-hashed on every future pass. One Rust transaction per call;
+ * an empty batch never touches the backend.
+ */
+export async function touchIndexedNotes(
+  entries: readonly IndexedNoteTouch[],
+  generation: number,
+): Promise<void> {
+  if (entries.length === 0) {
+    return
+  }
+  await call('index_touch', { entries, generation }, voidSchema)
+}
+
 /** Wipe all derived tables (precedes a full rebuild; for `generation`). */
 export async function clearIndex(generation: number): Promise<void> {
   await call('index_clear', { generation }, voidSchema)

@@ -20,7 +20,9 @@ export interface DevFileStore {
   /** A note's markdown, or `null` when the path doesn't exist. */
   read: (path: string) => string | null
   exists: (path: string) => boolean
-  write: (path: string, contents: string) => void
+  /** Write a file and return the `modifiedMs` it was stamped with (the
+   * `note_write` contract: the caller's index echo carries this stamp). */
+  write: (path: string, contents: string) => number
   /** Delete a path; a missing path is a no-op (mirrors trashing semantics). */
   remove: (path: string) => void
   /** Rename a file; refuses (returns false) when the destination exists. */
@@ -67,7 +69,9 @@ export function createDevFileStore(seed: Record<string, string>): DevFileStore {
     read: (path) => files.get(path)?.contents ?? null,
     exists: (path) => files.has(path),
     write: (path, contents) => {
-      files.set(path, { contents, modifiedMs: Date.now() })
+      const modifiedMs = Date.now()
+      files.set(path, { contents, modifiedMs })
+      return modifiedMs
     },
     remove: (path) => {
       files.delete(path)

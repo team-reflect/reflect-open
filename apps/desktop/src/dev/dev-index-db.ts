@@ -16,6 +16,8 @@ export interface DevIndexDb {
   removeNote: (path: string) => void
   /** Re-key every row from `from` to `to` (`index_move`); throws when `to` is occupied. */
   moveNote: (from: string, to: string) => void
+  /** Re-stamp a row's `mtime`/`updated_at` (one `index_touch` entry). */
+  touchNote: (path: string, mtime: number) => void
   /** Wipe derived tables, preserving `index_meta` (`index_clear`). */
   clear: () => void
   /** Upsert one `index_meta` key (`index_meta_set`). */
@@ -183,6 +185,10 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
         db.exec('ROLLBACK')
         throw cause
       }
+    },
+
+    touchNote: (path, mtime) => {
+      run(db, 'UPDATE notes SET mtime = ?, updated_at = ? WHERE path = ?', [mtime, mtime, path])
     },
 
     clear: () => {

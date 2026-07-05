@@ -10,8 +10,8 @@ use super::embed_write::{apply_chunks, remove_chunks, EmbeddedChunk};
 use super::migrations::{migrate, migrate_to, open_in_memory, open_index_at, validate_migrations};
 use super::query::run_query;
 use super::write::{
-    apply_note, clear_index, move_note, IndexedEmail, IndexedLink, IndexedNote, IndexedTag,
-    IndexedTask,
+    apply_note, clear_index, move_note, touch_note, IndexedEmail, IndexedLink, IndexedNote,
+    IndexedTag, IndexedTask,
 };
 
 fn migrated() -> Connection {
@@ -407,6 +407,28 @@ fn reapplying_a_note_replaces_its_rows() {
     let rows = run_query(&conn, "SELECT target_key FROM links", &[]).unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0]["target_key"], Value::from("z"));
+}
+
+#[test]
+fn touch_note_restamps_mtime_and_updated_at_without_creating_rows() {
+    let conn = migrated();
+    apply_note(&conn, &note("notes/a.md", "A", vec![])).unwrap();
+
+    touch_note(&conn, "notes/a.md", 4_200).unwrap();
+    let rows = run_query(
+        &conn,
+        "SELECT mtime, updated_at FROM notes WHERE path = ?1",
+        &[Value::from("notes/a.md")],
+    )
+    .unwrap();
+    assert_eq!(rows[0]["mtime"], Value::from(4_200));
+    assert_eq!(rows[0]["updated_at"], Value::from(4_200));
+
+    // A path with no row updates nothing — a touch must never resurrect a
+    // removed note.
+    touch_note(&conn, "notes/gone.md", 4_200).unwrap();
+    let count = run_query(&conn, "SELECT COUNT(*) AS n FROM notes", &[]).unwrap();
+    assert_eq!(count[0]["n"], Value::from(1));
 }
 
 #[test]

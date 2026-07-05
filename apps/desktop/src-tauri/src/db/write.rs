@@ -264,6 +264,17 @@ pub(super) fn clear_index(conn: &Connection) -> AppResult<()> {
     Ok(())
 }
 
+/// Re-stamp a note row's stored `mtime` (and `updated_at`, which `apply_note`
+/// keeps equal to it) without touching the projection. The reconcile calls
+/// this when a file's content hash still matches but its listed mtime doesn't
+/// — otherwise the stale stamp costs a re-read on every future pass. A path
+/// with no row matches nothing: a touch must never resurrect a removed note.
+pub(super) fn touch_note(conn: &Connection, path: &str, mtime: i64) -> AppResult<()> {
+    conn.prepare_cached("UPDATE notes SET mtime = ?2, updated_at = ?2 WHERE path = ?1")?
+        .execute(params![path, mtime])?;
+    Ok(())
+}
+
 /// Drop every row belonging to `path` (the `notes` row cascades to child
 /// tables; `search_fts` is standalone).
 pub(super) fn remove_note(conn: &Connection, path: &str) -> AppResult<()> {

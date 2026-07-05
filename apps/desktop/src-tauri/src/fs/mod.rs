@@ -258,13 +258,17 @@ pub fn note_read(
 
 /// Atomically write a note's markdown by graph-relative path. `generation` pins
 /// the write to the graph it was issued for (see `root_for_generation`).
+/// Returns the written file's on-disk mtime (epoch ms, `None` when the
+/// platform can't provide one) so the caller's index echo can stamp the row
+/// with the value a later `list_files` will report — a `Date.now()` stamp
+/// never matches and costs a re-read on every reconcile.
 #[tauri::command]
 pub fn note_write(
     path: String,
     contents: String,
     generation: u64,
     state: State<GraphState>,
-) -> AppResult<()> {
+) -> AppResult<Option<u64>> {
     let root = root_for_generation(&state, generation)?;
     atomic_write(&root, &resolve(&root, &path)?, &contents)
 }
@@ -284,7 +288,8 @@ pub fn asset_write(
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(contents_base64.as_bytes())
         .map_err(|err| AppError::io(format!("invalid base64 asset payload: {err}")))?;
-    atomic_write_bytes(&root, &resolve(&root, &path)?, &bytes)
+    atomic_write_bytes(&root, &resolve(&root, &path)?, &bytes)?;
+    Ok(())
 }
 
 /// Read a binary asset's bytes, base64-encoded for the JSON IPC (e.g. audio

@@ -5,7 +5,12 @@ import { moveIndexedRows, removeFromIndex } from './commands'
 import { subscribeFileChanges, type FileChange } from './file-changes'
 import { hashContent, matchesTrustedMtime } from './hash'
 import { emitIndexApplied } from './index-applied'
-import { buildNoteProjection, createIndexApplyBatch, indexNote } from './indexer'
+import {
+  buildNoteProjection,
+  createIndexApplyBatch,
+  createMtimeTouchBatch,
+  indexNote,
+} from './indexer'
 import { detectExternalMoves } from './move-healing'
 import { INDEX_PASS_YIELD_EVERY, yieldToEventLoop } from './pacing'
 import { getIndexedFileFactsByPath, getNoteIdsByPath, type IndexedFileFacts } from './queries'
@@ -163,6 +168,7 @@ export async function applyIndexChanges(
       changeByPath.get(skipped.path) ?? { path: skipped.path, kind: 'upsert' },
     )
   })
+  const touches = createMtimeTouchBatch(generation)
 
   let done = 0
   for (const change of notes) {
@@ -189,7 +195,13 @@ export async function applyIndexChanges(
       const content = await readNote(change.path)
       const fileHash = await hashContent(content)
       if (facts?.fileHash === fileHash) {
-        continue // content unchanged; only the mtime moved
+        // Content unchanged; only the mtime moved. Re-stamp the row so the
+        // next pass skips the read — a stored echo-time stamp never matches
+        // and would cost this read on every reconcile and every batch.
+        if (change.modifiedMs !== undefined && facts.mtime !== change.modifiedMs) {
+          await touches.add({ path: change.path, mtime: change.modifiedMs })
+        }
+        continue
       }
       await batch.add(
         await buildNoteProjection(change.path, content, {
@@ -202,7 +214,10 @@ export async function applyIndexChanges(
     }
   }
   await batch.flush()
-  return mutations + batch.applied()
+  await touches.flush()
+  // Re-stamps count as mutations: `updated_at` moved, so recency-ordered
+  // queries may return different rows and the caller must invalidate.
+  return mutations + batch.applied() + touches.applied()
 }
 
 /**

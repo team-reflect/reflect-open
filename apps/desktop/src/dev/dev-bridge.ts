@@ -24,6 +24,9 @@ const pathArgsSchema = z.object({ path: z.string() })
 const writeArgsSchema = z.object({ path: z.string(), contents: z.string() })
 const moveArgsSchema = z.object({ from: z.string(), to: z.string() })
 const metaArgsSchema = z.object({ key: z.string(), value: z.string() })
+const touchArgsSchema = z.object({
+  entries: z.array(z.object({ path: z.string(), mtime: z.number() })),
+})
 const applyArgsSchema = z.object({ note: indexedNoteSchema })
 const applyBatchArgsSchema = z.object({ notes: z.array(indexedNoteSchema) })
 const settingsArgsSchema = z.object({ settings: z.record(z.string(), z.unknown()) })
@@ -87,8 +90,7 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
       }
       case 'note_write': {
         const { path, contents } = writeArgsSchema.parse(args)
-        files.write(path, contents)
-        return null
+        return files.write(path, contents)
       }
       case 'note_exists':
         return files.exists(pathArgsSchema.parse(args).path)
@@ -157,6 +159,12 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
       case 'index_move': {
         const { from, to } = moveArgsSchema.parse(args)
         index.moveNote(from, to)
+        return null
+      }
+      case 'index_touch': {
+        for (const entry of touchArgsSchema.parse(args).entries) {
+          index.touchNote(entry.path, entry.mtime)
+        }
         return null
       }
       case 'index_clear': {

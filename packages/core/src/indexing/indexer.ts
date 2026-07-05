@@ -8,6 +8,8 @@ import {
   moveIndexedRows,
   removeFromIndex,
   setIndexMeta,
+  touchIndexedNotes,
+  type IndexedNoteTouch,
 } from './commands'
 import { assetReferencingNotePaths } from './asset-refs'
 import { gatherAssetDescriptionText } from './asset-description-text'
@@ -229,6 +231,47 @@ export function createIndexApplyBatch(
   }
 }
 
+/** A shared accumulator for mtime re-stamps — see {@link createMtimeTouchBatch}. */
+export interface MtimeTouchBatch {
+  /** Queue a re-stamp; flushes automatically at the transaction cap. */
+  add: (entry: IndexedNoteTouch) => Promise<void>
+  /** Apply everything still queued. Safe to call repeatedly. */
+  flush: () => Promise<void>
+  /** Re-stamps actually written so far. */
+  applied: () => number
+}
+
+/**
+ * Accumulate mtime re-stamps for hash-match skips (the self-heal for rows
+ * whose stored mtime was an echo-time stamp — see {@link touchIndexedNotes})
+ * and apply them in shared `index_touch` transactions of
+ * {@link INDEX_APPLY_BATCH_SIZE}. Both bulk skip paths (reconcile, watcher
+ * batch) share this shape, mirroring {@link createIndexApplyBatch}.
+ */
+export function createMtimeTouchBatch(generation: number): MtimeTouchBatch {
+  let batch: IndexedNoteTouch[] = []
+  let appliedCount = 0
+  async function flush(): Promise<void> {
+    if (batch.length === 0) {
+      return
+    }
+    const entries = batch
+    batch = []
+    await touchIndexedNotes(entries, generation)
+    appliedCount += entries.length
+  }
+  return {
+    add: async (entry) => {
+      batch.push(entry)
+      if (batch.length >= INDEX_APPLY_BATCH_SIZE) {
+        await flush()
+      }
+    },
+    flush,
+    applied: () => appliedCount,
+  }
+}
+
 /**
  * Full rebuild: wipe derived tables and re-index every markdown file. Used for
  * explicit repair / schema-bump triggers, not the hot graph-switch path (that's
@@ -293,8 +336,10 @@ export async function syncIndex(options: IndexPassOptions): Promise<void> {
  * Two skip layers keep a repeat pass over a large, mostly-unchanged graph
  * cheap: a file whose listed mtime matches its indexed row is never even read
  * ({@link matchesTrustedMtime}), and a read whose hash matches skips the
- * write. Changed notes apply in shared `index_apply_batch` transactions
- * rather than one round-trip each.
+ * write — re-stamping the row's mtime when it disagreed with the listing, so
+ * the mismatch (e.g. an echo-time stamp from a local write) can't cost a
+ * re-read on every future pass. Changed notes apply in shared
+ * `index_apply_batch` transactions rather than one round-trip each.
  */
 export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
   const { generation, signal, onMoved, onSkippedNote, onFileProgress } = options
@@ -353,6 +398,7 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
 
   const now = Date.now()
   const batch = createIndexApplyBatch(generation, onSkippedNote)
+  const touches = createMtimeTouchBatch(generation)
   let done = 0
   for (const file of files) {
     if (signal?.aborted) {
@@ -390,6 +436,12 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
     }
     const fileHash = await hashContent(content)
     if (facts?.fileHash === fileHash) {
+      // Content unchanged. If the stored mtime doesn't match the listing (an
+      // echo-time stamp, or a provider rewrote it), re-stamp it so the next
+      // pass takes the read-free path — left alone it mismatches forever.
+      if (facts.mtime !== file.modifiedMs) {
+        await touches.add({ path: file.path, mtime: file.modifiedMs })
+      }
       continue // unchanged
     }
     if (signal?.aborted) {
@@ -398,6 +450,7 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
     await batch.add(await buildNoteProjection(file.path, content, { fileHash, mtime: file.modifiedMs }))
   }
   await batch.flush()
+  await touches.flush()
   onFileProgress?.(files.length, files.length)
 
   for (const path of stored.keys()) {
