@@ -3,7 +3,7 @@
   "identifier": "desktop",
   "description": "Desktop-only capabilities: auto-update checks, the post-install relaunch, window-state restore, and deep-link events",
   "platforms": ["macOS", "windows", "linux"],
-  "windows": ["main"],
+  "windows": ["main", "note-*"],
   "permissions": [
     "updater:default",
     "process:default",

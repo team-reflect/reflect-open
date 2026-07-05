@@ -41,6 +41,21 @@ export const fileMetaSchema = z.object({
 })
 export type FileMeta = z.infer<typeof fileMetaSchema>
 
+/**
+ * What a secondary note window needs to boot (mirrors the Rust
+ * `WindowBootstrap`): the open graph's identity with both session generations
+ * **unbumped** — adoption is a read, never a re-open — plus the one-shot deep
+ * link the window was created to show.
+ */
+export const windowBootstrapSchema = z.object({
+  graph: graphInfoSchema,
+  /** The open index session's generation, or null when no index is open. */
+  indexGeneration: z.number().nullable(),
+  /** The `reflect://` link this window was opened for; absent on a reload. */
+  initialDeepLink: z.string().nullable(),
+})
+export type WindowBootstrap = z.infer<typeof windowBootstrapSchema>
+
 /** Result of importing a Reflect V1 graph-shaped zip into the open graph. */
 export const graphImportSummarySchema = z.object({
   /** Files newly written to the open graph. */

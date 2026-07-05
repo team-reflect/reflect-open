@@ -22,6 +22,7 @@ import { runCommand } from '@/lib/commands/registry'
 import type { CommandContext } from '@/lib/commands/types'
 import { DEFAULT_GRAPH_COLOR, GRAPH_COLOR_OPTIONS } from '@/lib/graph-colors'
 import { cn } from '@/lib/utils'
+import { isMainWindow } from '@/lib/window-role'
 import { useGraph } from '@/providers/graph-provider'
 import { useSync, type BackupState } from '@/providers/sync-provider'
 import { useRouter } from '@/routing/router'
@@ -167,13 +168,16 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
             <LocateFixed aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
             <span className="min-w-0 flex-1 truncate">Reveal graph in Finder</span>
           </DropdownMenuItem>
-          <DropdownMenuItem
-            onSelect={() => void chooseGraph()}
-            className={MENU_ITEM_CLASS}
-          >
-            <FolderOpen aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
-            <span className="min-w-0 flex-1 truncate">Open another graph…</span>
-          </DropdownMenuItem>
+          {/* Graph switching re-roots every window; note windows hide it. */}
+          {isMainWindow() ? (
+            <DropdownMenuItem
+              onSelect={() => void chooseGraph()}
+              className={MENU_ITEM_CLASS}
+            >
+              <FolderOpen aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">Open another graph…</span>
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem
             onSelect={() => void runCommand('settings.open', context)}
             className={MENU_ITEM_CLASS}

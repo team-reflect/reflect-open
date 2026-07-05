@@ -789,22 +789,24 @@ fn stale_generation_writes_are_dropped_end_to_end() {
     };
 
     let stale = super::index_open(app.state(), app.state()).expect("first open");
-    super::index_apply(note("notes/a.md", "A", vec![]), stale, app.state()).expect("apply");
+    super::index_apply(note("notes/a.md", "A", vec![]), stale, app.handle().clone(), app.state())
+        .expect("apply");
     assert_eq!(count("after first apply"), Value::from(1));
 
     // Reopening (graph switch / reload) bumps the generation; the old one is stale.
     let fresh = super::index_open(app.state(), app.state()).expect("reopen");
     assert_ne!(stale, fresh);
 
-    super::index_apply(note("notes/b.md", "B", vec![]), stale, app.state())
+    super::index_apply(note("notes/b.md", "B", vec![]), stale, app.handle().clone(), app.state())
         .expect("stale apply returns Ok");
     assert_eq!(count("after stale apply"), Value::from(1)); // dropped, not applied
 
-    super::index_remove("notes/a.md".to_string(), stale, app.state())
+    super::index_remove("notes/a.md".to_string(), stale, app.handle().clone(), app.state())
         .expect("stale remove returns Ok");
     assert_eq!(count("after stale remove"), Value::from(1)); // also dropped
 
-    super::index_apply(note("notes/b.md", "B", vec![]), fresh, app.state()).expect("fresh apply");
+    super::index_apply(note("notes/b.md", "B", vec![]), fresh, app.handle().clone(), app.state())
+        .expect("fresh apply");
     assert_eq!(count("after fresh apply"), Value::from(2));
 
     // index_meta_set rides the same gate: stale stamps vanish, fresh ones land

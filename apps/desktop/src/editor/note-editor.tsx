@@ -38,6 +38,7 @@ import { isTouchEditorSurface } from '@/lib/platform-surface'
 import { useLightboxTransition } from '@/editor/use-lightbox-transition'
 import { dispatchDeepLink } from '@/lib/deep-links/intake'
 import { isDeepLinkUrl } from '@/lib/deep-links/parse'
+import { isNewWindowClick, openDeepLinkInNewWindow } from '@/lib/open-in-new-window'
 import { cn } from '@/lib/utils'
 
 /**
@@ -135,8 +136,12 @@ interface NoteEditorProps {
   resolveFileLink?: FileLinkResolver
   /** Resolve the file size a rendered file pill shows next to its name. */
   resolveFileInfo?: FileInfoResolver
-  /** Click on a `[[wiki link]]`. */
-  onWikiLinkClick?: (target: string) => void
+  /**
+   * Click on a `[[wiki link]]`. `event` is the originating click (or the
+   * Mod-Enter key press that followed the link) — handlers read its
+   * modifiers, e.g. ⌘-click opens the target in a new window.
+   */
+  onWikiLinkClick?: (target: string, event?: MouseEvent | KeyboardEvent) => void
   /** Click on an inline `#tag`. The tag name arrives without the leading `#`. */
   onTagClick?: (tag: string) => void
   /** Search notes for the `[[` autocomplete menu. */
@@ -268,7 +273,8 @@ export function NoteEditor({
   )
 
   const handleWikilinkClick = useCallback(
-    (payload: { target: string }) => onWikiLinkClickRef.current?.(payload.target),
+    (payload: { target: string; event: MouseEvent | KeyboardEvent }) =>
+      onWikiLinkClickRef.current?.(payload.target, payload.event),
     [],
   )
   const handleTagClick = useCallback(
@@ -285,8 +291,8 @@ export function NoteEditor({
   )
   const handleLinkClick = useCallback(
     // The event may also be the Mod-Enter key press that followed the link
-    // (meowdown ≥0.33); only the href matters here.
-    ({ href }: { href: string; event: MouseEvent | KeyboardEvent }) => {
+    // (meowdown ≥0.33).
+    ({ href, event }: { href: string; event: MouseEvent | KeyboardEvent }) => {
       // A graph-relative `assets/…` href (an attachment link) opens through
       // the generation-pinned asset command, never the URL opener — which
       // would receive a meaningless relative string.
@@ -299,8 +305,18 @@ export function NoteEditor({
       }
       // A `reflect://` link routes through the in-app deep-link pipeline —
       // the OS opener would deny the scheme (and a round-trip could land on
-      // another installed flavor).
+      // another installed flavor). ⌘-click sends an *addressing* link to a
+      // new window instead; a declined open (capture link, browser dev)
+      // degrades to the normal dispatch.
       if (isDeepLinkUrl(href)) {
+        if (isNewWindowClick(event)) {
+          void openDeepLinkInNewWindow(href).then((opened) => {
+            if (!opened) {
+              dispatchDeepLink(href)
+            }
+          })
+          return
+        }
         dispatchDeepLink(href)
         return
       }

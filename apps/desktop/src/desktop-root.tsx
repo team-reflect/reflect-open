@@ -7,6 +7,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { WindowDragRegion } from '@/components/window-drag-region'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { startDeepLinkListener } from '@/lib/deep-links/intake'
+import { isMainWindow } from '@/lib/window-role'
 import { GraphProvider } from '@/providers/graph-provider'
 import { UpdateProvider } from '@/providers/update-provider'
 
@@ -19,8 +20,12 @@ export function DesktopRoot(): ReactElement {
   // Deep-link intake starts with the surface, not the workspace: a
   // `reflect://` URL that launched the app (or arrived on the graph chooser)
   // buffers in `intake.ts` until a graph opens. Browser dev has no plugin.
+  // Main window only: the plugin's event stream reaches every webview, and a
+  // ⌘-clicked note window must not also navigate itself on OS-delivered URLs
+  // (in-note `reflect://` clicks still work — `dispatchDeepLink` and the
+  // handler are per-webview state).
   useEffect(() => {
-    if (!hasBridge()) {
+    if (!hasBridge() || !isMainWindow()) {
       return
     }
     startDeepLinkListener().catch((cause: unknown) => {

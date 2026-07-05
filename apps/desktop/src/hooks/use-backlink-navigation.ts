@@ -2,6 +2,11 @@ import { useCallback } from 'react'
 import type { WikilinkClickHandler } from '@meowdown/core'
 import { useAssetPersistence } from '@/editor/use-asset-persistence'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
+import {
+  isNewWindowClick,
+  openRouteInNewWindow,
+  type NewWindowClickEvent,
+} from '@/lib/open-in-new-window'
 import { useGraph } from '@/providers/graph-provider'
 import { routeForPath } from '@/routing/route'
 import { useRouter } from '@/routing/router'
@@ -13,9 +18,10 @@ export interface BacklinkNavigation {
    * view (on mobile that swipes the carousel to the date — the surface stays
    * mounted), anything else opens the note. A backlink tap restores focus on
    * the destination (the mobile focus contract); desktop autofocuses note
-   * arrivals anyway.
+   * arrivals anyway. `event` (desktop) lets ⌘-click open a new window;
+   * mobile taps omit it.
    */
-  openSource: (path: string) => void
+  openSource: (path: string, event?: NewWindowClickEvent) => void
   /**
    * Navigate a `[[wiki link]]` clicked *inside* a snippet — resolves its
    * target the same way the editor does, distinct from {@link openSource}.
@@ -36,9 +42,20 @@ export function useBacklinkNavigation(): BacklinkNavigation {
   const { graph } = useGraph()
 
   const openSource = useCallback(
-    (target: string) => {
+    (target: string, event?: NewWindowClickEvent) => {
       const route = routeForPath(target)
-      navigate(route, { focusEditor: route.kind === 'note' })
+      const arrive = (): void => navigate(route, { focusEditor: route.kind === 'note' })
+      if (isNewWindowClick(event)) {
+        // Degrade a declined/failed open to in-window navigation so the
+        // modifier can never make the click do nothing.
+        void openRouteInNewWindow(route).then((opened) => {
+          if (!opened) {
+            arrive()
+          }
+        })
+        return
+      }
+      arrive()
     },
     [navigate],
   )
@@ -46,7 +63,7 @@ export function useBacklinkNavigation(): BacklinkNavigation {
   const navigateWikiLink = useWikiLinkNavigation(graph?.generation ?? null)
   const { resolveImageUrl } = useAssetPersistence(graph?.root ?? null, graph?.generation ?? null)
   const onWikilinkClick = useCallback<WikilinkClickHandler>(
-    ({ target }) => navigateWikiLink(target),
+    ({ target, event }) => navigateWikiLink(target, event),
     [navigateWikiLink],
   )
   const resolveImageUrlStable = useCallback(

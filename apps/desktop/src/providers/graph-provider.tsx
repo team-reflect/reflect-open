@@ -28,8 +28,10 @@ import { resetNoteRowOverlays } from '@/hooks/note-row-overlay'
 import { setIndexProgress } from '@/lib/index-progress'
 import { dropIcloudStatusQuery, throttledInvalidateIndexQueries } from '@/lib/query-client'
 import { ensureWelcomeNote } from '@/lib/welcome-note'
+import { isMainWindow, requireMainWindow } from '@/lib/window-role'
 import { createGraphIndex } from './graph-index'
 import { useMobileGraphBoot, type MobileGraphBoot } from './use-mobile-graph-boot'
+import { useNoteWindowBoot } from './use-note-window-boot'
 
 /** Lifecycle of the active graph (Plan 02 loading gate). */
 export type GraphStatus = 'loading' | 'choosing' | 'opening' | 'ready'
@@ -187,6 +189,9 @@ export function GraphProvider({
 
   const openRecent = useCallback(
     (root: string): Promise<boolean> => {
+      if (!requireMainWindow('opening a graph')) {
+        return Promise.resolve(false)
+      }
       const seq = ++openSeq.current
       setStatus('opening')
       setError(null)
@@ -283,10 +288,26 @@ export function GraphProvider({
     completeOnboarding,
   } = useMobileGraphBoot({ platform, openRecent, onParked })
 
-  // Desktop boot: reopen the most recent graph, or show the chooser. The
-  // mobile leg (fixed roots, onboarding gate) is the hook's job above.
+  // Secondary note windows never open a graph: they adopt the main window's.
+  useNoteWindowBoot({
+    platform,
+    onAdopted: useCallback((boot) => {
+      setGraph(boot.graph)
+      setIndexGeneration(boot.indexGeneration)
+      setStatus('ready')
+    }, []),
+    onFailed: useCallback((message) => {
+      // Off-main, 'choosing' renders as an error screen (app.tsx), never the
+      // chooser — choosing here would re-root every other window.
+      setError(message)
+      setStatus('choosing')
+    }, []),
+  })
+
+  // Desktop main-window boot: reopen the most recent graph, or show the
+  // chooser. Mobile and note windows boot through their hooks above.
   useEffect(() => {
-    if (isMobilePlatform(platform)) {
+    if (isMobilePlatform(platform) || !isMainWindow()) {
       return
     }
     let active = true
@@ -356,6 +377,9 @@ export function GraphProvider({
   }, [])
 
   const chooseGraph = useCallback(async (): Promise<void> => {
+    if (!requireMainWindow('switching graphs')) {
+      return
+    }
     await closeActiveGraph()
     await loadRecents({ surfaceErrors: true })
   }, [closeActiveGraph, loadRecents])
@@ -376,6 +400,9 @@ export function GraphProvider({
   )
 
   const deleteGraph = useCallback(async (): Promise<void> => {
+    if (!isMainWindow()) {
+      throw new Error('Deleting a graph is only available from the main window.')
+    }
     if (graph === null) {
       return
     }
@@ -407,7 +434,8 @@ export function GraphProvider({
   }, [closeActiveGraph, graph, loadRecents, openRecent])
 
   const refreshIndex = useCallback((): void => {
-    if (indexGeneration === null) {
+    // Off-main, a refresh would start a second concurrent index writer.
+    if (indexGeneration === null || !isMainWindow()) {
       return
     }
     // The index lifecycle coalesces stacked triggers (resume + poll-end +

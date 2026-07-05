@@ -29,6 +29,7 @@ mod recents;
 mod secrets;
 mod settings;
 mod skill;
+mod windows;
 
 // The watcher and the embedding runtime are desktop capabilities (Plan 19):
 // mobile swaps in stand-ins with the identical command surface, so the
@@ -93,7 +94,7 @@ pub fn run() {
     // the running app natively; this is the Windows/Linux equivalent.
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-        if let Some(window) = app.get_webview_window("main") {
+        if let Some(window) = app.get_webview_window(windows::MAIN_WINDOW_LABEL) {
             let _ = window.show();
             let _ = window.set_focus();
         }
@@ -135,7 +136,14 @@ pub fn run() {
     let builder = builder
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build());
+        .plugin(
+            // Note windows are excluded from state tracking: they cascade
+            // fresh from their opener, and their content-hashed labels would
+            // otherwise accrete in the state file forever.
+            tauri_plugin_window_state::Builder::default()
+                .with_filter(|label| !label.starts_with(windows::NOTE_WINDOW_PREFIX))
+                .build(),
+        );
 
     // The keyboard bridge (Plan 19, decision 8) is mobile-only: desktop has
     // no software keyboard to track. (Sharing uses the webview's Web Share
@@ -152,7 +160,7 @@ pub fn run() {
     // line with the spike, but keep the window show.)
     #[cfg(mobile)]
     let builder = builder.setup(|app| {
-        if let Some(window) = app.get_webview_window("main") {
+        if let Some(window) = app.get_webview_window(windows::MAIN_WINDOW_LABEL) {
             window.show()?;
         }
         spike_mobile::run_self_check(app.handle());
@@ -165,6 +173,7 @@ pub fn run() {
         .manage(db::IndexState::default())
         .manage(watcher::WatcherState::default())
         .manage(quit::QuitState::default())
+        .manage(windows::WindowInit::default())
         .manage(embed::EmbedState::default())
         .invoke_handler(tauri::generate_handler![
             app_version,
@@ -251,22 +260,42 @@ pub fn run() {
             git::git_merge_remote,
             git::git_push,
             quit::quit_confirm,
+            windows::open_note_window,
+            windows::window_bootstrap,
             devtools::toggle_devtools,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app, event| {
-            if let tauri::RunEvent::ExitRequested { code, api, .. } = &event {
-                // A user/OS-initiated quit (⌘Q — no exit code) with a live
-                // webview defers once so the frontend can flush dirty note
-                // buffers (`app:quit-requested` → `quit_confirm`). An exit
-                // carrying a code is the confirm itself; with no webview left
-                // the window-close path has already flushed.
+        .run(|app, event| match &event {
+            tauri::RunEvent::ExitRequested { code, api, .. } => {
+                // A user/OS-initiated quit (⌘Q — no exit code) with live
+                // webviews defers so the frontend can flush dirty note
+                // buffers (`app:quit-requested` → `quit_confirm`). The
+                // handshake is armed with the webview count: every window
+                // flushes its own buffers, and only the last confirmation
+                // exits (quit.rs). An exit carrying a code is that final
+                // confirm itself; with no webview left the window-close path
+                // has already flushed.
                 let quit = app.state::<quit::QuitState>();
-                if code.is_none() && !quit.flushed() && !app.webview_windows().is_empty() {
+                let window_count = app.webview_windows().len();
+                if code.is_none() && window_count > 0 {
                     api.prevent_exit();
+                    quit.arm(window_count);
                     let _ = app.emit("app:quit-requested", ());
                 }
             }
+            tauri::RunEvent::WindowEvent {
+                event: tauri::WindowEvent::Destroyed,
+                ..
+            } => {
+                // A window destroyed mid-handshake (user closed it while the
+                // quit flush ran) can no longer confirm — count it as done or
+                // the surviving windows' quit would hang forever.
+                let quit = app.state::<quit::QuitState>();
+                if quit.armed() && quit.confirm_one() {
+                    app.exit(0);
+                }
+            }
+            _ => {}
         });
 }

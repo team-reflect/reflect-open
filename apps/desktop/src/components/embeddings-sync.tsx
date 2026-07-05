@@ -6,6 +6,7 @@ import {
   ensureEmbeddingsVisibly,
 } from '@/lib/semantic'
 import { useEmbedStatus } from '@/lib/use-embed-status'
+import { isMainWindow } from '@/lib/window-role'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
 
@@ -37,7 +38,9 @@ export function EmbeddingsSync(): null {
   // the file-write generation in GraphInfo — the counters are independent.
   const generation = indexGeneration
   const root = graph?.root ?? null
-  const enabled = settings.semanticSearchEnabled
+  // Main window only: a secondary note window loading the model and
+  // re-embedding on the same watcher stream would duplicate every write.
+  const enabled = settings.semanticSearchEnabled && isMainWindow()
   const ready = status.status === 'ready'
   const modelId = status.status === 'ready' ? status.model : null
 

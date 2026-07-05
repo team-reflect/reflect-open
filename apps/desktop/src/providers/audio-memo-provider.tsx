@@ -23,6 +23,7 @@ import {
   createTranscriptionReconciler,
   type TranscriptionReconciler,
 } from '@/lib/transcription-reconciler'
+import { isMainWindow } from '@/lib/window-role'
 import { useSettings } from '@/providers/settings-provider'
 import { useSidebar } from '@/providers/sidebar-provider'
 
@@ -172,6 +173,13 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
   const [reconciler, setReconciler] = useState<TranscriptionReconciler | null>(null)
   const reconcilerRef = useRef<TranscriptionReconciler | null>(null)
   useEffect(() => {
+    // Main window only: two reconcilers would double-transcribe (and
+    // double-bill) the same memos. Recording still works in a note window —
+    // the saved memo is transcribed by the main window's reconciler, which
+    // sees it arrive on the watcher stream.
+    if (!isMainWindow()) {
+      return
+    }
     const next = createTranscriptionReconciler({
       generation: graph.generation,
       getProviders: () => providersRef.current,

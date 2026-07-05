@@ -6,13 +6,18 @@ import { useWikiLinkNavigation } from './use-wiki-link-navigation'
 
 const resolveWikiTarget = vi.hoisted(() => vi.fn())
 const createNoteWithTitle = vi.hoisted(() => vi.fn())
+const openRouteInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   resolveWikiTarget,
   createNoteWithTitle,
 }))
+vi.mock('@/lib/open-in-new-window', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/open-in-new-window')>()),
+  openRouteInNewWindow,
+}))
 
-let lastHandler: ((target: string) => void) | null = null
+let lastHandler: ((target: string, event?: MouseEvent | KeyboardEvent) => void) | null = null
 
 function Host({ generation }: { generation: number | null }): ReactNode {
   lastHandler = useWikiLinkNavigation(generation)
@@ -44,6 +49,8 @@ function currentRoute(view: ReturnType<typeof renderHost>): string {
 beforeEach(() => {
   resolveWikiTarget.mockReset()
   createNoteWithTitle.mockReset()
+  openRouteInNewWindow.mockReset()
+  openRouteInNewWindow.mockResolvedValue(true)
   lastHandler = null
 })
 
@@ -105,6 +112,48 @@ describe('useWikiLinkNavigation', () => {
     await waitFor(() => expect(resolveWikiTarget).toHaveBeenCalled())
     expect(createNoteWithTitle).not.toHaveBeenCalled()
     expect(currentRoute(view)).toContain('"today"')
+    view.unmount()
+  })
+
+  it('⌘-click opens the resolved note in a new window instead of navigating', async () => {
+    resolveWikiTarget.mockResolvedValue({ kind: 'resolved', ref: 'notes/target.md' })
+    const view = renderHost()
+    lastHandler?.('Target', new MouseEvent('click', { metaKey: true }))
+    await waitFor(() =>
+      expect(openRouteInNewWindow).toHaveBeenCalledWith({ kind: 'note', path: 'notes/target.md' }),
+    )
+    expect(currentRoute(view)).toContain('"today"') // this window stays put
+    view.unmount()
+  })
+
+  it('⌘-click on an unresolved title still creates, then opens the new window', async () => {
+    resolveWikiTarget.mockResolvedValue({ kind: 'unresolved', text: 'Brand New' })
+    createNoteWithTitle.mockResolvedValue('notes/created.md')
+    const view = renderHost(7)
+    lastHandler?.('Brand New', new MouseEvent('click', { metaKey: true }))
+    await waitFor(() =>
+      expect(openRouteInNewWindow).toHaveBeenCalledWith({ kind: 'note', path: 'notes/created.md' }),
+    )
+    expect(createNoteWithTitle).toHaveBeenCalledWith('Brand New', 7)
+    expect(currentRoute(view)).toContain('"today"')
+    view.unmount()
+  })
+
+  it('a declined new-window open falls back to in-window navigation', async () => {
+    resolveWikiTarget.mockResolvedValue({ kind: 'resolved', ref: 'notes/target.md' })
+    openRouteInNewWindow.mockResolvedValue(false)
+    const view = renderHost()
+    lastHandler?.('Target', new MouseEvent('click', { metaKey: true }))
+    await waitFor(() => expect(currentRoute(view)).toContain('notes/target.md'))
+    view.unmount()
+  })
+
+  it('a Mod-Enter keyboard follow stays in-window despite the held modifier', async () => {
+    resolveWikiTarget.mockResolvedValue({ kind: 'resolved', ref: 'notes/target.md' })
+    const view = renderHost()
+    lastHandler?.('Target', new KeyboardEvent('keydown', { metaKey: true }))
+    await waitFor(() => expect(currentRoute(view)).toContain('notes/target.md'))
+    expect(openRouteInNewWindow).not.toHaveBeenCalled()
     view.unmount()
   })
 

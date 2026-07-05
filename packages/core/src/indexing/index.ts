@@ -22,6 +22,7 @@ export {
 export { setLocalWriteEcho, subscribeOwnWrites } from './local-write-echo'
 export { subscribeIcloudConflicts, subscribeIcloudWatchFailed } from './icloud-conflicts'
 export { subscribeIndexApplied, type IndexAppliedListener } from './index-applied'
+export { INDEX_WRITTEN_EVENT, subscribeIndexWritten } from './index-written'
 export {
   subscribeIndexChanges,
   applyIndexChanges,

@@ -14,6 +14,7 @@ import {
   type UpdateController,
   type UpdateState,
 } from '@/lib/update-controller'
+import { isMainWindow } from '@/lib/window-role'
 
 interface UpdateContextValue {
   state: UpdateState
@@ -54,7 +55,8 @@ export function UpdateProvider({ children, autoCheck }: UpdateProviderProps): Re
   const [controller, setController] = useState<UpdateController | null>(null)
 
   useEffect(() => {
-    if (!supported) {
+    // One checker per app: secondary note windows never poll for updates.
+    if (!supported || !isMainWindow()) {
       return
     }
     const next = createUpdateController({ autoCheck: resolvedAutoCheck })

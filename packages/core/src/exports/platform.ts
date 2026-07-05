@@ -82,13 +82,17 @@ export {
   recentGraphSchema,
   fileMetaSchema,
   graphImportSummarySchema,
+  windowBootstrapSchema,
   type GraphInfo,
   type RecentGraph,
   type FileMeta,
   type GraphImportSummary,
+  type WindowBootstrap,
 } from '../graph/schemas'
 export {
   openGraph,
+  openNoteWindow,
+  windowBootstrap,
   createGraph,
   importReflectV1Zip,
   markReflectV1ImportOwnWrites,

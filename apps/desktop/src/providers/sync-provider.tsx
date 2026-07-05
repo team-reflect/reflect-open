@@ -17,6 +17,7 @@ import {
 } from '@/lib/backup-controller'
 import { createIcloudController, isICloudRoot } from '@/lib/icloud-controller'
 import { isMobileSurface } from '@/lib/platform-surface'
+import { isMainWindow } from '@/lib/window-role'
 import { useGraph } from '@/providers/graph-provider'
 
 export type { BackupState, ConnectExistingResult } from '@/lib/backup-controller'
@@ -56,6 +57,12 @@ export function SyncProvider({ graph, children }: SyncProviderProps): ReactEleme
   const [controller, setController] = useState<BackupController | null>(null)
 
   useEffect(() => {
+    // One backup controller per app: a secondary note window mounting a
+    // second one would race commits/pulls against the main window's. Its
+    // sync state stays 'loading' — the note window edits, main syncs.
+    if (!isMainWindow()) {
+      return
+    }
     const next = createBackupController({ graph, indexGeneration })
     // The controller is an imperative lifecycle object created per (graph, index
     // session); it must be instantiated in an effect (it subscribes and starts)
@@ -74,7 +81,7 @@ export function SyncProvider({ graph, children }: SyncProviderProps): ReactEleme
   // bookkeeping. Same per-(graph, index session) shape as the backup
   // controller; a graph outside iCloud mounts nothing.
   useEffect(() => {
-    if (!hasBridge() || !isICloudRoot(graph.root)) {
+    if (!hasBridge() || !isICloudRoot(graph.root) || !isMainWindow()) {
       return
     }
     const icloud = createIcloudController({

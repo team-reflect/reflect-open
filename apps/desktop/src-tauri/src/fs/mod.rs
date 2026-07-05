@@ -148,6 +148,16 @@ pub(crate) fn current_root(state: &State<GraphState>) -> AppResult<PathBuf> {
         .ok_or_else(AppError::no_graph)
 }
 
+/// The open graph's identity as a pure read — the note-window bootstrap
+/// (`windows::window_bootstrap`) must *adopt* the session, never re-open it:
+/// a generation bump here would strand every command the main window has
+/// pinned to the current one.
+pub(crate) fn current_graph_info(state: &State<GraphState>) -> AppResult<GraphInfo> {
+    let inner = lock_graph(state)?;
+    let root = inner.root.clone().ok_or_else(AppError::no_graph)?;
+    Ok(graph_info(&root, inner.generation))
+}
+
 /// The current root, verified against the generation a mutating command was
 /// issued for. A stale generation means the graph was switched after the
 /// command was enqueued — the mutation must be rejected (loudly), or it would

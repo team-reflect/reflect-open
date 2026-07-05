@@ -3,6 +3,7 @@ import { ChevronRight } from 'lucide-react'
 import type { WikilinkClickHandler } from '@meowdown/core'
 import { BacklinkSnippet } from '@/components/backlink-snippet'
 import type { BacklinkSource } from '@/lib/group-backlinks'
+import type { NewWindowClickEvent } from '@/lib/open-in-new-window'
 
 interface BacklinkSourceGroupProps {
   source: BacklinkSource
@@ -13,8 +14,11 @@ interface BacklinkSourceGroupProps {
    * group chevron can then override until the next panel toggle.
    */
   expanded: boolean
-  /** Open the source note (the panel wires this to the router). */
-  onOpen: (path: string) => void
+  /**
+   * Open the source note (the panel wires this to the router). The click
+   * event rides along so ⌘-click can open a new window.
+   */
+  onOpen: (path: string, event?: NewWindowClickEvent) => void
   /** Navigate a clicked `[[wiki link]]` inside a snippet to its target. */
   onWikilinkClick: WikilinkClickHandler
   /** Resolve `![…](…)` sources inside a snippet to displayable URLs. */
@@ -62,7 +66,7 @@ export function BacklinkSourceGroup({
       <div className="relative flex items-center">
         <button
           type="button"
-          onClick={() => onOpen(source.path)}
+          onClick={(event) => onOpen(source.path, event)}
           className="min-w-0 cursor-pointer truncate text-left text-xs text-accent"
         >
           {source.title}
