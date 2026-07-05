@@ -5,6 +5,7 @@ import {
   archiveRecentlyCompleted,
   forgetRecentlyCompleted,
   markRecentlyCompleted,
+  reconcileRecentlyCompleted,
   resetRecentlyCompleted,
   useRecentlyCompleted,
 } from './recently-completed'
@@ -34,7 +35,7 @@ afterEach(() => {
 
 describe('recently-completed', () => {
   it('keeps session completions showing, as checked', () => {
-    const { result } = renderHook(() => useRecentlyCompleted('/g'))
+    const { result } = renderHook(() => useRecentlyCompleted('/g', undefined))
     expect(result.current).toEqual([])
 
     act(() => markRecentlyCompleted('/g', [task({ notePath: 'a.md', markerOffset: 2 })]))
@@ -46,7 +47,7 @@ describe('recently-completed', () => {
   })
 
   it('dedupes by task key', () => {
-    const { result } = renderHook(() => useRecentlyCompleted('/g'))
+    const { result } = renderHook(() => useRecentlyCompleted('/g', undefined))
     const t = task({ notePath: 'a.md', markerOffset: 2 })
     act(() => markRecentlyCompleted('/g', [t]))
     act(() => markRecentlyCompleted('/g', [t]))
@@ -54,7 +55,7 @@ describe('recently-completed', () => {
   })
 
   it('forgets dropped keys and clears on archive', () => {
-    const { result } = renderHook(() => useRecentlyCompleted('/g'))
+    const { result } = renderHook(() => useRecentlyCompleted('/g', undefined))
     act(() =>
       markRecentlyCompleted('/g', [
         task({ notePath: 'a.md', markerOffset: 2 }),
@@ -68,8 +69,74 @@ describe('recently-completed', () => {
     expect(result.current).toEqual([])
   })
 
+  it('drops a struck copy when the index reports the task open again with a newer updatedAt', () => {
+    const { result } = renderHook(() => useRecentlyCompleted('/g', undefined))
+    act(() => markRecentlyCompleted('/g', [task({ notePath: 'a.md', markerOffset: 2, updatedAt: 100 })]))
+    expect(result.current).toHaveLength(1)
+
+    // The source note was rewritten (checkbox flipped back to [ ]) and reindexed:
+    // the live open row supersedes the session's struck shadow.
+    act(() =>
+      reconcileRecentlyCompleted('/g', [
+        task({ notePath: 'a.md', markerOffset: 2, updatedAt: 200 }),
+      ]),
+    )
+    expect(result.current).toEqual([])
+  })
+
+  it('keeps the struck copy when the open row is the pre-completion index state', () => {
+    const { result } = renderHook(() => useRecentlyCompleted('/g', undefined))
+    act(() => markRecentlyCompleted('/g', [task({ notePath: 'a.md', markerOffset: 2, updatedAt: 100 })]))
+
+    // A refetch racing the completion's reindex restores the row unchanged
+    // (same updatedAt) — the shadow must hold or the row flickers back open.
+    act(() =>
+      reconcileRecentlyCompleted('/g', [
+        task({ notePath: 'a.md', markerOffset: 2, updatedAt: 100 }),
+      ]),
+    )
+    expect(result.current).toHaveLength(1)
+  })
+
+  it('reconciles only the active graph root, and leaves unrelated struck tasks alone', () => {
+    const { result } = renderHook(() => useRecentlyCompleted('/g', undefined))
+    act(() =>
+      markRecentlyCompleted('/g', [
+        task({ notePath: 'a.md', markerOffset: 2, updatedAt: 100 }),
+        task({ notePath: 'b.md', markerOffset: 2, updatedAt: 100 }),
+      ]),
+    )
+
+    act(() =>
+      reconcileRecentlyCompleted('/other', [
+        task({ notePath: 'a.md', markerOffset: 2, updatedAt: 200 }),
+      ]),
+    )
+    expect(result.current).toHaveLength(2)
+
+    act(() =>
+      reconcileRecentlyCompleted('/g', [
+        task({ notePath: 'a.md', markerOffset: 2, updatedAt: 200 }),
+      ]),
+    )
+    expect(result.current.map((row) => row.notePath)).toEqual(['b.md'])
+  })
+
+  it('useRecentlyCompleted reconciles against the open rows it is given', () => {
+    const { result, rerender } = renderHook(
+      ({ open }: { open: readonly OpenTask[] | undefined }) => useRecentlyCompleted('/g', open),
+      { initialProps: { open: undefined as readonly OpenTask[] | undefined } },
+    )
+    act(() => markRecentlyCompleted('/g', [task({ notePath: 'a.md', markerOffset: 2, updatedAt: 100 })]))
+    expect(result.current).toHaveLength(1)
+
+    // A fresh open read carrying the reopened row (newer updatedAt) sheds the shadow.
+    rerender({ open: [task({ notePath: 'a.md', markerOffset: 2, updatedAt: 200 })] })
+    expect(result.current).toEqual([])
+  })
+
   it('is scoped to a graph root — switching graphs yields an empty set', () => {
-    const { result, rerender } = renderHook(({ root }) => useRecentlyCompleted(root), {
+    const { result, rerender } = renderHook(({ root }) => useRecentlyCompleted(root, undefined), {
       initialProps: { root: '/g' },
     })
     act(() => markRecentlyCompleted('/g', [task({ notePath: 'a.md', markerOffset: 2 })]))

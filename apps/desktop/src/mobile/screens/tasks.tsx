@@ -64,7 +64,7 @@ export function MobileTasks(): ReactElement {
   const isError = openFailed || (filters.archived && completedFailed)
   const ready = open !== undefined && (!filters.archived || completed !== undefined)
 
-  const recentlyCompleted = useRecentlyCompleted(graph?.root ?? null)
+  const recentlyCompleted = useRecentlyCompleted(graph?.root ?? null, open)
   const actions = useTaskActions()
 
   // Defer the needle like the All tab defers its query: fast typing coalesces

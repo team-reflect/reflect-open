@@ -105,8 +105,10 @@ export function TasksScreen(): ReactElement {
   const ready = open !== undefined && (!filters.archived || completed !== undefined)
   const { onScroll } = useScrollRestoration(scrollElement, ready)
 
-  // This session's completed tasks, still showing struck until archived.
-  const recentlyCompleted = useRecentlyCompleted(graph?.root ?? null)
+  // This session's completed tasks, still showing struck until archived —
+  // reconciled against the open read so a task reopened at its source note
+  // sheds its struck shadow instead of masking the live row.
+  const recentlyCompleted = useRecentlyCompleted(graph?.root ?? null, open)
 
   const needle = query.trim().toLowerCase()
   const groups = useMemo(

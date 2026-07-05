@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OpenTask } from '@reflect/core'
 import { useEffect, useState, type MutableRefObject, type ReactNode } from 'react'
+import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { resetRecentlyCompleted } from '@/lib/tasks/recently-completed'
 import { RouterProvider, useRouter } from '@/routing/router'
 import { TasksScreen } from './tasks-screen'
@@ -202,8 +203,9 @@ function RouteProbe(): ReactNode {
   return <output data-testid="route">{JSON.stringify(route)}</output>
 }
 
-function renderScreen() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+function renderScreen(
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   return render(
     <QueryClientProvider client={client}>
       <RouterProvider>
@@ -962,6 +964,72 @@ describe('TasksScreen', () => {
     // V1's middle state: the row stays visible, struck, until archived.
     await view.findByRole('button', { name: 'Reopen: project task' })
     expect(view.getByText('project task')).toBeDefined()
+    view.unmount()
+  })
+
+  it('yields the struck row to the index when the task is reopened at its source note', async () => {
+    toggleTask.mockResolvedValue(undefined)
+    getOpenTasks.mockResolvedValue([
+      task({
+        notePath: 'notes/p.md',
+        markerOffset: 5,
+        raw: '[ ] project task',
+        text: 'project task',
+        noteTitle: 'Project',
+        updatedAt: 100,
+      }),
+    ])
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const view = renderScreen(client)
+
+    await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
+    await view.findByRole('button', { name: 'Reopen: project task' })
+
+    // The checkbox is flipped back to [ ] in the note itself; the reindex
+    // reports the task open again with the note's newer updatedAt. The session's
+    // struck copy must yield — keeping it would shadow the live row and its
+    // Reopen would fail (the [x] line is no longer in the note).
+    getOpenTasks.mockResolvedValue([
+      task({
+        notePath: 'notes/p.md',
+        markerOffset: 5,
+        raw: '[ ] project task',
+        text: 'project task',
+        noteTitle: 'Project',
+        updatedAt: 200,
+      }),
+    ])
+    await client.invalidateQueries({ queryKey: [INDEX_QUERY_SCOPE] })
+
+    await view.findByRole('button', { name: 'Complete: project task' })
+    expect(view.queryByRole('button', { name: 'Reopen: project task' })).toBeNull()
+    view.unmount()
+  })
+
+  it('keeps the struck row when a refetch races the completion’s reindex', async () => {
+    toggleTask.mockResolvedValue(undefined)
+    const staleRow = task({
+      notePath: 'notes/p.md',
+      markerOffset: 5,
+      raw: '[ ] project task',
+      text: 'project task',
+      noteTitle: 'Project',
+      updatedAt: 100,
+    })
+    getOpenTasks.mockResolvedValue([staleRow])
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const view = renderScreen(client)
+
+    await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
+    await view.findByRole('button', { name: 'Reopen: project task' })
+
+    // An unrelated invalidation refetches before the completion's reindex lands:
+    // the index still returns the pre-completion row (same updatedAt). The row
+    // must stay struck rather than flicker back to open.
+    await client.invalidateQueries({ queryKey: [INDEX_QUERY_SCOPE] })
+
+    await view.findByRole('button', { name: 'Reopen: project task' })
+    expect(view.queryByRole('button', { name: 'Complete: project task' })).toBeNull()
     view.unmount()
   })
 
