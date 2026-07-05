@@ -1,13 +1,6 @@
-import { useEffect, useState, type ReactElement } from 'react'
+import { useEffect, type ReactElement } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
-import {
-  AI_PROVIDERS,
-  aiProvider,
-  aiProviderIdSchema,
-  errorMessage,
-  validateApiKey,
-  type AiProviderId,
-} from '@reflect/core'
+import { AI_PROVIDERS, aiProvider, aiProviderIdSchema, type AiProviderId } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -25,7 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { InlineAlert } from '@/components/inline-alert'
-import { providerFetch } from '@/lib/provider-fetch'
+import { useAddAiProviderSubmit } from '@/hooks/use-add-ai-provider-submit'
 import type { NewAiProvider } from '@/hooks/use-ai-providers'
 import { ModelCombobox } from './model-combobox'
 
@@ -46,13 +39,11 @@ const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
 
 /**
  * The "Add AI provider" modal: pick a provider, pick its default model, paste
- * an API key, optionally mark it as the app default. The key is verified against
- * the provider before anything is stored — a rejected key shows inline; an
- * unreachable provider (offline) downgrades the submit to an explicit "Save
- * anyway" instead of hard-blocking on connectivity. Submitting hands the
- * draft to {@link AddAiProviderDialogProps.onAdd} — the key goes to the OS
- * keychain, never into the settings document — and a failure keeps the
- * dialog open with the typed key intact so the user can retry.
+ * an API key, optionally mark it as the app default. The verify-then-persist
+ * flow (rejected keys inline, unreachable providers downgrading to "Save
+ * anyway") is {@link useAddAiProviderSubmit}, shared with the mobile sheet.
+ * The key goes to the OS keychain, never into the settings document, and a
+ * failure keeps the dialog open with the typed key intact for a retry.
  */
 export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps): ReactElement {
   const { register, control, handleSubmit, setValue, formState } = useForm<AddAiProviderForm>({
@@ -63,10 +54,10 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
       isDefault: false,
     },
   })
-  const [submitError, setSubmitError] = useState<string | null>(null)
-  // Set when the provider couldn't be reached to verify the key; the next
-  // submit then saves without verification (the button says so).
-  const [unverified, setUnverified] = useState(false)
+  const { submitError, unverified, resetUnverified, submit } = useAddAiProviderSubmit({
+    onAdd,
+    onDone: onClose,
+  })
 
   // The dialog is conditionally mounted by its parent (not kept alive with
   // open=false), so Radix's Presence/onCloseAutoFocus path is bypassed when
@@ -86,31 +77,8 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
   const selectedModel = useWatch({ control, name: 'model' })
   const provider = aiProvider(providerId)
 
-  const submit = handleSubmit(async (values) => {
-    setSubmitError(null)
-    const apiKey = values.apiKey.trim()
-    try {
-      if (!unverified) {
-        const validation = await validateApiKey(values.provider, apiKey, providerFetch)
-        if (validation === 'invalid') {
-          setSubmitError(`${aiProvider(values.provider).label} rejected this API key.`)
-          return
-        }
-        if (validation === 'unreachable') {
-          setUnverified(true)
-          return
-        }
-      }
-      await onAdd({
-        provider: values.provider,
-        model: values.model,
-        apiKey,
-        isDefault: values.isDefault,
-      })
-      onClose()
-    } catch (error: unknown) {
-      setSubmitError(errorMessage(error))
-    }
+  const submitForm = handleSubmit(async (values) => {
+    await submit(values)
   })
 
   return (
@@ -125,7 +93,7 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
         <form
           className="flex flex-col gap-3"
           onSubmit={(event) => {
-            void submit(event)
+            void submitForm(event)
           }}
         >
           <div className="flex flex-col gap-1">
@@ -136,7 +104,7 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
                 const next = aiProvider(aiProviderIdSchema.parse(value))
                 setValue('provider', next.id)
                 setValue('model', next.models[0].id)
-                setUnverified(false)
+                resetUnverified()
               }}
             >
               <SelectTrigger aria-label="Provider" className="w-full">
@@ -172,7 +140,7 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
               {...register('apiKey', {
                 validate: (value) => value.trim().length > 0 || 'Enter an API key.',
                 onChange: () => {
-                  setUnverified(false)
+                  resetUnverified()
                 },
               })}
             />

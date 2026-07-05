@@ -1,7 +1,5 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -27,7 +25,6 @@ import {
   userMessage,
   type AiProviderConfig,
   type ChatConversation,
-  type ChatModelOption,
   type ChatModelSelection,
   type ChatStreamEvent,
   type ChatTurn,
@@ -35,8 +32,14 @@ import {
 } from '@reflect/core'
 import { toChatAttachment, type ChatAttachment } from '@/lib/chat-attachments'
 import { todayIso } from '@/lib/dates'
+import { isMobileSurface } from '@/lib/platform-surface'
 import { providerFetch } from '@/lib/provider-fetch'
 import { invalidateChatQueries } from '@/lib/query-client'
+import {
+  ChatContext,
+  type ChatContextValue,
+  type ChatStatus,
+} from '@/providers/chat-context'
 import { conversationTitle } from '@/providers/chat-title'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
@@ -57,50 +60,10 @@ import { useSettings } from '@/providers/settings-provider'
  * in-memory conversation carries on.
  */
 
-export type ChatStatus = 'idle' | 'streaming'
+export { useChatSession, type ChatStatus } from '@/providers/chat-context'
 
 /** Resume the latest conversation within this window; otherwise start fresh. */
 const CHAT_IDLE_CUTOFF_MS = 6 * 60 * 60 * 1000
-
-interface ChatContextValue {
-  turns: ChatTurn[]
-  status: ChatStatus
-  /** Configured provider entries (empty → the add-a-provider CTA). */
-  providers: AiProviderConfig[]
-  /** Every model the picker offers: each provider's full curated list. */
-  modelOptions: ChatModelOption[]
-  /**
-   * The provider entry + model the next turn calls (`model` already carries
-   * the picker's choice) — the persisted last pick or the settings default.
-   */
-  activeModel: AiProviderConfig | null
-  /**
-   * Pick the chat model. Persisted (`chatModelSelection` in the settings
-   * document), so later sessions start on it; null returns to the app
-   * default.
-   */
-  selectModel: (selection: ChatModelSelection | null) => void
-  /** Images queued for the next message (dropped or pasted onto the chat). */
-  attachments: ChatAttachment[]
-  /** Queue image files for the next message. */
-  attachImages: (files: File[]) => Promise<void>
-  /** Drop one queued image. */
-  removeAttachment: (id: string) => void
-  /** Send one user message (text, queued images, or both) and stream the turn. */
-  send: (text: string) => Promise<void>
-  /** Abort the in-flight turn (partial text stays in the transcript). */
-  stop: () => void
-  /** Leave the conversation in the history and start a fresh one. */
-  newChat: () => void
-  /** The persisted conversation the transcript belongs to. */
-  activeConversationId: string
-  /** Load a past conversation from the history. */
-  openConversation: (id: string) => Promise<void>
-  /** Delete a conversation; deleting the active one starts a fresh chat. */
-  deleteConversation: (id: string) => Promise<void>
-}
-
-const ChatContext = createContext<ChatContextValue | null>(null)
 
 interface ChatProviderProps {
   /** The open graph — names the prompt's overview block. */
@@ -112,6 +75,7 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
   const { settings, updateSettings } = useSettings()
   const { indexGeneration } = useGraph()
   const [turns, setTurns] = useState<ChatTurn[]>([])
+  const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState<ChatAttachment[]>([])
   const [conversationId, setConversationId] = useState<string>(() => crypto.randomUUID())
 
@@ -133,14 +97,20 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
   const activeModelRef = useRef<AiProviderConfig | null>(activeModel)
   const conversationIdRef = useRef(conversationId)
   const generationRef = useRef<number | null>(indexGeneration)
-  const semanticSearchEnabledRef = useRef(settings.semanticSearchEnabled)
+  // Semantic search never runs on the mobile surface — the embed runtime is
+  // desktop-only (Plan 23, contract 3) — and the tool must *say* it is
+  // lexical, not lean on hybrid's degrade-on-error to absorb the missing
+  // runtime. The settings document syncs no further than the device, but a
+  // stray enabled flag must still lose to the platform here.
+  const semanticSearchEnabled = settings.semanticSearchEnabled && !isMobileSurface()
+  const semanticSearchEnabledRef = useRef(semanticSearchEnabled)
   useEffect(() => {
     turnsRef.current = turns
     attachmentsRef.current = attachments
     activeModelRef.current = activeModel
     conversationIdRef.current = conversationId
     generationRef.current = indexGeneration
-    semanticSearchEnabledRef.current = settings.semanticSearchEnabled
+    semanticSearchEnabledRef.current = semanticSearchEnabled
   })
 
   // The in-flight send, tracked synchronously — the no-concurrent-sends
@@ -252,6 +222,7 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
       ) {
         return
       }
+      setDraft('')
       setAttachments([])
 
       const turnId = crypto.randomUUID()
@@ -455,6 +426,8 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
       modelOptions,
       activeModel,
       selectModel,
+      draft,
+      setDraft,
       attachments,
       attachImages,
       removeAttachment,
@@ -472,6 +445,7 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
       modelOptions,
       activeModel,
       selectModel,
+      draft,
       attachments,
       attachImages,
       removeAttachment,
@@ -486,11 +460,3 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>
 }
 
-/** Access the chat session. Use within a ChatProvider. */
-export function useChatSession(): ChatContextValue {
-  const context = useContext(ChatContext)
-  if (!context) {
-    throw new Error('useChatSession must be used within a ChatProvider')
-  }
-  return context
-}

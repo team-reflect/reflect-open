@@ -30,6 +30,26 @@ const touchArgsSchema = z.object({
 const applyArgsSchema = z.object({ note: indexedNoteSchema })
 const applyBatchArgsSchema = z.object({ notes: z.array(indexedNoteSchema) })
 const settingsArgsSchema = z.object({ settings: z.record(z.string(), z.unknown()) })
+const secretNameArgsSchema = z.object({ name: z.string() })
+const secretSetArgsSchema = z.object({ name: z.string(), value: z.string() })
+const chatSaveArgsSchema = z.object({
+  conversation: z.object({
+    id: z.string(),
+    title: z.string(),
+    createdMs: z.number(),
+    updatedMs: z.number(),
+  }),
+  message: z.object({
+    id: z.string(),
+    conversationId: z.string(),
+    userText: z.string(),
+    attachments: z.string(),
+    parts: z.string(),
+    responseMessages: z.string(),
+    createdMs: z.number(),
+  }),
+})
+const chatDeleteArgsSchema = z.object({ id: z.string() })
 
 /**
  * The in-browser stand-in for the Rust shell (dev builds only): answers the
@@ -46,6 +66,9 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
   const graphInfo = { root: DEV_GRAPH_ROOT, name: 'Dev Graph', generation: 1 }
   let settingsDocument: Record<string, unknown> = { mobileOnboarded: true }
   const assets = new Map<string, string>()
+  // In-memory keychain stand-in so the AI-provider settings flow (and chat,
+  // against a CORS-permissive provider) works end-to-end in the harness.
+  const secrets = new Map<string, string>()
 
   async function invoke(command: string, args: Record<string, unknown>): Promise<unknown> {
     switch (command) {
@@ -184,10 +207,16 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         return null
       }
       case 'secret_get':
+        return secrets.get(secretNameArgsSchema.parse(args).name) ?? null
+      case 'secret_set': {
+        const { name, value } = secretSetArgsSchema.parse(args)
+        secrets.set(name, value)
         return null
-      case 'secret_set':
-      case 'secret_delete':
+      }
+      case 'secret_delete': {
+        secrets.delete(secretNameArgsSchema.parse(args).name)
         return null
+      }
 
       case 'git_status':
         return {
@@ -208,8 +237,15 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
       case 'contacts_lookup_by_name':
         return []
 
-      case 'chat_conversation_delete':
+      case 'chat_message_save': {
+        const { conversation, message } = chatSaveArgsSchema.parse(args)
+        index.saveChatMessage(conversation, message)
         return null
+      }
+      case 'chat_conversation_delete': {
+        index.deleteChatConversation(chatDeleteArgsSchema.parse(args).id)
+        return null
+      }
 
       default:
         console.error(`[dev-bridge] unimplemented command "${command}"`, args)

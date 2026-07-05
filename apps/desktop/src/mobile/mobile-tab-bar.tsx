@@ -1,9 +1,9 @@
 import { useLayoutEffect, useRef, type ReactElement } from 'react'
-import { CircleCheck, Files, SquarePen } from 'lucide-react'
+import { CircleCheck, Files, MessageSquare, SquarePen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { hapticImpactLight } from '@/mobile/haptics'
 
-export type MobileTab = 'daily' | 'all' | 'tasks'
+export type MobileTab = 'daily' | 'all' | 'tasks' | 'chat'
 
 interface MobileTabBarProps {
   tab: MobileTab
@@ -69,6 +69,12 @@ export function MobileTabBar({ tab, onSelect }: MobileTabBarProps): ReactElement
         icon={<CircleCheck className="size-5" />}
         active={tab === 'tasks'}
         onClick={() => onSelect('tasks')}
+      />
+      <TabButton
+        label="Chat"
+        icon={<MessageSquare className="size-5" />}
+        active={tab === 'chat'}
+        onClick={() => onSelect('chat')}
       />
     </nav>
   )

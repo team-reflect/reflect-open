@@ -12,6 +12,7 @@ import type {
   StreamChatOptions,
 } from '@reflect/core'
 import { NO_REPLY_NOTICE } from '@reflect/core'
+import { setPlatformSurface } from '@/lib/platform-surface'
 import { ChatProvider, useChatSession } from '@/providers/chat-provider'
 
 /**
@@ -230,6 +231,37 @@ describe('ChatProvider persistence', () => {
     expect(core.streamChat).toHaveBeenCalledWith(
       expect.objectContaining({ semanticSearchEnabled: true }),
     )
+  })
+
+  it('forces lexical search on the mobile surface, over an enabled setting', async () => {
+    settingsState.semanticSearchEnabled = true
+    setPlatformSurface({ mobileApp: true })
+    try {
+      scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] }])
+      renderProvider()
+      await waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+
+      await act(() => session?.send('hello'))
+
+      expect(core.streamChat).toHaveBeenCalledWith(
+        expect.objectContaining({ semanticSearchEnabled: false }),
+      )
+    } finally {
+      setPlatformSurface({ mobileApp: false })
+    }
+  })
+
+  it('holds the composer draft and clears it when a send goes through', async () => {
+    scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] }])
+    renderProvider()
+    await waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+
+    act(() => session?.setDraft('half-typed question'))
+    expect(session?.draft).toBe('half-typed question')
+
+    await act(() => session?.send('half-typed question'))
+    expect(session?.draft).toBe('')
+    expect(session?.turns.at(-1)?.userText).toBe('half-typed question')
   })
 
   it('opens a past conversation and switches the active id', async () => {

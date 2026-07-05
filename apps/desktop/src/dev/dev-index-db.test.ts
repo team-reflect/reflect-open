@@ -125,4 +125,57 @@ describe('createDevIndexDb', () => {
     const pinned = db.query('SELECT path FROM notes WHERE is_pinned = ?', [true])
     expect(pinned).toEqual([{ path: 'notes/sample.md' }])
   })
+
+  it('chat writes mirror chat_write.rs: seq assignment, upsert-by-id, cascade delete', async () => {
+    const db = await openDb()
+    const conversation = { id: 'c1', title: 'first question', createdMs: 1, updatedMs: 1 }
+    const message = (id: string, userText: string) => ({
+      id,
+      conversationId: 'c1',
+      userText,
+      attachments: '[]',
+      parts: '[]',
+      responseMessages: '[]',
+      createdMs: 1,
+    })
+
+    db.saveChatMessage(conversation, message('m1', 'one'))
+    db.saveChatMessage({ ...conversation, title: 'renamed?', updatedMs: 9 }, message('m2', 'two'))
+    // A settle-time re-save: conflicts on id, keeps its seq, updates the body.
+    db.saveChatMessage(conversation, { ...message('m1', 'one settled'), parts: '[{"k":1}]' })
+
+    // Title is set once (save 2's rename lost); updated_ms is last-write-wins,
+    // so the settle re-save's stamp is the one that sticks.
+    expect(
+      db.query('SELECT title, updated_ms FROM chat_conversations WHERE id = ?', ['c1']),
+    ).toEqual([{ title: 'first question', updated_ms: 1 }])
+    expect(
+      db.query('SELECT id, seq, user_text FROM chat_messages ORDER BY seq', []),
+    ).toEqual([
+      { id: 'm1', seq: 0, user_text: 'one settled' },
+      { id: 'm2', seq: 1, user_text: 'two' },
+    ])
+
+    db.deleteChatConversation('c1')
+    expect(db.query('SELECT count(*) AS rows FROM chat_messages', [])).toEqual([{ rows: 0 }])
+  })
+
+  it('clearing the index leaves chat history alone (the durable-tables rule)', async () => {
+    const db = await openDb()
+    db.applyNote(sampleNote())
+    db.saveChatMessage({ id: 'c1', title: 't', createdMs: 1, updatedMs: 1 }, {
+      id: 'm1',
+      conversationId: 'c1',
+      userText: 'hello',
+      attachments: '[]',
+      parts: '[]',
+      responseMessages: '[]',
+      createdMs: 1,
+    })
+
+    db.clear()
+
+    expect(db.query('SELECT count(*) AS rows FROM notes', [])).toEqual([{ rows: 0 }])
+    expect(db.query('SELECT count(*) AS rows FROM chat_messages', [])).toEqual([{ rows: 1 }])
+  })
 })

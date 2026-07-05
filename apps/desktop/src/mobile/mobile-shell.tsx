@@ -55,9 +55,11 @@ export function MobileShell(): ReactElement {
       ? 'all'
       : route.kind === 'tasks'
         ? 'tasks'
-        : route.kind === 'today' || route.kind === 'daily'
-          ? 'daily'
-          : lastTab
+        : route.kind === 'chat'
+          ? 'chat'
+          : route.kind === 'today' || route.kind === 'daily'
+            ? 'daily'
+            : lastTab
   const currentDailyRoute = dailyRouteFrom(route)
   if (tab !== lastTab) {
     setLastTab(tab)
@@ -78,7 +80,9 @@ export function MobileShell(): ReactElement {
       navigate(
         next === 'tasks'
           ? { kind: 'tasks' }
-          : { kind: 'allNotes', tag: null },
+          : next === 'chat'
+            ? { kind: 'chat' }
+            : { kind: 'allNotes', tag: null },
       )
       return
     }

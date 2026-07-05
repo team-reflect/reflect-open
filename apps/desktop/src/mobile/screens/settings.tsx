@@ -1,14 +1,19 @@
 import { useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
+  aiProvider,
   errorMessage,
   hasBridge,
   listNotes,
+  type AiProviderConfig,
   type EditorTextSize,
   type ThemePreference,
 } from '@reflect/core'
+import { useAiProviders } from '@/hooks/use-ai-providers'
 import { useAppVersion } from '@/hooks/use-app-version'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer'
+import { AiProviderActionsDrawer } from '@/mobile/ai-provider-actions-drawer'
 import { ConnectGithubDrawer } from '@/mobile/connect-github-drawer'
 import { MobileScreenHeader } from '@/mobile/screen-header'
 import {
@@ -59,6 +64,12 @@ export function MobileSettings(): ReactElement {
   const status = useMobileSyncStatus()
   const [disconnecting, setDisconnecting] = useState(false)
   const [connectOpen, setConnectOpen] = useState(false)
+  const { providers, defaultProvider, addProvider, removeProvider, makeDefault } = useAiProviders()
+  const [addProviderOpen, setAddProviderOpen] = useState(false)
+  // The managed provider sticks around after close so the exit animation has
+  // content; `manageOpen` alone drives visibility (the edit-sheet pattern).
+  const [managedProvider, setManagedProvider] = useState<AiProviderConfig | null>(null)
+  const [manageOpen, setManageOpen] = useState(false)
 
   const { data: notes } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'mobile-note-count'],
@@ -152,6 +163,24 @@ export function MobileSettings(): ReactElement {
             />
           </SettingsGroup>
 
+          <SettingsGroup
+            header="AI"
+            footer="Keys stay in this device’s keychain and are never synced."
+          >
+            {providers.map((provider) => (
+              <SettingsNavRow
+                key={provider.id}
+                label={aiProvider(provider.provider).label}
+                value={`·····${provider.keyHint}${provider.id === defaultProvider?.id ? ' · Default' : ''}`}
+                onPress={() => {
+                  setManagedProvider(provider)
+                  setManageOpen(true)
+                }}
+              />
+            ))}
+            <SettingsActionRow label="Add AI provider" onPress={() => setAddProviderOpen(true)} />
+          </SettingsGroup>
+
           {repo !== null || status !== null || canConnect ? (
             <SettingsGroup
               header="Backup"
@@ -189,6 +218,19 @@ export function MobileSettings(): ReactElement {
         </div>
       </main>
       <ConnectGithubDrawer open={connectOpen} onOpenChange={setConnectOpen} />
+      <AddAiProviderDrawer
+        open={addProviderOpen}
+        onOpenChange={setAddProviderOpen}
+        onAdd={addProvider}
+      />
+      <AiProviderActionsDrawer
+        provider={managedProvider}
+        isDefault={managedProvider !== null && managedProvider.id === defaultProvider?.id}
+        open={manageOpen}
+        onOpenChange={setManageOpen}
+        onMakeDefault={makeDefault}
+        onRemove={removeProvider}
+      />
     </div>
   )
 }

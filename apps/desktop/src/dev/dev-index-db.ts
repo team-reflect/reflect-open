@@ -22,6 +22,29 @@ export interface DevIndexDb {
   clear: () => void
   /** Upsert one `index_meta` key (`index_meta_set`). */
   setMeta: (key: string, value: string) => void
+  /** Upsert one chat turn + its conversation row (`chat_message_save`). */
+  saveChatMessage: (conversation: DevChatConversation, message: DevChatMessageRow) => void
+  /** Delete a conversation; its messages cascade (`chat_conversation_delete`). */
+  deleteChatConversation: (id: string) => void
+}
+
+/** Mirrors `chat_write.rs`'s `ChatConversation` (camelCased over IPC). */
+export interface DevChatConversation {
+  id: string
+  title: string
+  createdMs: number
+  updatedMs: number
+}
+
+/** Mirrors `chat_write.rs`'s `ChatMessageRow`: the JSON columns stay opaque strings. */
+export interface DevChatMessageRow {
+  id: string
+  conversationId: string
+  userText: string
+  attachments: string
+  parts: string
+  responseMessages: string
+  createdMs: number
 }
 
 // The real migrations, inlined at build time. This chunk only loads behind the
@@ -204,6 +227,48 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
         'INSERT INTO index_meta(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
         [key, value],
       )
+    },
+
+    // The chat writes mirror `chat_write.rs` statement-for-statement: the
+    // conversation keeps its original title/created_ms and bumps updated_ms,
+    // seq is assigned inside the insert (never by the caller), and the
+    // message upserts by primary key — deliberately not INSERT OR REPLACE.
+    saveChatMessage: (conversation, message) => {
+      run(
+        db,
+        `INSERT INTO chat_conversations(id, title, created_ms, updated_ms)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET updated_ms = excluded.updated_ms`,
+        [conversation.id, conversation.title, conversation.createdMs, conversation.updatedMs],
+      )
+      run(
+        db,
+        `INSERT INTO chat_messages(
+            id, conversation_id, seq, user_text, attachments, parts,
+            response_messages, created_ms)
+         VALUES (
+            ?1, ?2,
+            (SELECT COALESCE(MAX(seq) + 1, 0) FROM chat_messages WHERE conversation_id = ?2),
+            ?3, ?4, ?5, ?6, ?7)
+         ON CONFLICT(id) DO UPDATE SET
+            user_text = excluded.user_text,
+            attachments = excluded.attachments,
+            parts = excluded.parts,
+            response_messages = excluded.response_messages`,
+        [
+          message.id,
+          message.conversationId,
+          message.userText,
+          message.attachments,
+          message.parts,
+          message.responseMessages,
+          message.createdMs,
+        ],
+      )
+    },
+
+    deleteChatConversation: (id) => {
+      run(db, 'DELETE FROM chat_conversations WHERE id = ?', [id])
     },
   }
 }

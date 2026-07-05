@@ -1,5 +1,4 @@
-import { useMemo, useState, type ReactElement } from 'react'
-import { aiProvider, type AiProviderConfig, type ChatModelOption } from '@reflect/core'
+import { useMemo, type ReactElement } from 'react'
 import { ArrowUp, Plus, Square, X } from 'lucide-react'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import {
@@ -21,49 +20,12 @@ import {
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { imageFilesFrom } from '@/lib/chat-attachments'
+import { groupModelOptions } from '@/lib/chat-model-groups'
 import { keybindingFor } from '@/lib/commands/app-commands'
 import { useChatSession } from '@/providers/chat-provider'
 import { ChatHistoryMenu } from './chat-history-menu'
 
 const NEW_CHAT_BINDING = keybindingFor('chat.new')
-
-interface ModelOptionGroup {
-  configId: string
-  /** Provider label, key-hint-qualified when the provider is configured twice. */
-  label: string
-  /** The group's models, each with its picker value (index into the options). */
-  options: Array<{ option: ChatModelOption; value: string }>
-}
-
-/**
- * The flat option list regrouped per configured provider for rendering
- * (options arrive consecutively per entry). Values are list indexes — model
- * ids alone can collide across providers.
- */
-function groupModelOptions(
-  options: ChatModelOption[],
-  providers: AiProviderConfig[],
-): ModelOptionGroup[] {
-  const groups: ModelOptionGroup[] = []
-  options.forEach((option, index) => {
-    const item = { option, value: String(index) }
-    const last = groups.at(-1)
-    if (last?.configId === option.configId) {
-      last.options.push(item)
-      return
-    }
-    const providerLabel = aiProvider(option.provider).label
-    const duplicated =
-      providers.filter((provider) => provider.provider === option.provider).length > 1
-    const keyHint = providers.find((provider) => provider.id === option.configId)?.keyHint ?? ''
-    groups.push({
-      configId: option.configId,
-      label: duplicated && keyHint !== '' ? `${providerLabel} ·····${keyHint}` : providerLabel,
-      options: [item],
-    })
-  })
-  return groups
-}
 
 /**
  * The composer: a textarea (Enter sends, Shift-Enter breaks, Esc stops a
@@ -82,6 +44,8 @@ export function ChatInput(): ReactElement {
     modelOptions,
     activeModel,
     selectModel,
+    draft,
+    setDraft,
     attachments,
     attachImages,
     removeAttachment,
@@ -89,9 +53,8 @@ export function ChatInput(): ReactElement {
     stop,
     newChat,
   } = useChatSession()
-  const [text, setText] = useState('')
   const streaming = status === 'streaming'
-  const empty = text.trim() === '' && attachments.length === 0
+  const empty = draft.trim() === '' && attachments.length === 0
 
   const groups = useMemo(
     () => groupModelOptions(modelOptions, providers),
@@ -104,12 +67,14 @@ export function ChatInput(): ReactElement {
       option.modelId === activeModel.model,
   )
 
+  // The draft lives in the provider (it must survive the screen unmounting —
+  // on mobile every tab switch does that), and a send that goes through
+  // clears it there.
   const submit = () => {
     if (streaming || empty) {
       return
     }
-    void send(text)
-    setText('')
+    void send(draft)
   }
 
   return (
@@ -141,8 +106,8 @@ export function ChatInput(): ReactElement {
           </AttachmentGroup>
         ) : null}
         <textarea
-          value={text}
-          onChange={(event) => setText(event.target.value)}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault()
