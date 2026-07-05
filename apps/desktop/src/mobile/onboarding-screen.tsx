@@ -21,7 +21,7 @@ type PendingChoice = string | 'icloud-create' | 'local' | null
  * iPhone and Mac, so the hero block ({@link OnboardingIcloudSection}) lists
  * every graph already in the app's iCloud container plus a create row.
  * **Keep notes on this device** opens the app-sandbox root instead (and is
- * promoted to the only storage button when iCloud is unavailable). Every
+ * promoted to the only storage card when iCloud is unavailable). Every
  * path ends in `completeOnboarding(kind, root)`, which opens the chosen root
  * and records the flag + storage kind + graph name.
  *
@@ -79,18 +79,30 @@ export function MobileOnboardingScreen(): ReactElement {
             />
           ) : null}
 
-          <Button
-            variant={icloudReady || icloudPending ? 'outline' : 'default'}
-            onClick={() => runChoice('local', () => completeOnboarding('local'))}
-            disabled={action.pending || mobileStorageInfo === null}
-          >
-            {pendingChoice === 'local' ? (
-              <Spinner />
-            ) : (
-              <HardDrive aria-hidden strokeWidth={1.75} />
-            )}
-            {pendingChoice === 'local' ? 'Setting up…' : 'Keep notes on this device'}
-          </Button>
+          <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-text-secondary">
+                <HardDrive aria-hidden className="size-4" strokeWidth={1.75} />
+              </div>
+              <div className="min-w-0 flex-1 space-y-1">
+                <h2 className="text-sm font-semibold">This device</h2>
+                <p className="text-xs text-text-muted">Stored locally in Reflect on this device.</p>
+              </div>
+            </div>
+            <Button
+              variant={icloudReady || icloudPending ? 'outline' : 'default'}
+              className="w-full"
+              onClick={() => runChoice('local', () => completeOnboarding('local'))}
+              disabled={action.pending || mobileStorageInfo === null}
+            >
+              {pendingChoice === 'local' ? (
+                <Spinner />
+              ) : (
+                <HardDrive aria-hidden strokeWidth={1.75} />
+              )}
+              {pendingChoice === 'local' ? 'Setting up…' : 'Keep notes on this device'}
+            </Button>
+          </section>
           {!icloudReady && !icloudPending ? (
             <p className="text-center text-xs text-text-muted">
               Sign in to iCloud on this device to sync notes with iCloud Drive.
