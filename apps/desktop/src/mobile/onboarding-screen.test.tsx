@@ -150,6 +150,41 @@ describe('MobileOnboardingScreen', () => {
     expect(completeOnboarding).toHaveBeenCalledWith('local')
   })
 
+  it('submits the repo step from the keyboard (Enter in the input)', async () => {
+    render(<MobileOnboardingScreen />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sync with GitHub instead' }))
+    await waitFor(() => expect(screen.getByLabelText('Backup repository')).toBeTruthy())
+
+    const repoInput = screen.getByLabelText('Backup repository')
+    fireEvent.change(repoInput, { target: { value: 'notes' } })
+    fireEvent.keyDown(repoInput, { key: 'Enter' })
+
+    await waitFor(() =>
+      expect(cloned).toEqual([
+        { url: 'https://github.com/alex/notes.git', path: '/Documents', token: 'ghp_abc' },
+      ]),
+    )
+    expect(completeOnboarding).toHaveBeenCalledWith('local')
+  })
+
+  it('ignores Enter while a clone is already in flight (no overlapping clones)', async () => {
+    hangClone = true
+    render(<MobileOnboardingScreen />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sync with GitHub instead' }))
+    await waitFor(() => expect(screen.getByLabelText('Backup repository')).toBeTruthy())
+
+    const repoInput = screen.getByLabelText('Backup repository')
+    fireEvent.change(repoInput, { target: { value: 'notes' } })
+    fireEvent.keyDown(repoInput, { key: 'Enter' })
+    await waitFor(() => expect(cloned).toHaveLength(1))
+
+    fireEvent.keyDown(repoInput, { key: 'Enter' })
+    fireEvent.keyDown(repoInput, { key: 'Enter' })
+    expect(cloned).toHaveLength(1)
+  })
+
   it('disables Back while a clone is in flight (can’t leave it running)', async () => {
     hangClone = true
     render(<MobileOnboardingScreen />)

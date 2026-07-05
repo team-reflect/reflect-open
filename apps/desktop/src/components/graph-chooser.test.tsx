@@ -141,13 +141,25 @@ describe('GraphChooser', () => {
     const user = userEvent.setup()
     render(<GraphChooser />, { wrapper })
 
-    const nameInput = await screen.findByRole('textbox', { name: 'Name' })
-    // The default "Notes" collides (case-insensitively) with the existing
-    // graph — creating it would land inside that folder, so Create refuses.
+    // Wait for the status to land (the existing graph is listed) so the
+    // compact create row — not the pre-status empty-container form — is the
+    // input under test. Next to an existing list the row starts empty.
+    await screen.findByRole('button', { name: 'Notes' })
+    const nameInput = screen.getByRole('textbox', { name: 'Name' })
+    expect(nameInput).toHaveValue('')
+    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled()
+
+    // "notes" collides (case-insensitively) with the existing graph —
+    // creating it would land inside that folder, so Create refuses and the
+    // field says why.
+    await user.type(nameInput, 'notes')
+    expect(nameInput).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByText('That name already exists in iCloud Drive.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled()
 
     await user.clear(nameInput)
     await user.type(nameInput, 'Journal')
+    expect(screen.queryByText('That name already exists in iCloud Drive.')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Create' }))
 
     await waitFor(() =>
@@ -164,7 +176,7 @@ describe('GraphChooser', () => {
     expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled()
   })
 
-  it('hides the iCloud card outside macOS builds', async () => {
+  it('hides the iCloud card outside macOS builds and drops the Mac-specific copy', async () => {
     vi.stubEnv('TAURI_ENV_PLATFORM', 'windows')
     render(<GraphChooser />, { wrapper })
 
@@ -172,6 +184,7 @@ describe('GraphChooser', () => {
       expect(screen.getByRole('heading', { name: 'A folder you choose' })).toBeInTheDocument(),
     )
     expect(screen.queryByRole('heading', { name: 'iCloud' })).not.toBeInTheDocument()
+    expect(screen.getByText(/any folder on this computer/)).toBeInTheDocument()
   })
 
   // The provider auto-opens the most recent graph on mount, so the chooser's
