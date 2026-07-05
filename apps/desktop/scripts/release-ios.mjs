@@ -77,7 +77,7 @@ export function createTauriIosBuildArgs({
   const args = ['tauri', 'ios', 'build', '--export-method', exportMethod, '--ci']
   if (buildNumber) args.push('--config', JSON.stringify({ bundle: { iOS: { bundleVersion: buildNumber } } }))
   if (verbose) args.push('--verbose')
-  args.push('--', 'CI=true', ...xcodeAuthenticationArgs)
+  if (xcodeAuthenticationArgs.length > 0) args.push('--', ...xcodeAuthenticationArgs)
   return args
 }
 

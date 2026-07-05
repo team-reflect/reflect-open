@@ -38,7 +38,6 @@ test('iOS release builds pass App Store Connect export and xcodebuild API key au
     '--config',
     JSON.stringify({ bundle: { iOS: { bundleVersion: '492' } } }),
     '--',
-    'CI=true',
     '-authenticationKeyPath',
     '/tmp/AuthKey_ABC123DEFG.p8',
     '-authenticationKeyID',
@@ -56,8 +55,6 @@ test('iOS release builds can rely on local Xcode accounts when no API key is sup
     '--export-method',
     'release-testing',
     '--ci',
-    '--',
-    'CI=true',
   ])
 })
 
