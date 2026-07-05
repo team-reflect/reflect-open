@@ -103,9 +103,10 @@ export function DestructiveSection(): ReactElement {
       <Dialog open={confirming} onOpenChange={(open) => !forgetting && setConfirming(open)}>
         <DialogContent>
           <DialogTitle>Forget graph?</DialogTitle>
-          <DialogDescription>
-            Remove <span className="font-mono text-text">{graphId}</span> from saved graphs. Files
-            stay on disk.
+          <DialogDescription className="min-w-0">
+            Remove{' '}
+            <span className="font-mono text-text [overflow-wrap:anywhere]">{graphId}</span> from
+            saved graphs. Files stay on disk.
           </DialogDescription>
           <DialogFooter>
             <DialogClose asChild>
@@ -126,9 +127,11 @@ export function DestructiveSection(): ReactElement {
       >
         <DialogContent>
           <DialogTitle>Delete graph?</DialogTitle>
-          <DialogDescription>
-            Move <span className="font-mono text-text">{graphId}</span> and all of its notes to
-            the trash. Type <span className="font-mono text-text">{graphName}</span> to confirm.
+          <DialogDescription className="min-w-0">
+            Move{' '}
+            <span className="font-mono text-text [overflow-wrap:anywhere]">{graphId}</span> and
+            all of its notes to the trash. Type{' '}
+            <span className="font-mono text-text">{graphName}</span> to confirm.
           </DialogDescription>
           <Input
             aria-label="Graph name"

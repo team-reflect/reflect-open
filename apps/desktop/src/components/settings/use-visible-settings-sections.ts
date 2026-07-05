@@ -19,7 +19,7 @@ export function useVisibleSettingsSections(): readonly SettingsSectionEntry[] {
     if (section.id === 'integrations') {
       return hasAppleIntegrations
     }
-    if (section.id === 'icloud') {
+    if (section.id === 'icloud' || section.id === 'agents') {
       return isMacosDesktop
     }
     return true

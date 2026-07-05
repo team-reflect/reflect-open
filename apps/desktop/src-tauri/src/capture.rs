@@ -56,7 +56,8 @@ fn pointer_json(root: &Path) -> String {
     .to_string()
 }
 
-fn atomic_write_to(path: &Path, contents: &str) -> AppResult<()> {
+// Also used by `skill.rs` for the agent-skill files under `~/.agents/`.
+pub(crate) fn atomic_write_to(path: &Path, contents: &str) -> AppResult<()> {
     let dir = path
         .parent()
         .ok_or_else(|| AppError::io(format!("no parent directory for {}", path.display())))?;

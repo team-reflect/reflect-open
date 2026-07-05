@@ -8,6 +8,7 @@
 //! [`recents`] (recent-graphs store), [`settings`] (user settings store),
 //! [`secrets`] (OS keychain), [`git`] (backup/sync primitives),
 //! [`capture`] (link-capture inbox + native-messaging host plumbing),
+//! [`skill`] (per-graph agent-skill install under `~/.agents/skills/`),
 //! [`calendar`] (read-only Apple Calendar access),
 //! [`contacts`] (live Apple Contacts lookups),
 //! [`error`] (the shared error contract).
@@ -27,6 +28,7 @@ mod quit;
 mod recents;
 mod secrets;
 mod settings;
+mod skill;
 
 // The watcher and the embedding runtime are desktop capabilities (Plan 19):
 // mobile swaps in stand-ins with the identical command surface, so the
@@ -177,6 +179,7 @@ pub fn run() {
             fs::graph_open,
             fs::graph_create,
             fs::graph_delete,
+            fs::graph_import_reflect_v1_zip,
             fs::note_read,
             fs::note_write,
             fs::asset_write,
@@ -195,6 +198,9 @@ pub fn run() {
             recents::forget_recent,
             settings::settings_load,
             settings::settings_save,
+            skill::skill_status,
+            skill::skill_install,
+            skill::skill_uninstall,
             secrets::secret_set,
             secrets::secret_get,
             secrets::secret_delete,

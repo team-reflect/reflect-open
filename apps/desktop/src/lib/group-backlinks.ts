@@ -12,9 +12,9 @@ export interface BacklinkSource {
 
 /**
  * Group flat backlink rows by their source note, preserving the query's
- * source-title order. Empty snippets (a source that vanished between the
- * index query and the file read) are dropped, but the source group itself
- * still renders so the reference stays discoverable.
+ * most-recent-source-first order (V1 parity). Empty snippets (a source that
+ * vanished between the index query and the file read) are dropped, but the
+ * source group itself still renders so the reference stays discoverable.
  */
 export function groupBacklinksBySource(
   backlinks: readonly BacklinkContext[],

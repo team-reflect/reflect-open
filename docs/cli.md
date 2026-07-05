@@ -155,6 +155,13 @@ are stable; new fields may be added, existing ones won't change meaning.
 Reading a private note is not possible through this surface by design — don't
 work around it by reading graph files directly unless the user asked for that.
 
+Settings → Agents installs a per-graph agent skill
+(`~/.agents/skills/reflect-<graph-slug>/SKILL.md`) that teaches coding agents
+this contract: the graph's root, the bundled CLI's path, the commands, and
+the privacy rules. The file carries a `reflect-managed` sha256 marker so the
+app can refresh its own installs without ever overwriting a hand-edited one
+(`apps/desktop/src-tauri/src/skill.rs`).
+
 ## Development notes
 
 - The CLI deliberately duplicates a thin read-side contract from

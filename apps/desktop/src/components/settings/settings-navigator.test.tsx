@@ -5,11 +5,12 @@ import { SETTINGS_SECTIONS, settingsSectionDomId } from './sections'
 import { SettingsNavigator } from './settings-navigator'
 
 // No bridge is installed here, so the platform-gated entries are hidden
-// (Integrations needs the Rust contacts answer; iCloud sync needs
+// (Integrations needs the Rust contacts answer; iCloud sync and Agents need
 // `isMacosDesktop`, which requires a Tauri webview) — the navigator lists the
 // sections every platform shows.
 const VISIBLE_SECTIONS = SETTINGS_SECTIONS.filter(
-  (section) => section.id !== 'integrations' && section.id !== 'icloud',
+  (section) =>
+    section.id !== 'integrations' && section.id !== 'icloud' && section.id !== 'agents',
 )
 
 // jsdom implements neither; the navigator re-measures its marker on resize,

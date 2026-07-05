@@ -33,6 +33,13 @@ export {
 } from './ipc/commands'
 export { confirmQuit, subscribeQuitRequested } from './app/quit'
 export { toggleDevtools } from './app/devtools'
+export {
+  agentSkillStatus,
+  agentSkillInstall,
+  agentSkillUninstall,
+  type AgentSkillInstallState,
+  type AgentSkillStatus,
+} from './app/agent-skill'
 
 // Embeddings & retrieval (Plan 09)
 export { chunkNote, type NoteChunk } from './embeddings/chunk'
@@ -88,13 +95,17 @@ export {
   graphInfoSchema,
   recentGraphSchema,
   fileMetaSchema,
+  graphImportSummarySchema,
   type GraphInfo,
   type RecentGraph,
   type FileMeta,
+  type GraphImportSummary,
 } from './graph/schemas'
 export {
   openGraph,
   createGraph,
+  importReflectV1Zip,
+  markReflectV1ImportOwnWrites,
   readNote,
   writeNote,
   writeAsset,
