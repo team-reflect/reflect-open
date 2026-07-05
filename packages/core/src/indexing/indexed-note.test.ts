@@ -3,8 +3,8 @@ import { gistBodyHash, parseNote } from '../markdown'
 import { buildIndexedNote, indexedNoteSchema, PROJECTION_VERSION } from './indexed-note'
 
 describe('buildIndexedNote', () => {
-  it('carries the projection version that backfills the note kind', () => {
-    expect(PROJECTION_VERSION).toBe(12)
+  it('carries the projection version that backfills the note email rows', () => {
+    expect(PROJECTION_VERSION).toBe(13)
   })
 
   it('flattens a parsed note into the index payload', () => {
@@ -44,6 +44,27 @@ describe('buildIndexedNote', () => {
       true,
     )
     expect(indexed.assets).toEqual(['assets/p.png'])
+  })
+
+  it('projects Email field bullets with folded keys, ignoring prose mentions', () => {
+    const source =
+      '# Ada Lovelace\n\n- Type: #person\n- Email: Ada@Example.com\n\nIntro via bob@corp.example.'
+    const indexed = buildIndexedNote(parseNote({ path: 'notes/ada.md', source }), {
+      fileHash: 'h',
+      mtime: 0,
+      source,
+    })
+    expect(indexed.emails).toEqual([{ email: 'Ada@Example.com', emailKey: 'ada@example.com' }])
+  })
+
+  it('reads email fields from the body with frontmatter split off', () => {
+    const source = '---\nid: 01H\n---\n# Ada\n\n- Email: ada@example.com'
+    const indexed = buildIndexedNote(parseNote({ path: 'notes/ada.md', source }), {
+      fileHash: 'h',
+      mtime: 0,
+      source,
+    })
+    expect(indexed.emails).toEqual([{ email: 'ada@example.com', emailKey: 'ada@example.com' }])
   })
 
   it('derives the list preview and folded tag keys at index time', () => {

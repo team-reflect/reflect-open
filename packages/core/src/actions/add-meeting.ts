@@ -9,6 +9,7 @@ import { appendUnderHeading, wikiLinkSafe } from '../markdown/edit'
 import { parseNote } from '../markdown/extract'
 import { foldKey } from '../markdown/keys'
 import { slugForTitle } from '../markdown/slug'
+import { resolveMeetingAttendees } from './resolve-attendees'
 
 /**
  * "Add to daily note" for a calendar event — the write half of the calendar
@@ -20,11 +21,16 @@ import { slugForTitle } from '../markdown/slug'
  *
  * and creates the notes those links resolve to when they don't exist yet.
  * With "Create backlinked note" off, the meeting name is plain text (as in
- * v1), not a link — only attendees get `[[Person]]` links and notes. With the
+ * v1), not a link — only attendees get `[[Person]]` links and notes.
+ *
+ * Attendees resolve by invite email first ({@link resolveMeetingAttendees}):
+ * a `#person`-tagged note owning the address via a `- Email:` bullet supplies
+ * the link name, so a person keeps one note however the calendar spelled
+ * them. With the
  * contacts integration on (docs/porting/contacts-integration.md), a fresh
- * person note is pre-filled from the Apple Contacts entry matching the
- * attendee's invite email. After that, they are ordinary notes; nothing stays
- * tied to the calendar, and no event metadata is persisted beyond this
+ * person note is named and pre-filled from the Apple Contacts entry matching
+ * the attendee's invite email. After that, they are ordinary notes; nothing
+ * stays tied to the calendar, and no event metadata is persisted beyond this
  * markdown.
  *
  * Wiki links resolve by title, so "one note per meeting title" holds by
@@ -224,11 +230,7 @@ export async function addMeetingToDaily(input: AddMeetingInput): Promise<AddMeet
   if (title === '') {
     throw new Error('a meeting needs a name')
   }
-  // An attendee spelled like the meeting itself (a shared mailbox, a 1:1
-  // named after the person) would just duplicate the link — drop it.
-  const attendees = normalizeAttendees(input.attendees).filter(
-    (attendee) => attendee.name.toLowerCase() !== title.toLowerCase(),
-  )
+  const lookupContacts = input.lookupContacts ?? false
 
   const daily = dailyPath(input.date)
   const source = await noteSource(daily, input.generation)
@@ -240,6 +242,14 @@ export async function addMeetingToDaily(input: AddMeetingInput): Promise<AddMeet
   if (input.backlinkMeeting && meetingAlreadyLinked(source, title)) {
     return { appended: false, createdNotes: [] }
   }
+  // Canonicalize by invite email before deduplicating: an attendee whose
+  // address an existing note owns takes that note's title, so two spellings
+  // of one person collapse here and the link below lands on their note. An
+  // attendee spelled like the meeting itself (a shared mailbox, a 1:1 named
+  // after the person) would just duplicate the link — drop it.
+  const attendees = normalizeAttendees(
+    await resolveMeetingAttendees(input.attendees, lookupContacts),
+  ).filter((attendee) => attendee.name.toLowerCase() !== title.toLowerCase())
   const line = meetingLine({
     title,
     attendees: attendees.map((attendee) => attendee.name),
@@ -257,7 +267,7 @@ export async function addMeetingToDaily(input: AddMeetingInput): Promise<AddMeet
     if (await titleHasNote(attendee.name)) {
       continue
     }
-    const body = await personNoteBody(attendee, input.lookupContacts ?? false)
+    const body = await personNoteBody(attendee, lookupContacts)
     await createNoteWithTitle(attendee.name, input.generation, body)
     createdNotes.push(attendee.name)
   }

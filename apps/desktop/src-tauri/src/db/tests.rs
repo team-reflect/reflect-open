@@ -10,7 +10,8 @@ use super::embed_write::{apply_chunks, remove_chunks, EmbeddedChunk};
 use super::migrations::{migrate, migrate_to, open_in_memory, open_index_at, validate_migrations};
 use super::query::run_query;
 use super::write::{
-    apply_note, clear_index, move_note, IndexedLink, IndexedNote, IndexedTag, IndexedTask,
+    apply_note, clear_index, move_note, IndexedEmail, IndexedLink, IndexedNote, IndexedTag,
+    IndexedTask,
 };
 
 fn migrated() -> Connection {
@@ -44,6 +45,7 @@ fn note(path: &str, title: &str, links: Vec<IndexedLink>) -> IndexedNote {
         links,
         tags: vec![],
         aliases: vec![],
+        emails: vec![],
         assets: vec![],
         tasks: vec![],
     }
@@ -78,7 +80,7 @@ fn migrations_are_valid_and_idempotent() {
     let version: i64 = conn
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 15); // applied migrations (0001 through 0015)
+    assert_eq!(version, 16); // applied migrations (0001 through 0016)
     migrate(&mut conn).expect("re-running to_latest is a no-op");
 }
 
@@ -153,6 +155,44 @@ fn preview_and_tag_keys_round_trip() {
     let tags = run_query(&conn, "SELECT tag, tag_key FROM tags", &[]).unwrap();
     assert_eq!(tags[0]["tag"], Value::from("Café"));
     assert_eq!(tags[0]["tag_key"], Value::from("café"));
+}
+
+#[test]
+fn note_emails_apply_move_and_cascade() {
+    let conn = migrated();
+    let mut person = note("notes/jane-doe.md", "Jane Doe", vec![]);
+    person.emails = vec![IndexedEmail {
+        email: "Jane@Corp.com".to_string(),
+        email_key: "jane@corp.com".to_string(),
+    }];
+    apply_note(&conn, &person).unwrap();
+
+    // Display casing and the folded match key are stored side by side, like tags.
+    let rows = run_query(
+        &conn,
+        "SELECT note_path, email, email_key FROM note_emails",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["email"], Value::from("Jane@Corp.com"));
+    assert_eq!(rows[0]["email_key"], Value::from("jane@corp.com"));
+
+    // A rename carries the rows to the new path (inside the same deferred-FK
+    // transaction the command layer would open).
+    conn.execute_batch("BEGIN; PRAGMA defer_foreign_keys = ON;")
+        .unwrap();
+    move_note(&conn, "notes/jane-doe.md", "notes/jane.md").unwrap();
+    conn.execute_batch("COMMIT;").unwrap();
+    let moved = run_query(&conn, "SELECT note_path FROM note_emails", &[]).unwrap();
+    assert_eq!(moved[0]["note_path"], Value::from("notes/jane.md"));
+
+    // Re-applying with no emails replaces the rows rather than accreting.
+    let mut renamed = note("notes/jane.md", "Jane Doe", vec![]);
+    renamed.emails = vec![];
+    apply_note(&conn, &renamed).unwrap();
+    let cleared = run_query(&conn, "SELECT note_path FROM note_emails", &[]).unwrap();
+    assert!(cleared.is_empty());
 }
 
 #[test]
@@ -680,7 +720,7 @@ fn open_index_at_creates_migrates_and_reopens() {
     let version: i64 = conn
         .query_row("PRAGMA user_version", [], |row| row.get(0))
         .unwrap();
-    assert_eq!(version, 15);
+    assert_eq!(version, 16);
     let journal: String = conn
         .query_row("PRAGMA journal_mode", [], |row| row.get(0))
         .unwrap();

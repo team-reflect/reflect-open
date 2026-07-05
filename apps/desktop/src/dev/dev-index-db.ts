@@ -130,6 +130,13 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
           alias.aliasKey,
         ])
       }
+      for (const email of note.emails) {
+        run(db, 'INSERT INTO note_emails(note_path, email, email_key) VALUES(?, ?, ?)', [
+          note.path,
+          email.email,
+          email.emailKey,
+        ])
+      }
       for (const asset of note.assets) {
         run(db, 'INSERT INTO assets(note_path, asset_path) VALUES(?, ?)', [note.path, asset])
       }
@@ -166,6 +173,7 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
         run(db, 'UPDATE links SET source_path = ? WHERE source_path = ?', [to, from])
         run(db, 'UPDATE tags SET note_path = ? WHERE note_path = ?', [to, from])
         run(db, 'UPDATE aliases SET note_path = ? WHERE note_path = ?', [to, from])
+        run(db, 'UPDATE note_emails SET note_path = ? WHERE note_path = ?', [to, from])
         run(db, 'UPDATE assets SET note_path = ? WHERE note_path = ?', [to, from])
         run(db, 'UPDATE tasks SET note_path = ? WHERE note_path = ?', [to, from])
         run(db, 'UPDATE embedding_chunks SET note_path = ? WHERE note_path = ?', [to, from])

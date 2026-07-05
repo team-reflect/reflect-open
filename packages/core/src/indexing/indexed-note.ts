@@ -2,6 +2,8 @@ import { z } from 'zod'
 import { dateFromDailyPath, isDaily, isTemplatePath } from '../graph/paths'
 import {
   detectConflictMarkers,
+  extractEmailFields,
+  foldEmail,
   foldKey,
   foldTag,
   gistBodyHash,
@@ -54,8 +56,11 @@ import { previewSnippet } from './snippet'
  * `+ [x]`), excluding square checklist checkboxes from the aggregate Tasks view.
  * 12 — `notes.kind` (daily / note / template): templates are indexed but
  * excluded from note surfaces, so rows must carry the kind.
+ * 13 — `note_emails` projection (`- Email:` contact-field bullets): existing
+ * person notes carry no email rows until reprojected, and attendee → note
+ * resolution in the calendar flow needs them, so the bump backfills them.
  */
-export const PROJECTION_VERSION = 12
+export const PROJECTION_VERSION = 13
 
 export const indexedLinkSchema = z.object({
   kind: z.enum(['wiki', 'md']),
@@ -81,6 +86,14 @@ export const indexedAliasSchema = z.object({
   aliasKey: z.string(),
 })
 export type IndexedAlias = z.infer<typeof indexedAliasSchema>
+
+export const indexedEmailSchema = z.object({
+  /** Display casing (as written in the field bullet). */
+  email: z.string(),
+  /** Case-folded match key ({@link foldEmail}) — what resolution compares against. */
+  emailKey: z.string(),
+})
+export type IndexedEmail = z.infer<typeof indexedEmailSchema>
 
 export const indexedTaskSchema = z.object({
   /** Character offset of the marker's `[` in the file (UTF-16 units) — the row PK with `path`. */
@@ -131,6 +144,8 @@ export const indexedNoteSchema = z.object({
   links: z.array(indexedLinkSchema),
   tags: z.array(indexedTagSchema),
   aliases: z.array(indexedAliasSchema),
+  /** Emails the note owns via `- Email:` contact-field bullets. */
+  emails: z.array(indexedEmailSchema),
   assets: z.array(z.string()),
   /** Reflect task rows for the Tasks projection (Plan 18). */
   tasks: z.array(indexedTaskSchema),
@@ -162,6 +177,7 @@ export function buildIndexedNote(
     posFrom: link.from,
     posTo: link.to,
   }))
+  const body = splitFrontmatter(meta.source).body
 
   return {
     path: parsed.path,
@@ -179,8 +195,7 @@ export function buildIndexedNote(
     // writes the `gist` block itself, and a pin/private toggle is not an edit
     // worth a "republish" nudge.
     gistStale:
-      parsed.frontmatter.gist !== undefined &&
-      gistBodyHash(splitFrontmatter(meta.source).body) !== parsed.frontmatter.gist.hash,
+      parsed.frontmatter.gist !== undefined && gistBodyHash(body) !== parsed.frontmatter.gist.hash,
     fileHash: meta.fileHash,
     mtime: meta.mtime,
     text: parsed.text,
@@ -192,6 +207,7 @@ export function buildIndexedNote(
       alias,
       aliasKey: foldKey(alias),
     })),
+    emails: extractEmailFields(body).map((email) => ({ email, emailKey: foldEmail(email) })),
     assets: parsed.assets.map((asset) => asset.path),
     tasks: parsed.tasks.map((task) => ({
       markerOffset: task.markerOffset,

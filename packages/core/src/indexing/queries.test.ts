@@ -8,6 +8,7 @@ import {
   getOpenTasks,
   getPinnedNotes,
   listDailyNotes,
+  noteTitleOwningEmail,
   suggestWikiTargets,
 } from './queries'
 
@@ -46,6 +47,34 @@ describe('dailyDatesInRange', () => {
   it('returns an empty list when no daily notes exist in the range', async () => {
     mockInvoke.mockResolvedValue([])
     await expect(dailyDatesInRange('2025-01-01', '2025-01-31')).resolves.toEqual([])
+  })
+})
+
+describe('noteTitleOwningEmail', () => {
+  it('joins note_emails to #person-tagged regular notes by folded key, first path wins', async () => {
+    mockInvoke.mockResolvedValue([{ title: 'Jane Doe' }])
+
+    await expect(noteTitleOwningEmail('  Jane@Corp.com ')).resolves.toBe('Jane Doe')
+
+    const [command, args] = mockInvoke.mock.calls[0]!
+    expect(command).toBe('db_query')
+    const sql = String(args['sql'])
+    expect(sql).toContain('note_emails')
+    expect(sql).toContain('email_key')
+    expect(sql).toContain('tag_key')
+    expect(sql).toContain('kind')
+    expect(sql).toContain('order by')
+    expect(args['params']).toEqual(['jane@corp.com', 'person', 'note'])
+  })
+
+  it('answers null for an unowned address without guessing', async () => {
+    mockInvoke.mockResolvedValue([])
+    await expect(noteTitleOwningEmail('nobody@corp.com')).resolves.toBeNull()
+  })
+
+  it('short-circuits a blank address before touching the bridge', async () => {
+    await expect(noteTitleOwningEmail('   ')).resolves.toBeNull()
+    expect(mockInvoke).not.toHaveBeenCalled()
   })
 })
 

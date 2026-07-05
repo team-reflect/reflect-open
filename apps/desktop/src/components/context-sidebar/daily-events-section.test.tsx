@@ -30,11 +30,17 @@ window.HTMLElement.prototype.scrollIntoView = () => {}
 const addMeetingToDaily = vi.hoisted(() => vi.fn(async () => ({ appended: true, createdNotes: [] })))
 const suggestWikiTargets = vi.hoisted(() => vi.fn(async () => []))
 const contactLinkSuggestions = vi.hoisted(() => vi.fn(async () => []))
+// Identity by default: the email → note-title canonicalization is covered in
+// @reflect/core; here it is the seam the chip-upgrade effect renders through.
+const resolveMeetingAttendees = vi.hoisted(() =>
+  vi.fn(async (attendees: readonly unknown[]) => [...attendees]),
+)
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   addMeetingToDaily,
   suggestWikiTargets,
   contactLinkSuggestions,
+  resolveMeetingAttendees,
 }))
 
 const DATE = '2026-07-01'
@@ -97,6 +103,7 @@ beforeEach(() => {
   contactsAuthorization = 'unavailable'
   addMeetingToDaily.mockClear()
   addMeetingToDaily.mockResolvedValue({ appended: true, createdNotes: [] })
+  resolveMeetingAttendees.mockClear()
   window.sessionStorage.clear()
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   installFakeBridge()
@@ -231,6 +238,40 @@ describe('DailyEventsSection', () => {
         expect.objectContaining({
           attendees: [{ name: 'Ada Lovelace', email: 'ada@example.com' }],
           lookupContacts: true,
+        }),
+      ),
+    )
+  })
+
+  it('upgrades a prefilled chip to the note that owns its invite email', async () => {
+    resolveMeetingAttendees.mockResolvedValueOnce([
+      { name: 'Ada Lovelace', email: 'ada@example.com' },
+    ])
+    events = [
+      eventAt(9, {
+        title: 'Standup',
+        attendees: [
+          {
+            name: 'ada@example.com',
+            email: 'ada@example.com',
+            isCurrentUser: false,
+            isPerson: true,
+            status: 'accepted',
+          },
+        ],
+      }),
+    ]
+    renderSection()
+    fireEvent.click(await screen.findByRole('button', { name: /standup/i }))
+
+    await screen.findByText('Ada Lovelace')
+    expect(screen.queryByText('ada@example.com')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: /add to daily note/i }))
+    await waitFor(() =>
+      expect(addMeetingToDaily).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attendees: [{ name: 'Ada Lovelace', email: 'ada@example.com' }],
         }),
       ),
     )

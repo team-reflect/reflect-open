@@ -44,6 +44,8 @@ pub struct IndexedNote {
     pub(super) links: Vec<IndexedLink>,
     pub(super) tags: Vec<IndexedTag>,
     pub(super) aliases: Vec<IndexedAlias>,
+    /// Emails the note owns via `- Email:` contact-field bullets.
+    pub(super) emails: Vec<IndexedEmail>,
     pub(super) assets: Vec<String>,
     pub(super) tasks: Vec<IndexedTask>,
 }
@@ -71,6 +73,13 @@ pub(super) struct IndexedTag {
 pub(super) struct IndexedAlias {
     pub(super) alias: String,
     pub(super) alias_key: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct IndexedEmail {
+    pub(super) email: String,
+    pub(super) email_key: String,
 }
 
 /// One GFM checkbox (Plan 18). `marker_offset` is the `[`'s character offset in
@@ -153,6 +162,14 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
         }
     }
     {
+        let mut stmt = conn.prepare_cached(
+            "INSERT INTO note_emails(note_path, email, email_key) VALUES(?1, ?2, ?3)",
+        )?;
+        for email in &note.emails {
+            stmt.execute(params![note.path, email.email, email.email_key])?;
+        }
+    }
+    {
         let mut stmt =
             conn.prepare_cached("INSERT INTO assets(note_path, asset_path) VALUES(?1, ?2)")?;
         for asset in &note.assets {
@@ -222,6 +239,8 @@ pub(super) fn move_note(conn: &Connection, from: &str, to: &str) -> AppResult<()
     conn.prepare_cached("UPDATE tags SET note_path = ?2 WHERE note_path = ?1")?
         .execute(params![from, to])?;
     conn.prepare_cached("UPDATE aliases SET note_path = ?2 WHERE note_path = ?1")?
+        .execute(params![from, to])?;
+    conn.prepare_cached("UPDATE note_emails SET note_path = ?2 WHERE note_path = ?1")?
         .execute(params![from, to])?;
     conn.prepare_cached("UPDATE assets SET note_path = ?2 WHERE note_path = ?1")?
         .execute(params![from, to])?;

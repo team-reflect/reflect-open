@@ -59,6 +59,7 @@ export {
   type ConflictMarkerLabels,
   type ConflictResolution,
 } from './conflict-markers'
+export { extractEmailFields, foldEmail } from './email-fields'
 export { foldKey, foldTag } from './keys'
 export { gistBodyHash, gistFilename } from './gist'
 export { slugForTitle } from './slug'

@@ -414,6 +414,7 @@ export {
   type AddMeetingOutcome,
   type MeetingAttendee,
 } from './actions/add-meeting'
+export { resolveMeetingAttendees } from './actions/resolve-attendees'
 export {
   describePage,
   isDescriptionRejected,
