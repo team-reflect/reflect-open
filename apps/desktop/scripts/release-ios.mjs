@@ -6,7 +6,7 @@
 //   pnpm release:ios upload --ipa=apps/desktop/src-tauri/gen/apple/build/arm64/Reflect.ipa
 //
 // The App Store Connect API key is used twice when present:
-//   1. xcodebuild provisioning/export auth via -authenticationKey*
+//   1. Tauri/xcodebuild provisioning auth via APPLE_API_KEY* env vars
 //   2. altool IPA upload auth via --api-key/--api-issuer
 //
 // Set APPLE_API_KEY, APPLE_API_ISSUER, and either APPLE_API_KEY_CONTENT or
@@ -48,18 +48,6 @@ function capture(command, args) {
   return execFileSync(command, args, { encoding: 'utf8' })
 }
 
-/** Build the runner authentication args xcodebuild needs for automatic provisioning. */
-export function createXcodeAuthenticationArgs({ issuerId, keyId, keyPath }) {
-  return [
-    '-authenticationKeyPath',
-    keyPath,
-    '-authenticationKeyID',
-    keyId,
-    '-authenticationKeyIssuerID',
-    issuerId,
-  ]
-}
-
 /** Build the altool authentication args for an App Store Connect API key. */
 export function createApiKeyAltoolArgs({ issuerId, keyId, keyPath }) {
   const args = ['--api-key', keyId, '--api-issuer', issuerId]
@@ -72,12 +60,10 @@ export function createTauriIosBuildArgs({
   buildNumber = null,
   exportMethod = DEFAULT_EXPORT_METHOD,
   verbose = false,
-  xcodeAuthenticationArgs = [],
 }) {
   const args = ['tauri', 'ios', 'build', '--export-method', exportMethod, '--ci']
   if (buildNumber) args.push('--config', JSON.stringify({ bundle: { iOS: { bundleVersion: buildNumber } } }))
   if (verbose) args.push('--verbose')
-  if (xcodeAuthenticationArgs.length > 0) args.push('--', ...xcodeAuthenticationArgs)
   return args
 }
 
@@ -225,9 +211,6 @@ function resolveApiKeyCredentials({ requirePrivateKey }) {
     source: keyPath
       ? `App Store Connect API key ${APPLE_API_KEY} (${keyPath})`
       : `App Store Connect API key ${APPLE_API_KEY} (altool standard key search path)`,
-    xcodeAuthenticationArgs: keyPath
-      ? createXcodeAuthenticationArgs({ issuerId: APPLE_API_ISSUER, keyId: APPLE_API_KEY, keyPath })
-      : [],
   }
 }
 
@@ -244,7 +227,6 @@ function resolveUploadCredentials() {
       cleanup: null,
       env: {},
       source: `Apple ID ${APPLE_ID} (APPLE_PASSWORD from environment)`,
-      xcodeAuthenticationArgs: [],
     }
   }
 
@@ -257,7 +239,6 @@ function resolveUploadCredentials() {
       cleanup: null,
       env: { APPLE_PASSWORD: stored.password },
       source: `Apple ID ${stored.account} (keychain item "${KEYCHAIN_SERVICE}")`,
-      xcodeAuthenticationArgs: [],
     }
   }
 
@@ -372,13 +353,12 @@ function runTauriIosBuild({ apiKeyCredentials, buildNumber, exportMethod, verbos
     buildNumber,
     exportMethod,
     verbose,
-    xcodeAuthenticationArgs: apiKeyCredentials?.xcodeAuthenticationArgs ?? [],
   })
   log(`building ${IOS_BUNDLE_IDENTIFIER} with export method ${exportMethod}${buildNumber ? `, build ${buildNumber}` : ''}…`)
-  if (apiKeyCredentials?.xcodeAuthenticationArgs.length) {
-    log(`xcodebuild provisioning auth: ${apiKeyCredentials.source}`)
+  if (apiKeyCredentials) {
+    log(`Tauri provisioning auth: ${apiKeyCredentials.source}`)
   } else {
-    log('xcodebuild provisioning auth: local Xcode account/profiles')
+    log('Tauri provisioning auth: local Xcode account/profiles')
   }
   const result = spawnSync('pnpm', args, {
     cwd: appDir,

@@ -9,24 +9,16 @@ import {
   createApiKeyAltoolArgs,
   createTauriIosBuildEnv,
   createTauriIosBuildArgs,
-  createXcodeAuthenticationArgs,
   findIpaInfoPlistPath,
   isFalsePlistValue,
   normalizeApiKeyContent,
 } from './release-ios.mjs'
 
-test('iOS release builds pass App Store Connect export and xcodebuild API key auth through Tauri', () => {
-  const xcodeAuthenticationArgs = createXcodeAuthenticationArgs({
-    issuerId: 'issuer-uuid',
-    keyId: 'ABC123DEFG',
-    keyPath: '/tmp/AuthKey_ABC123DEFG.p8',
-  })
-
+test('iOS release builds pass App Store Connect export and build number through Tauri', () => {
   expect(
     createTauriIosBuildArgs({
       buildNumber: '492',
       exportMethod: 'app-store-connect',
-      xcodeAuthenticationArgs,
     }),
   ).toEqual([
     'tauri',
@@ -37,13 +29,6 @@ test('iOS release builds pass App Store Connect export and xcodebuild API key au
     '--ci',
     '--config',
     JSON.stringify({ bundle: { iOS: { bundleVersion: '492' } } }),
-    '--',
-    '-authenticationKeyPath',
-    '/tmp/AuthKey_ABC123DEFG.p8',
-    '-authenticationKeyID',
-    'ABC123DEFG',
-    '-authenticationKeyIssuerID',
-    'issuer-uuid',
   ])
 })
 

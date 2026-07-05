@@ -32,7 +32,8 @@ for `pnpm release:ios testflight`.
    with a team account that can provision `app.reflect.ios` is enough for
    `pnpm release:ios build`. For CI, use an App Store Connect API key with
    permission to manage signing and upload builds. When the API key is present,
-   the release helper uses it for both xcodebuild provisioning and altool upload:
+   the release helper exposes it to Tauri/xcodebuild through environment
+   variables and uses it directly for altool upload:
 
    ```bash
    export APPLE_API_KEY=ABC123DEFG
@@ -83,9 +84,9 @@ pnpm release:ios build --build-number=123
 ```
 
 Runs `pnpm tauri ios build --export-method app-store-connect --ci`, using the
-signed-in Xcode account locally or passing the App Store Connect API key through
-to xcodebuild when the key is configured. The build number is merged into the
-Tauri config as `bundle.iOS.bundleVersion`. The IPA lands under
+signed-in Xcode account locally or the App Store Connect API key environment
+when the key is configured. The build number is merged into the Tauri config as
+`bundle.iOS.bundleVersion`. The IPA lands under
 `apps/desktop/src-tauri/gen/apple/build/`.
 
 ```bash
@@ -112,7 +113,7 @@ the upload flow.
 ## GitHub Action
 
 Use **Actions -> TestFlight -> Run workflow**. The workflow builds on
-`macos-latest`, uploads the IPA to App Store Connect, and serializes runs so two
+`macos-26`, uploads the IPA to App Store Connect, and serializes runs so two
 uploads do not race each other.
 
 Configure these repository secrets:
