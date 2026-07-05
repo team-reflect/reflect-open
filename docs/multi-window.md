@@ -117,6 +117,11 @@ silently dropped the note window's initial link.
   flushes its own note buffers and settings; the backup commit hook is only
   registered in main. Per-window JS state makes this correct with no
   coordination.
+- **Closing the main window closes every note window.** Note windows adopt
+  main's graph session and would degrade silently without it — edits still
+  land on disk, but nothing indexes, syncs, or propagates renames. Rather
+  than run in that half-alive state, they close with their owner (via
+  `close()`, so each child's flush runs exactly like ⌘W — no data loss).
 - **App quit (⌘Q):** the run loop defers the exit, arms `QuitState` with the
   **labels** of every live webview, and emits `app:quit-requested`. Every
   window flushes and calls `quit_confirm`; settling the *last owed label*
@@ -139,9 +144,9 @@ can contend; the writer connection carries a 5s `busy_timeout`
 ## Deliberate v1 limits
 
 - Note windows are **same-graph only**; switching graphs lives in main.
-- Closing the main window leaves note windows editable (writes stay
-  generation-valid) but with no sync or index writer until relaunch —
-  "promote a note window to owner" is a deliberate non-goal for v1.
+- Note windows close with the main window (above) — "promote a note window
+  to session owner", which would let one survive as a focus surface, is the
+  eventual alternative if that usage ever matters.
 - The same note open in two windows converges through the existing
   external-change reconciliation, the same path an iCloud edit takes.
 - A note window's settings screen shows sync as loading (its controller is

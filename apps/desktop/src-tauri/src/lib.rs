@@ -296,6 +296,18 @@ pub fn run() {
                 if quit.settle(label) {
                     app.exit(0);
                 }
+                // Note windows adopt the main window's graph session and
+                // degrade silently without it (no indexing, sync, or rename
+                // propagation) — they close with their owner. `close()`, not
+                // `destroy()`: each child's close-requested flush still runs,
+                // exactly like ⌘W (docs/multi-window.md).
+                if label == windows::MAIN_WINDOW_LABEL {
+                    for (child_label, child) in app.webview_windows() {
+                        if child_label.starts_with(windows::NOTE_WINDOW_PREFIX) {
+                            let _ = child.close();
+                        }
+                    }
+                }
             }
             _ => {}
         });
