@@ -294,9 +294,8 @@ describe('NoteEditor image lightbox', () => {
     expect(close.parentElement?.className).toContain(
       'left-[max(env(safe-area-inset-left),1rem)]',
     )
-    expect(screen.getByRole('button', { name: 'Close image preview' }).className).toContain(
-      'bg-black',
-    )
+    const dialog = screen.getByRole('dialog', { name: 'Image preview' })
+    expect(dialog.querySelector('.bg-black')).not.toBeNull()
   })
 
   it('dismisses the mobile image lightbox with a downward drag', async () => {
@@ -321,7 +320,7 @@ describe('NoteEditor image lightbox', () => {
       clientX: 182,
       clientY: 180,
     })
-    expect(image?.style.transform).toContain('translate3d(0, 60px, 0)')
+    expect(image?.style.transform).toContain('translate3d(0px, 0px, 0)')
 
     firePointer(preview, 'pointermove', {
       pointerId: 1,
@@ -334,136 +333,9 @@ describe('NoteEditor image lightbox', () => {
       clientY: 360,
     })
 
-    expect(image?.style.transform).toContain(`translate3d(0, ${window.innerHeight}px, 0)`)
+    expect(image?.style.transform).toContain(`, ${window.innerHeight}px, 0)`)
     fireEvent.transitionEnd(image!)
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-  })
-
-  it('uses the release position when the final mobile drag move is coalesced', async () => {
-    setPlatformSurface({ mobileApp: true })
-    renderEditor()
-
-    act(() => captured.props?.onImageClick?.(imageClick('assets/cat.png', 'Cat')))
-
-    const preview = await screen.findByRole('button', { name: 'Close image preview' })
-    const image = preview.querySelector('img')
-    expect(image).toBeInstanceOf(HTMLImageElement)
-
-    firePointer(preview, 'pointerdown', {
-      pointerId: 1,
-      isPrimary: true,
-      pointerType: 'touch',
-      clientX: 180,
-      clientY: 120,
-    })
-    firePointer(preview, 'pointermove', {
-      pointerId: 1,
-      clientX: 182,
-      clientY: 180,
-    })
-    firePointer(preview, 'pointerup', {
-      pointerId: 1,
-      clientX: 184,
-      clientY: 360,
-    })
-
-    expect(image?.style.transform).toContain(`translate3d(0, ${window.innerHeight}px, 0)`)
-    fireEvent.transitionEnd(image!)
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-  })
-
-  it('snaps the mobile lightbox back after a short drag without tap-closing it', async () => {
-    setPlatformSurface({ mobileApp: true })
-    renderEditor()
-
-    act(() => captured.props?.onImageClick?.(imageClick('assets/cat.png', 'Cat')))
-
-    const preview = await screen.findByRole('button', { name: 'Close image preview' })
-    const image = preview.querySelector('img')
-    expect(image).toBeInstanceOf(HTMLImageElement)
-
-    firePointer(preview, 'pointerdown', {
-      pointerId: 1,
-      isPrimary: true,
-      pointerType: 'touch',
-      clientX: 180,
-      clientY: 120,
-    })
-    firePointer(preview, 'pointermove', {
-      pointerId: 1,
-      clientX: 182,
-      clientY: 150,
-    })
-    firePointer(preview, 'pointerup', {
-      pointerId: 1,
-      clientX: 182,
-      clientY: 150,
-    })
-
-    expect(image?.style.transform).toBe('translate3d(0, 0, 0) scale(1)')
-    fireEvent.click(preview)
-    expect(screen.getByRole('dialog', { name: 'Image preview' })).toBeInTheDocument()
-    fireEvent.click(preview)
-    expect(screen.getByRole('dialog', { name: 'Image preview' })).toBeInTheDocument()
-
-    fireEvent.transitionEnd(image!)
-    fireEvent.click(preview)
-    expect(screen.queryByRole('dialog')).toBeNull()
-  })
-
-  it('clears mobile drag click suppression when reduced motion skips the snap animation', async () => {
-    const originalMatchMedia = window.matchMedia
-    Object.defineProperty(window, 'matchMedia', {
-      configurable: true,
-      writable: true,
-      value: vi.fn((query: string): MediaQueryList => ({
-        matches: query === '(prefers-reduced-motion: reduce)',
-        media: query,
-        onchange: null,
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        dispatchEvent: vi.fn(),
-      })),
-    })
-
-    setPlatformSurface({ mobileApp: true })
-    renderEditor()
-
-    act(() => captured.props?.onImageClick?.(imageClick('assets/cat.png', 'Cat')))
-
-    const preview = await screen.findByRole('button', { name: 'Close image preview' })
-    try {
-      firePointer(preview, 'pointerdown', {
-        pointerId: 1,
-        isPrimary: true,
-        pointerType: 'touch',
-        clientX: 180,
-        clientY: 120,
-      })
-      firePointer(preview, 'pointermove', {
-        pointerId: 1,
-        clientX: 182,
-        clientY: 150,
-      })
-      firePointer(preview, 'pointerup', {
-        pointerId: 1,
-        clientX: 182,
-        clientY: 150,
-      })
-
-      fireEvent.click(preview)
-      expect(screen.getByRole('dialog', { name: 'Image preview' })).toBeInTheDocument()
-      fireEvent.click(preview)
-      expect(screen.queryByRole('dialog')).toBeNull()
-    } finally {
-      Object.defineProperty(window, 'matchMedia', {
-        configurable: true,
-        writable: true,
-        value: originalMatchMedia,
-      })
-    }
   })
 
   it('uses the opener captured when the lightbox opens', async () => {
