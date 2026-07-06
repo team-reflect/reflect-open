@@ -30,8 +30,17 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
   // The day a swipe is heading toward, announced at pointer-up — the strip
   // (and its rolling month title) follows it while the carousel's snap
   // animation plays, instead of waiting for the settle-time route change.
-  // Any actual selection clears it: by then the route is the truth again.
   const [targetDate, setTargetDate] = useState<string | null>(null)
+  // Any route move — the swipe's own settle, a strip tap, a date link, back —
+  // supersedes the override: the route is the truth again. Cleared on the
+  // `date` change itself (the render-phase previous-value pattern) rather
+  // than in `select`, because navigations from elsewhere (a daily backlink,
+  // history) never pass through `select`.
+  const [lastDate, setLastDate] = useState(date)
+  if (date !== lastDate) {
+    setLastDate(date)
+    setTargetDate(null)
+  }
   const select = useCallback(
     (day: string): void => {
       setTargetDate(null)
