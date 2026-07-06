@@ -52,6 +52,9 @@ export function useCaretReveal({ containerRef, contentRef }: CaretRevealOptions)
     stopRef.current?.()
     let observer: ResizeObserver | null = null
     let deadline: ReturnType<typeof setTimeout> | null = null
+    const pin = (): void => {
+      container.scrollTop = container.scrollHeight
+    }
     const stop = (): void => {
       if (stopRef.current === stop) {
         stopRef.current = null
@@ -61,16 +64,20 @@ export function useCaretReveal({ containerRef, contentRef }: CaretRevealOptions)
       }
       observer?.disconnect()
       container.removeEventListener('pointerdown', stop)
+      container.removeEventListener('scroll', pin)
     }
     stopRef.current = stop
-    const pin = (): void => {
-      container.scrollTop = container.scrollHeight
-    }
     pin()
     observer = new ResizeObserver(pin)
     observer.observe(container)
     observer.observe(content)
     container.addEventListener('pointerdown', stop, { passive: true })
+    // Anything that scrolls the container away mid-reveal loses. Sizes are
+    // covered by the observer, but iOS WebKit may scroll the container
+    // directly to reveal the newly focused editor — no resize involved. The
+    // user's own take-over always leads with a pointerdown (which stops the
+    // reveal above), so a scroll arriving here is never the user's.
+    container.addEventListener('scroll', pin, { passive: true })
     deadline = setTimeout(stop, REVEAL_WINDOW_MS)
   }, [containerRef, contentRef])
 

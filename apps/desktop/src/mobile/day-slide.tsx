@@ -57,7 +57,7 @@ export function DaySlide({
   const { settings } = useSettings()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
-  const { handleScroll, resetToTop } = useScrollRestore({
+  const { handleScroll, resetToTop, cancelRestore } = useScrollRestore({
     key: day,
     memory: scrollMemory,
     containerRef,
@@ -70,10 +70,17 @@ export function DaySlide({
   // full-height viewport; the keyboard then raises and shrinks the shell by
   // its height, dropping the note's end below the fold. The reveal holds the
   // container at its end while that settles (see use-caret-reveal.ts).
+  //
+  // A remount's scroll restore must die first: the double-tap's second
+  // arrival often lands while this slide (freshly remounted from another
+  // tab) is still chasing its saved offset, and the chase's next re-apply —
+  // delivered after the reveal's pin, on the same content growth — would
+  // yank the caret back out of view with nothing re-pinning it.
   const handleAutoFocused = useCallback(() => {
+    cancelRestore()
     revealEnd()
     onFocusConsumed()
-  }, [revealEnd, onFocusConsumed])
+  }, [cancelRestore, revealEnd, onFocusConsumed])
 
   const lastResetSeq = useRef(scrollResetSeq)
   useEffect(() => {

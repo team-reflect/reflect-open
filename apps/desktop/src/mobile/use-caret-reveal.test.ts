@@ -125,6 +125,29 @@ describe('useCaretReveal', () => {
     expect(scrollable.element.scrollTop).toBe(800)
   })
 
+  it('re-pins when something scrolls the container away without a resize', () => {
+    const { scrollable, hook } = mountReveal({ scrollHeight: 900, maxScrollTop: 400 })
+
+    hook.result.current.revealEnd()
+    // iOS WebKit scrolls the container directly to reveal the newly focused
+    // editor — no size change, so the observer never fires. The user's own
+    // take-over always leads with a pointerdown, so a bare scroll is never
+    // the user's.
+    scrollable.element.scrollTop = 120
+    scrollable.element.dispatchEvent(new Event('scroll'))
+    expect(scrollable.element.scrollTop).toBe(400)
+  })
+
+  it('stops chasing scrolls once the reveal ends', () => {
+    const { scrollable, hook } = mountReveal({ scrollHeight: 900, maxScrollTop: 400 })
+
+    hook.result.current.revealEnd()
+    scrollable.element.dispatchEvent(new Event('pointerdown'))
+    scrollable.element.scrollTop = 120
+    scrollable.element.dispatchEvent(new Event('scroll'))
+    expect(scrollable.element.scrollTop).toBe(120)
+  })
+
   it('ends the reveal at the deadline — later resizes leave the user alone', () => {
     const { scrollable, hook } = mountReveal({ scrollHeight: 900, maxScrollTop: 400 })
 

@@ -200,6 +200,27 @@ describe('useScrollRestore', () => {
     expect(memory.get(KEY)).toBe(10)
   })
 
+  it('cancelRestore ends the chase without touching the scroll or the memory', () => {
+    const { memory, scrollable, hook } = mountRestore({ saved: 500, maxScrollTop: 100 })
+
+    // An end-of-note focus arrival (the double-tap) pins the container to its
+    // end; the chase must die in place — its next content-growth re-apply
+    // would yank the caret back to the stale offset.
+    hook.result.current.cancelRestore()
+    expect(scrollable.element.scrollTop).toBe(100)
+    expect(memory.get(KEY)).toBe(500)
+    expect(observer()?.disconnected).toBe(true)
+
+    scrollable.setMaxScrollTop(1000)
+    observer()?.resize()
+    expect(scrollable.element.scrollTop).toBe(100)
+
+    // Scrolling records normally afterwards (the reveal's pins included).
+    scrollable.element.scrollTop = 900
+    hook.result.current.handleScroll(scrollEventOn(scrollable.element))
+    expect(memory.get(KEY)).toBe(900)
+  })
+
   it('restores a reachable offset synchronously without arming the machinery', () => {
     const { scrollable } = mountRestore({ saved: 80, maxScrollTop: 100 })
 

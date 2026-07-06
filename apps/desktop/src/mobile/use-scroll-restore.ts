@@ -29,6 +29,14 @@ export interface ScrollRestore {
   handleScroll: (event: UIEvent<HTMLElement>) => void
   /** Cancel any in-flight restore, forget the saved offset, and jump to the top. */
   resetToTop: () => void
+  /**
+   * End an in-flight restore without touching the scroll position or the
+   * saved offset. An end-of-note focus arrival (the Daily-tab double-tap)
+   * must call this before pinning the container to its end — the chase would
+   * otherwise re-apply the stale offset on the next content growth and yank
+   * the caret back out of view.
+   */
+  cancelRestore: () => void
 }
 
 /**
@@ -110,5 +118,9 @@ export function useScrollRestore({
     }
   }, [key, memory, containerRef])
 
-  return { handleScroll, resetToTop }
+  const cancelRestore = useCallback(() => {
+    stopRestoringRef.current?.()
+  }, [])
+
+  return { handleScroll, resetToTop, cancelRestore }
 }

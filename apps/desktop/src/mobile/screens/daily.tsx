@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
+import { useCallback, useState, type ReactElement } from 'react'
 import { untitledNotePath } from '@reflect/core'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToday } from '@/lib/use-today'
 import { CalendarStrip } from '@/mobile/calendar-strip'
 import { DayCarousel } from '@/mobile/day-carousel'
+import { useDailyArrivals } from '@/mobile/use-daily-arrivals'
 import { useRouter } from '@/routing/router'
 
 /**
@@ -50,30 +51,15 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
   )
 
   // An explicit re-arrival at the day already shown — the Daily tab tapped
-  // while on today (V1's double-tap-to-today lands here as two such
-  // arrivals) — re-anchors the surface: the selected slide scrolls
-  // to the top and the strip re-centers. The router bumps `arrivalSeq` for
-  // every navigate, but a swipe's own echo also changes `date`, so only
-  // date-preserving arrivals count.
-  const [resetSeq, setResetSeq] = useState(0)
-  const [focusDate, setFocusDate] = useState<string | null>(null)
-  const lastArrival = useRef({ seq: arrivalSeq, date })
-  useEffect(() => {
-    const last = lastArrival.current
-    lastArrival.current = { seq: arrivalSeq, date }
-    if (arrivalSeq !== last.seq && arrivalFocusEditor) {
-      setFocusDate(date)
-    } else if (arrivalSeq !== last.seq) {
-      setFocusDate(null)
-    }
-    if (arrivalSeq !== last.seq && date === last.date) {
-      setResetSeq((seq) => seq + 1)
-    }
-  }, [arrivalSeq, arrivalFocusEditor, date])
-
-  const consumeFocus = useCallback((): void => {
-    setFocusDate(null)
-  }, [])
+  // while on today (V1's double-tap-to-today lands here) — re-anchors the
+  // surface, and a capture arrival focuses the day's editor; the arrival
+  // bookkeeping (including a focus request racing this surface's remount)
+  // lives in use-daily-arrivals.ts.
+  const { resetSeq, focusDate, consumeFocus } = useDailyArrivals({
+    arrivalSeq,
+    arrivalFocusEditor,
+    date,
+  })
 
   return (
     <div className="flex h-full w-screen flex-col">
