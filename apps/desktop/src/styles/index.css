@@ -551,7 +551,7 @@ html:root {
    dot is a lighter gray via `--meowdown-bullet` on `html:root` above; a collapsed
    bullet keeps meowdown's themed purple dot. */
 
-/* Task checkbox spacing. Two rules work together to give the checkbox breathing
+/* Task checkbox spacing. These rules work together to give the checkbox breathing
    room from its label (PR #373's goal) WITHOUT moving the label (moving it
    misaligns the label from sibling bullets and makes bullet<->task conversion
    jump sideways, the way the `1.25lh` content nudge #373 originally shipped did).
@@ -564,6 +564,9 @@ html:root {
       `.95rem` checkbox flush-left lands its right edge ~where a centered bullet
       dot's sits, so the checkbox<->label gap matches a bullet's. The breathing
       room comes from the marker, not from indenting the text.
+   3. The input itself is raised slightly to optically center both square
+      checklist boxes (`- [ ]`) and round task boxes (`+ [ ]`) against the text
+      baseline.
 
    meowdown does not fold this gap into its default yet, so it stays a Reflect
    override; meowdown is layered, so the unlayered `.reflect-editor` rules win. */
@@ -572,6 +575,9 @@ html:root {
 }
 .reflect-editor .prosemirror-flat-list[data-list-kind='task'] > .list-marker {
   justify-content: start;
+}
+.reflect-editor .prosemirror-flat-list[data-list-kind='task'] > .list-marker input[type='checkbox'] {
+  transform: translateY(-0.06em);
 }
 
 /* ---- shadcn inputs (components/ui/) -------------------------------------

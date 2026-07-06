@@ -43,9 +43,9 @@ export function MobileTaskRow({ task, showSource, onEdit }: MobileTaskRowProps):
           hapticImpactLight()
           toggle()
         }}
-        // A generous touch target around the small glyph; py-3 h-6 keeps the
-        // circle centered on the first text line when a task wraps.
-        className="flex shrink-0 items-start py-3 pl-4 pr-3 text-text-muted disabled:opacity-50"
+        // A generous touch target around the small glyph; self-stretch keeps
+        // the circle vertically centered in the row as task text wraps.
+        className="flex shrink-0 self-stretch items-center pl-4 pr-3 text-text-muted disabled:opacity-50"
       >
         {task.checked ? (
           <CircleCheck aria-hidden className="size-5 text-accent" strokeWidth={2} />
