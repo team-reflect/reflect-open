@@ -353,11 +353,13 @@ export function NoteEditor({
       if (displayUrl === null) {
         return
       }
-      // The clicked target is the `<img>` or its `.md-image-preview` wrapper;
+      // The clicked target is the `<img>` or its meowdown image wrapper;
       // the source element drives the View Transition zoom.
       const sourceImage =
         event.target instanceof HTMLElement
-          ? event.target.closest('.md-image-preview')?.querySelector('img') ?? null
+          ? event.target
+              .closest('.md-image-view-preview, .md-image-preview')
+              ?.querySelector('img') ?? null
           : null
       openLightbox(sourceImage, {
         src: displayUrl,

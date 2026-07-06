@@ -112,7 +112,7 @@ describe('ImageLightbox mobile drag-to-dismiss', () => {
     firePointer(preview, 'pointermove', { pointerId: 1, clientX: 182, clientY: 180 })
     firePointer(preview, 'pointermove', { pointerId: 1, clientX: 190, clientY: 260 })
 
-    const progress = 80 / (window.innerHeight * 0.5)
+    const progress = Math.hypot(8, 80) / (window.innerHeight * 0.5)
     expect(Number.parseFloat(backdrop!.style.opacity)).toBeCloseTo(1 - progress * 0.85, 5)
     expect(Number.parseFloat(closeChrome.style.opacity)).toBeCloseTo(1 - progress * 2, 5)
     expect(closeChrome.style.pointerEvents).toBe('none')
@@ -128,6 +128,21 @@ describe('ImageLightbox mobile drag-to-dismiss', () => {
 
     expect(image.style.transform).toContain(`, ${window.innerHeight}px, 0) scale(0.9)`)
     expect(backdrop!.style.opacity).toBe('0')
+    expect(onClose).not.toHaveBeenCalled()
+
+    fireEvent.transitionEnd(image)
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('dismisses horizontally past the distance threshold', () => {
+    const { preview, image, onClose } = renderMobileLightbox()
+
+    touchDown(preview, 100, 100)
+    firePointer(preview, 'pointermove', { pointerId: 1, clientX: 120, clientY: 100 })
+    firePointer(preview, 'pointermove', { pointerId: 1, clientX: 340, clientY: 104 })
+    firePointer(preview, 'pointerup', { pointerId: 1, clientX: 340, clientY: 104 })
+
+    expect(image.style.transform).toContain(`translate3d(${window.innerWidth}px, `)
     expect(onClose).not.toHaveBeenCalled()
 
     fireEvent.transitionEnd(image)
@@ -174,22 +189,19 @@ describe('ImageLightbox mobile drag-to-dismiss', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('rubber-bands upward travel and never dismisses upward', () => {
+  it('dismisses upward past the distance threshold', () => {
     const { preview, image, onClose } = renderMobileLightbox()
 
     touchDown(preview, 100, 100)
-    firePointer(preview, 'pointermove', { pointerId: 1, clientX: 100, clientY: 120 })
-    firePointer(preview, 'pointermove', { pointerId: 1, clientX: 100, clientY: 60 })
+    firePointer(preview, 'pointermove', { pointerId: 1, clientX: 100, clientY: 80 })
+    firePointer(preview, 'pointermove', { pointerId: 1, clientX: 100, clientY: -120 })
 
-    const match = /translate3d\(0px, (-[\d.]+)px, 0\)/.exec(image.style.transform)
-    const offsetY = Number.parseFloat(match?.[1] ?? 'NaN')
-    expect(offsetY).toBeGreaterThan(-48)
-    expect(offsetY).toBeLessThan(-20)
+    expect(image.style.transform).toContain('translate3d(0px, -200px, 0)')
 
-    firePointer(preview, 'pointerup', { pointerId: 1, clientX: 100, clientY: 60 })
-    expect(image.style.transform).toBe('translate3d(0, 0, 0) scale(1)')
+    firePointer(preview, 'pointerup', { pointerId: 1, clientX: 100, clientY: -120 })
+    expect(image.style.transform).toContain(`, -${window.innerHeight}px, 0)`)
     fireEvent.transitionEnd(image)
-    expect(onClose).not.toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('snaps back without closing when the drag is interrupted', () => {
@@ -205,16 +217,22 @@ describe('ImageLightbox mobile drag-to-dismiss', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  it('does not treat a horizontal wiggle as a tap-to-close', () => {
-    const { preview, onClose } = renderMobileLightbox()
+  it('springs back after a short horizontal drag and suppresses the trailing tap', () => {
+    const { preview, image, onClose } = renderMobileLightbox()
 
     touchDown(preview, 100, 100)
     firePointer(preview, 'pointermove', { pointerId: 1, clientX: 140, clientY: 102 })
     firePointer(preview, 'pointerup', { pointerId: 1, clientX: 140, clientY: 102 })
 
+    expect(image.style.transform).toBe('translate3d(0, 0, 0) scale(1)')
+
     fireEvent.click(preview)
     expect(onClose).not.toHaveBeenCalled()
 
+    fireEvent.click(preview)
+    expect(onClose).not.toHaveBeenCalled()
+
+    fireEvent.transitionEnd(image)
     fireEvent.click(preview)
     expect(onClose).toHaveBeenCalledTimes(1)
   })

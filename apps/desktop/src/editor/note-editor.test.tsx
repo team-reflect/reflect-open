@@ -58,7 +58,7 @@ vi.mock('@meowdown/react', () => ({
     captured.props = props
     return (
       <div className={props.editorClassName}>
-        <span className="md-image-preview md-image-preview-img">
+        <span className="md-image-view-preview">
           <img
             src={props.resolveImageUrl?.('assets/cat.png') ?? ''}
             alt="Cat"
