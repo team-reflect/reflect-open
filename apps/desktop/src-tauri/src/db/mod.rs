@@ -15,6 +15,7 @@ mod chat_write;
 mod embed_write;
 mod migrations;
 mod query;
+mod scan;
 #[cfg(test)]
 mod tests;
 mod write;
@@ -294,6 +295,32 @@ pub fn index_move<R: tauri::Runtime>(
     emit_index_written(&app);
     emit_note_moved(&app, &from, &to);
     Ok(())
+}
+
+/// Compute the open-path reconcile delta natively (see [`scan`]): list the
+/// graph's notes, compare against the stored rows, and return only what
+/// needs work. The listing happens **before** the index lock is taken, so
+/// thousands of stats never block concurrent reads. A stale generation
+/// returns the empty scan — that pass is superseded and its writes would be
+/// dropped anyway, so "nothing to do" is the honest answer.
+#[tauri::command]
+pub fn index_reconcile_scan(
+    generation: u64,
+    graph: State<GraphState>,
+    index: State<IndexState>,
+) -> AppResult<scan::ReconcileScan> {
+    let root = crate::fs::current_root(&graph)?;
+    let files = crate::fs::note_files(&root)?;
+    let state = lock_state(&index)?;
+    if state.generation != generation {
+        return Ok(scan::ReconcileScan::empty());
+    }
+    let conn = state.conn.as_ref().ok_or_else(AppError::no_graph)?;
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_millis() as u64)
+        .unwrap_or(0);
+    scan::scan_reconcile(conn, &files, now_ms)
 }
 
 /// One `index_touch` entry: re-stamp `path`'s stored mtime to `mtime`

@@ -190,6 +190,8 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         }
         return null
       }
+      case 'index_reconcile_scan':
+        return reconcileScan(files, index)
       case 'index_clear': {
         index.clear()
         return null
@@ -260,4 +262,42 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
     // refresh the UI through core's in-process local-write echo.
     listen: async () => () => {},
   }
+}
+
+/** Mirrors `MTIME_TRUST_AGE_MS` in core's hash.ts and Rust's scan.rs. */
+const MTIME_TRUST_AGE_MS = 5_000
+
+/**
+ * The `index_reconcile_scan` stand-in: the same listing-vs-rows comparison
+ * `src-tauri/src/db/scan.rs` runs natively, over the in-memory store. The
+ * dev store never lists placeholders, so that arm has no mirror here.
+ */
+function reconcileScan(files: DevFileStore, index: DevIndexDb) {
+  const stored = new Map(
+    index
+      .query('SELECT path, mtime, file_hash FROM notes', [])
+      .map((row) => [String(row['path']), { mtime: Number(row['mtime']), hash: String(row['file_hash']) }]),
+  )
+  const now = Date.now()
+  const listing = files.list()
+  const onDisk = new Set(listing.map((file) => file.path))
+  const candidates = []
+  for (const file of listing) {
+    const facts = stored.get(file.path)
+    const settled = now - file.modifiedMs >= MTIME_TRUST_AGE_MS
+    if (settled && facts !== undefined && facts.mtime === file.modifiedMs) {
+      continue
+    }
+    candidates.push({
+      path: file.path,
+      modifiedMs: file.modifiedMs,
+      storedMtime: facts?.mtime ?? null,
+      storedHash: facts?.hash ?? null,
+    })
+  }
+  const orphans = [...stored.entries()]
+    .filter(([path]) => !onDisk.has(path))
+    .map(([path, facts]) => ({ path, storedMtime: facts.mtime, storedHash: facts.hash }))
+    .sort((first, second) => first.path.localeCompare(second.path))
+  return { total: listing.length, candidates, orphans }
 }

@@ -9,6 +9,7 @@ use super::chat_write::{delete_conversation, save_message, ChatConversation, Cha
 use super::embed_write::{apply_chunks, remove_chunks, EmbeddedChunk};
 use super::migrations::{migrate, migrate_to, open_in_memory, open_index_at, validate_migrations};
 use super::query::run_query;
+use super::scan::scan_reconcile;
 use super::write::{
     apply_note, clear_index, move_note, touch_note, IndexedEmail, IndexedLink, IndexedNote,
     IndexedTag, IndexedTask,
@@ -407,6 +408,64 @@ fn reapplying_a_note_replaces_its_rows() {
     let rows = run_query(&conn, "SELECT target_key FROM links", &[]).unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0]["target_key"], Value::from("z"));
+}
+
+#[test]
+fn reconcile_scan_classifies_candidates_orphans_and_skips() {
+    let conn = migrated();
+    let now: u64 = 100_000;
+    let indexed = |path: &str, mtime: i64, hash: &str| {
+        let mut row = note(path, "T", vec![]);
+        row.mtime = mtime;
+        row.file_hash = hash.to_string();
+        apply_note(&conn, &row).unwrap();
+    };
+    indexed("notes/settled.md", 1_000, "settled-hash");
+    indexed("notes/moved.md", 1_000, "moved-hash");
+    indexed("notes/fresh.md", (now - 1_000) as i64, "fresh-hash");
+    indexed("notes/evicted.md", 1_000, "evicted-hash");
+    indexed("notes/gone.md", 1_000, "gone-hash");
+
+    let meta = |path: &str, modified_ms: u64, placeholder: bool| crate::fs::FileMeta {
+        path: path.to_string(),
+        size: 1,
+        modified_ms,
+        placeholder,
+    };
+    let files = [
+        meta("notes/settled.md", 1_000, false), // row matches, settled → skipped
+        meta("notes/moved.md", 2_000, false),   // mtime moved → candidate with facts
+        meta("notes/fresh.md", now - 1_000, false), // matches but too fresh to trust → candidate
+        meta("notes/new.md", 3_000, false),     // no row → arrival candidate
+        meta("notes/evicted.md", 9_000, true),  // placeholder → never a candidate, never orphaned
+    ];
+
+    let scan = scan_reconcile(&conn, &files, now).unwrap();
+
+    assert_eq!(scan.total, 5);
+    let paths: Vec<&str> = scan
+        .candidates
+        .iter()
+        .map(|candidate| candidate.path.as_str())
+        .collect();
+    assert_eq!(paths, ["notes/moved.md", "notes/fresh.md", "notes/new.md"]);
+    let moved = &scan.candidates[0];
+    assert_eq!(moved.modified_ms, 2_000);
+    assert_eq!(moved.stored_mtime, Some(1_000));
+    assert_eq!(moved.stored_hash.as_deref(), Some("moved-hash"));
+    let arrival = &scan.candidates[2];
+    assert_eq!(arrival.stored_mtime, None);
+    assert_eq!(arrival.stored_hash, None);
+
+    // Only the vanished row is an orphan — eviction must not read as deletion.
+    let orphan_paths: Vec<&str> = scan
+        .orphans
+        .iter()
+        .map(|orphan| orphan.path.as_str())
+        .collect();
+    assert_eq!(orphan_paths, ["notes/gone.md"]);
+    assert_eq!(scan.orphans[0].stored_hash, "gone-hash");
+    assert_eq!(scan.orphans[0].stored_mtime, 1_000);
 }
 
 #[test]

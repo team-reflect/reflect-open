@@ -12,6 +12,12 @@ export interface IndexProgress {
   readonly done: number
   /** Files in the listing. */
   readonly total: number
+  /**
+   * Files the pass has actually read so far (not skipped read-free). The
+   * pill gates on this: a routine pass skips everything (`worked` stays 0)
+   * and must never surface, no matter how large the graph.
+   */
+  readonly worked: number
 }
 
 let current: IndexProgress | null = null
@@ -19,7 +25,11 @@ const listeners = new Set<() => void>()
 
 /** Publish the running pass's progress; `null` clears it (pass finished). */
 export function setIndexProgress(progress: IndexProgress | null): void {
-  if (progress?.done === current?.done && progress?.total === current?.total) {
+  if (
+    progress?.done === current?.done &&
+    progress?.total === current?.total &&
+    progress?.worked === current?.worked
+  ) {
     return
   }
   current = progress

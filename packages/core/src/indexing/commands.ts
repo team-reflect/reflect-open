@@ -69,6 +69,47 @@ export async function moveNoteIndexed(
   await call('note_move_indexed', { from, to, generation }, voidSchema)
 }
 
+const scanCandidateSchema = z.object({
+  path: z.string(),
+  modifiedMs: z.number(),
+  storedMtime: z.number().nullable(),
+  storedHash: z.string().nullable(),
+})
+
+const scanOrphanSchema = z.object({
+  path: z.string(),
+  storedMtime: z.number(),
+  storedHash: z.string(),
+})
+
+const reconcileScanSchema = z.object({
+  total: z.number(),
+  candidates: z.array(scanCandidateSchema),
+  orphans: z.array(scanOrphanSchema),
+})
+
+/** One file the reconcile must read — see {@link reconcileScan}. */
+export type ScanCandidate = z.infer<typeof scanCandidateSchema>
+
+/** A stored row whose file vanished from disk — see {@link reconcileScan}. */
+export type ScanOrphan = z.infer<typeof scanOrphanSchema>
+
+/** The reconcile delta: what changed on disk relative to the index. */
+export type ReconcileScan = z.infer<typeof reconcileScanSchema>
+
+/**
+ * Compute the open-path reconcile delta natively: Rust lists the graph's
+ * notes and compares mtimes against the stored rows, returning only the
+ * files that need a read (with their stored facts riding along) and the
+ * rows whose files vanished. One IPC round-trip replaces the full-listing
+ * `listFiles` + stored-facts sweep the webview used to crawl on every open —
+ * on a healthy graph the delta is empty and the pass costs nothing. A stale
+ * `generation` reports an empty scan.
+ */
+export async function reconcileScan(generation: number): Promise<ReconcileScan> {
+  return call('index_reconcile_scan', { generation }, reconcileScanSchema)
+}
+
 /** One {@link touchIndexedNotes} entry: re-stamp `path`'s stored mtime. */
 export interface IndexedNoteTouch {
   /** Graph-relative markdown path. */

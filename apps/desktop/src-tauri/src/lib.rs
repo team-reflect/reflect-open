@@ -221,6 +221,7 @@ pub fn run() {
             db::index_remove,
             db::index_clear,
             db::index_move,
+            db::index_reconcile_scan,
             db::index_touch,
             db::note_move_indexed,
             db::index_meta_set,

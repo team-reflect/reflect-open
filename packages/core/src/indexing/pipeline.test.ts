@@ -24,6 +24,13 @@ beforeEach(() => {
         return '# Hello\n\n[[World]]'
       case 'list_files':
         return [{ path: 'notes/a.md', size: 1, modifiedMs: 5 }]
+      case 'index_reconcile_scan':
+        // Mirrors the default list_files: one arrival needing a read.
+        return {
+          total: 1,
+          candidates: [{ path: 'notes/a.md', modifiedMs: 5, storedMtime: null, storedHash: null }],
+          orphans: [],
+        }
       case 'index_apply':
       case 'index_apply_batch':
       case 'index_clear':
@@ -63,7 +70,13 @@ describe('indexNote', () => {
 
 describe('rebuildIndex', () => {
   it('clears, lists, applies every file in one batch, then stamps the projection version', async () => {
-    await rebuildIndex({ generation: 1 })
+    const progress: Array<[number, number, number]> = []
+    await rebuildIndex({
+      generation: 1,
+      onFileProgress: (done, total, worked) => progress.push([done, total, worked]),
+    })
+    // A rebuild reads everything: worked tracks done, so the pill surfaces.
+    expect(progress.at(-1)).toEqual([1, 1, 1])
     const commands = mockInvoke.mock.calls.map(([cmd]) => cmd)
     expect(commands[0]).toBe('index_clear')
     expect(commands).toContain('list_files')
@@ -165,7 +178,7 @@ describe('syncIndex', () => {
     metaRows = [{ value: String(PROJECTION_VERSION) }]
     await syncIndex({ generation: 2 })
     const commands = mockInvoke.mock.calls.map(([cmd]) => cmd)
-    expect(commands).toContain('list_files')
+    expect(commands).toContain('index_reconcile_scan')
     expect(commands).not.toContain('index_clear')
     expect(commands).not.toContain('index_meta_set')
   })
@@ -364,9 +377,12 @@ describe('reconcileIndex move healing (Plan 17)', () => {
     const calls: Array<[string, Record<string, unknown>]> = []
     mockInvoke.mockImplementation(async (command, args) => {
       calls.push([command, args])
-      const sql = String(args['sql'] ?? '')
-      if (command === 'list_files') {
-        return [{ path: NEW, size: 1, modifiedMs: 9 }]
+      if (command === 'index_reconcile_scan') {
+        return {
+          total: 1,
+          candidates: [{ path: NEW, modifiedMs: 9, storedMtime: null, storedHash: null }],
+          orphans: [{ path: OLD, storedMtime: 1, storedHash: options.storedHash }],
+        }
       }
       if (command === 'note_read') {
         if (args['path'] === NEW) {
@@ -375,9 +391,6 @@ describe('reconcileIndex move healing (Plan 17)', () => {
         throw { kind: 'notFound', message: 'missing' }
       }
       if (command === 'db_query') {
-        if (sql.includes('file_hash')) {
-          return [{ path: OLD, file_hash: options.storedHash }]
-        }
         if (((args['params'] as unknown[]) ?? []).includes(OLD)) {
           return [{ path: OLD, id: '01abcdefghjkmnpqrstvwxyz00' }]
         }
@@ -442,119 +455,141 @@ describe('reconcileIndex move healing (Plan 17)', () => {
   })
 })
 
-describe('reconcileIndex mtime skip', () => {
-  it('never reads a file whose indexed row matches its settled mtime', async () => {
-    mockInvoke.mockImplementation(async (command, args) => {
-      const sql = String(args['sql'] ?? '')
-      if (command === 'list_files') {
-        return [{ path: 'notes/a.md', size: 1, modifiedMs: 1_000 }]
+describe('reconcileIndex over the native scan delta', () => {
+  it('does nothing when the scan reports no delta — the healthy-open path', async () => {
+    // Mtime-matched files never leave Rust (the scan's own tests cover the
+    // classification); an empty delta must cost no reads, no writes, and no
+    // visible progress.
+    mockInvoke.mockImplementation(async (command) => {
+      if (command === 'index_reconcile_scan') {
+        return { total: 7_000, candidates: [], orphans: [] }
       }
-      if (command === 'db_query' && sql.includes('file_hash')) {
-        return [{ path: 'notes/a.md', file_hash: 'stored', mtime: 1_000 }]
+      if (command === 'note_read') {
+        throw new Error('must not read without a candidate')
       }
       if (command === 'db_query') {
         return []
-      }
-      if (command === 'note_read') {
-        throw new Error('must not read an mtime-matched file')
       }
       return null
     })
+    const progress: Array<[number, number, number]> = []
 
-    await reconcileIndex({ generation: 4 })
+    await reconcileIndex({
+      generation: 4,
+      onFileProgress: (done, total, worked) => progress.push([done, total, worked]),
+    })
 
     const commands = mockInvoke.mock.calls.map(([cmd]) => cmd)
-    expect(commands).not.toContain('note_read')
-    expect(commands).not.toContain('index_apply_batch')
-    expect(commands).not.toContain('index_touch')
+    expect(commands).toEqual(['index_reconcile_scan'])
+    // Zero worked files, and the total is the delta (0), not the graph size —
+    // the pill stays hidden on every routine open.
+    expect(progress).toEqual([[0, 0, 0]])
   })
 
-  it('reads (and hash-skips) when the stored mtime differs — providers rewrite mtimes', async () => {
+  it('reads (and hash-skips) a candidate whose stored mtime differs — providers rewrite mtimes', async () => {
     const content = '# Hello\n'
-    mockInvoke.mockImplementation(async (command, args) => {
-      const sql = String(args['sql'] ?? '')
-      if (command === 'list_files') {
-        return [{ path: 'notes/a.md', size: 1, modifiedMs: 2_000 }]
-      }
-      if (command === 'db_query' && sql.includes('file_hash')) {
-        return [{ path: 'notes/a.md', file_hash: await hashContent(content), mtime: 1_000 }]
-      }
-      if (command === 'db_query') {
-        return []
+    const storedHash = await hashContent(content)
+    mockInvoke.mockImplementation(async (command) => {
+      if (command === 'index_reconcile_scan') {
+        return {
+          total: 1,
+          candidates: [{ path: 'notes/a.md', modifiedMs: 2_000, storedMtime: 1_000, storedHash }],
+          orphans: [],
+        }
       }
       if (command === 'note_read') {
         return content
       }
+      if (command === 'db_query') {
+        return []
+      }
       return null
     })
 
-    await reconcileIndex({ generation: 4 })
+    const progress: Array<[number, number, number]> = []
+
+    await reconcileIndex({
+      generation: 4,
+      onFileProgress: (done, total, worked) => progress.push([done, total, worked]),
+    })
 
     const commands = mockInvoke.mock.calls.map(([cmd]) => cmd)
     expect(commands).toContain('note_read')
     // Identical content under a rewritten mtime: the hash still gates the write.
     expect(commands).not.toContain('index_apply_batch')
     // The self-heal: the row is re-stamped with the listed mtime, so the next
-    // pass skips the read entirely instead of re-hashing forever.
+    // scan skips it entirely instead of re-reading forever.
     const touch = mockInvoke.mock.calls.find(([cmd]) => cmd === 'index_touch')
     expect(touch![1]).toEqual({
       entries: [{ path: 'notes/a.md', mtime: 2_000 }],
       generation: 4,
     })
+    // The read counts as worked even though nothing was re-applied.
+    expect(progress.at(-1)).toEqual([1, 1, 1])
+  })
+
+  it('re-indexes changed candidates and drops orphans', async () => {
+    mockInvoke.mockImplementation(async (command, args) => {
+      if (command === 'index_reconcile_scan') {
+        return {
+          total: 2,
+          candidates: [
+            { path: 'notes/changed.md', modifiedMs: 2_000, storedMtime: 1_000, storedHash: 'old' },
+          ],
+          orphans: [{ path: 'notes/gone.md', storedMtime: 1_000, storedHash: 'gone' }],
+        }
+      }
+      if (command === 'note_read') {
+        return `# ${String(args['path'])}\n`
+      }
+      if (command === 'db_query') {
+        return []
+      }
+      return null
+    })
+
+    await reconcileIndex({ generation: 4 })
+
+    const apply = mockInvoke.mock.calls.find(([cmd]) => cmd === 'index_apply_batch')
+    const notes = (apply![1] as { notes: Array<{ path: string; mtime: number }> }).notes
+    expect(notes.map((note) => note.path)).toEqual(['notes/changed.md'])
+    expect(notes[0]!.mtime).toBe(2_000)
+    const remove = mockInvoke.mock.calls.find(([cmd]) => cmd === 'index_remove')
+    expect(remove![1]).toMatchObject({ path: 'notes/gone.md', generation: 4 })
+  })
+
+  it('removes the row for a candidate that vanished between the scan and the read', async () => {
+    mockInvoke.mockImplementation(async (command) => {
+      if (command === 'index_reconcile_scan') {
+        return {
+          total: 1,
+          candidates: [
+            { path: 'notes/ghost.md', modifiedMs: 2_000, storedMtime: 1_000, storedHash: 'h' },
+          ],
+          orphans: [],
+        }
+      }
+      if (command === 'note_read') {
+        throw { kind: 'notFound', message: 'vanished' }
+      }
+      if (command === 'db_query') {
+        return []
+      }
+      return null
+    })
+
+    await reconcileIndex({ generation: 4 })
+
+    const remove = mockInvoke.mock.calls.find(([cmd]) => cmd === 'index_remove')
+    expect(remove![1]).toMatchObject({ path: 'notes/ghost.md', generation: 4 })
   })
 })
 
 describe('iCloud eviction placeholders (Plan 21)', () => {
   /** A graph whose listing carries `files`; every note_read throws notFound. */
-  function evictedFake(files: Array<Record<string, unknown>>, storedPaths: string[]) {
-    mockInvoke.mockImplementation(async (command, args) => {
-      const sql = String(args['sql'] ?? '')
-      if (command === 'list_files') {
-        return files
-      }
-      if (command === 'note_read') {
-        throw { kind: 'notFound', message: 'evicted' }
-      }
-      if (command === 'db_query') {
-        if (sql.includes('file_hash')) {
-          return storedPaths.map((path) => ({ path, file_hash: 'stored-hash' }))
-        }
-        return []
-      }
-      return null
-    })
-  }
-
-  it('reconcile keeps the stored row for an evicted note instead of deleting it', async () => {
-    evictedFake([{ path: 'notes/a.md', size: 1, modifiedMs: 5, placeholder: true }], ['notes/a.md'])
-
-    await reconcileIndex({ generation: 5 })
-
-    const commands = mockInvoke.mock.calls.map(([cmd]) => cmd)
-    // Present-but-offloaded: never read (unreadable), never removed (not deleted).
-    expect(commands).not.toContain('note_read')
-    expect(commands).not.toContain('index_remove')
-    expect(commands).not.toContain('index_apply')
-    expect(commands).not.toContain('index_apply_batch')
-  })
-
-  it('placeholders are not move-healing arrivals, and true orphans still drop', async () => {
-    evictedFake(
-      [{ path: 'notes/arrived.md', size: 1, modifiedMs: 5, placeholder: true }],
-      ['notes/gone-for-real.md'],
-    )
-
-    await reconcileIndex({ generation: 5 })
-
-    const commands = mockInvoke.mock.calls.map(([cmd]) => cmd)
-    // Nothing pairs against unreadable content…
-    expect(commands).not.toContain('note_read')
-    expect(commands).not.toContain('index_move')
-    // …and a row whose file is gone *without* a placeholder is still removed.
-    const remove = mockInvoke.mock.calls.find(([cmd]) => cmd === 'index_remove')
-    expect(remove?.[1]).toMatchObject({ path: 'notes/gone-for-real.md', generation: 5 })
-  })
-
+  // Reconcile-side placeholder rules (never a candidate, never an orphan)
+  // now live in the Rust scan — `reconcile_scan_classifies_candidates_orphans_and_skips`
+  // in src-tauri covers them. Only the rebuild path still walks the listing here.
   it('rebuild indexes readable files and skips evicted ones', async () => {
     mockInvoke.mockImplementation(async (command, args) => {
       if (command === 'list_files') {

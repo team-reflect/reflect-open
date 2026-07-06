@@ -6,6 +6,7 @@ import {
   applyIndexedNotes,
   clearIndex,
   moveIndexedRows,
+  reconcileScan,
   removeFromIndex,
   setIndexMeta,
   touchIndexedNotes,
@@ -13,11 +14,11 @@ import {
 } from './commands'
 import { assetReferencingNotePaths } from './asset-refs'
 import { gatherAssetDescriptionText } from './asset-description-text'
-import { hashContent, matchesTrustedMtime } from './hash'
+import { hashContent } from './hash'
 import { buildIndexedNote, PROJECTION_VERSION, type IndexedNote } from './indexed-note'
 import { detectExternalMoves } from './move-healing'
 import { INDEX_PASS_YIELD_EVERY, yieldToEventLoop } from './pacing'
-import { getIndexedFileFacts, getIndexMeta } from './queries'
+import { getIndexMeta } from './queries'
 
 /**
  * The indexing pipeline (Plan 04): read (Plan 02) → parse/extract in TS
@@ -143,9 +144,13 @@ export interface IndexPassOptions {
    * break and once at the end — so a first index over thousands of notes can
    * show real progress instead of a frozen shell. `done` counts every listed
    * file the pass has moved past (skipped or indexed); `total` is the listing
-   * size.
+   * size; `worked` counts the files actually *read* so far (not skipped
+   * read-free by the mtime layer). `worked` is what distinguishes a genuine
+   * first index from a routine repeat pass that skips everything — the
+   * progress UI must gate on it, or a healthy sub-second pass flashes a
+   * "preparing" surface on every open.
    */
-  onFileProgress?: (done: number, total: number) => void
+  onFileProgress?: (done: number, total: number, worked: number) => void
 }
 
 /** One note omitted from a rebuild because its projection could not be written. */
@@ -288,21 +293,23 @@ export async function rebuildIndex(options: IndexPassOptions): Promise<void> {
   const files = await listFiles()
   const batch = createIndexApplyBatch(generation, onSkippedNote)
   let done = 0
+  let worked = 0
   for (const file of files) {
     done += 1
     if (done % INDEX_PASS_YIELD_EVERY === 0) {
-      onFileProgress?.(done, files.length)
+      onFileProgress?.(done, files.length, worked)
       await yieldToEventLoop()
     }
     if (file.placeholder === true) {
       continue // evicted to iCloud — unreadable until re-download, indexed then
     }
+    worked += 1
     const content = await readNote(file.path)
     const fileHash = await hashContent(content)
     await batch.add(await buildNoteProjection(file.path, content, { fileHash, mtime: file.modifiedMs }))
   }
   await batch.flush()
-  onFileProgress?.(files.length, files.length)
+  onFileProgress?.(files.length, files.length, worked)
   // The rows now match the current projection — stamp it so `syncIndex` can
   // reconcile cheaply from here on. A superseded pass stamps into a stale
   // generation, which Rust drops: the next open then rebuilds again, which is
@@ -323,6 +330,13 @@ export async function syncIndex(options: IndexPassOptions): Promise<void> {
   if (stamped === String(PROJECTION_VERSION)) {
     return reconcileIndex(options)
   }
+  // Loud on purpose: a rebuild is expected once per projection bump or fresh
+  // graph. Seeing this on *every* open means the stamp (or the whole index
+  // file) isn't persisting between launches — a pathology that would
+  // otherwise be indistinguishable from a slow reconcile.
+  console.warn(
+    `index: stored projection version ${stamped === null ? 'none' : `"${stamped}"`} ≠ ${PROJECTION_VERSION} — full rebuild`,
+  )
   return rebuildIndex(options)
 }
 
@@ -333,41 +347,48 @@ export async function syncIndex(options: IndexPassOptions): Promise<void> {
  * carry `generation`, so even a pass that races a connection swap can't corrupt
  * the newly-opened index — Rust drops its stale writes.
  *
- * Two skip layers keep a repeat pass over a large, mostly-unchanged graph
- * cheap: a file whose listed mtime matches its indexed row is never even read
- * ({@link matchesTrustedMtime}), and a read whose hash matches skips the
- * write — re-stamping the row's mtime when it disagreed with the listing, so
- * the mismatch (e.g. an echo-time stamp from a local write) can't cost a
- * re-read on every future pass. Changed notes apply in shared
- * `index_apply_batch` transactions rather than one round-trip each.
+ * The full-listing comparison lives in Rust ({@link reconcileScan}): one IPC
+ * round-trip returns only the files needing a read — mtime moved, mtime too
+ * fresh to trust, or no row yet — with their stored facts riding along, plus
+ * the rows whose files vanished. On a healthy graph the delta is empty and
+ * the whole pass is that single call. Hashes stay the authority for "did
+ * content change": a read whose hash matches skips the write, re-stamping the
+ * row's mtime when it disagreed with the listing (an echo-time stamp, or a
+ * provider rewrote it) so the mismatch can't cost a re-read on every future
+ * pass. Changed notes apply in shared `index_apply_batch` transactions.
  */
 export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
   const { generation, signal, onMoved, onSkippedNote, onFileProgress } = options
-  const files = await listFiles()
+  const scan = await reconcileScan(generation)
   if (signal?.aborted) {
     return
   }
-  const onDisk = new Set(files.map((file) => file.path))
-  const stored = await getIndexedFileFacts()
+  /** Stored facts per candidate path; healed moves graft the orphan's in. */
+  const facts = new Map<string, { mtime: number; fileHash: string }>()
+  for (const candidate of scan.candidates) {
+    if (candidate.storedMtime !== null && candidate.storedHash !== null) {
+      facts.set(candidate.path, { mtime: candidate.storedMtime, fileHash: candidate.storedHash })
+    }
+  }
+  /** Rows to drop at the end: scan orphans, minus heals, plus TOCTOU ghosts. */
+  const removals = new Map(scan.orphans.map((orphan) => [orphan.path, orphan]))
 
   // Id-based move healing (Plan 17): a row whose file vanished plus a new
   // file carrying the same frontmatter id is a rename observed after the
   // fact — an external tool or a sync pull moved it while Reflect wasn't
   // looking. Move the rows instead of delete+create, so embedding vectors
   // survive. Best-effort throughout: any failure degrades to the plain pass
-  // below (the arrival is indexed fresh, the cleanup loop drops the orphan).
-  const orphanPaths = [...stored.keys()].filter((path) => !onDisk.has(path))
-  // Placeholders can't be arrivals: their content is unreadable until iCloud
-  // re-downloads them, so move pairing has nothing to match on.
-  const arrivalPaths = files
-    .filter((file) => !stored.has(file.path) && file.placeholder !== true)
-    .map((file) => file.path)
+  // below (the arrival is indexed fresh, the removal loop drops the orphan).
+  // Placeholders can't be arrivals: Rust never lists them as candidates.
+  const arrivalPaths = scan.candidates
+    .filter((candidate) => candidate.storedHash === null)
+    .map((candidate) => candidate.path)
   /** Arrival content read for pairing — the main pass below reuses it. */
   let arrivalContent = new Map<string, string>()
   try {
-    const scan = await detectExternalMoves(orphanPaths, arrivalPaths, { signal })
-    arrivalContent = scan.content
-    for (const move of scan.moves) {
+    const healScan = await detectExternalMoves([...removals.keys()], arrivalPaths, { signal })
+    arrivalContent = healScan.content
+    for (const move of healScan.moves) {
       if (signal?.aborted) {
         return
       }
@@ -381,10 +402,10 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
       }
       // The moved row carries the old path's facts: the main pass re-indexes
       // at the new path only if the content actually changed in transit.
-      const facts = stored.get(move.from)
-      stored.delete(move.from)
-      if (facts !== undefined) {
-        stored.set(move.to, facts)
+      const orphan = removals.get(move.from)
+      removals.delete(move.from)
+      if (orphan !== undefined) {
+        facts.set(move.to, { mtime: orphan.storedMtime, fileHash: orphan.storedHash })
       }
       onMoved?.(move.from, move.to)
     }
@@ -396,69 +417,65 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
     return
   }
 
-  const now = Date.now()
   const batch = createIndexApplyBatch(generation, onSkippedNote)
   const touches = createMtimeTouchBatch(generation)
+  const total = scan.candidates.length
   let done = 0
-  for (const file of files) {
+  let worked = 0
+  for (const candidate of scan.candidates) {
     if (signal?.aborted) {
       return
     }
     done += 1
     if (done % INDEX_PASS_YIELD_EVERY === 0) {
-      onFileProgress?.(done, files.length)
+      onFileProgress?.(done, total, worked)
       await yieldToEventLoop()
     }
-    if (file.placeholder === true) {
-      // Evicted to iCloud: present but unreadable until re-download. Keep the
-      // stored row (its path is in `onDisk`, so the cleanup loop skips it) —
-      // reading would land in the notFound arm below and delete the note from
-      // the index, turning eviction into disappearance.
-      continue
-    }
-    const facts = stored.get(file.path)
-    if (matchesTrustedMtime(facts?.mtime, file.modifiedMs, now)) {
-      continue // untouched since it was indexed — skip the read entirely
-    }
-    let content = arrivalContent.get(file.path)
+    const stored = facts.get(candidate.path)
+    worked += 1
+    let content = arrivalContent.get(candidate.path)
     if (content === undefined) {
       try {
-        content = await readNote(file.path)
+        content = await readNote(candidate.path)
       } catch (err) {
-        // The file moved/was deleted/locked between listFiles() and here (TOCTOU).
-        // If it's gone, drop it from `onDisk` so the cleanup loop removes its
-        // now-ghost row this pass; for a transient error keep the row and retry.
-        if (isAppError(err) && err.kind === 'notFound') {
-          onDisk.delete(file.path)
+        // The file moved/was deleted/locked between the scan and here (TOCTOU).
+        // If it's gone and had a row, that row is now a ghost — remove it this
+        // pass; for a transient error keep the row and retry next pass.
+        if (isAppError(err) && err.kind === 'notFound' && stored !== undefined) {
+          removals.set(candidate.path, {
+            path: candidate.path,
+            storedMtime: stored.mtime,
+            storedHash: stored.fileHash,
+          })
         }
         continue
       }
     }
     const fileHash = await hashContent(content)
-    if (facts?.fileHash === fileHash) {
+    if (stored?.fileHash === fileHash) {
       // Content unchanged. If the stored mtime doesn't match the listing (an
       // echo-time stamp, or a provider rewrote it), re-stamp it so the next
       // pass takes the read-free path — left alone it mismatches forever.
-      if (facts.mtime !== file.modifiedMs) {
-        await touches.add({ path: file.path, mtime: file.modifiedMs })
+      if (stored.mtime !== candidate.modifiedMs) {
+        await touches.add({ path: candidate.path, mtime: candidate.modifiedMs })
       }
       continue // unchanged
     }
     if (signal?.aborted) {
       return // re-check after the awaits — don't write for a superseded pass
     }
-    await batch.add(await buildNoteProjection(file.path, content, { fileHash, mtime: file.modifiedMs }))
+    await batch.add(
+      await buildNoteProjection(candidate.path, content, { fileHash, mtime: candidate.modifiedMs }),
+    )
   }
   await batch.flush()
   await touches.flush()
-  onFileProgress?.(files.length, files.length)
+  onFileProgress?.(total, total, worked)
 
-  for (const path of stored.keys()) {
+  for (const path of removals.keys()) {
     if (signal?.aborted) {
       return
     }
-    if (!onDisk.has(path)) {
-      await removeFromIndex(path, generation)
-    }
+    await removeFromIndex(path, generation)
   }
 }
