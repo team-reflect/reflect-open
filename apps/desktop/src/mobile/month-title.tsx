@@ -5,7 +5,7 @@ import { usePrefersReducedMotion } from '@/mobile/use-reduced-motion'
 import './month-title.css'
 
 /** Mirrors the animation durations in month-title.css (the fallback timer). */
-export const MONTH_TITLE_TRANSITION_MS = 200
+export const MONTH_TITLE_TRANSITION_MS = 320
 
 interface OutgoingMonth {
   month: string
@@ -59,12 +59,12 @@ export function MonthTitle({ month }: MonthTitleProps): ReactElement {
   }, [outgoing])
 
   return (
-    <span className="relative block min-w-0">
+    <span className="relative block h-[1.5em] min-w-0 overflow-hidden">
       <span
         key={shown}
         data-slot="month-title"
         className={cn(
-          'block truncate',
+          'block truncate leading-[1.5]',
           outgoing && (outgoing.direction === 'up' ? 'month-title-enter-up' : 'month-title-enter-down'),
         )}
       >
@@ -75,7 +75,7 @@ export function MonthTitle({ month }: MonthTitleProps): ReactElement {
           ref={outgoingRef}
           aria-hidden
           className={cn(
-            'absolute inset-x-0 top-0 block truncate',
+            'absolute inset-x-0 top-0 block truncate leading-[1.5]',
             outgoing.direction === 'up' ? 'month-title-exit-up' : 'month-title-exit-down',
           )}
         >
