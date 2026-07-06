@@ -523,6 +523,27 @@ describe('NoteEditor link opening', () => {
     expect(openUrl).toHaveBeenCalledWith('https://example.com')
   })
 
+  it('opens a custom app scheme link via the URL opener', () => {
+    renderEditor()
+
+    const event = new MouseEvent('click')
+    act(() =>
+      captured.props?.onLinkClick?.({ href: 'x-devonthink-item://40C88434-68B6-4DCB', event }),
+    )
+
+    expect(openUrl).toHaveBeenCalledWith('x-devonthink-item://40C88434-68B6-4DCB')
+  })
+
+  it('drops an unsafe scheme link without opening anything', () => {
+    renderEditor()
+
+    const event = new MouseEvent('click')
+    act(() => captured.props?.onLinkClick?.({ href: 'file:///etc/passwd', event }))
+
+    expect(openUrl).not.toHaveBeenCalled()
+    expect(dispatchDeepLink).not.toHaveBeenCalled()
+  })
+
   it('opens an assets/ link through the graph asset opener, not the URL opener', () => {
     const openImage = vi.fn(async () => {})
     renderEditor(openImage)

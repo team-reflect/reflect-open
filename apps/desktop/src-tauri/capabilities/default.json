@@ -11,7 +11,8 @@
     "opener:default",
     {
       "identifier": "opener:allow-open-url",
-      "allow": [{ "url": "x-apple.systempreferences:*" }]
+      "allow": [{ "url": "x-apple.systempreferences:*" }, { "url": "*://*" }],
+      "deny": [{ "url": "file://*" }]
     },
     "dialog:default",
     {

@@ -34,6 +34,7 @@ import {
   ImageLightbox,
   type LightboxImage,
 } from '@/editor/image-lightbox'
+import { isOpenableExternalUrl } from '@/editor/open-external-link'
 import { isTouchEditorSurface } from '@/lib/platform-surface'
 import { useLightboxTransition } from '@/editor/use-lightbox-transition'
 import { dispatchDeepLink } from '@/lib/deep-links/intake'
@@ -324,6 +325,9 @@ export function NoteEditor({
           return
         }
         dispatchDeepLink(href)
+        return
+      }
+      if (!isOpenableExternalUrl(href)) {
         return
       }
       void openUrl(href).catch((cause) => {

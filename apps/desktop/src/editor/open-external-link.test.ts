@@ -36,8 +36,29 @@ describe('openExternalLink', () => {
     expect(openUrl).not.toHaveBeenCalled()
   })
 
-  it('drops other schemes without opening anything', () => {
-    const event = click('javascript:alert(1)')
+  it('opens a custom app scheme in its OS default app', () => {
+    const event = click('x-devonthink-item://40C88434-68B6-4DCB-A258-754679764C3C')
+
+    expect(openUrl).toHaveBeenCalledWith('x-devonthink-item://40C88434-68B6-4DCB-A258-754679764C3C')
+    expect(event.defaultPrevented).toBe(true)
+  })
+
+  it.each([
+    ['javascript:alert(1)'],
+    ['JavaScript:alert(1)'],
+    ['data:text/html,<script>alert(1)</script>'],
+    ['file:///etc/passwd'],
+    ['blob:https://example.com/uuid'],
+  ])('drops the unsafe scheme %s without opening anything', (href) => {
+    const event = click(href)
+
+    expect(openUrl).not.toHaveBeenCalled()
+    expect(dispatchDeepLink).not.toHaveBeenCalled()
+    expect(event.defaultPrevented).toBe(true)
+  })
+
+  it('drops a scheme-less relative href', () => {
+    const event = click('notes/foo.md')
 
     expect(openUrl).not.toHaveBeenCalled()
     expect(dispatchDeepLink).not.toHaveBeenCalled()
