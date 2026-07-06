@@ -445,6 +445,11 @@ html:root {
   line-height: inherit;
   letter-spacing: 0;
 }
+/* meowdown bottoms atom previews; in compact task rows that drops wiki-link text
+   below the surrounding task copy. */
+.reflect-task-preview .md-wikilink-view-preview {
+  vertical-align: baseline;
+}
 .line-through .reflect-task-preview .md-link,
 .line-through .reflect-task-preview .md-wikilink-view-label,
 .line-through .reflect-task-preview .md-tag {
