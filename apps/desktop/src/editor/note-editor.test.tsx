@@ -367,9 +367,12 @@ describe('NoteEditor image lightbox', () => {
     expect(image?.style.transform).toBe('translate3d(0, 0, 0) scale(1)')
     fireEvent.click(preview)
     expect(screen.getByRole('dialog', { name: 'Image preview' })).toBeInTheDocument()
+    fireEvent.click(preview)
+    expect(screen.getByRole('dialog', { name: 'Image preview' })).toBeInTheDocument()
 
     fireEvent.transitionEnd(image!)
-    expect(screen.getByRole('dialog', { name: 'Image preview' })).toBeInTheDocument()
+    fireEvent.click(preview)
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('clears mobile drag click suppression when reduced motion skips the snap animation', async () => {
@@ -395,7 +398,6 @@ describe('NoteEditor image lightbox', () => {
     act(() => captured.props?.onImageClick?.(imageClick('assets/cat.png', 'Cat')))
 
     const preview = await screen.findByRole('button', { name: 'Close image preview' })
-    vi.useFakeTimers()
     try {
       firePointer(preview, 'pointerdown', {
         pointerId: 1,
@@ -417,12 +419,9 @@ describe('NoteEditor image lightbox', () => {
 
       fireEvent.click(preview)
       expect(screen.getByRole('dialog', { name: 'Image preview' })).toBeInTheDocument()
-
-      act(() => vi.advanceTimersByTime(101))
       fireEvent.click(preview)
       expect(screen.queryByRole('dialog')).toBeNull()
     } finally {
-      vi.useRealTimers()
       Object.defineProperty(window, 'matchMedia', {
         configurable: true,
         writable: true,

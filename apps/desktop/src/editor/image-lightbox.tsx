@@ -223,10 +223,11 @@ function useImageDismissDrag({
         performance.now() - current.sampleTime <= VELOCITY_STALE_MS
       const shouldClose =
         !interrupted && (current.deltaY > current.height * DISMISS_FRACTION || flicked)
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
       suppressClickUntilRef.current =
-        performance.now() + (shouldClose ? SETTLE_MS + 80 : CLICK_SUPPRESSION_MS)
+        performance.now() + (reducedMotion ? CLICK_SUPPRESSION_MS : SETTLE_MS + 80)
 
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      if (reducedMotion) {
         commit(IDLE)
         if (shouldClose) {
           onClose()
@@ -251,8 +252,14 @@ function useImageDismissDrag({
 
   const onClick = useCallback(
     (event: ReactMouseEvent<HTMLButtonElement>): void => {
-      if (suppressClickUntilRef.current > 0 && performance.now() <= suppressClickUntilRef.current) {
-        suppressClickUntilRef.current = 0
+      const settling = stateRef.current.phase === 'settling'
+      const suppressClick =
+        settling ||
+        (suppressClickUntilRef.current > 0 && performance.now() <= suppressClickUntilRef.current)
+      if (suppressClick) {
+        if (!settling) {
+          suppressClickUntilRef.current = 0
+        }
         event.preventDefault()
         event.stopPropagation()
         return
