@@ -175,20 +175,31 @@ export async function installNativeMenu(): Promise<void> {
   if (!isMacosDesktop()) {
     return
   }
+  const layouts = appMenuLayout()
   const submenus = await Promise.all(
-    appMenuLayout().map(async (layout) => {
-      const submenu = await Submenu.new({
+    layouts.map((layout) =>
+      Submenu.new({
         text: layout.text,
         items: layout.entries.map(entryOptions),
-      })
-      if (layout.nsAppRole === 'windows') {
-        await submenu.setAsWindowsMenuForNSApp()
-      } else if (layout.nsAppRole === 'help') {
-        await submenu.setAsHelpMenuForNSApp()
-      }
-      return submenu
-    }),
+      }),
+    ),
   )
   const menu = await Menu.new({ items: submenus })
   await menu.setAsAppMenu()
+  // NSApp roles must be assigned after setAsAppMenu: attaching the menu
+  // clones each submenu's NSMenu, and muda resolves the role against the
+  // instance inside the installed main menu — assigned earlier, the role
+  // silently no-ops and macOS never adds its automatic items (the window
+  // list and Move & Resize/tiling with their system shortcuts; Help search).
+  for (const [index, layout] of layouts.entries()) {
+    const submenu = submenus[index]
+    if (!submenu) {
+      continue
+    }
+    if (layout.nsAppRole === 'windows') {
+      await submenu.setAsWindowsMenuForNSApp()
+    } else if (layout.nsAppRole === 'help') {
+      await submenu.setAsHelpMenuForNSApp()
+    }
+  }
 }
