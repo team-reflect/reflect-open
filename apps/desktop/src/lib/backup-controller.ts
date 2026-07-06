@@ -227,6 +227,13 @@ export function createBackupController(options: BackupControllerOptions): Backup
       generation,
       localOnly: true,
       getToken: async () => null,
+      onStatus: (engineStatus) => {
+        // No UI surfaces local history, so a failing commit loop (disk full,
+        // corrupted repo) must at least leave a trace for diagnosis.
+        if (engineStatus.state === 'error') {
+          console.error('local history commit failed:', engineStatus.message)
+        }
+      },
     })
     if (!(await adoptEngine(next))) {
       return
