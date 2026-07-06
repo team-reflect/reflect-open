@@ -7,9 +7,10 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
+import { flushSync } from 'react-dom'
 
 const DRAG_ACTIVATE_PX = 8
-const DISMISS_FRACTION = 0.22
+const DISMISS_FRACTION = 0.18
 const DISMISS_VELOCITY_PX_PER_MS = 0.45
 const MIN_FLICK_DISTANCE_PX = 40
 const VELOCITY_WINDOW_MS = 30
@@ -219,12 +220,14 @@ export function useImageDismissDrag({
     if (current.phase !== 'settling') {
       return
     }
+    if (current.action === 'close') {
+      flushSync(() => commit(IDLE))
+      onClose()
+      return
+    }
     commit(IDLE)
     if (current.action === 'cancel') {
       suppressClickUntilRef.current = 0
-    }
-    if (current.action === 'close') {
-      onClose()
     }
   }, [commit, onClose])
 
