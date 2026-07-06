@@ -56,6 +56,12 @@ Download the latest DMG from
 updates itself from GitHub Releases; update payloads are verified against a
 public key compiled into the app.
 
+Reflect for iPhone is available as a TestFlight beta. It is the mobile
+companion for the same plain-file graph: capture quick notes, read and edit
+your daily note, and keep everything in sync through the same iCloud or git
+setup you use on Mac. Join the
+[Reflect TestFlight](https://testflight.apple.com/join/j2eEz43d).
+
 Or [build from source](#building-from-source).
 
 ## Browser capture
