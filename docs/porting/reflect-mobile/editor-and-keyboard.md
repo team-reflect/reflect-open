@@ -32,10 +32,22 @@ toolbar — and the hard-won keyboard/focus lessons.
 > the keyboard is up (V1 let the keyboard cover it). Checkbox-toggle
 > haptics ride the keyboard plugin's `impact_light` command like the
 > date/tab taps. **Still owed to the spike-B gate:** the simulator/
-> on-device pass — smart-punctuation typing test, whether programmatic
-> `focus()` raises the keyboard in wry's WKWebView, menu tappability,
+> on-device pass — smart-punctuation typing test, menu tappability,
 > caret visibility, haptic feel — plus focus restore for wiki links
 > resolving to *daily* notes (the daily surface owns that).
+>
+> **On-device finding (2026-07-06):** programmatic `focus()` does NOT
+> raise the keyboard in wry's WKWebView on its own — WebKit gates keyboard
+> presentation on `userIsInteracting`, and Reflect's deliberate focuses
+> (the Tasks tab's "+" quick-edit sheet, new-note autofocus) run after an
+> async write, outside the gesture's event loop, so they landed with the
+> keyboard down (V1 hit the same wall and scheduled focus inside gestures).
+> The keyboard plugin now swizzles `WKContentView`'s
+> `_elementDidFocus:userIsInteracting:…` to always report user interaction
+> (the Capacitor/Cordova `keyboardDisplayRequiresUserAction = false`
+> swizzle), so every programmatic focus presents the keyboard — safe under
+> the revised focus contract, where `focus()` is only ever an explicit
+> write gesture.
 >
 > **On-device finding (2026-07-04):** `contentInsetAdjustmentBehavior =
 > .never` was not enough — on focus, WebKit still scrolls the *native*

@@ -56,6 +56,11 @@ class KeyboardPlugin: Plugin {
     // keyboard for any focused field or contenteditable. Reflect edits one
     // continuous document, so the bar is meaningless chrome — strip it.
     Self.suppressInputAccessoryBar()
+    // WebKit only raises the keyboard for a focus() that runs inside a user
+    // gesture; Reflect's deliberate programmatic focuses (the task sheet's
+    // "+" add flow, new-note autofocus) run after an async write, so they
+    // landed with the keyboard down. Lift the restriction.
+    Self.allowProgrammaticFocus()
     let center = NotificationCenter.default
     center.addObserver(
       self,
@@ -141,6 +146,38 @@ class KeyboardPlugin: Plugin {
     } else {
       class_replaceMethod(contentClass, selector, implementation, "@@:")
     }
+  }
+
+  /// WebKit gates keyboard presentation on `userIsInteracting`: a `focus()`
+  /// outside a user gesture's event loop moves DOM focus but leaves the
+  /// keyboard down. Reflect reserves programmatic focus for explicit write
+  /// gestures whose focus target only exists after an async hop (navigation
+  /// never focuses — the PR #575 contract), so every such focus should
+  /// present the keyboard: rewrite `WKContentView`'s focus notification to
+  /// always report user interaction — the same swizzle Capacitor/Cordova
+  /// ship as `keyboardDisplayRequiresUserAction = false`. The remaining
+  /// arguments pass through untouched. Guarded by the class/selector lookup,
+  /// so a WebKit rename degrades to "keyboard stays down" rather than
+  /// crashing. Idempotent via the static flag.
+  private static var didAllowProgrammaticFocus = false
+  private static func allowProgrammaticFocus() {
+    guard !didAllowProgrammaticFocus, let contentClass = NSClassFromString("WKContentView")
+    else { return }
+    didAllowProgrammaticFocus = true
+    // The iOS 13+ spelling of the notification (deployment target is 14).
+    let selector = NSSelectorFromString(
+      "_elementDidFocus:userIsInteracting:blurPreviousNode:activityStateChanges:userObject:")
+    guard let method = class_getInstanceMethod(contentClass, selector) else { return }
+    typealias ElementDidFocus = @convention(c) (
+      AnyObject, Selector, UnsafeRawPointer, Bool, Bool, UInt, AnyObject?
+    ) -> Void
+    let original = unsafeBitCast(method_getImplementation(method), to: ElementDidFocus.self)
+    let block: @convention(block) (
+      AnyObject, UnsafeRawPointer, Bool, Bool, UInt, AnyObject?
+    ) -> Void = { view, element, _, blurPreviousNode, activityStateChanges, userObject in
+      original(view, selector, element, true, blurPreviousNode, activityStateChanges, userObject)
+    }
+    method_setImplementation(method, imp_implementationWithBlock(block))
   }
 }
 
