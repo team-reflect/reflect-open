@@ -22,13 +22,15 @@ interface MobileTaskRowProps {
  * round checkbox that toggles the task through the same guarded write-back as
  * desktop — with a light haptic, V1's check feedback — and the task content
  * rendered as markdown. A completed (struck) row stays visible until archived.
- * Tapping the row body opens the quick-edit sheet instead of desktop's
- * multi-select; there is no inline editor on touch.
+ * Tapping the row body gives the same light confirmation and opens the
+ * quick-edit sheet instead of desktop's multi-select; there is no inline editor
+ * on touch.
  */
 export function MobileTaskRow({ task, showSource, onEdit }: MobileTaskRowProps): ReactElement {
   const { settings } = useSettings()
   const { toggle, isPending } = useTaskCheckboxToggle(task)
   const label = task.text || 'Empty task'
+  const edit = (): void => onEdit(task)
 
   return (
     <li
@@ -61,11 +63,11 @@ export function MobileTaskRow({ task, showSource, onEdit }: MobileTaskRowProps):
         role="button"
         tabIndex={0}
         aria-label={`Edit: ${label}`}
-        onClick={() => onEdit(task)}
+        onClick={edit}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault()
-            onEdit(task)
+            edit()
           }
         }}
         className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 py-3 pr-4 text-left focus-visible:outline-none"

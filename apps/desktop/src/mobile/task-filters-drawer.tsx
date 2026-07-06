@@ -3,6 +3,7 @@ import { Check } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import type { TaskFilters } from '@/lib/tasks/task-filters'
 import { cn } from '@/lib/utils'
+import { hapticImpactLight } from '@/mobile/haptics'
 
 interface TaskFiltersDrawerProps {
   open: boolean
@@ -66,7 +67,10 @@ function FilterRow({
       type="button"
       role="checkbox"
       aria-checked={checked}
-      onClick={onToggle}
+      onClick={() => {
+        hapticImpactLight()
+        onToggle()
+      }}
       className="flex h-12 items-center gap-3 text-left text-base"
     >
       <span

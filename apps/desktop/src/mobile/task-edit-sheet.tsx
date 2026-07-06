@@ -159,6 +159,7 @@ export function MobileTaskEditSheet({
   }
 
   const convertToBullet = (): void => {
+    hapticImpactLight()
     const result = resolve()
     if (result.type === 'commit') {
       actions.editAndConvertToBullet(task, result.content)
@@ -173,6 +174,7 @@ export function MobileTaskEditSheet({
   }
 
   const openNote = (): void => {
+    hapticImpactLight()
     closeNavigate()
     onOpenNote(task.notePath)
   }
@@ -190,11 +192,13 @@ export function MobileTaskEditSheet({
   }
 
   const remove = (): void => {
+    hapticImpactLight()
     actions.remove([task])
     closeHandled()
   }
 
   const schedule = (isoDate: string | null): void => {
+    hapticImpactLight()
     // Base the rewrite on the freshest draft, then keep every mirror in step
     // by hand: setMarkdown is silent (no onChange echo), so neither the live
     // mirror nor the state (chip highlights) updates on its own.
@@ -203,6 +207,11 @@ export function MobileTaskEditSheet({
     setDraft(next)
     editorRef.current?.setMarkdown(next)
     setShowCalendar(false)
+  }
+
+  const toggleCalendar = (): void => {
+    hapticImpactLight()
+    setShowCalendar((showing) => !showing)
   }
 
   return (
@@ -266,7 +275,7 @@ export function MobileTaskEditSheet({
             }
             icon={<CalendarDays aria-hidden className="size-3.5" />}
             active={showCalendar}
-            onClick={() => setShowCalendar((showing) => !showing)}
+            onClick={toggleCalendar}
           />
           {dueDate !== null ? (
             <ScheduleChip

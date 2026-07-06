@@ -19,6 +19,7 @@ import { composeVisibleTaskGroups } from '@/lib/tasks/task-visibility'
 import { completedTasksQueryKey, tasksQueryKey } from '@/lib/tasks/tasks-query'
 import { useTaskActions } from '@/lib/tasks/use-task-actions'
 import { useToday } from '@/lib/use-today'
+import { hapticImpactLight } from '@/mobile/haptics'
 import { MobileTaskEditSheet } from '@/mobile/task-edit-sheet'
 import { TaskFiltersDrawer } from '@/mobile/task-filters-drawer'
 import { MobileTaskGroup } from '@/mobile/task-group'
@@ -32,11 +33,12 @@ import { useRouter } from '@/routing/router'
  * Upcoming, then per-note — via the same queries, grouping
  * ({@link composeVisibleTaskGroups}) and optimistic mutations
  * ({@link useTaskActions}) the desktop view uses; this screen adds only the
- * touch surface. Checkboxes toggle with a light haptic; tapping a row opens the
- * quick-edit sheet (edit / schedule / complete / convert / open note) instead of
- * desktop's multi-select; the filter sheet carries desktop's bucket toggles and
- * "Show archived". Completing keeps the row struck (V1's middle state) until
- * Archive hides this session's completed tasks.
+ * touch surface. Task taps, toggles, adds, filters, scheduling, and archival
+ * get light haptics; tapping a row opens the quick-edit sheet (edit / schedule /
+ * complete / convert / open note) instead of desktop's multi-select; the filter
+ * sheet carries desktop's bucket toggles and "Show archived". Completing keeps
+ * the row struck (V1's middle state) until Archive hides this session's completed
+ * tasks.
  */
 export function MobileTasks(): ReactElement {
   const { graph } = useGraph()
@@ -98,7 +100,10 @@ export function MobileTasks(): ReactElement {
     )
   }, [groups, editingTask])
 
-  const editTask = (task: OpenTask, options?: { autoFocus?: boolean }): void => {
+  const editTask = (task: OpenTask, options?: { autoFocus?: boolean; haptic?: boolean }): void => {
+    if (options?.haptic !== false) {
+      hapticImpactLight()
+    }
     setAutoFocusEditor(options?.autoFocus === true)
     setEditingTask(task)
     setSheetOpen(true)
@@ -108,12 +113,18 @@ export function MobileTasks(): ReactElement {
   // visible, write it, then open its quick-edit sheet with the editor focused
   // so typing starts immediately.
   const onAdd = (target: InsertTaskTarget): void => {
+    hapticImpactLight()
     setQuery('')
     void actions.insert(target).then((created) => {
       if (created !== null) {
-        editTask(created, { autoFocus: true })
+        editTask(created, { autoFocus: true, haptic: false })
       }
     })
+  }
+
+  const archiveCompleted = (): void => {
+    hapticImpactLight()
+    actions.archive()
   }
 
   return (
@@ -137,7 +148,7 @@ export function MobileTasks(): ReactElement {
             size="icon"
             className="size-10 shrink-0"
             aria-label={`Archive ${recentlyCompleted.length} completed`}
-            onClick={actions.archive}
+            onClick={archiveCompleted}
           >
             <Archive />
           </Button>
@@ -147,7 +158,10 @@ export function MobileTasks(): ReactElement {
           size="icon"
           className="size-10 shrink-0"
           aria-label="Task filters"
-          onClick={() => setFiltersOpen(true)}
+          onClick={() => {
+            hapticImpactLight()
+            setFiltersOpen(true)
+          }}
         >
           <SlidersHorizontal />
         </Button>

@@ -21,6 +21,7 @@ import { MobileTasks } from './tasks'
 const getOpenTasks = vi.hoisted(() => vi.fn())
 const getCompletedTasks = vi.hoisted(() => vi.fn())
 const resolveWikiTarget = vi.hoisted(() => vi.fn())
+const hapticImpactLight = vi.hoisted(() => vi.fn())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
@@ -57,6 +58,9 @@ vi.mock('@/editor/use-editor-autocomplete', () => ({
     onWikilinkSearch: async () => [],
     onTagSearch: async () => [],
   }),
+}))
+vi.mock('@/mobile/haptics', () => ({
+  hapticImpactLight,
 }))
 
 const editorProbe = vi.hoisted(() => ({ focusCalls: 0 }))
@@ -228,6 +232,7 @@ beforeEach(() => {
   fail.mockReset()
   resolveWikiTarget.mockReset()
   resolveWikiTarget.mockResolvedValue({ kind: 'resolved', ref: 'notes/other.md' })
+  hapticImpactLight.mockClear()
   editorProbe.focusCalls = 0
   resetRecentlyCompleted()
 })
@@ -261,13 +266,36 @@ describe('MobileTasks', () => {
 
     await user.click(await view.findByRole('button', { name: 'Complete: buy milk' }))
 
+    expect(hapticImpactLight).toHaveBeenCalledTimes(1)
     expect(toggleTask).toHaveBeenCalledTimes(1)
     // V1's middle state: the completed row stays visible, struck, reopenable.
     await view.findByRole('button', { name: 'Reopen: buy milk' })
 
     // Archive hides this session's completed rows.
     await user.click(view.getByRole('button', { name: 'Archive 1 completed' }))
+    expect(hapticImpactLight).toHaveBeenCalledTimes(2)
     await waitFor(() => expect(view.queryByText('buy milk')).toBeNull())
+    view.unmount()
+  })
+
+  it('fires light haptics for task list controls', async () => {
+    getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
+    const user = userEvent.setup()
+    const view = renderScreen()
+
+    await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
+    expect(hapticImpactLight).toHaveBeenCalledTimes(1)
+
+    await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
+    await user.click(view.getByRole('button', { name: 'Task filters' }))
+    expect(hapticImpactLight).toHaveBeenCalledTimes(2)
+
+    await user.click(view.getByRole('checkbox', { name: 'Current' }))
+    expect(hapticImpactLight).toHaveBeenCalledTimes(3)
+
+    await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
+    await user.click(view.getByRole('button', { name: 'New task' }))
+    expect(hapticImpactLight).toHaveBeenCalledTimes(4)
     view.unmount()
   })
 
@@ -330,6 +358,29 @@ describe('MobileTasks', () => {
     await user.click(view.getByRole('button', { name: 'dismiss-drawer' }))
     expect(editTask).toHaveBeenCalledTimes(1)
     expect(editTask.mock.calls[0]?.[1]).toBe('buy milk [[2026-06-15]]')
+    view.unmount()
+  })
+
+  it('fires light haptics for task sheet scheduling and actions', async () => {
+    getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
+    const user = userEvent.setup()
+    const view = renderScreen()
+
+    await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
+    hapticImpactLight.mockClear()
+
+    await user.click(view.getByRole('button', { name: 'Pick date' }))
+    expect(hapticImpactLight).toHaveBeenCalledTimes(1)
+
+    await user.click(view.getByRole('button', { name: 'Tomorrow' }))
+    expect(hapticImpactLight).toHaveBeenCalledTimes(2)
+
+    await user.click(view.getByRole('button', { name: 'Clear' }))
+    expect(hapticImpactLight).toHaveBeenCalledTimes(3)
+
+    await user.click(view.getByRole('button', { name: 'Convert to bullet' }))
+    expect(hapticImpactLight).toHaveBeenCalledTimes(4)
+    await waitFor(() => expect(convertTaskToBullet).toHaveBeenCalledTimes(1))
     view.unmount()
   })
 

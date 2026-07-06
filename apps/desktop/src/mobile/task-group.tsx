@@ -5,6 +5,7 @@ import { addTargetForGroup, taskGroupHeaderStyle } from '@/lib/tasks/task-group-
 import { taskKey } from '@/lib/tasks/task-identity'
 import type { InsertTaskTarget } from '@/lib/tasks/task-insert-target'
 import { cn } from '@/lib/utils'
+import { hapticImpactLight } from '@/mobile/haptics'
 import { MobileTaskRow } from '@/mobile/task-row'
 
 interface MobileTaskGroupProps {
@@ -48,7 +49,14 @@ export function MobileTaskGroup({
             <span className="sr-only">Pinned:</span>
           ) : null}
           {group.kind === 'note' && notePath !== null ? (
-            <button type="button" onClick={() => onOpen(notePath)} className="truncate">
+            <button
+              type="button"
+              onClick={() => {
+                hapticImpactLight()
+                onOpen(notePath)
+              }}
+              className="truncate"
+            >
               {group.label}
             </button>
           ) : (

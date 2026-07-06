@@ -108,8 +108,8 @@ class KeyboardPlugin: Plugin {
     invoke.resolve(currentState)
   }
 
-  /// Fire a light impact haptic — V1 parity for date-selection and tab
-  /// taps. `UIFeedbackGenerator` is main-thread-only; resolve immediately
+  /// Fire a light impact haptic — V1 parity for date-selection, task controls,
+  /// and tab taps. `UIFeedbackGenerator` is main-thread-only; resolve immediately
   /// rather than after the dispatch since the tap has already happened and
   /// callers are fire-and-forget. Silently does nothing on hardware
   /// without a haptic engine (iPads, the simulator).
