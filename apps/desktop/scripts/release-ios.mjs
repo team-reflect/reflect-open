@@ -24,6 +24,7 @@ const IOS_BUNDLE_IDENTIFIER = 'app.reflect.ios'
 const OLD_CAPACITOR_BUNDLE_IDENTIFIER = 'app.reflect.ReflectMobile'
 const NON_EXEMPT_ENCRYPTION_KEY = 'ITSAppUsesNonExemptEncryption'
 const KEYCHAIN_SERVICE = 'reflect-notary'
+const SHARE_EXTENSION_APP_GROUP = 'group.app.reflect'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const appDir = join(here, '..')
@@ -126,6 +127,16 @@ export function findIpaInfoPlistPath(listing) {
 /** Return true when an Info.plist raw value represents boolean false. */
 export function isFalsePlistValue(value) {
   return ['false', 'no', '0'].includes(value.trim().toLowerCase())
+}
+
+/** Find every app-extension bundle path inside an IPA's unzip listing. */
+export function findIpaAppexPaths(listing) {
+  const paths = new Set()
+  for (const line of listing.split('\n')) {
+    const match = line.trim().match(/^(Payload\/[^/]+\.app\/PlugIns\/[^/]+\.appex)\//)
+    if (match) paths.add(match[1])
+  }
+  return [...paths].sort()
 }
 
 function ensureMacos() {
@@ -346,9 +357,50 @@ function assertIpaExportCompliance(ipa) {
   log(`${NON_EXEMPT_ENCRYPTION_KEY}: false`)
 }
 
+/**
+ * The share extension is useless without its App Group entitlement: the
+ * container lookup returns nil and every share fails with "Couldn't save",
+ * while the build itself installs and launches normally. The entitlement
+ * comes from the export re-signing step (not the committed .entitlements
+ * file), so verify what was actually signed before letting an IPA upload.
+ */
+function assertIpaAppexEntitlements(ipa) {
+  const appexPaths = findIpaAppexPaths(capture('unzip', ['-Z1', ipa]))
+  if (appexPaths.length === 0) {
+    fail(
+      'IPA contains no app extensions — expected the ShareExtension appex.\n' +
+        '  Check that ios.project.yml still embeds ShareExtension.',
+    )
+  }
+  const tempDir = mkdtempSync(join(tmpdir(), 'reflect-ios-appex-'))
+  try {
+    execFileSync('unzip', ['-q', ipa, 'Payload/*', '-d', tempDir])
+    for (const appexPath of appexPaths) {
+      let entitlements
+      try {
+        entitlements = capture('codesign', ['-d', '--entitlements', ':-', join(tempDir, appexPath)])
+      } catch (error) {
+        fail(`cannot read code-signing entitlements of ${basename(appexPath)}: ${error.message}`)
+      }
+      if (!entitlements.includes(SHARE_EXTENSION_APP_GROUP)) {
+        fail(
+          `${basename(appexPath)} is signed without the ${SHARE_EXTENSION_APP_GROUP} App Group entitlement.\n` +
+            '  Shares from this build would fail with "Couldn\'t save" — the extension\n' +
+            '  cannot reach the shared capture inbox. Check the export re-signing step\n' +
+            '  against gen/apple/ShareExtension/ShareExtension.entitlements.',
+        )
+      }
+      log(`${basename(appexPath)} entitlements include ${SHARE_EXTENSION_APP_GROUP}`)
+    }
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+}
+
 function assertIpaAppStoreMetadata(ipa) {
   assertIpaBundleIdentifier(ipa)
   assertIpaExportCompliance(ipa)
+  assertIpaAppexEntitlements(ipa)
 }
 
 function ensureReleaseTools() {

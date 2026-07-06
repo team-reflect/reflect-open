@@ -10,6 +10,7 @@ import {
   createTimestampBuildNumber,
   createTauriIosBuildEnv,
   createTauriIosBuildArgs,
+  findIpaAppexPaths,
   findIpaInfoPlistPath,
   isFalsePlistValue,
   normalizeApiKeyContent,
@@ -194,6 +195,26 @@ test('IPA Info.plist lookup rejects ambiguous payloads', () => {
       ['Payload/Reflect.app/Info.plist', 'Payload/Other.app/Info.plist'].join('\n'),
     ),
   ).toThrow('expected exactly one app Info.plist')
+})
+
+test('IPA appex lookup finds each embedded extension bundle once', () => {
+  expect(
+    findIpaAppexPaths(
+      [
+        'Payload/',
+        'Payload/Reflect.app/',
+        'Payload/Reflect.app/Info.plist',
+        'Payload/Reflect.app/PlugIns/ShareExtension.appex/',
+        'Payload/Reflect.app/PlugIns/ShareExtension.appex/Info.plist',
+        'Payload/Reflect.app/PlugIns/ShareExtension.appex/ShareExtension',
+        'Symbols/Reflect.symbols',
+      ].join('\n'),
+    ),
+  ).toEqual(['Payload/Reflect.app/PlugIns/ShareExtension.appex'])
+})
+
+test('IPA appex lookup returns empty for an IPA without extensions', () => {
+  expect(findIpaAppexPaths(['Payload/Reflect.app/', 'Payload/Reflect.app/Info.plist'].join('\n'))).toEqual([])
 })
 
 test('Info.plist export-compliance false values are normalized', () => {
