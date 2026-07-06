@@ -67,14 +67,15 @@ function wikiTargetKeyOf(body: string, link: SyntaxNode): string | null {
   return target === '' ? null : normalizeWikiTarget(target).key
 }
 
-/** Does the textblock's inline content hold a wiki link with this match key? */
-function textblockMentions(body: string, block: SyntaxNode, targetKey: string): boolean {
+/** Does the textblock's inline content hold a wiki link with one of these match keys? */
+function textblockMentions(body: string, block: SyntaxNode, keys: ReadonlySet<string>): boolean {
   for (let child = block.firstChild; child; child = child.nextSibling) {
     if (child.name === 'WikiLink') {
-      if (wikiTargetKeyOf(body, child) === targetKey) {
+      const key = wikiTargetKeyOf(body, child)
+      if (key !== null && keys.has(key)) {
         return true
       }
-    } else if (textblockMentions(body, child, targetKey)) {
+    } else if (textblockMentions(body, child, keys)) {
       return true // links nested in emphasis/strikethrough still count
     }
   }
@@ -87,15 +88,15 @@ function textblockMentions(body: string, block: SyntaxNode, targetKey: string): 
  * qualify the branch — old Reflect's `nodeHasDirectBacklink` looked exactly one
  * block deep, and each mention deeper down produces its own context anyway.
  */
-function branchMentions(body: string, branch: SyntaxNode, targetKey: string | null): boolean {
-  if (targetKey === null) {
+function branchMentions(body: string, branch: SyntaxNode, keys: ReadonlySet<string>): boolean {
+  if (keys.size === 0) {
     return false
   }
   if (isTextblockName(branch.name)) {
-    return textblockMentions(body, branch, targetKey)
+    return textblockMentions(body, branch, keys)
   }
   for (let child = branch.firstChild; child; child = child.nextSibling) {
-    if (isTextblockName(child.name) && textblockMentions(body, child, targetKey)) {
+    if (isTextblockName(child.name) && textblockMentions(body, child, keys)) {
       return true
     }
   }
@@ -197,7 +198,7 @@ function containsPos(node: SyntaxNode, pos: number): boolean {
 function listItemContext(
   body: string,
   item: SyntaxNode,
-  targetKey: string | null,
+  targetKeys: ReadonlySet<string>,
   bodyPos: number,
 ): string {
   const parentItem = selfOrAncestor(item.parent, (node) => node.name === 'ListItem')
@@ -211,7 +212,7 @@ function listItemContext(
   for (let child = lead.nextSibling; child; child = child.nextSibling) {
     const branches = isListName(child.name) ? child.getChildren('ListItem') : [child]
     for (const branch of branches) {
-      if (branchMentions(body, branch, targetKey) || containsPos(branch, bodyPos)) {
+      if (branchMentions(body, branch, targetKeys) || containsPos(branch, bodyPos)) {
         pieces.push(dedentedSlice(body, branch.from, branch.to, indent))
       }
     }
@@ -249,15 +250,29 @@ export function prepareBlockContext(content: string): BlockContextSource {
  * contexts from one note. Falls back to the physical line when the offset has
  * drifted out of any block (the source changed between the index write and
  * this read).
+ *
+ * `targetKeys` is every match key that resolves to the target note (title,
+ * aliases, daily date — the `note_keys` view). Sibling branches co-group when
+ * they mention the target under *any* spelling, the way old Reflect compared
+ * resolved note ids; without it, matching falls back to the exact spelling of
+ * the link at `pos`.
  */
-export function blockContextAt(source: string | BlockContextSource, pos: number): string {
+export function blockContextAt(
+  source: string | BlockContextSource,
+  pos: number,
+  targetKeys?: ReadonlySet<string>,
+): string {
   const { body, bodyOffset, tree } =
     typeof source === 'string' ? prepareBlockContext(source) : source
   const bodyPos = Math.max(0, Math.min(pos - bodyOffset, body.length))
   const leaf: SyntaxNode = tree.resolveInner(bodyPos, 1)
 
   const link = selfOrAncestor(leaf, (node) => node.name === 'WikiLink')
-  const targetKey = link ? wikiTargetKeyOf(body, link) : null
+  const posKey = link ? wikiTargetKeyOf(body, link) : null
+  const keys = new Set(targetKeys)
+  if (posKey !== null) {
+    keys.add(posKey) // a stale index entry still anchors its own branch
+  }
 
   const heading = selfOrAncestor(leaf, (node) => isHeadingName(node.name))
   if (heading) {
@@ -267,7 +282,7 @@ export function blockContextAt(source: string | BlockContextSource, pos: number)
 
   const item = selfOrAncestor(leaf, (node) => node.name === 'ListItem')
   if (item) {
-    return listItemContext(body, item, targetKey, bodyPos)
+    return listItemContext(body, item, keys, bodyPos)
   }
 
   const block = selfOrAncestor(leaf, (node) => isTextblockName(node.name))

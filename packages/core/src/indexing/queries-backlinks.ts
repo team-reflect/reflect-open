@@ -56,6 +56,15 @@ export async function getBacklinksWithContext(path: string): Promise<BacklinkCon
     .orderBy('backlinks.posFrom')
     .execute()
 
+  // Every spelling that resolves to the target (title, aliases, daily date),
+  // so sibling branches co-group under any of them — old Reflect compared
+  // resolved note ids, not link text.
+  const targetKeys = new Set(
+    (await db.selectFrom('noteKeys').where('notePath', '=', path).select('key').execute())
+      .map((row) => row.key)
+      .filter((key): key is string => typeof key === 'string'),
+  )
+
   // One read *and one parse* per distinct source: a well-linked source
   // contributes many rows, and context extraction walks the parsed body.
   const sources = new Map<string, BlockContextSource | null>()
@@ -73,7 +82,7 @@ export async function getBacklinksWithContext(path: string): Promise<BacklinkCon
   const results: BacklinkContext[] = []
   for (const row of rows) {
     const source = sources.get(row.sourcePath)
-    const snippet = source == null ? '' : blockContextAt(source, row.posFrom)
+    const snippet = source == null ? '' : blockContextAt(source, row.posFrom, targetKeys)
     if (snippet !== '') {
       const key = `${row.sourcePath}\u0000${snippet}`
       if (seen.has(key)) {

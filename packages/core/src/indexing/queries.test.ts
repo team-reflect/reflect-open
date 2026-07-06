@@ -176,6 +176,32 @@ describe('getBacklinksWithContext', () => {
     ])
   })
 
+  it('co-groups sibling branches through the target aliases, not just the clicked spelling', async () => {
+    const content = '- parent line\n  - one [[Project X]]\n  - two [[projx]]\n'
+    mockInvoke.mockImplementation(async (command, args) => {
+      if (command !== 'db_query') {
+        return content
+      }
+      const sql = String(args['sql'])
+      if (sql.includes('note_keys')) {
+        return [{ key: 'project x' }, { key: 'projx' }]
+      }
+      return [
+        {
+          source_path: 'notes/source.md',
+          pos_from: content.indexOf('[[Project X]]'),
+          source_title: 'Source',
+        },
+      ]
+    })
+
+    const rows = await getBacklinksWithContext('notes/target.md')
+
+    expect(rows.map((row) => row.snippet)).toEqual([
+      '- parent line\n  - one [[Project X]]\n  - two [[projx]]',
+    ])
+  })
+
   it('collapses mentions with an identical context into one row (V1 parity)', async () => {
     const content = 'both [[target]] links on one [[target]] line\n\nanother [[target]] mention\n'
     mockInvoke.mockImplementation(async (command) => {

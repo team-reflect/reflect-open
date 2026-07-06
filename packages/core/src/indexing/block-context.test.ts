@@ -121,6 +121,20 @@ describe('blockContextAt', () => {
     )
   })
 
+  it('co-groups sibling branches through any of the target keys, like V1 id matching', () => {
+    const content = [
+      '- parent line',
+      '  - one [[Project X]]',
+      '  - two [[projx]]',
+      '  - three [[Other Note]]',
+      '',
+    ].join('\n')
+    const targetKeys = new Set(['project x', 'projx'])
+    expect(blockContextAt(content, posOf(content, '[[Project X]]'), targetKeys)).toBe(
+      '- parent line\n  - one [[Project X]]\n  - two [[projx]]',
+    )
+  })
+
   it('matches sibling mentions case-insensitively, like link resolution', () => {
     const content = '- parent line\n  - one [[Target]]\n  - two [[target]]\n'
     expect(blockContextAt(content, posOf(content, '[[Target]]'))).toBe(
