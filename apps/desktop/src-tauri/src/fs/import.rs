@@ -154,7 +154,14 @@ pub(super) fn finalize_import(
     let mut replacements = HashMap::new();
     let mut planned: Vec<(import_assets::FetchedAsset, import_assets::PlannedAssetName)> =
         Vec::new();
-    let mut taken = HashSet::new();
+    // Names the zip's own `assets/` entries will write are off-limits to
+    // downloads — a download claiming one would persist, then the zip entry
+    // would collide and abort after a partial graph write.
+    let mut taken: HashSet<String> = entries
+        .iter()
+        .filter_map(|entry| entry.relative.strip_prefix("assets/"))
+        .map(str::to_string)
+        .collect();
     let mut downloaded_assets = 0;
     let mut failed_asset_downloads = 0;
     for url in &urls {
@@ -795,6 +802,44 @@ mod tests {
         assert!(!root.path().join("assets/pic-2.png").exists());
         let note = fs::read_to_string(root.path().join("daily/2026-07-04.md")).unwrap();
         assert_eq!(note, "![](assets/pic.png)\n\n![](assets/pic.png)\n");
+    }
+
+    #[test]
+    fn downloads_never_claim_names_the_zip_assets_need() {
+        let root = tempdir().unwrap();
+        let base = serve(
+            vec![(
+                "/photo?alt=media&token=t",
+                "200 OK",
+                "Content-Type: image/png\r\nContent-Disposition: inline; filename=\"pic.png\"\r\n",
+                b"remote bytes",
+            )],
+            1,
+        );
+        let zip_path = root.path().join("export.zip");
+        let markdown = format!("![]({base}photo?alt=media\\&token=t)\n");
+        write_zip(
+            &zip_path,
+            &[
+                ("daily/2026-07-04.md", markdown.as_str()),
+                ("assets/pic.png", "zip bytes"),
+            ],
+        );
+
+        let summary = import_zip_downloading_from(root.path(), &zip_path, &base).unwrap();
+
+        assert_eq!(summary.imported_files, 2);
+        assert_eq!(summary.downloaded_assets, 1);
+        assert_eq!(
+            fs::read(root.path().join("assets/pic.png")).unwrap(),
+            b"zip bytes"
+        );
+        assert_eq!(
+            fs::read(root.path().join("assets/pic-2.png")).unwrap(),
+            b"remote bytes"
+        );
+        let note = fs::read_to_string(root.path().join("daily/2026-07-04.md")).unwrap();
+        assert_eq!(note, "![](assets/pic-2.png)\n");
     }
 
     #[test]

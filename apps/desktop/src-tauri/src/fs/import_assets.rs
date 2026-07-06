@@ -12,7 +12,7 @@
 //! can simply retry.
 
 use std::collections::HashMap;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -49,7 +49,10 @@ pub(super) enum DownloadOutcome {
     Gone,
 }
 
+/// A successfully downloaded attachment, staged and waiting to be persisted.
 pub(super) struct FetchedAsset {
+    /// Temp file in `.reflect/tmp` holding the downloaded bytes; deletes on
+    /// drop if the import aborts before persisting it.
     pub file: tempfile::NamedTempFile,
     /// Sanitized filename the asset would like under `assets/` (collision
     /// suffixes are decided later, against the live graph).
@@ -487,15 +490,29 @@ pub(super) fn plan_asset_name(
     )))
 }
 
-/// Whether two files hold identical bytes (length check first, so comparing
-/// large attachments is cheap in the common differing case).
+/// Whether two files hold identical bytes: length check first, then a
+/// fixed-size chunked comparison — attachments can be videos, so neither file
+/// is ever read into memory whole.
 pub(super) fn same_file_bytes(existing: &Path, staged: &Path) -> AppResult<bool> {
     let existing_meta = std::fs::metadata(existing)?;
     let staged_meta = std::fs::metadata(staged)?;
     if existing_meta.len() != staged_meta.len() {
         return Ok(false);
     }
-    Ok(std::fs::read(existing)? == std::fs::read(staged)?)
+    let mut left = std::io::BufReader::new(std::fs::File::open(existing)?);
+    let mut right = std::io::BufReader::new(std::fs::File::open(staged)?);
+    let mut left_chunk = [0u8; 64 * 1024];
+    let mut right_chunk = [0u8; 64 * 1024];
+    loop {
+        let read = left.read(&mut left_chunk)?;
+        if read == 0 {
+            return Ok(true);
+        }
+        right.read_exact(&mut right_chunk[..read])?;
+        if left_chunk[..read] != right_chunk[..read] {
+            return Ok(false);
+        }
+    }
 }
 
 /// Persist a staged download at its planned name. The plan already verified
