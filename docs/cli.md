@@ -106,7 +106,8 @@ Resolves `<note>` and prints the raw markdown. Resolution order:
 2. An explicit path (graph-relative like `notes/foo.md`, or absolute inside
    the graph).
 3. A title match (case-insensitive, trimmed).
-4. An alias match (from `aliases:` frontmatter).
+4. An alias match (from `aliases:` frontmatter, or a v1 subject-alias
+   segment of a `//` title like `Charlotte MacCaw // Mum`).
 
 Works with or without the index — when the index is missing, titles/aliases
 are derived by scanning the files. Ambiguous matches resolve to the first path

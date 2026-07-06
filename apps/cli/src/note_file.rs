@@ -11,6 +11,7 @@ use pulldown_cmark::{Event, HeadingLevel, Parser, Tag};
 
 use crate::error::CliError;
 use crate::frontmatter::{parse_frontmatter, split_frontmatter, Frontmatter};
+use crate::keys::fold_key;
 use crate::paths::{date_from_daily_path, NOTE_DIRS};
 
 /// A note's derived metadata, as the TS indexer would compute it.
@@ -84,6 +85,53 @@ fn first_h1(body: &str) -> Option<String> {
     None
 }
 
+/// Split positions of v1 subject-alias separators: exactly two slashes, not
+/// preceded by `:` or `/` and not followed by `/`, so URL schemes
+/// (`https://…`) and slash runs never split. Mirrors the TS
+/// `SUBJECT_ALIAS_SEPARATOR` regex (`subject-aliases.ts`); the bytes checked
+/// are ASCII, so the indices are always UTF-8 char boundaries.
+fn split_subject_segments(title: &str) -> Vec<&str> {
+    let bytes = title.as_bytes();
+    let mut segments = Vec::new();
+    let mut start = 0;
+    let mut index = 0;
+    while index + 1 < bytes.len() {
+        let separator = bytes[index] == b'/'
+            && bytes[index + 1] == b'/'
+            && (index == 0 || (bytes[index - 1] != b':' && bytes[index - 1] != b'/'))
+            && bytes.get(index + 2) != Some(&b'/');
+        if separator {
+            segments.push(&title[start..index]);
+            start = index + 2;
+            index += 2;
+        } else {
+            index += 1;
+        }
+    }
+    segments.push(&title[start..]);
+    segments
+}
+
+/// The TS `subjectAliases` (`subject-aliases.ts`): Reflect V1's `//` title
+/// convention (`Charlotte MacCaw // Mum`) derived as aliases — each segment
+/// trimmed, empties dropped, deduplicated by fold key, first segment included.
+fn subject_aliases(title: &str) -> Vec<String> {
+    let segments = split_subject_segments(title);
+    if segments.len() < 2 {
+        return Vec::new();
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut aliases = Vec::new();
+    for segment in segments {
+        let alias = segment.trim();
+        if alias.is_empty() || !seen.insert(fold_key(alias)) {
+            continue;
+        }
+        aliases.push(alias.to_string());
+    }
+    aliases
+}
+
 /// The TS `deriveTitle` chain: frontmatter `title` → first H1 → daily date →
 /// filename.
 fn derive_title(rel_path: &str, frontmatter: &Frontmatter, body: &str) -> String {
@@ -102,15 +150,26 @@ fn derive_title(rel_path: &str, frontmatter: &Frontmatter, body: &str) -> String
     basename(rel_path).to_string()
 }
 
-/// Derive a note's metadata from its source, as the TS indexer would.
+/// Derive a note's metadata from its source, as the TS indexer would:
+/// `aliases:` frontmatter verbatim, then the v1 subject aliases derived from
+/// the title, skipping segments a frontmatter alias already claims (the TS
+/// `noteAliases`, `indexed-note.ts`).
 pub fn parse_note_meta(rel_path: &str, source: &str) -> NoteMeta {
     let split = split_frontmatter(source);
     let frontmatter = parse_frontmatter(split.raw);
     let title = derive_title(rel_path, &frontmatter, split.body);
+    let mut aliases = frontmatter.aliases;
+    let mut claimed: std::collections::HashSet<String> =
+        aliases.iter().map(|alias| fold_key(alias)).collect();
+    for alias in subject_aliases(&title) {
+        if claimed.insert(fold_key(&alias)) {
+            aliases.push(alias);
+        }
+    }
     NoteMeta {
         id: frontmatter.id,
         title,
-        aliases: frontmatter.aliases,
+        aliases,
         private: frontmatter.private,
     }
 }
@@ -232,5 +291,37 @@ mod tests {
     fn empty_h1_is_skipped_for_a_later_one() {
         let meta = parse_note_meta("notes/a.md", "#\n\n# Real Title\n");
         assert_eq!(meta.title, "Real Title");
+    }
+
+    /// Parity with `subjectAliases` (`subject-aliases.ts`): v1 `//` titles
+    /// derive every trimmed segment, first included, deduplicated by fold key.
+    #[test]
+    fn subject_aliases_match_the_ts_derivation() {
+        assert_eq!(
+            subject_aliases("Charlotte MacCaw // Mum"),
+            vec!["Charlotte MacCaw", "Mum"]
+        );
+        assert_eq!(subject_aliases("Charlotte//Mum"), vec!["Charlotte", "Mum"]);
+        assert_eq!(subject_aliases("Charlotte MacCaw // "), vec!["Charlotte MacCaw"]);
+        assert_eq!(subject_aliases("Mum //  // MUM // Mother"), vec!["Mum", "Mother"]);
+        assert_eq!(subject_aliases("Charlotte MacCaw"), Vec::<String>::new());
+        assert_eq!(subject_aliases("https://reflect.app"), Vec::<String>::new());
+        assert_eq!(subject_aliases("a///b"), Vec::<String>::new());
+        assert_eq!(subject_aliases("file:///etc/hosts"), Vec::<String>::new());
+        assert_eq!(
+            subject_aliases("Reflect // https://reflect.app"),
+            vec!["Reflect", "https://reflect.app"]
+        );
+    }
+
+    /// Parity with `noteAliases` (`indexed-note.ts`): frontmatter aliases stay
+    /// verbatim and first; derived segments they already claim are skipped.
+    #[test]
+    fn subject_aliases_merge_after_frontmatter_aliases() {
+        let meta = parse_note_meta(
+            "notes/charlotte.md",
+            "---\naliases: [MUM]\n---\n# Charlotte MacCaw // Mum\n",
+        );
+        assert_eq!(meta.aliases, vec!["MUM", "Charlotte MacCaw"]);
     }
 }

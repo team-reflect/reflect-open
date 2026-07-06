@@ -16,7 +16,8 @@ import { db } from './db'
  *    exists yet (dailies are created lazily, same as in-app navigation);
  * 3. an explicit graph-relative path;
  * 4. a title match (case-folded like wiki-link resolution);
- * 5. an alias match (`aliases:` frontmatter, same folding).
+ * 5. an alias match (`aliases:` frontmatter or a derived v1 subject alias —
+ *    a `//` segment of the title — same folding).
  *
  * Ambiguity (two paths claiming one id after a sync fork, duplicate titles)
  * resolves to the first path alphabetically — the CLI's rule. Private notes

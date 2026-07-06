@@ -23,7 +23,8 @@ reflect://tasks                     the tasks view
 2. a calendar-valid ISO date → that daily note
 3. an explicit graph-relative path (`notes/foo.md`)
 4. a title match (case-folded)
-5. an alias match (`aliases:` frontmatter)
+5. an alias match (`aliases:` frontmatter, or a v1 subject-alias segment of
+   a `//` title like `Charlotte MacCaw // Mum`)
 
 Ambiguity resolves to the first path alphabetically — the CLI's rule. Links
 resolve **in the open graph**; there is no cross-graph addressing.

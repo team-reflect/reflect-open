@@ -63,6 +63,7 @@ export { extractEmailFields, foldEmail } from './email-fields'
 export { foldKey, foldTag } from './keys'
 export { gistBodyHash, gistFilename } from './gist'
 export { slugForTitle } from './slug'
+export { subjectAliases } from './subject-aliases'
 export {
   normalizeWikiTarget,
   resolved,

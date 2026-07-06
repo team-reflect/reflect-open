@@ -3,8 +3,8 @@ import { gistBodyHash, parseNote } from '../markdown'
 import { buildIndexedNote, indexedNoteSchema, PROJECTION_VERSION } from './indexed-note'
 
 describe('buildIndexedNote', () => {
-  it('carries the projection version that backfills the note email rows', () => {
-    expect(PROJECTION_VERSION).toBe(13)
+  it('carries the projection version that backfills the derived subject-alias rows', () => {
+    expect(PROJECTION_VERSION).toBe(14)
   })
 
   it('flattens a parsed note into the index payload', () => {
@@ -44,6 +44,35 @@ describe('buildIndexedNote', () => {
       true,
     )
     expect(indexed.assets).toEqual(['assets/p.png'])
+  })
+
+  it('derives v1 subject aliases from a `//` title, after frontmatter aliases', () => {
+    const source = '---\naliases: [Mummy]\n---\n# Charlotte MacCaw // Mum\n\nHi.'
+    const indexed = buildIndexedNote(parseNote({ path: 'notes/charlotte.md', source }), {
+      fileHash: 'h',
+      mtime: 0,
+      source,
+    })
+    expect(indexed.title).toBe('Charlotte MacCaw // Mum')
+    expect(indexed.titleKey).toBe('charlotte maccaw // mum')
+    expect(indexed.aliases).toEqual([
+      { alias: 'Mummy', aliasKey: 'mummy' },
+      { alias: 'Charlotte MacCaw', aliasKey: 'charlotte maccaw' },
+      { alias: 'Mum', aliasKey: 'mum' },
+    ])
+  })
+
+  it('skips derived subject aliases a frontmatter alias already claims', () => {
+    const source = '---\naliases: [MUM]\n---\n# Charlotte MacCaw // Mum\n\nHi.'
+    const indexed = buildIndexedNote(parseNote({ path: 'notes/charlotte.md', source }), {
+      fileHash: 'h',
+      mtime: 0,
+      source,
+    })
+    expect(indexed.aliases).toEqual([
+      { alias: 'MUM', aliasKey: 'mum' },
+      { alias: 'Charlotte MacCaw', aliasKey: 'charlotte maccaw' },
+    ])
   })
 
   it('projects Email field bullets with folded keys, ignoring prose mentions', () => {

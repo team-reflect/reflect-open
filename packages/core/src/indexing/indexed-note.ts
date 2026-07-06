@@ -11,6 +11,7 @@ import {
   normalizeWikiTarget,
   pinnedOrder,
   splitFrontmatter,
+  subjectAliases,
   type ParsedNote,
 } from '../markdown'
 import { previewSnippet } from './snippet'
@@ -59,8 +60,11 @@ import { previewSnippet } from './snippet'
  * 13 — `note_emails` projection (`- Email:` contact-field bullets): existing
  * person notes carry no email rows until reprojected, and attendee → note
  * resolution in the calendar flow needs them, so the bump backfills them.
+ * 14 — v1 subject aliases (`//` segments of the title) folded into the
+ * `aliases` projection: existing v1-style titles carry no derived alias rows
+ * until reprojected, so the bump backfills them.
  */
-export const PROJECTION_VERSION = 13
+export const PROJECTION_VERSION = 14
 
 export const indexedLinkSchema = z.object({
   kind: z.enum(['wiki', 'md']),
@@ -153,6 +157,29 @@ export const indexedNoteSchema = z.object({
 export type IndexedNote = z.infer<typeof indexedNoteSchema>
 
 /**
+ * The `aliases` projection: `aliases:` frontmatter verbatim, then the v1
+ * subject aliases derived from the title (`Charlotte MacCaw // Mum`), skipping
+ * segments a frontmatter alias already claims. The derived rows are index-only
+ * compatibility — the file's frontmatter is never rewritten to hold them.
+ */
+function noteAliases(parsed: ParsedNote): IndexedAlias[] {
+  const aliases: IndexedAlias[] = parsed.frontmatter.aliases.map((alias) => ({
+    alias,
+    aliasKey: foldKey(alias),
+  }))
+  const claimed = new Set(aliases.map((row) => row.aliasKey))
+  for (const alias of subjectAliases(parsed.title)) {
+    const aliasKey = foldKey(alias)
+    if (claimed.has(aliasKey)) {
+      continue
+    }
+    claimed.add(aliasKey)
+    aliases.push({ alias, aliasKey })
+  }
+  return aliases
+}
+
+/**
  * Flatten a parsed note into the index payload. `meta.source` is the raw
  * markdown the note was parsed from — conflict markers are detected on it
  * (not on the extracted plain text, which may reshape marker lines).
@@ -203,10 +230,7 @@ export function buildIndexedNote(
     preview: previewSnippet(parsed.text, parsed.title),
     links: [...wikiLinks, ...mdLinks],
     tags: parsed.tags.map((tag) => ({ tag, tagKey: foldTag(tag) })),
-    aliases: parsed.frontmatter.aliases.map((alias) => ({
-      alias,
-      aliasKey: foldKey(alias),
-    })),
+    aliases: noteAliases(parsed),
     emails: extractEmailFields(body).map((email) => ({ email, emailKey: foldEmail(email) })),
     assets: parsed.assets.map((asset) => asset.path),
     tasks: parsed.tasks.map((task) => ({
