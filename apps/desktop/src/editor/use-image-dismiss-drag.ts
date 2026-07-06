@@ -10,7 +10,7 @@ import {
 import { flushSync } from 'react-dom'
 
 const DRAG_ACTIVATE_PX = 8
-const DISMISS_FRACTION = 0.22
+const DISMISS_FRACTION = 0.18
 const DISMISS_VELOCITY_PX_PER_MS = 0.45
 const MIN_FLICK_DISTANCE_PX = 40
 const VELOCITY_WINDOW_MS = 30

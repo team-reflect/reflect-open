@@ -124,7 +124,7 @@ describe('ImageLightbox mobile drag-to-dismiss', () => {
     touchDown(preview, 180, 120)
     firePointer(preview, 'pointermove', { pointerId: 1, clientX: 182, clientY: 180 })
     firePointer(preview, 'pointermove', { pointerId: 1, clientX: 190, clientY: 260 })
-    firePointer(preview, 'pointerup', { pointerId: 1, clientX: 190, clientY: 360 })
+    firePointer(preview, 'pointerup', { pointerId: 1, clientX: 190, clientY: 320 })
 
     expect(image.style.transform).toContain(`, ${window.innerHeight}px, 0) scale(0.9)`)
     expect(backdrop!.style.opacity).toBe('0')
