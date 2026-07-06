@@ -2,10 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- iCloud Drive document storage (Plan 21). CloudDocuments only: the
-	     graph is plain markdown files in the app's container; there is no
-	     CloudKit database. Xcode's automatic signing registers the container
-	     against the App ID on the first entitled build. -->
 	<key>com.apple.developer.icloud-container-identifiers</key>
 	<array>
 		<string>iCloud.app.reflect</string>
@@ -18,9 +14,6 @@
 	<array>
 		<string>iCloud.app.reflect</string>
 	</array>
-	<!-- Shared with the ShareExtension target: the share sheet spools capture
-	     envelopes into this container's inbox/, and the app relays them into
-	     the graph's .reflect/inbox/ on launch/foreground (Plan 11). -->
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>group.app.reflect</string>

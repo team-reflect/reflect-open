@@ -68,6 +68,7 @@
 		28AF2C553C3E42F07C4AF0DD /* shadow.rs */ = {isa = PBXFileReference; path = shadow.rs; sourceTree = "<group>"; };
 		28B078410B4B4507A763E297 /* ladder.rs */ = {isa = PBXFileReference; path = ladder.rs; sourceTree = "<group>"; };
 		2EDECD14A0418A8D4AA04512 /* remote.rs */ = {isa = PBXFileReference; path = remote.rs; sourceTree = "<group>"; };
+		2FA419867A84041644CC42E9 /* skill.rs */ = {isa = PBXFileReference; path = skill.rs; sourceTree = "<group>"; };
 		32B7D9FD2081133899440765 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		3779A211A168AE84C5573923 /* merge.rs */ = {isa = PBXFileReference; path = merge.rs; sourceTree = "<group>"; };
 		37EF719F509C3A532C0E0114 /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
@@ -80,6 +81,7 @@
 		44C3B8C21F2D38187423AB2F /* libiconv.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libiconv.tbd; path = usr/lib/libiconv.tbd; sourceTree = SDKROOT; };
 		48F8214D2C537DF115410CC0 /* resolve.rs */ = {isa = PBXFileReference; path = resolve.rs; sourceTree = "<group>"; };
 		491E4F680A58FFBD620237F9 /* commit.rs */ = {isa = PBXFileReference; path = commit.rs; sourceTree = "<group>"; };
+		4B8413C8F746CEEC50B61694 /* import_assets.rs */ = {isa = PBXFileReference; path = import_assets.rs; sourceTree = "<group>"; };
 		4EE64B671C831953394179E2 /* watcher.rs */ = {isa = PBXFileReference; path = watcher.rs; sourceTree = "<group>"; };
 		51006DE1482D28D9562253A1 /* ShareExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		5249E1475DBD7CCB817F7D1B /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
@@ -89,6 +91,7 @@
 		5C56D455FF36B2FFA8189246 /* repo.rs */ = {isa = PBXFileReference; path = repo.rs; sourceTree = "<group>"; };
 		5F2E1B8E7D79BDAFFCD2DCDE /* assets.rs */ = {isa = PBXFileReference; path = assets.rs; sourceTree = "<group>"; };
 		5F605BA8949402DAE91B9243 /* embed_write.rs */ = {isa = PBXFileReference; path = embed_write.rs; sourceTree = "<group>"; };
+		6572C3F24F414FF11A16F640 /* asset_protocol.rs */ = {isa = PBXFileReference; path = asset_protocol.rs; sourceTree = "<group>"; };
 		65C0E213C54BBE2152AA5DF2 /* chat_write.rs */ = {isa = PBXFileReference; path = chat_write.rs; sourceTree = "<group>"; };
 		68D1FDE7F099CA5F909105EB /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
 		6BB60C6D34C4AFB61F084B4D /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
@@ -103,10 +106,12 @@
 		8C04E40F02C9B4AE9A24A9A4 /* recents.rs */ = {isa = PBXFileReference; path = recents.rs; sourceTree = "<group>"; };
 		8D0D6D72E614086946EBF890 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		93EF89A222208D739ABC00B8 /* ShareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareView.swift; sourceTree = "<group>"; };
+		A4F0D18C7B37B593ED8ACD6F /* scan.rs */ = {isa = PBXFileReference; path = scan.rs; sourceTree = "<group>"; };
 		A67279D745DF48458936735A /* storage.rs */ = {isa = PBXFileReference; path = storage.rs; sourceTree = "<group>"; };
 		A86D201016958E2276806466 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A8921CA643078550A7A02536 /* embed_mobile.rs */ = {isa = PBXFileReference; path = embed_mobile.rs; sourceTree = "<group>"; };
 		AABA262BFCEDA2C43E343A31 /* sweep.rs */ = {isa = PBXFileReference; path = sweep.rs; sourceTree = "<group>"; };
+		ACE1CDF45CDBB8D7B2446E36 /* windows.rs */ = {isa = PBXFileReference; path = windows.rs; sourceTree = "<group>"; };
 		ADB23521181EEB9EF095D4AB /* contacts.rs */ = {isa = PBXFileReference; path = contacts.rs; sourceTree = "<group>"; };
 		B667667E9C6C141128493B00 /* quit.rs */ = {isa = PBXFileReference; path = quit.rs; sourceTree = "<group>"; };
 		BC3901740F3A40252C3750C7 /* reflect-open_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "reflect-open_iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -121,6 +126,7 @@
 		D8F1F4787BA60FD05FD83FD1 /* spike_mobile.rs */ = {isa = PBXFileReference; path = spike_mobile.rs; sourceTree = "<group>"; };
 		DBD22A8C59FD8892E5F139EC /* tests.rs */ = {isa = PBXFileReference; path = tests.rs; sourceTree = "<group>"; };
 		DD5CA5DD1A0A2C6898BF16AE /* tests.rs */ = {isa = PBXFileReference; path = tests.rs; sourceTree = "<group>"; };
+		DFD67CD43D5BD05A1C511C01 /* import.rs */ = {isa = PBXFileReference; path = import.rs; sourceTree = "<group>"; };
 		E1940DEB1B975598A69CA93F /* frontmatter.rs */ = {isa = PBXFileReference; path = frontmatter.rs; sourceTree = "<group>"; };
 		E66BC7105426B91F03659B53 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 		E8031FEC080EBAF422BEE44C /* markers.rs */ = {isa = PBXFileReference; path = markers.rs; sourceTree = "<group>"; };
@@ -252,9 +258,11 @@
 				8C04E40F02C9B4AE9A24A9A4 /* recents.rs */,
 				D7DA2E13EA6655A16DFDE015 /* secrets.rs */,
 				18A732A38CD75FF514E4CF86 /* settings.rs */,
+				2FA419867A84041644CC42E9 /* skill.rs */,
 				D8F1F4787BA60FD05FD83FD1 /* spike_mobile.rs */,
 				F3173A0D7E498896FAC5A43E /* watcher_mobile.rs */,
 				4EE64B671C831953394179E2 /* watcher.rs */,
+				ACE1CDF45CDBB8D7B2446E36 /* windows.rs */,
 				3F54925F5E584B8E6578AFAD /* conflict */,
 				9E54DCC255F04D51453CC522 /* db */,
 				C0FD50680AFE75D524EF47A4 /* fs */,
@@ -292,6 +300,7 @@
 				C38A6847351881E6D17A1DC2 /* migrations.rs */,
 				73D6C2FDB2DD7919E24C4533 /* mod.rs */,
 				89B314CA06450414E4537033 /* query.rs */,
+				A4F0D18C7B37B593ED8ACD6F /* scan.rs */,
 				DD5CA5DD1A0A2C6898BF16AE /* tests.rs */,
 				1EB2845C34150F5FE04A33D3 /* write.rs */,
 			);
@@ -327,7 +336,10 @@
 		C0FD50680AFE75D524EF47A4 /* fs */ = {
 			isa = PBXGroup;
 			children = (
+				6572C3F24F414FF11A16F640 /* asset_protocol.rs */,
 				5F2E1B8E7D79BDAFFCD2DCDE /* assets.rs */,
+				4B8413C8F746CEEC50B61694 /* import_assets.rs */,
+				DFD67CD43D5BD05A1C511C01 /* import.rs */,
 				383CB9669208178C6B235BE6 /* io.rs */,
 				D3691D8F671B7FA21D1E7BD7 /* mod.rs */,
 				48F8214D2C537DF115410CC0 /* resolve.rs */,
@@ -353,6 +365,7 @@
 			buildPhases = (
 				6C4170AF0104E2BB23FF2992 /* Sources */,
 				D66D7A4411695309647B6A04 /* Resources */,
+				E8E8484E1F59D64EA785432B /* Preserve entitlements on skip-codesign builds */,
 			);
 			buildRules = (
 			);
@@ -448,6 +461,25 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		E8E8484E1F59D64EA785432B /* Preserve entitlements on skip-codesign builds */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Preserve entitlements on skip-codesign builds";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ \"${CODE_SIGNING_ALLOWED:-YES}\" = \"NO\" ]; then\n  /usr/bin/codesign --force --sign - \\\n    --entitlements \"${SRCROOT:?}/ShareExtension/ShareExtension.entitlements\" \\\n    \"${CODESIGNING_FOLDER_PATH:?}\"\nfi\n";
+		};
 		F27159B8EA2BAA999947A4AF /* Build Rust Code */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -533,7 +565,7 @@
 				CODE_SIGN_ENTITLEMENTS = "reflect-open_iOS/reflect-open_iOS.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "789ULN5MZB";
+				DEVELOPMENT_TEAM = 789ULN5MZB;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -548,7 +580,7 @@
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = app.reflect.ios;
-				PRODUCT_NAME = "Reflect";
+				PRODUCT_NAME = Reflect;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;
@@ -649,7 +681,7 @@
 				CODE_SIGN_ENTITLEMENTS = "reflect-open_iOS/reflect-open_iOS.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "789ULN5MZB";
+				DEVELOPMENT_TEAM = 789ULN5MZB;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -664,7 +696,7 @@
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = app.reflect.ios;
-				PRODUCT_NAME = "Reflect";
+				PRODUCT_NAME = Reflect;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;

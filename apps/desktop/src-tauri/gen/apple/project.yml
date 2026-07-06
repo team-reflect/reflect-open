@@ -57,6 +57,12 @@ targets:
         # Apple Contacts integration: read-only CNContactStore lookups for
         # person notes; the string is shown on the iOS permission prompt.
         NSContactsUsageDescription: Reflect reads your contacts to suggest details for person notes. Nothing is stored or sent anywhere.
+        # Mirrored from src-tauri/Info.plist (which merges at build) so that
+        # xcodegen regens keep them in the committed generated Info.plist
+        # instead of silently dropping them.
+        NSMicrophoneUsageDescription: Reflect uses the microphone to record audio memos that are transcribed into your daily note.
+        NSCalendarsFullAccessUsageDescription: Reflect reads your calendar to show the day's meetings beside your daily note. Access is read-only and stays on this device.
+        NSCalendarsUsageDescription: Reflect reads your calendar to show the day's meetings beside your daily note. Access is read-only and stays on this device.
         UILaunchStoryboardName: LaunchScreen
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:
@@ -82,11 +88,27 @@ targets:
         # version lives in one place and never drifts. Do not hardcode a literal.
         CFBundleShortVersionString: 0.4.0
         CFBundleVersion: 0.4.0.17
-    # CAUTION: `tauri ios init` rewrites BOTH committed .entitlements files
-    # to empty dicts — after a regen, restore the iCloud + App Group entries
-    # before committing (see docs/porting/reflect-mobile/share-extension.md).
+    # Entitlement contents live HERE, not in the .entitlements files: xcodegen
+    # (and `tauri ios init`, which runs it) rewrites those files from these
+    # properties on every regen — with no properties they were wiped to empty
+    # dicts (see docs/porting/reflect-mobile/share-extension.md).
+    #
+    # iCloud Drive document storage (Plan 21). CloudDocuments only: the graph
+    # is plain markdown in the app's container; there is no CloudKit database.
+    # The App Group is shared with ShareExtension: the share sheet spools
+    # capture envelopes into the container's inbox/, and the app relays them
+    # into the graph's .reflect/inbox/ on launch/foreground (Plan 11).
     entitlements:
       path: reflect-open_iOS/reflect-open_iOS.entitlements
+      properties:
+        com.apple.developer.icloud-container-identifiers:
+          - iCloud.app.reflect
+        com.apple.developer.icloud-services:
+          - CloudDocuments
+        com.apple.developer.ubiquity-container-identifiers:
+          - iCloud.app.reflect
+        com.apple.security.application-groups:
+          - group.app.reflect
     scheme:
       environmentVariables:
         RUST_BACKTRACE: full
@@ -167,8 +189,15 @@ targets:
               NSExtensionActivationSupportsWebPageWithMaxCount: 1
               NSExtensionActivationSupportsWebURLWithMaxCount: 1
             NSExtensionJavaScriptPreprocessingFile: ExtensionClass
+    # The extension's only capability: the App Group container it spools
+    # capture envelopes into. Must match the main app's entry — the app reads
+    # the same container to relay envelopes into the graph. Contents declared
+    # here so xcodegen regens rewrite the .entitlements file correctly.
     entitlements:
       path: ShareExtension/ShareExtension.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.app.reflect
     settings:
       base:
         PRODUCT_NAME: ShareExtension
@@ -177,3 +206,20 @@ targets:
         DEVELOPMENT_TEAM: 789ULN5MZB
         SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: 1,2
+    postBuildScripts:
+      # Tauri's App Store Connect API-key flow (CI TestFlight builds) archives
+      # with code signing disabled, then dummy-signs only the app binary before
+      # export. Xcode's export re-signing preserves only entitlements already
+      # present in a signature, so an unsigned appex ships without the App
+      # Group entitlement — the container lookup returns nil and every share
+      # fails with "Couldn't save" (tauri-cli mobile/ios/build.rs). Ad-hoc
+      # signing the extension with its entitlements here keeps them through
+      # export; properly signed builds never enter the branch.
+      - script: |
+          if [ "${CODE_SIGNING_ALLOWED:-YES}" = "NO" ]; then
+            /usr/bin/codesign --force --sign - \
+              --entitlements "${SRCROOT:?}/ShareExtension/ShareExtension.entitlements" \
+              "${CODESIGNING_FOLDER_PATH:?}"
+          fi
+        name: Preserve entitlements on skip-codesign builds
+        basedOnDependencyAnalysis: false
