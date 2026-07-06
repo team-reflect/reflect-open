@@ -26,6 +26,23 @@ Always target the graph explicitly so calls stay deterministic:
 
 or export `REFLECT_GRAPH="{{GRAPH_ROOT}}"` for a sequence of calls.
 
+## Git history
+
+On desktop, every graph is also a Git repository at its root. Reflect
+initializes or adopts that repo when the graph opens; even graphs with no
+backup remote keep local history through a commit-only sync loop. There may be
+no `origin`, but `.git` history is available.
+
+Use the CLI for current note lookup, privacy filtering, and path resolution.
+Use Git only when the user asks for history, diffs, recovery, or past states:
+
+    git -C "{{GRAPH_ROOT}}" log --oneline -- <graph-relative-path>
+    git -C "{{GRAPH_ROOT}}" diff <rev> -- <graph-relative-path>
+    git -C "{{GRAPH_ROOT}}" show <rev>:<graph-relative-path>
+
+Do not use Git history to bypass privacy. If a note is private, avoid reading
+or exposing its current or historical content unless the user explicitly asks.
+
 ## Commands
 
     reflect today              # print today's daily note
