@@ -114,7 +114,7 @@ fn planned_duplicate(
 ) -> AppResult<Option<String>> {
     for (prior, plan) in planned {
         if prior.desired_name == fetched.desired_name
-            && import_assets::same_file_bytes(prior.file.path(), fetched.file.path())?
+            && import_assets::same_file_bytes(prior.file.as_ref(), fetched.file.as_ref())?
         {
             return Ok(Some(plan.name.clone()));
         }
@@ -168,7 +168,7 @@ pub(super) fn finalize_import(
                 let plan = import_assets::plan_asset_name(
                     &assets_dir,
                     &fetched.desired_name,
-                    fetched.file.path(),
+                    fetched.file.as_ref(),
                     &taken,
                 )?;
                 taken.insert(plan.name.clone());
@@ -516,6 +516,46 @@ mod tests {
         base
     }
 
+    fn serve_generated_assets(expected_requests: usize) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = format!("http://{}/", listener.local_addr().unwrap());
+        std::thread::spawn(move || {
+            for _ in 0..expected_requests {
+                let Ok((stream, _)) = listener.accept() else {
+                    return;
+                };
+                let mut reader = BufReader::new(stream);
+                let mut request_line = String::new();
+                if reader.read_line(&mut request_line).is_err() {
+                    continue;
+                }
+                loop {
+                    let mut header = String::new();
+                    if reader.read_line(&mut header).is_err() || header.trim().is_empty() {
+                        break;
+                    }
+                }
+                let requested = request_line.split_whitespace().nth(1).unwrap_or("");
+                let body = requested.as_bytes();
+                let mut stream = reader.into_inner();
+                let _ = write!(
+                    stream,
+                    "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: image/png\r\nContent-Length: {}\r\n\r\n",
+                    body.len()
+                );
+                let _ = stream.write_all(body);
+            }
+        });
+        base
+    }
+
+    #[cfg(unix)]
+    fn open_fd_count() -> Option<usize> {
+        ["/proc/self/fd", "/dev/fd"]
+            .into_iter()
+            .find_map(|path| fs::read_dir(path).ok().map(|entries| entries.count()))
+    }
+
     #[test]
     fn imports_notes_into_the_open_graph() {
         let root = tempdir().unwrap();
@@ -759,6 +799,48 @@ mod tests {
         assert_eq!(
             note,
             "![](assets/trip-photo.webp)\n\n[memo.m4a](assets/memo.m4a)\n\n![](assets/9c2c28.png)\n"
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn downloaded_assets_do_not_hold_file_descriptors_until_finalize() {
+        const ASSET_COUNT: usize = 80;
+
+        let root = tempdir().unwrap();
+        let base = serve_generated_assets(ASSET_COUNT);
+        let zip_path = root.path().join("export.zip");
+        let markdown = (0..ASSET_COUNT)
+            .map(|index| format!("![]({base}asset-{index}?alt=media\\&token={index})\n"))
+            .collect::<String>();
+        write_zip(&zip_path, &[("daily/2026-07-04.md", markdown.as_str())]);
+
+        let prepared = prepare_zip_import_from(root.path(), &zip_path, &base).unwrap();
+        let Some(before) = open_fd_count() else {
+            return;
+        };
+        let downloads = tauri::async_runtime::block_on(prepared.download_assets()).unwrap();
+        let Some(after) = open_fd_count() else {
+            return;
+        };
+
+        assert_eq!(downloads.len(), ASSET_COUNT);
+        assert!(
+            after.saturating_sub(before) < ASSET_COUNT / 4,
+            "asset downloads kept too many file descriptors open: before {before}, after {after}"
+        );
+
+        let summary = finalize_import(root.path(), prepared, downloads).unwrap();
+        assert_eq!(summary.imported_files, 1);
+        assert_eq!(summary.downloaded_assets, ASSET_COUNT);
+        assert_eq!(summary.failed_asset_downloads, 0);
+        assert_eq!(
+            summary
+                .changed_paths
+                .iter()
+                .filter(|path| path.starts_with("assets/"))
+                .count(),
+            ASSET_COUNT
         );
     }
 

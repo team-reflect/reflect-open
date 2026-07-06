@@ -50,7 +50,7 @@ pub(super) enum DownloadOutcome {
 }
 
 pub(super) struct FetchedAsset {
-    pub file: tempfile::NamedTempFile,
+    pub file: tempfile::TempPath,
     /// Sanitized filename the asset would like under `assets/` (collision
     /// suffixes are decided later, against the live graph).
     pub desired_name: String,
@@ -231,7 +231,7 @@ async fn fetch_asset(
     }
     file.as_file().sync_all()?;
     Ok(DownloadOutcome::Fetched(FetchedAsset {
-        file,
+        file: file.into_temp_path(),
         desired_name,
     }))
 }
