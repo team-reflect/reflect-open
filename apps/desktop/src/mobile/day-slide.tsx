@@ -1,10 +1,11 @@
-import { useEffect, useRef, type ReactElement } from 'react'
+import { useCallback, useEffect, useRef, type ReactElement } from 'react'
 import { dailyPath } from '@reflect/core'
 import { NotePane } from '@/components/note-pane'
 import { formatDayLabel } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 import { IncomingBacklinks } from '@/mobile/incoming-backlinks'
 import { MOBILE_CONTENT_GUTTER } from '@/mobile/mobile-content-gutter'
+import { useCaretReveal } from '@/mobile/use-caret-reveal'
 import { useScrollRestore } from '@/mobile/use-scroll-restore'
 import { useSettings } from '@/providers/settings-provider'
 
@@ -63,6 +64,17 @@ export function DaySlide({
     contentRef,
   })
 
+  const { revealEnd, cancelReveal } = useCaretReveal({ containerRef, contentRef })
+
+  // The end-of-note autofocus scrolls the caret into view against the
+  // full-height viewport; the keyboard then raises and shrinks the shell by
+  // its height, dropping the note's end below the fold. The reveal holds the
+  // container at its end while that settles (see use-caret-reveal.ts).
+  const handleAutoFocused = useCallback(() => {
+    revealEnd()
+    onFocusConsumed()
+  }, [revealEnd, onFocusConsumed])
+
   const lastResetSeq = useRef(scrollResetSeq)
   useEffect(() => {
     if (scrollResetSeq === lastResetSeq.current) {
@@ -78,8 +90,11 @@ export function DaySlide({
       // the selection the editor just placed.
       return
     }
+    // A reveal still settling from a recent double-tap must die first, or
+    // its next re-pin would undo this jump to the top.
+    cancelReveal()
     resetToTop()
-  }, [scrollResetSeq, selected, focusRequested, resetToTop])
+  }, [scrollResetSeq, selected, focusRequested, cancelReveal, resetToTop])
 
   return (
     <div
@@ -110,7 +125,7 @@ export function DaySlide({
           // V1's double-tap-to-today is a capture gesture: the caret (and the
           // scroll) land at the end of the day's content, ready to append.
           autoFocusSelection="end"
-          onAutoFocused={onFocusConsumed}
+          onAutoFocused={handleAutoFocused}
           showBacklinks={false}
           gutterClassName={MOBILE_CONTENT_GUTTER}
           editorClassName="min-h-[60dvh]"
