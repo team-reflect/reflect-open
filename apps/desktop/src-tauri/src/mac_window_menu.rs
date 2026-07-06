@@ -9,7 +9,7 @@ use objc2::rc::Retained;
 use objc2::runtime::AnyObject;
 use objc2::{define_class, msg_send, sel, DefinedClass, MainThreadOnly};
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use objc2_app_kit::{
     NSApplication, NSDownArrowFunctionKey, NSEventModifierFlags, NSLeftArrowFunctionKey, NSMenu,
@@ -141,6 +141,7 @@ impl WindowLayoutMenuTarget {
     }
 
     fn remember_frame(&self, window: &NSWindow) {
+        self.prune_closed_window_frames();
         self.ivars()
             .previous_frames
             .borrow_mut()
@@ -149,6 +150,7 @@ impl WindowLayoutMenuTarget {
     }
 
     fn restore_previous_frame(&self, window: &NSWindow) {
+        self.prune_closed_window_frames();
         let Some(frame) = self
             .ivars()
             .previous_frames
@@ -162,6 +164,23 @@ impl WindowLayoutMenuTarget {
             true,
             true,
         );
+    }
+
+    fn prune_closed_window_frames(&self) {
+        let live_window_numbers = self.live_window_numbers();
+        prune_frames_for_live_windows(
+            &mut self.ivars().previous_frames.borrow_mut(),
+            &live_window_numbers,
+        );
+    }
+
+    fn live_window_numbers(&self) -> HashSet<isize> {
+        let app = NSApplication::sharedApplication(self.mtm());
+        app.windows()
+            .to_vec()
+            .iter()
+            .map(|window| window.windowNumber())
+            .collect()
     }
 }
 
@@ -417,6 +436,13 @@ fn quarter_frame(partition: NSRect, horizontal: Horizontal, vertical: Vertical) 
     vertical.apply(horizontal.apply(partition))
 }
 
+fn prune_frames_for_live_windows(
+    previous_frames: &mut HashMap<isize, NSRect>,
+    live_window_numbers: &HashSet<isize>,
+) {
+    previous_frames.retain(|window_number, _frame| live_window_numbers.contains(window_number));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -481,5 +507,17 @@ mod tests {
             600.0,
             400.0,
         );
+    }
+
+    #[test]
+    fn stale_previous_frames_are_pruned() {
+        let mut previous_frames = HashMap::from([(11, frame()), (22, frame()), (33, frame())]);
+        let live_window_numbers = HashSet::from([22, 33]);
+
+        prune_frames_for_live_windows(&mut previous_frames, &live_window_numbers);
+
+        assert!(!previous_frames.contains_key(&11));
+        assert!(previous_frames.contains_key(&22));
+        assert!(previous_frames.contains_key(&33));
     }
 }
