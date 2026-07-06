@@ -21,8 +21,8 @@ describe('reconcileCarousel', () => {
   })
 
   it('does nothing for the echo of our own swipe', () => {
-    // The route just echoed back the day we reported — re-scrolling would
-    // cancel Embla's settling animation.
+    // The route just echoed back the day we reported — the carousel already
+    // shows that slide, so re-scrolling would be a redundant jump.
     expect(reconcileCarousel({ ...base, date: '2026-06-01', reported: '2026-06-01' })).toEqual({
       action: 'none',
     })

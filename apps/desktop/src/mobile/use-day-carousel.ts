@@ -76,8 +76,9 @@ export interface ReconcileInput {
  * branchy reconciliation can be unit-tested without driving Embla:
  *
  * - `none` when the date is outside the window (`index === -1`, a re-anchor is
- *   pending) or is the echo of our own swipe (already reported) — re-scrolling
- *   then would cancel the in-flight animation.
+ *   pending) or is the echo of our own swipe (already reported) — the carousel
+ *   is already showing that slide, and the echo's redundant jump would clip an
+ *   animation the user may have restarted.
  * - `reinit` when the window was re-anchored (its start moved): Embla must
  *   reinitialize onto the rebuilt slide set at the target index.
  * - `scroll` for an ordinary in-window jump (calendar tap, Today, near link).
@@ -112,18 +113,23 @@ export interface DayCarousel {
  * A settled swipe reports its day via `onSelect` (which the parent turns into a
  * daily-route navigation); the route flows back in as `date` and scrolls the
  * carousel to match — guarded by {@link reconcileCarousel} so the swipe's own
- * echo doesn't re-scroll and cancel the animation. A `date` beyond the window
- * re-anchors it, and the follow effect then reinitializes Embla onto the new
- * slides.
+ * echo doesn't redundantly re-scroll. A `date` beyond the window re-anchors it,
+ * and the follow effect then reinitializes Embla onto the new slides.
  */
 export function useDayCarousel(date: string, onSelect: (date: string) => void): DayCarousel {
   const [dayWindow, setDayWindow] = useState<DayWindow>(() => createDayWindow(date, CAROUSEL_WINDOW))
-  const [emblaRef, emblaApi] = useEmblaCarousel({
+  // Frozen at mount: `embla-carousel-react` reinitializes whenever the options
+  // object stops comparing equal, and `reInit` snaps to `startIndex` with no
+  // animation — a render-derived `startIndex` would let every swipe's route
+  // echo cancel the settle animation and hard-switch to the landed slide.
+  // After mount, positioning belongs exclusively to the follow effect below.
+  const [emblaOptions] = useState<Parameters<typeof useEmblaCarousel>[0]>(() => ({
     startIndex: indexWithin(dayWindow, date),
     align: 'center',
     skipSnaps: false,
     watchDrag: dragAllowedWithKeyboardClosed,
-  })
+  }))
+  const [emblaRef, emblaApi] = useEmblaCarousel(emblaOptions)
   const [selectedIndex, setSelectedIndex] = useState(() => indexWithin(dayWindow, date))
   // The day we last reported via onSelect — so the route echo it produces
   // doesn't trigger a redundant (animation-cancelling) scrollTo.
@@ -132,7 +138,21 @@ export function useDayCarousel(date: string, onSelect: (date: string) => void): 
   // so Embla must reinitialize rather than scroll.
   const windowStartRef = useRef(dayWindow.start)
 
-  const onEmblaSelect = useCallback(
+  // Everything a swipe triggers waits for `settle` (snap animation done) —
+  // never `select`, which fires at pointer-up, exactly when the animation
+  // starts. Reporting there mounts a fresh editor slide and re-renders the
+  // whole route in the release frame, and Embla's fixed-timestep animation
+  // loop has no lag cap: the stall fast-forwards the physics to the target,
+  // so the note switches instantly instead of sliding over. The incoming
+  // slide is already mounted (it was a neighbor within the mount radius), so
+  // deferring costs nothing visually.
+  //
+  // Settling near a window edge also rebuilds the window around the current
+  // day, keeping swiping effectively infinite in both directions. The report
+  // above lands in the same batch, so the follow effect below sees the
+  // re-anchored window together with the new `date` and reinitializes Embla
+  // onto the slide the user is already looking at.
+  const onEmblaSettle = useCallback(
     (api: NonNullable<typeof emblaApi>) => {
       const index = api.selectedScrollSnap()
       setSelectedIndex(index)
@@ -141,37 +161,22 @@ export function useDayCarousel(date: string, onSelect: (date: string) => void): 
         reportedRef.current = day
         onSelect(day)
       }
-    },
-    [dayWindow, onSelect],
-  )
-
-  // Re-center the window when a settled swipe nears an edge: rebuild it around
-  // the current day so swiping stays effectively infinite in both directions.
-  // On `settle` (momentum done), never mid-drag — the rebuild reinitializes
-  // Embla (via the follow effect below), which would fight a live gesture. By
-  // settle time the swipe's day has already been reported and echoed back as
-  // `date`, so the reinit lands on the same slide the user is looking at.
-  const onEmblaSettle = useCallback(
-    (api: NonNullable<typeof emblaApi>) => {
-      const index = api.selectedScrollSnap()
       if (shouldRecenter(dayWindow, index)) {
-        setDayWindow(createDayWindow(dateAtIndex(dayWindow, index), CAROUSEL_WINDOW))
+        setDayWindow(createDayWindow(day, CAROUSEL_WINDOW))
       }
     },
-    [dayWindow],
+    [dayWindow, onSelect],
   )
 
   useEffect(() => {
     if (!emblaApi) {
       return
     }
-    emblaApi.on('select', onEmblaSelect)
     emblaApi.on('settle', onEmblaSettle)
     return () => {
-      emblaApi.off('select', onEmblaSelect)
       emblaApi.off('settle', onEmblaSettle)
     }
-  }, [emblaApi, onEmblaSelect, onEmblaSettle])
+  }, [emblaApi, onEmblaSettle])
 
   // Re-anchor only when the requested day falls outside the window (a far date
   // link): rebuild the window centered on it. The follow effect below then
