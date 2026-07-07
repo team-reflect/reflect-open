@@ -17,6 +17,14 @@ const captureAudioMemo = vi.hoisted(() =>
 const failOperation = vi.hoisted(() => vi.fn<(message: string) => void>())
 const invoke = vi.hoisted(() => vi.fn<(command: string, args?: unknown) => Promise<unknown>>())
 
+/** Captured plugin-event handlers, keyed by event name, dispatchable per test. */
+const pluginEvents = vi.hoisted(() => ({
+  handlers: new Map<string, (payload: unknown) => void>(),
+  emit(event: string, payload: unknown): void {
+    pluginEvents.handlers.get(event)?.(payload)
+  },
+}))
+
 /** Fake reconciler lifecycle — the pipeline is only a shim over it. */
 const reconcilerControls = vi.hoisted(() => {
   const listeners = new Set<() => void>()
@@ -70,7 +78,12 @@ vi.mock('@reflect/core', async (importOriginal) => ({
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke,
-  addPluginListener: vi.fn(async () => ({ unregister: vi.fn() })),
+  addPluginListener: vi.fn(
+    async (_plugin: string, event: string, handler: (payload: unknown) => void) => {
+      pluginEvents.handlers.set(event, handler)
+      return { unregister: vi.fn() }
+    },
+  ),
 }))
 
 vi.mock('@/lib/transcription-reconciler', () => ({
@@ -177,6 +190,7 @@ beforeEach(() => {
   }
   captureAudioMemo.mockResolvedValue({ ok: true, memo: MEMO })
   invoke.mockResolvedValue({ files: [] })
+  pluginEvents.handlers.clear()
   reconcilerControls.fake.getTranscribing.mockReturnValue(false)
   reconcilerControls.listeners.clear()
 })
@@ -430,6 +444,54 @@ describe('MobileAudioMemoProvider', () => {
 
     await waitFor(() => expect(stagedControls.recordingStatus).toHaveBeenCalled())
     expect(stagedControls.stopActive).not.toHaveBeenCalled()
+  })
+
+  it('the handshake claims queued actions: recordAudio records, then confirms', async () => {
+    vi.useFakeTimers()
+    try {
+      const { result } = renderHook(() => useMobileAudioMemo(), { wrapper })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(invoke).toHaveBeenCalledWith('plugin:recording|actions_ready')
+
+      await act(async () => {
+        pluginEvents.emit('nativeAction', { action: 'recordAudio' })
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(recorderControls.startSpy).toHaveBeenCalledTimes(1)
+      expect(result.current.drawerOpen).toBe(true)
+
+      // Confirmation waits until the recording UI has survived presentation —
+      // a crash in that window must leave the action queued for next launch.
+      expect(invoke).not.toHaveBeenCalledWith('plugin:recording|action_performed')
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000)
+      })
+      expect(invoke).toHaveBeenCalledWith('plugin:recording|action_performed')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('unknown native actions are ignored', async () => {
+    vi.useFakeTimers()
+    try {
+      renderHook(() => useMobileAudioMemo(), { wrapper })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+
+      await act(async () => {
+        pluginEvents.emit('nativeAction', { action: 'somethingElse' })
+        await vi.advanceTimersByTimeAsync(2000)
+      })
+
+      expect(recorderControls.startSpy).not.toHaveBeenCalled()
+      expect(invoke).not.toHaveBeenCalledWith('plugin:recording|action_performed')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('is unavailable without an OpenAI or Gemini model, and toggle does nothing', async () => {

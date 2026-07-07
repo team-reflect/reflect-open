@@ -3,6 +3,10 @@ import Tauri
 import UIKit
 import WebKit
 
+#if canImport(ActivityKit)
+  import ActivityKit
+#endif
+
 /// The payload of the plugin's ~10 Hz `recordingLevel` event.
 struct RecordingLevel: Encodable {
   /// Linear input level 0…1, from the recorder's average power meter.
@@ -29,6 +33,18 @@ struct RecordingStopped: Encodable {
 struct RecordingStatus: Encodable {
   let recording: Bool
   let elapsedMs: Double
+}
+
+/// The payload of the `nativeAction` event — an OS entry point (Siri, the
+/// home-screen quick action, the lock-screen widget's `reflect://` URL)
+/// asked for something only the webview can present.
+struct NativeAction: Encodable {
+  /// Currently only `recordAudio`.
+  let action: String
+}
+
+struct QueueActionArgs: Decodable {
+  let action: String
 }
 
 /// `stopRecording`'s response.
@@ -87,7 +103,27 @@ class RecordingPlugin: Plugin {
     case routeChange
     case maxDuration
     case error
+    /// Siri "stop" or the Live Activity's stop button (in-process intents).
+    case remote
   }
+
+  /// The Siri/App-Intent bridge: intents compiled into the app target run in
+  /// this process but in a different module, so they talk to the plugin
+  /// through NotificationCenter. Names are duplicated in
+  /// `gen/apple/Sources/reflect-open/` — keep them in sync.
+  static let startRequestedNotification = Notification.Name(
+    "app.reflect.recording.start-requested")
+  static let stopRequestedNotification = Notification.Name(
+    "app.reflect.recording.stop-requested")
+  /// The home-screen quick action's `UIApplicationShortcutItemType`.
+  static let recordShortcutType = "app.reflect.record-audio"
+  /// The persisted native-action queue (the V1 handshake): an action fired
+  /// from an OS entry point survives webview crashes and cold starts here
+  /// until the webview confirms it ran.
+  private static let pendingActionKey = "reflect.recording.pendingAction"
+
+  /// The delegate-hook target for OS callbacks that carry no plugin context.
+  private static weak var shared: RecordingPlugin?
 
   private var recorder: AVAudioRecorder?
   private var meterTimer: Timer?
@@ -108,6 +144,12 @@ class RecordingPlugin: Plugin {
   /// True while the app is backgrounded — level events pause (a suspended
   /// webview can't drain them) but the recording itself continues.
   private var isBackgrounded = false
+  /// True once the webview called `actionsReady` — queued native actions
+  /// deliver immediately from then on.
+  private var webviewReadyForActions = false
+  /// The live recording's Live Activity (`Activity<RecordingActivityAttributes>`,
+  /// type-erased: stored properties can't be availability-restricted).
+  private var liveActivity: Any?
 
   @objc public override func load(webview: WKWebView) {
     let center = NotificationCenter.default
@@ -137,6 +179,22 @@ class RecordingPlugin: Plugin {
       name: UIApplication.willEnterForegroundNotification,
       object: nil
     )
+    // OS entry points (Siri App Intents run in this process, in the app
+    // module) reach the plugin through NotificationCenter.
+    center.addObserver(
+      self,
+      selector: #selector(handleStartRequested),
+      name: Self.startRequestedNotification,
+      object: nil
+    )
+    center.addObserver(
+      self,
+      selector: #selector(handleStopRequested),
+      name: Self.stopRequestedNotification,
+      object: nil
+    )
+    Self.shared = self
+    Self.installShortcutHandler()
   }
 
   // MARK: - Commands
@@ -323,6 +381,7 @@ class RecordingPlugin: Plugin {
       [weak self] _ in
       self?.emitLevel()
     }
+    startLiveActivity()
   }
 
   /// Capture the duration and ask the recorder to finalize the file; the
@@ -351,6 +410,7 @@ class RecordingPlugin: Plugin {
     self.meterTimer = nil
     UIApplication.shared.isIdleTimerDisabled = false
     deactivateAudioSession()
+    endLiveActivity()
 
     if let cancel = pendingCancel {
       pendingCancel = nil
@@ -426,6 +486,142 @@ class RecordingPlugin: Plugin {
 
   @objc private func handleWillEnterForeground() {
     isBackgrounded = false
+  }
+
+  // MARK: - Native actions (the V1 handshake)
+
+  /// The webview's action surface is mounted and listening: deliver the
+  /// queued action, if any. The action stays queued until `actionPerformed`
+  /// — a webview that crashes mid-delivery gets it again on the next launch.
+  @objc public func actionsReady(_ invoke: Invoke) {
+    DispatchQueue.main.async {
+      self.webviewReadyForActions = true
+      self.deliverPendingAction()
+      invoke.resolve()
+    }
+  }
+
+  /// The webview executed the delivered action — retire it from the queue.
+  @objc public func actionPerformed(_ invoke: Invoke) {
+    DispatchQueue.main.async {
+      UserDefaults.standard.removeObject(forKey: Self.pendingActionKey)
+      invoke.resolve()
+    }
+  }
+
+  /// Queue a native action from the Rust side (the lock-screen widget's
+  /// `reflect://record-audio` URL arrives as a tao `Opened` event).
+  @objc public func queueAction(_ invoke: Invoke) throws {
+    let args = try invoke.parseArgs(QueueActionArgs.self)
+    DispatchQueue.main.async {
+      self.queueNativeAction(args.action)
+      invoke.resolve()
+    }
+  }
+
+  /// Persist the request, then deliver it if the webview is listening. The
+  /// two-step shape is the point (see `native-entry-points.md`): OS entry
+  /// points can fire before the webview exists or right before it dies, and
+  /// the action must be neither lost nor double-run.
+  private func queueNativeAction(_ action: String) {
+    UserDefaults.standard.set(action, forKey: Self.pendingActionKey)
+    deliverPendingAction()
+  }
+
+  private func deliverPendingAction() {
+    guard
+      webviewReadyForActions,
+      let action = UserDefaults.standard.string(forKey: Self.pendingActionKey)
+    else { return }
+    do {
+      try trigger("nativeAction", data: NativeAction(action: action))
+    } catch {
+      Logger.error("nativeAction event failed to serialize: \(error)")
+    }
+  }
+
+  @objc private func handleStartRequested() {
+    // Starting needs the webview (recording UI, then capture) — queue it.
+    queueNativeAction("recordAudio")
+  }
+
+  @objc private func handleStopRequested() {
+    // Stopping is pure native work: finalize now, even with the app
+    // backgrounded or the webview dead; ingest follows the usual paths.
+    guard let recorder = self.recorder, pendingStop == nil, pendingCancel == nil else { return }
+    finalize(recorder, native: .remote)
+  }
+
+  /// The home-screen quick action arrives on the app delegate — a runtime
+  /// class tao registers without implementing
+  /// `application:performActionForShortcutItem:completionHandler:`. Add the
+  /// method to that class; if some future delegate already implements it,
+  /// leave theirs alone (the quick action degrades to just opening the app).
+  private static var didInstallShortcutHandler = false
+  private static func installShortcutHandler() {
+    guard
+      !didInstallShortcutHandler,
+      let delegate = UIApplication.shared.delegate,
+      let delegateClass = object_getClass(delegate)
+    else { return }
+    didInstallShortcutHandler = true
+    let selector = NSSelectorFromString(
+      "application:performActionForShortcutItem:completionHandler:")
+    guard class_getInstanceMethod(delegateClass, selector) == nil else { return }
+    let block:
+      @convention(block) (
+        AnyObject, UIApplication, UIApplicationShortcutItem, @escaping (Bool) -> Void
+      ) -> Void = { _, _, item, completion in
+        let handled = item.type == RecordingPlugin.recordShortcutType
+        if handled {
+          DispatchQueue.main.async {
+            RecordingPlugin.shared?.queueNativeAction("recordAudio")
+          }
+        }
+        completion(handled)
+      }
+    class_addMethod(
+      delegateClass, selector, imp_implementationWithBlock(block), "v@:@@@?")
+  }
+
+  // MARK: - Live Activity
+
+  /// Show the recording on the lock screen / Dynamic Island: elapsed timer
+  /// plus (iOS 17+) a stop button. Requires iOS 16.2 and the user not having
+  /// disabled Live Activities — both degrade to "no activity", never an error.
+  private func startLiveActivity() {
+    #if canImport(ActivityKit)
+      if #available(iOS 16.2, *) {
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        let content = ActivityContent(
+          state: RecordingActivityAttributes.ContentState(startedAt: Date()),
+          staleDate: nil
+        )
+        do {
+          liveActivity = try Activity.request(
+            attributes: RecordingActivityAttributes(),
+            content: content,
+            pushType: nil
+          )
+        } catch {
+          Logger.error("recording Live Activity failed to start: \(error)")
+        }
+      }
+    #endif
+  }
+
+  private func endLiveActivity() {
+    #if canImport(ActivityKit)
+      if #available(iOS 16.2, *) {
+        guard let activity = liveActivity as? Activity<RecordingActivityAttributes> else {
+          return
+        }
+        liveActivity = nil
+        Task {
+          await activity.end(nil, dismissalPolicy: .immediate)
+        }
+      }
+    #endif
   }
 
   // MARK: - Staging directory

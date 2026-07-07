@@ -7,14 +7,18 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		14BE6EF4AB511AC099410853 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 57BCB79C0774021318852985 /* main.mm */; };
 		1C8847A7F1C163FBA53373F9 /* ExtensionClass.js in Resources */ = {isa = PBXBuildFile; fileRef = 536E4F5E21B7DCC3C7ECDC1A /* ExtensionClass.js */; };
 		266B3807E809464C8FC14146 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FDC9BB81FAB5AF8D65160799 /* Metal.framework */; };
 		319EDF8F46AB05DFBA9D674F /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 80E05926405BFDA2A3BC70BC /* libz.tbd */; };
 		495C9E97530FC781EB5645D6 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A58A746A41B6BF1D50A8547 /* ShareViewController.swift */; };
 		5693613DE956199D6486EA26 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 8D0D6D72E614086946EBF890 /* LaunchScreen.storyboard */; };
-		5C88834F22D37FFC49CBD2F1 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 38829A9D2116D0D324C18C4B /* main.mm */; };
+		6C3751B3B175DFE411D97C0F /* StopRecordingLiveActivityIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3613166A0FB6AFF3C3B2F85C /* StopRecordingLiveActivityIntent.swift */; };
+		6C55CBAB912EC5920CE314DA /* RecordingIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D29B88183661F5C1C960E074 /* RecordingIntents.swift */; };
 		74275EAEFEA922B7D8A2C78F /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5249E1475DBD7CCB817F7D1B /* CoreGraphics.framework */; };
+		85FC869F776C24A9ED0A1779 /* RecordingActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = C228C4BA95B0BADA424A9E8A /* RecordingActivityAttributes.swift */; };
 		93F2A1181D6BC7832338EE9C /* ShareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93EF89A222208D739ABC00B8 /* ShareView.swift */; };
+		9611839F9E9EC688FCDFCC91 /* RecordingWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26DB86321DA75DFE1CD4B41 /* RecordingWidgetBundle.swift */; };
 		961AA49623F0DDC7AB09B777 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 39269153EFAD0C2FEFBE6696 /* UIKit.framework */; };
 		9C05940F9725363AAB9131D3 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C94374B175075AF3AA7DE586 /* Security.framework */; };
 		9D7F5A94048CECBFC3D89BBA /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F28F8A628D32337E04C0CBC0 /* libapp.a */; };
@@ -22,15 +26,26 @@
 		B109D161D258110DC703F97C /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 51006DE1482D28D9562253A1 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B6B5B091EADAF6EAEC6E2EDA /* ShareState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89342C7501B47DBB934B2D27 /* ShareState.swift */; };
 		BEA09DBDD61413051FFEB9E3 /* CaptureInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = D357D2D54012FD394DF9423E /* CaptureInbox.swift */; };
+		BFB9F91C8E2628460C84C8A3 /* StopRecordingLiveActivityIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3613166A0FB6AFF3C3B2F85C /* StopRecordingLiveActivityIntent.swift */; };
 		C1FBC0B57C41A13D88225DFB /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 3ED6411036D50396010D935D /* assets */; };
 		C4FAE42D7B978D8330E5D6DC /* Contacts.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3D182B9445129EC2433F8218 /* Contacts.framework */; };
+		C605CBEEDBC31FA67F1A4F5E /* RecordingWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = DB54D6D030C08888E9D17442 /* RecordingWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		D37EE1ED817FDDC16C5643BB /* RecordingActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A3930E6E7AB28929B07A6D0 /* RecordingActivityWidget.swift */; };
 		DD1AE73F867F4264272EFED2 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 68D1FDE7F099CA5F909105EB /* QuartzCore.framework */; };
 		E413DBCB60FF081C8E58468A /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 088536D8F462855DCFDA7B06 /* WebKit.framework */; };
+		E7D75AA83CFA468E0EFBAB21 /* RecordAudioWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7AC6BF821D47F74D41DFAFE /* RecordAudioWidget.swift */; };
 		E9E7B6C59015E7301EE63308 /* libiconv.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 44C3B8C21F2D38187423AB2F /* libiconv.tbd */; };
 		F00F5EAED90E34102F9AE651 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A86D201016958E2276806466 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		6A2683A904EF67AC778ED704 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5489219F37B2885D5C3112F4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 665EB942B5F6FB93F8DF2A57;
+			remoteInfo = RecordingWidget;
+		};
 		E15A48A368A368CDA2B5A070 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 5489219F37B2885D5C3112F4 /* Project object */;
@@ -48,6 +63,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				B109D161D258110DC703F97C /* ShareExtension.appex in Embed Foundation Extensions */,
+				C605CBEEDBC31FA67F1A4F5E /* RecordingWidget.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -60,7 +76,9 @@
 		08B3817A23175E584BA6FD8D /* error.rs */ = {isa = PBXFileReference; path = error.rs; sourceTree = "<group>"; };
 		152767D3A95549268E140D0F /* graph_gitignore.rs */ = {isa = PBXFileReference; path = graph_gitignore.rs; sourceTree = "<group>"; };
 		18A732A38CD75FF514E4CF86 /* settings.rs */ = {isa = PBXFileReference; path = settings.rs; sourceTree = "<group>"; };
+		1A3930E6E7AB28929B07A6D0 /* RecordingActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingActivityWidget.swift; sourceTree = "<group>"; };
 		1A58A746A41B6BF1D50A8547 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
+		1B481887CBBFA6FB3C78F2B2 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
 		1EB2845C34150F5FE04A33D3 /* write.rs */ = {isa = PBXFileReference; path = write.rs; sourceTree = "<group>"; };
 		2130029E77013461A501E644 /* devtools.rs */ = {isa = PBXFileReference; path = devtools.rs; sourceTree = "<group>"; };
 		21F0526713DAC48C777B2D4C /* union.rs */ = {isa = PBXFileReference; path = union.rs; sourceTree = "<group>"; };
@@ -70,10 +88,10 @@
 		2EDECD14A0418A8D4AA04512 /* remote.rs */ = {isa = PBXFileReference; path = remote.rs; sourceTree = "<group>"; };
 		2FA419867A84041644CC42E9 /* skill.rs */ = {isa = PBXFileReference; path = skill.rs; sourceTree = "<group>"; };
 		32B7D9FD2081133899440765 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		3613166A0FB6AFF3C3B2F85C /* StopRecordingLiveActivityIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopRecordingLiveActivityIntent.swift; sourceTree = "<group>"; };
 		3779A211A168AE84C5573923 /* merge.rs */ = {isa = PBXFileReference; path = merge.rs; sourceTree = "<group>"; };
 		37EF719F509C3A532C0E0114 /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
 		383CB9669208178C6B235BE6 /* io.rs */ = {isa = PBXFileReference; path = io.rs; sourceTree = "<group>"; };
-		38829A9D2116D0D324C18C4B /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
 		39269153EFAD0C2FEFBE6696 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		3AE251E5F7E95CDEFDD3C8B4 /* reflect-open_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "reflect-open_iOS.entitlements"; sourceTree = "<group>"; };
 		3D182B9445129EC2433F8218 /* Contacts.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Contacts.framework; path = System/Library/Frameworks/Contacts.framework; sourceTree = SDKROOT; };
@@ -88,6 +106,7 @@
 		5306360328A772EEE5EDDD87 /* versions.rs */ = {isa = PBXFileReference; path = versions.rs; sourceTree = "<group>"; };
 		536E4F5E21B7DCC3C7ECDC1A /* ExtensionClass.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = ExtensionClass.js; sourceTree = "<group>"; };
 		560C7C23BE58D7EA845F1170 /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
+		57BCB79C0774021318852985 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
 		5C56D455FF36B2FFA8189246 /* repo.rs */ = {isa = PBXFileReference; path = repo.rs; sourceTree = "<group>"; };
 		5F2E1B8E7D79BDAFFCD2DCDE /* assets.rs */ = {isa = PBXFileReference; path = assets.rs; sourceTree = "<group>"; };
 		5F605BA8949402DAE91B9243 /* embed_write.rs */ = {isa = PBXFileReference; path = embed_write.rs; sourceTree = "<group>"; };
@@ -97,7 +116,6 @@
 		6BB60C6D34C4AFB61F084B4D /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		73D6C2FDB2DD7919E24C4533 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		772B62ED093A33BDCD1864D8 /* calendar.rs */ = {isa = PBXFileReference; path = calendar.rs; sourceTree = "<group>"; };
-		777653BF3E38355A5F6B6EF9 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
 		80E05926405BFDA2A3BC70BC /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
 		88ED38A3B3D14839B5066255 /* embed.rs */ = {isa = PBXFileReference; path = embed.rs; sourceTree = "<group>"; };
 		89342C7501B47DBB934B2D27 /* ShareState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareState.swift; sourceTree = "<group>"; };
@@ -106,6 +124,7 @@
 		8C04E40F02C9B4AE9A24A9A4 /* recents.rs */ = {isa = PBXFileReference; path = recents.rs; sourceTree = "<group>"; };
 		8D0D6D72E614086946EBF890 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		93EF89A222208D739ABC00B8 /* ShareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareView.swift; sourceTree = "<group>"; };
+		A26DB86321DA75DFE1CD4B41 /* RecordingWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingWidgetBundle.swift; sourceTree = "<group>"; };
 		A4F0D18C7B37B593ED8ACD6F /* scan.rs */ = {isa = PBXFileReference; path = scan.rs; sourceTree = "<group>"; };
 		A67279D745DF48458936735A /* storage.rs */ = {isa = PBXFileReference; path = storage.rs; sourceTree = "<group>"; };
 		A86D201016958E2276806466 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -115,15 +134,19 @@
 		ADB23521181EEB9EF095D4AB /* contacts.rs */ = {isa = PBXFileReference; path = contacts.rs; sourceTree = "<group>"; };
 		B667667E9C6C141128493B00 /* quit.rs */ = {isa = PBXFileReference; path = quit.rs; sourceTree = "<group>"; };
 		BC3901740F3A40252C3750C7 /* reflect-open_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "reflect-open_iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		C228C4BA95B0BADA424A9E8A /* RecordingActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingActivityAttributes.swift; sourceTree = "<group>"; };
 		C38A6847351881E6D17A1DC2 /* migrations.rs */ = {isa = PBXFileReference; path = migrations.rs; sourceTree = "<group>"; };
 		C7BE8291B337F95D913C6AE9 /* commit_message.rs */ = {isa = PBXFileReference; path = commit_message.rs; sourceTree = "<group>"; };
 		C94374B175075AF3AA7DE586 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		CF582FB0094C95210BE919F7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		D05B757D9AB841897576F256 /* merge3.rs */ = {isa = PBXFileReference; path = merge3.rs; sourceTree = "<group>"; };
+		D29B88183661F5C1C960E074 /* RecordingIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingIntents.swift; sourceTree = "<group>"; };
 		D357D2D54012FD394DF9423E /* CaptureInbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureInbox.swift; sourceTree = "<group>"; };
 		D3691D8F671B7FA21D1E7BD7 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		D7AC6BF821D47F74D41DFAFE /* RecordAudioWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordAudioWidget.swift; sourceTree = "<group>"; };
 		D7DA2E13EA6655A16DFDE015 /* secrets.rs */ = {isa = PBXFileReference; path = secrets.rs; sourceTree = "<group>"; };
 		D8F1F4787BA60FD05FD83FD1 /* spike_mobile.rs */ = {isa = PBXFileReference; path = spike_mobile.rs; sourceTree = "<group>"; };
+		DB54D6D030C08888E9D17442 /* RecordingWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = RecordingWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		DBD22A8C59FD8892E5F139EC /* tests.rs */ = {isa = PBXFileReference; path = tests.rs; sourceTree = "<group>"; };
 		DD5CA5DD1A0A2C6898BF16AE /* tests.rs */ = {isa = PBXFileReference; path = tests.rs; sourceTree = "<group>"; };
 		DFD67CD43D5BD05A1C511C01 /* import.rs */ = {isa = PBXFileReference; path = import.rs; sourceTree = "<group>"; };
@@ -158,6 +181,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		024093CF75026447063ECAFB /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				1B481887CBBFA6FB3C78F2B2 /* bindings.h */,
+			);
+			path = bindings;
+			sourceTree = "<group>";
+		};
 		064330CA0617C1F023B33371 /* ShareExtension */ = {
 			isa = PBXGroup;
 			children = (
@@ -173,6 +204,7 @@
 		085B9B9F8FF6A8514F9F4511 /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				DB54D6D030C08888E9D17442 /* RecordingWidget.appex */,
 				BC3901740F3A40252C3750C7 /* reflect-open_iOS.app */,
 				51006DE1482D28D9562253A1 /* ShareExtension.appex */,
 			);
@@ -200,9 +232,12 @@
 				A86D201016958E2276806466 /* Assets.xcassets */,
 				8D0D6D72E614086946EBF890 /* LaunchScreen.storyboard */,
 				59A902E5FAB9324234886822 /* Externals */,
+				90B73AA2E17A6707CD2373F8 /* RecordingWidget */,
+				B36B6C8C4266337158D8EA7E /* reflect-open */,
 				D93D4C46C491FF3654305D76 /* reflect-open_iOS */,
 				064330CA0617C1F023B33371 /* ShareExtension */,
 				3644284E3067EA5E39E59FDA /* Sources */,
+				503727866B7D08BD30A503FF /* Sources */,
 				55421F1EE94451C6C2F0F2F6 /* src */,
 				B6C98802589FDB7BF4EC3F7C /* Frameworks */,
 				085B9B9F8FF6A8514F9F4511 /* Products */,
@@ -212,7 +247,7 @@
 		3644284E3067EA5E39E59FDA /* Sources */ = {
 			isa = PBXGroup;
 			children = (
-				504E678B5FB1E7386811074E /* reflect-open */,
+				B36B6C8C4266337158D8EA7E /* reflect-open */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -232,13 +267,13 @@
 			path = conflict;
 			sourceTree = "<group>";
 		};
-		504E678B5FB1E7386811074E /* reflect-open */ = {
+		503727866B7D08BD30A503FF /* Sources */ = {
 			isa = PBXGroup;
 			children = (
-				38829A9D2116D0D324C18C4B /* main.mm */,
-				B04D04114CD26DD4ACE666B0 /* bindings */,
+				C228C4BA95B0BADA424A9E8A /* RecordingActivityAttributes.swift */,
 			);
-			path = "reflect-open";
+			name = Sources;
+			path = "../../../../../plugins/tauri-plugin-recording/ios/Sources";
 			sourceTree = "<group>";
 		};
 		55421F1EE94451C6C2F0F2F6 /* src */ = {
@@ -292,6 +327,16 @@
 			path = icloud;
 			sourceTree = "<group>";
 		};
+		90B73AA2E17A6707CD2373F8 /* RecordingWidget */ = {
+			isa = PBXGroup;
+			children = (
+				D7AC6BF821D47F74D41DFAFE /* RecordAudioWidget.swift */,
+				1A3930E6E7AB28929B07A6D0 /* RecordingActivityWidget.swift */,
+				A26DB86321DA75DFE1CD4B41 /* RecordingWidgetBundle.swift */,
+			);
+			path = RecordingWidget;
+			sourceTree = "<group>";
+		};
 		9E54DCC255F04D51453CC522 /* db */ = {
 			isa = PBXGroup;
 			children = (
@@ -307,12 +352,16 @@
 			path = db;
 			sourceTree = "<group>";
 		};
-		B04D04114CD26DD4ACE666B0 /* bindings */ = {
+		B36B6C8C4266337158D8EA7E /* reflect-open */ = {
 			isa = PBXGroup;
 			children = (
-				777653BF3E38355A5F6B6EF9 /* bindings.h */,
+				57BCB79C0774021318852985 /* main.mm */,
+				D29B88183661F5C1C960E074 /* RecordingIntents.swift */,
+				3613166A0FB6AFF3C3B2F85C /* StopRecordingLiveActivityIntent.swift */,
+				024093CF75026447063ECAFB /* bindings */,
 			);
-			path = bindings;
+			name = "reflect-open";
+			path = "Sources/reflect-open";
 			sourceTree = "<group>";
 		};
 		B6C98802589FDB7BF4EC3F7C /* Frameworks */ = {
@@ -359,6 +408,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		665EB942B5F6FB93F8DF2A57 /* RecordingWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0CB80A8B9A6F429446C05ECD /* Build configuration list for PBXNativeTarget "RecordingWidget" */;
+			buildPhases = (
+				6E18E3E924D4531333C9C477 /* Sources */,
+				823BEF2AC9236315045FA6B8 /* Preserve entitlements on skip-codesign builds */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RecordingWidget;
+			packageProductDependencies = (
+			);
+			productName = RecordingWidget;
+			productReference = DB54D6D030C08888E9D17442 /* RecordingWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		85FC564C07724F1F4E282538 /* ShareExtension */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 85C256481A6DA4978244EF0C /* Build configuration list for PBXNativeTarget "ShareExtension" */;
@@ -392,6 +459,7 @@
 			);
 			dependencies = (
 				4117F1E82CF9953D0AD38F11 /* PBXTargetDependency */,
+				D540AFE4185360A528491534 /* PBXTargetDependency */,
 			);
 			name = "reflect-open_iOS";
 			packageProductDependencies = (
@@ -409,6 +477,10 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					665EB942B5F6FB93F8DF2A57 = {
+						DevelopmentTeam = 789ULN5MZB;
+						ProvisioningStyle = Automatic;
+					};
 					85FC564C07724F1F4E282538 = {
 						DevelopmentTeam = 789ULN5MZB;
 						ProvisioningStyle = Automatic;
@@ -433,6 +505,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				665EB942B5F6FB93F8DF2A57 /* RecordingWidget */,
 				85FC564C07724F1F4E282538 /* ShareExtension */,
 				E2CEE6E5CCFA69CBA5F9AA3F /* reflect-open_iOS */,
 			);
@@ -461,6 +534,25 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		823BEF2AC9236315045FA6B8 /* Preserve entitlements on skip-codesign builds */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Preserve entitlements on skip-codesign builds";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ \"${CODE_SIGNING_ALLOWED:-YES}\" = \"NO\" ]; then\n  /usr/bin/codesign --force --sign - \\\n    --entitlements \"${SRCROOT:?}/RecordingWidget/RecordingWidget.entitlements\" \\\n    \"${CODESIGNING_FOLDER_PATH:?}\"\nfi\n";
+		};
 		E8E8484E1F59D64EA785432B /* Preserve entitlements on skip-codesign builds */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -515,11 +607,25 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		6E18E3E924D4531333C9C477 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E7D75AA83CFA468E0EFBAB21 /* RecordAudioWidget.swift in Sources */,
+				85FC869F776C24A9ED0A1779 /* RecordingActivityAttributes.swift in Sources */,
+				D37EE1ED817FDDC16C5643BB /* RecordingActivityWidget.swift in Sources */,
+				9611839F9E9EC688FCDFCC91 /* RecordingWidgetBundle.swift in Sources */,
+				BFB9F91C8E2628460C84C8A3 /* StopRecordingLiveActivityIntent.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B34A0474C6B6B9C6508E3011 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				5C88834F22D37FFC49CBD2F1 /* main.mm in Sources */,
+				6C55CBAB912EC5920CE314DA /* RecordingIntents.swift in Sources */,
+				6C3751B3B175DFE411D97C0F /* StopRecordingLiveActivityIntent.swift in Sources */,
+				14BE6EF4AB511AC099410853 /* main.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -530,6 +636,11 @@
 			isa = PBXTargetDependency;
 			target = 85FC564C07724F1F4E282538 /* ShareExtension */;
 			targetProxy = E15A48A368A368CDA2B5A070 /* PBXContainerItemProxy */;
+		};
+		D540AFE4185360A528491534 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 665EB942B5F6FB93F8DF2A57 /* RecordingWidget */;
+			targetProxy = 6A2683A904EF67AC778ED704 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -582,6 +693,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = app.reflect.ios;
 				PRODUCT_NAME = Reflect;
 				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;
 			};
@@ -650,6 +762,27 @@
 			};
 			name = debug;
 		};
+		A96125CC5A34976C051BA669 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = RecordingWidget/RecordingWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 789ULN5MZB;
+				INFOPLIST_FILE = RecordingWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.reflect.ios.widgets;
+				PRODUCT_NAME = RecordingWidget;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = debug;
+		};
 		ABFF23DB75DCB9354EA41A14 /* debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -669,6 +802,27 @@
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = debug;
+		};
+		B60F0D6C1613C372224A6C74 /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = RecordingWidget/RecordingWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 789ULN5MZB;
+				INFOPLIST_FILE = RecordingWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.reflect.ios.widgets;
+				PRODUCT_NAME = RecordingWidget;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = release;
 		};
 		CB0922CFF8EEBA69B8A9C2FB /* debug */ = {
 			isa = XCBuildConfiguration;
@@ -698,6 +852,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = app.reflect.ios;
 				PRODUCT_NAME = Reflect;
 				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;
 			};
@@ -762,6 +917,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		0CB80A8B9A6F429446C05ECD /* Build configuration list for PBXNativeTarget "RecordingWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A96125CC5A34976C051BA669 /* debug */,
+				B60F0D6C1613C372224A6C74 /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
 		10FFF2E018E94EEF95D56337 /* Build configuration list for PBXNativeTarget "reflect-open_iOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

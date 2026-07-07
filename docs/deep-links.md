@@ -70,6 +70,13 @@ drain re-runs cleanly.
   snippet) dispatches straight into the same in-app handler — no OS
   round-trip, so it works in dev builds and can never land on a different
   installed flavor.
+- iOS registers the scheme too (`CFBundleURLTypes` in `ios.project.yml`), but
+  only for one **mobile-native verb**: `reflect://record-audio`, the
+  lock-screen widget's start-recording entry point. It is handled in the Rust
+  shell (queued into the recording plugin's native action handshake — see
+  `docs/porting/reflect-mobile/audio-memos.md`) and deliberately absent from
+  the desktop JS grammar: desktop parses it as unknown. The route-shaped
+  navigation grammar is not a mobile surface yet.
 
 ## Relationship to the CLI
 

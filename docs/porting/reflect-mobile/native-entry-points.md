@@ -1,11 +1,18 @@
 # Porting native entry points
 
-**v2 status: later waves, partially dropped.** Widgets, Siri intents, and
-quick actions arrive with the audio wave; push notifications and universal
-links are dropped (no server); `reflect://` deep links exist on desktop v2
-but are not a mobile v1 surface. The **native-action handshake** is the
-pattern from this area worth porting on day one of any OS-triggered
-capture.
+**v2 status: shipped with the audio wave, partially dropped.** The
+recording entry points are in: the lock-screen/home-screen widget (opens
+`reflect://record-audio`, forwarded by the Rust shell into the recording
+plugin's queue), Siri App Intents ("Start/Stop recording in Reflect",
+in-process `AppIntent`s in the app target posting NotificationCenter
+requests), the home-screen quick action (a shortcut-item handler the plugin
+adds to tao's app delegate), and the Live Activity with an iOS 17
+`LiveActivityIntent` stop button. The **native-action handshake** below is
+implemented in `plugins/tauri-plugin-recording` (persisted queue →
+`actions_ready` → deliver → confirm-after-2s), exactly as this doc
+prescribed. Push notifications and universal links stay dropped (no
+server); the route-shaped `reflect://` navigation grammar is still not a
+mobile surface — only the `record-audio` verb is registered on iOS.
 
 ## What V1 mobile does
 

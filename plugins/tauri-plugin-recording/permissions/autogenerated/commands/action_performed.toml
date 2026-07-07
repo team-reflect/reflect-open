@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-action-performed"
+description = "Enables the action_performed command without any pre-configured scope."
+commands.allow = ["action_performed"]
+
+[[permission]]
+identifier = "deny-action-performed"
+description = "Denies the action_performed command without any pre-configured scope."
+commands.deny = ["action_performed"]

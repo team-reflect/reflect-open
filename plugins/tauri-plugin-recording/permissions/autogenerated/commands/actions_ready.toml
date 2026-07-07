@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-actions-ready"
+description = "Enables the actions_ready command without any pre-configured scope."
+commands.allow = ["actions_ready"]
+
+[[permission]]
+identifier = "deny-actions-ready"
+description = "Denies the actions_ready command without any pre-configured scope."
+commands.deny = ["actions_ready"]

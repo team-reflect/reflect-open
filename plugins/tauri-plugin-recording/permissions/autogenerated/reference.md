@@ -8,6 +8,8 @@ Record audio memos natively, manage the staging directory, and subscribe to reco
 - `allow-stop-recording`
 - `allow-cancel-recording`
 - `allow-recording-status`
+- `allow-actions-ready`
+- `allow-action-performed`
 - `allow-list-staged`
 - `allow-read-staged`
 - `allow-delete-staged`
@@ -22,6 +24,58 @@ Record audio memos natively, manage the staging directory, and subscribe to reco
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`recording:allow-action-performed`
+
+</td>
+<td>
+
+Enables the action_performed command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`recording:deny-action-performed`
+
+</td>
+<td>
+
+Denies the action_performed command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`recording:allow-actions-ready`
+
+</td>
+<td>
+
+Enables the actions_ready command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`recording:deny-actions-ready`
+
+</td>
+<td>
+
+Denies the actions_ready command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>

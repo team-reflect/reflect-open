@@ -9,7 +9,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { addPluginListener, invoke } from '@tauri-apps/api/core'
 import { errorMessage, hasBridge, type GraphInfo } from '@reflect/core'
 import { z } from 'zod'
 import { useAudioMemoPipeline, type PendingAudioCapture } from '@/hooks/use-audio-memo-pipeline'
@@ -36,7 +36,7 @@ import {
  * presents recording in a sidebar popover; here it is a bottom drawer plus a
  * mic FAB on the daily spine.
  *
- * Three mobile-only responsibilities live here:
+ * Four mobile-only responsibilities live here:
  *
  * - **Native stops.** Interruptions (calls, Siri), input-route loss, and the
  *   duration cap finalize the recording natively and announce it on the
@@ -53,6 +53,11 @@ import {
  *   live flow owns are ingested, then deleted. Ingest is idempotent by stop
  *   time — a re-scan of a file whose delete failed rewrites the same
  *   `audio-memos/` path rather than duplicating the memo.
+ * - **The native-action handshake.** OS entry points (Siri, the home-screen
+ *   quick action, the lock-screen widget) queue a `recordAudio` request in
+ *   the plugin, persisted until this surface confirms it ran — so a request
+ *   arriving before the webview exists, or right before it dies, is neither
+ *   lost nor double-run (`docs/porting/reflect-mobile/native-entry-points.md`).
  */
 
 interface MobileAudioMemoContextValue {
@@ -96,6 +101,15 @@ const MIC_DENIED_REASON =
 const listStagedSchema = z.object({
   files: z.array(z.object({ path: z.string(), modifiedMs: z.number() })),
 })
+
+const nativeActionSchema = z.object({ action: z.string() })
+
+/**
+ * How long the recording UI must survive before a delivered native action is
+ * confirmed (V1 parity): a webview crash during presentation must leave the
+ * action queued so it re-fires on the next launch.
+ */
+const ACTION_CONFIRM_DELAY_MS = 2000
 
 interface MobileAudioMemoProviderProps {
   graph: GraphInfo
@@ -254,34 +268,83 @@ export function MobileAudioMemoProvider({
     [recorder.status, stopAndSave, cancelRecorder, setDrawerOpen],
   )
 
-  // The live-recording reconcile: this mount did not start any recording, so
-  // a native one still running (the webview reloaded or crashed mid-memo, or
-  // the provider remounted across a graph switch) has no UI — stop and save
-  // it rather than leave a hidden hot microphone.
+  const startRef = useRef(start)
+  useEffect(() => {
+    startRef.current = start
+  })
+
+  // The live-recording reconcile, then the native-action handshake — in that
+  // order, so a queued "record" delivered at `actions_ready` can never race
+  // the stop of a recording that outlived the previous webview.
+  //
+  // Reconcile: this mount did not start any recording, so a native one still
+  // running (the webview reloaded or crashed mid-memo, or the provider
+  // remounted across a graph switch) has no UI — stop and save it rather
+  // than leave a hidden hot microphone.
+  //
+  // Handshake: claim the plugin's persisted action queue; a delivered
+  // `recordAudio` starts a memo and is confirmed only once the recording UI
+  // has survived presentation (an unconfirmed action re-fires next launch).
+  // Confirmation is about delivery, not success — a mic-denied start still
+  // confirms, or the queue would re-surface the same failure every launch.
   useEffect(() => {
     if (!hasBridge()) {
       return
     }
+    let disposed = false
+    let confirmTimer: ReturnType<typeof setTimeout> | null = null
+    let unlisten: (() => void) | null = null
     void (async () => {
       try {
         const status = await nativeRecordingStatus()
-        if (!status.recording) {
-          return
-        }
-        const result = await stopActiveRecording()
-        if (result !== null) {
-          enqueueStaged({
-            blob: result.blob,
-            recordedAt: new Date(),
-            stagedPath: result.stagedPath,
-          })
+        if (status.recording) {
+          const result = await stopActiveRecording()
+          if (result !== null) {
+            enqueueStaged({
+              blob: result.blob,
+              recordedAt: new Date(),
+              stagedPath: result.stagedPath,
+            })
+          }
         }
       } catch (cause) {
         // A user stop or native finalize winning the race lands here — the
         // memo arrives through that path (or the orphan scan) instead.
         console.warn('reconciling a live native recording failed:', cause)
       }
+      if (disposed) {
+        return
+      }
+      try {
+        const listener = await addPluginListener('recording', 'nativeAction', (raw: unknown) => {
+          const parsed = nativeActionSchema.safeParse(raw)
+          if (disposed || !parsed.success || parsed.data.action !== 'recordAudio') {
+            return
+          }
+          void startRef.current()
+          confirmTimer = setTimeout(() => {
+            void invoke('plugin:recording|action_performed').catch((cause: unknown) => {
+              console.warn('confirming a native action failed:', cause)
+            })
+          }, ACTION_CONFIRM_DELAY_MS)
+        })
+        if (disposed) {
+          void listener.unregister()
+          return
+        }
+        unlisten = () => void listener.unregister()
+        await invoke('plugin:recording|actions_ready')
+      } catch (cause) {
+        console.error('the native-action handshake is unavailable:', cause)
+      }
     })()
+    return () => {
+      disposed = true
+      if (confirmTimer !== null) {
+        clearTimeout(confirmTimer)
+      }
+      unlisten?.()
+    }
   }, [enqueueStaged])
 
   // The orphan scan: staged recordings no live flow owns — from a crash, a

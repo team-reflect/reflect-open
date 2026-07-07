@@ -18,6 +18,15 @@ pub struct StopResponse {
     pub duration_ms: f64,
 }
 
+/// A native action to queue for the webview (the V1 handshake). Sent by the
+/// Rust shell when an OS entry point arrives as a URL open.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueueActionRequest {
+    /// Currently only `recordAudio`.
+    pub action: String,
+}
+
 /// `recording_status`'s response — whether a native recording is live.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

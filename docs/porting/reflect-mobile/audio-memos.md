@@ -1,6 +1,6 @@
 # Porting audio memos (mobile)
 
-**v2 status: in-app + reliability waves shipped; OS entry points pending.**
+**v2 status: all three waves implemented; physical-device pass owed.**
 Desktop v2 audio memos shipped first (raw-first recording into the graph +
 async BYOK transcription — see the desktop
 [audio-memos porting doc](../audio-memos.md)). The mobile in-app wave reuses
@@ -14,10 +14,18 @@ never saw. The reliability wave added `UIBackgroundModes: audio` (a memo
 keeps recording through screen lock and backgrounding; the audio session is
 active only while capturing) and a mount-time reconcile that stops-and-saves
 a recording that outlived its JS (webview reload/crash) instead of leaving a
-hidden hot microphone. Still open from this doc: the OS entry points
-(widget, Siri, Live Activity, quick action) and the App Group staging move
-they imply, plus the physical-device pass. V1's server-upload design is
-forbidden in v2, but V1's *reliability engineering* is the bar to meet.
+hidden hot microphone. The entry-points wave added the native-action
+handshake (persisted queue → `actions_ready` → deliver → confirm; see
+[native-entry-points](./native-entry-points.md)), Siri App Intents, the
+home-screen quick action, the lock-screen/home-screen record widget
+(`RecordingWidget` appex, `reflect://record-audio`), and the Live Activity
+with an iOS 17 stop intent. Notably absent vs. this doc's original sketch:
+an App Group **audio** inbox — recording always happens in the main app
+process (widgets can't record), so the plugin's app-sandbox staging
+directory remains the can't-lose buffer and nothing extension-side writes
+audio. Still owed: the physical-device pass (entry points, interruptions,
+lock-screen continuation). V1's server-upload design is forbidden in v2,
+but V1's *reliability engineering* is the bar to meet.
 This is the most engineered feature in V1 mobile and the clearest
 expression of its design philosophy: **critical capture must not depend on
 the webview being alive.**

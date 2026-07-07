@@ -51,6 +51,35 @@ impl<R: Runtime> Recording<R> {
             .map_err(Into::into)
     }
 
+    /// The webview's action surface is listening — deliver queued actions.
+    pub fn actions_ready(&self) -> crate::Result<()> {
+        self.0
+            .run_mobile_plugin("actionsReady", ())
+            .map_err(Into::into)
+    }
+
+    /// Retire the delivered action so it doesn't re-fire on the next launch.
+    pub fn action_performed(&self) -> crate::Result<()> {
+        self.0
+            .run_mobile_plugin("actionPerformed", ())
+            .map_err(Into::into)
+    }
+
+    /// Queue a native action for the webview (see the handshake in
+    /// `RecordingPlugin.swift`): persisted until the webview confirms it ran,
+    /// so it survives crashes and cold starts. The Rust shell calls this when
+    /// a `reflect://record-audio` URL opens the app (the lock-screen widget).
+    pub fn queue_action(&self, action: &str) -> crate::Result<()> {
+        self.0
+            .run_mobile_plugin(
+                "queueAction",
+                QueueActionRequest {
+                    action: action.to_string(),
+                },
+            )
+            .map_err(Into::into)
+    }
+
     /// Whether a native recording is live right now — a fresh webview mount
     /// uses this to stop-and-save a recording that outlived its UI.
     pub fn recording_status(&self) -> crate::Result<RecordingStatusResponse> {

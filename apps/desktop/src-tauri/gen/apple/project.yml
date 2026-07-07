@@ -68,6 +68,21 @@ targets:
         # session only while a recording is live, so the mode never keeps the
         # app running outside an actual capture.
         UIBackgroundModes: [audio]
+        # The `reflect://` scheme (audio-memos wave 3): the lock-screen
+        # widget opens `reflect://record-audio`, which the Rust shell hands
+        # to the recording plugin's action queue. Desktop registers the same
+        # scheme through the deep-link plugin config in tauri.conf.json.
+        CFBundleURLTypes:
+          - CFBundleURLName: app.reflect.ios
+            CFBundleURLSchemes: [reflect]
+        # The recording Live Activity (audio-memos wave 3).
+        NSSupportsLiveActivities: true
+        # Home-screen quick action (audio-memos wave 3); handled by the
+        # recording plugin via the shortcut-item delegate hook.
+        UIApplicationShortcutItems:
+          - UIApplicationShortcutItemType: app.reflect.record-audio
+            UIApplicationShortcutItemTitle: Record audio
+            UIApplicationShortcutItemIconType: UIApplicationShortcutIconTypeAudio
         UILaunchStoryboardName: LaunchScreen
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:
@@ -126,12 +141,17 @@ targets:
         LIBRARY_SEARCH_PATHS[arch=x86_64]: $(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)
         LIBRARY_SEARCH_PATHS[arch=arm64]: $(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)
         ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
+        SWIFT_VERSION: "5.0"
         EXCLUDED_ARCHS[sdk=iphoneos*]: x86_64
       groups: [app]
     dependencies:
       # The share-sheet capture extension (Plan 11's iOS producer): embedded
       # into the app bundle and signed with it.
       - target: ShareExtension
+        embed: true
+      # The audio-memo widget extension (wave 3): lock-screen record widget
+      # + the recording Live Activity; embedded and signed with the app.
+      - target: RecordingWidget
         embed: true
       - framework: libapp.a
         embed: false
@@ -224,6 +244,60 @@ targets:
           if [ "${CODE_SIGNING_ALLOWED:-YES}" = "NO" ]; then
             /usr/bin/codesign --force --sign - \
               --entitlements "${SRCROOT:?}/ShareExtension/ShareExtension.entitlements" \
+              "${CODESIGNING_FOLDER_PATH:?}"
+          fi
+        name: Preserve entitlements on skip-codesign builds
+        basedOnDependencyAnalysis: false
+
+  # The audio-memo widget extension (wave 3): the lock-screen / home-screen
+  # "record" widget plus the recording Live Activity. Swift only — no Rust,
+  # no webview. Two sources are shared by path: the Live Activity attributes
+  # (also compiled into the recording plugin — ActivityKit matches app and
+  # widget by type name) and the stop LiveActivityIntent (also compiled into
+  # the app target, where it executes).
+  RecordingWidget:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "16.2"
+    sources:
+      - path: RecordingWidget/RecordingWidgetBundle.swift
+      - path: RecordingWidget/RecordAudioWidget.swift
+      - path: RecordingWidget/RecordingActivityWidget.swift
+      - path: Sources/reflect-open/StopRecordingLiveActivityIntent.swift
+      - path: ../../../../../plugins/tauri-plugin-recording/ios/Sources/RecordingActivityAttributes.swift
+    info:
+      path: RecordingWidget/Info.plist
+      properties:
+        CFBundleDisplayName: Reflect
+        CFBundleShortVersionString: 0.4.0
+        CFBundleVersion: 0.4.0.17
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    # The widget needs no capability of its own, but the release pipeline
+    # asserts every appex carries the App Group (release-ios.mjs), and the
+    # skip-codesign ad-hoc phase below must have entitlements to preserve —
+    # exactly like ShareExtension.
+    entitlements:
+      path: RecordingWidget/RecordingWidget.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.app.reflect
+    settings:
+      base:
+        PRODUCT_NAME: RecordingWidget
+        PRODUCT_BUNDLE_IDENTIFIER: app.reflect.ios.widgets
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 789ULN5MZB
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: 1,2
+    postBuildScripts:
+      # Same skip-codesign entitlement preservation as ShareExtension: CI
+      # TestFlight builds archive unsigned, and export re-signing only keeps
+      # entitlements already present in a signature.
+      - script: |
+          if [ "${CODE_SIGNING_ALLOWED:-YES}" = "NO" ]; then
+            /usr/bin/codesign --force --sign - \
+              --entitlements "${SRCROOT:?}/RecordingWidget/RecordingWidget.entitlements" \
               "${CODESIGNING_FOLDER_PATH:?}"
           fi
         name: Preserve entitlements on skip-codesign builds

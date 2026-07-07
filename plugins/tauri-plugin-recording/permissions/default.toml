@@ -5,6 +5,8 @@ permissions = [
     "allow-stop-recording",
     "allow-cancel-recording",
     "allow-recording-status",
+    "allow-actions-ready",
+    "allow-action-performed",
     "allow-list-staged",
     "allow-read-staged",
     "allow-delete-staged",
