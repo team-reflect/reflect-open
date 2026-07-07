@@ -184,6 +184,9 @@ export async function chunkAssetDescriptions(
   let offset = baseOffset
   let budget = MAX_ASSET_TEXT_CHARS
   for (const { assetPath, body } of bodies) {
+    if (chunks.length > 0) {
+      budget -= 2 // the joiner counts against the FTS fold's slice — mirror it
+    }
     if (budget <= 0) {
       break
     }

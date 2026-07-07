@@ -130,6 +130,21 @@ describe('chunkAssetDescriptions', () => {
     expect(total).toBe(MAX_ASSET_TEXT_CHARS)
   })
 
+  it('counts the body joiner against the cap, like the FTS join-then-slice', async () => {
+    // FTS keeps `first + '\n\n' + second` sliced to the cap, so a later body
+    // only gets what the cap leaves after the two joiner chars.
+    const chunks = await chunkAssetDescriptions(
+      [
+        { assetPath: 'assets/a.png', body: 'x'.repeat(MAX_ASSET_TEXT_CHARS - 6) },
+        { assetPath: 'assets/b.png', body: 'yyyyyyyy' },
+      ],
+      BASE,
+    )
+    const second = chunks.filter((chunk) => chunk.heading === 'b.png')
+    expect(second).toHaveLength(1)
+    expect(second[0]!.text).toBe('yyyy') // cap − body − joiner = 4 chars left
+  })
+
   it('returns nothing for no bodies', async () => {
     expect(await chunkAssetDescriptions([], BASE)).toEqual([])
   })
