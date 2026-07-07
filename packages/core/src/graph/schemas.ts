@@ -66,6 +66,12 @@ export const graphImportSummarySchema = z.object({
   downloadedAssets: z.number(),
   /** Attachments that are permanently gone; their notes keep the remote link. */
   failedAssetDownloads: z.number(),
+  /**
+   * Files written under a suffixed name because the filesystem treats their
+   * own name as an alias of a differing existing file (e.g. case-insensitive
+   * APFS folds `füße.md` and `füsse.md` to one path).
+   */
+  renamedFiles: z.number(),
   /** Graph-relative paths newly written to the open graph. */
   changedPaths: z.array(z.string()),
 })

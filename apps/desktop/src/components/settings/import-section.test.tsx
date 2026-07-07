@@ -7,6 +7,7 @@ interface SummaryFixture {
   skippedFiles: number
   downloadedAssets: number
   failedAssetDownloads: number
+  renamedFiles: number
   changedPaths: string[]
 }
 
@@ -40,6 +41,7 @@ beforeEach(() => {
     skippedFiles: 1,
     downloadedAssets: 0,
     failedAssetDownloads: 0,
+    renamedFiles: 0,
     changedPaths: ['notes/a.md', 'daily/2026-07-04.md'],
   })
   graphState.graph = { root: '/graphs/notes', name: 'Notes', generation: 42 }
@@ -84,6 +86,7 @@ describe('ImportSection', () => {
       skippedFiles: 1,
       downloadedAssets: 0,
       failedAssetDownloads: 0,
+      renamedFiles: 0,
       changedPaths: ['notes/a.md', 'daily/2026-07-04.md'],
     })
     expect(graphState.refreshIndex).toHaveBeenCalledTimes(1)
@@ -98,6 +101,7 @@ describe('ImportSection', () => {
       skippedFiles: 0,
       downloadedAssets: 140,
       failedAssetDownloads: 1,
+      renamedFiles: 0,
       changedPaths: ['notes/a.md'],
     })
     render(<ImportSection />)
@@ -106,6 +110,24 @@ describe('ImportSection', () => {
 
     expect((await screen.findByRole('status')).textContent).toBe(
       "12 files imported, 140 attachments downloaded. 1 attachment couldn't be downloaded and still links to Reflect V1.",
+    )
+  })
+
+  it('summarizes notes renamed around filename clashes', async () => {
+    importReflectV1Zip.mockResolvedValueOnce({
+      importedFiles: 2,
+      skippedFiles: 0,
+      downloadedAssets: 0,
+      failedAssetDownloads: 0,
+      renamedFiles: 1,
+      changedPaths: ['notes/füsse.md', 'notes/füße-2.md'],
+    })
+    render(<ImportSection />)
+
+    fireEvent.click(importButton())
+
+    expect((await screen.findByRole('status')).textContent).toBe(
+      '2 files imported, 1 renamed to avoid a name clash.',
     )
   })
 
@@ -151,6 +173,7 @@ describe('ImportSection', () => {
       skippedFiles: 0,
       downloadedAssets: 0,
       failedAssetDownloads: 0,
+      renamedFiles: 0,
       changedPaths: ['notes/a.md'],
     })
 

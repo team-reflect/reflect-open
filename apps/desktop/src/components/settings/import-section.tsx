@@ -24,6 +24,9 @@ function summaryText(summary: GraphImportSummary): string {
   if (summary.downloadedAssets > 0) {
     parts.push(`${count(summary.downloadedAssets, 'attachment', 'attachments')} downloaded`)
   }
+  if (summary.renamedFiles > 0) {
+    parts.push(`${summary.renamedFiles} renamed to avoid a name clash`)
+  }
   const text = `${parts.join(', ')}.`
   if (summary.failedAssetDownloads === 0) {
     return text

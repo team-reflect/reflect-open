@@ -26,6 +26,7 @@ describe('graph commands', () => {
       skippedFiles: 0,
       downloadedAssets: 0,
       failedAssetDownloads: 0,
+      renamedFiles: 0,
       changedPaths: ['notes/a.md', 'daily/2026-07-04.md'],
     }))
     setBridge({ invoke, listen: async () => () => {} })
@@ -40,6 +41,7 @@ describe('graph commands', () => {
       skippedFiles: 0,
       downloadedAssets: 0,
       failedAssetDownloads: 0,
+      renamedFiles: 0,
       changedPaths: ['notes/a.md', 'daily/2026-07-04.md'],
     })
   })
@@ -55,6 +57,7 @@ describe('graph commands', () => {
         skippedFiles: 0,
         downloadedAssets: 0,
         failedAssetDownloads: 0,
+        renamedFiles: 0,
         changedPaths: ['notes/a.md', 'daily/2026-07-04.md'],
       })
 
