@@ -2,8 +2,27 @@ import { useLayoutEffect, useRef, type ReactElement } from 'react'
 import { CircleCheck, Files, MessageSquare, SquarePen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { hapticImpactLight } from '@/mobile/haptics'
+import type { Route } from '@/routing/route'
 
 export type MobileTab = 'daily' | 'all' | 'tasks' | 'chat'
+
+/** The tab whose root screen a route shows, or `null` for stacked screens. */
+export function tabRootFor(route: Route): MobileTab | null {
+  switch (route.kind) {
+    case 'today':
+    case 'daily':
+      return 'daily'
+    case 'allNotes':
+    case 'search':
+      return 'all'
+    case 'tasks':
+      return 'tasks'
+    case 'chat':
+      return 'chat'
+    default:
+      return null
+  }
+}
 
 interface MobileTabBarProps {
   tab: MobileTab

@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
+import { useDoubleTap } from '@/hooks/use-double-tap'
 import { MobileFormattingToolbar } from '@/mobile/formatting-toolbar'
 import { MobileStack } from '@/mobile/mobile-stack'
-import { MobileTabBar, type MobileTab } from '@/mobile/mobile-tab-bar'
+import { MobileTabBar, tabRootFor, type MobileTab } from '@/mobile/mobile-tab-bar'
 import {
   EMPTY_ALL_NOTES_FILTERS,
   type AllNotesFilters,
 } from '@/mobile/search-filters/filter-state'
 import { useKeyboardVisible } from '@/mobile/use-keyboard'
-import { tabRootFor, useTabDoubleTap } from '@/mobile/use-tab-double-tap'
 import { useWakeToToday } from '@/mobile/use-wake-to-today'
 import { routesEqual, type Route } from '@/routing/route'
 import { useRouter } from '@/routing/router'
@@ -31,7 +31,10 @@ export function MobileShell(): ReactElement {
   const [allFilters, setAllFilters] = useState<AllNotesFilters>(EMPTY_ALL_NOTES_FILTERS)
   const [lastTab, setLastTab] = useState<MobileTab>('daily')
   const [lastDailyRoute, setLastDailyRoute] = useState<DailyRoute>({ kind: 'today' })
-  const isDoubleTap = useTabDoubleTap(route)
+  // A tab double-tap is a capture gesture (Daily focuses today's editor, All
+  // its search input); a pending tap expires if the route leaves the tab's
+  // root between taps — that second tap is a return, not a double-tap.
+  const isDoubleTap = useDoubleTap<MobileTab>(tabRootFor(route))
   const keyboardVisible = useKeyboardVisible()
   // V1's wake-to-today: foregrounding on a new calendar date lands on today.
   useWakeToToday()
