@@ -392,6 +392,39 @@ describe('ChatScreen', () => {
     expect(probedRoute).toEqual({ kind: 'daily', date: '2026-06-10' })
   })
 
+  it('renders an attachment chip: filenames, with per-asset refusals inline', async () => {
+    configureModel()
+    scriptTurn([
+      {
+        type: 'tool-call',
+        call: {
+          tool: 'assets',
+          toolCallId: 'tool-1',
+          paths: ['assets/chart.png', 'assets/scan.pdf'],
+        },
+      },
+      {
+        type: 'tool-result',
+        result: {
+          tool: 'assets',
+          toolCallId: 'tool-1',
+          assets: [
+            { path: 'assets/chart.png', error: null },
+            { path: 'assets/scan.pdf', error: 'This asset cannot be read by AI.' },
+          ],
+        },
+      },
+      { type: 'complete', messages: [{ role: 'assistant', content: 'Done.' }] },
+    ])
+    const view = renderChat()
+
+    await userEvent.type(view.getByLabelText('Chat message'), 'what does the chart show?{Enter}')
+
+    // Entries are labeled by filename; a refused asset keeps its refusal inline.
+    await view.findByText('chart.png')
+    await view.findByText(/scan\.pdf — This asset cannot be read by AI\./)
+  })
+
   it('renders streaming text as plain text until the turn settles', async () => {
     configureModel()
     streamChat.mockImplementation(() =>

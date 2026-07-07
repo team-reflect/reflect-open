@@ -30,6 +30,7 @@ export {
 export { validateApiKey, type ApiKeyValidation } from '../ai/validate-key'
 export {
   assertCloudAllowed,
+  cloudSafeAssetDescription,
   cloudSafeGraphContext,
   cloudSafeNoteContent,
   cloudSafeNoteListings,
@@ -37,6 +38,7 @@ export {
   cloudSafeSelection,
   isPrivateNoteError,
   PrivateNoteError,
+  type CloudAssetDescription,
   type CloudGraphContext,
   type CloudNoteContent,
   type CloudNoteListing,
@@ -47,8 +49,6 @@ export {
 export {
   buildNoteTools,
   MAX_DAILY_NOTE_DAYS,
-  MAX_NOTE_CONTENT_CHARS,
-  MAX_READ_NOTES,
   type ListDailyNotesOutput,
   type ListRecentNotesOutput,
   type NoteHitSummary,
@@ -56,11 +56,22 @@ export {
   type NoteToolDeps,
   type NoteToolResult,
   type NoteTools,
-  type ReadNoteResult,
+  type ReadAssetSummary,
   type ReadNoteSummary,
-  type ReadNotesOutput,
   type SearchNotesOutput,
 } from '../ai/chat/tools'
+export {
+  MAX_NOTE_CONTENT_CHARS,
+  MAX_READ_NOTES,
+  type ReadNoteResult,
+  type ReadNotesOutput,
+} from '../ai/chat/read-notes'
+export {
+  MAX_ASSET_DESCRIPTION_CHARS,
+  MAX_READ_ASSETS,
+  type ReadAssetResult,
+  type ReadAssetsOutput,
+} from '../ai/chat/read-assets'
 export { chatSystemPrompt, type SystemPromptInput } from '../ai/chat/system-prompt'
 export {
   loadChatGraphContext,

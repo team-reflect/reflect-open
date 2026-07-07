@@ -1,5 +1,5 @@
 import { Fragment, type ReactElement, type ReactNode } from 'react'
-import { CalendarDays, FileText, History, Search } from 'lucide-react'
+import { CalendarDays, FileText, History, Paperclip, Search } from 'lucide-react'
 import { isTagName, isToolPending, type AssistantPart, type NoteHitSummary } from '@reflect/core'
 import { Marker, MarkerContent, MarkerIcon } from '@/components/ui/marker'
 import { Spinner } from '@/components/ui/spinner'
@@ -13,6 +13,11 @@ interface ChatToolChipProps {
 /** ` · 3 notes` — the settled count suffix of a listing chip. */
 function countSuffix(count: number, noun: string): string {
   return ` · ${count} ${noun}${count === 1 ? '' : 's'}`
+}
+
+/** An asset chip labels entries by filename — the path adds only noise. */
+function assetName(path: string): string {
+  return path.split('/').pop() ?? path
 }
 
 interface ChipFrameProps {
@@ -120,6 +125,35 @@ export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
         Listed daily notes {call.start} – {call.end}
         {result !== null ? countSuffix(result.days.length, 'day') : ''}
         {result !== null ? <NoteLinks notes={result.days} onOpen={openNote} /> : null}
+      </ChipFrame>
+    )
+  }
+
+  // read_assets: one chip for the whole batch of attachment descriptions.
+  // Assets have no note route, so entries stay plain text with per-asset
+  // refusals inline.
+  if (call.tool === 'assets') {
+    const result = part.result?.tool === 'assets' ? part.result : null
+    if (part.error !== null) {
+      return (
+        <ChipFrame pending={false} icon={<Paperclip aria-hidden className="size-3.5" />}>
+          {call.paths.map(assetName).join(', ')} — {part.error}
+        </ChipFrame>
+      )
+    }
+    const assets = result?.assets ?? call.paths.map((path) => ({ path, error: null }))
+    return (
+      <ChipFrame pending={pending} icon={<Paperclip aria-hidden className="size-3.5" />}>
+        Read{' '}
+        {assets.map((asset, index) => (
+          <Fragment key={`${asset.path}-${index}`}>
+            {index > 0 ? ', ' : ''}
+            <span>
+              {assetName(asset.path)}
+              {asset.error !== null ? ` — ${asset.error}` : ''}
+            </span>
+          </Fragment>
+        ))}
       </ChipFrame>
     )
   }

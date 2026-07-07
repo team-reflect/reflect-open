@@ -190,6 +190,35 @@ export function cloudSafeNoteContent(
   })
 }
 
+/** One asset's stored description as an external service may see it. */
+export interface CloudAssetDescription {
+  /** Graph-relative asset path, e.g. `assets/photo.png`. */
+  path: string
+  /** The description file's markdown body (frontmatter stripped, capped). */
+  description: string
+  truncated: boolean
+}
+
+/**
+ * Gate one asset's stored description (Plan 20's `<asset>.reflect.md`) for an
+ * outbound payload. Callers pass the asset's **live** privacy verdict as
+ * `isPrivate` — sendable only when the asset is referenced by ≥1 public note
+ * and 0 private notes, decided from each referencing note's markdown at call
+ * time (`classifyAssetFromNotes`), because the sidecar on disk can predate a
+ * note turning private. A blocked asset throws {@link PrivateNoteError}
+ * before any description text is minted.
+ */
+export function cloudSafeAssetDescription(
+  asset: CloudSendable & Omit<CloudAssetDescription, 'path'>,
+): CloudSafe<CloudAssetDescription> {
+  assertCloudAllowed(asset)
+  return mint({
+    path: asset.path,
+    description: asset.description,
+    truncated: asset.truncated,
+  })
+}
+
 /**
  * Gate a text selection (the AI menu's editor selection) for an outbound
  * payload. The selection is note content, so the same contract as

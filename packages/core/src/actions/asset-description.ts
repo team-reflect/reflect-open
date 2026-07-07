@@ -14,23 +14,22 @@ import {
   assetTypeFor,
   base64ByteLength,
   buildDescriptionSource,
-  classifyAsset,
   isEligibleAssetPath,
   readManagedDescription,
   type ManagedDescription,
 } from './asset-description-helpers'
+import { classifyAsset } from './asset-privacy'
 export {
   assetTypeFor,
   base64ByteLength,
   buildDescriptionSource,
-  classifyAsset,
   isEligibleAssetPath,
   readManagedDescription,
   type AssetDescriptionMeta,
   type AssetType,
-  type AssetVerdict,
   type ManagedDescription,
 } from './asset-description-helpers'
+export { classifyAsset, classifyAssetFromNotes, type AssetVerdict } from './asset-privacy'
 
 /**
  * Asset descriptions (Plan 20). For each eligible image/PDF under `assets/`

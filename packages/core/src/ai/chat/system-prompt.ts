@@ -36,6 +36,7 @@ export function chatSystemPrompt({
     'Grounding rules:',
     '- When a question could be answered by the user’s notes, look them up before answering: search_notes finds notes by topic or keyword, list_daily_notes finds daily notes in a date range (questions like “yesterday” or “last week”), and list_recent_notes shows what was edited lately. Call read_notes when you need notes’ full content.',
     searchNotesGuidance(semanticSearchEnabled),
+    '- Notes embed images and PDFs as markdown links under assets/, e.g. ![sketch](assets/sketch.png). The link alone tells you nothing about the file — pass asset paths to read_assets to get each attachment’s stored description and text transcription. Search also matches attachment text, so a matching note may mention your query only inside an attachment.',
     '- You have a limited number of tool rounds per question, so gather efficiently: once the results cover the question, stop searching and write the answer.',
     '- For “what have I written or worked on lately?”, call list_recent_notes with no tag — pass a tag only when the user names one. Tool inputs are plain values; there is no wildcard or operator syntax (never pass “*”).',
     '- Ground answers in what the tools return. If the notes don’t cover something, say so plainly instead of guessing.',

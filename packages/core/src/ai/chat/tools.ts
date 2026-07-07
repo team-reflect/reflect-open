@@ -1,18 +1,17 @@
 import { tool, type TypedToolCall, type TypedToolResult } from 'ai'
 import { z } from 'zod'
-import { isAppError } from '../../errors'
 import { readNote } from '../../graph/commands'
 import { retrieve, type RetrievalHit, type RetrieveOptions } from '../../embeddings/retrieve'
+import { assetReferencingNotePaths } from '../../indexing/asset-refs'
 import { listDailyNotes, type DailyNoteRow, type DailyNotesRange } from '../../indexing/queries'
 import { listRecentNotes, type RecentNoteRow, type RecentNotesOptions } from '../../indexing/note-list'
 import { parseFrontmatter, splitFrontmatter } from '../../markdown/frontmatter'
-import { isTagName, parseNote } from '../../markdown/extract'
+import { isTagName } from '../../markdown/extract'
+import { buildReadOneAsset, readAssetsInput, type ReadAssetsOutput } from './read-assets'
+import { buildReadOneNote, readNotesInput, type ReadNotesOutput } from './read-notes'
 import {
-  cloudSafeNoteContent,
   cloudSafeNoteListings,
   cloudSafeSearchHits,
-  isPrivateNoteError,
-  type CloudNoteContent,
   type CloudNoteListing,
   type CloudSafe,
   type CloudSearchHit,
@@ -24,8 +23,9 @@ import {
  * and — deliberately in the same module — everything else that knows their
  * names: the {@link NoteToolCall}/{@link NoteToolResult} unions the engine
  * streams and the UI renders, and the mappers from SDK stream parts onto
- * them. Adding a tool means extending this file and the chip that renders
- * it; nothing else switches on tool names.
+ * them. Adding a tool means registering it here (batch executors live in
+ * sibling `read-*.ts` modules) and extending the chip that renders it;
+ * nothing else switches on tool names.
  *
  * Note content enters tool outputs only as {@link CloudSafe} values, minted
  * by the privacy gate in `../checkers` — search drops private hits entirely,
@@ -43,22 +43,13 @@ const MAX_RECENT_LIMIT = 20
 /** Most days one daily-range call returns; past it the model narrows the range. */
 export const MAX_DAILY_NOTE_DAYS = 31
 
-/** Cap on returned note content so one huge note can't flood the context. */
-export const MAX_NOTE_CONTENT_CHARS = 24_000
-
-/**
- * Cap on notes one read_notes call returns. Each note is itself capped at
- * {@link MAX_NOTE_CONTENT_CHARS}, so this bounds a single batch read to roughly
- * the per-turn token reserve — past it the model splits the read across calls.
- */
-export const MAX_READ_NOTES = 10
-
 /** Injectable effects so tests can drive the tools without a live bridge. */
 export interface NoteToolDeps {
   retrieveFn?: (query: string, options?: RetrieveOptions) => Promise<RetrievalHit[]>
   readNoteFn?: (path: string) => Promise<string>
   listRecentNotesFn?: (options: RecentNotesOptions) => Promise<RecentNoteRow[]>
   listDailyNotesFn?: (range: DailyNotesRange) => Promise<DailyNoteRow[]>
+  assetReferencingNotePathsFn?: (assetPath: string) => Promise<string[]>
 }
 
 export interface BuildNoteToolsOptions extends NoteToolDeps {
@@ -71,16 +62,6 @@ export interface BuildNoteToolsOptions extends NoteToolDeps {
 
 export interface SearchNotesOutput {
   hits: CloudSafe<CloudSearchHit>[]
-}
-
-/** One note in a {@link ReadNotesOutput}: its content, or a structured refusal/miss. */
-export type ReadNoteResult =
-  | { ok: true; note: CloudSafe<CloudNoteContent> }
-  | { ok: false; path: string; error: string }
-
-/** The read_notes output: one {@link ReadNoteResult} per requested path, in order. */
-export interface ReadNotesOutput {
-  notes: ReadNoteResult[]
 }
 
 /**
@@ -112,17 +93,6 @@ const searchNotesInput = z.object({
     .max(MAX_SEARCH_LIMIT)
     .optional()
     .describe(`How many notes to return (default ${DEFAULT_SEARCH_LIMIT})`),
-})
-
-const readNotesInput = z.object({
-  paths: z
-    .array(z.string().min(1))
-    .min(1)
-    .max(MAX_READ_NOTES)
-    .describe(
-      'Graph-relative note paths to read, e.g. ["notes/abc.md"] (from search_notes ' +
-        `results). Pass every note you need in one call, up to ${MAX_READ_NOTES}.`,
-    ),
 })
 
 const listRecentNotesInput = z.object({
@@ -173,6 +143,7 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}) {
   const readNoteFn = options.readNoteFn ?? readNote
   const listRecentNotesFn = options.listRecentNotesFn ?? listRecentNotes
   const listDailyNotesFn = options.listDailyNotesFn ?? listDailyNotes
+  const assetRefsFn = options.assetReferencingNotePathsFn ?? assetReferencingNotePaths
   const searchMode: RetrieveOptions['mode'] =
     options.semanticSearchEnabled === false ? 'lexical' : 'hybrid'
 
@@ -189,40 +160,12 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}) {
     }
   }
 
-  // Read one note for read_notes: its body (frontmatter stripped, capped), or
-  // a structured per-note miss/refusal so one bad path never fails the batch.
-  // Content is minted CloudSafe only after the live private re-check.
-  const readOneNote = async (path: string): Promise<ReadNoteResult> => {
-    let source: string
-    try {
-      source = await readNoteFn(path)
-    } catch (cause) {
-      if (isAppError(cause) && cause.kind === 'notFound') {
-        return { ok: false, path, error: 'No note exists at this path.' }
-      }
-      throw cause
-    }
-    const parsed = parseNote({ path, source })
-    const { body } = splitFrontmatter(source)
-    const truncated = body.length > MAX_NOTE_CONTENT_CHARS
-    try {
-      return {
-        ok: true,
-        note: cloudSafeNoteContent({
-          path,
-          isPrivate: parsed.frontmatter.private,
-          title: parsed.title,
-          content: truncated ? body.slice(0, MAX_NOTE_CONTENT_CHARS) : body,
-          truncated,
-        }),
-      }
-    } catch (cause) {
-      if (isPrivateNoteError(cause)) {
-        return { ok: false, path, error: 'This note is marked private and cannot be read by AI.' }
-      }
-      throw cause
-    }
-  }
+  const readOneNote = buildReadOneNote({ readNoteFn })
+
+  const readOneAsset = buildReadOneAsset({
+    readNoteFn,
+    assetReferencingNotePathsFn: assetRefsFn,
+  })
 
   return {
     search_notes: tool({
@@ -288,6 +231,19 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}) {
         return { notes: await Promise.all(paths.map(readOneNote)) }
       },
     }),
+
+    read_assets: tool({
+      description:
+        'Read the stored text description and OCR transcription of image or PDF ' +
+        'attachments that notes embed as assets/… markdown links, e.g. ' +
+        '![sketch](assets/sketch.png). Returns descriptive text about each file, not ' +
+        'the file itself. Pass every attachment you need in a single call. ' +
+        'Attachments of private notes cannot be read.',
+      inputSchema: readAssetsInput,
+      execute: async ({ paths }): Promise<ReadAssetsOutput> => {
+        return { assets: await Promise.all(paths.map(readOneAsset)) }
+      },
+    }),
   }
 }
 
@@ -315,10 +271,18 @@ export interface ReadNoteSummary {
   error: string | null
 }
 
+/** One asset's outcome in a read_assets call, for the tool-activity UI. */
+export interface ReadAssetSummary {
+  path: string
+  /** The per-asset refusal/miss text, or `null` when the read succeeded. */
+  error: string | null
+}
+
 /** One tool invocation, as the transcript sees it. */
 export type NoteToolCall =
   | { tool: 'search'; toolCallId: string; query: string }
   | { tool: 'read'; toolCallId: string; paths: string[] }
+  | { tool: 'assets'; toolCallId: string; paths: string[] }
   | { tool: 'recents'; toolCallId: string; tag: string | null }
   | { tool: 'dailies'; toolCallId: string; start: string; end: string }
 
@@ -326,6 +290,7 @@ export type NoteToolCall =
 export type NoteToolResult =
   | { tool: 'search'; toolCallId: string; query: string; hits: NoteHitSummary[] }
   | { tool: 'read'; toolCallId: string; notes: ReadNoteSummary[] }
+  | { tool: 'assets'; toolCallId: string; assets: ReadAssetSummary[] }
   | {
       tool: 'recents'
       toolCallId: string
@@ -345,6 +310,8 @@ export function noteToolCall(part: TypedToolCall<NoteTools>): NoteToolCall | nul
       return { tool: 'search', toolCallId: part.toolCallId, query: part.input.query }
     case 'read_notes':
       return { tool: 'read', toolCallId: part.toolCallId, paths: part.input.paths }
+    case 'read_assets':
+      return { tool: 'assets', toolCallId: part.toolCallId, paths: part.input.paths }
     case 'list_recent_notes':
       return { tool: 'recents', toolCallId: part.toolCallId, tag: part.input.tag ?? null }
     case 'list_daily_notes':
@@ -383,6 +350,16 @@ export function noteToolResult(part: TypedToolResult<NoteTools>): NoteToolResult
           entry.ok
             ? { path: entry.note.path, title: entry.note.title, error: null }
             : { path: entry.path, title: null, error: entry.error },
+        ),
+      }
+    case 'read_assets':
+      return {
+        tool: 'assets',
+        toolCallId: part.toolCallId,
+        assets: part.output.assets.map((entry) =>
+          entry.ok
+            ? { path: entry.asset.path, error: null }
+            : { path: entry.path, error: entry.error },
         ),
       }
     case 'list_recent_notes': {
