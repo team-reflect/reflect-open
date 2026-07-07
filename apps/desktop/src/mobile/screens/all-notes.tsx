@@ -11,7 +11,6 @@ import {
   type NoteTagFacet,
 } from '@reflect/core'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { FilterBar } from '@/mobile/search-filters/filter-bar'
@@ -22,6 +21,7 @@ import {
   type AllNotesFilters,
 } from '@/mobile/search-filters/filter-state'
 import { NoteRowList, type NoteRowModel } from '@/mobile/note-row-list'
+import { SearchInput } from '@/mobile/search-input'
 import { useArrivalFocus } from '@/mobile/use-arrival-focus'
 import { useGraph } from '@/providers/graph-provider'
 import { routeForPath } from '@/routing/route'
@@ -140,22 +140,12 @@ export function MobileAllNotes({
               <ChevronLeft />
             </Button>
           )}
-          <Input
+          <SearchInput
             ref={searchInputRef}
-            type="search"
-            inputMode="search"
             placeholder="Search anything…"
             aria-label="Search notes"
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
-            onKeyDown={(event) => {
-              // Results filter live, so the keyboard's search key has nothing
-              // to submit — it dismisses the keyboard to reveal the list.
-              if (event.key === 'Enter') {
-                event.currentTarget.blur()
-              }
-            }}
-            className="text-base"
           />
         </div>
         {pending !== null ? (

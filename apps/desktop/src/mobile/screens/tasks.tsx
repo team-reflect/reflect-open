@@ -8,7 +8,6 @@ import {
   type OpenTask,
 } from '@reflect/core'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { useRecentlyCompleted } from '@/lib/tasks/recently-completed'
 import { taskKey } from '@/lib/tasks/task-identity'
@@ -20,6 +19,7 @@ import { completedTasksQueryKey, tasksQueryKey } from '@/lib/tasks/tasks-query'
 import { useTaskActions } from '@/lib/tasks/use-task-actions'
 import { useToday } from '@/lib/use-today'
 import { hapticImpactLight } from '@/mobile/haptics'
+import { SearchInput } from '@/mobile/search-input'
 import { MobileTaskEditSheet } from '@/mobile/task-edit-sheet'
 import { TaskFiltersDrawer } from '@/mobile/task-filters-drawer'
 import { MobileTaskGroup } from '@/mobile/task-group'
@@ -133,14 +133,11 @@ export function MobileTasks(): ReactElement {
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
       <header className="flex shrink-0 items-center gap-1 border-b border-border px-4 pb-2 pt-1">
-        <Input
-          type="search"
-          inputMode="search"
+        <SearchInput
           placeholder="Search tasks…"
           aria-label="Search tasks"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          className="text-base"
         />
         {recentlyCompleted.length > 0 ? (
           <Button
