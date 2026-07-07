@@ -35,8 +35,8 @@ The user can start an audio memo from several places:
 - The lock-screen widget via the `reflect-widget://` URL.
 - The home-screen quick action named "Record audio."
 - Siri / App Intents with "Start recording in Reflect."
-- The Live Activity / Dynamic Island, which shows elapsed time and exposes a stop
-  button on supported iOS versions.
+- The Live Activity / Dynamic Island, which displays recording status on the lock
+  screen, shows elapsed time, and exposes a stop button on supported iOS versions.
 
 Most OS-triggered entry points post a native `recordAudio` notification. The
 `NativeActions` plugin stores the requested action until the webview has finished
@@ -79,7 +79,8 @@ The pipeline is:
    needed.
 2. Create an `.m4a` file under `audio-uploads/`.
 3. Record with `AVAudioRecorder` as AAC mono audio at 44.1 kHz.
-4. Start timers for waveform metering and Live Activity duration updates.
+4. Start timers for waveform metering and lock-screen / Live Activity duration
+   updates.
 5. Disable the idle timer while recording so the screen does not sleep.
 6. On stop, add the file to a persisted pending-upload queue.
 7. Upload directly from Swift to Firebase Storage.
