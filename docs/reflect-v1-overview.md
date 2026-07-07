@@ -8,7 +8,7 @@ For deeper implementation notes, see:
 - [Search](./search.md)
 - [Note sync](./note-sync.md)
 - [SQLite persistence](./sqlite-persistence.md)
-- [Audio memo recording](./audio-memo-recording.md)
+- [Mobile audio memos](./reflect-v1-mobile-audio-memos.md)
 
 ## Product Summary
 
