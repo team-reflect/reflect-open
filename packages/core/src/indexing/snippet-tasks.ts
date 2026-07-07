@@ -32,7 +32,7 @@ export interface SnippetTask {
    * an ambiguous line instead of guessing.
    */
   markerOffset: number
-  /** The marker line from `[` to the end of the snippet line ({@link TaskMarker.raw}). */
+  /** The source marker line from `[` to the physical line end ({@link TaskMarker.raw}). */
   raw: string
   /** `[x]`/`[X]` → true, `[ ]` → false. */
   checked: boolean
@@ -43,6 +43,22 @@ export interface SnippetTask {
   round: boolean
   /** The line's content after the marker and one space — the view's click payload `text`. */
   text: string
+}
+
+function rawLineFor(
+  snippet: string,
+  starts: readonly number[],
+  line: number,
+  lineEnd: number,
+  column: number,
+  lineSourceTexts: readonly string[],
+): string {
+  const snippetLine = snippet.slice(starts[line]!, lineEnd)
+  const sourceLine = lineSourceTexts[line]
+  if (sourceLine === undefined || sourceLine.length < column + 3) {
+    return snippetLine
+  }
+  return sourceLine
 }
 
 /** Start offset of every line of `text`. */
@@ -76,9 +92,16 @@ function isCheckboxTask(task: SyntaxNode): boolean {
  * Enumerate the checkboxes of one snippet in document order — the same order
  * (and count) meowdown's `MarkdownView` renders and reports click indexes in —
  * each anchored to its source-note marker offset via `lineOrigins`, the
- * per-line origins from `blockContextLinesAt`.
+ * per-line origins from `blockContextLinesAt`. When present,
+ * `lineSourceTexts` carries the untrimmed source line for each displayed
+ * snippet line, letting `raw` preserve trailing bytes that the snippet trims
+ * away for rendering.
  */
-export function extractSnippetTasks(snippet: string, lineOrigins: number[]): SnippetTask[] {
+export function extractSnippetTasks(
+  snippet: string,
+  lineOrigins: readonly number[],
+  lineSourceTexts: readonly string[] = [],
+): SnippetTask[] {
   if (snippet === '') {
     return []
   }
@@ -97,13 +120,14 @@ export function extractSnippetTasks(snippet: string, lineOrigins: number[]): Sni
       const column = markerFrom - starts[line]!
       const origin = lineOrigins[line]
       const bullet = snippet.slice(starts[line]!, markerFrom)
+      const sourceLine = rawLineFor(snippet, starts, line, lineEnd, column, lineSourceTexts)
       let textStart = markerFrom + 3
       if (snippet[textStart] === ' ') {
         textStart += 1
       }
       tasks.push({
         markerOffset: origin === undefined ? -1 : origin + column,
-        raw: snippet.slice(markerFrom, lineEnd),
+        raw: sourceLine.slice(column),
         // A `Task` node always carries a valid GFM marker; the parse is the
         // defensive read the toggle repeats against the live source.
         checked: marker?.checked === true,

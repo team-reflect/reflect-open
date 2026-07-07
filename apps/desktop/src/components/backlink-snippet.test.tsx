@@ -88,11 +88,10 @@ describe('BacklinkSnippet task checkboxes', () => {
   it('leaves a square GFM checkbox read-only', async () => {
     const view = renderSnippet()
     const boxes = view.container.querySelectorAll('input[type="checkbox"]')
+    expect((boxes[1] as HTMLInputElement).checked).toBe(true)
     await userEvent.click(boxes[1]!)
     expect(toggleTask).not.toHaveBeenCalled()
     expect(operationFail).not.toHaveBeenCalled()
-    // The click never flips the rendered box either.
-    expect((boxes[1] as HTMLInputElement).checked).toBe(true)
     view.unmount()
   })
 

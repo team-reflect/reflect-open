@@ -91,7 +91,7 @@ export async function getBacklinksWithContext(path: string): Promise<BacklinkCon
     const source = sources.get(row.sourcePath)
     const context =
       source == null
-        ? { text: '', lineOrigins: [] }
+        ? { text: '', lineOrigins: [], lineSourceTexts: [] }
         : blockContextLinesAt(source, row.posFrom, targetKeys)
     const snippet = context.text
     if (snippet !== '') {
@@ -106,7 +106,7 @@ export async function getBacklinksWithContext(path: string): Promise<BacklinkCon
       sourceTitle: row.sourceTitle,
       snippet,
       posFrom: row.posFrom,
-      tasks: extractSnippetTasks(snippet, context.lineOrigins),
+      tasks: extractSnippetTasks(snippet, context.lineOrigins, context.lineSourceTexts),
     })
   }
   return results

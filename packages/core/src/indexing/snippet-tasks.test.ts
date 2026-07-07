@@ -14,8 +14,8 @@ function posOf(content: string, link: string): number {
 
 /** The full pipeline the panel runs: source → block context → task anchors. */
 function tasksFor(content: string, link = '[[Target]]'): SnippetTask[] {
-  const { text, lineOrigins } = blockContextLinesAt(content, posOf(content, link))
-  return extractSnippetTasks(text, lineOrigins)
+  const { text, lineOrigins, lineSourceTexts } = blockContextLinesAt(content, posOf(content, link))
+  return extractSnippetTasks(text, lineOrigins, lineSourceTexts)
 }
 
 describe('extractSnippetTasks', () => {
@@ -46,6 +46,19 @@ describe('extractSnippetTasks', () => {
     const toggled = toggleTaskMarker(content, { markerOffset: first!.markerOffset, raw: first!.raw })
     expect(toggled.checked).toBe(true)
     expect(toggled.source).toBe('- [[Target]] kickoff\n  + [x] prep agenda\n  + [x] send invite\n')
+  })
+
+  it('preserves trailing whitespace in the source raw line', () => {
+    const content = '- [[Target]] kickoff\n  + [ ] prep agenda   \n'
+    const [task] = tasksFor(content)
+    expect(task).toMatchObject({
+      markerOffset: content.indexOf('[ ]'),
+      raw: '[ ] prep agenda   ',
+      text: 'prep agenda',
+    })
+    expect(toggleTaskMarker(content, task!).source).toBe(
+      '- [[Target]] kickoff\n  + [x] prep agenda   \n',
+    )
   })
 
   it('anchors correctly through a dedented nested context', () => {

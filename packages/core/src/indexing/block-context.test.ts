@@ -216,11 +216,15 @@ describe('blockContextLinesAt', () => {
    * every snippet line must read back verbatim from the source at its origin.
    */
   function expectOriginsAnchor(content: string, pos: number, targetKeys?: Set<string>): void {
-    const { text, lineOrigins } = blockContextLinesAt(content, pos, targetKeys)
+    const { text, lineOrigins, lineSourceTexts } = blockContextLinesAt(content, pos, targetKeys)
     const lines = text.split('\n')
     expect(lineOrigins).toHaveLength(lines.length)
+    expect(lineSourceTexts).toHaveLength(lines.length)
     for (const [index, line] of lines.entries()) {
       expect(content.slice(lineOrigins[index], lineOrigins[index]! + line.length)).toBe(line)
+      expect(
+        content.slice(lineOrigins[index], lineOrigins[index]! + lineSourceTexts[index]!.length),
+      ).toBe(lineSourceTexts[index])
     }
   }
 
@@ -233,6 +237,13 @@ describe('blockContextLinesAt', () => {
   it('anchors every paragraph line to its source offset', () => {
     const content = 'intro\n\nwrapped [[Target]] line\nsecond line\n'
     expectOriginsAnchor(content, posOf(content, '[[Target]]'))
+  })
+
+  it('keeps untrimmed source text for a trailing task line', () => {
+    const content = '- [[Target]] kickoff\n  + [ ] prep agenda   \n'
+    const { text, lineSourceTexts } = blockContextLinesAt(content, posOf(content, '[[Target]]'))
+    expect(text).toBe('- [[Target]] kickoff\n  + [ ] prep agenda')
+    expect(lineSourceTexts).toEqual(['- [[Target]] kickoff', '  + [ ] prep agenda   '])
   })
 
   it('anchors across frontmatter with whole-file offsets', () => {
