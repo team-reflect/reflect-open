@@ -10,7 +10,9 @@ import { splitFrontmatter } from '../markdown/frontmatter'
  * so a query matching a description surfaces the note — transparently, as an
  * ordinary hit. The same bodies feed the note's embedding chunks (the semantic
  * leg), so lexical and semantic retrieval see the same asset text. It never
- * enters the All-Notes preview or the AI-readable note *content*.
+ * enters the All-Notes preview or the note *content* AI reads — chat reaches
+ * description text solely through the read_assets tool
+ * (`ai/chat/read-assets.ts`), behind its own live privacy gate.
  */
 
 /** Cap on folded description text per note (chars) — bounds the FTS document. */

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { classifyAssetFromNotes } from '../../actions/asset-description-helpers'
+import { classifyAssetFromNotes } from '../../actions/asset-privacy'
 import { isAppError } from '../../errors'
 import { descriptionPathFor, isAssetPath } from '../../graph/paths'
 import { splitFrontmatter } from '../../markdown/frontmatter'

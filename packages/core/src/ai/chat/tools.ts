@@ -1,43 +1,31 @@
 import { tool, type TypedToolCall, type TypedToolResult } from 'ai'
 import { z } from 'zod'
-import { isAppError } from '../../errors'
 import { readNote } from '../../graph/commands'
 import { retrieve, type RetrievalHit, type RetrieveOptions } from '../../embeddings/retrieve'
 import { assetReferencingNotePaths } from '../../indexing/asset-refs'
 import { listDailyNotes, type DailyNoteRow, type DailyNotesRange } from '../../indexing/queries'
 import { listRecentNotes, type RecentNoteRow, type RecentNotesOptions } from '../../indexing/note-list'
 import { parseFrontmatter, splitFrontmatter } from '../../markdown/frontmatter'
-import { isTagName, parseNote } from '../../markdown/extract'
+import { isTagName } from '../../markdown/extract'
 import { buildReadOneAsset, readAssetsInput, type ReadAssetsOutput } from './read-assets'
+import { buildReadOneNote, readNotesInput, type ReadNotesOutput } from './read-notes'
 import {
-  cloudSafeNoteContent,
   cloudSafeNoteListings,
   cloudSafeSearchHits,
-  isPrivateNoteError,
-  type CloudNoteContent,
   type CloudNoteListing,
   type CloudSafe,
   type CloudSearchHit,
   type CloudSendable,
 } from '../checkers'
 
-export {
-  ASSET_UNAVAILABLE_ERROR,
-  MAX_ASSET_DESCRIPTION_CHARS,
-  MAX_READ_ASSETS,
-  NO_ASSET_DESCRIPTION_ERROR,
-  NOT_AN_ASSET_ERROR,
-  type ReadAssetResult,
-  type ReadAssetsOutput,
-} from './read-assets'
-
 /**
  * The read-only note tools the chat model can call (Plan 10, first wave),
  * and — deliberately in the same module — everything else that knows their
  * names: the {@link NoteToolCall}/{@link NoteToolResult} unions the engine
  * streams and the UI renders, and the mappers from SDK stream parts onto
- * them. Adding a tool means extending this file and the chip that renders
- * it; nothing else switches on tool names.
+ * them. Adding a tool means registering it here (batch executors live in
+ * sibling `read-*.ts` modules) and extending the chip that renders it;
+ * nothing else switches on tool names.
  *
  * Note content enters tool outputs only as {@link CloudSafe} values, minted
  * by the privacy gate in `../checkers` — search drops private hits entirely,
@@ -54,16 +42,6 @@ const MAX_RECENT_LIMIT = 20
 
 /** Most days one daily-range call returns; past it the model narrows the range. */
 export const MAX_DAILY_NOTE_DAYS = 31
-
-/** Cap on returned note content so one huge note can't flood the context. */
-export const MAX_NOTE_CONTENT_CHARS = 24_000
-
-/**
- * Cap on notes one read_notes call returns. Each note is itself capped at
- * {@link MAX_NOTE_CONTENT_CHARS}, so this bounds a single batch read to roughly
- * the per-turn token reserve — past it the model splits the read across calls.
- */
-export const MAX_READ_NOTES = 10
 
 /** Injectable effects so tests can drive the tools without a live bridge. */
 export interface NoteToolDeps {
@@ -84,16 +62,6 @@ export interface BuildNoteToolsOptions extends NoteToolDeps {
 
 export interface SearchNotesOutput {
   hits: CloudSafe<CloudSearchHit>[]
-}
-
-/** One note in a {@link ReadNotesOutput}: its content, or a structured refusal/miss. */
-export type ReadNoteResult =
-  | { ok: true; note: CloudSafe<CloudNoteContent> }
-  | { ok: false; path: string; error: string }
-
-/** The read_notes output: one {@link ReadNoteResult} per requested path, in order. */
-export interface ReadNotesOutput {
-  notes: ReadNoteResult[]
 }
 
 /**
@@ -125,17 +93,6 @@ const searchNotesInput = z.object({
     .max(MAX_SEARCH_LIMIT)
     .optional()
     .describe(`How many notes to return (default ${DEFAULT_SEARCH_LIMIT})`),
-})
-
-const readNotesInput = z.object({
-  paths: z
-    .array(z.string().min(1))
-    .min(1)
-    .max(MAX_READ_NOTES)
-    .describe(
-      'Graph-relative note paths to read, e.g. ["notes/abc.md"] (from search_notes ' +
-        `results). Pass every note you need in one call, up to ${MAX_READ_NOTES}.`,
-    ),
 })
 
 const listRecentNotesInput = z.object({
@@ -203,40 +160,7 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}) {
     }
   }
 
-  // Read one note for read_notes: its body (frontmatter stripped, capped), or
-  // a structured per-note miss/refusal so one bad path never fails the batch.
-  // Content is minted CloudSafe only after the live private re-check.
-  const readOneNote = async (path: string): Promise<ReadNoteResult> => {
-    let source: string
-    try {
-      source = await readNoteFn(path)
-    } catch (cause) {
-      if (isAppError(cause) && cause.kind === 'notFound') {
-        return { ok: false, path, error: 'No note exists at this path.' }
-      }
-      throw cause
-    }
-    const parsed = parseNote({ path, source })
-    const { body } = splitFrontmatter(source)
-    const truncated = body.length > MAX_NOTE_CONTENT_CHARS
-    try {
-      return {
-        ok: true,
-        note: cloudSafeNoteContent({
-          path,
-          isPrivate: parsed.frontmatter.private,
-          title: parsed.title,
-          content: truncated ? body.slice(0, MAX_NOTE_CONTENT_CHARS) : body,
-          truncated,
-        }),
-      }
-    } catch (cause) {
-      if (isPrivateNoteError(cause)) {
-        return { ok: false, path, error: 'This note is marked private and cannot be read by AI.' }
-      }
-      throw cause
-    }
-  }
+  const readOneNote = buildReadOneNote({ readNoteFn })
 
   const readOneAsset = buildReadOneAsset({
     readNoteFn,

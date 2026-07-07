@@ -397,6 +397,9 @@ note(s) that reference that asset, as ordinary hits.
   alone** — so descriptions are locally searchable but never widen the All-Notes
   preview or what is sent to a provider (those read the note body / live
   markdown). That falls out of enriching only the FTS column.
+  > **Addendum (PR #630):** AI chat can now read description text explicitly via
+  > the `read_assets` tool (`ai/chat/read-assets.ts`), behind its own live
+  > privacy verdict. Note text and previews are still never widened.
 - `PROJECTION_VERSION` 8 → 9, so existing graphs rebuild and fold descriptions.
 
 **Async re-index seam.** Descriptions are written *after* a note is indexed and

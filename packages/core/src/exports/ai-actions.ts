@@ -48,11 +48,7 @@ export {
 } from '../ai/checkers'
 export {
   buildNoteTools,
-  MAX_ASSET_DESCRIPTION_CHARS,
   MAX_DAILY_NOTE_DAYS,
-  MAX_NOTE_CONTENT_CHARS,
-  MAX_READ_ASSETS,
-  MAX_READ_NOTES,
   type ListDailyNotesOutput,
   type ListRecentNotesOutput,
   type NoteHitSummary,
@@ -60,14 +56,22 @@ export {
   type NoteToolDeps,
   type NoteToolResult,
   type NoteTools,
-  type ReadAssetResult,
-  type ReadAssetsOutput,
   type ReadAssetSummary,
-  type ReadNoteResult,
   type ReadNoteSummary,
-  type ReadNotesOutput,
   type SearchNotesOutput,
 } from '../ai/chat/tools'
+export {
+  MAX_NOTE_CONTENT_CHARS,
+  MAX_READ_NOTES,
+  type ReadNoteResult,
+  type ReadNotesOutput,
+} from '../ai/chat/read-notes'
+export {
+  MAX_ASSET_DESCRIPTION_CHARS,
+  MAX_READ_ASSETS,
+  type ReadAssetResult,
+  type ReadAssetsOutput,
+} from '../ai/chat/read-assets'
 export { chatSystemPrompt, type SystemPromptInput } from '../ai/chat/system-prompt'
 export {
   loadChatGraphContext,
