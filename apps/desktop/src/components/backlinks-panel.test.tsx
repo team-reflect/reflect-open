@@ -69,6 +69,7 @@ describe('BacklinksPanel', () => {
         sourceTitle: 'Meeting Notes',
         snippet: 'discussed [[Roadmap]] follow-ups',
         posFrom: 12,
+        tasks: [],
       },
     ])
     const view = renderPanel('notes/roadmap.md')
@@ -83,6 +84,7 @@ describe('BacklinksPanel', () => {
         sourceTitle: 'Meeting Notes',
         snippet: 'discussed [[Roadmap]] follow-ups',
         posFrom: 12,
+        tasks: [],
       },
     ])
     resolveWikiTarget.mockResolvedValue({ kind: 'resolved', ref: 'notes/roadmap.md' })
@@ -107,18 +109,21 @@ describe('BacklinksPanel', () => {
         sourceTitle: 'Meeting Notes',
         snippet: 'discussed [[Roadmap]] follow-ups',
         posFrom: 12,
+        tasks: [],
       },
       {
         sourcePath: 'notes/meeting.md',
         sourceTitle: 'Meeting Notes',
         snippet: 'revisit [[Roadmap]] next week',
         posFrom: 80,
+        tasks: [],
       },
       {
         sourcePath: 'notes/planning.md',
         sourceTitle: 'Planning',
         snippet: 'ship the [[Roadmap]]',
         posFrom: 3,
+        tasks: [],
       },
     ])
     const view = renderPanel('notes/roadmap.md')
@@ -147,6 +152,7 @@ describe('BacklinksPanel', () => {
         sourceTitle: 'Meeting Notes',
         snippet: 'discussed [[Roadmap]] follow-ups',
         posFrom: 12,
+        tasks: [],
       },
     ])
     const view = renderPanel('notes/roadmap.md')
@@ -175,6 +181,7 @@ describe('BacklinksPanel', () => {
         sourceTitle: 'Shared Source',
         snippet: 'links [[A]] and [[B]]',
         posFrom: 5,
+        tasks: [],
       },
     ])
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -205,6 +212,7 @@ describe('BacklinksPanel', () => {
         sourceTitle: 'Meeting Notes',
         snippet: 'discussed [[Roadmap]] follow-ups',
         posFrom: 12,
+        tasks: [],
       },
     ])
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -236,12 +244,14 @@ describe('BacklinksPanel', () => {
         sourceTitle: 'Meeting Notes',
         snippet: 'discussed [[Roadmap]] follow-ups',
         posFrom: 12,
+        tasks: [],
       },
       {
         sourcePath: 'notes/planning.md',
         sourceTitle: 'Planning',
         snippet: 'ship the [[Roadmap]]',
         posFrom: 3,
+        tasks: [],
       },
     ])
     const view = renderPanel('notes/roadmap.md')
@@ -269,12 +279,14 @@ describe('BacklinksPanel', () => {
         sourceTitle: 'Meeting Notes',
         snippet: 'discussed [[Roadmap]] follow-ups',
         posFrom: 12,
+        tasks: [],
       },
       {
         sourcePath: 'notes/planning.md',
         sourceTitle: 'Planning',
         snippet: 'ship the [[Roadmap]]',
         posFrom: 3,
+        tasks: [],
       },
     ])
     const view = renderPanel('notes/roadmap.md')

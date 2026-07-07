@@ -3,7 +3,6 @@ import { parseFrontmatter, splitFrontmatter } from '../markdown/frontmatter'
 import { parseBody } from '../markdown/grammar'
 import { unescapeMarkdownText } from '../markdown/plain-text'
 import { normalizeWikiTarget } from '../markdown/resolve'
-import { lineAt } from './snippet'
 
 /**
  * Block-level context extraction for the backlinks panel, ported from old
@@ -115,25 +114,60 @@ function lineEndAt(body: string, pos: number): number {
 }
 
 /**
+ * Context text in line-structured form: `origins[i]` is the body offset of the
+ * first character of `lines[i]` — the character the line starts with *after*
+ * dedenting, so an offset within a snippet line maps back to the source by
+ * plain addition. The tracked origins are what lets a snippet interaction (a
+ * task checkbox click) write through to the exact source position.
+ */
+interface ContextLines {
+  lines: string[]
+  origins: number[]
+  sourceLines: string[]
+}
+
+/** Drop trailing all-whitespace lines, then trailing whitespace of the last line. */
+function trimTrailing(context: ContextLines): ContextLines {
+  const { lines, origins, sourceLines } = context
+  while (lines.length > 0 && lines[lines.length - 1]!.trim() === '') {
+    lines.pop()
+    origins.pop()
+    sourceLines.pop()
+  }
+  if (lines.length > 0) {
+    lines[lines.length - 1] = lines[lines.length - 1]!.replace(/\s+$/, '')
+  }
+  return context
+}
+
+/**
  * The full lines covering `[from, to)`, with `prefix` stripped from every line
  * it leads. Deeper indentation stays relative, so a sliced list still renders
  * nested.
  */
-function dedentedSlice(body: string, from: number, to: number, prefix: string): string {
+function dedentedSlice(body: string, from: number, to: number, prefix: string): ContextLines {
   const start = lineStartAt(body, from)
   const end = to > from && body[to - 1] === '\n' ? to - 1 : to
-  const lines = body.slice(start, lineEndAt(body, end)).split('\n')
-  const dedented = lines.map((line) =>
-    prefix !== '' && line.startsWith(prefix) ? line.slice(prefix.length) : line,
-  )
-  return dedented.join('\n').trimEnd()
+  const lines: string[] = []
+  const origins: number[] = []
+  const sourceLines: string[] = []
+  let lineStart = start
+  for (const raw of body.slice(start, lineEndAt(body, end)).split('\n')) {
+    const stripped = prefix !== '' && raw.startsWith(prefix)
+    const line = stripped ? raw.slice(prefix.length) : raw
+    lines.push(line)
+    sourceLines.push(line)
+    origins.push(stripped ? lineStart + prefix.length : lineStart)
+    lineStart += raw.length + 1
+  }
+  return trimTrailing({ lines, origins, sourceLines })
 }
 
 /**
  * A block's full lines dedented by its own first-line prefix — the text before
  * `from` on its line: indentation, or `> ` inside a blockquote.
  */
-function dedentedBlockAt(body: string, from: number, to: number): string {
+function dedentedBlockAt(body: string, from: number, to: number): ContextLines {
   return dedentedSlice(body, from, to, body.slice(lineStartAt(body, from), from))
 }
 
@@ -207,7 +241,7 @@ function listItemContext(
   item: SyntaxNode,
   targetKeys: ReadonlySet<string>,
   bodyPos: number,
-): string {
+): ContextLines {
   const parentItem = selfOrAncestor(item.parent, (node) => node.name === 'ListItem')
   const lead = parentItem ? leadTextblock(parentItem) : null
   if (!parentItem || !lead) {
@@ -215,7 +249,7 @@ function listItemContext(
   }
 
   const indent = body.slice(lineStartAt(body, parentItem.from), parentItem.from)
-  const pieces: string[] = [dedentedBlockAt(body, parentItem.from, lead.to)]
+  const pieces: ContextLines[] = [dedentedBlockAt(body, parentItem.from, lead.to)]
   for (let child = lead.nextSibling; child; child = child.nextSibling) {
     const branches = isListName(child.name) ? child.getChildren('ListItem') : [child]
     for (const branch of branches) {
@@ -224,7 +258,11 @@ function listItemContext(
       }
     }
   }
-  return pieces.join('\n')
+  return {
+    lines: pieces.flatMap((piece) => piece.lines),
+    origins: pieces.flatMap((piece) => piece.origins),
+    sourceLines: pieces.flatMap((piece) => piece.sourceLines),
+  }
 }
 
 /**
@@ -254,6 +292,74 @@ export function prepareBlockContext(content: string): BlockContextSource {
 }
 
 /**
+ * A block context with its write-back coordinates: the snippet Markdown plus,
+ * per snippet line, the whole-file offset of the line's first character (the
+ * dedent already accounted for — see {@link ContextLines}). Interactions
+ * inside a rendered snippet map back to the source by line + column.
+ */
+export interface BlockContextLines {
+  /** The snippet Markdown, exactly what {@link blockContextAt} returns. */
+  text: string
+  /** Whole-file offset of each snippet line's first character. */
+  lineOrigins: number[]
+  /**
+   * Each snippet line's exact source text from `lineOrigins[i]` to the physical
+   * line end, before display-only trailing whitespace trimming.
+   */
+  lineSourceTexts: string[]
+}
+
+function contextLinesAt(
+  source: string | BlockContextSource,
+  pos: number,
+  targetKeys?: ReadonlySet<string>,
+): { context: ContextLines; bodyOffset: number } {
+  const { body, bodyOffset, tree, frontmatterTitled } =
+    typeof source === 'string' ? prepareBlockContext(source) : source
+  const bodyPos = Math.max(0, Math.min(pos - bodyOffset, body.length))
+  const leaf: SyntaxNode = tree.resolveInner(bodyPos, 1)
+
+  const link = selfOrAncestor(leaf, (node) => node.name === 'WikiLink')
+  const posKey = link ? wikiTargetKeyOf(body, link) : null
+  const keys = new Set(targetKeys)
+  if (posKey !== null) {
+    keys.add(posKey) // a stale index entry still anchors its own branch
+  }
+
+  const heading = selfOrAncestor(leaf, (node) => isHeadingName(node.name))
+  if (heading) {
+    const end = isTitleHeading(body, heading, frontmatterTitled)
+      ? heading.to
+      : headingSectionEnd(heading)
+    return { context: dedentedBlockAt(body, heading.from, end), bodyOffset }
+  }
+
+  const item = selfOrAncestor(leaf, (node) => node.name === 'ListItem')
+  if (item) {
+    return { context: listItemContext(body, item, keys, bodyPos), bodyOffset }
+  }
+
+  const block = selfOrAncestor(leaf, (node) => isTextblockName(node.name))
+  if (block) {
+    return { context: dedentedBlockAt(body, block.from, block.to), bodyOffset }
+  }
+
+  // Not inside a text block: a table cell, or an offset drifted into the gap
+  // between blocks. Use the nearest top-level block, else the bare line.
+  const top = selfOrAncestor(leaf, (node) => node.parent?.name === 'Document')
+  if (top) {
+    return { context: dedentedBlockAt(body, top.from, top.to), bodyOffset }
+  }
+  const lineStart = lineStartAt(body, bodyPos)
+  const raw = body.slice(lineStart, lineEndAt(body, bodyPos))
+  const leading = raw.length - raw.trimStart().length
+  return {
+    context: { lines: [raw.trim()], origins: [lineStart + leading], sourceLines: [raw.slice(leading)] },
+    bodyOffset,
+  }
+}
+
+/**
  * The Markdown block context around the link at whole-file offset `pos` (the
  * index's `pos_from`, frontmatter offset included) — see the module doc for
  * the shape per mention location. Accepts either raw source (parsed on the
@@ -273,41 +379,25 @@ export function blockContextAt(
   pos: number,
   targetKeys?: ReadonlySet<string>,
 ): string {
-  const { body, bodyOffset, tree, frontmatterTitled } =
-    typeof source === 'string' ? prepareBlockContext(source) : source
-  const bodyPos = Math.max(0, Math.min(pos - bodyOffset, body.length))
-  const leaf: SyntaxNode = tree.resolveInner(bodyPos, 1)
+  return contextLinesAt(source, pos, targetKeys).context.lines.join('\n')
+}
 
-  const link = selfOrAncestor(leaf, (node) => node.name === 'WikiLink')
-  const posKey = link ? wikiTargetKeyOf(body, link) : null
-  const keys = new Set(targetKeys)
-  if (posKey !== null) {
-    keys.add(posKey) // a stale index entry still anchors its own branch
+/**
+ * {@link blockContextAt} plus each snippet line's whole-file origin, for
+ * mapping an interaction inside the rendered snippet (a task checkbox click)
+ * back to the exact source offset it came from. Origins are as of this read;
+ * a later edit can drift them, which the task toggle's staleness guard
+ * ({@link toggleTaskMarker}) turns into a refusal rather than a wrong write.
+ */
+export function blockContextLinesAt(
+  source: string | BlockContextSource,
+  pos: number,
+  targetKeys?: ReadonlySet<string>,
+): BlockContextLines {
+  const { context, bodyOffset } = contextLinesAt(source, pos, targetKeys)
+  return {
+    text: context.lines.join('\n'),
+    lineOrigins: context.origins.map((origin) => origin + bodyOffset),
+    lineSourceTexts: context.sourceLines,
   }
-
-  const heading = selfOrAncestor(leaf, (node) => isHeadingName(node.name))
-  if (heading) {
-    const end = isTitleHeading(body, heading, frontmatterTitled)
-      ? heading.to
-      : headingSectionEnd(heading)
-    return dedentedBlockAt(body, heading.from, end)
-  }
-
-  const item = selfOrAncestor(leaf, (node) => node.name === 'ListItem')
-  if (item) {
-    return listItemContext(body, item, keys, bodyPos)
-  }
-
-  const block = selfOrAncestor(leaf, (node) => isTextblockName(node.name))
-  if (block) {
-    return dedentedBlockAt(body, block.from, block.to)
-  }
-
-  // Not inside a text block: a table cell, or an offset drifted into the gap
-  // between blocks. Use the nearest top-level block, else the bare line.
-  const top = selfOrAncestor(leaf, (node) => node.parent?.name === 'Document')
-  if (top) {
-    return dedentedBlockAt(body, top.from, top.to)
-  }
-  return lineAt(body, bodyPos)
 }

@@ -1,8 +1,9 @@
 import type { Database } from '@reflect/db'
 import { sql, type Selectable } from 'kysely'
 import { readNote } from '../graph/commands'
-import { blockContextAt, prepareBlockContext, type BlockContextSource } from './block-context'
+import { blockContextLinesAt, prepareBlockContext, type BlockContextSource } from './block-context'
 import { db } from './db'
+import { extractSnippetTasks, type SnippetTask } from './snippet-tasks'
 
 export type Backlink = Pick<
   Selectable<Database['backlinks']>,
@@ -31,6 +32,12 @@ export interface BacklinkContext {
    */
   snippet: string
   posFrom: number
+  /**
+   * The snippet's rendered task checkboxes in document order, each anchored to
+   * its source-note marker ({@link extractSnippetTasks}), so a checkbox click
+   * in the panel can write the toggle through to the source note.
+   */
+  tasks: SnippetTask[]
 }
 
 /**
@@ -82,7 +89,11 @@ export async function getBacklinksWithContext(path: string): Promise<BacklinkCon
   const results: BacklinkContext[] = []
   for (const row of rows) {
     const source = sources.get(row.sourcePath)
-    const snippet = source == null ? '' : blockContextAt(source, row.posFrom, targetKeys)
+    const context =
+      source == null
+        ? { text: '', lineOrigins: [], lineSourceTexts: [] }
+        : blockContextLinesAt(source, row.posFrom, targetKeys)
+    const snippet = context.text
     if (snippet !== '') {
       const key = `${row.sourcePath}\u0000${snippet}`
       if (seen.has(key)) {
@@ -95,6 +106,7 @@ export async function getBacklinksWithContext(path: string): Promise<BacklinkCon
       sourceTitle: row.sourceTitle,
       snippet,
       posFrom: row.posFrom,
+      tasks: extractSnippetTasks(snippet, context.lineOrigins, context.lineSourceTexts),
     })
   }
   return results

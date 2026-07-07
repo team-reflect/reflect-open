@@ -471,6 +471,19 @@ html:root {
   line-height: inherit;
   letter-spacing: 0;
 }
+/* Only round `+ [ ]` Reflect tasks write back from a snippet (V1's backlink
+   checkboxes were Reflect tasks); a square GFM box is plain markdown, so its
+   checkbox stays inert — no click, no hover grow. */
+.reflect-backlink-snippet
+  .prosemirror-flat-list[data-list-kind='task']:not([data-list-marker='+'])
+  > .list-marker {
+  pointer-events: none;
+}
+.reflect-backlink-snippet
+  .prosemirror-flat-list[data-list-kind='task'][data-list-marker='+']
+  > .list-marker {
+  cursor: pointer;
+}
 
 /* meowdown's blockquote is now upright, muted, and themed by default; we only
    restate the thinner accent border and the block margin (the per-element spacing

@@ -122,7 +122,14 @@ export {
   type HighlightSegment,
 } from './search'
 export { lineAt, lineSnippet, previewSnippet } from './snippet'
-export { blockContextAt, prepareBlockContext, type BlockContextSource } from './block-context'
+export {
+  blockContextAt,
+  blockContextLinesAt,
+  prepareBlockContext,
+  type BlockContextLines,
+  type BlockContextSource,
+} from './block-context'
+export { extractSnippetTasks, type SnippetTask } from './snippet-tasks'
 export { parseSearchQuery, type ParsedSearchQuery, type SearchFilters } from './filter-query'
 export {
   searchWithFilters,

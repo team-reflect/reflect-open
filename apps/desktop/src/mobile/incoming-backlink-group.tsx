@@ -88,6 +88,8 @@ export function IncomingBacklinkGroup({
             <BacklinkSnippet
               key={snippet.key}
               text={snippet.text}
+              notePath={source.path}
+              tasks={snippet.tasks}
               onWikilinkClick={onWikilinkClick}
               resolveImageUrl={resolveImageUrl}
             />

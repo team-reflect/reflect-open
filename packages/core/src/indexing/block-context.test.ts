@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { blockContextAt, prepareBlockContext } from './block-context'
+import { blockContextAt, blockContextLinesAt, prepareBlockContext } from './block-context'
 
 /** Offset of the first `[[target]]` occurrence — the index's `pos_from`. */
 function posOf(content: string, link: string): number {
@@ -207,5 +207,97 @@ describe('blockContextAt', () => {
     const source = prepareBlockContext(content)
     expect(blockContextAt(source, posOf(content, '[[Target]]'))).toBe('first [[Target]] mention')
     expect(blockContextAt(source, content.lastIndexOf('[[Target]]'))).toBe('- second [[Target]]')
+  })
+})
+
+describe('blockContextLinesAt', () => {
+  /**
+   * The line-origin invariant: dedenting only ever strips a line *prefix*, so
+   * every snippet line must read back verbatim from the source at its origin.
+   */
+  function expectOriginsAnchor(content: string, pos: number, targetKeys?: Set<string>): void {
+    const { text, lineOrigins, lineSourceTexts } = blockContextLinesAt(content, pos, targetKeys)
+    const lines = text.split('\n')
+    expect(lineOrigins).toHaveLength(lines.length)
+    expect(lineSourceTexts).toHaveLength(lines.length)
+    for (const [index, line] of lines.entries()) {
+      expect(content.slice(lineOrigins[index], lineOrigins[index]! + line.length)).toBe(line)
+      expect(
+        content.slice(lineOrigins[index], lineOrigins[index]! + lineSourceTexts[index]!.length),
+      ).toBe(lineSourceTexts[index])
+    }
+  }
+
+  it('returns the same text as blockContextAt', () => {
+    const content = '- parent line\n  - first [[Target]] mention\n  - unrelated\n'
+    const pos = posOf(content, '[[Target]]')
+    expect(blockContextLinesAt(content, pos).text).toBe(blockContextAt(content, pos))
+  })
+
+  it('anchors every paragraph line to its source offset', () => {
+    const content = 'intro\n\nwrapped [[Target]] line\nsecond line\n'
+    expectOriginsAnchor(content, posOf(content, '[[Target]]'))
+  })
+
+  it('keeps untrimmed source text for a trailing task line', () => {
+    const content = '- [[Target]] kickoff\n  + [ ] prep agenda   \n'
+    const { text, lineSourceTexts } = blockContextLinesAt(content, posOf(content, '[[Target]]'))
+    expect(text).toBe('- [[Target]] kickoff\n  + [ ] prep agenda')
+    expect(lineSourceTexts).toEqual(['- [[Target]] kickoff', '  + [ ] prep agenda   '])
+  })
+
+  it('anchors across frontmatter with whole-file offsets', () => {
+    const content = '---\ntitle: Note\n---\n\na [[Target]] paragraph\n'
+    const { lineOrigins } = blockContextLinesAt(content, posOf(content, '[[Target]]'))
+    expect(lineOrigins).toEqual([content.indexOf('a [[Target]]')])
+    expectOriginsAnchor(content, posOf(content, '[[Target]]'))
+  })
+
+  it('anchors dedented nested-list lines past the stripped indent', () => {
+    const content = [
+      '- top item',
+      '\t- middle item',
+      '\t\t- deep [[Target]] mention',
+      '\t\t\t+ [ ] nested task',
+      '\t- other branch',
+      '',
+    ].join('\n')
+    const pos = posOf(content, '[[Target]]')
+    const { text, lineOrigins } = blockContextLinesAt(content, pos)
+    expect(text).toBe('- middle item\n\t- deep [[Target]] mention\n\t\t+ [ ] nested task')
+    // The dedented lines' origins skip the stripped one-tab parent indent.
+    expect(lineOrigins).toEqual([
+      content.indexOf('- middle'),
+      content.indexOf('\t\t- deep') + 1,
+      content.indexOf('\t\t\t+ [ ]') + 1,
+    ])
+    expectOriginsAnchor(content, pos)
+  })
+
+  it('anchors the reassembled branches of a sibling-mention context', () => {
+    const content = [
+      '- parent line',
+      '  - first [[Target]] mention',
+      '  - nothing relevant',
+      '  - also [[Target]] here',
+      '',
+    ].join('\n')
+    expectOriginsAnchor(content, posOf(content, '[[Target]]'))
+  })
+
+  it('anchors a heading section and a blockquote', () => {
+    const heading = '## Meeting [[Target]]\n\nnotes line\n\n- a bullet\n'
+    expectOriginsAnchor(heading, posOf(heading, '[[Target]]'))
+    const quote = '> quoted [[Target]] mention\n> second quoted line\n'
+    expectOriginsAnchor(quote, posOf(quote, '[[Target]]'))
+  })
+
+  it('anchors the bare-line fallback past leading whitespace', () => {
+    const content = 'first paragraph\n\n   \nsecond paragraph\n'
+    // An offset drifted into the whitespace-only line between blocks.
+    const pos = content.indexOf('   \n') + 1
+    const { text, lineOrigins } = blockContextLinesAt(content, pos)
+    expect(text).toBe('')
+    expect(lineOrigins).toHaveLength(1)
   })
 })

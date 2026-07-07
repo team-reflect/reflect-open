@@ -66,18 +66,21 @@ describe('IncomingBacklinks', () => {
         sourceTitle: 'Meeting Notes',
         snippet: 'discussed [[2026-07-02]] follow-ups',
         posFrom: 12,
+        tasks: [],
       },
       {
         sourcePath: 'notes/meeting.md',
         sourceTitle: 'Meeting Notes',
         snippet: 'revisit on [[2026-07-02]]',
         posFrom: 80,
+        tasks: [],
       },
       {
         sourcePath: 'notes/planning.md',
         sourceTitle: 'Planning',
         snippet: 'ship by [[2026-07-02]]',
         posFrom: 3,
+        tasks: [],
       },
     ])
     const view = renderSection('daily/2026-07-02.md')
@@ -97,6 +100,7 @@ describe('IncomingBacklinks', () => {
         sourceTitle: 'June 1st, 2026',
         snippet: 'planned [[Roadmap]] here',
         posFrom: 4,
+        tasks: [],
       },
     ])
     const view = renderSection('notes/roadmap.md')
@@ -116,6 +120,7 @@ describe('IncomingBacklinks', () => {
         sourceTitle: 'Meeting Notes',
         snippet: 'discussed [[2026-07-02]] follow-ups',
         posFrom: 12,
+        tasks: [],
       },
     ])
     const view = renderSection('daily/2026-07-02.md')
@@ -135,6 +140,7 @@ describe('IncomingBacklinks', () => {
         sourceTitle: 'Meeting Notes',
         snippet: 'discussed [[2026-07-02]] follow-ups',
         posFrom: 12,
+        tasks: [],
       },
     ])
     const view = renderSection('daily/2026-07-02.md')
@@ -163,6 +169,7 @@ describe('IncomingBacklinks', () => {
         sourceTitle: 'Meeting Notes',
         snippet: 'discussed follow-ups',
         posFrom: 12,
+        tasks: [],
       },
     ])
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -193,12 +200,14 @@ describe('IncomingBacklinks', () => {
         sourceTitle: 'Meeting Notes',
         snippet: 'discussed follow-ups',
         posFrom: 12,
+        tasks: [],
       },
       {
         sourcePath: 'notes/planning.md',
         sourceTitle: 'Planning',
         snippet: 'ship the roadmap',
         posFrom: 3,
+        tasks: [],
       },
     ])
     const view = renderSection('daily/2026-07-02.md')

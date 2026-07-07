@@ -1,4 +1,14 @@
-import type { BacklinkContext } from '@reflect/core'
+import type { BacklinkContext, SnippetTask } from '@reflect/core'
+
+/** One rendered reference: the snippet Markdown plus its checkbox anchors. */
+export interface BacklinkSnippetData {
+  /** Stable render key, `path:posFrom`. */
+  key: string
+  /** The snippet Markdown. */
+  text: string
+  /** The snippet's checkbox tasks anchored to the source note, render order. */
+  tasks: SnippetTask[]
+}
 
 /** One referencing note: its identity plus every linking line found in it. */
 export interface BacklinkSource {
@@ -7,7 +17,7 @@ export interface BacklinkSource {
   /** Title of the source note. */
   title: string
   /** The line around each link, keyed `path:posFrom` for stable rendering. */
-  snippets: Array<{ key: string; text: string }>
+  snippets: BacklinkSnippetData[]
 }
 
 /**
@@ -30,6 +40,7 @@ export function groupBacklinksBySource(
       group.snippets.push({
         key: `${backlink.sourcePath}:${backlink.posFrom}`,
         text: backlink.snippet,
+        tasks: backlink.tasks,
       })
     }
   }

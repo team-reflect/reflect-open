@@ -18,9 +18,3 @@ minimumReleaseAgeExclude:
   - '@aria-ui/*'
   - prosemirror-flat-list
   - prosemirror-view
-
-# Uncomment the "blockExoticSubdeps" and "overrides" sections below to install packages from pkg.pr.new
-# blockExoticSubdeps: false
-# overrides:
-#   '@meowdown/core': 'https://pkg.pr.new/prosekit/meowdown/@meowdown/core@5a4a25a'
-#   '@meowdown/react': 'https://pkg.pr.new/prosekit/meowdown/@meowdown/react@5a4a25a'
