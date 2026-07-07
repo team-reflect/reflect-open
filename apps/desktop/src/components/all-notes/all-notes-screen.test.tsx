@@ -15,6 +15,10 @@ import { AllNotesScreen } from './all-notes-screen'
  * query, and navigation through the real router.
  */
 
+const settingsState = vi.hoisted((): { dateFormat: 'mdy' | 'dmy' | 'iso' } => ({
+  dateFormat: 'mdy',
+}))
+
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({
     graph: { root: '/g', name: 'g', generation: 1 },
@@ -27,7 +31,7 @@ vi.mock('@/providers/settings-provider', () => ({
       editorMarkdownSyntax: 'hide',
       theme: 'system',
       timeFormat: '12h',
-      dateFormat: 'mdy',
+      dateFormat: settingsState.dateFormat,
       allNotesFilterTags: ['book', 'person'],
     },
     updateSettings: () => {},
@@ -76,6 +80,7 @@ setBridge({ invoke: mockInvoke, listen: async () => () => {} })
 
 beforeEach(() => {
   resetOperations()
+  settingsState.dateFormat = 'mdy'
   mockInvoke.mockReset()
   mockInvoke.mockImplementation(async (command, args) => {
     if (command !== 'db_query') {
@@ -162,6 +167,18 @@ describe('AllNotesScreen', () => {
     expect(view.getAllByText('#link')).toHaveLength(2)
     expect(view.getByText('1/15/2020')).toBeDefined()
     expect(view.getByText('1/10/2020')).toBeDefined()
+    view.unmount()
+  })
+
+  it('keeps ISO updated dates on one line', async () => {
+    settingsState.dateFormat = 'iso'
+    const view = renderScreen()
+
+    const updated = await view.findByText('2020-01-15')
+    expect(updated.className).toContain('whitespace-nowrap')
+    expect(updated.parentElement?.className ?? '').toContain(
+      'grid-cols-[minmax(0,15rem)_minmax(0,1fr)_minmax(0,8rem)_6rem]',
+    )
     view.unmount()
   })
 
