@@ -40,22 +40,20 @@ another git remote are connected directly by the user.
 
 ## Install
 
-Download the latest macOS DMG from
-[Releases](https://github.com/team-reflect/reflect-open/releases/latest).
-The macOS app is signed, notarized, and auto-updated from GitHub Releases.
-
-Reflect for iPhone is available through
-[TestFlight](https://testflight.apple.com/join/j2eEz43d). The iOS app uses the
-same plain-file graph and sync options as the Mac app.
+1. **Install the Mac app.** Download the latest macOS DMG from
+   [Releases](https://github.com/team-reflect/reflect-open/releases/latest).
+   The app is signed, notarized, and auto-updated from GitHub Releases.
+2. **Install the iOS beta.** Join
+   [TestFlight](https://testflight.apple.com/join/j2eEz43d). The iOS app uses
+   the same plain-file graph and sync options as the Mac app.
+3. **Install the Chrome extension.** Add
+   [Reflect Capture from the Chrome Web Store](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd)
+   to save the current page, selected text, screenshots, and optional page text
+   from Chrome.
 
 You can also [build from source](#building-from-source).
 
-## Browser Capture
-
-Install
-[Reflect Capture from the Chrome Web Store](https://chromewebstore.google.com/detail/reflect-capture/ccabifmooehighoonjeiololjfofkhkd)
-to save the current page, selected text, screenshots, and optional page text
-from Chrome.
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## Your Notes Are Files
 
