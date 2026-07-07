@@ -42,6 +42,16 @@ describe('chatSystemPrompt', () => {
     expect(prompt).toContain('limited number of tool rounds')
   })
 
+  it('points attachment links at read_assets', () => {
+    const prompt = chatSystemPrompt({
+      today: '2026-06-12',
+      context: null,
+      semanticSearchEnabled: true,
+    })
+    expect(prompt).toContain('pass asset paths to read_assets')
+    expect(prompt).toContain('may mention your query only inside an attachment')
+  })
+
   it('describes lexical search when semantic search is disabled', () => {
     const prompt = chatSystemPrompt({
       today: '2026-06-12',

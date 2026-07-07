@@ -3,10 +3,12 @@ import { z } from 'zod'
 import { isAppError } from '../../errors'
 import { readNote } from '../../graph/commands'
 import { retrieve, type RetrievalHit, type RetrieveOptions } from '../../embeddings/retrieve'
+import { assetReferencingNotePaths } from '../../indexing/asset-refs'
 import { listDailyNotes, type DailyNoteRow, type DailyNotesRange } from '../../indexing/queries'
 import { listRecentNotes, type RecentNoteRow, type RecentNotesOptions } from '../../indexing/note-list'
 import { parseFrontmatter, splitFrontmatter } from '../../markdown/frontmatter'
 import { isTagName, parseNote } from '../../markdown/extract'
+import { buildReadOneAsset, readAssetsInput, type ReadAssetsOutput } from './read-assets'
 import {
   cloudSafeNoteContent,
   cloudSafeNoteListings,
@@ -18,6 +20,16 @@ import {
   type CloudSearchHit,
   type CloudSendable,
 } from '../checkers'
+
+export {
+  ASSET_UNAVAILABLE_ERROR,
+  MAX_ASSET_DESCRIPTION_CHARS,
+  MAX_READ_ASSETS,
+  NO_ASSET_DESCRIPTION_ERROR,
+  NOT_AN_ASSET_ERROR,
+  type ReadAssetResult,
+  type ReadAssetsOutput,
+} from './read-assets'
 
 /**
  * The read-only note tools the chat model can call (Plan 10, first wave),
@@ -59,6 +71,7 @@ export interface NoteToolDeps {
   readNoteFn?: (path: string) => Promise<string>
   listRecentNotesFn?: (options: RecentNotesOptions) => Promise<RecentNoteRow[]>
   listDailyNotesFn?: (range: DailyNotesRange) => Promise<DailyNoteRow[]>
+  assetReferencingNotePathsFn?: (assetPath: string) => Promise<string[]>
 }
 
 export interface BuildNoteToolsOptions extends NoteToolDeps {
@@ -173,6 +186,7 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}) {
   const readNoteFn = options.readNoteFn ?? readNote
   const listRecentNotesFn = options.listRecentNotesFn ?? listRecentNotes
   const listDailyNotesFn = options.listDailyNotesFn ?? listDailyNotes
+  const assetRefsFn = options.assetReferencingNotePathsFn ?? assetReferencingNotePaths
   const searchMode: RetrieveOptions['mode'] =
     options.semanticSearchEnabled === false ? 'lexical' : 'hybrid'
 
@@ -223,6 +237,11 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}) {
       throw cause
     }
   }
+
+  const readOneAsset = buildReadOneAsset({
+    readNoteFn,
+    assetReferencingNotePathsFn: assetRefsFn,
+  })
 
   return {
     search_notes: tool({
@@ -288,6 +307,19 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}) {
         return { notes: await Promise.all(paths.map(readOneNote)) }
       },
     }),
+
+    read_assets: tool({
+      description:
+        'Read the stored text description and OCR transcription of image or PDF ' +
+        'attachments that notes embed as assets/… markdown links, e.g. ' +
+        '![sketch](assets/sketch.png). Returns descriptive text about each file, not ' +
+        'the file itself. Pass every attachment you need in a single call. ' +
+        'Attachments of private notes cannot be read.',
+      inputSchema: readAssetsInput,
+      execute: async ({ paths }): Promise<ReadAssetsOutput> => {
+        return { assets: await Promise.all(paths.map(readOneAsset)) }
+      },
+    }),
   }
 }
 
@@ -315,10 +347,18 @@ export interface ReadNoteSummary {
   error: string | null
 }
 
+/** One asset's outcome in a read_assets call, for the tool-activity UI. */
+export interface ReadAssetSummary {
+  path: string
+  /** The per-asset refusal/miss text, or `null` when the read succeeded. */
+  error: string | null
+}
+
 /** One tool invocation, as the transcript sees it. */
 export type NoteToolCall =
   | { tool: 'search'; toolCallId: string; query: string }
   | { tool: 'read'; toolCallId: string; paths: string[] }
+  | { tool: 'assets'; toolCallId: string; paths: string[] }
   | { tool: 'recents'; toolCallId: string; tag: string | null }
   | { tool: 'dailies'; toolCallId: string; start: string; end: string }
 
@@ -326,6 +366,7 @@ export type NoteToolCall =
 export type NoteToolResult =
   | { tool: 'search'; toolCallId: string; query: string; hits: NoteHitSummary[] }
   | { tool: 'read'; toolCallId: string; notes: ReadNoteSummary[] }
+  | { tool: 'assets'; toolCallId: string; assets: ReadAssetSummary[] }
   | {
       tool: 'recents'
       toolCallId: string
@@ -345,6 +386,8 @@ export function noteToolCall(part: TypedToolCall<NoteTools>): NoteToolCall | nul
       return { tool: 'search', toolCallId: part.toolCallId, query: part.input.query }
     case 'read_notes':
       return { tool: 'read', toolCallId: part.toolCallId, paths: part.input.paths }
+    case 'read_assets':
+      return { tool: 'assets', toolCallId: part.toolCallId, paths: part.input.paths }
     case 'list_recent_notes':
       return { tool: 'recents', toolCallId: part.toolCallId, tag: part.input.tag ?? null }
     case 'list_daily_notes':
@@ -383,6 +426,16 @@ export function noteToolResult(part: TypedToolResult<NoteTools>): NoteToolResult
           entry.ok
             ? { path: entry.note.path, title: entry.note.title, error: null }
             : { path: entry.path, title: null, error: entry.error },
+        ),
+      }
+    case 'read_assets':
+      return {
+        tool: 'assets',
+        toolCallId: part.toolCallId,
+        assets: part.output.assets.map((entry) =>
+          entry.ok
+            ? { path: entry.asset.path, error: null }
+            : { path: entry.path, error: entry.error },
         ),
       }
     case 'list_recent_notes': {

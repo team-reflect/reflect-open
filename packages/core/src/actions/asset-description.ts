@@ -24,6 +24,7 @@ export {
   base64ByteLength,
   buildDescriptionSource,
   classifyAsset,
+  classifyAssetFromNotes,
   isEligibleAssetPath,
   readManagedDescription,
   type AssetDescriptionMeta,

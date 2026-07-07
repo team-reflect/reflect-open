@@ -4,13 +4,19 @@ import type { RetrievalHit, RetrieveOptions } from '../../embeddings/retrieve'
 import type { DailyNoteRow, DailyNotesRange } from '../../indexing/queries'
 import type { RecentNoteRow, RecentNotesOptions } from '../../indexing/note-list'
 import {
+  ASSET_UNAVAILABLE_ERROR,
   buildNoteTools,
   INVALID_TAG_ERROR,
+  MAX_ASSET_DESCRIPTION_CHARS,
   MAX_DAILY_NOTE_DAYS,
   MAX_NOTE_CONTENT_CHARS,
+  NO_ASSET_DESCRIPTION_ERROR,
+  NOT_AN_ASSET_ERROR,
   type ListDailyNotesOutput,
   type ListRecentNotesOutput,
   type NoteTools,
+  type ReadAssetResult,
+  type ReadAssetsOutput,
   type ReadNoteResult,
   type ReadNotesOutput,
   type SearchNotesOutput,
@@ -102,6 +108,28 @@ async function runRead(tools: NoteTools, path: string): Promise<ReadNoteResult> 
     throw new Error('read_notes returned no notes')
   }
   return note
+}
+
+/** Execute `read_assets` directly, asserting a non-streaming output. */
+async function runReadAssets(tools: NoteTools, paths: string[]): Promise<ReadAssetsOutput> {
+  const execute = tools.read_assets.execute
+  if (!execute) {
+    throw new Error('read_assets has no execute')
+  }
+  const output = await execute({ paths }, CALL)
+  if (isAsyncIterable(output)) {
+    throw new Error('unexpected streaming tool output')
+  }
+  return output
+}
+
+/** Read a single asset via `read_assets`, returning its lone result. */
+async function runReadAsset(tools: NoteTools, path: string): Promise<ReadAssetResult> {
+  const [asset] = (await runReadAssets(tools, [path])).assets
+  if (asset === undefined) {
+    throw new Error('read_assets returned no assets')
+  }
+  return asset
 }
 
 /** Execute `list_recent_notes` directly, asserting a non-streaming output. */
@@ -284,6 +312,156 @@ describe('read_notes', () => {
     }
     expect(output.note.content.length).toBe(MAX_NOTE_CONTENT_CHARS)
     expect(output.note.truncated).toBe(true)
+  })
+})
+
+describe('read_assets', () => {
+  const ASSET = 'assets/chart.png'
+  const SIDECAR = 'assets/chart.png.reflect.md'
+  const DESCRIPTION_BODY = 'sentinel-description-01jxq3'
+  const PUBLIC_REF = '# Board deck\n\n![chart](assets/chart.png)\n'
+  const PRIVATE_REF = `---\nprivate: true\n---\n# Diary\n\n![chart](assets/chart.png)\n`
+
+  /** Tools over an in-memory file map + a fixed referencing-notes answer. */
+  function assetTools(files: Record<string, string>, refs: string[]): NoteTools {
+    return buildNoteTools({
+      readNoteFn: async (path) => {
+        const source = files[path]
+        if (source === undefined) {
+          throw { kind: 'notFound', message: 'no such file' }
+        }
+        return source
+      },
+      assetReferencingNotePathsFn: async () => refs,
+    })
+  }
+
+  it('returns the sidecar body without frontmatter for a public-referenced asset', async () => {
+    const tools = assetTools(
+      {
+        [SIDECAR]: `---\nreflectAsset: true\nsource: ${ASSET}\n---\nA bar chart.\n\nOCR: ${DESCRIPTION_BODY}\n`,
+        'notes/deck.md': PUBLIC_REF,
+      },
+      ['notes/deck.md'],
+    )
+    const output = await runReadAsset(tools, ASSET)
+    if (!output.ok) {
+      expect.unreachable('expected a successful read')
+    }
+    expect(output.asset.path).toBe(ASSET)
+    expect(output.asset.description).toBe(`A bar chart.\n\nOCR: ${DESCRIPTION_BODY}`)
+    expect(output.asset.truncated).toBe(false)
+  })
+
+  it('reads several assets in one call, isolating a per-asset miss', async () => {
+    const tools = assetTools(
+      {
+        [SIDECAR]: `---\nreflectAsset: true\n---\n${DESCRIPTION_BODY}\n`,
+        'notes/deck.md': PUBLIC_REF,
+      },
+      ['notes/deck.md'],
+    )
+    const output = await runReadAssets(tools, [ASSET, 'assets/undescribed.pdf'])
+    expect(output.assets.map((asset) => asset.ok)).toEqual([true, false])
+    expect(output.assets[1]).toMatchObject({
+      ok: false,
+      path: 'assets/undescribed.pdf',
+      error: NO_ASSET_DESCRIPTION_ERROR,
+    })
+  })
+
+  it('refuses when any referencing note is private — live, and without the description', async () => {
+    const tools = assetTools(
+      {
+        [SIDECAR]: `---\nreflectAsset: true\n---\n${DESCRIPTION_BODY}\n`,
+        'notes/deck.md': PUBLIC_REF,
+        [PRIVATE_PATH]: PRIVATE_REF,
+      },
+      ['notes/deck.md', PRIVATE_PATH],
+    )
+    const output = await runReadAsset(tools, ASSET)
+    if (output.ok) {
+      expect.unreachable('expected a refusal')
+    }
+    expect(output.error).toBe(ASSET_UNAVAILABLE_ERROR)
+    expect(JSON.stringify(output)).not.toContain(DESCRIPTION_BODY)
+  })
+
+  it('refuses an asset no note references, with the same unspecific message', async () => {
+    const tools = assetTools(
+      { [SIDECAR]: `---\nreflectAsset: true\n---\n${DESCRIPTION_BODY}\n` },
+      [],
+    )
+    const output = await runReadAsset(tools, ASSET)
+    if (output.ok) {
+      expect.unreachable('expected a refusal')
+    }
+    expect(output.error).toBe(ASSET_UNAVAILABLE_ERROR)
+    expect(JSON.stringify(output)).not.toContain(DESCRIPTION_BODY)
+  })
+
+  it('fails closed when a referencing note cannot be read', async () => {
+    const tools = buildNoteTools({
+      readNoteFn: async (path) => {
+        if (path === SIDECAR) {
+          return `---\nreflectAsset: true\n---\n${DESCRIPTION_BODY}\n`
+        }
+        throw { kind: 'io', message: 'disk error' }
+      },
+      assetReferencingNotePathsFn: async () => ['notes/deck.md'],
+    })
+    const output = await runReadAsset(tools, ASSET)
+    if (output.ok) {
+      expect.unreachable('expected a refusal')
+    }
+    expect(output.error).toBe(ASSET_UNAVAILABLE_ERROR)
+  })
+
+  it('rejects a non-asset path without touching the filesystem', async () => {
+    const reads: string[] = []
+    const tools = buildNoteTools({
+      readNoteFn: async (path) => {
+        reads.push(path)
+        throw { kind: 'notFound', message: 'no such file' }
+      },
+      assetReferencingNotePathsFn: async () => [],
+    })
+    for (const path of ['notes/secret.md', 'assets/chart.png.reflect.md']) {
+      const output = await runReadAsset(tools, path)
+      if (output.ok) {
+        expect.unreachable('expected a refusal')
+      }
+      expect(output.error).toBe(NOT_AN_ASSET_ERROR)
+    }
+    expect(reads).toEqual([])
+  })
+
+  it('treats an empty sidecar body as no description', async () => {
+    const tools = assetTools(
+      { [SIDECAR]: '---\nreflectAsset: true\n---\n\n', 'notes/deck.md': PUBLIC_REF },
+      ['notes/deck.md'],
+    )
+    const output = await runReadAsset(tools, ASSET)
+    if (output.ok) {
+      expect.unreachable('expected a miss')
+    }
+    expect(output.error).toBe(NO_ASSET_DESCRIPTION_ERROR)
+  })
+
+  it('caps an oversized description and flags the cut', async () => {
+    const tools = assetTools(
+      {
+        [SIDECAR]: 'x'.repeat(MAX_ASSET_DESCRIPTION_CHARS + 10),
+        'notes/deck.md': PUBLIC_REF,
+      },
+      ['notes/deck.md'],
+    )
+    const output = await runReadAsset(tools, ASSET)
+    if (!output.ok) {
+      expect.unreachable('expected a successful read')
+    }
+    expect(output.asset.description.length).toBe(MAX_ASSET_DESCRIPTION_CHARS)
+    expect(output.asset.truncated).toBe(true)
   })
 })
 

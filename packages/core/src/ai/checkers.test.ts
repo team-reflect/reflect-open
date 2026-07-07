@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { RetrievalHit } from '../embeddings/retrieve'
 import {
   assertCloudAllowed,
+  cloudSafeAssetDescription,
   cloudSafeNoteContent,
   cloudSafeSearchHits,
   cloudSafeSelection,
@@ -121,6 +122,34 @@ describe('cloudSafeNoteContent', () => {
         isPrivate: true,
         title: PRIVATE_TITLE,
         content: PRIVATE_BODY,
+        truncated: false,
+      }),
+    ).toThrow(PrivateNoteError)
+  })
+})
+
+describe('cloudSafeAssetDescription', () => {
+  it('mints a description for a sendable asset', () => {
+    expect(
+      cloudSafeAssetDescription({
+        path: 'assets/chart.png',
+        isPrivate: false,
+        description: 'A bar chart of Q4 revenue.',
+        truncated: false,
+      }),
+    ).toEqual({
+      path: 'assets/chart.png',
+      description: 'A bar chart of Q4 revenue.',
+      truncated: false,
+    })
+  })
+
+  it('refuses to mint a blocked asset before any description escapes', () => {
+    expect(() =>
+      cloudSafeAssetDescription({
+        path: 'assets/secret.png',
+        isPrivate: true,
+        description: PRIVATE_BODY,
         truncated: false,
       }),
     ).toThrow(PrivateNoteError)

@@ -130,6 +130,20 @@ export type AssetVerdict = 'send' | 'skip-unreferenced' | 'skip-private'
  */
 export async function classifyAsset(assetPath: string, generation: number): Promise<AssetVerdict> {
   const candidates = await assetReferencingNotePaths(assetPath)
+  return classifyAssetFromNotes(assetPath, candidates, (notePath) => readNote(notePath, generation))
+}
+
+/**
+ * The verdict core of {@link classifyAsset}, over an explicit candidate list
+ * and note reader. The chat tools reuse it with unpinned reads and an
+ * injectable candidate query; the description pass wraps it with
+ * generation-pinned reads.
+ */
+export async function classifyAssetFromNotes(
+  assetPath: string,
+  candidates: readonly string[],
+  readSource: (notePath: string) => Promise<string>,
+): Promise<AssetVerdict> {
   if (candidates.length === 0) {
     return 'skip-unreferenced'
   }
@@ -137,7 +151,7 @@ export async function classifyAsset(assetPath: string, generation: number): Prom
   for (const notePath of candidates) {
     let source: string
     try {
-      source = await readNote(notePath, generation)
+      source = await readSource(notePath)
     } catch (cause) {
       if (isAppError(cause) && cause.kind === 'notFound') {
         continue

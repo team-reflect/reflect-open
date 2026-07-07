@@ -30,6 +30,7 @@ export {
 export { validateApiKey, type ApiKeyValidation } from '../ai/validate-key'
 export {
   assertCloudAllowed,
+  cloudSafeAssetDescription,
   cloudSafeGraphContext,
   cloudSafeNoteContent,
   cloudSafeNoteListings,
@@ -37,6 +38,7 @@ export {
   cloudSafeSelection,
   isPrivateNoteError,
   PrivateNoteError,
+  type CloudAssetDescription,
   type CloudGraphContext,
   type CloudNoteContent,
   type CloudNoteListing,
@@ -46,8 +48,10 @@ export {
 } from '../ai/checkers'
 export {
   buildNoteTools,
+  MAX_ASSET_DESCRIPTION_CHARS,
   MAX_DAILY_NOTE_DAYS,
   MAX_NOTE_CONTENT_CHARS,
+  MAX_READ_ASSETS,
   MAX_READ_NOTES,
   type ListDailyNotesOutput,
   type ListRecentNotesOutput,
@@ -56,6 +60,9 @@ export {
   type NoteToolDeps,
   type NoteToolResult,
   type NoteTools,
+  type ReadAssetResult,
+  type ReadAssetsOutput,
+  type ReadAssetSummary,
   type ReadNoteResult,
   type ReadNoteSummary,
   type ReadNotesOutput,
