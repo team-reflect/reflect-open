@@ -413,8 +413,11 @@ and enriching only `search_fts.body` keeps descriptions out of AI/cloud and the
 preview. (`descriptionPathFor`/`DESCRIPTION_SUFFIX` moved to `graph/paths.ts` so
 `indexing/` need not import `actions/`.)
 
-**Deferred:** semantic embedding of descriptions (Plan 09 is opt-in/off by
-default); attributed "matched in image: X" result UI (transparent chosen).
+**Deferred:** ~~semantic embedding of descriptions~~ (shipped later: description
+bodies chunk into the referencing note's embedding set, mirroring the FTS fold —
+see `embeddings/pipeline.ts`); attributed "matched in image: X" result UI
+(transparent chosen — though asset chunks carry the asset filename as their
+chunk heading).
 
 ## Conventions
 

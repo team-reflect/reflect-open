@@ -126,6 +126,7 @@ export {
   watchStop,
   subscribeIndexChanges,
   subscribeIndexApplied,
+  type IndexAppliedListener,
   subscribeIndexWritten,
   subscribeNoteMoved,
   subscribeFileChanges,

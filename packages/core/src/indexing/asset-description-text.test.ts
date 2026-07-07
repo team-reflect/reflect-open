@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { readNote } from '../graph/commands'
-import { gatherAssetDescriptionText, MAX_ASSET_TEXT_CHARS } from './asset-description-text'
+import {
+  gatherAssetDescriptionBodies,
+  gatherAssetDescriptionText,
+  MAX_ASSET_TEXT_CHARS,
+} from './asset-description-text'
 
 vi.mock('../graph/commands', () => ({
   readNote: vi.fn(),
@@ -70,5 +74,44 @@ describe('gatherAssetDescriptionText', () => {
   it('propagates a non-notFound read error', async () => {
     readNoteMock.mockRejectedValueOnce({ kind: 'io', message: 'disk error' })
     await expect(gatherAssetDescriptionText(['assets/a.png'])).rejects.toMatchObject({ kind: 'io' })
+  })
+})
+
+describe('gatherAssetDescriptionBodies', () => {
+  it('returns per-asset bodies attributed to their asset paths', async () => {
+    files.set('assets/a.png.reflect.md', '---\nreflectAsset: true\n---\n\nA flow diagram.\n')
+    files.set('assets/b.pdf.reflect.md', '---\nreflectAsset: true\n---\n\nQ4 revenue report.\n')
+
+    const bodies = await gatherAssetDescriptionBodies(['assets/a.png', 'assets/b.pdf'])
+
+    expect(bodies).toEqual([
+      { assetPath: 'assets/a.png', body: 'A flow diagram.' },
+      { assetPath: 'assets/b.pdf', body: 'Q4 revenue report.' },
+    ])
+  })
+
+  it('skips missing descriptions, empty bodies, and repeated assets', async () => {
+    files.set('assets/a.png.reflect.md', '---\nreflectAsset: true\n---\n\nDescribed.\n')
+    files.set('assets/empty.png.reflect.md', '---\nreflectAsset: true\n---\n\n  \n')
+
+    const bodies = await gatherAssetDescriptionBodies([
+      'assets/a.png',
+      'assets/a.png',
+      'assets/empty.png',
+      'assets/missing.pdf',
+    ])
+
+    expect(bodies).toEqual([{ assetPath: 'assets/a.png', body: 'Described.' }])
+    expect(readNoteMock).toHaveBeenCalledTimes(3) // the repeat never re-reads
+  })
+
+  it('stops accumulating once the combined length reaches the cap', async () => {
+    files.set('assets/a.png.reflect.md', 'x'.repeat(MAX_ASSET_TEXT_CHARS))
+    files.set('assets/b.png.reflect.md', 'never reached')
+
+    const bodies = await gatherAssetDescriptionBodies(['assets/a.png', 'assets/b.png'])
+
+    expect(bodies).toHaveLength(1)
+    expect(bodies[0]!.assetPath).toBe('assets/a.png')
   })
 })

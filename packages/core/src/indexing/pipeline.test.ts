@@ -3,7 +3,15 @@ import { setBridge } from '../ipc/bridge'
 import { getBacklinks, resolveWikiTarget, searchNotes } from './queries'
 import { hashContent } from './hash'
 import { PROJECTION_VERSION } from './indexed-note'
-import { indexNote, rebuildIndex, reconcileIndex, syncIndex, PROJECTION_VERSION_KEY } from './indexer'
+import {
+  indexNote,
+  rebuildIndex,
+  reconcileIndex,
+  reindexNotesReferencing,
+  syncIndex,
+  PROJECTION_VERSION_KEY,
+} from './indexer'
+import { subscribeIndexApplied } from './index-applied'
 import { applyIndexChanges } from './live'
 
 // Install a fake bridge so both core's `call` and the Kysely runner resolve
@@ -39,6 +47,7 @@ beforeEach(() => {
         return null
       case 'db_query':
         if (sql.includes('index_meta')) return metaRows
+        if (sql.includes('from "assets"')) return [{ note_path: 'notes/a.md' }]
         if (sql.includes('search_fts')) return [{ path: 'notes/a.md', title: 'A' }]
         if (sql.includes('backlinks')) {
           return [{ source_path: 'notes/b.md', target_raw: 'A', alias: null, pos_from: 0, pos_to: 3 }]
@@ -65,6 +74,48 @@ describe('indexNote', () => {
     expect(args.note['mtime']).toBe(5)
     expect(args.note['fileHash']).toMatch(/^[0-9a-f]{64}$/)
     expect((args.note['links'] as { targetKey: string }[]).map((link) => link.targetKey)).toContain('world')
+  })
+})
+
+describe('reindexNotesReferencing', () => {
+  it('re-applies referencing notes and emits the post-apply signal', async () => {
+    const emitted: Array<[readonly { path: string; kind: string }[], number]> = []
+    const unsubscribe = subscribeIndexApplied((changes, generation) => {
+      emitted.push([changes, generation])
+    })
+    try {
+      await reindexNotesReferencing(['assets/pic.png'], 7)
+    } finally {
+      unsubscribe()
+    }
+
+    const apply = mockInvoke.mock.calls.find(([cmd]) => cmd === 'index_apply')
+    expect(apply).toBeDefined()
+    expect((apply![1] as { generation: number }).generation).toBe(7)
+
+    // These writes bypass the watcher pipeline, so the emit is the only way
+    // followers (the embedding sync) hear about the refreshed notes.
+    expect(emitted).toEqual([[[{ path: 'notes/a.md', kind: 'upsert' }], 7]])
+  })
+
+  it('emits nothing when no note references the assets', async () => {
+    mockInvoke.mockImplementation(async (command, args) => {
+      const sql = String(args['sql'] ?? '')
+      if (command === 'db_query' && sql.includes('from "assets"')) {
+        return []
+      }
+      return null
+    })
+    const emitted: unknown[] = []
+    const unsubscribe = subscribeIndexApplied((changes) => {
+      emitted.push(changes)
+    })
+    try {
+      await reindexNotesReferencing(['assets/pic.png'], 7)
+    } finally {
+      unsubscribe()
+    }
+    expect(emitted).toEqual([])
   })
 })
 

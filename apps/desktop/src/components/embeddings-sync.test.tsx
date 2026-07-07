@@ -1,18 +1,18 @@
 import { cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { FileChange } from '@reflect/core'
+import type { IndexAppliedListener } from '@reflect/core'
 import { EmbeddingsSync } from './embeddings-sync'
 
 const core = vi.hoisted(() => ({
   embedNote: vi.fn(async () => ({ written: 0 })),
   embedRemove: vi.fn(async () => {}),
-  subscribeFileChanges: vi.fn(),
+  subscribeIndexApplied: vi.fn(),
 }))
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   embedNote: core.embedNote,
   embedRemove: core.embedRemove,
-  subscribeFileChanges: core.subscribeFileChanges,
+  subscribeIndexApplied: core.subscribeIndexApplied,
 }))
 
 const semantic = vi.hoisted(() => ({
@@ -39,22 +39,20 @@ vi.mock('@/lib/use-embed-status', () => ({
   useEmbedStatus: () => ({ status: 'ready', model: 'all-MiniLM-L6-v2' }),
 }))
 
-let onFileChanges: ((changes: FileChange[]) => void) | null = null
+let onApplied: IndexAppliedListener | null = null
 const unlisten = vi.fn()
 
 beforeEach(() => {
   semanticSetting.enabled = true
-  onFileChanges = null
+  onApplied = null
   unlisten.mockClear()
   core.embedNote.mockClear()
   core.embedRemove.mockClear()
   semantic.backfillEmbeddingsVisibly.mockClear()
-  core.subscribeFileChanges
-    .mockReset()
-    .mockImplementation(async (handler: (changes: FileChange[]) => void) => {
-      onFileChanges = handler
-      return unlisten
-    })
+  core.subscribeIndexApplied.mockReset().mockImplementation((handler: IndexAppliedListener) => {
+    onApplied = handler
+    return unlisten
+  })
 })
 
 afterEach(cleanup)
@@ -65,12 +63,12 @@ function flushQueue(): Promise<void> {
 }
 
 describe('EmbeddingsSync', () => {
-  it('backfills and follows the watcher while enabled and ready', async () => {
+  it('backfills and follows applied index batches while enabled and ready', async () => {
     render(<EmbeddingsSync />)
     await waitFor(() => expect(semantic.backfillEmbeddingsVisibly).toHaveBeenCalled())
-    await waitFor(() => expect(onFileChanges).not.toBeNull())
+    await waitFor(() => expect(onApplied).not.toBeNull())
 
-    onFileChanges?.([{ kind: 'upsert', path: 'notes/a.md' }])
+    onApplied?.([{ kind: 'upsert', path: 'notes/a.md' }], 7)
     await waitFor(() =>
       expect(core.embedNote).toHaveBeenCalledWith({
         path: 'notes/a.md',
@@ -80,14 +78,26 @@ describe('EmbeddingsSync', () => {
     )
   })
 
-  it('never embeds audio-memo recordings riding the same stream', async () => {
+  it('ignores a delayed emit from a superseded index session', async () => {
     render(<EmbeddingsSync />)
-    await waitFor(() => expect(onFileChanges).not.toBeNull())
+    await waitFor(() => expect(onApplied).not.toBeNull())
 
-    onFileChanges?.([
-      { kind: 'upsert', path: 'audio-memos/audio-memo-2026-06-12-090000-000.m4a' },
-      { kind: 'remove', path: 'audio-memos/audio-memo-2026-06-12-091500-000.m4a' },
-    ])
+    onApplied?.([{ kind: 'upsert', path: 'notes/a.md' }], 6)
+    await flushQueue()
+    expect(core.embedNote).not.toHaveBeenCalled()
+  })
+
+  it('never embeds asset-file changes riding the same batches', async () => {
+    render(<EmbeddingsSync />)
+    await waitFor(() => expect(onApplied).not.toBeNull())
+
+    onApplied?.(
+      [
+        { kind: 'upsert', path: 'assets/photo.png' },
+        { kind: 'remove', path: 'assets/old.pdf' },
+      ],
+      7,
+    )
     await flushQueue()
     expect(core.embedNote).not.toHaveBeenCalled()
     expect(core.embedRemove).not.toHaveBeenCalled()
@@ -98,12 +108,12 @@ describe('EmbeddingsSync', () => {
     render(<EmbeddingsSync />)
     await flushQueue()
     expect(semantic.backfillEmbeddingsVisibly).not.toHaveBeenCalled()
-    expect(core.subscribeFileChanges).not.toHaveBeenCalled()
+    expect(core.subscribeIndexApplied).not.toHaveBeenCalled()
   })
 
-  it('pauses watcher work the moment semantic search is disabled', async () => {
+  it('pauses follow-up work the moment semantic search is disabled', async () => {
     const view = render(<EmbeddingsSync />)
-    await waitFor(() => expect(onFileChanges).not.toBeNull())
+    await waitFor(() => expect(onApplied).not.toBeNull())
 
     semanticSetting.enabled = false
     view.rerender(<EmbeddingsSync />)
@@ -111,7 +121,7 @@ describe('EmbeddingsSync', () => {
 
     // A batch still in flight when the teardown ran must be dropped, not
     // embedded behind the user's back.
-    onFileChanges?.([{ kind: 'upsert', path: 'notes/b.md' }])
+    onApplied?.([{ kind: 'upsert', path: 'notes/b.md' }], 7)
     await flushQueue()
     expect(core.embedNote).not.toHaveBeenCalled()
   })

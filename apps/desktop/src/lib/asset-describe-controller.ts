@@ -103,7 +103,11 @@ export function createAssetDescribeController(
     }
     // Runs even on a stop — whatever was described is real. A re-index failure
     // must not crash the loop: the descriptions are written, so search catches
-    // up on the note's next re-index or a rebuild.
+    // up on the note's next re-index or a rebuild. The re-index emits the
+    // post-apply signal for the refreshed notes (the embedding sync re-embeds
+    // them off it); our own index-applied trigger hears that emit too and
+    // re-marks the notes' assets, which the next pass skips as up-to-date —
+    // one cheap extra cycle, no loop (a clean pass writes nothing new).
     if (outcome.describedAssetPaths.length > 0) {
       try {
         await reindexNotesReferencing(outcome.describedAssetPaths, options.generation)
