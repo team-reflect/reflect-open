@@ -8,6 +8,7 @@ import {
 import { ArrowRight, Circle, CircleCheck } from 'lucide-react'
 import type { OpenTask } from '@reflect/core'
 import { formatDayLabel } from '@/lib/dates'
+import { visibleTaskBreadcrumbs } from '@/lib/tasks/task-breadcrumbs'
 import { taskKey } from '@/lib/tasks/task-identity'
 import { useTaskCheckboxToggle } from '@/lib/tasks/use-task-checkbox-toggle'
 import { cn } from '@/lib/utils'
@@ -95,6 +96,7 @@ export function TaskRow({
   const checkboxPending = isPending || taskActionPending
   const done = task.checked
   const label = task.text || 'Empty task'
+  const breadcrumbs = visibleTaskBreadcrumbs(task.breadcrumbs)
   const selectFromKeyboard = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (event.key !== 'Enter' && event.key !== ' ') {
       return
@@ -114,98 +116,117 @@ export function TaskRow({
     onSelect(event)
   }
 
+  const checkboxButton = (
+    <button
+      type="button"
+      data-task-row
+      aria-label={task.checked ? `Reopen: ${label}` : `Complete: ${label}`}
+      disabled={checkboxPending}
+      onClick={(event) => {
+        event.stopPropagation()
+        if (editing) {
+          checkboxToggleControllerRef.current?.()
+          return
+        }
+        if (togglesSelection) {
+          onSelectionCheckboxToggle()
+          return
+        }
+        toggle()
+      }}
+      // h-6 matches the text/editor's leading-6 line so the circle centers on
+      // the first line (items-start keeps it there when a task wraps).
+      className="flex h-6 shrink-0 items-center text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none disabled:cursor-default"
+    >
+      {done ? (
+        <CircleCheck aria-hidden className="size-[18px] text-accent" strokeWidth={2} />
+      ) : (
+        <Circle aria-hidden className="size-[18px]" strokeWidth={2} />
+      )}
+    </button>
+  )
+  const sourceDate =
+    showSource && task.dailyDate !== null ? (
+      <span className="mt-0.5 shrink-0 whitespace-nowrap text-xs text-text-muted">
+        {formatDayLabel(task.dailyDate, settings.dateFormat)}
+      </span>
+    ) : null
+  const openButton = (
+    <button
+      type="button"
+      aria-label={`Open ${task.noteTitle}`}
+      // Hidden while editing: keep focus on the editor (Esc first to leave).
+      disabled={editing}
+      onClick={(event) => {
+        event.stopPropagation()
+        onOpen(task.notePath)
+      }}
+      className={cn(
+        'mt-0.5 shrink-0 text-text-muted/60 opacity-0 transition-opacity hover:text-text focus-visible:opacity-100 focus-visible:outline-none',
+        !editing && 'group-hover/task:opacity-100',
+      )}
+    >
+      <ArrowRight aria-hidden className="size-3.5" />
+    </button>
+  )
+
   return (
     <li
       data-task-key={taskKey(task)}
       onClick={selectFromRow}
       className={cn(
-        'group/task flex min-h-10 items-start gap-3 border-b border-border bg-surface px-4 py-2 transition-colors duration-100 lg:px-12',
+        'group/task min-h-10 border-b border-border bg-surface px-4 py-2 transition-colors duration-100 lg:px-12',
+        editing && 'flex items-start gap-3',
         !editing && 'cursor-pointer',
         selected
           ? 'bg-accent-soft ring-1 ring-inset ring-accent/20 dark:ring-accent/10'
           : 'hover:bg-surface-hover dark:bg-surface dark:hover:bg-surface-hover',
       )}
     >
-      <button
-        type="button"
-        data-task-row
-        aria-label={task.checked ? `Reopen: ${label}` : `Complete: ${label}`}
-        disabled={checkboxPending}
-        onClick={(event) => {
-          event.stopPropagation()
-          if (editing) {
-            checkboxToggleControllerRef.current?.()
-            return
-          }
-          if (togglesSelection) {
-            onSelectionCheckboxToggle()
-            return
-          }
-          toggle()
-        }}
-        // h-6 matches the text/editor's leading-6 line so the circle centers on
-        // the first line (items-start keeps it there when a task wraps).
-        className="flex h-6 shrink-0 items-center text-text-muted transition-colors hover:text-text focus-visible:text-text focus-visible:outline-none disabled:cursor-default"
-      >
-        {done ? (
-          <CircleCheck aria-hidden className="size-[18px] text-accent" strokeWidth={2} />
-        ) : (
-          <Circle aria-hidden className="size-[18px]" strokeWidth={2} />
-        )}
-      </button>
       {editing ? (
-        <TaskEditor
-          task={task}
-          onCommit={onEditCommit}
-          onContinue={onEditContinue}
-          onDelete={onEditDelete}
-          onDeleteEmpty={onEditDeleteEmpty}
-          onCancel={onEditCancel}
-          onComplete={onEditComplete}
-          onCheckboxToggle={onEditCheckboxToggle}
-          onConvertToBullet={onEditConvertToBullet}
-          onFlush={onEditFlush}
-          onNavigate={onEditNavigate}
-          checkboxToggleControllerRef={checkboxToggleControllerRef}
-          convertControllerRef={convertControllerRef}
-        />
+        <>
+          {checkboxButton}
+          <TaskEditor
+            task={task}
+            onCommit={onEditCommit}
+            onContinue={onEditContinue}
+            onDelete={onEditDelete}
+            onDeleteEmpty={onEditDeleteEmpty}
+            onCancel={onEditCancel}
+            onComplete={onEditComplete}
+            onCheckboxToggle={onEditCheckboxToggle}
+            onConvertToBullet={onEditConvertToBullet}
+            onFlush={onEditFlush}
+            onNavigate={onEditNavigate}
+            checkboxToggleControllerRef={checkboxToggleControllerRef}
+            convertControllerRef={convertControllerRef}
+          />
+          {sourceDate}
+          {openButton}
+        </>
       ) : (
-        <div
-          role="button"
-          tabIndex={0}
-          aria-pressed={selected}
-          onKeyDown={selectFromKeyboard}
-          className={cn(
-            'min-w-0 flex-1 break-words text-left text-sm leading-6 text-text focus-visible:outline-none',
-          )}
-        >
-          <TaskBreadcrumbs breadcrumbs={task.breadcrumbs} />
-          <div className={cn(task.checked && 'text-text-muted line-through')}>
-            <TaskText task={task} />
+        <div className="min-w-0 flex-1">
+          <TaskBreadcrumbs breadcrumbs={breadcrumbs} />
+          <div className="flex min-w-0 items-start gap-3">
+            {checkboxButton}
+            <div
+              role="button"
+              tabIndex={0}
+              aria-pressed={selected}
+              onKeyDown={selectFromKeyboard}
+              className={cn(
+                'min-w-0 flex-1 break-words text-left text-sm leading-6 text-text focus-visible:outline-none',
+              )}
+            >
+              <div className={cn(task.checked && 'text-text-muted line-through')}>
+                <TaskText task={task} />
+              </div>
+            </div>
+            {sourceDate}
+            {openButton}
           </div>
         </div>
       )}
-      {showSource && task.dailyDate !== null ? (
-        <span className="mt-0.5 shrink-0 whitespace-nowrap text-xs text-text-muted">
-          {formatDayLabel(task.dailyDate, settings.dateFormat)}
-        </span>
-      ) : null}
-      <button
-        type="button"
-        aria-label={`Open ${task.noteTitle}`}
-        // Hidden while editing: keep focus on the editor (Esc first to leave).
-        disabled={editing}
-        onClick={(event) => {
-          event.stopPropagation()
-          onOpen(task.notePath)
-        }}
-        className={cn(
-          'mt-0.5 shrink-0 text-text-muted/60 opacity-0 transition-opacity hover:text-text focus-visible:opacity-100 focus-visible:outline-none',
-          !editing && 'group-hover/task:opacity-100',
-        )}
-      >
-        <ArrowRight aria-hidden className="size-3.5" />
-      </button>
     </li>
   )
 }

@@ -4,6 +4,7 @@ import type { OpenTask } from '@reflect/core'
 import { TaskBreadcrumbs } from '@/components/tasks/task-breadcrumbs'
 import { TaskText } from '@/components/tasks/task-text'
 import { formatShortDate } from '@/lib/dates'
+import { visibleTaskBreadcrumbs } from '@/lib/tasks/task-breadcrumbs'
 import { taskKey } from '@/lib/tasks/task-identity'
 import { useTaskCheckboxToggle } from '@/lib/tasks/use-task-checkbox-toggle'
 import { cn } from '@/lib/utils'
@@ -32,12 +33,20 @@ export function MobileTaskRow({ task, showSource, onEdit }: MobileTaskRowProps):
   const { toggle, isPending } = useTaskCheckboxToggle(task)
   const label = task.text || 'Empty task'
   const edit = (): void => onEdit(task)
+  const breadcrumbs = visibleTaskBreadcrumbs(task.breadcrumbs)
+  const hasBreadcrumbs = breadcrumbs.length > 0
 
   return (
     <li
       data-task-key={taskKey(task)}
-      className="flex min-h-12 items-start border-b border-border bg-surface"
+      className="grid min-h-12 grid-cols-[auto,minmax(0,1fr)] border-b border-border bg-surface"
     >
+      {hasBreadcrumbs ? (
+        <TaskBreadcrumbs
+          breadcrumbs={breadcrumbs}
+          className="col-start-2 mb-0 min-w-0 pr-4 pt-3"
+        />
+      ) : null}
       <button
         type="button"
         aria-label={task.checked ? `Reopen: ${label}` : `Complete: ${label}`}
@@ -48,7 +57,12 @@ export function MobileTaskRow({ task, showSource, onEdit }: MobileTaskRowProps):
         }}
         // A generous touch target around the small glyph; self-stretch keeps
         // the circle vertically centered in the row as task text wraps.
-        className="flex shrink-0 self-stretch items-center pl-4 pr-3 text-text-muted disabled:opacity-50"
+        className={cn(
+          'col-start-1 flex shrink-0 pl-4 pr-3 text-text-muted disabled:opacity-50',
+          hasBreadcrumbs
+            ? 'row-start-2 items-start pb-3 pt-0.5'
+            : 'row-start-1 self-stretch items-center',
+        )}
       >
         {task.checked ? (
           <CircleCheck aria-hidden className="size-5 text-accent" strokeWidth={2} />
@@ -71,10 +85,12 @@ export function MobileTaskRow({ task, showSource, onEdit }: MobileTaskRowProps):
             edit()
           }
         }}
-        className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 py-3 pr-4 text-left focus-visible:outline-none"
+        className={cn(
+          'col-start-2 flex min-w-0 cursor-pointer items-start gap-3 pr-4 text-left focus-visible:outline-none',
+          hasBreadcrumbs ? 'row-start-2 pb-3' : 'row-start-1 py-3',
+        )}
       >
         <div className="min-w-0 flex-1 break-words text-sm leading-6 text-text">
-          <TaskBreadcrumbs breadcrumbs={task.breadcrumbs} />
           <div className={cn(task.checked && 'text-text-muted line-through')}>
             <TaskText task={task} />
           </div>

@@ -377,6 +377,42 @@ describe('suggestWikiTargets', () => {
 })
 
 describe('getOpenTasks', () => {
+  it('parses task breadcrumbs and normalizes boolean note context', async () => {
+    mockInvoke.mockResolvedValue([
+      {
+        note_path: 'notes/project.md',
+        marker_offset: 12,
+        raw: '[ ] ship it',
+        text: 'ship it',
+        breadcrumbs: '["StartupToolbox","Reflections"]',
+        checked: 0,
+        due_date: null,
+        note_title: 'Project',
+        daily_date: null,
+        is_pinned: 1,
+        pinned_order: 2,
+        updated_at: 123,
+      },
+    ])
+
+    await expect(getOpenTasks()).resolves.toEqual([
+      {
+        notePath: 'notes/project.md',
+        markerOffset: 12,
+        raw: '[ ] ship it',
+        text: 'ship it',
+        breadcrumbs: ['StartupToolbox', 'Reflections'],
+        checked: false,
+        dueDate: null,
+        noteTitle: 'Project',
+        dailyDate: null,
+        isPinned: true,
+        pinnedOrder: 2,
+        updatedAt: 123,
+      },
+    ])
+  })
+
   it('never surfaces template checkboxes — boilerplate, not real tasks', async () => {
     mockInvoke.mockResolvedValue([])
 
