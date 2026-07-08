@@ -30,6 +30,11 @@ import { useRouter } from '@/routing/router'
 const MENU_ITEM_CLASS = 'gap-2 px-2 py-1.5 text-[13px] text-text-secondary'
 const SETTINGS_BINDING = keybindingFor('settings.open')
 
+function graphSwitchBindingFor(index: number): string | null {
+  // Recent rows are zero-based; `graph.switchN` commands and keycaps are one-based.
+  return keybindingFor(`graph.switch${index + 1}`)
+}
+
 /**
  * The quiet backup indicator: nothing when backed up (or not set up), a
  * pulsing accent dot while backing up, amber when offline with queued
@@ -111,8 +116,9 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
           <TooltipContent>{graph.root}</TooltipContent>
         </Tooltip>
         <DropdownMenuContent aria-label="Switch graph" side="top" sideOffset={6}>
-          {recents.map((recent) => {
+          {recents.map((recent, index) => {
             const current = recent.root === graph.root
+            const binding = graphSwitchBindingFor(index)
             return (
               <Tooltip key={recent.root} delayDuration={700}>
                 <TooltipTrigger asChild>
@@ -128,6 +134,8 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
                     <span className="min-w-0 flex-1 truncate">{recent.name}</span>
                     {current ? (
                       <Check aria-hidden className="size-3.5 shrink-0 text-accent" />
+                    ) : binding !== null ? (
+                      <ShortcutKeys binding={binding} className="text-[10px]" />
                     ) : null}
                   </DropdownMenuItem>
                 </TooltipTrigger>

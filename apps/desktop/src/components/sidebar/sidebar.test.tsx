@@ -135,6 +135,7 @@ function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?: Route
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
     newChat: vi.fn(),
+    switchGraph: vi.fn(),
     toggleAudioMemo: vi.fn(),
     generation: () => 1,
     openPalette,
@@ -364,7 +365,9 @@ describe('Sidebar', () => {
     const { view } = renderSidebar()
 
     await userEvent.click(view.getByRole('button', { name: /Notes/ }))
-    await userEvent.click(view.getByRole('menuitem', { name: 'Work' }))
+    const work = view.getByRole('menuitem', { name: 'Work' })
+    expect([...work.querySelectorAll('kbd')].map((keycap) => keycap.textContent)).toContain('2')
+    await userEvent.click(work)
     expect(openRecent).toHaveBeenCalledWith('/work')
 
     await userEvent.click(view.getByRole('button', { name: /Notes/ }))

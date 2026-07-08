@@ -48,7 +48,19 @@ function openNewNote(context: CommandContext): void {
   context.navigate(newNoteRoute())
 }
 
+const GRAPH_SWITCH_COMMANDS: AppCommand[] = Array.from({ length: 9 }, (_, index) => {
+  const position = index + 1
+  return {
+    id: `graph.switch${position}`,
+    title: `Switch to graph ${position}`,
+    keywords: ['graph', 'workspace', 'switch', 'recent'],
+    keybinding: `Meta-${position}`,
+    run: (context) => context.switchGraph(index),
+  }
+})
+
 const APP_COMMANDS: AppCommand[] = [
+  ...GRAPH_SWITCH_COMMANDS,
   {
     id: 'nav.today',
     title: 'Go to today',

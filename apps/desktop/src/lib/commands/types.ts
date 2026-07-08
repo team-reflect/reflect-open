@@ -28,6 +28,8 @@ export interface CommandContext {
   toggleSidebar: () => void
   /** Start a fresh chat conversation. */
   newChat: () => void
+  /** Switch to a recent graph by zero-based position in the graph switcher. */
+  switchGraph: (index: number) => void
   /** Start an audio memo, or stop-and-save the one recording. */
   toggleAudioMemo: () => void
   /**

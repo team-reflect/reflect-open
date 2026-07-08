@@ -21,6 +21,7 @@ function contextFor(notePath: string | null, generation: number | null): Command
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
     newChat: vi.fn(),
+    switchGraph: vi.fn(),
     toggleAudioMemo: vi.fn(),
     generation: () => generation,
     openPalette: vi.fn(),

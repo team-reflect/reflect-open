@@ -90,6 +90,7 @@ function renderPalette(query: string, context?: Partial<CommandContext>) {
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
     newChat: vi.fn(),
+    switchGraph: vi.fn(),
     toggleAudioMemo: vi.fn(),
     generation: () => 1,
     openPalette: vi.fn(),

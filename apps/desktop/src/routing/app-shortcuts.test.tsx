@@ -11,9 +11,18 @@ import { useAppShortcuts } from './app-shortcuts'
 import { RouterProvider, useRouter } from './router'
 
 const newChat = vi.hoisted(() => vi.fn())
+const openRecent = vi.hoisted(() => vi.fn())
 
 vi.mock('@/providers/graph-provider', () => ({
-  useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 1 } }),
+  useGraph: () => ({
+    graph: { root: '/g', name: 'g', generation: 1 },
+    recents: [
+      { root: '/g', name: 'g', openedMs: 3 },
+      { root: '/work', name: 'Work', openedMs: 2 },
+      { root: '/side', name: 'Side', openedMs: 1 },
+    ],
+    openRecent,
+  }),
 }))
 vi.mock('@/providers/theme-provider', () => ({
   useTheme: () => ({ theme: 'light', resolvedTheme: 'light', setTheme: vi.fn() }),
@@ -33,7 +42,10 @@ vi.mock('@/providers/chat-provider', () => ({
 
 registerAppCommands() // production does this in main.tsx
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  openRecent.mockClear()
+})
 
 function shortcutsHook() {
   return renderHook(
@@ -87,6 +99,8 @@ describe('app shortcuts', () => {
       'Mod-]',
       'Mod-k',
       'Alt-Mod-l',
+      'Meta-1',
+      'Meta-9',
     ]) {
       expect(bindings.get(key)).toBe('app')
     }
@@ -209,6 +223,51 @@ describe('app shortcuts', () => {
     act(() => press('n', { shiftKey: true }))
     expect(result.current.router.route).toEqual({ kind: 'today' })
     expect(newChat).not.toHaveBeenCalled()
+  })
+
+  it('⌘number switches to the matching recent graph', () => {
+    shortcutsHook()
+
+    act(() => press('1'))
+    expect(openRecent).not.toHaveBeenCalled() // first row is already open
+
+    act(() => press('2'))
+    expect(openRecent).toHaveBeenCalledWith('/work')
+
+    act(() => press('9'))
+    expect(openRecent).toHaveBeenCalledTimes(1)
+  })
+
+  it('matches graph number shortcuts by physical digit key on symbol-producing layouts', () => {
+    shortcutsHook()
+
+    act(() => press('@', { code: 'Digit2' }))
+
+    expect(openRecent).toHaveBeenCalledWith('/work')
+  })
+
+  it('strips Shift from physical digit fallback on layouts where digits require Shift', () => {
+    shortcutsHook()
+
+    act(() => press('2', { code: 'Digit2', shiftKey: true }))
+
+    expect(openRecent).toHaveBeenCalledWith('/work')
+  })
+
+  it('does not turn produced symbols with Shift into graph number shortcuts', () => {
+    shortcutsHook()
+
+    act(() => press('@', { code: 'Digit2', shiftKey: true }))
+
+    expect(openRecent).not.toHaveBeenCalled()
+  })
+
+  it('keeps graph switching on the Meta key, not Ctrl-number', () => {
+    shortcutsHook()
+
+    act(() => press('2', { metaKey: false, ctrlKey: true }))
+
+    expect(openRecent).not.toHaveBeenCalled()
   })
 
   it('matches uppercase keys (caps lock) and ignores auto-repeat', () => {

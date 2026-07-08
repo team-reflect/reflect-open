@@ -45,8 +45,9 @@ const CODE_TO_BINDING_KEY: Record<string, string> = {
   BracketRight: ']',
 }
 
-function isModKey(event: KeyboardEvent): boolean {
-  return event.metaKey || event.ctrlKey
+interface BindingKeyLookup {
+  key: string
+  shift: boolean
 }
 
 function bindingKeyFor(event: KeyboardEvent): string {
@@ -68,15 +69,69 @@ function bindingKeyFor(event: KeyboardEvent): string {
   return event.key.toLowerCase()
 }
 
+function physicalDigitKeyFor(event: KeyboardEvent): string | null {
+  if (event.altKey) {
+    return null
+  }
+  const match = /^Digit([0-9])$/.exec(event.code)
+  if (match === null) {
+    return null
+  }
+  const digit = match[1]!
+  // Some layouts type number-row digits with Shift. Treat that as the same
+  // graph-switch shortcut, but don't make US-style Cmd+Shift+@ mean Cmd+2.
+  if (event.shiftKey && event.key !== digit) {
+    return null
+  }
+  return digit
+}
+
+function addBindingLookup(lookups: BindingKeyLookup[], lookup: BindingKeyLookup): void {
+  if (lookups.some((existing) => existing.key === lookup.key && existing.shift === lookup.shift)) {
+    return
+  }
+  lookups.push(lookup)
+}
+
+function bindingLookupsFor(event: KeyboardEvent): BindingKeyLookup[] {
+  const lookups: BindingKeyLookup[] = []
+  addBindingLookup(lookups, { key: bindingKeyFor(event), shift: event.shiftKey })
+
+  const digit = physicalDigitKeyFor(event)
+  if (digit !== null) {
+    addBindingLookup(lookups, { key: digit, shift: false })
+  }
+
+  return lookups
+}
+
+function modifierPrefixesFor(event: KeyboardEvent): string[] {
+  const alt = event.altKey ? 'Alt-' : ''
+  return [
+    event.metaKey ? `${alt}Meta-` : null,
+    event.ctrlKey ? `${alt}Ctrl-` : null,
+    `${alt}Mod-`,
+  ].filter((prefix): prefix is string => prefix !== null)
+}
+
 function idForKeyDown(event: KeyboardEvent): string | null {
-  if (!isModKey(event) || event.repeat) {
+  if ((!event.metaKey && !event.ctrlKey) || event.repeat) {
     return null // held keys must not spam navigations (e.g. a stack of new notes)
   }
-  // Alt participates in the lookup rather than being rejected, so `Alt-Mod-l`
-  // can bind while an alt chord still never fires a plain `Mod-` command.
-  const alt = event.altKey ? 'Alt-' : ''
-  const shift = event.shiftKey ? 'Shift-' : ''
-  return BINDING_TO_ID.get(`${alt}Mod-${shift}${bindingKeyFor(event)}`) ?? null
+  for (const { key, shift: shifted } of bindingLookupsFor(event)) {
+    const shift = shifted ? 'Shift-' : ''
+    for (const prefix of modifierPrefixesFor(event)) {
+      // Alt participates in the lookup rather than being rejected, so
+      // `Alt-Mod-l` can bind while an alt chord still never fires a plain
+      // `Mod-` command.
+      const candidate = `${prefix}${shift}${key}`
+      const id = BINDING_TO_ID.get(candidate)
+      if (id !== undefined) {
+        return id
+      }
+    }
+  }
+  return null
 }
 
 /**
@@ -90,7 +145,7 @@ export function useAppShortcuts(): CommandContext {
   const { route, navigate, back, forward, clearScrollState } = useRouter()
   const focusedDailyDate = useFocusedDailyDate()
   const { resolvedTheme, setTheme } = useTheme()
-  const { graph } = useGraph()
+  const { graph, recents, openRecent } = useGraph()
   const { openPalette, open: paletteOpen } = usePalette()
   const { openShortcuts, closeShortcuts, open: shortcutsOpen } = useShortcuts()
   const {
@@ -118,6 +173,9 @@ export function useAppShortcuts(): CommandContext {
   // Read at run time, not captured: a command can fire long after the render
   // that created the context (palette open across an index rebuild, etc.).
   const generationRef = useRef<number | null>(graph?.generation ?? null)
+  const graphRootRef = useRef<string | null>(graph?.root ?? null)
+  const recentsRef = useRef(recents)
+  const openRecentRef = useRef(openRecent)
   const routeRef = useRef(route)
   const focusedDailyDateRef = useRef(focusedDailyDate)
   useEffect(() => {
@@ -125,6 +183,9 @@ export function useAppShortcuts(): CommandContext {
     shortcutsOpenRef.current = shortcutsOpen
     templatesOpenRef.current = templatePickerOpen || templateCreateOpen
     generationRef.current = graph?.generation ?? null
+    graphRootRef.current = graph?.root ?? null
+    recentsRef.current = recents
+    openRecentRef.current = openRecent
     routeRef.current = route
     focusedDailyDateRef.current = focusedDailyDate
   })
@@ -148,6 +209,13 @@ export function useAppShortcuts(): CommandContext {
       toggleTheme: () => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark'),
       toggleSidebar,
       newChat,
+      switchGraph: (index) => {
+        const recent = recentsRef.current[index]
+        if (recent === undefined || recent.root === graphRootRef.current) {
+          return
+        }
+        void openRecentRef.current(recent.root)
+      },
       toggleAudioMemo,
       generation: () => generationRef.current,
       openPalette,

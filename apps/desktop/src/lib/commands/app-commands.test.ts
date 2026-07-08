@@ -76,6 +76,7 @@ function fakeContext(overrides?: Partial<CommandContext>) {
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
     newChat: vi.fn(),
+    switchGraph: vi.fn(),
     toggleAudioMemo: vi.fn(),
     generation: () => 7,
     openPalette: vi.fn(),
@@ -122,6 +123,11 @@ describe('keybindingFor', () => {
 
   it('note.copyDeepLink keeps the V1 copy-link shortcut', () => {
     expect(keybindingFor('note.copyDeepLink')).toBe('Alt-Mod-l')
+  })
+
+  it('graph switch commands use macOS command-number bindings', () => {
+    expect(keybindingFor('graph.switch1')).toBe('Meta-1')
+    expect(keybindingFor('graph.switch9')).toBe('Meta-9')
   })
 })
 
@@ -186,6 +192,17 @@ describe('app commands', () => {
     const { context: outsideChat } = fakeContext()
     await command('chat.new').run(outsideChat)
     expect(outsideChat.newChat).not.toHaveBeenCalled()
+  })
+
+  it('graph switch commands select their recent graph position', async () => {
+    const switchGraph = vi.fn()
+    const { context } = fakeContext({ switchGraph })
+
+    await command('graph.switch1').run(context)
+    await command('graph.switch9').run(context)
+
+    expect(switchGraph).toHaveBeenNthCalledWith(1, 0)
+    expect(switchGraph).toHaveBeenNthCalledWith(2, 8)
   })
 
   it('note.new clears daily scroll and navigates to a fresh lazy ULID note path', async () => {
