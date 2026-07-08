@@ -88,22 +88,11 @@ export function MobileOnboardingScreen(): ReactElement {
             <IcloudUnavailableSection />
           )}
 
-          <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
-            <div className="flex items-start gap-3">
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-text-secondary">
-                <HardDrive aria-hidden className="size-4" strokeWidth={1.75} />
-              </div>
-              <div className="min-w-0 flex-1 space-y-1">
-                <h2 className="text-sm font-semibold">This device only</h2>
-                <p className="text-xs text-text-muted">
-                  Notes stay on this device and won’t sync through iCloud. You can add GitHub
-                  sync later from Settings.
-                </p>
-              </div>
-            </div>
+          <div className="flex flex-col items-center gap-1 px-4 text-center">
             <Button
-              variant="outline"
-              className="w-full justify-start text-left"
+              variant="ghost"
+              size="sm"
+              className="text-text-secondary"
               onClick={() => runChoice('local', () => completeOnboarding('local'))}
               disabled={action.pending || mobileStorageInfo === null}
             >
@@ -112,9 +101,12 @@ export function MobileOnboardingScreen(): ReactElement {
               ) : (
                 <HardDrive aria-hidden strokeWidth={1.75} />
               )}
-              {pendingChoice === 'local' ? 'Setting up…' : 'Keep notes on this device'}
+              {pendingChoice === 'local' ? 'Setting up…' : 'Use this device only'}
             </Button>
-          </section>
+            <p className="text-xs leading-5 text-text-muted">
+              No iCloud sync. You can add GitHub later from Settings.
+            </p>
+          </div>
         </div>
 
         {action.error !== null ? <InlineAlert tone="error">{action.error}</InlineAlert> : null}

@@ -1,5 +1,5 @@
 import { useId, useState, type ReactElement } from 'react'
-import { Cloud, FolderOpen, Plus } from 'lucide-react'
+import { Cloud, FolderOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
@@ -37,16 +37,12 @@ export function OnboardingIcloudSection(props: OnboardingIcloudSectionProps): Re
   const [typedName, setTypedName] = useState<string | null>(null)
   const nameId = useId()
 
-  const name = typedName ?? ''
+  // Fresh iCloud setup still needs a user-editable graph name; keep the
+  // friendly default, but only leave the field blank when creating alongside
+  // existing iCloud notes where "Notes" would usually collide.
+  const name = typedName ?? (graphs.length > 0 ? '' : DEFAULT_ICLOUD_NOTES_NAME)
   const cleanName = cleanGraphName(name)
   const nameTaken = cleanName !== null && isGraphNameTaken(cleanName, graphs)
-
-  function createDefault(): void {
-    if (documentsRoot === null) {
-      return
-    }
-    onCreate(graphRootForName(documentsRoot, DEFAULT_ICLOUD_NOTES_NAME))
-  }
 
   function create(): void {
     if (documentsRoot === null || cleanName === null || nameTaken) {
@@ -92,66 +88,48 @@ export function OnboardingIcloudSection(props: OnboardingIcloudSectionProps): Re
                 </li>
               ))}
             </ul>
-          ) : (
+          ) : null}
+
+          <div className="space-y-2">
+            {graphs.length > 0 ? <MobileDivider>Start fresh</MobileDivider> : null}
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor={nameId} className="text-xs font-medium text-text-secondary">
+                Name
+              </label>
+              <Input
+                id={nameId}
+                value={name}
+                placeholder={graphs.length > 0 ? 'Personal notes' : undefined}
+                enterKeyHint="go"
+                onChange={(event) => setTypedName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    create()
+                  }
+                }}
+                aria-invalid={nameTaken}
+                disabled={busy}
+              />
+            </div>
+            {nameTaken ? (
+              <p className="text-xs text-destructive">
+                That name already exists in iCloud Drive.
+              </p>
+            ) : null}
             <Button
               type="button"
               className="w-full justify-start text-left"
-              onClick={createDefault}
-              disabled={busy || documentsRoot === null}
+              onClick={create}
+              disabled={busy || cleanName === null || nameTaken || documentsRoot === null}
             >
               {pendingChoice === 'icloud-create' ? (
                 <Spinner />
               ) : (
                 <Cloud aria-hidden strokeWidth={1.75} />
               )}
-              {pendingChoice === 'icloud-create' ? 'Setting up…' : 'Continue with iCloud'}
+              {pendingChoice === 'icloud-create' ? 'Setting up…' : 'Start with iCloud'}
             </Button>
-          )}
-
-          {graphs.length > 0 ? (
-            <div className="space-y-2">
-              <MobileDivider>Start fresh</MobileDivider>
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor={nameId} className="text-xs font-medium text-text-secondary">
-                  Name
-                </label>
-                <div className="flex gap-2">
-                  <Input
-                    id={nameId}
-                    value={name}
-                    placeholder="Personal notes"
-                    enterKeyHint="go"
-                    onChange={(event) => setTypedName(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        create()
-                      }
-                    }}
-                    aria-invalid={nameTaken}
-                    disabled={busy}
-                  />
-                  <Button
-                    type="button"
-                    className="shrink-0"
-                    onClick={create}
-                    disabled={busy || cleanName === null || nameTaken}
-                  >
-                    {pendingChoice === 'icloud-create' ? (
-                      <Spinner />
-                    ) : (
-                      <Plus aria-hidden strokeWidth={1.75} />
-                    )}
-                    {pendingChoice === 'icloud-create' ? 'Setting up…' : 'Create in iCloud'}
-                  </Button>
-                </div>
-              </div>
-              {nameTaken ? (
-                <p className="text-xs text-destructive">
-                  That name already exists in iCloud Drive.
-                </p>
-              ) : null}
-            </div>
-          ) : null}
+          </div>
         </>
       )}
     </section>

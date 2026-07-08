@@ -33,16 +33,16 @@ afterEach(() => {
 })
 
 describe('MobileOnboardingScreen', () => {
-  it('leads with iCloud sync and creates the default iCloud notes', async () => {
+  it('leads with iCloud sync and creates the named iCloud notes', async () => {
     render(<MobileOnboardingScreen />)
 
     expect(screen.getByRole('heading', { name: 'iCloud sync' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Continue with iCloud' })).toBeTruthy()
-    expect(screen.queryByLabelText('Name')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Continue with iCloud' }))
+    expect(screen.getByLabelText('Name')).toHaveProperty('value', 'Notes')
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Journal' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Start with iCloud' }))
 
     await waitFor(() =>
-      expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Notes'),
+      expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal'),
     )
   })
 
@@ -58,7 +58,7 @@ describe('MobileOnboardingScreen', () => {
     expect(screen.getByText('Start fresh')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Continue with Notes' })).toBeTruthy()
     expect(
-      (screen.getByRole('button', { name: 'Create in iCloud' }) as HTMLButtonElement).disabled,
+      (screen.getByRole('button', { name: 'Start with iCloud' }) as HTMLButtonElement).disabled,
     ).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: 'Continue with Work' }))
 
@@ -76,24 +76,21 @@ describe('MobileOnboardingScreen', () => {
     render(<MobileOnboardingScreen />)
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Journal' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Create in iCloud' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start with iCloud' }))
 
     await waitFor(() =>
       expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal'),
     )
   })
 
-  it('chooses a folder on this device without cloning', async () => {
+  it('keeps the on-device choice as a quiet secondary path', async () => {
     render(<MobileOnboardingScreen />)
 
     expect(screen.queryByText(/Your notes are plain markdown files/i)).toBeNull()
-    expect(screen.getByRole('heading', { name: 'This device only' })).toBeTruthy()
     expect(
-      screen.getByText(
-        'Notes stay on this device and won’t sync through iCloud. You can add GitHub sync later from Settings.',
-      ),
+      screen.getByText('No iCloud sync. You can add GitHub later from Settings.'),
     ).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Keep notes on this device' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Use this device only' }))
 
     await waitFor(() => expect(completeOnboarding).toHaveBeenCalledWith('local'))
   })
@@ -108,10 +105,10 @@ describe('MobileOnboardingScreen', () => {
 
     expect(screen.getByRole('heading', { name: 'iCloud sync' })).toBeTruthy()
     expect(screen.getByText('Checking iCloud Drive…')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Continue with iCloud' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Start with iCloud' })).toBeNull()
     expect(screen.queryByText(/Sign in to iCloud/)).toBeNull()
     // The on-device path stays live — its root is already known.
-    const local = screen.getByRole('button', { name: 'Keep notes on this device' })
+    const local = screen.getByRole('button', { name: 'Use this device only' })
     expect((local as HTMLButtonElement).disabled).toBe(false)
   })
 
@@ -126,8 +123,7 @@ describe('MobileOnboardingScreen', () => {
     expect(
       screen.getByText('Sign in to iCloud on this device, then reopen Reflect.'),
     ).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'This device only' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Keep notes on this device' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Use this device only' })).toBeTruthy()
   })
 
   it('does not offer repository setup from the first-run picker', () => {
