@@ -306,7 +306,9 @@ describe('NoteEditor image lightbox', () => {
 
     const preview = await screen.findByRole('button', { name: 'Close image preview' })
     const image = preview.querySelector('img')
+    const lightboxLayer = preview.parentElement
     expect(image).toBeInstanceOf(HTMLImageElement)
+    expect(lightboxLayer).toBeInstanceOf(HTMLElement)
 
     firePointer(preview, 'pointerdown', {
       pointerId: 1,
@@ -333,8 +335,9 @@ describe('NoteEditor image lightbox', () => {
       clientY: 360,
     })
 
-    expect(image?.style.transform).toContain(`, ${window.innerHeight}px, 0)`)
-    fireEvent.transitionEnd(image!)
+    expect(image?.style.transform).toContain('translate3d(2px, 180px, 0)')
+    expect(lightboxLayer?.style.opacity).toBe('0')
+    fireEvent.transitionEnd(lightboxLayer!)
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 

@@ -35,6 +35,7 @@ interface RenderedLightbox {
   onClose: ReturnType<typeof vi.fn>
   preview: HTMLElement
   image: HTMLImageElement
+  lightboxLayer: HTMLElement
   backdrop: HTMLElement | null
   closeChrome: HTMLElement
 }
@@ -50,6 +51,10 @@ function renderMobileLightbox(): RenderedLightbox {
   if (!(image instanceof HTMLImageElement)) {
     throw new Error('lightbox image missing')
   }
+  const lightboxLayer = preview.parentElement
+  if (!(lightboxLayer instanceof HTMLElement)) {
+    throw new Error('lightbox layer missing')
+  }
   const closeChrome = screen.getByRole('button', { name: 'Close' }).parentElement
   if (!(closeChrome instanceof HTMLElement)) {
     throw new Error('close chrome missing')
@@ -58,6 +63,7 @@ function renderMobileLightbox(): RenderedLightbox {
     onClose,
     preview,
     image,
+    lightboxLayer,
     backdrop: dialog.querySelector('.bg-black'),
     closeChrome,
   }
@@ -118,42 +124,47 @@ describe('ImageLightbox mobile drag-to-dismiss', () => {
     expect(closeChrome.style.pointerEvents).toBe('none')
   })
 
-  it('dismisses past the distance threshold, sliding out along the drag vector', () => {
-    const { preview, image, backdrop, onClose } = renderMobileLightbox()
+  it('dismisses past the distance threshold by fading the lightbox layer', () => {
+    const { preview, image, lightboxLayer, backdrop, onClose } = renderMobileLightbox()
 
     touchDown(preview, 180, 120)
     firePointer(preview, 'pointermove', { pointerId: 1, clientX: 182, clientY: 180 })
     firePointer(preview, 'pointermove', { pointerId: 1, clientX: 190, clientY: 260 })
     firePointer(preview, 'pointerup', { pointerId: 1, clientX: 190, clientY: 320 })
 
-    expect(image.style.transform).toContain(`, ${window.innerHeight}px, 0) scale(0.9)`)
-    expect(backdrop!.style.opacity).toBe('0')
+    expect(image.style.transform).toContain('translate3d(8px, 140px, 0)')
+    expect(image.style.transform).not.toContain(`${window.innerHeight}px`)
+    expect(lightboxLayer.style.opacity).toBe('0')
+    expect(lightboxLayer.style.transition).toContain('opacity 180ms')
+    expect(backdrop!.style.opacity).not.toBe('0')
     expect(onClose).not.toHaveBeenCalled()
     onClose.mockImplementation(() => {
       expect(image.style.transform).toBe('')
     })
 
-    fireEvent.transitionEnd(image)
+    fireEvent.transitionEnd(lightboxLayer)
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('dismisses horizontally past the distance threshold', () => {
-    const { preview, image, onClose } = renderMobileLightbox()
+    const { preview, image, lightboxLayer, onClose } = renderMobileLightbox()
 
     touchDown(preview, 100, 100)
     firePointer(preview, 'pointermove', { pointerId: 1, clientX: 120, clientY: 100 })
     firePointer(preview, 'pointermove', { pointerId: 1, clientX: 340, clientY: 104 })
     firePointer(preview, 'pointerup', { pointerId: 1, clientX: 340, clientY: 104 })
 
-    expect(image.style.transform).toContain(`translate3d(${window.innerWidth}px, `)
+    expect(image.style.transform).toContain('translate3d(220px, 4px, 0)')
+    expect(image.style.transform).not.toContain(`${window.innerWidth}px`)
+    expect(lightboxLayer.style.opacity).toBe('0')
     expect(onClose).not.toHaveBeenCalled()
 
-    fireEvent.transitionEnd(image)
+    fireEvent.transitionEnd(lightboxLayer)
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('dismisses a fast flick before the distance threshold', () => {
-    const { preview, image, onClose } = renderMobileLightbox()
+    const { preview, image, lightboxLayer, onClose } = renderMobileLightbox()
     const nowSpy = vi.spyOn(performance, 'now')
 
     nowSpy.mockReturnValue(1_000)
@@ -167,8 +178,9 @@ describe('ImageLightbox mobile drag-to-dismiss', () => {
     firePointer(preview, 'pointerup', { pointerId: 1, clientX: 100, clientY: 180 })
     nowSpy.mockRestore()
 
-    expect(image.style.transform).toContain(`, ${window.innerHeight}px, 0)`)
-    fireEvent.transitionEnd(image)
+    expect(image.style.transform).toContain('translate3d(0px, 60px, 0)')
+    expect(lightboxLayer.style.opacity).toBe('0')
+    fireEvent.transitionEnd(lightboxLayer)
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
@@ -193,7 +205,7 @@ describe('ImageLightbox mobile drag-to-dismiss', () => {
   })
 
   it('dismisses upward past the distance threshold', () => {
-    const { preview, image, onClose } = renderMobileLightbox()
+    const { preview, image, lightboxLayer, onClose } = renderMobileLightbox()
 
     touchDown(preview, 100, 100)
     firePointer(preview, 'pointermove', { pointerId: 1, clientX: 100, clientY: 80 })
@@ -202,8 +214,9 @@ describe('ImageLightbox mobile drag-to-dismiss', () => {
     expect(image.style.transform).toContain('translate3d(0px, -200px, 0)')
 
     firePointer(preview, 'pointerup', { pointerId: 1, clientX: 100, clientY: -120 })
-    expect(image.style.transform).toContain(`, -${window.innerHeight}px, 0)`)
-    fireEvent.transitionEnd(image)
+    expect(image.style.transform).toContain('translate3d(0px, -200px, 0)')
+    expect(lightboxLayer.style.opacity).toBe('0')
+    fireEvent.transitionEnd(lightboxLayer)
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 

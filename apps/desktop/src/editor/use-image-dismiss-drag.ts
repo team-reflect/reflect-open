@@ -16,8 +16,7 @@ const MIN_FLICK_DISTANCE_PX = 40
 const VELOCITY_WINDOW_MS = 30
 const VELOCITY_STALE_MS = 120
 const SNAP_BACK_MS = 300
-const DISMISS_MS = 260
-const DISMISS_MIN_MS = 140
+const DISMISS_FADE_MS = 180
 const SETTLE_SLACK_MS = 80
 const CLICK_SUPPRESSION_MS = 500
 // Full visual effect (backdrop gone, image at min scale) at half the viewport.
@@ -37,7 +36,6 @@ type DragState =
       pointerId: number
       originX: number
       originY: number
-      width: number
       height: number
       deltaX: number
       deltaY: number
@@ -50,7 +48,6 @@ type DragState =
       action: 'close' | 'cancel'
       deltaX: number
       deltaY: number
-      width: number
       height: number
       durationMs: number
     }
@@ -59,6 +56,8 @@ const IDLE: DragState = { phase: 'idle' }
 
 /** Styles and handlers driving the mobile drag-to-dismiss gesture. */
 export interface ImageDismissDrag {
+  /** Fade applied to the whole mobile lightbox while a drag-close settles. */
+  lightboxStyle: CSSProperties | undefined
   /** Transform applied to the dragged image, or undefined at rest. */
   imageStyle: CSSProperties | undefined
   /** Fade applied to the lightbox backdrop as the drag progresses. */
@@ -72,7 +71,7 @@ export interface ImageDismissDrag {
     onPointerCancel: (event: ReactPointerEvent<HTMLButtonElement>) => void
     onClick: (event: ReactMouseEvent<HTMLButtonElement>) => void
   }
-  /** Completes a settle animation; wire to the image's `onTransitionEnd`. */
+  /** Completes a settle animation; wire to transition-end events for settling elements. */
   finishSettle: () => void
 }
 
@@ -92,36 +91,35 @@ function dragProgress(deltaX: number, deltaY: number, height: number): number {
   )
 }
 
-/** Continue the drag vector so the image exits along the finger's line. */
-function projectDismissOffset(
-  deltaX: number,
-  deltaY: number,
-  width: number,
-  height: number,
-): { x: number; y: number } {
-  const absX = Math.abs(deltaX)
-  const absY = Math.abs(deltaY)
-  if (absX === 0 && absY === 0) {
-    return { x: 0, y: height }
-  }
-  const factor = absX >= absY ? width / Math.max(absX, 1) : height / Math.max(absY, 1)
-  return {
-    x: deltaX * factor,
-    y: deltaY * factor,
-  }
+function imageTransformForDrag(deltaX: number, deltaY: number, height: number): string {
+  const progress = dragProgress(deltaX, deltaY, height)
+  return `translate3d(${deltaX}px, ${deltaY}px, 0) scale(${1 - progress * DRAG_SHRINK})`
 }
 
-function dismissDurationMs(distance: number, height: number, velocity: number): number {
-  const remaining = Math.max(0, height - distance)
-  const floorVelocity = remaining / DISMISS_MS
-  return clamp(remaining / Math.max(velocity, floorVelocity), DISMISS_MIN_MS, DISMISS_MS)
+function backdropOpacityForDrag(deltaX: number, deltaY: number, height: number): number {
+  return 1 - dragProgress(deltaX, deltaY, height) * BACKDROP_FADE
+}
+
+function chromeOpacityForDrag(deltaX: number, deltaY: number, height: number): number {
+  return clamp(1 - dragProgress(deltaX, deltaY, height) * CHROME_FADE_RATE, 0, 1)
+}
+
+function lightboxStyleForState(state: DragState): CSSProperties | undefined {
+  if (state.phase === 'settling' && state.action === 'close') {
+    return {
+      opacity: 0,
+      pointerEvents: 'none',
+      transition: `opacity ${state.durationMs}ms ${DISMISS_EASING}`,
+      willChange: 'opacity',
+    }
+  }
+  return undefined
 }
 
 function imageStyleForState(state: DragState): CSSProperties | undefined {
   if (state.phase === 'dragging') {
-    const progress = dragProgress(state.deltaX, state.deltaY, state.height)
     return {
-      transform: `translate3d(${state.deltaX}px, ${state.deltaY}px, 0) scale(${1 - progress * DRAG_SHRINK})`,
+      transform: imageTransformForDrag(state.deltaX, state.deltaY, state.height),
       transition: 'none',
       willChange: 'transform',
     }
@@ -129,10 +127,9 @@ function imageStyleForState(state: DragState): CSSProperties | undefined {
   if (state.phase === 'settling') {
     const closing = state.action === 'close'
     if (closing) {
-      const offset = projectDismissOffset(state.deltaX, state.deltaY, state.width, state.height)
       return {
-        transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(0.9)`,
-        transition: `transform ${state.durationMs}ms ${DISMISS_EASING}`,
+        transform: imageTransformForDrag(state.deltaX, state.deltaY, state.height),
+        transition: 'none',
         willChange: 'transform',
       }
     }
@@ -148,15 +145,21 @@ function imageStyleForState(state: DragState): CSSProperties | undefined {
 function backdropStyleForState(state: DragState): CSSProperties | undefined {
   if (state.phase === 'dragging') {
     return {
-      opacity: 1 - dragProgress(state.deltaX, state.deltaY, state.height) * BACKDROP_FADE,
+      opacity: backdropOpacityForDrag(state.deltaX, state.deltaY, state.height),
       transition: 'none',
     }
   }
   if (state.phase === 'settling') {
     const closing = state.action === 'close'
+    if (closing) {
+      return {
+        opacity: backdropOpacityForDrag(state.deltaX, state.deltaY, state.height),
+        transition: 'none',
+      }
+    }
     return {
-      opacity: closing ? 0 : 1,
-      transition: `opacity ${state.durationMs}ms ${closing ? DISMISS_EASING : SNAP_BACK_EASING}`,
+      opacity: 1,
+      transition: `opacity ${state.durationMs}ms ${SNAP_BACK_EASING}`,
     }
   }
   return undefined
@@ -165,21 +168,24 @@ function backdropStyleForState(state: DragState): CSSProperties | undefined {
 function chromeStyleForState(state: DragState): CSSProperties | undefined {
   if (state.phase === 'dragging') {
     return {
-      opacity: clamp(
-        1 - dragProgress(state.deltaX, state.deltaY, state.height) * CHROME_FADE_RATE,
-        0,
-        1,
-      ),
+      opacity: chromeOpacityForDrag(state.deltaX, state.deltaY, state.height),
       pointerEvents: 'none',
       transition: 'none',
     }
   }
   if (state.phase === 'settling') {
     const closing = state.action === 'close'
+    if (closing) {
+      return {
+        opacity: chromeOpacityForDrag(state.deltaX, state.deltaY, state.height),
+        pointerEvents: 'none',
+        transition: 'none',
+      }
+    }
     return {
-      opacity: closing ? 0 : 1,
+      opacity: 1,
       pointerEvents: 'none',
-      transition: `opacity ${state.durationMs}ms ${closing ? DISMISS_EASING : SNAP_BACK_EASING}`,
+      transition: `opacity ${state.durationMs}ms ${SNAP_BACK_EASING}`,
     }
   }
   return undefined
@@ -189,9 +195,8 @@ function chromeStyleForState(state: DragState): CSSProperties | undefined {
  * Touch drag-to-dismiss for the mobile image lightbox. A touch drag detaches
  * the image so it follows the finger in any direction while the backdrop and
  * chrome fade with distance. Releasing past a distance threshold, or flicking,
- * slides the image out along the drag vector at a velocity-matched speed and
- * then calls `onClose`; shorter drags spring back. A plain tap still closes via
- * `onClick`.
+ * fades the lightbox out and then calls `onClose`; shorter drags spring back.
+ * A plain tap still closes via `onClick`.
  */
 export function useImageDismissDrag({
   active,
@@ -287,9 +292,7 @@ export function useImageDismissDrag({
           // Synthetic tests do not have a live pointer to capture.
         }
 
-        const rect = event.currentTarget.getBoundingClientRect()
-        const width = rect.width || window.innerWidth
-        const height = rect.height || window.innerHeight
+        const height = event.currentTarget.getBoundingClientRect().height || window.innerHeight
         // Rebase on the activation point so the image picks up from rest
         // instead of jumping by the activation distance.
         commit({
@@ -297,7 +300,6 @@ export function useImageDismissDrag({
           pointerId: event.pointerId,
           originX: event.clientX,
           originY: event.clientY,
-          width,
           height,
           deltaX: 0,
           deltaY: 0,
@@ -373,11 +375,8 @@ export function useImageDismissDrag({
         action: shouldClose ? 'close' : 'cancel',
         deltaX: releaseDeltaX,
         deltaY: releaseDeltaY,
-        width: current.width,
         height: current.height,
-        durationMs: shouldClose
-          ? dismissDurationMs(releaseDistance, current.height, releaseVelocity)
-          : SNAP_BACK_MS,
+        durationMs: shouldClose ? DISMISS_FADE_MS : SNAP_BACK_MS,
       })
     },
     [commit, onClose, suppressUpcomingClick],
@@ -413,6 +412,7 @@ export function useImageDismissDrag({
   )
 
   return {
+    lightboxStyle: lightboxStyleForState(state),
     imageStyle: imageStyleForState(state),
     backdropStyle: backdropStyleForState(state),
     chromeStyle: chromeStyleForState(state),
