@@ -94,7 +94,7 @@ export function OnboardingIcloudSection(props: OnboardingIcloudSectionProps): Re
             {graphs.length > 0 ? <MobileDivider>Start fresh</MobileDivider> : null}
             <div className="flex flex-col gap-1.5">
               <label htmlFor={nameId} className="text-xs font-medium text-text-secondary">
-                Name
+                Graph name
               </label>
               <Input
                 id={nameId}
@@ -127,7 +127,7 @@ export function OnboardingIcloudSection(props: OnboardingIcloudSectionProps): Re
               ) : (
                 <Cloud aria-hidden strokeWidth={1.75} />
               )}
-              {pendingChoice === 'icloud-create' ? 'Setting up…' : 'Start with iCloud'}
+              {pendingChoice === 'icloud-create' ? 'Setting up…' : 'Setup graph'}
             </Button>
           </div>
         </>

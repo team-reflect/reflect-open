@@ -101,11 +101,8 @@ export function MobileOnboardingScreen(): ReactElement {
               ) : (
                 <HardDrive aria-hidden strokeWidth={1.75} />
               )}
-              {pendingChoice === 'local' ? 'Setting up…' : 'Use this device only'}
+              {pendingChoice === 'local' ? 'Setting up…' : 'Or, use this device only'}
             </Button>
-            <p className="text-xs leading-5 text-text-muted">
-              No iCloud sync. You can add GitHub later from Settings.
-            </p>
           </div>
         </div>
 

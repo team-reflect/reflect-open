@@ -37,9 +37,9 @@ describe('MobileOnboardingScreen', () => {
     render(<MobileOnboardingScreen />)
 
     expect(screen.getByRole('heading', { name: 'iCloud sync' })).toBeTruthy()
-    expect(screen.getByLabelText('Name')).toHaveProperty('value', 'Notes')
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Journal' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Start with iCloud' }))
+    expect(screen.getByLabelText('Graph name')).toHaveProperty('value', 'Notes')
+    fireEvent.change(screen.getByLabelText('Graph name'), { target: { value: 'Journal' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Setup graph' }))
 
     await waitFor(() =>
       expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal'),
@@ -58,7 +58,7 @@ describe('MobileOnboardingScreen', () => {
     expect(screen.getByText('Start fresh')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Continue with Notes' })).toBeTruthy()
     expect(
-      (screen.getByRole('button', { name: 'Start with iCloud' }) as HTMLButtonElement).disabled,
+      (screen.getByRole('button', { name: 'Setup graph' }) as HTMLButtonElement).disabled,
     ).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: 'Continue with Work' }))
 
@@ -75,8 +75,8 @@ describe('MobileOnboardingScreen', () => {
     })
     render(<MobileOnboardingScreen />)
 
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Journal' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Start with iCloud' }))
+    fireEvent.change(screen.getByLabelText('Graph name'), { target: { value: 'Journal' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Setup graph' }))
 
     await waitFor(() =>
       expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal'),
@@ -87,10 +87,8 @@ describe('MobileOnboardingScreen', () => {
     render(<MobileOnboardingScreen />)
 
     expect(screen.queryByText(/Your notes are plain markdown files/i)).toBeNull()
-    expect(
-      screen.getByText('No iCloud sync. You can add GitHub later from Settings.'),
-    ).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Use this device only' }))
+    expect(screen.queryByText('No iCloud sync. You can add GitHub later from Settings.')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Or, use this device only' }))
 
     await waitFor(() => expect(completeOnboarding).toHaveBeenCalledWith('local'))
   })
@@ -105,10 +103,10 @@ describe('MobileOnboardingScreen', () => {
 
     expect(screen.getByRole('heading', { name: 'iCloud sync' })).toBeTruthy()
     expect(screen.getByText('Checking iCloud Drive…')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Start with iCloud' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Setup graph' })).toBeNull()
     expect(screen.queryByText(/Sign in to iCloud/)).toBeNull()
     // The on-device path stays live — its root is already known.
-    const local = screen.getByRole('button', { name: 'Use this device only' })
+    const local = screen.getByRole('button', { name: 'Or, use this device only' })
     expect((local as HTMLButtonElement).disabled).toBe(false)
   })
 
@@ -123,7 +121,7 @@ describe('MobileOnboardingScreen', () => {
     expect(
       screen.getByText('Sign in to iCloud on this device, then reopen Reflect.'),
     ).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Use this device only' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Or, use this device only' })).toBeTruthy()
   })
 
   it('does not offer repository setup from the first-run picker', () => {
@@ -134,10 +132,9 @@ describe('MobileOnboardingScreen', () => {
     expect(screen.queryByRole('button', { name: 'Download & open' })).toBeNull()
   })
 
-  it('does not expose graph or folder language in the primary first-run path', () => {
+  it('does not expose folder language in the primary first-run path', () => {
     render(<MobileOnboardingScreen />)
 
-    expect(screen.queryByText(/graph/i)).toBeNull()
     expect(screen.queryByText(/folder/i)).toBeNull()
   })
 })
