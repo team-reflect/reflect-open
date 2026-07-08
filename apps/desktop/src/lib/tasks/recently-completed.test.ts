@@ -18,6 +18,7 @@ function task(over: Partial<OpenTask> = {}): OpenTask {
     raw: '[ ] do it',
     checked: false,
     text: 'do it',
+    breadcrumbs: [],
     noteTitle: 'N',
     dueDate: null,
     dailyDate: null,

@@ -63,8 +63,10 @@ import { previewSnippet } from './snippet'
  * 14 — v1 subject aliases (`//` segments of the title) folded into the
  * `aliases` projection: existing v1-style titles carry no derived alias rows
  * until reprojected, so the bump backfills them.
+ * 15 — task parent outline/list breadcrumbs: existing task rows carry empty
+ * breadcrumbs until reprojected.
  */
-export const PROJECTION_VERSION = 14
+export const PROJECTION_VERSION = 15
 
 export const indexedLinkSchema = z.object({
   kind: z.enum(['wiki', 'md']),
@@ -104,6 +106,8 @@ export const indexedTaskSchema = z.object({
   markerOffset: z.number(),
   /** Display/search text of the task's marker line, markdown stripped. */
   text: z.string(),
+  /** Parent outline/list item text, top-down, displayed in the Tasks view. */
+  breadcrumbs: z.array(z.string()),
   /** The marker line verbatim — the surgical write-back's staleness guard. */
   raw: z.string(),
   checked: z.boolean(),
@@ -237,6 +241,7 @@ export function buildIndexedNote(
     tasks: parsed.tasks.map((task) => ({
       markerOffset: task.markerOffset,
       text: task.text,
+      breadcrumbs: task.breadcrumbs,
       raw: task.raw,
       checked: task.checked,
       dueDate: task.dueDate,

@@ -32,6 +32,13 @@ export interface TaskListSources {
   readonly today: string
 }
 
+function taskMatchesNeedle(task: OpenTask, needle: string): boolean {
+  return (
+    task.text.toLowerCase().includes(needle) ||
+    task.breadcrumbs.some((breadcrumb) => breadcrumb.toLowerCase().includes(needle))
+  )
+}
+
 /**
  * The Tasks list every surface renders (Plan 18): open rows merged with the
  * struck "completed" rows, searched, grouped ({@link groupTasks}) and narrowed to
@@ -71,6 +78,6 @@ export function composeVisibleTaskGroups({
     : recentlyCompleted
   const completedKeys = new Set(completedRows.map(taskKey))
   const all = [...open.filter((task) => !completedKeys.has(taskKey(task))), ...completedRows]
-  const matched = needle ? all.filter((task) => task.text.toLowerCase().includes(needle)) : all
+  const matched = needle ? all.filter((task) => taskMatchesNeedle(task, needle)) : all
   return visibleGroups(groupTasks(matched, today), filters)
 }

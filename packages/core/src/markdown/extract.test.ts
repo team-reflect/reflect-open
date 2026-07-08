@@ -146,15 +146,36 @@ describe('parseNote — tasks', () => {
   it('extracts open and checked round task checkboxes with text, raw, marker offset', () => {
     const note = parse('+ [ ] buy milk\n+ [x] call mum\n')
     expect(note.tasks).toEqual([
-      { text: 'buy milk', raw: '[ ] buy milk', checked: false, markerOffset: 2, dueDate: null },
-      { text: 'call mum', raw: '[x] call mum', checked: true, markerOffset: 17, dueDate: null },
+      {
+        text: 'buy milk',
+        breadcrumbs: [],
+        raw: '[ ] buy milk',
+        checked: false,
+        markerOffset: 2,
+        dueDate: null,
+      },
+      {
+        text: 'call mum',
+        breadcrumbs: [],
+        raw: '[x] call mum',
+        checked: true,
+        markerOffset: 17,
+        dueDate: null,
+      },
     ])
   })
 
   it('treats an uppercase [X] marker as checked', () => {
     const note = parse('+ [X] done\n')
     expect(note.tasks).toEqual([
-      { text: 'done', raw: '[X] done', checked: true, markerOffset: 2, dueDate: null },
+      {
+        text: 'done',
+        breadcrumbs: [],
+        raw: '[X] done',
+        checked: true,
+        markerOffset: 2,
+        dueDate: null,
+      },
     ])
   })
 
@@ -184,10 +205,35 @@ describe('parseNote — tasks', () => {
     ])
   })
 
+  it('captures parent outline items as task breadcrumbs', () => {
+    const note = parse('+ Project [[Alpha]]\n  + **Phase one**\n    + [ ] ship it\n')
+    expect(note.tasks).toEqual([
+      expect.objectContaining({
+        text: 'ship it',
+        breadcrumbs: ['Project Alpha', 'Phase one'],
+      }),
+    ])
+  })
+
+  it('uses parent task rows as breadcrumbs for nested subtasks', () => {
+    const note = parse('+ [ ] parent task\n  + [x] child task\n')
+    expect(note.tasks.map((task) => ({ text: task.text, breadcrumbs: task.breadcrumbs }))).toEqual([
+      { text: 'parent task', breadcrumbs: [] },
+      { text: 'child task', breadcrumbs: ['parent task'] },
+    ])
+  })
+
   it('ignores checkboxes inside fenced code', () => {
     const note = parse('+ [ ] real\n\n```\n+ [ ] not a task\n```\n')
     expect(note.tasks).toEqual([
-      { text: 'real', raw: '[ ] real', checked: false, markerOffset: 2, dueDate: null },
+      {
+        text: 'real',
+        breadcrumbs: [],
+        raw: '[ ] real',
+        checked: false,
+        markerOffset: 2,
+        dueDate: null,
+      },
     ])
   })
 

@@ -20,6 +20,7 @@ export function insertedTaskRow(target: InsertTaskTarget, markerOffset: number):
     raw: '[ ] ',
     checked: false,
     text: '',
+    breadcrumbs: [],
     noteTitle: target.noteTitle,
     dueDate: null,
     dailyDate: target.dailyDate,

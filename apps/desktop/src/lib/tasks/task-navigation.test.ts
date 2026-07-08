@@ -10,6 +10,7 @@ function task(over: Partial<OpenTask> = {}): OpenTask {
     raw: '[ ] x',
     checked: false,
     text: 'x',
+    breadcrumbs: [],
     noteTitle: 'N',
     dueDate: null,
     dailyDate: null,

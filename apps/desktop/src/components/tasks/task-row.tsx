@@ -12,6 +12,7 @@ import { taskKey } from '@/lib/tasks/task-identity'
 import { useTaskCheckboxToggle } from '@/lib/tasks/use-task-checkbox-toggle'
 import { cn } from '@/lib/utils'
 import { useSettings } from '@/providers/settings-provider'
+import { TaskBreadcrumbs } from './task-breadcrumbs'
 import { TaskEditor, type TaskNavigate } from './task-editor'
 import { TaskText } from './task-text'
 
@@ -176,10 +177,12 @@ export function TaskRow({
           onKeyDown={selectFromKeyboard}
           className={cn(
             'min-w-0 flex-1 break-words text-left text-sm leading-6 text-text focus-visible:outline-none',
-            task.checked && 'text-text-muted line-through',
           )}
         >
-          <TaskText task={task} />
+          <TaskBreadcrumbs breadcrumbs={task.breadcrumbs} />
+          <div className={cn(task.checked && 'text-text-muted line-through')}>
+            <TaskText task={task} />
+          </div>
         </div>
       )}
       {showSource && task.dailyDate !== null ? (

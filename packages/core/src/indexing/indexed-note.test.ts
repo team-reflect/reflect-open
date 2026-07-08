@@ -3,8 +3,8 @@ import { gistBodyHash, parseNote } from '../markdown'
 import { buildIndexedNote, indexedNoteSchema, PROJECTION_VERSION } from './indexed-note'
 
 describe('buildIndexedNote', () => {
-  it('carries the projection version that backfills the derived subject-alias rows', () => {
-    expect(PROJECTION_VERSION).toBe(14)
+  it('carries the projection version that backfills task breadcrumbs', () => {
+    expect(PROJECTION_VERSION).toBe(15)
   })
 
   it('flattens a parsed note into the index payload', () => {
@@ -219,8 +219,22 @@ describe('buildIndexedNote', () => {
       source,
     })
     expect(indexed.tasks).toEqual([
-      { markerOffset: source.indexOf('[ ]'), text: 'buy milk', raw: '[ ] buy milk', checked: false, dueDate: null },
-      { markerOffset: source.indexOf('[x] call'), text: 'call mum', raw: '[x] call mum', checked: true, dueDate: null },
+      {
+        markerOffset: source.indexOf('[ ]'),
+        text: 'buy milk',
+        breadcrumbs: [],
+        raw: '[ ] buy milk',
+        checked: false,
+        dueDate: null,
+      },
+      {
+        markerOffset: source.indexOf('[x] call'),
+        text: 'call mum',
+        breadcrumbs: [],
+        raw: '[x] call mum',
+        checked: true,
+        dueDate: null,
+      },
     ])
   })
 

@@ -1,6 +1,7 @@
 import { type ReactElement } from 'react'
 import { Circle, CircleCheck } from 'lucide-react'
 import type { OpenTask } from '@reflect/core'
+import { TaskBreadcrumbs } from '@/components/tasks/task-breadcrumbs'
 import { TaskText } from '@/components/tasks/task-text'
 import { formatShortDate } from '@/lib/dates'
 import { taskKey } from '@/lib/tasks/task-identity'
@@ -72,14 +73,12 @@ export function MobileTaskRow({ task, showSource, onEdit }: MobileTaskRowProps):
         }}
         className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 py-3 pr-4 text-left focus-visible:outline-none"
       >
-        <span
-          className={cn(
-            'min-w-0 flex-1 break-words text-sm leading-6 text-text',
-            task.checked && 'text-text-muted line-through',
-          )}
-        >
-          <TaskText task={task} />
-        </span>
+        <div className="min-w-0 flex-1 break-words text-sm leading-6 text-text">
+          <TaskBreadcrumbs breadcrumbs={task.breadcrumbs} />
+          <div className={cn(task.checked && 'text-text-muted line-through')}>
+            <TaskText task={task} />
+          </div>
+        </div>
         {showSource && task.dailyDate !== null ? (
           // The compact date, not desktop's long day label — a phone row can't
           // spare "Mon, June 1st, 2026" (V1 mobile's small gray source label).

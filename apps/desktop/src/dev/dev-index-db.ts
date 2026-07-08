@@ -168,8 +168,16 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
       for (const task of note.tasks) {
         run(
           db,
-          'INSERT INTO tasks(note_path, marker_offset, text, raw, checked, due_date) VALUES(?, ?, ?, ?, ?, ?)',
-          [note.path, task.markerOffset, task.text, task.raw, task.checked, task.dueDate],
+          'INSERT INTO tasks(note_path, marker_offset, text, breadcrumbs, raw, checked, due_date) VALUES(?, ?, ?, ?, ?, ?, ?)',
+          [
+            note.path,
+            task.markerOffset,
+            task.text,
+            JSON.stringify(task.breadcrumbs),
+            task.raw,
+            task.checked,
+            task.dueDate,
+          ],
         )
       }
       const searchBody = note.assetText === '' ? note.text : `${note.text}\n${note.assetText}`

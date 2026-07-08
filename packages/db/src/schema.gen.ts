@@ -122,6 +122,7 @@ export interface Tags {
 }
 
 export interface Tasks {
+  breadcrumbs: Generated<string>;
   checked: number;
   dueDate: string | null;
   markerOffset: number;
