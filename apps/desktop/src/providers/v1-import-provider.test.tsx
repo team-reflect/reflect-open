@@ -211,6 +211,28 @@ describe('V1ImportProvider', () => {
     expect(refreshIndex).not.toHaveBeenCalled()
   })
 
+  it('cancels and drops the result when the workspace unmounts mid-import', async () => {
+    let finish: (value: SummaryFixture) => void = () => {}
+    importReflectV1Zip.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    )
+    const view = renderProvider()
+
+    fireEvent.click(startButton())
+    await screen.findByRole('dialog')
+
+    view.unmount()
+    expect(cancelReflectV1Import).toHaveBeenCalledTimes(1)
+
+    finish(summary())
+    await waitFor(() => expect(importReflectV1Zip).toHaveBeenCalledTimes(1))
+    expect(markReflectV1ImportOwnWrites).not.toHaveBeenCalled()
+    expect(refreshIndex).not.toHaveBeenCalled()
+  })
+
   it('summarizes failed attachment downloads', async () => {
     importReflectV1Zip.mockResolvedValueOnce(
       summary({

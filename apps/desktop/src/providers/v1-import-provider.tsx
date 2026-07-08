@@ -69,9 +69,16 @@ export function V1ImportProvider({ graph, children }: V1ImportProviderProps): Re
 
   // The native import keeps running without this window; if the workspace
   // unmounts mid-import (graph switch, app teardown) nobody is left to show
-  // or apply the result, so stop the work too.
+  // or apply the result, so stop the work too. `mountedRef` also gates the
+  // completion bookkeeping: cancellation only aborts before the write phase,
+  // so a near-finished import can still resolve after unmount — its
+  // own-write echoes and index refresh would then land on whatever graph is
+  // open now, not the one it imported into.
+  const mountedRef = useRef(true)
   useEffect(() => {
+    mountedRef.current = true
     return () => {
+      mountedRef.current = false
       if (runningRef.current) {
         void cancelReflectV1Import().catch(() => {})
       }
@@ -96,7 +103,11 @@ export function V1ImportProvider({ graph, children }: V1ImportProviderProps): Re
         try {
           const summary = await importReflectV1Zip(zipPath, startedFor.generation)
           const current = graphRef.current
-          if (current.root === startedFor.root && current.generation === startedFor.generation) {
+          if (
+            mountedRef.current &&
+            current.root === startedFor.root &&
+            current.generation === startedFor.generation
+          ) {
             markReflectV1ImportOwnWrites(summary)
             refreshIndex()
             setState({ phase: 'done', summary })

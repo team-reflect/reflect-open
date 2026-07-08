@@ -79,35 +79,59 @@ pub struct ImportProgress {
     pub total: usize,
 }
 
-/// Cooperative cancellation for the (single) running import, managed as Tauri
-/// state. `begin` rearms the flag when an import starts; `graph_import_cancel`
-/// trips it. Downloads stop promptly and the import aborts *before any graph
-/// write* — cancellation never leaves a half-imported graph.
+/// Cooperative cancellation for the single running import, managed as Tauri
+/// state. `begin` claims the one import slot and rearms the flag;
+/// `graph_import_cancel` trips it. Downloads stop promptly and the import
+/// aborts *before any graph write* — cancellation never leaves a
+/// half-imported graph.
 #[derive(Default)]
-pub struct ImportCancel(Arc<AtomicBool>);
+pub struct ImportCancel {
+    cancelled: Arc<AtomicBool>,
+    running: AtomicBool,
+}
 
 impl ImportCancel {
-    /// Rearm for a fresh import (clears a leftover cancel).
-    pub fn begin(&self) {
-        self.0.store(false, Ordering::SeqCst);
+    /// Claim the import slot and rearm the cancel flag. Errors when an
+    /// import is already running: a second import beginning would clear a
+    /// cancel meant for the first, and concurrent imports are not
+    /// serialized anywhere else.
+    pub fn begin(&self) -> AppResult<ImportRunGuard<'_>> {
+        if self
+            .running
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            return Err(AppError::io("an import is already running"));
+        }
+        self.cancelled.store(false, Ordering::SeqCst);
+        Ok(ImportRunGuard(self))
     }
 
     /// Request cancellation of the running import.
     pub fn cancel(&self) {
-        self.0.store(true, Ordering::SeqCst);
+        self.cancelled.store(true, Ordering::SeqCst);
     }
 
     /// The shared flag, for the download workers.
     pub fn flag(&self) -> Arc<AtomicBool> {
-        Arc::clone(&self.0)
+        Arc::clone(&self.cancelled)
     }
 
     /// Error out if cancellation was requested (checked between phases).
     pub fn ensure_active(&self) -> AppResult<()> {
-        if self.0.load(Ordering::SeqCst) {
+        if self.cancelled.load(Ordering::SeqCst) {
             return Err(AppError::io("import cancelled"));
         }
         Ok(())
+    }
+}
+
+/// Releases the import slot when the import command returns (any path).
+pub struct ImportRunGuard<'a>(&'a ImportCancel);
+
+impl Drop for ImportRunGuard<'_> {
+    fn drop(&mut self) {
+        self.0.running.store(false, Ordering::SeqCst);
     }
 }
 
@@ -1632,6 +1656,22 @@ mod tests {
         let note = fs::read_to_string(root.path().join("daily/2026-07-04.md")).unwrap();
         assert_eq!(note, markdown);
         assert!(!root.path().join("assets").join("deleted").exists());
+    }
+
+    /// One import at a time: a second `begin` while the slot is held must
+    /// error (it would clear a cancel meant for the running import), and the
+    /// slot frees once the guard drops.
+    #[test]
+    fn a_second_import_cannot_begin_while_one_runs() {
+        let cancel = ImportCancel::default();
+
+        let guard = cancel.begin().unwrap();
+        assert!(cancel.begin().is_err());
+
+        cancel.cancel();
+        drop(guard);
+        let _rearmed = cancel.begin().unwrap();
+        assert!(cancel.ensure_active().is_ok());
     }
 
     #[test]

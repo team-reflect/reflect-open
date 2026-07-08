@@ -233,7 +233,10 @@ pub async fn graph_import_reflect_v1_zip(
     cancel: State<'_, ImportCancel>,
 ) -> AppResult<import::ImportSummary> {
     let root = root_for_generation(&state, generation)?;
-    cancel.begin();
+    // Holds the one import slot until this command returns on any path — a
+    // second import starting mid-run would clear a cancel meant for the
+    // first and race its writes.
+    let _running = cancel.begin()?;
     let prepared = import::prepare_zip_import(&root, Path::new(&path))?;
     if prepared.remote_asset_count() > 0 {
         emit_import_progress(&app, "downloading", 0, prepared.remote_asset_count());
