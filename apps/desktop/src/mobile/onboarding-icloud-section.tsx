@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { cleanGraphName, graphNameFromRoot, graphRootForName, isGraphNameTaken } from '@/lib/graph-names'
 
+const DEFAULT_ICLOUD_NOTES_NAME = 'Notes'
+
 interface OnboardingIcloudSectionProps {
   /** The container is still resolving — render the pending row, not the form. */
   pending: boolean
@@ -34,12 +36,16 @@ export function OnboardingIcloudSection(props: OnboardingIcloudSectionProps): Re
   const [typedName, setTypedName] = useState<string | null>(null)
   const nameId = useId()
 
-  // "Notes" pre-fills only a fresh container. Next to an existing list the
-  // row starts empty — a prefilled default would collide with the usual
-  // first graph ("Notes") and paint the screen invalid before any input.
-  const name = typedName ?? (graphs.length > 0 ? '' : 'Notes')
+  const name = typedName ?? ''
   const cleanName = cleanGraphName(name)
   const nameTaken = cleanName !== null && isGraphNameTaken(cleanName, graphs)
+
+  function createDefault(): void {
+    if (documentsRoot === null) {
+      return
+    }
+    onCreate(graphRootForName(documentsRoot, DEFAULT_ICLOUD_NOTES_NAME))
+  }
 
   function create(): void {
     if (documentsRoot === null || cleanName === null || nameTaken) {
@@ -49,22 +55,22 @@ export function OnboardingIcloudSection(props: OnboardingIcloudSectionProps): Re
   }
 
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+    <section className="flex flex-col gap-4 rounded-lg border border-primary/20 bg-surface p-4">
       <div className="flex items-start gap-3">
         <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Cloud aria-hidden className="size-4" strokeWidth={1.75} />
         </div>
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold">iCloud Drive</h2>
-            <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
+            <h2 className="text-sm font-semibold">iCloud sync</h2>
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
               Recommended
             </span>
           </div>
           <p className="text-xs text-text-muted">
             {graphs.length > 0
-              ? 'Open an existing graph from iCloud Drive.'
-              : 'Syncs with Reflect on your other devices.'}
+              ? 'We found notes in iCloud Drive. Continue with one, or start fresh.'
+              : 'Recommended for most people. Your notes sync through iCloud Drive and stay available offline.'}
           </p>
         </div>
       </div>
@@ -72,7 +78,7 @@ export function OnboardingIcloudSection(props: OnboardingIcloudSectionProps): Re
       {pending ? (
         <div className="flex items-center gap-2 text-xs text-text-muted">
           <Spinner />
-          Looking for your notes…
+          Checking iCloud Drive…
         </div>
       ) : (
         <>
@@ -83,7 +89,7 @@ export function OnboardingIcloudSection(props: OnboardingIcloudSectionProps): Re
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full justify-start"
+                    className="w-full justify-start text-left"
                     onClick={() => onOpen(root)}
                     disabled={busy}
                   >
@@ -92,52 +98,70 @@ export function OnboardingIcloudSection(props: OnboardingIcloudSectionProps): Re
                     ) : (
                       <FolderOpen aria-hidden strokeWidth={1.75} />
                     )}
-                    <span className="truncate">{graphNameFromRoot(root, root)}</span>
+                    <span className="truncate">Continue with {graphNameFromRoot(root, root)}</span>
                   </Button>
                 </li>
               ))}
             </ul>
-          ) : null}
+          ) : (
+            <Button
+              type="button"
+              className="w-full justify-start text-left"
+              onClick={createDefault}
+              disabled={busy || documentsRoot === null}
+            >
+              {pendingChoice === 'icloud-create' ? (
+                <Spinner />
+              ) : (
+                <Cloud aria-hidden strokeWidth={1.75} />
+              )}
+              {pendingChoice === 'icloud-create' ? 'Setting up…' : 'Continue with iCloud'}
+            </Button>
+          )}
 
-          <div className="space-y-2">
-            {graphs.length > 0 ? <MobileDivider>or create new graph</MobileDivider> : null}
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor={nameId} className="text-xs font-medium text-text-secondary">
-                Name
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  id={nameId}
-                  value={name}
-                  placeholder={graphs.length > 0 ? 'New name' : undefined}
-                  enterKeyHint="go"
-                  onChange={(event) => setTypedName(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      create()
-                    }
-                  }}
-                  aria-invalid={nameTaken}
-                  disabled={busy}
-                />
-                <Button
-                  type="button"
-                  className="shrink-0"
-                  onClick={create}
-                  disabled={busy || cleanName === null || nameTaken}
-                >
-                  {pendingChoice === 'icloud-create' ? (
-                    <Spinner />
-                  ) : (
-                    <Plus aria-hidden strokeWidth={1.75} />
-                  )}
-                  {pendingChoice === 'icloud-create' ? 'Setting up…' : 'Create'}
-                </Button>
+          {graphs.length > 0 ? (
+            <div className="space-y-2">
+              <MobileDivider>Start fresh</MobileDivider>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor={nameId} className="text-xs font-medium text-text-secondary">
+                  Name
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    id={nameId}
+                    value={name}
+                    placeholder="Personal notes"
+                    enterKeyHint="go"
+                    onChange={(event) => setTypedName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        create()
+                      }
+                    }}
+                    aria-invalid={nameTaken}
+                    disabled={busy}
+                  />
+                  <Button
+                    type="button"
+                    className="shrink-0"
+                    onClick={create}
+                    disabled={busy || cleanName === null || nameTaken}
+                  >
+                    {pendingChoice === 'icloud-create' ? (
+                      <Spinner />
+                    ) : (
+                      <Plus aria-hidden strokeWidth={1.75} />
+                    )}
+                    {pendingChoice === 'icloud-create' ? 'Setting up…' : 'Create in iCloud'}
+                  </Button>
+                </div>
               </div>
+              {nameTaken ? (
+                <p className="text-xs text-destructive">
+                  That name already exists in iCloud Drive.
+                </p>
+              ) : null}
             </div>
-          </div>
-          {nameTaken ? (
-            <p className="text-xs text-destructive">That name already exists in iCloud Drive.</p>
           ) : null}
         </>
       )}
