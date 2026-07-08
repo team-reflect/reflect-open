@@ -18,3 +18,5 @@ minimumReleaseAgeExclude:
   - '@aria-ui/*'
   - prosemirror-flat-list
   - prosemirror-view
+  - '@ai-sdk/openai-compatible@2.0.58'
+  - '@ai-sdk/provider-utils@4.0.37'

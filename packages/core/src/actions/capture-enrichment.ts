@@ -1,13 +1,12 @@
 import { describePage, isDescriptionRejected, type PageEnrichment } from '../ai/describe-page'
 import { defaultAiProvider, type AiProvidersState } from '../ai/provider-config'
-import { aiKeySecretName } from '../ai/secrets'
+import { aiApiKeyForConfig } from '../ai/secrets'
 import { errorMessage, isAppError, toAppError } from '../errors'
 import { listFiles, readAsset, readNote, writeNote } from '../graph/commands'
 import { dailyPath } from '../graph/paths'
 import { hashContent } from '../indexing/hash'
 import { parseNote } from '../markdown/extract'
 import { parseFrontmatter, splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter'
-import { getSecret } from '../secrets/keychain'
 import type { AiProviderConfig } from '../settings/schema'
 import type { ReconcileStop } from './audio-memo'
 import { captureFromPath, type CaptureIdentity } from './capture-identity'
@@ -159,7 +158,7 @@ export async function reconcileCaptureEnrichment(
   const config = defaultAiProvider(input.providers)
   let apiKey: string | null = null
   if (config !== null) {
-    apiKey = await getSecret(aiKeySecretName(config.id)).catch(() => null)
+    apiKey = await aiApiKeyForConfig(config)
     if (apiKey === null) {
       return {
         pending: pending.length,

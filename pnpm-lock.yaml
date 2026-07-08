@@ -247,6 +247,9 @@ importers:
       '@ai-sdk/openai':
         specifier: ^3.0.75
         version: 3.0.75(zod@4.4.3)
+      '@ai-sdk/openai-compatible':
+        specifier: ^2.0.58
+        version: 2.0.58(zod@4.4.3)
       '@lezer/common':
         specifier: ^1.5.2
         version: 1.5.2
@@ -348,6 +351,12 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
+  '@ai-sdk/openai-compatible@2.0.58':
+    resolution: {integrity: sha512-0SXA0xVt18F4ki7ttVshqaM0oLXSB475ACOU0/2RK3OZS3UYqrmKF+DJwYBYUZmqCq2nZ2vkNZEXpWP2wfGsrQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/openai@3.0.75':
     resolution: {integrity: sha512-xKW+ZSHOdsFIUR6H2uSVjQQmzuHG+onsBZQmsr1OagDK/G55Vhx7Msd/5itoIT/kfGIhOGtCY0DTxbP0RWT7hA==}
     engines: {node: '>=18'}
@@ -360,8 +369,18 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
+  '@ai-sdk/provider-utils@4.0.37':
+    resolution: {integrity: sha512-VG4tpVXCuzm21U9xjg05BCMZnjZOazC72+MxBkLAa7hCKsnqNt542GYWUUqwmHSczJwgbSXN8UvaNgSerUaKdw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/provider@3.0.11':
     resolution: {integrity: sha512-GKu3RxsfKGWjBiXmEdsKsGR9uVgJ56mzL1w7mLsn5k2TiNtpyS2IYQo3v1NJpK3oyv2OVavlK3g801VSe+gujg==}
+    engines: {node: '>=18'}
+
+  '@ai-sdk/provider@3.0.13':
+    resolution: {integrity: sha512-ZPtVYt5QIJzOta1kdUiDuCx4HhFkvNPv/rvmZ2b1iXwybYjJsCnNYR4PAw4kW7rgVfDARvHXcU64efWuqNp6bw==}
     engines: {node: '>=18'}
 
   '@aklinker1/rollup-plugin-visualizer@5.12.0':
@@ -6084,6 +6103,12 @@ snapshots:
       '@ai-sdk/provider-utils': 4.0.31(zod@4.4.3)
       zod: 4.4.3
 
+  '@ai-sdk/openai-compatible@2.0.58(zod@4.4.3)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.13
+      '@ai-sdk/provider-utils': 4.0.37(zod@4.4.3)
+      zod: 4.4.3
+
   '@ai-sdk/openai@3.0.75(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 3.0.11
@@ -6097,7 +6122,18 @@ snapshots:
       eventsource-parser: 3.1.0
       zod: 4.4.3
 
+  '@ai-sdk/provider-utils@4.0.37(zod@4.4.3)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.13
+      '@standard-schema/spec': 1.1.0
+      eventsource-parser: 3.1.0
+      zod: 4.4.3
+
   '@ai-sdk/provider@3.0.11':
+    dependencies:
+      json-schema: 0.4.0
+
+  '@ai-sdk/provider@3.0.13':
     dependencies:
       json-schema: 0.4.0
 

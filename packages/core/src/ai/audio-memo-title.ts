@@ -21,7 +21,7 @@ const audioMemoTitleSchema = z.object({
 interface AudioMemoTitleCredentials {
   /** The provider entry whose provider selects the fixed small title model. */
   readonly config: AiProviderConfig
-  /** The BYOK API key, read from the OS keychain by the caller. */
+  /** The BYOK API key, or an empty string for no-key compatible endpoints. */
   readonly apiKey: string
 }
 
@@ -46,6 +46,8 @@ function audioMemoTitleConfig(config: AiProviderConfig): AiProviderConfig | null
       return { ...config, model: GOOGLE_AUDIO_MEMO_TITLE_MODEL }
     case 'openrouter':
       return null
+    case 'openai-compatible':
+      return config
   }
 }
 
@@ -53,7 +55,8 @@ function audioMemoTitleConfig(config: AiProviderConfig): AiProviderConfig | null
  * Pick the small-model provider for audio memo title generation. The user's
  * default provider wins when it has a fixed small title model; otherwise the
  * first supported configured provider is used. OpenRouter is skipped because
- * `openrouter/auto` is not a small-model guarantee.
+ * `openrouter/auto` is not a small-model guarantee; OpenAI-compatible entries
+ * use the model the user configured for that endpoint.
  */
 export function pickAudioMemoTitleConfig(state: AiProvidersState): AiProviderConfig | null {
   const preferred = state.providers.find((provider) => provider.id === state.defaultProviderId)

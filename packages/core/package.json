@@ -16,6 +16,7 @@
     "@ai-sdk/anthropic": "^3.0.87",
     "@ai-sdk/google": "^3.0.84",
     "@ai-sdk/openai": "^3.0.75",
+    "@ai-sdk/openai-compatible": "^2.0.58",
     "@lezer/common": "^1.5.2",
     "@lezer/markdown": "^1.6.4",
     "@reflect/db": "workspace:*",

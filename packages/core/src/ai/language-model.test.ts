@@ -26,6 +26,14 @@ const OPENROUTER_CONFIG: AiProviderConfig = {
   keyHint: 'wxyz1',
 }
 
+const OPENAI_COMPATIBLE_CONFIG: AiProviderConfig = {
+  id: 'cfg-local',
+  provider: 'openai-compatible',
+  model: 'llama-local',
+  baseUrl: 'http://localhost:1234/v1',
+  keyHint: '',
+}
+
 function recordingAnthropicFetch(calls: RecordedCall[]): typeof fetch {
   return async (input, init) => {
     calls.push({
@@ -74,6 +82,32 @@ function recordingOpenRouterFetch(calls: RecordedCall[]): typeof fetch {
   }
 }
 
+function recordingOpenAICompatibleFetch(calls: RecordedCall[]): typeof fetch {
+  return async (input, init) => {
+    calls.push({
+      url: String(input),
+      headers: new Headers(init?.headers),
+    })
+    return new Response(
+      JSON.stringify({
+        id: 'chatcmpl_local',
+        object: 'chat.completion',
+        created: 0,
+        model: OPENAI_COMPATIBLE_CONFIG.model,
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'ok' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )
+  }
+}
+
 describe('languageModel', () => {
   it('adds Anthropic direct-browser access to model calls', async () => {
     const calls: RecordedCall[] = []
@@ -105,5 +139,19 @@ describe('languageModel', () => {
     expect(calls[0]!.headers.get('Authorization')).toBe('Bearer sk-or-v1-test')
     expect(calls[0]!.headers.get('HTTP-Referer')).toBe('https://reflect.app')
     expect(calls[0]!.headers.get('X-OpenRouter-Title')).toBe('Reflect')
+  })
+
+  it('routes custom OpenAI-compatible providers through their configured endpoint', async () => {
+    const calls: RecordedCall[] = []
+
+    await generateText({
+      model: languageModel(OPENAI_COMPATIBLE_CONFIG, '', recordingOpenAICompatibleFetch(calls)),
+      prompt: 'hello',
+      maxRetries: 0,
+    })
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0]!.url).toBe('http://localhost:1234/v1/chat/completions')
+    expect(calls[0]!.headers.get('Authorization')).toBeNull()
   })
 })

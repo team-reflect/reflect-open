@@ -25,6 +25,7 @@ import { ChatProvider, useChatSession } from '@/providers/chat-provider'
 
 const core = vi.hoisted(() => ({
   streamChat: vi.fn<(options: StreamChatOptions) => AsyncGenerator<ChatStreamEvent>>(),
+  aiApiKeyForConfig: vi.fn<(config: AiProviderConfig) => Promise<string | null>>(),
   getSecret: vi.fn<(name: string) => Promise<string | null>>(),
   hasBridge: vi.fn<() => boolean>(),
   loadChatGraphContext: vi.fn<(graphName: string) => Promise<null>>(),
@@ -126,6 +127,7 @@ beforeEach(() => {
   settingsState.selection = null
   settingsState.semanticSearchEnabled = false
   core.hasBridge.mockReturnValue(true)
+  core.aiApiKeyForConfig.mockResolvedValue('sk-test')
   core.getSecret.mockResolvedValue('sk-test')
   core.loadChatGraphContext.mockResolvedValue(null)
   core.listChatConversations.mockResolvedValue([])

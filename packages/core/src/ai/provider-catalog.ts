@@ -1,4 +1,5 @@
 import type { AiProviderId } from '../settings/schema'
+import { DEFAULT_OPENAI_COMPATIBLE_MODEL } from './openai-compatible'
 
 /** A compile-time guarantee that an array has at least one element. */
 type NonEmptyArray<ElementType> = [ElementType, ...ElementType[]]
@@ -30,6 +31,8 @@ export interface AiProviderInfo {
   id: AiProviderId
   /** Human-readable provider name shown in pickers. */
   label: string
+  /** Whether a non-empty key must be stored before this provider can be used. */
+  apiKeyRequired: boolean
   /** Placeholder illustrating the provider's API-key format. */
   keyPlaceholder: string
   /** Curated models, most capable first (the first is the picker default). */
@@ -40,6 +43,7 @@ export const AI_PROVIDERS: NonEmptyArray<AiProviderInfo> = [
   {
     id: 'openai',
     label: 'OpenAI',
+    apiKeyRequired: true,
     keyPlaceholder: 'sk-…',
     models: [
       { id: 'gpt-5.5', label: 'GPT-5.5', contextWindow: 1_000_000 },
@@ -51,6 +55,7 @@ export const AI_PROVIDERS: NonEmptyArray<AiProviderInfo> = [
   {
     id: 'anthropic',
     label: 'Anthropic',
+    apiKeyRequired: true,
     keyPlaceholder: 'sk-ant-…',
     models: [
       { id: 'claude-fable-5', label: 'Claude Fable 5', contextWindow: 1_000_000 },
@@ -62,6 +67,7 @@ export const AI_PROVIDERS: NonEmptyArray<AiProviderInfo> = [
   {
     id: 'google',
     label: 'Google Gemini',
+    apiKeyRequired: true,
     keyPlaceholder: 'AIza…',
     models: [
       { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', contextWindow: 1_000_000 },
@@ -73,6 +79,7 @@ export const AI_PROVIDERS: NonEmptyArray<AiProviderInfo> = [
   {
     id: 'openrouter',
     label: 'OpenRouter',
+    apiKeyRequired: true,
     keyPlaceholder: 'sk-or-v1-…',
     models: [
       { id: 'openrouter/auto', label: 'Auto Router', contextWindow: 128_000 },
@@ -85,6 +92,15 @@ export const AI_PROVIDERS: NonEmptyArray<AiProviderInfo> = [
       { id: 'openai/gpt-5.2', label: 'GPT-5.2', contextWindow: 400_000 },
     ],
   },
+  {
+    id: 'openai-compatible',
+    label: 'OpenAI-compatible',
+    apiKeyRequired: false,
+    keyPlaceholder: 'Optional API key',
+    models: [
+      { id: DEFAULT_OPENAI_COMPATIBLE_MODEL, label: 'Local model', contextWindow: 128_000 },
+    ],
+  },
 ]
 
 /** The catalog entry for `id` (every `AiProviderId` is in the catalog). */
@@ -94,6 +110,11 @@ export function aiProvider(id: AiProviderId): AiProviderInfo {
     throw new Error(`unknown AI provider: ${id}`)
   }
   return provider
+}
+
+/** Whether a configured provider must have a non-empty keychain secret. */
+export function aiProviderRequiresApiKey(id: AiProviderId): boolean {
+  return aiProvider(id).apiKeyRequired
 }
 
 /**

@@ -1,13 +1,12 @@
 import { describeAsset, isAssetDescriptionRejected } from '../ai/describe-asset'
 import { defaultAiProvider, type AiProvidersState } from '../ai/provider-config'
-import { aiKeySecretName } from '../ai/secrets'
+import { aiApiKeyForConfig } from '../ai/secrets'
 import { base64ToBytes } from '../ai/transcribe'
 import { errorMessage, isAppError, toAppError } from '../errors'
 import { listDir, readAsset, readNote, writeNote } from '../graph/commands'
 import { ASSETS_DIR, descriptionPathFor } from '../graph/paths'
 import type { FileMeta } from '../graph/schemas'
 import { hashContent } from '../indexing/hash'
-import { getSecret } from '../secrets/keychain'
 import type { AiProviderConfig } from '../settings/schema'
 import type { ReconcileStop } from './audio-memo'
 import {
@@ -359,7 +358,7 @@ export async function reconcileAssetDescriptions(
   if (config === null) {
     return outcome(total, { reason: 'config', message: 'No AI provider is configured.' })
   }
-  const apiKey = await getSecret(aiKeySecretName(config.id)).catch(() => null)
+  const apiKey = await aiApiKeyForConfig(config)
   if (apiKey === null) {
     return outcome(total, {
       reason: 'config',

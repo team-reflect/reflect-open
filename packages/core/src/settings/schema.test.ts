@@ -218,6 +218,19 @@ describe('settingsSchema', () => {
       expect(settingsSchema.parse({ aiProviders: [entry] }).aiProviders).toEqual([entry])
     })
 
+    it('accepts OpenAI-compatible entries with an http base URL', () => {
+      const entry = {
+        id: 'local',
+        provider: 'openai-compatible',
+        model: 'llama-local',
+        baseUrl: 'http://localhost:1234/v1/',
+        keyHint: '',
+      }
+      expect(settingsSchema.parse({ aiProviders: [entry] }).aiProviders).toEqual([
+        { ...entry, baseUrl: 'http://localhost:1234/v1' },
+      ])
+    })
+
     it('defaults the per-entry display fields', () => {
       const entry = { id: 'abc', provider: 'openai', model: 'gpt-5.1' }
       expect(settingsSchema.parse({ aiProviders: [entry] }).aiProviders).toEqual([
@@ -228,6 +241,30 @@ describe('settingsSchema', () => {
     it('drops a corrupt entry without losing the rest', () => {
       const parsed = settingsSchema.parse({
         aiProviders: [valid, { provider: 'aliens' }, 42],
+      })
+      expect(parsed.aiProviders).toEqual([valid])
+    })
+
+    it('drops OpenAI-compatible entries without a safe base URL', () => {
+      const parsed = settingsSchema.parse({
+        aiProviders: [
+          valid,
+          { id: 'local', provider: 'openai-compatible', model: 'llama-local', keyHint: '' },
+          {
+            id: 'socket',
+            provider: 'openai-compatible',
+            model: 'llama-local',
+            baseUrl: 'file:///tmp/model.sock',
+            keyHint: '',
+          },
+          {
+            id: 'query',
+            provider: 'openai-compatible',
+            model: 'llama-local',
+            baseUrl: 'http://localhost:1234/v1?token=abc',
+            keyHint: '',
+          },
+        ],
       })
       expect(parsed.aiProviders).toEqual([valid])
     })

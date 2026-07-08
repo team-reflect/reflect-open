@@ -2,12 +2,20 @@ export {
   AI_PROVIDERS,
   aiProvider,
   aiModelLabel,
+  aiProviderRequiresApiKey,
   DEFAULT_CONTEXT_WINDOW,
   modelContextWindow,
   type AiProviderInfo,
   type AiModelOption,
 } from '../ai/provider-catalog'
-export { aiKeySecretName } from '../ai/secrets'
+export { aiKeySecretName, aiApiKeyForConfig } from '../ai/secrets'
+export {
+  DEFAULT_OPENAI_COMPATIBLE_BASE_URL,
+  DEFAULT_OPENAI_COMPATIBLE_MODEL,
+  isHttpBaseUrl,
+  normalizeOpenAICompatibleBaseUrl,
+  OPENAI_COMPATIBLE_PROVIDER_ID,
+} from '../ai/openai-compatible'
 export { setSecret, getSecret, deleteSecret } from '../secrets/keychain'
 export {
   KEY_HINT_LENGTH,
@@ -27,7 +35,11 @@ export {
   type ChatModelOption,
   type ChatModelSelection,
 } from '../ai/chat/model-options'
-export { validateApiKey, type ApiKeyValidation } from '../ai/validate-key'
+export {
+  validateApiKey,
+  type ApiKeyValidation,
+  type ApiKeyValidationInput,
+} from '../ai/validate-key'
 export {
   assertCloudAllowed,
   cloudSafeAssetDescription,

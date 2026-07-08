@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isHttpBaseUrl, normalizeOpenAICompatibleBaseUrl } from '../ai/openai-compatible'
 
 /**
  * The user-settings schema — the policy half of the settings store. Rust
@@ -233,12 +234,30 @@ export const graphColorsSchema = z
   })
 
 /**
- * The cloud AI providers Reflect can call directly (BYOK — the user's own
- * keys, no Reflect-hosted proxy).
+ * The AI providers Reflect can call directly (BYOK — the user's own keys, no
+ * Reflect-hosted proxy). `openai-compatible` stores its user-supplied base URL
+ * per configured entry.
  */
-export const aiProviderIdSchema = z.enum(['openai', 'anthropic', 'google', 'openrouter'])
+export const aiProviderIdSchema = z.enum([
+  'openai',
+  'anthropic',
+  'google',
+  'openrouter',
+  'openai-compatible',
+])
 
 export type AiProviderId = z.infer<typeof aiProviderIdSchema>
+
+const hostedAiProviderIdSchema = z.enum(['openai', 'anthropic', 'google', 'openrouter'])
+
+export type HostedAiProviderId = z.infer<typeof hostedAiProviderIdSchema>
+
+export const openAiCompatibleBaseUrlSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine(isHttpBaseUrl)
+  .transform(normalizeOpenAICompatibleBaseUrl)
 
 /**
  * One configured AI provider: the provider, its default model id, and a key
@@ -247,13 +266,54 @@ export type AiProviderId = z.infer<typeof aiProviderIdSchema>
  * key's trailing characters so the settings UI can identify it. Which entry
  * is the app-wide default is a sibling scalar (`defaultAiProviderId`), not a
  * per-entry flag, so "at most one default" holds by construction.
+ * OpenAI-compatible entries additionally carry their API base URL, because it
+ * is user configuration rather than a fixed catalog endpoint.
  */
-export const aiProviderConfigSchema = z.object({
+const aiProviderConfigBaseSchema = z.object({
   id: z.string().min(1),
-  provider: aiProviderIdSchema,
   model: z.string().min(1),
   keyHint: z.string().catch(''),
 })
+
+const openAiProviderConfigSchema = aiProviderConfigBaseSchema.extend({
+  provider: z.literal('openai'),
+})
+
+const anthropicProviderConfigSchema = aiProviderConfigBaseSchema.extend({
+  provider: z.literal('anthropic'),
+})
+
+const googleProviderConfigSchema = aiProviderConfigBaseSchema.extend({
+  provider: z.literal('google'),
+})
+
+const openRouterProviderConfigSchema = aiProviderConfigBaseSchema.extend({
+  provider: z.literal('openrouter'),
+})
+
+const hostedAiProviderConfigSchema = z.union([
+  openAiProviderConfigSchema,
+  anthropicProviderConfigSchema,
+  googleProviderConfigSchema,
+  openRouterProviderConfigSchema,
+])
+
+export type HostedAiProviderConfig = z.infer<typeof hostedAiProviderConfigSchema>
+
+const openAiCompatibleProviderConfigSchema = aiProviderConfigBaseSchema.extend({
+  provider: z.literal('openai-compatible'),
+  baseUrl: openAiCompatibleBaseUrlSchema,
+})
+
+export type OpenAiCompatibleProviderConfig = z.infer<typeof openAiCompatibleProviderConfigSchema>
+
+export const aiProviderConfigSchema = z.discriminatedUnion('provider', [
+  openAiProviderConfigSchema,
+  anthropicProviderConfigSchema,
+  googleProviderConfigSchema,
+  openRouterProviderConfigSchema,
+  openAiCompatibleProviderConfigSchema,
+])
 
 export type AiProviderConfig = z.infer<typeof aiProviderConfigSchema>
 

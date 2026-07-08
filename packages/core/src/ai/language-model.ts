@@ -1,9 +1,11 @@
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createOpenAI } from '@ai-sdk/openai'
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import type { LanguageModel } from 'ai'
 import type { AiProviderConfig } from '../settings/schema'
 import { anthropicDirectBrowserAccessHeaders } from './anthropic-headers'
+import { OPENAI_COMPATIBLE_PROVIDER_ID } from './openai-compatible'
 import { OPENROUTER_BASE_URL, openRouterAttributionHeaders } from './openrouter'
 
 /**
@@ -36,5 +38,13 @@ export function languageModel(
         headers: openRouterAttributionHeaders(),
         name: 'openrouter',
       }).chat(config.model)
+    case 'openai-compatible':
+      return createOpenAICompatible({
+        name: OPENAI_COMPATIBLE_PROVIDER_ID,
+        baseURL: config.baseUrl,
+        fetch: fetchFn,
+        includeUsage: true,
+        ...(apiKey.trim() === '' ? {} : { apiKey }),
+      }).chatModel(config.model)
   }
 }

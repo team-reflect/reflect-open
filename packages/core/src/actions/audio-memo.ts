@@ -4,7 +4,7 @@ import {
   type AiProvidersState,
   type TranscriptionConfig,
 } from '../ai/provider-config'
-import { aiKeySecretName } from '../ai/secrets'
+import { aiApiKeyForConfig, aiKeySecretName } from '../ai/secrets'
 import { generateAudioMemoTitle, pickAudioMemoTitleConfig } from '../ai/audio-memo-title'
 import {
   AUDIO_EXTENSION_BY_MIME,
@@ -433,7 +433,7 @@ export async function reconcileAudioMemos(
       ? null
       : titleConfig.id === config.id
         ? apiKey
-        : await getSecret(aiKeySecretName(titleConfig.id)).catch(() => null)
+        : await aiApiKeyForConfig(titleConfig)
   const titleCredentials =
     titleConfig !== null && titleApiKey !== null ? { config: titleConfig, apiKey: titleApiKey } : null
 
