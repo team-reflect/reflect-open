@@ -141,6 +141,22 @@ describe('composeVisibleTaskGroups', () => {
     const rows = groups.flatMap((group) => group.tasks)
     expect(rows.map((row) => row.text)).toEqual(['ship'])
   })
+
+  it('filters by source-note title', () => {
+    const groups = composeVisibleTaskGroups({
+      open: [
+        task({ text: 'ship it', markerOffset: 0, noteTitle: 'Desktop launch' }),
+        task({ text: 'buy milk', markerOffset: 10, noteTitle: 'Home' }),
+      ],
+      completed: undefined,
+      recentlyCompleted: [],
+      filters: ALL_ON,
+      needle: 'desktop',
+      today: TODAY,
+    })
+    const rows = groups.flatMap((group) => group.tasks)
+    expect(rows.map((row) => row.text)).toEqual(['ship it'])
+  })
 })
 
 describe('visibleGroups', () => {

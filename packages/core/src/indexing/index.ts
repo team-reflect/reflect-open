@@ -92,7 +92,15 @@ export {
   type TagSuggestion,
 } from './queries'
 export { resolveNoteTarget } from './resolve-target'
-export { groupTasks, taskDateBucket, type TaskGroup, type TaskGroupKind } from './group-tasks'
+export {
+  groupTaskContexts,
+  groupTasks,
+  taskDateBucket,
+  visibleTaskBreadcrumbs,
+  type TaskContext,
+  type TaskGroup,
+  type TaskGroupKind,
+} from './group-tasks'
 export {
   listNotes,
   listNoteTags,

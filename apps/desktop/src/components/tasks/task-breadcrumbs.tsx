@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { visibleTaskBreadcrumbs } from '@/lib/tasks/task-breadcrumbs'
+import { visibleTaskBreadcrumbs } from '@reflect/core'
 
 interface TaskBreadcrumbsProps {
   breadcrumbs: readonly string[]
