@@ -183,9 +183,17 @@ export function TaskRow({
         </div>
       )}
       {showSource && task.dailyDate !== null ? (
-        <span className="mt-0.5 shrink-0 whitespace-nowrap text-xs text-text-muted">
+        <button
+          type="button"
+          disabled={editing}
+          onClick={(event) => {
+            event.stopPropagation()
+            onOpen(task.notePath)
+          }}
+          className="mt-0.5 shrink-0 whitespace-nowrap text-xs text-text-muted hover:underline focus-visible:underline focus-visible:outline-none"
+        >
           {formatDayLabel(task.dailyDate, settings.dateFormat)}
-        </span>
+        </button>
       ) : null}
       <button
         type="button"
