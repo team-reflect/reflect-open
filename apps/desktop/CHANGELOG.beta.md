@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.5.0-beta...v0.5.0-beta.1) (2026-07-09)
+
+
+### Bug Fixes
+
+* trigger the release build from the desktop package outputs ([#698](https://github.com/team-reflect/reflect-open/issues/698)) ([6d64062](https://github.com/team-reflect/reflect-open/commit/6d64062085f8469844519d0edde996b6d7f0e332))
+
 ## [0.5.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.4.0...v0.5.0-beta) (2026-07-09)
 
 
