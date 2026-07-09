@@ -22,9 +22,12 @@ jobs:
   release-please:
     name: Maintain the Release PR
     runs-on: ubuntu-latest
+    # `release_created` and `tag_name` are root-package outputs; our package
+    # lives at apps/desktop, so its outputs carry the `apps/desktop--` prefix
+    # and the global `releases_created` reports whether any release exists.
     outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
+      release_created: ${{ steps.release.outputs.releases_created }}
+      tag_name: ${{ steps.release.outputs['apps/desktop--tag_name'] }}
     steps:
       - name: Pick the channel config for this branch
         id: channel
@@ -43,6 +46,13 @@ jobs:
           target-branch: ${{ github.ref_name }}
           config-file: ${{ steps.channel.outputs.config }}
           manifest-file: ${{ steps.channel.outputs.manifest }}
+
+      # The output names above are load-bearing for the jobs below; dump the
+      # full map so a skipped downstream job is diagnosable from the run log.
+      - name: Print release-please outputs
+        env:
+          RELEASE_PLEASE_OUTPUTS: ${{ toJSON(steps.release.outputs) }}
+        run: echo "$RELEASE_PLEASE_OUTPUTS"
 
   # Merging the Release PR makes release-please create a draft release and
   # output its tag. Chain straight into the build/sign/publish pipeline; tags
