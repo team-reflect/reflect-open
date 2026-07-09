@@ -62,6 +62,11 @@ bump, and — for `feat`/`fix`/`perf` — is the user-facing changelog entry, so
 as behavior, not implementation. Do not use `feat!:` or `BREAKING CHANGE:` footers;
 see [CONTRIBUTING.md](CONTRIBUTING.md).
 
+The app version lives solely in `apps/desktop/package.json`, maintained by
+release-please through Release PRs. Never hand-edit that version, the changelogs
+(`apps/desktop/CHANGELOG.md`, `apps/desktop/CHANGELOG.beta.md`), or the manifests
+under `.github/release-please/`.
+
 1. Make your changes
 2. Run typecheck (`pnpm typecheck`)
 3. Run lint (`pnpm lint`) — fix any errors; `pnpm lint:fix` auto-fixes where possible
@@ -164,9 +169,10 @@ pnpm tauri dev        # Full Tauri app with hot reload (stages the CLI sidecar f
 pnpm tauri:dev        # `pnpm tauri dev` with the dev overlay → the "Reflect Dev" flavor (green icon, own identifier; coexists with Reflect / Reflect Beta)
 pnpm build            # turbo build pipeline → apps/desktop/dist/
 pnpm tauri build      # Native app bundle, incl. the reflect CLI sidecar
-pnpm release:bump     # Bump the version everywhere + push the release tag (docs/macos-distribution.md)
+                      # Releases: merge the release-please "Release PR" on next (beta) or
+                      #   master (stable) — see docs/macos-distribution.md → Cutting a release
 pnpm release:macos    # Signed + notarized macOS build for distribution (docs/macos-distribution.md)
-pnpm release:macos publish  # The above, then upload the DMG to a new GitHub release
+pnpm release:macos publish  # The above, then fill and undraft the release-please draft release
 pnpm tauri ios dev "iPhone 17 Pro"  # Run the Tauri iOS target in the simulator (docs/contributing/mobile-simulator.md)
 pnpm release:ios preflight --build-number=123  # Check iOS/TestFlight signing, App Store Connect app record, and upload auth
 pnpm release:ios testflight --build-number=123 --wait  # Build and upload the iOS app to TestFlight

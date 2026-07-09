@@ -96,53 +96,105 @@ pnpm release:macos --no-notarize   # signed-only build (runs locally; Gatekeeper
 CI uses `build --target=<triple> --artifact-dir=<dir>` for each architecture, then
 `publish --from-artifacts=<dir>` after downloading both artifact sets.
 
-## Cutting a release (`pnpm release:bump`)
+## Cutting a release (Release PRs)
 
-The version is declared in three places that must move together —
-`apps/desktop/src-tauri/tauri.conf.json`, `apps/desktop/src-tauri/Cargo.toml`, and the
-`reflect-open` entry in `Cargo.lock`. `pnpm release:bump` edits all three, commits the
-bump on a short-lived release branch, pushes that branch, opens and immediately merges a
-PR back to the protected release branch, then pushes the `v<version>` tag from the
-merged commit. That tag push triggers the Release workflow to build, sign, notarize, and
-publish. You don't run `release:macos` by hand for a normal release.
+The version lives in one place: `version` in `apps/desktop/package.json`.
+`tauri.conf.json` points its `version` at that file, the crate version in
+`src-tauri/Cargo.toml` is frozen at `0.0.0`, and `Cargo.lock` never changes for a
+release. release-please maintains the version: on every push to `next` (beta channel)
+and `master` (stable channel), `.github/workflows/release-please.yml` updates that
+branch's **Release PR**, which bumps `apps/desktop/package.json` and prepends the
+channel changelog (`apps/desktop/CHANGELOG.beta.md` on `next`,
+`apps/desktop/CHANGELOG.md` on `master`) from the conventional-commit PR titles landed
+since the last release. (`release-bump.mjs` is retired; it stays in-tree only until the
+first release-please release ships.)
 
-```bash
-pnpm release:bump                # cut the next beta: 0.2.0-beta.1 → 0.2.0-beta.2
-pnpm release:bump stable         # drop the prerelease: 0.2.0-beta.3 → 0.2.0
-pnpm release:bump patch          # 0.2.0 → 0.2.1   (also: minor, major)
-pnpm release:bump preminor       # open a new beta cycle: 0.2.0 → 0.3.0-beta.1
-pnpm release:bump 0.5.0-beta.1   # set an explicit version
-pnpm release:bump --dry-run      # show the plan, change nothing
-pnpm release:bump --tag-only     # recovery: push the tag for an already-merged bump
-```
+**Merging the Release PR is the release.** release-please then creates a draft GitHub
+release with the changelog as its body and hands the tag name to the Release workflow,
+which builds, signs, notarizes, uploads the assets, and undrafts the release — the
+undraft is what creates the `v<version>` git tag. Nothing is visible to users (and
+`releases/latest` does not move) until every asset is in place.
 
-Default (no argument) is `beta`, the common case on `next`. The script refuses to run on
-a dirty tree or a branch out of sync with origin, and refuses a version whose tag already
-exists. Releases are branch-independent: the version string picks the channel (a
-`-beta.N` prerelease publishes to the beta feed, a plain version to the stable feed) and
-the build pins the matching updater feed (`release-macos.mjs`), so a stable release can be
-cut straight from `next` without ever polling the wrong feed. It requires the GitHub CLI
-(`gh`) for the protected-branch PR flow, merges the release PR immediately with admin
-bypass instead of waiting for CI, prints the plan, and asks for confirmation (skip with
-`--yes`).
+Merge methods matter:
 
-The typical flows, both on `next`:
+- **Release PRs: squash** (the default).
+- **Promote and back-merge PRs: "Create a merge commit"** — squashing one collapses a
+  whole branch's history into a single non-conventional commit, blinding the other
+  channel's version calculation and changelog, and the two branches' histories diverge
+  for good.
 
-- **Beta**: `pnpm release:bump`.
-- **Stable**: `pnpm release:bump minor` (or `patch`/`major`), then `pnpm release:bump
-  preminor` to open the next beta cycle.
+Bot-created PRs (the Release PR and the post-stable back-merge PR) do not run CI
+automatically; use the run-checks button on the PR before merging.
 
-`--direct` keeps the old direct-push behavior for repositories or maintainers that have
-an explicit ruleset bypass. With `--direct`, `--no-tag` bumps and pushes the branch
-without tagging, for when you want the version commit but aren't ready to release.
-`--tag-only` is a recovery path for a release PR that was merged without the tag push.
+### Beta (the everyday release, on `next`)
+
+1. Land PRs on `next` as usual.
+2. When it's time to ship, open the Release PR (`chore: release X.Y.Z-beta.N`), polish
+   the changelog if needed (edit the PR branch — release-please regenerates the PR when
+   new commits land, so polish last), and **merge it**.
+3. Everything else is automatic, ending with the `updater-beta` feed refresh. Installed
+   Reflect Beta apps pick up the update.
+
+### Stable
+
+1. **Promote**: open a PR with base `master`, compare `next`, titled
+   `chore: promote next to master`, and merge it with a **merge commit**. In the normal
+   cycle it merges clean; if a hotfix shipped since the last back-merge, the only
+   conflict is the `version` line in `apps/desktop/package.json` — take either side,
+   the next Release PR rewrites it from the manifest.
+2. **Merge the stable Release PR** (`chore: release X.Y.Z`) that appears on `master`.
+3. **Merge the post-stable PR** (`chore: merge master back into next`), which the
+   workflow opens automatically: it back-merges master and advances the beta manifest
+   so the next beta cycle starts above the released version. **Merge commit, not
+   squash.**
+
+### Hotfix (directly on `master`)
+
+1. Branch from `master`, fix, PR back to `master` with a `fix:` title.
+2. Merge the stable Release PR (`chore: release X.Y.Z`) that appears on `master`.
+3. Merge the auto-opened post-stable back-merge PR into `next`.
+
+### Release automation files
+
+Every release-please state file is owned by exactly one branch, so promote and
+back-merge never conflict on them:
+
+| File | Written by |
+| --- | --- |
+| `.github/release-please/config.beta.json` | humans (same content on both branches) |
+| `.github/release-please/manifest.beta.json` | the Release PR on `next` (plus the post-stable PR) |
+| `.github/release-please/config.stable.json` | humans (same content on both branches) |
+| `.github/release-please/manifest.stable.json` | the Release PR on `master` |
+| `apps/desktop/CHANGELOG.beta.md` | the Release PR on `next` |
+| `apps/desktop/CHANGELOG.md` | the Release PR on `master` |
+
+The manifests are the per-channel source of truth for "last released version". The only
+file both channels write is `apps/desktop/package.json` (`version`); on a merge
+conflict, take either side — the next Release PR rewrites it. Do not hand-edit the
+changelogs or manifests outside the flows above.
+
+All version interventions go through the manifest files. **Never use `Release-As:`
+commit footers**: they stay in `next`'s history and leak into `master`'s version
+calculation at the next promote. The first beta of a new cycle is tagged without a
+number (`v0.6.0-beta`, then `-beta.1`, `-beta.2`, …) — a release-please naming quirk,
+not a bug.
+
+### Manual fallback (no Release PR)
+
+Merge a PR that sets `version` in `apps/desktop/package.json`, then run
+**Actions → Release → Run workflow** on that branch. The workflow derives the tag from
+the version, and publish creates the release (and its tag) itself via
+`gh release create`. Afterwards, sync that channel's manifest file with a follow-up PR
+so release-please continues from the right version.
 
 ## Publishing to GitHub Releases
 
 `pnpm release:macos publish` runs the full build above for both supported macOS targets
 (`aarch64-apple-darwin` for Apple Silicon and `x86_64-apple-darwin` for Intel), then
-creates a GitHub release tagged `v<version>` (the `version` in
-`apps/desktop/src-tauri/tauri.conf.json`). The release carries two notarized DMGs, two
+publishes the release tagged `v<version>` (the `version` in
+`apps/desktop/package.json`): normally by filling and undrafting the draft release that
+release-please created when the Release PR merged, or — when no release exists — by
+creating one itself. The release carries two notarized DMGs, two
 updater archives (one per architecture, each with its `.sig`), and a single
 `latest.json` manifest with both `darwin-aarch64` and `darwin-x86_64` platform entries.
 Stable installs poll `releases/latest/download/latest.json`; beta installs poll
@@ -158,10 +210,11 @@ than after notarization:
 
 - the working tree is clean and `HEAD` is on an `origin` branch — the release tag is
   created at that exact commit;
-- no release for `v<version>` exists yet, and any existing `v<version>` tag on origin
-  points at `HEAD` (`gh` reuses an existing tag, which would release the wrong commit).
-  Publishing a new release means bumping `version` in `tauri.conf.json` first (keep
-  `src-tauri/Cargo.toml` in step).
+- the `v<version>` release, when it already exists, is the asset-less draft created by
+  release-please and targets `HEAD` (publish fills and undrafts it); a release that
+  already carries artifacts, or a stray `v<version>` tag pointing at another commit,
+  fails the preflight. Publishing again means bumping `version` in
+  `apps/desktop/package.json` (via a Release PR) first.
 
 Pass `--draft` to create the release without publishing it, then review and publish it
 from the GitHub UI.
@@ -179,14 +232,14 @@ uploads the beta's `latest.json` to that fixed release with `--clobber`; the man
 still points at the immutable versioned release artifacts for the actual download. Draft
 beta releases do not update the feed.
 
-`pnpm release:bump` keeps the channel endpoint in `tauri.conf.json` in sync with the
-version it writes: prerelease versions poll the beta feed, stable versions poll
-`releases/latest`.
+The channel is picked by the version string alone: a `-beta.N` prerelease publishes to
+the beta feed, a plain version to the stable feed. The beta and dev flavor overlays pin
+their own feeds, and `release-macos.mjs` pins the stable feed into stable builds at
+build time, so releases are branch-independent.
 
-Cutting a beta is the normal release flow on `next`: `pnpm release:bump` (see
-[Cutting a release](#cutting-a-release-pnpm-releasebump) above) bumps the prerelease
-version and pushes the tag that triggers the workflow. For a stable release, merge
-`next` into `master` and run `pnpm release:bump stable` there.
+Cutting a beta is the normal Release PR flow on `next`; a stable release is the
+promote + Release PR flow on `master` (see
+[Cutting a release](#cutting-a-release-release-prs) above).
 
 ## Build flavors (Reflect / Reflect Beta / Reflect Dev)
 
@@ -204,12 +257,13 @@ The base `tauri.conf.json` is the stable flavor and uses the shipped gradient ic
 artwork recolored via `magick -modulate` (beta `104,100,120`, dev `92,100,231`; see
 `src-tauri/icons/README.md`). `release:macos` picks the flavor from the version
 (prerelease → beta, else stable), so a release always matches the updater feed compiled
-into it; `release.yml` needs no flavor knowledge and `release:bump` is unchanged.
+into it; `release.yml` needs no flavor knowledge.
 
 Each overlay pins its own updater feed so the flavor is self-consistent regardless of the
 base config's channel: beta → `updater-beta`, dev → a deliberately non-existent
 `updater-dev-noop` feed so dev builds never find an update (in `tauri dev` the updater is
-off anyway). The stable feed lives on the base config and is managed by `release:bump`.
+off anyway). The stable feed is pinned into stable builds at build time by
+`release-macos.mjs` (the committed base config points at the beta feed).
 
 Distinct identifiers give each flavor its own webview storage and embeddings cache.
 Settings, recent graphs and keychain secrets are currently **shared** across flavors (the
@@ -245,14 +299,15 @@ signed/notarized macOS artifacts in parallel:
 
 Each build job runs the same DMG notarization, Gatekeeper checks, and updater artifact
 signing as a local release, then uploads its artifacts to the workflow. A final publish
-job downloads both sets, writes the combined `latest.json`, and creates the GitHub
-release. The publish step asks GitHub for generated release notes, appends the Mac
-download chooser that maps Apple Silicon to `_aarch64.dmg` and Intel to
-`_x86_64.dmg`, then creates the release with that complete notes file. Trigger it from
-**Actions → Release → Run workflow** (tick *draft* to review
-the release before publishing), or by pushing the matching `v<version>` tag. The publish
-preflights apply unchanged, so bump `version` in `tauri.conf.json` (and
-`src-tauri/Cargo.toml`) on the released branch first.
+job downloads both sets, writes the combined `latest.json`, and fills the release-please
+draft release: it keeps the changelog body, appends the Mac download chooser that maps
+Apple Silicon to `_aarch64.dmg` and Intel to `_x86_64.dmg`, and undrafts the release as
+its last step. The workflow normally runs via `workflow_call` from
+`.github/workflows/release-please.yml` when a Release PR merges. The manual fallback is
+**Actions → Release → Run workflow** (tick *draft* to review the release before
+publishing) on a branch whose `apps/desktop/package.json` version was already bumped by
+a merged PR; in that mode publish creates the release (and its tag) itself, with
+GitHub-generated notes.
 
 The script reads all signing material from environment variables, which take
 precedence over the keychain (exporting them works for local releases too); the
