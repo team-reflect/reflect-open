@@ -68,6 +68,13 @@ export const editorTextSizeSchema = z.enum(['small', 'medium', 'large']).catch('
 export type EditorTextSize = z.infer<typeof editorTextSizeSchema>
 
 /**
+ * Whether note content stretches across the available desktop pane instead
+ * of staying in the default centered reading column. Off by default to
+ * preserve Reflect Open's existing layout.
+ */
+export const editorFullWidthSchema = z.boolean().catch(false)
+
+/**
  * The app color theme. `system` (the default) follows the OS preference;
  * `light`/`dark` pin it. Persisted here so the choice survives relaunch.
  */
@@ -348,6 +355,7 @@ export const settingsSchema = z
     editorDefaultBullet: editorDefaultBulletSchema,
     editorBulletAfterHeading: editorBulletAfterHeadingSchema,
     editorTextSize: editorTextSizeSchema,
+    editorFullWidth: editorFullWidthSchema,
     semanticSearchEnabled: semanticSearchEnabledSchema,
     describeAssets: describeAssetsSchema,
     contactsEnabled: contactsEnabledSchema,

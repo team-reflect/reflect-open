@@ -6,6 +6,7 @@ import { registerAppCommands } from '@/lib/commands/app-commands'
 import { installNativeMenu } from '@/lib/native-menu/menu'
 import { installTauriBridge } from '@/lib/tauri-bridge'
 import { PlatformRoot, warmPlatformRoot } from '@/platform-root'
+import { EditorFullWidthEffect } from '@/providers/editor-full-width'
 import { EditorTextSizeEffect } from '@/providers/editor-text-size'
 import { SettingsProvider } from '@/providers/settings-provider'
 import { ThemeProvider } from '@/providers/theme-provider'
@@ -33,6 +34,7 @@ createRoot(rootElement).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <SettingsProvider>
+        <EditorFullWidthEffect />
         <EditorTextSizeEffect />
         <ThemeProvider>
           <PlatformRoot />

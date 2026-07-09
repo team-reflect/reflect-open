@@ -9,6 +9,7 @@ describe('settingsSchema', () => {
       editorDefaultBullet: true,
       editorBulletAfterHeading: true,
       editorTextSize: 'small',
+      editorFullWidth: false,
       semanticSearchEnabled: false,
       describeAssets: true,
       contactsEnabled: false,
@@ -33,6 +34,7 @@ describe('settingsSchema', () => {
     expect(DEFAULT_SETTINGS.editorDefaultBullet).toBe(true)
     expect(DEFAULT_SETTINGS.editorBulletAfterHeading).toBe(true)
     expect(DEFAULT_SETTINGS.editorTextSize).toBe('small')
+    expect(DEFAULT_SETTINGS.editorFullWidth).toBe(false)
     expect(DEFAULT_SETTINGS.semanticSearchEnabled).toBe(false)
     expect(DEFAULT_SETTINGS.describeAssets).toBe(true)
     expect(DEFAULT_SETTINGS.contactsEnabled).toBe(false)
@@ -69,6 +71,8 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ editorTextSize: 'small' }).editorTextSize).toBe('small')
     expect(settingsSchema.parse({ editorTextSize: 'medium' }).editorTextSize).toBe('medium')
     expect(settingsSchema.parse({ editorTextSize: 'large' }).editorTextSize).toBe('large')
+    expect(settingsSchema.parse({ editorFullWidth: false }).editorFullWidth).toBe(false)
+    expect(settingsSchema.parse({ editorFullWidth: true }).editorFullWidth).toBe(true)
     expect(settingsSchema.parse({ theme: 'dark' }).theme).toBe('dark')
     expect(settingsSchema.parse({ theme: 'light' }).theme).toBe('light')
     expect(settingsSchema.parse({ theme: 'system' }).theme).toBe('system')
@@ -113,6 +117,8 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ editorBulletAfterHeading: 0 }).editorBulletAfterHeading).toBe(true)
     expect(settingsSchema.parse({ editorTextSize: 'huge' }).editorTextSize).toBe('small')
     expect(settingsSchema.parse({ editorTextSize: 3 }).editorTextSize).toBe('small')
+    expect(settingsSchema.parse({ editorFullWidth: 'yes' }).editorFullWidth).toBe(false)
+    expect(settingsSchema.parse({ editorFullWidth: 1 }).editorFullWidth).toBe(false)
     expect(settingsSchema.parse({ theme: 'sepia' }).theme).toBe('system')
     expect(settingsSchema.parse({ theme: 7 }).theme).toBe('system')
     expect(settingsSchema.parse({ timeFormat: '36h' }).timeFormat).toBe('12h')
@@ -155,6 +161,7 @@ describe('settingsSchema', () => {
       editorDefaultBullet: true,
       editorBulletAfterHeading: true,
       editorTextSize: 'small',
+      editorFullWidth: false,
       semanticSearchEnabled: false,
       describeAssets: true,
       contactsEnabled: false,

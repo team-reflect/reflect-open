@@ -316,6 +316,10 @@ html:root {
   font-size: var(--editor-font-size, var(--text-base));
 }
 
+:root[data-editor-full-width='true'] {
+  --editor-content-gutter: 2rem;
+}
+
 /* The reading gutter: pads content into a centered ~42rem column while the element
    itself spans the pane's full width. Two uses:
    - On a normal note's editor (route-content.tsx) so the editor stretches edge to
@@ -326,7 +330,7 @@ html:root {
    Un-layered, so it beats both the `padding: 0` reset above and meowdown's layered
    `--meowdown-gutter` padding. */
 .reflect-content-gutter {
-  padding-inline: max(2rem, calc((100% - 42rem) / 2));
+  padding-inline: var(--editor-content-gutter, max(2rem, calc((100% - 42rem) / 2)));
 }
 
 /* Mobile note-body gutter. This mirrors `.reflect-content-gutter`'s cascade

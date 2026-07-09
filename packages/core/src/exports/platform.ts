@@ -141,6 +141,7 @@ export {
   editorDefaultBulletSchema,
   editorBulletAfterHeadingSchema,
   editorTextSizeSchema,
+  editorFullWidthSchema,
   semanticSearchEnabledSchema,
   describeAssetsSchema,
   contactsEnabledSchema,
