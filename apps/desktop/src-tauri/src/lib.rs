@@ -13,6 +13,7 @@
 //! [`contacts`] (live Apple Contacts lookups),
 //! [`error`] (the shared error contract).
 
+mod background_task;
 mod calendar;
 mod capture;
 mod conflict;
@@ -186,6 +187,7 @@ pub fn run() {
             fs::asset_protocol::handle,
         )
         .manage(fs::GraphState::default())
+        .manage(background_task::BackgroundTaskState::default())
         .manage(fs::ImportCancel::default())
         .manage(fs::assets::AssetUploads::default())
         .manage(db::IndexState::default())
@@ -196,6 +198,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             app_version,
             app_platform,
+            background_task::background_task_begin,
+            background_task::background_task_end,
             icloud::storage::mobile_storage,
             icloud::storage::mobile_storage_local,
             icloud::storage::icloud_download_pending,

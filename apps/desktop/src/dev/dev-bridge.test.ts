@@ -67,3 +67,18 @@ describe('dev bridge index_reconcile_scan', () => {
     ])
   })
 })
+
+describe('dev bridge background task parity', () => {
+  it('reports native background assertions as unavailable and accepts cleanup', async () => {
+    const bridge = createDevBridge({
+      platform: 'ios',
+      files: createDevFileStore({}),
+      index: await createDevIndexDb(),
+    })
+
+    await expect(bridge.invoke('background_task_begin', {})).resolves.toBeNull()
+    await expect(
+      bridge.invoke('background_task_end', { token: 'already-expired' }),
+    ).resolves.toBeNull()
+  })
+})

@@ -117,8 +117,12 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
   let queuedScan: 'prompt' | 'ingest' | null = null
   let lastScanEndedAt = 0
 
+  function scanSuspended(): boolean {
+    return emitFileChangesFromWatch && document.visibilityState === 'hidden'
+  }
+
   function scheduleScan(delayMs: number = SCAN_DEBOUNCE_MS): void {
-    if (disposed) {
+    if (disposed || scanSuspended()) {
       return
     }
     if (scanRunning) {
@@ -148,7 +152,7 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
   }
 
   async function runScan(): Promise<void> {
-    if (disposed) {
+    if (disposed || scanSuspended()) {
       return
     }
     if (scanRunning) {
@@ -221,7 +225,13 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
     }
     const indexable = changes.filter((change) => isNotePath(change.path))
     if (indexGeneration !== null && indexable.length > 0) {
-      void applyIndexChanges(indexable, indexGeneration).then((mutations) => {
+      void applyIndexChanges(
+        indexable,
+        indexGeneration,
+        undefined,
+        undefined,
+        () => !emitFileChangesFromWatch || document.visibilityState !== 'hidden',
+      ).then((mutations) => {
         if (mutations > 0) {
           throttledInvalidateIndexQueries()
         }

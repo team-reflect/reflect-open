@@ -61,6 +61,7 @@ async function healBatchMoves(
   generation: number,
   onError: ApplyErrorHandler,
   onMoved?: MovedHandler,
+  canApply: () => boolean = () => true,
 ): Promise<{ handled: Set<string>; healed: number }> {
   const handled = new Set<string>()
   let healed = 0
@@ -80,8 +81,21 @@ async function healBatchMoves(
   )
   const mtimeByPath = new Map(arrivals.map((change) => [change.path, change.modifiedMs]))
   for (const move of moves) {
+    if (!canApply()) {
+      break
+    }
     try {
       await moveIndexedRows(move.from, move.to, generation)
+      if (!canApply()) {
+        // The move transaction began while foregrounded and has committed.
+        // Preserve its UI/session notification even though the projection
+        // refresh is deferred; foreground reconcile repairs that row.
+        handled.add(move.from)
+        handled.add(move.to)
+        healed += 1
+        onMoved?.(move.from, move.to)
+        break
+      }
       await indexNote(move.to, {
         generation,
         content: content.get(move.to),
@@ -127,13 +141,21 @@ async function prefetchFacts(paths: string[]): Promise<Map<string, IndexedFileFa
  * Returns how many index mutations the batch actually performed (applies,
  * removes, and healed moves). Zero means every change was already reflected
  * in the index — the caller can skip its cache invalidation.
+ *
+ * `canApply` is checked immediately before each SQLite write. A caller that
+ * suspends the lifecycle can therefore abandon the remaining batch; its next
+ * full reconcile is responsible for convergence.
  */
 export async function applyIndexChanges(
   changes: FileChange[],
   generation: number,
   onError: ApplyErrorHandler = logApplyError,
   onMoved?: MovedHandler,
+  canApply: () => boolean = () => true,
 ): Promise<number> {
+  if (!canApply()) {
+    return 0
+  }
   // The change stream carries more than notes (the watcher also reports
   // audio-memo recordings); only markdown notes reach the index.
   const notes = changes.filter((change) => isNotePath(change.path))
@@ -143,7 +165,7 @@ export async function applyIndexChanges(
   let handled: Set<string>
   let mutations = 0
   try {
-    const outcome = await healBatchMoves(notes, generation, onError, onMoved)
+    const outcome = await healBatchMoves(notes, generation, onError, onMoved, canApply)
     handled = outcome.handled
     mutations += outcome.healed
   } catch (error) {
@@ -172,9 +194,15 @@ export async function applyIndexChanges(
 
   let done = 0
   for (const change of notes) {
+    if (!canApply()) {
+      return mutations
+    }
     done += 1
     if (done % INDEX_PASS_YIELD_EVERY === 0) {
       await yieldToEventLoop()
+      if (!canApply()) {
+        return mutations
+      }
     }
     if (handled.has(change.path)) {
       continue
@@ -183,7 +211,13 @@ export async function applyIndexChanges(
       if (change.kind === 'remove') {
         // Flush first: a same-batch upsert(x) … remove(x) sequence must not
         // have the batched upsert land *after* the remove and resurrect it.
+        if (!canApply()) {
+          return mutations
+        }
         await batch.flush()
+        if (!canApply()) {
+          return mutations
+        }
         await removeFromIndex(change.path, generation)
         mutations += 1
         continue
@@ -194,26 +228,40 @@ export async function applyIndexChanges(
       }
       const content = await readNote(change.path)
       const fileHash = await hashContent(content)
+      if (!canApply()) {
+        return mutations
+      }
       if (facts?.fileHash === fileHash) {
         // Content unchanged; only the mtime moved. Re-stamp the row so the
         // next pass skips the read — a stored echo-time stamp never matches
         // and would cost this read on every reconcile and every batch.
         if (change.modifiedMs !== undefined && facts.mtime !== change.modifiedMs) {
+          if (!canApply()) {
+            return mutations
+          }
           await touches.add({ path: change.path, mtime: change.modifiedMs })
         }
         continue
       }
-      await batch.add(
-        await buildNoteProjection(change.path, content, {
-          fileHash,
-          mtime: change.modifiedMs ?? Date.now(),
-        }),
-      )
+      const projection = await buildNoteProjection(change.path, content, {
+        fileHash,
+        mtime: change.modifiedMs ?? Date.now(),
+      })
+      if (!canApply()) {
+        return mutations
+      }
+      await batch.add(projection)
     } catch (error) {
       onError(error, change)
     }
   }
+  if (!canApply()) {
+    return mutations
+  }
   await batch.flush()
+  if (!canApply()) {
+    return mutations + batch.applied()
+  }
   await touches.flush()
   // Re-stamps count as mutations: `updated_at` moved, so recency-ordered
   // queries may return different rows and the caller must invalidate.
@@ -237,24 +285,42 @@ export async function applyIndexChanges(
  * settled index, never racing a just-written private note's indexing. Batches
  * that touch neither notes nor assets (e.g. audio-memo recordings) are skipped
  * entirely, as before.
+ *
+ * `canApply` gates both event admission and execution from the serialized
+ * queue. Events dropped after suspension are intentionally recovered by the
+ * lifecycle's foreground reconcile.
  */
 export function subscribeIndexChanges(
   generation: number,
   onApplied?: (changes: FileChange[]) => void,
   onMoved?: MovedHandler,
+  canApply: () => boolean = () => true,
 ): Promise<Unlisten> {
   // Serialize batches so overlapping events for the same path can't reorder
   // (e.g. an upsert landing after a later remove, leaving a ghost row).
   let applyQueue: Promise<void> = Promise.resolve()
   return subscribeFileChanges((changes) => {
+    if (!canApply()) {
+      return
+    }
     const notes = changes.filter((change) => isNotePath(change.path))
     const touchesAssets = changes.some((change) => isAssetPath(change.path))
     if (notes.length === 0 && !touchesAssets) {
       return // e.g. a batch of audio-memo recordings — nothing the index tracks
     }
     applyQueue = applyQueue
-      .then(() => (notes.length > 0 ? applyIndexChanges(notes, generation, undefined, onMoved) : 0))
+      .then(() => {
+        if (!canApply()) {
+          return 0
+        }
+        return notes.length > 0
+          ? applyIndexChanges(notes, generation, undefined, onMoved, canApply)
+          : 0
+      })
       .then((mutations) => {
+        if (!canApply()) {
+          return
+        }
         if (notes.length > 0 && mutations > 0) {
           onApplied?.(notes)
         }

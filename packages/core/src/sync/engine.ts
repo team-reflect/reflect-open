@@ -84,6 +84,14 @@ export interface SyncEngineOptions {
   /** Ceiling on deferral while the user keeps typing. */
   maxWaitMs?: number
   /**
+   * Checked before a new cycle and again after every awaited command boundary.
+   * Returning false at admission drops the trigger without issuing Git work;
+   * returning false mid-cycle lets the already-issued command finish but
+   * suppresses every subsequent command. The lifecycle owner must replay a
+   * full cycle when work is allowed again.
+   */
+  canStartCycle?: () => boolean
+  /**
    * Commit-only mode, for a graph with no remote (local history): every
    * cycle ends after the commit — no credential resolved, no fetch/merge,
    * no push. Edits still land in Git history and stay revertable.
@@ -116,6 +124,9 @@ const MAX_PUSH_ATTEMPTS = 3
 /** A push the remote refused for a non-divergence reason (e.g. push protection). */
 class PushRejectedError extends Error {}
 
+/** Internal control flow: the owner suspended cycles while one command was in flight. */
+class CycleSuppressedError extends Error {}
+
 /**
  * Build a sync engine for one graph session. The engine starts idle and does
  * nothing until `noteChanged()` (debounced commit→push) or `syncNow()` (full
@@ -144,13 +155,17 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   }
 
   /**
-   * Await one cycle step, then bail if the engine stopped meanwhile. An
-   * already-issued git command can't be recalled, but nothing further runs
-   * after `stop()`.
+   * Await one cycle step, preserve any result-side notification, then bail if
+   * the engine stopped or the owner suppressed further cycles meanwhile. An
+   * already-issued Git command cannot be recalled, but no later command starts.
    */
-  async function step<T>(promise: Promise<T>): Promise<T> {
+  async function step<T>(promise: Promise<T>, onResult?: (result: T) => void): Promise<T> {
     const result = await promise
     signal.throwIfAborted()
+    onResult?.(result)
+    if (options.canStartCycle?.() === false) {
+      throw new CycleSuppressedError()
+    }
     return result
   }
 
@@ -178,7 +193,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   }
 
   async function run(mode: 'push' | 'full'): Promise<void> {
-    if (signal.aborted) {
+    if (signal.aborted || options.canStartCycle?.() === false) {
       return
     }
     if (running !== null) {
@@ -201,7 +216,9 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
         await cycle(mode)
         emit({ state: 'idle' })
       } catch (error) {
-        if (!signal.aborted) {
+        if (error instanceof CycleSuppressedError) {
+          emit({ state: 'idle' })
+        } else if (!signal.aborted) {
           emit(statusForError(error))
         }
       } finally {
@@ -262,11 +279,13 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
 
   /** Merge the fetched remote and hand any changed files to the reindexer. */
   async function merge(): Promise<{ kind: string }> {
-    const outcome = await step(gitMergeRemote(options.generation)) // upToDate is a no-op
-    if (outcome.changedFiles.length > 0) {
-      options.onRemoteChanges?.(outcome.changedFiles)
-    }
-    return outcome
+    return step(gitMergeRemote(options.generation), (outcome) => {
+      // The command may already have rewritten files before suspension. Fan
+      // those changes out before the boundary gate stops subsequent Git work.
+      if (outcome.changedFiles.length > 0) {
+        options.onRemoteChanges?.(outcome.changedFiles)
+      }
+    }) // upToDate is a no-op
   }
 
   function syncNow(): Promise<void> {

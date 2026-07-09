@@ -69,7 +69,7 @@ describe('createGraphIndex', () => {
       signal: expect.any(AbortSignal),
       onMoved,
     })
-    expect(mockSubscribe).toHaveBeenCalledWith(5, onApplied, onMoved)
+    expect(mockSubscribe).toHaveBeenCalledWith(5, onApplied, onMoved, expect.any(Function))
     // The initial reconcile is itself an index change: invalidate once there.
     expect(onApplied).toHaveBeenCalledTimes(1)
     expect(mockWatchStart).toHaveBeenCalledTimes(1)
@@ -207,6 +207,76 @@ describe('createGraphIndex', () => {
     await index.settled()
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(mockSync).not.toHaveBeenCalled()
+  })
+
+  it('defers an initial sync while suspended and replays it on resume', async () => {
+    let backgrounded = true
+    const index = createGraphIndex({ shouldSuspend: () => backgrounded })
+
+    index.sync(5, () => false)
+    await Promise.resolve()
+    expect(mockSync).not.toHaveBeenCalled()
+    expect(mockSubscribe).not.toHaveBeenCalled()
+
+    backgrounded = false
+    index.resume(5, () => false)
+    await vi.waitFor(() => expect(mockSync).toHaveBeenCalledTimes(1))
+    await index.settled()
+
+    expect(mockSubscribe).toHaveBeenCalledTimes(1)
+    expect(mockWatchStart).toHaveBeenCalledTimes(1)
+  })
+
+  it('resume(null) clears suspension without starting work before graph open', async () => {
+    const index = createGraphIndex()
+    index.suspend()
+
+    index.resume(null, () => false)
+    await Promise.resolve()
+    expect(mockSync).not.toHaveBeenCalled()
+
+    index.sync(5, () => false)
+    await index.settled()
+    expect(mockSync).toHaveBeenCalledTimes(1)
+    expect(mockWatchStart).toHaveBeenCalledTimes(1)
+  })
+
+  it('suspend() aborts bulk work, drops live work, and resume coalesces catch-up triggers', async () => {
+    const unlisten = vi.fn()
+    let canApply: (() => boolean) | undefined
+    mockSubscribe.mockImplementation(async (_generation, _onApplied, _onMoved, guard) => {
+      canApply = guard
+      return unlisten
+    })
+    const index = createGraphIndex()
+    index.sync(5, () => false)
+    await index.settled()
+    expect(canApply?.()).toBe(true)
+
+    index.suspend()
+    expect(unlisten).toHaveBeenCalledTimes(1)
+    expect(canApply?.()).toBe(false)
+
+    const settles: Array<() => void> = []
+    mockSync.mockClear()
+    mockSync.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          settles.push(resolve)
+        }),
+    )
+    index.resume(5, () => false)
+    await vi.waitFor(() => expect(settles).toHaveLength(1))
+    index.refresh(5, () => false)
+    index.refresh(5, () => false)
+
+    settles[0]!()
+    await vi.waitFor(() => expect(settles).toHaveLength(2))
+    settles[1]!()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    // One foreground catch-up plus one coalesced queued rerun, not one pass
+    // for every simultaneous resume/iCloud trigger.
+    expect(mockSync).toHaveBeenCalledTimes(2)
   })
 
   it('stops reporting file progress once the pass is superseded', async () => {

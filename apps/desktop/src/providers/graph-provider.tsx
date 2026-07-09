@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -14,6 +15,7 @@ import {
   errorMessage,
   forgetRecent,
   hasBridge,
+  isMobilePlatform,
   createGraph,
   openGraph,
   recentGraphs,
@@ -161,8 +163,43 @@ export function GraphProvider({
       // External renames healed by id follow through to sessions and routes,
       // exactly as for an in-app rename (Plan 17).
       onMoved: followHealedMove,
+      // `visibilitychange` below performs the active teardown; this dynamic
+      // guard also closes the launch race where the first sync is scheduled
+      // after iOS has already hidden the webview.
+      shouldSuspend: () =>
+        isMobilePlatform(platform) && document.visibilityState === 'hidden',
     }),
   )
+
+  useEffect(() => {
+    if (!isMobilePlatform(platform) || !isMainWindow()) {
+      return
+    }
+
+    const index = indexRef.current
+    const onVisibilityChange = (): void => {
+      if (document.visibilityState === 'hidden') {
+        // Synchronous teardown prevents a locally emitted or metadata-watcher
+        // batch from entering the index queue after iOS begins suspension.
+        index.suspend()
+        return
+      }
+      const seq = openSeq.current
+      // A null generation still clears suspension: mobile can foreground
+      // before onboarding/open has produced an index session. With a session,
+      // the full pass recovers every event missed while hidden; stacked
+      // resume/iCloud triggers fold into the lifecycle's queued rerun.
+      index.resume(indexGeneration, () => seq !== openSeq.current)
+    }
+
+    if (document.visibilityState === 'hidden') {
+      index.suspend()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [indexGeneration, platform])
 
   const loadRecents = useCallback(
     async (options?: { surfaceErrors?: boolean }): Promise<RecentGraph[]> => {

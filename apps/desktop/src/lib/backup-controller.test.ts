@@ -451,6 +451,53 @@ describe('createBackupController', () => {
     controller.dispose()
   })
 
+  it('defers mobile launch, online, and debounce cycles until foreground', async () => {
+    setPlatformSurface({ mobileApp: true })
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    const { calls } = fakeBridge()
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    try {
+      await controller.start()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      // Adoption may probe status/auth while hidden, but the launch cycle must
+      // not acquire the Git index or touch the network.
+      expect(calls).not.toContain('git_commit_all')
+      expect(calls).not.toContain('git_fetch')
+
+      visibility.mockReturnValue('visible')
+      document.dispatchEvent(new Event('visibilitychange'))
+      await vi.waitFor(() => {
+        expect(calls.filter((command) => command === 'git_commit_all')).toHaveLength(1)
+      })
+      expect(calls.filter((command) => command === 'git_fetch')).toHaveLength(1)
+
+      visibility.mockReturnValue('hidden')
+      vi.useFakeTimers()
+      emitFileChanges([{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }])
+      window.dispatchEvent(new Event('online'))
+      await vi.advanceTimersByTimeAsync(10_000)
+
+      // Both the immediate online trigger and the edit's 10s mobile debounce
+      // are dropped while hidden.
+      expect(calls.filter((command) => command === 'git_commit_all')).toHaveLength(1)
+      expect(calls.filter((command) => command === 'git_fetch')).toHaveLength(1)
+
+      visibility.mockReturnValue('visible')
+      document.dispatchEvent(new Event('visibilitychange'))
+      await vi.runAllTimersAsync()
+      expect(calls.filter((command) => command === 'git_commit_all')).toHaveLength(2)
+      // Foreground replay is full, so it fetches rather than merely pushing
+      // the edit that arrived while hidden.
+      expect(calls.filter((command) => command === 'git_fetch')).toHaveLength(2)
+    } finally {
+      vi.useRealTimers()
+      controller.dispose()
+      visibility.mockRestore()
+      setPlatformSurface({ mobileApp: false })
+    }
+  })
+
   it('an edit backs up after 30s idle on desktop, 10s on mobile', async () => {
     const commitCount = (calls: string[]): number =>
       calls.filter((command) => command === 'git_commit_all').length
@@ -516,5 +563,29 @@ describe('createBackupController', () => {
     ])
     controller.dispose()
     unlisten()
+  })
+
+  it('defers a pulled note direct-index apply while the mobile app is hidden', async () => {
+    setPlatformSurface({ mobileApp: true })
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    try {
+      const { calls } = fakeBridge({
+        mergeOutcome: {
+          kind: 'merged',
+          conflictedPaths: [],
+          changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
+        },
+      })
+      const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+      await controller.start()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(calls).not.toContain('note_read')
+      expect(calls).not.toContain('index_apply_batch')
+      controller.dispose()
+    } finally {
+      visibility.mockRestore()
+      setPlatformSurface({ mobileApp: false })
+    }
   })
 })
