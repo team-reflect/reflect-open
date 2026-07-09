@@ -78,13 +78,6 @@ export interface NoteEditorHandle {
    * previous day / the start of the next day).
    */
   setSelection(position: 'start' | 'end'): void
-  /**
-   * Scroll the caret (the current selection) into view if it sits outside
-   * the visible area — a no-op while it is visible. Layout that settles
-   * after focus (the iOS keyboard raise, images sizing in) can push the
-   * caret off screen; this re-reveals it without touching the selection.
-   */
-  scrollIntoView(): void
   /** The current selection's text (blocks separated by blank lines). */
   getSelectedText(): string
   /** Open the selection AI menu (no-op on an empty selection). */
@@ -266,7 +259,6 @@ export function NoteEditor({
       insertMarkdown: (markdown) => innerRef.current?.insertMarkdown(markdown),
       focus: () => innerRef.current?.focus(),
       setSelection: (position) => innerRef.current?.setSelection(position),
-      scrollIntoView: () => innerRef.current?.scrollIntoView(),
       getSelectedText: () => innerRef.current?.getSelectedText() ?? '',
       openSelectionMenu: () => innerRef.current?.openSelectionMenu(),
       startPendingReplacement: (options) =>
