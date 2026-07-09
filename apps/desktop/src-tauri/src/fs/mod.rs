@@ -220,10 +220,11 @@ pub fn graph_create(path: String, state: State<GraphState>) -> AppResult<GraphIn
 /// directly under the current root; existing files are never replaced (and
 /// never fail the import — identical files skip, conflicting notes rename,
 /// conflicting daily notes merge). Attachments the notes link to on Firebase
-/// Storage are downloaded into `assets/` first and the links rewritten, so
-/// the imported graph doesn't depend on Reflect V1's infrastructure staying
-/// up. Progress is emitted as `import:progress` events, and
-/// [`graph_import_cancel`] aborts the run before anything lands in the graph.
+/// Storage or Reflect's asset CDN are downloaded into `assets/` first and the
+/// links rewritten, so the imported graph doesn't depend on Reflect V1's
+/// infrastructure staying up. Progress is emitted as `import:progress` events,
+/// and [`graph_import_cancel`] aborts the run before anything lands in the
+/// graph.
 #[tauri::command]
 pub async fn graph_import_reflect_v1_zip(
     path: String,
