@@ -65,7 +65,16 @@ export function DayCarousel({
   )
 
   return (
-    <div className="min-h-0 flex-1 overflow-hidden" ref={setViewportRef}>
+    /* `overflow: clip`, not `hidden`: a clip box is not a scroll container, so
+       nothing (ProseMirror's caret reveal, WebKit's focus reveal) can
+       programmatically scroll the viewport off its transform-positioned belt.
+       Inline so pre-iOS-16 WebKit rejects the value and falls back to the
+       class's `hidden`, which the scroll guard in useDayCarousel heals. */
+    <div
+      className="min-h-0 flex-1 overflow-hidden"
+      style={{ overflow: 'clip' }}
+      ref={setViewportRef}
+    >
       <div className="flex h-full">
         {Array.from({ length: dayWindow.count }, (_, index) => {
           const day = dateAtIndex(dayWindow, index)
