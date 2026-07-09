@@ -14,6 +14,15 @@ describe('AI_PROVIDERS', () => {
       keyPlaceholder: 'sk-or-v1-…',
     })
   })
+
+  it('includes OpenAI-compatible endpoints with optional keys', () => {
+    expect(aiProvider('openai-compatible')).toMatchObject({
+      id: 'openai-compatible',
+      label: 'OpenAI-compatible',
+      apiKeyRequired: false,
+      keyPlaceholder: 'Optional API key',
+    })
+  })
 })
 
 describe('modelContextWindow', () => {

@@ -1,9 +1,11 @@
 import { useCallback } from 'react'
 import {
   aiKeySecretName,
+  aiProviderRequiresApiKey,
   apiKeyHint,
   defaultAiProvider,
   deleteSecret,
+  normalizeOpenAICompatibleBaseUrl,
   setSecret,
   withAiProviderAdded,
   withAiProviderRemoved,
@@ -24,6 +26,7 @@ import { useSettings } from '@/providers/settings-provider'
 export interface NewAiProvider {
   provider: AiProviderId
   model: string
+  baseUrl?: string | undefined
   apiKey: string
   isDefault: boolean
 }
@@ -76,11 +79,29 @@ export function useAiProviders(): UseAiProvidersValue {
         throw error
       }
       const id = crypto.randomUUID()
-      await setSecret(aiKeySecretName(id), draft.apiKey)
+      const apiKey = draft.apiKey.trim()
+      if (apiKey !== '' || aiProviderRequiresApiKey(draft.provider)) {
+        await setSecret(aiKeySecretName(id), apiKey)
+      }
       updateSettingsWith((current) => {
+        const entry: AiProviderConfig =
+          draft.provider === 'openai-compatible'
+            ? {
+                id,
+                provider: draft.provider,
+                model: draft.model,
+                baseUrl: normalizeOpenAICompatibleBaseUrl(draft.baseUrl ?? ''),
+                keyHint: apiKeyHint(apiKey),
+              }
+            : {
+                id,
+                provider: draft.provider,
+                model: draft.model,
+                keyHint: apiKeyHint(apiKey),
+              }
         const next = withAiProviderAdded(
           { providers: current.aiProviders, defaultProviderId: current.defaultAiProviderId },
-          { id, provider: draft.provider, model: draft.model, keyHint: apiKeyHint(draft.apiKey) },
+          entry,
           draft.isDefault,
         )
         return { aiProviders: next.providers, defaultAiProviderId: next.defaultProviderId }

@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
-import type { ApiKeyValidation } from '@reflect/core'
+import type { ApiKeyValidation, ApiKeyValidationInput } from '@reflect/core'
 
 /**
  * The mobile add-provider sheet over the shared submit flow: a verified key
@@ -11,7 +11,7 @@ import type { ApiKeyValidation } from '@reflect/core'
  */
 
 const validateApiKey = vi.hoisted(() =>
-  vi.fn<(provider: string, key: string, fetchFn?: typeof fetch) => Promise<ApiKeyValidation>>(),
+  vi.fn<(input: ApiKeyValidationInput, fetchFn?: typeof fetch) => Promise<ApiKeyValidation>>(),
 )
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
@@ -97,5 +97,39 @@ describe('AddAiProviderDrawer', () => {
     )
     // The unverified key was saved once, without a second validation probe.
     expect(validateApiKey).toHaveBeenCalledTimes(1)
+  })
+
+  it('submits an OpenAI-compatible endpoint without requiring an API key', async () => {
+    validateApiKey.mockResolvedValue('valid')
+    renderSheet()
+
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Provider' }), { key: 'ArrowDown' })
+    fireEvent.keyDown(await screen.findByRole('option', { name: 'OpenAI-compatible' }), {
+      key: 'Enter',
+    })
+    fireEvent.change(screen.getByLabelText('Endpoint base URL'), {
+      target: { value: 'http://localhost:1234/v1' },
+    })
+    fireEvent.change(screen.getByLabelText('Default model'), { target: { value: 'llama-local' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add provider' }))
+
+    await waitFor(() =>
+      expect(validateApiKey).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: 'openai-compatible',
+          apiKey: '',
+          baseUrl: 'http://localhost:1234/v1',
+        }),
+        expect.any(Function),
+      ),
+    )
+    expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'openai-compatible',
+        apiKey: '',
+        baseUrl: 'http://localhost:1234/v1',
+        model: 'llama-local',
+      }),
+    )
   })
 })

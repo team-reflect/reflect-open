@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { AiProviderConfig } from '../../settings/schema'
+import type { HostedAiProviderConfig } from '../../settings/schema'
 import { aiProvider } from '../provider-catalog'
 import { chatModelOptions, resolveChatModel } from './model-options'
 
-function config(overrides: Partial<AiProviderConfig>): AiProviderConfig {
+function config(overrides: Partial<HostedAiProviderConfig>): HostedAiProviderConfig {
   return {
     id: 'id',
     provider: 'anthropic',
@@ -35,6 +35,24 @@ describe('chatModelOptions', () => {
       label: 'claude-custom',
     })
     expect(options).toHaveLength(aiProvider('anthropic').models.length + 1)
+  })
+
+  it('keeps the configured OpenAI-compatible model selectable', () => {
+    const options = chatModelOptions([
+      {
+        id: 'local',
+        provider: 'openai-compatible',
+        model: 'llama-local',
+        baseUrl: 'http://localhost:1234/v1',
+        keyHint: '',
+      },
+    ])
+    expect(options.at(-1)).toEqual({
+      configId: 'local',
+      provider: 'openai-compatible',
+      modelId: 'llama-local',
+      label: 'llama-local',
+    })
   })
 
   it('groups options consecutively per configured entry', () => {

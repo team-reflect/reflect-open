@@ -22,7 +22,7 @@ export type AssetKind = 'image' | 'pdf' | 'svg'
 export interface DescribeAssetRequest {
   /** The provider entry to call (the app default). */
   config: AiProviderConfig
-  /** The BYOK API key, read from the OS keychain by the caller. */
+  /** The BYOK API key, or an empty string for no-key compatible endpoints. */
   apiKey: string
   /** Host transport (the Tauri HTTP plugin's fetch; tests pass a stub). */
   fetchFn?: typeof fetch | undefined

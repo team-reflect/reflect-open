@@ -1,7 +1,12 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { setBridge, settingsSchema, type AiProviderConfig, type Settings } from '@reflect/core'
+import {
+  setBridge,
+  settingsSchema,
+  type HostedAiProviderConfig,
+  type Settings,
+} from '@reflect/core'
 import { SettingsProvider } from '@/providers/settings-provider'
 import { resetOperations } from '@/lib/operations'
 import { AiProvidersSection } from './ai-providers-section'
@@ -79,7 +84,7 @@ function lastSavedDoc(): Settings {
   return settingsSchema.parse(saved.at(-1))
 }
 
-function entry(overrides: Partial<AiProviderConfig>): AiProviderConfig {
+function entry(overrides: Partial<HostedAiProviderConfig>): HostedAiProviderConfig {
   return {
     id: 'id',
     provider: 'anthropic',
@@ -182,6 +187,42 @@ describe('AiProvidersSection', () => {
     fireEvent.keyDown(dialog.getByRole('combobox', { name: 'Provider' }), { key: 'ArrowDown' })
 
     expect(await screen.findByRole('option', { name: 'OpenRouter' })).toBeTruthy()
+    expect(await screen.findByRole('option', { name: 'OpenAI-compatible' })).toBeTruthy()
+  })
+
+  it('adds an OpenAI-compatible endpoint without storing an empty key', async () => {
+    renderSection()
+    await waitFor(() => expect(screen.getByText(/No AI providers configured/)).toBeTruthy())
+
+    const dialog = openDialog()
+    fireEvent.keyDown(dialog.getByRole('combobox', { name: 'Provider' }), { key: 'ArrowDown' })
+    fireEvent.keyDown(await screen.findByRole('option', { name: 'OpenAI-compatible' }), {
+      key: 'Enter',
+    })
+    fireEvent.change(dialog.getByLabelText('Endpoint base URL'), {
+      target: { value: 'http://localhost:1234/v1/' },
+    })
+    fireEvent.change(dialog.getByLabelText('Default model'), {
+      target: { value: 'llama-local' },
+    })
+    fireEvent.click(dialog.getByRole('button', { name: 'Add provider' }))
+
+    await waitFor(() => expect(saved).toHaveLength(1))
+    const doc = lastSavedDoc()
+    const [added] = doc.aiProviders
+    expect(added).toMatchObject({
+      provider: 'openai-compatible',
+      model: 'llama-local',
+      baseUrl: 'http://localhost:1234/v1',
+      keyHint: '',
+    })
+    expect(providerFetchMock).toHaveBeenCalledWith(
+      'http://localhost:1234/v1/models',
+      expect.objectContaining({ method: 'GET', headers: {} }),
+    )
+    expect(secrets.size).toBe(0)
+    expect(JSON.stringify(saved)).not.toContain('localhost:1234/v1/')
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('rejects a key the provider turns down, storing nothing', async () => {

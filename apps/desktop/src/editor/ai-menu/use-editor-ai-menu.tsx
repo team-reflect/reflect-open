@@ -15,11 +15,10 @@ import type {
   SelectionMenuSearchHandler,
 } from '@meowdown/react'
 import {
-  aiKeySecretName,
+  aiApiKeyForConfig,
   chatModelOptions,
   cloudSafeSelection,
   filterAiPrompts,
-  getSecret,
   isPrivateNoteError,
   transformSelection,
   type AiPrompt,
@@ -176,7 +175,7 @@ export function useEditorAiMenu({
         throw cause
       }
 
-      const apiKey = await getSecret(aiKeySecretName(config.id)).catch(() => null)
+      const apiKey = await aiApiKeyForConfig(config)
       if (runRef.current !== run) return
       if (apiKey === null) {
         fail('No API key found for this provider — re-add it in Settings → AI providers.')

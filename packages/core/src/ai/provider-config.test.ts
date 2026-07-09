@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AiProviderConfig } from '../settings/schema'
+import type { AiProviderConfig, HostedAiProviderConfig } from '../settings/schema'
 import {
   apiKeyHint,
   defaultAiProvider,
@@ -9,7 +9,7 @@ import {
   type AiProvidersState,
 } from './provider-config'
 
-function config(overrides: Partial<AiProviderConfig>): AiProviderConfig {
+function config(overrides: Partial<HostedAiProviderConfig>): HostedAiProviderConfig {
   return {
     id: 'id',
     provider: 'openai',

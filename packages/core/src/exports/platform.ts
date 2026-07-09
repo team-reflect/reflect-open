@@ -155,6 +155,7 @@ export {
   graphColorsSchema,
   GRAPH_COLOR_IDS,
   aiProviderIdSchema,
+  openAiCompatibleBaseUrlSchema,
   aiProviderConfigSchema,
   aiProvidersSchema,
   defaultAiProviderIdSchema,
@@ -175,7 +176,10 @@ export {
   type GraphColor,
   type GraphColors,
   type AiProviderId,
+  type HostedAiProviderId,
   type AiProviderConfig,
+  type HostedAiProviderConfig,
+  type OpenAiCompatibleProviderConfig,
   type AiPrompt,
   type AiPromptMode,
 } from '../settings/schema'

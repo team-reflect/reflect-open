@@ -1,5 +1,6 @@
-import type { AiProviderId } from '../settings/schema'
+import type { AiProviderId, HostedAiProviderId } from '../settings/schema'
 import { anthropicDirectBrowserAccessHeaders } from './anthropic-headers'
+import { isHttpBaseUrl, normalizeOpenAICompatibleBaseUrl } from './openai-compatible'
 import { OPENROUTER_BASE_URL } from './openrouter'
 
 /**
@@ -23,7 +24,13 @@ interface KeyProbe {
   invalidStatuses: number[]
 }
 
-const PROBES: Record<AiProviderId, KeyProbe> = {
+export interface ApiKeyValidationInput {
+  provider: AiProviderId
+  apiKey: string
+  baseUrl?: string | undefined
+}
+
+const PROBES: Record<HostedAiProviderId, KeyProbe> = {
   openai: {
     url: 'https://api.openai.com/v1/models',
     headers: (key) => ({ Authorization: `Bearer ${key}` }),
@@ -51,20 +58,41 @@ const PROBES: Record<AiProviderId, KeyProbe> = {
   },
 }
 
+function openAiCompatibleProbe(input: ApiKeyValidationInput): KeyProbe | null {
+  if (input.baseUrl === undefined || !isHttpBaseUrl(input.baseUrl)) {
+    return null
+  }
+  const baseUrl = normalizeOpenAICompatibleBaseUrl(input.baseUrl)
+  return {
+    url: `${baseUrl}/models`,
+    headers: (key) => (key.trim() === '' ? {} : { Authorization: `Bearer ${key}` }),
+    invalidStatuses: [401, 403],
+  }
+}
+
+function keyProbe(input: ApiKeyValidationInput): KeyProbe | null {
+  if (input.provider === 'openai-compatible') {
+    return openAiCompatibleProbe(input)
+  }
+  return PROBES[input.provider]
+}
+
 /**
- * Probe `provider` with `apiKey`. `fetchFn` lets hosts substitute a
+ * Probe `input.provider` with `input.apiKey`. `fetchFn` lets hosts substitute a
  * CORS-free transport (the desktop app passes the Tauri HTTP plugin's fetch;
  * `@reflect/core` itself stays platform-agnostic).
  */
 export async function validateApiKey(
-  provider: AiProviderId,
-  apiKey: string,
+  input: ApiKeyValidationInput,
   fetchFn: typeof fetch = fetch,
 ): Promise<ApiKeyValidation> {
-  const probe = PROBES[provider]
+  const probe = keyProbe(input)
+  if (probe === null) {
+    return 'invalid'
+  }
   let response: Response
   try {
-    response = await fetchFn(probe.url, { method: 'GET', headers: probe.headers(apiKey) })
+    response = await fetchFn(probe.url, { method: 'GET', headers: probe.headers(input.apiKey) })
   } catch {
     return 'unreachable'
   }

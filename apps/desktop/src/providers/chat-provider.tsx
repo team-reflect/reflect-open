@@ -8,13 +8,12 @@ import {
   type ReactNode,
 } from 'react'
 import {
-  aiKeySecretName,
+  aiApiKeyForConfig,
   appendEvent,
   buildHistory,
   chatModelOptions,
   deleteChatConversation,
   errorMessage,
-  getSecret,
   hasBridge,
   listChatConversations,
   loadChatGraphContext,
@@ -280,7 +279,7 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
         // The graph overview degrades to null (prompt without the block)
         // rather than blocking the turn — a cold index shouldn't kill chat.
         const [apiKey, context] = await Promise.all([
-          getSecret(aiKeySecretName(config.id)),
+          aiApiKeyForConfig(config),
           loadChatGraphContext(graph.name).catch((cause: unknown) => {
             console.error('chat graph context failed:', errorMessage(cause))
             return null
@@ -459,4 +458,3 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
   )
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>
 }
-
