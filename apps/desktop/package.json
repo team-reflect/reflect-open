@@ -8,7 +8,6 @@
     "build": "vite build",
     "preview": "vite preview",
     "sidecar": "node scripts/build-sidecar.mjs",
-    "release:bump": "node scripts/release-bump.mjs",
     "release:ios": "node scripts/release-ios.mjs",
     "release:macos": "node scripts/release-macos.mjs",
     "typecheck": "tsc --noEmit",

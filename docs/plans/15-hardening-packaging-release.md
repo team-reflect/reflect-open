@@ -102,9 +102,8 @@ the original release scope and are **in** scope for the privacy/signing review.
     - **Release automation (shipped):** versioning moved to release-please with one
       channel per branch (`next` → beta Release PR, `master` → stable Release PR).
       The app version lives only in `apps/desktop/package.json`; releases are created
-      as drafts and undrafted after the assets upload; `release-bump.mjs` is retired
-      (deleted after the first release-please release ships). See
-      docs/macos-distribution.md → Cutting a release.
+      as drafts and undrafted after the assets upload; `release-bump.mjs` was removed.
+      See docs/macos-distribution.md → Cutting a release.
 
 11. **Definition-of-success walkthrough.** Manually verify the product-vision success
     list end-to-end (below) as the release checklist.

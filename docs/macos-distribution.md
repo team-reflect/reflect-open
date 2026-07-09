@@ -106,8 +106,7 @@ and `master` (stable channel), `.github/workflows/release-please.yml` updates th
 branch's **Release PR**, which bumps `apps/desktop/package.json` and prepends the
 channel changelog (`apps/desktop/CHANGELOG.beta.md` on `next`,
 `apps/desktop/CHANGELOG.md` on `master`) from the conventional-commit PR titles landed
-since the last release. (`release-bump.mjs` is retired; it stays in-tree only until the
-first release-please release ships.)
+since the last release.
 
 **Merging the Release PR is the release.** release-please then creates a draft GitHub
 release with the changelog as its body and hands the tag name to the Release workflow,

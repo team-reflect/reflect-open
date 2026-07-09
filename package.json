@@ -13,7 +13,6 @@
     "lint:fix": "oxlint --fix apps packages",
     "check": "pnpm typecheck && pnpm lint",
     "tauri": "pnpm --filter @reflect/desktop tauri",
-    "release:bump": "pnpm --filter @reflect/desktop release:bump",
     "release:ios": "pnpm --filter @reflect/desktop release:ios",
     "release:macos": "pnpm --filter @reflect/desktop release:macos",
     "release:testflight": "pnpm --filter @reflect/desktop release:ios testflight",

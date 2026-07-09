@@ -130,10 +130,9 @@ export function createTauriBuildArgs({ flavor, resourceConfig = null, target }) 
   if (overlay) buildArgs.push('--config', overlay)
   // The beta and dev overlays pin their own updater feed; the stable flavor has
   // no overlay, so without this it would inherit whatever endpoint is committed
-  // in the base tauri.conf.json — which on the `next` branch is the *beta* feed.
-  // Pin it at build time so a stable build always polls the stable feed, no
-  // matter which branch it was cut from. This is what makes releases
-  // branch-independent (release-bump.mjs no longer ties the channel to a branch).
+  // in the base tauri.conf.json — which is the *beta* feed. Pin it at build
+  // time so a stable build always polls the stable feed, no matter which
+  // branch it was cut from. This is what makes releases branch-independent.
   if (flavor === 'stable') {
     buildArgs.push('--config', JSON.stringify({ plugins: { updater: { endpoints: [STABLE_UPDATER_ENDPOINT] } } }))
   }
