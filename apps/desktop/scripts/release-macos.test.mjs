@@ -19,7 +19,6 @@ import {
   macosEntitlementsPath,
   macosTargetResourceConfig,
   parseKeychainList,
-  resolveVersionField,
   signDmgArgs,
   uploadBetaFeedArgs,
 } from './release-macos.mjs'
@@ -221,25 +220,6 @@ test('beta feed upload replaces the moving manifest', () => {
     'latest.json',
     '--clobber',
   ])
-})
-
-test('a literal version field is used as-is', () => {
-  expect(
-    resolveVersionField('0.5.0-beta.3', () => {
-      throw new Error('a literal version must not be resolved as a path')
-    }),
-  ).toBe('0.5.0-beta.3')
-})
-
-test('a package.json pointer resolves to that file\'s version, like Tauri does', () => {
-  const seen = []
-  const version = resolveVersionField('../package.json', (path) => {
-    seen.push(path)
-    return { version: '0.5.0' }
-  })
-
-  expect(version).toBe('0.5.0')
-  expect(seen).toEqual(['../package.json'])
 })
 
 test('release builds ask Tauri for the app bundle only', () => {

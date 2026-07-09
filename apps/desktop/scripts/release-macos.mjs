@@ -316,31 +316,23 @@ function hostTarget() {
   releaseTargetConfig(target)
   return target
 }
-
-/**
- * Mirror Tauri's `version` field semantics: a semver string is used as-is; a
- * path names a package.json (relative to src-tauri) whose "version" field is
- * the app version. The committed config points at ../package.json — the single
- * version source, maintained by release-please.
- */
-export function resolveVersionField(version, readJsonAt) {
-  if (typeof version !== 'string' || version === '') {
-    fail('tauri.conf.json has no "version"')
-  }
-  if (!version.endsWith('.json')) return version
-  const pkg = readJsonAt(version)
-  if (typeof pkg?.version !== 'string') {
-    fail(`${version} (tauri.conf.json "version" pointer) has no "version" field`)
+/** The app version, from apps/desktop/package.json — the single version source. */
+function readAppVersion() {
+  const pkg = JSON.parse(readFileSync(join(appDir, 'package.json'), 'utf8'))
+  if (typeof pkg.version !== 'string' || pkg.version === '') {
+    fail('apps/desktop/package.json has no "version"')
   }
   return pkg.version
 }
 
-/** Parse tauri.conf.json (version indirection resolved) — the source of truth for the base bundle name. */
+/**
+ * Parse tauri.conf.json — the source of truth for the base bundle name. Its
+ * committed `version` is a pointer at ../package.json (Tauri resolves it at
+ * build time), so set the real app version here for every downstream reader.
+ */
 function readTauriConf() {
   const conf = JSON.parse(readFileSync(join(appDir, 'src-tauri', 'tauri.conf.json'), 'utf8'))
-  conf.version = resolveVersionField(conf.version, (path) =>
-    JSON.parse(readFileSync(join(appDir, 'src-tauri', path), 'utf8')),
-  )
+  conf.version = readAppVersion()
   return conf
 }
 
