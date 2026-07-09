@@ -7,6 +7,7 @@ import {
 } from '@sentry/react'
 import type { BrowserOptions, ErrorEvent, Exception, StackFrame } from '@sentry/react'
 import type { RootOptions } from 'react-dom/client'
+import { z } from 'zod'
 
 const REDACTED_VALUE = '[redacted]'
 const MAX_EXCEPTION_COUNT = 3
@@ -36,10 +37,30 @@ const SAFE_MECHANISM_TYPES = new Set([
   'onunhandledrejection',
 ])
 
-const SAFE_FUNCTION_NAME = /^(?:async |new )?[A-Za-z_$][\w$]*(?:(?:\.|#)[A-Za-z_$][\w$]*)*$/
 const SAFE_SCRIPT_BASENAME = /^[A-Za-z0-9_.-]+\.(?:js|jsx|mjs|ts|tsx)$/
 const SAFE_RELEASE = /^reflect@\d+\.\d+\.\d+(?:-[a-z0-9.-]+)?$/
 const SAFE_EVENT_ID = /^[a-f0-9]{32}$/
+const SAFE_DEBUG_ID = /^(?:[a-f0-9]{32}|[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/
+const SENTRY_DSN_SCHEMA = z
+  .url()
+  .transform((value) => new URL(value))
+  .refine(
+    (url) =>
+      url.protocol === 'https:' &&
+      url.hostname === 'o463484.ingest.us.sentry.io' &&
+      url.pathname === '/4511705649971200' &&
+      /^[a-f0-9]{32}$/.test(url.username) &&
+      !url.password &&
+      !url.search &&
+      !url.hash,
+  )
+  .transform((url) => url.toString())
+
+/** Accept only the production Reflect Sentry project DSN, while allowing public-key rotation. */
+export function parseExceptionTelemetryDsn(value: string | undefined): string | null {
+  const parsed = SENTRY_DSN_SCHEMA.safeParse(value?.trim())
+  return parsed.success ? parsed.data : null
+}
 
 function scrubExceptionType(type: string | undefined): string {
   if (type?.startsWith('React ErrorBoundary ')) {
@@ -47,18 +68,6 @@ function scrubExceptionType(type: string | undefined): string {
     return SAFE_EXCEPTION_TYPES.has(causeType) ? `ReactErrorBoundary<${causeType}>` : 'ReactErrorBoundary<Error>'
   }
   return type && SAFE_EXCEPTION_TYPES.has(type) ? type : 'Error'
-}
-
-function scrubFunctionName(functionName: string | undefined): string | undefined {
-  if (!functionName) {
-    return undefined
-  }
-  if (functionName === '<anonymous>' || functionName === 'global code') {
-    return functionName
-  }
-  return functionName.length <= 120 && SAFE_FUNCTION_NAME.test(functionName)
-    ? functionName
-    : REDACTED_VALUE
 }
 
 function scrubFilename(filename: string | undefined): string | undefined {
@@ -75,12 +84,8 @@ function scrubFilename(filename: string | undefined): string | undefined {
 function scrubStackFrame(frame: StackFrame): StackFrame {
   const scrubbed: StackFrame = {}
   const filename = scrubFilename(frame.filename)
-  const functionName = scrubFunctionName(frame.function)
   if (filename) {
     scrubbed.filename = filename
-  }
-  if (functionName) {
-    scrubbed.function = functionName
   }
   if (typeof frame.lineno === 'number' && Number.isFinite(frame.lineno)) {
     scrubbed.lineno = frame.lineno
@@ -92,6 +97,17 @@ function scrubStackFrame(frame: StackFrame): StackFrame {
     scrubbed.in_app = frame.in_app
   }
   return scrubbed
+}
+
+function scrubDebugMeta(debugMeta: ErrorEvent['debug_meta']): ErrorEvent['debug_meta'] {
+  const images = debugMeta?.images?.flatMap((image) => {
+    if (image.type !== 'sourcemap' || !SAFE_DEBUG_ID.test(image.debug_id)) {
+      return []
+    }
+    const codeFile = scrubFilename(image.code_file)
+    return codeFile ? [{ type: 'sourcemap' as const, code_file: codeFile, debug_id: image.debug_id }] : []
+  })
+  return images?.length ? { images } : undefined
 }
 
 function scrubException(exception: Exception): Exception {
@@ -130,6 +146,7 @@ export function scrubExceptionEvent(event: ErrorEvent): ErrorEvent | null {
     return null
   }
 
+  const debugMeta = scrubDebugMeta(event.debug_meta)
   return {
     type: undefined,
     level: 'error',
@@ -144,6 +161,7 @@ export function scrubExceptionEvent(event: ErrorEvent): ErrorEvent | null {
       : {}),
     ...(event.release && SAFE_RELEASE.test(event.release) ? { release: event.release } : {}),
     ...(event.environment === 'production' ? { environment: 'production' } : {}),
+    ...(debugMeta ? { debug_meta: debugMeta } : {}),
   }
 }
 
@@ -192,12 +210,16 @@ export function createExceptionTelemetryOptions(dsn: string, release: string): B
  * React 19 root handlers which capture render and recovery failures.
  */
 export function initializeExceptionTelemetry(): RootOptions {
-  const dsn = import.meta.env.VITE_SENTRY_DSN?.trim()
+  const dsn = parseExceptionTelemetryDsn(import.meta.env.VITE_SENTRY_DSN)
   if (!import.meta.env.PROD || !dsn) {
     return {}
   }
 
-  init(createExceptionTelemetryOptions(dsn, `reflect@${__REFLECT_VERSION__}`))
+  try {
+    init(createExceptionTelemetryOptions(dsn, `reflect@${__REFLECT_VERSION__}`))
+  } catch {
+    return {}
+  }
   const adaptReactErrorHandler = (
     handler: ReturnType<typeof reactErrorHandler>,
   ): ((error: unknown, errorInfo: { componentStack?: string | undefined }) => void) => {

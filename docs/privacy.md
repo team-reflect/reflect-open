@@ -93,10 +93,16 @@ disk at call time), and it is covered by tests.
   text, sanitized JavaScript stack locations, the app version, and whether React handled
   the error. Stack filenames are reduced to bundle basenames. Request data, note content,
   note titles, graph paths, local filesystem paths, breadcrumbs, console output, session
-  replay, tracing, IP addresses, and user identifiers are not collected.
+  replay, tracing, and user identifiers are not collected. Sentry is also configured not
+  to store the transport IP address with events.
 - **When:** only when an official desktop or iOS release raises an uncaught JavaScript
   error, an unhandled promise rejection, or a caught/recoverable React error. Development
   and self-built apps without the release DSN do not initialize Sentry.
+- **Operational safeguards:** Sentry's server-side and default scrubbers are enabled, IP
+  address storage and server-side JavaScript source scraping are disabled, and explicit
+  sensitive-field rules cover notes, graph paths, requests, and user identifiers. Private
+  source maps are uploaded during official builds for readable stacks, then deleted from
+  the app bundle.
 
 ## Housekeeping calls
 

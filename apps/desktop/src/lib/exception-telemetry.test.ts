@@ -1,6 +1,33 @@
 import { describe, expect, it } from 'vitest'
 import type { ErrorEvent } from '@sentry/react'
-import { createExceptionTelemetryOptions, scrubExceptionEvent } from './exception-telemetry'
+import {
+  createExceptionTelemetryOptions,
+  parseExceptionTelemetryDsn,
+  scrubExceptionEvent,
+} from './exception-telemetry'
+
+describe('parseExceptionTelemetryDsn', () => {
+  it('accepts only the production Reflect Sentry project', () => {
+    expect(
+      parseExceptionTelemetryDsn(
+        ' https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/4511705649971200 ',
+      ),
+    ).toBe(
+      'https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/4511705649971200',
+    )
+    expect(
+      parseExceptionTelemetryDsn(
+        'https://0123456789abcdef0123456789abcdef@evil.example/4511705649971200',
+      ),
+    ).toBeNull()
+    expect(
+      parseExceptionTelemetryDsn(
+        'https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/123',
+      ),
+    ).toBeNull()
+    expect(parseExceptionTelemetryDsn(undefined)).toBeNull()
+  })
+})
 
 describe('scrubExceptionEvent', () => {
   it('rebuilds exceptions from an allow-list and removes user and request data', () => {
@@ -24,6 +51,20 @@ describe('scrubExceptionEvent', () => {
       tags: { graphId: 'graph-123' },
       modules: { privatePlugin: '1.0.0' },
       fingerprint: ['person@example.com'],
+      debug_meta: {
+        images: [
+          {
+            type: 'sourcemap',
+            code_file: 'file:///Users/alex/reflect/dist/assets/main-ABC123.js',
+            debug_id: '12345678-1234-1234-1234-123456789abc',
+          },
+          {
+            type: 'sourcemap',
+            code_file: '/Users/alex/Notes/Customers/Acme.md',
+            debug_id: 'person@example.com',
+          },
+        ],
+      },
       exception: {
         values: [
           {
@@ -74,13 +115,21 @@ describe('scrubExceptionEvent', () => {
               frames: [
                 {
                   filename: 'app:///main-ABC123.js',
-                  function: 'openDailyNote',
                   lineno: 42,
                   colno: 7,
                   in_app: true,
                 },
               ],
             },
+          },
+        ],
+      },
+      debug_meta: {
+        images: [
+          {
+            type: 'sourcemap',
+            code_file: 'app:///main-ABC123.js',
+            debug_id: '12345678-1234-1234-1234-123456789abc',
           },
         ],
       },
@@ -127,7 +176,6 @@ describe('scrubExceptionEvent', () => {
               frames: [
                 {
                   filename: 'app:///[redacted]',
-                  function: '[redacted]',
                 },
               ],
             },

@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
 import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
 import { reactWithCompiler } from './react-compiler-plugin'
@@ -9,14 +10,29 @@ const host = process.env.TAURI_DEV_HOST
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
-  plugins: [reactWithCompiler(), tailwindcss()],
+  plugins: [
+    reactWithCompiler(),
+    tailwindcss(),
+    sentryVitePlugin({
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      org: 'reflect-64',
+      project: 'reflect-open',
+      telemetry: false,
+      release: {
+        name: `reflect@${tauriConfig.version}`,
+      },
+      sourcemaps: {
+        filesToDeleteAfterUpload: ['./dist/**/*.map'],
+      },
+    }),
+  ],
 
   define: {
     __REFLECT_VERSION__: JSON.stringify(tauriConfig.version),
   },
 
   // If the target is below Safari 17.5, Lightning CSS downlevels `light-dark()` to a broken polyfill.
-  build: { cssTarget: 'safari17.5' },
+  build: { cssTarget: 'safari17.5', sourcemap: 'hidden' },
 
   resolve: {
     alias: {
