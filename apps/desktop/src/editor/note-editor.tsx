@@ -28,6 +28,7 @@ import {
   type WikilinkSearchHandler,
 } from '@meowdown/react'
 import { EditorInputTraits } from '@/editor/editor-input-traits'
+import { BlockDragClipboard } from '@/editor/block-drag-clipboard'
 import { FormattingToolbarBridge } from '@/editor/formatting-toolbar-bridge'
 import {
   IMAGE_LIGHTBOX_TRANSITION_NAME,
@@ -425,6 +426,7 @@ export function NoteEditor({
         onExitBoundary={handleExitBoundary}
       >
         <EditorInputTraits />
+        <BlockDragClipboard />
         <FormattingToolbarBridge />
         {children}
       </MeowdownEditor>

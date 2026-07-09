@@ -25,6 +25,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@meowdown/core": "^0.42.0",
     "@meowdown/react": "^0.42.0",
+    "@prosekit/pm": "^0.1.19-beta.2",
     "@reflect/core": "workspace:*",
     "@reflect/db": "workspace:*",
     "@reflect/design-system": "workspace:*",
