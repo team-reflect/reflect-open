@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import { addPluginListener, invoke } from '@tauri-apps/api/core'
 import { z } from 'zod'
+import { focusedEditorCommands } from '@/editor/formatting-toolbar-store'
 
 const keyboardStateSchema = z.object({ height: z.number(), duration: z.number() })
 
@@ -40,6 +41,10 @@ function subscribeKeyboard(listener: () => void): () => void {
 
 function keyboardVisibleSnapshot(): boolean {
   return currentKeyboardHeight > 0
+}
+
+function keyboardHeightSnapshot(): number {
+  return currentKeyboardHeight
 }
 
 /**
@@ -105,4 +110,51 @@ export function useKeyboardHeightVar(): void {
       publishKeyboardHeight(0)
     }
   }, [])
+}
+
+/**
+ * Re-reveals the caret whenever the keyboard changes the visible area.
+ *
+ * {@link useKeyboardHeightVar} shrinks the shell by the keyboard's height, but
+ * that height only arrives as the keyboard starts animating up, long after the
+ * focus that raised it. That focus ran against the full-height viewport, where
+ * the caret was still visible, so neither WebKit's caret reveal (pinned off in
+ * `KeyboardPlugin.swift`) nor ProseMirror's had anything to do; tapping a
+ * paragraph at the bottom of a long note then left the caret under the
+ * keyboard, with nothing to scroll it back.
+ *
+ * The keyboard is the only thing that occludes, so the keyboard is what
+ * re-reveals. That makes this a single mount: every screen's editors publish to
+ * the same focused-editor slot, and a height change under an already-raised
+ * keyboard (a CJK candidate bar) is covered for free.
+ *
+ * `scrollCaretIntoView` is a no-op while the caret is visible, so raising the
+ * keyboard with the caret near the top of a note scrolls nothing.
+ */
+export function useKeyboardCaretReveal(): void {
+  const height = useSyncExternalStore(
+    subscribeKeyboard,
+    keyboardHeightSnapshot,
+    keyboardHeightSnapshot,
+  )
+
+  useEffect(() => {
+    if (height <= 0) {
+      return
+    }
+    // A passive effect, so this runs after the paint that applied both the CSS
+    // variable and the tab bar's swap for the formatting toolbar: the scroll
+    // container is already at its final height. The one frame that painted the
+    // caret still occluded is invisible inside the keyboard's own animation.
+    focusedEditorCommands()?.scrollCaretIntoView()
+    // Backstop for chrome that settles a frame late (the tab bar unmounting
+    // republishes `--mobile-tab-bar-height`). Re-read the slot: by now the
+    // editor may have unmounted, or another may hold the caret.
+    const frame = requestAnimationFrame(() => {
+      focusedEditorCommands()?.scrollCaretIntoView()
+    })
+    return () => {
+      cancelAnimationFrame(frame)
+    }
+  }, [height])
 }

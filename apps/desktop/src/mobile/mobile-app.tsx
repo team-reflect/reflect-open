@@ -7,7 +7,7 @@ import { MobileShell } from '@/mobile/mobile-shell'
 import { MobileStatusLayer } from '@/mobile/status-layer'
 import { RecordingDrawer } from '@/mobile/recording-drawer'
 import { useICloudRefresh } from '@/mobile/use-icloud-refresh'
-import { useKeyboardHeightVar } from '@/mobile/use-keyboard'
+import { useKeyboardCaretReveal, useKeyboardHeightVar } from '@/mobile/use-keyboard'
 import { useTaskCheckboxHaptics } from '@/mobile/use-task-haptics'
 import { CaptureProvider } from '@/providers/capture-provider'
 import { ChatProvider } from '@/providers/chat-provider'
@@ -24,12 +24,15 @@ import { RouterProvider } from '@/routing/router'
  * The router mounts per graph exactly as on desktop; `MobileScreen` renders
  * the current route (daily spine, note pages), so wiki-link and date-link
  * taps navigate for real. The keyboard-height bridge lives here so every
- * screen inherits `--keyboard-height` — and the checkbox-haptic listener
- * mounts here so it covers every screen's editors.
+ * screen inherits `--keyboard-height`; the caret reveal and the
+ * checkbox-haptic listener mount here so they cover every screen's editors.
  */
 export function MobileApp(): ReactElement {
   const { status, graph, error, needsOnboarding } = useGraph()
   useKeyboardHeightVar()
+  // The keyboard is what occludes the caret, so the keyboard is what reveals
+  // it: one listener here covers every screen's editors.
+  useKeyboardCaretReveal()
   useTaskCheckboxHaptics()
   // iCloud graphs have an out-of-process writer (the OS syncing files in):
   // nudge downloads + re-reconcile on resume. Inert for local/git graphs.
