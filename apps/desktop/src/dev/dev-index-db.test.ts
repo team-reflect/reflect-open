@@ -164,6 +164,73 @@ describe('createDevIndexDb', () => {
     expect(filtered.map((hit) => hit.path)).toEqual(['notes/body-hit.md'])
   })
 
+  it('matches Latin terms at title word starts only, never mid-word', async () => {
+    const db = await openDb()
+    db.applyNote(
+      sampleNote({
+        path: 'notes/car-log.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n93',
+        title: 'Car maintenance log',
+        titleKey: 'car maintenance log',
+        isPinned: false,
+        text: 'An otherwise unrelated body.',
+        preview: 'An otherwise unrelated body.',
+        tags: [],
+        mtime: 100,
+      }),
+    )
+    db.applyNote(
+      sampleNote({
+        path: 'notes/car-wash.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n94',
+        title: 'Weekend car wash',
+        titleKey: 'weekend car wash',
+        isPinned: false,
+        text: 'An otherwise unrelated body.',
+        preview: 'An otherwise unrelated body.',
+        tags: [],
+        mtime: 50,
+      }),
+    )
+    db.applyNote(
+      sampleNote({
+        path: 'notes/oscar.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n95',
+        title: 'Oscar party plans',
+        titleKey: 'oscar party plans',
+        isPinned: false,
+        text: 'An otherwise unrelated body.',
+        preview: 'An otherwise unrelated body.',
+        tags: [],
+        mtime: 300,
+      }),
+    )
+    db.applyNote(
+      sampleNote({
+        path: 'notes/garage.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n96',
+        title: 'Garage',
+        titleKey: 'garage',
+        isPinned: false,
+        text: 'The car needs new brakes.',
+        preview: 'The car needs new brakes.',
+        tags: [],
+        mtime: 200,
+      }),
+    )
+    installQueryBridge(db)
+
+    // Title-prefix (rank 1) leads, then the word-start title match (rank 2),
+    // then the FTS body hit (rank 3). `Oscar party plans` contains `car` only
+    // mid-word and must not surface at all.
+    const hits = await searchWithFilters(parseSearchQuery('car'))
+    expect(hits.map((hit) => hit.path)).toEqual([
+      'notes/car-log.md',
+      'notes/car-wash.md',
+      'notes/garage.md',
+    ])
+  })
+
   it('re-applying a note replaces its rows instead of duplicating them', async () => {
     const db = await openDb()
     db.applyNote(sampleNote())

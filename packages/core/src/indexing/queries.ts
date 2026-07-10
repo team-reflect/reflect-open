@@ -1,5 +1,4 @@
-import type { Database } from '@reflect/db'
-import { sql, type Selectable } from 'kysely'
+import { sql } from 'kysely'
 import {
   foldEmail,
   foldTag,
@@ -8,7 +7,6 @@ import {
 } from '../markdown'
 import { db } from './db'
 import { inClauseChunks } from './query-utils'
-import { buildFtsMatch, buildTitleMatchSql } from './search-query'
 export {
   getBacklinks,
   getBacklinksWithContext,
@@ -244,51 +242,6 @@ export async function getIndexMeta(key: string): Promise<string | null> {
     .select('value')
     .executeTakeFirst()
   return row?.value ?? null
-}
-
-/** A lexical/title-substring search result: the note's path and title. */
-export type SearchHit = Pick<Selectable<Database['notes']>, 'path' | 'title'>
-
-/**
- * Search over title + body, ranked like the palette's lexical search
- * (`searchWithFilters` in `filtered-search.ts`): exact, prefix, and substring
- * title matches lead, then title-boosted bm25, pinned, and recency. Title
- * substring recall complements FTS5's `unicode61` tokenizer, which cannot
- * match part of an uninterrupted CJK title. The title key is folded the same
- * way titles were at index time so it cannot drift from `notes.title_key`.
- */
-export async function searchNotes(query: string, limit = 50): Promise<SearchHit[]> {
-  const match = buildFtsMatch(query)
-  if (match === null) {
-    return [] // nothing to search (FTS5 also errors on an empty MATCH).
-  }
-  const lexicalDb = db.with(
-    (cte) => cte('lexical').materialized(),
-    (queryDb) =>
-      queryDb
-        .selectFrom('searchFts')
-        .select([
-          'searchFts.path',
-          sql<number>`bm25(search_fts, 0, 10.0, 1.0)`.as('rank'),
-        ])
-        .where(sql<boolean>`search_fts MATCH ${match}`),
-  )
-  const titleMatch = buildTitleMatchSql(sql.ref<string>('notes.titleKey'), query)
-  return lexicalDb
-    .selectFrom('notes')
-    .leftJoin('lexical', 'lexical.path', 'notes.path')
-    .where('notes.kind', '!=', 'template')
-    .select(['notes.path', 'notes.title'])
-    .where(
-      sql<boolean>`("lexical"."path" is not null or ${titleMatch.containsAllTerms})`,
-    )
-    .orderBy(titleMatch.rank)
-    .orderBy(sql`coalesce("lexical"."rank", 0)`)
-    .orderBy('notes.isPinned', 'desc')
-    .orderBy('notes.mtime', 'desc')
-    .orderBy('notes.path', 'asc')
-    .limit(limit)
-    .execute()
 }
 
 /** What a pass knows about an indexed note without reading its file. */

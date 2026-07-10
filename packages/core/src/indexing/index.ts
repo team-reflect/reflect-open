@@ -72,7 +72,6 @@ export {
   getOpenTasks,
   getCompletedTasks,
   getPinnedNotes,
-  searchNotes,
   suggestWikiTargets,
   suggestTags,
   getIndexedFileFacts,
@@ -88,7 +87,6 @@ export {
   type NoteRow,
   type OpenTask,
   type PinnedNote,
-  type SearchHit,
   type TagSuggestion,
 } from './queries'
 export { resolveNoteTarget } from './resolve-target'
@@ -140,9 +138,11 @@ export {
 export { extractSnippetTasks, type SnippetTask } from './snippet-tasks'
 export { parseSearchQuery, type ParsedSearchQuery, type SearchFilters } from './filter-query'
 export {
+  searchNotes,
   searchWithFilters,
   type FilteredSearchHit,
   type FilteredSearchOptions,
+  type SearchHit,
 } from './filtered-search'
 export {
   rewriteLinksForTitleChange,

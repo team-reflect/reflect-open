@@ -65,6 +65,16 @@ const EMPTY_FILTERS: SearchFilters = {
   updatedBeforeMs: null,
 }
 
+/**
+ * Wrap raw text as a parsed query with no filters — deliberately UNPARSED.
+ * For callers whose input is literal text (AI retrieval, programmatic search)
+ * where palette tokens like `is:daily` inside a sentence must stay search
+ * terms, not become constraints.
+ */
+export function literalSearchQuery(text: string): ParsedSearchQuery {
+  return { text, filters: { ...EMPTY_FILTERS, tags: [] }, filtered: false }
+}
+
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 /**

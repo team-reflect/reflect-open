@@ -80,10 +80,13 @@ this is how editors/scripts create them).
 ### `reflect search <query> [--limit N] [--json]`
 
 Search over note titles and bodies, ranked like the app: exact, prefix, and
-substring title matches lead, followed by title-boosted bm25 matches. Body
-matches include snippets. Terms are matched literally (FTS5 operators in the
-query have no special meaning); a title-substring-only JSON result has an empty
-snippet and score `0`. Requires the index: if `.reflect/index.sqlite` is missing
+per-term title matches lead, followed by title-boosted bm25 matches. Title
+terms match at word starts (`car` finds `Car log`, never `Oscar party`);
+terms in scripts written without spaces (Japanese, Chinese, Korean, Thai, …)
+match anywhere in the title, since FTS alone cannot see inside their
+uninterrupted title runs. Body matches include snippets. Terms are matched
+literally (FTS5 operators in the query have no special meaning); a title-only
+JSON result has an empty snippet and score `0`. Requires the index: if `.reflect/index.sqlite` is missing
 the exit code is `4` — open the graph in Reflect to build it; the CLI never runs
 the indexer. If files on disk diverge from the index (checked by mtime, then
 content hash), a staleness warning goes to stderr and `"stale": true` is set —

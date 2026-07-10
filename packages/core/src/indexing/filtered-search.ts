@@ -1,6 +1,7 @@
-import { sql, type RawBuilder } from 'kysely'
+import type { Database } from '@reflect/db'
+import { sql, type RawBuilder, type Selectable } from 'kysely'
 import { db } from './db'
-import type { ParsedSearchQuery } from './filter-query'
+import { literalSearchQuery, type ParsedSearchQuery } from './filter-query'
 import { resolveWikiTarget } from './queries'
 import { HIGHLIGHT_END, HIGHLIGHT_START } from './search'
 import { buildFtsMatch, buildTitleMatchSql } from './search-query'
@@ -8,16 +9,18 @@ import { buildFtsMatch, buildTitleMatchSql } from './search-query'
 /**
  * The one palette search (Plan 08): parsed filter tokens become composable
  * predicates on `notes` (EXISTS subqueries against `tags` and the `backlinks`
- * view), with free text constraining and ranking through FTS plus folded title
- * substring recall. The latter is essential for scripts such as Japanese:
+ * view), with free text constraining and ranking through FTS plus folded
+ * title recall. Title recall matches each query term at a title word start —
+ * except terms in unsegmented scripts such as Japanese, which match anywhere:
  * FTS5's default `unicode61` tokenizer treats an uninterrupted title as one
- * token, so a shorter title query cannot match it lexically. Free-text ranking
- * promotes exact, prefix, then substring title matches ahead of body hits,
- * followed by title-boosted bm25, pinned, and recency. Filters may be empty —
- * plain text search is the degenerate case, so there is exactly one search
- * path to keep correct. Without text, results order by recency — a (possibly
- * filtered) recall feed. The mobile All tab reuses that recall feed as its
- * filtered list via {@link FilteredSearchOptions}.
+ * token, so a shorter title query can never match it lexically
+ * (`buildTitleMatchSql`). Free-text ranking promotes exact, prefix, then
+ * all-terms title matches ahead of body hits, followed by title-boosted bm25,
+ * pinned, and recency. Filters may be empty — plain text search is the
+ * degenerate case, so there is exactly one search path to keep correct.
+ * Without text, results order by recency — a (possibly filtered) recall feed.
+ * The mobile All tab reuses that recall feed as its filtered list via
+ * {@link FilteredSearchOptions}.
  */
 
 export interface FilteredSearchHit {
@@ -253,7 +256,10 @@ export async function searchWithFilters(
   // SQLite rejects `MATCH ... OR title_key LIKE ...`, and flattening an FTS
   // subquery under this notes-first join reruns MATCH for every note. An
   // explicitly materialized CTE computes lexical hits once, while the outer
-  // join safely admits title-substring-only rows and preserves FTS snippets.
+  // join safely admits title-recall-only rows and preserves FTS snippets.
+  // The admission OR can't use an index, so the ranked path scans the
+  // (filtered) notes table once per query — `instr` over titles is cheap at
+  // graph scale, and the FTS pass stays a single MATCH.
   const lexicalDb = db.with(
     (cte) => cte('lexical').materialized(),
     (queryDb) =>
@@ -295,4 +301,21 @@ export async function searchWithFilters(
   }
   const rows = await rankedQuery.execute()
   return rows.map((row) => ({ ...row, isPinned: row.isPinned !== 0 }))
+}
+
+/** A lexical/title search result: the note's path and title. */
+export type SearchHit = Pick<Selectable<Database['notes']>, 'path' | 'title'>
+
+/**
+ * Plain-text search over title + body: {@link searchWithFilters} without
+ * filter parsing (tokens like `is:daily` stay literal search text), projected
+ * to path + title. Delegating keeps exactly one ranked search query to keep
+ * correct — recall and ordering can never drift from the palette's.
+ */
+export async function searchNotes(query: string, limit = 50): Promise<SearchHit[]> {
+  if (buildFtsMatch(query) === null) {
+    return [] // nothing to search — never fall through to the recall feed.
+  }
+  const hits = await searchWithFilters(literalSearchQuery(query), { limit })
+  return hits.map((hit) => ({ path: hit.path, title: hit.title }))
 }

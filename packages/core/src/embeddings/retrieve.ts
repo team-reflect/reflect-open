@@ -1,7 +1,7 @@
 import { sql } from 'kysely'
 import { db } from '../indexing/db'
 import { searchWithFilters } from '../indexing/filtered-search'
-import type { ParsedSearchQuery } from '../indexing/filter-query'
+import { literalSearchQuery } from '../indexing/filter-query'
 import { embedTexts } from './commands'
 
 /**
@@ -101,23 +101,10 @@ async function semanticHits(query: string, limit: number): Promise<RetrievalHit[
 }
 
 async function lexicalHits(query: string, limit: number): Promise<RetrievalHit[]> {
-  // Deliberately UNPARSED: retrieve() receives raw text (often from AI
-  // callers, Plan 10) where palette filter tokens like "is:daily" inside a
-  // sentence must stay literal search terms, not become constraints.
-  const plain: ParsedSearchQuery = {
-    text: query,
-    filters: {
-      tags: [],
-      dailyOnly: false,
-      pinnedOnly: false,
-      linksTo: null,
-      linkedFrom: null,
-      updatedAfterMs: null,
-      updatedBeforeMs: null,
-    },
-    filtered: false,
-  }
-  const hits = await searchWithFilters(plain, { limit })
+  // Literal on purpose: retrieve() receives raw text (often from AI callers,
+  // Plan 10) where palette filter tokens like "is:daily" inside a sentence
+  // must stay search terms, not become constraints.
+  const hits = await searchWithFilters(literalSearchQuery(query), { limit })
   if (hits.length === 0) {
     return []
   }
