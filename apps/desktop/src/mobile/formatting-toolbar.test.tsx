@@ -57,7 +57,7 @@ describe('MobileFormattingToolbar', () => {
     expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual([
       'Slash command',
       'Bullet list',
-      'Checklist / task',
+      'Cycle checklist and task',
       'Link note',
       'Tag',
       'Outdent',
@@ -96,7 +96,7 @@ describe('MobileFormattingToolbar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Bullet list' }))
     expect(toolbar.commands.toggleBulletList).toHaveBeenCalledOnce()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Checklist / task' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cycle checklist and task' }))
     expect(toolbar.commands.cycleCheckableList).toHaveBeenCalledOnce()
 
     fireEvent.click(screen.getByRole('button', { name: 'Link note' }))

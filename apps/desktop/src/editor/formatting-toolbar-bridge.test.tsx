@@ -16,6 +16,12 @@ interface FakeCommand {
   canExec: ReturnType<typeof vi.fn>
 }
 
+interface SelectedListAttrs {
+  kind: string
+  marker: string | null
+  checked?: boolean
+}
+
 function makeCommand(): FakeCommand {
   return Object.assign(vi.fn(), { canExec: vi.fn(() => true) })
 }
@@ -23,7 +29,7 @@ function makeCommand(): FakeCommand {
 function makeFakeEditor() {
   const dom = document.createElement('div')
   document.body.appendChild(dom)
-  let selectedListAttrs: { kind: string; marker: string | null } | null = null
+  let selectedListAttrs: SelectedListAttrs | null = null
   return {
     mounted: true,
     focused: false,
@@ -41,7 +47,7 @@ function makeFakeEditor() {
         },
       },
     },
-    selectList: (attrs: { kind: string; marker: string | null } | null) => {
+    selectList: (attrs: SelectedListAttrs | null) => {
       selectedListAttrs = attrs
     },
     commands: {
@@ -164,7 +170,7 @@ describe('FormattingToolbarBridge', () => {
     expect(store.result.current?.capabilities.canDedent).toBe(false)
   })
 
-  it('cycles the combined checklist/task command with V1 semantics', () => {
+  it('cycles checklist/task marker shape with V1 semantics regardless of checked state', () => {
     const store = renderHook(() => useFormattingToolbar())
     render(<FormattingToolbarBridge />)
     focusIn()
@@ -180,6 +186,14 @@ describe('FormattingToolbarBridge', () => {
     editor.selectList({ kind: 'task', marker: '+' })
     commands.cycleCheckableList()
     expect(editor.commands.wrapInSquareTask).toHaveBeenCalledTimes(2)
+
+    editor.selectList({ kind: 'task', marker: '*', checked: true })
+    commands.cycleCheckableList()
+    expect(editor.commands.wrapInCircleTask).toHaveBeenCalledTimes(2)
+
+    editor.selectList({ kind: 'task', marker: '+', checked: true })
+    commands.cycleCheckableList()
+    expect(editor.commands.wrapInSquareTask).toHaveBeenCalledTimes(3)
   })
 
   it("types autocomplete triggers through the editor's insertTrigger command", () => {
