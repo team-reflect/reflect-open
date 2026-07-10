@@ -8,6 +8,7 @@
   "prerelease-type": "beta",
   "draft": true,
   "force-tag-creation": true,
+  "always-update": true,
   "packages": {
     "apps/desktop": {
       "package-name": "reflect-open",
