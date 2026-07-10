@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactElement } from 'react'
+import { useCallback, type ReactElement } from 'react'
 import { untitledNotePath } from '@reflect/core'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -7,12 +7,8 @@ import { AudioMemoFab } from '@/mobile/audio-memo-fab'
 import { CalendarStrip } from '@/mobile/calendar-strip'
 import { DayCarousel } from '@/mobile/day-carousel'
 import { useDailyArrivals } from '@/mobile/use-daily-arrivals'
+import { useSwipeTarget } from '@/mobile/use-swipe-target'
 import { useRouter } from '@/routing/router'
-
-interface SwipeTargetState {
-  readonly navigationKey: string
-  readonly date: string | null
-}
 
 /**
  * The mobile spine (Plan 19, V1 parity): a month header + week calendar strip
@@ -34,35 +30,21 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
   // tap on the highlighted today cell to a frozen `daily` date). Selecting
   // today routes to the live `today` route, keeping the spine rolling over.
   const today = useToday()
+  // The identity of the current router arrival. Every navigate bumps
+  // `arrivalSeq` (history moves change `entryId`), so any arrival — including
+  // a date-preserving Today tap — mints a new key, which supersedes the swipe
+  // state scoped to the old one.
+  const navigationKey = `${entryId}:${arrivalSeq}:${date}`
   // The day a swipe is heading toward, announced at pointer-up — the strip
   // (and its rolling month title) follows it while the carousel's snap
   // animation plays, instead of waiting for the settle-time route change.
-  // Tag it with the router arrival that created it: a delayed transition from
-  // an older swipe must not overwrite a newer Today/strip/history arrival.
-  const navigationKey = `${entryId}:${arrivalSeq}:${date}`
-  const [swipeTarget, setSwipeTarget] = useState<SwipeTargetState>(() => ({
-    navigationKey,
-    date: null,
-  }))
-  // Any route move or same-route re-arrival supersedes the transient target.
-  // Reconcile during render so stale transition state never reaches a frame.
-  if (swipeTarget.navigationKey !== navigationKey) {
-    setSwipeTarget({ navigationKey, date: null })
-  }
+  const { targetDate, followSwipeTarget } = useSwipeTarget(navigationKey)
   const select = useCallback(
     (day: string): void => {
-      setSwipeTarget((current) =>
-        current.date === null ? current : { ...current, date: null },
-      )
       navigate(day === today ? { kind: 'today' } : { kind: 'daily', date: day })
     },
     [navigate, today],
   )
-  const followSwipeTarget = useCallback((day: string, sourceNavigationKey: string): void => {
-    setSwipeTarget((current) =>
-      current.navigationKey === sourceNavigationKey ? { ...current, date: day } : current,
-    )
-  }, [])
 
   // An explicit re-arrival at the day already shown — the Daily tab tapped
   // while on today (V1's double-tap-to-today lands here) — re-anchors the
@@ -74,8 +56,6 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
     arrivalFocusEditor,
     date,
   })
-  const targetDate =
-    swipeTarget.navigationKey === navigationKey ? swipeTarget.date : null
 
   return (
     <div className="flex h-full w-screen flex-col">

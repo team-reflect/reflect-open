@@ -116,6 +116,22 @@ interface CarouselSelectionState {
   readonly index: number
 }
 
+/**
+ * State updater adopting the arrival's `navigationKey` and `index`, bailing
+ * out (returning the current state) when both already match — the state is an
+ * object, so an unconditional set would re-render the whole slide belt even
+ * when nothing changed.
+ */
+function adoptSelection(
+  navigationKey: string,
+  index: number,
+): (current: CarouselSelectionState) => CarouselSelectionState {
+  return (current) =>
+    current.navigationKey === navigationKey && current.index === index
+      ? current
+      : { navigationKey, index }
+}
+
 interface CarouselNavigationState {
   readonly navigationKey: string
   readonly date: string
@@ -154,15 +170,14 @@ export function useDayCarousel(
     watchDrag: dragAllowedWithKeyboardClosed,
   }))
   const [emblaRef, emblaApi] = useEmblaCarousel(emblaOptions)
-  const initialIndex = indexWithin(dayWindow, date)
+  const routeIndex = indexWithin(dayWindow, date)
   const [selection, setSelection] = useState<CarouselSelectionState>(() => ({
     navigationKey,
-    index: initialIndex,
+    index: routeIndex,
   }))
   // A newer router arrival is authoritative over transition-priority swipe
   // state. Carry its identity in the state itself so an older queued updater
   // cannot restore the old mount radius after navigation has won.
-  const routeIndex = indexWithin(dayWindow, date)
   const selectedIndex =
     selection.navigationKey === navigationKey || routeIndex === -1
       ? selection.index
@@ -227,7 +242,7 @@ export function useDayCarousel(
         return
       }
       const index = api.selectedScrollSnap()
-      setSelection({ navigationKey, index })
+      setSelection(adoptSelection(navigationKey, index))
       const day = dateAtIndex(dayWindow, index)
       if (day !== reportedRef.current) {
         reportedRef.current = day
@@ -322,7 +337,7 @@ export function useDayCarousel(
     } else {
       emblaApi.scrollTo(sync.index, true)
     }
-    setSelection({ navigationKey, index: sync.index })
+    setSelection(adoptSelection(navigationKey, sync.index))
   }, [emblaApi, date, dayWindow, navigationKey])
 
   return { emblaRef, dayWindow, selectedIndex }
