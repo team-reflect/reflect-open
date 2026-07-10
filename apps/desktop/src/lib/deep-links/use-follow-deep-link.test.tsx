@@ -1,0 +1,137 @@
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ReactElement } from 'react'
+import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
+import { RouterProvider, useRouter } from '@/routing/router'
+import { type FollowDeepLink, useFollowDeepLink } from './use-follow-deep-link'
+
+const dispatchDeepLink = vi.hoisted(() => vi.fn())
+const openDeepLinkInNewWindow = vi.hoisted(() =>
+  vi.fn<(href: string) => Promise<boolean>>(),
+)
+const openRouteInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
+
+vi.mock('@/lib/deep-links/intake', () => ({ dispatchDeepLink }))
+vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/windows/open-in-new-window')>()),
+  openDeepLinkInNewWindow,
+  openRouteInNewWindow,
+}))
+
+let followDeepLink: FollowDeepLink | null = null
+
+function Host(): ReactElement {
+  followDeepLink = useFollowDeepLink()
+  const openNoteLink = useNoteLinkNavigation()
+  return (
+    <button
+      type="button"
+      onClick={(event) =>
+        openNoteLink({ kind: 'note', path: 'notes/newer-link.md' }, event)
+      }
+    >
+      Open newer note link
+    </button>
+  )
+}
+
+function NavigateAway(): ReactElement {
+  const { navigate } = useRouter()
+  return (
+    <button type="button" onClick={() => navigate({ kind: 'note', path: 'notes/newer.md' })}>
+      Navigate away
+    </button>
+  )
+}
+
+function Harness({ showHost = true }: { readonly showHost?: boolean }): ReactElement {
+  return (
+    <RouterProvider>
+      {showHost ? <Host /> : null}
+      <NavigateAway />
+    </RouterProvider>
+  )
+}
+
+function modifierClick(href = 'reflect://note/older'): void {
+  followDeepLink?.(href, new MouseEvent('click', { metaKey: true }))
+}
+
+beforeEach(() => {
+  dispatchDeepLink.mockReset()
+  openDeepLinkInNewWindow.mockReset().mockResolvedValue(true)
+  openRouteInNewWindow.mockReset().mockResolvedValue(true)
+  followDeepLink = null
+})
+
+afterEach(cleanup)
+
+describe('useFollowDeepLink', () => {
+  it('falls back to in-window dispatch when the window open is declined', async () => {
+    openDeepLinkInNewWindow.mockResolvedValue(false)
+    render(<Harness />)
+
+    modifierClick()
+
+    await vi.waitFor(() =>
+      expect(dispatchDeepLink).toHaveBeenCalledWith('reflect://note/older'),
+    )
+  })
+
+  it('drops a failed fallback after a newer router navigation', async () => {
+    let finishOpen: (opened: boolean) => void = () => {}
+    openDeepLinkInNewWindow.mockReturnValue(
+      new Promise((resolve) => {
+        finishOpen = resolve
+      }),
+    )
+    const view = render(<Harness />)
+
+    modifierClick()
+    fireEvent.click(view.getByRole('button', { name: 'Navigate away' }))
+    await act(async () => {
+      finishOpen(false)
+    })
+
+    expect(dispatchDeepLink).not.toHaveBeenCalled()
+  })
+
+  it('drops a failed fallback after a newer note-link window intent', async () => {
+    let finishOpen: (opened: boolean) => void = () => {}
+    openDeepLinkInNewWindow.mockReturnValue(
+      new Promise((resolve) => {
+        finishOpen = resolve
+      }),
+    )
+    const view = render(<Harness />)
+
+    modifierClick()
+    fireEvent.click(view.getByRole('button', { name: 'Open newer note link' }), {
+      metaKey: true,
+    })
+    await vi.waitFor(() => expect(openRouteInNewWindow).toHaveBeenCalledTimes(1))
+    await act(async () => {
+      finishOpen(false)
+    })
+
+    expect(dispatchDeepLink).not.toHaveBeenCalled()
+  })
+
+  it('drops a failed fallback after its rendered-link host unmounts', async () => {
+    let finishOpen: (opened: boolean) => void = () => {}
+    openDeepLinkInNewWindow.mockReturnValue(
+      new Promise((resolve) => {
+        finishOpen = resolve
+      }),
+    )
+    const view = render(<Harness />)
+
+    modifierClick()
+    view.rerender(<Harness showHost={false} />)
+    await act(async () => {
+      finishOpen(false)
+    })
+
+    expect(dispatchDeepLink).not.toHaveBeenCalled()
+  })
+})

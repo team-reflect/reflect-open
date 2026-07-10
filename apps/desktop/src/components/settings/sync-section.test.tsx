@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GraphInfo } from '@reflect/core'
@@ -32,6 +32,8 @@ const sync = vi.hoisted(() => ({
   backUpNow: vi.fn(async () => {}),
 }))
 
+const openRouteInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
+
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
@@ -49,6 +51,10 @@ vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: graph.current, openRecent: graph.openRecent }),
 }))
 vi.mock('@/providers/sync-provider', () => ({ useSync: () => sync }))
+vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/windows/open-in-new-window')>()),
+  openRouteInNewWindow,
+}))
 
 function renderSection(): void {
   render(
@@ -82,6 +88,7 @@ beforeEach(() => {
   core.duplicateIds = []
   platform.isMacosDesktop = true
   sync.backup = { phase: 'disconnected' }
+  openRouteInNewWindow.mockReset().mockResolvedValue(true)
 })
 
 afterEach(() => {
@@ -156,6 +163,34 @@ describe('SyncSection', () => {
     fireEvent.click(noteLink)
 
     expect(screen.getByTestId('route').textContent).toBe('notes/conflicted.md')
+  })
+
+  it('opens a ⌘-clicked conflicted note in a new window', async () => {
+    core.conflictedNotes = [{ path: 'notes/conflicted.md', title: 'Conflicted note' }]
+    sync.backup = {
+      phase: 'connected',
+      remoteUrl: 'https://github.com/alex/notes.git',
+      repo: { owner: 'alex', name: 'notes' },
+      status: { state: 'idle' },
+    }
+
+    renderSection()
+
+    const section = screen.getByRole('region', { name: 'Sync' })
+    fireEvent.click(
+      await within(section).findByRole('button', {
+        name: /Conflicted note.*notes\/conflicted\.md/,
+      }),
+      { metaKey: true },
+    )
+
+    await waitFor(() =>
+      expect(openRouteInNewWindow).toHaveBeenCalledWith({
+        kind: 'note',
+        path: 'notes/conflicted.md',
+      }),
+    )
+    expect(screen.getByTestId('route').textContent).toBe('settings')
   })
 
   it('keeps backup visible when the iCloud row is platform-hidden', () => {

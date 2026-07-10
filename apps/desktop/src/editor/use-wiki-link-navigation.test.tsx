@@ -183,4 +183,27 @@ describe('useWikiLinkNavigation', () => {
     expect(view.getByTestId('route').textContent).toContain('"today"')
     view.unmount()
   })
+
+  it('drops an older resolution after a newer wiki-link click', async () => {
+    let finishOlder: (value: { kind: 'resolved'; ref: string }) => void = () => {}
+    resolveWikiTarget.mockImplementation((target: string) => {
+      if (target === 'Older') {
+        return new Promise((resolve) => {
+          finishOlder = resolve
+        })
+      }
+      return Promise.resolve({ kind: 'resolved', ref: 'notes/newer.md' })
+    })
+    const view = renderHost()
+
+    lastHandler?.('Older')
+    lastHandler?.('Newer')
+    await waitFor(() => expect(currentRoute(view)).toContain('notes/newer.md'))
+    finishOlder({ kind: 'resolved', ref: 'notes/older.md' })
+    await new Promise((tick) => setTimeout(tick, 0))
+
+    expect(currentRoute(view)).toContain('notes/newer.md')
+    expect(currentRoute(view)).not.toContain('notes/older.md')
+    view.unmount()
+  })
 })

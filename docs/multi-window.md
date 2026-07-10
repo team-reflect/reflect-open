@@ -1,10 +1,12 @@
 # Multiple windows & cross-window communication
 
-Modifier-click a note link — an editor `[[wiki link]]`, a backlink title or
-snippet, an in-note `reflect://` link — or run the selected-note command, and
-the note opens in its own chrome-free window: just the editor with its
-backlinks, no sidebar, palette, or context panel. This document describes how
-those windows relate to the main window and to each other.
+Modifier-click a note reference anywhere it appears in the app — editor
+`[[wiki links]]`, backlinks, pinned notes, calendar days, search/palette
+results, and other note lists — or run the selected-note command, and the note
+opens in its own chrome-free window: just the editor with its backlinks, no
+sidebar, palette, or context panel. In-note `reflect://` links follow the same
+convention. This document describes how those windows relate to the main
+window and to each other.
 
 Two ideas carry the whole design:
 
@@ -55,13 +57,14 @@ below. The command is also exposed in the native Window menu.
 
 1. A modifier click (`isNewWindowClick` — **mouse events only**: meowdown
    also fires link handlers for Mod-Enter keyboard follows, whose modifier
-   is held by definition) resolves the target as usual, then calls
-   `openRouteInNewWindow` / `openDeepLinkInNewWindow`
-   (`src/lib/windows/open-in-new-window.ts`). Routes serialize through the
-   existing deep-link grammar (`deepLinkForRoute`); capture links (`append`,
-   `task`) are writes, not places, and never window-ify. Any declined or
-   failed open falls back to in-window navigation, so the modifier can never
-   make a link do nothing.
+   is held by definition) resolves the target as usual. Resolved note
+   references share `useNoteLinkNavigation`, which applies the convention and
+   delegates to `openRouteInNewWindow`; raw in-note links use
+   `openDeepLinkInNewWindow` (`src/lib/windows/open-in-new-window.ts`). Routes
+   serialize through the existing deep-link grammar (`deepLinkForRoute`);
+   capture links (`append`, `task`) are writes, not places, and never
+   window-ify. Any declined or failed open falls back to in-window navigation,
+   so the modifier can never make a link do nothing.
 2. `open_note_window` (`src-tauri/src/windows.rs`) refuses without an open
    graph or while a quit is in flight, dedupes by label (see
    [Focus & re-navigation](#focus--re-navigation)), stores the deep link in

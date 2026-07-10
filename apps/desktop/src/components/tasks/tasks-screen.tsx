@@ -18,6 +18,7 @@ import {
 } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { useRecentlyCompleted } from '@/lib/tasks/recently-completed'
 import { sameTask, taskKey } from '@/lib/tasks/task-identity'
 import { type InsertTaskTarget } from '@/lib/tasks/task-insert-target'
@@ -31,9 +32,9 @@ import { useTaskSelection } from '@/lib/tasks/use-task-selection'
 import { completedTasksQueryKey, tasksQueryKey } from '@/lib/tasks/tasks-query'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration'
 import { useToday } from '@/lib/use-today'
+import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
 import { useGraph } from '@/providers/graph-provider'
 import { routeForPath } from '@/routing/route'
-import { useRouter } from '@/routing/router'
 import { TaskFiltersMenu } from './task-filters-menu'
 import { TaskGroupSection } from './task-group-section'
 import { TaskScheduleCalendar } from './task-schedule-calendar'
@@ -73,7 +74,7 @@ function focusedSelectedKey(
  */
 export function TasksScreen(): ReactElement {
   const { graph } = useGraph()
-  const { navigate } = useRouter()
+  const navigateNoteLink = useNoteLinkNavigation()
   const today = useToday()
   const { filters, toggle } = useTaskFilters()
   const [query, setQuery] = useState('')
@@ -210,6 +211,11 @@ export function TasksScreen(): ReactElement {
       selection.clear()
     }
   }, [actions, selection, selectedTasks])
+  const openNote = useCallback(
+    (path: string, event?: NewWindowClickEvent) =>
+      navigateNoteLink(routeForPath(path), event),
+    [navigateNoteLink],
+  )
   useTaskKeyboard({
     selection,
     actions,
@@ -332,7 +338,7 @@ export function TasksScreen(): ReactElement {
                 today={today}
                 onAdd={onAdd}
                 convertControllerRef={convertControllerRef}
-                onOpen={(path) => navigate(routeForPath(path))}
+                onOpen={openNote}
               />
             ))}
           </div>

@@ -82,14 +82,45 @@ describe('handleDeepLink', () => {
     expect(operationHandle.fail).toHaveBeenCalled()
   })
 
-  it('drops a resolution that finished after the graph session ended', async () => {
-    resolveMock.mockResolvedValue('notes/project-x.md')
-
-    await handleDeepLink('reflect://note/Project%20X', {
+  it('drops a resolution failure that arrives after the link became stale', async () => {
+    let rejectResolve: (cause: Error) => void = () => {}
+    resolveMock.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        rejectResolve = reject
+      }),
+    )
+    let stale = false
+    const pending = handleDeepLink('reflect://note/Project%20X', {
       navigate,
       generation: 3,
-      isStale: () => true,
+      isStale: () => stale,
     })
+
+    stale = true
+    rejectResolve(new Error('old index disappeared'))
+    await pending
+
+    expect(navigate).not.toHaveBeenCalled()
+    expect(startOperationMock).not.toHaveBeenCalled()
+  })
+
+  it('drops a resolution that finished after the graph session ended', async () => {
+    let finishResolve: (path: string) => void = () => {}
+    resolveMock.mockReturnValue(
+      new Promise((resolve) => {
+        finishResolve = resolve
+      }),
+    )
+    let stale = false
+
+    const pending = handleDeepLink('reflect://note/Project%20X', {
+      navigate,
+      generation: 3,
+      isStale: () => stale,
+    })
+    stale = true
+    finishResolve('notes/project-x.md')
+    await pending
 
     expect(navigate).not.toHaveBeenCalled()
     expect(startOperationMock).not.toHaveBeenCalled()

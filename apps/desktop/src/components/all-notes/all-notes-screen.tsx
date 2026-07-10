@@ -3,7 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import { hasBridge, listNotes, listNoteTags } from '@reflect/core'
 import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { allNotesQueryKey, allNotesTagsQueryKey } from '@/lib/notes/all-notes-query'
+import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
 import { useListSelection } from '@/lib/selection/use-list-selection'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration'
 import { useScrollToIndexBridge } from '@/lib/use-scroll-to-index-bridge'
@@ -39,6 +41,7 @@ interface AllNotesScreenProps {
 export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   const { graph } = useGraph()
   const { navigate } = useRouter()
+  const navigateNoteLink = useNoteLinkNavigation()
   // The scroll container lives in state, not a ref, so scroll restoration
   // re-runs its restore once the element attaches (a callback ref re-renders;
   // a plain ref would still be null during the restore effect on the first,
@@ -66,7 +69,11 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   // The flat, render-order paths the selection and its shortcuts act on.
   const orderedPaths = useMemo(() => (notes ?? []).map((note) => note.path), [notes])
   const selection = useListSelection(orderedPaths)
-  const openNote = useCallback((path: string) => navigate(routeForPath(path)), [navigate])
+  const openNote = useCallback(
+    (path: string, event?: NewWindowClickEvent) =>
+      navigateNoteLink(routeForPath(path), event),
+    [navigateNoteLink],
+  )
   const handleFilterSelect = useCallback(
     (next: string | null) => navigate({ kind: 'allNotes', tag: next }),
     [navigate],

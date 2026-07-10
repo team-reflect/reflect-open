@@ -37,9 +37,8 @@ import {
 import { isOpenableExternalUrl } from '@/editor/open-external-link'
 import { isTouchEditorSurface } from '@/lib/platform-surface'
 import { useLightboxTransition } from '@/editor/use-lightbox-transition'
-import { dispatchDeepLink } from '@/lib/deep-links/intake'
 import { isDeepLinkUrl } from '@/lib/deep-links/parse'
-import { isNewWindowClick, openDeepLinkInNewWindow } from '@/lib/windows/open-in-new-window'
+import { useFollowDeepLink } from '@/lib/deep-links/use-follow-deep-link'
 import { cn } from '@/lib/utils'
 
 /**
@@ -218,6 +217,7 @@ export function NoteEditor({
   handleRef,
 }: NoteEditorProps): ReactElement {
   const innerRef = useRef<EditorHandle>(null)
+  const followDeepLink = useFollowDeepLink()
 
   // Latest callbacks, read through refs so a changing prop identity never
   // rebuilds meowdown's extensions (the uncontrolled-editor contract).
@@ -317,15 +317,7 @@ export function NoteEditor({
       // new window instead; a declined open (capture link, browser dev)
       // degrades to the normal dispatch.
       if (isDeepLinkUrl(href)) {
-        if (isNewWindowClick(event)) {
-          void openDeepLinkInNewWindow(href).then((opened) => {
-            if (!opened) {
-              dispatchDeepLink(href)
-            }
-          })
-          return
-        }
-        dispatchDeepLink(href)
+        followDeepLink(href, event)
         return
       }
       if (!isOpenableExternalUrl(href)) {
@@ -335,7 +327,7 @@ export function NoteEditor({
         console.error('open link failed:', errorMessage(cause))
       })
     },
-    [],
+    [followDeepLink],
   )
   // A file pill is a claimed link, so a click on it routes exactly like a
   // link click: `assets/…` through the asset opener, anything else through

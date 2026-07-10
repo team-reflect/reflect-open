@@ -23,6 +23,9 @@ export type Route =
   // it as the settings screen (its switcher lives in the sidebar footer).
   | { kind: 'graphs' }
 
+/** A route that addresses one concrete note, including a dated daily note. */
+export type NoteRoute = Extract<Route, { kind: 'daily' | 'note' }>
+
 /** Structural route equality (used to avoid pushing no-op history entries). */
 export function routesEqual(a: Route, b: Route): boolean {
   if (a.kind !== b.kind) {
@@ -52,7 +55,7 @@ export function routesEqual(a: Route, b: Route): boolean {
  * well-formed but impossible date (e.g. `2026-02-31`), which `dailyPath` would
  * reject — opens as a plain note so navigation can never crash the workspace.
  */
-export function routeForPath(path: string): Route {
+export function routeForPath(path: string): NoteRoute {
   const date = isDaily(path) ? dateFromDailyPath(path) : null
   return date !== null && isIsoDate(date) ? { kind: 'daily', date } : { kind: 'note', path }
 }

@@ -1,4 +1,4 @@
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -7,6 +7,7 @@ import type { NoteRow } from '@reflect/core'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { formatDayLabel } from '@/lib/dates'
 import { monthLabel, monthOf } from '@/lib/month-grid'
+import type { NoteRoute } from '@/routing/route'
 import { RouterProvider, useRouter } from '@/routing/router'
 import { DailyContextSidebar } from './daily-context-sidebar'
 
@@ -14,6 +15,9 @@ const dailyDatesInRange = vi.hoisted(() => vi.fn())
 const relatedNotes = vi.hoisted(() => vi.fn())
 const readNote = vi.hoisted(() => vi.fn())
 const useNoteRow = vi.hoisted(() => vi.fn<(path: string) => NoteRow | null>(() => null))
+const openRouteInNewWindow = vi.hoisted(() =>
+  vi.fn<(route: NoteRoute) => Promise<boolean>>(),
+)
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
@@ -22,6 +26,10 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   relatedNotes,
 }))
 vi.mock('@/hooks/use-note-row', () => ({ useNoteRow }))
+vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/windows/open-in-new-window')>()),
+  openRouteInNewWindow,
+}))
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 1 } }),
 }))
@@ -70,6 +78,7 @@ beforeEach(() => {
   readNote.mockReset().mockResolvedValue('- daily entry\n')
   relatedNotes.mockReset().mockResolvedValue([])
   useNoteRow.mockReset().mockReturnValue(null)
+  openRouteInNewWindow.mockReset().mockResolvedValue(true)
 })
 
 afterEach(cleanup)
@@ -94,6 +103,55 @@ describe('DailyContextSidebar calendar', () => {
 
     await userEvent.click(view.getByRole('button', { name: formatDayLabel('2026-06-18', 'mdy') }))
     expect(view.getByTestId('route').textContent).toContain('2026-06-18')
+    view.unmount()
+  })
+
+  it('modifier-click opens a day in a new window without moving the current window', async () => {
+    const view = renderSidebar('2026-06-09')
+    const day = view.getByRole('button', { name: formatDayLabel('2026-06-18', 'mdy') })
+
+    fireEvent.click(day, { metaKey: true })
+
+    await waitFor(() =>
+      expect(openRouteInNewWindow).toHaveBeenCalledWith({
+        kind: 'daily',
+        date: '2026-06-18',
+      }),
+    )
+    expect(openRouteInNewWindow).toHaveBeenCalledTimes(1)
+    expect(view.getByTestId('route').textContent).toBe(JSON.stringify({ kind: 'today' }))
+    view.unmount()
+  })
+
+  it('does not fall back after the calendar scope moves to another selected day', async () => {
+    let finishOpen: (opened: boolean) => void = () => {}
+    openRouteInNewWindow.mockReturnValue(
+      new Promise((resolve) => {
+        finishOpen = resolve
+      }),
+    )
+    const view = renderSidebar('2026-06-09')
+    const day = view.getByRole('button', { name: formatDayLabel('2026-06-18', 'mdy') })
+
+    fireEvent.click(day, { metaKey: true })
+    view.rerender(
+      <TooltipProvider>
+        <QueryClientProvider
+          client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+        >
+          <RouterProvider>
+            <DailyContextSidebar date="2026-06-10" />
+            <RouteProbe />
+          </RouterProvider>
+        </QueryClientProvider>
+      </TooltipProvider>,
+    )
+
+    await act(async () => {
+      finishOpen(false)
+    })
+
+    expect(view.getByTestId('route').textContent).toBe(JSON.stringify({ kind: 'today' }))
     view.unmount()
   })
 

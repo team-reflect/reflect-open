@@ -11,6 +11,7 @@ import { formatDayLabel } from '@/lib/dates'
 import { taskKey } from '@/lib/tasks/task-identity'
 import { useTaskCheckboxToggle } from '@/lib/tasks/use-task-checkbox-toggle'
 import { cn } from '@/lib/utils'
+import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
 import { useSettings } from '@/providers/settings-provider'
 import { TaskEditor, type TaskNavigate } from './task-editor'
 import { TaskText } from './task-text'
@@ -53,7 +54,7 @@ interface TaskRowProps {
   onEditNavigate: TaskNavigate
   /** Holds the editing row's flush-then-convert trigger for the toolbar button. */
   convertControllerRef: MutableRefObject<(() => void) | null>
-  onOpen: (notePath: string) => void
+  onOpen: (notePath: string, event?: NewWindowClickEvent) => void
 }
 
 /**
@@ -188,7 +189,7 @@ export function TaskRow({
           disabled={editing}
           onClick={(event) => {
             event.stopPropagation()
-            onOpen(task.notePath)
+            onOpen(task.notePath, event)
           }}
           className="flex h-6 shrink-0 items-center whitespace-nowrap text-xs text-text-muted transition-colors hover:text-accent focus-visible:text-accent focus-visible:outline-none"
         >

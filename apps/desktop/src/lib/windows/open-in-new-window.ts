@@ -19,6 +19,9 @@ export interface NewWindowClickEvent {
   type: string
 }
 
+/** Coalesce double-clicks before the shell has registered its content-addressed window label. */
+const pendingWindowOpens = new Map<string, Promise<boolean>>()
+
 /**
  * Whether a link click asked for a new window (⌘-click; ctrl-click off mac).
  * Mouse events only: meowdown also fires link handlers for the Mod-Enter
@@ -67,11 +70,25 @@ export async function openDeepLinkInNewWindow(href: string): Promise<boolean> {
 }
 
 async function openWindowFor(link: string): Promise<boolean> {
-  try {
-    await openNoteWindow(link)
-    return true
-  } catch (cause) {
-    console.error('open in new window failed:', errorMessage(cause))
-    return false
+  const pending = pendingWindowOpens.get(link)
+  if (pending !== undefined) {
+    return pending
   }
+
+  const opening = (async (): Promise<boolean> => {
+    try {
+      await openNoteWindow(link)
+      return true
+    } catch (cause) {
+      console.error('open in new window failed:', errorMessage(cause))
+      return false
+    }
+  })()
+  pendingWindowOpens.set(link, opening)
+  void opening.finally(() => {
+    if (pendingWindowOpens.get(link) === opening) {
+      pendingWindowOpens.delete(link)
+    }
+  })
+  return opening
 }

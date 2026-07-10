@@ -1,7 +1,8 @@
+import { useCallback } from 'react'
 import type { LinkClickHandler } from '@meowdown/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
-import { dispatchDeepLink } from '@/lib/deep-links/intake'
 import { isDeepLinkUrl } from '@/lib/deep-links/parse'
+import { useFollowDeepLink } from '@/lib/deep-links/use-follow-deep-link'
 
 /**
  * Schemes that must never reach the OS opener: script and data URIs carry
@@ -36,13 +37,19 @@ export function isOpenableExternalUrl(href: string): boolean {
  * whole app. A `reflect://` link routes through the in-app deep-link pipeline
  * instead — the OS opener denies the scheme.
  */
-export const openExternalLink: LinkClickHandler = ({ href, event }) => {
-  event.preventDefault()
-  if (isDeepLinkUrl(href)) {
-    dispatchDeepLink(href)
-    return
-  }
-  if (isOpenableExternalUrl(href)) {
-    void openUrl(href)
-  }
+export function useOpenExternalLink(): LinkClickHandler {
+  const followDeepLink = useFollowDeepLink()
+  return useCallback<LinkClickHandler>(
+    ({ href, event }) => {
+      event.preventDefault()
+      if (isDeepLinkUrl(href)) {
+        followDeepLink(href, event)
+        return
+      }
+      if (isOpenableExternalUrl(href)) {
+        void openUrl(href)
+      }
+    },
+    [followDeepLink],
+  )
 }

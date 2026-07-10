@@ -3,16 +3,20 @@ import { cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GraphInfo } from '@reflect/core'
 import type { DeepLinkIo } from '@/lib/deep-links/handle'
+import { beginLinkNavigationIntent } from '@/lib/windows/link-navigation-intent'
 
 const setDeepLinkHandler = vi.hoisted(() => vi.fn<(handler: ((url: string) => void) | null) => void>())
 const handleDeepLink = vi.hoisted(() =>
   vi.fn<(url: string, io: DeepLinkIo) => Promise<void>>(async () => {}),
 )
 const navigate = vi.hoisted(() => vi.fn())
+const navigation = vi.hoisted(() => ({ revision: 0 }))
 
 vi.mock('@/lib/deep-links/intake', () => ({ setDeepLinkHandler }))
 vi.mock('@/lib/deep-links/handle', () => ({ handleDeepLink }))
-vi.mock('@/routing/router', () => ({ useRouter: () => ({ navigate }) }))
+vi.mock('@/routing/router', () => ({
+  useRouter: () => ({ navigate, navigationRevision: () => navigation.revision }),
+}))
 
 import { DeepLinkProvider } from './deep-link-provider'
 
@@ -33,6 +37,7 @@ function attachedHandler(): (url: string) => void {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  navigation.revision = 0
 })
 
 afterEach(cleanup)
@@ -67,6 +72,26 @@ describe('DeepLinkProvider', () => {
     view.rerender(
       <DeepLinkProvider graph={{ ...GRAPH, generation: 8 }}>{null}</DeepLinkProvider>,
     )
+    expect(io.isStale?.()).toBe(true)
+  })
+
+  it('reports stale when navigation changes while a note target resolves', () => {
+    mount()
+    attachedHandler()('reflect://note/x')
+    const io = handleDeepLink.mock.calls[0]![1]
+
+    expect(io.isStale?.()).toBe(false)
+    navigation.revision += 1
+    expect(io.isStale?.()).toBe(true)
+  })
+
+  it('reports stale when a newer note-link intent starts during resolution', () => {
+    mount()
+    attachedHandler()('reflect://note/x')
+    const io = handleDeepLink.mock.calls[0]![1]
+
+    expect(io.isStale?.()).toBe(false)
+    beginLinkNavigationIntent()
     expect(io.isStale?.()).toBe(true)
   })
 

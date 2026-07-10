@@ -6,6 +6,7 @@ import { ChevronLeftIcon } from '@/components/icons/chevron-left-icon'
 import { ChevronRightIcon } from '@/components/icons/chevron-right-icon'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { keybindingFor } from '@/lib/commands/app-commands'
 import { formatDayLabel } from '@/lib/dates'
 import {
@@ -44,11 +45,13 @@ const HEADER_BUTTON_CLASS =
  * on a grey one), and days that already have a daily note carry a dot marker
  * revealed while the pointer is over the calendar (an indexed `dailyDate`
  * row — daily files exist only once written, so a row means real content).
- * Clicking a day navigates to it; the month view follows the selected day,
- * and the calendar glyph between the month arrows jumps back to today.
+ * Clicking a day navigates to it; modifier-clicking opens that daily note in
+ * a secondary window. The month view follows the selected day, and the
+ * calendar glyph between the month arrows jumps back to today.
  */
 export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactElement {
   const { navigate } = useRouter()
+  const navigateNoteLink = useNoteLinkNavigation(selectedDate)
   const { graph } = useGraph()
   const { settings } = useSettings()
   const weekStartsOn = toWeekStartsOn(settings.weekStartDay)
@@ -138,7 +141,9 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
                     aria-label={formatDayLabel(cell.date, settings.dateFormat)}
                     aria-current={isToday ? 'date' : undefined}
                     aria-pressed={isSelected}
-                    onClick={() => navigate({ kind: 'daily', date: cell.date })}
+                    onClick={(event) =>
+                      navigateNoteLink({ kind: 'daily', date: cell.date }, event)
+                    }
                     className={cn(
                       'relative cursor-default py-1.5 text-xs',
                       // Today stays fully visible even as an adjacent-month

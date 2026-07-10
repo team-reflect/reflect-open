@@ -16,11 +16,16 @@ Element.prototype.scrollIntoView = scrollIntoView
 
 const getOpenTasks = vi.hoisted(() => vi.fn())
 const getCompletedTasks = vi.hoisted(() => vi.fn())
+const openRouteInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
   getOpenTasks,
   getCompletedTasks,
+}))
+vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/windows/open-in-new-window')>()),
+  openRouteInNewWindow,
 }))
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 1 } }),
@@ -202,6 +207,7 @@ beforeEach(() => {
   getOpenTasks.mockReset()
   getCompletedTasks.mockReset()
   getCompletedTasks.mockResolvedValue([])
+  openRouteInNewWindow.mockReset().mockResolvedValue(true)
   toggleTask.mockReset()
   deleteTask.mockReset()
   editTask.mockReset()
@@ -375,6 +381,49 @@ describe('TasksScreen', () => {
     expect(sourceLink.querySelector('svg')).toBeNull()
     await userEvent.click(sourceLink)
     expect(view.getByTestId('route').textContent).toContain('notes/p.md')
+    view.unmount()
+  })
+
+  it('opens a modifier-clicked task source in a new window without selecting the row', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({
+        notePath: 'notes/p.md',
+        dailyDate: null,
+        dueDate: '2026-06-10',
+        text: 'project task',
+        noteTitle: 'Project',
+      }),
+    ])
+    const view = renderScreen()
+
+    fireEvent.click(await view.findByRole('button', { name: 'Project' }), { metaKey: true })
+
+    await waitFor(() =>
+      expect(openRouteInNewWindow).toHaveBeenCalledWith({
+        kind: 'note',
+        path: 'notes/p.md',
+      }),
+    )
+    expect(view.getByTestId('route').textContent).toBe('{"kind":"today"}')
+    expect(view.queryByTestId('task-editor')).toBeNull()
+    view.unmount()
+  })
+
+  it('opens a modifier-clicked note-group title in a new window', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({ notePath: 'notes/p.md', text: 'project task', noteTitle: 'Project' }),
+    ])
+    const view = renderScreen()
+
+    fireEvent.click(await view.findByRole('button', { name: 'Project' }), { metaKey: true })
+
+    await waitFor(() =>
+      expect(openRouteInNewWindow).toHaveBeenCalledWith({
+        kind: 'note',
+        path: 'notes/p.md',
+      }),
+    )
+    expect(view.getByTestId('route').textContent).toBe('{"kind":"today"}')
     view.unmount()
   })
 
@@ -606,6 +655,7 @@ describe('TasksScreen', () => {
     // userEvent's held modifiers don't reach its synthetic click).
     fireEvent.click(view.getByRole('button', { name: 'third' }), { metaKey: true })
     expect([pressed('first'), pressed('second'), pressed('third')]).toEqual([true, false, true])
+    expect(openRouteInNewWindow).not.toHaveBeenCalled()
 
     // Shift-click from the anchor (third) back to first selects the whole range.
     fireEvent.click(view.getByRole('button', { name: 'first' }), { shiftKey: true })

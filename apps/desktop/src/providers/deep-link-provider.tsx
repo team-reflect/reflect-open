@@ -2,6 +2,10 @@ import { useEffect, useRef, type ReactElement, type ReactNode } from 'react'
 import type { GraphInfo } from '@reflect/core'
 import { handleDeepLink } from '@/lib/deep-links/handle'
 import { setDeepLinkHandler } from '@/lib/deep-links/intake'
+import {
+  beginLinkNavigationIntent,
+  isCurrentLinkNavigationIntent,
+} from '@/lib/windows/link-navigation-intent'
 import { useRouter } from '@/routing/router'
 
 /**
@@ -17,7 +21,7 @@ interface DeepLinkProviderProps {
 }
 
 export function DeepLinkProvider({ graph, children }: DeepLinkProviderProps): ReactElement {
-  const { navigate } = useRouter()
+  const { navigate, navigationRevision } = useRouter()
 
   // The graph session this provider instance currently serves. Staleness must
   // mean "the session changed", NOT "the effect re-ran": StrictMode's probe
@@ -33,10 +37,15 @@ export function DeepLinkProvider({ graph, children }: DeepLinkProviderProps): Re
     sessionRef.current = graph.generation
     const issued = graph.generation
     setDeepLinkHandler((url) => {
+      const linkIntent = beginLinkNavigationIntent()
+      const issuedAtRevision = navigationRevision()
       handleDeepLink(url, {
         navigate,
         generation: issued,
-        isStale: () => sessionRef.current !== issued,
+        isStale: () =>
+          sessionRef.current !== issued ||
+          navigationRevision() !== issuedAtRevision ||
+          !isCurrentLinkNavigationIntent(linkIntent),
       }).catch((cause: unknown) => {
         console.error('deep link failed:', url, cause)
       })
@@ -44,7 +53,7 @@ export function DeepLinkProvider({ graph, children }: DeepLinkProviderProps): Re
     return () => {
       setDeepLinkHandler(null)
     }
-  }, [navigate, graph.generation])
+  }, [navigate, navigationRevision, graph.generation])
 
   return <>{children}</>
 }

@@ -18,6 +18,7 @@ import { AllNotesScreen } from './all-notes-screen'
 const settingsState = vi.hoisted((): { dateFormat: 'mdy' | 'dmy' | 'iso' } => ({
   dateFormat: 'mdy',
 }))
+const openRouteInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
 
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({
@@ -36,6 +37,10 @@ vi.mock('@/providers/settings-provider', () => ({
     },
     updateSettings: () => {},
   }),
+}))
+vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/windows/open-in-new-window')>()),
+  openRouteInNewWindow,
 }))
 
 // jsdom computes no layout, so virtua can't measure its viewport or rows.
@@ -81,6 +86,7 @@ setBridge({ invoke: mockInvoke, listen: async () => () => {} })
 beforeEach(() => {
   resetOperations()
   settingsState.dateFormat = 'mdy'
+  openRouteInNewWindow.mockReset().mockResolvedValue(true)
   mockInvoke.mockReset()
   mockInvoke.mockImplementation(async (command, args) => {
     if (command !== 'db_query') {
@@ -209,6 +215,45 @@ describe('AllNotesScreen', () => {
     fireEvent.click(await view.findByRole('button', { name: /Health Stacked/ }))
 
     expect(probedRoute(view)).toEqual({ kind: 'note', path: 'notes/health.md' })
+    view.unmount()
+  })
+
+  it('opens a modifier-clicked note subject in a new window without selecting its row', async () => {
+    const view = renderScreen()
+
+    fireEvent.click(await view.findByRole('button', { name: 'Health Stacked' }), {
+      metaKey: true,
+    })
+
+    await waitFor(() =>
+      expect(openRouteInNewWindow).toHaveBeenCalledWith({
+        kind: 'note',
+        path: 'notes/health.md',
+      }),
+    )
+    expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: null })
+    expect(view.queryByRole('button', { name: /Trash \(/ })).toBeNull()
+    view.unmount()
+  })
+
+  it('keeps a modifier-double-click from navigating the current window', async () => {
+    const view = renderScreen()
+    const subject = await view.findByRole('button', { name: 'Health Stacked' })
+
+    // The browser sequence is click, click, dblclick (fireEvent.doubleClick by
+    // itself emits only the last leg and would miss duplicate window opens).
+    fireEvent.click(subject, { metaKey: true, detail: 1 })
+    fireEvent.click(subject, { metaKey: true, detail: 2 })
+    fireEvent.doubleClick(subject, { metaKey: true, detail: 2 })
+
+    await waitFor(() =>
+      expect(openRouteInNewWindow).toHaveBeenCalledWith({
+        kind: 'note',
+        path: 'notes/health.md',
+      }),
+    )
+    expect(openRouteInNewWindow).toHaveBeenCalledTimes(1)
+    expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: null })
     view.unmount()
   })
 
@@ -383,6 +428,7 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     // ⌘-click a second row extends the selection.
     fireEvent.click(view.getByText('Dandelion chocolate.'), { metaKey: true })
     expect(view.getByRole('button', { name: /Trash \(2\)/ })).toBeDefined()
+    expect(openRouteInNewWindow).not.toHaveBeenCalled()
     view.unmount()
   })
 
@@ -436,6 +482,7 @@ describe('AllNotesScreen — selection and bulk trash', () => {
 
     fireEvent.keyDown(surface, { key: 'Enter' })
     expect(probedRoute(view)).toEqual({ kind: 'note', path: 'notes/health.md' })
+    expect(openRouteInNewWindow).not.toHaveBeenCalled()
     view.unmount()
   })
 

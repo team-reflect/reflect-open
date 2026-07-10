@@ -48,6 +48,27 @@ describe('openRouteInNewWindow', () => {
     expect(openNoteWindow).toHaveBeenCalledWith('reflect://note/notes%2Ffoo.md')
   })
 
+  it('shares one native request between concurrent opens of the same note', async () => {
+    let finishOpen: () => void = () => {}
+    openNoteWindow.mockReturnValue(
+      new Promise((resolve) => {
+        finishOpen = resolve
+      }),
+    )
+
+    const first = openRouteInNewWindow({ kind: 'note', path: 'notes/foo.md' })
+    const second = openRouteInNewWindow({ kind: 'note', path: 'notes/foo.md' })
+
+    expect(openNoteWindow).toHaveBeenCalledTimes(1)
+    finishOpen()
+    await expect(Promise.all([first, second])).resolves.toEqual([true, true])
+
+    await expect(
+      openRouteInNewWindow({ kind: 'note', path: 'notes/foo.md' }),
+    ).resolves.toBe(true)
+    expect(openNoteWindow).toHaveBeenCalledTimes(2)
+  })
+
   it('declines routes the deep-link grammar does not name', async () => {
     await expect(openRouteInNewWindow({ kind: 'allNotes', tag: null })).resolves.toBe(false)
     expect(openNoteWindow).not.toHaveBeenCalled()

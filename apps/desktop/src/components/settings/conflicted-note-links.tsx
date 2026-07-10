@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import type { ConflictedNote } from '@reflect/core'
 import { ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useRouter } from '@/routing/router'
+import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 
 interface ConflictedNoteLinksProps {
   readonly notes: readonly ConflictedNote[]
@@ -13,7 +13,7 @@ interface ConflictedNoteLinkProps {
 }
 
 function ConflictedNoteLink({ note }: ConflictedNoteLinkProps): ReactElement {
-  const { navigate } = useRouter()
+  const navigateNoteLink = useNoteLinkNavigation(note.path)
 
   return (
     <li>
@@ -21,7 +21,7 @@ function ConflictedNoteLink({ note }: ConflictedNoteLinkProps): ReactElement {
         variant="ghost"
         size="sm"
         className="h-auto w-full max-w-sm justify-start whitespace-normal px-2 py-1 text-left text-xs text-current hover:bg-amber-500/10 hover:text-current"
-        onClick={() => navigate({ kind: 'note', path: note.path })}
+        onClick={(event) => navigateNoteLink({ kind: 'note', path: note.path }, event)}
       >
         <span className="min-w-0 flex-1">
           <span className="block truncate font-medium">{note.title}</span>

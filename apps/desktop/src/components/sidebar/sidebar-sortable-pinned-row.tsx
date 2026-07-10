@@ -9,6 +9,7 @@ import {
   updatePinnedNotesCache,
 } from '@/lib/notes/pinned-notes-cache'
 import { formatDayLabel } from '@/lib/dates'
+import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { openNativeContextMenu } from '@/lib/native-menu/context-menu'
 import { displayNoteTitle } from '@/lib/note-title-display'
 import { unpinNote } from '@/lib/note-pin'
@@ -26,7 +27,8 @@ interface SidebarSortablePinnedRowProps {
 export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
   note,
 }: SidebarSortablePinnedRowProps): ReactElement {
-  const { route, navigate } = useRouter()
+  const { route } = useRouter()
+  const navigateNoteLink = useNoteLinkNavigation()
   const { settings } = useSettings()
   const { graph } = useGraph()
   const queryClient = useQueryClient()
@@ -82,7 +84,7 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
         ref={setNodeRef}
         type="button"
         style={style}
-        onClick={() => navigate(target)}
+        onClick={(event) => navigateNoteLink(target, event)}
         onContextMenu={handleContextMenu}
         aria-current={active ? 'page' : undefined}
         className="block w-full"

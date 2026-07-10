@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import { MarkdownView } from '@meowdown/react'
-import { openExternalLink } from '@/editor/open-external-link'
+import { useOpenExternalLink } from '@/editor/open-external-link'
 import { cn } from '@/lib/utils'
 
 /**
@@ -35,6 +35,7 @@ export function MarkdownPreview({
   onWikiLinkClick,
   className,
 }: MarkdownPreviewProps): ReactElement {
+  const openExternalLink = useOpenExternalLink()
   // The resolver and click handler are read through refs so a changing prop
   // never gives MarkdownView a new callback identity (which would re-render its
   // whole tree).

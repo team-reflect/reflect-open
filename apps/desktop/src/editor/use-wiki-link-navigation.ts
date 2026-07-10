@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { createNoteWithTitle, resolveWikiTarget } from '@reflect/core'
+import { createNoteWithTitle, dailyPath, resolveWikiTarget } from '@reflect/core'
+import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { isIsoDate } from '@/lib/dates'
-import { isNewWindowClick, openRouteInNewWindow } from '@/lib/windows/open-in-new-window'
-import { routeForPath, type Route } from '@/routing/route'
-import { useRouter } from '@/routing/router'
+import {
+  beginLinkNavigationIntent,
+  isCurrentLinkNavigationIntent,
+} from '@/lib/windows/link-navigation-intent'
+import { routeForPath, type NoteRoute } from '@/routing/route'
+import { useNavigationRevision } from '@/routing/router'
 
 /**
  * Navigation for a clicked `[[wiki link]]`: resolve via the index, then open
@@ -32,7 +36,8 @@ import { useRouter } from '@/routing/router'
 export function useWikiLinkNavigation(
   generation: number | null,
 ): (target: string, event?: MouseEvent | KeyboardEvent) => void {
-  const { navigate } = useRouter()
+  const navigateNoteLink = useNoteLinkNavigation()
+  const navigationRevision = useNavigationRevision()
 
   const unmountedRef = useRef(false)
   useEffect(() => {
@@ -44,24 +49,19 @@ export function useWikiLinkNavigation(
 
   return useCallback(
     (target: string, event?: MouseEvent | KeyboardEvent) => {
-      const newWindow = isNewWindowClick(event)
-      const open = async (route: Route): Promise<void> => {
-        if (newWindow) {
-          if (await openRouteInNewWindow(route)) {
-            return
-          }
-          // The await above opened an unmount window; a late fallback must
-          // not yank a pane the user already left.
-          if (unmountedRef.current) {
-            return
-          }
-        }
-        navigate(route)
+      const intent = beginLinkNavigationIntent()
+      const startedAtRevision = navigationRevision?.() ?? null
+      const isStale = (): boolean =>
+        unmountedRef.current ||
+        !isCurrentLinkNavigationIntent(intent) ||
+        (navigationRevision !== null && navigationRevision() !== startedAtRevision)
+      const open = (route: NoteRoute): void => {
+        navigateNoteLink(route, event)
       }
       void (async () => {
         try {
           const resolution = await resolveWikiTarget(target)
-          if (unmountedRef.current) {
+          if (isStale()) {
             return
           }
           if (resolution.kind === 'resolved') {
@@ -69,13 +69,13 @@ export function useWikiLinkNavigation(
             // Deliberately no focus request: on mobile, focusing mid-arrival
             // raises the keyboard through the stack animation. Desktop
             // autofocuses note arrivals on its own.
-            await open(route)
+            open(route)
           } else if (isIsoDate(resolution.text)) {
-            await open({ kind: 'daily', date: resolution.text })
+            open(routeForPath(dailyPath(resolution.text)))
           } else if (generation !== null && resolution.text.trim() !== '') {
             const created = await createNoteWithTitle(resolution.text, generation)
-            if (!unmountedRef.current) {
-              await open({ kind: 'note', path: created })
+            if (!isStale()) {
+              open({ kind: 'note', path: created })
             }
           }
         } catch (err) {
@@ -83,6 +83,6 @@ export function useWikiLinkNavigation(
         }
       })()
     },
-    [navigate, generation],
+    [generation, navigateNoteLink, navigationRevision],
   )
 }

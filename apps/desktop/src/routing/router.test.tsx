@@ -64,6 +64,19 @@ describe('router', () => {
     expect(result.current.route).toEqual({ kind: 'today' })
   })
 
+  it('advances the synchronous navigation revision for every navigation intent', () => {
+    const { result } = routerHook()
+    const revision = result.current.navigationRevision
+    const initial = revision()
+
+    act(() => result.current.navigate({ kind: 'today' }))
+    expect(revision()).toBe(initial + 1)
+    act(() => result.current.back())
+    expect(revision()).toBe(initial + 2)
+    act(() => result.current.forward())
+    expect(revision()).toBe(initial + 3)
+  })
+
   it('restores a saved scroll offset on back/forward, per entry', () => {
     const { result } = routerHook()
     act(() => result.current.saveScrollState(120)) // scrolling on today
@@ -280,6 +293,7 @@ describe('router', () => {
       act(() => result.current.navigate({ kind: 'note', path: 'notes/01abc.md' }))
       const arrivalsBefore = result.current.arrivalSeq
       const entryBefore = result.current.entryId
+      const revisionBefore = result.current.navigationRevision()
 
       act(() => emitNoteMoved('notes/01abc.md', 'notes/meeting-notes.md'))
 
@@ -288,6 +302,7 @@ describe('router', () => {
       expect(result.current.route).toEqual({ kind: 'note', path: 'notes/meeting-notes.md' })
       expect(result.current.arrivalSeq).toBe(arrivalsBefore)
       expect(result.current.entryId).toBe(entryBefore)
+      expect(result.current.navigationRevision()).toBe(revisionBefore + 1)
 
       // The earlier history entry followed too: back over the rename lands
       // on the file's real home, never the dead path.

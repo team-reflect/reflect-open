@@ -1,9 +1,11 @@
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useEffect } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import type { CommandContext } from '@/lib/commands/types'
+import type { NoteRoute } from '@/routing/route'
+import { RouterProvider, useRouter } from '@/routing/router'
 import { CommandPalette } from './command-palette'
 import { PaletteProvider, usePalette } from './palette-provider'
 
@@ -11,6 +13,9 @@ const suggestWikiTargets = vi.hoisted(() => vi.fn())
 const searchWithFilters = vi.hoisted(() => vi.fn())
 const retrieve = vi.hoisted(() => vi.fn())
 const readNote = vi.hoisted(() => vi.fn<(path: string) => Promise<string>>())
+const openRouteInNewWindow = vi.hoisted(() =>
+  vi.fn<(route: NoteRoute) => Promise<boolean>>(),
+)
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
@@ -25,6 +30,10 @@ vi.mock('@/editor/markdown-preview', () => ({
   MarkdownPreview: ({ content }: { content: string }) => (
     <div data-testid="markdown-preview">{content}</div>
   ),
+}))
+vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/windows/open-in-new-window')>()),
+  openRouteInNewWindow,
 }))
 // The model is absent by default: the palette is exactly the lexical surface
 // it was before Plan 09 (hybrid mode is additive). The gating tests flip both
@@ -59,6 +68,7 @@ beforeEach(() => {
   embedReady.value = false
   semanticSetting.enabled = false
   readNote.mockReset().mockResolvedValue('')
+  openRouteInNewWindow.mockReset().mockResolvedValue(true)
 })
 
 // cmdk scrolls the selected item into view and observes list size; jsdom has
@@ -76,6 +86,11 @@ function OpenOnMount({ query }: { query: string }) {
     openPalette(query)
   }, [openPalette, query])
   return null
+}
+
+function RouteProbe(): ReactNode {
+  const { route } = useRouter()
+  return <output data-testid="route">{JSON.stringify(route)}</output>
 }
 
 function renderPalette(query: string, context?: Partial<CommandContext>) {
@@ -103,10 +118,13 @@ function renderPalette(query: string, context?: Partial<CommandContext>) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const view = render(
     <QueryClientProvider client={client}>
-      <PaletteProvider>
-        <OpenOnMount query={query} />
-        <CommandPalette context={fullContext} />
-      </PaletteProvider>
+      <RouterProvider>
+        <PaletteProvider>
+          <OpenOnMount query={query} />
+          <CommandPalette context={fullContext} />
+          <RouteProbe />
+        </PaletteProvider>
+      </RouterProvider>
     </QueryClientProvider>,
   )
   return { view, navigate }
@@ -162,13 +180,60 @@ describe('CommandPalette', () => {
     searchWithFilters.mockResolvedValue([
       { path: 'notes/rust.md', title: 'Rust Notes', snippet: 'about rust things', dailyDate: null },
     ])
-    const { view, navigate } = renderPalette('rust')
+    const { view } = renderPalette('rust')
     await view.findByText('Rust Notes')
     expect(view.getByText('rust').tagName).toBe('MARK')
 
     await userEvent.keyboard('{Enter}')
+    await waitFor(() => expect(view.getByTestId('route').textContent).toContain('notes/rust.md'))
+    expect(openRouteInNewWindow).not.toHaveBeenCalled()
+    expect(view.queryByTestId('palette-overlay')).toBeNull()
+  })
+
+  it('modifier-click opens one note window and closes the palette synchronously', async () => {
+    suggestWikiTargets.mockResolvedValue([])
+    searchWithFilters.mockResolvedValue([
+      { path: 'notes/rust.md', title: 'Rust Notes', snippet: null, dailyDate: null },
+    ])
+    let finishOpen: (opened: boolean) => void = () => {}
+    openRouteInNewWindow.mockReturnValue(
+      new Promise((resolve) => {
+        finishOpen = resolve
+      }),
+    )
+    const { view } = renderPalette('rust')
+    const result = await view.findByText('Rust Notes')
+    const item = result.closest('[cmdk-item]')
+    expect(item).not.toBeNull()
+
+    fireEvent.click(item!, { metaKey: true })
+
+    expect(view.queryByTestId('palette-overlay')).toBeNull()
+    expect(openRouteInNewWindow).toHaveBeenCalledTimes(1)
+    expect(openRouteInNewWindow).toHaveBeenCalledWith({
+      kind: 'note',
+      path: 'notes/rust.md',
+    })
+    expect(view.getByTestId('route').textContent).toBe(JSON.stringify({ kind: 'today' }))
+    finishOpen(true)
+  })
+
+  it('falls back in-window after a declined modifier-click even though the palette closed', async () => {
+    suggestWikiTargets.mockResolvedValue([])
+    searchWithFilters.mockResolvedValue([
+      { path: 'notes/rust.md', title: 'Rust Notes', snippet: null, dailyDate: null },
+    ])
+    openRouteInNewWindow.mockResolvedValue(false)
+    const { view } = renderPalette('rust')
+    const result = await view.findByText('Rust Notes')
+    const item = result.closest('[cmdk-item]')
+    expect(item).not.toBeNull()
+
+    fireEvent.click(item!, { metaKey: true })
+
+    expect(view.queryByTestId('palette-overlay')).toBeNull()
     await waitFor(() =>
-      expect(navigate).toHaveBeenCalledWith({ kind: 'note', path: 'notes/rust.md' }),
+      expect(view.getByTestId('route').textContent).toContain('notes/rust.md'),
     )
   })
 
@@ -197,7 +262,7 @@ describe('CommandPalette', () => {
       { path: 'daily/2026-06-08.md', title: '2026-06-08', dailyDate: '2026-06-08', snippet: null },
       { path: 'notes/w.md', title: 'Work log', dailyDate: null, snippet: null },
     ])
-    const { view, navigate } = renderPalette('#work is:daily')
+    const { view } = renderPalette('#work is:daily')
     await view.findByText('Work log')
     // The label renders in the row and again as the preview pane's header.
     await waitFor(() => expect(view.getAllByText('Mon, June 8th, 2026')).toHaveLength(2))
@@ -209,9 +274,7 @@ describe('CommandPalette', () => {
     )
 
     await userEvent.keyboard('{Enter}')
-    await waitFor(() =>
-      expect(navigate).toHaveBeenCalledWith({ kind: 'daily', date: '2026-06-08' }),
-    )
+    await waitFor(() => expect(view.getByTestId('route').textContent).toContain('2026-06-08'))
   })
 
   it('stays lexical when the model is ready but semantic search is disabled', async () => {
@@ -324,13 +387,11 @@ describe('CommandPalette', () => {
       },
     ])
     searchWithFilters.mockResolvedValue([])
-    const { view, navigate } = renderPalette('2026-06-09')
+    const { view } = renderPalette('2026-06-09')
     // The label renders in the row and again as the preview pane's header.
     await waitFor(() => expect(view.getAllByText('Tue, June 9th, 2026')).toHaveLength(2))
 
     await userEvent.keyboard('{Enter}')
-    await waitFor(() =>
-      expect(navigate).toHaveBeenCalledWith({ kind: 'daily', date: '2026-06-09' }),
-    )
+    await waitFor(() => expect(view.getByTestId('route').textContent).toContain('2026-06-09'))
   })
 })

@@ -1,15 +1,11 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback } from 'react'
 import type { WikilinkClickHandler } from '@meowdown/core'
 import { useAssetPersistence } from '@/editor/use-asset-persistence'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
-import {
-  isNewWindowClick,
-  openRouteInNewWindow,
-  type NewWindowClickEvent,
-} from '@/lib/windows/open-in-new-window'
+import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
+import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
 import { useGraph } from '@/providers/graph-provider'
 import { routeForPath } from '@/routing/route'
-import { useRouter } from '@/routing/router'
 
 /** The click plumbing a backlinks surface wires into its rows and snippets. */
 export interface BacklinkNavigation {
@@ -38,37 +34,14 @@ export interface BacklinkNavigation {
  * through the same pipelines as the editor.
  */
 export function useBacklinkNavigation(): BacklinkNavigation {
-  const { navigate } = useRouter()
   const { graph } = useGraph()
-
-  // The new-window fallback below resolves async — a late in-window
-  // navigation must not yank a surface the user already left (the same
-  // lifetime guard as useWikiLinkNavigation's).
-  const unmountedRef = useRef(false)
-  useEffect(() => {
-    unmountedRef.current = false
-    return () => {
-      unmountedRef.current = true
-    }
-  }, [])
+  const navigateNoteLink = useNoteLinkNavigation()
 
   const openSource = useCallback(
     (target: string, event?: NewWindowClickEvent) => {
-      const route = routeForPath(target)
-      const arrive = (): void => navigate(route)
-      if (isNewWindowClick(event)) {
-        // Degrade a declined/failed open to in-window navigation so the
-        // modifier can never make the click do nothing.
-        void openRouteInNewWindow(route).then((opened) => {
-          if (!opened && !unmountedRef.current) {
-            arrive()
-          }
-        })
-        return
-      }
-      arrive()
+      navigateNoteLink(routeForPath(target), event)
     },
-    [navigate],
+    [navigateNoteLink],
   )
 
   const navigateWikiLink = useWikiLinkNavigation(graph?.generation ?? null)

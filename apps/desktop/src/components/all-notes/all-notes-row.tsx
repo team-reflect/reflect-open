@@ -2,6 +2,7 @@ import { memo, type MouseEvent, type ReactElement } from 'react'
 import type { NoteListEntry } from '@reflect/core'
 import { formatRecencyLabel } from '@/lib/dates'
 import { cn } from '@/lib/utils'
+import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
 import { useSettings } from '@/providers/settings-provider'
 
 /**
@@ -21,7 +22,7 @@ interface AllNotesRowProps {
   /** Indicator click: toggle this row (Shift extends a range) — V1's check gutter. */
   onToggle: (path: string, event: Pick<MouseEvent, 'shiftKey'>) => void
   /** Open the note (subject click / double-click). */
-  onOpen: (path: string) => void
+  onOpen: (path: string, event?: NewWindowClickEvent) => void
 }
 
 /**
@@ -41,7 +42,7 @@ export const AllNotesRow = memo(function AllNotesRow({ note, selected, onSelect,
         }
         onSelect(note.path, event)
       }}
-      onDoubleClick={() => onOpen(note.path)}
+      onDoubleClick={(event) => onOpen(note.path, event)}
       className={cn(
         'group/row relative h-12 cursor-default select-none transition-colors duration-100',
         ALL_NOTES_GRID,
@@ -75,8 +76,15 @@ export const AllNotesRow = memo(function AllNotesRow({ note, selected, onSelect,
         type="button"
         onClick={(event) => {
           event.stopPropagation()
-          onOpen(note.path)
+          // A browser double-click emits click, click, dblclick. The first
+          // title click already opens; suppress repeats so modifier-double-
+          // click cannot race multiple native opens for the same window.
+          if (event.detail > 1) {
+            return
+          }
+          onOpen(note.path, event)
         }}
+        onDoubleClick={(event) => event.stopPropagation()}
         className={cn(
           'truncate text-left text-[13px] font-medium focus-visible:outline-none',
           selected ? 'text-accent' : 'text-text',

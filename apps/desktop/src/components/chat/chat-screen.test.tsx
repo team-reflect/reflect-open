@@ -39,12 +39,17 @@ const loadChatGraphContext = vi.hoisted(() =>
     (graphName: string, deps?: GraphContextDeps) => Promise<CloudSafe<CloudGraphContext>>
   >(),
 )
+const openRouteInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   streamChat,
   getSecret,
   resolveWikiTarget,
   loadChatGraphContext,
+}))
+vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/windows/open-in-new-window')>()),
+  openRouteInNewWindow,
 }))
 
 const settingsState = vi.hoisted(() => ({
@@ -142,6 +147,7 @@ beforeEach(() => {
     kind: 'resolved',
     ref: `notes/${target.toLowerCase()}.md`,
   }))
+  openRouteInNewWindow.mockReset().mockResolvedValue(true)
 })
 
 const MODEL: AiProviderConfig = { id: 'm1', provider: 'openai', model: 'gpt-5.1', keyHint: '12345' }
@@ -240,6 +246,48 @@ describe('ChatScreen', () => {
     const options = streamChat.mock.lastCall?.[0]
     expect(options?.config).toEqual(MODEL)
     expect(options?.messages.at(-1)).toEqual({ role: 'user', content: 'when does atlas ship?' })
+  })
+
+  it('opens ⌘-clicked tool-result and read-note links in new windows', async () => {
+    configureModel()
+    scriptTurn([
+      { type: 'tool-call', call: { tool: 'search', toolCallId: 'tool-1', query: 'atlas' } },
+      {
+        type: 'tool-result',
+        result: {
+          tool: 'search',
+          toolCallId: 'tool-1',
+          query: 'atlas',
+          hits: [{ path: 'notes/atlas.md', title: 'Atlas' }],
+        },
+      },
+      {
+        type: 'tool-call',
+        call: { tool: 'read', toolCallId: 'tool-2', paths: ['notes/brief.md'] },
+      },
+      {
+        type: 'tool-result',
+        result: {
+          tool: 'read',
+          toolCallId: 'tool-2',
+          notes: [{ path: 'notes/brief.md', title: 'Brief', error: null }],
+        },
+      },
+      { type: 'complete', messages: [{ role: 'assistant', content: 'Done.' }] },
+    ])
+    const view = renderChat()
+
+    await userEvent.type(view.getByLabelText('Chat message'), 'open the source notes{Enter}')
+    fireEvent.click(await view.findByRole('button', { name: 'Atlas' }), { metaKey: true })
+    fireEvent.click(await view.findByRole('button', { name: 'Brief' }), { metaKey: true })
+
+    await waitFor(() =>
+      expect(openRouteInNewWindow.mock.calls).toEqual([
+        [{ kind: 'note', path: 'notes/atlas.md' }],
+        [{ kind: 'note', path: 'notes/brief.md' }],
+      ]),
+    )
+    expect(probedRoute).toEqual({ kind: 'today' })
   })
 
   it('opens cited wiki links from settled chat markdown', async () => {
