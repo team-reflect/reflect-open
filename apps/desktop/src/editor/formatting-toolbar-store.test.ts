@@ -18,7 +18,7 @@ function makeToolbar(overrides: Partial<FormattingToolbar['capabilities']> = {})
     },
     commands: {
       toggleBulletList: vi.fn(),
-      toggleTaskList: vi.fn(),
+      cycleCheckableList: vi.fn(),
       indent: vi.fn(),
       dedent: vi.fn(),
       moveUp: vi.fn(),

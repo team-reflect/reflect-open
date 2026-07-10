@@ -23,13 +23,31 @@ function makeCommand(): FakeCommand {
 function makeFakeEditor() {
   const dom = document.createElement('div')
   document.body.appendChild(dom)
+  let selectedListAttrs: { kind: string; marker: string | null } | null = null
   return {
     mounted: true,
     focused: false,
     blur: vi.fn(),
     view: { dom },
+    state: {
+      selection: {
+        $from: {
+          depth: 1,
+          node: vi.fn(() =>
+            selectedListAttrs === null
+              ? { type: { name: 'paragraph' }, attrs: {} }
+              : { type: { name: 'list' }, attrs: selectedListAttrs },
+          ),
+        },
+      },
+    },
+    selectList: (attrs: { kind: string; marker: string | null } | null) => {
+      selectedListAttrs = attrs
+    },
     commands: {
       toggleList: makeCommand(),
+      wrapInCircleTask: makeCommand(),
+      wrapInSquareTask: makeCommand(),
       indentList: makeCommand(),
       dedentList: makeCommand(),
       moveList: makeCommand(),
@@ -131,8 +149,6 @@ describe('FormattingToolbarBridge', () => {
 
     commands.toggleBulletList()
     expect(editor.commands.toggleList).toHaveBeenCalledWith({ kind: 'bullet' })
-    commands.toggleTaskList()
-    expect(editor.commands.toggleList).toHaveBeenCalledWith({ kind: 'task' })
     commands.indent()
     expect(editor.commands.indentList).toHaveBeenCalledWith()
     commands.dedent()
@@ -146,6 +162,24 @@ describe('FormattingToolbarBridge', () => {
     act(() => commands.moveDown())
     expect(editor.commands.moveList).toHaveBeenCalledWith('down')
     expect(store.result.current?.capabilities.canDedent).toBe(false)
+  })
+
+  it('cycles the combined checklist/task command with V1 semantics', () => {
+    const store = renderHook(() => useFormattingToolbar())
+    render(<FormattingToolbarBridge />)
+    focusIn()
+    const commands = store.result.current!.commands
+
+    commands.cycleCheckableList()
+    expect(editor.commands.wrapInSquareTask).toHaveBeenCalledOnce()
+
+    editor.selectList({ kind: 'task', marker: null })
+    commands.cycleCheckableList()
+    expect(editor.commands.wrapInCircleTask).toHaveBeenCalledOnce()
+
+    editor.selectList({ kind: 'task', marker: '+' })
+    commands.cycleCheckableList()
+    expect(editor.commands.wrapInSquareTask).toHaveBeenCalledTimes(2)
   })
 
   it("types autocomplete triggers through the editor's insertTrigger command", () => {

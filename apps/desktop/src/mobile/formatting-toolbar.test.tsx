@@ -22,7 +22,7 @@ function makeToolbar(
     },
     commands: {
       toggleBulletList: vi.fn(),
-      toggleTaskList: vi.fn(),
+      cycleCheckableList: vi.fn(),
       indent: vi.fn(),
       dedent: vi.fn(),
       moveUp: vi.fn(),
@@ -57,7 +57,7 @@ describe('MobileFormattingToolbar', () => {
     expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual([
       'Slash command',
       'Bullet list',
-      'Task list',
+      'Checklist / task',
       'Link note',
       'Tag',
       'Outdent',
@@ -95,6 +95,9 @@ describe('MobileFormattingToolbar', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Bullet list' }))
     expect(toolbar.commands.toggleBulletList).toHaveBeenCalledOnce()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Checklist / task' }))
+    expect(toolbar.commands.cycleCheckableList).toHaveBeenCalledOnce()
 
     fireEvent.click(screen.getByRole('button', { name: 'Link note' }))
     expect(toolbar.commands.insertTrigger).toHaveBeenCalledWith('[[')

@@ -57,9 +57,9 @@ export function MobileFormattingToolbar(): ReactElement | null {
           onPress={commands.toggleBulletList}
         />
         <ToolbarButton
-          label="Task list"
+          label="Checklist / task"
           icon={<ListTodo className="size-5" />}
-          onPress={commands.toggleTaskList}
+          onPress={commands.cycleCheckableList}
         />
         <ToolbarButton
           label="Link note"

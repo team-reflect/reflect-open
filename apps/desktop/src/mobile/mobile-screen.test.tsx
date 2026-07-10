@@ -633,7 +633,7 @@ describe('MobileShell', () => {
         capabilities: { canIndent: true, canDedent: false, canMoveUp: true, canMoveDown: true },
         commands: {
           toggleBulletList: vi.fn(),
-          toggleTaskList: vi.fn(),
+          cycleCheckableList: vi.fn(),
           indent: vi.fn(),
           dedent: vi.fn(),
           moveUp: vi.fn(),

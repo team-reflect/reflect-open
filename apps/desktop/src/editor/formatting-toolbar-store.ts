@@ -23,7 +23,8 @@ export type FormattingTriggerText = '/' | '[[' | '#'
  */
 export interface FormattingToolbarCommands {
   toggleBulletList: () => void
-  toggleTaskList: () => void
+  /** Cycle other content → square checklist → round task → square checklist. */
+  cycleCheckableList: () => void
   indent: () => void
   dedent: () => void
   moveUp: () => void

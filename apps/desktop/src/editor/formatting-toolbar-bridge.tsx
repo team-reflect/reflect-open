@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useEditor } from '@meowdown/react'
-import type { EditorExtension } from '@meowdown/core'
+import type { EditorExtension, MeowdownListAttrs, TypedEditor } from '@meowdown/core'
 import { isTouchEditorSurface } from '@/lib/platform-surface'
 import {
   clearFormattingToolbar,
@@ -71,7 +71,7 @@ export function FormattingToolbarBridge(): null {
 
       const commands: FormattingToolbarCommands = {
         toggleBulletList: () => run(() => editor.commands.toggleList({ kind: 'bullet' })),
-        toggleTaskList: () => run(() => editor.commands.toggleList({ kind: 'task' })),
+        cycleCheckableList: () => run(() => cycleCheckableList(editor)),
         indent: () => run(() => editor.commands.indentList()),
         dedent: () => run(() => editor.commands.dedentList()),
         moveUp: () => run(() => editor.commands.moveList('up')),
@@ -127,4 +127,25 @@ export function FormattingToolbarBridge(): null {
   }, [editor])
 
   return null
+}
+
+/** Mirror V1's combined checklist/task button without changing checkbox state. */
+function cycleCheckableList(editor: TypedEditor): void {
+  if (isSquareChecklistAtSelection(editor)) {
+    editor.commands.wrapInCircleTask()
+  } else {
+    editor.commands.wrapInSquareTask()
+  }
+}
+
+function isSquareChecklistAtSelection(editor: TypedEditor): boolean {
+  const { $from } = editor.state.selection
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const node = $from.node(depth)
+    if (node.type.name === 'list') {
+      const attrs = node.attrs as MeowdownListAttrs
+      return attrs.kind === 'task' && attrs.marker !== '+'
+    }
+  }
+  return false
 }
