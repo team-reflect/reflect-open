@@ -144,6 +144,16 @@ reflect-open/
 └── turbo.json, pnpm-workspace.yaml
 ```
 
+### Related repos
+
+- **Meowdown:** the local checkout lives at `~/repos/meowdown`. Meowdown is the
+  first-party hybrid/live-preview Markdown editor that Reflect uses through
+  `@meowdown/core` and `@meowdown/react`. When investigating editor behavior,
+  markdown round-tripping, keybindings, slash menus, wiki links, task checkboxes,
+  paste/drop handling, or mobile editor quirks, check that repo as well as this
+  one. If the root cause is in Meowdown, fix it there and open the PR against the
+  Meowdown project rather than papering over it in Reflect.
+
 **Design system**
 
 All UI work should follow the Reflect design system documented in [`design-system/readme.md`](design-system/readme.md). Key resources:
