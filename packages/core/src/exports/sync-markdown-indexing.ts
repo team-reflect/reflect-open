@@ -96,6 +96,8 @@ export {
   isTagName,
   hasAuthoredTitle,
   normalizeWikiTarget,
+  displayNoteTitle,
+  wikiLinkTargetForTitle,
   slugForTitle,
   type ConflictResolution,
   type Frontmatter,

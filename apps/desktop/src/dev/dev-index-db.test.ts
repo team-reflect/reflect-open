@@ -1,18 +1,26 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  buildIndexedNote,
   parseHighlights,
+  parseNote,
   parseSearchQuery,
+  resolveWikiTarget,
   searchNotes,
   searchWithFilters,
   setBridge,
+  suggestWikiTargets,
   type IndexedNote,
 } from '@reflect/core'
+import { createDevBridge } from '@/dev/dev-bridge'
+import { createDevFileStore } from '@/dev/dev-file-store'
 import { createDevIndexDb, type DevIndexDb } from '@/dev/dev-index-db'
 import {
   buildAllNotesSearch,
   EMPTY_ALL_NOTES_FILTERS,
   searchPlanFor,
 } from '@/mobile/search-filters/filter-state'
+
+afterEach(() => setBridge(null))
 
 function sampleNote(overrides: Partial<IndexedNote> = {}): IndexedNote {
   return {
@@ -402,6 +410,37 @@ describe('createDevIndexDb', () => {
     db.applyNote(sampleNote({ isPinned: true, pinnedOrder: 1 }))
     const pinned = db.query('SELECT path FROM notes WHERE is_pinned = ?', [true])
     expect(pinned).toEqual([{ path: 'notes/sample.md' }])
+  })
+
+  it('suggests and resolves a note whose title contains a wiki link', async () => {
+    const source = '# Meeting with [[Ada Lovelace|Ada]]\n\nAgenda.'
+    const index = await openDb()
+    index.applyNote(
+      buildIndexedNote(parseNote({ path: 'notes/meeting.md', source }), {
+        fileHash: 'meeting-hash',
+        mtime: 1,
+        source,
+      }),
+    )
+    setBridge(
+      createDevBridge({
+        platform: 'ios',
+        files: createDevFileStore({ 'notes/meeting.md': source }),
+        index,
+      }),
+    )
+
+    const suggestions = await suggestWikiTargets('meeting with ada')
+
+    expect(suggestions[0]).toMatchObject({
+      path: 'notes/meeting.md',
+      title: 'Meeting with [[Ada Lovelace|Ada]]',
+      target: 'Meeting with Ada',
+    })
+    await expect(resolveWikiTarget(suggestions[0]!.target)).resolves.toEqual({
+      kind: 'resolved',
+      ref: 'notes/meeting.md',
+    })
   })
 
   it('chat writes mirror chat_write.rs: seq assignment, upsert-by-id, cascade delete', async () => {

@@ -74,6 +74,29 @@ describe('rankWikiSuggestions', () => {
     expect(result[0]!.date).toBe('2026-06-09')
   })
 
+  it('targets a rich title through its linkable visible form', () => {
+    const richTitle = 'Meeting with [[Ada Lovelace|Ada]]'
+    const result = rankWikiSuggestions('meeting', [note(richTitle)], [], 8)
+
+    expect(result[0]).toMatchObject({
+      target: 'Meeting with Ada',
+      title: richTitle,
+      alias: null,
+    })
+  })
+
+  it('does not present the derived rich-title alias as an alternate name', () => {
+    const rich = note('Meeting with [[Ada Lovelace|Ada]]')
+    const result = rankWikiSuggestions(
+      'meeting with ada',
+      [],
+      [alias(rich, 'Meeting with Ada')],
+      8,
+    )
+
+    expect(result[0]).toMatchObject({ target: 'Meeting with Ada', alias: null })
+  })
+
   it('honours the limit after merging', () => {
     const titles = Array.from({ length: 10 }, (_, i) => note(`Note ${i}`, i))
     expect(rankWikiSuggestions('note', titles, [], 3)).toHaveLength(3)

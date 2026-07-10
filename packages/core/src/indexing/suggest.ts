@@ -7,6 +7,7 @@
  */
 
 import { foldKey } from '../markdown/keys'
+import { wikiLinkTargetForTitle } from '../markdown/note-title'
 import type { DateSuggestion } from './date-suggestions'
 
 /**
@@ -23,7 +24,7 @@ export interface GeneratedDate {
 
 /** A `[[` autocomplete candidate. */
 export interface WikiSuggestion {
-  /** What `[[…]]` should contain when chosen (the canonical title, or an ISO date). */
+  /** What `[[…]]` should contain when chosen (a linkable title target, or an ISO date). */
   target: string
   /** The note it resolves to — `null` for a daily whose file doesn't exist yet. */
   path: string | null
@@ -82,29 +83,37 @@ export function rankWikiSuggestions(
   limit: number,
 ): WikiSuggestion[] {
   const scored: Scored[] = [
-    ...titles.map((row) => ({
-      suggestion: {
-        target: row.dailyDate ?? row.title,
-        path: row.path,
-        title: row.title,
-        alias: null,
-        date: row.dailyDate,
-      },
-      // ×2 leaves room for the alias penalty between match ranks.
-      score: matchRank(key, row.titleKey) * 2,
-      mtime: row.mtime,
-    })),
-    ...aliases.map((row) => ({
-      suggestion: {
-        target: row.dailyDate ?? row.title,
-        path: row.path,
-        title: row.title,
-        alias: row.alias,
-        date: row.dailyDate,
-      },
-      score: matchRank(key, row.aliasKey) * 2 + 1,
-      mtime: row.mtime,
-    })),
+    ...titles.map((row) => {
+      const target = row.dailyDate ?? wikiLinkTargetForTitle(row.title)
+      return {
+        suggestion: {
+          target,
+          path: row.path,
+          title: row.title,
+          alias: null,
+          date: row.dailyDate,
+        },
+        // ×2 leaves room for the alias penalty between match ranks.
+        score: matchRank(key, row.titleKey) * 2,
+        mtime: row.mtime,
+      }
+    }),
+    ...aliases.map((row) => {
+      const target = row.dailyDate ?? wikiLinkTargetForTitle(row.title)
+      return {
+        suggestion: {
+          target,
+          path: row.path,
+          title: row.title,
+          // The derived linkable-title alias is an addressing detail, not a
+          // meaningful alternate name to repeat as "alias → same title".
+          alias: foldKey(row.alias) === foldKey(target) ? null : row.alias,
+          date: row.dailyDate,
+        },
+        score: matchRank(key, row.aliasKey) * 2 + 1,
+        mtime: row.mtime,
+      }
+    }),
   ]
 
   scored.sort(

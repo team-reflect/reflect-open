@@ -1,4 +1,5 @@
 import { isAppError } from '../errors'
+import { projectNoteAliases } from '../indexing/indexed-note'
 import {
   findExactWikiTargetMatches,
   type ExactWikiTargetMatch,
@@ -7,7 +8,6 @@ import { foldFallbackTitleKey, foldKey } from '../markdown/keys'
 import { parseNote } from '../markdown/extract'
 import { normalizeWikiTarget } from '../markdown/resolve'
 import { slugForTitle } from '../markdown/slug'
-import { subjectAliases } from '../markdown/subject-aliases'
 import { listFiles, readNote } from './commands'
 import { dailyPath, NOTES_DIR } from './paths'
 
@@ -94,7 +94,7 @@ async function matchTitleOnDisk(
       continue
     }
     const parsed = parseNote({ path: candidate.path, source })
-    const aliases = [...parsed.frontmatter.aliases, ...subjectAliases(parsed.title)]
+    const aliases = projectNoteAliases(parsed).map((alias) => alias.alias)
     if (foldKey(parsed.title) === targetKey) {
       exactTitlePaths.push(candidate.path)
       continue

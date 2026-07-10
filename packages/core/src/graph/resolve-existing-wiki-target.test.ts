@@ -234,6 +234,24 @@ describe('resolveExistingWikiTarget', () => {
     expectNoWrites(invoke)
   })
 
+  it('uses a rich title’s linkable alias in the bounded slug-family scan', async () => {
+    const invoke = bindBridge({
+      files: {
+        'notes/meeting-with-ada.md': '# Meeting with [[Ada]]\n',
+      },
+    })
+
+    await expect(resolveExistingWikiTarget('Meeting with Ada', 23)).resolves.toEqual({
+      kind: 'resolved',
+      path: 'notes/meeting-with-ada.md',
+    })
+    expect(invoke).toHaveBeenCalledWith('note_read', {
+      path: 'notes/meeting-with-ada.md',
+      generation: 23,
+    })
+    expectNoWrites(invoke)
+  })
+
   it.each([
     {
       label: 'iCloud placeholder',

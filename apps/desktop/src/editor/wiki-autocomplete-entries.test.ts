@@ -39,6 +39,14 @@ describe('buildAutocompleteEntries', () => {
     expect(entries.every((entry) => entry.kind === 'suggestion')).toBe(true)
   })
 
+  it('does not offer create when a rich title has a different link target', () => {
+    const entries = buildAutocompleteEntries('Meeting with [[Ada]]', [
+      suggestion({ target: 'Meeting with Ada', title: 'Meeting with [[Ada]]' }),
+    ])
+
+    expect(entries.every((entry) => entry.kind === 'suggestion')).toBe(true)
+  })
+
   it('does not offer create on an exact alias match', () => {
     const entries = buildAutocompleteEntries('meetco', [
       suggestion({ target: 'Acme Corp', title: 'Acme Corp', alias: 'meetco' }),

@@ -66,6 +66,7 @@ export {
 export { extractEmailFields, foldEmail } from './email-fields'
 export { foldFallbackTitleKey, foldKey, foldTag } from './keys'
 export { gistBodyHash, gistFilename } from './gist'
+export { displayNoteTitle, wikiLinkTargetForTitle } from './note-title'
 export { slugForTitle } from './slug'
 export { subjectAliases } from './subject-aliases'
 export {

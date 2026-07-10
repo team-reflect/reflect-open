@@ -1,5 +1,6 @@
 import { renameWikiLink } from '../markdown/edit'
 import { foldKey } from '../markdown/keys'
+import { wikiLinkTargetForTitle } from '../markdown/note-title'
 import type { Resolution } from '../markdown/resolve'
 
 /**
@@ -39,15 +40,19 @@ export interface TitleRenameRewriteResult {
 }
 
 /**
- * Rewrite `[[from]]` → `[[to]]` across every source that links to the renamed
- * note's old title. Serialized (ordering stays deterministic and progress
- * means something); a failing source is skipped, not fatal — the old-title
- * alias keeps its links resolving.
+ * Rewrite the old title's linkable target to the new title's linkable target
+ * across every source. Rich title Markdown cannot be nested inside `[[...]]`,
+ * so this deliberately uses the same visible-title mapping as autocomplete.
+ * Serialized (ordering stays deterministic and progress means something); a
+ * failing source is skipped, not fatal — the old-target alias keeps its links
+ * resolving.
  */
 export async function rewriteLinksForTitleChange(
   options: TitleRenameRewriteOptions,
 ): Promise<TitleRenameRewriteResult> {
   const { path, from, to, io, onProgress } = options
+  const fromTarget = wikiLinkTargetForTitle(from)
+  const toTarget = wikiLinkTargetForTitle(to)
 
   // Collision guard: if the old title now resolves to a *different* note (a
   // second note owns it as title or alias), the existing links still point
@@ -57,19 +62,19 @@ export async function rewriteLinksForTitleChange(
   // with the old title inside that sub-second window can be missed here —
   // resolution stays deterministic and the alias still lands, so nothing
   // breaks; the late-created note simply wins future resolutions.
-  const resolution = await io.resolve(from)
+  const resolution = await io.resolve(fromTarget)
   if (resolution.kind === 'resolved' && resolution.ref !== path) {
     return { rewritten: [], failed: [], collision: true }
   }
 
-  const sources = (await io.sources(foldKey(from))).filter((source) => source !== path)
+  const sources = (await io.sources(foldKey(fromTarget))).filter((source) => source !== path)
   const rewritten: string[] = []
   const failed: string[] = []
   let done = 0
   for (const source of sources) {
     try {
       const content = await io.read(source)
-      const next = renameWikiLink(content, from, to)
+      const next = renameWikiLink(content, fromTarget, toTarget)
       if (next !== content) {
         await io.write(source, next)
         rewritten.push(source)

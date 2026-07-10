@@ -52,6 +52,8 @@ export function buildAutocompleteEntries(
   for (const suggestion of suggestions) {
     resolvable.add(foldKey(suggestion.target))
     fallbackResolvable.add(foldFallbackTitleKey(suggestion.target))
+    resolvable.add(foldKey(suggestion.title))
+    fallbackResolvable.add(foldFallbackTitleKey(suggestion.title))
     if (suggestion.alias !== null) {
       resolvable.add(foldKey(suggestion.alias))
       fallbackResolvable.add(foldFallbackTitleKey(suggestion.alias))

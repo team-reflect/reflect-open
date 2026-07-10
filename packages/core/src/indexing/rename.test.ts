@@ -116,6 +116,47 @@ describe('rewriteLinksForTitleChange', () => {
       [2, 2],
     ])
   })
+
+  it('rewrites links using the visible targets of rich titles', async () => {
+    const { io, writes } = fakeIo({
+      'notes/source.md': 'Discuss [[Meeting with Ada]] tomorrow.\n',
+    })
+    io.sources = async (targetKey) => {
+      expect(targetKey).toBe('meeting with ada')
+      return ['notes/source.md']
+    }
+    io.resolve = async (target) => {
+      expect(target).toBe('Meeting with Ada')
+      return unresolved(target)
+    }
+
+    const result = await rewriteLinksForTitleChange({
+      path: 'notes/target.md',
+      from: 'Meeting with [[Ada Lovelace|Ada]]',
+      to: 'Meeting with [[Grace Hopper|Grace]]',
+      io,
+    })
+
+    expect(result.rewritten).toEqual(['notes/source.md'])
+    expect(writes['notes/source.md']).toBe('Discuss [[Meeting with Grace]] tomorrow.\n')
+  })
+
+  it('preserves repeated whitespace in ordinary title rewrites', async () => {
+    const { io, writes } = fakeIo({ 'notes/source.md': '[[Old  Title]]\n' })
+    io.sources = async (targetKey) => {
+      expect(targetKey).toBe('old  title')
+      return ['notes/source.md']
+    }
+
+    await rewriteLinksForTitleChange({
+      path: 'notes/target.md',
+      from: 'Old  Title',
+      to: 'New  Title',
+      io,
+    })
+
+    expect(writes['notes/source.md']).toBe('[[New  Title]]\n')
+  })
 })
 
 describe('rewriteLinksForTitleChange write failures', () => {
@@ -169,5 +210,15 @@ describe('nextAliases', () => {
 
   it('adds the first alias to an empty list', () => {
     expect(nextAliases([], { from: 'Old', to: 'New', previousAutoAlias: null })).toEqual(['Old'])
+  })
+
+  it('preserves the raw rich old title for non-wiki resolution', () => {
+    expect(
+      nextAliases([], {
+        from: 'Meeting with [[Ada Lovelace|Ada]]',
+        to: 'Meeting with [[Grace Hopper|Grace]]',
+        previousAutoAlias: null,
+      }),
+    ).toEqual(['Meeting with [[Ada Lovelace|Ada]]'])
   })
 })

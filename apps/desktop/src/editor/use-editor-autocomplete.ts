@@ -7,6 +7,7 @@ import {
 } from '@meowdown/react'
 import {
   contactLinkSuggestions,
+  displayNoteTitle,
   errorMessage,
   hasBridge,
   isContactsReadable,
@@ -130,15 +131,16 @@ export function useEditorAutocomplete(): EditorAutocomplete {
           }
         }
         const { target, title, alias, date, path, generated } = entry.suggestion
+        const displayedTitle = displayNoteTitle(title)
         // A generated date leads with its phrase ("Next Friday"), resolved day
         // as the detail; everything else keeps the title/alias/daily form.
         if (generated !== undefined && date !== null) {
           return { target, label: generated.phrase, detail: formatDayLabel(date, settings.dateFormat) }
         }
-        const label = date !== null ? formatDayLabel(date, settings.dateFormat) : title
+        const label = date !== null ? formatDayLabel(date, settings.dateFormat) : displayedTitle
         const detail =
           alias !== null
-            ? `${alias} → ${title}`
+            ? `${alias} → ${displayedTitle}`
             : date !== null
               ? path === null
                 ? `${date} · new`

@@ -48,6 +48,24 @@ fn basename(path: &str) -> &str {
     }
 }
 
+/// CommonMark backslash escapes, matching TS `unescapeMarkdownText`.
+fn unescape_markdown_text(text: &str) -> String {
+    let mut unescaped = String::new();
+    let mut characters = text.chars().peekable();
+    while let Some(character) = characters.next() {
+        if character == '\\'
+            && characters
+                .peek()
+                .is_some_and(|next| next.is_ascii_punctuation())
+        {
+            unescaped.push(characters.next().expect("peeked character exists"));
+        } else {
+            unescaped.push(character);
+        }
+    }
+    unescaped
+}
+
 /// The TS `cleanHeadingText`: setext headings keep their first line; ATX
 /// headings lose the leading hashes and any trailing closing hashes.
 fn clean_heading_text(raw: &str) -> String {
@@ -56,14 +74,14 @@ fn clean_heading_text(raw: &str) -> String {
         .map(|text| text.strip_suffix('\r').unwrap_or(text))
         .unwrap_or(raw);
     if let Some(newline_at) = raw.find('\n') {
-        return raw[..newline_at].trim().to_string();
+        return unescape_markdown_text(raw[..newline_at].trim());
     }
     let text = raw.trim_start();
     let text = text.trim_start_matches('#');
     let text = text.trim_start_matches([' ', '\t']);
     let text = text.trim_end_matches([' ', '\t']);
     let text = text.trim_end_matches('#');
-    text.trim().to_string()
+    unescape_markdown_text(text.trim())
 }
 
 /// First level-1 heading with non-empty text, cleaned like the TS extractor
@@ -132,6 +150,66 @@ fn subject_aliases(title: &str) -> Vec<String> {
     aliases
 }
 
+/// Mirrors TS `renderEmbeddedWikiLinks` (`markdown/note-title.ts`): this is
+/// source normalization, independent of Markdown context, so both runtimes
+/// derive the same fallback target from an indexed title string.
+fn render_embedded_wiki_links(title: &str) -> Option<String> {
+    let mut rendered = String::new();
+    let mut index = 0;
+    let mut replaced = false;
+    while index < title.len() {
+        let Some(open_offset) = title[index..].find("[[") else {
+            break;
+        };
+        let open = index + open_offset;
+        let Some(close_offset) = title[open + 2..].find("]]") else {
+            break;
+        };
+        let close = open + 2 + close_offset;
+        let inner = &title[open + 2..close];
+        if inner.contains('\r') || inner.contains('\n') {
+            rendered.push_str(&title[index..open + 2]);
+            index = open + 2;
+            continue;
+        }
+        let (target, alias) = inner
+            .split_once('|')
+            .map_or((inner.trim(), ""), |(target, alias)| {
+                (target.trim(), alias.trim())
+            });
+        if target.is_empty() {
+            rendered.push_str(&title[index..open + 2]);
+            index = open + 2;
+            continue;
+        }
+        rendered.push_str(&title[index..open]);
+        rendered.push_str(if alias.is_empty() { target } else { alias });
+        index = close + 2;
+        replaced = true;
+    }
+    if !replaced {
+        return None;
+    }
+    rendered.push_str(&title[index..]);
+    Some(rendered)
+}
+
+/// TS `wikiLinkTargetForTitle`: titles without embedded wiki source keep their
+/// exact identity; rich titles use the normalized, link-safe form.
+fn wiki_link_target_for_title(title: &str) -> String {
+    let Some(visible) = render_embedded_wiki_links(title) else {
+        return title.to_string();
+    };
+    let sanitized: String = visible
+        .chars()
+        .map(|character| match character {
+            '[' | ']' | '|' | '\r' | '\n' => ' ',
+            other => other,
+        })
+        .collect();
+    sanitized.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 /// The TS `deriveTitle` chain: frontmatter `title` → first H1 → daily date →
 /// filename.
 fn derive_title(rel_path: &str, frontmatter: &Frontmatter, body: &str) -> String {
@@ -151,8 +229,8 @@ fn derive_title(rel_path: &str, frontmatter: &Frontmatter, body: &str) -> String
 }
 
 /// Derive a note's metadata from its source, as the TS indexer would:
-/// `aliases:` frontmatter verbatim, then the v1 subject aliases derived from
-/// the title, skipping segments a frontmatter alias already claims (the TS
+/// `aliases:` frontmatter verbatim, then linkable rich title/alias forms,
+/// then v1 subject aliases, skipping values already claimed (the TS
 /// `noteAliases`, `indexed-note.ts`).
 pub fn parse_note_meta(rel_path: &str, source: &str) -> NoteMeta {
     let split = split_frontmatter(source);
@@ -161,6 +239,16 @@ pub fn parse_note_meta(rel_path: &str, source: &str) -> NoteMeta {
     let mut aliases = frontmatter.aliases;
     let mut claimed: std::collections::HashSet<String> =
         aliases.iter().map(|alias| fold_key(alias)).collect();
+    let rich_texts: Vec<String> = std::iter::once(title.clone())
+        .chain(aliases.iter().cloned())
+        .collect();
+    for rich_text in rich_texts {
+        let link_target = wiki_link_target_for_title(&rich_text);
+        let link_target_key = fold_key(&link_target);
+        if link_target_key != fold_key(&rich_text) && claimed.insert(link_target_key) {
+            aliases.push(link_target);
+        }
+    }
     for alias in subject_aliases(&title) {
         if claimed.insert(fold_key(&alias)) {
             aliases.push(alias);
@@ -329,5 +417,30 @@ mod tests {
             "---\naliases: [MUM]\n---\n# Charlotte MacCaw // Mum\n",
         );
         assert_eq!(meta.aliases, vec!["MUM", "Charlotte MacCaw"]);
+    }
+
+    #[test]
+    fn rich_titles_derive_the_same_linkable_alias_as_ts() {
+        assert_eq!(
+            wiki_link_target_for_title("Meeting with [[Ada Lovelace|Ada]]"),
+            "Meeting with Ada"
+        );
+        assert_eq!(wiki_link_target_for_title("Old  Title"), "Old  Title");
+        assert_eq!(
+            wiki_link_target_for_title("Code `[[Ada Lovelace|Ada]]`"),
+            "Code `Ada`"
+        );
+
+        let meta = parse_note_meta("notes/meeting.md", "# Meeting with [[Ada Lovelace|Ada]]\n");
+        assert_eq!(meta.aliases, vec!["Meeting with Ada"]);
+
+        let renamed = parse_note_meta(
+            "notes/meeting.md",
+            "---\naliases: ['Meeting with [[Ada Lovelace|Ada]]']\n---\n# Current Meeting\n",
+        );
+        assert_eq!(
+            renamed.aliases,
+            vec!["Meeting with [[Ada Lovelace|Ada]]", "Meeting with Ada"]
+        );
     }
 }

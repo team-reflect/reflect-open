@@ -3,8 +3,8 @@ import { gistBodyHash, parseNote } from '../markdown'
 import { buildIndexedNote, indexedNoteSchema, PROJECTION_VERSION } from './indexed-note'
 
 describe('buildIndexedNote', () => {
-  it('carries the projection version that backfills task breadcrumbs', () => {
-    expect(PROJECTION_VERSION).toBe(15)
+  it('carries the projection version that backfills linkable rich-title aliases', () => {
+    expect(PROJECTION_VERSION).toBe(16)
   })
 
   it('flattens a parsed note into the index payload', () => {
@@ -72,6 +72,53 @@ describe('buildIndexedNote', () => {
     expect(indexed.aliases).toEqual([
       { alias: 'MUM', aliasKey: 'mum' },
       { alias: 'Charlotte MacCaw', aliasKey: 'charlotte maccaw' },
+    ])
+  })
+
+  it('derives a resolvable visible alias for a title containing a wiki link', () => {
+    const source = '# Meeting with [[Ada Lovelace|Ada]]\n\nAgenda.'
+    const indexed = buildIndexedNote(parseNote({ path: 'notes/meeting.md', source }), {
+      fileHash: 'h',
+      mtime: 0,
+      source,
+    })
+
+    expect(indexed.title).toBe('Meeting with [[Ada Lovelace|Ada]]')
+    expect(indexed.aliases).toContainEqual({
+      alias: 'Meeting with Ada',
+      aliasKey: 'meeting with ada',
+    })
+  })
+
+  it('does not duplicate a rich title target already claimed by frontmatter', () => {
+    const source =
+      '---\naliases: [Meeting with Ada]\n---\n# Meeting with [[Ada Lovelace|Ada]]\n'
+    const indexed = buildIndexedNote(parseNote({ path: 'notes/meeting.md', source }), {
+      fileHash: 'h',
+      mtime: 0,
+      source,
+    })
+
+    expect(indexed.aliases).toEqual([
+      { alias: 'Meeting with Ada', aliasKey: 'meeting with ada' },
+    ])
+  })
+
+  it('derives a linkable form for a rich frontmatter alias', () => {
+    const source =
+      '---\naliases: ["Meeting with [[Ada Lovelace|Ada]]"]\n---\n# Current Meeting\n'
+    const indexed = buildIndexedNote(parseNote({ path: 'notes/meeting.md', source }), {
+      fileHash: 'h',
+      mtime: 0,
+      source,
+    })
+
+    expect(indexed.aliases).toEqual([
+      {
+        alias: 'Meeting with [[Ada Lovelace|Ada]]',
+        aliasKey: 'meeting with [[ada lovelace|ada]]',
+      },
+      { alias: 'Meeting with Ada', aliasKey: 'meeting with ada' },
     ])
   })
 
