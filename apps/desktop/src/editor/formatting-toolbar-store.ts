@@ -32,6 +32,11 @@ export interface FormattingToolbarCommands {
   insertTrigger: (text: FormattingTriggerText) => void
   /** Blur the editor, dropping the software keyboard (and this toolbar). */
   dismissKeyboard: () => void
+  /**
+   * Scroll the caret back into view if it left the visible area; a no-op
+   * while it is visible. Called by the keyboard reveal, not a toolbar button.
+   */
+  scrollCaretIntoView: () => void
 }
 
 /** What the mobile shell's toolbar renders for the focused editor. */
@@ -120,4 +125,13 @@ function snapshot(): FormattingToolbar | null {
  */
 export function useFormattingToolbar(): FormattingToolbar | null {
   return useSyncExternalStore(subscribe, snapshot, snapshot)
+}
+
+/**
+ * The focused editor's commands, or `null` when none is focused (always the
+ * case off the touch surface). The non-reactive twin of
+ * {@link useFormattingToolbar}, for the keyboard caret reveal.
+ */
+export function focusedEditorCommands(): FormattingToolbarCommands | null {
+  return active?.commands ?? null
 }

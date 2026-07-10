@@ -316,6 +316,10 @@ html:root {
   font-size: var(--editor-font-size, var(--text-base));
 }
 
+:root[data-editor-full-width='true'] {
+  --editor-content-gutter: 2rem;
+}
+
 /* The reading gutter: pads content into a centered ~42rem column while the element
    itself spans the pane's full width. Two uses:
    - On a normal note's editor (route-content.tsx) so the editor stretches edge to
@@ -326,7 +330,7 @@ html:root {
    Un-layered, so it beats both the `padding: 0` reset above and meowdown's layered
    `--meowdown-gutter` padding. */
 .reflect-content-gutter {
-  padding-inline: max(2rem, calc((100% - 42rem) / 2));
+  padding-inline: var(--editor-content-gutter, max(2rem, calc((100% - 42rem) / 2)));
 }
 
 /* Mobile note-body gutter. This mirrors `.reflect-content-gutter`'s cascade
@@ -550,30 +554,6 @@ html:root {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-}
-
-/* Wiki links: a chip over meowdown's `[[…]]` mark view (the theme's dashed
-   underline reads as a draft affordance; V1 renders chips). meowdown renders the
-   immutable label as `.md-wikilink-view-label`. */
-.reflect-editor .md-wikilink-view-label {
-  text-decoration: none;
-  color: var(--accent-soft-text, var(--accent));
-  background: var(--accent-soft, rgb(99 102 241 / 12%));
-  border-radius: var(--radius-sm, 4px);
-  padding: 0.05em 0.15em;
-  cursor: pointer;
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
-}
-
-/* A wrapping chip must flow like text, not sit in meowdown's `inline-block`
-   atom box: when the block fills the full line, the zero-width wikilink
-   source span after it no longer fits, and iOS WebKit wraps it onto an empty
-   full-strut line — a phantom blank line under every wrapped link. Inline
-   flow keeps the source glued to the last label fragment; the clone above
-   keeps chip corners on every fragment. */
-.reflect-editor .md-wikilink-view-preview {
-  display: inline;
 }
 
 /* Tags render via meowdown's `.md-tag` (an accent pill, our purple); the task

@@ -302,9 +302,11 @@ export function createMtimeTouchBatch(generation: number): MtimeTouchBatch {
 /**
  * Full rebuild: wipe derived tables and re-index every markdown file. Used for
  * explicit repair / schema-bump triggers, not the hot graph-switch path (that's
- * {@link reconcileIndex}). Abort is checked **only before** the wipe — once we've
- * cleared, we run to completion so an interrupted rebuild can't leave the index
- * empty or half-populated.
+ * {@link reconcileIndex}). An aborted rebuild may leave a partial index after
+ * the wipe; that is intentional for mobile suspension. `index_clear` preserves
+ * metadata, so the next foreground sync either rebuilds again for an old stamp
+ * or reconciles the missing rows for a current stamp. Both converge without
+ * continuing to hold SQLite locks in the background.
  */
 export async function rebuildIndex(options: IndexPassOptions): Promise<void> {
   const { generation, onSkippedNote, onFileProgress } = options
@@ -312,15 +314,24 @@ export async function rebuildIndex(options: IndexPassOptions): Promise<void> {
     return // don't wipe the current index for an already-cancelled pass
   }
   await clearIndex(generation)
+  if (options.signal?.aborted) {
+    return
+  }
   const files = await listFiles()
   const batch = createIndexApplyBatch(generation, onSkippedNote)
   let done = 0
   let worked = 0
   for (const file of files) {
+    if (options.signal?.aborted) {
+      return
+    }
     done += 1
     if (done % INDEX_PASS_YIELD_EVERY === 0) {
       onFileProgress?.(done, files.length, worked)
       await yieldToEventLoop()
+      if (options.signal?.aborted) {
+        return
+      }
     }
     if (file.placeholder === true) {
       continue // evicted to iCloud — unreadable until re-download, indexed then
@@ -328,9 +339,22 @@ export async function rebuildIndex(options: IndexPassOptions): Promise<void> {
     worked += 1
     const content = await readNote(file.path)
     const fileHash = await hashContent(content)
-    await batch.add(await buildNoteProjection(file.path, content, { fileHash, mtime: file.modifiedMs }))
+    const projection = await buildNoteProjection(file.path, content, {
+      fileHash,
+      mtime: file.modifiedMs,
+    })
+    if (options.signal?.aborted) {
+      return
+    }
+    await batch.add(projection)
+  }
+  if (options.signal?.aborted) {
+    return
   }
   await batch.flush()
+  if (options.signal?.aborted) {
+    return
+  }
   onFileProgress?.(files.length, files.length, worked)
   // The rows now match the current projection — stamp it so `syncIndex` can
   // reconcile cheaply from here on. A superseded pass stamps into a stale
@@ -479,6 +503,9 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
       // echo-time stamp, or a provider rewrote it), re-stamp it so the next
       // pass takes the read-free path — left alone it mismatches forever.
       if (stored.mtime !== candidate.modifiedMs) {
+        if (signal?.aborted) {
+          return
+        }
         await touches.add({ path: candidate.path, mtime: candidate.modifiedMs })
       }
       continue // unchanged
@@ -486,11 +513,22 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
     if (signal?.aborted) {
       return // re-check after the awaits — don't write for a superseded pass
     }
-    await batch.add(
-      await buildNoteProjection(candidate.path, content, { fileHash, mtime: candidate.modifiedMs }),
-    )
+    const projection = await buildNoteProjection(candidate.path, content, {
+      fileHash,
+      mtime: candidate.modifiedMs,
+    })
+    if (signal?.aborted) {
+      return
+    }
+    await batch.add(projection)
+  }
+  if (signal?.aborted) {
+    return
   }
   await batch.flush()
+  if (signal?.aborted) {
+    return
+  }
   await touches.flush()
   onFileProgress?.(total, total, worked)
 

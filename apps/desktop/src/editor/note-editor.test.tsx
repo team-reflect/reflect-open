@@ -13,6 +13,7 @@ interface CapturedEditorProps {
   mode?: 'hide' | 'focus' | 'show' | 'source'
   editorClassName?: string
   spellCheck?: boolean
+  blockHandle?: boolean
   timeFormat?: '12' | '24'
   children?: ReactNode
   resolveImageUrl?: (src: string) => string | undefined
@@ -191,6 +192,17 @@ describe('NoteEditor touch-surface input hygiene', () => {
     setPlatformSurface({ touchEditor: true })
     render(<NoteEditor initialContent="" spellCheck={true} />)
     expect(captured.props?.spellCheck).toBe(false)
+  })
+
+  it('passes the block handle through on desktop', () => {
+    render(<NoteEditor initialContent="" blockHandle={true} />)
+    expect(captured.props?.blockHandle).toBe(true)
+  })
+
+  it('pins the block handle off on the touch surface', () => {
+    setPlatformSurface({ touchEditor: true })
+    render(<NoteEditor initialContent="" blockHandle={true} />)
+    expect(captured.props?.blockHandle).toBe(false)
   })
 
   it('sets explicit input traits on the contenteditable on the touch surface', () => {

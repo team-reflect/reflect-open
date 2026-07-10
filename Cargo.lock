@@ -4737,7 +4737,7 @@ dependencies = [
 
 [[package]]
 name = "reflect-open"
-version = "0.4.0"
+version = "0.0.0"
 dependencies = [
  "base64 0.22.1",
  "block2",
@@ -4756,6 +4756,7 @@ dependencies = [
  "objc2-contacts",
  "objc2-event-kit",
  "objc2-foundation",
+ "objc2-ui-kit",
  "ort",
  "percent-encoding",
  "reflect-index-schema",

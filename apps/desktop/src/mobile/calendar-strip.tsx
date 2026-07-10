@@ -3,6 +3,7 @@ import { ChevronDown, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { addDaysIso } from '@/lib/dates'
 import { monthOf } from '@/lib/month-grid'
+import { cn } from '@/lib/utils'
 import { monthPickTarget, weekAtIndex, weekStartOf } from '@/mobile/calendar'
 import { hapticImpactLight } from '@/mobile/haptics'
 import { MonthPickerDrawer } from '@/mobile/month-picker-drawer'
@@ -56,6 +57,7 @@ export function CalendarStrip({ date, today, resetSeq, onSelect }: CalendarStrip
   const selectionWeekStart = weekStartOf(date, settings.weekStartDay)
   const headerDate =
     displayedWeekStart === selectionWeekStart ? date : addDaysIso(displayedWeekStart, 3)
+  const showToday = date !== today
 
   const jumpToToday = (): void => {
     hapticImpactLight()
@@ -101,7 +103,7 @@ export function CalendarStrip({ date, today, resetSeq, onSelect }: CalendarStrip
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
       {/* Three equal-flanked columns so the month sits at the screen's center
-          regardless of the gear (left) and the conditional Today button (right). */}
+          regardless of the gear (left) and the fading Today button (right). */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 px-1 py-1">
         <div className="justify-self-start">
           <Button
@@ -126,14 +128,24 @@ export function CalendarStrip({ date, today, resetSeq, onSelect }: CalendarStrip
           </button>
         </h1>
         <div className="justify-self-end">
-          {date !== today && (
-            <Button variant="ghost" size="sm" onClick={jumpToToday}>
-              Today
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-hidden={!showToday || undefined}
+            inert={!showToday}
+            className={cn(
+              'transition-opacity duration-150 motion-reduce:transition-none',
+              showToday ? 'opacity-100' : 'pointer-events-none opacity-0',
+            )}
+            onClick={jumpToToday}
+          >
+            Today
+          </Button>
         </div>
       </div>
-      <div className="overflow-hidden" ref={emblaRef}>
+      {/* `overflow: clip` with the class as pre-iOS-16 fallback: see the day
+          carousel's viewport. */}
+      <div className="overflow-hidden" style={{ overflow: 'clip' }} ref={emblaRef}>
         <div className="flex">
           {Array.from({ length: weekWindow.count }, (_, index) => {
             const weekStart = weekAtIndex(weekWindow, index)

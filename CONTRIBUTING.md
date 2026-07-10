@@ -22,6 +22,27 @@ pnpm lint
 cargo test        # from apps/desktop/src-tauri, if you touched Rust
 ```
 
+## PR titles
+
+PR titles must follow [Conventional Commits](https://www.conventionalcommits.org)
+— CI enforces the format. The repo squash-merges, so your PR title becomes the
+commit message and, for `feat`/`fix`, the user-facing changelog entry.
+
+- `feat: …` — new behavior; bumps the minor version (on `next`: the next beta).
+- `fix: …` — a fix; bumps the patch version (on `next`: the next beta).
+- `docs:` / `chore:` / `ci:` / `test:` / `refactor:` / `build:` — no release,
+  no changelog entry.
+- Reflect is an app, not a library: `feat!:` and `BREAKING CHANGE:` footers are
+  not used (CI rejects `!`). Going 1.0 someday is a product decision, made by
+  editing the release manifests, not by commit markers.
+- Write the title as user-visible behavior (`fix: keep the daily caret in view
+  on long iOS notes`), not implementation detail.
+- The changelog is scoped to `apps/desktop/`: a change that should appear in it
+  must touch that directory. Core changes usually ship alongside their
+  desktop-side counterpart; a pure `packages/core` fix that lands alone still
+  ships in the next release, it just gets no changelog line.
+- GitHub's Revert button writes `Revert "…"`; retitle it to `revert: …`.
+
 ## Where code goes
 
 - **Business logic → `packages/core`.** No file/DB/AI logic in React

@@ -198,6 +198,47 @@ describe('createIcloudController', () => {
     expect(scanCalls[1]?.ingestedPaths).toEqual(['notes/other.md'])
   })
 
+  it('defers mobile baseline, conflict, and ingest scans until foreground', async () => {
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    try {
+      const icloud = controller({ emit: true })
+      await icloud.start()
+      await settleScan()
+      expect(scanCalls).toHaveLength(0)
+
+      emitFileChanges([{ path: 'notes/external.md', kind: 'upsert', modifiedMs: 5 }])
+      listeners.get('icloud:conflicts')?.(['notes/conflicted.md'])
+      await settleScan(INGEST_SETTLE_MS)
+      expect(scanCalls).toHaveLength(0)
+
+      visibility.mockReturnValue('visible')
+      document.dispatchEvent(new Event('visibilitychange'))
+      await settleScan()
+
+      expect(scanCalls).toHaveLength(1)
+      expect(scanCalls[0]).toMatchObject({
+        recordBaseline: true,
+        ingestedPaths: ['notes/external.md'],
+      })
+    } finally {
+      visibility.mockRestore()
+    }
+  })
+
+  it('preserves desktop baseline scanning while the document is hidden', async () => {
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+    try {
+      const icloud = controller({ emit: false })
+      await icloud.start()
+      await settleScan()
+
+      expect(scanCalls).toHaveLength(1)
+      expect(scanCalls[0]?.recordBaseline).toBe(true)
+    } finally {
+      visibility.mockRestore()
+    }
+  })
+
   it('a failed sweep re-queues its ingests and the adoption baseline', async () => {
     scanResults.push(new Error('container hiccup'))
     const icloud = controller()

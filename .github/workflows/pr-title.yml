@@ -1,0 +1,25 @@
+name: PR title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions: {}
+
+jobs:
+  conventional-title:
+    name: Conventional PR title
+    runs-on: ubuntu-latest
+    steps:
+      # The repo squash-merges, so the PR title becomes the commit message and,
+      # for feat/fix, the user-facing changelog entry. Breaking-change
+      # markers (feat!:) are deliberately not accepted: Reflect is an app, not
+      # a library — see CONTRIBUTING.md → PR titles.
+      - name: PR title follows conventional commits
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "$TITLE" | grep -qE '^(feat|fix|refactor|docs|test|build|ci|chore|revert)(\([a-z0-9./-]+\))?: .+' || {
+            echo "::error::PR title must be a conventional commit like \"fix: keep the caret in view\" — the title becomes the changelog entry (see CONTRIBUTING.md)"
+            exit 1
+          }

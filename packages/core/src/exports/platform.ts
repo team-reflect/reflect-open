@@ -22,6 +22,11 @@ export {
   type MobileStorageKind,
 } from '../ipc/commands'
 export { confirmQuit, subscribeQuitRequested } from '../app/quit'
+export {
+  beginBackgroundTask,
+  endBackgroundTask,
+  type BackgroundTaskToken,
+} from '../app/background-task'
 export { WINDOW_NAVIGATE_EVENT, subscribeWindowNavigate } from '../app/window-events'
 export { toggleDevtools } from '../app/devtools'
 export {
@@ -141,6 +146,7 @@ export {
   editorDefaultBulletSchema,
   editorBulletAfterHeadingSchema,
   editorTextSizeSchema,
+  editorFullWidthSchema,
   semanticSearchEnabledSchema,
   describeAssetsSchema,
   contactsEnabledSchema,

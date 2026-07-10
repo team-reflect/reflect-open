@@ -64,9 +64,9 @@ export async function createGraph(path: string): Promise<GraphInfo> {
  * Reflect Open's graph-folder layout; Rust extracts safe entries under the
  * active graph root without ever replacing an existing file (identical files
  * skip, conflicting notes rename, conflicting daily notes merge). Attachments
- * the notes link to on Firebase Storage are downloaded into `assets/` and the
- * links rewritten, so the call can take a while on attachment-heavy graphs —
- * observe {@link subscribeImportProgress} and offer
+ * the notes link to on Firebase Storage or Reflect's asset CDN are downloaded
+ * into `assets/` and the links rewritten, so the call can take a while on
+ * attachment-heavy graphs — observe {@link subscribeImportProgress} and offer
  * {@link cancelReflectV1Import} while it runs.
  */
 export async function importReflectV1Zip(

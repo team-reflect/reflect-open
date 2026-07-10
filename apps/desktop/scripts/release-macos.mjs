@@ -5,7 +5,7 @@
 //   pnpm release:macos setup          Store notarization credentials (one-time)
 //   pnpm release:macos setup-updater  Generate the auto-update signing keypair (one-time)
 //   pnpm release:macos verify         Re-run Gatekeeper checks on existing bundles
-//   pnpm release:macos publish        Build, then upload the DMG + updater artifacts to a new GitHub release
+//   pnpm release:macos publish        Build, then fill and undraft the release-please draft release (or create one)
 //   pnpm release:macos --no-notarize  Signed-only build (won't pass Gatekeeper elsewhere)
 //   pnpm release:macos --flavor=beta  Build a specific flavor: stable | beta | dev (default: from the version)
 //
@@ -130,10 +130,9 @@ export function createTauriBuildArgs({ flavor, resourceConfig = null, target }) 
   if (overlay) buildArgs.push('--config', overlay)
   // The beta and dev overlays pin their own updater feed; the stable flavor has
   // no overlay, so without this it would inherit whatever endpoint is committed
-  // in the base tauri.conf.json — which on the `next` branch is the *beta* feed.
-  // Pin it at build time so a stable build always polls the stable feed, no
-  // matter which branch it was cut from. This is what makes releases
-  // branch-independent (release-bump.mjs no longer ties the channel to a branch).
+  // in the base tauri.conf.json — which is the *beta* feed. Pin it at build
+  // time so a stable build always polls the stable feed, no matter which
+  // branch it was cut from. This is what makes releases branch-independent.
   if (flavor === 'stable') {
     buildArgs.push('--config', JSON.stringify({ plugins: { updater: { endpoints: [STABLE_UPDATER_ENDPOINT] } } }))
   }
@@ -316,10 +315,24 @@ function hostTarget() {
   releaseTargetConfig(target)
   return target
 }
+/** The app version, from apps/desktop/package.json — the single version source. */
+function readAppVersion() {
+  const pkg = JSON.parse(readFileSync(join(appDir, 'package.json'), 'utf8'))
+  if (typeof pkg.version !== 'string' || pkg.version === '') {
+    fail('apps/desktop/package.json has no "version"')
+  }
+  return pkg.version
+}
 
-/** Parse tauri.conf.json — the source of truth for the version and base bundle name. */
+/**
+ * Parse tauri.conf.json — the source of truth for the base bundle name. Its
+ * committed `version` is a pointer at ../package.json (Tauri resolves it at
+ * build time), so set the real app version here for every downstream reader.
+ */
 function readTauriConf() {
-  return JSON.parse(readFileSync(join(appDir, 'src-tauri', 'tauri.conf.json'), 'utf8'))
+  const conf = JSON.parse(readFileSync(join(appDir, 'src-tauri', 'tauri.conf.json'), 'utf8'))
+  conf.version = readAppVersion()
+  return conf
 }
 
 function readPlatformConf(platform) {
@@ -925,14 +938,63 @@ function ensurePublishableCommit() {
   return commit
 }
 
-/** Assert no release exists for the tag yet, distinguishing "absent" from gh errors. */
-function ensureReleaseIsNew(tag) {
-  const existing = run('gh', ['release', 'view', tag])
-  if (existing.status === 0) {
-    fail(`release ${tag} already exists — bump "version" in apps/desktop/src-tauri/tauri.conf.json first`)
+/**
+ * Find the GitHub release for a tag, drafts included. release-please creates
+ * releases as drafts, and the `releases/tags/<tag>` endpoint does not resolve
+ * drafts — list and match instead.
+ */
+function findReleaseByTag(tag) {
+  const result = spawnSync(
+    'gh',
+    ['api', '--paginate', 'repos/{owner}/{repo}/releases', '--jq', `.[] | select(.tag_name == ${JSON.stringify(tag)})`],
+    { encoding: 'utf8' },
+  )
+  if (result.status !== 0) {
+    fail(`could not list GitHub releases:\n${`${result.stdout ?? ''}${result.stderr ?? ''}`.trim()}`)
   }
-  if (!/release not found/i.test(existing.output)) {
-    fail(`could not check GitHub for an existing ${tag} release:\n${existing.output.trim()}`)
+  const line = (result.stdout ?? '').split('\n').find((candidate) => candidate.trim() !== '')
+  return line ? JSON.parse(line) : null
+}
+
+/**
+ * A release created by release-please (the Release PR flow) starts as an
+ * asset-less draft; publish fills it in and undrafts it. Refuse a published
+ * release that already carries built artifacts — that version has shipped.
+ * A draft with partial assets is a crashed publish; uploads clobber, so
+ * retrying is safe.
+ */
+function ensureReleaseAcceptsAssets(release, tag) {
+  const names = (release.assets ?? []).map((asset) => asset.name)
+  const shipped = names.some((name) => name.endsWith('.dmg') || name === 'latest.json')
+  if (shipped && !release.draft) {
+    fail(`release ${tag} already has published artifacts — bump "version" in apps/desktop/package.json first`)
+  }
+}
+
+/**
+ * A draft release's target_commitish records the commit it releases. Refuse
+ * to attach artifacts built from a different commit. (For an already-published
+ * release the git tag is authoritative, so the tag check covers it.)
+ */
+function ensureReleaseTargetsCommit(release, tag, commit) {
+  if (!release.draft) return ensureTagMatchesCommit(tag, commit)
+
+  const target = release.target_commitish ?? ''
+  let taggedCommit = target
+  if (!/^[0-9a-f]{40}$/.test(target)) {
+    // target_commitish may be a branch name; resolve it to its origin tip.
+    const resolved = run('git', ['rev-parse', '--verify', `refs/remotes/origin/${target}`])
+    if (resolved.status !== 0) {
+      fail(`draft release ${tag} targets "${target}", which is neither a commit nor a known origin branch`)
+    }
+    taggedCommit = resolved.output.trim()
+  }
+  if (taggedCommit !== commit) {
+    fail(
+      `draft release ${tag} targets ${taggedCommit.slice(0, 7)} but HEAD is ${commit.slice(0, 7)}.\n` +
+        '  Publishing would attach artifacts built from the wrong commit —\n' +
+        '  run the release workflow on the commit that merged the Release PR.',
+    )
   }
 }
 
@@ -954,7 +1016,7 @@ function ensureTagMatchesCommit(tag, commit) {
     fail(
       `tag ${tag} already exists on origin at ${taggedCommit.slice(0, 7)} but HEAD is ${commit.slice(0, 7)}.\n` +
         '  gh would attach the release to the existing tag, not the commit being built —\n' +
-        '  delete the remote tag or bump "version" in apps/desktop/src-tauri/tauri.conf.json.',
+        '  delete the remote tag or bump "version" in apps/desktop/package.json.',
     )
   }
 }
@@ -1053,6 +1115,28 @@ export function createReleaseArgs({ assets, commit, draft, notesPath, prerelease
   return releaseArgs
 }
 
+/** Build the `gh release upload` args that fill a release-please draft release. */
+export function createExistingReleaseUploadArgs({ assets, tag }) {
+  return ['release', 'upload', tag, ...assets, '--clobber']
+}
+
+/**
+ * Build the `gh release edit` args that finalize a release-please draft:
+ * title, complete notes, channel flags, and — unless the draft is kept for
+ * review — the undraft itself, which makes the release visible to users only
+ * once every asset is in place.
+ */
+export function createFinalizeReleaseArgs({ keepDraft, notesPath, prerelease, productName, tag, version }) {
+  const args = ['release', 'edit', tag, '--title', `${productName} ${version}`, '--notes-file', notesPath]
+  if (prerelease) {
+    args.push('--prerelease', '--latest=false')
+  } else {
+    args.push('--prerelease=false', '--latest')
+  }
+  if (!keepDraft) args.push('--draft=false')
+  return args
+}
+
 /** Build the `gh release create` arguments for the moving beta updater feed. */
 export function createBetaFeedReleaseArgs({ commit, manifestPath }) {
   return [
@@ -1103,8 +1187,10 @@ function updateBetaFeed({ commit, manifestPath }) {
 }
 
 /**
- * Build a signed + notarized DMG and upload it to a new GitHub release tagged
- * v<version> (from tauri.conf.json). A version with a prerelease segment
+ * Build signed + notarized artifacts for the release tagged v<version> (from
+ * apps/desktop/package.json). The normal flow fills the asset-less draft
+ * release that release-please created when the Release PR merged; the manual
+ * fallback creates the release itself. A version with a prerelease segment
  * (e.g. `0.2.0-beta.1`, the `next`-branch convention) publishes as a GitHub
  * pre-release. All preflight checks run before the build so a doomed publish
  * fails in seconds, not after notarization.
@@ -1116,20 +1202,53 @@ function ensurePublishableRelease({ flavorFlag }) {
   const flavor = resolveFlavor({ flavorFlag, version, forPublish: true })
   const { productName } = readFlavorConf(flavor)
   const tag = `v${version}`
-  ensureReleaseIsNew(tag)
-  ensureTagMatchesCommit(tag, commit)
-  return { commit, flavor, productName, tag, version }
+  const release = findReleaseByTag(tag)
+  if (release) {
+    ensureReleaseAcceptsAssets(release, tag)
+    ensureReleaseTargetsCommit(release, tag, commit)
+  } else {
+    ensureTagMatchesCommit(tag, commit)
+  }
+  return { commit, flavor, productName, release, tag, version }
 }
 
 /** Run release publish checks without building artifacts or creating a release. */
 function preflight({ flavorFlag }) {
-  const { commit, tag } = ensurePublishableRelease({ flavorFlag })
-  log(`${tag} is publishable from ${commit.slice(0, 7)}`)
+  const { commit, release, tag } = ensurePublishableRelease({ flavorFlag })
+  log(`${tag} is publishable from ${commit.slice(0, 7)}${release ? ' (into the existing draft release)' : ''}`)
 }
 
-/** Create the GitHub release from freshly built or pre-staged macOS artifacts. */
+/** Fill the release-please draft release: upload the artifacts, then finalize. */
+function publishIntoExistingRelease({ assets, draft, prerelease, productName, release, releaseNotesPath, tag, version }) {
+  log(`uploading ${assets.length} assets to the ${release.draft ? 'draft ' : ''}release ${tag}…`)
+  const upload = spawnSync('gh', createExistingReleaseUploadArgs({ assets, tag }), {
+    encoding: 'utf8',
+    stdio: ['inherit', 'pipe', 'inherit'],
+  })
+  if (upload.status !== 0) {
+    fail(`uploading release assets failed${upload.stdout ? `\n${upload.stdout.trim()}` : ''}`)
+  }
+
+  // Finalizing last keeps the release invisible (and `releases/latest`
+  // unmoved) until every asset — latest.json included — is in place.
+  const finalize = spawnSync(
+    'gh',
+    createFinalizeReleaseArgs({ keepDraft: draft, notesPath: releaseNotesPath, prerelease, productName, tag, version }),
+    { encoding: 'utf8', stdio: ['inherit', 'pipe', 'inherit'] },
+  )
+  if (finalize.status !== 0) {
+    fail(`finalizing the GitHub release failed${finalize.stdout ? `\n${finalize.stdout.trim()}` : ''}`)
+  }
+  log(draft ? `draft release ${tag} updated — publish it from the GitHub UI` : `release published: ${tag}`)
+}
+
+/**
+ * Publish freshly built or pre-staged macOS artifacts: into the draft release
+ * created by release-please when one exists (the Release PR flow), otherwise
+ * as a brand-new release (the manual workflow_dispatch fallback).
+ */
 function publish({ draft, flavorFlag, fromArtifacts }) {
-  const { commit, flavor, productName, tag, version } = ensurePublishableRelease({ flavorFlag })
+  const { commit, flavor, productName, release, tag, version } = ensurePublishableRelease({ flavorFlag })
   const artifactDir = fromArtifacts ?? mkdtempSync(join(tmpdir(), 'reflect-release-assets-'))
 
   if (!fromArtifacts) {
@@ -1146,37 +1265,48 @@ function publish({ draft, flavorFlag, fromArtifacts }) {
     version,
   })
   const manifestPath = writeUpdaterManifest({ artifacts, outputDir: artifactDir, tag, version })
-  const releaseNotesPath = writeReleaseNotes({
-    commit,
-    outputDir: artifactDir,
-    productName,
-    tag,
-    version,
-  })
+  const assets = [
+    ...artifacts.flatMap((artifact) => [artifact.dmg, artifact.updaterArchive, artifact.updaterSignature]),
+    manifestPath,
+  ]
   // Pre-releases are invisible to `releases/latest` — the stable updater feed —
   // so installed stable apps never see a beta.
   const prerelease = version.includes('-')
-  log(`creating GitHub ${prerelease ? 'pre-release' : 'release'} ${tag} from commit ${commit.slice(0, 7)}…`)
-  const releaseArgs = createReleaseArgs({
-    assets: [
-      ...artifacts.flatMap((artifact) => [artifact.dmg, artifact.updaterArchive, artifact.updaterSignature]),
-      manifestPath,
-    ],
-    commit,
-    draft,
-    notesPath: releaseNotesPath,
-    prerelease,
-    productName,
-    tag,
-    version,
-  })
-  const result = spawnSync('gh', releaseArgs, { encoding: 'utf8', stdio: ['inherit', 'pipe', 'inherit'] })
-  if (result.status !== 0) fail(`creating the GitHub release failed${result.stdout ? `\n${result.stdout.trim()}` : ''}`)
-  log(`${draft ? 'draft release created' : 'release published'}: ${result.stdout.trim()}`)
+
+  if (release) {
+    // release-please already wrote the changelog into the release body; keep
+    // it and append the Mac download chooser.
+    const releaseNotesPath = join(artifactDir, RELEASE_NOTES_FILENAME)
+    writeFileSync(releaseNotesPath, appendMacDownloadNotice({ body: release.body ?? '', productName, version }))
+    publishIntoExistingRelease({ assets, draft, prerelease, productName, release, releaseNotesPath, tag, version })
+  } else {
+    const releaseNotesPath = writeReleaseNotes({
+      commit,
+      outputDir: artifactDir,
+      productName,
+      tag,
+      version,
+    })
+    log(`creating GitHub ${prerelease ? 'pre-release' : 'release'} ${tag} from commit ${commit.slice(0, 7)}…`)
+    const releaseArgs = createReleaseArgs({
+      assets,
+      commit,
+      draft,
+      notesPath: releaseNotesPath,
+      prerelease,
+      productName,
+      tag,
+      version,
+    })
+    const result = spawnSync('gh', releaseArgs, { encoding: 'utf8', stdio: ['inherit', 'pipe', 'inherit'] })
+    if (result.status !== 0) fail(`creating the GitHub release failed${result.stdout ? `\n${result.stdout.trim()}` : ''}`)
+    log(`${draft ? 'draft release created' : 'release published'}: ${result.stdout.trim()}`)
+  }
+
   if (prerelease && !draft) {
     updateBetaFeed({ commit, manifestPath })
   } else if (prerelease) {
-    log(`draft pre-release created — ${BETA_UPDATER_FEED_TAG} feed not updated`)
+    log(`draft pre-release — ${BETA_UPDATER_FEED_TAG} feed not updated`)
   }
 }
 
@@ -1258,7 +1388,7 @@ Commands:
   setup          Store the notarization Apple ID + app-specific password in the keychain
   setup-updater  Generate the auto-update signing keypair (keychain + pubkey to commit)
   verify         Re-run signing/Gatekeeper checks on already-built bundles
-  publish        Build, then upload the DMG + updater artifacts to a new GitHub release
+  publish        Build, then fill and undraft the release-please draft release (or create one)
 
 Flags:
   --no-notarize   Skip notarization (signed-only build/verify)

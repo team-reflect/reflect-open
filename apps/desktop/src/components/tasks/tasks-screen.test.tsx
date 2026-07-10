@@ -336,6 +336,28 @@ describe('TasksScreen', () => {
     view.unmount()
   })
 
+  it('opens a task’s source note from its date without editing the task', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({
+        notePath: 'daily/2026-06-09.md',
+        dailyDate: '2026-06-09',
+        text: 'daily task',
+        noteTitle: '2026-06-09',
+      }),
+    ])
+    const view = renderScreen()
+
+    await userEvent.click(
+      await view.findByRole('button', { name: 'Tue, June 9th, 2026' }),
+    )
+
+    expect(view.getByTestId('route').textContent).toBe(
+      '{"kind":"daily","date":"2026-06-09"}',
+    )
+    expect(view.queryByTestId('task-editor')).toBeNull()
+    view.unmount()
+  })
+
   it('renders unfocused task content through the markdown preview', async () => {
     getOpenTasks.mockResolvedValue([
       task({

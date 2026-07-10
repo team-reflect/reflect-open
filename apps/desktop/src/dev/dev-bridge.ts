@@ -76,6 +76,10 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         return '0.0.0-dev'
       case 'app_platform':
         return platform
+      case 'background_task_begin':
+        // Browser previews are never suspended like an iOS process, so the
+        // native finite-length assertion is honestly unavailable.
+        return null
       case 'mobile_storage':
         // No iCloud in a plain browser — the dev harness exercises the
         // local-storage path (and, via `mobileOnboarded` above, skips
@@ -94,6 +98,7 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
       case 'capture_host_register':
       case 'watch_start':
       case 'watch_stop':
+      case 'background_task_end':
       case 'quit_confirm':
       case 'toggle_devtools':
         return null

@@ -204,6 +204,29 @@ export function useDayCarousel(
     }
   }, [emblaApi, onEmblaSelect, onEmblaSettle])
 
+  // Embla positions the belt with transforms and never resets the viewport's
+  // scrollLeft, so a stray programmatic write (ProseMirror revealing a caret
+  // mid-snap; observed on device) sticks as a permanent visual offset.
+  // `overflow: clip` on the viewport blocks such writes on iOS 16+; this
+  // heals the `hidden` fallback below that. Embla never scrolls the viewport
+  // itself, so any scroll event here is a stray write.
+  useEffect(() => {
+    if (!emblaApi) {
+      return
+    }
+    const viewport = emblaApi.rootNode()
+    const reset = (): void => {
+      if (viewport.scrollLeft !== 0) {
+        viewport.scrollLeft = 0
+      }
+    }
+    reset()
+    viewport.addEventListener('scroll', reset, { passive: true })
+    return () => {
+      viewport.removeEventListener('scroll', reset)
+    }
+  }, [emblaApi])
+
   // Re-anchor only when the requested day falls outside the window (a far date
   // link): rebuild the window centered on it. The follow effect below then
   // reinitializes Embla onto the new slides — so `reportedRef` is left

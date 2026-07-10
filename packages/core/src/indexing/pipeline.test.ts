@@ -251,6 +251,30 @@ describe('rebuildIndex', () => {
     await expect(rebuildIndex({ generation: 1 })).rejects.toThrow('single note refused')
     expect(mockInvoke.mock.calls.some(([command]) => command === 'index_meta_set')).toBe(false)
   })
+
+  it('stops before the next SQLite write when suspended after the rebuild wipe', async () => {
+    const controller = new AbortController()
+    mockInvoke.mockImplementation(async (command) => {
+      if (command === 'list_files') {
+        return [{ path: 'notes/a.md', size: 1, modifiedMs: 1 }]
+      }
+      if (command === 'note_read') {
+        // Models iOS becoming hidden while filesystem work is in flight.
+        controller.abort()
+        return '# A\n'
+      }
+      return null
+    })
+
+    await rebuildIndex({ generation: 1, signal: controller.signal })
+
+    const commands = mockInvoke.mock.calls.map(([command]) => command)
+    expect(commands).toContain('index_clear') // began while foregrounded
+    expect(commands).not.toContain('index_apply_batch')
+    // No new projection stamp is written; foreground sync converges either by
+    // rebuilding an old projection or reconciling missing rows for a current one.
+    expect(commands).not.toContain('index_meta_set')
+  })
 })
 
 describe('syncIndex', () => {

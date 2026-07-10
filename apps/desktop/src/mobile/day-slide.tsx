@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useRef, type ReactElement } from 'react'
 import { dailyPath } from '@reflect/core'
 import { NotePane } from '@/components/note-pane'
-import { noteEditorHandleFor } from '@/editor/editor-handle-registry'
 import { formatDayLabel } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 import { IncomingBacklinks } from '@/mobile/incoming-backlinks'
 import { MOBILE_CONTENT_GUTTER } from '@/mobile/mobile-content-gutter'
-import { useCaretReveal } from '@/mobile/use-caret-reveal'
 import { useScrollRestore } from '@/mobile/use-scroll-restore'
 import { useSettings } from '@/providers/settings-provider'
 
@@ -65,35 +63,20 @@ export function DaySlide({
     contentRef,
   })
 
-  // The day's editor registers under its note path as it mounts — before the
-  // autofocus that starts a reveal — so the lookup only misses after the
-  // editor unmounted, when there is no caret left to reveal.
-  const scrollCaretIntoView = useCallback(() => {
-    noteEditorHandleFor(dailyPath(day))?.scrollIntoView()
-  }, [day])
-
-  const { revealEnd, cancelReveal } = useCaretReveal({
-    containerRef,
-    contentRef,
-    scrollCaretIntoView,
-  })
-
-  // The end-of-note autofocus scrolls the caret into view against the
-  // full-height viewport; the keyboard then raises and shrinks the shell by
-  // its height — and a long note keeps growing as images size in — dropping
-  // the caret below the fold. The reveal keeps scrolling it back into view
-  // while that settles (see use-caret-reveal.ts).
+  // Keeping the end-of-note caret visible is the editor's own job: meowdown's
+  // focus reveal window re-scrolls the caret through the keyboard raise, late
+  // content growth, and stray non-user scrolls until the layout settles or
+  // the user takes over.
   //
-  // A remount's scroll restore must die first: the double-tap's second
+  // A remount's scroll restore must still die here: the double-tap's second
   // arrival often lands while this slide (freshly remounted from another
-  // tab) is still chasing its saved offset, and the chase's next re-apply —
-  // delivered after the reveal's pin, on the same content growth — would
-  // yank the caret back out of view with nothing re-pinning it.
+  // tab) is still chasing its saved offset. The editor's reveal would win
+  // each round against the chase, but every re-applied offset costs a
+  // visible flicker — kill the competing writer instead of fighting it.
   const handleAutoFocused = useCallback(() => {
     cancelRestore()
-    revealEnd()
     onFocusConsumed()
-  }, [cancelRestore, revealEnd, onFocusConsumed])
+  }, [cancelRestore, onFocusConsumed])
 
   const lastResetSeq = useRef(scrollResetSeq)
   useEffect(() => {
@@ -110,11 +93,11 @@ export function DaySlide({
       // the selection the editor just placed.
       return
     }
-    // A reveal still settling from a recent double-tap must die first, or
-    // its next re-pin would undo this jump to the top.
-    cancelReveal()
+    // The tap that bumped the sequence also closed the editor's reveal
+    // window (a pointerdown anywhere ends it), so a reveal still settling
+    // from a recent double-tap cannot undo this jump.
     resetToTop()
-  }, [scrollResetSeq, selected, focusRequested, cancelReveal, resetToTop])
+  }, [scrollResetSeq, selected, focusRequested, resetToTop])
 
   return (
     <div

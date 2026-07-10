@@ -576,6 +576,40 @@ describe('createSyncEngine', () => {
     engine.stop()
   })
 
+  it('stops at the next command boundary when cycles become suppressed', async () => {
+    let canStartCycle = true
+    const fetchGate: { resolve: ((value: unknown) => void) | null } = { resolve: null }
+    const calls = fakeGit((command) => {
+      if (command === 'git_fetch') {
+        return new Promise((resolve) => {
+          fetchGate.resolve = resolve
+        })
+      }
+      return defaultResponses(command)
+    })
+    const statuses: SyncStatus[] = []
+    const engine = createSyncEngine({
+      generation: 1,
+      getToken: async () => 'tok',
+      onStatus: (status) => statuses.push(status),
+      canStartCycle: () => canStartCycle,
+    })
+
+    const syncing = engine.syncNow()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(commandsOf(calls)).toEqual(['git_commit_all', 'git_fetch'])
+
+    canStartCycle = false
+    fetchGate.resolve?.(DELTA)
+    await syncing
+
+    // Fetch began while allowed, but merge/push must not start after the
+    // lifecycle becomes hidden. Suppression is an idle pause, not an error.
+    expect(commandsOf(calls)).toEqual(['git_commit_all', 'git_fetch'])
+    expect(statuses.map((status) => status.state)).toEqual(['syncing', 'idle'])
+    engine.stop()
+  })
+
   it('stop() mid-cycle issues no further commands and emits no further status', async () => {
     const pushGate: { resolve: ((value: unknown) => void) | null } = { resolve: null }
     const calls = fakeGit((command) => {

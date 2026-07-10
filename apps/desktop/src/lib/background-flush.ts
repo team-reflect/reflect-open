@@ -1,3 +1,4 @@
+import { beginBackgroundTask, endBackgroundTask, type BackgroundTaskToken } from '@reflect/core'
 import { flushOpenDocuments } from '@/editor/open-documents'
 import { flushBackup } from '@/lib/backup-flush'
 import { flushSettings } from '@/lib/settings-flush'
@@ -28,6 +29,35 @@ export function installBackgroundFlush(): () => void {
   // the process. The trailing chain is a cheap no-op when nothing changed.
   let inFlight: Promise<void> | null = null
   let rerun = false
+  let hidden = document.visibilityState === 'hidden'
+  let transition = hidden ? 1 : 0
+  let lastRequestedTransition = 0
+
+  const runProtectedFlush = async (): Promise<void> => {
+    // Acquire before issuing any write IPC. If iOS cannot grant more time (or
+    // browser/mobile dev has no native command), the flush remains best-effort.
+    let backgroundTask: BackgroundTaskToken | null = null
+    try {
+      backgroundTask = await beginBackgroundTask()
+    } catch {
+      // Native protection is unavailable; still land as much as possible.
+    }
+
+    try {
+      await Promise.allSettled([flushOpenDocuments(), flushSettings()])
+      await flushBackup()
+    } finally {
+      if (backgroundTask !== null) {
+        try {
+          await endBackgroundTask(backgroundTask)
+        } catch {
+          // UIKit's expiration callback also ends an outstanding assertion.
+          // Backgrounding cannot surface cleanup failures into the webview.
+        }
+      }
+    }
+  }
+
   const flush = (): void => {
     if (inFlight !== null) {
       rerun = true
@@ -35,9 +65,10 @@ export function installBackgroundFlush(): () => void {
     }
     // Buffers and settings land first so the commit captures them. Failures
     // are surfaced by the save pipeline / next launch's sync — backgrounding
-    // must never be blocked on them.
-    inFlight = Promise.allSettled([flushOpenDocuments(), flushSettings()])
-      .then(() => flushBackup())
+    // must never be blocked on them. The catch also guarantees cleanup errors
+    // cannot become an unhandled rejection from this fire-and-forget trigger.
+    inFlight = runProtectedFlush()
+      .catch(() => {})
       .finally(() => {
         inFlight = null
         if (rerun) {
@@ -46,15 +77,38 @@ export function installBackgroundFlush(): () => void {
         }
       })
   }
+
+  const flushTransition = (): void => {
+    if (lastRequestedTransition === transition) {
+      return
+    }
+    lastRequestedTransition = transition
+    flush()
+  }
   const onVisibilityChange = (): void => {
     if (document.visibilityState === 'hidden') {
-      flush()
+      if (!hidden) {
+        hidden = true
+        transition += 1
+      }
+      flushTransition()
+    } else {
+      hidden = false
     }
   }
+  const onPageHide = (): void => {
+    // Usually follows visibilitychange for the same transition. When it is
+    // the only signal (some teardown/reload paths), create its transition.
+    if (!hidden) {
+      hidden = true
+      transition += 1
+    }
+    flushTransition()
+  }
   document.addEventListener('visibilitychange', onVisibilityChange)
-  window.addEventListener('pagehide', flush)
+  window.addEventListener('pagehide', onPageHide)
   return () => {
     document.removeEventListener('visibilitychange', onVisibilityChange)
-    window.removeEventListener('pagehide', flush)
+    window.removeEventListener('pagehide', onPageHide)
   }
 }

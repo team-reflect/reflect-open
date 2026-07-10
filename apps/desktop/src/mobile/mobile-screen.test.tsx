@@ -77,7 +77,6 @@ vi.mock('@/editor/note-editor', async () => {
           setSelection: (position: 'start' | 'end') => {
             editorProbe.selectionCalls.push(position)
           },
-          scrollIntoView: () => {},
           getSelectedText: () => '',
           openSelectionMenu: () => {},
           startPendingReplacement: () => false,
@@ -310,14 +309,23 @@ describe('MobileShell', () => {
     const view = mount({ kind: 'today' })
 
     expect(view.queryByRole('button', { name: 'Today' })).toBeNull()
+    const todayButton = view.getByText('Today')
+    expect(todayButton.classList.contains('opacity-0')).toBe(true)
+    expect(todayButton.hasAttribute('inert')).toBe(true)
+
     await user.click(view.getByRole('button', { name: dayCellLabel(other) }))
     expect(view.getByRole('button', { name: dayCellLabel(other) }).getAttribute('aria-current')).toBe(
       'date',
     )
-    expect(view.getByRole('button', { name: 'Today' })).toBeTruthy()
+    expect(
+      view.getByRole('button', { name: 'Today' }).classList.contains('opacity-100'),
+    ).toBe(true)
+    expect(todayButton.hasAttribute('inert')).toBe(false)
 
     await user.click(view.getByRole('button', { name: 'Today' }))
     expect(view.queryByRole('button', { name: 'Today' })).toBeNull()
+    expect(todayButton.classList.contains('opacity-0')).toBe(true)
+    expect(todayButton.hasAttribute('inert')).toBe(true)
     expect(view.getByRole('button', { name: dayCellLabel(today) }).getAttribute('aria-current')).toBe(
       'date',
     )
@@ -614,6 +622,7 @@ describe('MobileShell', () => {
           moveDown: vi.fn(),
           insertTrigger: vi.fn(),
           dismissKeyboard: vi.fn(),
+          scrollCaretIntoView: vi.fn(),
         },
       }),
     )

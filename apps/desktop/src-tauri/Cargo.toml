@@ -1,6 +1,9 @@
 [package]
 name = "reflect-open"
-version = "0.4.0"
+# Intentionally frozen: the app version lives in apps/desktop/package.json and
+# tauri.conf.json points at it. The crate is never published, so its version
+# has no consumer — freezing it keeps Cargo.lock out of every release diff.
+version = "0.0.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -118,6 +121,15 @@ objc2 = "0.6.4"
 objc2-foundation = "0.3.2"
 objc2-contacts = "0.3.2"
 block2 = "0.6.2"
+
+# Finite-length execution assertions around iOS persistence. UIKit's begin/end
+# methods keep file and SQLite locks from surviving process suspension.
+[target.'cfg(target_os = "ios")'.dependencies]
+objc2-ui-kit = { version = "0.3.2", default-features = false, features = [
+  "std",
+  "UIApplication",
+  "block2",
+] }
 
 # Desktop-only capabilities (Plan 19): auto-update (mobile updates go through
 # the app stores), window-state (no windows to restore on mobile), the file

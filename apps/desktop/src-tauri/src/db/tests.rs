@@ -828,6 +828,7 @@ fn session_adoption_reads_never_bump_generations() {
         .expect("mock app");
     app.manage(crate::fs::GraphState::default());
     app.manage(super::IndexState::default());
+    app.manage(crate::background_task::BackgroundTaskState::default());
 
     let graph_dir = tempfile::tempdir().expect("tempdir");
     {
@@ -841,7 +842,7 @@ fn session_adoption_reads_never_bump_generations() {
     // than opening one itself.
     assert_eq!(super::current_generation(&app.state()).unwrap(), None);
 
-    let opened = super::index_open(app.state(), app.state()).expect("open");
+    let opened = super::index_open(app.state(), app.state(), app.state()).expect("open");
     for _ in 0..2 {
         let info = crate::fs::current_graph_info(&app.state()).expect("graph info");
         assert_eq!(info.generation, 3);
@@ -867,6 +868,7 @@ fn stale_generation_writes_are_dropped_end_to_end() {
         .expect("mock app");
     app.manage(crate::fs::GraphState::default());
     app.manage(super::IndexState::default());
+    app.manage(crate::background_task::BackgroundTaskState::default());
 
     let graph_dir = tempfile::tempdir().expect("tempdir");
     {
@@ -886,24 +888,26 @@ fn stale_generation_writes_are_dropped_end_to_end() {
         rows[0]["n"].clone()
     };
 
-    let stale = super::index_open(app.state(), app.state()).expect("first open");
+    let stale = super::index_open(app.state(), app.state(), app.state()).expect("first open");
     super::index_apply(
         note("notes/a.md", "A", vec![]),
         stale,
         app.handle().clone(),
+        app.state(),
         app.state(),
     )
     .expect("apply");
     assert_eq!(count("after first apply"), Value::from(1));
 
     // Reopening (graph switch / reload) bumps the generation; the old one is stale.
-    let fresh = super::index_open(app.state(), app.state()).expect("reopen");
+    let fresh = super::index_open(app.state(), app.state(), app.state()).expect("reopen");
     assert_ne!(stale, fresh);
 
     super::index_apply(
         note("notes/b.md", "B", vec![]),
         stale,
         app.handle().clone(),
+        app.state(),
         app.state(),
     )
     .expect("stale apply returns Ok");
@@ -914,6 +918,7 @@ fn stale_generation_writes_are_dropped_end_to_end() {
         stale,
         app.handle().clone(),
         app.state(),
+        app.state(),
     )
     .expect("stale remove returns Ok");
     assert_eq!(count("after stale remove"), Value::from(1)); // also dropped
@@ -922,6 +927,7 @@ fn stale_generation_writes_are_dropped_end_to_end() {
         note("notes/b.md", "B", vec![]),
         fresh,
         app.handle().clone(),
+        app.state(),
         app.state(),
     )
     .expect("fresh apply");
@@ -937,13 +943,31 @@ fn stale_generation_writes_are_dropped_end_to_end() {
         )
         .unwrap_or_else(|err| panic!("{label}: {err:?}"))
     };
-    super::index_meta_set("k".to_string(), "stale".to_string(), stale, app.state())
-        .expect("stale meta set returns Ok");
+    super::index_meta_set(
+        "k".to_string(),
+        "stale".to_string(),
+        stale,
+        app.state(),
+        app.state(),
+    )
+    .expect("stale meta set returns Ok");
     assert!(meta("after stale meta set").is_empty());
-    super::index_meta_set("k".to_string(), "v1".to_string(), fresh, app.state())
-        .expect("fresh meta set");
-    super::index_meta_set("k".to_string(), "v2".to_string(), fresh, app.state())
-        .expect("meta upsert");
+    super::index_meta_set(
+        "k".to_string(),
+        "v1".to_string(),
+        fresh,
+        app.state(),
+        app.state(),
+    )
+    .expect("fresh meta set");
+    super::index_meta_set(
+        "k".to_string(),
+        "v2".to_string(),
+        fresh,
+        app.state(),
+        app.state(),
+    )
+    .expect("meta upsert");
     assert_eq!(meta("after meta upsert")[0]["value"], Value::from("v2"));
 }
 

@@ -1,14 +1,23 @@
 name: Release
 
 on:
+  # The normal path: called by release-please.yml right after it creates the
+  # draft release for a merged Release PR.
+  workflow_call:
+    inputs:
+      tag:
+        description: The release tag (v<version>) created by release-please
+        type: string
+        required: true
+  # Manual fallback and retry path: run on a branch (or commit) whose version
+  # was already bumped by a merged PR; the tag is derived from
+  # apps/desktop/package.json.
   workflow_dispatch:
     inputs:
       draft:
         description: Create the GitHub release as a draft for review
         type: boolean
         default: false
-  push:
-    tags: [v*]
 
 # Never run two releases at once, and never cancel one mid-notarization —
 # queue instead. A cancelled run can leave a half-published release behind.
@@ -16,7 +25,9 @@ concurrency:
   group: release
   cancel-in-progress: false
 
-# `gh release create` pushes the v<version> tag and uploads the assets.
+# Publish uploads assets into the release-please draft release and undrafts
+# it; the manual fallback path still creates the release itself via
+# `gh release create`.
 permissions:
   contents: write
 
@@ -33,14 +44,18 @@ jobs:
           persist-credentials: true
           fetch-depth: 0
 
-      # The release is tagged v<version> from tauri.conf.json regardless of
-      # the pushed tag, so a mismatch would publish under the wrong name.
-      - name: Verify the pushed tag matches tauri.conf.json
-        if: github.ref_type == 'tag'
+      # The release is tagged v<version> from apps/desktop/package.json (the
+      # single version source; tauri.conf.json points at it). When called from
+      # release-please.yml, the tag it created must match the checked-out
+      # commit's version, or the assets would publish under the wrong name.
+      - name: Verify the release tag matches apps/desktop/package.json
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          version="$(jq -r .version apps/desktop/src-tauri/tauri.conf.json)"
-          if [ "$GITHUB_REF_NAME" != "v${version}" ]; then
-            echo "::error::pushed tag ${GITHUB_REF_NAME} but tauri.conf.json says ${version} — fix the tag, or bump the version (and src-tauri/Cargo.toml)"
+          version="$(jq -r .version apps/desktop/package.json)"
+          tag="${INPUT_TAG:-v${version}}"
+          if [ "$tag" != "v${version}" ]; then
+            echo "::error::release tag ${tag} but apps/desktop/package.json says ${version} — run this workflow on the release commit"
             exit 1
           fi
 
@@ -87,10 +102,12 @@ jobs:
           APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
           missing=()
-          for name in APPLE_SIGNING_IDENTITY APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD TAURI_SIGNING_PRIVATE_KEY; do
+          for name in APPLE_SIGNING_IDENTITY APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD SENTRY_AUTH_TOKEN SENTRY_DSN TAURI_SIGNING_PRIVATE_KEY; do
             [ -n "${!name}" ] || missing+=("$name")
           done
           if { [ -z "$APPLE_API_KEY" ] || [ -z "$APPLE_API_ISSUER" ] || [ -z "$APPLE_API_KEY_CONTENT" ]; } &&
@@ -149,8 +166,10 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: pnpm release:macos build --target=${{ matrix.target }} --artifact-dir="$RUNNER_TEMP/release-artifacts"
 
       - name: Upload release artifacts

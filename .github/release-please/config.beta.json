@@ -1,0 +1,17 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/v17.10.3/schemas/config.json",
+  "release-type": "node",
+  "include-component-in-tag": false,
+  "bump-minor-pre-major": true,
+  "versioning": "prerelease",
+  "prerelease": true,
+  "prerelease-type": "beta",
+  "draft": true,
+  "force-tag-creation": true,
+  "packages": {
+    "apps/desktop": {
+      "package-name": "reflect-open",
+      "changelog-path": "CHANGELOG.beta.md"
+    }
+  }
+}

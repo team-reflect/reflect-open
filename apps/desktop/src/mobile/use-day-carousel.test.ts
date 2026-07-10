@@ -19,9 +19,11 @@ import {
 const embla = vi.hoisted(() => {
   const handlers = new Map<string, Set<(api: unknown) => void>>()
   let selected = 0
+  const rootEl = document.createElement('div')
 
   const api = {
     selectedScrollSnap: (): number => selected,
+    rootNode: (): HTMLElement => rootEl,
     on: (event: string, handler: (api: unknown) => void) => {
       let registered = handlers.get(event)
       if (!registered) {

@@ -161,6 +161,44 @@ describe('subscribeIndexChanges', () => {
     ])
   })
 
+  it('drops queued live writes when the lifecycle suspends and leaves replay to reconcile', async () => {
+    const order: string[] = []
+    let canApply = true
+    let releaseRead: () => void = () => {}
+    const { emitChanges } = fakeBridge(async (command, args) => {
+      if (command === 'note_read') {
+        order.push(`read:${String(args['path'])}`)
+        await new Promise<void>((resolve) => {
+          releaseRead = resolve
+        })
+        order.push(`read-finished:${String(args['path'])}`)
+      }
+      if (command === 'index_apply_batch') {
+        order.push('apply')
+      }
+      if (command === 'db_query') {
+        return []
+      }
+      return command === 'note_read' ? '# content' : null
+    })
+
+    await subscribeIndexChanges(1, undefined, undefined, () => canApply)
+    emitChanges([{ path: 'notes/started-visible.md', kind: 'upsert' }])
+    emitChanges([{ path: 'notes/queued.md', kind: 'upsert' }])
+    await vi.waitFor(() => expect(order).toContain('read:notes/started-visible.md'))
+
+    canApply = false
+    releaseRead()
+    await vi.waitFor(() => expect(order).toContain('read-finished:notes/started-visible.md'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    // The first batch had begun reading while visible, but did not start its
+    // SQLite write after suspension. The second never began at all; the
+    // foreground full reconcile is the durable replay path for both.
+    expect(order).not.toContain('apply')
+    expect(order).not.toContain('read:notes/queued.md')
+  })
+
   it('fires onApplied only after the batch has been written to the index', async () => {
     const order: string[] = []
     const { emitChanges } = fakeBridge(async (command, args) => {

@@ -25,6 +25,7 @@ function makeToolbar(overrides: Partial<FormattingToolbar['capabilities']> = {})
       moveDown: vi.fn(),
       insertTrigger: vi.fn(),
       dismissKeyboard: vi.fn(),
+      scrollCaretIntoView: vi.fn(),
     },
   }
 }

@@ -25,6 +25,9 @@ import {
  * Capabilities recompute on DOM `selectionchange` (WebKit fires it for every
  * caret move in the contenteditable) and after each toolbar command, whose
  * own document change is not guaranteed to move the DOM selection.
+ *
+ * The command surface also carries `scrollCaretIntoView` for the keyboard's
+ * caret reveal; no toolbar button calls it.
  */
 export function FormattingToolbarBridge(): null {
   const editor = useEditor<EditorExtension>()
@@ -76,6 +79,15 @@ export function FormattingToolbarBridge(): null {
         insertTrigger: (text: FormattingTriggerText) =>
           run(() => editor.commands.insertTrigger(text)),
         dismissKeyboard: () => editor.blur(),
+        // Not wrapped in `run()`: this never changes the document. Skipped
+        // mid-composition, where a dispatch would end the composition and eat
+        // a half-typed CJK character.
+        scrollCaretIntoView: () => {
+          if (editor.view.composing) {
+            return
+          }
+          editor.commands.scrollIntoView()
+        },
       }
 
       function handleFocusIn(): void {

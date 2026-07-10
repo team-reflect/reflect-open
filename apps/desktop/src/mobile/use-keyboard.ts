@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import { addPluginListener, invoke } from '@tauri-apps/api/core'
 import { z } from 'zod'
+import { focusedEditorCommands } from '@/editor/formatting-toolbar-store'
 
 const keyboardStateSchema = z.object({ height: z.number(), duration: z.number() })
 
@@ -105,4 +106,35 @@ export function useKeyboardHeightVar(): void {
       publishKeyboardHeight(0)
     }
   }, [])
+}
+
+/**
+ * Re-reveals the caret whenever the keyboard changes the visible area.
+ *
+ * Focus raises the keyboard before any height arrives, so the focus-time
+ * reveal ran against the full-height viewport and did nothing; once the shell
+ * shrinks, nothing else scrolls the caret back (WebKit's own reveal is pinned
+ * off in `KeyboardPlugin.swift`). Mounted once: every screen's editors publish
+ * to the same focused-editor slot, and `scrollCaretIntoView` is a no-op while
+ * the caret is already visible.
+ */
+export function useKeyboardCaretReveal(): void {
+  const height = useSyncExternalStore(subscribeKeyboard, getKeyboardHeight, getKeyboardHeight)
+
+  useEffect(() => {
+    if (height <= 0) {
+      return
+    }
+    // Passive effect: runs after the paint that applied the shrunken shell,
+    // so the scroll container is already at its final height.
+    focusedEditorCommands()?.scrollCaretIntoView()
+    // Backstop for chrome that settles a frame late (the tab bar swaps for
+    // the toolbar); re-read the slot, the focused editor may have changed.
+    const frame = requestAnimationFrame(() => {
+      focusedEditorCommands()?.scrollCaretIntoView()
+    })
+    return () => {
+      cancelAnimationFrame(frame)
+    }
+  }, [height])
 }

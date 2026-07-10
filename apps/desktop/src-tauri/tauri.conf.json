@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Reflect",
-  "version": "0.4.0",
+  "version": "../package.json",
   "identifier": "app.reflect.desktop",
   "build": {
     "beforeDevCommand": "pnpm sidecar && pnpm dev",
@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' ipc: http://ipc.localhost; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: reflect-asset: https:; font-src 'self' data:; frame-src 'self' https://platform.twitter.com https://platform.x.com https://syndication.twitter.com https://www.youtube-nocookie.com https://www.youtube.com; connect-src 'self' ipc: http://ipc.localhost https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://openrouter.ai https://github.com https://api.github.com"
+      "csp": "default-src 'self' ipc: http://ipc.localhost; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: reflect-asset: https:; font-src 'self' data:; frame-src 'self' https://platform.twitter.com https://platform.x.com https://syndication.twitter.com https://www.youtube-nocookie.com https://www.youtube.com; connect-src 'self' ipc: http://ipc.localhost https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://openrouter.ai https://github.com https://api.github.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io"
     }
   },
   "plugins": {

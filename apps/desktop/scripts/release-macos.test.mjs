@@ -8,6 +8,8 @@ import {
   canLaunchTarget,
   createBetaFeedReleaseArgs,
   createDmgArgs,
+  createExistingReleaseUploadArgs,
+  createFinalizeReleaseArgs,
   createGenerateReleaseNotesArgs,
   createMacDownloadNotice,
   createReleaseArgs,
@@ -80,6 +82,67 @@ test('draft publish keeps the draft flag last', () => {
   })
 
   expect(args.at(-1)).toBe('--draft')
+})
+
+test('draft release uploads clobber so a crashed publish can retry', () => {
+  expect(
+    createExistingReleaseUploadArgs({
+      assets: ['Reflect.dmg', 'Reflect.app.tar.gz', 'latest.json'],
+      tag: 'v0.5.0-beta.1',
+    }),
+  ).toEqual(['release', 'upload', 'v0.5.0-beta.1', 'Reflect.dmg', 'Reflect.app.tar.gz', 'latest.json', '--clobber'])
+})
+
+test('finalizing a beta draft keeps the pre-release flag and undrafts last', () => {
+  const args = createFinalizeReleaseArgs({
+    keepDraft: false,
+    notesPath: 'release-notes.md',
+    prerelease: true,
+    productName: 'Reflect Beta',
+    tag: 'v0.5.0-beta.1',
+    version: '0.5.0-beta.1',
+  })
+
+  expect(args).toEqual([
+    'release',
+    'edit',
+    'v0.5.0-beta.1',
+    '--title',
+    'Reflect Beta 0.5.0-beta.1',
+    '--notes-file',
+    'release-notes.md',
+    '--prerelease',
+    '--latest=false',
+    '--draft=false',
+  ])
+})
+
+test('finalizing a stable draft promotes it to the latest release', () => {
+  const args = createFinalizeReleaseArgs({
+    keepDraft: false,
+    notesPath: 'release-notes.md',
+    prerelease: false,
+    productName: 'Reflect',
+    tag: 'v0.5.0',
+    version: '0.5.0',
+  })
+
+  expect(args).toContain('--latest')
+  expect(args).toContain('--prerelease=false')
+  expect(args.at(-1)).toBe('--draft=false')
+})
+
+test('finalizing with --draft leaves the release a draft for review', () => {
+  const args = createFinalizeReleaseArgs({
+    keepDraft: true,
+    notesPath: 'release-notes.md',
+    prerelease: true,
+    productName: 'Reflect Beta',
+    tag: 'v0.5.0-beta.1',
+    version: '0.5.0-beta.1',
+  })
+
+  expect(args).not.toContain('--draft=false')
 })
 
 test('generated release notes API targets the release tag and commit', () => {

@@ -1,9 +1,10 @@
 //! Remote-asset localization for the Reflect V1 import.
 //!
-//! V1 notes link attachments straight at Firebase Storage download URLs. An
-//! import must not leave a graph depending on Reflect V1's infrastructure, so
-//! every such URL is downloaded into the graph's `assets/` directory and the
-//! markdown link is rewritten to the relative `assets/…` path.
+//! V1 notes link attachments straight at Firebase Storage and Reflect's asset
+//! CDN. An import must not leave a graph depending on Reflect V1's
+//! infrastructure, so every such URL is downloaded into the graph's `assets/`
+//! directory and the markdown link is rewritten to the relative `assets/…`
+//! path.
 //!
 //! Download failures split by permanence: a 4xx means the asset is gone (or
 //! the token was revoked) and no retry will help, so the note keeps its remote
@@ -20,9 +21,12 @@ use std::time::Duration;
 
 use crate::error::{AppError, AppResult};
 
-/// Only asset links on Reflect V1's storage host are localized; every other
+/// Only asset links on Reflect V1's storage hosts are localized; every other
 /// URL in the export is an ordinary link and imports untouched.
-pub(super) const V1_ASSET_URL_PREFIX: &str = "https://firebasestorage.googleapis.com/";
+pub(super) const V1_ASSET_URL_PREFIXES: &[&str] = &[
+    "https://firebasestorage.googleapis.com/",
+    "https://reflect-assets.app/v1/users/",
+];
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 /// Per-read stall timeout. There is deliberately no whole-request timeout so
@@ -57,17 +61,26 @@ pub(super) struct FetchedAsset {
     pub desired_name: String,
 }
 
-/// Find every remote-asset URL in `markdown` that starts with `prefix`.
+/// Find every remote-asset URL in `markdown` that starts with one of
+/// `prefixes`.
 ///
 /// V1 exports escape URL punctuation the CommonMark way (`?alt=media\&token=`),
 /// so the span keeps the escaped bytes (for splicing) while `url` holds the
 /// unescaped form (for fetching). A span ends at whitespace or any character
 /// that terminates a markdown link destination.
-pub(super) fn scan_remote_spans(markdown: &str, prefix: &str) -> Vec<RemoteSpan> {
+pub(super) fn scan_remote_spans<P: AsRef<str>>(markdown: &str, prefixes: &[P]) -> Vec<RemoteSpan> {
     let mut spans = Vec::new();
     let mut from = 0;
-    while let Some(found) = markdown[from..].find(prefix) {
-        let start = from + found;
+    while let Some((start, prefix)) = prefixes
+        .iter()
+        .filter_map(|candidate| {
+            let prefix = candidate.as_ref();
+            markdown[from..]
+                .find(prefix)
+                .map(|found| (from + found, prefix))
+        })
+        .min_by_key(|(start, _)| *start)
+    {
         let mut url = String::new();
         let mut cursor = start;
         let mut chars = markdown[start..].char_indices().peekable();
@@ -108,13 +121,13 @@ pub(super) fn scan_remote_spans(markdown: &str, prefix: &str) -> Vec<RemoteSpan>
 /// Replace the remote spans of `markdown` whose URL has a localized path in
 /// `replacements` (URL → `assets/…`). URLs without a replacement (permanent
 /// download failures) keep their remote form.
-pub(super) fn rewrite_markdown(
+pub(super) fn rewrite_markdown<P: AsRef<str>>(
     markdown: &str,
-    prefix: &str,
+    prefixes: &[P],
     replacements: &HashMap<String, String>,
 ) -> String {
     let mut result = markdown.to_string();
-    for span in scan_remote_spans(markdown, prefix).into_iter().rev() {
+    for span in scan_remote_spans(markdown, prefixes).into_iter().rev() {
         if let Some(local) = replacements.get(&span.url) {
             result.replace_range(span.start..span.end, local);
         }
@@ -135,7 +148,7 @@ pub(super) fn rewrite_asset_paths(
         return markdown.to_string();
     }
     let mut result = markdown.to_string();
-    for span in scan_remote_spans(markdown, "assets/").into_iter().rev() {
+    for span in scan_remote_spans(markdown, &["assets/"]).into_iter().rev() {
         let opens_destination = markdown[..span.start]
             .chars()
             .next_back()
@@ -571,12 +584,12 @@ mod tests {
     use std::fs;
     use tempfile::tempdir;
 
-    const PREFIX: &str = "https://firebasestorage.googleapis.com/";
+    const PREFIXES: &[&str] = &["https://firebasestorage.googleapis.com/"];
 
     #[test]
     fn scan_finds_escaped_urls_in_link_destinations() {
         let markdown = "![](https://firebasestorage.googleapis.com/v0/b/x/o/a?alt=media\\&token=t)\nplain text\n[memo.m4a](https://firebasestorage.googleapis.com/v0/b/x/o/b?alt=media\\&token=u)";
-        let spans = scan_remote_spans(markdown, PREFIX);
+        let spans = scan_remote_spans(markdown, PREFIXES);
         assert_eq!(spans.len(), 2);
         assert_eq!(
             spans[0].url,
@@ -595,13 +608,13 @@ mod tests {
     #[test]
     fn scan_ignores_other_hosts() {
         let markdown = "[a](https://example.com/file.png)";
-        assert!(scan_remote_spans(markdown, PREFIX).is_empty());
+        assert!(scan_remote_spans(markdown, PREFIXES).is_empty());
     }
 
     #[test]
     fn scan_stops_at_terminators() {
         let markdown = "see https://firebasestorage.googleapis.com/v0/o/a?alt=media end";
-        let spans = scan_remote_spans(markdown, PREFIX);
+        let spans = scan_remote_spans(markdown, PREFIXES);
         assert_eq!(spans.len(), 1);
         assert_eq!(
             spans[0].url,
@@ -617,8 +630,42 @@ mod tests {
             "assets/photo.webp".to_string(),
         )]);
         assert_eq!(
-            rewrite_markdown(markdown, PREFIX, &replacements),
+            rewrite_markdown(markdown, PREFIXES, &replacements),
             "![](assets/photo.webp) and [f](https://firebasestorage.googleapis.com/o/b?alt=media\\&token=u)"
+        );
+    }
+
+    #[test]
+    fn scan_and_rewrite_support_all_v1_asset_hosts_in_source_order() {
+        let reflect_user = "https://reflect-assets.app/v1/users/user/asset?key=k1";
+        let reflect_graph = "https://reflect-assets.app/v1/users/user/graph/asset?key=k2";
+        let firebase =
+            "https://firebasestorage.googleapis.com/v0/b/bucket/o/asset?alt=media&token=t";
+        let markdown = format!("![]({reflect_user})\n\n![]({firebase})\n\n![]({reflect_graph})\n");
+
+        let spans = scan_remote_spans(&markdown, V1_ASSET_URL_PREFIXES);
+
+        assert_eq!(
+            spans
+                .iter()
+                .map(|span| span.url.as_str())
+                .collect::<Vec<_>>(),
+            [reflect_user, firebase, reflect_graph]
+        );
+        let replacements = HashMap::from([
+            (
+                reflect_user.to_string(),
+                "assets/reflect-user.png".to_string(),
+            ),
+            (
+                reflect_graph.to_string(),
+                "assets/reflect-graph.png".to_string(),
+            ),
+            (firebase.to_string(), "assets/firebase.png".to_string()),
+        ]);
+        assert_eq!(
+            rewrite_markdown(&markdown, V1_ASSET_URL_PREFIXES, &replacements),
+            "![](assets/reflect-user.png)\n\n![](assets/firebase.png)\n\n![](assets/reflect-graph.png)\n"
         );
     }
 

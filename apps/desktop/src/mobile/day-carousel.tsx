@@ -54,7 +54,11 @@ export function DayCarousel({
   const [scrollMemory] = useState(() => new Map<string, number>())
 
   return (
-    <div className="min-h-0 flex-1 overflow-hidden" ref={emblaRef}>
+    /* `overflow: clip`: not a scroll container, so a stray scrollLeft write
+       (ProseMirror's caret reveal) cannot offset the transform-positioned
+       belt. Inline so pre-iOS-16 falls back to the class's `hidden`, healed
+       by the scroll guard in useDayCarousel. */
+    <div className="min-h-0 flex-1 overflow-hidden" style={{ overflow: 'clip' }} ref={emblaRef}>
       <div className="flex h-full">
         {Array.from({ length: dayWindow.count }, (_, index) => {
           const day = dateAtIndex(dayWindow, index)

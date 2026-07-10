@@ -173,7 +173,13 @@ export function createBackupController(options: BackupControllerOptions): Backup
     emitFileChanges(changes)
     const indexable = changes.filter((change) => isNotePath(change.path))
     if (indexGeneration !== null && indexable.length > 0) {
-      void applyIndexChanges(indexable, indexGeneration).then((mutations) => {
+      void applyIndexChanges(
+        indexable,
+        indexGeneration,
+        undefined,
+        undefined,
+        () => !isMobileSurface() || document.visibilityState !== 'hidden',
+      ).then((mutations) => {
         if (mutations > 0) {
           throttledInvalidateIndexQueries()
         }
@@ -288,6 +294,13 @@ export function createBackupController(options: BackupControllerOptions): Backup
       const next = createSyncEngine({
         generation,
         ...(isMobileSurface() ? { idleMs: MOBILE_IDLE_MS } : {}),
+        // iOS can suspend us at any await. Do not begin a launch, online, or
+        // debounced Git cycle after the document is hidden; the existing
+        // visible/focus trigger below replays a full cycle on foreground.
+        // The background flusher's protected local commit bypasses this
+        // engine deliberately.
+        canStartCycle: () =>
+          !isMobileSurface() || document.visibilityState !== 'hidden',
         // The managed token is for github.com only — a generic host must
         // never receive it. Rust resolves generic credentials locally.
         getToken: repo === null ? async () => null : () => getGithubToken(providerFetch),
