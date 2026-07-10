@@ -161,18 +161,15 @@ function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?: Route
 }
 
 describe('Sidebar', () => {
-  it('nav rows navigate, with Daily notes restoring its surface scroll', async () => {
-    const { view, navigate } = renderSidebar()
+  it('nav rows navigate, with Daily notes always re-anchoring to today', async () => {
+    const { view, navigate } = renderSidebar(undefined, { kind: 'settings' })
 
-    // The Daily row is a capture gesture: it asks for editor focus (the
-    // stream appends at today's end), while a genuine off-surface return
-    // still restores the stream's saved position instead.
+    // The Daily row shares the ⌘D capture command: omitting
+    // `restoreSurfaceScroll` makes even an off-surface return discard the
+    // stream's saved position and re-anchor on today.
     await userEvent.click(view.getByRole('button', { name: /daily notes/i }))
     await waitFor(() =>
-      expect(navigate).toHaveBeenCalledWith(
-        { kind: 'today' },
-        { restoreSurfaceScroll: true, focusEditor: true },
-      ),
+      expect(navigate).toHaveBeenCalledWith({ kind: 'today' }, { focusEditor: true }),
     )
 
     await userEvent.click(view.getByRole('button', { name: /settings/i }))

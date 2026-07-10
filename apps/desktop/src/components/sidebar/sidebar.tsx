@@ -31,10 +31,8 @@ interface SidebarProps {
  * Pinned shelf, and the graph switcher footer. Most nav rows run registered
  * commands so a binding and its behavior stay one definition; the Daily notes
  * row is a capture gesture like `Mod-D` — it asks the stream to focus today
- * with the caret at the end, ready to append — except when clicked from
- * another surface with a saved stream position, where the surface-scroll
- * restore wins and focus stays put. (Sidebar collapse stays on `Mod-\` via
- * the command registry.)
+ * with the caret at the end, ready to append. (Sidebar collapse stays on
+ * `Mod-\` via the command registry.)
  */
 export function Sidebar({ graph, context }: SidebarProps): ReactElement {
   const { route } = useRouter()
@@ -75,12 +73,7 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
             label="Daily notes"
             binding={keybindingFor('nav.today') ?? undefined}
             active={(route.kind === 'today' || route.kind === 'daily') && !hasActivePinnedNote}
-            onClick={() =>
-              context.navigate(
-                { kind: 'today' },
-                { restoreSurfaceScroll: true, focusEditor: true },
-              )
-            }
+            onClick={() => void runCommand('nav.today', context)}
           />
           <SidebarItem
             icon={
