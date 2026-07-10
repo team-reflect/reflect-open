@@ -5,7 +5,13 @@ interface FlushableDomObserver {
   flush(): void
 }
 
-function isFlushableDomObserver(value: unknown): value is FlushableDomObserver {
+/**
+ * Does `value` look like ProseMirror's private `DOMObserver`? Exported only
+ * for the rot-detection test that mounts the real editor: when a meowdown or
+ * ProseMirror upgrade changes this internal shape, the barrier degrades to a
+ * no-op by design — the test turns that silent degradation into a CI failure.
+ */
+export function isFlushableDomObserver(value: unknown): value is FlushableDomObserver {
   if (typeof value !== 'object' || value === null) {
     return false
   }
@@ -44,7 +50,17 @@ function flushPendingEditorDom(handle: EditorHandle | null): boolean {
   return !editor.state.doc.eq(previous)
 }
 
-/** Flush pending native input, then serialize the editor's settled document. */
+/**
+ * Flush pending native input, then serialize the editor's settled document.
+ *
+ * This runs on every serialization — including the per-change callback, not
+ * just persistence flushes — deliberately: a doc change dispatched while a
+ * composition's mutation records sit in the delayed queue would otherwise
+ * hand the session a buffer missing the composed text, and the debounced
+ * save can persist that stale buffer before the 20ms timer corrects it.
+ * Re-entry from inside a dispatch is safe: a second flush finds no pending
+ * records and stops (verified against WebKit in the Meowdown 0.42 harness).
+ */
 export function settledEditorMarkdown(handle: EditorHandle | null): string {
   flushPendingEditorDom(handle)
   return handle?.getMarkdown() ?? ''

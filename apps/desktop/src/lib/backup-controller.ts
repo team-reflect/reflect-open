@@ -173,15 +173,24 @@ export function createBackupController(options: BackupControllerOptions): Backup
     emitFileChanges(changes)
     const indexable = changes.filter((change) => isNotePath(change.path))
     if (indexGeneration !== null && indexable.length > 0) {
-      const mutations = await applyIndexChanges(
-        indexable,
-        indexGeneration,
-        undefined,
-        undefined,
-        () => !isMobileSurface() || document.visibilityState !== 'hidden',
-      )
-      if (mutations > 0) {
-        throttledInvalidateIndexQueries()
+      // Awaited so sync only reports idle once pulled notes are indexed —
+      // but a failure here must not fail the cycle: the index is a
+      // rebuildable projection (the reconcile scan heals it), while the
+      // cycle's remaining work pushes the user's markdown. Markdown backup
+      // never waits on projection health.
+      try {
+        const mutations = await applyIndexChanges(
+          indexable,
+          indexGeneration,
+          undefined,
+          undefined,
+          () => !isMobileSurface() || document.visibilityState !== 'hidden',
+        )
+        if (mutations > 0) {
+          throttledInvalidateIndexQueries()
+        }
+      } catch (cause) {
+        console.error('pulled-note direct index apply failed:', cause)
       }
     }
   }

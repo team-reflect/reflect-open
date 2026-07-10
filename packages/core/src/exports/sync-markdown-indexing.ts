@@ -175,7 +175,6 @@ export {
   resolveNoteTarget,
   rewriteLinksForTitleChange,
   nextAliases,
-  availableNotePath,
   availableTemplatePath,
   slugPathForTitle,
   templateSlugPathForTitle,

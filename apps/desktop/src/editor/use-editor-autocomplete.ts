@@ -13,11 +13,11 @@ import {
   suggestTags,
   suggestWikiTargets,
 } from '@reflect/core'
+import { reportAmbiguousNoteTitle } from '@/editor/ambiguous-note-feedback'
 import { buildAutocompleteEntries } from '@/editor/wiki-autocomplete-entries'
 import { useContactsAuthorization } from '@/hooks/use-contacts-authorization'
 import { formatDayLabel, todayIso } from '@/lib/dates'
 import { createPersonNoteFromContact } from '@/lib/note-contact'
-import { startOperation } from '@/lib/operations'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
 
@@ -59,9 +59,7 @@ export function useEditorAutocomplete(): EditorAutocomplete {
       if (generation !== null) {
         const outcome = await resolveOrCreateNoteWithTitle(title, generation)
         if (outcome.kind === 'ambiguous') {
-          startOperation('Creating note').fail(
-            `Couldn’t safely choose one note matching “${title}”. Choose the intended note from autocomplete.`,
-          )
+          reportAmbiguousNoteTitle('Creating note', title)
         }
       }
     },

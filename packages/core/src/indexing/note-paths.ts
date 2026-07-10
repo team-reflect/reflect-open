@@ -12,10 +12,13 @@ import { db } from './db'
  * disk: the index lags the watcher by a debounce, and an unindexed file must
  * never be clobbered by a new note's slug.
  *
- * Two entry points share one probe loop: {@link availableNotePath} for
- * creation (every candidate must be free) and {@link slugPathForTitle} for
- * the rename pipeline (the note's own path always counts as free — a note
- * never collides with itself, and never "tightens" to a shorter suffix).
+ * The entry points share one probe loop: {@link slugPathForTitle} /
+ * {@link templateSlugPathForTitle} for the rename pipeline (the note's own
+ * path always counts as free — a note never collides with itself, and never
+ * "tightens" to a shorter suffix) and {@link availableTemplatePath} for
+ * template creation. Note creation no longer probes here: it claims each
+ * candidate atomically through the no-clobber `note_create` command
+ * (`createNoteWithTitle`), where disk occupancy is the only authority.
  * See `docs/readable-filenames.md`.
  */
 
@@ -39,7 +42,7 @@ async function pathTaken(path: string): Promise<boolean> {
 const MAX_COLLISION_PROBES = 1000
 
 /**
- * The one probe loop both entry points share: candidates are the bare slug,
+ * The one probe loop the entry points share: candidates are the bare slug,
  * then `-2`, `-3`, …; the note's own current path (when given) is always an
  * acceptable answer — a note never collides with itself.
  */
@@ -62,20 +65,9 @@ async function probeNotePath(
 }
 
 /**
- * The first available `notes/…` path for `slug` (note creation). `taken` is
- * injectable for tests; the default probes the index and the filesystem.
- */
-export async function availableNotePath(
-  slug: string,
-  taken: (path: string) => Promise<boolean> = pathTaken,
-): Promise<string> {
-  return probeNotePath(slug, taken, null)
-}
-
-/**
  * The first available `templates/…` path for `slug` (template creation) —
- * the same probe and collision suffix as {@link availableNotePath}, in the
- * templates directory.
+ * the shared probe and collision suffix, in the templates directory. `taken`
+ * is injectable for tests; the default probes the index and the filesystem.
  */
 export async function availableTemplatePath(
   slug: string,

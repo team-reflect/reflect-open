@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { resolveOrCreateNoteWithTitle, resolveWikiTarget } from '@reflect/core'
+import { reportAmbiguousNoteTitle } from '@/editor/ambiguous-note-feedback'
 import { isIsoDate } from '@/lib/dates'
-import { startOperation } from '@/lib/operations'
 import { isNewWindowClick, openRouteInNewWindow } from '@/lib/windows/open-in-new-window'
 import { routeForPath, type Route } from '@/routing/route'
 import { useRouter } from '@/routing/router'
@@ -80,9 +80,7 @@ export function useWikiLinkNavigation(
               return
             }
             if (outcome.kind === 'ambiguous') {
-              startOperation('Opening link').fail(
-                `Couldn’t safely choose one note matching “${resolution.text}”. Choose the intended note from autocomplete.`,
-              )
+              reportAmbiguousNoteTitle('Opening link', resolution.text)
             } else {
               await open({ kind: 'note', path: outcome.path })
             }
