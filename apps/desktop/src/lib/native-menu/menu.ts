@@ -6,6 +6,7 @@ import {
   type PredefinedMenuItemOptions,
 } from '@tauri-apps/api/menu'
 import { APP_COMMANDS } from '@/lib/commands/app-commands'
+import { isMainWindow } from '@/lib/windows/window-role'
 import { bindingToAccelerator } from './accelerator'
 import { dispatchMenuCommand } from './dispatch'
 
@@ -112,6 +113,8 @@ export function appMenuLayout(): AppSubmenuLayout[] {
       text: 'Window',
       nsAppRole: 'windows',
       entries: [
+        command('note.openInNewWindow'),
+        separator(),
         predefined('Minimize'),
         predefined('Maximize', 'Zoom'),
         separator(),
@@ -172,7 +175,10 @@ function isMacosDesktop(): boolean {
  * so a focused webview never double-fires a command.
  */
 export async function installNativeMenu(): Promise<void> {
-  if (!isMacosDesktop()) {
+  // Menu actions use channels owned by the webview that created them. A note
+  // window has no command dispatcher, so it must not replace the app-wide
+  // menu installed by the main workspace with an inert copy.
+  if (!isMacosDesktop() || !isMainWindow()) {
     return
   }
   const layouts = appMenuLayout()

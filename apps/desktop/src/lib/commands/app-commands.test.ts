@@ -20,6 +20,7 @@ const getNote = vi.hoisted(() => vi.fn<() => Promise<NoteRow | undefined>>(async
 const getPinnedNotes = vi.hoisted(() => vi.fn<() => Promise<PinnedNote[]>>(async () => []))
 const hasBridge = vi.hoisted(() => vi.fn(() => true))
 const toggleDevtools = vi.hoisted(() => vi.fn(async () => undefined))
+const openRouteInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
 const operationFail = vi.hoisted(() => vi.fn())
 const startOperation = vi.hoisted(() =>
   vi.fn(() => ({ progress: vi.fn(), done: vi.fn(), fail: operationFail })),
@@ -31,6 +32,7 @@ vi.mock('@/lib/semantic', async (importOriginal) => ({
 vi.mock('@/lib/note-pin', () => ({ toggleNotePinned }))
 vi.mock('@/lib/note-private', () => ({ toggleNotePrivate }))
 vi.mock('@/lib/note-deep-link', () => ({ runCopyDeepLink }))
+vi.mock('@/lib/windows/open-in-new-window', () => ({ openRouteInNewWindow }))
 vi.mock('@/lib/operations', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/operations')>()),
   startOperation,
@@ -123,6 +125,10 @@ describe('keybindingFor', () => {
 
   it('note.copyDeepLink keeps the V1 copy-link shortcut', () => {
     expect(keybindingFor('note.copyDeepLink')).toBe('Alt-Mod-l')
+  })
+
+  it('note.openInNewWindow uses the system-level open-window shortcut', () => {
+    expect(keybindingFor('note.openInNewWindow')).toBe('Mod-Shift-o')
   })
 
   it('graph switch commands use macOS command-number bindings', () => {
@@ -224,6 +230,29 @@ describe('app commands', () => {
     })
     await command('note.new').run(context)
     expect(clearScrollState).not.toHaveBeenCalled()
+  })
+
+  it('note.openInNewWindow opens the selected note, including the focused daily note', async () => {
+    openRouteInNewWindow.mockReset().mockResolvedValue(true)
+    const { context } = fakeContext({ route: () => ({ kind: 'note', path: 'notes/a.md' }) })
+    await command('note.openInNewWindow').run(context)
+    expect(openRouteInNewWindow).toHaveBeenLastCalledWith({
+      kind: 'note',
+      path: 'notes/a.md',
+    })
+
+    const { context: focusedDaily } = fakeContext({
+      notePath: () => 'daily/2026-06-18.md',
+    })
+    await command('note.openInNewWindow').run(focusedDaily)
+    expect(openRouteInNewWindow).toHaveBeenLastCalledWith({ kind: 'daily', date: '2026-06-18' })
+  })
+
+  it('note.openInNewWindow is inert on a screen with no selected note', async () => {
+    openRouteInNewWindow.mockReset().mockResolvedValue(true)
+    const { context } = fakeContext({ route: () => ({ kind: 'settings' }) })
+    await command('note.openInNewWindow').run(context)
+    expect(openRouteInNewWindow).not.toHaveBeenCalled()
   })
 
   it('note.random navigates to the picked note and no-ops on an empty graph', async () => {

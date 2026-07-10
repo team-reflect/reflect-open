@@ -1,4 +1,4 @@
-//! Secondary note windows (⌘-click a note link → its own window, Plan 06).
+//! Secondary note windows (modifier-click or command → its own window, Plan 06).
 //!
 //! The shell owns *creation* only: one window per deep-link target, deduped
 //! by a content-addressed label, plus the one-shot bootstrap a secondary

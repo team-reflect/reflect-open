@@ -4,7 +4,7 @@ import { hasBridge } from '@reflect/core'
 /**
  * Which window this webview is: the main window (the config-declared `main`
  * label — also what plain-browser dev and mobile report) or a secondary
- * `note-*` window opened by ⌘-clicking a note link.
+ * `note-*` window opened by a modifier click or command.
  *
  * Secondary windows *adopt* the main window's graph session and run none of
  * the app-wide singletons — the index writer, sync/backup, the capture

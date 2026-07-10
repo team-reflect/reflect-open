@@ -48,15 +48,20 @@ under every window at once.
 
 ## Opening a window
 
-1. A modifier click (`isNewWindowClick` — **mouse events only**: meowdown
-   also fires link handlers for Mod-Enter keyboard follows, whose modifier
-   is held by definition) resolves the target as usual, then calls
-   `openRouteInNewWindow` / `openDeepLinkInNewWindow`
-   (`src/lib/windows/open-in-new-window.ts`). Routes serialize through the
-   existing deep-link grammar (`deepLinkForRoute`); capture links (`append`,
-   `task`) are writes, not places, and never window-ify. Any declined or
-   failed open falls back to in-window navigation, so the modifier can never
-   make a link do nothing.
+1. A new-window intent comes from modifier-clicking a note link on any note
+   surface, modifier-clicking a calendar day in the main workspace, or running
+   the main workspace's `note.openInNewWindow` command with
+   Cmd/Ctrl+Shift+O. `isNewWindowClick` applies to **mouse events only**:
+   meowdown also fires link handlers for Mod-Enter keyboard follows, whose
+   modifier is held by definition. The command targets
+   `CommandContext.notePath()`, which follows the focused day inside the daily
+   stream as well as ordinary note routes, and is also exposed in the native
+   Window menu. All three paths call `openRouteInNewWindow` /
+   `openDeepLinkInNewWindow` (`src/lib/windows/open-in-new-window.ts`). Routes
+   serialize through the existing deep-link grammar (`deepLinkForRoute`);
+   capture links (`append`, `task`) are writes, not places, and never
+   window-ify. Any declined or failed modifier-click open falls back to
+   in-window navigation, so the modifier can never make a click do nothing.
 2. `open_note_window` (`src-tauri/src/windows.rs`) refuses without an open
    graph or while a quit is in flight, dedupes by label (see
    [Focus & re-navigation](#focus--re-navigation)), stores the deep link in
@@ -160,6 +165,10 @@ can contend; the writer connection carries a 5s `busy_timeout`
   eventual alternative if that usage ever matters.
 - The same note open in two windows converges through the existing
   external-change reconciliation, the same path an iCloud edit takes.
+- The native macOS application menu is installed by the main window only.
+  Menu action channels belong to the webview that creates them; letting a
+  chrome-free note window replace the app-wide menu would leave command items
+  with no `useAppShortcuts` dispatcher.
 - A note window's settings screen shows sync as loading (its controller is
   deliberately inert).
 - **Settings are effectively main-window-owned.** Note windows mount no

@@ -1,4 +1,4 @@
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -14,12 +14,17 @@ const dailyDatesInRange = vi.hoisted(() => vi.fn())
 const relatedNotes = vi.hoisted(() => vi.fn())
 const readNote = vi.hoisted(() => vi.fn())
 const useNoteRow = vi.hoisted(() => vi.fn<(path: string) => NoteRow | null>(() => null))
+const openRouteInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
   dailyDatesInRange,
   readNote,
   relatedNotes,
+}))
+vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/windows/open-in-new-window')>()),
+  openRouteInNewWindow,
 }))
 vi.mock('@/hooks/use-note-row', () => ({ useNoteRow }))
 vi.mock('@/providers/graph-provider', () => ({
@@ -70,6 +75,7 @@ beforeEach(() => {
   readNote.mockReset().mockResolvedValue('- daily entry\n')
   relatedNotes.mockReset().mockResolvedValue([])
   useNoteRow.mockReset().mockReturnValue(null)
+  openRouteInNewWindow.mockReset().mockResolvedValue(true)
 })
 
 afterEach(cleanup)
@@ -94,6 +100,30 @@ describe('DailyContextSidebar calendar', () => {
 
     await userEvent.click(view.getByRole('button', { name: formatDayLabel('2026-06-18', 'mdy') }))
     expect(view.getByTestId('route').textContent).toContain('2026-06-18')
+    view.unmount()
+  })
+
+  it('opens a day in a new window on ⌘-click without moving the current window', async () => {
+    const view = renderSidebar('2026-06-09')
+    const day = view.getByRole('button', { name: formatDayLabel('2026-06-18', 'mdy') })
+
+    fireEvent.click(day, { metaKey: true })
+
+    await waitFor(() =>
+      expect(openRouteInNewWindow).toHaveBeenCalledWith({ kind: 'daily', date: '2026-06-18' }),
+    )
+    expect(view.getByTestId('route').textContent).toBe(JSON.stringify({ kind: 'today' }))
+    view.unmount()
+  })
+
+  it('falls back to in-window day navigation when a new window cannot open', async () => {
+    openRouteInNewWindow.mockResolvedValue(false)
+    const view = renderSidebar('2026-06-09')
+    const day = view.getByRole('button', { name: formatDayLabel('2026-06-18', 'mdy') })
+
+    fireEvent.click(day, { metaKey: true })
+
+    await waitFor(() => expect(view.getByTestId('route').textContent).toContain('2026-06-18'))
     view.unmount()
   })
 
