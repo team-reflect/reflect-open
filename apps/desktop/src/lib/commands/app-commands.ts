@@ -14,7 +14,8 @@ import { toggleNotePinned } from '@/lib/note-pin'
 import { toggleNotePrivate } from '@/lib/note-private'
 import { startOperation } from '@/lib/operations'
 import { rebuildIndexVisibly } from '@/lib/rebuild-index'
-import { type Route } from '@/routing/route'
+import { openRouteInNewWindow } from '@/lib/windows/open-in-new-window'
+import { routeForPath, type Route } from '@/routing/route'
 import { registerCommands } from './registry'
 import type { AppCommand, CommandContext } from './types'
 
@@ -93,6 +94,22 @@ const APP_COMMANDS: AppCommand[] = [
     keywords: ['create'],
     keybinding: 'Mod-n',
     run: openNewNote,
+  },
+  {
+    id: 'note.openInNewWindow',
+    title: 'Open note in new window',
+    keywords: ['window', 'duplicate', 'pop out'],
+    keybinding: 'Mod-Shift-o',
+    // `notePath` follows the focused day inside the daily stream. Converting
+    // that path back to a route also canonicalizes Today to a dated daily
+    // link, so every way of opening the day dedupes to the same window.
+    run: async (context) => {
+      const path = context.notePath()
+      if (path === null) {
+        return
+      }
+      await openRouteInNewWindow(routeForPath(path))
+    },
   },
   {
     id: 'chat.open',

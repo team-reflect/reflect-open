@@ -1,10 +1,10 @@
 # Multiple windows & cross-window communication
 
-⌘-click a note link — an editor `[[wiki link]]`, a backlink title or snippet,
-an in-note `reflect://` link — and the note opens in its own chrome-free
-window: just the editor with its backlinks, no sidebar, palette, or context
-panel. This document describes how those windows relate to the main window
-and to each other.
+Modifier-click a note link — an editor `[[wiki link]]`, a backlink title or
+snippet, an in-note `reflect://` link — or run the selected-note command, and
+the note opens in its own chrome-free window: just the editor with its
+backlinks, no sidebar, palette, or context panel. This document describes how
+those windows relate to the main window and to each other.
 
 Two ideas carry the whole design:
 
@@ -24,7 +24,7 @@ Two ideas carry the whole design:
 
 The webview's Tauri label decides the role: `main` is the config-declared
 window; note windows get content-addressed `note-<hash(deep link)>` labels
-(so re-⌘-clicking a target finds its window). The frontend reads the role
+(so reopening a target finds its window). The frontend reads the role
 via `isMainWindow()` (`src/lib/windows/window-role.ts`), which treats
 bridge-less environments — browser dev, jsdom, the `?platform=ios` harness —
 as main: they are all single-window.
@@ -47,6 +47,11 @@ opening a graph from a note window would re-root the shared `GraphState`
 under every window at once.
 
 ## Opening a window
+
+The main workspace also exposes `note.openInNewWindow` at Cmd/Ctrl+Shift+O.
+It targets `CommandContext.notePath()`, so the focused day in the daily stream
+and an ordinary routed note both open through the same mechanism described
+below. The command is also exposed in the native Window menu.
 
 1. A modifier click (`isNewWindowClick` — **mouse events only**: meowdown
    also fires link handlers for Mod-Enter keyboard follows, whose modifier
@@ -95,7 +100,7 @@ asymmetry is what each broadcast below exists to bridge.
 | `index:changed` | file watcher (`watcher.rs`) | every window | Open editors reconcile external changes; the main window's indexer applies the batch. Pre-dates multi-window; note windows get editor freshness from it for free. |
 | `index:written` | index write commands after a **committed** write (`db/mod.rs`) | note windows only | Refetch index-backed queries (backlinks, lists). The main window invalidates in-process via its indexer and must not subscribe — it would refetch twice. |
 | `note:moved` | `note_move_indexed` / `index_move` after rows commit | **every** window (`desktop-root.tsx`) | Retarget open sessions + router history after a rename. Renames can originate in any window (a title edit), and a window left behind would resurrect the dead path on its next save. The origin window's in-process handling makes the echo idempotent. |
-| `window:navigate` | `open_note_window` on a dedupe hit (targeted `emit_to`) | that note window | Re-⌘-clicking a target focuses its window *and* re-navigates it there — it may have browsed elsewhere since opening. |
+| `window:navigate` | `open_note_window` on a dedupe hit (targeted `emit_to`) | that note window | Reopening a target focuses its window *and* re-navigates it there — it may have browsed elsewhere since opening. |
 | `app:quit-requested` | the run loop on a deferred ⌘Q (`lib.rs`) | every window | Each window flushes its own dirty buffers, then confirms. |
 
 The write path that ties it together: a note window saves via the ordinary
@@ -160,6 +165,10 @@ can contend; the writer connection carries a 5s `busy_timeout`
   eventual alternative if that usage ever matters.
 - The same note open in two windows converges through the existing
   external-change reconciliation, the same path an iCloud edit takes.
+- The native macOS application menu is installed by the main window only.
+  Menu action channels belong to the webview that creates them; letting a
+  chrome-free note window replace the app-wide menu would leave command items
+  with no `useAppShortcuts` dispatcher.
 - A note window's settings screen shows sync as loading (its controller is
   deliberately inert).
 - **Settings are effectively main-window-owned.** Note windows mount no

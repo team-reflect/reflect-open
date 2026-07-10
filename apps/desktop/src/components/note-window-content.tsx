@@ -9,15 +9,14 @@ import { useSettings } from '@/providers/settings-provider'
 import { useRouter } from '@/routing/router'
 
 /**
- * A secondary note window's whole surface (⌘-click → new window): the routed
- * view, full-bleed — no workspace sidebar, no context panel, no palette or
- * dialogs. A note window is an editing surface; every other affordance lives
- * in the main window.
+ * A secondary note window's whole surface: the routed view, full-bleed — no
+ * workspace sidebar, context panel, palette, or dialogs. A note window is an
+ * editing surface; every other affordance lives in the main window.
  *
  * Daily targets render as a **single note pane**, not the daily stream: this
- * window shows the one note that was ⌘-clicked, so a daily source is treated
- * like any other note (`lazy` covers a not-yet-created day, same as the
- * stream's placeholder behavior).
+ * window shows the one requested note, so a daily source is treated like any
+ * other note (`lazy` covers a not-yet-created day, same as the stream's
+ * placeholder behavior).
  */
 export function NoteWindowContent(): ReactElement {
   const { route } = useRouter()

@@ -1,4 +1,4 @@
-//! Secondary note windows (⌘-click a note link → its own window, Plan 06).
+//! Secondary note windows (modifier-click or command → its own window, Plan 06).
 //!
 //! The shell owns *creation* only: one window per deep-link target, deduped
 //! by a content-addressed label, plus the one-shot bootstrap a secondary
@@ -32,10 +32,10 @@ pub const MAIN_WINDOW_LABEL: &str = "main";
 /// and hash labels would otherwise accrete in the state file forever).
 pub const NOTE_WINDOW_PREFIX: &str = "note-";
 
-/// Event delivered to an existing note window when its target is ⌘-clicked
-/// again: the window may have navigated elsewhere since it opened, so a
-/// focus alone could surface the wrong note — the payload (the deep link)
-/// re-navigates it to the clicked target.
+/// Event delivered when an already-open target is requested again: the window
+/// may have navigated elsewhere since it opened, so a focus alone could
+/// surface the wrong note — the payload (the deep link) re-navigates it to the
+/// requested target.
 const WINDOW_NAVIGATE_EVENT: &str = "window:navigate";
 
 /// Window properties that survive a desktop restart.
@@ -119,8 +119,8 @@ fn lock_init<'a>(
 }
 
 /// The label for a note window addressing `deep_link` — content-addressed so
-/// ⌘-clicking the same target focuses the existing window instead of piling
-/// up duplicates. Stable within a process run, which is all dedupe needs.
+/// reopening the same target focuses the existing window instead of piling up
+/// duplicates. Stable within a process run, which is all dedupe needs.
 fn note_window_label(deep_link: &str) -> String {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     deep_link.hash(&mut hasher);
@@ -129,8 +129,8 @@ fn note_window_label(deep_link: &str) -> String {
 
 /// Surface an already-open window for this target, when one exists: show,
 /// focus, and deliver the link ([`WINDOW_NAVIGATE_EVENT`]) so a window that
-/// has navigated away comes back to the note that was clicked. All
-/// best-effort — a focus that fails must not fail the click.
+/// has navigated away comes back to the note that was requested. All
+/// best-effort — a focus that fails must not fail the open request.
 fn focus_existing(app: &tauri::AppHandle, label: &str, deep_link: &str) -> bool {
     let Some(existing) = app.get_webview_window(label) else {
         return false;
@@ -176,7 +176,7 @@ pub async fn open_note_window(
     }
     // Mid-quit, a new webview would never join the flush handshake's pending
     // set — the armed windows' confirms would exit underneath it. Refuse
-    // (best-effort: the ⌘-click site degrades to in-window navigation).
+    // (best-effort: modifier-click callers degrade to in-window navigation).
     if quit.armed() {
         return Err(AppError::io("the app is quitting"));
     }

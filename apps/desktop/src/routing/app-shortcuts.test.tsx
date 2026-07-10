@@ -12,6 +12,9 @@ import { RouterProvider, useRouter } from './router'
 
 const newChat = vi.hoisted(() => vi.fn())
 const openRecent = vi.hoisted(() => vi.fn())
+const openRouteInNewWindow = vi.hoisted(() => vi.fn(async () => true))
+
+vi.mock('@/lib/windows/open-in-new-window', () => ({ openRouteInNewWindow }))
 
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({
@@ -45,6 +48,7 @@ registerAppCommands() // production does this in main.tsx
 afterEach(() => {
   cleanup()
   openRecent.mockClear()
+  openRouteInNewWindow.mockClear()
 })
 
 function shortcutsHook() {
@@ -95,6 +99,7 @@ describe('app shortcuts', () => {
       'Mod-Shift-a',
       'Mod-n',
       'Mod-Shift-n',
+      'Mod-Shift-o',
       'Mod-[',
       'Mod-]',
       'Mod-k',
@@ -135,6 +140,17 @@ describe('app shortcuts', () => {
     act(() => press('['))
     expect(result.current.router.route).toEqual({ kind: 'today' })
     expect(result.current.router.savedScroll()).toBeNull()
+  })
+
+  it('⌘⇧O opens the current note in a new window', () => {
+    const { result } = shortcutsHook()
+    act(() => press('n'))
+    const opened = result.current.router.route
+
+    act(() => press('o', { shiftKey: true }))
+
+    expect(openRouteInNewWindow).toHaveBeenCalledWith(opened)
+    expect(result.current.router.route).toEqual(opened)
   })
 
   it('⌘[ and ⌘] still traverse when the focused editor consumes the keydown', () => {
