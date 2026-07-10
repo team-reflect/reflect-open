@@ -113,6 +113,7 @@ export {
 export {
   rankWikiSuggestions,
   mergeDateSuggestions,
+  wikiSuggestionInsertText,
   type WikiSuggestion,
   type GeneratedDate,
 } from './suggest'

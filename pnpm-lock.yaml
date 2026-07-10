@@ -284,9 +284,18 @@ importers:
       '@ai-sdk/provider':
         specifier: ^3.0.11
         version: 3.0.11
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
+      better-sqlite3:
+        specifier: ^12.11.1
+        version: 12.11.1
       jsdom:
         specifier: ^29.1.1
         version: 29.1.1(@noble/hashes@1.8.0)
+      sqlite-vec:
+        specifier: ^0.1.9
+        version: 0.1.9
       typescript:
         specifier: ~6.0.3
         version: 6.0.3

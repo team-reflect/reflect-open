@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   mergeDateSuggestions,
   rankWikiSuggestions,
+  wikiSuggestionInsertText,
   type AliasCandidate,
   type TitleCandidate,
   type WikiSuggestion,
@@ -77,6 +78,28 @@ describe('rankWikiSuggestions', () => {
   it('honours the limit after merging', () => {
     const titles = Array.from({ length: 10 }, (_, i) => note(`Note ${i}`, i))
     expect(rankWikiSuggestions('note', titles, [], 3)).toHaveLength(3)
+  })
+})
+
+describe('wikiSuggestionInsertText', () => {
+  it('preserves an alias as display text while targeting the canonical note', () => {
+    const suggestion = rankWikiSuggestions(
+      'dad',
+      [],
+      [alias(note('Tim MacCaw // Dad'), 'Dad')],
+      8,
+    )[0]!
+
+    expect(wikiSuggestionInsertText(suggestion)).toBe('Tim MacCaw // Dad|Dad')
+  })
+
+  it('keeps title and date hits as bare targets', () => {
+    expect(wikiSuggestionInsertText(ranked('Roadmap'))).toBe('Roadmap')
+    expect(
+      wikiSuggestionInsertText(
+        ranked('2026-07-10', { target: '2026-07-10', date: '2026-07-10' }),
+      ),
+    ).toBe('2026-07-10')
   })
 })
 

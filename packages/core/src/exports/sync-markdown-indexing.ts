@@ -171,6 +171,7 @@ export {
   searchNotes,
   suggestWikiTargets,
   suggestTags,
+  wikiSuggestionInsertText,
   getIndexedFileFacts,
   getIndexedFileFactsByPath,
   resolveWikiTarget,

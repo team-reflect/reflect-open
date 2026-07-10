@@ -23,18 +23,30 @@ export interface GeneratedDate {
 
 /** A `[[` autocomplete candidate. */
 export interface WikiSuggestion {
-  /** What `[[…]]` should contain when chosen (the canonical title, or an ISO date). */
+  /** Canonical resolution target (a note title, or an ISO date). */
   target: string
   /** The note it resolves to — `null` for a daily whose file doesn't exist yet. */
   path: string | null
   /** Display title (for dailies this is the ISO date; hosts format it). */
   title: string
-  /** Set when the match came in via an alias (display as "alias → title"). */
+  /** Set for an alias hit; shown in the menu and preserved as the link's display text. */
   alias: string | null
   /** Set on daily-note suggestions. */
   date: string | null
   /** Set only on rows the date generator synthesised; see {@link GeneratedDate}. */
   generated?: GeneratedDate
+}
+
+/**
+ * The exact text to insert inside `[[…]]` for a suggestion. Alias hits retain
+ * the canonical target for unambiguous resolution while displaying the alias
+ * the user searched for: `Tim MacCaw // Dad|Dad`. Title and date hits remain
+ * bare targets.
+ */
+export function wikiSuggestionInsertText(suggestion: WikiSuggestion): string {
+  return suggestion.alias === null
+    ? suggestion.target
+    : `${suggestion.target}|${suggestion.alias}`
 }
 
 /** One `notes` row considered for suggestion (a title match or recency fill). */

@@ -12,6 +12,7 @@ import {
   isContactsReadable,
   suggestTags,
   suggestWikiTargets,
+  wikiSuggestionInsertText,
 } from '@reflect/core'
 import { buildAutocompleteEntries } from '@/editor/wiki-autocomplete-entries'
 import { useContactsAuthorization } from '@/hooks/use-contacts-authorization'
@@ -117,7 +118,8 @@ export function useEditorAutocomplete(): EditorAutocomplete {
             },
           }
         }
-        const { target, title, alias, date, path, generated } = entry.suggestion
+        const { title, alias, date, path, generated } = entry.suggestion
+        const target = wikiSuggestionInsertText(entry.suggestion)
         // A generated date leads with its phrase ("Next Friday"), resolved day
         // as the detail; everything else keeps the title/alias/daily form.
         if (generated !== undefined && date !== null) {

@@ -1,9 +1,8 @@
 # Porting note aliases
 
-**Status: ported.** Aliases shipped with the readable-filenames work
-([docs/readable-filenames.md](../readable-filenames.md)); this doc records
-how the v1 concept maps onto what v2 does, and the one open porting task
-(import).
+**Status: ported.** Frontmatter aliases shipped with the readable-filenames
+work ([docs/readable-filenames.md](../readable-filenames.md)); direct support
+for v1 `//` titles followed in `v0.4.0-beta.31` and stable `v0.4.0`.
 
 ## What v1 did
 
@@ -16,8 +15,7 @@ long as their spelling still appeared somewhere in the title.
 
 ## How v2 does it
 
-The concept survives intact; the mechanism moves out of the title and into
-frontmatter, where it belongs in a files-first app:
+Frontmatter is the native files-first representation for aliases:
 
 ```yaml
 ---
@@ -33,9 +31,17 @@ aliases:
 - The `aliases` field is a plain YAML string array
   (`packages/core/src/markdown/model.ts`); malformed values degrade to an
   empty list rather than breaking the note.
-- `[[` autocomplete and link resolution treat titles, aliases, and daily
-  dates uniformly through the `note_keys` view in the SQLite index
-  (`crates/index-schema/migrations/0001_initial.sql`).
+- V1 titles also work without conversion. For `# Tim MacCaw // Dad`, the
+  complete H1 remains the canonical title while `Tim MacCaw` and `Dad` are
+  derived into the rebuildable alias projection. The markdown file is not
+  rewritten.
+- `[[Dad]]` resolves to that note and counts as its backlink. Choosing the
+  `Dad` autocomplete match writes `[[Tim MacCaw // Dad|Dad]]`: the canonical
+  target stays unambiguous while the editor displays the alias the user chose.
+- Wiki-link resolution is deterministic: a calendar-valid daily date wins,
+  then an exact title, then an alias; collisions within one tier choose the
+  first graph-relative path alphabetically. The `note_keys` and `backlinks`
+  views apply the same policy as navigation.
 - Renames are **stronger than v1**: the rename coordinator
   (`apps/desktop/src/editor/rename-coordinator.ts`) rewrites known
   `[[old title]]` links across the graph, then records the old title as an
@@ -46,21 +52,30 @@ aliases:
 
 ## v1 → v2 mapping
 
-| v1                                               | v2                                                     |
-| ------------------------------------------------ | ------------------------------------------------------ |
-| `Title // Alias1 // Alias2` in the H1            | `aliases:` array in frontmatter                        |
-| Rename keeps old links only via title spelling   | Rename rewrites links **and** preserves title as alias |
-| No alias UI beyond the title bar                 | Frontmatter is directly editable (in-app or any tool)  |
-| Daily notes cannot be renamed or aliased         | Same: daily notes are keyed by date                    |
-| Alias collisions: first match wins, silently     | Same at resolution time (open question below)          |
+| v1                                               | v2                                                              |
+| ------------------------------------------------ | --------------------------------------------------------------- |
+| `Title // Alias1 // Alias2` in the H1            | Supported directly; segments become derived index aliases       |
+| Rename keeps old links only via title spelling   | Rename rewrites links **and** preserves title as alias          |
+| No alias UI beyond the title bar                 | `//` remains available; frontmatter aliases are also editable   |
+| Daily notes cannot be renamed or aliased         | Same: daily notes are keyed by date                             |
+| Alias collisions: first match wins, silently     | Daily, then title, then alias; path breaks ties deterministically |
 
-## Open porting tasks
+## Diagnosing an alias report
 
-- **Import.** When importing a v1 export
-  ([plans/13-import-export-portability.md](../plans/13-import-export-portability.md)),
-  titles containing `//` should be split: the first segment becomes the
-  title, the rest become frontmatter `aliases`. Without this, v1 alias-heavy
-  graphs arrive with `//` baked into titles and every aliased link breaks.
+1. Check the app version. Direct `//` support begins in
+   `v0.4.0-beta.31` and is included in stable `v0.4.0` and later. Earlier
+   builds treat the whole H1 as one literal title. Upgrading triggers the
+   projection-version rebuild that adds the derived aliases to the index.
+2. Check for a standalone note whose complete title is the reported alias.
+   For example, an older build may have created `# Dad` when `[[Dad]]` looked
+   unresolved. That exact title intentionally wins over the `Dad` alias on
+   `# Tim MacCaw // Dad`, for navigation, backlinks, and autocomplete.
+3. If both notes are intentional, use the canonical target explicitly — for
+   example `[[Tim MacCaw // Dad|Dad]]`. Otherwise rename or remove the
+   accidental standalone note so bare `[[Dad]]` resolves through the alias.
+
+## Open porting task
+
 - **Collision surfacing.** Neither v1 nor v2 warns when two notes claim the
   same alias. Worth a lint-style indicator eventually, but not a porting
   blocker.

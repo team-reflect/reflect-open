@@ -28,7 +28,10 @@
   },
   "devDependencies": {
     "@ai-sdk/provider": "^3.0.11",
+    "@types/better-sqlite3": "^7.6.13",
+    "better-sqlite3": "^12.11.1",
     "jsdom": "^29.1.1",
+    "sqlite-vec": "^0.1.9",
     "typescript": "~6.0.3",
     "vitest": "^4.1.9"
   }
