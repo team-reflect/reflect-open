@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -124,6 +124,29 @@ describe('DailyContextSidebar calendar', () => {
     fireEvent.click(day, { metaKey: true })
 
     await waitFor(() => expect(view.getByTestId('route').textContent).toContain('2026-06-18'))
+    view.unmount()
+  })
+
+  it('does not let a stale failed window open overwrite newer day navigation', async () => {
+    let finishOpen: ((opened: boolean) => void) | null = null
+    openRouteInNewWindow.mockReturnValue(
+      new Promise((resolve) => {
+        finishOpen = resolve
+      }),
+    )
+    const view = renderSidebar('2026-06-09')
+    const firstDay = view.getByRole('button', { name: formatDayLabel('2026-06-18', 'mdy') })
+    const newerDay = view.getByRole('button', { name: formatDayLabel('2026-06-19', 'mdy') })
+
+    fireEvent.click(firstDay, { metaKey: true })
+    fireEvent.click(newerDay)
+    expect(view.getByTestId('route').textContent).toContain('2026-06-19')
+
+    await act(async () => {
+      finishOpen?.(false)
+    })
+
+    expect(view.getByTestId('route').textContent).toContain('2026-06-19')
     view.unmount()
   })
 

@@ -57,28 +57,41 @@ const HEADER_BUTTON_CLASS =
  * calendar glyph between the month arrows jumps back to today.
  */
 export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactElement {
-  const { navigate } = useRouter()
+  const { navigate, arrivalSeq, entryId } = useRouter()
   const { graph } = useGraph()
   const { settings } = useSettings()
   const weekStartsOn = toWeekStartsOn(settings.weekStartDay)
 
   const [month, setMonth] = useState(() => monthOf(selectedDate))
-  // A failed native open falls back after an await. If the calendar has
-  // disappeared meanwhile, that late fallback must not pull the user back to
-  // a day they already left.
+  // A failed native open falls back after an await. Only the latest unchanged
+  // navigation intent may do that; otherwise a late failure could pull the
+  // user back to a day they already left.
   const unmountedRef = useRef(false)
+  const latestOpenRequestRef = useRef(0)
+  const navigationStateRef = useRef({ arrivalSeq, entryId, selectedDate })
   useEffect(() => {
     unmountedRef.current = false
     return () => {
       unmountedRef.current = true
     }
   }, [])
+  useEffect(() => {
+    navigationStateRef.current = { arrivalSeq, entryId, selectedDate }
+  }, [arrivalSeq, entryId, selectedDate])
 
   function openDate(date: string, event: MouseEvent<HTMLButtonElement>): void {
     const route = { kind: 'daily', date } as const
+    const request = ++latestOpenRequestRef.current
     if (isNewWindowClick(event)) {
+      const navigationState = navigationStateRef.current
       void openRouteInNewWindow(route).then((opened) => {
-        if (!opened && !unmountedRef.current) {
+        const currentNavigationState = navigationStateRef.current
+        const isLatestIntent = latestOpenRequestRef.current === request
+        const navigationIsUnchanged =
+          currentNavigationState.arrivalSeq === navigationState.arrivalSeq &&
+          currentNavigationState.entryId === navigationState.entryId &&
+          currentNavigationState.selectedDate === navigationState.selectedDate
+        if (!opened && !unmountedRef.current && isLatestIntent && navigationIsUnchanged) {
           navigate(route)
         }
       })
