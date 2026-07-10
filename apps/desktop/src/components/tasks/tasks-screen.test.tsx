@@ -359,14 +359,21 @@ describe('TasksScreen', () => {
     view.unmount()
   })
 
-  it('opens a task’s source note via the open arrow', async () => {
+  it('opens a task’s source note from its title without an arrow', async () => {
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/p.md', dailyDate: null, text: 'project task', noteTitle: 'Project' }),
+      task({
+        notePath: 'notes/p.md',
+        dailyDate: null,
+        dueDate: '2026-06-10',
+        text: 'project task',
+        noteTitle: 'Project',
+      }),
     ])
     const view = renderScreen()
 
-    await view.findByText('project task')
-    await userEvent.click(view.getByRole('button', { name: 'Open Project' }))
+    const sourceLink = await view.findByRole('button', { name: 'Project' })
+    expect(sourceLink.querySelector('svg')).toBeNull()
+    await userEvent.click(sourceLink)
     expect(view.getByTestId('route').textContent).toContain('notes/p.md')
     view.unmount()
   })
