@@ -38,6 +38,77 @@ pub const NOTE_WINDOW_PREFIX: &str = "note-";
 /// re-navigates it to the clicked target.
 const WINDOW_NAVIGATE_EVENT: &str = "window:navigate";
 
+/// Window properties that survive a desktop restart.
+///
+/// Visibility is intentionally absent. The main window starts hidden while
+/// geometry restores, and shutdown or updater relaunches can otherwise persist
+/// that temporary state and leave every subsequent launch hidden.
+#[cfg(desktop)]
+pub(crate) fn restorable_window_state_flags() -> tauri_plugin_window_state::StateFlags {
+    use tauri_plugin_window_state::StateFlags;
+
+    StateFlags::SIZE
+        | StateFlags::POSITION
+        | StateFlags::MAXIMIZED
+        | StateFlags::DECORATIONS
+        | StateFlags::FULLSCREEN
+}
+
+#[cfg(desktop)]
+fn surface_window<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>) {
+    if let Err(err) = window.unminimize() {
+        tracing::warn!(error = %err, label = window.label(), "failed to unminimize window");
+    }
+    if let Err(err) = window.show() {
+        tracing::warn!(error = %err, label = window.label(), "failed to show window");
+    }
+    if let Err(err) = window.set_focus() {
+        tracing::warn!(error = %err, label = window.label(), "failed to focus window");
+    }
+}
+
+/// Show, unminimize, and focus the existing main window.
+///
+/// Returns whether the window exists, so macOS Dock reopen handling can create
+/// a replacement after the user has closed the original window.
+#[cfg(desktop)]
+pub(crate) fn surface_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> bool {
+    let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) else {
+        return false;
+    };
+    surface_window(&window);
+    true
+}
+
+/// Recover the main window when macOS asks an app with no visible windows to
+/// reopen (normally a Dock click).
+#[cfg(target_os = "macos")]
+pub(crate) fn reopen_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    if app.state::<QuitState>().armed() {
+        return;
+    }
+    if surface_main_window(app) {
+        return;
+    }
+
+    let Some(config) = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|config| config.label == MAIN_WINDOW_LABEL)
+        .cloned()
+    else {
+        tracing::warn!("cannot reopen main window because its config is missing");
+        return;
+    };
+
+    match WebviewWindowBuilder::from_config(app, &config).and_then(|builder| builder.build()) {
+        Ok(window) => surface_window(&window),
+        Err(err) => tracing::warn!(error = %err, "failed to recreate main window"),
+    }
+}
+
 fn lock_init<'a>(
     state: &'a State<'_, WindowInit>,
 ) -> AppResult<MutexGuard<'a, HashMap<String, String>>> {
@@ -226,6 +297,39 @@ pub fn window_bootstrap(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(desktop)]
+    #[test]
+    fn restart_state_restores_geometry_but_never_visibility() {
+        use tauri_plugin_window_state::StateFlags;
+
+        let flags = restorable_window_state_flags();
+        for geometry_flag in [
+            StateFlags::SIZE,
+            StateFlags::POSITION,
+            StateFlags::MAXIMIZED,
+            StateFlags::DECORATIONS,
+            StateFlags::FULLSCREEN,
+        ] {
+            assert!(flags.contains(geometry_flag));
+        }
+        assert!(!flags.contains(StateFlags::VISIBLE));
+    }
+
+    #[cfg(desktop)]
+    #[test]
+    fn surfacing_main_window_distinguishes_missing_and_existing_windows() {
+        let app = tauri::test::mock_builder()
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock app");
+        assert!(!surface_main_window(app.handle()));
+
+        let _main = WebviewWindowBuilder::new(&app, MAIN_WINDOW_LABEL, WebviewUrl::default())
+            .visible(false)
+            .build()
+            .expect("main window");
+        assert!(surface_main_window(app.handle()));
+    }
 
     #[test]
     fn labels_are_stable_per_target_and_distinct_across_targets() {

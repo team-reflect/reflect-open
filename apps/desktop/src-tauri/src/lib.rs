@@ -95,10 +95,7 @@ pub fn run() {
     // the running app natively; this is the Windows/Linux equivalent.
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-        if let Some(window) = app.get_webview_window(windows::MAIN_WINDOW_LABEL) {
-            let _ = window.show();
-            let _ = window.set_focus();
-        }
+        windows::surface_main_window(app);
     }));
 
     let builder = builder
@@ -131,8 +128,10 @@ pub fn run() {
     // Window-state restore is likewise meaningless on mobile (one fullscreen
     // webview, no window frames to remember). The main window starts hidden
     // (`visible: false` in tauri.conf.json) so this plugin can restore its
-    // geometry before first paint — avoiding a visible jump — and then reveal
-    // it; mobile shows the window itself in the setup hook below.
+    // geometry before first paint — avoiding a visible jump. Visibility is
+    // deliberately not persistent: shutdown and updater relaunches can observe
+    // a transiently hidden window, which must not suppress every later launch.
+    // The Ready event reveals the restored window below.
     #[cfg(desktop)]
     let builder = builder
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -142,6 +141,7 @@ pub fn run() {
             // fresh from their opener, and their content-hashed labels would
             // otherwise accrete in the state file forever.
             tauri_plugin_window_state::Builder::default()
+                .with_state_flags(windows::restorable_window_state_flags())
                 .with_filter(|label| !label.starts_with(windows::NOTE_WINDOW_PREFIX))
                 .build(),
         );
@@ -160,9 +160,9 @@ pub fn run() {
     #[cfg(mobile)]
     let builder = builder.plugin(tauri_plugin_recording::init());
 
-    // The main window starts hidden (`visible: false`); on desktop the
-    // window-state plugin reveals it after restoring geometry, but mobile has
-    // no such plugin, so show it here or the UI would never appear.
+    // The main window starts hidden (`visible: false`); desktop reveals it on
+    // Ready after restoring geometry, but mobile has no window-state plugin,
+    // so show it here or the UI would never appear.
     //
     // (Also runs the TEMPORARY Plan 19 spike-A capability probe — delete that
     // line with the spike, but keep the window show.)
@@ -292,6 +292,30 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| match &event {
+            // Config windows are built before Ready, including the synchronous
+            // window-state restore. Reveal the main window only after that
+            // geometry is settled, regardless of any stale persisted
+            // visibility from an older build.
+            #[cfg(desktop)]
+            tauri::RunEvent::Ready => {
+                windows::surface_main_window(app);
+            }
+            // Clicking the Dock icon is macOS's recovery path when an app has
+            // no visible windows. Surface a hidden/minimized main window, or
+            // recreate it if the user previously closed it with ⌘W.
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Reopen {
+                has_visible_windows,
+                ..
+            } => {
+                if !*has_visible_windows
+                    || app
+                        .get_webview_window(windows::MAIN_WINDOW_LABEL)
+                        .is_none()
+                {
+                    windows::reopen_main_window(app);
+                }
+            }
             // The lock-screen widget opens `reflect://record-audio`; hand it
             // to the recording plugin's persisted action queue (the V1
             // handshake) so the request survives webview churn and cold
