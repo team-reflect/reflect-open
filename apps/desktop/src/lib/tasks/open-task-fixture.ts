@@ -7,11 +7,12 @@ import type { OpenTask } from '@reflect/core'
  */
 export function makeOpenTask(overrides: Partial<OpenTask> = {}): OpenTask {
   const text = overrides.text ?? 'do it'
+  const checked = overrides.checked ?? false
   return {
     notePath: 'notes/n.md',
     markerOffset: 2,
-    raw: `[ ] ${text}`,
-    checked: false,
+    raw: `[${checked ? 'x' : ' '}] ${text}`,
+    checked,
     text,
     breadcrumbs: [],
     noteTitle: 'N',
