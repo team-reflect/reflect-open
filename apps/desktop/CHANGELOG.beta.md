@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.5.0-beta.2...v0.5.0-beta.3) (2026-07-10)
+
+
+### Features
+
+* trigger a release ([#705](https://github.com/team-reflect/reflect-open/issues/705)) ([955d9cc](https://github.com/team-reflect/reflect-open/commit/955d9ccf104e719952ff870465bf66d2f6e75ed6))
+
 ## [0.5.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.5.0-beta.1...v0.5.0-beta.2) (2026-07-10)
 
 
