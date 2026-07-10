@@ -93,11 +93,21 @@ jobs:
 
           # Advance the beta manifest only when it is behind the just-released
           # stable version; never move it backwards once next has entered a
-          # higher beta cycle.
+          # higher beta cycle. Read next's copy of the manifest — it is the
+          # authoritative one, and master's can lag behind by a promote.
+          #
+          # The comparison must follow semver, not `sort -V`: GNU version sort
+          # ranks 0.5.0-beta.4 above 0.5.0, the opposite of semver, which is
+          # exactly the case after a beta line graduates. The released version
+          # is always a plain X.Y.Z, so semver order reduces to a numeric
+          # compare of the X.Y.Z bases, with a same-base prerelease (-beta.N)
+          # behind its own release.
           manifest=.github/release-please/manifest.beta.json
-          current="$(jq -r '."apps/desktop"' "$manifest")"
-          highest="$(printf '%s\n%s\n' "$current" "$version" | sort -V | tail -1)"
-          if [ "$highest" = "$version" ] && [ "$current" != "$version" ]; then
+          current="$(git show "origin/next:$manifest" | jq -r '."apps/desktop"')"
+          base="${current%%-*}"
+          lower="$(printf '%s\n%s\n' "$base" "$version" | sort -t . -k 1,1n -k 2,2n -k 3,3n | head -1)"
+          if { [ "$base" != "$version" ] && [ "$lower" = "$base" ]; } ||
+            { [ "$base" = "$version" ] && [ "$current" != "$base" ]; }; then
             jq --arg v "$version" '."apps/desktop" = $v' "$manifest" > "$manifest.tmp"
             mv "$manifest.tmp" "$manifest"
             git config user.name "github-actions[bot]"
