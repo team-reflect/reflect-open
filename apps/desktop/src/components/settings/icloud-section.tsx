@@ -9,6 +9,7 @@ import {
   icloudPendingCount,
   icloudStatus,
 } from '@reflect/core'
+import { ConflictedNoteLinks } from '@/components/settings/conflicted-note-links'
 import { SettingsField } from '@/components/settings/field'
 import { Button } from '@/components/ui/button'
 import {
@@ -176,9 +177,10 @@ export function IcloudSettingsField(): ReactElement | null {
             {pendingNotes.isPending ? <p>Checking downloaded notes...</p> : null}
             {pendingNotes.data !== undefined ? <p>{pendingNotesLine(pendingNotes.data)}</p> : null}
             {conflictCount !== undefined && forkCount !== undefined ? (
-              <p className={hasReviewIssues ? 'text-amber-700 dark:text-amber-300' : undefined}>
-                {reviewLine(conflictCount, forkCount)}
-              </p>
+              <div className={hasReviewIssues ? 'text-amber-700 dark:text-amber-300' : undefined}>
+                <p>{reviewLine(conflictCount, forkCount)}</p>
+                <ConflictedNoteLinks notes={conflicted.data ?? []} />
+              </div>
             ) : null}
           </div>
         ) : status?.available === true ? (

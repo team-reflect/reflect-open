@@ -1,8 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import type { ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GraphInfo } from '@reflect/core'
 import type { BackupState } from '@/lib/backup-controller'
+import { RouterProvider, useRouter } from '@/routing/router'
 import { SyncSection } from './sync-section'
 
 const core = vi.hoisted(() => ({
@@ -51,9 +53,17 @@ vi.mock('@/providers/sync-provider', () => ({ useSync: () => sync }))
 function renderSection(): void {
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <SyncSection />
+      <RouterProvider initialRoute={{ kind: 'settings' }}>
+        <SyncSection />
+        <RouteProbe />
+      </RouterProvider>
     </QueryClientProvider>,
   )
+}
+
+function RouteProbe(): ReactElement {
+  const { route } = useRouter()
+  return <output data-testid="route">{route.kind === 'note' ? route.path : route.kind}</output>
 }
 
 beforeEach(() => {
@@ -124,6 +134,28 @@ describe('SyncSection', () => {
       await within(section).findByText('2 notes are still downloading from iCloud.'),
     ).toBeTruthy()
     expect(within(section).getByText('1 note needs review, 1 sync fork')).toBeTruthy()
+    expect(within(section).getByRole('button', { name: /A.*notes\/a\.md/ })).toBeTruthy()
+  })
+
+  it('opens the conflicted note listed under GitHub backup', async () => {
+    core.conflictedNotes = [{ path: 'notes/conflicted.md', title: 'Conflicted note' }]
+    sync.backup = {
+      phase: 'connected',
+      remoteUrl: 'https://github.com/alex/notes.git',
+      repo: { owner: 'alex', name: 'notes' },
+      status: { state: 'idle' },
+    }
+
+    renderSection()
+
+    const section = screen.getByRole('region', { name: 'Sync' })
+    const noteLink = await within(section).findByRole('button', {
+      name: /Conflicted note.*notes\/conflicted\.md/,
+    })
+
+    fireEvent.click(noteLink)
+
+    expect(screen.getByTestId('route').textContent).toBe('notes/conflicted.md')
   })
 
   it('keeps backup visible when the iCloud row is platform-hidden', () => {

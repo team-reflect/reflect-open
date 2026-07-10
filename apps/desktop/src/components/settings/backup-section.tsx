@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { getConflictedNotes, getDuplicateNoteIds, hasBridge } from '@reflect/core'
 import { ExternalLink } from 'lucide-react'
 import { ConnectGithubDialog } from '@/components/settings/connect-github-dialog'
+import { ConflictedNoteLinks } from '@/components/settings/conflicted-note-links'
 import { SettingsField } from '@/components/settings/field'
 import { SyncForkNotice } from '@/components/settings/sync-fork-notice'
 import { Button } from '@/components/ui/button'
@@ -65,7 +66,8 @@ export function BackupSettingsField(): ReactElement {
     queryFn: () => getConflictedNotes(),
     enabled: hasBridge() && graph !== null,
   })
-  const conflictCount = conflicted.data?.length ?? 0
+  const conflictedNotes = conflicted.data ?? []
+  const conflictCount = conflictedNotes.length
 
   // A sync fork (Plan 17): two files claiming one frontmatter id — the same
   // note retitled differently on two devices. Surfaced for review beside the
@@ -149,12 +151,15 @@ export function BackupSettingsField(): ReactElement {
                 <span className="ml-2 text-xs text-text-muted">{statusLine(backup)}</span>
               </p>
               {conflictCount > 0 ? (
-                <p className="text-xs text-amber-700 dark:text-amber-300">
-                  {conflictCount === 1
-                    ? '1 note needs review'
-                    : `${conflictCount} notes need review`}{' '}
-                  — open it to keep the version you want.
-                </p>
+                <div className="text-xs text-amber-700 dark:text-amber-300">
+                  <p>
+                    {conflictCount === 1
+                      ? '1 note needs review'
+                      : `${conflictCount} notes need review`}{' '}
+                    — open {conflictCount === 1 ? 'it' : 'one'} to keep the version you want:
+                  </p>
+                  <ConflictedNoteLinks notes={conflictedNotes} />
+                </div>
               ) : null}
               <SyncForkNotice groups={forkGroups} />
               <div className="flex flex-wrap gap-2">
