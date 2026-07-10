@@ -1,4 +1,9 @@
-import { foldKey, type ContactMatch, type WikiSuggestion } from '@reflect/core'
+import {
+  foldKey,
+  serializeWikiSuggestionAddress,
+  type ContactMatch,
+  type WikiSuggestion,
+} from '@reflect/core'
 
 /**
  * Pure assembly of the `[[` popover's rows (Plan 07): the ranked index
@@ -9,8 +14,8 @@ import { foldKey, type ContactMatch, type WikiSuggestion } from '@reflect/core'
  * are unit-testable (the popover itself needs real custom elements + layout).
  */
 
-export type AutocompleteEntry =
-  | { kind: 'suggestion'; suggestion: WikiSuggestion }
+export type AutocompleteEntry<Suggestion extends WikiSuggestion = WikiSuggestion> =
+  | { kind: 'suggestion'; suggestion: Suggestion }
   | { kind: 'contact'; contact: ContactMatch }
   | { kind: 'create'; title: string }
 
@@ -27,14 +32,20 @@ export interface EntryOptions {
    * the note row already covers it, exactly v1's dedup.
    */
   contacts?: readonly ContactMatch[]
+  /**
+   * Drop raw Create/contact text that cannot be embedded in `[[…]]` without
+   * changing what Markdown parses. False for non-markdown consumers such as
+   * the attendee combobox.
+   */
+  requireSerializableWikiText?: boolean
 }
 
-export function buildAutocompleteEntries(
+export function buildAutocompleteEntries<Suggestion extends WikiSuggestion>(
   query: string,
-  suggestions: WikiSuggestion[],
+  suggestions: Suggestion[],
   options: EntryOptions = { offerCreate: true },
-): AutocompleteEntry[] {
-  const entries: AutocompleteEntry[] = suggestions.map((suggestion) => ({
+): AutocompleteEntry<Suggestion>[] {
+  const entries: AutocompleteEntry<Suggestion>[] = suggestions.map((suggestion) => ({
     kind: 'suggestion',
     suggestion,
   }))
@@ -48,9 +59,15 @@ export function buildAutocompleteEntries(
       resolvable.add(foldKey(suggestion.alias))
     }
   }
-  const contacts = (options.contacts ?? []).filter(
-    (contact) => !resolvable.has(foldKey(contact.fullName)),
-  )
+  const contacts = (options.contacts ?? []).filter((contact) => {
+    if (resolvable.has(foldKey(contact.fullName))) {
+      return false
+    }
+    return (
+      !options.requireSerializableWikiText ||
+      serializeWikiSuggestionAddress(contact.fullName, null) !== null
+    )
+  })
   entries.push(...contacts.map((contact) => ({ kind: 'contact' as const, contact })))
 
   const title = query.trim()
@@ -69,7 +86,15 @@ export function buildAutocompleteEntries(
   // A contact row for the exact typed name IS the create action (prefilled) —
   // a bare Create row beside it would just be the worse duplicate.
   const contactCoversQuery = contacts.some((contact) => foldKey(contact.fullName) === key)
-  if (!resolvesAsTyped && !hasDateSuggestion && !contactCoversQuery) {
+  const canSerializeCreate =
+    !options.requireSerializableWikiText ||
+    serializeWikiSuggestionAddress(title, null) !== null
+  if (
+    !resolvesAsTyped &&
+    !hasDateSuggestion &&
+    !contactCoversQuery &&
+    canSerializeCreate
+  ) {
     entries.push({ kind: 'create', title })
   }
   return entries

@@ -6,7 +6,12 @@ import { describe, expect, it } from 'vitest'
 import { parseNote } from '../markdown'
 import { setBridge } from '../ipc/bridge'
 import { buildIndexedNote, type IndexedNote } from './indexed-note'
-import { getBacklinks, resolveWikiTarget, suggestWikiTargets } from './queries'
+import {
+  getBacklinks,
+  resolveWikiTarget,
+  suggestWikiLinkTargets,
+  suggestWikiTargets,
+} from './queries'
 import { wikiSuggestionInsertText } from './suggest'
 
 type SqliteParameter = string | number | bigint | Buffer | null
@@ -134,6 +139,39 @@ function project(path: string, source: string, mtime: number): IndexedNote {
   })
 }
 
+function connectIndex(database: Database.Database): void {
+  setBridge({
+    invoke: (command, args) => {
+      if (command !== 'db_query') {
+        return Promise.reject(new Error(`unexpected command: ${command}`))
+      }
+      const sql = args['sql']
+      const params = args['params']
+      if (typeof sql !== 'string' || !Array.isArray(params)) {
+        return Promise.reject(new TypeError('invalid db_query arguments'))
+      }
+      return queryRows(database, sql, params)
+    },
+    listen: () => Promise.resolve(() => {}),
+  })
+}
+
+async function expectSuggestionAddressesItsPath(
+  suggestion: Awaited<ReturnType<typeof suggestWikiLinkTargets>>[number],
+): Promise<void> {
+  expect(suggestion.path).not.toBeNull()
+  const insertText = wikiSuggestionInsertText(suggestion)
+  const parsed = parseNote({
+    path: 'notes/selection-check.md',
+    source: `[[${insertText}]]`,
+  }).wikiLinks
+  expect(parsed).toHaveLength(1)
+  await expect(resolveWikiTarget(parsed[0]!.target)).resolves.toEqual({
+    kind: 'resolved',
+    ref: suggestion.path,
+  })
+}
+
 describe('v1 subject alias flow', () => {
   it('projects, resolves, backlinks, and autocompletes Dad through the real schema', async () => {
     const database = openMigratedIndex()
@@ -147,20 +185,7 @@ describe('v1 subject alias flow', () => {
     applyProjection(database, person)
     applyProjection(database, source)
 
-    setBridge({
-      invoke: (command, args) => {
-        if (command !== 'db_query') {
-          return Promise.reject(new Error(`unexpected command: ${command}`))
-        }
-        const sql = args['sql']
-        const params = args['params']
-        if (typeof sql !== 'string' || !Array.isArray(params)) {
-          return Promise.reject(new TypeError('invalid db_query arguments'))
-        }
-        return queryRows(database, sql, params)
-      },
-      listen: () => Promise.resolve(() => {}),
-    })
+    connectIndex(database)
 
     try {
       await expect(resolveWikiTarget('Dad')).resolves.toEqual({
@@ -171,7 +196,7 @@ describe('v1 subject alias flow', () => {
         { sourcePath: 'notes/family.md', targetRaw: 'Dad' },
       ])
 
-      const suggestions = await suggestWikiTargets('Dad')
+      const suggestions = await suggestWikiLinkTargets('Dad')
       expect(suggestions[0]).toMatchObject({
         target: 'Tim MacCaw // Dad',
         path: 'notes/tim-maccaw-dad.md',
@@ -225,7 +250,7 @@ describe('v1 subject alias flow', () => {
         { sourcePath: 'notes/family.md', targetRaw: 'Dad' },
       ])
 
-      const collidedSuggestions = await suggestWikiTargets('Dad')
+      const collidedSuggestions = await suggestWikiLinkTargets('Dad')
       expect(collidedSuggestions.map((suggestion) => suggestion.path)).toEqual([
         'notes/dad.md',
         'notes/tim-maccaw-dad.md',
@@ -234,6 +259,87 @@ describe('v1 subject alias flow', () => {
       expect(wikiSuggestionInsertText(collidedSuggestions[1]!)).toBe(
         'Tim MacCaw // Dad|Dad',
       )
+      await Promise.all(collidedSuggestions.map(expectSuggestionAddressesItsPath))
+    } finally {
+      setBridge(null)
+      database.close()
+    }
+  })
+
+  it('offers only suggestions whose serialized address resolves to the selected note', async () => {
+    const database = openMigratedIndex()
+    const projections = [
+      // A calendar-valid daily address outranks a regular note with that title.
+      project('daily/2026-07-10.md', 'Daily body\n', 10),
+      project('notes/date-title.md', '# 2026-07-10\n', 90),
+      // A shape-valid but impossible daily path is only an ordinary title
+      // claimant. Its daily_date projection must not block the real title.
+      project('daily/2026-02-31.md', '# Invalid date file\n', 15),
+      project('notes/invalid-date-title.md', '# 2026-02-31\n', 95),
+      // Duplicate titles use the first graph-relative path as their only
+      // canonical textual winner, irrespective of menu recency.
+      project('notes/a-roadmap.md', '# Roadmap\n', 20),
+      project('notes/z-roadmap.md', '# Roadmap\n', 100),
+      // A losing duplicate title can still be addressed through its own unique
+      // alias. The verified insertion must fall back to that alias, not Shared.
+      project('notes/a-shared.md', '# Shared\n', 30),
+      project(
+        'notes/z-shared.md',
+        '---\naliases:\n  - Second Shared\n---\n# Shared\n',
+        110,
+      ),
+      // Unsafe syntax is never silently cleaned into a different key.
+      project('notes/unsafe.md', '# Unsafe | Title\n', 120),
+      project(
+        'notes/escaped.md',
+        "---\ntitle: 'Escape \\. Title'\n---\nBody\n",
+        130,
+      ),
+    ]
+    for (const projection of projections) {
+      applyProjection(database, projection)
+    }
+    connectIndex(database)
+
+    try {
+      const dateSuggestions = await suggestWikiLinkTargets('2026-07-10')
+      expect(dateSuggestions.map((suggestion) => suggestion.path)).toEqual([
+        'daily/2026-07-10.md',
+      ])
+      const invalidDateSuggestions = await suggestWikiLinkTargets('2026-02-31')
+      expect(invalidDateSuggestions.map((suggestion) => suggestion.path)).toEqual([
+        'notes/invalid-date-title.md',
+      ])
+
+      const duplicateSuggestions = await suggestWikiLinkTargets('Roadmap')
+      expect(duplicateSuggestions.map((suggestion) => suggestion.path)).toEqual([
+        'notes/a-roadmap.md',
+      ])
+      const navigationSuggestions = await suggestWikiTargets('Roadmap')
+      expect(navigationSuggestions.map((suggestion) => suggestion.path)).toEqual([
+        'notes/z-roadmap.md',
+        'notes/a-roadmap.md',
+      ])
+
+      const aliasSuggestions = await suggestWikiLinkTargets('Second Shared')
+      expect(aliasSuggestions).toHaveLength(1)
+      expect(aliasSuggestions[0]).toMatchObject({
+        path: 'notes/z-shared.md',
+        target: 'Shared',
+        alias: 'Second Shared',
+        insertText: 'Second Shared',
+      })
+
+      await Promise.all(
+        [
+          ...dateSuggestions,
+          ...invalidDateSuggestions,
+          ...duplicateSuggestions,
+          ...aliasSuggestions,
+        ].map(expectSuggestionAddressesItsPath),
+      )
+      await expect(suggestWikiLinkTargets('Unsafe | Title')).resolves.toEqual([])
+      await expect(suggestWikiLinkTargets('Escape \\. Title')).resolves.toEqual([])
     } finally {
       setBridge(null)
       database.close()

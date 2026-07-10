@@ -96,8 +96,8 @@ function installGraphFake({ files, linkSources, resolveTitleTo }: GraphFakeOptio
       if (sql.includes('"links"')) {
         return linkSources ? linkSources() : []
       }
-      if (resolveTitleTo !== undefined && sql.includes('title_key')) {
-        return [{ path: resolveTitleTo }]
+      if (resolveTitleTo !== undefined && sql.includes('note_keys')) {
+        return [{ note_path: resolveTitleTo }]
       }
       return []
     }

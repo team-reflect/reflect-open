@@ -79,11 +79,13 @@ reflect://search?q=meeting          { kind: 'search', query }
 reflect://tasks                     { kind: 'tasks' }
 ```
 
-`<target>` resolves exactly like the CLI's `<note>` argument and the
-`note_keys` view: frontmatter `id` first (stable across renames — the
-reason ids exist), then date, title, or alias. "Copy deep link" therefore
-prefers the id form, so a link outlives any rename; a human-written
-`reflect://note/Project%20X` still works via title resolution.
+`<target>` resolves exactly like the CLI's `<note>` argument: frontmatter `id`
+first (stable across renames — the reason ids exist), then a calendar-valid
+date, an explicit graph-relative path, a title, and finally an alias. Duplicate
+claims within a lookup tier choose the first path alphabetically. This broader
+free-form resolver is separate from the textual wikilink `note_keys` mapping.
+"Copy deep link" therefore prefers the id form, so a link outlives any rename;
+a human-written `reflect://note/Project%20X` still works via title resolution.
 
 A "Copy deep link" command joins the command palette and keeps v1's
 `alt+mod+l` shortcut.

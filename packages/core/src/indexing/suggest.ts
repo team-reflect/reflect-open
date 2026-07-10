@@ -21,7 +21,7 @@ export interface GeneratedDate {
   phrase: string
 }
 
-/** A `[[` autocomplete candidate. */
+/** A ranked note/date suggestion used by navigation and autocomplete surfaces. */
 export interface WikiSuggestion {
   /** Canonical resolution target (a note title, or an ISO date). */
   target: string
@@ -38,15 +38,44 @@ export interface WikiSuggestion {
 }
 
 /**
- * The exact text to insert inside `[[…]]` for a suggestion. Alias hits retain
- * the canonical target for unambiguous resolution while displaying the alias
- * the user searched for: `Tim MacCaw // Dad|Dad`. Title and date hits remain
- * bare targets.
+ * A selectable `[[` autocomplete suggestion. `insertText` is present only after
+ * the query layer has verified that its parsed target resolves back to `path`
+ * through the canonical `note_keys` address map. Consequently, an existing
+ * note that has lost every textual key collision is not offered as selectable.
  */
-export function wikiSuggestionInsertText(suggestion: WikiSuggestion): string {
-  return suggestion.alias === null
-    ? suggestion.target
-    : `${suggestion.target}|${suggestion.alias}`
+export interface WikiLinkSuggestion extends WikiSuggestion {
+  /** Validated text to place inside `[[…]]`. */
+  insertText: string
+}
+
+const WIKI_LINK_RESERVED_CHARACTERS = /[[\]|\\\r\n]/u
+
+/**
+ * Serialize one textual wiki-link address and optional display label.
+ *
+ * Wiki-link syntax has no way to preserve its delimiters, and Markdown consumes
+ * backslash escapes before extraction, so either makes the original address
+ * unrepresentable and returns `null`. In particular, callers must never clean a
+ * target and pretend it still identifies the same note: changing the target
+ * changes its folded resolution key.
+ */
+export function serializeWikiSuggestionAddress(
+  target: string,
+  display: string | null,
+): string | null {
+  if (
+    target.trim() === '' ||
+    WIKI_LINK_RESERVED_CHARACTERS.test(target) ||
+    (display !== null && WIKI_LINK_RESERVED_CHARACTERS.test(display))
+  ) {
+    return null
+  }
+  return display === null ? target : `${target}|${display}`
+}
+
+/** The already-validated text to insert inside `[[…]]` for a suggestion. */
+export function wikiSuggestionInsertText(suggestion: WikiLinkSuggestion): string {
+  return suggestion.insertText
 }
 
 /** One `notes` row considered for suggestion (a title match or recency fill). */

@@ -11,7 +11,7 @@ import {
   hasBridge,
   isContactsReadable,
   suggestTags,
-  suggestWikiTargets,
+  suggestWikiLinkTargets,
   wikiSuggestionInsertText,
 } from '@reflect/core'
 import { buildAutocompleteEntries } from '@/editor/wiki-autocomplete-entries'
@@ -68,7 +68,7 @@ export function useEditorAutocomplete(): EditorAutocomplete {
         return []
       }
       const [suggestions, contacts] = await Promise.all([
-        suggestWikiTargets(query, 8, {
+        suggestWikiLinkTargets(query, 8, {
           today: todayIso(),
           dateFormat: settings.dateFormat,
           weekStartDay: settings.weekStartDay,
@@ -85,6 +85,7 @@ export function useEditorAutocomplete(): EditorAutocomplete {
       return buildAutocompleteEntries(query, suggestions, {
         offerCreate: true,
         contacts,
+        requireSerializableWikiText: true,
       }).map((entry) => {
         if (entry.kind === 'create') {
           return {

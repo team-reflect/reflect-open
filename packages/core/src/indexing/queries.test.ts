@@ -9,6 +9,7 @@ import {
   getPinnedNotes,
   listDailyNotes,
   noteTitleOwningEmail,
+  resolveWikiTarget,
   suggestWikiTargets,
 } from './queries'
 
@@ -74,6 +75,39 @@ describe('noteTitleOwningEmail', () => {
 
   it('short-circuits a blank address before touching the bridge', async () => {
     await expect(noteTitleOwningEmail('   ')).resolves.toBeNull()
+    expect(mockInvoke).not.toHaveBeenCalled()
+  })
+})
+
+describe('resolveWikiTarget', () => {
+  it('resolves through the canonical note_keys winner map in one query', async () => {
+    mockInvoke.mockResolvedValue([{ note_path: 'notes/winner.md' }])
+
+    await expect(resolveWikiTarget('  DAD  ')).resolves.toEqual({
+      kind: 'resolved',
+      ref: 'notes/winner.md',
+    })
+
+    expect(mockInvoke).toHaveBeenCalledTimes(1)
+    const [command, args] = mockInvoke.mock.calls[0]!
+    expect(command).toBe('db_query')
+    expect(String(args['sql'])).toContain('note_keys')
+    expect(args['params']).toEqual(['dad'])
+  })
+
+  it('preserves trimmed text when the canonical address is unresolved', async () => {
+    mockInvoke.mockResolvedValue([])
+    await expect(resolveWikiTarget('  Missing  ')).resolves.toEqual({
+      kind: 'unresolved',
+      text: 'Missing',
+    })
+  })
+
+  it('short-circuits a blank target before querying the index', async () => {
+    await expect(resolveWikiTarget('   ')).resolves.toEqual({
+      kind: 'unresolved',
+      text: '',
+    })
     expect(mockInvoke).not.toHaveBeenCalled()
   })
 })
@@ -339,10 +373,21 @@ describe('suggestWikiTargets', () => {
   })
 
   it('keeps an exact title match above the generated date (folded key threaded into the merge)', async () => {
-    mockInvoke.mockResolvedValue([]) // aliases query + fallback
-    mockInvoke.mockResolvedValueOnce([
-      { path: 'notes/today.md', title: 'Today', title_key: 'today', daily_date: null, mtime: 1 },
-    ])
+    mockInvoke.mockImplementation(async (_command, args) => {
+      const sql = String(args['sql'])
+      if (sql.includes('from "notes"')) {
+        return [
+          {
+            path: 'notes/today.md',
+            title: 'Today',
+            title_key: 'today',
+            daily_date: null,
+            mtime: 1,
+          },
+        ]
+      }
+      return []
+    })
 
     const result = await suggestWikiTargets('today', 8, clock)
 

@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import type { ContactMatch, WikiSuggestion } from '@reflect/core'
+import type { ContactMatch, WikiLinkSuggestion } from '@reflect/core'
 import { buildAutocompleteEntries } from './wiki-autocomplete-entries'
 
-function suggestion(overrides: Partial<WikiSuggestion>): WikiSuggestion {
+function suggestion(overrides: Partial<WikiLinkSuggestion>): WikiLinkSuggestion {
+  const target = overrides.target ?? 'Note'
+  const alias = overrides.alias ?? null
   return {
-    target: 'Note',
+    target,
+    insertText: alias === null ? target : `${target}|${alias}`,
     path: 'notes/note.md',
     title: 'Note',
-    alias: null,
+    alias,
     date: null,
     ...overrides,
   }
@@ -55,6 +58,19 @@ describe('buildAutocompleteEntries', () => {
 
   it('offers nothing for a blank query', () => {
     expect(buildAutocompleteEntries('  ', [])).toEqual([])
+  })
+
+  it('omits unsafe Create and contact rows when the consumer inserts wikilinks', () => {
+    for (const reserved of ['[', ']', '|', '\\', '\r', '\n']) {
+      const unsafeName = `A${reserved}B`
+      expect(
+        buildAutocompleteEntries(unsafeName, [], {
+          offerCreate: true,
+          contacts: [contact({ fullName: unsafeName })],
+          requireSerializableWikiText: true,
+        }),
+      ).toEqual([])
+    }
   })
 
   it('does not offer create when a generated date suggestion is present', () => {

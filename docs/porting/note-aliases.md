@@ -9,9 +9,11 @@ for v1 `//` titles followed in `v0.4.0-beta.31` and stable `v0.4.0`.
 In v1, aliases were part of the note's title: editing the H1 to
 `Superman // Clark Kent // Kal‑El` made everything after each `//` an alias.
 `[[` autocomplete matched aliases, links through any spelling resolved to the
-canonical note, and backlinks aggregated under the canonical title. Renaming
-a note did **not** rewrite existing links — old links kept working only as
-long as their spelling still appeared somewhere in the title.
+canonical note, and backlinks aggregated under the canonical title. A saved
+v1 link carried the target note's stable ID as well as its visible label, so an
+existing link survived a rename even when the old spelling disappeared from
+the title. Its displayed label could remain stale; the ID still identified the
+note.
 
 ## How v2 does it
 
@@ -36,16 +38,28 @@ aliases:
   derived into the rebuildable alias projection. The markdown file is not
   rewritten.
 - `[[Dad]]` resolves to that note and counts as its backlink. Choosing the
-  `Dad` autocomplete match writes `[[Tim MacCaw // Dad|Dad]]`: the canonical
-  target stays unambiguous while the editor displays the alias the user chose.
+  `Dad` autocomplete match normally writes `[[Tim MacCaw // Dad|Dad]]`, so the
+  editor displays the alias the user chose. Unlike v1's ID-backed links, this
+  is still a textual address: if another note wins the complete-title key, the
+  alias itself is used when it uniquely resolves to the selected note. A note
+  with no winning textual key is omitted from `[[` autocomplete rather than
+  inserting a link to a different note.
 - Wiki-link resolution is deterministic: a calendar-valid daily date wins,
   then an exact title, then an alias; collisions within one tier choose the
-  first graph-relative path alphabetically. The `note_keys` and `backlinks`
-  views apply the same policy as navigation.
+  first graph-relative path alphabetically. The `note_keys` view contains the
+  single resolved winner for each folded textual address, and navigation,
+  verified autocomplete insertion, and backlinks all read that same mapping.
 - Renames are **stronger than v1**: the rename coordinator
   (`apps/desktop/src/editor/rename-coordinator.ts`) rewrites known
   `[[old title]]` links across the graph, then records the old title as an
   alias so unindexed or external references keep resolving too.
+- Because the whole `Tim MacCaw // Dad` H1 is v2's canonical title, changing
+  only its `Dad` segment is still a normal title rename. It can rename the
+  markdown file and rewrite graph links; `//` is compatibility syntax, not a
+  separately stored alias field. Use frontmatter `aliases` when that distinction
+  matters.
+- Daily notes may carry frontmatter or derived `//` aliases. Their calendar
+  date remains the strongest address for the ISO-date key.
 - Markdown wikilinks additionally support display text via
   `[[target|shown text]]` — a per-link cosmetic that v1 didn't have, distinct
   from aliases (which affect resolution).
@@ -55,10 +69,10 @@ aliases:
 | v1                                               | v2                                                              |
 | ------------------------------------------------ | --------------------------------------------------------------- |
 | `Title // Alias1 // Alias2` in the H1            | Supported directly; segments become derived index aliases       |
-| Rename keeps old links only via title spelling   | Rename rewrites links **and** preserves title as alias          |
+| Existing links keep working by stable target ID  | Textual links are rewritten; old title is preserved as alias    |
 | No alias UI beyond the title bar                 | `//` remains available; frontmatter aliases are also editable   |
-| Daily notes cannot be renamed or aliased         | Same: daily notes are keyed by date                             |
-| Alias collisions: first match wins, silently     | Daily, then title, then alias; path breaks ties deterministically |
+| Daily links target the note's stable identity    | Date wins its key; daily notes may also project aliases         |
+| Alias collisions: first match wins, silently     | Deterministic winner; losing keys are not text-addressable      |
 
 ## Diagnosing an alias report
 
@@ -71,8 +85,10 @@ aliases:
    unresolved. That exact title intentionally wins over the `Dad` alias on
    `# Tim MacCaw // Dad`, for navigation, backlinks, and autocomplete.
 3. If both notes are intentional, use the canonical target explicitly — for
-   example `[[Tim MacCaw // Dad|Dad]]`. Otherwise rename or remove the
-   accidental standalone note so bare `[[Dad]]` resolves through the alias.
+   example `[[Tim MacCaw // Dad|Dad]]` when that full title resolves to the
+   intended note. Otherwise rename or remove the accidental standalone note so
+   bare `[[Dad]]` resolves through the alias. Duplicate complete titles cannot
+   both be addressed by that title; give the losing note a unique alias.
 
 ## Open porting task
 

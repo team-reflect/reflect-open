@@ -1,12 +1,15 @@
 -- One folded wiki-link key must resolve to one note, with the same precedence
--- as the TypeScript and CLI resolvers: daily date, then title, then alias;
+-- as the TypeScript and CLI resolvers: calendar-valid daily date, then title,
+-- then alias;
 -- collisions within a tier choose the first path alphabetically. Previously
 -- `note_keys` exposed every claimant, so `backlinks` fanned one `[[Dad]]` link
 -- out to both a note titled `Dad` and another note aliased to `Dad` even though
 -- clicking the link opened only the titled note.
 --
--- `note_keys` is filtered by both key (navigation) and note path (backlink
--- panels), so keep both directions indexed. No projection rows need rebuilding.
+-- `note_keys` is the resolved address map, not a list of every claim: it has
+-- exactly one winning note path per folded key. It is filtered by both key
+-- (navigation/autocomplete verification) and note path (backlink panels), so
+-- keep both directions indexed. No projection rows need rebuilding.
 CREATE INDEX aliases_note_key ON aliases(note_path, alias_key);
 
 DROP VIEW backlinks;
@@ -17,10 +20,12 @@ CREATE VIEW note_keys AS
   SELECT daily.path AS note_path, daily.daily_date AS key
   FROM notes daily
   WHERE daily.daily_date IS NOT NULL
+    AND date(daily.daily_date) = daily.daily_date
     AND NOT EXISTS (
       SELECT 1
       FROM notes better_daily
       WHERE better_daily.daily_date = daily.daily_date
+        AND date(better_daily.daily_date) = better_daily.daily_date
         AND better_daily.path < daily.path
     )
 
@@ -31,7 +36,10 @@ CREATE VIEW note_keys AS
   FROM notes titled
   WHERE titled.kind != 'template'
     AND NOT EXISTS (
-      SELECT 1 FROM notes daily WHERE daily.daily_date = titled.title_key
+      SELECT 1
+      FROM notes daily
+      WHERE daily.daily_date = titled.title_key
+        AND date(daily.daily_date) = daily.daily_date
     )
     AND NOT EXISTS (
       SELECT 1
@@ -50,7 +58,10 @@ CREATE VIEW note_keys AS
   FROM aliases aliased
   JOIN notes owner ON owner.path = aliased.note_path AND owner.kind != 'template'
   WHERE NOT EXISTS (
-      SELECT 1 FROM notes daily WHERE daily.daily_date = aliased.alias_key
+      SELECT 1
+      FROM notes daily
+      WHERE daily.daily_date = aliased.alias_key
+        AND date(daily.daily_date) = daily.daily_date
     )
     AND NOT EXISTS (
       SELECT 1

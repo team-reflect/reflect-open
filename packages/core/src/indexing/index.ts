@@ -75,6 +75,7 @@ export {
   getCompletedTasks,
   getPinnedNotes,
   suggestWikiTargets,
+  suggestWikiLinkTargets,
   suggestTags,
   getIndexedFileFacts,
   getIndexedFileFactsByPath,
@@ -113,7 +114,9 @@ export {
 export {
   rankWikiSuggestions,
   mergeDateSuggestions,
+  serializeWikiSuggestionAddress,
   wikiSuggestionInsertText,
+  type WikiLinkSuggestion,
   type WikiSuggestion,
   type GeneratedDate,
 } from './suggest'
