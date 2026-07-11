@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.6.0-beta.9](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.8...v0.6.0-beta.9) (2026-07-11)
+
+
+### Features
+
+* **desktop:** drag to resize the sidebar and context panel ([#751](https://github.com/team-reflect/reflect-open/issues/751)) ([1b448a2](https://github.com/team-reflect/reflect-open/commit/1b448a245dfa85a16ebf142c7fdf67007171837f))
+
+
+### Bug Fixes
+
+* backlink audio memos and links from daily notes ([#745](https://github.com/team-reflect/reflect-open/issues/745)) ([98eb22f](https://github.com/team-reflect/reflect-open/commit/98eb22f4eff8372b1d777836067c56940c7411a5))
+* make sidebar toggling keyboard-first ([#749](https://github.com/team-reflect/reflect-open/issues/749)) ([276906e](https://github.com/team-reflect/reflect-open/commit/276906e01acba961d6fe334db39163f4806c7818))
+* update meowdown to ^0.44.1 ([#743](https://github.com/team-reflect/reflect-open/issues/743)) ([d47005a](https://github.com/team-reflect/reflect-open/commit/d47005a55b16c256cd2906052132e0d8d7ce8e6b))
+
 ## [0.6.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.7...v0.6.0-beta.8) (2026-07-11)
 
 
