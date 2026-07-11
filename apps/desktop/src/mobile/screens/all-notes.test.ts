@@ -6,6 +6,7 @@ function hit(overrides: Partial<FilteredSearchHit>): FilteredSearchHit {
   return {
     path: 'notes/a.md',
     title: 'A',
+    highlightedTitle: 'A',
     dailyDate: null,
     snippet: null,
     preview: '',
@@ -33,6 +34,31 @@ describe('rowForHit', () => {
 
   it('renders no snippet line for an empty preview', () => {
     expect(rowForHit(hit({})).snippet).toEqual([])
+  })
+
+  it('highlights free-text matches in the note title', () => {
+    const row = rowForHit(
+      hit({ title: 'Tim MacCaw', highlightedTitle: '\u0001Tim Mac\u0002Caw' }),
+    )
+    expect(row.titleSegments).toEqual([
+      { text: 'Tim Mac', highlighted: true },
+      { text: 'Caw', highlighted: false },
+    ])
+  })
+
+  it('uses the index title markers for tokenizer-normalized matches', () => {
+    const row = rowForHit(
+      hit({ title: 'Café Alpha', highlightedTitle: '\u0001Café\u0002 Alpha' }),
+    )
+    expect(row.titleSegments).toEqual([
+      { text: 'Café', highlighted: true },
+      { text: ' Alpha', highlighted: false },
+    ])
+  })
+
+  it('does not highlight a body-only query that appears inside the title', () => {
+    const row = rowForHit(hit({ title: 'Oscar plans', highlightedTitle: 'Oscar plans' }))
+    expect(row.titleSegments).toEqual([{ text: 'Oscar plans', highlighted: false }])
   })
 })
 

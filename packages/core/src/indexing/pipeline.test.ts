@@ -49,7 +49,20 @@ beforeEach(() => {
       case 'db_query':
         if (sql.includes('index_meta')) return metaRows
         if (sql.includes('from "assets"')) return [{ note_path: 'notes/a.md' }]
-        if (sql.includes('search_fts')) return [{ path: 'notes/a.md', title: 'A' }]
+        if (sql.includes('search_fts')) {
+          return [
+            {
+              path: 'notes/a.md',
+              title: 'A',
+              daily_date: null,
+              preview: 'Hello',
+              mtime: 5,
+              is_pinned: 0,
+              fts_highlighted_title: 'A',
+              snippet: '\u0001Hello\u0002',
+            },
+          ]
+        }
         if (sql.includes('backlinks')) {
           return [{ source_path: 'notes/b.md', target_raw: 'A', alias: null, pos_from: 0, pos_to: 3 }]
         }

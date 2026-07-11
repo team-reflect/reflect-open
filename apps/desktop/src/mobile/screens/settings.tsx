@@ -11,6 +11,7 @@ import {
 } from '@reflect/core'
 import { useAiProviders } from '@/hooks/use-ai-providers'
 import { useAppVersion } from '@/hooks/use-app-version'
+import { marketingVersion } from '@/lib/marketing-version'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer'
 import { AiProviderActionsDrawer } from '@/mobile/ai-provider-actions-drawer'
@@ -213,7 +214,10 @@ export function MobileSettings(): ReactElement {
               label="Notes"
               value={notes === undefined ? '…' : String(notes.length)}
             />
-            <SettingsValueRow label="Version" value={version ?? '…'} />
+            <SettingsValueRow
+              label="Version"
+              value={version === null ? '…' : marketingVersion(version)}
+            />
           </SettingsGroup>
         </div>
       </main>

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { APP_REVIEW_STUB_KEY } from './audio-memo-review-stub'
 import { validateApiKey } from './validate-key'
 
 function fetchReturning(status: number): typeof fetch {
@@ -38,6 +39,10 @@ describe('validateApiKey', () => {
 
   it('reads an ok response as valid', async () => {
     expect(await validateApiKey('openai', 'sk-test', fetchReturning(200))).toBe('valid')
+  })
+
+  it('accepts the App Review demo key without probing the provider', async () => {
+    expect(await validateApiKey('openai', APP_REVIEW_STUB_KEY, fetchThrowing)).toBe('valid')
   })
 
   it('reads an auth rejection as invalid', async () => {

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  parseHighlights,
   parseSearchQuery,
   searchNotes,
   searchWithFilters,
@@ -153,6 +154,12 @@ describe('createDevIndexDb', () => {
       'notes/tokyo-trip.md',
       'notes/body-hit.md',
     ])
+    expect(parseHighlights(hits[0]!.highlightedTitle)).toEqual([
+      { text: '来週の', highlighted: false },
+      { text: '東京', highlighted: true },
+      { text: '旅行計画', highlighted: false },
+    ])
+    expect(hits[1]!.highlightedTitle).toBe('別のノート')
     expect(hits[0]!.snippet).toBeNull()
     expect(hits[1]!.snippet).toContain('東京')
     const plan = db.query(`EXPLAIN QUERY PLAN ${captured[0]!.sql}`, captured[0]!.params)
@@ -161,8 +168,14 @@ describe('createDevIndexDb', () => {
       { path: 'notes/tokyo-trip.md', title: '来週の東京旅行計画' },
       { path: 'notes/body-hit.md', title: '別のノート' },
     ])
-    await expect(searchWithFilters(parseSearchQuery('東京 旅行'))).resolves.toMatchObject([
+    const multiTermHits = await searchWithFilters(parseSearchQuery('東京 旅行'))
+    expect(multiTermHits).toMatchObject([
       { path: 'notes/tokyo-trip.md', title: '来週の東京旅行計画', snippet: null },
+    ])
+    expect(parseHighlights(multiTermHits[0]!.highlightedTitle)).toEqual([
+      { text: '来週の', highlighted: false },
+      { text: '東京旅行', highlighted: true },
+      { text: '計画', highlighted: false },
     ])
 
     const filtered = await searchWithFilters(parseSearchQuery('is:pinned 東京'))
@@ -234,6 +247,61 @@ describe('createDevIndexDb', () => {
       'notes/car-wash.md',
       'notes/garage.md',
     ])
+    expect(parseHighlights(hits[0]!.highlightedTitle)[0]).toEqual({
+      text: 'Car',
+      highlighted: true,
+    })
+    expect(parseHighlights(hits[1]!.highlightedTitle)).toContainEqual({
+      text: 'car',
+      highlighted: true,
+    })
+    expect(hits[2]!.highlightedTitle).toBe('Garage')
+  })
+
+  it('returns title markers from SQLite for tokenizer-normalized matches', async () => {
+    const db = await openDb()
+    db.applyNote(
+      sampleNote({
+        path: 'notes/cafe-alpha.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n90',
+        title: 'Café Alpha',
+        titleKey: 'café alpha',
+        text: 'An otherwise unrelated body.',
+        preview: 'An otherwise unrelated body.',
+        tags: [],
+      }),
+    )
+    db.applyNote(
+      sampleNote({
+        path: 'notes/car-punctuation.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n88',
+        title: 'Car, car',
+        titleKey: 'car, car',
+        text: 'An otherwise unrelated body.',
+        preview: 'An otherwise unrelated body.',
+        tags: [],
+      }),
+    )
+    installQueryBridge(db)
+
+    const accentHit = (await searchWithFilters(parseSearchQuery('cafe')))[0]!
+    expect(parseHighlights(accentHit.highlightedTitle)).toEqual([
+      { text: 'Café', highlighted: true },
+      { text: ' Alpha', highlighted: false },
+    ])
+
+    const punctuationHit = (await searchWithFilters(parseSearchQuery('alpha,')))[0]!
+    expect(parseHighlights(punctuationHit.highlightedTitle)).toEqual([
+      { text: 'Café ', highlighted: false },
+      { text: 'Alpha', highlighted: true },
+    ])
+
+    const mergedHit = (await searchWithFilters(parseSearchQuery('car,')))[0]!
+    expect(parseHighlights(mergedHit.highlightedTitle)).toEqual([
+      { text: 'Car,', highlighted: true },
+      { text: ' ', highlighted: false },
+      { text: 'car', highlighted: true },
+    ])
   })
 
   it('finds a partial multi-term title through the mobile All search plan', async () => {
@@ -252,8 +320,37 @@ describe('createDevIndexDb', () => {
     installQueryBridge(db)
 
     const parsed = buildAllNotesSearch('Tim Mac', EMPTY_ALL_NOTES_FILTERS, null)
-    await expect(searchWithFilters(parsed, searchPlanFor(parsed))).resolves.toMatchObject([
+    const hits = await searchWithFilters(parsed, searchPlanFor(parsed))
+    expect(hits).toMatchObject([
       { path: 'notes/tim-maccaw.md', title: 'Tim MacCaw', snippet: null },
+    ])
+    expect(parseHighlights(hits[0]!.highlightedTitle)).toEqual([
+      { text: 'Tim Mac', highlighted: true },
+      { text: 'Caw', highlighted: false },
+    ])
+  })
+
+  it('keeps title-recall highlights when the body also creates an FTS hit', async () => {
+    const db = await openDb()
+    db.applyNote(
+      sampleNote({
+        path: 'notes/tim-maccaw.md',
+        id: '01hv3xq7c2dm8k4t9w5e6r1n89',
+        title: 'Tim MacCaw',
+        titleKey: 'tim maccaw',
+        text: 'The mac migration is documented here.',
+        preview: 'The mac migration is documented here.',
+        tags: [],
+      }),
+    )
+    installQueryBridge(db)
+
+    const hit = (await searchWithFilters(parseSearchQuery('mac')))[0]!
+    expect(hit.snippet).toContain('mac')
+    expect(parseHighlights(hit.highlightedTitle)).toEqual([
+      { text: 'Tim ', highlighted: false },
+      { text: 'Mac', highlighted: true },
+      { text: 'Caw', highlighted: false },
     ])
   })
 

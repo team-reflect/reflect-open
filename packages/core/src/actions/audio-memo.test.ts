@@ -10,6 +10,7 @@ import {
   type ReconcileAudioMemosInput,
   type ReconcileStop,
 } from './audio-memo'
+import { APP_REVIEW_STUB_KEY } from '../ai/audio-memo-review-stub'
 import {
   listDir,
   listFiles,
@@ -420,6 +421,29 @@ describe('reconcileAudioMemos', () => {
     expect(writeNoteMock).toHaveBeenCalledWith(
       'daily/2026-06-11.md',
       expect.stringContaining('- [[audio-memo-2026-06-11-153022-845|Audio memo 2026-06-11 15:30:22]]'),
+      3,
+    )
+  })
+
+  it('the App Review demo key writes a canned transcript without any provider call', async () => {
+    listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
+    getSecretMock.mockResolvedValue(APP_REVIEW_STUB_KEY)
+
+    const outcome = await reconcile()
+
+    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, stopped: null })
+    expect(transcribeMock).not.toHaveBeenCalled()
+    expect(generateAudioMemoTitleMock).not.toHaveBeenCalled()
+    expect(writeNoteMock).toHaveBeenCalledWith(
+      MEMO.notePath,
+      expect.stringContaining('demo transcription'),
+      3,
+    )
+    expect(writeNoteMock).toHaveBeenCalledWith(
+      'daily/2026-06-11.md',
+      expect.stringContaining(
+        '- [[audio-memo-2026-06-11-153022-845|Audio memo 2026-06-11 15:30:22]]',
+      ),
       3,
     )
   })

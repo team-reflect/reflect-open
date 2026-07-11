@@ -6,6 +6,7 @@ import {
 } from '../ai/provider-config'
 import { aiKeySecretName } from '../ai/secrets'
 import { generateAudioMemoTitle, pickAudioMemoTitleConfig } from '../ai/audio-memo-title'
+import { APP_REVIEW_STUB_KEY, stubTranscriptBody } from '../ai/audio-memo-review-stub'
 import {
   AUDIO_EXTENSION_BY_MIME,
   base64ToBytes,
@@ -265,6 +266,9 @@ async function memoNoteBody(input: {
   titleCredentials: { config: AiProviderConfig; apiKey: string } | null
   fetchFn?: typeof fetch | undefined
 }): Promise<{ body: string; title: string; rejected: boolean }> {
+  if (input.apiKey === APP_REVIEW_STUB_KEY) {
+    return { body: stubTranscriptBody(), title: input.memo.title, rejected: false }
+  }
   try {
     const text = await transcribeAudio({
       provider: input.config.provider,

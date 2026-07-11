@@ -9,6 +9,7 @@ const memo = vi.hoisted(() => ({
   level: 0.4,
   pendingCount: 0,
   available: true,
+  hasTranscriptionConfig: true,
   error: null as string | null,
   canRetry: false,
   drawerOpen: true,
@@ -31,12 +32,19 @@ vi.mock('@/mobile/audio-memo-provider', () => ({
   useMobileAudioMemo: () => ({ ...memo }),
 }))
 
+const navigate = vi.hoisted(() => vi.fn())
+
+vi.mock('@/routing/router', () => ({
+  useRouter: () => ({ navigate }),
+}))
+
 const { RecordingDrawer } = await import('./recording-drawer')
 
 beforeEach(() => {
   vi.useRealTimers()
   vi.clearAllMocks()
   memo.phase = 'recording'
+  memo.hasTranscriptionConfig = true
   memo.error = null
   memo.drawerOpen = true
 })
@@ -83,5 +91,18 @@ describe('RecordingDrawer', () => {
     await user.click(view.getByRole('button', { name: 'Stop recording' }))
 
     expect(memo.stopAndSave).toHaveBeenCalledOnce()
+  })
+
+  it('without a transcription model, guides key setup instead of recording', async () => {
+    memo.hasTranscriptionConfig = false
+    const user = userEvent.setup()
+    const view = render(<RecordingDrawer />)
+
+    expect(view.getByText(/OpenAI or Gemini API key/)).not.toBeNull()
+    expect(view.queryByRole('button', { name: 'Stop recording' })).toBeNull()
+
+    await user.click(view.getByRole('button', { name: 'Open Settings' }))
+    expect(navigate).toHaveBeenCalledWith({ kind: 'settings' })
+    expect(memo.onDrawerOpenChange).toHaveBeenCalledWith(false)
   })
 })

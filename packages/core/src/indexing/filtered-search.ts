@@ -5,6 +5,7 @@ import { literalSearchQuery, type ParsedSearchQuery } from './filter-query'
 import { resolveWikiTarget } from './queries'
 import { HIGHLIGHT_END, HIGHLIGHT_START } from './search'
 import { buildFtsMatch, buildTitleMatchSql } from './search-query'
+import { highlightTitle } from './title-highlight'
 
 /**
  * The one palette search (Plan 08): parsed filter tokens become composable
@@ -26,6 +27,8 @@ import { buildFtsMatch, buildTitleMatchSql } from './search-query'
 export interface FilteredSearchHit {
   path: string
   title: string
+  /** Full title with search matches marked; plain when the title did not match. */
+  highlightedTitle: string
   dailyDate: string | null
   /** Highlighted body snippet when free text was searched, else null. */
   snippet: string | null
@@ -184,7 +187,12 @@ export async function searchWithFilters(
       taggedQuery = taggedQuery.orderBy(order)
     }
     const rows = await taggedQuery.execute()
-    return rows.map((row) => ({ ...row, snippet: null, isPinned: row.isPinned !== 0 }))
+    return rows.map((row) => ({
+      ...row,
+      highlightedTitle: row.title,
+      snippet: null,
+      isPinned: row.isPinned !== 0,
+    }))
   }
 
   // Templates never surface in search — they are boilerplate, not notes.
@@ -250,7 +258,12 @@ export async function searchWithFilters(
       recallQuery = recallQuery.limit(limit)
     }
     const rows = await recallQuery.execute()
-    return rows.map((row) => ({ ...row, snippet: null, isPinned: row.isPinned !== 0 }))
+    return rows.map((row) => ({
+      ...row,
+      highlightedTitle: row.title,
+      snippet: null,
+      isPinned: row.isPinned !== 0,
+    }))
   }
 
   // SQLite rejects `MATCH ... OR title_key LIKE ...`, and flattening an FTS
@@ -267,6 +280,9 @@ export async function searchWithFilters(
         .selectFrom('searchFts')
         .select([
           'searchFts.path',
+          sql<string>`highlight(search_fts, 1, ${HIGHLIGHT_START}, ${HIGHLIGHT_END})`.as(
+            'ftsHighlightedTitle',
+          ),
           sql<string>`snippet(search_fts, 2, ${HIGHLIGHT_START}, ${HIGHLIGHT_END}, '…', 10)`.as(
             'snippet',
           ),
@@ -286,6 +302,7 @@ export async function searchWithFilters(
       'filteredNotes.preview',
       'filteredNotes.mtime',
       'filteredNotes.isPinned',
+      'lexical.ftsHighlightedTitle',
       'lexical.snippet',
     ])
     .where(
@@ -300,7 +317,11 @@ export async function searchWithFilters(
     rankedQuery = rankedQuery.limit(limit)
   }
   const rows = await rankedQuery.execute()
-  return rows.map((row) => ({ ...row, isPinned: row.isPinned !== 0 }))
+  return rows.map(({ ftsHighlightedTitle, ...row }) => ({
+    ...row,
+    highlightedTitle: highlightTitle(row.title, parsed.text, ftsHighlightedTitle),
+    isPinned: row.isPinned !== 0,
+  }))
 }
 
 /** A lexical/title search result: the note's path and title. */

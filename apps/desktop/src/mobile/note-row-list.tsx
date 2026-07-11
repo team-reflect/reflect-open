@@ -1,4 +1,4 @@
-import { type ReactElement } from 'react'
+import { type ReactElement, type ReactNode } from 'react'
 import { Pin } from 'lucide-react'
 import { Virtualizer } from 'virtua'
 import type { HighlightSegment } from '@reflect/core'
@@ -8,10 +8,11 @@ import { useSettings } from '@/providers/settings-provider'
 /** V1's fixed row height (px) — placeholder resolution never causes jumps. */
 export const NOTE_ROW_HEIGHT = 64
 
-/** One rendered row: a note with its snippet resolved to segments. */
+/** One rendered row with query-aware title and snippet segments. */
 export interface NoteRowModel {
   path: string
-  title: string
+  /** Title split into plain and highlighted free-text search matches. */
+  titleSegments: HighlightSegment[]
   /** File modification time (epoch ms) — the relative timestamp. */
   mtime: number
   isPinned: boolean
@@ -22,6 +23,18 @@ export interface NoteRowModel {
 interface NoteRowListProps {
   rows: NoteRowModel[]
   onOpen: (path: string) => void
+}
+
+function renderHighlightedSegments(segments: HighlightSegment[]): ReactNode {
+  return segments.map((segment, index) =>
+    segment.highlighted ? (
+      <mark key={index} className="rounded-sm bg-primary/15 text-text">
+        {segment.text}
+      </mark>
+    ) : (
+      <span key={index}>{segment.text}</span>
+    ),
+  )
 }
 
 /**
@@ -55,22 +68,16 @@ export function NoteRowList({ rows, onOpen }: NoteRowListProps): ReactElement {
                   <span className="sr-only">Pinned</span>
                 </>
               )}
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">{row.title}</span>
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                {renderHighlightedSegments(row.titleSegments)}
+              </span>
               <span className="shrink-0 text-xs text-text-muted">
                 {formatRecencyLabel(row.mtime, settings)}
               </span>
             </span>
             {row.snippet.length > 0 && (
               <span className="w-full truncate text-xs text-text-muted">
-                {row.snippet.map((segment, index) =>
-                  segment.highlighted ? (
-                    <mark key={index} className="rounded-sm bg-primary/15 text-text">
-                      {segment.text}
-                    </mark>
-                  ) : (
-                    <span key={index}>{segment.text}</span>
-                  ),
-                )}
+                {renderHighlightedSegments(row.snippet)}
               </span>
             )}
           </button>

@@ -17,7 +17,9 @@
       "minimumReleaseAge": "0 days",
       "prPriority": 100,
       "dependencyDashboardApproval": false,
-      "draftPR": false
+      "draftPR": false,
+      "semanticCommitType": "fix",
+      "semanticCommitScope": null
     }
   ]
 }

@@ -2,9 +2,10 @@ import { sql } from 'kysely'
 import { db } from './db'
 
 /**
- * Snippet-highlight plumbing for palette search (Plan 08). The search itself
- * lives in `filtered-search.ts` — one ranked, snippeted query whose filters
- * may be empty, so there is exactly one search path to keep correct.
+ * Search-highlight plumbing for indexed snippets and query-matched titles.
+ * The search itself lives in `filtered-search.ts` — one ranked, snippeted
+ * query whose filters may be empty, so there is exactly one search path to
+ * keep correct.
  * Highlight boundaries use control-character markers so {@link parseHighlights}
  * can split them without ever confusing user text for markup.
  */
@@ -13,7 +14,7 @@ import { db } from './db'
 export const HIGHLIGHT_START = '\u0001'
 export const HIGHLIGHT_END = '\u0002'
 
-/** One run of snippet text, highlighted or plain. */
+/** One run of display text, highlighted or plain. */
 export interface HighlightSegment {
   text: string
   highlighted: boolean

@@ -496,7 +496,7 @@ describe('MobileAudioMemoProvider', () => {
     }
   })
 
-  it('is unavailable without an OpenAI or Gemini model, and toggle does nothing', async () => {
+  it('without an OpenAI or Gemini model, toggle opens the drawer for key setup, never the mic', async () => {
     SETTINGS.current = {
       aiProviders: [
         { id: 'claude', provider: 'anthropic', model: 'claude-fable-5', keyHint: 'wxyz1' },
@@ -505,13 +505,16 @@ describe('MobileAudioMemoProvider', () => {
     }
     const { result } = renderHook(() => useMobileAudioMemo(), { wrapper })
 
-    expect(result.current.available).toBe(false)
+    // The FAB stays visible (available) so the feature is discoverable; only
+    // the recording itself waits for a key.
+    expect(result.current.available).toBe(true)
+    expect(result.current.hasTranscriptionConfig).toBe(false)
 
     await act(async () => {
       result.current.toggle()
     })
+    expect(result.current.drawerOpen).toBe(true)
     expect(result.current.phase).toBe('idle')
-    expect(result.current.drawerOpen).toBe(false)
     expect(recorderControls.startSpy).not.toHaveBeenCalled()
   })
 })

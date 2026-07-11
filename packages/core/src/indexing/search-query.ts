@@ -71,6 +71,21 @@ export function containsUnsegmentedScript(value: string): boolean {
   return false
 }
 
+export interface TitleRecallTerm {
+  /** Query term folded exactly like the indexed title key. */
+  readonly value: string
+  /** Whether the term matches anywhere rather than only at a title word start. */
+  readonly anywhere: boolean
+}
+
+/** Resolve query terms into the shared title-recall matching policy. */
+export function titleRecallTerms(query: string): TitleRecallTerm[] {
+  return splitSearchTerms(query).map(foldKey).map((value) => ({
+    value,
+    anywhere: containsUnsegmentedScript(value),
+  }))
+}
+
 /**
  * The `instr` needles for title recall, one per query term, folded like
  * `notes.title_key`. Matched with `instr(' ' || title_key, needle)`: terms in
@@ -80,9 +95,9 @@ export function containsUnsegmentedScript(value: string): boolean {
  * cannot segment those, so word starts don't exist to anchor on.
  */
 export function titleRecallNeedles(query: string): string[] {
-  return splitSearchTerms(query)
-    .map(foldKey)
-    .map((term) => (containsUnsegmentedScript(term) ? term : ` ${term}`))
+  return titleRecallTerms(query).map((term) =>
+    term.anywhere ? term.value : ` ${term.value}`,
+  )
 }
 
 export interface TitleMatchSql {

@@ -67,6 +67,17 @@ jobs:
       tag: ${{ needs.release-please.outputs.tag_name }}
     secrets: inherit
 
+  # Every release also ships to TestFlight. iOS needs no version bump of its
+  # own: the marketing version follows apps/desktop/package.json with the
+  # prerelease suffix stripped, so beta and stable builds stack under the same
+  # version, told apart by the UTC-timestamp build number.
+  publish-testflight:
+    name: Upload to TestFlight
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    uses: ./.github/workflows/testflight.yml
+    secrets: inherit
+
   # After a stable release, open a single PR that merges master back into next
   # and advances the beta manifest. A human merges it with a merge commit —
   # never squash, or the two branches diverge for good. This job does not wait
