@@ -16,9 +16,26 @@ on:
         required: true
         type: boolean
         default: true
+  # Called by release-please.yml so every published release also ships to
+  # TestFlight. workflow_call has no choice type; release-ios.mjs validates
+  # the export method.
+  workflow_call:
+    inputs:
+      export_method:
+        description: Xcode export method for the IPA (app-store-connect or release-testing).
+        required: false
+        type: string
+        default: app-store-connect
+      wait_for_processing:
+        description: Wait for App Store Connect processing before finishing.
+        required: false
+        type: boolean
+        default: true
 
 # TestFlight uploads should be serialized so build numbers and App Store
-# Connect processing don't race each other.
+# Connect processing don't race each other. This also holds when the workflow
+# is called from release-please.yml; keep the group name hardcoded, since a
+# `github.workflow` group would resolve to the caller's name there.
 concurrency:
   group: testflight
   cancel-in-progress: false
