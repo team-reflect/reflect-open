@@ -94,7 +94,9 @@ The editor is built on `@team-reflect/reflect-editor` and ProseMirror/Yjs docume
 Important editor capabilities:
 
 - Rich text, bullets, nested lists, collapsible list items, code blocks, formatting, highlights, underline, strikethrough, links, and images.
-- Backlink creation with `[[...]]`, backlink opening, backlink hover previews, and selected-text backlinking.
+- Backlink creation with `[[...]]`, backlink opening,
+  [backlink hover previews](./porting/backlink-hover-previews.md), and
+  selected-text backlinking.
 - Tags and tag clicks.
 - Tasks embedded directly in notes.
 - Note merge suggestions for duplicate subjects.

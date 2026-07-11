@@ -41,6 +41,7 @@ designs simply don't survive the move:
 | Doc                                                                 | v1 feature               | v2 status                                        |
 | ------------------------------------------------------------------- | ------------------------ | ------------------------------------------------ |
 | [Note aliases](./note-aliases.md)                                   | `//` title aliases       | **Ported** (frontmatter `aliases`) — mapping doc |
+| [Backlink hover previews](./backlink-hover-previews.md)             | Wiki-link preview        | Planned — Meowdown hover UI + local loader       |
 | [Audio memos](./audio-memos.md)                                     | Voice notes + transcript | **Ported** (BYOK transcription) — mapping doc    |
 | [AI menu and prompts](./ai-menu-and-prompts.md)                     | Selection AI + prompts   | Planned — needs meowdown + app work              |
 | [Note templates](./note-templates.md)                               | Per-graph templates      | Planned — markdown files in the graph            |
