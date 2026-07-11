@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { useMobileAudioMemo } from '@/mobile/audio-memo-provider'
 import { RecordingLevelWaveform } from '@/mobile/recording-level-waveform'
+import { useRouter } from '@/routing/router'
 
 /**
  * The recording sheet (V1's recording modal as a bottom drawer): waveform +
@@ -12,6 +13,10 @@ import { RecordingLevelWaveform } from '@/mobile/recording-level-waveform'
  * stops-and-saves — dismissal must never silently drop audio; discarding is
  * explicit and requires a second tap. The provider owns open state and the
  * stop/discard semantics behind `onDrawerOpenChange`.
+ *
+ * Without an OpenAI/Gemini model the sheet shows key-setup guidance instead
+ * of recording controls: the mic FAB stays discoverable, but recording never
+ * starts until transcription has a key to run on.
  */
 export function RecordingDrawer(): ReactElement {
   const memo = useMobileAudioMemo()
@@ -34,6 +39,8 @@ export function RecordingDrawer(): ReactElement {
               </Button>
             </div>
           </div>
+        ) : !memo.hasTranscriptionConfig ? (
+          <KeySetupControls memo={memo} />
         ) : (
           <LiveRecordingControls key={memo.drawerOpen ? 'open' : 'closed'} memo={memo} />
         )}
@@ -46,6 +53,27 @@ type MobileAudioMemo = ReturnType<typeof useMobileAudioMemo>
 
 interface LiveRecordingControlsProps {
   memo: MobileAudioMemo
+}
+
+function KeySetupControls({ memo }: LiveRecordingControlsProps): ReactElement {
+  const { navigate } = useRouter()
+
+  return (
+    <div className="flex flex-col items-center gap-4 px-4 pb-2 text-center">
+      <p className="text-sm text-text-muted">
+        Audio memos are transcribed into your notes with your own OpenAI or Gemini API key. Add
+        one in Settings to start recording.
+      </p>
+      <Button
+        onClick={() => {
+          memo.onDrawerOpenChange(false)
+          navigate({ kind: 'settings' })
+        }}
+      >
+        Open Settings
+      </Button>
+    </div>
+  )
 }
 
 function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactElement {

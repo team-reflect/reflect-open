@@ -11,7 +11,9 @@ import { useMobileAudioMemo } from '@/mobile/audio-memo-provider'
  * feature). Idle starts a memo, recording reads as the stop control, a
  * spinner carries the transcribe/save progress, and a failure turns it red —
  * tapping reopens the drawer with Retry/Discard. Hidden entirely when the
- * feature can't run (no native bridge, or no OpenAI/Gemini model configured).
+ * feature can't run (no native bridge). A missing OpenAI/Gemini model never
+ * hides it: the feature must stay discoverable, so the tap opens the
+ * drawer's key-setup guidance instead of recording.
  */
 export function AudioMemoFab(): ReactElement | null {
   const memo = useMobileAudioMemo()
