@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.5...v0.6.0-beta.6) (2026-07-11)
+
+
+### Features
+
+* add an App Review demo key for audio memo and mobile key-setup guidance ([#735](https://github.com/team-reflect/reflect-open/issues/735)) ([654f1a4](https://github.com/team-reflect/reflect-open/commit/654f1a440ef7f2126d7470bb64b2b9cddc2b781d))
+
 ## [0.6.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.4...v0.6.0-beta.5) (2026-07-10)
 
 
