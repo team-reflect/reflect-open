@@ -6,7 +6,7 @@ import {
 } from '../ai/provider-config'
 import { aiKeySecretName } from '../ai/secrets'
 import { generateAudioMemoTitle, pickAudioMemoTitleConfig } from '../ai/audio-memo-title'
-import { APP_REVIEW_STUB_KEY, stubTranscriptBody } from './audio-memo-review-stub'
+import { APP_REVIEW_STUB_KEY, stubTranscriptBody } from '../ai/audio-memo-review-stub'
 import {
   AUDIO_EXTENSION_BY_MIME,
   base64ToBytes,
