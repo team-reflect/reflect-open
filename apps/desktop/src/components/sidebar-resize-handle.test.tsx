@@ -38,8 +38,17 @@ function mockRenderedRail(handle: HTMLElement, width: number): void {
   vi.spyOn(aside, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, width, 800))
 }
 
+function setViewport(width: number): void {
+  Object.defineProperty(window, 'innerWidth', {
+    value: width,
+    configurable: true,
+    writable: true,
+  })
+}
+
 afterEach(() => {
   cleanup()
+  setViewport(1024)
   const style = document.documentElement.style
   for (const property of [
     '--sidebar-width',
@@ -120,6 +129,36 @@ describe('SidebarResizeHandle', () => {
 
     firePointer(handle, 'pointerup', { pointerId: 7, clientX: 420 })
     expect(settingsState.updateSettings).toHaveBeenCalledWith({ sidebarWidth: 420 })
+  })
+
+  it('never clamps the first move below the rendered width', () => {
+    // A 700px viewport budgets only 340px for the rail, but proportional
+    // flooring can render it at 400px: the cap must stop growth, not yank the
+    // rail to 340px on the first activated move.
+    setViewport(700)
+    const handle = renderHandle('workspace')
+    mockRenderedRail(handle, 400)
+
+    firePointer(handle, 'pointerdown', { pointerId: 7, button: 0, clientX: 400 })
+    firePointer(handle, 'pointermove', { pointerId: 7, clientX: 450 })
+    expect(rootVariable('--sidebar-width')).toBe('400px')
+
+    firePointer(handle, 'pointermove', { pointerId: 7, clientX: 340 })
+    firePointer(handle, 'pointerup', { pointerId: 7, clientX: 340 })
+    expect(settingsState.updateSettings).toHaveBeenCalledWith({ sidebarWidth: 340 })
+  })
+
+  it('keeps aria-valuenow in step with viewport scaling', () => {
+    settingsState.settings = { sidebarWidth: 480, contextSidebarWidth: 480 }
+    const handle = renderHandle('workspace')
+    // At 1024px the 480px preferences scale to 332px each.
+    expect(handle.getAttribute('aria-valuenow')).toBe('332')
+
+    act(() => {
+      setViewport(1600)
+      window.dispatchEvent(new Event('resize'))
+    })
+    expect(handle.getAttribute('aria-valuenow')).toBe('480')
   })
 
   it('a bare click commits nothing and never suppresses the width effect', () => {

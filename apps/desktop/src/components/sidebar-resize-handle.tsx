@@ -38,7 +38,9 @@ export function SidebarResizeHandle({ panel }: SidebarResizeHandleProps): ReactE
       aria-valuemax={range.max}
       {...handlers}
       className={cn(
-        'absolute inset-y-0 z-10 w-2 cursor-col-resize touch-none outline-none',
+        // outline-hidden (not -none) keeps the forced-colors fallback outline
+        // for high-contrast users, whom the tinted edge line cannot reach.
+        'absolute inset-y-0 z-10 w-2 cursor-col-resize touch-none outline-hidden',
         'after:absolute after:inset-y-0 after:w-0.5 after:transition-colors after:duration-100',
         'hover:after:bg-border-strong hover:after:delay-150 focus-visible:after:bg-accent/40',
         panel === 'workspace' ? 'right-0 after:right-0' : 'left-0 after:left-0',

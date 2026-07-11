@@ -254,11 +254,16 @@ export function useSidebarResize(panel: ResizableSidebarPanel): SidebarResize {
       } catch {
         // Synthetic tests do not have a live pointer to capture.
       }
+      const startWidth = renderedBaseWidth(event.currentTarget)
       dragRef.current = {
         pointerId: event.pointerId,
         startX: event.clientX,
-        startWidth: renderedBaseWidth(event.currentTarget),
-        cap: gestureCap(event.currentTarget),
+        startWidth,
+        // Never below the rendered width: proportional scaling can floor the
+        // other rail at its minimum and leave this one wider than the naive
+        // budget. The cap stops growth; it must not shrink the current state
+        // on the first move.
+        cap: Math.max(startWidth, gestureCap(event.currentTarget)),
         activated: false,
       }
     },
@@ -321,7 +326,7 @@ export function useSidebarResize(panel: ResizableSidebarPanel): SidebarResize {
         return
       }
       const base = renderedBaseWidth(event.currentTarget)
-      const cap = gestureCap(event.currentTarget)
+      const cap = Math.max(base, gestureCap(event.currentTarget))
       const grow = side === 'left' ? 1 : -1
       let next: number
       switch (event.key) {
@@ -369,8 +374,21 @@ export function useSidebarResize(panel: ResizableSidebarPanel): SidebarResize {
     }
   }, [applyWidth, cssVariable])
 
+  // The separator's reported value must track viewport scaling, so the hook
+  // re-renders on window resize like `SidebarWidthEffect` does.
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth)
+  useEffect(() => {
+    const onResize = (): void => {
+      setViewportWidth(window.innerWidth)
+    }
+    window.addEventListener('resize', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+    }
+  }, [])
+
   const effective = effectiveSidebarWidths(
-    window.innerWidth,
+    viewportWidth,
     settings.sidebarWidth,
     settings.contextSidebarWidth,
   )
