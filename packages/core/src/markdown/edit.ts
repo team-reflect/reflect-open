@@ -1,4 +1,7 @@
+import type { SyntaxNode } from '@lezer/common'
 import { parseNote } from './extract'
+import { splitFrontmatter } from './frontmatter'
+import { parseBody } from './grammar'
 import { normalizeWikiTarget } from './resolve'
 import { scanInlineWikiLinks } from './scan'
 import { parseTaskMarker } from './task-marker'
@@ -96,8 +99,9 @@ export function editTaskLine(source: string, task: TaskMarker, content: string):
   }
   const newline = source.indexOf('\n', offset)
   const lineEnd = newline === -1 ? source.length : newline
+  const contentEnd = lineEnd > offset && source[lineEnd - 1] === '\r' ? lineEnd - 1 : lineEnd
   const rewritten = text.length > 0 ? `${marker} ${text}` : marker
-  return source.slice(0, offset) + rewritten + source.slice(lineEnd)
+  return source.slice(0, offset) + rewritten + source.slice(contentEnd)
 }
 
 /**
@@ -128,6 +132,80 @@ export function appendTaskLine(source: string): { source: string; markerOffset: 
   const base = source.replace(/\s*$/, '')
   const prefix = base.length > 0 ? `${base}\n+ ` : '+ '
   return { source: `${prefix}[ ] \n`, markerOffset: prefix.length }
+}
+
+function taskNodeAt(body: string, markerOffset: number): SyntaxNode | null {
+  let node: SyntaxNode | null = parseBody(body).resolve(markerOffset, 1)
+  while (node !== null && node.name !== 'Task') {
+    node = node.parent
+  }
+  return node
+}
+
+function nearestParentListItem(taskNode: SyntaxNode): SyntaxNode | null {
+  const ownItem = taskNode.parent
+  if (ownItem?.name !== 'ListItem') {
+    return null
+  }
+  for (let ancestor = ownItem.parent; ancestor !== null; ancestor = ancestor.parent) {
+    if (ancestor.name === 'ListItem') {
+      return ancestor
+    }
+  }
+  return null
+}
+
+function insertionLineEnding(source: string, insertionOffset: number): '\r\n' | '\n' {
+  if (source.startsWith('\r\n', insertionOffset)) {
+    return '\r\n'
+  }
+  if (source[insertionOffset] === '\n') {
+    return '\n'
+  }
+  const previousNewline = source.lastIndexOf('\n', insertionOffset - 1)
+  return previousNewline > 0 && source[previousNewline - 1] === '\r' ? '\r\n' : '\n'
+}
+
+/**
+ * Add an empty task to the end of `task`'s nearest parent-list context. The new
+ * line reuses the task's exact indentation and round-list prefix, so parsing it
+ * yields the same ancestor breadcrumbs. The indexed marker is relocated through
+ * the normal stale guard first; a task that no longer has a parent context is
+ * refused rather than silently appended at the note root.
+ */
+export function appendTaskToContext(
+  source: string,
+  task: TaskMarker,
+): {
+  source: string
+  markerOffset: number
+  anchorOffset: number
+  insertionOffset: number
+} {
+  const locatedOffset = locateTaskMarker(source, task.markerOffset, task.raw)
+  const { body, bodyOffset } = splitFrontmatter(source)
+  const taskNode = taskNodeAt(body, locatedOffset - bodyOffset)
+  const contextItem = taskNode === null ? null : nearestParentListItem(taskNode)
+  if (contextItem === null) {
+    throw new TaskStaleError('task no longer has a parent list context')
+  }
+
+  const contextEnd = bodyOffset + contextItem.to
+  // Lezer's CRLF ranges end between `\r` and `\n`; splice before the pair so
+  // the inserted line cannot inherit a lone LF at either boundary.
+  const insertionOffset =
+    source[contextEnd - 1] === '\r' && source[contextEnd] === '\n' ? contextEnd - 1 : contextEnd
+  const lineStart = source.lastIndexOf('\n', locatedOffset - 1) + 1
+  const linePrefix = source.slice(lineStart, locatedOffset)
+  const lineEnding = insertionLineEnding(source, insertionOffset)
+  const trailingLineEnding = insertionOffset === source.length ? lineEnding : ''
+  const inserted = `${lineEnding}${linePrefix}[ ] ${trailingLineEnding}`
+  return {
+    source: source.slice(0, insertionOffset) + inserted + source.slice(insertionOffset),
+    markerOffset: insertionOffset + lineEnding.length + linePrefix.length,
+    anchorOffset: locatedOffset,
+    insertionOffset,
+  }
 }
 
 /**

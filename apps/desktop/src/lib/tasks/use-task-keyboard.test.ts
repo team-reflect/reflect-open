@@ -350,6 +350,37 @@ describe('useTaskKeyboard', () => {
     })
   })
 
+  it('Return continues a grouped Current row inside its task context', () => {
+    const grouped = task({
+      notePath: 'notes/a.md',
+      noteTitle: 'A',
+      breadcrumbs: ['Project', 'Phase one'],
+      dueDate: '2026-06-15',
+    })
+    const insert = vi.fn().mockResolvedValue(null)
+    const insertAfter = vi.fn().mockResolvedValue(null)
+    const selection = makeSelection({
+      selected: new Set(['grouped']),
+      selectedCount: 1,
+      activeKey: () => 'grouped',
+    })
+    mount({
+      selection,
+      actions: makeActions({ insert, insertAfter }),
+      tasksByKey: new Map([['grouped', grouped]]),
+    })
+
+    press(root, 'Enter')
+    expect(insertAfter).toHaveBeenCalledWith(grouped, null, {
+      notePath: 'notes/a.md',
+      noteTitle: 'A',
+      dailyDate: null,
+      isPinned: false,
+      pinnedOrder: null,
+    })
+    expect(insert).not.toHaveBeenCalled()
+  })
+
   it('Return falls to today’s daily when the pivot is no longer selected', () => {
     const deselected = task({ notePath: 'notes/a.md', noteTitle: 'A' })
     const insert = vi.fn().mockResolvedValue(null)

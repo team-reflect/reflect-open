@@ -2,12 +2,14 @@ import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { type OpenTask } from '@reflect/core'
 import { makeOpenTask as task } from './open-task-fixture'
+import { taskKey } from './task-identity'
 import {
   archiveRecentlyCompleted,
   forgetRecentlyCompleted,
   hasRecentlyCompleted,
   markRecentlyCompleted,
   reconcileRecentlyCompleted,
+  relocateRecentlyCompleted,
   resetRecentlyCompleted,
   useRecentlyCompleted,
 } from './recently-completed'
@@ -52,6 +54,96 @@ describe('recently-completed', () => {
 
     act(() => archiveRecentlyCompleted('/g'))
     expect(result.current).toEqual([])
+  })
+
+  it('relocates struck rows shifted by a contextual insertion', () => {
+    const { result } = renderHook(() => useRecentlyCompleted('/g', undefined))
+    act(() =>
+      markRecentlyCompleted('/g', [
+        task({ notePath: 'a.md', markerOffset: 40, raw: '[ ] done' }),
+        task({ notePath: 'b.md', markerOffset: 40, raw: '[ ] other' }),
+      ]),
+    )
+
+    act(() =>
+      relocateRecentlyCompleted('/g', 'a.md', [
+        { from: 40, fromRaw: '[x] done', marker: { markerOffset: 56, raw: '[x] done' } },
+      ]),
+    )
+
+    expect(result.current.map((row) => taskKey(row))).toEqual(['a.md:56', 'b.md:40'])
+    expect(result.current[0]?.raw).toBe('[x] done')
+  })
+
+  it('relocates a stale struck offset by a unique raw marker match', () => {
+    const { result } = renderHook(() => useRecentlyCompleted('/g', undefined))
+    act(() =>
+      markRecentlyCompleted('/g', [
+        task({ notePath: 'a.md', markerOffset: 12, raw: '[ ] done' }),
+      ]),
+    )
+
+    act(() =>
+      relocateRecentlyCompleted('/g', 'a.md', [
+        { from: 20, fromRaw: '[x] done', marker: { markerOffset: 36, raw: '[x] done' } },
+      ]),
+    )
+
+    expect(result.current.map((row) => taskKey(row))).toEqual(['a.md:36'])
+  })
+
+  it('refreshes an edited struck row from its relocated persisted marker', () => {
+    const { result } = renderHook(() => useRecentlyCompleted('/g', undefined))
+    act(() =>
+      markRecentlyCompleted('/g', [
+        task({ notePath: 'a.md', markerOffset: 20, raw: '[ ] old', text: 'old' }),
+      ]),
+    )
+
+    act(() =>
+      relocateRecentlyCompleted('/g', 'a.md', [
+        {
+          from: 20,
+          fromRaw: '[x] old',
+          marker: {
+            markerOffset: 20,
+            raw: '[x] edited [[2026-07-01]]',
+          },
+        },
+      ]),
+    )
+
+    expect(result.current[0]).toMatchObject({
+      raw: '[x] edited [[2026-07-01]]',
+      text: 'edited 2026-07-01',
+      dueDate: '2026-07-01',
+    })
+  })
+
+  it('does not guess when a stale raw marker is ambiguous', () => {
+    const { result } = renderHook(() => useRecentlyCompleted('/g', undefined))
+    act(() =>
+      markRecentlyCompleted('/g', [
+        task({ notePath: 'a.md', markerOffset: 12, raw: '[ ] duplicate' }),
+      ]),
+    )
+
+    act(() =>
+      relocateRecentlyCompleted('/g', 'a.md', [
+        {
+          from: 20,
+          fromRaw: '[x] duplicate',
+          marker: { markerOffset: 36, raw: '[x] duplicate' },
+        },
+        {
+          from: 40,
+          fromRaw: '[x] duplicate',
+          marker: { markerOffset: 56, raw: '[x] duplicate' },
+        },
+      ]),
+    )
+
+    expect(result.current.map((row) => taskKey(row))).toEqual(['a.md:12'])
   })
 
   it('drops a struck copy when the index reports the task open again with a newer updatedAt', () => {

@@ -1,7 +1,9 @@
 import {
+  appendTaskToContext,
   appendTaskLine,
   editTaskLine,
   isAppError,
+  parseNote,
   readNote,
   removeTaskLine,
   taskLineToBullet,
@@ -15,6 +17,22 @@ import { openSession } from '@/editor/open-documents'
 /** The marker coordinates ({@link TaskMarker}) plus the note they live in. */
 export interface TaskRef extends TaskMarker {
   notePath: string
+}
+
+export interface TaskMarkerOffsetChange {
+  /** Marker offset before the contextual write. */
+  readonly from: number
+  /** Exact pre-write marker line, used to relocate a stale indexed offset safely. */
+  readonly fromRaw: string
+  /** Marker after the write, or null when the original task was removed. */
+  readonly marker: TaskMarker | null
+}
+
+export interface ContinuedTaskInContext {
+  /** The newly inserted empty task's exact persisted marker identity. */
+  readonly created: TaskMarker
+  /** Relocations for pre-existing task markers shifted by the atomic write. */
+  readonly offsetChanges: readonly TaskMarkerOffsetChange[]
 }
 
 /**
@@ -146,6 +164,80 @@ export function convertTaskToBullet(task: TaskRef, generation: number): Promise<
     (owner, marker) => owner.commitTaskToBullet(marker),
     (source, marker) => taskLineToBullet(source, marker),
   )
+}
+
+/**
+ * Continue entry from a grouped task by atomically resolving the current draft
+ * and adding a new empty task to the same parent-list context. Changed content
+ * replaces the anchor line; cleared content removes it. The returned marker
+ * identities reflect the final source so the Tasks view can immediately address
+ * the new row and relocate shifted cached rows before reindexing catches up.
+ */
+export function continueTaskInContext(
+  task: TaskRef,
+  content: string | null,
+  generation: number,
+): Promise<ContinuedTaskInContext> {
+  return serializeByPath(task.notePath, async () => {
+    if (openSession(task.notePath) !== null) {
+      throw new NoteBusyError('This note is open — add the task in the note itself.')
+    }
+    const source = await readNote(task.notePath)
+    const originalTasks = parseNote({ path: task.notePath, source }).tasks
+    const marker: TaskMarker = { markerOffset: task.markerOffset, raw: task.raw }
+    const inserted = appendTaskToContext(source, marker)
+    const resolvedMarker: TaskMarker = { markerOffset: inserted.anchorOffset, raw: task.raw }
+    const insertionLength = inserted.source.length - source.length
+    let nextSource = inserted.source
+    let markerOffset = inserted.markerOffset
+    let anchorDelta = 0
+
+    if (content === '') {
+      const withoutAnchor = removeTaskLine(nextSource, resolvedMarker)
+      anchorDelta = withoutAnchor.length - nextSource.length
+      markerOffset += anchorDelta
+      nextSource = withoutAnchor
+    } else if (content !== null) {
+      const withEditedAnchor = editTaskLine(nextSource, resolvedMarker, content)
+      anchorDelta = withEditedAnchor.length - nextSource.length
+      markerOffset += anchorDelta
+      nextSource = withEditedAnchor
+    }
+
+    const finalTasksByOffset = new Map(
+      parseNote({ path: task.notePath, source: nextSource }).tasks.map((row) => [
+        row.markerOffset,
+        row,
+      ]),
+    )
+    const offsetChanges = originalTasks.map<TaskMarkerOffsetChange>((original) => {
+      if (content === '' && original.markerOffset === inserted.anchorOffset) {
+        return { from: original.markerOffset, fromRaw: original.raw, marker: null }
+      }
+      const shiftedOffset =
+        original.markerOffset +
+        (original.markerOffset >= inserted.insertionOffset ? insertionLength : 0) +
+        (original.markerOffset > inserted.anchorOffset ? anchorDelta : 0)
+      const shifted = finalTasksByOffset.get(shiftedOffset)
+      if (shifted === undefined) {
+        throw new Error(`contextual task relocation failed at offset ${original.markerOffset}`)
+      }
+      return {
+        from: original.markerOffset,
+        fromRaw: original.raw,
+        marker: { markerOffset: shifted.markerOffset, raw: shifted.raw },
+      }
+    })
+    const created = finalTasksByOffset.get(markerOffset)
+    if (created === undefined) {
+      throw new Error(`contextual task insertion failed at offset ${markerOffset}`)
+    }
+    await writeNote(task.notePath, nextSource, generation)
+    return {
+      created: { markerOffset: created.markerOffset, raw: created.raw },
+      offsetChanges,
+    }
+  })
 }
 
 /**

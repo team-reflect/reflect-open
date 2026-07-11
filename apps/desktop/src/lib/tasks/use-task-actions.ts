@@ -1,6 +1,12 @@
 import { useMutation } from '@tanstack/react-query'
 import { type OpenTask } from '@reflect/core'
-import { convertTaskToBullet, deleteTask, editTask, insertTask, toggleTask } from '@/lib/note-task'
+import {
+  convertTaskToBullet,
+  deleteTask,
+  editTask,
+  insertTask,
+  toggleTask,
+} from '@/lib/note-task'
 import { editAndToggleError, isEditAndToggleError } from '@/lib/tasks/edit-and-toggle-error'
 import {
   archiveRecentlyCompleted,
@@ -20,6 +26,7 @@ import { taskKey } from '@/lib/tasks/task-identity'
 import { insertedTaskRow, type InsertTaskTarget } from '@/lib/tasks/task-insert-target'
 import { useTaskCheckboxAction } from '@/lib/tasks/use-task-checkbox-action'
 import { useTaskCacheWriter } from '@/lib/tasks/use-task-cache'
+import { useTaskContextInsert } from '@/lib/tasks/use-task-context-insert'
 import { useGraph } from '@/providers/graph-provider'
 
 /**
@@ -58,8 +65,8 @@ export interface TaskActions {
   /**
    * Enter while editing (V1 continuous entry): persist the current row's edit
    * (when `content` isn't null), then add the next task in `target` and return it
-   * to select. The edit is **awaited before** the insert reads the note, so the
-   * new task's marker offset reflects the post-edit source and can't drift.
+   * to select. A task with breadcrumb context is continued structurally inside
+   * that context; other tasks retain the V1 bucket-target behavior.
    */
   insertAfter: (
     task: OpenTask,
@@ -102,6 +109,7 @@ export function useTaskActions(): TaskActions {
   const root = graph?.root ?? null
   const cache = useTaskCacheWriter()
   const checkboxAction = useTaskCheckboxAction()
+  const contextInsert = useTaskContextInsert()
 
   const completeMutation = useMutation({
     mutationFn: async (tasks: OpenTask[]) => {
@@ -360,6 +368,18 @@ export function useTaskActions(): TaskActions {
     },
   })
 
+  async function persistTaskDraft(task: OpenTask, content: string | null): Promise<boolean> {
+    try {
+      if (content === '') {
+        await deleteMutation.mutateAsync([task])
+      } else if (content !== null) {
+        await editMutation.mutateAsync({ task, content })
+      }
+      return true
+    } catch {
+      return false
+    }
+  }
   return {
     isPending:
       completeMutation.isPending ||
@@ -369,6 +389,7 @@ export function useTaskActions(): TaskActions {
       editAndToggleMutation.isPending ||
       checkboxAction.isPending ||
       insertMutation.isPending ||
+      contextInsert.isPending ||
       scheduleMutation.isPending ||
       convertMutation.isPending ||
       editAndConvertMutation.isPending,
@@ -425,17 +446,23 @@ export function useTaskActions(): TaskActions {
       if (graph?.generation === undefined) {
         return null
       }
+      if (task.breadcrumbs.length > 0) {
+        try {
+          const created = await contextInsert.insert(task, content)
+          if (created !== null) {
+            return created
+          }
+        } catch {
+          // Failure already surfaced; fall through to preserve the draft.
+        }
+        await persistTaskDraft(task, content)
+        return null
+      }
       // Resolve the current row first and *await* it, so the append reads the
       // settled source — the new offset can't drift when the line above resized.
       // Emptied content (the row was cleared) deletes that row rather than leaving
       // a bare `+ [ ]` ghost; a real change persists; null (unchanged) is left be.
-      try {
-        if (content === '') {
-          await deleteMutation.mutateAsync([task])
-        } else if (content !== null) {
-          await editMutation.mutateAsync({ task, content })
-        }
-      } catch {
+      if (!(await persistTaskDraft(task, content))) {
         return null // the edit/delete rollback already surfaced the failure
       }
       let markerOffset: number

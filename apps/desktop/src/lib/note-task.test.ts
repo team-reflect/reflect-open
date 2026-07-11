@@ -1,7 +1,8 @@
-import { TaskStaleError } from '@reflect/core'
+import { parseNote, TaskStaleError } from '@reflect/core'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   convertTaskToBullet,
+  continueTaskInContext,
   deleteTask,
   editTask,
   insertTask,
@@ -221,5 +222,110 @@ describe('insertTask', () => {
 
     await expect(insertTask('notes/a.md', 7)).resolves.toBe('# Notes\n\nbody\n+ '.length)
     expect(writeNote).toHaveBeenCalledWith('notes/a.md', '# Notes\n\nbody\n+ [ ] \n', 7)
+  })
+})
+
+describe('continueTaskInContext', () => {
+  it('saves an edited task and adds the next row to the same nested context', async () => {
+    const source = [
+      '+ StartupToolbox',
+      '  + Reflections',
+      '    + [ ] first',
+      '  + Later',
+      '    + [ ] third',
+      '',
+    ].join('\n')
+    const anchor = parseNote({ path: 'notes/a.md', source }).tasks[0]!
+    openSession.mockReturnValue(null)
+    readNote.mockResolvedValue(source)
+    writeNote.mockResolvedValue(undefined)
+
+    const result = await continueTaskInContext(
+      { notePath: 'notes/a.md', markerOffset: anchor.markerOffset, raw: anchor.raw },
+      'edited first',
+      7,
+    )
+
+    const written = [
+      '+ StartupToolbox',
+      '  + Reflections',
+      '    + [ ] edited first',
+      '    + [ ] ',
+      '  + Later',
+      '    + [ ] third',
+      '',
+    ].join('\n')
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', written, 7)
+    const writtenTasks = parseNote({ path: 'notes/a.md', source: written }).tasks
+    const created = writtenTasks.find(
+      (task) => task.markerOffset === result.created.markerOffset,
+    )
+    expect(created?.breadcrumbs).toEqual(['StartupToolbox', 'Reflections'])
+    expect(result.offsetChanges[1]?.marker?.markerOffset).toBe(writtenTasks[2]?.markerOffset)
+  })
+
+  it('replaces a cleared row with one empty task at the end of its context', async () => {
+    const source = '+ Group\n  + [ ] old\n  + [ ] peer\n'
+    const anchor = parseNote({ path: 'notes/a.md', source }).tasks[0]!
+    openSession.mockReturnValue(null)
+    readNote.mockResolvedValue(source)
+    writeNote.mockResolvedValue(undefined)
+
+    const result = await continueTaskInContext(
+      { notePath: 'notes/a.md', markerOffset: anchor.markerOffset, raw: anchor.raw },
+      '',
+      7,
+    )
+
+    const written = '+ Group\n  + [ ] peer\n  + [ ] \n'
+    expect(writeNote).toHaveBeenCalledWith('notes/a.md', written, 7)
+    const tasks = parseNote({ path: 'notes/a.md', source: written }).tasks
+    expect(tasks.map((task) => task.text)).toEqual(['peer', ''])
+    expect(tasks[1]?.markerOffset).toBe(result.created.markerOffset)
+    expect(tasks[1]?.breadcrumbs).toEqual(['Group'])
+    expect(result.offsetChanges[0]?.marker).toBeNull()
+  })
+
+  it('uses the relocated anchor when an empty task moved before insertion', async () => {
+    const indexedSource = '+ Group\n  + [ ] \n'
+    const anchor = parseNote({ path: 'notes/a.md', source: indexedSource }).tasks[0]!
+    const source = `Intro\n\n${indexedSource}`
+    openSession.mockReturnValue(null)
+    readNote.mockResolvedValue(source)
+    writeNote.mockResolvedValue(undefined)
+
+    await expect(
+      continueTaskInContext(
+        { notePath: 'notes/a.md', markerOffset: anchor.markerOffset, raw: anchor.raw },
+        'filled',
+        7,
+      ),
+    ).resolves.toEqual(expect.objectContaining({ created: expect.any(Object) }))
+    expect(writeNote).toHaveBeenCalledWith(
+      'notes/a.md',
+      'Intro\n\n+ Group\n  + [ ] filled\n  + [ ] \n',
+      7,
+    )
+  })
+
+  it('returns the persisted CRLF raw marker for the optimistic row', async () => {
+    const source = '+ Group\r\n  + [ ] first\r\n'
+    const anchor = parseNote({ path: 'notes/a.md', source }).tasks[0]!
+    openSession.mockReturnValue(null)
+    readNote.mockResolvedValue(source)
+    writeNote.mockResolvedValue(undefined)
+
+    const result = await continueTaskInContext(
+      { notePath: 'notes/a.md', markerOffset: anchor.markerOffset, raw: anchor.raw },
+      'edited',
+      7,
+    )
+
+    expect(writeNote).toHaveBeenCalledWith(
+      'notes/a.md',
+      '+ Group\r\n  + [ ] edited\r\n  + [ ] \r\n',
+      7,
+    )
+    expect(result.created.raw).toBe('[ ] \r')
   })
 })

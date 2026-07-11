@@ -58,6 +58,7 @@ export {
   appendBlock,
   appendUnderHeading,
   appendTaskLine,
+  appendTaskToContext,
   wikiLinkSafe,
   editTaskLine,
   removeTaskLine,

@@ -133,12 +133,14 @@ const toggleTask = vi.hoisted(() => vi.fn())
 const deleteTask = vi.hoisted(() => vi.fn())
 const editTask = vi.hoisted(() => vi.fn())
 const insertTask = vi.hoisted(() => vi.fn())
+const continueTaskInContext = vi.hoisted(() => vi.fn())
 const convertTaskToBullet = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/note-task', () => ({
   toggleTask,
   deleteTask,
   editTask,
   insertTask,
+  continueTaskInContext,
   convertTaskToBullet,
 }))
 
@@ -209,6 +211,11 @@ beforeEach(() => {
   editTask.mockReset()
   insertTask.mockReset()
   insertTask.mockResolvedValue(0)
+  continueTaskInContext.mockReset()
+  continueTaskInContext.mockResolvedValue({
+    created: { markerOffset: 0, raw: '[ ] ' },
+    offsetChanges: [],
+  })
   convertTaskToBullet.mockReset()
   convertTaskToBullet.mockResolvedValue(undefined)
   startOperation.mockClear()

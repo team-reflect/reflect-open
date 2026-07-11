@@ -6,6 +6,7 @@ import {
   taskRawWithContent,
   withCheckedMarker,
   withEditedTask,
+  withRelocatedTaskMarkers,
   withoutTasks,
 } from './task-cache'
 
@@ -20,6 +21,62 @@ describe('withoutTasks', () => {
 
   it('leaves an undefined (not-loaded) list untouched', () => {
     expect(withoutTasks(undefined, [a])).toBeUndefined()
+  })
+})
+
+describe('withRelocatedTaskMarkers', () => {
+  it('moves and removes same-note rows while preserving unrelated rows', () => {
+    const moved = task({ notePath: 'a.md', markerOffset: 20, raw: '[ ] moved' })
+    const removed = task({ notePath: 'a.md', markerOffset: 40, raw: '[ ] removed' })
+    const unrelated = task({ notePath: 'b.md', markerOffset: 20, raw: '[ ] other' })
+
+    expect(
+      withRelocatedTaskMarkers([moved, removed, unrelated], 'a.md', [
+        {
+          from: 20,
+          fromRaw: '[ ] moved',
+          marker: { markerOffset: 36, raw: '[ ] moved' },
+        },
+        { from: 40, fromRaw: '[ ] removed', marker: null },
+      ]),
+    ).toEqual([{ ...moved, markerOffset: 36 }, unrelated])
+  })
+
+  it('returns the same list when every matched marker is unchanged', () => {
+    const rows = [task({ notePath: 'a.md', markerOffset: 20, raw: '[ ] same' })]
+    expect(
+      withRelocatedTaskMarkers(rows, 'a.md', [
+        {
+          from: 20,
+          fromRaw: '[ ] same',
+          marker: { markerOffset: 20, raw: '[ ] same' },
+        },
+      ]),
+    ).toBe(rows)
+  })
+
+  it('does not mistake an optimistically edited anchor for another source row', () => {
+    const editedAnchor = task({
+      notePath: 'a.md',
+      markerOffset: 2,
+      raw: '[ ] duplicate',
+    })
+    const rows = [editedAnchor]
+
+    expect(
+      withRelocatedTaskMarkers(rows, 'a.md', [
+        {
+          from: 2,
+          fromRaw: '[ ] original',
+          marker: { markerOffset: 2, raw: '[ ] duplicate' },
+        },
+        {
+          from: 40,
+          fromRaw: '[ ] duplicate',
+          marker: { markerOffset: 56, raw: '[ ] duplicate' },
+        },
+      ]),
+    ).toBe(rows)
   })
 })
 
@@ -71,6 +128,10 @@ describe('taskRawWithContent', () => {
 
   it('preserves the indexed line’s exact marker casing (GitHub `[X]`)', () => {
     expect(taskRawWithContent(task({ checked: true, raw: '[X] old' }), 'edited')).toBe('[X] edited')
+  })
+
+  it('preserves a CRLF raw line’s carriage return', () => {
+    expect(taskRawWithContent(task({ raw: '[ ] old\r' }), 'edited')).toBe('[ ] edited\r')
   })
 
   it('clears to a bare marker when content is empty', () => {
