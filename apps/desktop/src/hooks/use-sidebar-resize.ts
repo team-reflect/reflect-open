@@ -51,6 +51,15 @@ interface DragState {
 }
 
 /**
+ * The width variables with a drag in flight. While a variable is listed,
+ * `SidebarWidthEffect` must not re-assert the persisted width over it — the
+ * async settings hydration can land mid-drag and would yank the rail out
+ * from under the pointer. The drag's release writes the variable and commits
+ * to settings itself, so a skipped re-assert is never left stale.
+ */
+export const activeSidebarWidthDrags = new Set<string>()
+
+/**
  * While a drag is live the cursor must read `col-resize` everywhere (pointer
  * capture routes events to the handle but does not pin the cursor) and text
  * selection must not paint across the panes the pointer sweeps.
@@ -156,10 +165,11 @@ export function useSidebarResize(panel: ResizableSidebarPanel): SidebarResize {
         startX: event.clientX,
         startWidth,
       }
+      activeSidebarWidthDrags.add(cssVariable)
       setDragWidth(startWidth)
       setDragChrome(true)
     },
-    [range, settingsWidth],
+    [range, settingsWidth, cssVariable],
   )
 
   const onPointerMove = useCallback(
@@ -182,13 +192,14 @@ export function useSidebarResize(panel: ResizableSidebarPanel): SidebarResize {
         return
       }
       dragRef.current = null
+      activeSidebarWidthDrags.delete(cssVariable)
       setDragChrome(false)
       const next = widthAt(drag, event.clientX)
       applyWidth(next)
       commitWidth(next)
       setDragWidth(null)
     },
-    [widthAt, applyWidth, commitWidth],
+    [widthAt, applyWidth, commitWidth, cssVariable],
   )
 
   const onDoubleClick = useCallback((): void => {
@@ -234,11 +245,12 @@ export function useSidebarResize(panel: ResizableSidebarPanel): SidebarResize {
   useEffect(() => {
     return () => {
       if (dragRef.current !== null) {
+        activeSidebarWidthDrags.delete(cssVariable)
         setDragChrome(false)
         applyWidth(settingsWidthRef.current)
       }
     }
-  }, [applyWidth])
+  }, [applyWidth, cssVariable])
 
   return {
     width: dragWidth ?? settingsWidth,
