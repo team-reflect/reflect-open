@@ -32,7 +32,6 @@ export {
 } from './live'
 export { hashContent } from './hash'
 export {
-  availableNotePath,
   availableTemplatePath,
   slugPathForTitle,
   templateSlugPathForTitle,

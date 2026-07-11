@@ -35,6 +35,7 @@ function harness(options?: {
   disk?: string | null
   createIfMissing?: boolean
   missingSeed?: string
+  reconcileEditorInput?: () => void
 }): Harness {
   const snapshots: NoteSessionSnapshot[] = []
   const writes: Array<{ path: string; contents: string }> = []
@@ -67,6 +68,9 @@ function harness(options?: {
     applyContent: (markdown) => {
       applied.push(markdown)
     },
+    ...(options?.reconcileEditorInput === undefined
+      ? {}
+      : { reconcileEditorInput: options.reconcileEditorInput }),
     onContent: (content, origin) => {
       contents.push({ content, origin })
     },
@@ -127,6 +131,25 @@ describe('createNoteSession', () => {
 
     expect(writes).toEqual([{ path: 'notes/a.md', contents: '# Final\n' }])
     expect(snapshots.length).toBe(emittedBeforeDispose)
+  })
+
+  it('reconciles pending editor input before a flush snapshots the buffer', async () => {
+    let target: ReturnType<typeof createNoteSession> | null = null
+    const reconcileEditorInput = vi.fn(() => {
+      target?.editorChanged('# 🧠 Business ideas\n')
+    })
+    const { session, writes } = harness({ reconcileEditorInput })
+    target = session
+    session.load()
+    await settled()
+
+    session.editorChanged('# Business ideas\n')
+    await session.flush()
+
+    expect(reconcileEditorInput).toHaveBeenCalledOnce()
+    expect(writes).toEqual([
+      { path: 'notes/a.md', contents: '# 🧠 Business ideas\n' },
+    ])
   })
 
   it('discard detaches without writing — even with a pending edit (delete path)', async () => {

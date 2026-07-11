@@ -46,6 +46,36 @@ describe('buildAutocompleteEntries', () => {
     expect(entries.every((entry) => entry.kind === 'suggestion')).toBe(true)
   })
 
+  it('does not offer create when a leading-emoji fallback candidate exists', () => {
+    const entries = buildAutocompleteEntries('Business ideas', [
+      suggestion({ target: '🧠 Business ideas', title: '🧠 Business ideas' }),
+    ])
+    expect(entries.map((entry) => entry.kind)).toEqual(['suggestion'])
+  })
+
+  it('does not offer create when multiple emoji titles make the fallback ambiguous', () => {
+    const entries = buildAutocompleteEntries('Business ideas', [
+      suggestion({
+        target: '🧠 Business ideas',
+        title: '🧠 Business ideas',
+        path: 'notes/business-ideas.md',
+      }),
+      suggestion({
+        target: '💡 Business ideas',
+        title: '💡 Business ideas',
+        path: 'notes/business-ideas-2.md',
+      }),
+    ])
+    expect(entries.map((entry) => entry.kind)).toEqual(['suggestion', 'suggestion'])
+  })
+
+  it('does not offer create when an alias matches after emoji-space normalization', () => {
+    const entries = buildAutocompleteEntries('🧠 Business ideas', [
+      suggestion({ target: 'Incubator', title: 'Incubator', alias: '🧠Business ideas' }),
+    ])
+    expect(entries.map((entry) => entry.kind)).toEqual(['suggestion'])
+  })
+
   it('does not offer create for a full date (the daily suggestion covers it)', () => {
     const entries = buildAutocompleteEntries('2026-06-09', [
       suggestion({ target: '2026-06-09', title: '2026-06-09', path: null, date: '2026-06-09' }),
@@ -114,6 +144,15 @@ describe('buildAutocompleteEntries', () => {
       { offerCreate: true, contacts: [contact({})] },
     )
     expect(entries.filter((entry) => entry.kind === 'contact')).toEqual([])
+  })
+
+  it('drops a contact covered by a leading-emoji fallback title', () => {
+    const entries = buildAutocompleteEntries(
+      'Ada Lovelace',
+      [suggestion({ target: '🧠 Ada Lovelace', title: '🧠 Ada Lovelace' })],
+      { offerCreate: true, contacts: [contact({})] },
+    )
+    expect(entries.map((entry) => entry.kind)).toEqual(['suggestion'])
   })
 
   it('suppresses the create row when a contact covers the exact query', () => {

@@ -165,6 +165,24 @@ describe('useNoteDocument', () => {
     }
   })
 
+  it('reconciles pending editor input before the editor handle unbinds', async () => {
+    const hook = await readyHook()
+    const editor = fakeEditor()
+    const getMarkdown = vi.fn(() => {
+      hook.result.current.onEditorChange('# 🧠 Business ideas\n')
+      return '# 🧠 Business ideas\n'
+    })
+    editor.getMarkdown = getMarkdown
+
+    act(() => hook.result.current.bindEditor(editor))
+    act(() => hook.result.current.bindEditor(null))
+    await act(() => flushOpenDocuments())
+
+    expect(getMarkdown).toHaveBeenCalledOnce()
+    expect(writes).toEqual(['# 🧠 Business ideas\n'])
+    hook.unmount()
+  })
+
   it('unmounting unregisters the buffer from the quit-flush registry', async () => {
     const hook = await readyHook()
     act(() => hook.result.current.onEditorChange('# Edited\n'))
@@ -638,11 +656,14 @@ describe('useNoteDocument', () => {
       // reports a *normalized* serialization (extra trailing newline) — as the
       // real editor does for e.g. loose lists.
       const editor = fakeEditor()
+      let normalizedMarkdown = ''
       const normalizing: typeof editor = {
         ...editor,
+        getMarkdown: () => normalizedMarkdown,
         setMarkdown: (markdown) => {
           editor.setMarkdown(markdown)
-          hook.result.current.onEditorChange(`${markdown}\n`)
+          normalizedMarkdown = `${markdown}\n`
+          hook.result.current.onEditorChange(normalizedMarkdown)
         },
       }
       act(() => hook.result.current.bindEditor(normalizing))
@@ -655,6 +676,13 @@ describe('useNoteDocument', () => {
 
       // No save may fire from the reload alone.
       await act(() => vi.advanceTimersByTimeAsync(5000))
+      expect(writes).toEqual([])
+
+      // A persistence flush and ref teardown both ask Meowdown to reconcile,
+      // but its unchanged normalized snapshot is not itself a user edit.
+      await act(() => flushOpenDocuments())
+      act(() => hook.result.current.bindEditor(null))
+      await act(() => vi.advanceTimersByTimeAsync(0))
       expect(writes).toEqual([])
     } finally {
       vi.useRealTimers()
@@ -845,6 +873,40 @@ describe('useNoteDocument', () => {
 
       expect(written).toContainEqual({ path: 'notes/a.md', contents: '# Unsaved on A\n' })
       expect(written.some((write) => write.path === 'notes/b.md')).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('reconciles pending editor input during a same-path session rebind', async () => {
+    vi.useFakeTimers()
+    try {
+      const hook = renderHook(
+        ({ createIfMissing }) => useNoteDocument('notes/a.md', 1, { createIfMissing }),
+        { initialProps: { createIfMissing: false } },
+      )
+      await act(() => vi.advanceTimersByTimeAsync(0))
+      expect(hook.result.current.status).toBe('ready')
+
+      const editor = fakeEditor()
+      let reconciled = false
+      editor.getMarkdown = vi.fn(() => {
+        if (!reconciled) {
+          reconciled = true
+          hook.result.current.onEditorChange('# Pending native input\n')
+        }
+        return '# Pending native input\n'
+      })
+      act(() => hook.result.current.bindEditor(editor))
+
+      // Changing an IO option recreates the session without unmounting the
+      // editor. The outgoing session must remain discoverable while Meowdown
+      // synchronously reports reconciled native input from getMarkdown().
+      hook.rerender({ createIfMissing: true })
+      await act(() => vi.advanceTimersByTimeAsync(2000))
+
+      expect(editor.getMarkdown).toHaveBeenCalled()
+      expect(writes).toContain('# Pending native input\n')
     } finally {
       vi.useRealTimers()
     }

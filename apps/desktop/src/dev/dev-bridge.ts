@@ -22,6 +22,7 @@ export interface DevBridgeBackend {
 const dbQueryArgsSchema = z.object({ sql: z.string(), params: z.array(z.unknown()) })
 const pathArgsSchema = z.object({ path: z.string() })
 const writeArgsSchema = z.object({ path: z.string(), contents: z.string() })
+const createArgsSchema = writeArgsSchema.extend({ generation: z.number().int().nonnegative() })
 const moveArgsSchema = z.object({ from: z.string(), to: z.string() })
 const metaArgsSchema = z.object({ key: z.string(), value: z.string() })
 const touchArgsSchema = z.object({
@@ -54,8 +55,9 @@ const chatDeleteArgsSchema = z.object({ id: z.string() })
 /**
  * The in-browser stand-in for the Rust shell (dev builds only): answers the
  * command surface the mobile tree exercises from an in-memory file map and the
- * wasm SQLite index. Filesystem generations are meaningless with one immortal
- * in-memory graph, so `generation` args are accepted and ignored (always 1).
+ * wasm SQLite index. The in-memory graph has one fixed generation (`1`); the
+ * no-clobber note-create command validates that value before touching the
+ * store, matching its native race-safety contract.
  *
  * Anything unimplemented rejects loudly with the command name — a surface
  * quietly rendering empty because a stub answered wrong is worse than an
@@ -119,6 +121,16 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
       case 'note_write': {
         const { path, contents } = writeArgsSchema.parse(args)
         return files.write(path, contents)
+      }
+      case 'note_create': {
+        const { path, contents, generation } = createArgsSchema.parse(args)
+        if (generation !== graphInfo.generation) {
+          throw new ReflectError(
+            'io',
+            'the graph changed since this command was issued; dropping it',
+          )
+        }
+        return files.create(path, contents)
       }
       case 'note_exists':
         return files.exists(pathArgsSchema.parse(args).path)

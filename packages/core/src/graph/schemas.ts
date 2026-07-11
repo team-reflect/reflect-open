@@ -41,6 +41,13 @@ export const fileMetaSchema = z.object({
 })
 export type FileMeta = z.infer<typeof fileMetaSchema>
 
+/** Result of the native no-clobber note claim. */
+export const noteCreateOutcomeSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('created'), modifiedMs: z.number().nullable() }),
+  z.object({ kind: z.literal('collision') }),
+])
+export type NoteCreateOutcome = z.infer<typeof noteCreateOutcomeSchema>
+
 /**
  * What a secondary note window needs to boot (mirrors the Rust
  * `WindowBootstrap`): the open graph's identity with both session generations

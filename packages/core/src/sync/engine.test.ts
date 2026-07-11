@@ -313,7 +313,9 @@ describe('createSyncEngine', () => {
     const engine = createSyncEngine({
       generation: 1,
       getToken: async () => 'tok',
-      onRemoteChanges: (changes) => batches.push(changes),
+      onRemoteChanges: (changes) => {
+        batches.push(changes)
+      },
     })
 
     await engine.syncNow()
@@ -325,6 +327,151 @@ describe('createSyncEngine', () => {
       ],
     ])
     engine.stop()
+  })
+
+  it('waits for async remote-change handling before reporting idle', async () => {
+    const calls = fakeGit((command) => {
+      if (command === 'git_commit_all') {
+        return CLEAN_COMMIT
+      }
+      if (command === 'git_fetch') {
+        return { ahead: 0, behind: 1 }
+      }
+      if (command === 'git_merge_remote') {
+        return {
+          kind: 'fastForward',
+          conflictedPaths: [],
+          changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert' }],
+        }
+      }
+      return defaultResponses(command)
+    })
+    const remoteChangesGate: { resolve: (() => void) | null } = { resolve: null }
+    const statuses: SyncStatus[] = []
+    const engine = createSyncEngine({
+      generation: 1,
+      getToken: async () => 'tok',
+      onStatus: (status) => statuses.push(status),
+      onRemoteChanges: () =>
+        new Promise<void>((resolve) => {
+          remoteChangesGate.resolve = resolve
+        }),
+    })
+
+    const syncing = engine.syncNow()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(commandsOf(calls)).toEqual(['git_commit_all', 'git_fetch', 'git_merge_remote'])
+    expect(statuses.map((status) => status.state)).toEqual(['syncing'])
+
+    remoteChangesGate.resolve?.()
+    await syncing
+
+    expect(statuses.map((status) => status.state)).toEqual(['syncing', 'idle'])
+    engine.stop()
+  })
+
+  it('finishes async remote-change handling before applying a suppression gate', async () => {
+    const calls = fakeGit((command) =>
+      command === 'git_merge_remote'
+        ? {
+            kind: 'merged',
+            conflictedPaths: [],
+            changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert' }],
+          }
+        : defaultResponses(command),
+    )
+    const remoteChangesGate: { resolve: (() => void) | null } = { resolve: null }
+    const statuses: SyncStatus[] = []
+    let canStartCycle = true
+    const engine = createSyncEngine({
+      generation: 1,
+      getToken: async () => 'tok',
+      onStatus: (status) => statuses.push(status),
+      canStartCycle: () => canStartCycle,
+      onRemoteChanges: () =>
+        new Promise<void>((resolve) => {
+          remoteChangesGate.resolve = resolve
+        }),
+    })
+
+    const syncing = engine.syncNow()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(commandsOf(calls)).toEqual(['git_commit_all', 'git_fetch', 'git_merge_remote'])
+
+    canStartCycle = false
+    expect(statuses.map((status) => status.state)).toEqual(['syncing'])
+    remoteChangesGate.resolve?.()
+    await syncing
+
+    expect(commandsOf(calls)).toEqual(['git_commit_all', 'git_fetch', 'git_merge_remote'])
+    expect(statuses.map((status) => status.state)).toEqual(['syncing', 'idle'])
+    engine.stop()
+  })
+
+  it('surfaces an async remote-change failure and stops before push', async () => {
+    const calls = fakeGit((command) =>
+      command === 'git_merge_remote'
+        ? {
+            kind: 'merged',
+            conflictedPaths: [],
+            changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert' }],
+          }
+        : defaultResponses(command),
+    )
+    const statuses: SyncStatus[] = []
+    const engine = createSyncEngine({
+      generation: 1,
+      getToken: async () => 'tok',
+      onStatus: (status) => statuses.push(status),
+      onRemoteChanges: async () => {
+        throw new Error('remote index failed')
+      },
+    })
+
+    await engine.syncNow()
+
+    expect(commandsOf(calls)).toEqual(['git_commit_all', 'git_fetch', 'git_merge_remote'])
+    expect(statuses.at(-1)).toMatchObject({
+      state: 'error',
+      errorKind: 'other',
+      message: 'remote index failed',
+    })
+    engine.stop()
+  })
+
+  it('stop during async remote-change handling emits nothing further', async () => {
+    const calls = fakeGit((command) =>
+      command === 'git_merge_remote'
+        ? {
+            kind: 'merged',
+            conflictedPaths: [],
+            changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert' }],
+          }
+        : defaultResponses(command),
+    )
+    const remoteChangesGate: { resolve: (() => void) | null } = { resolve: null }
+    const statuses: SyncStatus[] = []
+    const engine = createSyncEngine({
+      generation: 1,
+      getToken: async () => 'tok',
+      onStatus: (status) => statuses.push(status),
+      onRemoteChanges: () =>
+        new Promise<void>((resolve) => {
+          remoteChangesGate.resolve = resolve
+        }),
+    })
+
+    const syncing = engine.syncNow()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(commandsOf(calls)).toEqual(['git_commit_all', 'git_fetch', 'git_merge_remote'])
+
+    engine.stop()
+    remoteChangesGate.resolve?.()
+    await syncing
+
+    expect(commandsOf(calls)).toEqual(['git_commit_all', 'git_fetch', 'git_merge_remote'])
+    expect(statuses.map((status) => status.state)).toEqual(['syncing'])
   })
 
   it('syncNow pulls and merges even with nothing to push (launch/focus)', async () => {

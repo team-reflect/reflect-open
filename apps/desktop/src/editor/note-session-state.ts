@@ -7,7 +7,7 @@ const DEFAULT_SAVE_DEBOUNCE_MS = 800
 
 /** Create the document session for one note. See note-session.ts for semantics. */
 export function createNoteSession(options: NoteSessionOptions): NoteSession {
-  const { io, classify, onSnapshot, applyContent, onContent } = options
+  const { io, classify, onSnapshot, applyContent, onContent, reconcileEditorInput } = options
   /** Mutable: a rename retargets the session in place (Plan 17). */
   let path = options.path
   const createIfMissing = options.createIfMissing ?? false
@@ -142,6 +142,7 @@ export function createNoteSession(options: NoteSessionOptions): NoteSession {
   }
 
   function flush(): Promise<void> {
+    reconcileEditorInput?.()
     cancelScheduledSave()
     save()
     // save() extended the chain synchronously (or left it settled when there

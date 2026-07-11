@@ -23,7 +23,9 @@ use tauri_plugin_opener::OpenerExt;
 
 use crate::error::{AppError, AppResult};
 
-use self::io::{atomic_write, bootstrap, collect_files, NOTE_DIRS};
+use self::io::{
+    atomic_create, atomic_write, bootstrap, collect_files, AtomicCreateOutcome, NOTE_DIRS,
+};
 use self::resolve::resolve;
 
 /// Cancellation flag for the running Reflect V1 import, managed as Tauri
@@ -101,6 +103,20 @@ pub struct FileMeta {
     /// `modified_ms` describe the placeholder stub, not the real file.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub placeholder: bool,
+}
+
+/// Result of claiming a note path without overwriting an existing file.
+#[derive(Debug, Serialize)]
+#[serde(
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    tag = "kind"
+)]
+pub enum NoteCreateOutcome {
+    /// The path was free and now contains the supplied bytes.
+    Created { modified_ms: Option<u64> },
+    /// A file or iCloud eviction placeholder already owns the path.
+    Collision,
 }
 
 // ---- state accessors --------------------------------------------------------
@@ -322,6 +338,24 @@ pub fn note_write(
 ) -> AppResult<Option<u64>> {
     let root = root_for_generation(&state, generation)?;
     atomic_write(&root, &resolve(&root, &path)?, &contents)
+}
+
+/// Atomically create a note only when `path` is still free. Unlike
+/// [`note_write`], this is a no-clobber claim: a concurrent sync checkout or
+/// creator wins as `Collision`, with its file left byte-for-byte intact.
+#[tauri::command]
+pub fn note_create(
+    path: String,
+    contents: String,
+    generation: u64,
+    state: State<GraphState>,
+) -> AppResult<NoteCreateOutcome> {
+    let root = root_for_generation(&state, generation)?;
+    let target = resolve(&root, &path)?;
+    match atomic_create(&root, &target, &contents)? {
+        AtomicCreateOutcome::Created(modified_ms) => Ok(NoteCreateOutcome::Created { modified_ms }),
+        AtomicCreateOutcome::Collision => Ok(NoteCreateOutcome::Collision),
+    }
 }
 
 /// Atomically write a binary asset (pasted/dropped image) by graph-relative
@@ -606,6 +640,27 @@ pub(crate) fn note_files(root: &Path) -> AppResult<Vec<FileMeta>> {
         collect_files(root, dir, Some("md"), &mut out)?;
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod note_create_tests {
+    use super::NoteCreateOutcome;
+    use serde_json::json;
+
+    #[test]
+    fn outcome_serializes_for_the_typescript_boundary() {
+        assert_eq!(
+            serde_json::to_value(NoteCreateOutcome::Created {
+                modified_ms: Some(1_234),
+            })
+            .unwrap(),
+            json!({ "kind": "created", "modifiedMs": 1_234 })
+        );
+        assert_eq!(
+            serde_json::to_value(NoteCreateOutcome::Collision).unwrap(),
+            json!({ "kind": "collision" })
+        );
+    }
 }
 
 #[cfg(test)]

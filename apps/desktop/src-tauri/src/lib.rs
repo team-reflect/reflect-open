@@ -237,6 +237,7 @@ pub fn run() {
             fs::graph_import_reflect_v1_zip,
             fs::graph_import_cancel,
             fs::note_read,
+            fs::note_create,
             fs::note_write,
             fs::asset_write,
             fs::asset_read,

@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
-import { createNoteWithTitle, dailyPath, resolveWikiTarget } from '@reflect/core'
+import { resolveOrCreateNoteWithTitle, resolveWikiTarget } from '@reflect/core'
+import { reportAmbiguousNoteTitle } from '@/editor/ambiguous-note-feedback'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { isIsoDate } from '@/lib/dates'
 import { useLinkIntentGuard } from '@/lib/windows/use-link-intent-guard'
@@ -8,10 +9,11 @@ import { routeForPath, type NoteRoute } from '@/routing/route'
 /**
  * Navigation for a clicked `[[wiki link]]`: resolve via the index, then open
  * the target. An unresolved ISO date is still a valid daily target (created
- * lazily on first write), and an unresolved non-empty title is created and
- * opened on the spot — Plan 07's create-from-unresolved, consistent with lazy
- * dailies. With no graph generation available, unresolved titles are a no-op
- * (nothing can be written).
+ * lazily on first write). An unresolved non-empty title is rechecked against
+ * the index and its on-disk slug family before it can be created and opened —
+ * Plan 07's create-from-unresolved with a guard for a lagging device index and
+ * title/path mismatch. With no graph generation available, unresolved titles
+ * are a no-op (nothing can be written).
  *
  * A ⌘-click (the originating `event`, when the caller passes it) opens the
  * resolved target in a secondary note window instead — falling back to
@@ -54,11 +56,16 @@ export function useWikiLinkNavigation(
             // autofocuses note arrivals on its own.
             open(route)
           } else if (isIsoDate(resolution.text)) {
-            open(routeForPath(dailyPath(resolution.text)))
+            open({ kind: 'daily', date: resolution.text })
           } else if (generation !== null && resolution.text.trim() !== '') {
-            const created = await createNoteWithTitle(resolution.text, generation)
-            if (!isStale()) {
-              open({ kind: 'note', path: created })
+            const outcome = await resolveOrCreateNoteWithTitle(resolution.text, generation)
+            if (isStale()) {
+              return
+            }
+            if (outcome.kind === 'ambiguous') {
+              reportAmbiguousNoteTitle('Opening link', resolution.text)
+            } else {
+              open({ kind: 'note', path: outcome.path })
             }
           }
         } catch (err) {

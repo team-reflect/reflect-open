@@ -7,12 +7,14 @@ import {
   graphImportProgressSchema,
   graphImportSummarySchema,
   graphInfoSchema,
+  noteCreateOutcomeSchema,
   recentGraphSchema,
   windowBootstrapSchema,
   type FileMeta,
   type GraphImportProgress,
   type GraphImportSummary,
   type GraphInfo,
+  type NoteCreateOutcome,
   type RecentGraph,
   type WindowBootstrap,
 } from './schemas'
@@ -138,6 +140,27 @@ export async function readNote(path: string, generation?: number): Promise<strin
 export async function writeNote(path: string, contents: string, generation: number): Promise<void> {
   const modifiedMs = await call('note_write', { path, contents, generation }, z.number().nullable())
   echoLocalWrite({ path, kind: 'upsert', modifiedMs: modifiedMs ?? Date.now() })
+}
+
+/**
+ * Atomically create a note only if `path` is still unoccupied. A collision is
+ * returned as data and never overwrites the winner, closing the race between a
+ * caller's availability check and a concurrent sync checkout or creator.
+ */
+export async function createNoteIfAbsent(
+  path: string,
+  contents: string,
+  generation: number,
+): Promise<NoteCreateOutcome> {
+  const outcome = await call(
+    'note_create',
+    { path, contents, generation },
+    noteCreateOutcomeSchema,
+  )
+  if (outcome.kind === 'created') {
+    echoLocalWrite({ path, kind: 'upsert', modifiedMs: outcome.modifiedMs ?? Date.now() })
+  }
+  return outcome
 }
 
 /**

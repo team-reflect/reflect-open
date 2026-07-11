@@ -74,11 +74,12 @@ export interface SyncEngineOptions {
   /**
    * Files a pull's merge changed on disk. The caller reindexes them directly:
    * pull-applied writes must reach the index even when the file watcher isn't
-   * up yet (the launch pull can race the watcher start). Called synchronously
-   * mid-cycle and not awaited — kick off async work, don't block on it. A
-   * throw here fails the cycle and surfaces as an `error` status.
+   * up yet (the launch pull can race the watcher start). The cycle waits for
+   * async work here before proceeding or reporting idle, so consumers see a
+   * converged index when sync settles. A throw or rejection fails the cycle
+   * and surfaces as an `error` status.
    */
-  onRemoteChanges?: (changes: ChangedFile[]) => void
+  onRemoteChanges?: (changes: ChangedFile[]) => void | Promise<void>
   /** Quiet period after the last edit before a backup commit. */
   idleMs?: number
   /** Ceiling on deferral while the user keeps typing. */
@@ -155,14 +156,25 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
   }
 
   /**
-   * Await one cycle step, preserve any result-side notification, then bail if
-   * the engine stopped or the owner suppressed further cycles meanwhile. An
-   * already-issued Git command cannot be recalled, but no later command starts.
+   * Await one cycle step; while the engine is still alive, await any result-side
+   * notification, then bail if the engine stopped or the owner suppressed
+   * further cycles meanwhile. An already-issued Git command cannot be recalled,
+   * but no later command starts.
    */
-  async function step<T>(promise: Promise<T>, onResult?: (result: T) => void): Promise<T> {
+  async function step<T>(
+    promise: Promise<T>,
+    onResult?: (result: T) => void | Promise<void>,
+  ): Promise<T> {
     const result = await promise
     signal.throwIfAborted()
-    onResult?.(result)
+    const resultNotification = onResult?.(result)
+    if (resultNotification !== undefined) {
+      await resultNotification
+    }
+    // An async result observer can outlive the engine just like a Git command.
+    // Re-check before the caller is allowed to issue its next command or emit
+    // idle; stop() remains terminal even when it lands during reindexing.
+    signal.throwIfAborted()
     if (options.canStartCycle?.() === false) {
       throw new CycleSuppressedError()
     }
@@ -283,7 +295,7 @@ export function createSyncEngine(options: SyncEngineOptions): SyncEngine {
       // The command may already have rewritten files before suspension. Fan
       // those changes out before the boundary gate stops subsequent Git work.
       if (outcome.changedFiles.length > 0) {
-        options.onRemoteChanges?.(outcome.changedFiles)
+        return options.onRemoteChanges?.(outcome.changedFiles)
       }
     }) // upToDate is a no-op
   }

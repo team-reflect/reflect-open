@@ -157,6 +157,40 @@ pub(super) fn atomic_write(root: &Path, target: &Path, contents: &str) -> AppRes
     atomic_write_bytes(root, target, contents.as_bytes())
 }
 
+/// Result of an atomic create-if-absent attempt.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum AtomicCreateOutcome {
+    Created(Option<u64>),
+    Collision,
+}
+
+/// Atomically create `target` without replacing anything that already owns its
+/// path. This is the filesystem claim for note creation: the caller may probe
+/// beforehand for policy, but only `persist_noclobber` closes the race with a
+/// concurrent sync checkout or another creator.
+pub(super) fn atomic_create(
+    root: &Path,
+    target: &Path,
+    contents: &str,
+) -> AppResult<AtomicCreateOutcome> {
+    // An evicted iCloud note occupies its logical path through the placeholder
+    // alone. `persist_noclobber(target)` cannot see that sibling stub, so keep
+    // the shared occupancy check in front of the atomic real-file claim.
+    if file_occupied(target) {
+        return Ok(AtomicCreateOutcome::Collision);
+    }
+    let temp = stage_bytes(root, target, contents.as_bytes())?;
+    match temp.persist_noclobber(target) {
+        Ok(file) => Ok(AtomicCreateOutcome::Created(
+            file.metadata().ok().as_ref().and_then(modified_ms),
+        )),
+        Err(error) if error.error.kind() == std::io::ErrorKind::AlreadyExists => {
+            Ok(AtomicCreateOutcome::Collision)
+        }
+        Err(error) => Err(AppError::io(error.error.to_string())),
+    }
+}
+
 /// Byte-level atomic write — shared by notes (text) and assets (binary).
 /// Returns the persisted file's mtime in epoch milliseconds (`None` when the
 /// platform can't provide one), read from the file handle itself — the index
@@ -173,6 +207,15 @@ pub(crate) fn atomic_write_bytes(
     target: &Path,
     contents: &[u8],
 ) -> AppResult<Option<u64>> {
+    let tmp = stage_bytes(root, target, contents)?;
+    let file = tmp
+        .persist(target)
+        .map_err(|err| AppError::io(err.to_string()))?;
+    Ok(file.metadata().ok().as_ref().and_then(modified_ms))
+}
+
+/** Stage synced bytes on `target`'s volume, ready for an atomic persist. */
+fn stage_bytes(root: &Path, target: &Path, contents: &[u8]) -> AppResult<tempfile::NamedTempFile> {
     let dir = target
         .parent()
         .ok_or_else(|| AppError::io(format!("no parent directory for {}", target.display())))?;
@@ -182,10 +225,7 @@ pub(crate) fn atomic_write_bytes(
     let mut tmp = tempfile::NamedTempFile::new_in(&staging)?;
     tmp.write_all(contents)?;
     tmp.as_file().sync_all()?;
-    let file = tmp
-        .persist(target)
-        .map_err(|err| AppError::io(err.to_string()))?;
-    Ok(file.metadata().ok().as_ref().and_then(modified_ms))
+    Ok(tmp)
 }
 
 /// Last-modified time in epoch milliseconds, or `None` when the platform
@@ -390,6 +430,39 @@ mod tests {
             .collect();
         assert_eq!(entries, vec!["a.md".to_string()]);
         assert!(dir.path().join(".reflect/tmp").is_dir());
+    }
+
+    #[test]
+    fn atomic_create_reports_collision_without_overwriting() {
+        let dir = tempdir().unwrap();
+        bootstrap(dir.path()).unwrap();
+        let target = dir.path().join("notes/business-ideas.md");
+
+        assert!(matches!(
+            atomic_create(dir.path(), &target, "# First\n").unwrap(),
+            AtomicCreateOutcome::Created(_)
+        ));
+        assert_eq!(
+            atomic_create(dir.path(), &target, "# Replacement\n").unwrap(),
+            AtomicCreateOutcome::Collision
+        );
+        assert_eq!(fs::read_to_string(target).unwrap(), "# First\n");
+    }
+
+    #[test]
+    fn atomic_create_treats_an_eviction_placeholder_as_a_collision() {
+        let dir = tempdir().unwrap();
+        bootstrap(dir.path()).unwrap();
+        let target = dir.path().join("notes/business-ideas.md");
+        let placeholder = dir.path().join("notes/.business-ideas.md.icloud");
+        fs::write(&placeholder, b"stub").unwrap();
+
+        assert_eq!(
+            atomic_create(dir.path(), &target, "# Replacement\n").unwrap(),
+            AtomicCreateOutcome::Collision
+        );
+        assert!(!target.exists());
+        assert_eq!(fs::read(placeholder).unwrap(), b"stub");
     }
 
     #[test]

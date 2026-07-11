@@ -1,4 +1,9 @@
-import { foldKey, type ContactMatch, type WikiSuggestion } from '@reflect/core'
+import {
+  foldFallbackTitleKey,
+  foldKey,
+  type ContactMatch,
+  type WikiSuggestion,
+} from '@reflect/core'
 
 /**
  * Pure assembly of the `[[` popover's rows (Plan 07): the ranked index
@@ -39,17 +44,23 @@ export function buildAutocompleteEntries(
     suggestion,
   }))
 
-  // Folding here matches link resolution (case only): a contact row shows
-  // whenever selecting it would NOT resolve to an existing note as typed.
+  // Exact folding matches ordinary link resolution. The fallback set also
+  // prevents a contact action from creating through the same leading-emoji
+  // collision this menu protects for bare Create rows.
   const resolvable = new Set<string>()
+  const fallbackResolvable = new Set<string>()
   for (const suggestion of suggestions) {
     resolvable.add(foldKey(suggestion.target))
+    fallbackResolvable.add(foldFallbackTitleKey(suggestion.target))
     if (suggestion.alias !== null) {
       resolvable.add(foldKey(suggestion.alias))
+      fallbackResolvable.add(foldFallbackTitleKey(suggestion.alias))
     }
   }
   const contacts = (options.contacts ?? []).filter(
-    (contact) => !resolvable.has(foldKey(contact.fullName)),
+    (contact) =>
+      !resolvable.has(foldKey(contact.fullName)) &&
+      !fallbackResolvable.has(foldFallbackTitleKey(contact.fullName)),
   )
   entries.push(...contacts.map((contact) => ({ kind: 'contact' as const, contact })))
 
@@ -62,6 +73,12 @@ export function buildAutocompleteEntries(
   // nothing to create. (A full `YYYY-MM-DD` query always has its daily
   // suggestion injected by the query layer, so dates never offer a create.)
   const resolvesAsTyped = resolvable.has(key)
+  // A leading-emoji/whitespace fallback candidate is either the existing note
+  // to reuse or an ambiguity to leave unresolved. Neither case may offer a
+  // duplicate-creating row.
+  const fallbackKey = foldFallbackTitleKey(title)
+  const hasFallbackCollision =
+    fallbackKey !== '' && fallbackResolvable.has(fallbackKey)
   // A generated date suggestion means the query reads as a date — "3 days ago",
   // "next friday" — so offering to create a note with that literal title would
   // be noise.
@@ -69,7 +86,7 @@ export function buildAutocompleteEntries(
   // A contact row for the exact typed name IS the create action (prefilled) —
   // a bare Create row beside it would just be the worse duplicate.
   const contactCoversQuery = contacts.some((contact) => foldKey(contact.fullName) === key)
-  if (!resolvesAsTyped && !hasDateSuggestion && !contactCoversQuery) {
+  if (!resolvesAsTyped && !hasFallbackCollision && !hasDateSuggestion && !contactCoversQuery) {
     entries.push({ kind: 'create', title })
   }
   return entries

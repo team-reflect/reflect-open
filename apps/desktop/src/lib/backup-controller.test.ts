@@ -35,6 +35,10 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 interface FakeOptions {
   auth?: string | null
+  /** Hold the direct index write until `releaseIndexApply()` (the convergence barrier). */
+  gateIndexApply?: boolean
+  /** Make every direct index write throw (the projection-failure path). */
+  failIndexApply?: boolean
   /** Hold the listen promise until `release()` (the teardown-race window). */
   gateListen?: boolean
   failStatus?: boolean
@@ -63,6 +67,7 @@ function fakeBridge(options: FakeOptions = {}) {
     inProgress: false,
   }
   let releaseListen: (() => void) | null = null
+  let releaseIndexApply: (() => void) | null = null
   setBridge({
     invoke: async (command, args) => {
       calls.push(command)
@@ -90,6 +95,20 @@ function fakeBridge(options: FakeOptions = {}) {
           return options.mergeOutcome ?? UP_TO_DATE
         case 'git_push':
           return { pushed: true, nonFastForward: false, rejectionMessage: null }
+        case 'db_query':
+          return []
+        case 'note_read':
+          return '# Remote note\n'
+        case 'index_apply_batch':
+          if (options.failIndexApply === true) {
+            throw { kind: 'io', message: 'index write failed' }
+          }
+          if (options.gateIndexApply === true) {
+            await new Promise<void>((resolve) => {
+              releaseIndexApply = resolve
+            })
+          }
+          return null
         case 'git_disconnect':
           status.remoteUrl = null
           return status
@@ -106,7 +125,13 @@ function fakeBridge(options: FakeOptions = {}) {
       return () => {}
     },
   })
-  return { calls, invocations, status, releaseListen: () => releaseListen?.() }
+  return {
+    calls,
+    invocations,
+    status,
+    releaseListen: () => releaseListen?.(),
+    releaseIndexApply: () => releaseIndexApply?.(),
+  }
 }
 
 function trackStates(controller: ReturnType<typeof createBackupController>): BackupState[] {
@@ -563,6 +588,63 @@ describe('createBackupController', () => {
     ])
     controller.dispose()
     unlisten()
+  })
+
+  it('keeps launch sync active until pulled notes finish direct indexing', async () => {
+    const { calls, releaseIndexApply } = fakeBridge({
+      gateIndexApply: true,
+      mergeOutcome: {
+        kind: 'fastForward',
+        conflictedPaths: [],
+        changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
+      },
+    })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+
+    await vi.waitFor(() => {
+      expect(calls).toContain('index_apply_batch')
+    })
+    expect(controller.getState()).toMatchObject({
+      phase: 'connected',
+      status: { state: 'syncing' },
+    })
+
+    releaseIndexApply()
+    await vi.waitFor(() => {
+      expect(controller.getState()).toMatchObject({
+        phase: 'connected',
+        status: { state: 'idle' },
+      })
+    })
+    controller.dispose()
+  })
+
+  it('still settles to idle when direct indexing fails — projection health never blocks backup', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { calls } = fakeBridge({
+      failIndexApply: true,
+      mergeOutcome: {
+        kind: 'fastForward',
+        conflictedPaths: [],
+        changedFiles: [{ path: 'notes/from-remote.md', kind: 'upsert', modifiedMs: 123 }],
+      },
+    })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+
+    await vi.waitFor(() => {
+      expect(controller.getState()).toMatchObject({
+        phase: 'connected',
+        status: { state: 'idle' },
+      })
+    })
+    expect(calls).toContain('index_apply_batch')
+    // The failure is reported (which layer logs it is incidental), never thrown
+    // into the sync cycle — the projection is rebuildable, the push is not.
+    expect(consoleError).toHaveBeenCalled()
+    consoleError.mockRestore()
+    controller.dispose()
   })
 
   it('defers a pulled note direct-index apply while the mobile app is hidden', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { foldKey, foldTag } from './keys'
+import { foldFallbackTitleKey, foldKey, foldTag } from './keys'
 
 describe('foldKey', () => {
   it('trims and lowercases', () => {
@@ -13,6 +13,26 @@ describe('foldKey', () => {
 
   it('leaves an already-folded key unchanged', () => {
     expect(foldKey('charlotte')).toBe('charlotte')
+  })
+})
+
+describe('foldFallbackTitleKey', () => {
+  it('tolerates a leading emoji with or without following whitespace', () => {
+    expect(foldFallbackTitleKey('🧠 Business ideas')).toBe('business ideas')
+    expect(foldFallbackTitleKey('🧠Business ideas')).toBe('business ideas')
+    expect(foldFallbackTitleKey('Business ideas')).toBe('business ideas')
+  })
+
+  it('handles emoji sequences and collapses Unicode whitespace', () => {
+    expect(foldFallbackTitleKey('👩🏽‍💻  Product\tIdeas')).toBe('product ideas')
+    expect(foldFallbackTitleKey('🇬🇧\u00a0Travel  Ideas')).toBe('travel ideas')
+    expect(foldFallbackTitleKey('1️⃣  First idea')).toBe('first idea')
+  })
+
+  it('keeps non-prefix punctuation significant', () => {
+    expect(foldFallbackTitleKey('C')).toBe('c')
+    expect(foldFallbackTitleKey('C++')).toBe('c++')
+    expect(foldFallbackTitleKey('# Project')).toBe('# project')
   })
 })
 

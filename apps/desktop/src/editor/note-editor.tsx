@@ -57,7 +57,7 @@ import { cn } from '@/lib/utils'
 
 /** Imperative surface for note switching, reload, and save flushes. */
 export interface NoteEditorHandle {
-  /** Serialize the current document to markdown. */
+  /** Serialize the current, settled document to Markdown. */
   getMarkdown(): string
   /** Replace the document (note switch / external reload). */
   setMarkdown(markdown: string): void

@@ -7,12 +7,13 @@ import {
 } from '@meowdown/react'
 import {
   contactLinkSuggestions,
-  createNoteWithTitle,
   hasBridge,
   isContactsReadable,
+  resolveOrCreateNoteWithTitle,
   suggestTags,
   suggestWikiTargets,
 } from '@reflect/core'
+import { reportAmbiguousNoteTitle } from '@/editor/ambiguous-note-feedback'
 import { buildAutocompleteEntries } from '@/editor/wiki-autocomplete-entries'
 import { useContactsAuthorization } from '@/hooks/use-contacts-authorization'
 import { formatDayLabel, todayIso } from '@/lib/dates'
@@ -50,12 +51,16 @@ export function useEditorAutocomplete(): EditorAutocomplete {
   const contactsInMenu =
     settings.contactsEnabled && authorization !== null && isContactsReadable(authorization)
 
-  // The `[[` autocomplete's create row: make the file; the menu inserts the
-  // link text either way (a failed create just leaves an unresolved link).
-  const createFromAutocomplete = useCallback(
+  // The `[[` autocomplete's create row: re-resolve and inspect the title's
+  // on-disk slug family before creating. The menu inserts the link text either
+  // way; an ambiguous or failed create simply leaves it unresolved.
+  const resolveOrCreateFromAutocomplete = useCallback(
     async (title: string) => {
       if (generation !== null) {
-        await createNoteWithTitle(title, generation)
+        const outcome = await resolveOrCreateNoteWithTitle(title, generation)
+        if (outcome.kind === 'ambiguous') {
+          reportAmbiguousNoteTitle('Creating note', title)
+        }
       }
     },
     [generation],
@@ -92,7 +97,7 @@ export function useEditorAutocomplete(): EditorAutocomplete {
             // Insert happens in the menu; create the note in the background.
             // Best-effort: a failed create just leaves an unresolved link.
             onSelect: () => {
-              void createFromAutocomplete(entry.title).catch((error: unknown) => {
+              void resolveOrCreateFromAutocomplete(entry.title).catch((error: unknown) => {
                 console.error('create-from-autocomplete failed:', error)
               })
             },
@@ -139,7 +144,7 @@ export function useEditorAutocomplete(): EditorAutocomplete {
       graph,
       settings.dateFormat,
       settings.weekStartDay,
-      createFromAutocomplete,
+      resolveOrCreateFromAutocomplete,
       contactsInMenu,
       generation,
     ],
