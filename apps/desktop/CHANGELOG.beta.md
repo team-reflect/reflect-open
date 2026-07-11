@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.6...v0.6.0-beta.7) (2026-07-11)
+
+
+### Bug Fixes
+
+* **mobile:** show the Settings version without the prerelease tag ([#741](https://github.com/team-reflect/reflect-open/issues/741)) ([2d3f1d7](https://github.com/team-reflect/reflect-open/commit/2d3f1d7d23db1f1f6fecb0055ddc69f3ae7cf5eb))
+* update meowdown to ^0.43.0 ([#737](https://github.com/team-reflect/reflect-open/issues/737)) ([fb1c6f6](https://github.com/team-reflect/reflect-open/commit/fb1c6f624e7fefaa3b36223abb1f4ada2ef0bca6))
+
 ## [0.6.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.5...v0.6.0-beta.6) (2026-07-11)
 
 
