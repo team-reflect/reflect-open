@@ -6,7 +6,7 @@ import { upsertFrontmatter } from '../markdown/frontmatter'
 import { slugForTitle } from '../markdown/slug'
 import { subjectAliases } from '../markdown/subject-aliases'
 import { createNoteIfAbsent, listFiles, readNote } from './commands'
-import { notePath } from './paths'
+import { notePath, NOTES_DIR } from './paths'
 
 /**
  * Note identity at creation (`docs/readable-filenames.md`): regular notes get
@@ -77,16 +77,8 @@ export async function createNoteWithTitle(
   generation: number,
   body?: string,
 ): Promise<string> {
-  const slug = slugForTitle(title)
-  const source = newNoteSource(title, body)
-  for (let ordinal = 1; ordinal <= MAX_CREATE_ATTEMPTS; ordinal += 1) {
-    const path = notePath(ordinal === 1 ? slug : `${slug}-${ordinal}`)
-    const outcome = await createNoteIfAbsent(path, source, generation)
-    if (outcome.kind === 'created') {
-      return path
-    }
-  }
-  throw new Error(`no available note path for slug "${slug}" after ${MAX_CREATE_ATTEMPTS} attempts`)
+  const claimed = await claimNotePathForSlug(slugForTitle(title), newNoteSource(title, body), generation)
+  return claimed.path
 }
 
 /** Far beyond any real graph's same-slug population; fail loud instead of spinning. */
@@ -99,6 +91,44 @@ export type ResolveOrCreateNoteResult =
   | { readonly kind: 'ambiguous'; readonly paths: readonly string[] }
 
 type ExistingTitleResolution = Exclude<ResolveOrCreateNoteResult, { kind: 'created' }>
+
+/**
+ * Claim the first free path in `slug`'s collision family (`slug.md`, then
+ * `slug-2.md`, …) through the atomic no-clobber create — the one ordinal
+ * convention both create entry points share. `onCollision` runs after each
+ * lost claim; a non-null result short-circuits instead of trying the next
+ * suffix (`resolveOrCreateNoteWithTitle` re-resolves the winner there).
+ */
+async function claimNotePathForSlug(
+  slug: string,
+  source: string,
+  generation: number,
+): Promise<{ kind: 'created'; path: string }>
+async function claimNotePathForSlug(
+  slug: string,
+  source: string,
+  generation: number,
+  onCollision: () => Promise<ExistingTitleResolution | null>,
+): Promise<ResolveOrCreateNoteResult>
+async function claimNotePathForSlug(
+  slug: string,
+  source: string,
+  generation: number,
+  onCollision?: () => Promise<ExistingTitleResolution | null>,
+): Promise<ResolveOrCreateNoteResult> {
+  for (let ordinal = 1; ordinal <= MAX_CREATE_ATTEMPTS; ordinal += 1) {
+    const path = notePath(ordinal === 1 ? slug : `${slug}-${ordinal}`)
+    const outcome = await createNoteIfAbsent(path, source, generation)
+    if (outcome.kind === 'created') {
+      return { kind: 'created', path }
+    }
+    const resolution = (await onCollision?.()) ?? null
+    if (resolution !== null) {
+      return resolution
+    }
+  }
+  throw new Error(`no available note path for slug "${slug}" after ${MAX_CREATE_ATTEMPTS} attempts`)
+}
 
 interface DiskTitleMatch {
   exactTitlePaths: string[]
@@ -115,7 +145,9 @@ interface DiskTitleMatch {
  * graph-wide title search.
  */
 function isSlugFamilyPath(path: string, slug: string): boolean {
-  const prefix = 'notes/'
+  // Derived from the same contract `notePath` builds with, so a directory
+  // rename can't silently turn the disk guard into an always-empty scan.
+  const prefix = `${NOTES_DIR}/`
   const suffix = '.md'
   if (!path.startsWith(prefix) || !path.endsWith(suffix)) {
     return false
@@ -277,25 +309,13 @@ export async function resolveOrCreateNoteWithTitle(
     return reResolved
   }
 
-  const slug = slugForTitle(title)
-  const source = newNoteSource(title)
-  for (let ordinal = 1; ordinal <= MAX_CREATE_ATTEMPTS; ordinal += 1) {
-    const path = notePath(ordinal === 1 ? slug : `${slug}-${ordinal}`)
-    const outcome = await createNoteIfAbsent(path, source, generation)
-    if (outcome.kind === 'created') {
-      return { kind: 'created', path }
-    }
-
-    // The claim lost after our checks. Re-resolve both projections before
-    // considering a suffix: the winner may be the note this link meant.
+  // On a lost claim, re-resolve both projections before considering a
+  // suffix: the winner may be the note this link meant.
+  return claimNotePathForSlug(slugForTitle(title), newNoteSource(title), generation, async () => {
     const collisionIndex = await indexedTargetResolution(title)
     if (collisionIndex !== null) {
       return collisionIndex
     }
-    const collisionDisk = diskTitleResolution(await matchTitleOnDisk(title, generation))
-    if (collisionDisk !== null) {
-      return collisionDisk
-    }
-  }
-  throw new Error(`no available note path for slug "${slug}" after ${MAX_CREATE_ATTEMPTS} attempts`)
+    return diskTitleResolution(await matchTitleOnDisk(title, generation))
+  })
 }

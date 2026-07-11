@@ -37,6 +37,26 @@ describe('graph commands', () => {
     }
   })
 
+  it('propagates a note-create rejection without echoing a local write', async () => {
+    // The failure side of the generation pin: a stale-generation bridge
+    // rejection reaches the caller, and nothing pretends a file was written.
+    const invoke = vi.fn(async () => {
+      throw { kind: 'io', message: 'the graph changed since this command was issued; dropping it' }
+    })
+    setBridge({ invoke, listen: async () => () => {} })
+    const ownWrites: string[] = []
+    const unlisten = subscribeOwnWrites((path) => ownWrites.push(path))
+
+    try {
+      await expect(
+        createNoteIfAbsent('notes/business-ideas.md', '# Business ideas\n', 6),
+      ).rejects.toMatchObject({ kind: 'io' })
+      expect(ownWrites).toEqual([])
+    } finally {
+      unlisten()
+    }
+  })
+
   it('returns a note-create collision without echoing a local write', async () => {
     const invoke = vi.fn(async () => ({ kind: 'collision' }))
     setBridge({ invoke, listen: async () => () => {} })
