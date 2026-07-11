@@ -9,6 +9,7 @@ import { EmbeddingsSync } from '@/components/embeddings-sync'
 import { RouteContent } from '@/components/route-content'
 import { ShortcutsDialog } from '@/components/shortcuts-dialog'
 import { Sidebar } from '@/components/sidebar/sidebar'
+import { SidebarResizeHandle } from '@/components/sidebar-resize-handle'
 import { TemplateCreateDialog } from '@/components/templates/template-create-dialog'
 import { TemplatePicker } from '@/components/templates/template-picker'
 import { useDailyContextTarget } from '@/providers/focused-daily-provider'
@@ -51,7 +52,9 @@ export function WorkspaceContent({ graph }: WorkspaceContentProps): ReactElement
   return (
     <AppShell
       sidebar={collapsed ? undefined : <Sidebar graph={graph} context={commandContext} />}
+      sidebarEdge={<SidebarResizeHandle panel="workspace" />}
       context={collapsed ? undefined : contextSidebarFor(contextTarget)}
+      contextEdge={<SidebarResizeHandle panel="context" />}
     >
       <div className="relative flex h-full flex-col">
         <div className="min-h-0 flex-1">

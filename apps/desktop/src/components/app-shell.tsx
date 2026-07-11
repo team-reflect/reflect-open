@@ -1,12 +1,15 @@
 import type { ReactElement, ReactNode } from 'react'
-import { SidebarResizeHandle } from '@/components/sidebar-resize-handle'
 import { cn } from '@/lib/utils'
 
 interface AppShellProps {
   /** The workspace sidebar; omit to render the note pane edge-to-edge. */
   sidebar?: ReactNode
+  /** Resize affordance for the workspace aside's inner edge (a separator). */
+  sidebarEdge?: ReactNode
   /** Right context panel (the AI copilot lands here in Plan 10). */
   context?: ReactNode
+  /** Resize affordance for the context aside's inner edge (a separator). */
+  contextEdge?: ReactNode
   /** The center note pane. */
   children: ReactNode
   className?: string
@@ -16,15 +19,24 @@ interface AppShellProps {
  * The application frame, in the original app's shape: a sunken sidebar beside
  * the raised note pane, no header bar — the document is the chrome. Layout
  * and landmark regions only; what fills the slots (and whether the sidebar
- * shows at all) is the workspace's business. Each aside carries a resize
- * handle on its inner edge; the widths come from the `--sidebar-width` /
- * `--context-sidebar-width` root variables (persisted via settings, applied
- * by `SidebarWidthEffect`), capped so neither rail can crush the note pane on
- * a small window. The frame never scrolls: every route mounts its own scroll
- * container, so the center region clips instead of growing a second scrollbar
- * around a route's own.
+ * shows at all) is the workspace's business — including the edge slots,
+ * which the workspace fills with resize handles. The aside widths read the
+ * `--sidebar-width` / `--context-sidebar-width` root variables, which
+ * `SidebarWidthEffect` derives from the persisted preferences and the
+ * viewport. The context edge renders before the panel's scroller so the
+ * separator precedes the panel's controls in tab order, matching its visual
+ * position on the aside's leading edge. The frame never scrolls: every route
+ * mounts its own scroll container, so the center region clips instead of
+ * growing a second scrollbar around a route's own.
  */
-export function AppShell({ sidebar, context, children, className }: AppShellProps): ReactElement {
+export function AppShell({
+  sidebar,
+  sidebarEdge,
+  context,
+  contextEdge,
+  children,
+  className,
+}: AppShellProps): ReactElement {
   return (
     <div
       className={cn(
@@ -34,11 +46,12 @@ export function AppShell({ sidebar, context, children, className }: AppShellProp
     >
       {sidebar ? (
         <aside
+          id="workspace-sidebar"
           aria-label="Workspace"
-          className="relative flex w-[var(--sidebar-width)] max-w-[40vw] shrink-0 flex-col overflow-hidden border-r border-border bg-surface-sunken"
+          className="relative flex w-[var(--sidebar-width)] shrink-0 flex-col overflow-hidden border-r border-border bg-surface-sunken"
         >
           {sidebar}
-          <SidebarResizeHandle panel="workspace" />
+          {sidebarEdge}
         </aside>
       ) : null}
 
@@ -46,11 +59,12 @@ export function AppShell({ sidebar, context, children, className }: AppShellProp
 
       {context ? (
         <aside
+          id="context-sidebar"
           aria-label="Context"
-          className="relative hidden w-[var(--context-sidebar-width)] max-w-[40vw] shrink-0 border-l border-border bg-surface-sunken lg:block"
+          className="relative hidden w-[var(--context-sidebar-width)] shrink-0 border-l border-border bg-surface-sunken lg:block"
         >
+          {contextEdge}
           <div className="h-full overflow-auto">{context}</div>
-          <SidebarResizeHandle panel="context" />
         </aside>
       ) : null}
     </div>
