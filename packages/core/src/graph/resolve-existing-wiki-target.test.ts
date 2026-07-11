@@ -19,9 +19,10 @@ function bindBridge({
 }: BridgeBehavior = {}): ReturnType<typeof vi.fn> {
   const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
     if (command === 'db_query') {
+      const params = args?.['params']
       return query?.(
         String(args?.['sql'] ?? ''),
-        ((args?.['params'] as unknown[]) ?? []),
+        Array.isArray(params) ? params : [],
       ) ?? []
     }
     if (command === 'list_files') {

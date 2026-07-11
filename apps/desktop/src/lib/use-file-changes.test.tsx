@@ -102,6 +102,29 @@ describe('useFileChanges', () => {
     view.unmount()
   })
 
+  it('waits for a new subscription when the same handler is re-enabled', async () => {
+    const first = stubSubscription()
+    const handler = vi.fn()
+    const view = render(<Host handler={handler} />)
+    await first.resolve()
+    expect(view.getByTestId('ready').textContent).toBe('true')
+
+    view.rerender(<Host handler={null} />)
+    expect(view.getByTestId('ready').textContent).toBe('true')
+    expect(first.unlisten).toHaveBeenCalledOnce()
+
+    const second = stubSubscription()
+    view.rerender(<Host handler={handler} />)
+    expect(view.getByTestId('ready').textContent).toBe('false')
+    await second.resolve()
+    expect(view.getByTestId('ready').textContent).toBe('true')
+    expect(subscribeFileChanges).toHaveBeenCalledTimes(2)
+
+    second.emit(UPSERT)
+    expect(handler).toHaveBeenCalledWith(UPSERT)
+    view.unmount()
+  })
+
   it('does nothing when disabled or without a bridge', () => {
     const view = render(<Host handler={null} />)
     expect(subscribeFileChanges).not.toHaveBeenCalled()

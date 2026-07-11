@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { hasBridge, subscribeFileChanges, type FileChange } from '@reflect/core'
 
 /**
@@ -21,23 +21,28 @@ import { hasBridge, subscribeFileChanges, type FileChange } from '@reflect/core'
  */
 export function useFileChanges(handler: ((changes: FileChange[]) => void) | null): boolean {
   const bridgeAvailable = hasBridge()
-  const [readyHandler, setReadyHandler] = useState<typeof handler>(null)
+  const subscription = useMemo(
+    () => ({ bridgeAvailable, handler }),
+    [bridgeAvailable, handler],
+  )
+  const [readySubscription, setReadySubscription] = useState<typeof subscription | null>(null)
 
   useEffect(() => {
-    if (handler === null || !bridgeAvailable) {
+    const currentHandler = subscription.handler
+    if (currentHandler === null || !subscription.bridgeAvailable) {
       return
     }
     let active = true
     let unlisten: (() => void) | null = null
     void subscribeFileChanges((changes) => {
       if (active) {
-        handler(changes)
+        currentHandler(changes)
       }
     })
       .then((stop) => {
         if (active) {
           unlisten = stop
-          setReadyHandler(() => handler)
+          setReadySubscription(subscription)
         } else {
           stop()
         }
@@ -51,7 +56,7 @@ export function useFileChanges(handler: ((changes: FileChange[]) => void) | null
       active = false
       unlisten?.()
     }
-  }, [bridgeAvailable, handler])
+  }, [subscription])
 
-  return handler === null || !bridgeAvailable || readyHandler === handler
+  return handler === null || !bridgeAvailable || readySubscription === subscription
 }
