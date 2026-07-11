@@ -4,7 +4,7 @@ interface MenuItemOptionsForTest {
   readonly id?: string
   readonly text?: string
   readonly accelerator?: string
-  readonly action?: (id: string) => void
+  readonly action?: (commandId: string) => void
 }
 
 interface SubmenuOptionsForTest {

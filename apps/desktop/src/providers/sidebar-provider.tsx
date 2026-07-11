@@ -9,10 +9,10 @@ import {
 } from 'react'
 
 /**
- * Sidebar visibility state, provided once per workspace so both the shell
- * (which renders or hides the sidebar) and the command registry (`⌘\` /
- * "Toggle sidebar") share one source of truth. Session-only by design —
- * a relaunch starts expanded.
+ * Side-panel visibility state, provided once per workspace so the shell
+ * (which renders or hides both sidebar regions) and the command registry
+ * (`⌘\` / "Toggle sidebar") share one source of truth. Session-only by
+ * design — a relaunch starts expanded.
  */
 
 interface SidebarContextValue {
@@ -35,7 +35,7 @@ export function SidebarProvider({ children }: { children: ReactNode }): ReactEle
   return <SidebarContext.Provider value={value}>{children}</SidebarContext.Provider>
 }
 
-/** Access sidebar visibility + the toggle. Use within a SidebarProvider. */
+/** Access side-panel visibility + the toggle. Use within a SidebarProvider. */
 export function useSidebar(): SidebarContextValue {
   const context = useContext(SidebarContext)
   if (!context) {

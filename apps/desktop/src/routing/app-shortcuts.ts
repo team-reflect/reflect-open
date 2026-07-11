@@ -141,8 +141,12 @@ function idForKeyDown(event: KeyboardEvent): string | null {
   return null
 }
 
-function isNativeMacosMenuCommand(id: string): boolean {
-  return isMacosDesktop && isNativeMenuInstalled() && NATIVE_MACOS_MENU_COMMAND_IDS.has(id)
+function isNativeMacosMenuCommand(commandId: string): boolean {
+  return (
+    isMacosDesktop &&
+    isNativeMenuInstalled() &&
+    NATIVE_MACOS_MENU_COMMAND_IDS.has(commandId)
+  )
 }
 
 /**

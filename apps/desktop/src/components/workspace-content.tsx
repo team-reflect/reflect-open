@@ -33,9 +33,9 @@ function contextSidebarFor(target: ContextSidebarTarget | null): ReactElement | 
 
 /**
  * Everything inside the workspace's providers: the headerless shell — the
- * collapsible workspace sidebar beside the note pane, with the contextual
- * panel on the right for daily and note routes — plus the always-mounted
- * global surfaces (operations status, ⌘K palette, embeddings sync). Split
+ * collapsible workspace and contextual sidebars beside the note pane — plus
+ * the always-mounted global surfaces (operations status, ⌘K palette,
+ * embeddings sync). Split
  * from {@link GraphWorkspace} because these hooks need the providers it
  * mounts.
  */
@@ -51,7 +51,7 @@ export function WorkspaceContent({ graph }: WorkspaceContentProps): ReactElement
   return (
     <AppShell
       sidebar={collapsed ? undefined : <Sidebar graph={graph} context={commandContext} />}
-      context={contextSidebarFor(contextTarget)}
+      context={collapsed ? undefined : contextSidebarFor(contextTarget)}
     >
       <div className="relative flex h-full flex-col">
         <div className="min-h-0 flex-1">
