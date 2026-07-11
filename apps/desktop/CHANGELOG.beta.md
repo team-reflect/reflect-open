@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.6.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.7...v0.6.0-beta.8) (2026-07-11)
+
+
+### Features
+
+* **desktop:** open note references in new windows ([#731](https://github.com/team-reflect/reflect-open/issues/731)) ([05432b8](https://github.com/team-reflect/reflect-open/commit/05432b81511ccd753b160d5a9c5cfcd144633a10))
+
+
+### Bug Fixes
+
+* harden cross-device title resolution ([#744](https://github.com/team-reflect/reflect-open/issues/744)) ([25edd7e](https://github.com/team-reflect/reflect-open/commit/25edd7ece954e2dadbc4421311f94783b04741d7))
+* highlight note titles in mobile search ([#733](https://github.com/team-reflect/reflect-open/issues/733)) ([c0a2e03](https://github.com/team-reflect/reflect-open/commit/c0a2e03c6dff95bea1fe5ee0017ef2604c65ed31))
+* keep Return-created tasks in their groups ([#727](https://github.com/team-reflect/reflect-open/issues/727)) ([ec47836](https://github.com/team-reflect/reflect-open/commit/ec47836975fdced5547310225a8c4183f31b4246))
+* prevent emoji title loss and link duplicates ([#696](https://github.com/team-reflect/reflect-open/issues/696)) ([eeeb4de](https://github.com/team-reflect/reflect-open/commit/eeeb4de38676c0692fb07960a30f541e82aa843c))
+* restore mobile checklist and task toolbar cycle ([#730](https://github.com/team-reflect/reflect-open/issues/730)) ([76e02b1](https://github.com/team-reflect/reflect-open/commit/76e02b17d82cc2b1d25c485fc10560d09c81dc32))
+
 ## [0.6.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.6...v0.6.0-beta.7) (2026-07-11)
 
 
