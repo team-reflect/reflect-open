@@ -10,13 +10,16 @@ import {
   type Settings,
 } from '@reflect/core'
 import type { CommandContext } from '@/lib/commands/types'
-import type { Route } from '@/routing/route'
+import type { NoteRoute, Route } from '@/routing/route'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { UpdateProvider } from '@/providers/update-provider'
 import { RouterProvider } from '@/routing/router'
 
 const getPinnedNotes = vi.hoisted(() => vi.fn<() => Promise<PinnedNote[]>>(async () => []))
 const revealItemInDir = vi.hoisted(() => vi.fn<(path: string) => Promise<void>>(async () => {}))
+const openRouteInNewWindow = vi.hoisted(() =>
+  vi.fn<(route: NoteRoute) => Promise<boolean>>(),
+)
 const openRecent = vi.hoisted(() => vi.fn())
 const pickAndOpen = vi.hoisted(() => vi.fn())
 const chooseGraph = vi.hoisted(() => vi.fn())
@@ -45,6 +48,10 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   getPinnedNotes,
 }))
 vi.mock('@tauri-apps/plugin-opener', () => ({ revealItemInDir }))
+vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/windows/open-in-new-window')>()),
+  openRouteInNewWindow,
+}))
 vi.mock('@/lib/native-menu/context-menu', () => ({ openNativeContextMenu }))
 vi.mock('@/lib/note-pin', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/note-pin')>()),
@@ -113,6 +120,7 @@ beforeEach(() => {
   audioMemo.unavailableReason = null
   audioMemo.toggle.mockReset()
   revealItemInDir.mockClear()
+  openRouteInNewWindow.mockReset().mockResolvedValue(true)
   openRecent.mockClear()
   pickAndOpen.mockClear()
   chooseGraph.mockClear()
@@ -267,6 +275,25 @@ describe('Sidebar', () => {
     expect(roadmapPreview?.getAttribute('class')).toContain('hover:text-text')
     await userEvent.click(roadmap)
     await waitFor(() => expect(roadmap.getAttribute('aria-current')).toBe('page'))
+  })
+
+  it('modifier-click opens a pinned note in a new window without changing routes', async () => {
+    getPinnedNotes.mockResolvedValue([
+      { path: 'notes/roadmap.md', title: 'Roadmap', dailyDate: null },
+    ])
+    const { view } = renderSidebar()
+    const roadmap = await view.findByRole('button', { name: 'Roadmap' })
+
+    fireEvent.click(roadmap, { metaKey: true })
+
+    await waitFor(() =>
+      expect(openRouteInNewWindow).toHaveBeenCalledWith({
+        kind: 'note',
+        path: 'notes/roadmap.md',
+      }),
+    )
+    expect(openRouteInNewWindow).toHaveBeenCalledTimes(1)
+    expect(roadmap.getAttribute('aria-current')).toBeNull()
   })
 
   it('renders wiki links in pinned note titles as display text', async () => {

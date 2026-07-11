@@ -1,10 +1,12 @@
 # Multiple windows & cross-window communication
 
-Modifier-click a note link — an editor `[[wiki link]]`, a backlink title or
-snippet, an in-note `reflect://` link — or run the selected-note command, and
-the note opens in its own chrome-free window: just the editor with its
-backlinks, no sidebar, palette, or context panel. This document describes how
-those windows relate to the main window and to each other.
+Modifier-click a note reference anywhere it appears in the app — editor
+`[[wiki links]]`, backlinks, pinned notes, calendar days, search/palette
+results, and other note lists — or run the selected-note command, and the note
+opens in its own chrome-free window: just the editor with its backlinks, no
+sidebar, palette, or context panel. In-note `reflect://` links follow the same
+convention. This document describes how those windows relate to the main
+window and to each other.
 
 Two ideas carry the whole design:
 
@@ -23,9 +25,11 @@ Two ideas carry the whole design:
 ## Window roles
 
 The webview's Tauri label decides the role: `main` is the config-declared
-window; note windows get content-addressed `note-<hash(deep link)>` labels
-(so reopening a target finds its window). The frontend reads the role
-via `isMainWindow()` (`src/lib/windows/window-role.ts`), which treats
+window; note windows normally get content-addressed `note-<hash(deep link)>`
+labels, with a numeric suffix when opening the target requires a distinct
+destination. An app-wide registry remembers the preferred window for each
+target. The frontend reads the role via `isMainWindow()`
+(`src/lib/windows/window-role.ts`), which treats
 bridge-less environments — browser dev, jsdom, the `?platform=ios` harness —
 as main: they are all single-window.
 
@@ -55,19 +59,25 @@ below. The command is also exposed in the native Window menu.
 
 1. A modifier click (`isNewWindowClick` — **mouse events only**: meowdown
    also fires link handlers for Mod-Enter keyboard follows, whose modifier
-   is held by definition) resolves the target as usual, then calls
-   `openRouteInNewWindow` / `openDeepLinkInNewWindow`
-   (`src/lib/windows/open-in-new-window.ts`). Routes serialize through the
-   existing deep-link grammar (`deepLinkForRoute`); capture links (`append`,
-   `task`) are writes, not places, and never window-ify. Any declined or
-   failed open falls back to in-window navigation, so the modifier can never
-   make a link do nothing.
+   is held by definition) resolves the target as usual. Resolved note
+   references share `useNoteLinkNavigation`, which applies the convention and
+   delegates to `openRouteInNewWindow`; raw in-note links use
+   `openDeepLinkInNewWindow` (`src/lib/windows/open-in-new-window.ts`). Routes
+   serialize through the existing deep-link grammar (`deepLinkForRoute`);
+   capture links (`append`, `task`) are writes, not places, and never
+   window-ify. A declined or failed open falls back to in-window navigation
+   while its originating link intent remains current; a newer navigation drops
+   the late fallback instead of pulling the source window somewhere stale.
 2. `open_note_window` (`src-tauri/src/windows.rs`) refuses without an open
-   graph or while a quit is in flight, dedupes by label (see
-   [Focus & re-navigation](#focus--re-navigation)), stores the deep link in
-   a label-keyed pending map (`WindowInit`), and builds the window — cascade
-   offset by the live note-window count, main-window chrome (overlay
-   titlebar, native drag-drop off), excluded from window-state tracking.
+   graph, after a graph switch, or while a quit is in flight. An app-wide
+   creation gate serializes target selection and Tauri's non-atomic native
+   build, then the registry selects the target's preferred destination, stores
+   the deep link in `WindowInit`'s label-keyed one-shot bootstrap map, and
+   builds the window — cascade offset by the live note-window count, main-window
+   chrome (overlay titlebar, native drag-drop off), excluded from window-state
+   tracking. The invoking window is never a valid destination. If it was
+   preferred for that target, a distinct suffixed `note-*` window is created
+   and becomes preferred instead.
 3. The new webview boots the ordinary desktop tree. `GraphProvider` sees a
    non-main label and takes the adoption leg (`useNoteWindowBoot`):
    `window_bootstrap` returns the graph info + index generation (unbumped —
@@ -100,7 +110,7 @@ asymmetry is what each broadcast below exists to bridge.
 | `index:changed` | file watcher (`watcher.rs`) | every window | Open editors reconcile external changes; the main window's indexer applies the batch. Pre-dates multi-window; note windows get editor freshness from it for free. |
 | `index:written` | index write commands after a **committed** write (`db/mod.rs`) | note windows only | Refetch index-backed queries (backlinks, lists). The main window invalidates in-process via its indexer and must not subscribe — it would refetch twice. |
 | `note:moved` | `note_move_indexed` / `index_move` after rows commit | **every** window (`desktop-root.tsx`) | Retarget open sessions + router history after a rename. Renames can originate in any window (a title edit), and a window left behind would resurrect the dead path on its next save. The origin window's in-process handling makes the echo idempotent. |
-| `window:navigate` | `open_note_window` on a dedupe hit (targeted `emit_to`) | that note window | Reopening a target focuses its window *and* re-navigates it there — it may have browsed elsewhere since opening. |
+| `window:navigate` | `open_note_window` on a preferred-destination hit (targeted `emit_to`) | that note window | Reopening a target focuses its window *and* re-navigates it there — it may have browsed elsewhere since opening. The invoking window is excluded, so modifier-open never redirects its source. |
 | `app:quit-requested` | the run loop on a deferred ⌘Q (`lib.rs`) | every window | Each window flushes its own dirty buffers, then confirms. |
 
 The write path that ties it together: a note window saves via the ordinary

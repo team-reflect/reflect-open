@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { MarkdownView } from '@meowdown/react'
 import type { WikilinkClickHandler } from '@meowdown/core'
 import type { SnippetTask } from '@reflect/core'
-import { openExternalLink } from '@/editor/open-external-link'
+import { useOpenExternalLink } from '@/editor/open-external-link'
 import { useSnippetTaskToggle } from '@/hooks/use-snippet-task-toggle'
 
 interface BacklinkSnippetProps {
@@ -40,6 +40,7 @@ export function BacklinkSnippet({
   resolveImageUrl,
 }: BacklinkSnippetProps): ReactElement {
   const onTaskClick = useSnippetTaskToggle(notePath, tasks)
+  const openExternalLink = useOpenExternalLink()
   return (
     <div className="reflect-backlink-snippet select-text text-xs text-text">
       <MarkdownView

@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react'
+import { fireEvent, render, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -8,11 +8,16 @@ import { SimilarNotesSection } from './similar-notes-section'
 
 const relatedNotes = vi.hoisted(() => vi.fn())
 const readNote = vi.hoisted(() => vi.fn())
+const openRouteInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
   readNote,
   relatedNotes,
+}))
+vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/windows/open-in-new-window')>()),
+  openRouteInNewWindow,
 }))
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 1 } }),
@@ -47,6 +52,7 @@ beforeEach(() => {
   semanticSetting.enabled = true
   readNote.mockReset().mockResolvedValue('- daily entry\n')
   relatedNotes.mockReset().mockResolvedValue([])
+  openRouteInNewWindow.mockReset().mockResolvedValue(true)
 })
 
 describe('SimilarNotesSection', () => {
@@ -142,6 +148,33 @@ describe('SimilarNotesSection', () => {
     await userEvent.click(await view.findByText('Gardening'))
     expect(view.getByTestId('route').textContent).toContain('"kind":"note"')
     expect(view.getByTestId('route').textContent).toContain('notes/gardening.md')
+    view.unmount()
+  })
+
+  it('opens a ⌘-clicked neighbor in a new window', async () => {
+    relatedNotes.mockResolvedValue([
+      {
+        path: 'notes/gardening.md',
+        title: 'Gardening',
+        score: 0.8,
+        snippet: 'tomato beds',
+        heading: null,
+        isPrivate: false,
+      },
+    ])
+    const view = renderSimilar('daily/2026-06-09.md')
+
+    fireEvent.click(await view.findByRole('button', { name: 'Gardening' }), {
+      metaKey: true,
+    })
+
+    await waitFor(() =>
+      expect(openRouteInNewWindow).toHaveBeenCalledWith({
+        kind: 'note',
+        path: 'notes/gardening.md',
+      }),
+    )
+    expect(view.getByTestId('route').textContent).toContain('"kind":"today"')
     view.unmount()
   })
 })

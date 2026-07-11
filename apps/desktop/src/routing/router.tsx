@@ -40,6 +40,15 @@ interface RouterValue {
    */
   arrivalSeq: number
   /**
+   * Read the synchronous, monotonic navigation-state revision. Unlike rendered
+   * route state, this advances before `navigate`, `back`, or `forward` enqueue
+   * an update (and before the current note follows a rename), so async link
+   * fallbacks can detect even a same-route arrival or a back/forward round trip
+   * that returned to the same history entry. A back/forward at a history
+   * boundary changes nothing and does not advance it.
+   */
+  navigationRevision: () => number
+  /**
    * True when the latest arrival asked the destination to focus its primary
    * input (`navigate(route, { focusEditor: true })`). Only explicit capture
    * gestures request it — the mobile Daily-, All-, Tasks-, and Chat-tab
@@ -141,6 +150,7 @@ export function RouterProvider({
   const [arrivalSeq, setArrivalSeq] = useState(0)
   const [arrivalFocusEditor, setArrivalFocusEditor] = useState(false)
   const nextId = useRef(1)
+  const navigationRevisionRef = useRef(0)
   /** Scroll offsets by entry id — a ref so scroll reporting never re-renders. */
   const scrollById = useRef(new Map<number, number>())
   /** Last offset per long-lived surface, independent of history entries. */
@@ -157,8 +167,17 @@ export function RouterProvider({
   currentId.current = history.stack[history.index]!.id
   // eslint-disable-next-line react-hooks/refs
   currentRoute.current = history.stack[history.index]!.route
+  /**
+   * History position, readable from the stable back/forward callbacks. A
+   * boundary press must be a true no-op — advancing the navigation revision
+   * for it would silently cancel an unrelated pending link fallback.
+   */
+  const historyPosition = useRef({ index: 0, length: 1 })
+  // eslint-disable-next-line react-hooks/refs
+  historyPosition.current = { index: history.index, length: history.stack.length }
 
   const navigate = useCallback((route: Route, options?: NavigateOptions) => {
+    navigationRevisionRef.current += 1
     const target = normalizeRoute(route)
     const surface = scrollSurfaceForRoute(target)
     // A surface restore only means something when coming from OFF the surface;
@@ -205,6 +224,10 @@ export function RouterProvider({
   }, [])
 
   const back = useCallback(() => {
+    if (historyPosition.current.index === 0) {
+      return // nothing behind us — must not advance the navigation revision
+    }
+    navigationRevisionRef.current += 1
     setArrivalFocusEditor(false) // history moves are never focus arrivals
     setHistory((current) =>
       current.index > 0 ? { ...current, index: current.index - 1 } : current,
@@ -212,6 +235,10 @@ export function RouterProvider({
   }, [])
 
   const forward = useCallback(() => {
+    if (historyPosition.current.index >= historyPosition.current.length - 1) {
+      return
+    }
+    navigationRevisionRef.current += 1
     setArrivalFocusEditor(false)
     setHistory((current) =>
       current.index < current.stack.length - 1 ? { ...current, index: current.index + 1 } : current,
@@ -225,6 +252,9 @@ export function RouterProvider({
   useEffect(
     () =>
       onNoteMoved((from, to) => {
+        if (currentRoute.current.kind === 'note' && currentRoute.current.path === from) {
+          navigationRevisionRef.current += 1
+        }
         setHistory((current) => {
           let changed = false
           const stack = current.stack.map((entry) => {
@@ -260,6 +290,7 @@ export function RouterProvider({
     () => scrollById.current.get(currentId.current) ?? null,
     [],
   )
+  const navigationRevision = useCallback(() => navigationRevisionRef.current, [])
 
   const value = useMemo<RouterValue>(() => {
     const entry = history.stack[history.index]!
@@ -267,6 +298,7 @@ export function RouterProvider({
       route: entry.route,
       entryId: entry.id,
       arrivalSeq,
+      navigationRevision,
       arrivalFocusEditor,
       navigate,
       back,
@@ -281,6 +313,7 @@ export function RouterProvider({
   }, [
     history,
     arrivalSeq,
+    navigationRevision,
     arrivalFocusEditor,
     navigate,
     back,
@@ -300,6 +333,15 @@ export function useRouter(): RouterValue {
     throw new Error('useRouter must be used within a RouterProvider')
   }
   return context
+}
+
+/**
+ * Read the router's synchronous navigation-revision getter when a provider is
+ * present. Low-level rendered-link hooks use the nullable form so their
+ * standalone component harnesses remain valid outside a full app router.
+ */
+export function useNavigationRevision(): (() => number) | null {
+  return useContext(RouterContext)?.navigationRevision ?? null
 }
 
 interface RouterFreezeProps {

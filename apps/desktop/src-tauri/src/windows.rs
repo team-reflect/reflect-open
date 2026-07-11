@@ -1,13 +1,15 @@
 //! Secondary note windows (modifier-click or command → its own window, Plan 06).
 //!
-//! The shell owns *creation* only: one window per deep-link target, deduped
-//! by a content-addressed label, plus the one-shot bootstrap a secondary
-//! webview calls to adopt the already-open graph. Adoption is strictly a
-//! read — the note window must never re-run `graph_open`/`index_open`, whose
-//! generation bumps would strand every command the main window has pinned to
-//! the current sessions.
+//! The shell owns *creation* only: one preferred window per deep-link target,
+//! plus the one-shot bootstrap a secondary webview calls to adopt the
+//! already-open graph. A target normally receives a content-addressed label;
+//! when that label belongs to the invoking window, a distinct suffixed label
+//! becomes the new preferred destination. Adoption is strictly a read — the
+//! note window must never re-run `graph_open`/`index_open`, whose generation
+//! bumps would strand every command the main window has pinned to the current
+//! sessions.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::sync::{Mutex, MutexGuard};
 
@@ -19,10 +21,32 @@ use crate::error::{AppError, AppResult};
 use crate::fs::{self, GraphInfo, GraphState};
 use crate::quit::QuitState;
 
-/// Deep links waiting for their window's first `window_bootstrap` call,
-/// keyed by window label. Entries are one-shot: bootstrapping drains them.
+/// App-wide note-window registry.
+///
+/// `preferred_destinations` separates a target's current destination from a
+/// window's immutable Tauri label. That matters after a note window navigates:
+/// modifier-opening its original target must create a distinct window rather
+/// than reusing the invoking window. `pending_bootstraps` remains one-shot and
+/// is drained by the destination's first `window_bootstrap` call. The separate
+/// creation gate serializes Tauri's non-atomic window-label check and insert;
+/// bootstrap deliberately never takes that gate.
 #[derive(Default)]
-pub struct WindowInit(Mutex<HashMap<String, String>>);
+pub struct WindowInit {
+    registry: Mutex<WindowRegistry>,
+    creation: Mutex<()>,
+}
+
+#[derive(Default)]
+struct WindowRegistry {
+    preferred_destinations: HashMap<String, String>,
+    pending_bootstraps: HashMap<String, String>,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum WindowOpenPlan {
+    Focus(String),
+    Create(String),
+}
 
 /// The main window's label (Tauri's default for the config-declared window).
 pub const MAIN_WINDOW_LABEL: &str = "main";
@@ -109,12 +133,19 @@ pub(crate) fn reopen_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     }
 }
 
-fn lock_init<'a>(
+fn lock_registry<'a>(
     state: &'a State<'_, WindowInit>,
-) -> AppResult<MutexGuard<'a, HashMap<String, String>>> {
-    state.0.lock().map_err(|err| {
-        tracing::error!(?err, "window init lock poisoned by an earlier panic");
-        AppError::io("window init lock poisoned")
+) -> AppResult<MutexGuard<'a, WindowRegistry>> {
+    state.registry.lock().map_err(|err| {
+        tracing::error!(?err, "window registry lock poisoned by an earlier panic");
+        AppError::io("window registry lock poisoned")
+    })
+}
+
+fn lock_creation<'a>(state: &'a State<'_, WindowInit>) -> AppResult<MutexGuard<'a, ()>> {
+    state.creation.lock().map_err(|err| {
+        tracing::error!(?err, "window creation lock poisoned by an earlier panic");
+        AppError::io("window creation lock poisoned")
     })
 }
 
@@ -127,11 +158,72 @@ fn note_window_label(deep_link: &str) -> String {
     format!("{NOTE_WINDOW_PREFIX}{:016x}", hasher.finish())
 }
 
+impl WindowRegistry {
+    /// Select and reserve the destination for an open request.
+    ///
+    /// Repeated calls for the same not-yet-built target intentionally receive
+    /// the same `Create` label. The outer creation gate serializes planning,
+    /// focus, and native construction for that label. A request may never
+    /// focus its invoking window, even when that window was the target's
+    /// earlier preferred destination.
+    fn plan_open(
+        &mut self,
+        deep_link: &str,
+        invoking_label: &str,
+        live_labels: &HashSet<String>,
+    ) -> WindowOpenPlan {
+        if let Some(preferred_label) = self.preferred_destinations.get(deep_link).cloned() {
+            if preferred_label != invoking_label {
+                if live_labels.contains(&preferred_label) {
+                    return WindowOpenPlan::Focus(preferred_label);
+                }
+                self.pending_bootstraps
+                    .insert(preferred_label.clone(), deep_link.to_owned());
+                return WindowOpenPlan::Create(preferred_label);
+            }
+        }
+
+        let base_label = note_window_label(deep_link);
+        let label = (1_u64..)
+            .map(|sequence| {
+                if sequence == 1 {
+                    base_label.clone()
+                } else {
+                    format!("{base_label}-{sequence}")
+                }
+            })
+            .find(|candidate| {
+                candidate != invoking_label
+                    && !live_labels.contains(candidate)
+                    && !self.pending_bootstraps.contains_key(candidate)
+                    && !self
+                        .preferred_destinations
+                        .values()
+                        .any(|preferred| preferred == candidate)
+            })
+            .expect("the unbounded note-window suffix space cannot be exhausted");
+
+        self.preferred_destinations
+            .insert(deep_link.to_owned(), label.clone());
+        self.pending_bootstraps
+            .insert(label.clone(), deep_link.to_owned());
+        WindowOpenPlan::Create(label)
+    }
+}
+
 /// Surface an already-open window for this target, when one exists: show,
 /// focus, and deliver the link ([`WINDOW_NAVIGATE_EVENT`]) so a window that
 /// has navigated away comes back to the note that was requested. All
 /// best-effort — a focus that fails must not fail the open request.
-fn focus_existing(app: &tauri::AppHandle, label: &str, deep_link: &str) -> bool {
+fn focus_existing(
+    app: &tauri::AppHandle,
+    label: &str,
+    deep_link: &str,
+    invoking_label: &str,
+) -> bool {
+    if label == invoking_label {
+        return false;
+    }
     let Some(existing) = app.get_webview_window(label) else {
         return false;
     };
@@ -174,21 +266,48 @@ pub async fn open_note_window(
             "not a reflect:// link: {deep_link}"
         )));
     }
-    // Mid-quit, a new webview would never join the flush handshake's pending
-    // set — the armed windows' confirms would exit underneath it. Refuse
-    // (best-effort: modifier-click callers degrade to in-window navigation).
+    let issued_generation = fs::current_graph_info(&graph)?.generation;
+    // Tauri's internal label availability check and window-map insertion are
+    // separate operations. Serialize the whole plan/focus/build transaction,
+    // not just our registry mutation, so two webviews cannot both pass the
+    // native check for the same label. `window_bootstrap` uses only the
+    // registry lock and can therefore run while this guard is held.
+    let _creation_guard = lock_creation(&init)?;
+    // Recheck mutable app state after waiting for an earlier creation. A queued
+    // request must not build into a newer graph session or active quit
+    // handshake than the click that issued it.
+    // Mid-quit, a new webview would never join the handshake's pending set —
+    // refuse and let modifier-click callers degrade to in-window navigation.
     if quit.armed() {
         return Err(AppError::io("the app is quitting"));
     }
-    fs::current_graph_info(&graph)?;
+    fs::root_for_generation(&graph, issued_generation)?;
 
-    let label = note_window_label(&deep_link);
-    if focus_existing(&app, &label, &deep_link) {
-        return Ok(());
-    }
+    let invoking_label = window.label().to_owned();
+    let label = loop {
+        // Take the live-window snapshot while holding the registry lock. A
+        // just-built window's bootstrap needs this same lock, so the snapshot
+        // and reservation are ordered with its one-shot drain: we either see
+        // the live destination and focus it, or reserve the still-pending
+        // bootstrap that the new window will consume.
+        let plan = {
+            let mut registry = lock_registry(&init)?;
+            let live_labels: HashSet<String> = app.webview_windows().into_keys().collect();
+            registry.plan_open(&deep_link, &invoking_label, &live_labels)
+        };
+        match plan {
+            WindowOpenPlan::Focus(preferred_label) => {
+                if focus_existing(&app, &preferred_label, &deep_link, &invoking_label) {
+                    return Ok(());
+                }
+                // The window closed after the locked snapshot. Re-plan from a
+                // fresh snapshot; the missing preferred label becomes the
+                // reserved-label build path below.
+            }
+            WindowOpenPlan::Create(reserved_label) => break reserved_label,
+        }
+    };
     let cascade = cascade_offset(&app);
-
-    lock_init(&init)?.insert(label.clone(), deep_link);
 
     let mut builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::default())
         .title("Reflect")
@@ -210,13 +329,13 @@ pub async fn open_note_window(
     }
 
     if let Err(err) = builder.build() {
-        // Clean the pending link up ONLY when no window claimed the label: a
-        // concurrent same-target open can fail exactly because the first
-        // call's window already exists, and that window's bootstrap still
-        // needs the entry (both calls stored the identical link).
-        if app.get_webview_window(&label).is_none() {
-            lock_init(&init)?.remove(&label);
+        // Be defensive if a window created outside this command claimed the
+        // reserved label: surface it and preserve its one-shot bootstrap.
+        if focus_existing(&app, &label, &deep_link, &invoking_label) {
+            return Ok(());
         }
+        // Keep the pending bootstrap for a later serialized retry, which
+        // reuses this preferred reservation.
         return Err(AppError::io(format!("failed to open note window: {err}")));
     }
     Ok(())
@@ -286,7 +405,9 @@ pub fn window_bootstrap(
 ) -> AppResult<WindowBootstrap> {
     let graph = fs::current_graph_info(&graph)?;
     let index_generation = db::current_generation(&index)?;
-    let initial_deep_link = lock_init(&init)?.remove(window.label());
+    let initial_deep_link = lock_registry(&init)?
+        .pending_bootstraps
+        .remove(window.label());
     Ok(WindowBootstrap {
         graph,
         index_generation,
@@ -339,5 +460,58 @@ mod tests {
         assert_eq!(a1, a2);
         assert_ne!(a1, b);
         assert!(a1.starts_with(NOTE_WINDOW_PREFIX));
+    }
+
+    #[test]
+    fn invoking_window_is_replaced_as_the_preferred_target_destination() {
+        let deep_link = "reflect://note/notes/a.md";
+        let mut registry = WindowRegistry::default();
+        let mut live_labels = HashSet::from([MAIN_WINDOW_LABEL.to_owned()]);
+
+        let WindowOpenPlan::Create(original_label) =
+            registry.plan_open(deep_link, MAIN_WINDOW_LABEL, &live_labels)
+        else {
+            panic!("first open should create a note window");
+        };
+        registry.pending_bootstraps.remove(&original_label);
+        live_labels.insert(original_label.clone());
+
+        let WindowOpenPlan::Create(replacement_label) =
+            registry.plan_open(deep_link, &original_label, &live_labels)
+        else {
+            panic!("opening from the preferred window should create a replacement");
+        };
+        assert_ne!(replacement_label, original_label);
+        assert!(replacement_label.starts_with(&format!("{original_label}-")));
+
+        registry.pending_bootstraps.remove(&replacement_label);
+        live_labels.insert(replacement_label.clone());
+        assert_eq!(
+            registry.plan_open(deep_link, MAIN_WINDOW_LABEL, &live_labels),
+            WindowOpenPlan::Focus(replacement_label)
+        );
+    }
+
+    #[test]
+    fn repeated_same_target_creations_share_the_reserved_label() {
+        let deep_link = "reflect://note/notes/a.md";
+        let mut registry = WindowRegistry::default();
+        let live_labels = HashSet::from([MAIN_WINDOW_LABEL.to_owned()]);
+
+        let first_plan = registry.plan_open(deep_link, MAIN_WINDOW_LABEL, &live_labels);
+        let repeated_plan = registry.plan_open(deep_link, MAIN_WINDOW_LABEL, &live_labels);
+
+        assert_eq!(repeated_plan, first_plan);
+        assert!(matches!(first_plan, WindowOpenPlan::Create(_)));
+    }
+
+    #[test]
+    fn bootstrap_registry_is_independent_from_creation_gate() {
+        let init = WindowInit::default();
+        let _creation_guard = init.creation.lock().expect("creation gate");
+        let _registry_guard = init
+            .registry
+            .try_lock()
+            .expect("bootstrap registry should remain available");
     }
 }

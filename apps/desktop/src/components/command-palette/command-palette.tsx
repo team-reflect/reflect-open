@@ -4,10 +4,12 @@ import { parseHighlights } from '@reflect/core'
 import { CalendarDays, FileText } from 'lucide-react'
 import { Kbd } from '@/components/kbd'
 import { ShortcutKeys } from '@/components/shortcut-keys'
+import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { runCommand } from '@/lib/commands/registry'
 import type { CommandContext } from '@/lib/commands/types'
 import { formatDayLabel } from '@/lib/dates'
 import { cn } from '@/lib/utils'
+import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
 import { useSettings } from '@/providers/settings-provider'
 import { routeForPath } from '@/routing/route'
 import { commandIcon } from './command-icons'
@@ -48,10 +50,20 @@ const Snippet = memo(function Snippet({ snippet }: { snippet: string }): ReactEl
   )
 })
 
+interface PendingNoteClick {
+  path: string
+  event: NewWindowClickEvent
+}
+
 export function CommandPalette({ context }: CommandPaletteProps): ReactElement | null {
   const { open, query, setQuery, closePalette } = usePalette()
   const { settings } = useSettings()
   const { sections, resultsSettled, searchFailed } = usePaletteResults(open, query)
+  const navigateNoteLink = useNoteLinkNavigation()
+  // cmdk's `onSelect` exposes only the selected value, not its originating
+  // click. Capture the modifiers before cmdk's own click handler, then consume
+  // them exactly once from `onSelect`; keyboard Enter has no captured click.
+  const pendingNoteClickRef = useRef<PendingNoteClick | null>(null)
   // cmdk's highlighted item, mirrored so the preview pane can follow it. Reset
   // on close so a reopened palette highlights its first result, not the last
   // session's pick.
@@ -99,8 +111,13 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
   }
 
   const openNote = (entry: NoteEntry): void => {
+    const pendingClick = pendingNoteClickRef.current
+    pendingNoteClickRef.current = null
+    navigateNoteLink(
+      routeForPath(entry.path),
+      pendingClick?.path === entry.path ? pendingClick.event : undefined,
+    )
     closePalette()
-    context.navigate(routeForPath(entry.path))
   }
 
   // Width follows the palette's *mode*, not the result count: note modes keep
@@ -133,6 +150,11 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
           value={selectedValue}
           onValueChange={setSelectedValue}
           onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
+            // cmdk dispatches its custom select event after this handler. Drop
+            // any abandoned pointer intent so Enter can never inherit it.
+            if (event.key === 'Enter') {
+              pendingNoteClickRef.current = null
+            }
             if (event.key === 'Escape') {
               event.preventDefault()
               closePalette()
@@ -170,6 +192,16 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
                       <Command.Item
                         key={entry.path}
                         value={entry.path}
+                        onClickCapture={(event) => {
+                          pendingNoteClickRef.current = {
+                            path: entry.path,
+                            event: {
+                              metaKey: event.metaKey,
+                              ctrlKey: event.ctrlKey,
+                              type: event.type,
+                            },
+                          }
+                        }}
                         onSelect={() => openNote(entry)}
                         className="reflect-palette-item"
                       >
@@ -209,6 +241,7 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
                         key={command.id}
                         value={`command:${command.id}`}
                         onSelect={() => {
+                          pendingNoteClickRef.current = null
                           closePalette()
                           void runCommand(command.id, context)
                         }}

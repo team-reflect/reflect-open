@@ -14,11 +14,12 @@ export interface DeepLinkIo {
   /** `GraphInfo.generation` — pins the capture spool to the issuing graph. */
   generation: number
   /**
-   * Whether this graph session ended while the handler awaited (graph
-   * switch). Note resolution queries whichever index is open when it runs, so
+   * Whether the graph session or navigation intent changed while the handler
+   * awaited. Note resolution queries whichever index is open when it runs, so
    * a stale result must be dropped, never navigated — it may name a homonym
-   * note in the newly opened graph. (The capture path needs no gate: the
-   * spool write is generation-pinned in Rust and fails loudly when stale.)
+   * note in the newly opened graph or override a newer user action. (The
+   * capture path needs no gate: the spool write is generation-pinned in Rust
+   * and fails loudly when stale.)
    */
   isStale?: () => boolean
 }
@@ -45,6 +46,9 @@ export async function handleDeepLink(url: string, io: DeepLinkIo): Promise<void>
       try {
         path = await resolveNoteTarget(link.target)
       } catch (cause) {
+        if (io.isStale?.() === true) {
+          return
+        }
         startOperation('Opening link').fail(errorMessage(cause))
         return
       }

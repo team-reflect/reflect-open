@@ -1,8 +1,9 @@
-import { Fragment, type ReactElement, type ReactNode } from 'react'
+import { Fragment, type MouseEvent, type ReactElement, type ReactNode } from 'react'
 import { CalendarDays, FileText, History, Paperclip, Search } from 'lucide-react'
 import { isTagName, isToolPending, type AssistantPart, type NoteHitSummary } from '@reflect/core'
 import { Marker, MarkerContent, MarkerIcon } from '@/components/ui/marker'
 import { Spinner } from '@/components/ui/spinner'
+import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { routeForPath } from '@/routing/route'
 import { useRouter } from '@/routing/router'
 
@@ -38,7 +39,7 @@ function ChipFrame({ pending, icon, children }: ChipFrameProps): ReactElement {
 
 interface NoteLinksProps {
   notes: readonly NoteHitSummary[]
-  onOpen: (path: string) => void
+  onOpen: (path: string, event: MouseEvent<HTMLButtonElement>) => void
 }
 
 function NoteLinks({ notes, onOpen }: NoteLinksProps): ReactElement | null {
@@ -54,7 +55,7 @@ function NoteLinks({ notes, onOpen }: NoteLinksProps): ReactElement | null {
           {index > 0 ? ', ' : ''}
           <button
             type="button"
-            onClick={() => onOpen(note.path)}
+            onClick={(event) => onOpen(note.path, event)}
             className="underline-offset-2 hover:text-text hover:underline"
           >
             {note.title}
@@ -74,7 +75,10 @@ function NoteLinks({ notes, onOpen }: NoteLinksProps): ReactElement | null {
  */
 export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
   const { navigate } = useRouter()
-  const openNote = (path: string) => navigate(routeForPath(path))
+  const navigateNoteLink = useNoteLinkNavigation()
+  const openNote = (path: string, event: MouseEvent<HTMLButtonElement>): void => {
+    navigateNoteLink(routeForPath(path), event)
+  }
   const pending = isToolPending(part)
   const call = part.call
 
@@ -181,7 +185,7 @@ export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
             {!pending && note.error === null ? (
               <button
                 type="button"
-                onClick={() => openNote(note.path)}
+                onClick={(event) => openNote(note.path, event)}
                 className="underline-offset-2 hover:text-text hover:underline"
               >
                 {label}

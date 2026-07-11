@@ -1,7 +1,12 @@
 import { useEffect, useRef, type ReactElement, type ReactNode } from 'react'
 import type { GraphInfo } from '@reflect/core'
-import { handleDeepLink } from '@/lib/deep-links/handle'
+import { handleDeepLink, type DeepLinkIo } from '@/lib/deep-links/handle'
 import { setDeepLinkHandler } from '@/lib/deep-links/intake'
+import { parseDeepLink } from '@/lib/deep-links/parse'
+import {
+  beginLinkNavigationIntent,
+  isCurrentLinkNavigationIntent,
+} from '@/lib/windows/link-navigation-intent'
 import { useRouter } from '@/routing/router'
 
 /**
@@ -17,7 +22,7 @@ interface DeepLinkProviderProps {
 }
 
 export function DeepLinkProvider({ graph, children }: DeepLinkProviderProps): ReactElement {
-  const { navigate } = useRouter()
+  const { navigate, navigationRevision } = useRouter()
 
   // The graph session this provider instance currently serves. Staleness must
   // mean "the session changed", NOT "the effect re-ran": StrictMode's probe
@@ -33,18 +38,39 @@ export function DeepLinkProvider({ graph, children }: DeepLinkProviderProps): Re
     sessionRef.current = graph.generation
     const issued = graph.generation
     setDeepLinkHandler((url) => {
-      handleDeepLink(url, {
-        navigate,
-        generation: issued,
-        isStale: () => sessionRef.current !== issued,
-      }).catch((cause: unknown) => {
+      const link = parseDeepLink(url)
+      // Capture and rejected URLs do not express a navigation intent, so they
+      // must not supersede a note target that is still resolving.
+      const io =
+        link !== null && link.kind !== 'capture'
+          ? createNavigationIo(navigate, navigationRevision, sessionRef, issued)
+          : { navigate, generation: issued }
+      handleDeepLink(url, io).catch((cause: unknown) => {
         console.error('deep link failed:', url, cause)
       })
     })
     return () => {
       setDeepLinkHandler(null)
     }
-  }, [navigate, graph.generation])
+  }, [navigate, navigationRevision, graph.generation])
 
   return <>{children}</>
+}
+
+function createNavigationIo(
+  navigate: DeepLinkIo['navigate'],
+  navigationRevision: () => number,
+  sessionRef: { readonly current: number },
+  generation: number,
+): DeepLinkIo {
+  const linkIntent = beginLinkNavigationIntent()
+  const issuedAtRevision = navigationRevision()
+  return {
+    navigate,
+    generation,
+    isStale: () =>
+      sessionRef.current !== generation ||
+      navigationRevision() !== issuedAtRevision ||
+      !isCurrentLinkNavigationIntent(linkIntent),
+  }
 }

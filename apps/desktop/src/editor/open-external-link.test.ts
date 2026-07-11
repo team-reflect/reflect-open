@@ -1,7 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, renderHook } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { LinkClickHandler } from '@meowdown/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { dispatchDeepLink } from '@/lib/deep-links/intake'
-import { openExternalLink } from '@/editor/open-external-link'
+import { useOpenExternalLink } from '@/editor/open-external-link'
+
+const openDeepLinkInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
 
 vi.mock('@tauri-apps/plugin-opener', () => ({
   openUrl: vi.fn(async () => {}),
@@ -10,16 +14,27 @@ vi.mock('@tauri-apps/plugin-opener', () => ({
 vi.mock('@/lib/deep-links/intake', () => ({
   dispatchDeepLink: vi.fn(),
 }))
+vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/windows/open-in-new-window')>()),
+  openDeepLinkInNewWindow,
+}))
 
-function click(href: string): MouseEvent {
-  const event = new MouseEvent('click', { cancelable: true })
-  openExternalLink({ href, event })
+let openExternalLink: LinkClickHandler
+
+function click(href: string, metaKey = false): MouseEvent {
+  const event = new MouseEvent('click', { cancelable: true, metaKey })
+  act(() => openExternalLink({ href, event }))
   return event
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  openDeepLinkInNewWindow.mockResolvedValue(true)
+  const { result } = renderHook(() => useOpenExternalLink())
+  openExternalLink = result.current
 })
+
+afterEach(cleanup)
 
 describe('openExternalLink', () => {
   it('opens an http(s) link in the OS browser and blocks the frame navigation', () => {
@@ -34,6 +49,24 @@ describe('openExternalLink', () => {
 
     expect(dispatchDeepLink).toHaveBeenCalledWith('reflect://note/abc123')
     expect(openUrl).not.toHaveBeenCalled()
+  })
+
+  it('⌘-clicks a rendered reflect:// link into a secondary window', async () => {
+    click('reflect://note/abc123', true)
+
+    await vi.waitFor(() =>
+      expect(openDeepLinkInNewWindow).toHaveBeenCalledWith('reflect://note/abc123'),
+    )
+    expect(dispatchDeepLink).not.toHaveBeenCalled()
+  })
+
+  it('falls back to in-window dispatch when a rendered deep link cannot open a window', async () => {
+    openDeepLinkInNewWindow.mockResolvedValue(false)
+    click('reflect://note/abc123', true)
+
+    await vi.waitFor(() =>
+      expect(dispatchDeepLink).toHaveBeenCalledWith('reflect://note/abc123'),
+    )
   })
 
   it('opens a custom app scheme in its OS default app', () => {

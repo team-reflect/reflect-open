@@ -21,9 +21,11 @@ vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
 vi.mock('@/lib/operations', () => ({ startOperation }))
 
 let lastHandler: ((target: string, event?: MouseEvent | KeyboardEvent) => void) | null = null
+let navigate: ReturnType<typeof useRouter>['navigate'] | null = null
 
 function Host({ generation }: { generation: number | null }): ReactNode {
   lastHandler = useWikiLinkNavigation(generation)
+  navigate = useRouter().navigate
   return null
 }
 
@@ -57,6 +59,7 @@ beforeEach(() => {
   operationFail.mockReset()
   startOperation.mockClear()
   lastHandler = null
+  navigate = null
 })
 
 describe('useWikiLinkNavigation', () => {
@@ -252,6 +255,9 @@ describe('useWikiLinkNavigation', () => {
       </RouterProvider>,
     )
     lastHandler?.('Target')
+    await waitFor(() =>
+      expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Target', 1),
+    )
     // Unmount only the host; the router (and probe) live on, so a navigate
     // slipping through the guard would be visible as a route change.
     view.rerender(
@@ -262,6 +268,80 @@ describe('useWikiLinkNavigation', () => {
     resolve({ kind: 'resolved', path: 'notes/target.md' })
     await new Promise((tick) => setTimeout(tick, 0))
     expect(view.getByTestId('route').textContent).toContain('"today"')
+    view.unmount()
+  })
+
+  it('drops an older resolution after a newer wiki-link click', async () => {
+    let finishOlder: (value: { kind: 'resolved'; path: string }) => void = () => {}
+    resolveOrCreateNoteWithTitle.mockImplementation((target: string) => {
+      if (target === 'Older') {
+        return new Promise((resolve) => {
+          finishOlder = resolve
+        })
+      }
+      return Promise.resolve({ kind: 'resolved', path: 'notes/newer.md' })
+    })
+    const view = renderHost()
+
+    lastHandler?.('Older')
+    await waitFor(() =>
+      expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Older', 1),
+    )
+    lastHandler?.('Newer')
+    await waitFor(() => expect(currentRoute(view)).toContain('notes/newer.md'))
+    finishOlder({ kind: 'resolved', path: 'notes/older.md' })
+    await new Promise((tick) => setTimeout(tick, 0))
+
+    expect(currentRoute(view)).toContain('notes/newer.md')
+    expect(currentRoute(view)).not.toContain('notes/older.md')
+    view.unmount()
+  })
+
+  it('drops a pending resolution after unrelated router navigation', async () => {
+    let finishResolution: (value: { kind: 'resolved'; path: string }) => void = () => {}
+    resolveOrCreateNoteWithTitle.mockReturnValue(
+      new Promise((resolve) => {
+        finishResolution = resolve
+      }),
+    )
+    const view = renderHost()
+
+    lastHandler?.('Target')
+    await waitFor(() =>
+      expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Target', 1),
+    )
+    navigate?.({ kind: 'settings' })
+    await waitFor(() => expect(currentRoute(view)).toContain('"settings"'))
+
+    finishResolution({ kind: 'resolved', path: 'notes/target.md' })
+    await new Promise((tick) => setTimeout(tick, 0))
+
+    expect(currentRoute(view)).toContain('"settings"')
+    expect(currentRoute(view)).not.toContain('notes/target.md')
+    view.unmount()
+  })
+
+  it('drops a pending note creation after unrelated router navigation', async () => {
+    let finishCreation: (outcome: { kind: 'created'; path: string }) => void = () => {}
+    resolveOrCreateNoteWithTitle.mockReturnValue(
+      new Promise((resolve) => {
+        finishCreation = resolve
+      }),
+    )
+    const view = renderHost(7)
+
+    lastHandler?.('Brand New')
+    await waitFor(() =>
+      expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Brand New', 7),
+    )
+    navigate?.({ kind: 'settings' })
+    await waitFor(() => expect(currentRoute(view)).toContain('"settings"'))
+
+    finishCreation({ kind: 'created', path: 'notes/created.md' })
+    await new Promise((tick) => setTimeout(tick, 0))
+
+    expect(currentRoute(view)).toContain('"settings"')
+    expect(currentRoute(view)).not.toContain('notes/created.md')
     view.unmount()
   })
 })

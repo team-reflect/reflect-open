@@ -3,16 +3,20 @@ import { cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GraphInfo } from '@reflect/core'
 import type { DeepLinkIo } from '@/lib/deep-links/handle'
+import { beginLinkNavigationIntent } from '@/lib/windows/link-navigation-intent'
 
 const setDeepLinkHandler = vi.hoisted(() => vi.fn<(handler: ((url: string) => void) | null) => void>())
 const handleDeepLink = vi.hoisted(() =>
   vi.fn<(url: string, io: DeepLinkIo) => Promise<void>>(async () => {}),
 )
 const navigate = vi.hoisted(() => vi.fn())
+const navigation = vi.hoisted(() => ({ revision: 0 }))
 
 vi.mock('@/lib/deep-links/intake', () => ({ setDeepLinkHandler }))
 vi.mock('@/lib/deep-links/handle', () => ({ handleDeepLink }))
-vi.mock('@/routing/router', () => ({ useRouter: () => ({ navigate }) }))
+vi.mock('@/routing/router', () => ({
+  useRouter: () => ({ navigate, navigationRevision: () => navigation.revision }),
+}))
 
 import { DeepLinkProvider } from './deep-link-provider'
 
@@ -33,6 +37,7 @@ function attachedHandler(): (url: string) => void {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  navigation.revision = 0
 })
 
 afterEach(cleanup)
@@ -69,6 +74,55 @@ describe('DeepLinkProvider', () => {
     )
     expect(io.isStale?.()).toBe(true)
   })
+
+  it('reports stale when navigation changes while a note target resolves', () => {
+    mount()
+    attachedHandler()('reflect://note/x')
+    const io = handleDeepLink.mock.calls[0]![1]
+
+    expect(io.isStale?.()).toBe(false)
+    navigation.revision += 1
+    expect(io.isStale?.()).toBe(true)
+  })
+
+  it('reports stale when a newer note-link intent starts during resolution', () => {
+    mount()
+    attachedHandler()('reflect://note/x')
+    const io = handleDeepLink.mock.calls[0]![1]
+
+    expect(io.isStale?.()).toBe(false)
+    beginLinkNavigationIntent()
+    expect(io.isStale?.()).toBe(true)
+  })
+
+  it.each([
+    'reflect://append?text=captured',
+    'reflect://task?text=captured',
+    'reflect://edit-notes?content=invalid',
+  ])('does not stale a pending note resolve for non-navigation URL %s', (url) => {
+    mount()
+    attachedHandler()('reflect://note/x')
+    const pendingNoteIo = handleDeepLink.mock.calls[0]![1]
+
+    attachedHandler()(url)
+
+    expect(pendingNoteIo.isStale?.()).toBe(false)
+    expect(handleDeepLink.mock.calls[1]![1].isStale).toBeUndefined()
+  })
+
+  it.each(['reflect://today', 'reflect://note/y'])(
+    'stales a pending note resolve for newer navigation URL %s',
+    (url) => {
+      mount()
+      attachedHandler()('reflect://note/x')
+      const pendingNoteIo = handleDeepLink.mock.calls[0]![1]
+
+      attachedHandler()(url)
+
+      expect(pendingNoteIo.isStale?.()).toBe(true)
+      expect(handleDeepLink.mock.calls[1]![1].isStale?.()).toBe(false)
+    },
+  )
 
   it('a StrictMode probe cycle does not stale a link the probe attach drained', () => {
     // The note window's initial deep link buffers in the intake and is drained

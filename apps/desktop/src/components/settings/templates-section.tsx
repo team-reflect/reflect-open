@@ -12,13 +12,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { deleteOpenNote } from '@/lib/note-delete'
 import { renameTemplate } from '@/lib/note-templates'
 import { startOperation } from '@/lib/operations'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 import { useNoteTemplates } from '@/providers/note-templates-provider'
-import { useRouter } from '@/routing/router'
 import { SettingsField } from './field'
 import { SettingsSection } from './section'
 
@@ -30,7 +30,7 @@ import { SettingsSection } from './section'
  */
 export function TemplatesSection(): ReactElement {
   const { graph } = useGraph()
-  const { navigate } = useRouter()
+  const navigateNoteLink = useNoteLinkNavigation()
   const { openTemplateCreate } = useNoteTemplates()
   const [renaming, setRenaming] = useState<TemplateEntry | null>(null)
   const [deleting, setDeleting] = useState<TemplateEntry | null>(null)
@@ -52,7 +52,9 @@ export function TemplatesSection(): ReactElement {
               <li key={template.path} className="group flex items-center gap-2 px-3 py-2">
                 <button
                   type="button"
-                  onClick={() => navigate({ kind: 'note', path: template.path })}
+                  onClick={(event) =>
+                    navigateNoteLink({ kind: 'note', path: template.path }, event)
+                  }
                   className="min-w-0 flex-1 text-left"
                 >
                   <span className="block truncate text-sm text-text hover:text-accent">
