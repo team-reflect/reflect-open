@@ -72,11 +72,14 @@ export const activeSidebarWidthDrags = new Set<string>()
 /**
  * While a drag is live the cursor must read `col-resize` everywhere (pointer
  * capture routes events to the handle but does not pin the cursor) and text
- * selection must not paint across the panes the pointer sweeps.
+ * selection must not paint across the panes the pointer sweeps. The chrome is
+ * shared across handles: it follows {@link activeSidebarWidthDrags}, so
+ * ending one rail's drag while a second pointer still holds the other rail
+ * keeps it in place.
  */
-function setDragChrome(active: boolean): void {
+function syncDragChrome(): void {
   const style = document.documentElement.style
-  if (active) {
+  if (activeSidebarWidthDrags.size > 0) {
     style.setProperty('cursor', 'col-resize')
     style.setProperty('user-select', 'none')
     style.setProperty('-webkit-user-select', 'none')
@@ -183,7 +186,7 @@ export function useSidebarResize(panel: ResizableSidebarPanel): SidebarResize {
         activated: false,
       }
       activeSidebarWidthDrags.add(cssVariable)
-      setDragChrome(true)
+      syncDragChrome()
     },
     [renderedBaseWidth, cssVariable],
   )
@@ -215,7 +218,7 @@ export function useSidebarResize(panel: ResizableSidebarPanel): SidebarResize {
       }
       dragRef.current = null
       activeSidebarWidthDrags.delete(cssVariable)
-      setDragChrome(false)
+      syncDragChrome()
       // A never-activated press is a click, not a drag — commit nothing.
       if (drag.activated) {
         const next = widthAt(drag, event.clientX)
@@ -272,7 +275,7 @@ export function useSidebarResize(panel: ResizableSidebarPanel): SidebarResize {
     return () => {
       if (dragRef.current !== null) {
         activeSidebarWidthDrags.delete(cssVariable)
-        setDragChrome(false)
+        syncDragChrome()
         applyWidth(settingsWidthRef.current)
       }
     }

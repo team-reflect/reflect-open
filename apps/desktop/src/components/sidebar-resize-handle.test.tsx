@@ -163,6 +163,29 @@ describe('SidebarResizeHandle', () => {
     expect(rootVariable('cursor')).toBe('')
   })
 
+  it('keeps the drag chrome while another rail still drags', () => {
+    render(
+      <>
+        <SidebarResizeHandle panel="workspace" />
+        <SidebarResizeHandle panel="context" />
+      </>,
+    )
+    const [workspace, context] = screen.getAllByRole('separator')
+    if (!workspace || !context) {
+      throw new Error('handles missing')
+    }
+
+    firePointer(workspace, 'pointerdown', { pointerId: 1, button: 0, clientX: 300 })
+    firePointer(context, 'pointerdown', { pointerId: 2, button: 0, clientX: 700 })
+    firePointer(workspace, 'pointermove', { pointerId: 1, clientX: 340 })
+    firePointer(workspace, 'pointerup', { pointerId: 1, clientX: 340 })
+
+    expect(rootVariable('cursor')).toBe('col-resize')
+
+    firePointer(context, 'pointerup', { pointerId: 2, clientX: 700 })
+    expect(rootVariable('cursor')).toBe('')
+  })
+
   it('resets to the default width on double-click', () => {
     settingsState.settings.sidebarWidth = 333
     const handle = renderHandle('workspace')
