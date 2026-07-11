@@ -24,7 +24,7 @@ const editorProbe = vi.hoisted(() => ({
 }))
 
 vi.mock('@/editor/note-editor', async () => {
-  const { useEffect } = await import('react')
+  const { useEffect, useRef } = await import('react')
   return {
     NoteEditor: ({
       initialContent,
@@ -35,12 +35,17 @@ vi.mock('@/editor/note-editor', async () => {
       onChange: (markdown: string) => void
       handleRef?: (handle: NoteEditorHandle | null) => void
     }) => {
-      editorProbe.onChange = onChange
+      const markdownRef = useRef(initialContent)
+      editorProbe.onChange = (markdown) => {
+        markdownRef.current = markdown
+        onChange(markdown)
+      }
       useEffect(() => {
         handleRef?.({
-          setMarkdown: () => {},
-          getMarkdown: () => '',
-          commitPendingInput: () => null,
+          setMarkdown: (markdown) => {
+            markdownRef.current = markdown
+          },
+          getMarkdown: () => markdownRef.current,
           insertMarkdown: () => {},
           focus: () => editorProbe.focusCalls.push('focus'),
           setSelection: () => {},

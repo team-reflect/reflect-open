@@ -134,7 +134,13 @@ export function useNoteDocument(
             setSnapshot(next)
           },
           applyContent: (markdown) => editorRef.current?.setMarkdown(markdown),
-          commitPendingInput: () => editorRef.current?.commitPendingInput() ?? null,
+          reconcileEditorInput: () => {
+            // Meowdown 0.43.1 synchronously emits onDocChange only when this
+            // reconciliation changes the document. Discarding the always-
+            // returned snapshot avoids dirtying files whose serialization is
+            // merely normalized relative to their on-disk Markdown.
+            editorRef.current?.getMarkdown()
+          },
           onContent: coordinator ? coordinator.content : undefined,
           createIfMissing,
           missingSeed,
@@ -200,13 +206,13 @@ export function useNoteDocument(
 
   const bindEditor = useCallback((handle: NoteEditorHandle | null) => {
     if (handle === null) {
-      const pending = editorRef.current?.commitPendingInput()
-      if (pending !== undefined && pending !== null) {
-        binding.session()?.editorChanged(pending)
-      }
+      // React detaches this consumer ref while the child editor handle is
+      // still live. Reconcile before dropping it; onDocChange updates the
+      // current session synchronously only when pending input changed state.
+      editorRef.current?.getMarkdown()
     }
     editorRef.current = handle
-  }, [binding])
+  }, [])
 
   const keepMine = useCallback(() => {
     binding.session()?.keepMine()

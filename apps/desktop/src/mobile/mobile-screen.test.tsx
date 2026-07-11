@@ -55,7 +55,7 @@ const editorProbe = vi.hoisted(() => ({
 const hapticImpactLight = vi.hoisted(() => vi.fn())
 
 vi.mock('@/editor/note-editor', async () => {
-  const { useEffect } = await import('react')
+  const { useEffect, useRef } = await import('react')
   return {
     NoteEditor: ({
       initialContent,
@@ -66,11 +66,13 @@ vi.mock('@/editor/note-editor', async () => {
       onWikiLinkClick?: (target: string) => void
       handleRef?: (handle: import('@/editor/note-editor').NoteEditorHandle | null) => void
     }) => {
+      const markdownRef = useRef(initialContent)
       useEffect(() => {
         handleRef?.({
-          setMarkdown: () => {},
-          getMarkdown: () => '',
-          commitPendingInput: () => null,
+          setMarkdown: (markdown) => {
+            markdownRef.current = markdown
+          },
+          getMarkdown: () => markdownRef.current,
           insertMarkdown: () => {},
           focus: () => {
             editorProbe.focusCalls += 1

@@ -30,10 +30,6 @@ import {
 import { EditorInputTraits } from '@/editor/editor-input-traits'
 import { FormattingToolbarBridge } from '@/editor/formatting-toolbar-bridge'
 import {
-  commitPendingEditorInput,
-  settledEditorMarkdown,
-} from '@/editor/pending-editor-input'
-import {
   IMAGE_LIGHTBOX_TRANSITION_NAME,
   ImageLightbox,
   type LightboxImage,
@@ -62,19 +58,8 @@ import { cn } from '@/lib/utils'
 
 /** Imperative surface for note switching, reload, and save flushes. */
 export interface NoteEditorHandle {
-  /** Serialize the current document to markdown. */
+  /** Serialize the current, settled document to Markdown. */
   getMarkdown(): string
-  /**
-   * Reconcile native `contenteditable` input that has not reached the editor
-   * state yet. Returns the committed Markdown only when that reconciliation
-   * changed the document, otherwise `null`.
-   *
-   * Persistence calls this immediately before a flush. On WebKit, ending an
-   * emoji/IME composition and blurring can leave the visible DOM ahead of
-   * ProseMirror's state for one timer turn; saving the previous callback
-   * buffer in that window silently drops the composed text.
-   */
-  commitPendingInput(): string | null
   /** Replace the document (note switch / external reload). */
   setMarkdown(markdown: string): void
   /**
@@ -267,8 +252,7 @@ export function NoteEditor({
   useImperativeHandle(
     handleRef,
     (): NoteEditorHandle => ({
-      getMarkdown: () => settledEditorMarkdown(innerRef.current),
-      commitPendingInput: () => commitPendingEditorInput(innerRef.current),
+      getMarkdown: () => innerRef.current?.getMarkdown() ?? '',
       setMarkdown: (markdown) => innerRef.current?.setMarkdown(markdown),
       // meowdown ≥0.33 collapses an active selection itself, so an insert
       // can never delete selected text — plain delegation is the whole story.
@@ -288,7 +272,7 @@ export function NoteEditor({
   )
 
   const handleDocChange = useCallback(() => {
-    onChangeRef.current?.(settledEditorMarkdown(innerRef.current))
+    onChangeRef.current?.(innerRef.current?.getMarkdown() ?? '')
   }, [])
 
   const handleExitBoundary: ExitBoundaryHandler = useCallback(

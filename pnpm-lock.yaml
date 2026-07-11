@@ -34,11 +34,11 @@ importers:
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.7)
       '@meowdown/core':
-        specifier: ^0.43.0
-        version: 0.43.0(@shikijs/types@4.3.1)(@types/hast@3.0.4)(prosemirror-model@1.25.10)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.0)
+        specifier: ^0.43.1
+        version: 0.43.1(@shikijs/types@4.3.1)(@types/hast@3.0.4)(prosemirror-model@1.25.10)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.0)
       '@meowdown/react':
-        specifier: ^0.43.0
-        version: 0.43.0(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.3.1)(@types/hast@3.0.4)(@types/react@19.2.17)(date-fns@4.4.0)(prosemirror-model@1.25.10)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.0)(react-dom@19.2.7)(react@19.2.7)
+        specifier: ^0.43.1
+        version: 0.43.1(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.3.1)(@types/hast@3.0.4)(@types/react@19.2.17)(date-fns@4.4.0)(prosemirror-model@1.25.10)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.0)(react-dom@19.2.7)(react@19.2.7)
       '@reflect/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -1055,11 +1055,11 @@ packages:
   '@marijn/find-cluster-break@1.0.3':
     resolution: {integrity: sha512-FY+MKLBoTsLNJF/eLWaOsXGdz6uh3Iu1axjPf6TUq92IYumcTcXWHoS747JARLkcdlJ/Waiaxc5wQfFO8jC6NA==}
 
-  '@meowdown/core@0.43.0':
-    resolution: {integrity: sha512-XfELt9d6aSlOwVWkeqiqyWCLLU8+Cpgk2tZwzNNznu4cqqs0+MtVtnwK02SN9285pzzM//dlxyouhNPPx+rOAA==}
+  '@meowdown/core@0.43.1':
+    resolution: {integrity: sha512-6P59FpeEKbwNFNZ5y+X1Wf0jDOC285iDmskxSgsUKO8xEjDIJ1ON2OpjXacdcWKEhJB/1F1MonnuxS1oOsLnMw==}
 
-  '@meowdown/react@0.43.0':
-    resolution: {integrity: sha512-pnCZ9urPgwEWFQlTrcsFLL5CyTeskWeq9hkomRZ0zXlcd1ismK8rpAbiQr3gaOyIJIYXp0IA+fLZ1u2wHbrjKA==}
+  '@meowdown/react@0.43.1':
+    resolution: {integrity: sha512-lg2A7SqYnLcDPHFxFEHyvr/C6df/kSOcvL9j4dINxyFHAkC72EtTZigFhhmHA3tpyVnicydQL2tfO57cd4ukkA==}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
@@ -7173,7 +7173,7 @@ snapshots:
 
   '@marijn/find-cluster-break@1.0.3': {}
 
-  '@meowdown/core@0.43.0(@shikijs/types@4.3.1)(@types/hast@3.0.4)(prosemirror-model@1.25.10)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.0)':
+  '@meowdown/core@0.43.1(@shikijs/types@4.3.1)(@types/hast@3.0.4)(prosemirror-model@1.25.10)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.0)':
     dependencies:
       '@codemirror/language': 6.12.4
       '@codemirror/language-data': 6.5.2
@@ -7211,10 +7211,10 @@ snapshots:
       - y-prosemirror
       - yjs
 
-  '@meowdown/react@0.43.0(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.3.1)(@types/hast@3.0.4)(@types/react@19.2.17)(date-fns@4.4.0)(prosemirror-model@1.25.10)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.0)(react-dom@19.2.7)(react@19.2.7)':
+  '@meowdown/react@0.43.1(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.3.1)(@types/hast@3.0.4)(@types/react@19.2.17)(date-fns@4.4.0)(prosemirror-model@1.25.10)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.0)(react-dom@19.2.7)(react@19.2.7)':
     dependencies:
       '@base-ui/react': 1.6.0(@types/react@19.2.17)(date-fns@4.4.0)(react-dom@19.2.7)(react@19.2.7)
-      '@meowdown/core': 0.43.0(@shikijs/types@4.3.1)(@types/hast@3.0.4)(prosemirror-model@1.25.10)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.0)
+      '@meowdown/core': 0.43.1(@shikijs/types@4.3.1)(@types/hast@3.0.4)(prosemirror-model@1.25.10)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.0)
       '@ocavue/utils': 1.7.0
       '@prosekit/core': 0.13.0-beta.5(prosemirror-model@1.25.10)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)
       '@prosekit/pm': 0.1.19-beta.2

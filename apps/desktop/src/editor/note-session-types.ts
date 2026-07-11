@@ -79,11 +79,12 @@ export interface NoteSessionOptions {
    */
   applyContent: (markdown: string) => void
   /**
-   * Commit native editor input that has not reached the change callback yet.
-   * Returns Markdown only when the editor document changed. Every persistence
-   * flush invokes this before reading the session buffer.
+   * Ask the live editor to reconcile native input immediately before
+   * persistence. Meowdown synchronously emits `onDocChange` only when that
+   * reconciliation changes the document, which updates the session buffer
+   * without treating a normalized but unchanged snapshot as a user edit.
    */
-  commitPendingInput?: () => string | null
+  reconcileEditorInput?: () => void
   /**
    * Treat a missing file as an empty note on load instead of an error; the
    * file is then created by the first save — Plan 06's lazy daily-note
