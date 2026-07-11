@@ -1,10 +1,12 @@
 /**
  * The App Review demo key. App Store reviewers have no BYOK key, so this
  * sentinel (shared with Apple in the App Review notes; not a secret) makes
- * transcription produce a canned local transcript instead of calling any
- * provider. Only `memoNoteBody` in `actions/audio-memo` consults it: capture
- * and note plumbing run exactly as in production, and the network is never
- * touched.
+ * the app behave as if a real key was entered while never touching the
+ * network. Exactly two places consult it: `validateApiKey` accepts it without
+ * probing the provider (a real probe would 401 and block saving it), and
+ * `memoNoteBody` in `actions/audio-memo` returns a canned local transcript
+ * instead of calling any provider. Capture and note plumbing run exactly as
+ * in production.
  */
 export const APP_REVIEW_STUB_KEY = 'sk-demo-app-review'
 

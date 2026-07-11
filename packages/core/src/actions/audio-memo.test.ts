@@ -10,7 +10,7 @@ import {
   type ReconcileAudioMemosInput,
   type ReconcileStop,
 } from './audio-memo'
-import { APP_REVIEW_STUB_KEY } from './audio-memo-review-stub'
+import { APP_REVIEW_STUB_KEY } from '../ai/audio-memo-review-stub'
 import {
   listDir,
   listFiles,
