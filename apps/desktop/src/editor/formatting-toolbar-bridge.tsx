@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useEditor } from '@meowdown/react'
-import type { EditorExtension, TypedEditor } from '@meowdown/core'
+import type { EditorExtension } from '@meowdown/core'
 import { isTouchEditorSurface } from '@/lib/platform-surface'
 import {
   clearFormattingToolbar,
@@ -9,8 +9,6 @@ import {
   type FormattingToolbarCommands,
   type FormattingTriggerText,
 } from './formatting-toolbar-store'
-
-const CIRCLE_TASK_MARKER = '+'
 
 /**
  * Publishes this editor's formatting-toolbar surface while it holds focus
@@ -73,7 +71,7 @@ export function FormattingToolbarBridge(): null {
 
       const commands: FormattingToolbarCommands = {
         toggleBulletList: () => run(() => editor.commands.toggleList({ kind: 'bullet' })),
-        cycleCheckableList: () => run(() => cycleCheckableList(editor)),
+        cycleCheckableList: () => run(() => editor.commands.cycleCheckableList()),
         indent: () => run(() => editor.commands.indentList()),
         dedent: () => run(() => editor.commands.dedentList()),
         moveUp: () => run(() => editor.commands.moveList('up')),
@@ -129,36 +127,4 @@ export function FormattingToolbarBridge(): null {
   }, [editor])
 
   return null
-}
-
-/** Mirror V1's combined checklist/task button without changing checkbox state. */
-function cycleCheckableList(editor: TypedEditor): void {
-  if (isSquareChecklistAtSelection(editor)) {
-    editor.commands.wrapInCircleTask()
-  } else {
-    editor.commands.wrapInSquareTask()
-  }
-}
-
-function isSquareChecklistAtSelection(editor: TypedEditor): boolean {
-  const { $from } = editor.state.selection
-  for (let depth = $from.depth; depth > 0; depth -= 1) {
-    const node = $from.node(depth)
-    if (node.type.name === 'list') {
-      return isSquareChecklistAttrs(node.attrs)
-    }
-  }
-  return false
-}
-
-function isSquareChecklistAttrs(value: unknown): boolean {
-  if (
-    typeof value !== 'object' ||
-    value === null ||
-    !('kind' in value) ||
-    !('marker' in value)
-  ) {
-    return false
-  }
-  return value.kind === 'task' && value.marker !== CIRCLE_TASK_MARKER
 }
