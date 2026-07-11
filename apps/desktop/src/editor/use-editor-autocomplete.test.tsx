@@ -57,4 +57,23 @@ describe('useEditorAutocomplete', () => {
       'Couldn’t safely choose one note matching “Business ideas”. Choose the intended note from autocomplete.',
     )
   })
+
+  it('creates in the background without user-facing feedback on the happy path', async () => {
+    resolveOrCreateNoteWithTitle.mockResolvedValue({
+      kind: 'created',
+      path: 'notes/business-ideas.md',
+    })
+    const { result } = renderHook(() => useEditorAutocomplete())
+    const items = await result.current.onWikilinkSearch('Business ideas')
+
+    act(() => {
+      items[0]!.onSelect?.()
+    })
+
+    await waitFor(() =>
+      expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Business ideas', 7),
+    )
+    expect(startOperation).not.toHaveBeenCalled()
+    expect(operationFail).not.toHaveBeenCalled()
+  })
 })
