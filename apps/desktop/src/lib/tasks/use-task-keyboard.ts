@@ -3,10 +3,10 @@ import { type OpenTask } from '@reflect/core'
 import { taskKey } from '@/lib/tasks/task-identity'
 import {
   insertTargetForBucket,
+  insertTargetForTask,
   previousTaskKey,
   todaysDailyTarget,
 } from '@/lib/tasks/task-navigation'
-import { type InsertTaskTarget } from '@/lib/tasks/task-insert-target'
 import { type TaskActions } from '@/lib/tasks/use-task-actions'
 import { type TaskSelection } from '@/lib/tasks/use-task-selection'
 
@@ -118,18 +118,16 @@ export function useTaskKeyboard({
         return
       }
       const inSearch = target instanceof HTMLInputElement
-      // The note a Return-inserted task lands in (V1 group-based): the active row's
-      // group — Current → today's daily, a note → that note, Overdue/Upcoming refuse
-      // (`null`) — else, with nothing selected, today's daily. The pivot must still be
-      // *selected*: `activeKey()` keeps pointing at the last-touched row even after a
-      // ⌘-click deselects it (or all of them), so an unselected pivot falls to today.
-      const insertTarget = (): InsertTaskTarget | null => {
+      // Resolve the active row that Return pivots from. Breadcrumb context takes
+      // precedence and can always be continued structurally; otherwise the bucket
+      // decides whether insertion is available (Current/note yes, aggregate
+      // Overdue/Upcoming no). The pivot must still be selected: `activeKey()` keeps
+      // pointing at the last touched row after deselection, which falls back to today.
+      const activeTask = (): OpenTask | undefined => {
         const activeKey = selection.activeKey()
-        const active =
-          activeKey !== null && selection.selected.has(activeKey)
-            ? tasksByKey.get(activeKey)
-            : undefined
-        return active !== undefined ? insertTargetForBucket(active, today) : todaysDailyTarget(today)
+        return activeKey !== null && selection.selected.has(activeKey)
+          ? tasksByKey.get(activeKey)
+          : undefined
       }
       const selectExclusively = (key: string): void => {
         selection.clickSelect(key, { metaKey: false, ctrlKey: false, shiftKey: false })
@@ -164,9 +162,19 @@ export function useTaskKeyboard({
         // Skip while a write is in flight so a held/rapid Return can't append several
         // empty rows before the first insert's editor takes focus.
         event.preventDefault()
-        const target = insertTarget()
-        if (target !== null && !actions.isPending) {
-          void actions.insert(target).then((created) => {
+        const active = activeTask()
+        const taskTarget =
+          active === undefined
+            ? todaysDailyTarget(today)
+            : active.breadcrumbs.length > 0
+              ? insertTargetForTask(active)
+              : insertTargetForBucket(active, today)
+        if (taskTarget !== null && !actions.isPending) {
+          const insertion =
+            active !== undefined && active.breadcrumbs.length > 0
+              ? actions.insertAfter(active, null, taskTarget)
+              : actions.insert(taskTarget)
+          void insertion.then((created) => {
             if (created !== null) {
               selectExclusively(taskKey(created))
             }

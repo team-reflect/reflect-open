@@ -1,6 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { errorMessage, type OpenTask } from '@reflect/core'
+import { type TaskMarkerOffsetChange } from '@/lib/note-task'
 import { startOperation } from '@/lib/operations'
+import { withRelocatedTaskMarkers } from '@/lib/tasks/task-cache'
 import { sameTask } from '@/lib/tasks/task-identity'
 import { completedTasksQueryKey, tasksQueryKey } from '@/lib/tasks/tasks-query'
 import { useGraph } from '@/providers/graph-provider'
@@ -20,10 +22,13 @@ export interface TaskCacheWriter {
   /** Optimistically rewrite the open and completed lists at once. */
   patch: (open: TaskListPatch, completed: TaskListPatch) => void
   /**
-   * Append one optimistic open row (Return-to-add): idempotent by task identity,
-   * so a reindex refetch that already added the real row can't double-list it.
+   * Upsert one optimistic open row (Return-to-add) and remove the same identity
+   * from completed. Contextual callers relocate shifted source rows first so the
+   * new marker cannot collide with an existing cache identity.
    */
   addOpen: (task: OpenTask) => void
+  /** Re-key existing rows shifted by a contextual write, in both task caches. */
+  relocate: (notePath: string, changes: readonly TaskMarkerOffsetChange[]) => void
   /** Restore both lists from a snapshot and surface the failure once (single-write undo). */
   rollback: (captured: TaskCacheSnapshot | undefined, label: string, cause: unknown) => void
   /**
@@ -69,10 +74,17 @@ export function useTaskCacheWriter(): TaskCacheWriter {
   }
 
   const addOpen = (task: OpenTask): void => {
-    queryClient.setQueryData<OpenTask[]>(openKey, (rows) => {
-      const list = rows ?? []
-      return list.some((row) => sameTask(row, task)) ? list : [...list, task]
-    })
+    patch(
+      (rows) => [...(rows ?? []).filter((row) => !sameTask(row, task)), task],
+      (rows) => rows?.filter((row) => !sameTask(row, task)),
+    )
+  }
+
+  const relocate = (notePath: string, changes: readonly TaskMarkerOffsetChange[]): void => {
+    patch(
+      (rows) => withRelocatedTaskMarkers(rows, notePath, changes),
+      (rows) => withRelocatedTaskMarkers(rows, notePath, changes),
+    )
   }
 
   const rollback = (
@@ -95,5 +107,5 @@ export function useTaskCacheWriter(): TaskCacheWriter {
     startOperation(label).fail(errorMessage(cause))
   }
 
-  return { snapshot, patch, addOpen, rollback, reconcile }
+  return { snapshot, patch, addOpen, relocate, rollback, reconcile }
 }

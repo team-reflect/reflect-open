@@ -13,14 +13,19 @@ export interface InsertTaskTarget {
 }
 
 /** Build the optimistic open row for a just-written empty task. */
-export function insertedTaskRow(target: InsertTaskTarget, markerOffset: number): OpenTask {
+export function insertedTaskRow(
+  target: InsertTaskTarget,
+  markerOffset: number,
+  breadcrumbs: readonly string[] = [],
+  raw = '[ ] ',
+): OpenTask {
   return {
     notePath: target.notePath,
     markerOffset,
-    raw: '[ ] ',
+    raw,
     checked: false,
     text: '',
-    breadcrumbs: [],
+    breadcrumbs,
     noteTitle: target.noteTitle,
     dueDate: null,
     dailyDate: target.dailyDate,

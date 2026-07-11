@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { type OpenTask } from '@reflect/core'
-import { withCheckedMarker } from '@/lib/tasks/task-cache'
+import { type TaskMarkerOffsetChange } from '@/lib/note-task'
+import { withCheckedMarker, withRelocatedTaskMarkers } from '@/lib/tasks/task-cache'
 import { taskKey } from '@/lib/tasks/task-identity'
 
 /**
@@ -79,6 +80,28 @@ export function forgetRecentlyCompleted(root: string | null, keys: readonly stri
 /** Whether a task is currently being kept visible by the session's struck set. */
 export function hasRecentlyCompleted(root: string | null, key: string): boolean {
   return root === graphRoot && tasks.some((task) => taskKey(task) === key)
+}
+
+/**
+ * Apply a contextual note write's marker relocations to the session's struck
+ * rows. Unlike the query caches, this singleton is not rebuilt by an open-task
+ * refetch, so shifted completed rows must be re-keyed explicitly.
+ */
+export function relocateRecentlyCompleted(
+  root: string | null,
+  notePath: string,
+  changes: readonly TaskMarkerOffsetChange[],
+): void {
+  if (root !== graphRoot || changes.length === 0) {
+    return
+  }
+  const next = withRelocatedTaskMarkers(tasks, notePath, changes, {
+    matchUniqueRaw: true,
+  }) ?? tasks
+  if (next !== tasks) {
+    tasks = next
+    emit()
+  }
 }
 
 /**

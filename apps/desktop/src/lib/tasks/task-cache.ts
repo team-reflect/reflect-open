@@ -1,4 +1,5 @@
 import { parseNote, type OpenTask } from '@reflect/core'
+import { type TaskMarkerOffsetChange } from '@/lib/note-task'
 import { sameTask, taskKey } from '@/lib/tasks/task-identity'
 
 /**
@@ -18,6 +19,98 @@ export function withoutTasks(
   tasks: OpenTask[],
 ): OpenTask[] | undefined {
   return rows?.filter((row) => !tasks.some((task) => sameTask(row, task)))
+}
+
+function markerChangeForTask(
+  task: OpenTask,
+  changes: readonly TaskMarkerOffsetChange[],
+  matchUniqueRaw: boolean,
+): TaskMarkerOffsetChange | undefined {
+  const exact = changes.find(
+    (change) => change.from === task.markerOffset && change.fromRaw === task.raw,
+  )
+  if (exact !== undefined) {
+    return exact
+  }
+  if (!matchUniqueRaw) {
+    return undefined
+  }
+  const rawMatches = changes.filter((change) => change.fromRaw === task.raw)
+  return rawMatches.length === 1 ? rawMatches[0] : undefined
+}
+
+interface TaskMarkerRelocationOptions {
+  /** Relocate a stale offset when its raw marker has exactly one source match. */
+  readonly matchUniqueRaw?: boolean
+}
+
+interface TaskLineProjection {
+  readonly text: string
+  readonly dueDate: string | null
+}
+
+function taskLineProjection(raw: string): TaskLineProjection {
+  const projected = parseNote({ path: '', source: `+ ${raw}` }).tasks[0]
+  return {
+    text: projected?.text ?? '',
+    dueDate: projected?.dueDate ?? null,
+  }
+}
+
+/**
+ * Re-key cached rows after a contextual note write shifts marker offsets. Exact
+ * offset + raw identity is the default. A caller holding a stale shadow row can
+ * opt into unique-raw matching; query caches must not because their optimistic
+ * anchor edit may now share another task's original raw.
+ */
+export function withRelocatedTaskMarkers(
+  rows: OpenTask[] | undefined,
+  notePath: string,
+  changes: readonly TaskMarkerOffsetChange[],
+  options?: TaskMarkerRelocationOptions,
+): OpenTask[] | undefined
+export function withRelocatedTaskMarkers(
+  rows: readonly OpenTask[],
+  notePath: string,
+  changes: readonly TaskMarkerOffsetChange[],
+  options?: TaskMarkerRelocationOptions,
+): readonly OpenTask[]
+export function withRelocatedTaskMarkers(
+  rows: readonly OpenTask[] | undefined,
+  notePath: string,
+  changes: readonly TaskMarkerOffsetChange[],
+  options: TaskMarkerRelocationOptions = {},
+): readonly OpenTask[] | undefined {
+  if (rows === undefined || changes.length === 0) {
+    return rows
+  }
+  let changed = false
+  const relocated = rows.flatMap((task) => {
+    if (task.notePath !== notePath) {
+      return [task]
+    }
+    const change = markerChangeForTask(task, changes, options.matchUniqueRaw === true)
+    if (change === undefined) {
+      return [task]
+    }
+    const { marker } = change
+    if (marker === null) {
+      changed = true
+      return []
+    }
+    if (marker.markerOffset === task.markerOffset && marker.raw === task.raw) {
+      return [task]
+    }
+    changed = true
+    return [
+      {
+        ...task,
+        ...marker,
+        ...(marker.raw === task.raw ? {} : taskLineProjection(marker.raw)),
+      },
+    ]
+  })
+  return changed ? relocated : rows
 }
 
 /**
@@ -61,14 +154,15 @@ export function asOpen(rows: OpenTask[] | undefined, tasks: OpenTask[]): OpenTas
 /**
  * The `raw` line a task would have after an inline edit: the indexed line's exact
  * marker kept, the content after it replaced. The marker is taken verbatim from
- * `raw` (not rebuilt from `checked`), so GitHub's `[X]` survives — otherwise the
- * cached `raw` wouldn't match disk and a follow-up edit/delete's staleness guard
- * would fail until the reindex. Empty content clears to a bare marker, matching
- * the disk edit ({@link editTaskLine}).
+ * `raw` (not rebuilt from `checked`), so GitHub's `[X]` survives; a CRLF raw line
+ * likewise keeps its trailing carriage return. Otherwise a follow-up edit/delete
+ * would fail the staleness guard until reindexing. Empty content clears to a bare
+ * marker, matching the disk edit ({@link editTaskLine}).
  */
 export function taskRawWithContent(task: OpenTask, content: string): string {
   const marker = task.raw.slice(0, 3) // `[ ]` / `[x]` / `[X]` — raw always begins with it
-  return content === '' ? marker : `${marker} ${content}`
+  const carriageReturn = task.raw.endsWith('\r') ? '\r' : ''
+  return content === '' ? `${marker}${carriageReturn}` : `${marker} ${content}${carriageReturn}`
 }
 
 /**
@@ -78,7 +172,7 @@ export function taskRawWithContent(task: OpenTask, content: string): string {
  * reindex will store, not the raw markdown the editor produced.
  */
 function plainTextOfTaskLine(raw: string): string {
-  return parseNote({ path: '', source: `+ ${raw}` }).tasks[0]?.text ?? ''
+  return taskLineProjection(raw).text
 }
 
 /**

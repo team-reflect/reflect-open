@@ -1,7 +1,11 @@
 import { useCallback } from 'react'
 import { type OpenTask } from '@reflect/core'
 import { type TaskNavigate } from '@/components/tasks/task-editor'
-import { insertTargetForBucket, previousTaskKey } from '@/lib/tasks/task-navigation'
+import {
+  insertTargetForBucket,
+  insertTargetForTask,
+  previousTaskKey,
+} from '@/lib/tasks/task-navigation'
 import { taskKey } from '@/lib/tasks/task-identity'
 import { type TaskActions } from '@/lib/tasks/use-task-actions'
 import { type TaskSelection } from '@/lib/tasks/use-task-selection'
@@ -61,12 +65,16 @@ export function useTaskRowHandlers({
         selection.clear()
       },
       onEditContinue: (content) => {
-        // Enter: persist this row, add the next task into its group (V1 — Current
-        // → today's daily, a note → that note), and select it so its editor opens.
-        const target = insertTargetForBucket(task, today)
+        // Enter: persist this row, add the next task into its breadcrumb context
+        // when it has one (otherwise use V1's Current/note bucket target), and
+        // select the new row so its editor opens.
+        const target =
+          task.breadcrumbs.length > 0
+            ? insertTargetForTask(task)
+            : insertTargetForBucket(task, today)
         if (target === null) {
-          // Overdue/Upcoming aggregate many notes — V1 can't add there. Persist the
-          // edit (or delete an emptied row) and exit, never stranding the editor.
+          // An ungrouped Overdue/Upcoming bucket spans many notes, so V1 can't add
+          // there. Persist the edit (or delete an emptied row) and exit cleanly.
           if (content === '') {
             actions.remove([task])
           } else if (content !== null) {

@@ -3,6 +3,7 @@ import { parseNote } from './extract'
 import {
   appendBlock,
   appendTaskLine,
+  appendTaskToContext,
   appendUnderHeading,
   clearTaskDueDate,
   editTaskLine,
@@ -179,6 +180,11 @@ describe('editTaskLine', () => {
     expect(editTaskLine(source, indexedTask(source), 'really done')).toBe('+ [x] really done\n')
   })
 
+  it('preserves a CRLF line ending', () => {
+    const source = '+ [ ] old\r\n'
+    expect(editTaskLine(source, indexedTask(source), 'edited')).toBe('+ [ ] edited\r\n')
+  })
+
   it('keeps the indentation and bullet style of a nested item', () => {
     const source = '  + [ ] nested task\n'
     expect(editTaskLine(source, indexedTask(source), 'edited')).toBe('  + [ ] edited\n')
@@ -250,6 +256,69 @@ describe('appendTaskLine', () => {
     const tasks = parseNote({ path: 'n.md', source }).tasks
     expect(tasks).toHaveLength(1)
     expect(tasks[0]!.markerOffset).toBe(markerOffset)
+  })
+})
+
+describe('appendTaskToContext', () => {
+  it('adds a sibling at the end of a nested task context', () => {
+    const source = [
+      '+ StartupToolbox',
+      '  + Reflections',
+      '    + [ ] first',
+      '  + Later',
+      '    + [ ] third',
+      '',
+    ].join('\n')
+    const anchor = parseNote({ path: 'notes/n.md', source }).tasks[0]!
+    const inserted = appendTaskToContext(source, anchor)
+
+    expect(inserted.source).toBe([
+      '+ StartupToolbox',
+      '  + Reflections',
+      '    + [ ] first',
+      '    + [ ] ',
+      '  + Later',
+      '    + [ ] third',
+      '',
+    ].join('\n'))
+    const created = parseNote({ path: 'notes/n.md', source: inserted.source }).tasks.find(
+      (task) => task.markerOffset === inserted.markerOffset,
+    )
+    expect(created?.breadcrumbs).toEqual(['StartupToolbox', 'Reflections'])
+  })
+
+  it('appends after the selected context subtree without reparenting its children', () => {
+    const source = [
+      '+ Group',
+      '  + [ ] parent',
+      '    + [ ] child',
+      '  + [ ] peer',
+      '+ Other',
+      '',
+    ].join('\n')
+    const tasks = parseNote({ path: 'notes/n.md', source }).tasks
+    const inserted = appendTaskToContext(source, tasks[0]!)
+    const nextTasks = parseNote({ path: 'notes/n.md', source: inserted.source }).tasks
+
+    expect(nextTasks.map((task) => ({ text: task.text, breadcrumbs: task.breadcrumbs }))).toEqual([
+      { text: 'parent', breadcrumbs: ['Group'] },
+      { text: 'child', breadcrumbs: ['Group', 'parent'] },
+      { text: 'peer', breadcrumbs: ['Group'] },
+      { text: '', breadcrumbs: ['Group'] },
+    ])
+  })
+
+  it('refuses a task that is no longer nested under a parent list item', () => {
+    const source = '+ [ ] top-level\n'
+    const task = parseNote({ path: 'notes/n.md', source }).tasks[0]!
+    expect(() => appendTaskToContext(source, task)).toThrow(TaskStaleError)
+  })
+
+  it('preserves CRLF line endings around the inserted task', () => {
+    const source = '+ Group\r\n  + [ ] first\r\n'
+    const task = parseNote({ path: 'notes/n.md', source }).tasks[0]!
+    const inserted = appendTaskToContext(source, task)
+    expect(inserted.source).toBe('+ Group\r\n  + [ ] first\r\n  + [ ] \r\n')
   })
 })
 
