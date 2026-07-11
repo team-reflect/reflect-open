@@ -30,7 +30,7 @@ vi.mock('@/providers/graph-provider', () => ({
     mobileStorageKind: graphState.mobileStorageKind,
   }),
 }))
-vi.mock('@/hooks/use-app-version', () => ({ useAppVersion: () => '1.2.3' }))
+vi.mock('@/hooks/use-app-version', () => ({ useAppVersion: () => '1.2.3-beta.4' }))
 
 const settingsState = vi.hoisted(() => ({ current: {} as Settings }))
 const updateSettings = vi.hoisted(() => vi.fn())
