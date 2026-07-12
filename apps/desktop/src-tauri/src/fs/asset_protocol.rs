@@ -16,6 +16,9 @@
 //! commands — a request racing a graph switch is refused, never resolved
 //! against the new graph. The path must live under `assets/` and passes the
 //! shared symlink-aware traversal guard before any IO.
+//! Passive previews append `?reflect-preview=raster`; those responses are
+//! served only when byte sniffing identifies PNG, JPEG, GIF, or WebP content,
+//! so an SVG renamed with a raster extension cannot load subresources there.
 
 use std::borrow::Cow;
 
@@ -28,6 +31,7 @@ use super::GraphState;
 /// The scheme name, shared with the `lib.rs` registration. The frontend and
 /// the CSP `img-src` grant in `tauri.conf.json` spell it out literally.
 pub(crate) const SCHEME: &str = "reflect-asset";
+const PREVIEW_RASTER_QUERY: &str = "reflect-preview=raster";
 
 /// Protocol entry point (`register_asynchronous_uri_scheme_protocol`). Runs
 /// on the webview's calling thread — on WebKit, the app's main thread — so it
@@ -42,31 +46,53 @@ pub(crate) fn handle<R: Runtime>(
     let request_path = percent_encoding::percent_decode(&request.uri().path().as_bytes()[1..])
         .decode_utf8_lossy()
         .into_owned();
+    let preview_raster_only = requests_preview_raster(request.uri().query());
     let method_allowed = request.method() == tauri::http::Method::GET;
     tauri::async_runtime::spawn_blocking(move || {
         if !method_allowed {
             responder.respond(status_response(StatusCode::METHOD_NOT_ALLOWED));
             return;
         }
-        responder.respond(response_for(&app, &request_path));
+        responder.respond(response_for(&app, &request_path, preview_raster_only));
     });
 }
 
 fn response_for<R: Runtime>(
     app: &AppHandle<R>,
     request_path: &str,
+    preview_raster_only: bool,
 ) -> Response<Cow<'static, [u8]>> {
     match serve(app, request_path) {
-        Ok((mime, bytes)) => Response::builder()
-            .header(header::CONTENT_TYPE, mime)
-            .header(header::CONTENT_LENGTH, bytes.len())
-            .body(Cow::Owned(bytes))
-            .unwrap_or_else(|_| status_response(StatusCode::INTERNAL_SERVER_ERROR)),
+        Ok((mime, bytes)) => {
+            if preview_raster_only && !is_preview_safe_raster_mime(&mime) {
+                return status_response(StatusCode::UNSUPPORTED_MEDIA_TYPE);
+            }
+            Response::builder()
+                .header(header::CONTENT_TYPE, mime)
+                .header(header::CONTENT_LENGTH, bytes.len())
+                .body(Cow::Owned(bytes))
+                .unwrap_or_else(|_| status_response(StatusCode::INTERNAL_SERVER_ERROR))
+        }
         Err(status) => {
             tracing::warn!(path = request_path, %status, "asset protocol refused a request");
             status_response(status)
         }
     }
+}
+
+fn requests_preview_raster(query: Option<&str>) -> bool {
+    query.is_some_and(|query| {
+        query
+            .split('&')
+            .any(|parameter| parameter == PREVIEW_RASTER_QUERY)
+    })
+}
+
+fn is_preview_safe_raster_mime(mime: &str) -> bool {
+    matches!(
+        mime,
+        "image/png" | "image/jpeg" | "image/gif" | "image/webp"
+    )
 }
 
 fn status_response(status: StatusCode) -> Response<Cow<'static, [u8]>> {
@@ -154,5 +180,28 @@ mod tests {
             parse_request_path("3/assets/").unwrap_err(),
             StatusCode::FORBIDDEN,
         );
+    }
+
+    #[test]
+    fn recognizes_only_the_explicit_preview_raster_query() {
+        assert!(requests_preview_raster(Some("reflect-preview=raster")));
+        assert!(requests_preview_raster(Some(
+            "cache=1&reflect-preview=raster"
+        )));
+        assert!(!requests_preview_raster(None));
+        assert!(!requests_preview_raster(Some("reflect-preview=svg")));
+    }
+
+    #[test]
+    fn preview_raster_filter_uses_sniffed_content_not_the_filename() {
+        let disguised_svg = br#"<svg xmlns="http://www.w3.org/2000/svg"></svg>"#;
+        let svg_mime = MimeType::parse(disguised_svg, "assets/disguised.png");
+        assert_ne!(svg_mime, "image/png");
+        assert!(!is_preview_safe_raster_mime(&svg_mime));
+
+        let png_signature = b"\x89PNG\r\n\x1a\n";
+        let png_mime = MimeType::parse(png_signature, "assets/image.bin");
+        assert_eq!(png_mime, "image/png");
+        assert!(is_preview_safe_raster_mime(&png_mime));
     }
 }
