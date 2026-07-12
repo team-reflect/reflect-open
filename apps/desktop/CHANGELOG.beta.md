@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.6.0-beta.12](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.11...v0.6.0-beta.12) (2026-07-12)
+
+
+### Features
+
+* add backlink hover previews ([#768](https://github.com/team-reflect/reflect-open/issues/768)) ([16c8b4f](https://github.com/team-reflect/reflect-open/commit/16c8b4f7b8a5d952391f76a174431b6707604406))
+
+
+### Bug Fixes
+
+* keep notes with many backlinks responsive ([#767](https://github.com/team-reflect/reflect-open/issues/767)) ([4ec5a69](https://github.com/team-reflect/reflect-open/commit/4ec5a694001c7023182a06653c30febdd274465f))
+* **mobile:** show task context grouping ([#769](https://github.com/team-reflect/reflect-open/issues/769)) ([072f3f6](https://github.com/team-reflect/reflect-open/commit/072f3f6519fac652b5bb16a3d7beb7bf97a13f2a))
+* update meowdown to ^0.45.1 ([#759](https://github.com/team-reflect/reflect-open/issues/759)) ([6e0f159](https://github.com/team-reflect/reflect-open/commit/6e0f1593236dffcf3b8302cd898e4903c72a4762))
+* update meowdown to ^0.46.0 ([#766](https://github.com/team-reflect/reflect-open/issues/766)) ([a2edb38](https://github.com/team-reflect/reflect-open/commit/a2edb38deb2547df8566f378d4ffd62ee671609b))
+
 ## [0.6.0-beta.11](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.10...v0.6.0-beta.11) (2026-07-12)
 
 
