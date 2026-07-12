@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.0-beta.10](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.9...v0.6.0-beta.10) (2026-07-12)
+
+
+### Features
+
+* add GPT-5.6 models to AI chat ([#760](https://github.com/team-reflect/reflect-open/issues/760)) ([7fd7826](https://github.com/team-reflect/reflect-open/commit/7fd782627c9408b6aaac04357b7cc5ab53a9cf2c))
+
+
+### Bug Fixes
+
+* **desktop:** soften the sidebar resize handle hover ([#753](https://github.com/team-reflect/reflect-open/issues/753)) ([9a3b3ad](https://github.com/team-reflect/reflect-open/commit/9a3b3ad510e6d29d7336a8a5f4a322aff4335391))
+* scroll to the caret when it sits on a backlink ([#758](https://github.com/team-reflect/reflect-open/issues/758)) ([1b29144](https://github.com/team-reflect/reflect-open/commit/1b29144f1b981235fda47823738eba0c1e796472))
+
 ## [0.6.0-beta.9](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.8...v0.6.0-beta.9) (2026-07-11)
 
 
