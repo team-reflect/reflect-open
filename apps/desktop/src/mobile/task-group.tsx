@@ -1,6 +1,7 @@
-import { type ReactElement } from 'react'
+import { Fragment, type ReactElement } from 'react'
 import { Plus } from 'lucide-react'
-import type { OpenTask, TaskGroup } from '@reflect/core'
+import { groupTaskContexts, type OpenTask, type TaskGroup } from '@reflect/core'
+import { TaskBreadcrumbs } from '@/components/tasks/task-breadcrumbs'
 import { addTargetForGroup, taskGroupHeaderStyle } from '@/lib/tasks/task-group-presentation'
 import { taskKey } from '@/lib/tasks/task-identity'
 import type { InsertTaskTarget } from '@/lib/tasks/task-insert-target'
@@ -25,7 +26,8 @@ interface MobileTaskGroupProps {
  * bucket (Current/Overdue/Upcoming) or a note — with a task count (V1 mobile
  * showed counts on its groups) over the rows. A note group's header opens the
  * note; Current and note groups grow a "+" that adds a task there and opens
- * its quick-edit sheet.
+ * its quick-edit sheet. Consecutive tasks sharing an outline context render
+ * under the same read-only breadcrumb row, matching desktop's grouping.
  */
 export function MobileTaskGroup({
   group,
@@ -38,6 +40,7 @@ export function MobileTaskGroup({
   const { notePath } = group
   const { icon, colorClass } = taskGroupHeaderStyle(group)
   const addTarget = addTargetForGroup(group, today)
+  const contexts = groupTaskContexts(group.tasks)
 
   return (
     <section>
@@ -76,8 +79,21 @@ export function MobileTaskGroup({
         ) : null}
       </div>
       <ul className="flex flex-col">
-        {group.tasks.map((task) => (
-          <MobileTaskRow key={taskKey(task)} task={task} showSource={showSource} onEdit={onEdit} />
+        {contexts.map((context) => (
+          <Fragment key={taskKey(context.tasks[0]!)}>
+            <TaskBreadcrumbs
+              breadcrumbs={context.visibleBreadcrumbs}
+              className="px-4 pb-1 pt-3"
+            />
+            {context.tasks.map((task) => (
+              <MobileTaskRow
+                key={taskKey(task)}
+                task={task}
+                showSource={showSource}
+                onEdit={onEdit}
+              />
+            ))}
+          </Fragment>
         ))}
       </ul>
     </section>

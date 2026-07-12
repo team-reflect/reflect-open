@@ -71,8 +71,9 @@ markers in markdown, AI task extraction (later, over this projection), CLI
   derived projection data: `tasks.breadcrumbs` holds one JSON string array written
   and read only through `encodeTaskBreadcrumbs`/`decodeTaskBreadcrumbs` (mirrored by
   `write.rs`). Task search matches task text, note title, and breadcrumb labels.
-  Clicking a desktop breadcrumb selects exactly the rows it labels; mobile shares the
-  data and search but intentionally renders no context row.
+  Both desktop and mobile render the same context runs. Clicking a desktop breadcrumb
+  selects exactly the rows it labels; mobile renders the breadcrumb as a read-only
+  grouping label because its Tasks tab has no multi-select mode.
 - **Write-back is surgical and guarded.** Toggling from the Tasks view replaces
   exactly the three-character marker (`[ ]` ↔ `[x]`) at the indexed position **only
   if** the surrounding item text still matches what the index recorded. On mismatch

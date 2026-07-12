@@ -252,6 +252,32 @@ describe('MobileTasks', () => {
     view.unmount()
   })
 
+  it('renders one read-only breadcrumb per consecutive task context', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({ markerOffset: 2, text: 'first', breadcrumbs: ['Project', 'Release'] }),
+      task({ markerOffset: 20, text: 'second', breadcrumbs: ['Project', 'Release'] }),
+      task({ markerOffset: 40, text: 'third', breadcrumbs: ['Project', 'Later'] }),
+      task({ markerOffset: 60, text: 'fourth', breadcrumbs: ['Project', 'Release'] }),
+    ])
+    const view = renderScreen()
+
+    expect(await view.findAllByText('Project → Release')).toHaveLength(2)
+    expect(view.getAllByText('Project → Later')).toHaveLength(1)
+    expect(view.queryByRole('button', { name: 'Project → Release' })).toBeNull()
+    view.unmount()
+  })
+
+  it('hides a lone generic task breadcrumb', async () => {
+    getOpenTasks.mockResolvedValue([
+      task({ markerOffset: 2, text: 'project task', breadcrumbs: ['Tasks:'] }),
+    ])
+    const view = renderScreen()
+
+    await view.findByText('project task')
+    expect(view.queryByText('Tasks:')).toBeNull()
+    view.unmount()
+  })
+
   it('toggles a task from its checkbox and keeps it struck until archived', async () => {
     getOpenTasks.mockResolvedValue([task({ text: 'buy milk' })])
     const user = userEvent.setup()
