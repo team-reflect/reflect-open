@@ -353,23 +353,6 @@ describe('reconcileAudioMemos', () => {
     expect(transcribeMock).not.toHaveBeenCalled()
   })
 
-  it('does not finalize a memo while its category backlink is ambiguous', async () => {
-    listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
-    ensureBacklinkTargetMock.mockRejectedValue({
-      kind: 'unknown',
-      message: 'The [[Audio memos]] backlink matches multiple notes',
-    })
-
-    const outcome = await reconcile()
-
-    expect(outcome).toMatchObject({
-      transcribed: 0,
-      stopped: { reason: 'unknown', message: expect.stringContaining('matches multiple notes') },
-    })
-    expect(transcribeMock).not.toHaveBeenCalled()
-    expect(writeNoteMock).not.toHaveBeenCalled()
-  })
-
   it('a daily-note backlink without the note is a tombstone — deletion stays deleted', async () => {
     listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
     readNoteMock.mockResolvedValue(

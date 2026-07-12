@@ -37,15 +37,48 @@ describe('ensureBacklinkTarget', () => {
     await expect(ensureBacklinkTarget('Links', 3)).resolves.toBe('Links')
   })
 
-  it('refuses an ambiguous target instead of creating a terminal unresolved backlink', async () => {
+  it('uses the read-only wiki-link winner when duplicate targets already exist', async () => {
     resolveOrCreateMock.mockResolvedValue({
       kind: 'ambiguous',
-      paths: ['notes/links-2.md', 'notes/links.md'],
+      paths: ['notes/links.md', 'notes/links-2.md'],
     })
+
+    await expect(ensureBacklinkTarget('Links', 3)).resolves.toBe('Links')
+    expect(readNoteMock).toHaveBeenCalledWith('notes/links-2.md', 3)
+  })
+
+  it('links directly to the selected duplicate when its current title is unique', async () => {
+    resolveOrCreateMock.mockResolvedValue({
+      kind: 'ambiguous',
+      paths: ['notes/saved-links.md', 'notes/bookmarks.md'],
+    })
+    readNoteMock.mockResolvedValue('# Bookmarks\n')
+
+    await expect(ensureBacklinkTarget('Links', 3)).resolves.toBe('Bookmarks')
+    expect(readNoteMock).toHaveBeenCalledWith('notes/bookmarks.md', 3)
+  })
+
+  it('keeps a duplicate target retryable when the selected winner cannot be read', async () => {
+    resolveOrCreateMock.mockResolvedValue({
+      kind: 'ambiguous',
+      paths: ['notes/links.md', 'notes/links-2.md'],
+    })
+    readNoteMock.mockRejectedValue({ kind: 'io', message: 'not downloaded' })
+
+    await expect(ensureBacklinkTarget('Links', 3)).rejects.toMatchObject({
+      kind: 'io',
+      message: 'not downloaded',
+    })
+    expect(readNoteMock).toHaveBeenCalledTimes(1)
+    expect(readNoteMock).toHaveBeenCalledWith('notes/links-2.md', 3)
+  })
+
+  it('rejects an impossible ambiguous result without any target paths', async () => {
+    resolveOrCreateMock.mockResolvedValue({ kind: 'ambiguous', paths: [] })
 
     await expect(ensureBacklinkTarget('Links', 3)).rejects.toMatchObject({
       kind: 'unknown',
-      message: expect.stringContaining('matches multiple notes'),
+      message: expect.stringContaining('could not be resolved'),
     })
     expect(readNoteMock).not.toHaveBeenCalled()
   })
