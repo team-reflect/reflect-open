@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0-beta.13](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.12...v0.6.0-beta.13) (2026-07-12)
+
+
+### Bug Fixes
+
+* polish the backlink hover preview card design ([#771](https://github.com/team-reflect/reflect-open/issues/771)) ([0fceefe](https://github.com/team-reflect/reflect-open/commit/0fceefe1b79963305979871c5b506a7455037fe3))
+* update meowdown to ^0.47.0 ([#770](https://github.com/team-reflect/reflect-open/issues/770)) ([1369af4](https://github.com/team-reflect/reflect-open/commit/1369af4ba8be3f6bf9f21a696c3eb6454b358bbd))
+
 ## [0.6.0-beta.12](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.11...v0.6.0-beta.12) (2026-07-12)
 
 
