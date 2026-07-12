@@ -143,6 +143,18 @@ describe('mergeDateSuggestions', () => {
     expect(result.map((row) => row.target)).toEqual(['Today', '2020-01-01', 'Today Notes'])
   })
 
+  it('keeps an exact raw rich-title match above generated dates', () => {
+    const title = '3 days ago [[Trip]]'
+    const rankedRows = rankWikiSuggestions(title.toLowerCase(), [note(title)], [], 8)
+    const result = mergeDateSuggestions(
+      rankedRows,
+      [{ date: '2026-07-09', phrase: '3 days ago' }],
+      { key: title.toLowerCase(), limit: 8 },
+    )
+
+    expect(result.map((row) => row.target)).toEqual(['3 days ago Trip', '2026-07-09'])
+  })
+
   it('reuses an existing daily row (real path) and marks it generated once', () => {
     const existingDaily = ranked('2020-01-06', {
       target: '2020-01-06',

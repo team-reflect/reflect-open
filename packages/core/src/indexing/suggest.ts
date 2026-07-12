@@ -189,6 +189,7 @@ export function mergeDateSuggestions(
   const rest = ranked.filter((suggestion) => !reused.has(suggestion))
   const exactIndex = rest.findIndex(
     (suggestion) =>
+      foldKey(suggestion.title) === options.key ||
       foldKey(suggestion.target) === options.key ||
       (suggestion.alias !== null && foldKey(suggestion.alias) === options.key),
   )
