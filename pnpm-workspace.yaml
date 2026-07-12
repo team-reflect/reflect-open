@@ -19,6 +19,10 @@ minimumReleaseAgeExclude:
   - '@aria-ui/*'
   - prosemirror-flat-list
   - prosemirror-view
+  - '@floating-ui/core@1.8.0'
+  - '@floating-ui/dom@1.8.0'
+  - '@floating-ui/utils@0.2.12'
+  - prosemirror-model@1.25.11
 
 # overrides:
 #   '@meowdown/core': https://pkg.pr.new/prosekit/meowdown/@meowdown/core@623bc43
