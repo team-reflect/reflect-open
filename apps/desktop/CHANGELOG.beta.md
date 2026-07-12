@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0-beta.11](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.10...v0.6.0-beta.11) (2026-07-12)
+
+
+### Features
+
+* add Claude Sonnet 5 to AI chat ([#762](https://github.com/team-reflect/reflect-open/issues/762)) ([5e9f277](https://github.com/team-reflect/reflect-open/commit/5e9f277aa4db140b3a58e544d8072f9e2cb5cece))
+
 ## [0.6.0-beta.10](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.9...v0.6.0-beta.10) (2026-07-12)
 
 
