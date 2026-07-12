@@ -6,6 +6,7 @@ interface TaskBreadcrumbsProps {
   breadcrumbs: readonly string[]
   /** Select every task row sharing this outline context; omit on read-only surfaces. */
   onSelect?: () => void
+  /** Additional classes applied to the wrapper list item. */
   className?: string
 }
 
