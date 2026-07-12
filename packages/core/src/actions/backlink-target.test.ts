@@ -73,6 +73,16 @@ describe('ensureBacklinkTarget', () => {
     expect(readNoteMock).toHaveBeenCalledWith('notes/links-2.md', 3)
   })
 
+  it('keeps the requested spelling when a matching note is unavailable', async () => {
+    resolveOrCreateMock.mockResolvedValue({
+      kind: 'unavailable',
+      paths: ['notes/links.md'],
+    })
+
+    await expect(ensureBacklinkTarget('Links', 3)).resolves.toBe('Links')
+    expect(readNoteMock).not.toHaveBeenCalled()
+  })
+
   it('rejects an impossible ambiguous result without any target paths', async () => {
     resolveOrCreateMock.mockResolvedValue({ kind: 'ambiguous', paths: [] })
 

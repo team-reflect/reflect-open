@@ -188,6 +188,22 @@ describe('resolveOrCreateNoteWithTitle', () => {
     ).toBe(false)
   })
 
+  it('reuses an unindexed daily file instead of creating a regular date-titled note', async () => {
+    const invoke = bindBridge({
+      files: { 'daily/2026-06-09.md': 'Daily contents\n' },
+    })
+
+    await expect(resolveOrCreateNoteWithTitle('2026-06-09', 7)).resolves.toEqual({
+      kind: 'resolved',
+      path: 'daily/2026-06-09.md',
+    })
+    expect(invoke).toHaveBeenCalledWith('note_read', {
+      path: 'daily/2026-06-09.md',
+      generation: 7,
+    })
+    expect(invoke.mock.calls.some(([command]) => command === 'note_create')).toBe(false)
+  })
+
   it('refuses multiple indexed notes claiming the same exact title', async () => {
     const invoke = bindBridge({
       query: (sql, params) =>
@@ -342,7 +358,7 @@ describe('resolveOrCreateNoteWithTitle', () => {
     expect(invoke.mock.calls.some(([command]) => command === 'note_create')).toBe(false)
   })
 
-  it('blocks creation when the fallback is ambiguous or unreadable', async () => {
+  it('reports an unavailable slug-family member instead of mislabeling it ambiguous', async () => {
     const invoke = bindBridge({
       files: {
         'notes/business-ideas.md': '# 🧠 Business ideas\n',
@@ -352,12 +368,8 @@ describe('resolveOrCreateNoteWithTitle', () => {
     })
 
     await expect(resolveOrCreateNoteWithTitle('Business ideas', 7)).resolves.toEqual({
-      kind: 'ambiguous',
-      paths: [
-        'notes/business-ideas-2.md',
-        'notes/business-ideas-3.md',
-        'notes/business-ideas.md',
-      ],
+      kind: 'unavailable',
+      paths: ['notes/business-ideas-3.md'],
     })
     expect(invoke.mock.calls.some(([command]) => command === 'note_create')).toBe(false)
   })
@@ -378,8 +390,8 @@ describe('resolveOrCreateNoteWithTitle', () => {
     })
 
     await expect(resolveOrCreateNoteWithTitle('Business ideas', 7)).resolves.toEqual({
-      kind: 'ambiguous',
-      paths: ['notes/business-ideas-2.md', 'notes/business-ideas.md'],
+      kind: 'unavailable',
+      paths: ['notes/business-ideas-2.md'],
     })
     expect(invoke.mock.calls.some(([command]) => command === 'note_create')).toBe(false)
   })

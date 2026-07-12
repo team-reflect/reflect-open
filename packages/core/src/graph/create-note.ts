@@ -1,12 +1,12 @@
 import { ulid } from 'ulidx'
-import { findExactWikiTargetMatches } from '../indexing/queries'
-import { foldFallbackTitleKey, foldKey } from '../markdown/keys'
-import { parseNote } from '../markdown/extract'
 import { upsertFrontmatter } from '../markdown/frontmatter'
 import { slugForTitle } from '../markdown/slug'
-import { subjectAliases } from '../markdown/subject-aliases'
-import { createNoteIfAbsent, listFiles, readNote } from './commands'
-import { notePath, NOTES_DIR } from './paths'
+import { createNoteIfAbsent } from './commands'
+import { notePath } from './paths'
+import {
+  resolveExistingWikiTarget,
+  type ExistingWikiTargetResolution,
+} from './resolve-existing-wiki-target'
 
 /**
  * Note identity at creation (`docs/readable-filenames.md`): regular notes get
@@ -89,8 +89,9 @@ export type ResolveOrCreateNoteResult =
   | { readonly kind: 'resolved'; readonly path: string }
   | { readonly kind: 'created'; readonly path: string }
   | { readonly kind: 'ambiguous'; readonly paths: readonly string[] }
+  | { readonly kind: 'unavailable'; readonly paths: readonly string[] }
 
-type ExistingTitleResolution = Exclude<ResolveOrCreateNoteResult, { kind: 'created' }>
+type ExistingTitleResolution = Exclude<ExistingWikiTargetResolution, { kind: 'missing' }>
 
 /**
  * Claim the first free path in `slug`'s collision family (`slug.md`, then
@@ -130,192 +131,30 @@ async function claimNotePathForSlug(
   throw new Error(`no available note path for slug "${slug}" after ${MAX_CREATE_ATTEMPTS} attempts`)
 }
 
-interface DiskTitleMatch {
-  exactTitlePaths: string[]
-  exactAliasPaths: string[]
-  fallbackTitlePaths: string[]
-  fallbackAliasPaths: string[]
-  unreadablePaths: string[]
-}
-
-/**
- * Does `path` belong to the collision family for `slug` (`slug.md`,
- * `slug-2.md`, ...)? Limiting the fallback scan to this family keeps the
- * second-chance lookup cheap and avoids turning link navigation into a fuzzy
- * graph-wide title search.
- */
-function isSlugFamilyPath(path: string, slug: string): boolean {
-  // Derived from the same contract `notePath` builds with, so a directory
-  // rename can't silently turn the disk guard into an always-empty scan.
-  const prefix = `${NOTES_DIR}/`
-  const suffix = '.md'
-  if (!path.startsWith(prefix) || !path.endsWith(suffix)) {
-    return false
-  }
-  const stem = path.slice(prefix.length, -suffix.length)
-  if (stem === slug) {
-    return true
-  }
-  if (!stem.startsWith(`${slug}-`)) {
-    return false
-  }
-  return /^\d+$/.test(stem.slice(slug.length + 1))
-}
-
-/**
- * Inspect the title-derived filename family directly on disk. The index can
- * briefly lag a sync checkout; disk is therefore the final authority before a
- * missing-link click is allowed to mint a suffixed note.
- */
-async function matchTitleOnDisk(title: string, generation: number): Promise<DiskTitleMatch> {
-  const slug = slugForTitle(title)
-  const candidates = (await listFiles(generation))
-    .filter((file) => isSlugFamilyPath(file.path, slug))
-    .sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0))
-  const targetKey = foldKey(title)
-  const fallbackKey = foldFallbackTitleKey(title)
-  const exactTitlePaths: string[] = []
-  const exactAliasPaths: string[] = []
-  const fallbackTitlePaths: string[] = []
-  const fallbackAliasPaths: string[] = []
-  const unreadablePaths: string[] = []
-
-  for (const candidate of candidates) {
-    if (candidate.placeholder === true) {
-      unreadablePaths.push(candidate.path)
-      continue
-    }
-    let source: string
-    try {
-      source = await readNote(candidate.path, generation)
-    } catch {
-      // A disappearing or temporarily unreadable collision cannot be proven
-      // distinct. Blocking creation is safer than silently minting `-2`.
-      unreadablePaths.push(candidate.path)
-      continue
-    }
-    const parsed = parseNote({ path: candidate.path, source })
-    const aliases = [...parsed.frontmatter.aliases, ...subjectAliases(parsed.title)]
-    if (foldKey(parsed.title) === targetKey) {
-      exactTitlePaths.push(candidate.path)
-      continue
-    }
-    if (aliases.some((alias) => foldKey(alias) === targetKey)) {
-      exactAliasPaths.push(candidate.path)
-      continue
-    }
-    if (fallbackKey !== '' && foldFallbackTitleKey(parsed.title) === fallbackKey) {
-      fallbackTitlePaths.push(candidate.path)
-      continue
-    }
-    if (
-      fallbackKey !== '' &&
-      aliases.some((alias) => foldFallbackTitleKey(alias) === fallbackKey)
-    ) {
-      fallbackAliasPaths.push(candidate.path)
-    }
-  }
-
-  return {
-    exactTitlePaths,
-    exactAliasPaths,
-    fallbackTitlePaths,
-    fallbackAliasPaths,
-    unreadablePaths,
-  }
-}
-
-function resolutionForPaths(paths: readonly string[]): ExistingTitleResolution | null {
-  if (paths.length === 1) {
-    return { kind: 'resolved', path: paths[0]! }
-  }
-  if (paths.length > 1) {
-    return { kind: 'ambiguous', paths: [...paths].sort() }
-  }
-  return null
-}
-
-async function indexedTargetResolution(
-  title: string,
-): Promise<ExistingTitleResolution | null> {
-  const match = await findExactWikiTargetMatches(title)
-  return resolutionForPaths(match.paths)
-}
-
-function diskTitleResolution(disk: DiskTitleMatch): ExistingTitleResolution | null {
-  // An unreadable candidate could claim any higher-precedence spelling. Do
-  // not choose a readable sibling until the whole collision family is known.
-  if (disk.unreadablePaths.length > 0) {
-    return {
-      kind: 'ambiguous',
-      paths: [
-        ...new Set([
-          ...disk.exactTitlePaths,
-          ...disk.exactAliasPaths,
-          ...disk.fallbackTitlePaths,
-          ...disk.fallbackAliasPaths,
-          ...disk.unreadablePaths,
-        ]),
-      ].sort(),
-    }
-  }
-
-  // Mirror indexed wiki resolution: an exact title outranks an exact alias.
-  // Only after both exact tiers miss do the conservative fallback tiers run,
-  // again preferring a title to an alias.
-  for (const paths of [
-    disk.exactTitlePaths,
-    disk.exactAliasPaths,
-    disk.fallbackTitlePaths,
-    disk.fallbackAliasPaths,
-  ]) {
-    const resolution = resolutionForPaths(paths)
-    if (resolution !== null) {
-      return resolution
-    }
-  }
-  return null
-}
-
 /**
  * Resolve a wiki-link title while guarding its title-derived creation path
  * against a stale per-device index.
  *
- * A unique exact index match wins; multiple indexed claims are ambiguous. On
- * a miss, the title's on-disk slug family is parsed with the same precedence
- * (title before alias), then the conservative leading-emoji fallback. A tier is
- * accepted only when exactly one file claims it; multiple or unreadable
- * candidates are ambiguous and no file is written. The index is queried once
- * more immediately before creation. The native path claim is atomic and
- * no-clobber; if it loses to a concurrent sync checkout or creator, the winner
- * is resolved before trying a suffix.
+ * Delegates the read-only decision to {@link resolveExistingWikiTarget}, so
+ * date/title/alias precedence, ambiguity, unavailable files, the bounded disk
+ * fallback, and the final index race check have one implementation. Only a
+ * genuine `missing` result reaches the atomic no-clobber claim. If that claim
+ * loses to a concurrent sync checkout or creator, the winner is resolved
+ * before any suffix is tried.
  */
 export async function resolveOrCreateNoteWithTitle(
   title: string,
   generation: number,
 ): Promise<ResolveOrCreateNoteResult> {
-  const indexed = await indexedTargetResolution(title)
-  if (indexed !== null) {
-    return indexed
-  }
-
-  const diskResolution = diskTitleResolution(await matchTitleOnDisk(title, generation))
-  if (diskResolution !== null) {
-    return diskResolution
-  }
-
-  const reResolved = await indexedTargetResolution(title)
-  if (reResolved !== null) {
-    return reResolved
+  const existing = await resolveExistingWikiTarget(title, generation)
+  if (existing.kind !== 'missing') {
+    return existing
   }
 
   // On a lost claim, re-resolve both projections before considering a
   // suffix: the winner may be the note this link meant.
   return claimNotePathForSlug(slugForTitle(title), newNoteSource(title), generation, async () => {
-    const collisionIndex = await indexedTargetResolution(title)
-    if (collisionIndex !== null) {
-      return collisionIndex
-    }
-    return diskTitleResolution(await matchTitleOnDisk(title, generation))
+    const collisionResolution = await resolveExistingWikiTarget(title, generation)
+    return collisionResolution.kind === 'missing' ? null : collisionResolution
   })
 }

@@ -145,6 +145,10 @@ export {
   type ResolveOrCreateNoteResult,
 } from '../graph/create-note'
 export {
+  resolveExistingWikiTarget,
+  type ExistingWikiTargetResolution,
+} from '../graph/resolve-existing-wiki-target'
+export {
   settingsSchema,
   editorMarkdownSyntaxSchema,
   editorSpellCheckSchema,
