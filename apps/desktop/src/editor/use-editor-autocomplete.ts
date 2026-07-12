@@ -55,13 +55,17 @@ export function useEditorAutocomplete(): EditorAutocomplete {
 
   // The `[[` autocomplete's create row: re-resolve and inspect the title's
   // on-disk slug family before creating. The menu inserts the link text either
-  // way; an ambiguous or failed create simply leaves it unresolved.
+  // way; an ambiguous, unavailable, or failed create leaves it unresolved.
   const resolveOrCreateFromAutocomplete = useCallback(
     async (title: string) => {
       if (generation !== null) {
         const outcome = await resolveOrCreateNoteWithTitle(title, generation)
         if (outcome.kind === 'ambiguous') {
           reportAmbiguousNoteTitle('Creating note', title)
+        } else if (outcome.kind === 'unavailable') {
+          startOperation('Creating note').fail(
+            `Couldn’t create “${title}” while a potentially matching note is unavailable. Try again when it is available on this device.`,
+          )
         }
       }
     },

@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import {
   errorMessage,
   normalizeWikiTarget,
+  resolveExistingWikiTarget,
   resolveOrCreateNoteWithTitle,
   resolveWikiTarget,
 } from '@reflect/core'
@@ -10,6 +11,12 @@ import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { startOperation } from '@/lib/operations'
 import { useLinkIntentGuard } from '@/lib/windows/use-link-intent-guard'
 import { routeForPath, type NoteRoute } from '@/routing/route'
+
+function reportUnavailableNoteTitle(title: string): void {
+  startOperation('Opening link').fail(
+    `Couldn’t open “${title}” because a matching note is currently unavailable. Try again when it is available on this device.`,
+  )
+}
 
 /**
  * Navigation for a clicked `[[wiki link]]`. Calendar-valid ISO dates preserve
@@ -55,15 +62,32 @@ export function useWikiLinkNavigation(
             return
           }
           if (normalized.date !== undefined) {
-            const resolution = await resolveWikiTarget(normalized.raw)
+            if (generation === null) {
+              const resolution = await resolveWikiTarget(normalized.raw)
+              if (isStale()) {
+                return
+              }
+              open(
+                resolution.kind === 'resolved'
+                  ? routeForPath(resolution.ref)
+                  : { kind: 'daily', date: normalized.date },
+              )
+              return
+            }
+
+            const resolution = await resolveExistingWikiTarget(normalized.raw, generation)
             if (isStale()) {
               return
             }
-            open(
-              resolution.kind === 'resolved'
-                ? routeForPath(resolution.ref)
-                : { kind: 'daily', date: normalized.date },
-            )
+            if (resolution.kind === 'resolved') {
+              open(routeForPath(resolution.path))
+            } else if (resolution.kind === 'missing') {
+              open({ kind: 'daily', date: normalized.date })
+            } else if (resolution.kind === 'ambiguous') {
+              reportAmbiguousNoteTitle('Opening link', normalized.raw)
+            } else {
+              reportUnavailableNoteTitle(normalized.raw)
+            }
             return
           }
           if (generation !== null) {
@@ -73,6 +97,8 @@ export function useWikiLinkNavigation(
             }
             if (outcome.kind === 'ambiguous') {
               reportAmbiguousNoteTitle('Opening link', normalized.raw)
+            } else if (outcome.kind === 'unavailable') {
+              reportUnavailableNoteTitle(normalized.raw)
             } else {
               open(routeForPath(outcome.path))
             }

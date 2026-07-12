@@ -58,6 +58,27 @@ describe('useEditorAutocomplete', () => {
     )
   })
 
+  it('reports an unavailable background create distinctly from ambiguity', async () => {
+    resolveOrCreateNoteWithTitle.mockResolvedValue({
+      kind: 'unavailable',
+      paths: ['notes/business-ideas.md'],
+    })
+    const { result } = renderHook(() => useEditorAutocomplete())
+    const items = await result.current.onWikilinkSearch('Business ideas')
+
+    act(() => {
+      items[0]!.onSelect?.()
+    })
+
+    await waitFor(() =>
+      expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Business ideas', 7),
+    )
+    expect(startOperation).toHaveBeenCalledWith('Creating note')
+    expect(operationFail).toHaveBeenCalledWith(
+      'Couldn’t create “Business ideas” while a potentially matching note is unavailable. Try again when it is available on this device.',
+    )
+  })
+
   it('surfaces a failed background create instead of silently doing nothing', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     resolveOrCreateNoteWithTitle.mockRejectedValue(new Error('graph changed'))

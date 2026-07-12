@@ -5,6 +5,7 @@ import { RouterProvider, useRouter } from '@/routing/router'
 import { useWikiLinkNavigation } from './use-wiki-link-navigation'
 
 const resolveWikiTarget = vi.hoisted(() => vi.fn())
+const resolveExistingWikiTarget = vi.hoisted(() => vi.fn())
 const resolveOrCreateNoteWithTitle = vi.hoisted(() => vi.fn())
 const openRouteInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
 const operationFail = vi.hoisted(() => vi.fn())
@@ -12,6 +13,7 @@ const startOperation = vi.hoisted(() => vi.fn(() => ({ fail: operationFail })))
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   resolveWikiTarget,
+  resolveExistingWikiTarget,
   resolveOrCreateNoteWithTitle,
 }))
 vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
@@ -53,6 +55,7 @@ function currentRoute(view: ReturnType<typeof renderHost>): string {
 
 beforeEach(() => {
   resolveWikiTarget.mockReset()
+  resolveExistingWikiTarget.mockReset()
   resolveOrCreateNoteWithTitle.mockReset()
   openRouteInNewWindow.mockReset()
   openRouteInNewWindow.mockResolvedValue(true)
@@ -89,24 +92,74 @@ describe('useWikiLinkNavigation', () => {
   })
 
   it('treats an unresolved ISO date as a daily target, without a focus intent', async () => {
-    resolveWikiTarget.mockResolvedValue({ kind: 'unresolved', text: '2026-06-09' })
+    resolveExistingWikiTarget.mockResolvedValue({ kind: 'missing' })
     const view = renderHost()
     lastHandler?.('2026-06-09')
     await waitFor(() => expect(currentRoute(view)).toContain('"daily"'))
     expect(currentRoute(view)).toContain('2026-06-09')
     expect(view.getByTestId('route').getAttribute('data-focus')).toBe('false')
     expect(resolveOrCreateNoteWithTitle).not.toHaveBeenCalled()
+    expect(resolveExistingWikiTarget).toHaveBeenCalledWith('2026-06-09', 1)
+    expect(resolveWikiTarget).not.toHaveBeenCalled()
     view.unmount()
   })
 
   it('preserves an existing regular note titled as an ISO date', async () => {
-    resolveWikiTarget.mockResolvedValue({ kind: 'resolved', ref: 'notes/2026-06-09.md' })
+    resolveExistingWikiTarget.mockResolvedValue({
+      kind: 'resolved',
+      path: 'notes/2026-06-09.md',
+    })
     const view = renderHost()
 
     lastHandler?.('2026-06-09')
 
     await waitFor(() => expect(currentRoute(view)).toContain('"note"'))
     expect(currentRoute(view)).toContain('notes/2026-06-09.md')
+    view.unmount()
+  })
+
+  it('retains read-only index resolution for ISO dates without a graph generation', async () => {
+    resolveWikiTarget.mockResolvedValue({ kind: 'resolved', ref: 'notes/2026-06-09.md' })
+    const view = renderHost(null)
+
+    lastHandler?.('2026-06-09')
+
+    await waitFor(() => expect(currentRoute(view)).toContain('notes/2026-06-09.md'))
+    expect(resolveWikiTarget).toHaveBeenCalledWith('2026-06-09')
+    expect(resolveExistingWikiTarget).not.toHaveBeenCalled()
+    view.unmount()
+  })
+
+  it('does not choose between ambiguous ISO-date targets', async () => {
+    resolveExistingWikiTarget.mockResolvedValue({
+      kind: 'ambiguous',
+      paths: ['daily/2026-06-09.md', 'daily/2026-06-09-2.md'],
+    })
+    const view = renderHost()
+
+    lastHandler?.('2026-06-09')
+
+    await waitFor(() => expect(operationFail).toHaveBeenCalled())
+    expect(currentRoute(view)).toContain('"today"')
+    expect(resolveOrCreateNoteWithTitle).not.toHaveBeenCalled()
+    view.unmount()
+  })
+
+  it('does not turn an unavailable ISO-date target into a lazy daily route', async () => {
+    resolveExistingWikiTarget.mockResolvedValue({
+      kind: 'unavailable',
+      paths: ['daily/2026-06-09.md'],
+    })
+    const view = renderHost()
+
+    lastHandler?.('2026-06-09')
+
+    await waitFor(() =>
+      expect(operationFail).toHaveBeenCalledWith(
+        expect.stringContaining('currently unavailable'),
+      ),
+    )
+    expect(currentRoute(view)).toContain('"today"')
     view.unmount()
   })
 
@@ -200,6 +253,25 @@ describe('useWikiLinkNavigation', () => {
     expect(operationFail).toHaveBeenCalledWith(
       'Couldn’t safely choose one note matching “Business ideas”. Rename conflicting notes or wait for unavailable notes to become available, then try again.',
     )
+    view.unmount()
+  })
+
+  it('does not navigate or create when a matching title is unavailable', async () => {
+    resolveOrCreateNoteWithTitle.mockResolvedValue({
+      kind: 'unavailable',
+      paths: ['notes/business-ideas.md'],
+    })
+    const view = renderHost(7)
+
+    lastHandler?.('Business ideas')
+
+    await waitFor(() =>
+      expect(operationFail).toHaveBeenCalledWith(
+        expect.stringContaining('currently unavailable'),
+      ),
+    )
+    expect(currentRoute(view)).toContain('"today"')
+    expect(resolveWikiTarget).not.toHaveBeenCalled()
     view.unmount()
   })
 
