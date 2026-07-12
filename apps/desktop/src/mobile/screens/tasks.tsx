@@ -149,7 +149,7 @@ export function MobileTasks(): ReactElement {
           placeholder="Search tasks…"
           aria-label="Search tasks"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onValueChange={setQuery}
         />
         {recentlyCompleted.length > 0 ? (
           <Button

@@ -725,10 +725,17 @@ describe('MobileTasks', () => {
     const view = renderScreen()
 
     await view.findByText('buy milk')
-    await user.type(view.getByRole('searchbox', { name: 'Search tasks' }), 'milk')
+    const search = view.getByRole('searchbox', { name: 'Search tasks' })
+    await user.type(search, 'milk')
 
     await waitFor(() => expect(view.queryByText('call mum')).toBeNull())
     view.getByText('buy milk')
+
+    await user.click(view.getByRole('button', { name: 'Clear search' }))
+
+    expect((search as HTMLInputElement).value).toBe('')
+    expect(document.activeElement).toBe(search)
+    await view.findByText('call mum')
     view.unmount()
   })
 

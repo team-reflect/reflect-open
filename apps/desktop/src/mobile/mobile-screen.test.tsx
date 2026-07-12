@@ -660,6 +660,7 @@ describe('MobileShell', () => {
   })
 
   it('renders a search entry as the All tab with the query seeded', async () => {
+    const user = userEvent.setup()
     const view = mount({ kind: 'search', query: 'meeting' })
 
     const box = view.getByRole('searchbox', { name: 'Search notes' })
@@ -667,6 +668,11 @@ describe('MobileShell', () => {
       expect((box as HTMLInputElement).value).toBe('meeting')
     })
     expect(view.getByRole('button', { name: 'All' }).getAttribute('aria-current')).toBe('page')
+
+    await user.click(view.getByRole('button', { name: 'Clear search' }))
+
+    expect((box as HTMLInputElement).value).toBe('')
+    expect(view.queryByRole('button', { name: 'Clear search' })).toBeNull()
   })
 
   it('back from a cold note entry lands on today', async () => {

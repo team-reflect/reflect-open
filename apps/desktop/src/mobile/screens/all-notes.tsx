@@ -145,7 +145,7 @@ export function MobileAllNotes({
             placeholder="Search anything…"
             aria-label="Search notes"
             value={query}
-            onChange={(event) => onQueryChange(event.target.value)}
+            onValueChange={onQueryChange}
           />
         </div>
         {pending !== null ? (

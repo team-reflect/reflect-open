@@ -3,8 +3,8 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { hasBridge, parseSearchQuery, searchWithFilters } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
-import { Input } from '@/components/ui/input'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
+import { SearchInput } from '@/mobile/search-input'
 import { useGraph } from '@/providers/graph-provider'
 import type { NoteFilterRef } from './filter-state'
 
@@ -63,14 +63,11 @@ export function NotePickerDrawer({
     <Drawer open={open} onOpenChange={setOpen}>
       <DrawerContent>
         <DrawerTitle>{title}</DrawerTitle>
-        <Input
-          type="search"
-          inputMode="search"
+        <SearchInput
           placeholder="Find a note…"
           aria-label="Find a note"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          className="text-base"
+          onValueChange={setQuery}
         />
         <div className="min-h-0 flex-1 overflow-y-auto">
           {hits !== undefined && hits.length === 0 && (
