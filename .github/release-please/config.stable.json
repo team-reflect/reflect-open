@@ -1,14 +1,23 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/v17.10.3/schemas/config.json",
-  "release-type": "node",
+  "release-type": "simple",
   "include-component-in-tag": false,
   "bump-minor-pre-major": true,
   "draft": true,
   "force-tag-creation": true,
   "always-update": true,
   "packages": {
-    "apps/desktop": {
-      "package-name": "reflect-open"
+    ".": {
+      "package-name": "reflect-open",
+      "changelog-path": "apps/desktop/CHANGELOG.md",
+      "exclude-paths": ["docs", "fixtures", ".github", "apps/extension"],
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "apps/desktop/package.json",
+          "jsonpath": "$.version"
+        }
+      ]
     }
   }
 }

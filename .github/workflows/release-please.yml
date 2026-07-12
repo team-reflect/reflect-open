@@ -22,12 +22,12 @@ jobs:
   release-please:
     name: Maintain the Release PR
     runs-on: ubuntu-latest
-    # `release_created` and `tag_name` are root-package outputs; our package
-    # lives at apps/desktop, so its outputs carry the `apps/desktop--` prefix
-    # and the global `releases_created` reports whether any release exists.
+    # The package lives at the repo root ("."), so release-please emits its
+    # outputs without a path prefix; the global `releases_created` reports
+    # whether any release exists.
     outputs:
       release_created: ${{ steps.release.outputs.releases_created }}
-      tag_name: ${{ steps.release.outputs['apps/desktop--tag_name'] }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - name: Pick the channel config for this branch
         id: channel
@@ -114,12 +114,12 @@ jobs:
           # compare of the X.Y.Z bases, with a same-base prerelease (-beta.N)
           # behind its own release.
           manifest=.github/release-please/manifest.beta.json
-          current="$(git show "origin/next:$manifest" | jq -r '."apps/desktop"')"
+          current="$(git show "origin/next:$manifest" | jq -r '."."')"
           base="${current%%-*}"
           lower="$(printf '%s\n%s\n' "$base" "$version" | sort -t . -k 1,1n -k 2,2n -k 3,3n | head -1)"
           if { [ "$base" != "$version" ] && [ "$lower" = "$base" ]; } ||
             { [ "$base" = "$version" ] && [ "$current" != "$base" ]; }; then
-            jq --arg v "$version" '."apps/desktop" = $v' "$manifest" > "$manifest.tmp"
+            jq --arg v "$version" '."." = $v' "$manifest" > "$manifest.tmp"
             mv "$manifest.tmp" "$manifest"
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
