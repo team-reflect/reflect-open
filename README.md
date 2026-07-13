@@ -40,9 +40,12 @@ another git remote are connected directly by the user.
 
 ## Install
 
-1. **Install the Mac app.** Download the latest macOS DMG from
-   [Releases](https://github.com/team-reflect/reflect-open/releases/latest).
-   The app is signed, notarized, and auto-updated from GitHub Releases.
+1. **Install the Mac app.** Download the latest release for your Mac:
+   - **Stable:** [Apple silicon (M-series)](https://github.com/team-reflect/reflect-open/releases/latest/download/Reflect_aarch64.dmg) · [Intel](https://github.com/team-reflect/reflect-open/releases/latest/download/Reflect_x86_64.dmg)
+   - **Beta:** [Apple silicon (M-series)](https://github.com/team-reflect/reflect-open/releases/download/updater-beta/Reflect.Beta_aarch64.dmg) · [Intel](https://github.com/team-reflect/reflect-open/releases/download/updater-beta/Reflect.Beta_x86_64.dmg)
+
+   Each build is signed, notarized, and auto-updated from GitHub Releases. You
+   can also [view all releases](https://github.com/team-reflect/reflect-open/releases).
 2. **Install the iOS beta.** Join
    [TestFlight](https://testflight.apple.com/join/j2eEz43d). The iOS app uses
    the same plain-file graph and sync options as the Mac app.
