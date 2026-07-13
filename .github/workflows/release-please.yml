@@ -43,6 +43,11 @@ jobs:
           echo "config=.github/release-please/config.${channel}.json" >> "$GITHUB_OUTPUT"
           echo "manifest=.github/release-please/manifest.${channel}.json" >> "$GITHUB_OUTPUT"
 
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
       # A stable promotion is a deliberately narrow path: it must be the merge
       # commit of the managed promotion PR. Squash/rebase would leave next and
       # master with unrelated histories, so reject it before touching releases.
@@ -217,7 +222,8 @@ jobs:
             exit 1
           fi
 
-          if release_details="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${expected_tag}" 2>/dev/null)"; then
+          release_details="$(bash apps/desktop/scripts/find-github-release.sh "$expected_tag")"
+          if [ "$release_details" != "null" ]; then
             if ! jq -e \
               --arg commit "$stable_commit" \
               --arg tag "$expected_tag" \
@@ -279,12 +285,6 @@ jobs:
       # The action's release-as input is not forwarded in manifest mode. Use
       # the lockfile-pinned matching CLI for the fresh promotion PR so a beta's
       # stable base (including a major version) is exact.
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        if: steps.promotion_state.outputs.phase == 'fresh'
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
         if: steps.promotion_state.outputs.phase == 'fresh'
 
@@ -571,52 +571,57 @@ jobs:
             elif [ "$FIRST_RELEASE_CREATED" = "true" ]; then
               release_created=true
               tag_name="$FIRST_TAG_NAME"
-            elif [ -n "$stable_commit" ] && \
-              release_details="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${expected_tag}" 2>/dev/null)"; then
-              if ! jq -e \
-                --arg commit "$stable_commit" \
-                --arg tag "$expected_tag" \
-                '.tag_name == $tag and
-                  .target_commitish == $commit and
-                  .prerelease == false and
-                  ((.draft == true and .published_at == null) or
-                   (.draft == false and .published_at != null))' \
-                <<< "$release_details" > /dev/null; then
-                echo "::error::existing ${expected_tag} release does not match generated stable commit ${stable_commit}"
-                exit 1
-              fi
-              tag_details="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${expected_tag}")"
-              if ! jq -e \
-                --arg commit "$stable_commit" \
-                '.object.type == "commit" and .object.sha == $commit' \
-                <<< "$tag_details" > /dev/null; then
-                echo "::error::existing ${expected_tag} tag does not point to generated stable commit ${stable_commit}"
-                exit 1
-              fi
-
-              if [ "$(jq -r '.draft' <<< "$release_details")" = "true" ]; then
-                release_created=true
-                tag_name="$expected_tag"
-                echo "Recovering draft ${expected_tag} created by an earlier promotion attempt."
-              else
-                release_available=true
-                tag_name="$expected_tag"
-                echo "The promoted ${expected_tag} release is already published; release delivery remains complete."
-              fi
             else
-              if [ "$STABLE_RELEASE_PR_MERGED" = "true" ]; then
-                echo "::error::the second release-please run did not create the promoted stable release"
-                exit 1
+              release_details=null
+              if [ -n "$stable_commit" ]; then
+                release_details="$(bash apps/desktop/scripts/find-github-release.sh "$expected_tag")"
               fi
-              if [ "$PROMOTION_PHASE" = "fresh" ]; then
-                echo "::error::release-please did not create a stable Release PR for the promotion"
-                exit 1
+              if [ "$release_details" != "null" ]; then
+                if ! jq -e \
+                  --arg commit "$stable_commit" \
+                  --arg tag "$expected_tag" \
+                  '.tag_name == $tag and
+                    .target_commitish == $commit and
+                    .prerelease == false and
+                    ((.draft == true and .published_at == null) or
+                     (.draft == false and .published_at != null))' \
+                  <<< "$release_details" > /dev/null; then
+                  echo "::error::existing ${expected_tag} release does not match generated stable commit ${stable_commit}"
+                  exit 1
+                fi
+                tag_details="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${expected_tag}")"
+                if ! jq -e \
+                  --arg commit "$stable_commit" \
+                  '.object.type == "commit" and .object.sha == $commit' \
+                  <<< "$tag_details" > /dev/null; then
+                  echo "::error::existing ${expected_tag} tag does not point to generated stable commit ${stable_commit}"
+                  exit 1
+                fi
+
+                if [ "$(jq -r '.draft' <<< "$release_details")" = "true" ]; then
+                  release_created=true
+                  tag_name="$expected_tag"
+                  echo "Recovering draft ${expected_tag} created by an earlier promotion attempt."
+                else
+                  release_available=true
+                  tag_name="$expected_tag"
+                  echo "The promoted ${expected_tag} release is already published; release delivery remains complete."
+                fi
+              else
+                if [ "$STABLE_RELEASE_PR_MERGED" = "true" ]; then
+                  echo "::error::the second release-please run did not create the promoted stable release"
+                  exit 1
+                fi
+                if [ "$PROMOTION_PHASE" = "fresh" ]; then
+                  echo "::error::release-please did not create a stable Release PR for the promotion"
+                  exit 1
+                fi
+                if [ "$PROMOTION_PHASE" = "resume" ]; then
+                  echo "::error::release-please did not create the stable release while resuming the promotion"
+                  exit 1
+                fi
+                echo "The promotion is already complete; no release work remains."
               fi
-              if [ "$PROMOTION_PHASE" = "resume" ]; then
-                echo "::error::release-please did not create the stable release while resuming the promotion"
-                exit 1
-              fi
-              echo "The promotion is already complete; no release work remains."
             fi
           elif [ "$FIRST_RELEASE_CREATED" = "true" ]; then
             if [ -z "$FIRST_TAG_NAME" ]; then
@@ -645,7 +650,11 @@ jobs:
               echo "::error::promoted release has no verified stable commit"
               exit 1
             fi
-            release_details="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag_name}")"
+            release_details="$(bash apps/desktop/scripts/find-github-release.sh "$tag_name")"
+            if [ "$release_details" = "null" ]; then
+              echo "::error::promoted draft ${tag_name} does not exist"
+              exit 1
+            fi
             if ! jq -e \
               --arg commit "$stable_commit" \
               --arg tag "$tag_name" \
@@ -679,7 +688,11 @@ jobs:
               exit 1
             fi
             release_commit="$(jq -r '.object.sha' <<< "$tag_details")"
-            release_details="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag_name}")"
+            release_details="$(bash apps/desktop/scripts/find-github-release.sh "$tag_name")"
+            if [ "$release_details" = "null" ]; then
+              echo "::error::GitHub release ${tag_name} does not exist"
+              exit 1
+            fi
             if ! jq -e \
               --arg commit "$release_commit" \
               --arg tag "$tag_name" \
