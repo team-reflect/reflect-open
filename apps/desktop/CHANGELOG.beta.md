@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0-beta.17](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.16...v0.6.0-beta.17) (2026-07-13)
+
+
+### Bug Fixes
+
+* complete releases after GitHub visibility delays ([#783](https://github.com/team-reflect/reflect-open/issues/783)) ([a3e913d](https://github.com/team-reflect/reflect-open/commit/a3e913d3e46f0c49a191bcf68b1cc2d97a6fb593))
+
 ## [0.6.0-beta.16](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.15...v0.6.0-beta.16) (2026-07-13)
 
 
