@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0-beta.16](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.15...v0.6.0-beta.16) (2026-07-13)
+
+
+### Bug Fixes
+
+* keep Apple Silicon releases Xcode-compatible ([a1c17ad](https://github.com/team-reflect/reflect-open/commit/a1c17ad2fa3fb916b719322cf6f9648555157627))
+
 ## [0.6.0-beta.15](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.14...v0.6.0-beta.15) (2026-07-13)
 
 
