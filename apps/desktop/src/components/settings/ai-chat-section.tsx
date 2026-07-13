@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react'
+import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { CHAT_SYSTEM_PROMPT_MAX_LENGTH, normalizeChatSystemPrompt } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -11,20 +11,46 @@ export function AiChatSection(): ReactElement {
   const { settings, updateSettings } = useSettings()
   const [draft, setDraft] = useState(settings.chatSystemPrompt)
   const [dirty, setDirty] = useState(false)
+  const draftRef = useRef(draft)
+  const dirtyRef = useRef(dirty)
+  const updateSettingsRef = useRef(updateSettings)
   const currentDraft = dirty ? draft : settings.chatSystemPrompt
 
   const saveDraft = () => {
-    const normalized = normalizeChatSystemPrompt(currentDraft)
+    if (!dirtyRef.current) {
+      return
+    }
+    const normalized = normalizeChatSystemPrompt(draftRef.current)
+    draftRef.current = normalized
+    dirtyRef.current = false
     setDraft(normalized)
     setDirty(false)
     updateSettings({ chatSystemPrompt: normalized })
   }
 
   const useDefault = () => {
+    draftRef.current = ''
+    dirtyRef.current = false
     setDraft('')
     setDirty(false)
     updateSettings({ chatSystemPrompt: '' })
   }
+
+  useEffect(() => {
+    updateSettingsRef.current = updateSettings
+  }, [updateSettings])
+
+  useEffect(
+    () => () => {
+      if (dirtyRef.current) {
+        dirtyRef.current = false
+        updateSettingsRef.current({
+          chatSystemPrompt: normalizeChatSystemPrompt(draftRef.current),
+        })
+      }
+    },
+    [],
+  )
 
   return (
     <SettingsSection id="ai-chat">
@@ -36,7 +62,10 @@ export function AiChatSection(): ReactElement {
           aria-label="System prompt"
           value={currentDraft}
           onChange={(event) => {
-            setDraft(event.target.value)
+            const nextDraft = event.target.value
+            draftRef.current = nextDraft
+            dirtyRef.current = true
+            setDraft(nextDraft)
             setDirty(true)
           }}
           onBlur={saveDraft}
