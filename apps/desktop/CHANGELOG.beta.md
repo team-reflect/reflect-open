@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.0-beta.14](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.13...v0.6.0-beta.14) (2026-07-13)
+
+
+### Features
+
+* add clear actions to mobile search fields ([#773](https://github.com/team-reflect/reflect-open/issues/773)) ([bf041b1](https://github.com/team-reflect/reflect-open/commit/bf041b177298b760689a8fd9c83ddcbcf036ace3))
+
+
+### Bug Fixes
+
+* keep macOS installer links current ([#776](https://github.com/team-reflect/reflect-open/issues/776)) ([fa0095a](https://github.com/team-reflect/reflect-open/commit/fa0095a69c4b3f0a89201183933f5abb3f717d57))
+
 ## [0.6.0-beta.13](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.12...v0.6.0-beta.13) (2026-07-12)
 
 
