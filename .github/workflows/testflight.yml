@@ -21,6 +21,10 @@ on:
   # the export method.
   workflow_call:
     inputs:
+      commit:
+        description: Immutable commit targeted by the release tag.
+        required: true
+        type: string
       export_method:
         description: Xcode export method for the IPA (app-store-connect or release-testing).
         required: false
@@ -53,6 +57,9 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          # Reusable workflows inherit the caller SHA, which may not be the
+          # release snapshot. Always build the verified immutable tag commit.
+          ref: ${{ inputs.commit || github.sha }}
           persist-credentials: false
 
       - name: Verify TestFlight secrets are configured
@@ -111,7 +118,11 @@ jobs:
           WAIT_FLAG: ${{ inputs.wait_for_processing && '--wait' || '' }}
         run: |
           pnpm release:ios preflight --build-number="$BUILD_NUMBER"
-          pnpm release:ios testflight --build-number="$BUILD_NUMBER" --export-method="$EXPORT_METHOD" $WAIT_FLAG
+          args=(testflight --build-number="$BUILD_NUMBER" --export-method="$EXPORT_METHOD")
+          if [ -n "$WAIT_FLAG" ]; then
+            args+=("$WAIT_FLAG")
+          fi
+          pnpm release:ios "${args[@]}"
 
       # The exported IPA, kept for post-hoc signing/entitlements inspection —
       # TestFlight builds cannot be downloaded back from App Store Connect.

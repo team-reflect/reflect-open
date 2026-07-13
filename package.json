@@ -24,6 +24,7 @@
   "devDependencies": {
     "@types/node": "^24.0.0",
     "oxlint": "^1.71.0",
+    "release-please": "17.6.0",
     "turbo": "^2.10.0",
     "typescript": "~6.0.3"
   }

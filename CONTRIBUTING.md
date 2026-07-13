@@ -33,8 +33,9 @@ commit message and, for `feat`/`fix`, the user-facing changelog entry.
 - `docs:` / `chore:` / `ci:` / `test:` / `refactor:` / `build:` — no release,
   no changelog entry.
 - Reflect is an app, not a library: `feat!:` and `BREAKING CHANGE:` footers are
-  not used (CI rejects `!`). Going 1.0 someday is a product decision, made by
-  editing the release manifests, not by commit markers.
+  not used (CI rejects `!`). Going 1.0 someday is a product decision: open the
+  1.0 beta cycle through the beta release manifest, then the stable promotion
+  carries `1.0.0-beta.N` to `1.0.0` automatically.
 - Write the title as user-visible behavior (`fix: keep the daily caret in view
   on long iOS notes`), not implementation detail.
 - The changelog is scoped to `apps/desktop/`: a change that should appear in it

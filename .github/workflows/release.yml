@@ -9,6 +9,10 @@ on:
         description: The release tag (v<version>) created by release-please
         type: string
         required: true
+      commit:
+        description: Immutable commit targeted by the release tag
+        type: string
+        required: true
   # Manual fallback and retry path: run on a branch (or commit) whose version
   # was already bumped by a merged PR; the tag is derived from
   # apps/desktop/package.json.
@@ -38,9 +42,12 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          # Reusable workflows inherit the caller SHA, which may be newer or
+          # older than the release. Build the verified immutable tag commit.
+          ref: ${{ inputs.commit || github.sha }}
           # Unlike CI, credentials stay: the publish preflights run
           # `git ls-remote` against origin. Full history so the
-          # HEAD-is-on-an-origin-branch check also passes on tag checkouts.
+          # HEAD-is-on-an-origin-branch check also passes on release commits.
           persist-credentials: true
           fetch-depth: 0
 
@@ -87,6 +94,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          ref: ${{ inputs.commit || github.sha }}
           persist-credentials: false
 
       # Without the certificate, signing only fails at codesign time — after
@@ -188,8 +196,9 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          # Full history so the HEAD-is-on-an-origin-branch check passes on tag
-          # checkouts, and credentials stay for gh/git release preflights.
+          ref: ${{ inputs.commit || github.sha }}
+          # Full history so the HEAD-is-on-an-origin-branch check passes on the
+          # release commit, and credentials stay for gh/git release preflights.
           persist-credentials: true
           fetch-depth: 0
 
@@ -216,7 +225,12 @@ jobs:
           # Pass the boolean flag through an env variable so the shell never
           # interpolates ${{ }} expressions directly into the run command.
           DRAFT_FLAG: ${{ inputs.draft && '--draft' || '' }}
-        run: node apps/desktop/scripts/release-macos.mjs publish --defer-beta-feed --from-artifacts="$RUNNER_TEMP/release-artifacts" $DRAFT_FLAG
+        run: |
+          args=(publish --defer-beta-feed --from-artifacts="$RUNNER_TEMP/release-artifacts")
+          if [ -n "$DRAFT_FLAG" ]; then
+            args+=("$DRAFT_FLAG")
+          fi
+          node apps/desktop/scripts/release-macos.mjs "${args[@]}"
 
   sync-beta-feed:
     name: Sync beta downloads and updater feed
@@ -226,6 +240,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          ref: ${{ inputs.commit || github.sha }}
           persist-credentials: true
           fetch-depth: 0
 
