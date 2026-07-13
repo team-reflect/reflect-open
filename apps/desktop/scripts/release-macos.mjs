@@ -54,6 +54,7 @@ const INTEL_ONNX_RUNTIME_RESOURCE_SOURCE = `resources/onnxruntime/${ONNX_RUNTIME
 const RELEASE_NOTES_FILENAME = 'release-notes.md'
 const MAC_DOWNLOAD_NOTICE_HEADING = '## Which Mac download should I choose?'
 const MACOS_SIDECARS = ['reflect', 'reflect-capture-host']
+const RELEASE_VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)(?:-beta(?:\.(\d+))?)?$/
 const NOTARIZATION_ENV_VARS = [
   'APPLE_ID',
   'APPLE_PASSWORD',
@@ -735,10 +736,10 @@ function printArtifacts(flavor, target) {
 /** Build the uploaded file name for a target-specific release artifact. */
 function releaseAssetName({ productName, version, target, type }) {
   const { arch } = releaseTargetConfig(target)
+  if (type === 'dmg') return `${githubAssetName(productName)}_${arch}.dmg`
+
   const prefix = `${productName}_${version}_${arch}`
   switch (type) {
-    case 'dmg':
-      return `${prefix}.dmg`
     case 'updaterArchive':
       return `${prefix}.app.tar.gz`
     case 'updaterSignature':
@@ -1036,11 +1037,11 @@ export function createGenerateReleaseNotesArgs({ commit, tag }) {
 }
 
 /** Create the release-note footer that maps Mac CPU families to the right DMG. */
-export function createMacDownloadNotice({ productName, version }) {
+export function createMacDownloadNotice({ productName }) {
   const appleSiliconDmg = githubAssetName(
-    releaseAssetName({ productName, version, target: APPLE_SILICON_MAC_TARGET, type: 'dmg' }),
+    releaseAssetName({ productName, target: APPLE_SILICON_MAC_TARGET, type: 'dmg' }),
   )
-  const intelDmg = githubAssetName(releaseAssetName({ productName, version, target: INTEL_MAC_TARGET, type: 'dmg' }))
+  const intelDmg = githubAssetName(releaseAssetName({ productName, target: INTEL_MAC_TARGET, type: 'dmg' }))
 
   return [
     MAC_DOWNLOAD_NOTICE_HEADING,
@@ -1053,11 +1054,11 @@ export function createMacDownloadNotice({ productName, version }) {
 }
 
 /** Append Reflect's Mac download guidance after GitHub's generated notes. */
-export function appendMacDownloadNotice({ body, productName, version }) {
+export function appendMacDownloadNotice({ body, productName }) {
   const trimmedBody = body.trimEnd()
   if (trimmedBody.includes(MAC_DOWNLOAD_NOTICE_HEADING)) return `${trimmedBody}\n`
 
-  const notice = createMacDownloadNotice({ productName, version })
+  const notice = createMacDownloadNotice({ productName })
   return `${trimmedBody ? `${trimmedBody}\n\n` : ''}${notice}\n`
 }
 
@@ -1084,11 +1085,11 @@ function generateReleaseNotesBody({ commit, tag }) {
 }
 
 /** Write generated release notes plus Reflect's Mac download footer to disk. */
-function writeReleaseNotes({ commit, outputDir, productName, tag, version }) {
+function writeReleaseNotes({ commit, outputDir, productName, tag }) {
   log('generating GitHub release notes…')
   const body = generateReleaseNotesBody({ commit, tag })
   const releaseNotesPath = join(outputDir, RELEASE_NOTES_FILENAME)
-  writeFileSync(releaseNotesPath, appendMacDownloadNotice({ body, productName, version }))
+  writeFileSync(releaseNotesPath, appendMacDownloadNotice({ body, productName }))
   return releaseNotesPath
 }
 
@@ -1137,52 +1138,204 @@ export function createFinalizeReleaseArgs({ keepDraft, notesPath, prerelease, pr
   return args
 }
 
-/** Build the `gh release create` arguments for the moving beta updater feed. */
-export function createBetaFeedReleaseArgs({ commit, manifestPath }) {
+/** Build the `gh release create` arguments for the moving beta download and updater feed. */
+export function createBetaFeedReleaseArgs({ assets, commit }) {
   return [
     'release',
     'create',
     BETA_UPDATER_FEED_TAG,
-    manifestPath,
+    ...assets,
     '--title',
-    'Reflect beta updater feed',
+    'Latest Reflect Beta downloads',
     '--target',
     commit,
     '--prerelease',
     '--latest=false',
     '--notes',
-    'Moving updater feed for beta builds. Do not install this release directly.',
+    'Moving downloads and updater feed for the latest Reflect Beta release. Choose a DMG for a fresh install; installed beta apps use latest.json.',
   ]
 }
 
-/** Build the `gh release upload` arguments that replace the beta feed manifest. */
-export function uploadBetaFeedArgs({ manifestPath }) {
-  return ['release', 'upload', BETA_UPDATER_FEED_TAG, manifestPath, '--clobber']
+/** Build ordered uploads so installer failures leave the working updater manifest untouched. */
+export function createBetaFeedUploadSteps({ dmgPaths, manifestPath }) {
+  return [
+    {
+      label: 'downloads',
+      args: ['release', 'upload', BETA_UPDATER_FEED_TAG, ...dmgPaths, '--clobber'],
+    },
+    {
+      label: 'updater feed',
+      args: ['release', 'upload', BETA_UPDATER_FEED_TAG, manifestPath, '--clobber'],
+    },
+  ]
 }
 
-function updateBetaFeed({ commit, manifestPath }) {
+/** Build the `gh release download` arguments used to recover moving assets from a tagged release. */
+export function createReleaseDownloadArgs({ assetNames, outputDir, tag }) {
+  return [
+    'release',
+    'download',
+    tag,
+    '--dir',
+    outputDir,
+    ...assetNames.flatMap((assetName) => ['--pattern', assetName]),
+  ]
+}
+
+function parseReleaseVersion(version) {
+  const match = RELEASE_VERSION_PATTERN.exec(version)
+  if (!match) throw new Error(`unsupported release version: ${version}`)
+
+  const [, major, minor, patch, betaNumber] = match
+  return {
+    core: [major, minor, patch].map(Number),
+    prerelease: version.includes('-beta') ? Number(betaNumber ?? 0) : null,
+  }
+}
+
+/** Compare Reflect stable/beta versions, returning negative, zero, or positive. */
+export function compareReleaseVersions(left, right) {
+  const leftVersion = parseReleaseVersion(left)
+  const rightVersion = parseReleaseVersion(right)
+
+  for (let index = 0; index < leftVersion.core.length; index += 1) {
+    const difference = leftVersion.core[index] - rightVersion.core[index]
+    if (difference !== 0) return Math.sign(difference)
+  }
+
+  if (leftVersion.prerelease === null && rightVersion.prerelease === null) return 0
+  if (leftVersion.prerelease === null) return 1
+  if (rightVersion.prerelease === null) return -1
+  return Math.sign(leftVersion.prerelease - rightVersion.prerelease)
+}
+
+/** Select the highest Reflect beta version from GitHub release tag names. */
+export function newestBetaVersionFromTags(tags) {
+  const versions = tags
+    .map((tag) => tag.trim())
+    .map((tag) => (tag.startsWith('v') ? tag.slice(1) : ''))
+    .filter((version) => version.includes('-beta') && RELEASE_VERSION_PATTERN.test(version))
+  if (versions.length === 0) throw new Error('GitHub did not return any published beta releases')
+
+  return versions.reduce((newest, version) =>
+    compareReleaseVersions(version, newest) > 0 ? version : newest,
+  )
+}
+
+function findNewestPublishedBetaVersion() {
+  const result = spawnSync(
+    'gh',
+    [
+      'api',
+      '--paginate',
+      'repos/{owner}/{repo}/releases',
+      '--jq',
+      '.[] | select(.prerelease == true and .draft == false) | .tag_name',
+    ],
+    { encoding: 'utf8' },
+  )
+  if (result.status !== 0) {
+    fail(`could not list published beta releases:\n${`${result.stdout ?? ''}${result.stderr ?? ''}`.trim()}`)
+  }
+
+  try {
+    return newestBetaVersionFromTags((result.stdout ?? '').split('\n'))
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    fail(message)
+  }
+}
+
+function updateBetaFeed({ commit, dmgPaths, manifestPath }) {
   const existing = run('gh', ['release', 'view', BETA_UPDATER_FEED_TAG])
   if (existing.status === 0) {
-    log(`updating ${BETA_UPDATER_FEED_TAG} updater feed…`)
-    const upload = spawnSync('gh', uploadBetaFeedArgs({ manifestPath }), {
-      encoding: 'utf8',
-      stdio: ['inherit', 'pipe', 'inherit'],
-    })
-    if (upload.status !== 0) {
-      fail(`updating the beta updater feed failed${upload.stdout ? `\n${upload.stdout.trim()}` : ''}`)
+    for (const step of createBetaFeedUploadSteps({ dmgPaths, manifestPath })) {
+      log(`updating ${BETA_UPDATER_FEED_TAG} ${step.label}…`)
+      const upload = spawnSync('gh', step.args, {
+        encoding: 'utf8',
+        stdio: ['inherit', 'pipe', 'inherit'],
+      })
+      if (upload.status !== 0) {
+        fail(`updating the beta ${step.label} failed${upload.stdout ? `\n${upload.stdout.trim()}` : ''}`)
+      }
     }
     return
   }
   if (!/release not found/i.test(existing.output)) {
     fail(`could not check GitHub for the ${BETA_UPDATER_FEED_TAG} updater feed:\n${existing.output.trim()}`)
   }
-  log(`creating ${BETA_UPDATER_FEED_TAG} updater feed…`)
-  const create = spawnSync('gh', createBetaFeedReleaseArgs({ commit, manifestPath }), {
+  log(`creating ${BETA_UPDATER_FEED_TAG} downloads and updater feed…`)
+  const create = spawnSync('gh', createBetaFeedReleaseArgs({ assets: [...dmgPaths, manifestPath], commit }), {
     encoding: 'utf8',
     stdio: ['inherit', 'pipe', 'inherit'],
   })
   if (create.status !== 0) {
-    fail(`creating the beta updater feed failed${create.stdout ? `\n${create.stdout.trim()}` : ''}`)
+    fail(`creating the beta downloads failed${create.stdout ? `\n${create.stdout.trim()}` : ''}`)
+  }
+}
+
+function downloadReleaseAssets({ assetNames, outputDir, tag }) {
+  mkdirSync(outputDir, { recursive: true })
+  const download = spawnSync('gh', createReleaseDownloadArgs({ assetNames, outputDir, tag }), {
+    encoding: 'utf8',
+    stdio: ['inherit', 'pipe', 'inherit'],
+  })
+  if (download.status !== 0) {
+    fail(`downloading release assets from ${tag} failed${download.stdout ? `\n${download.stdout.trim()}` : ''}`)
+  }
+
+  const paths = assetNames.map((assetName) => join(outputDir, assetName))
+  for (const path of paths) {
+    if (!existsSync(path)) fail(`release download did not produce ${path}`)
+  }
+  return paths
+}
+
+/** Refresh the moving beta assets from an already-published immutable release. */
+function syncBetaFeed() {
+  ensureGhReady()
+  const commit = ensurePublishableCommit()
+  const { version } = readTauriConf()
+  if (!version.includes('-')) fail(`version ${version} is stable — there is no beta feed to sync`)
+
+  const flavor = resolveFlavor({ version, forPublish: true })
+  const { productName } = readFlavorConf(flavor)
+  const tag = `v${version}`
+  const release = findReleaseByTag(tag)
+  if (!release) fail(`release ${tag} does not exist`)
+  ensureReleaseTargetsCommit(release, tag, commit)
+  if (release.draft) {
+    log(`release ${tag} is still a draft — ${BETA_UPDATER_FEED_TAG} remains unchanged`)
+    return
+  }
+  if (!release.prerelease) fail(`release ${tag} is not marked as a pre-release`)
+
+  const dmgNames = DEFAULT_PUBLISH_TARGETS.map((target) =>
+    releaseAssetName({ productName, target, type: 'dmg' }),
+  )
+  const assetNames = [...dmgNames, 'latest.json']
+  const publishedAssetNames = new Set((release.assets ?? []).map((asset) => asset.name))
+  const missingAsset = assetNames.find((assetName) => !publishedAssetNames.has(assetName))
+  if (missingAsset) fail(`release ${tag} does not contain ${missingAsset}`)
+
+  const newestPublishedVersion = findNewestPublishedBetaVersion()
+  if (compareReleaseVersions(version, newestPublishedVersion) < 0) {
+    log(`${newestPublishedVersion} is already published; skipping older ${version}`)
+    return
+  }
+  log(`syncing ${BETA_UPDATER_FEED_TAG} to the newest published beta, ${version}`)
+
+  const tempDir = mkdtempSync(join(tmpdir(), 'reflect-beta-feed-'))
+  try {
+    const sourceDir = join(tempDir, 'source')
+    downloadReleaseAssets({ assetNames, outputDir: sourceDir, tag })
+    updateBetaFeed({
+      commit,
+      dmgPaths: dmgNames.map((dmgName) => join(sourceDir, dmgName)),
+      manifestPath: join(sourceDir, 'latest.json'),
+    })
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
   }
 }
 
@@ -1247,7 +1400,7 @@ function publishIntoExistingRelease({ assets, draft, prerelease, productName, re
  * created by release-please when one exists (the Release PR flow), otherwise
  * as a brand-new release (the manual workflow_dispatch fallback).
  */
-function publish({ draft, flavorFlag, fromArtifacts }) {
+function publish({ deferBetaFeed, draft, flavorFlag, fromArtifacts }) {
   const { commit, flavor, productName, release, tag, version } = ensurePublishableRelease({ flavorFlag })
   const artifactDir = fromArtifacts ?? mkdtempSync(join(tmpdir(), 'reflect-release-assets-'))
 
@@ -1277,7 +1430,7 @@ function publish({ draft, flavorFlag, fromArtifacts }) {
     // release-please already wrote the changelog into the release body; keep
     // it and append the Mac download chooser.
     const releaseNotesPath = join(artifactDir, RELEASE_NOTES_FILENAME)
-    writeFileSync(releaseNotesPath, appendMacDownloadNotice({ body: release.body ?? '', productName, version }))
+    writeFileSync(releaseNotesPath, appendMacDownloadNotice({ body: release.body ?? '', productName }))
     publishIntoExistingRelease({ assets, draft, prerelease, productName, release, releaseNotesPath, tag, version })
   } else {
     const releaseNotesPath = writeReleaseNotes({
@@ -1285,7 +1438,6 @@ function publish({ draft, flavorFlag, fromArtifacts }) {
       outputDir: artifactDir,
       productName,
       tag,
-      version,
     })
     log(`creating GitHub ${prerelease ? 'pre-release' : 'release'} ${tag} from commit ${commit.slice(0, 7)}…`)
     const releaseArgs = createReleaseArgs({
@@ -1303,10 +1455,10 @@ function publish({ draft, flavorFlag, fromArtifacts }) {
     log(`${draft ? 'draft release created' : 'release published'}: ${result.stdout.trim()}`)
   }
 
-  if (prerelease && !draft) {
-    updateBetaFeed({ commit, manifestPath })
+  if (prerelease && !deferBetaFeed) {
+    syncBetaFeed()
   } else if (prerelease) {
-    log(`draft pre-release — ${BETA_UPDATER_FEED_TAG} feed not updated`)
+    log(`moving beta assets deferred to the downstream ${BETA_UPDATER_FEED_TAG} sync job`)
   }
 }
 
@@ -1385,6 +1537,7 @@ const USAGE = `Usage: pnpm release:macos [command] [flags]
 Commands:
   build          Signed + notarized release build, then verify (default)
   preflight      Check that the current commit can publish before CI spends macOS minutes
+  sync-beta-feed Refresh moving beta downloads/feed from the published tagged release
   setup          Store the notarization Apple ID + app-specific password in the keychain
   setup-updater  Generate the auto-update signing keypair (keychain + pubkey to commit)
   verify         Re-run signing/Gatekeeper checks on already-built bundles
@@ -1393,6 +1546,8 @@ Commands:
 Flags:
   --no-notarize   Skip notarization (signed-only build/verify)
   --draft         Create the GitHub release as a draft (publish only)
+  --defer-beta-feed
+                  Leave moving beta assets to a separate sync-beta-feed command (publish only)
   --target=<name> Build or verify one target: aarch64-apple-darwin | x86_64-apple-darwin
   --artifact-dir=<path>
                   Export release assets and metadata after build (build only)
@@ -1416,7 +1571,7 @@ async function main() {
   const fromArtifacts = flags.find((flag) => flag.startsWith('--from-artifacts='))?.slice('--from-artifacts='.length)
   const unknownFlag = flags.find(
     (flag) =>
-      !['--no-notarize', '--draft', '--help'].includes(flag) &&
+      !['--no-notarize', '--draft', '--defer-beta-feed', '--help'].includes(flag) &&
       !flag.startsWith('--flavor=') &&
       !flag.startsWith('--target=') &&
       !flag.startsWith('--artifact-dir=') &&
@@ -1430,6 +1585,7 @@ async function main() {
   if (targetFlag && !['build', 'verify'].includes(command)) fail('--target only applies to build and verify')
   if (artifactDir && command !== 'build') fail('--artifact-dir only applies to build')
   if (fromArtifacts && command !== 'publish') fail('--from-artifacts only applies to publish')
+  if (flags.includes('--defer-beta-feed') && command !== 'publish') fail('--defer-beta-feed only applies to publish')
   if (flags.includes('--help')) {
     console.log(USAGE)
     return
@@ -1458,6 +1614,8 @@ async function main() {
       return setup()
     case 'setup-updater':
       return setupUpdater()
+    case 'sync-beta-feed':
+      return syncBetaFeed()
     case 'verify': {
       const flavor = resolveFlavor({ flavorFlag, version, forPublish: false })
       const target = targetFlag ?? hostTarget()
@@ -1465,7 +1623,12 @@ async function main() {
       return printArtifacts(flavor, target)
     }
     case 'publish':
-      return publish({ draft: flags.includes('--draft'), flavorFlag, fromArtifacts })
+      return publish({
+        deferBetaFeed: flags.includes('--defer-beta-feed'),
+        draft: flags.includes('--draft'),
+        flavorFlag,
+        fromArtifacts,
+      })
     default:
       fail(`unknown command "${command}"\n\n${USAGE}`)
   }

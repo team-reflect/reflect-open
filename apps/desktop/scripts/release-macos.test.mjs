@@ -6,21 +6,24 @@ import { expect, test } from 'vitest'
 import {
   appendMacDownloadNotice,
   canLaunchTarget,
+  compareReleaseVersions,
   createBetaFeedReleaseArgs,
+  createBetaFeedUploadSteps,
   createDmgArgs,
   createExistingReleaseUploadArgs,
   createFinalizeReleaseArgs,
   createGenerateReleaseNotesArgs,
   createMacDownloadNotice,
+  createReleaseDownloadArgs,
   createReleaseArgs,
   createTauriBuildArgs,
   createUpdaterArchiveArgs,
   createUpdaterManifest,
   macosEntitlementsPath,
   macosTargetResourceConfig,
+  newestBetaVersionFromTags,
   parseKeychainList,
   signDmgArgs,
-  uploadBetaFeedArgs,
 } from './release-macos.mjs'
 
 const baseInput = {
@@ -159,10 +162,10 @@ test('generated release notes API targets the release tag and commit', () => {
 })
 
 test('Mac download notice points each processor at the matching DMG', () => {
-  const notice = createMacDownloadNotice({ productName: 'Reflect Beta', version: '0.4.0-beta.8' })
+  const notice = createMacDownloadNotice({ productName: 'Reflect Beta' })
 
-  expect(notice).toContain('`Reflect.Beta_0.4.0-beta.8_aarch64.dmg`')
-  expect(notice).toContain('`Reflect.Beta_0.4.0-beta.8_x86_64.dmg`')
+  expect(notice).toContain('`Reflect.Beta_aarch64.dmg`')
+  expect(notice).toContain('`Reflect.Beta_x86_64.dmg`')
   expect(notice).toContain('Apple Silicon (M-series Macs)')
   expect(notice).toContain('Apple menu -> About This Mac')
 })
@@ -171,7 +174,6 @@ test('Mac download notice is appended after generated release notes', () => {
   const notes = appendMacDownloadNotice({
     body: "## What's Changed\n\n- Fixed sync\n\n**Full Changelog**: v0.3.6...v0.3.7\n",
     productName: 'Reflect',
-    version: '0.3.7',
   })
 
   expect(notes).toBe(
@@ -179,47 +181,120 @@ test('Mac download notice is appended after generated release notes', () => {
       '- Fixed sync\n\n' +
       '**Full Changelog**: v0.3.6...v0.3.7\n\n' +
       '## Which Mac download should I choose?\n\n' +
-      '- **Apple Silicon (M-series Macs):** download `Reflect_0.3.7_aarch64.dmg`.\n' +
-      '- **Intel Macs:** download `Reflect_0.3.7_x86_64.dmg`.\n\n' +
+      '- **Apple Silicon (M-series Macs):** download `Reflect_aarch64.dmg`.\n' +
+      '- **Intel Macs:** download `Reflect_x86_64.dmg`.\n\n' +
       'To check your Mac, open **Apple menu -> About This Mac**. If it shows **Chip** with M1, M2, M3, M4, or newer, choose Apple Silicon. If it shows **Processor** with Intel, choose Intel.\n',
   )
 })
 
 test('Mac download notice is not duplicated when release notes are regenerated', () => {
   const notes = appendMacDownloadNotice({
-    body: createMacDownloadNotice({ productName: 'Reflect', version: '0.3.7' }),
+    body: createMacDownloadNotice({ productName: 'Reflect' }),
     productName: 'Reflect',
-    version: '0.3.7',
   })
 
   expect(notes.match(/Which Mac download should I choose/g)).toHaveLength(1)
 })
 
-test('beta feed release is a non-latest prerelease pointer', () => {
-  expect(createBetaFeedReleaseArgs({ commit: 'abc123', manifestPath: 'latest.json' })).toEqual([
+test('beta feed release carries the latest downloads without becoming the latest stable release', () => {
+  expect(
+    createBetaFeedReleaseArgs({
+      assets: ['Reflect.Beta_aarch64.dmg', 'Reflect.Beta_x86_64.dmg', 'latest.json'],
+      commit: 'abc123',
+    }),
+  ).toEqual([
     'release',
     'create',
     'updater-beta',
+    'Reflect.Beta_aarch64.dmg',
+    'Reflect.Beta_x86_64.dmg',
     'latest.json',
     '--title',
-    'Reflect beta updater feed',
+    'Latest Reflect Beta downloads',
     '--target',
     'abc123',
     '--prerelease',
     '--latest=false',
     '--notes',
-    'Moving updater feed for beta builds. Do not install this release directly.',
+    'Moving downloads and updater feed for the latest Reflect Beta release. Choose a DMG for a fresh install; installed beta apps use latest.json.',
   ])
 })
 
-test('beta feed upload replaces the moving manifest', () => {
-  expect(uploadBetaFeedArgs({ manifestPath: 'latest.json' })).toEqual([
-    'release',
-    'upload',
-    'updater-beta',
-    'latest.json',
-    '--clobber',
+test('beta feed replaces downloads before the updater manifest', () => {
+  expect(
+    createBetaFeedUploadSteps({
+      dmgPaths: ['Reflect.Beta_aarch64.dmg', 'Reflect.Beta_x86_64.dmg'],
+      manifestPath: 'latest.json',
+    }),
+  ).toEqual([
+    {
+      label: 'downloads',
+      args: [
+        'release',
+        'upload',
+        'updater-beta',
+        'Reflect.Beta_aarch64.dmg',
+        'Reflect.Beta_x86_64.dmg',
+        '--clobber',
+      ],
+    },
+    {
+      label: 'updater feed',
+      args: ['release', 'upload', 'updater-beta', 'latest.json', '--clobber'],
+    },
   ])
+})
+
+test('beta feed recovery downloads exact assets from the tagged release', () => {
+  expect(
+    createReleaseDownloadArgs({
+      assetNames: ['Reflect.Beta_aarch64.dmg', 'Reflect.Beta_x86_64.dmg', 'latest.json'],
+      outputDir: '/tmp/release-assets',
+      tag: 'v0.6.0-beta.14',
+    }),
+  ).toEqual([
+    'release',
+    'download',
+    'v0.6.0-beta.14',
+    '--dir',
+    '/tmp/release-assets',
+    '--pattern',
+    'Reflect.Beta_aarch64.dmg',
+    '--pattern',
+    'Reflect.Beta_x86_64.dmg',
+    '--pattern',
+    'latest.json',
+  ])
+})
+
+test('beta feed version comparison prevents rollback while allowing recovery', () => {
+  expect(compareReleaseVersions('0.6.0-beta.13', '0.6.0-beta.14')).toBe(-1)
+  expect(compareReleaseVersions('0.6.0-beta.14', '0.6.0-beta.14')).toBe(0)
+  expect(compareReleaseVersions('0.6.0-beta.15', '0.6.0-beta.14')).toBe(1)
+})
+
+test('beta feed version comparison handles release-please beta boundaries', () => {
+  expect(compareReleaseVersions('0.6.0-beta', '0.5.0-beta.99')).toBe(1)
+  expect(compareReleaseVersions('0.6.0-beta.1', '0.6.0-beta')).toBe(1)
+  expect(compareReleaseVersions('0.6.0', '0.6.0-beta.99')).toBe(1)
+})
+
+test('beta feed version comparison rejects unsupported versions', () => {
+  expect(() => compareReleaseVersions('0.6.0-rc.1', '0.6.0-beta.14')).toThrow('unsupported release version')
+})
+
+test('beta feed selects the newest immutable published beta tag', () => {
+  expect(
+    newestBetaVersionFromTags([
+      'updater-beta',
+      'v0.5.0',
+      'v0.5.0-beta.99',
+      'v0.6.0-beta.9',
+      'v0.6.0-beta.14',
+      '',
+    ]),
+  ).toBe('0.6.0-beta.14')
+  expect(() => newestBetaVersionFromTags(['updater-beta', 'v0.5.0'])).toThrow('published beta releases')
 })
 
 test('release builds ask Tauri for the app bundle only', () => {

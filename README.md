@@ -41,8 +41,8 @@ another git remote are connected directly by the user.
 ## Install
 
 1. **Install the Mac app.** Download the latest release for your Mac:
-   - **Stable 0.5.0:** [Apple silicon (M-series)](https://github.com/team-reflect/reflect-open/releases/download/v0.5.0/Reflect_0.5.0_aarch64.dmg) · [Intel](https://github.com/team-reflect/reflect-open/releases/download/v0.5.0/Reflect_0.5.0_x86_64.dmg)
-   - **Beta 0.6.0-beta.13:** [Apple silicon (M-series)](https://github.com/team-reflect/reflect-open/releases/download/v0.6.0-beta.13/Reflect.Beta_0.6.0-beta.13_aarch64.dmg) · [Intel](https://github.com/team-reflect/reflect-open/releases/download/v0.6.0-beta.13/Reflect.Beta_0.6.0-beta.13_x86_64.dmg)
+   - **Stable:** [Apple silicon (M-series)](https://github.com/team-reflect/reflect-open/releases/latest/download/Reflect_aarch64.dmg) · [Intel](https://github.com/team-reflect/reflect-open/releases/latest/download/Reflect_x86_64.dmg)
+   - **Beta:** [Apple silicon (M-series)](https://github.com/team-reflect/reflect-open/releases/download/updater-beta/Reflect.Beta_aarch64.dmg) · [Intel](https://github.com/team-reflect/reflect-open/releases/download/updater-beta/Reflect.Beta_x86_64.dmg)
 
    Each build is signed, notarized, and auto-updated from GitHub Releases. You
    can also [view all releases](https://github.com/team-reflect/reflect-open/releases).
