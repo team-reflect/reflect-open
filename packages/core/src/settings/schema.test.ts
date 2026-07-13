@@ -120,10 +120,10 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ chatSystemPrompt: '  Be concise.  ' }).chatSystemPrompt).toBe(
       'Be concise.',
     )
-    expect(
-      settingsSchema.parse({ chatSystemPrompt: 'x'.repeat(CHAT_SYSTEM_PROMPT_MAX_LENGTH + 1) })
-        .chatSystemPrompt,
-    ).toHaveLength(CHAT_SYSTEM_PROMPT_MAX_LENGTH)
+    const oversizedPrompt = `${'x'.repeat(CHAT_SYSTEM_PROMPT_MAX_LENGTH)}trailing text`
+    expect(settingsSchema.parse({ chatSystemPrompt: oversizedPrompt }).chatSystemPrompt).toBe(
+      oversizedPrompt.slice(0, CHAT_SYSTEM_PROMPT_MAX_LENGTH),
+    )
   })
 
   it('degrades an invalid value to its default instead of failing the load', () => {
