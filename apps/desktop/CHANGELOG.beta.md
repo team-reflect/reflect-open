@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0-beta.15](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.14...v0.6.0-beta.15) (2026-07-13)
+
+
+### Bug Fixes
+
+* find draft GitHub releases ([c2fc801](https://github.com/team-reflect/reflect-open/commit/c2fc801178212fa1ae5240b7012165418b225fd5))
+
 ## [0.6.0-beta.14](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.13...v0.6.0-beta.14) (2026-07-13)
 
 
