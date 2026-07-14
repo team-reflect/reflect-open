@@ -90,6 +90,7 @@ describe('graph paths', () => {
     expect(isSafeVisibleGraphPath('Projects/../outside.md')).toBe(false)
     expect(isSafeVisibleGraphPath('/absolute.md')).toBe(false)
     expect(isSafeVisibleGraphPath('C:/absolute.md')).toBe(false)
+    expect(isSafeVisibleGraphPath('C:relative.md')).toBe(false)
     expect(isSafeVisibleGraphPath('Projects//Plan.md')).toBe(false)
     expect(isSafeVisibleGraphPath('Projects\\Plan.md')).toBe(false)
   })

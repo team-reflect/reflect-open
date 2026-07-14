@@ -8,8 +8,12 @@
 
 use std::fs;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::UNIX_EPOCH;
+
+#[cfg(test)]
+use reflect_graph_paths::icloud_placeholder_target;
+use reflect_graph_paths::{evicted_logical_path, eviction_placeholder};
 
 use crate::error::{AppError, AppResult};
 use crate::graph_gitignore;
@@ -292,22 +296,6 @@ pub(crate) fn modified_ms(meta: &fs::Metadata) -> Option<u64> {
         .map(|dur| dur.as_millis() as u64)
 }
 
-/// The logical file name behind an iCloud eviction placeholder:
-/// `".<name>.icloud"` → `Some("<name>")`, anything else → `None`. Optimize
-/// Storage replaces a not-downloaded file with such a stub; to the rest of the
-/// app the file still exists — it just isn't readable until re-downloaded
-/// (Plan 21: eviction must never read as deletion).
-pub(crate) fn icloud_placeholder_target(file_name: &str) -> Option<&str> {
-    reflect_graph_paths::icloud_placeholder_target(file_name)
-}
-
-/// The placeholder path iCloud leaves behind when it evicts `logical`
-/// (`notes/a.md` → `notes/.a.md.icloud`).
-pub(crate) fn eviction_placeholder(logical: &Path) -> Option<PathBuf> {
-    let name = logical.file_name()?.to_str()?;
-    Some(logical.with_file_name(format!(".{name}.icloud")))
-}
-
 /// Whether a path is **occupied**: a readable file, or an evicted iCloud note
 /// whose placeholder still holds the name. Existence probes that guard
 /// against overwriting (the collision picker's `note_exists`, the rename
@@ -466,14 +454,6 @@ fn collect_classified_files(root: &Path, include_attachments: bool) -> AppResult
         .attachments
         .sort_by(|left, right| left.path.cmp(&right.path));
     Ok(catalog)
-}
-
-/// If `path` is an eviction placeholder, the sibling path of the file it
-/// stands in for (`notes/.a.md.icloud` → `notes/a.md`).
-fn evicted_logical_path(path: &Path) -> Option<PathBuf> {
-    let name = path.file_name()?.to_str()?;
-    let logical = icloud_placeholder_target(name)?;
-    Some(path.with_file_name(logical))
 }
 
 #[cfg(test)]

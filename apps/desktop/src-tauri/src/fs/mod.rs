@@ -37,19 +37,10 @@ pub use self::import::ImportCancel;
 /// the same crash-safe, sync-clean path.
 pub(crate) use self::io::atomic_write_bytes;
 
-/// iCloud eviction-placeholder name mapping, shared with the watcher (which
-/// must treat an evicted note as present, not deleted — Plan 21). Desktop-only
-/// like the watcher itself; mobile's change source is the Plan 21 Phase 2
-/// metadata query, which maps placeholders on its own side.
-#[cfg(desktop)]
-pub(crate) use self::io::eviction_placeholder;
 /// "Occupied" probe (real file OR eviction placeholder), shared with the
 /// iCloud sweep's collision folding — an evicted canonical note must not be
 /// treated as a free slot (Plan 21).
 pub(crate) use self::io::file_occupied;
-/// The one home of the `.{name}.icloud` placeholder grammar, shared with the
-/// desktop watcher and the iCloud container discovery (`icloud::storage`).
-pub(crate) use self::io::icloud_placeholder_target;
 /// Sync-exclusion marking, shared with `git::repo` (a freshly initialized
 /// backup repo must never ride a file-sync provider — Plan 21).
 pub(crate) use self::io::mark_dir_local_only;
@@ -60,6 +51,12 @@ pub(crate) use self::resolve::ensure_relative;
 /// The full traversal guard, shared with sibling modules that address graph
 /// files (capture promotes screenshots into `assets/`).
 pub(crate) use self::resolve::resolve as resolve_in_graph;
+/// iCloud eviction-placeholder path construction, shared with the desktop
+/// watcher (which must treat an evicted note as present, not deleted).
+#[cfg(desktop)]
+pub(crate) use reflect_graph_paths::eviction_placeholder;
+/// iCloud eviction-placeholder name mapping, shared with container discovery.
+pub(crate) use reflect_graph_paths::icloud_placeholder_target;
 
 /// The open graph root plus a monotonic generation, kept **under one lock** so
 /// they swap atomically (the same pattern as the index's `IndexState`, Plan 04b).
@@ -71,6 +68,10 @@ pub struct GraphInner {
     pub generation: u64,
     pub root: Option<PathBuf>,
     catalog: Option<io::FileCatalog>,
+    /// Monotonic invalidation epoch. A scan may run without the graph lock;
+    /// it can populate the cache only if no write/watcher invalidated the
+    /// catalog since that scan began.
+    catalog_revision: u64,
 }
 
 /// Tauri-managed state holding the currently open graph (root + generation).
@@ -142,6 +143,7 @@ fn activate(state: &State<GraphState>, root: &Path) -> AppResult<GraphInfo> {
         inner.generation += 1;
         inner.root = Some(root.to_path_buf());
         inner.catalog = None;
+        inner.catalog_revision = inner.catalog_revision.wrapping_add(1);
         inner.generation
     };
     let info = graph_info(root, generation);
@@ -514,7 +516,7 @@ pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> A
     let target = if abs.exists() {
         abs
     } else {
-        io::eviction_placeholder(&abs)
+        eviction_placeholder(&abs)
             .filter(|stub| stub.exists())
             .unwrap_or(abs)
     };
@@ -555,6 +557,7 @@ pub fn graph_delete(generation: u64, state: State<GraphState>) -> AppResult<()> 
             let root = inner.root.take().ok_or_else(AppError::no_graph)?;
             inner.generation += 1;
             inner.catalog = None;
+            inner.catalog_revision = inner.catalog_revision.wrapping_add(1);
             root
         };
         os_trash_delete(&root)?;
@@ -704,41 +707,65 @@ pub(crate) fn current_note_files(state: &GraphState) -> AppResult<Vec<FileMeta>>
 }
 
 fn file_catalog(state: &GraphState, generation: Option<u64>) -> AppResult<io::FileCatalog> {
-    let (root, expected_generation) = {
-        let inner = lock_graph(state)?;
-        if generation.is_some_and(|generation| generation != inner.generation) {
+    file_catalog_with(state, generation, io::collect_file_catalog)
+}
+
+fn file_catalog_with<F>(
+    state: &GraphState,
+    generation: Option<u64>,
+    mut scan: F,
+) -> AppResult<io::FileCatalog>
+where
+    F: FnMut(&Path) -> AppResult<io::FileCatalog>,
+{
+    loop {
+        let (root, expected_generation, expected_revision) = {
+            let inner = lock_graph(state)?;
+            if generation.is_some_and(|generation| generation != inner.generation) {
+                return Err(AppError::io(
+                    "the graph changed since this command was issued; dropping it",
+                ));
+            }
+            if let Some(catalog) = &inner.catalog {
+                return Ok(catalog.clone());
+            }
+            (
+                inner.root.clone().ok_or_else(AppError::no_graph)?,
+                inner.generation,
+                inner.catalog_revision,
+            )
+        };
+
+        let catalog = scan(&root)?;
+        let mut inner = lock_graph(state)?;
+        if inner.generation != expected_generation || inner.root.as_deref() != Some(root.as_path())
+        {
             return Err(AppError::io(
-                "the graph changed since this command was issued; dropping it",
+                "the graph changed while its files were being listed; dropping the result",
             ));
         }
-        if let Some(catalog) = &inner.catalog {
-            return Ok(catalog.clone());
+        if let Some(current) = &inner.catalog {
+            return Ok(current.clone());
         }
-        (
-            inner.root.clone().ok_or_else(AppError::no_graph)?,
-            inner.generation,
-        )
-    };
-
-    let catalog = io::collect_file_catalog(&root)?;
-    let mut inner = lock_graph(state)?;
-    if inner.generation != expected_generation || inner.root.as_deref() != Some(root.as_path()) {
-        return Err(AppError::io(
-            "the graph changed while its files were being listed; dropping the result",
-        ));
+        if inner.catalog_revision != expected_revision {
+            // A write or watcher invalidated the catalog while traversal ran.
+            // The scan is stale; retry from the new epoch instead of
+            // resurrecting rows the invalidation deliberately dropped.
+            continue;
+        }
+        inner.catalog = Some(catalog.clone());
+        return Ok(catalog);
     }
-    if let Some(current) = &inner.catalog {
-        return Ok(current.clone());
-    }
-    inner.catalog = Some(catalog.clone());
-    Ok(catalog)
 }
 
 /// Invalidate the catalog only if `root` is still the active generation's
 /// root. A late watcher/iCloud callback for a previous graph is harmless.
 pub(crate) fn invalidate_file_catalog(state: &GraphState, root: &Path) {
     match state.0.lock() {
-        Ok(mut inner) if inner.root.as_deref() == Some(root) => inner.catalog = None,
+        Ok(mut inner) if inner.root.as_deref() == Some(root) => {
+            inner.catalog = None;
+            inner.catalog_revision = inner.catalog_revision.wrapping_add(1);
+        }
         Ok(_) => {}
         Err(error) => tracing::error!(
             ?error,
@@ -770,7 +797,7 @@ mod note_create_tests {
 
 #[cfg(test)]
 mod file_catalog_tests {
-    use super::{file_catalog, invalidate_file_catalog, GraphInner, GraphState};
+    use super::{file_catalog, file_catalog_with, invalidate_file_catalog, GraphInner, GraphState};
     use std::fs;
     use std::sync::Mutex;
 
@@ -784,6 +811,7 @@ mod file_catalog_tests {
             generation: 7,
             root: Some(vault.path().to_path_buf()),
             catalog: None,
+            catalog_revision: 0,
         }));
 
         let first = file_catalog(&graph, Some(7)).expect("first catalog");
@@ -818,12 +846,47 @@ mod file_catalog_tests {
             generation: 3,
             root: Some(vault.path().to_path_buf()),
             catalog: None,
+            catalog_revision: 0,
         }));
         file_catalog(&graph, Some(3)).expect("catalog");
 
         invalidate_file_catalog(&graph, old_vault.path());
 
         assert!(graph.0.lock().expect("graph lock").catalog.is_some());
+    }
+
+    #[test]
+    fn invalidation_during_a_scan_forces_a_fresh_catalog() {
+        let vault = tempfile::tempdir().expect("vault");
+        fs::write(vault.path().join("README.md"), "# Root\n").expect("write root note");
+        let graph = GraphState(Mutex::new(GraphInner {
+            generation: 5,
+            root: Some(vault.path().to_path_buf()),
+            catalog: None,
+            catalog_revision: 0,
+        }));
+        let mut scans = 0;
+
+        let catalog = file_catalog_with(&graph, Some(5), |root| {
+            let scanned = super::io::collect_file_catalog(root)?;
+            scans += 1;
+            if scans == 1 {
+                fs::write(root.join("arrived.md"), "# Arrived\n")?;
+                invalidate_file_catalog(&graph, root);
+            }
+            Ok(scanned)
+        })
+        .expect("stable catalog");
+
+        assert_eq!(scans, 2);
+        assert_eq!(
+            catalog
+                .notes
+                .iter()
+                .map(|file| file.path.as_str())
+                .collect::<Vec<_>>(),
+            vec!["README.md", "arrived.md"]
+        );
     }
 }
 

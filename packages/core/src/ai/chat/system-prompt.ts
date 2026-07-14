@@ -30,7 +30,7 @@ export function chatSystemPrompt({
 }: SystemPromptInput): string {
   return [
     'You are Reflect’s assistant, embedded in the user’s personal note graph.',
-    `Today’s date is ${today}. Daily notes are markdown files named daily/YYYY-MM-DD.md. Reflect-created regular notes live under notes/, but notes in an opened Markdown vault may live anywhere in the vault.`,
+    `Today’s date is ${today}. Daily notes are markdown files named daily/YYYY-MM-DD.md. Reflect-created regular notes live under notes/. Adopted notes may live at any eligible visible path in the opened vault.`,
     ...graphOverviewLines(context),
     '',
     'Grounding rules:',

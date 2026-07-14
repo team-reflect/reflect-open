@@ -13,7 +13,10 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicBool, AtomicU8, Ordering},
+    Arc, Mutex,
+};
 use std::time::Duration;
 
 use notify::{RecommendedWatcher, RecursiveMode};
@@ -26,10 +29,85 @@ use crate::fs::GraphState;
 
 /// The Tauri event name carrying batched {@link FileChange}s to the frontend.
 const CHANGE_EVENT: &str = "index:changed";
+const RETRY_IDLE: u8 = 0;
+const RETRY_RUNNING: u8 = 1;
+const RETRY_PENDING: u8 = 2;
+
+fn request_catalog_retry(retry_state: &AtomicU8) -> bool {
+    loop {
+        match retry_state.load(Ordering::Acquire) {
+            RETRY_IDLE => {
+                if retry_state
+                    .compare_exchange(
+                        RETRY_IDLE,
+                        RETRY_RUNNING,
+                        Ordering::AcqRel,
+                        Ordering::Acquire,
+                    )
+                    .is_ok()
+                {
+                    return true;
+                }
+            }
+            RETRY_RUNNING => {
+                if retry_state
+                    .compare_exchange(
+                        RETRY_RUNNING,
+                        RETRY_PENDING,
+                        Ordering::AcqRel,
+                        Ordering::Acquire,
+                    )
+                    .is_ok()
+                {
+                    return false;
+                }
+                // Completion may have released RUNNING between the load and
+                // CAS. Re-read so this request can claim the now-idle slot.
+            }
+            RETRY_PENDING => return false,
+            invalid => {
+                tracing::error!(invalid, "invalid watcher retry state");
+                return false;
+            }
+        }
+    }
+}
+
+/// Release the running slot after success, or consume a request that arrived
+/// while the traversal was finishing and keep the same task alive for it.
+fn complete_catalog_retry(retry_state: &AtomicU8) -> bool {
+    match retry_state.compare_exchange(
+        RETRY_RUNNING,
+        RETRY_IDLE,
+        Ordering::AcqRel,
+        Ordering::Acquire,
+    ) {
+        Ok(_) => false,
+        Err(RETRY_PENDING) => {
+            retry_state.store(RETRY_RUNNING, Ordering::Release);
+            true
+        }
+        Err(invalid) => {
+            tracing::error!(invalid, "invalid watcher retry completion state");
+            false
+        }
+    }
+}
 
 /// Holds the active debouncer; dropping it stops the background watch thread.
 #[derive(Default)]
-pub struct WatcherState(pub Mutex<Option<Debouncer<RecommendedWatcher, RecommendedCache>>>);
+pub struct WatcherState(Mutex<Option<ActiveWatcher>>);
+
+struct ActiveWatcher {
+    debouncer: Debouncer<RecommendedWatcher, RecommendedCache>,
+    active: Arc<AtomicBool>,
+}
+
+impl Drop for ActiveWatcher {
+    fn drop(&mut self) {
+        self.active.store(false, Ordering::Release);
+    }
+}
 
 /// A debounced change to a tracked markdown note, sent to the frontend.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -47,7 +125,7 @@ pub struct FileChange {
     pub modified_ms: Option<u64>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct CatalogEntry {
     size: u64,
     modified_ms: u64,
@@ -126,7 +204,9 @@ fn tracked_relpath(path: &Path, root: &Path) -> Option<String> {
     // An iCloud eviction placeholder tracks as the file it stands in for —
     // eviction/re-download events must never read as a stub appearing or the
     // note being deleted (Plan 21).
-    let rel_str = evicted_logical_relpath(&rel_str).unwrap_or(rel_str);
+    let rel_str = reflect_graph_paths::evicted_logical_path(Path::new(&rel_str))
+        .map(|logical| logical.to_string_lossy().replace('\\', "/"))
+        .unwrap_or(rel_str);
     let kind = reflect_graph_paths::classify_normalized(&rel_str);
     let note = kind == Some(reflect_graph_paths::GraphPathKind::Note);
     let recording = rel_str.starts_with("audio-memos/")
@@ -134,21 +214,6 @@ fn tracked_relpath(path: &Path, root: &Path) -> Option<String> {
     let capture = rel_str.starts_with(".reflect/inbox/") && rel_str.ends_with(".json");
     let attachment = kind == Some(reflect_graph_paths::GraphPathKind::Attachment);
     (note || recording || capture || attachment).then_some(rel_str)
-}
-
-/// `notes/.a.md.icloud` → `Some("notes/a.md")`: the graph-relative path of the
-/// file an iCloud eviction placeholder stands in for, `None` for anything
-/// that isn't a placeholder name.
-fn evicted_logical_relpath(rel_str: &str) -> Option<String> {
-    let (dir, name) = match rel_str.rsplit_once('/') {
-        Some((dir, name)) => (Some(dir), name),
-        None => (None, rel_str),
-    };
-    let logical = crate::fs::icloud_placeholder_target(name)?;
-    Some(match dir {
-        Some(dir) => format!("{dir}/{logical}"),
-        None => logical.to_string(),
-    })
 }
 
 /// Reduce a debounced batch of paths to unique tracked changes (last kind wins).
@@ -186,9 +251,10 @@ fn collect_changes(paths: &[PathBuf], root: &Path) -> Vec<FileChange> {
                         modified_ms: None,
                     },
                     Err(_) => {
-                        if crate::fs::eviction_placeholder(&logical)
-                            .is_some_and(|stub| stub.exists())
-                        {
+                        if crate::fs::eviction_placeholder(&logical).is_some_and(|stub| {
+                            std::fs::symlink_metadata(stub)
+                                .is_ok_and(|metadata| metadata.file_type().is_file())
+                        }) {
                             continue; // evicted, not deleted
                         }
                         FileChange {
@@ -322,9 +388,98 @@ where
     Ok((changes, changed))
 }
 
+/// Retry a failed authoritative traversal until it succeeds or this graph is
+/// no longer active. Directory notifications can omit descendants, so keeping
+/// only their leaf events after a transient scan failure would leave the
+/// projection stale indefinitely when no later filesystem event arrives.
+fn schedule_catalog_retry(
+    app: AppHandle,
+    root: PathBuf,
+    generation: u64,
+    snapshot: Arc<Mutex<CatalogSnapshot>>,
+    retry_state: Arc<AtomicU8>,
+    watcher_active: Arc<AtomicBool>,
+) {
+    if !watcher_active.load(Ordering::Acquire) {
+        return;
+    }
+
+    if !request_catalog_retry(&retry_state) {
+        return;
+    }
+
+    tauri::async_runtime::spawn(async move {
+        let mut delay = Duration::from_millis(250);
+        loop {
+            tokio::time::sleep(delay).await;
+
+            if !watcher_active.load(Ordering::Acquire) {
+                retry_state.store(RETRY_IDLE, Ordering::Release);
+                break;
+            }
+
+            let active_root =
+                crate::fs::root_for_generation(&app.state::<GraphState>(), generation);
+            if !matches!(active_root, Ok(active_root) if active_root == root) {
+                watcher_active.store(false, Ordering::Release);
+                retry_state.store(RETRY_IDLE, Ordering::Release);
+                break;
+            }
+
+            let retry_root = root.clone();
+            let retry_snapshot = Arc::clone(&snapshot);
+            let outcome = tauri::async_runtime::spawn_blocking(move || {
+                catch_up_catalog_with(retry_snapshot.as_ref(), || scan_catalog(&retry_root))
+            })
+            .await;
+
+            match outcome {
+                Ok(Ok((changes, catalog_changed))) => {
+                    if !watcher_active.load(Ordering::Acquire) {
+                        retry_state.store(RETRY_IDLE, Ordering::Release);
+                        break;
+                    }
+                    let active_root =
+                        crate::fs::root_for_generation(&app.state::<GraphState>(), generation);
+                    if !matches!(active_root, Ok(active_root) if active_root == root) {
+                        watcher_active.store(false, Ordering::Release);
+                        retry_state.store(RETRY_IDLE, Ordering::Release);
+                        break;
+                    }
+                    if catalog_changed {
+                        crate::fs::invalidate_file_catalog(&app.state::<GraphState>(), &root);
+                    }
+                    if !changes.is_empty() {
+                        let _ = app.emit(CHANGE_EVENT, changes);
+                    }
+                    if complete_catalog_retry(&retry_state) {
+                        delay = Duration::from_millis(250);
+                        continue;
+                    }
+                    break;
+                }
+                Ok(Err(error)) => {
+                    tracing::warn!(?error, "failed to retry graph file catalog reconciliation")
+                }
+                Err(error) => {
+                    tracing::error!(?error, "graph file catalog reconciliation task panicked")
+                }
+            }
+
+            let _ = retry_state.compare_exchange(
+                RETRY_PENDING,
+                RETRY_RUNNING,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            );
+            delay = std::cmp::min(delay.saturating_mul(2), Duration::from_secs(5));
+        }
+    });
+}
+
 fn lock_watcher<'a>(
     watcher: &'a State<WatcherState>,
-) -> AppResult<std::sync::MutexGuard<'a, Option<Debouncer<RecommendedWatcher, RecommendedCache>>>> {
+) -> AppResult<std::sync::MutexGuard<'a, Option<ActiveWatcher>>> {
     watcher.0.lock().map_err(|err| {
         tracing::error!(?err, "watcher state lock poisoned by an earlier panic");
         AppError::io("watcher state lock poisoned")
@@ -363,22 +518,35 @@ pub fn watch_start(
 
     let handler_root = root.clone();
     let handler_snapshot = Arc::clone(&snapshot);
+    let retry_state = Arc::new(AtomicU8::new(RETRY_IDLE));
+    let handler_retry_state = Arc::clone(&retry_state);
+    let watcher_active = Arc::new(AtomicBool::new(true));
+    let handler_watcher_active = Arc::clone(&watcher_active);
     let handler_app = app.clone();
-    let mut debouncer = new_debouncer(
+    let debouncer = new_debouncer(
         Duration::from_millis(400),
         None,
         move |result: DebounceEventResult| {
             let Ok(events) = result else {
-                return; // watch errors are transient; the next batch recovers
+                schedule_catalog_retry(
+                    handler_app.clone(),
+                    handler_root.clone(),
+                    generation,
+                    Arc::clone(&handler_snapshot),
+                    Arc::clone(&handler_retry_state),
+                    Arc::clone(&handler_watcher_active),
+                );
+                return;
             };
             let paths: Vec<PathBuf> = events
                 .iter()
                 .flat_map(|event| event.paths.clone())
                 .collect();
-            let (changes, needs_diff) = match handler_snapshot.lock() {
+            let (changes, needs_diff, retry_catalog) = match handler_snapshot.lock() {
                 Ok(mut snapshot) => {
                     let mut changes = collect_changes(&paths, &handler_root);
                     let needs_diff = needs_catalog_diff(&paths, &handler_root, &snapshot);
+                    let mut retry_catalog = false;
                     if needs_diff {
                         match scan_catalog(&handler_root) {
                             Ok(after) => {
@@ -392,18 +560,29 @@ pub fn watch_start(
                                     "failed to rebuild graph file catalog after directory change"
                                 );
                                 apply_changes_to_snapshot(&mut snapshot, &changes, &handler_root);
+                                retry_catalog = true;
                             }
                         }
                     } else {
                         apply_changes_to_snapshot(&mut snapshot, &changes, &handler_root);
                     }
-                    (changes, needs_diff)
+                    (changes, needs_diff, retry_catalog)
                 }
                 Err(error) => {
                     tracing::error!(?error, "watcher catalog snapshot lock poisoned");
                     return;
                 }
             };
+            if retry_catalog {
+                schedule_catalog_retry(
+                    handler_app.clone(),
+                    handler_root.clone(),
+                    generation,
+                    Arc::clone(&handler_snapshot),
+                    Arc::clone(&handler_retry_state),
+                    Arc::clone(&handler_watcher_active),
+                );
+            }
             if needs_diff
                 || paths
                     .iter()
@@ -421,7 +600,13 @@ pub fn watch_start(
     )
     .map_err(|err| AppError::io(err.to_string()))?;
 
-    debouncer
+    let mut active_watcher = ActiveWatcher {
+        debouncer,
+        active: watcher_active,
+    };
+
+    active_watcher
+        .debouncer
         .watch(&root, RecursiveMode::Recursive)
         .map_err(|err| AppError::io(err.to_string()))?;
 
@@ -431,7 +616,7 @@ pub fn watch_start(
     let (catch_up, catalog_changed) =
         catch_up_catalog_with(snapshot.as_ref(), || scan_catalog(&root))?;
     // Dropping any previous debouncer here stops its thread.
-    *lock_watcher(&watcher)? = Some(debouncer);
+    *lock_watcher(&watcher)? = Some(active_watcher);
     drop(graph_guard);
     if catalog_changed {
         crate::fs::invalidate_file_catalog(&graph, &root);
@@ -698,6 +883,42 @@ mod tests {
     }
 
     #[test]
+    fn failed_catalog_scan_keeps_the_last_complete_snapshot() {
+        let mut before = CatalogSnapshot::new();
+        before.insert(
+            "Projects/plan.md".to_string(),
+            CatalogEntry {
+                size: 12,
+                modified_ms: 34,
+                placeholder: false,
+            },
+        );
+        let snapshot = Mutex::new(before.clone());
+
+        let result = catch_up_catalog_with(&snapshot, || {
+            Err(AppError::io("transient traversal failure"))
+        });
+
+        assert!(result.is_err());
+        assert_eq!(*snapshot.lock().unwrap(), before);
+    }
+
+    #[test]
+    fn retry_requested_while_a_scan_finishes_is_not_lost() {
+        let retry_state = AtomicU8::new(RETRY_RUNNING);
+
+        assert!(!request_catalog_retry(&retry_state));
+        assert_eq!(retry_state.load(Ordering::Acquire), RETRY_PENDING);
+        assert!(complete_catalog_retry(&retry_state));
+        assert_eq!(retry_state.load(Ordering::Acquire), RETRY_RUNNING);
+
+        assert!(!complete_catalog_retry(&retry_state));
+        assert_eq!(retry_state.load(Ordering::Acquire), RETRY_IDLE);
+        assert!(request_catalog_retry(&retry_state));
+        assert_eq!(retry_state.load(Ordering::Acquire), RETRY_RUNNING);
+    }
+
+    #[test]
     fn catalog_delta_keeps_evictions_silent_and_upserts_materialization() {
         let graph = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(graph.path().join("Projects")).unwrap();
@@ -813,6 +1034,31 @@ mod tests {
             root,
         );
         assert!(changes.is_empty(), "eviction leaked events: {changes:?}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinked_eviction_placeholder_does_not_suppress_removal() {
+        use std::os::unix::fs::symlink;
+
+        let graph = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(graph.path().join("notes")).unwrap();
+        std::fs::write(outside.path().join("stub"), b"outside").unwrap();
+        symlink(
+            outside.path().join("stub"),
+            graph.path().join("notes/.a.md.icloud"),
+        )
+        .unwrap();
+
+        assert_eq!(
+            collect_changes(&[graph.path().join("notes/a.md")], graph.path()),
+            vec![FileChange {
+                path: "notes/a.md".to_string(),
+                kind: "remove".to_string(),
+                modified_ms: None,
+            }]
+        );
     }
 
     #[test]

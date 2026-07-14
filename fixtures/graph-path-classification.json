@@ -21,6 +21,7 @@
   { "path": "Projects\\note.md", "kind": null },
   { "path": "/absolute.md", "kind": null },
   { "path": "C:/absolute.md", "kind": null },
+  { "path": "C:relative.md", "kind": null },
   { "path": "assets/photo.png", "kind": "attachment" },
   { "path": "Media/PHOTO.JPEG", "kind": "attachment" },
   { "path": "Media/clip.MP4", "kind": "attachment" },

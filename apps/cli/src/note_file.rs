@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 use pulldown_cmark::{Event, HeadingLevel, Parser, Tag};
+use reflect_graph_paths::{evicted_logical_path, eviction_placeholder};
 
 use crate::error::CliError;
 use crate::frontmatter::{parse_frontmatter, split_frontmatter, Frontmatter};
@@ -303,17 +304,6 @@ pub fn walk_notes(root: &Path) -> Result<Vec<DiskNote>, CliError> {
     }
     notes.sort_by(|left, right| left.rel_path.cmp(&right.rel_path));
     Ok(notes)
-}
-
-fn evicted_logical_path(path: &Path) -> Option<std::path::PathBuf> {
-    let name = path.file_name()?.to_str()?;
-    let logical = reflect_graph_paths::icloud_placeholder_target(name)?;
-    Some(path.with_file_name(logical))
-}
-
-fn eviction_placeholder(path: &Path) -> Option<std::path::PathBuf> {
-    let name = path.file_name()?.to_str()?;
-    Some(path.with_file_name(format!(".{name}.icloud")))
 }
 
 #[cfg(test)]

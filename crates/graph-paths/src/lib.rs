@@ -6,7 +6,7 @@
 //! must still skip symlinks separately because a lexical path cannot reveal
 //! what an entry points at.
 
-use std::path::{Component, Path};
+use std::path::{Component, Path, PathBuf};
 
 /// Root trees reserved for Reflect-managed attachments and recordings.
 /// Markdown under either tree is content, not a note.
@@ -41,19 +41,18 @@ pub fn classify(path: &Path) -> Option<GraphPathKind> {
 /// and `.` components instead of normalizing them. There is one canonical wire
 /// representation, shared with TypeScript, on every platform.
 pub fn classify_normalized(path: &str) -> Option<GraphPathKind> {
-    if path.is_empty() || path.starts_with('/') || path.ends_with('/') || path.contains('\\') {
+    if path.is_empty()
+        || path.starts_with('/')
+        || path.ends_with('/')
+        || path.contains('\\')
+        || has_windows_drive_prefix(path)
+    {
         return None;
     }
     let components: Vec<&str> = path.split('/').collect();
     if components
         .iter()
         .any(|component| component.is_empty() || component.starts_with('.'))
-    {
-        return None;
-    }
-    if components
-        .first()
-        .is_some_and(|first| first.len() == 2 && first.ends_with(':'))
     {
         return None;
     }
@@ -108,6 +107,25 @@ pub fn icloud_placeholder_target(file_name: &str) -> Option<&str> {
     (!name.is_empty()).then_some(name)
 }
 
+/// If `path` is an iCloud eviction placeholder, return the sibling path of
+/// the logical file it stands in for.
+pub fn evicted_logical_path(path: &Path) -> Option<PathBuf> {
+    let name = path.file_name()?.to_str()?;
+    let logical = icloud_placeholder_target(name)?;
+    Some(path.with_file_name(logical))
+}
+
+/// The iCloud eviction-placeholder sibling for a logical file path.
+pub fn eviction_placeholder(path: &Path) -> Option<PathBuf> {
+    let name = path.file_name()?.to_str()?;
+    Some(path.with_file_name(format!(".{name}.icloud")))
+}
+
+fn has_windows_drive_prefix(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':'
+}
+
 fn visible_components(path: &Path) -> Option<Vec<&str>> {
     if path.as_os_str().is_empty() || path.is_absolute() {
         return None;
@@ -123,7 +141,7 @@ fn visible_components(path: &Path) -> Option<Vec<&str>> {
         .collect::<Option<_>>()?;
     if components
         .first()
-        .is_some_and(|first| first.len() == 2 && first.ends_with(':'))
+        .is_some_and(|first| has_windows_drive_prefix(first))
     {
         return None;
     }
@@ -132,7 +150,12 @@ fn visible_components(path: &Path) -> Option<Vec<&str>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{classify_normalized, GraphPathKind};
+    use std::path::Path;
+
+    use super::{
+        classify, classify_normalized, evicted_logical_path, eviction_placeholder,
+        is_safe_visible_relative, GraphPathKind,
+    };
     use serde::Deserialize;
 
     #[derive(Deserialize)]
@@ -160,5 +183,21 @@ mod tests {
                 fixture.path
             );
         }
+    }
+
+    #[test]
+    fn maps_icloud_placeholders_in_both_directions() {
+        let logical = Path::new("Projects/plan.md");
+        let placeholder = Path::new("Projects/.plan.md.icloud");
+        assert_eq!(eviction_placeholder(logical).as_deref(), Some(placeholder));
+        assert_eq!(evicted_logical_path(placeholder).as_deref(), Some(logical));
+        assert_eq!(evicted_logical_path(logical), None);
+    }
+
+    #[test]
+    fn native_paths_reject_drive_relative_prefixes() {
+        let drive_relative = Path::new("C:relative.md");
+        assert_eq!(classify(drive_relative), None);
+        assert!(!is_safe_visible_relative(drive_relative));
     }
 }
