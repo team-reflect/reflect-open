@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1-beta](https://github.com/team-reflect/reflect-open/compare/v0.6.0...v0.6.1-beta) (2026-07-14)
+
+
+### Bug Fixes
+
+* capture iOS audio memos from Bluetooth headsets ([#789](https://github.com/team-reflect/reflect-open/issues/789)) ([8a4e2ea](https://github.com/team-reflect/reflect-open/commit/8a4e2eaa6f04283c3a1669893b45e1d5655f64a2))
+
 ## [0.6.0-beta.17](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.16...v0.6.0-beta.17) (2026-07-13)
 
 
