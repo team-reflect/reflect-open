@@ -56,6 +56,7 @@ pub(crate) use self::resolve::resolve as resolve_in_graph;
 #[cfg(desktop)]
 pub(crate) use reflect_graph_paths::eviction_placeholder;
 /// iCloud eviction-placeholder name mapping, shared with container discovery.
+#[cfg(any(target_os = "ios", target_os = "macos"))]
 pub(crate) use reflect_graph_paths::icloud_placeholder_target;
 
 /// The open graph root plus a monotonic generation, kept **under one lock** so
