@@ -51,9 +51,8 @@ pub(crate) use self::resolve::ensure_relative;
 /// The full traversal guard, shared with sibling modules that address graph
 /// files (capture promotes screenshots into `assets/`).
 pub(crate) use self::resolve::resolve as resolve_in_graph;
-/// iCloud eviction-placeholder path construction, shared with the desktop
-/// watcher (which must treat an evicted note as present, not deleted).
-#[cfg(desktop)]
+/// iCloud eviction-placeholder path construction, shared with note deletion
+/// and the desktop watcher (which treats an evicted note as present).
 pub(crate) use reflect_graph_paths::eviction_placeholder;
 /// iCloud eviction-placeholder name mapping, shared with container discovery.
 #[cfg(any(target_os = "ios", target_os = "macos"))]
