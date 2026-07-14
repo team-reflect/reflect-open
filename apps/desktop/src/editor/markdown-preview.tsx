@@ -19,6 +19,8 @@ interface MarkdownPreviewProps {
   content: string
   /** Resolve `![…](…)` sources to displayable URLs; unresolved images are skipped. */
   resolveImageUrl?: (src: string) => string | null
+  /** Changes when a stable resolver's backing attachment catalog changes. */
+  resolverRevision?: number
   /**
    * Navigate a clicked `[[wiki link]]` target. Omitted, links render as
    * inert chips (the palette preview's behavior). `event` carries the
@@ -38,18 +40,17 @@ interface MarkdownPreviewProps {
 export function MarkdownPreview({
   content,
   resolveImageUrl,
+  resolverRevision = 0,
   onWikiLinkClick,
   interactive = true,
   className,
 }: MarkdownPreviewProps): ReactElement {
   const openExternalLink = useOpenExternalLink()
-  // The resolver and click handler are read through refs so a changing prop
-  // never gives MarkdownView a new callback identity (which would re-render its
-  // whole tree).
-  const resolveRef = useRef(resolveImageUrl)
+  // Navigation stays behind a ref; attachment resolution intentionally gets a
+  // new callback when its resolver/revision changes so MarkdownView rebuilds
+  // stale image and embed atoms.
   const navigateRef = useRef(onWikiLinkClick)
   useEffect(() => {
-    resolveRef.current = resolveImageUrl
     navigateRef.current = onWikiLinkClick
   })
 
@@ -59,9 +60,9 @@ export function MarkdownPreview({
   // navigation.
   const navigates = interactive && onWikiLinkClick != null
 
-  const resolveImageUrlStable = useCallback(
-    (src: string) => resolveRef.current?.(src) ?? undefined,
-    [],
+  const resolveImageUrlVersioned = useCallback(
+    (src: string) => resolveImageUrl?.(src) ?? undefined,
+    [resolveImageUrl, resolverRevision],
   )
   const onWikilinkClickStable = useCallback(
     (payload: { target: string; event: MouseEvent | KeyboardEvent }) =>
@@ -74,7 +75,7 @@ export function MarkdownPreview({
       markdown={content}
       markMode="hide"
       interactive={interactive}
-      resolveImageUrl={resolveImageUrlStable}
+      resolveImageUrl={resolveImageUrlVersioned}
       {...(interactive ? { onLinkClick: openExternalLink } : {})}
       {...(navigates ? { onWikilinkClick: onWikilinkClickStable } : {})}
       className={cn('reflect-editor', className)}

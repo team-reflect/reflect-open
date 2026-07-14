@@ -17,6 +17,8 @@ interface BridgeBehavior {
   occupied?: string[]
   /** Markdown files visible to the disk-family fallback scan. */
   files?: Record<string, string>
+  /** Files whose manifest mtime is already represented by the index. */
+  indexedFiles?: Record<string, string>
   /** Evicted files whose title cannot currently be inspected. */
   placeholders?: string[]
   /** Listed files whose contents fail to read. */
@@ -34,17 +36,31 @@ interface BridgeBehavior {
 function bindBridge({
   occupied = [],
   files = {},
+  indexedFiles = {},
   placeholders = [],
   readErrors = [],
   query,
   create,
 }: BridgeBehavior = {}): ReturnType<typeof vi.fn> {
-  const taken = new Set([...occupied, ...Object.keys(files), ...placeholders, ...readErrors])
+  const taken = new Set([
+    ...occupied,
+    ...Object.keys(files),
+    ...Object.keys(indexedFiles),
+    ...placeholders,
+    ...readErrors,
+  ])
   const unreadable = new Set(readErrors)
   const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
     if (command === 'db_query') {
       const sql = String(args?.['sql'] ?? '')
       const params = (args?.['params'] as unknown[]) ?? []
+      if (sql.includes('"file_hash"') && sql.includes('"mtime"')) {
+        return Object.keys(indexedFiles).map((path) => ({
+          path,
+          file_hash: `hash:${path}`,
+          mtime: 1,
+        }))
+      }
       if (query !== undefined) {
         return query(sql, params)
       }
@@ -58,6 +74,11 @@ function bindBridge({
     }
     if (command === 'list_files') {
       return [
+        ...Object.keys(indexedFiles).map((path) => ({
+          path,
+          size: indexedFiles[path]!.length,
+          modifiedMs: 1,
+        })),
         ...Object.keys(files).map((path) => ({ path, size: files[path]!.length, modifiedMs: 1 })),
         ...placeholders.map((path) => ({
           path,
@@ -73,7 +94,7 @@ function bindBridge({
       if (unreadable.has(path)) {
         throw { kind: 'io', message: `${path} is temporarily unreadable` }
       }
-      const source = files[path]
+      const source = files[path] ?? indexedFiles[path]
       if (source === undefined) {
         throw { kind: 'notFound', message: `${path} not found` }
       }
@@ -149,8 +170,9 @@ describe('createNoteWithTitle', () => {
 describe('resolveOrCreateNoteWithTitle', () => {
   it('uses exact index resolution before reading the slug family', async () => {
     const invoke = bindBridge({
+      indexedFiles: { 'notes/indexed.md': '# Business ideas\n' },
       query: (sql, params) =>
-        sql.includes('"title_key" = ?') && params[0] === 'business ideas'
+        sql.includes('"authored_title_key" = ?') && params[0] === 'business ideas'
           ? [{ path: 'notes/indexed.md' }]
           : [],
     })
@@ -159,17 +181,22 @@ describe('resolveOrCreateNoteWithTitle', () => {
       kind: 'resolved',
       path: 'notes/indexed.md',
     })
-    expect(invoke).not.toHaveBeenCalledWith('list_files', expect.anything())
+    expect(invoke).toHaveBeenCalledWith('list_files', { generation: 7 })
+    expect(invoke).not.toHaveBeenCalledWith('note_read', expect.anything())
     expect(invoke.mock.calls.some(([command]) => command === 'note_create')).toBe(false)
   })
 
   it('preserves indexed daily-date precedence over a regular title', async () => {
     const invoke = bindBridge({
+      indexedFiles: {
+        'daily/2026-06-09.md': 'Daily contents\n',
+        'notes/date-title.md': '# 2026-06-09\n',
+      },
       query: (sql) => {
         if (sql.includes('"daily_date" = ?')) {
           return [{ path: 'daily/2026-06-09.md' }]
         }
-        if (sql.includes('"title_key" = ?')) {
+        if (sql.includes('"authored_title_key" = ?')) {
           return [{ path: 'notes/date-title.md' }]
         }
         return []
@@ -183,9 +210,9 @@ describe('resolveOrCreateNoteWithTitle', () => {
     expect(
       invoke.mock.calls.some(
         ([command, args]) =>
-          command === 'db_query' && String(args?.['sql']).includes('"title_key" = ?'),
+          command === 'db_query' && String(args?.['sql']).includes('"authored_title_key" = ?'),
       ),
-    ).toBe(false)
+    ).toBe(true)
   })
 
   it('reuses an unindexed daily file instead of creating a regular date-titled note', async () => {
@@ -206,8 +233,12 @@ describe('resolveOrCreateNoteWithTitle', () => {
 
   it('refuses multiple indexed notes claiming the same exact title', async () => {
     const invoke = bindBridge({
+      indexedFiles: {
+        'notes/business-ideas-2.md': '# Business ideas\n',
+        'notes/business-ideas.md': '# Business ideas\n',
+      },
       query: (sql, params) =>
-        sql.includes('"title_key" = ?') && params[0] === 'business ideas'
+        sql.includes('"authored_title_key" = ?') && params[0] === 'business ideas'
           ? [{ path: 'notes/business-ideas-2.md' }, { path: 'notes/business-ideas.md' }]
           : [],
     })
@@ -216,14 +247,19 @@ describe('resolveOrCreateNoteWithTitle', () => {
       kind: 'ambiguous',
       paths: ['notes/business-ideas-2.md', 'notes/business-ideas.md'],
     })
-    expect(invoke.mock.calls.some(([command]) => command === 'list_files')).toBe(false)
+    expect(invoke.mock.calls.some(([command]) => command === 'list_files')).toBe(true)
     expect(invoke.mock.calls.some(([command]) => command === 'note_create')).toBe(false)
   })
 
   it('prefers indexed title matches over aliases', async () => {
     const titleInvoke = bindBridge({
+      indexedFiles: {
+        'notes/titled.md': '# Business ideas\n',
+        'notes/alias-a.md': '---\naliases: [Business ideas]\n---\n# A\n',
+        'notes/alias-b.md': '---\naliases: [Business ideas]\n---\n# B\n',
+      },
       query: (sql) => {
-        if (sql.includes('"title_key" = ?')) {
+        if (sql.includes('"authored_title_key" = ?')) {
           return [{ path: 'notes/titled.md' }]
         }
         if (sql.includes('from "aliases"')) {
@@ -245,11 +281,15 @@ describe('resolveOrCreateNoteWithTitle', () => {
         ([command, args]) =>
           command === 'db_query' && String(args?.['sql']).includes('from "aliases"'),
       ),
-    ).toBe(false)
+    ).toBe(true)
   })
 
   it('refuses multiple indexed notes claiming the same exact alias', async () => {
     const aliasInvoke = bindBridge({
+      indexedFiles: {
+        'notes/alias-a.md': '---\naliases: [Business ideas]\n---\n# A\n',
+        'notes/alias-b.md': '---\naliases: [Business ideas]\n---\n# B\n',
+      },
       query: (sql) =>
         sql.includes('from "aliases"')
           ? [
@@ -398,13 +438,19 @@ describe('resolveOrCreateNoteWithTitle', () => {
 
   it('re-resolves after the disk scan before creating', async () => {
     let titleLookups = 0
+    const indexedFiles: Record<string, string> = {}
     const invoke = bindBridge({
+      indexedFiles,
       query: (sql) => {
-        if (!sql.includes('"title_key" = ?')) {
+        if (!sql.includes('"authored_title_key" = ?')) {
           return []
         }
         titleLookups += 1
-        return titleLookups === 2 ? [{ path: 'notes/synced.md' }] : []
+        if (titleLookups === 1) {
+          indexedFiles['notes/synced.md'] = '# Synced\n'
+          return []
+        }
+        return [{ path: 'notes/synced.md' }]
       },
     })
 
@@ -422,7 +468,7 @@ describe('resolveOrCreateNoteWithTitle', () => {
     const invoke = bindBridge({
       files,
       query: (sql) => {
-        if (!sql.includes('"title_key" = ?')) {
+        if (!sql.includes('"authored_title_key" = ?')) {
           return []
         }
         titleLookups += 1
@@ -438,7 +484,7 @@ describe('resolveOrCreateNoteWithTitle', () => {
       path: 'notes/business-ideas.md',
     })
     expect(titleLookups).toBe(3)
-    expect(invoke.mock.calls.filter(([command]) => command === 'list_files')).toHaveLength(2)
+    expect(invoke.mock.calls.filter(([command]) => command === 'list_files')).toHaveLength(3)
     expect(invoke.mock.calls.filter(([command]) => command === 'note_create')).toHaveLength(1)
     expect(files['notes/business-ideas-2.md']).toBeUndefined()
   })

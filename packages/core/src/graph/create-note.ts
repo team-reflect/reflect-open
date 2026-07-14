@@ -3,6 +3,7 @@ import { upsertFrontmatter } from '../markdown/frontmatter'
 import { slugForTitle } from '../markdown/slug'
 import { createNoteIfAbsent } from './commands'
 import { notePath } from './paths'
+import { bareWikiTitle, wikiNotePath } from './local-note-reference'
 import {
   resolveExistingWikiTarget,
   type ExistingWikiTargetResolution,
@@ -90,6 +91,7 @@ export type ResolveOrCreateNoteResult =
   | { readonly kind: 'created'; readonly path: string }
   | { readonly kind: 'ambiguous'; readonly paths: readonly string[] }
   | { readonly kind: 'unavailable'; readonly paths: readonly string[] }
+  | { readonly kind: 'invalid' }
 
 type ExistingTitleResolution = Exclude<ExistingWikiTargetResolution, { kind: 'missing' }>
 
@@ -151,10 +153,59 @@ export async function resolveOrCreateNoteWithTitle(
     return existing
   }
 
+  const confirmed = await resolveExistingWikiTarget(title, generation)
+  if (confirmed.kind !== 'missing') {
+    return confirmed
+  }
+
   // On a lost claim, re-resolve both projections before considering a
   // suffix: the winner may be the note this link meant.
   return claimNotePathForSlug(slugForTitle(title), newNoteSource(title), generation, async () => {
     const collisionResolution = await resolveExistingWikiTarget(title, generation)
     return collisionResolution.kind === 'missing' ? null : collisionResolution
   })
+}
+
+function exactPathTitle(path: string): string {
+  const filename = path.split('/').pop() ?? path
+  return filename.replace(/\.md$/, '')
+}
+
+function exactPathSource(path: string): string {
+  const title = exactPathTitle(path)
+  return /^notes\/[^/]+\.md$/.test(path) ? newNoteSource(title) : `# ${title}\n`
+}
+
+/**
+ * Resolve a wiki target, creating only through its authored syntax on a proven
+ * miss. Path-qualified targets atomically claim that exact safe vault path;
+ * ordinary titles keep Reflect's `notes/<slug>.md` convention.
+ */
+export async function resolveOrCreateWikiTarget(
+  target: string,
+  sourcePath: string,
+  generation: number,
+): Promise<ResolveOrCreateNoteResult> {
+  const exactPath = wikiNotePath(target)
+  if (exactPath === null) {
+    const title = bareWikiTitle(target)
+    if (title !== null) {
+      return resolveOrCreateNoteWithTitle(title, generation)
+    }
+    const existing = await resolveExistingWikiTarget(target, generation, sourcePath)
+    return existing.kind === 'missing' ? { kind: 'invalid' } : existing
+  }
+
+  const existing = await resolveExistingWikiTarget(target, generation, sourcePath)
+  if (existing.kind !== 'missing') {
+    return existing
+  }
+  const claimed = await createNoteIfAbsent(exactPath, exactPathSource(exactPath), generation)
+  if (claimed.kind === 'created') {
+    return { kind: 'created', path: exactPath }
+  }
+  const winner = await resolveExistingWikiTarget(target, generation, sourcePath)
+  return winner.kind === 'missing'
+    ? { kind: 'unavailable', paths: [exactPath] }
+    : winner
 }

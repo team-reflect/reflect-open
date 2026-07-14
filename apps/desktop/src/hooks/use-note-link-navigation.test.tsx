@@ -5,6 +5,7 @@ import { RouterProvider, useRouter } from '@/routing/router'
 import { useNoteLinkNavigation } from './use-note-link-navigation'
 
 const openRouteInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
+const beforeInWindowNavigate = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/windows/open-in-new-window')>()),
@@ -17,7 +18,13 @@ function Links({ scopeKey }: { readonly scopeKey: string | undefined }): ReactEl
     <>
       <button
         type="button"
-        onClick={(event) => openNoteLink({ kind: 'note', path: 'notes/alpha.md' }, event)}
+        onClick={(event) =>
+          openNoteLink(
+            { kind: 'note', path: 'notes/alpha.md' },
+            event,
+            beforeInWindowNavigate,
+          )
+        }
       >
         Alpha
       </button>
@@ -66,6 +73,7 @@ function route(view: ReturnType<typeof render>): unknown {
 
 beforeEach(() => {
   openRouteInNewWindow.mockReset().mockResolvedValue(true)
+  beforeInWindowNavigate.mockReset()
 })
 
 afterEach(cleanup)
@@ -78,6 +86,7 @@ describe('useNoteLinkNavigation', () => {
 
     expect(route(view)).toEqual({ kind: 'note', path: 'notes/alpha.md' })
     expect(openRouteInNewWindow).not.toHaveBeenCalled()
+    expect(beforeInWindowNavigate).toHaveBeenCalledOnce()
   })
 
   it('opens a modifier-click in a secondary window without navigating', async () => {
@@ -92,6 +101,7 @@ describe('useNoteLinkNavigation', () => {
       }),
     )
     expect(route(view)).toEqual({ kind: 'allNotes', tag: null })
+    expect(beforeInWindowNavigate).not.toHaveBeenCalled()
   })
 
   it('falls back to current-window navigation when a secondary window is declined', async () => {
@@ -103,6 +113,7 @@ describe('useNoteLinkNavigation', () => {
     await waitFor(() =>
       expect(route(view)).toEqual({ kind: 'note', path: 'notes/alpha.md' }),
     )
+    expect(beforeInWindowNavigate).toHaveBeenCalledOnce()
   })
 
   it('falls back to current-window navigation when a secondary window open rejects', async () => {

@@ -44,8 +44,9 @@ function setupRenderer(
       generation: 7,
       graphKey: '/graph',
       dateFormat: 'mdy',
-      resolveImageUrl: (source) => `reflect-asset://${source}`,
-      resolveAssetOpenPath: (source) =>
+      resolverRevision: 0,
+      resolveImageUrlFromSource: (_sourcePath, source) => `reflect-asset://${source}`,
+      resolveAssetOpenPathFromSource: (_sourcePath, source) =>
         source.startsWith('assets/') && !source.includes('..') ? source : null,
       ...overrides,
     }),

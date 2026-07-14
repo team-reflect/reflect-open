@@ -37,7 +37,10 @@ async function readNoteForPreview(path: string): Promise<string | null> {
 export function NotePreview({ entry }: NotePreviewProps): ReactElement {
   const { graph } = useGraph()
   const { settings } = useSettings()
-  const { resolveImageUrl } = useAssetPersistence(graph?.generation ?? null)
+  const { resolveImageUrl, attachmentCatalogRevision } = useAssetPersistence(
+    graph?.generation ?? null,
+    entry.path,
+  )
   const { data, isError } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'note-preview', entry.path],
     queryFn: () => readNoteForPreview(entry.path),
@@ -54,7 +57,13 @@ export function NotePreview({ entry }: NotePreviewProps): ReactElement {
   } else if (body === null || body.trim() === '') {
     content = <p className="text-sm text-text-muted italic">Empty</p>
   } else {
-    content = <MarkdownPreview content={body} resolveImageUrl={resolveImageUrl} />
+    content = (
+      <MarkdownPreview
+        content={body}
+        resolveImageUrl={resolveImageUrl}
+        resolverRevision={attachmentCatalogRevision}
+      />
+    )
   }
 
   return (

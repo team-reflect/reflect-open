@@ -12,6 +12,8 @@ import { useRouter } from '@/routing/router'
 export type NoteLinkNavigation = (
   route: NoteRoute,
   event?: NewWindowClickEvent,
+  /** Runs only when this window will navigate, immediately before the route change. */
+  beforeInWindowNavigate?: () => void,
 ) => void
 
 /**
@@ -37,9 +39,10 @@ export function useNoteLinkNavigation(scopeKey?: string | number | null): NoteLi
   }, [scopeKey])
 
   return useCallback(
-    (target, event) => {
+    (target, event, beforeInWindowNavigate) => {
       const isStale = beginLinkIntent()
       if (!isNewWindowClick(event)) {
+        beforeInWindowNavigate?.()
         navigate(target)
         return
       }
@@ -55,6 +58,7 @@ export function useNoteLinkNavigation(scopeKey?: string | number | null): NoteLi
         if (opened || isStale() || !Object.is(scopeKeyRef.current, startedInScope)) {
           return
         }
+        beforeInWindowNavigate?.()
         navigate(target)
       })()
     },

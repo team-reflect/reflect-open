@@ -6,6 +6,7 @@ import { WorkspaceContent } from '@/components/workspace-content'
 import { getInitialWindowRoute } from '@/lib/windows/initial-window-route'
 import { isMainWindow } from '@/lib/windows/window-role'
 import { AssetDescribeProvider } from '@/providers/asset-describe-provider'
+import { AttachmentCatalogProvider } from '@/providers/attachment-catalog-provider'
 import { AudioMemoProvider } from '@/providers/audio-memo-provider'
 import { FocusedDailyProvider } from '@/providers/focused-daily-provider'
 import { CaptureProvider } from '@/providers/capture-provider'
@@ -36,7 +37,11 @@ export function GraphWorkspace({ graph }: GraphWorkspaceProps): ReactElement {
   const initialRoute = isMainWindow() ? null : getInitialWindowRoute()
   return (
     <RouterProvider key={graph.root} {...(initialRoute !== null ? { initialRoute } : {})}>
-      <SyncProvider graph={graph}>
+      <AttachmentCatalogProvider
+        key={`${graph.root}:${graph.generation}`}
+        generation={graph.generation}
+      >
+        <SyncProvider graph={graph}>
         <PaletteProvider>
           <ShortcutsProvider>
             <NoteTemplatesProvider>
@@ -76,7 +81,8 @@ export function GraphWorkspace({ graph }: GraphWorkspaceProps): ReactElement {
             </NoteTemplatesProvider>
           </ShortcutsProvider>
         </PaletteProvider>
-      </SyncProvider>
+        </SyncProvider>
+      </AttachmentCatalogProvider>
     </RouterProvider>
   )
 }

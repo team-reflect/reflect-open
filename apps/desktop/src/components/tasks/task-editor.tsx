@@ -12,6 +12,7 @@ import { type OpenTask } from '@reflect/core'
 import { markModeFromSyntax } from '@/editor/mark-mode'
 import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor'
 import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete'
+import { useMarkdownLinkNavigation } from '@/editor/use-markdown-link-navigation'
 import { useTagNavigation } from '@/editor/use-tag-navigation'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
 import { taskContent } from '@/lib/tasks/task-content'
@@ -162,7 +163,8 @@ export function TaskEditor({
   const { graph } = useGraph()
   const { settings } = useSettings()
   const generation = graph?.generation ?? null
-  const navigate = useWikiLinkNavigation(generation)
+  const navigate = useWikiLinkNavigation(generation, task.notePath)
+  const navigateMarkdownLink = useMarkdownLinkNavigation(generation, task.notePath)
   const onTagClick = useTagNavigation()
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
 
@@ -220,6 +222,7 @@ export function TaskEditor({
         // A one-line editor has nothing to reorder, so keep the gutter grip off.
         blockHandle={false}
         onWikiLinkClick={navigate}
+        onMarkdownNoteLinkClick={navigateMarkdownLink}
         onTagClick={onTagClick}
         onWikilinkSearch={onWikilinkSearch}
         onTagSearch={onTagSearch}

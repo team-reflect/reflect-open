@@ -19,7 +19,7 @@ interface IncomingBacklinkGroupProps {
   /** Navigate a clicked `[[wiki link]]` inside a snippet to its target. */
   onWikilinkClick: WikilinkClickHandler
   /** Resolve `![…](…)` sources inside a snippet to displayable URLs. */
-  resolveImageUrl: (src: string) => string | undefined
+  resolveImageUrl: (sourcePath: string, src: string) => string | undefined
 }
 
 /**

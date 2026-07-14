@@ -100,6 +100,7 @@ vi.mock('@/editor/note-editor', async () => {
           focus: () => {
             editorProbe.focusCalls += 1
           },
+          revealHeading: () => false,
           setSelection: () => {},
           getSelectedText: () => '',
           openSelectionMenu: () => {},

@@ -8,8 +8,9 @@ interface WikiLinkHoverPreviewOptions {
   generation: number | null
   graphKey: string | null
   dateFormat: DateFormat
-  resolveImageUrl: (src: string) => string | null
-  resolveAssetOpenPath: (src: string) => string | null
+  resolverRevision: number
+  resolveImageUrlFromSource: (sourcePath: string, src: string) => string | null
+  resolveAssetOpenPathFromSource: (sourcePath: string, src: string) => string | null
 }
 
 function isSvgAsset(path: string): boolean {
@@ -33,25 +34,10 @@ export function useWikiLinkHoverPreview({
   generation,
   graphKey,
   dateFormat,
-  resolveImageUrl,
-  resolveAssetOpenPath,
+  resolverRevision,
+  resolveImageUrlFromSource,
+  resolveAssetOpenPathFromSource,
 }: WikiLinkHoverPreviewOptions): (hit: WikilinkHoverHit) => Promise<ReactNode> {
-  const resolvePreviewImageUrl = useCallback(
-    (source: string): string | null => {
-      const assetPath = resolveAssetOpenPath(source)
-      // SVG can contain external subresource references. The filename check
-      // avoids an unnecessary request; the query also makes the asset protocol
-      // enforce a sniffed raster MIME allowlist, so renamed SVG bytes cannot
-      // bypass the passive card's no-network boundary.
-      if (assetPath === null || isSvgAsset(assetPath)) {
-        return null
-      }
-      const url = resolveImageUrl(assetPath)
-      return url === null ? null : previewRasterUrl(url)
-    },
-    [resolveAssetOpenPath, resolveImageUrl],
-  )
-
   return useCallback(
     async ({ target }: WikilinkHoverHit): Promise<ReactNode> => {
       if (generation === null || graphKey === null) {
@@ -63,18 +49,38 @@ export function useWikiLinkHoverPreview({
           return null
         }
         const source = await readExistingNoteSource(resolution.path, generation)
+        const resolvePreviewImageUrl = (imageSource: string): string | null => {
+          const assetPath = resolveAssetOpenPathFromSource(resolution.path, imageSource)
+          // SVG can contain external subresource references. The filename check
+          // avoids an unnecessary request; the query also makes the asset protocol
+          // enforce a sniffed raster MIME allowlist, so renamed SVG bytes cannot
+          // bypass the passive card's no-network boundary.
+          if (assetPath === null || isSvgAsset(assetPath)) {
+            return null
+          }
+          const url = resolveImageUrlFromSource(resolution.path, imageSource)
+          return url === null ? null : previewRasterUrl(url)
+        }
         return (
           <WikiLinkHoverPreview
             path={resolution.path}
             markdown={splitFrontmatter(source).body}
             dateFormat={dateFormat}
             resolveImageUrl={resolvePreviewImageUrl}
+            resolverRevision={resolverRevision}
           />
         )
       } catch {
         return null
       }
     },
-    [dateFormat, generation, graphKey, resolvePreviewImageUrl],
+    [
+      dateFormat,
+      generation,
+      graphKey,
+      resolverRevision,
+      resolveAssetOpenPathFromSource,
+      resolveImageUrlFromSource,
+    ],
   )
 }

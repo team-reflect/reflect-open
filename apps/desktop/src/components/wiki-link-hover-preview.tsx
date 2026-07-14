@@ -10,6 +10,7 @@ interface WikiLinkHoverPreviewProps {
   markdown: string
   dateFormat: DateFormat
   resolveImageUrl: (src: string) => string | null
+  resolverRevision: number
 }
 
 /**
@@ -58,6 +59,7 @@ export function WikiLinkHoverPreview({
   markdown,
   dateFormat,
   resolveImageUrl,
+  resolverRevision,
 }: WikiLinkHoverPreviewProps): ReactElement {
   const dailyDate = dateFromDailyPath(path)
   const empty = markdown.trim().length === 0
@@ -82,6 +84,7 @@ export function WikiLinkHoverPreview({
           <MarkdownPreview
             content={markdown}
             resolveImageUrl={resolveImageUrl}
+            resolverRevision={resolverRevision}
             interactive={false}
             className="text-xs leading-relaxed"
           />

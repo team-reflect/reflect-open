@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import { useCallback, type ReactElement } from 'react'
 import { MarkdownView } from '@meowdown/react'
 import type { WikilinkClickHandler } from '@meowdown/core'
 import type { SnippetTask } from '@reflect/core'
@@ -15,7 +15,7 @@ interface BacklinkSnippetProps {
   /** Navigate a clicked `[[wiki link]]` to its target. Pass a stable function. */
   onWikilinkClick: WikilinkClickHandler
   /** Resolve `![…](…)` sources to displayable URLs. Pass a stable function. */
-  resolveImageUrl: (src: string) => string | undefined
+  resolveImageUrl: (sourcePath: string, src: string) => string | undefined
 }
 
 /**
@@ -41,6 +41,10 @@ export function BacklinkSnippet({
 }: BacklinkSnippetProps): ReactElement {
   const onTaskClick = useSnippetTaskToggle(notePath, tasks)
   const openExternalLink = useOpenExternalLink()
+  const resolveSnippetImageUrl = useCallback(
+    (src: string) => resolveImageUrl(notePath, src),
+    [notePath, resolveImageUrl],
+  )
   return (
     <div className="reflect-backlink-snippet select-text text-xs text-text">
       <MarkdownView
@@ -49,7 +53,7 @@ export function BacklinkSnippet({
         onWikilinkClick={onWikilinkClick}
         onLinkClick={openExternalLink}
         {...(onTaskClick ? { onTaskClick } : {})}
-        resolveImageUrl={resolveImageUrl}
+        resolveImageUrl={resolveSnippetImageUrl}
       />
     </div>
   )

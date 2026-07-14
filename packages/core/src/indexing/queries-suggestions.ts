@@ -2,7 +2,7 @@ import { sql } from 'kysely'
 import { foldTag, normalizeWikiTarget } from '../markdown'
 import { generateDateSuggestions, type DateSuggestionContext } from './date-suggestions'
 import { db } from './db'
-import { likeContains } from './query-utils'
+import { inClauseChunks, likeContains } from './query-utils'
 import {
   mergeDateSuggestions,
   rankWikiSuggestions,
@@ -15,6 +15,70 @@ import {
 export interface TagSuggestion {
   tag: string
   count: number
+}
+
+interface NoteKeyOwner {
+  readonly notePath: string
+  readonly priority: number
+}
+
+function pathQualifiedWikiTarget(path: string): string {
+  const withoutExtension = path.endsWith('.md') ? path.slice(0, -3) : path
+  return withoutExtension.includes('/') ? withoutExtension : `./${withoutExtension}`
+}
+
+/**
+ * Make every indexed autocomplete target resolve back to the row the user
+ * selected. Bare targets stay compact when the winning resolution tier has
+ * one owner; collisions use the shortest vault-root-qualified spelling (the
+ * graph-relative path without the optional `.md`).
+ */
+async function qualifyAmbiguousWikiSuggestions(
+  suggestions: readonly WikiSuggestion[],
+): Promise<WikiSuggestion[]> {
+  const keys = [
+    ...new Set(
+      suggestions.flatMap((suggestion) =>
+        suggestion.path === null ? [] : [normalizeWikiTarget(suggestion.target).key],
+      ),
+    ),
+  ].filter((key) => key !== '')
+  const ownersByKey = new Map<string, NoteKeyOwner[]>()
+  for (const chunk of inClauseChunks(keys)) {
+    const rows = await db
+      .selectFrom('noteKeys')
+      .where('key', 'in', chunk)
+      .select(['key', 'notePath', 'priority'])
+      .orderBy('key')
+      .orderBy('priority')
+      .orderBy('notePath')
+      .execute()
+    for (const row of rows) {
+      if (row.key === null || row.notePath === null || row.priority === null) {
+        continue
+      }
+      const owners = ownersByKey.get(row.key) ?? []
+      owners.push({ notePath: row.notePath, priority: Number(row.priority) })
+      ownersByKey.set(row.key, owners)
+    }
+  }
+
+  return suggestions.map((suggestion) => {
+    if (suggestion.path === null) {
+      return suggestion
+    }
+    const key = normalizeWikiTarget(suggestion.target).key
+    const owners = ownersByKey.get(key) ?? []
+    const bestPriority = owners.reduce(
+      (best, owner) => Math.min(best, owner.priority),
+      Number.POSITIVE_INFINITY,
+    )
+    const winners = owners.filter((owner) => owner.priority === bestPriority)
+    if (winners.length === 1 && winners[0]!.notePath === suggestion.path) {
+      return suggestion
+    }
+    return { ...suggestion, target: pathQualifiedWikiTarget(suggestion.path) }
+  })
 }
 
 /**
@@ -86,7 +150,9 @@ export async function suggestWikiTargets(
       .execute()
   }
 
-  const ranked = rankWikiSuggestions(key, titles, aliases, limit)
+  const ranked = await qualifyAmbiguousWikiSuggestions(
+    rankWikiSuggestions(key, titles, aliases, limit),
+  )
   if (dateGen !== undefined) {
     return mergeDateSuggestions(ranked, generateDateSuggestions(query, dateGen), { key, limit })
   }

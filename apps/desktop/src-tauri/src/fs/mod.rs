@@ -8,6 +8,7 @@
 
 pub mod asset_protocol;
 pub mod assets;
+mod attachments;
 mod import;
 mod import_assets;
 mod io;
@@ -210,18 +211,6 @@ fn root_for(state: &State<GraphState>, generation: Option<u64>) -> AppResult<Pat
     }
 }
 
-fn ensure_asset_path(path: &str) -> AppResult<()> {
-    if path
-        .strip_prefix("assets/")
-        .is_some_and(|rest| !rest.is_empty())
-    {
-        return Ok(());
-    }
-    Err(AppError::traversal(format!(
-        "asset path must be under assets/: {path}"
-    )))
-}
-
 // ---- commands --------------------------------------------------------------
 
 /// Create a new graph at `path` (scaffolds the layout) and open it.
@@ -401,9 +390,35 @@ pub fn asset_read(path: String, generation: u64, state: State<GraphState>) -> Ap
     Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
-/// Open a graph asset in the OS default application. The frontend supplies the
-/// graph-relative `assets/...` path from markdown; Rust resolves it inside the
-/// generation-pinned graph so the JS opener never gets broad filesystem access.
+/// Resolve a local Markdown or wiki-embed attachment without exposing the
+/// graph's absolute path. The tagged result keeps missing, unavailable, and
+/// ambiguous references distinct so the frontend never has to guess.
+#[tauri::command]
+pub async fn attachment_resolve(
+    request: attachments::AttachmentResolveRequest,
+    state: State<'_, GraphState>,
+) -> AppResult<attachments::AttachmentResolveOutcome> {
+    let root = root_for_generation(&state, request.generation)?;
+    let resolver_root = root.clone();
+    let outcome = tauri::async_runtime::spawn_blocking(move || {
+        attachments::resolve_reference(
+            &resolver_root,
+            &request.source_path,
+            &request.reference,
+            request.reference_kind,
+        )
+    })
+    .await
+    .map_err(|err| AppError::io(format!("attachment resolver task failed: {err}")))??;
+    if let attachments::AttachmentResolveOutcome::Unavailable { path } = &outcome {
+        attachments::request_materialization(&root, path);
+    }
+    Ok(outcome)
+}
+
+/// Open a resolved in-vault attachment in the OS default application. Protocol
+/// URLs and IPC calls are independently forgeable, so this revalidates the
+/// supported extension, visible path policy, and symlink-free ancestry.
 #[tauri::command]
 pub fn asset_open(
     path: String,
@@ -411,12 +426,8 @@ pub fn asset_open(
     app: tauri::AppHandle,
     state: State<GraphState>,
 ) -> AppResult<()> {
-    ensure_asset_path(&path)?;
     let root = root_for_generation(&state, generation)?;
-    let abs = resolve(&root, &path)?;
-    if !abs.is_file() {
-        return Err(AppError::not_found(format!("asset not found: {path}")));
-    }
+    let abs = attachments::resolve_existing_path(&root, &path)?;
     open_asset_path(&app, &abs)
 }
 
@@ -892,7 +903,7 @@ mod file_catalog_tests {
 
 #[cfg(test)]
 mod move_tests {
-    use super::{asset_file_url, ensure_asset_path, move_note_file};
+    use super::{asset_file_url, move_note_file};
     use std::fs;
 
     fn graph() -> tempfile::TempDir {
@@ -941,14 +952,6 @@ mod move_tests {
         fs::write(root.path().join("notes/.b.md.icloud"), "stub").unwrap();
         assert!(move_note_file(root.path(), "notes/a.md", "notes/b.md").is_err());
         assert!(root.path().join("notes/a.md").exists());
-    }
-
-    #[test]
-    fn asset_open_paths_must_stay_under_assets() {
-        assert!(ensure_asset_path("assets/cat.png").is_ok());
-        assert!(ensure_asset_path("notes/cat.png").is_err());
-        assert!(ensure_asset_path("assets/").is_err());
-        assert!(ensure_asset_path("assets").is_err());
     }
 
     #[test]

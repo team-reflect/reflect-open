@@ -14,6 +14,18 @@ function wikiLinkSpans(body: string): Array<[number, number]> {
   return spans
 }
 
+function wikiEmbedSpans(body: string): Array<[number, number]> {
+  const spans: Array<[number, number]> = []
+  parseBody(body).iterate({
+    enter(node) {
+      if (node.name === 'WikiEmbed') {
+        spans.push([node.from, node.to])
+      }
+    },
+  })
+  return spans
+}
+
 describe('wikiLinkExtension (Lezer grammar)', () => {
   it('parses a wiki link with exact source positions', () => {
     const body = 'See [[Target Note]] here'
@@ -40,5 +52,21 @@ describe('wikiLinkExtension (Lezer grammar)', () => {
   it('never matches inside code spans or fences', () => {
     expect(wikiLinkSpans('`[[in code]]`')).toEqual([])
     expect(wikiLinkSpans('```\n[[in fence]]\n```')).toEqual([])
+  })
+})
+
+describe('wikiEmbedExtension (Lezer grammar)', () => {
+  it('claims the complete embed without exposing a nested wiki link', () => {
+    const body = 'Before ![[Media/photo.png|640]] after'
+    expect(wikiEmbedSpans(body)).toEqual([[7, 31]])
+    expect(wikiLinkSpans(body)).toEqual([])
+  })
+
+  it('rejects empty, nested, unclosed, multiline, and code candidates', () => {
+    expect(wikiEmbedSpans('![[]]')).toEqual([])
+    expect(wikiEmbedSpans('![[a[[b]]')).toEqual([])
+    expect(wikiEmbedSpans('![[never closed')).toEqual([])
+    expect(wikiEmbedSpans('![[spans\nlines]]')).toEqual([])
+    expect(wikiEmbedSpans('`![[in code]]`')).toEqual([])
   })
 })

@@ -347,7 +347,67 @@ export type ExactWikiTargetMatch =
   | { readonly kind: 'date'; readonly paths: readonly string[] }
   | { readonly kind: 'title'; readonly paths: readonly string[] }
   | { readonly kind: 'alias'; readonly paths: readonly string[] }
+  | { readonly kind: 'basename'; readonly paths: readonly string[] }
   | { readonly kind: 'missing'; readonly paths: readonly [] }
+
+/** All bare-wiki candidates before precedence is applied. */
+export interface WikiTargetMatchTiers {
+  readonly date: readonly string[]
+  readonly title: readonly string[]
+  readonly alias: readonly string[]
+  readonly basename: readonly string[]
+}
+
+/** Query every bare-wiki resolution tier without collapsing lower priorities. */
+export async function findWikiTargetMatchTiers(target: string): Promise<WikiTargetMatchTiers> {
+  const normalized = normalizeWikiTarget(target)
+  if (normalized.key === '') {
+    return { date: [], title: [], alias: [], basename: [] }
+  }
+
+  const dateRows = normalized.date === undefined
+    ? []
+    : await db
+        .selectFrom('notes')
+        .where('dailyDate', '=', normalized.date)
+        .where('kind', '!=', 'template')
+        .select('path')
+        .distinct()
+        .orderBy('path')
+        .execute()
+  const titleRows = await db
+    .selectFrom('notes')
+    .where('authoredTitleKey', '=', normalized.key)
+    .where('kind', '!=', 'template')
+    .select('path')
+    .distinct()
+    .orderBy('path')
+    .execute()
+  const aliasRows = await db
+    .selectFrom('aliases')
+    .innerJoin('notes', 'notes.path', 'aliases.notePath')
+    .where('aliasKey', '=', normalized.key)
+    .where('notes.kind', '!=', 'template')
+    .select('notePath')
+    .distinct()
+    .orderBy('notePath')
+    .execute()
+  const basenameRows = await db
+    .selectFrom('notes')
+    .where('basenameKey', '=', normalized.key)
+    .where('kind', '!=', 'template')
+    .select('path')
+    .distinct()
+    .orderBy('path')
+    .execute()
+
+  return {
+    date: dateRows.map((row) => row.path),
+    title: titleRows.map((row) => row.path),
+    alias: aliasRows.map((row) => row.notePath),
+    basename: basenameRows.map((row) => row.path),
+  }
+}
 
 /**
  * Find every indexed path that exactly claims `target`, with ordinary wiki
@@ -359,48 +419,11 @@ export type ExactWikiTargetMatch =
 export async function findExactWikiTargetMatches(
   target: string,
 ): Promise<ExactWikiTargetMatch> {
-  const normalized = normalizeWikiTarget(target)
-  if (normalized.key === '') {
-    return { kind: 'missing', paths: [] }
-  }
-
-  if (normalized.date !== undefined) {
-    const dateRows = await db
-      .selectFrom('notes')
-      .where('dailyDate', '=', normalized.date)
-      .where('kind', '!=', 'template')
-      .select('path')
-      .distinct()
-      .orderBy('path')
-      .execute()
-    if (dateRows.length > 0) {
-      return { kind: 'date', paths: dateRows.map((row) => row.path) }
+  const tiers = await findWikiTargetMatchTiers(target)
+  for (const kind of ['date', 'title', 'alias', 'basename'] as const) {
+    if (tiers[kind].length > 0) {
+      return { kind, paths: tiers[kind] }
     }
-  }
-
-  const titleRows = await db
-    .selectFrom('notes')
-    .where('titleKey', '=', normalized.key)
-    .where('kind', '!=', 'template')
-    .select('path')
-    .distinct()
-    .orderBy('path')
-    .execute()
-  if (titleRows.length > 0) {
-    return { kind: 'title', paths: titleRows.map((row) => row.path) }
-  }
-
-  const aliasRows = await db
-    .selectFrom('aliases')
-    .innerJoin('notes', 'notes.path', 'aliases.notePath')
-    .where('aliasKey', '=', normalized.key)
-    .where('notes.kind', '!=', 'template')
-    .select('notePath')
-    .distinct()
-    .orderBy('notePath')
-    .execute()
-  if (aliasRows.length > 0) {
-    return { kind: 'alias', paths: aliasRows.map((row) => row.notePath) }
   }
   return { kind: 'missing', paths: [] }
 }
@@ -431,7 +454,7 @@ export function resolveWikiTarget(target: string): Promise<Resolution> {
       (
         await db
           .selectFrom('notes')
-          .where('titleKey', '=', key)
+          .where('authoredTitleKey', '=', key)
           .where('kind', '!=', 'template')
           .select('path')
           .orderBy('path')
@@ -448,5 +471,15 @@ export function resolveWikiTarget(target: string): Promise<Resolution> {
           .orderBy('notePath')
           .executeTakeFirst()
       )?.notePath,
+    byBasename: async (key) =>
+      (
+        await db
+          .selectFrom('notes')
+          .where('basenameKey', '=', key)
+          .where('kind', '!=', 'template')
+          .select('path')
+          .orderBy('path')
+          .executeTakeFirst()
+      )?.path,
   })
 }

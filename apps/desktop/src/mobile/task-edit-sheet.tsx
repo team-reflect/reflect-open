@@ -24,6 +24,7 @@ import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { markModeFromSyntax } from '@/editor/mark-mode'
 import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor'
 import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete'
+import { useMarkdownLinkNavigation } from '@/editor/use-markdown-link-navigation'
 import { useTagNavigation } from '@/editor/use-tag-navigation'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
 import { addDaysIso, formatDayLabel } from '@/lib/dates'
@@ -81,7 +82,8 @@ export function MobileTaskEditSheet({
   const { graph } = useGraph()
   const { settings } = useSettings()
   const generation = graph?.generation ?? null
-  const navigateWikiLink = useWikiLinkNavigation(generation)
+  const navigateWikiLink = useWikiLinkNavigation(generation, task.notePath)
+  const navigateMarkdownLink = useMarkdownLinkNavigation(generation, task.notePath)
   const navigateTag = useTagNavigation()
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
   const [showCalendar, setShowCalendar] = useState(false)
@@ -186,6 +188,17 @@ export function MobileTaskEditSheet({
     navigateWikiLink(target)
   }
 
+  const openMarkdownLink = (
+    href: string,
+    event?: MouseEvent | KeyboardEvent,
+  ): boolean => {
+    const claimed = navigateMarkdownLink(href, event)
+    if (claimed) {
+      closeNavigate()
+    }
+    return claimed
+  }
+
   const openTag = (tag: string): void => {
     closeNavigate()
     navigateTag(tag)
@@ -244,6 +257,7 @@ export function MobileTaskEditSheet({
             // A one-line editor has nothing to reorder, so keep the gutter grip off.
             blockHandle={false}
             onWikiLinkClick={openWikiLink}
+            onMarkdownNoteLinkClick={openMarkdownLink}
             onTagClick={openTag}
             onWikilinkSearch={onWikilinkSearch}
             onTagSearch={onTagSearch}

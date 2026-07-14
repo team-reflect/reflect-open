@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { noteBasenameKey, notePathKey } from '../graph/local-note-reference'
 import { call } from '../ipc/invoke'
 import type { IndexedNote } from './indexed-note'
 
@@ -50,7 +51,11 @@ export async function moveIndexedRows(
   to: string,
   generation: number,
 ): Promise<void> {
-  await call('index_move', { from, to, generation }, voidSchema)
+  await call(
+    'index_move',
+    { from, to, toPathKey: notePathKey(to), toBasenameKey: noteBasenameKey(to), generation },
+    voidSchema,
+  )
 }
 
 /**
@@ -66,7 +71,19 @@ export async function moveNoteIndexed(
   to: string,
   generation: number,
 ): Promise<void> {
-  await call('note_move_indexed', { from, to, generation }, voidSchema)
+  await call(
+    'note_move_indexed',
+    {
+      from,
+      to,
+      fromPathKey: notePathKey(from),
+      fromBasenameKey: noteBasenameKey(from),
+      toPathKey: notePathKey(to),
+      toBasenameKey: noteBasenameKey(to),
+      generation,
+    },
+    voidSchema,
+  )
 }
 
 const scanCandidateSchema = z.object({

@@ -22,8 +22,42 @@ describe('cross-device emoji title resolution', () => {
     setBridge({
       invoke: async (command, args) => {
         if (command === 'db_query') {
-          // The device's exact title index cannot match `Business ideas`
-          // against the indexed `🧠 Business ideas` title.
+          const sql = String(args['sql'])
+          const params = args['params'] as unknown[]
+          if (sql.includes('"file_hash"') && sql.includes('"mtime"')) {
+            return indexedNotes.map((note) => ({
+              path: note.path,
+              file_hash: note.fileHash,
+              mtime: note.mtime,
+            }))
+          }
+          if (sql.includes('"authored_title_key" = ?')) {
+            return indexedNotes
+              .filter((note) => note.authoredTitleKey === params[0])
+              .map((note) => ({ path: note.path }))
+          }
+          if (sql.includes('"basename_key" = ?')) {
+            return indexedNotes
+              .filter((note) => note.basenameKey === params[0])
+              .map((note) => ({ path: note.path }))
+          }
+          if (sql.includes('from "aliases"') && sql.includes('"alias_key" = ?')) {
+            return indexedNotes.flatMap((note) =>
+              note.aliases
+                .filter((alias) => alias.aliasKey === params[0])
+                .map(() => ({ note_path: note.path })),
+            )
+          }
+          if (sql.includes('"authored_title_key" is not null')) {
+            return indexedNotes
+              .filter((note) => note.authoredTitleKey !== null)
+              .map((note) => ({ path: note.path, title: note.title }))
+          }
+          if (sql.includes('from "aliases"')) {
+            return indexedNotes.flatMap((note) =>
+              note.aliases.map((alias) => ({ note_path: note.path, alias: alias.alias })),
+            )
+          }
           return []
         }
         if (command === 'note_read') {

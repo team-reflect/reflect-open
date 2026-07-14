@@ -3,6 +3,14 @@ import { echoLocalWrite } from '../indexing/local-write-echo'
 import { getBridge, type Unlisten } from '../ipc/bridge'
 import { call } from '../ipc/invoke'
 import {
+  attachmentFileMetaSchema,
+  attachmentResolveOutcomeSchema,
+  attachmentResolveRequestSchema,
+  type AttachmentFileMeta,
+  type AttachmentResolveOutcome,
+  type AttachmentResolveRequest,
+} from './attachment-resolution'
+import {
   fileMetaSchema,
   graphImportProgressSchema,
   graphImportSummarySchema,
@@ -197,6 +205,19 @@ export async function openAsset(path: string, generation: number): Promise<void>
 }
 
 /**
+ * Resolve one local Markdown or wiki-embed attachment without exposing an
+ * absolute filesystem path. The request and response are both validated;
+ * unsafe authored paths reject at the native boundary instead of being
+ * interpreted by UI code.
+ */
+export async function resolveAttachment(
+  request: AttachmentResolveRequest,
+): Promise<AttachmentResolveOutcome> {
+  const parsed = attachmentResolveRequestSchema.parse(request)
+  return call('attachment_resolve', { request: parsed }, attachmentResolveOutcomeSchema)
+}
+
+/**
  * List every file (any extension) under a graph-relative directory, e.g.
  * `audio-memos`. A missing directory lists as empty. Pinned to `generation`
  * for the same reason as {@link readAsset}.
@@ -225,6 +246,14 @@ export async function deleteNote(path: string, generation: number): Promise<void
  */
 export async function listFiles(generation?: number): Promise<FileMeta[]> {
   return call('list_files', { generation }, z.array(fileMetaSchema))
+}
+
+/**
+ * List supported local attachments from the open graph's shared file catalog.
+ * `generation` pins the manifest to the graph session that requested it.
+ */
+export async function listAttachments(generation?: number): Promise<AttachmentFileMeta[]> {
+  return call('list_attachments', { generation }, z.array(attachmentFileMetaSchema))
 }
 
 /**

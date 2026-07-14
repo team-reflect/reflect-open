@@ -25,7 +25,7 @@ export interface BacklinkNavigation {
    */
   onWikilinkClick: WikilinkClickHandler
   /** Resolve `![…](…)` sources inside a snippet to displayable URLs. Stable. */
-  resolveImageUrl: (src: string) => string | undefined
+  resolveImageUrl: (sourcePath: string, src: string) => string | undefined
 }
 
 /**
@@ -45,14 +45,14 @@ export function useBacklinkNavigation(): BacklinkNavigation {
   )
 
   const navigateWikiLink = useWikiLinkNavigation(graph?.generation ?? null)
-  const { resolveImageUrl } = useAssetPersistence(graph?.generation ?? null)
+  const { resolveImageUrlFromSource } = useAssetPersistence(graph?.generation ?? null)
   const onWikilinkClick = useCallback<WikilinkClickHandler>(
     ({ target, event }) => navigateWikiLink(target, event),
     [navigateWikiLink],
   )
   const resolveImageUrlStable = useCallback(
-    (src: string) => resolveImageUrl(src) ?? undefined,
-    [resolveImageUrl],
+    (sourcePath: string, src: string) => resolveImageUrlFromSource(sourcePath, src) ?? undefined,
+    [resolveImageUrlFromSource],
   )
 
   return { openSource, onWikilinkClick, resolveImageUrl: resolveImageUrlStable }

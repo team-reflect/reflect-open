@@ -1,12 +1,15 @@
 import { useCallback } from 'react'
 import {
+  bareWikiTitle,
   errorMessage,
+  indexWikiNoteReference,
   normalizeWikiTarget,
   resolveExistingWikiTarget,
-  resolveOrCreateNoteWithTitle,
+  resolveOrCreateWikiTarget,
   resolveWikiTarget,
 } from '@reflect/core'
-import { reportAmbiguousNoteTitle } from '@/editor/ambiguous-note-feedback'
+import { chooseAmbiguousNote } from '@/editor/ambiguous-note-chooser-store'
+import { requestNoteHeadingReveal } from '@/editor/editor-handle-registry'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { startOperation } from '@/lib/operations'
 import { useLinkIntentGuard } from '@/lib/windows/use-link-intent-guard'
@@ -15,6 +18,12 @@ import { routeForPath, type NoteRoute } from '@/routing/route'
 function reportUnavailableNoteTitle(title: string): void {
   startOperation('Opening link').fail(
     `Couldn’t open “${title}” because a matching note is currently unavailable. Try again when it is available on this device.`,
+  )
+}
+
+function reportInvalidNoteTarget(target: string): void {
+  startOperation('Opening link').fail(
+    `Couldn’t open “${target}” because it isn’t a safe Markdown note link.`,
   )
 }
 
@@ -40,11 +49,13 @@ function reportUnavailableNoteTitle(title: string): void {
  *
  * @param generation the open graph's write generation (`GraphInfo.generation`),
  *   or `null` when no graph is writable.
- * @returns a stable-per-`generation` click handler for the editor's wiki-link
- *   extension.
+ * @param sourcePath graph-relative path of the note containing the link.
+ * @returns a stable-per-generation-and-source click handler for the editor's
+ *   wiki-link extension.
  */
 export function useWikiLinkNavigation(
   generation: number | null,
+  sourcePath = '',
 ): (target: string, event?: MouseEvent | KeyboardEvent) => void {
   const navigateNoteLink = useNoteLinkNavigation()
   const beginLinkIntent = useLinkIntentGuard()
@@ -52,12 +63,27 @@ export function useWikiLinkNavigation(
   return useCallback(
     (target: string, event?: MouseEvent | KeyboardEvent) => {
       const isStale = beginLinkIntent()
-      const open = (route: NoteRoute): void => {
-        navigateNoteLink(route, event)
+      const open = (route: NoteRoute, path?: string, fragment?: string | null): void => {
+        navigateNoteLink(
+          route,
+          event,
+          path !== undefined && fragment !== undefined && fragment !== null
+            ? () => requestNoteHeadingReveal(path, fragment, generation)
+            : undefined,
+        )
       }
       void (async () => {
         try {
-          const normalized = normalizeWikiTarget(target)
+          if (target.trim() === '') {
+            return
+          }
+          const reference = indexWikiNoteReference(sourcePath, target)
+          if (reference === null) {
+            reportInvalidNoteTarget(target)
+            return
+          }
+          const bareTitle = bareWikiTitle(target)
+          const normalized = normalizeWikiTarget(bareTitle ?? target)
           if (normalized.raw === '') {
             return
           }
@@ -71,36 +97,48 @@ export function useWikiLinkNavigation(
                 resolution.kind === 'resolved'
                   ? routeForPath(resolution.ref)
                   : { kind: 'daily', date: normalized.date },
+                resolution.kind === 'resolved' ? resolution.ref : undefined,
+                reference.fragment,
               )
               return
             }
 
-            const resolution = await resolveExistingWikiTarget(normalized.raw, generation)
+            const resolution = await resolveExistingWikiTarget(target, generation, sourcePath)
             if (isStale()) {
               return
             }
             if (resolution.kind === 'resolved') {
-              open(routeForPath(resolution.path))
+              open(routeForPath(resolution.path), resolution.path, reference.fragment)
             } else if (resolution.kind === 'missing') {
               open({ kind: 'daily', date: normalized.date })
             } else if (resolution.kind === 'ambiguous') {
-              reportAmbiguousNoteTitle('Opening link', normalized.raw)
-            } else {
+              const chosen = await chooseAmbiguousNote(target, resolution.paths)
+              if (chosen !== null && !isStale()) {
+                open(routeForPath(chosen), chosen, reference.fragment)
+              }
+            } else if (resolution.kind === 'unavailable') {
               reportUnavailableNoteTitle(normalized.raw)
+            } else {
+              reportInvalidNoteTarget(target)
             }
             return
           }
           if (generation !== null) {
-            const outcome = await resolveOrCreateNoteWithTitle(normalized.raw, generation)
+            const outcome = await resolveOrCreateWikiTarget(target, sourcePath, generation)
             if (isStale()) {
               return
             }
             if (outcome.kind === 'ambiguous') {
-              reportAmbiguousNoteTitle('Opening link', normalized.raw)
+              const chosen = await chooseAmbiguousNote(target, outcome.paths)
+              if (chosen !== null && !isStale()) {
+                open(routeForPath(chosen), chosen, reference.fragment)
+              }
             } else if (outcome.kind === 'unavailable') {
               reportUnavailableNoteTitle(normalized.raw)
+            } else if (outcome.kind === 'invalid') {
+              reportInvalidNoteTarget(target)
             } else {
-              open(routeForPath(outcome.path))
+              open(routeForPath(outcome.path), outcome.path, reference.fragment)
             }
             return
           }
@@ -113,7 +151,7 @@ export function useWikiLinkNavigation(
             // Deliberately no focus request: on mobile, focusing mid-arrival
             // raises the keyboard through the stack animation. Desktop
             // autofocuses note arrivals on its own.
-            open(routeForPath(resolution.ref))
+            open(routeForPath(resolution.ref), resolution.ref, reference.fragment)
           }
         } catch (err) {
           console.error('wiki-link resolution failed:', err)
@@ -121,6 +159,6 @@ export function useWikiLinkNavigation(
         }
       })()
     },
-    [beginLinkIntent, generation, navigateNoteLink],
+    [beginLinkIntent, generation, navigateNoteLink, sourcePath],
   )
 }

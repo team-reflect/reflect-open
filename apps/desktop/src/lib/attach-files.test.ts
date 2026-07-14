@@ -41,6 +41,7 @@ function editorHandle(): NoteEditorHandle & {
     setMarkdown: () => {},
     insertMarkdown: vi.fn<(markdown: string) => void>(),
     focus: () => {},
+    revealHeading: () => false,
     setSelection: () => {},
     getSelectedText: () => '',
     openSelectionMenu: () => {},
@@ -57,16 +58,16 @@ afterEach(() => {
 })
 
 describe('attachFilesToNote', () => {
-  it('imports each pick and inserts one link per line at the caret', async () => {
+  it('imports supported non-images and inserts source-relative file links', async () => {
     const invoke = vi.fn(async (_command: string, args: Record<string, unknown>) =>
       typeof args['desiredName'] === 'string' ? `assets/${args['desiredName'] as string}` : null,
     )
     setBridge({ invoke, listen: async () => () => {} })
-    openMock.mockResolvedValue(['/Users/me/Q3 Report.pdf', '/Users/me/archive.tar.gz'])
+    openMock.mockResolvedValue(['/Users/me/Q3 Report.pdf', '/Users/me/interview.mp3'])
     const handle = editorHandle()
-    registerNoteEditorHandle('notes/plan.md', handle)
+    registerNoteEditorHandle('Projects/2026/Plan.md', handle)
 
-    await attachFilesToNote(contextFor('notes/plan.md', 4))
+    await attachFilesToNote(contextFor('Projects/2026/Plan.md', 4))
 
     expect(invoke).toHaveBeenCalledWith('asset_import', {
       sourcePath: '/Users/me/Q3 Report.pdf',
@@ -74,9 +75,28 @@ describe('attachFilesToNote', () => {
       generation: 4,
     })
     expect(handle.insertMarkdown).toHaveBeenCalledWith(
-      '[Q3 Report.pdf](assets/q3-report.pdf)\n[archive.tar.gz](assets/archive-tar.gz)',
+      '[Q3 Report.pdf](../../assets/q3-report.pdf)\n' +
+        '[interview.mp3](../../assets/interview.mp3)',
     )
-    unregisterNoteEditorHandle('notes/plan.md', handle)
+    unregisterNoteEditorHandle('Projects/2026/Plan.md', handle)
+  })
+
+  it('inserts supported images with Markdown image syntax', async () => {
+    const invoke = vi.fn(async () => 'assets/sunset.png')
+    setBridge({ invoke, listen: async () => () => {} })
+    openMock.mockResolvedValue('/Users/me/Sunset.png')
+    const handle = editorHandle()
+    registerNoteEditorHandle('Projects/Plan.md', handle)
+
+    await attachFilesToNote(contextFor('Projects/Plan.md', 4))
+
+    expect(invoke).toHaveBeenCalledWith('asset_import', {
+      sourcePath: '/Users/me/Sunset.png',
+      desiredName: 'sunset.png',
+      generation: 4,
+    })
+    expect(handle.insertMarkdown).toHaveBeenCalledWith('![Sunset.png](../assets/sunset.png)')
+    unregisterNoteEditorHandle('Projects/Plan.md', handle)
   })
 
   it('escapes bracketed filenames in the link label', async () => {
@@ -89,7 +109,7 @@ describe('attachFilesToNote', () => {
     await attachFilesToNote(contextFor('notes/plan.md', 4))
 
     expect(handle.insertMarkdown).toHaveBeenCalledWith(
-      String.raw`[report \[v2\].pdf](assets/report-v2.pdf)`,
+      String.raw`[report \[v2\].pdf](../assets/report-v2.pdf)`,
     )
     unregisterNoteEditorHandle('notes/plan.md', handle)
   })
@@ -134,23 +154,26 @@ describe('attachFilesToNote', () => {
     expect(handle.insertMarkdown).not.toHaveBeenCalled()
   })
 
-  it('continues past a failed copy and still links every file that landed', async () => {
+  it('rejects unsupported formats before copy and still links every supported file', async () => {
     const invoke = vi.fn(async (_command: string, args: Record<string, unknown>) => {
-      if (args['sourcePath'] === '/tmp/bad.bin') {
-        throw { kind: 'io', message: 'copy failed' }
-      }
       return `assets/${args['desiredName'] as string}`
     })
     setBridge({ invoke, listen: async () => () => {} })
-    // The failure comes FIRST: the files picked after it must still import.
+    // The unsupported file comes FIRST: the supported files after it must
+    // still import, while no native copy is attempted for the rejection.
     openMock.mockResolvedValue(['/tmp/bad.bin', '/tmp/good.pdf', '/tmp/also good.pdf'])
     const handle = editorHandle()
     registerNoteEditorHandle('notes/plan.md', handle)
 
     await attachFilesToNote(contextFor('notes/plan.md', 4))
 
+    expect(invoke).toHaveBeenCalledTimes(2)
+    expect(invoke).not.toHaveBeenCalledWith(
+      'asset_import',
+      expect.objectContaining({ sourcePath: '/tmp/bad.bin' }),
+    )
     expect(handle.insertMarkdown).toHaveBeenCalledWith(
-      '[good.pdf](assets/good.pdf)\n[also good.pdf](assets/also-good.pdf)',
+      '[good.pdf](../assets/good.pdf)\n[also good.pdf](../assets/also-good.pdf)',
     )
     unregisterNoteEditorHandle('notes/plan.md', handle)
   })

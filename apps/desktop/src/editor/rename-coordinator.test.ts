@@ -17,6 +17,8 @@ import { openSession, registerOpenDocument, retargetOpenDocument } from './open-
 
 const io = vi.hoisted(() => ({
   rewriteLinksForTitleChange: vi.fn(),
+  prepareNoteMoveRewrites: vi.fn(),
+  getBacklinks: vi.fn(),
   getLinkSources: vi.fn(),
   readNote: vi.fn(),
   writeNote: vi.fn(),
@@ -27,6 +29,8 @@ const io = vi.hoisted(() => ({
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   rewriteLinksForTitleChange: io.rewriteLinksForTitleChange,
+  prepareNoteMoveRewrites: io.prepareNoteMoveRewrites,
+  getBacklinks: io.getBacklinks,
   getLinkSources: io.getLinkSources,
   readNote: io.readNote,
   writeNote: io.writeNote,
@@ -127,6 +131,10 @@ function fakeSession(content: string): NoteSession & {
 beforeEach(() => {
   io.rewriteLinksForTitleChange.mockReset()
   io.rewriteLinksForTitleChange.mockResolvedValue({ rewritten: 1, failed: 0, collision: false })
+  io.getBacklinks.mockReset()
+  io.getBacklinks.mockResolvedValue([])
+  io.prepareNoteMoveRewrites.mockReset()
+  io.prepareNoteMoveRewrites.mockResolvedValue({ rewrites: [], failed: [] })
   io.readNote.mockReset()
   io.writeNote.mockReset()
   io.writeNote.mockResolvedValue(undefined)
@@ -315,6 +323,54 @@ describe('rename coordinator', () => {
     }
   })
 
+  it('prepares and writes exact path backlinks before moving a managed note', async () => {
+    io.slugPathForTitle.mockResolvedValue('notes/new-title.md')
+    io.getBacklinks.mockResolvedValue([
+      {
+        sourcePath: 'Projects/source.md',
+        kind: 'md',
+        targetRaw: '../notes/subject.md',
+        alias: null,
+        posFrom: 0,
+        posTo: 32,
+      },
+    ])
+    io.prepareNoteMoveRewrites.mockResolvedValue({
+      failed: [],
+      rewrites: [
+        {
+          path: 'Projects/source.md',
+          before: '[Subject](../notes/subject.md)\n',
+          after: '[Subject](../notes/new-title.md)\n',
+        },
+      ],
+    })
+    io.readNote.mockResolvedValue('# New Title\n')
+
+    const coordinator = makeCoordinator()
+    await renameOnce(coordinator, 'Old Title', 'New Title')
+
+    expect(io.prepareNoteMoveRewrites).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fromPath: PATH,
+        toPath: 'notes/new-title.md',
+        backlinks: [
+          {
+            sourcePath: 'Projects/source.md',
+            kind: 'md',
+            targetRaw: '../notes/subject.md',
+          },
+        ],
+      }),
+    )
+    expect(io.writeNote).toHaveBeenCalledWith(
+      'Projects/source.md',
+      '[Subject](../notes/new-title.md)\n',
+      7,
+    )
+    expect(io.moveNoteIndexed).toHaveBeenCalledWith(PATH, 'notes/new-title.md', 7)
+  })
+
   it('a birth (first authored title) moves the file without rewrite or alias', async () => {
     io.slugPathForTitle.mockResolvedValue('notes/fresh-note.md')
     const coordinator = makeCoordinator()
@@ -352,6 +408,33 @@ describe('rename coordinator', () => {
     } finally {
       unregister()
     }
+  })
+
+  it('restores prepared path-link writes when the file move fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    io.slugPathForTitle.mockResolvedValue('notes/new-title.md')
+    io.prepareNoteMoveRewrites.mockResolvedValue({
+      failed: [],
+      rewrites: [
+        {
+          path: 'Projects/source.md',
+          before: '[Subject](../notes/subject.md)\n',
+          after: '[Subject](../notes/new-title.md)\n',
+        },
+      ],
+    })
+    io.readNote.mockResolvedValue('# New Title\n')
+    io.moveNoteIndexed.mockRejectedValue(new Error('disk full'))
+
+    const coordinator = makeCoordinator()
+    await renameOnce(coordinator, 'Old Title', 'New Title')
+
+    const sourceWrites = io.writeNote.mock.calls.filter(([path]) => path === 'Projects/source.md')
+    expect(sourceWrites).toEqual([
+      ['Projects/source.md', '[Subject](../notes/new-title.md)\n', 7],
+      ['Projects/source.md', '[Subject](../notes/subject.md)\n', 7],
+    ])
+    expect(operationLog.records[0]!.outcome).toBe('failed')
   })
 
   it('the rewrite collision guard does not block the move (filename follows the NEW title)', async () => {

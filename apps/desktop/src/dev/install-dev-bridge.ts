@@ -1,8 +1,10 @@
 import { setBridge, type AppPlatform } from '@reflect/core'
+import { createDevAttachmentStore } from '@/dev/dev-attachment-store'
 import { createDevBridge } from '@/dev/dev-bridge'
 import { createDevFileStore } from '@/dev/dev-file-store'
 import { createDevIndexDb } from '@/dev/dev-index-db'
-import { seedGraphFiles } from '@/dev/seed-graph'
+import { seedGraphAttachments, seedGraphFiles } from '@/dev/seed-graph'
+import { installBrowserAttachmentUrlResolver } from '@/lib/attachment-display-url'
 
 let installation: Promise<void> | null = null
 
@@ -25,9 +27,11 @@ export function installDevBridge(platform: AppPlatform): Promise<void> {
 async function install(platform: AppPlatform): Promise<void> {
   const index = await createDevIndexDb()
   const files = createDevFileStore(seedGraphFiles())
-  setBridge(createDevBridge({ platform, files, index }))
+  const attachments = createDevAttachmentStore(1, seedGraphAttachments())
+  installBrowserAttachmentUrlResolver(attachments.displayUrl, attachments.dispose)
+  setBridge(createDevBridge({ platform, files, index, attachments }))
   // A console handle for poking the shim while debugging mobile surfaces:
   // `__reflectDev.query('select path, title from notes')`, `.files.read(...)`.
-  Object.assign(window, { __reflectDev: { query: index.query, files } })
+  Object.assign(window, { __reflectDev: { query: index.query, files, attachments } })
   console.info(`[dev-bridge] installed: platform=${platform}, in-memory graph + wasm SQLite index`)
 }

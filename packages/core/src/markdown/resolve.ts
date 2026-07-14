@@ -62,6 +62,7 @@ export interface WikiLookup {
   byDate(date: string): string | undefined
   byTitle(key: string): string | undefined
   byAlias(key: string): string | undefined
+  byBasename(key: string): string | undefined
 }
 
 /**
@@ -73,7 +74,8 @@ export function resolveWikiLink(target: string, lookup: WikiLookup): Resolution 
   const ref =
     (normalized.date ? lookup.byDate(normalized.date) : undefined) ??
     lookup.byTitle(normalized.key) ??
-    lookup.byAlias(normalized.key)
+    lookup.byAlias(normalized.key) ??
+    lookup.byBasename(normalized.key)
   return ref ? resolved(ref) : unresolved(normalized.raw)
 }
 
@@ -86,6 +88,7 @@ export interface AsyncWikiLookup {
   byDate(date: string): Promise<string | undefined>
   byTitle(key: string): Promise<string | undefined>
   byAlias(key: string): Promise<string | undefined>
+  byBasename(key: string): Promise<string | undefined>
 }
 
 /**
@@ -103,6 +106,7 @@ export async function resolveWikiLinkAsync(
   const ref =
     (normalized.date ? await lookup.byDate(normalized.date) : undefined) ??
     (await lookup.byTitle(normalized.key)) ??
-    (await lookup.byAlias(normalized.key))
+    (await lookup.byAlias(normalized.key)) ??
+    (await lookup.byBasename(normalized.key))
   return ref ? resolved(ref) : unresolved(normalized.raw)
 }

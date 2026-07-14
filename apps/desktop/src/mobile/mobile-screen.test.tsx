@@ -77,6 +77,7 @@ vi.mock('@/editor/note-editor', async () => {
           focus: () => {
             editorProbe.focusCalls += 1
           },
+          revealHeading: () => false,
           setSelection: (position: 'start' | 'end') => {
             editorProbe.selectionCalls.push(position)
           },

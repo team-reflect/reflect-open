@@ -7,7 +7,7 @@ import { extractSnippetTasks, type SnippetTask } from './snippet-tasks'
 
 export type Backlink = Pick<
   Selectable<Database['backlinks']>,
-  'sourcePath' | 'targetRaw' | 'alias' | 'posFrom' | 'posTo'
+  'sourcePath' | 'kind' | 'targetRaw' | 'alias' | 'posFrom' | 'posTo'
 >
 
 /** Notes that link to `path` (resolved at query time via the `backlinks` view). */
@@ -15,7 +15,7 @@ export function getBacklinks(path: string): Promise<Backlink[]> {
   return db
     .selectFrom('backlinks')
     .where('targetPath', '=', path)
-    .select(['sourcePath', 'targetRaw', 'alias', 'posFrom', 'posTo'])
+    .select(['sourcePath', 'kind', 'targetRaw', 'alias', 'posFrom', 'posTo'])
     .orderBy('sourcePath')
     .execute()
 }

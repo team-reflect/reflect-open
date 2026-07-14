@@ -12,8 +12,8 @@ use super::migrations::{migrate, migrate_to, open_in_memory, open_index_at, vali
 use super::query::run_query;
 use super::scan::scan_reconcile;
 use super::write::{
-    apply_note, clear_index, move_note, touch_note, IndexedEmail, IndexedLink, IndexedNote,
-    IndexedTag, IndexedTask,
+    apply_note, clear_index, move_note, touch_note, IndexedAlias, IndexedEmail, IndexedLink,
+    IndexedNote, IndexedTag, IndexedTask,
 };
 
 fn migrated() -> Connection {
@@ -31,6 +31,15 @@ fn note(path: &str, title: &str, links: Vec<IndexedLink>) -> IndexedNote {
         id: None,
         title: title.to_string(),
         title_key: title.to_lowercase(),
+        authored_title_key: Some(title.to_lowercase()),
+        path_key: path.to_lowercase(),
+        basename_key: path
+            .rsplit('/')
+            .next()
+            .unwrap_or(path)
+            .strip_suffix(".md")
+            .unwrap_or(path)
+            .to_lowercase(),
         kind: "note".to_string(),
         daily_date: None,
         is_private: false,
@@ -58,6 +67,21 @@ fn wiki(target: &str) -> IndexedLink {
         kind: "wiki".to_string(),
         target_raw: target.to_string(),
         target_key: target.to_lowercase(),
+        path_key: None,
+        alternate_path_key: None,
+        alias: None,
+        pos_from: 0,
+        pos_to: 0,
+    }
+}
+
+fn path_link(kind: &str, target: &str, path: &str, alternate: Option<&str>) -> IndexedLink {
+    IndexedLink {
+        kind: kind.to_string(),
+        target_raw: target.to_string(),
+        target_key: String::new(),
+        path_key: Some(path.to_lowercase()),
+        alternate_path_key: alternate.map(str::to_lowercase),
         alias: None,
         pos_from: 0,
         pos_to: 0,
@@ -185,7 +209,14 @@ fn note_emails_apply_move_and_cascade() {
     // transaction the command layer would open).
     conn.execute_batch("BEGIN; PRAGMA defer_foreign_keys = ON;")
         .unwrap();
-    move_note(&conn, "notes/jane-doe.md", "notes/jane.md").unwrap();
+    move_note(
+        &conn,
+        "notes/jane-doe.md",
+        "notes/jane.md",
+        "notes/jane.md",
+        "jane",
+    )
+    .unwrap();
     conn.execute_batch("COMMIT;").unwrap();
     let moved = run_query(&conn, "SELECT note_path FROM note_emails", &[]).unwrap();
     assert_eq!(moved[0]["note_path"], Value::from("notes/jane.md"));
@@ -221,6 +252,100 @@ fn backlinks_resolve_by_title_at_query_time() {
     .unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0]["source_path"], Value::from("notes/a.md"));
+}
+
+#[test]
+fn backlinks_resolve_exact_wiki_and_markdown_paths() {
+    let conn = migrated();
+    apply_note(
+        &conn,
+        &note(
+            "Projects/source.md",
+            "Source",
+            vec![
+                path_link("wiki", "Projects/Plan", "Projects/Plan.md", None),
+                path_link("md", "../README.md", "README.md", None),
+            ],
+        ),
+    )
+    .unwrap();
+    apply_note(&conn, &note("Projects/Plan.md", "Plan", vec![])).unwrap();
+    apply_note(&conn, &note("README.md", "Read me", vec![])).unwrap();
+
+    let rows = run_query(
+        &conn,
+        "SELECT target_path, kind FROM backlinks ORDER BY target_path",
+        &[],
+    )
+    .unwrap();
+    let resolved: Vec<(&str, &str)> = rows
+        .iter()
+        .map(|row| {
+            (
+                row["target_path"].as_str().unwrap(),
+                row["kind"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        resolved,
+        vec![("Projects/Plan.md", "wiki"), ("README.md", "md")]
+    );
+}
+
+#[test]
+fn markdown_backlinks_use_a_sole_candidate_and_fail_closed_when_both_exist() {
+    let conn = migrated();
+    apply_note(
+        &conn,
+        &note(
+            "Projects/source.md",
+            "Source",
+            vec![path_link(
+                "md",
+                "Plan.md",
+                "Projects/Plan.md",
+                Some("Plan.md"),
+            )],
+        ),
+    )
+    .unwrap();
+    apply_note(&conn, &note("Plan.md", "Root plan", vec![])).unwrap();
+
+    let sole = run_query(&conn, "SELECT target_path FROM backlinks", &[]).unwrap();
+    assert_eq!(sole.len(), 1);
+    assert_eq!(sole[0]["target_path"], Value::from("Plan.md"));
+
+    apply_note(&conn, &note("Projects/Plan.md", "Project plan", vec![])).unwrap();
+    let ambiguous = run_query(&conn, "SELECT target_path FROM backlinks", &[]).unwrap();
+    assert!(ambiguous.is_empty());
+}
+
+#[test]
+fn bare_backlinks_rank_authored_titles_above_aliases_and_basenames() {
+    let conn = migrated();
+    apply_note(
+        &conn,
+        &note("notes/source.md", "Source", vec![wiki("Plan")]),
+    )
+    .unwrap();
+
+    let mut alias = note("notes/alias-owner.md", "Alias owner", vec![]);
+    alias.aliases = vec![IndexedAlias {
+        alias: "Plan".to_string(),
+        alias_key: "plan".to_string(),
+    }];
+    apply_note(&conn, &alias).unwrap();
+    apply_note(
+        &conn,
+        &note("Projects/Plan.md", "Filename fallback loses", vec![]),
+    )
+    .unwrap();
+    apply_note(&conn, &note("notes/authored.md", "Plan", vec![])).unwrap();
+
+    let rows = run_query(&conn, "SELECT target_path FROM backlinks", &[]).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["target_path"], Value::from("notes/authored.md"));
 }
 
 #[test]
@@ -757,6 +882,8 @@ fn kind_invariant_migration_wipes_the_projection_for_reindex() {
          INSERT INTO index_meta(key, value) VALUES('k', 'v');",
     )
     .expect("stage v14 rows");
+    save_message(&conn, &conversation("c1"), &chat_message("m1", "c1"))
+        .expect("stage durable chat history");
 
     migrate(&mut conn).expect("migrate to latest");
 
@@ -773,6 +900,10 @@ fn kind_invariant_migration_wipes_the_projection_for_reindex() {
         .query_row("SELECT count(*) FROM index_meta", [], |row| row.get(0))
         .unwrap();
     assert_eq!(meta, 1);
+    let chat_messages: i64 = conn
+        .query_row("SELECT count(*) FROM chat_messages", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(chat_messages, 1, "derived-index rebuild must preserve chat");
 
     // Every notes index came back with the recreated table.
     for index in [
@@ -1354,7 +1485,14 @@ fn apply_chunks_for_an_unindexed_path_is_a_cleaning_no_op() {
 fn move_in_txn(conn: &mut Connection, from: &str, to: &str) -> crate::error::AppResult<()> {
     let tx = conn.transaction()?;
     tx.execute_batch("PRAGMA defer_foreign_keys = ON;")?;
-    move_note(&tx, from, to)?;
+    let basename_key = to
+        .rsplit('/')
+        .next()
+        .unwrap_or(to)
+        .strip_suffix(".md")
+        .unwrap_or(to)
+        .to_lowercase();
+    move_note(&tx, from, to, &to.to_lowercase(), &basename_key)?;
     tx.commit()?;
     Ok(())
 }
@@ -1377,6 +1515,15 @@ fn move_note_migrates_every_row_and_preserves_derived_state() {
     let vectors_before = vector_count(&conn);
 
     move_in_txn(&mut conn, "notes/old.md", "notes/kept-title.md").unwrap();
+
+    let path_keys = run_query(
+        &conn,
+        "SELECT path_key, basename_key FROM notes WHERE path = 'notes/kept-title.md'",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(path_keys[0]["path_key"], Value::from("notes/kept-title.md"));
+    assert_eq!(path_keys[0]["basename_key"], Value::from("kept-title"));
 
     // The notes row moved — same derived state, nothing re-created.
     let row = run_query(

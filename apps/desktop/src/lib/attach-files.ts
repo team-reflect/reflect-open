@@ -1,6 +1,7 @@
 import { open } from '@tauri-apps/plugin-dialog'
-import { assetFileName, errorMessage, importAsset } from '@reflect/core'
+import { attachmentRenderKind, assetFileName, errorMessage, importAsset } from '@reflect/core'
 import { noteEditorHandleFor } from '@/editor/editor-handle-registry'
+import { relativeAttachmentHref } from '@/editor/use-asset-persistence'
 import type { CommandContext } from '@/lib/commands/types'
 import { startOperation } from '@/lib/operations'
 
@@ -17,9 +18,10 @@ function escapeLinkLabel(name: string): string {
 /**
  * The Attach file… command: native file picker → each pick copied
  * file-to-file into the graph's `assets/` (the bytes never enter the
- * webview) → one `[original name](assets/…)` link per file inserted at the
- * caret of the current note's editor — the same markdown a drag-and-drop
- * produces, so the two entry points can't drift.
+ * webview) → one source-relative Markdown image or file link per file inserted
+ * at the caret of the current note's editor — the same markdown a drag-and-drop
+ * produces, so the two entry points can't drift. Unsupported attachment formats
+ * are rejected before native copy begins.
  *
  * No-ops without an open graph, a routed note, or a mounted editor; a
  * cancelled picker inserts nothing. When one copy fails mid-batch, the links
@@ -47,9 +49,17 @@ export async function attachFilesToNote(context: CommandContext): Promise<void> 
     // Each copy is independent — one failure must not drop the files picked
     // after it.
     const name = basenameOf(source)
+    const desiredName = assetFileName(name)
+    const renderKind = attachmentRenderKind(`assets/${desiredName}`)
+    if (renderKind === null) {
+      failures.push({ name, cause: new Error('unsupported attachment format') })
+      continue
+    }
     try {
-      const assetPath = await importAsset(source, assetFileName(name), generation)
-      links.push(`[${escapeLinkLabel(name)}](${assetPath})`)
+      const assetPath = await importAsset(source, desiredName, generation)
+      const href = relativeAttachmentHref(notePath, assetPath)
+      const imagePrefix = renderKind === 'image' ? '!' : ''
+      links.push(`${imagePrefix}[${escapeLinkLabel(name)}](${href})`)
       attachedNames.push(name)
     } catch (cause) {
       failures.push({ name, cause })

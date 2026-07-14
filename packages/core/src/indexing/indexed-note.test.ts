@@ -3,8 +3,8 @@ import { gistBodyHash, parseNote } from '../markdown'
 import { buildIndexedNote, indexedNoteSchema, PROJECTION_VERSION } from './indexed-note'
 
 describe('buildIndexedNote', () => {
-  it('carries the projection version that backfills task breadcrumbs', () => {
-    expect(PROJECTION_VERSION).toBe(15)
+  it('carries the projection version that backfills arbitrary-vault path keys', () => {
+    expect(PROJECTION_VERSION).toBe(16)
   })
 
   it('flattens a parsed note into the index payload', () => {
@@ -22,6 +22,9 @@ describe('buildIndexedNote', () => {
     expect(indexed.id).toBe('01H')
     expect(indexed.title).toBe('Project X')
     expect(indexed.titleKey).toBe('project x')
+    expect(indexed.authoredTitleKey).toBe('project x')
+    expect(indexed.pathKey).toBe('notes/project-x.md')
+    expect(indexed.basenameKey).toBe('project-x')
     expect(indexed.isPrivate).toBe(true)
     expect(indexed.isPinned).toBe(true)
     expect(indexed.pinnedOrder).toBeNull() // bare `pinned: true` carries no order
@@ -44,6 +47,20 @@ describe('buildIndexedNote', () => {
       true,
     )
     expect(indexed.assets).toEqual(['assets/p.png'])
+  })
+
+  it('keeps a filename-derived title out of the authored-title tier', () => {
+    const source = 'Body only.'
+    const indexed = buildIndexedNote(parseNote({ path: 'Archive/Project.md', source }), {
+      fileHash: 'h',
+      mtime: 0,
+      source,
+    })
+
+    expect(indexed.title).toBe('Project')
+    expect(indexed.titleKey).toBe('project')
+    expect(indexed.authoredTitleKey).toBeNull()
+    expect(indexed.basenameKey).toBe('project')
   })
 
   it('derives v1 subject aliases from a `//` title, after frontmatter aliases', () => {

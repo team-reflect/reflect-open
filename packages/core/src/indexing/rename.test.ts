@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { resolved, unresolved } from '../markdown'
-import { nextAliases, rewriteLinksForTitleChange, type RenameIo } from './rename'
+import {
+  nextAliases,
+  prepareNoteMoveRewrites,
+  rewriteLinksForTitleChange,
+  type RenameIo,
+} from './rename'
 
 function fakeIo(files: Record<string, string>, options?: { resolveTo?: string }) {
   const writes: Record<string, string> = {}
@@ -141,6 +146,84 @@ describe('rewriteLinksForTitleChange write failures', () => {
     expect(result.rewritten).toEqual(['notes/ok.md'])
     expect(writes['notes/ok.md']).toBe('[[New]]\n')
     expect(writes['notes/fail.md']).toBeUndefined()
+  })
+})
+
+describe('prepareNoteMoveRewrites', () => {
+  it('rewrites path-qualified wiki and relative Markdown links without touching labels or fragments', async () => {
+    const source = [
+      'Wiki: [[notes/old-title#Details|the plan]].',
+      'Markdown: [the plan](../notes/old-title.md#Details "keep title").',
+      'Bare title stays [[Old Title]].',
+      '',
+    ].join('\n')
+    const result = await prepareNoteMoveRewrites({
+      fromPath: 'notes/old-title.md',
+      toPath: 'notes/new-title.md',
+      backlinks: [
+        { sourcePath: 'Projects/source.md', kind: 'wiki', targetRaw: 'notes/old-title#Details' },
+        {
+          sourcePath: 'Projects/source.md',
+          kind: 'md',
+          targetRaw: '../notes/old-title.md#Details',
+        },
+        { sourcePath: 'Projects/source.md', kind: 'wiki', targetRaw: 'Old Title' },
+      ],
+      read: async () => source,
+    })
+
+    expect(result.failed).toEqual([])
+    expect(result.rewrites).toEqual([
+      {
+        path: 'Projects/source.md',
+        before: source,
+        after: [
+          'Wiki: [[notes/new-title#Details|the plan]].',
+          'Markdown: [the plan](../notes/new-title.md#Details "keep title").',
+          'Bare title stays [[Old Title]].',
+          '',
+        ].join('\n'),
+      },
+    ])
+  })
+
+  it('preserves optional extensions, root-relative hrefs, and bracketed href syntax', async () => {
+    const source = '[[notes/old-title.md|Wiki]] [Root](</notes/old-title#Part>)\n'
+    const result = await prepareNoteMoveRewrites({
+      fromPath: 'notes/old-title.md',
+      toPath: 'notes/new-title.md',
+      backlinks: [
+        { sourcePath: 'README.md', kind: 'wiki', targetRaw: 'notes/old-title.md' },
+        { sourcePath: 'README.md', kind: 'md', targetRaw: '/notes/old-title#Part' },
+      ],
+      read: async () => source,
+    })
+
+    expect(result.failed).toEqual([])
+    expect(result.rewrites[0]!.after).toBe(
+      '[[notes/new-title.md|Wiki]] [Root](</notes/new-title#Part>)\n',
+    )
+  })
+
+  it('fails closed when an indexed reference no longer exists in current bytes', async () => {
+    const result = await prepareNoteMoveRewrites({
+      fromPath: 'notes/old.md',
+      toPath: 'notes/new.md',
+      backlinks: [{ sourcePath: 'notes/source.md', kind: 'wiki', targetRaw: 'notes/old' }],
+      read: async () => 'The link was edited externally.\n',
+    })
+    expect(result).toEqual({ rewrites: [], failed: ['notes/source.md'] })
+  })
+
+  it('ignores bare-title backlinks and never rewrites wiki embeds', async () => {
+    const source = '[[Old]] ![[notes/old]]\n'
+    const result = await prepareNoteMoveRewrites({
+      fromPath: 'notes/old.md',
+      toPath: 'notes/new.md',
+      backlinks: [{ sourcePath: 'notes/source.md', kind: 'wiki', targetRaw: 'Old' }],
+      read: async () => source,
+    })
+    expect(result).toEqual({ rewrites: [], failed: [] })
   })
 })
 

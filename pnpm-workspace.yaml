@@ -24,7 +24,7 @@ minimumReleaseAgeExclude:
   - '@floating-ui/utils@0.2.12'
   - prosemirror-model@1.25.11
 
-# overrides:
-#   '@meowdown/core': https://pkg.pr.new/prosekit/meowdown/@meowdown/core@623bc43
-#   '@meowdown/react': https://pkg.pr.new/prosekit/meowdown/@meowdown/react@623bc43
-# blockExoticSubdeps: false
+overrides:
+  '@meowdown/core': https://pkg.pr.new/prosekit/meowdown/@meowdown/core@867a4d6
+  '@meowdown/react': https://pkg.pr.new/prosekit/meowdown/@meowdown/react@867a4d6
+blockExoticSubdeps: false

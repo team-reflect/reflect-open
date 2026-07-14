@@ -6,6 +6,12 @@ function parse(source: string, path = 'notes/test.md') {
 }
 
 describe('parseNote — wiki links', () => {
+  it('does not project wiki embeds as note links', () => {
+    const note = parseNote({ path: 'notes/a.md', source: '![[Media/photo.png|640]]\n' })
+    expect(note.wikiLinks).toEqual([])
+    expect(note.links).toEqual([])
+  })
+
   it('extracts plain, aliased, and date targets with positions', () => {
     const note = parse('See [[Charlotte]] and [[Project X|the project]] on [[2026-06-09]].')
     expect(note.wikiLinks.map((w) => ({ target: w.target, alias: w.alias }))).toEqual([

@@ -56,7 +56,8 @@ function isTagExcludedNode(name: string): boolean {
     name === 'FencedCode' ||
     name === 'CodeBlock' ||
     name === 'URL' ||
-    name === 'WikiLink'
+    name === 'WikiLink' ||
+    name === 'WikiEmbed'
   )
 }
 
@@ -345,6 +346,10 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
 
       if (name === 'WikiLink') {
         wikiLinks.push(readWikiLink(body, from, to, bodyOffset))
+        return false
+      }
+
+      if (name === 'WikiEmbed') {
         return false
       }
 

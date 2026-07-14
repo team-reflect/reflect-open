@@ -17,6 +17,7 @@ import {
   type FileLinkResolver,
   type MarkMode,
   type StartPendingReplacementOptions,
+  type WikiEmbedResolver,
   type WikilinkHoverHit,
 } from '@meowdown/core'
 import {
@@ -79,6 +80,10 @@ export interface NoteEditorHandle {
    */
   insertMarkdown(markdown: string): void
   focus(): void
+  /** Reveal and select the heading named by a decoded Markdown fragment. */
+  revealHeading(fragment: string): boolean
+  /** Reparse resolver-backed atoms without changing Markdown, selection, or undo history. */
+  refreshMarkdownRendering?(): void
   /**
    * Move the caret to a document edge and scroll it into view. Used for
    * cross-note arrow navigation in the daily stream (jump to the end of the
@@ -97,6 +102,30 @@ export interface NoteEditorHandle {
   acceptPendingReplacement(options?: AcceptPendingReplacementOptions): void
   /** Clear the staged replacement without touching the document. */
   discardPendingReplacement(): void
+}
+
+interface HeadingRevealEditorHandle {
+  revealHeading(fragment: string): boolean
+}
+
+interface ResolverRefreshEditorHandle {
+  refreshMarkdownRendering(): void
+}
+
+function supportsHeadingReveal(
+  handle: EditorHandle | null,
+): handle is EditorHandle & HeadingRevealEditorHandle {
+  return handle !== null && 'revealHeading' in handle && typeof handle.revealHeading === 'function'
+}
+
+function supportsResolverRefresh(
+  handle: EditorHandle | null,
+): handle is EditorHandle & ResolverRefreshEditorHandle {
+  return (
+    handle !== null &&
+    'refreshMarkdownRendering' in handle &&
+    typeof handle.refreshMarkdownRendering === 'function'
+  )
 }
 
 interface NoteEditorProps {
@@ -148,6 +177,8 @@ interface NoteEditorProps {
    * opener). Must be pure; read once on first render, like `initialContent`.
    */
   resolveFileLink?: FileLinkResolver
+  /** Classify an Obsidian `![[target]]` as an image, file, or note atom. */
+  resolveWikiEmbed?: WikiEmbedResolver
   /** Resolve the file size a rendered file pill shows next to its name. */
   resolveFileInfo?: FileInfoResolver
   /**
@@ -156,6 +187,14 @@ interface NoteEditorProps {
    * modifiers, e.g. ⌘-click opens the target in a new window.
    */
   onWikiLinkClick?: (target: string, event?: MouseEvent | KeyboardEvent) => void
+  /**
+   * Claim a standard Markdown href as an in-vault note link. Returning true
+   * prevents the attachment, deep-link, and external-URL fallbacks.
+   */
+  onMarkdownNoteLinkClick?: (
+    href: string,
+    event?: MouseEvent | KeyboardEvent,
+  ) => boolean
   /**
    * Resolve the passive body of Meowdown's editor-scoped wiki-link hover
    * card. Resolving `null` (missing, ambiguous, or unavailable targets)
@@ -216,8 +255,10 @@ export function NoteEditor({
   openAsset,
   saveFile,
   resolveFileLink,
+  resolveWikiEmbed,
   resolveFileInfo,
   onWikiLinkClick,
+  onMarkdownNoteLinkClick,
   renderWikilinkHoverCard,
   onTagClick,
   onWikilinkSearch,
@@ -240,22 +281,28 @@ export function NoteEditor({
   // TODO: This violates "Rule of hooks". Refactor this later.
   const onChangeRef = useRef(onChange)
   const onWikiLinkClickRef = useRef(onWikiLinkClick)
+  const onMarkdownNoteLinkClickRef = useRef(onMarkdownNoteLinkClick)
   const onTagClickRef = useRef(onTagClick)
   const resolveImageUrlRef = useRef(resolveImageUrl)
   const resolveAssetOpenPathRef = useRef(resolveAssetOpenPath)
   const openAssetRef = useRef(openAsset)
   const saveFileRef = useRef(saveFile)
   const resolveFileInfoRef = useRef(resolveFileInfo)
+  const resolveFileLinkRef = useRef(resolveFileLink)
+  const resolveWikiEmbedRef = useRef(resolveWikiEmbed)
   const onExitBoundaryRef = useRef(onExitBoundary)
   useLayoutEffect(() => {
     onChangeRef.current = onChange
     onWikiLinkClickRef.current = onWikiLinkClick
+    onMarkdownNoteLinkClickRef.current = onMarkdownNoteLinkClick
     onTagClickRef.current = onTagClick
     resolveImageUrlRef.current = resolveImageUrl
     resolveAssetOpenPathRef.current = resolveAssetOpenPath
     openAssetRef.current = openAsset
     saveFileRef.current = saveFile
     resolveFileInfoRef.current = resolveFileInfo
+    resolveFileLinkRef.current = resolveFileLink
+    resolveWikiEmbedRef.current = resolveWikiEmbed
     onExitBoundaryRef.current = onExitBoundary
   })
 
@@ -274,6 +321,16 @@ export function NoteEditor({
       // can never delete selected text — plain delegation is the whole story.
       insertMarkdown: (markdown) => innerRef.current?.insertMarkdown(markdown),
       focus: () => innerRef.current?.focus(),
+      revealHeading: (fragment) => {
+        const handle = innerRef.current
+        return supportsHeadingReveal(handle) ? handle.revealHeading(fragment) : false
+      },
+      refreshMarkdownRendering: () => {
+        const handle = innerRef.current
+        if (supportsResolverRefresh(handle)) {
+          handle.refreshMarkdownRendering()
+        }
+      },
       setSelection: (position) => innerRef.current?.setSelection(position),
       getSelectedText: () => innerRef.current?.getSelectedText() ?? '',
       openSelectionMenu: () => innerRef.current?.openSelectionMenu(),
@@ -317,6 +374,9 @@ export function NoteEditor({
     // The event may also be the Mod-Enter key press that followed the link
     // (meowdown ≥0.33).
     ({ href, event }: { href: string; event: MouseEvent | KeyboardEvent }) => {
+      if (onMarkdownNoteLinkClickRef.current?.(href, event) === true) {
+        return
+      }
       // A graph-relative `assets/…` href (an attachment link) opens through
       // the generation-pinned asset command, never the URL opener — which
       // would receive a meaningless relative string.
@@ -354,6 +414,14 @@ export function NoteEditor({
   )
   const handleResolveFileInfo: FileInfoResolver = useCallback(
     (href) => resolveFileInfoRef.current?.(href),
+    [],
+  )
+  const handleResolveFileLink = useCallback<FileLinkResolver>(
+    (payload) => resolveFileLinkRef.current?.(payload) ?? false,
+    [],
+  )
+  const handleResolveWikiEmbed = useCallback<WikiEmbedResolver>(
+    (embed) => resolveWikiEmbedRef.current?.(embed),
     [],
   )
   const handleImageClick = useCallback(
@@ -427,7 +495,8 @@ export function NoteEditor({
         {...(onSlashMenuSearch !== undefined ? { onSlashMenuSearch } : {})}
         resolveImageUrl={handleResolveImageUrl}
         onFilePaste={handleFilePaste}
-        {...(resolveFileLink !== undefined ? { resolveFileLink } : {})}
+        resolveFileLink={handleResolveFileLink}
+        resolveWikiEmbed={handleResolveWikiEmbed}
         resolveFileInfo={handleResolveFileInfo}
         onFileClick={handleFileClick}
         onExitBoundary={handleExitBoundary}

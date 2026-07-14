@@ -1,11 +1,14 @@
 import {
   errorMessage,
+  getBacklinks,
   getLinkSources,
   isReflectManagedNote,
+  prepareNoteMoveRewrites,
   readNote,
   resolveWikiTarget,
   rewriteLinksForTitleChange,
   slugPathForTitle,
+  type PreparedNoteMoveRewrite,
   writeNote,
 } from '@reflect/core'
 import { placeOldTitleAlias } from './alias-placement'
@@ -75,6 +78,21 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
   /** Serializes rewrites — a second settle waits for the first. */
   let chain: Promise<void> = Promise.resolve()
 
+  async function rollbackPreparedRewrites(
+    rewrites: readonly { readonly path: string; readonly before: string }[],
+    gen: number,
+  ): Promise<string[]> {
+    const failed: string[] = []
+    for (const rewrite of [...rewrites].reverse()) {
+      try {
+        await writeNote(rewrite.path, rewrite.before, gen)
+      } catch {
+        failed.push(rewrite.path)
+      }
+    }
+    return failed
+  }
+
   /**
    * Move the file onto its title's slug path (Plan 17). A failed move leaves
    * the filename drifting (cosmetic — resolution never reads filenames) until
@@ -85,7 +103,46 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
     if (target === currentPath) {
       return
     }
-    await moveNoteCarryingSession(currentPath, target, gen)
+    const backlinks = await getBacklinks(currentPath)
+    const prepared = await prepareNoteMoveRewrites({
+      fromPath: currentPath,
+      toPath: target,
+      backlinks: backlinks.flatMap((backlink) =>
+        backlink.sourcePath !== null &&
+        backlink.targetRaw !== null &&
+        (backlink.kind === 'wiki' || backlink.kind === 'md')
+          ? [
+              {
+                sourcePath: backlink.sourcePath,
+                kind: backlink.kind,
+                targetRaw: backlink.targetRaw,
+              },
+            ]
+          : [],
+      ),
+      read: readNote,
+    })
+    if (prepared.failed.length > 0) {
+      throw new Error(
+        `could not safely rewrite local links in: ${prepared.failed.join(', ')}`,
+      )
+    }
+    const applied: PreparedNoteMoveRewrite[] = []
+    try {
+      for (const rewrite of prepared.rewrites) {
+        await writeNote(rewrite.path, rewrite.after, gen)
+        applied.push(rewrite)
+      }
+      await moveNoteCarryingSession(currentPath, target, gen)
+    } catch (cause) {
+      const rollbackFailures = await rollbackPreparedRewrites(applied, gen)
+      if (rollbackFailures.length > 0) {
+        throw new Error(
+          `${errorMessage(cause)}; additionally failed to restore links in: ${rollbackFailures.join(', ')}`,
+        )
+      }
+      throw cause
+    }
     currentPath = target
   }
 

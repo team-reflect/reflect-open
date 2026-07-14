@@ -12,7 +12,44 @@ import type { Tree } from '@lezer/common'
 
 const OPEN_BRACKET = 91 // '['
 const CLOSE_BRACKET = 93 // ']'
+const EXCLAMATION = 33 // '!'
 const NEWLINE = 10 // '\n'
+
+/**
+ * Inline parser for Obsidian-style `![[target]]` embeds. Reflect's host
+ * resolver decides whether the opaque target is a local attachment or a note;
+ * the headless note index must still recognize the whole span so it never
+ * mistakes the nested `[[...]]` for a backlink.
+ */
+export const wikiEmbedExtension: MarkdownConfig = {
+  defineNodes: [{ name: 'WikiEmbed' }],
+  parseInline: [
+    {
+      name: 'WikiEmbed',
+      before: 'Link',
+      parse(cx, next, pos) {
+        if (
+          next !== EXCLAMATION ||
+          cx.char(pos + 1) !== OPEN_BRACKET ||
+          cx.char(pos + 2) !== OPEN_BRACKET
+        ) {
+          return -1
+        }
+        const contentStart = pos + 3
+        for (let index = contentStart; index < cx.end; index += 1) {
+          const character = cx.char(index)
+          if (character === NEWLINE || character === OPEN_BRACKET) {
+            return -1
+          }
+          if (character === CLOSE_BRACKET && cx.char(index + 1) === CLOSE_BRACKET) {
+            return index === contentStart ? -1 : cx.addElement(cx.elt('WikiEmbed', pos, index + 2))
+          }
+        }
+        return -1
+      },
+    },
+  ],
+}
 
 /**
  * Inline parser for `[[target]]` / `[[target|alias]]`. Registered `before` the
@@ -48,8 +85,12 @@ export const wikiLinkExtension: MarkdownConfig = {
   ],
 }
 
-/** GFM (tables, task lists, strikethrough, autolinks) + the wiki-link rule. */
-export const reflectMarkdownParser = baseParser.configure([GFM, wikiLinkExtension])
+/** GFM plus Reflect's wiki-link and wiki-embed rules. */
+export const reflectMarkdownParser = baseParser.configure([
+  GFM,
+  wikiEmbedExtension,
+  wikiLinkExtension,
+])
 
 /** Parse markdown **body** text (frontmatter already removed) into a Lezer tree. */
 export function parseBody(body: string): Tree {

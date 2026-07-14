@@ -16,6 +16,9 @@ function projection(path: string, mtime: number, fileHash: string): IndexedNote 
     id: null,
     title: path,
     titleKey: path,
+    authoredTitleKey: path,
+    pathKey: path,
+    basenameKey: path.replace(/^.*\//, '').replace(/\.md$/, ''),
     kind: 'note',
     dailyDate: null,
     isPrivate: false,
@@ -152,5 +155,93 @@ describe('dev bridge note_create parity', () => {
     })
     expect(files.read('notes/new.md')).toBeNull()
     expect(files.read('notes/existing.md')).toBe('# Existing\n')
+  })
+})
+
+describe('dev bridge streamed attachment parity', () => {
+  it('streams bytes, suffixes collisions, and exposes the attachment catalog', async () => {
+    const bridge = createDevBridge({
+      platform: 'ios',
+      files: createDevFileStore({ 'Projects/Plan.md': '# Plan\n' }),
+      index: await createDevIndexDb(),
+    })
+    const invokeBinary = bridge.invokeBinary
+    if (invokeBinary === undefined) {
+      throw new Error('dev bridge must expose its binary asset transport')
+    }
+
+    const firstId = await bridge.invoke('asset_upload_begin', { generation: 1 })
+    expect(firstId).toBe('upload-1')
+    await invokeBinary('asset_upload_append', new TextEncoder().encode('hello '), {
+      'x-upload-id': String(firstId),
+    })
+    await invokeBinary('asset_upload_append', new TextEncoder().encode('world'), {
+      'x-upload-id': String(firstId),
+    })
+    await expect(
+      bridge.invoke('asset_upload_commit', {
+        id: firstId,
+        desiredName: 'report.pdf',
+        generation: 1,
+      }),
+    ).resolves.toBe('assets/report.pdf')
+
+    const secondId = await bridge.invoke('asset_upload_begin', { generation: 1 })
+    await invokeBinary('asset_upload_append', new Uint8Array([1, 2]), {
+      'x-upload-id': String(secondId),
+    })
+    await expect(
+      bridge.invoke('asset_upload_commit', {
+        id: secondId,
+        desiredName: 'report.pdf',
+        generation: 1,
+      }),
+    ).resolves.toBe('assets/report-2.pdf')
+
+    await expect(
+      bridge.invoke('asset_read', { path: 'assets/report.pdf', generation: 1 }),
+    ).resolves.toBe(btoa('hello world'))
+    await expect(bridge.invoke('list_attachments', { generation: 1 })).resolves.toEqual([
+      expect.objectContaining({ path: 'assets/report.pdf', size: 11 }),
+      expect.objectContaining({ path: 'assets/report-2.pdf', size: 2 }),
+    ])
+    await expect(
+      bridge.invoke('attachment_resolve', {
+        request: {
+          sourcePath: 'Projects/Plan.md',
+          reference: '/assets/report.pdf',
+          referenceKind: 'markdown',
+          generation: 1,
+        },
+      }),
+    ).resolves.toEqual({
+      kind: 'resolved',
+      path: 'assets/report.pdf',
+      renderKind: 'file',
+    })
+  })
+
+  it('rejects stale upload generations and unsafe destination names', async () => {
+    const bridge = createDevBridge({
+      platform: 'ios',
+      files: createDevFileStore({}),
+      index: await createDevIndexDb(),
+    })
+
+    await expect(bridge.invoke('asset_upload_begin', { generation: 0 })).rejects.toMatchObject({
+      kind: 'io',
+    })
+    await expect(bridge.invoke('list_attachments', { generation: 0 })).rejects.toMatchObject({
+      kind: 'io',
+    })
+    const id = await bridge.invoke('asset_upload_begin', { generation: 1 })
+    await expect(
+      bridge.invoke('asset_upload_commit', {
+        id,
+        desiredName: '../escape.pdf',
+        generation: 1,
+      }),
+    ).rejects.toMatchObject({ kind: 'traversal' })
+    await expect(bridge.invoke('list_attachments', { generation: 1 })).resolves.toEqual([])
   })
 })

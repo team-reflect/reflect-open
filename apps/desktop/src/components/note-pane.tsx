@@ -1,4 +1,12 @@
-import { memo, useCallback, useMemo, useRef, useState, type ReactElement } from 'react'
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from 'react'
 import type { ExitBoundaryHandler } from '@meowdown/core'
 import {
   detectConflictMarkers,
@@ -24,8 +32,9 @@ import {
 } from '@/editor/editor-handle-registry'
 import { markModeFromSyntax } from '@/editor/mark-mode'
 import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor'
-import { resolveAssetFileLink, useAssetPersistence } from '@/editor/use-asset-persistence'
+import { useAssetPersistence } from '@/editor/use-asset-persistence'
 import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete'
+import { useMarkdownLinkNavigation } from '@/editor/use-markdown-link-navigation'
 import { useNoteDocument } from '@/editor/use-note-document'
 import { useTagNavigation } from '@/editor/use-tag-navigation'
 import { useTemplateSlashItems } from '@/editor/use-template-slash-items'
@@ -164,20 +173,27 @@ export function NotePaneComponent({
   })
   const {
     resolveImageUrl,
+    resolveImageUrlFromSource,
     resolveAssetOpenPath,
+    resolveAssetOpenPathFromSource,
+    resolveFileLink,
+    resolveWikiEmbed,
     openAsset,
     saveFile,
     resolveFileInfo,
+    attachmentCatalogRevision,
     saveError,
   } = useAssetPersistence(generation, path)
   const renderWikilinkHoverCard = useWikiLinkHoverPreview({
     generation,
     graphKey: graph?.root ?? null,
     dateFormat: settings.dateFormat,
-    resolveImageUrl,
-    resolveAssetOpenPath,
+    resolverRevision: attachmentCatalogRevision,
+    resolveImageUrlFromSource,
+    resolveAssetOpenPathFromSource,
   })
-  const onWikiLinkClick = useWikiLinkNavigation(generation)
+  const onWikiLinkClick = useWikiLinkNavigation(generation, path)
+  const onMarkdownNoteLinkClick = useMarkdownLinkNavigation(generation, path)
   const onTagClick = useTagNavigation()
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
 
@@ -205,7 +221,7 @@ export function NotePaneComponent({
           registeredHandle.current = null
         }
       } else {
-        registerNoteEditorHandle(path, handle)
+        registerNoteEditorHandle(path, handle, generation)
         registeredHandle.current = { path, handle }
       }
       if (dailyDate !== undefined) {
@@ -222,8 +238,31 @@ export function NotePaneComponent({
         onAutoFocused?.()
       }
     },
-    [bindEditor, path, dailyDate, registerHandle, autoFocus, autoFocusSelection, onAutoFocused],
+    [
+      bindEditor,
+      path,
+      generation,
+      dailyDate,
+      registerHandle,
+      autoFocus,
+      autoFocusSelection,
+      onAutoFocused,
+    ],
   )
+
+  const appliedAttachmentCatalogRevision = useRef(attachmentCatalogRevision)
+  const appliedAttachmentSourcePath = useRef(path)
+  useEffect(() => {
+    if (
+      appliedAttachmentCatalogRevision.current === attachmentCatalogRevision &&
+      appliedAttachmentSourcePath.current === path
+    ) {
+      return
+    }
+    appliedAttachmentCatalogRevision.current = attachmentCatalogRevision
+    appliedAttachmentSourcePath.current = path
+    registeredHandle.current?.handle.refreshMarkdownRendering?.()
+  }, [attachmentCatalogRevision, path])
 
   const aiMenu = useEditorAiMenu({
     path,
@@ -357,9 +396,11 @@ export function NotePaneComponent({
         // Claims `assets/…` links (what saveFile inserts for a dropped
         // non-image file) so they render as file pills, sized by
         // resolveFileInfo.
-        resolveFileLink={resolveAssetFileLink}
+        resolveFileLink={resolveFileLink}
+        resolveWikiEmbed={resolveWikiEmbed}
         resolveFileInfo={resolveFileInfo}
         onWikiLinkClick={onWikiLinkClick}
+        onMarkdownNoteLinkClick={onMarkdownNoteLinkClick}
         {...(generation !== null && !isTouchEditorSurface()
           ? { renderWikilinkHoverCard }
           : {})}

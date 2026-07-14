@@ -80,42 +80,58 @@ describe('noteTitleOwningEmail', () => {
 })
 
 describe('findExactWikiTargetMatches', () => {
-  it('returns every exact title in path order without querying aliases', async () => {
-    mockInvoke.mockResolvedValue([
-      { path: 'notes/business-ideas-2.md' },
-      { path: 'notes/business-ideas.md' },
-    ])
+  it('returns every exact authored title in path order ahead of lower tiers', async () => {
+    mockInvoke.mockImplementation(async (_command, args) => {
+      const sql = String(args['sql'])
+      return sql.includes('"authored_title_key" = ?')
+        ? [
+            { path: 'notes/business-ideas-2.md' },
+            { path: 'notes/business-ideas.md' },
+          ]
+        : []
+    })
 
     await expect(findExactWikiTargetMatches('Business ideas')).resolves.toEqual({
       kind: 'title',
       paths: ['notes/business-ideas-2.md', 'notes/business-ideas.md'],
     })
 
-    expect(mockInvoke).toHaveBeenCalledTimes(1)
-    const [, args] = mockInvoke.mock.calls[0]!
+    expect(mockInvoke).toHaveBeenCalledTimes(3)
+    const titleCall = mockInvoke.mock.calls.find(([, args]) =>
+      String(args['sql']).includes('"authored_title_key" = ?'),
+    )
+    expect(titleCall).toBeDefined()
+    const [, args] = titleCall!
     const sql = String(args['sql'])
-    expect(sql).toContain('title_key')
+    expect(sql).toContain('authored_title_key')
     expect(sql).toContain('distinct')
     expect(sql).toContain('order by "path"')
     expect(sql).toContain('"kind" != ?')
     expect(args['params']).toEqual(['business ideas', 'template'])
   })
 
-  it('queries exact aliases only after titles miss', async () => {
-    mockInvoke
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        { note_path: 'notes/alias-a.md' },
-        { note_path: 'notes/alias-b.md' },
-      ])
+  it('uses exact aliases only after authored titles miss', async () => {
+    mockInvoke.mockImplementation(async (_command, args) => {
+      const sql = String(args['sql'])
+      return sql.includes('from "aliases"')
+        ? [
+            { note_path: 'notes/alias-a.md' },
+            { note_path: 'notes/alias-b.md' },
+          ]
+        : []
+    })
 
     await expect(findExactWikiTargetMatches('Business ideas')).resolves.toEqual({
       kind: 'alias',
       paths: ['notes/alias-a.md', 'notes/alias-b.md'],
     })
 
-    expect(mockInvoke).toHaveBeenCalledTimes(2)
-    const [, args] = mockInvoke.mock.calls[1]!
+    expect(mockInvoke).toHaveBeenCalledTimes(3)
+    const aliasCall = mockInvoke.mock.calls.find(([, args]) =>
+      String(args['sql']).includes('from "aliases"'),
+    )
+    expect(aliasCall).toBeDefined()
+    const [, args] = aliasCall!
     const sql = String(args['sql'])
     expect(sql).toContain('from "aliases"')
     expect(sql).toContain('inner join "notes"')
@@ -126,15 +142,23 @@ describe('findExactWikiTargetMatches', () => {
   })
 
   it('preserves daily-date precedence before titles and aliases', async () => {
-    mockInvoke.mockResolvedValue([{ path: 'daily/2026-06-09.md' }])
+    mockInvoke.mockImplementation(async (_command, args) =>
+      String(args['sql']).includes('"daily_date" = ?')
+        ? [{ path: 'daily/2026-06-09.md' }]
+        : [],
+    )
 
     await expect(findExactWikiTargetMatches('2026-06-09')).resolves.toEqual({
       kind: 'date',
       paths: ['daily/2026-06-09.md'],
     })
 
-    expect(mockInvoke).toHaveBeenCalledTimes(1)
-    const [, args] = mockInvoke.mock.calls[0]!
+    expect(mockInvoke).toHaveBeenCalledTimes(4)
+    const dateCall = mockInvoke.mock.calls.find(([, args]) =>
+      String(args['sql']).includes('"daily_date" = ?'),
+    )
+    expect(dateCall).toBeDefined()
+    const [, args] = dateCall!
     expect(String(args['sql'])).toContain('daily_date')
     expect(args['params']).toEqual(['2026-06-09', 'template'])
   })
@@ -542,10 +566,18 @@ describe('suggestWikiTargets', () => {
   })
 
   it('keeps an exact title match above the generated date (folded key threaded into the merge)', async () => {
-    mockInvoke.mockResolvedValue([]) // aliases query + fallback
-    mockInvoke.mockResolvedValueOnce([
-      { path: 'notes/today.md', title: 'Today', title_key: 'today', daily_date: null, mtime: 1 },
-    ])
+    mockInvoke.mockImplementation(async (_command, args) => {
+      const sql = String(args['sql'])
+      if (sql.includes('from "notes"') && sql.includes('title_key LIKE')) {
+        return [
+          { path: 'notes/today.md', title: 'Today', title_key: 'today', daily_date: null, mtime: 1 },
+        ]
+      }
+      if (sql.includes('from "note_keys"')) {
+        return [{ key: 'today', note_path: 'notes/today.md', priority: 2 }]
+      }
+      return []
+    })
 
     const result = await suggestWikiTargets('today', 8, clock)
 

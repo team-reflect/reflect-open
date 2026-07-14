@@ -5,8 +5,10 @@ import {
   cancelReflectV1Import,
   createNoteIfAbsent,
   importReflectV1Zip,
+  listAttachments,
   markReflectV1ImportOwnWrites,
   openAsset,
+  resolveAttachment,
   subscribeImportProgress,
   IMPORT_PROGRESS_EVENT,
 } from './commands'
@@ -83,6 +85,83 @@ describe('graph commands', () => {
       path: 'assets/cat.png',
       generation: 7,
     })
+  })
+
+  it('resolves attachments through a validated generation-pinned request', async () => {
+    const invoke = vi.fn(async () => ({
+      kind: 'resolved',
+      path: 'Media/cat.png',
+      renderKind: 'image',
+    }))
+    setBridge({ invoke, listen: async () => () => {} })
+
+    await expect(
+      resolveAttachment({
+        sourcePath: 'Projects/Plan.md',
+        reference: '../Media/cat.png',
+        referenceKind: 'markdown',
+        generation: 7,
+      }),
+    ).resolves.toEqual({
+      kind: 'resolved',
+      path: 'Media/cat.png',
+      renderKind: 'image',
+    })
+    expect(invoke).toHaveBeenCalledWith('attachment_resolve', {
+      request: {
+        sourcePath: 'Projects/Plan.md',
+        reference: '../Media/cat.png',
+        referenceKind: 'markdown',
+        generation: 7,
+      },
+    })
+  })
+
+  it('rejects malformed attachment requests and native outcomes', async () => {
+    const invoke = vi.fn(async () => ({
+      kind: 'resolved',
+      path: 'Media/movie.mp4',
+      renderKind: 'video',
+    }))
+    setBridge({ invoke, listen: async () => () => {} })
+
+    await expect(
+      resolveAttachment({
+        sourcePath: 'Plan.md',
+        reference: 'movie.mp4',
+        referenceKind: 'wikiEmbed',
+        generation: -1,
+      }),
+    ).rejects.toBeDefined()
+    expect(invoke).not.toHaveBeenCalled()
+
+    await expect(
+      resolveAttachment({
+        sourcePath: 'Plan.md',
+        reference: 'movie.mp4',
+        referenceKind: 'wikiEmbed',
+        generation: 7,
+      }),
+    ).rejects.toMatchObject({ kind: 'parse' })
+  })
+
+  it('lists the generation-pinned attachment catalog through IPC', async () => {
+    const attachments = [
+      { path: 'Media/cat.png', size: 4, modifiedMs: 9 },
+      { path: 'Media/remote.pdf', size: 0, modifiedMs: 10, placeholder: true },
+    ]
+    const invoke = vi.fn(async () => attachments)
+    setBridge({ invoke, listen: async () => () => {} })
+
+    await expect(listAttachments(7)).resolves.toEqual(attachments)
+    expect(invoke).toHaveBeenCalledWith('list_attachments', { generation: 7 })
+  })
+
+  it('rejects non-attachment paths in the native attachment catalog', async () => {
+    const invoke = vi.fn(async () => [{ path: 'notes/Plan.md', size: 4, modifiedMs: 9 }])
+    setBridge({ invoke, listen: async () => () => {} })
+
+    await expect(listAttachments(7)).rejects.toMatchObject({ kind: 'parse' })
   })
 
   it('imports Reflect V1 zips through the generation-pinned native command', async () => {

@@ -125,10 +125,12 @@ export {
   writeAsset,
   readAsset,
   openAsset,
+  resolveAttachment,
   listDir,
   noteExists,
   deleteNote,
   listFiles,
+  listAttachments,
   recentGraphs,
   forgetRecent,
   deleteGraph,
@@ -142,6 +144,26 @@ export {
   captureSharedInboxRelay,
   promoteCaptureScreenshot,
 } from '../graph/commands'
+export {
+  attachmentReferenceKindSchema,
+  attachmentReferenceSchema,
+  attachmentResolveRequestSchema,
+  attachmentRenderKindSchema,
+  attachmentPathSchema,
+  attachmentFileMetaSchema,
+  attachmentResolveOutcomeSchema,
+  attachmentRenderKind,
+  prepareAttachmentCatalog,
+  resolveAttachmentFromCatalog,
+  type AttachmentReferenceKind,
+  type AttachmentReference,
+  type AttachmentResolveRequest,
+  type AttachmentRenderKind,
+  type AttachmentFileMeta,
+  type AttachmentResolveOutcome,
+  type AttachmentCatalogResolveOutcome,
+  type PreparedAttachmentCatalog,
+} from '../graph/attachment-resolution'
 export { createAsset, importAsset } from '../graph/assets'
 export { assetFileName } from '../graph/asset-names'
 export {
@@ -152,12 +174,20 @@ export {
   isUntitledNotePath,
   createNoteWithTitle,
   resolveOrCreateNoteWithTitle,
+  resolveOrCreateWikiTarget,
   type ResolveOrCreateNoteResult,
 } from '../graph/create-note'
 export {
+  resolveExistingMarkdownTarget,
   resolveExistingWikiTarget,
   type ExistingWikiTargetResolution,
 } from '../graph/resolve-existing-wiki-target'
+export {
+  bareWikiTitle,
+  indexMarkdownNoteReference,
+  indexWikiNoteReference,
+  type IndexedNoteReference,
+} from '../graph/local-note-reference'
 export {
   settingsSchema,
   editorMarkdownSyntaxSchema,
