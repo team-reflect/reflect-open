@@ -14,6 +14,16 @@ const workflowPath = join(
   'release-please.yml',
 )
 const workflow = readFileSync(workflowPath, 'utf8')
+const retryWorkflowPath = join(
+  scriptsDirectory,
+  '..',
+  '..',
+  '..',
+  '.github',
+  'workflows',
+  'retry-release-please.yml',
+)
+const retryWorkflow = readFileSync(retryWorkflowPath, 'utf8')
 
 test('new releases wait for draft visibility before delivery', () => {
   const resultStepStart = workflow.indexOf('- name: Collect release-please outputs')
@@ -67,4 +77,29 @@ test('a beta retry only recovers release state for its immutable commit', () => 
   expect(resultStep).not.toContain(
     'if [ "$BRANCH_NAME" = "next" ] && [ "$release_commit" != "$GITHUB_SHA" ]; then',
   )
+})
+
+test('failed release maintenance gets two bounded automatic retries', () => {
+  expect(retryWorkflow).toContain('workflow_run:')
+  expect(retryWorkflow).toContain('workflows: [Release PR]')
+  expect(retryWorkflow).toContain('types: [completed]')
+  expect(retryWorkflow).toContain('actions: write')
+  expect(retryWorkflow).toContain(
+    "github.event.workflow_run.conclusion == 'failure' &&\n      github.event.workflow_run.run_attempt < 3",
+  )
+  expect(retryWorkflow).toContain(
+    'actions/runs/${RUN_ID}/attempts/${RUN_ATTEMPT}/jobs?per_page=100',
+  )
+  expect(retryWorkflow).toContain('.name == "Maintain the Release PR"')
+  expect(retryWorkflow).toContain('.conclusion == "failure"')
+  expect(retryWorkflow).toContain(
+    'current_attempt="$(jq -r \'.run_attempt\' <<< "$current_run")"',
+  )
+  expect(retryWorkflow).toContain(
+    '[ "$current_attempt" != "$RUN_ATTEMPT" ] || [ "$current_status" != "completed" ]',
+  )
+  expect(retryWorkflow).toContain(
+    'gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/jobs/${JOB_ID}/rerun"',
+  )
+  expect(retryWorkflow).not.toContain('rerun-failed-jobs')
 })

@@ -113,6 +113,13 @@ channel changelog (`apps/desktop/CHANGELOG.beta.md` on `next`,
 `apps/desktop/CHANGELOG.md` on `master`) from the conventional-commit PR titles landed
 since the last release.
 
+If the Release PR workflow's maintenance job fails, a watchdog waits briefly and
+reruns that job automatically. It makes at most two attempts beyond the original run;
+GitHub also reruns the dependent release jobs so a partially completed release can
+resume through the workflow's existing recovery checks. After three failed attempts,
+inspect the latest logs and rerun the failed job manually rather than opening or
+editing release state by hand.
+
 **Merging the Release PR is the technical release boundary.** release-please then
 creates a draft GitHub release (with its `v<version>` tag — `force-tag-creation`, so
 later release-please runs can always anchor on the previous release) and hands the tag
