@@ -23,6 +23,7 @@ mod write;
 use std::sync::{Mutex, MutexGuard};
 
 use rusqlite::{params, Connection};
+use serde::Deserialize;
 use serde_json::{Map, Value};
 use tauri::State;
 
@@ -243,8 +244,9 @@ pub fn index_remove<R: tauri::Runtime>(
 /// together on graph open, and the projection is rebuildable in the worst case.
 ///
 /// The rename pipeline end-to-end: `docs/readable-filenames.md`.
-#[tauri::command]
-pub fn note_move_indexed<R: tauri::Runtime>(
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NoteMoveIndexedRequest {
     from: String,
     to: String,
     from_path_key: String,
@@ -252,11 +254,25 @@ pub fn note_move_indexed<R: tauri::Runtime>(
     to_path_key: String,
     to_basename_key: String,
     generation: u64,
+}
+
+#[tauri::command]
+pub fn note_move_indexed<R: tauri::Runtime>(
+    request: NoteMoveIndexedRequest,
     app: tauri::AppHandle<R>,
     graph: State<GraphState>,
     index: State<IndexState>,
     background_tasks: State<BackgroundTaskState>,
 ) -> AppResult<()> {
+    let NoteMoveIndexedRequest {
+        from,
+        to,
+        from_path_key,
+        from_basename_key,
+        to_path_key,
+        to_basename_key,
+        generation,
+    } = request;
     let _background_task = background_task::scoped(&background_tasks, "Reflect note move");
     let root = crate::fs::root_for_generation(&graph, generation)?;
     {
@@ -306,17 +322,30 @@ fn move_rows(
 /// content costs the user BYOK money). No filesystem half, and unlike
 /// `note_move_indexed` this is gated on the **index** generation like every
 /// other reconcile-path write — a superseded pass must no-op.
-#[tauri::command]
-pub fn index_move<R: tauri::Runtime>(
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct IndexMoveRequest {
     from: String,
     to: String,
     to_path_key: String,
     to_basename_key: String,
     generation: u64,
+}
+
+#[tauri::command]
+pub fn index_move<R: tauri::Runtime>(
+    request: IndexMoveRequest,
     app: tauri::AppHandle<R>,
     index: State<IndexState>,
     background_tasks: State<BackgroundTaskState>,
 ) -> AppResult<()> {
+    let IndexMoveRequest {
+        from,
+        to,
+        to_path_key,
+        to_basename_key,
+        generation,
+    } = request;
     let _background_task = background_task::scoped(&background_tasks, "Reflect index move");
     {
         let mut state = lock_state(&index)?;

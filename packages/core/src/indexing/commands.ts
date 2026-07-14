@@ -53,7 +53,15 @@ export async function moveIndexedRows(
 ): Promise<void> {
   await call(
     'index_move',
-    { from, to, toPathKey: notePathKey(to), toBasenameKey: noteBasenameKey(to), generation },
+    {
+      request: {
+        from,
+        to,
+        toPathKey: notePathKey(to),
+        toBasenameKey: noteBasenameKey(to),
+        generation,
+      },
+    },
     voidSchema,
   )
 }
@@ -74,13 +82,15 @@ export async function moveNoteIndexed(
   await call(
     'note_move_indexed',
     {
-      from,
-      to,
-      fromPathKey: notePathKey(from),
-      fromBasenameKey: noteBasenameKey(from),
-      toPathKey: notePathKey(to),
-      toBasenameKey: noteBasenameKey(to),
-      generation,
+      request: {
+        from,
+        to,
+        fromPathKey: notePathKey(from),
+        fromBasenameKey: noteBasenameKey(from),
+        toPathKey: notePathKey(to),
+        toBasenameKey: noteBasenameKey(to),
+        generation,
+      },
     },
     voidSchema,
   )

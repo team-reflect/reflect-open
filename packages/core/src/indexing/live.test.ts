@@ -365,11 +365,13 @@ describe('applyIndexChanges move healing (Plan 17)', () => {
     expect(commands).not.toContain('index_remove')
     const move = calls.find(([command]) => command === 'index_move')
     expect(move?.[1]).toEqual({
-      from: OLD,
-      to: NEW,
-      toPathKey: NEW,
-      toBasenameKey: 'meeting-notes',
-      generation: 7,
+      request: {
+        from: OLD,
+        to: NEW,
+        toPathKey: NEW,
+        toBasenameKey: 'meeting-notes',
+        generation: 7,
+      },
     })
     const apply = calls.find(([command]) => command === 'index_apply')
     expect(apply).toBeDefined()

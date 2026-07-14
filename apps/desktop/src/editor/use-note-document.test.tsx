@@ -112,7 +112,7 @@ function installGraphFake({ files, linkSources, resolveTitleTo }: GraphFakeOptio
       return files[(args as { path: string }).path] !== undefined
     }
     if (command === 'note_move_indexed') {
-      const { from, to } = args as { from: string; to: string }
+      const { from, to } = (args as { request: { from: string; to: string } }).request
       // Mirrors the Rust command for the paths these tests exercise: a free
       // destination renames (occupied ones refuse, but no test stages that).
       if (files[to] === undefined && files[from] !== undefined) {

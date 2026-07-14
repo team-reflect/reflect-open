@@ -42,6 +42,7 @@ const uploadCommitArgsSchema = uploadIdArgsSchema.extend({
   generation: z.number().int().nonnegative(),
 })
 const moveArgsSchema = z.object({ from: z.string(), to: z.string() })
+const moveRequestArgsSchema = z.object({ request: moveArgsSchema })
 const metaArgsSchema = z.object({ key: z.string(), value: z.string() })
 const touchArgsSchema = z.object({
   entries: z.array(z.object({ path: z.string(), mtime: z.number() })),
@@ -166,7 +167,7 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
       case 'dir_list':
         return files.listDir(z.object({ dir: z.string() }).parse(args).dir)
       case 'note_move_indexed': {
-        const { from, to } = moveArgsSchema.parse(args)
+        const { from, to } = moveRequestArgsSchema.parse(args).request
         if (!files.exists(from)) {
           throw new ReflectError('notFound', `cannot move note: ${from} does not exist`)
         }
@@ -274,7 +275,7 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         return null
       }
       case 'index_move': {
-        const { from, to } = moveArgsSchema.parse(args)
+        const { from, to } = moveRequestArgsSchema.parse(args).request
         index.moveNote(from, to)
         return null
       }
