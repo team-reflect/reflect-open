@@ -3,6 +3,7 @@ import { Trash2 } from 'lucide-react'
 import { aiModelLabel, aiProvider, errorMessage, type AiProviderConfig } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import { startOperation } from '@/lib/operations'
+import { ModelCombobox } from './model-combobox'
 
 interface AiProviderRowProps {
   config: AiProviderConfig
@@ -10,6 +11,8 @@ interface AiProviderRowProps {
   isDefault: boolean
   /** Make this entry the app-wide default. */
   onMakeDefault: (id: string) => void
+  /** Change the default model used by this provider entry. */
+  onSetDefaultModel: (id: string, model: string) => void
   /** Remove the entry and its keychain secret; rejects on failure. */
   onRemove: (id: string) => Promise<void>
 }
@@ -24,9 +27,11 @@ export function AiProviderRow({
   config,
   isDefault,
   onMakeDefault,
+  onSetDefaultModel,
   onRemove,
 }: AiProviderRowProps): ReactElement {
-  const providerLabel = aiProvider(config.provider).label
+  const provider = aiProvider(config.provider)
+  const providerLabel = provider.label
   const modelLabel = aiModelLabel(config.provider, config.model)
   const name = `${providerLabel} — ${modelLabel}`
 
@@ -37,13 +42,20 @@ export function AiProviderRow({
   }
 
   return (
-    <div className="flex items-center justify-between gap-4 px-4 py-3">
+    <div className="grid grid-cols-[minmax(0,1fr)_12rem_auto] items-center gap-3 px-4 py-3">
       <div className="min-w-0">
-        <div className="truncate text-sm font-medium text-text">{name}</div>
+        <div className="truncate text-sm font-medium text-text">{providerLabel}</div>
         <p className="mt-0.5 text-xs text-text-muted">
           API key <span className="font-mono">·····{config.keyHint}</span>
         </p>
       </div>
+      <ModelCombobox
+        value={config.model}
+        provider={config.provider}
+        models={provider.models}
+        onChange={(model) => onSetDefaultModel(config.id, model)}
+        ariaLabel={`Default model for ${providerLabel}`}
+      />
       <div className="flex shrink-0 items-center gap-2">
         {isDefault ? (
           <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-soft-text">

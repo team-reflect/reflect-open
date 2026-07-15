@@ -39,6 +39,8 @@ interface ModelComboboxProps {
   models: AiModelOption[]
   /** Called with the new model id — either a catalog id or a custom string. */
   onChange: (modelId: string) => void
+  /** Accessible name for the trigger when multiple model pickers are visible. */
+  ariaLabel?: string
 }
 
 /**
@@ -51,6 +53,7 @@ export function ModelCombobox({
   provider,
   models,
   onChange,
+  ariaLabel = 'Default model',
 }: ModelComboboxProps): ReactElement {
   const [open, setOpen] = useState(false)
   const [inputValue, setInputValue] = useState('')
@@ -92,7 +95,7 @@ export function ModelCombobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          aria-label="Default model"
+          aria-label={ariaLabel}
           className="w-full justify-between font-normal"
         >
           <span className="truncate">{aiModelLabel(provider, value)}</span>

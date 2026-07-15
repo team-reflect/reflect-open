@@ -65,7 +65,14 @@ export function MobileSettings(): ReactElement {
   const status = useMobileSyncStatus()
   const [disconnecting, setDisconnecting] = useState(false)
   const [connectOpen, setConnectOpen] = useState(false)
-  const { providers, defaultProvider, addProvider, removeProvider, makeDefault } = useAiProviders()
+  const {
+    providers,
+    defaultProvider,
+    addProvider,
+    removeProvider,
+    makeDefault,
+    setDefaultModel,
+  } = useAiProviders()
   const [addProviderOpen, setAddProviderOpen] = useState(false)
   // The managed provider sticks around after close so the exit animation has
   // content; `manageOpen` alone drives visibility (the edit-sheet pattern).
@@ -233,6 +240,7 @@ export function MobileSettings(): ReactElement {
         open={manageOpen}
         onOpenChange={setManageOpen}
         onMakeDefault={makeDefault}
+        onSetDefaultModel={setDefaultModel}
         onRemove={removeProvider}
       />
     </div>

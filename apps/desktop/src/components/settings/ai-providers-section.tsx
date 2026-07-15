@@ -13,7 +13,14 @@ import { SettingsSection } from './section'
  * which is the app-wide default and only the key's trailing characters.
  */
 export function AiProvidersSection(): ReactElement {
-  const { providers, defaultProvider, addProvider, removeProvider, makeDefault } = useAiProviders()
+  const {
+    providers,
+    defaultProvider,
+    addProvider,
+    removeProvider,
+    makeDefault,
+    setDefaultModel,
+  } = useAiProviders()
   const [adding, setAdding] = useState(false)
 
   return (
@@ -30,6 +37,7 @@ export function AiProvidersSection(): ReactElement {
             config={config}
             isDefault={config.id === defaultProvider?.id}
             onMakeDefault={makeDefault}
+            onSetDefaultModel={setDefaultModel}
             onRemove={removeProvider}
           />
         ))

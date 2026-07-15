@@ -127,10 +127,14 @@ describe('AiProvidersSection', () => {
     stored = twoStoredModels()
     renderSection()
 
-    await waitFor(() =>
-      expect(screen.getByText('Anthropic — Claude Opus 4.8')).toBeTruthy(),
+    await waitFor(() => expect(screen.getByText('Anthropic')).toBeTruthy())
+    expect(screen.getByText('OpenAI')).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: 'Default model for Anthropic' }).textContent).toMatch(
+      /Claude Opus 4\.8/,
     )
-    expect(screen.getByText('OpenAI — GPT-5.5')).toBeTruthy()
+    expect(screen.getByRole('combobox', { name: 'Default model for OpenAI' }).textContent).toMatch(
+      /GPT-5\.5/,
+    )
     expect(screen.getByText(/wxyz1/)).toBeTruthy()
     expect(screen.getByText(/abcd2/)).toBeTruthy()
     expect(screen.getByText('Default')).toBeTruthy()
@@ -256,9 +260,7 @@ describe('AiProvidersSection', () => {
     stored = twoStoredModels()
     secrets.set('ai-api-key:a', 'sk-a')
     renderSection()
-    await waitFor(() =>
-      expect(screen.getByText('Anthropic — Claude Opus 4.8')).toBeTruthy(),
-    )
+    await waitFor(() => expect(screen.getByText('Anthropic')).toBeTruthy())
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Remove Anthropic — Claude Opus 4.8' }),
@@ -278,9 +280,7 @@ describe('AiProvidersSection', () => {
     secrets.set('ai-api-key:a', 'sk-a')
     secrets.set('ai-api-key:b', 'sk-b')
     renderSection()
-    await waitFor(() =>
-      expect(screen.getByText('Anthropic — Claude Opus 4.8')).toBeTruthy(),
-    )
+    await waitFor(() => expect(screen.getByText('Anthropic')).toBeTruthy())
 
     // Both removes fire in the same tick; each suspends on its keychain
     // delete, so each settings update applies after the other's snapshot
@@ -308,6 +308,24 @@ describe('AiProvidersSection', () => {
 
     await waitFor(() => expect(lastSavedDoc().defaultAiProviderId).toBe('b'))
     expect(lastSavedDoc().aiProviders).toHaveLength(2)
+  })
+
+  it('changes a configured provider default model without replacing its key', async () => {
+    stored = twoStoredModels()
+    secrets.set('ai-api-key:b', 'sk-openai-secret')
+    renderSection()
+
+    fireEvent.click(
+      await screen.findByRole('combobox', { name: 'Default model for OpenAI' }),
+    )
+    fireEvent.click(await screen.findByRole('option', { name: /GPT-5\.4 mini/ }))
+
+    await waitFor(() => {
+      expect(lastSavedDoc().aiProviders).toContainEqual(
+        entry({ id: 'b', provider: 'openai', model: 'gpt-5.4-mini', keyHint: 'abcd2' }),
+      )
+    })
+    expect(secrets.get('ai-api-key:b')).toBe('sk-openai-secret')
   })
 
   it('traps Tab inside the dialog', async () => {
