@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.2...v0.7.0-beta.3) (2026-07-15)
+
+
+### Bug Fixes
+
+* let the Mac close button hide the app ([#811](https://github.com/team-reflect/reflect-open/issues/811)) ([df0e6fa](https://github.com/team-reflect/reflect-open/commit/df0e6fa7a7fbffd491f6386b439952589f6b8ef0))
+
 ## [0.7.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.6.1-beta.2...v0.7.0-beta.2) (2026-07-15)
 
 
