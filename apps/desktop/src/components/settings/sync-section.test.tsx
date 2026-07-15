@@ -97,17 +97,17 @@ afterEach(() => {
 })
 
 describe('SyncSection', () => {
-  it('combines iCloud Drive and GitHub backup under Sync for local graphs', async () => {
+  it('combines iCloud Drive and GitHub sync under Sync for local graphs', async () => {
     renderSection()
 
     const section = screen.getByRole('region', { name: 'Sync' })
     expect(within(section).getByText('iCloud Drive', { selector: 'legend' })).toBeTruthy()
     expect(await within(section).findByText('1 graph in iCloud Drive.')).toBeTruthy()
-    expect(within(section).getByText('GitHub backup', { selector: 'legend' })).toBeTruthy()
+    expect(within(section).getByText('GitHub sync', { selector: 'legend' })).toBeTruthy()
     expect(within(section).getByRole('button', { name: /connect github/i })).toBeTruthy()
   })
 
-  it('keeps GitHub backup visible when the graph syncs through iCloud', async () => {
+  it('keeps GitHub sync visible when the graph syncs through iCloud', async () => {
     graph.current = {
       root: '/Users/alex/Library/Mobile Documents/iCloud~app/Documents/Notes',
       name: 'Notes',
@@ -120,7 +120,7 @@ describe('SyncSection', () => {
     expect(within(section).getByText('iCloud Drive', { selector: 'legend' })).toBeTruthy()
     expect(await within(section).findByText('All note files are downloaded.')).toBeTruthy()
     expect(within(section).getByText('No notes need review.')).toBeTruthy()
-    expect(within(section).getByText('GitHub backup', { selector: 'legend' })).toBeTruthy()
+    expect(within(section).getByText('GitHub sync', { selector: 'legend' })).toBeTruthy()
     expect(within(section).getByRole('button', { name: /connect github/i })).toBeTruthy()
   })
 
@@ -144,7 +144,7 @@ describe('SyncSection', () => {
     expect(within(section).getByRole('button', { name: /A.*notes\/a\.md/ })).toBeTruthy()
   })
 
-  it('opens the conflicted note listed under GitHub backup', async () => {
+  it('opens the conflicted note listed under GitHub sync', async () => {
     core.conflictedNotes = [{ path: 'notes/conflicted.md', title: 'Conflicted note' }]
     sync.backup = {
       phase: 'connected',
@@ -205,6 +205,6 @@ describe('SyncSection', () => {
 
     const section = screen.getByRole('region', { name: 'Sync' })
     expect(within(section).queryByText('iCloud Drive', { selector: 'legend' })).toBeNull()
-    expect(within(section).getByText('GitHub backup', { selector: 'legend' })).toBeTruthy()
+    expect(within(section).getByText('GitHub sync', { selector: 'legend' })).toBeTruthy()
   })
 })
