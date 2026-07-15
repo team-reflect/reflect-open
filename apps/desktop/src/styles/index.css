@@ -258,6 +258,8 @@ html:root {
   --meowdown-heading: var(--text);
   --meowdown-muted: var(--text-secondary);
   --meowdown-accent: var(--accent);
+  /* Keep typing latency native: text should not outrun Meowdown's virtual caret. */
+  --meowdown-caret-glide: 0ms;
   --meowdown-mark: var(--text-muted);
   --meowdown-bullet: var(--text-muted); /* resting bullet dot; collapsed stays themed */
   --meowdown-border: var(--border);
