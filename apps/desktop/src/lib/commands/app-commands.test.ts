@@ -49,7 +49,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
 }))
 
 // Importing registers the commands (module side effect, like production).
-const { APP_COMMANDS, keybindingFor, reconcileStableGraphOrder } = await import('./app-commands')
+const { APP_COMMANDS, keybindingFor, sortGraphsByName } = await import('./app-commands')
 
 function command(id: string) {
   const found = APP_COMMANDS.find((entry) => entry.id === id)
@@ -103,29 +103,23 @@ function noteRow(isPrivate: boolean): NoteRow {
   }
 }
 
-function recentGraph(root: string, openedMs: number): RecentGraph {
-  return { root, name: root, openedMs }
+function recentGraph(root: string, openedMs: number, name: string = root): RecentGraph {
+  return { root, name, openedMs }
 }
 
-describe('reconcileStableGraphOrder', () => {
-  it('keeps graph positions fixed when opening a graph reorders recents', () => {
-    const graphA = recentGraph('/graphs/a', 2)
-    const graphB = recentGraph('/graphs/b', 1)
-    const initialOrder = reconcileStableGraphOrder([], [graphA, graphB])
+describe('sortGraphsByName', () => {
+  it('orders graphs alphabetically by name, ignoring the recents (most-recently-used) order', () => {
+    const banana = recentGraph('/graphs/2', 2, 'Banana')
+    const apple = recentGraph('/graphs/1', 1, 'Apple')
 
-    expect(initialOrder).toEqual(['/graphs/a', '/graphs/b'])
-    expect(reconcileStableGraphOrder(initialOrder, [graphB, graphA])).toEqual(initialOrder)
+    expect(sortGraphsByName([banana, apple])).toEqual(['/graphs/1', '/graphs/2'])
   })
 
-  it('drops forgotten graphs and appends newly seen graphs without reshuffling survivors', () => {
-    const previousOrder = ['/graphs/a', '/graphs/b']
-    const graphB = recentGraph('/graphs/b', 2)
-    const graphC = recentGraph('/graphs/c', 1)
+  it('sorts case-insensitively and breaks ties by root path', () => {
+    const lower = recentGraph('/graphs/z', 1, 'alpha')
+    const upper = recentGraph('/graphs/a', 2, 'Alpha')
 
-    expect(reconcileStableGraphOrder(previousOrder, [graphC, graphB])).toEqual([
-      '/graphs/b',
-      '/graphs/c',
-    ])
+    expect(sortGraphsByName([lower, upper])).toEqual(['/graphs/a', '/graphs/z'])
   })
 })
 

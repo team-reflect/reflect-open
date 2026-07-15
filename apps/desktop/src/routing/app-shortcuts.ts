@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { dailyPath } from '@reflect/core'
 import { usePalette } from '@/components/command-palette/palette-provider'
 import { registerKeymap } from '@/editor/keymap'
-import { APP_COMMANDS, reconcileStableGraphOrder } from '@/lib/commands/app-commands'
+import { APP_COMMANDS, sortGraphsByName } from '@/lib/commands/app-commands'
 import { runCommand } from '@/lib/commands/registry'
 import { todayIso } from '@/lib/dates'
 import { setMenuCommandDispatch } from '@/lib/native-menu/dispatch'
@@ -199,7 +199,7 @@ export function useAppShortcuts(): CommandContext {
     templatesOpenRef.current = templatePickerOpen || templateCreateOpen
     generationRef.current = graph?.generation ?? null
     graphRootRef.current = graph?.root ?? null
-    graphOrderRef.current = reconcileStableGraphOrder(graphOrderRef.current, recents)
+    graphOrderRef.current = sortGraphsByName(recents)
     openRecentRef.current = openRecent
     routeRef.current = route
     focusedDailyDateRef.current = focusedDailyDate

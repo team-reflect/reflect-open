@@ -51,32 +51,19 @@ function openNewNote(context: CommandContext): void {
 }
 
 /**
- * Keep numbered graph slots in first-seen order while the persisted recents
- * list reshuffles by most-recently-used. Forgotten graphs leave the order and
- * newly discovered graphs append without moving the remaining slots.
+ * Order the numbered graph slots (Cmd+1..9) alphabetically by graph name so a
+ * given number maps to a predictable graph instead of following the persisted
+ * recents list, which reshuffles by most-recently-used. Case-insensitive, with
+ * the root path as a stable tiebreak.
  */
-export function reconcileStableGraphOrder(
-  currentOrder: readonly string[],
-  recents: readonly RecentGraph[],
-): string[] {
-  const availableRoots = new Set(recents.map((recent) => recent.root))
-  const nextOrder: string[] = []
-  const orderedRoots = new Set<string>()
-
-  for (const root of currentOrder) {
-    if (availableRoots.has(root) && !orderedRoots.has(root)) {
-      nextOrder.push(root)
-      orderedRoots.add(root)
-    }
-  }
-  for (const recent of recents) {
-    if (!orderedRoots.has(recent.root)) {
-      nextOrder.push(recent.root)
-      orderedRoots.add(recent.root)
-    }
-  }
-
-  return nextOrder
+export function sortGraphsByName(recents: readonly RecentGraph[]): string[] {
+  return [...recents]
+    .sort(
+      (a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) ||
+        a.root.localeCompare(b.root),
+    )
+    .map((recent) => recent.root)
 }
 
 const GRAPH_SWITCH_COMMANDS: AppCommand[] = Array.from({ length: 9 }, (_, index) => {
