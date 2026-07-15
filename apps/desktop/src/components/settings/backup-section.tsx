@@ -47,7 +47,7 @@ function githubRepoBrowserUrl(repo: NonNullable<Extract<BackupState, { phase: 'c
 }
 
 /**
- * Settings → Sync → Backup: connect a GitHub repository, see the current
+ * Settings → Sync → GitHub sync: connect a GitHub repository, see the current
  * backup state in product language, back up on demand, and disconnect.
  * Conflicted notes ("needs review") surface here with a count; each conflicted
  * note also shows its own banner when opened.
@@ -124,7 +124,7 @@ export function BackupSettingsField(): ReactElement {
   return (
     <>
       <SettingsField
-        legend={genericRemote ? 'Backup' : 'GitHub backup'}
+        legend={genericRemote ? 'Backup' : 'GitHub sync'}
         description={
           genericRemote
             ? 'This graph backs up to its own git remote. Edits back up automatically a few moments after you stop typing.'

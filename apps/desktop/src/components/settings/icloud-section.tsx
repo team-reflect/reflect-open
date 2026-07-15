@@ -138,7 +138,7 @@ export function IcloudSettingsField(): ReactElement | null {
           // graph regardless; the original folder keeping its backup is the
           // recovery copy working as intended. Tell the user, don't block.
           setError(
-            `The graph moved to iCloud, but GitHub backup could not be disconnected from the original folder: ${errorMessage(caught)}`,
+            `The graph moved to iCloud, but GitHub sync could not be disconnected from the original folder: ${errorMessage(caught)}`,
           )
         }
       }
@@ -203,7 +203,7 @@ export function IcloudSettingsField(): ReactElement | null {
                     Your notes are copied into iCloud Drive and the graph reopens there. The
                     current folder stays on disk, untouched, as a recovery copy.
                     {backupConnected
-                      ? ' GitHub backup is disconnected from the recovery copy; you can reconnect backup after the iCloud graph opens.'
+                      ? ' GitHub sync is disconnected from the recovery copy; you can reconnect GitHub sync after the iCloud graph opens.'
                       : ''}
                   </DialogDescription>
                 </DialogHeader>

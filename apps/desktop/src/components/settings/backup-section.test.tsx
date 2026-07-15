@@ -49,7 +49,7 @@ describe('BackupSettingsField', () => {
     })
 
     expect(await screen.findByText('Backup', { selector: 'legend' })).toBeTruthy()
-    expect(screen.queryByText('GitHub backup')).toBeNull()
+    expect(screen.queryByText('GitHub sync')).toBeNull()
     expect(screen.getByText('git@gitlab.com:alex/notes.git')).toBeTruthy()
     // The actionable message, not a GitHub reconnect that can't help.
     expect(screen.getByText(/ssh-add/)).toBeTruthy()
@@ -67,7 +67,7 @@ describe('BackupSettingsField', () => {
       status: AUTH_ERROR,
     })
 
-    expect(await screen.findByText('GitHub backup')).toBeTruthy()
+    expect(await screen.findByText('GitHub sync')).toBeTruthy()
     expect(screen.getByText('alex/notes')).toBeTruthy()
     expect(screen.getByText(/reconnect GitHub/)).toBeTruthy()
     expect(screen.getByText('GitHub account')).toBeTruthy()
