@@ -15,7 +15,7 @@ export interface DevIndexDb {
   /** Drop every row belonging to `path` (`index_remove`). */
   removeNote: (path: string) => void
   /** Re-key every row from `from` to `to` (`index_move`); throws when `to` is occupied. */
-  moveNote: (from: string, to: string) => void
+  moveNote: (from: string, to: string, toPathKey: string, toBasenameKey: string) => void
   /** Re-stamp a row's `mtime`/`updated_at` (one `index_touch` entry). */
   touchNote: (path: string, mtime: number) => void
   /** Wipe derived tables, preserving `index_meta` (`index_clear`). */
@@ -44,6 +44,7 @@ export interface DevChatMessageRow {
   attachments: string
   parts: string
   responseMessages: string
+  privacyFingerprint: string | null
   createdMs: number
 }
 
@@ -111,13 +112,16 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
       removeNote(db, note.path)
       run(
         db,
-        `INSERT INTO notes(path, id, title, title_key, kind, daily_date, is_private, is_pinned, pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at, preview)
-         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO notes(path, id, title, title_key, authored_title_key, path_key, basename_key, kind, daily_date, is_private, is_pinned, pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at, preview)
+         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           note.path,
           note.id,
           note.title,
           note.titleKey,
+          note.authoredTitleKey,
+          note.pathKey,
+          note.basenameKey,
           note.kind,
           note.dailyDate,
           note.isPrivate,
@@ -136,9 +140,19 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
       for (const link of note.links) {
         run(
           db,
-          `INSERT INTO links(source_path, kind, target_raw, target_key, alias, pos_from, pos_to)
-           VALUES(?, ?, ?, ?, ?, ?, ?)`,
-          [note.path, link.kind, link.targetRaw, link.targetKey, link.alias, link.posFrom, link.posTo],
+          `INSERT INTO links(source_path, kind, target_raw, target_key, path_key, alternate_path_key, alias, pos_from, pos_to)
+           VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            note.path,
+            link.kind,
+            link.targetRaw,
+            link.targetKey,
+            link.pathKey,
+            link.alternatePathKey,
+            link.alias,
+            link.posFrom,
+            link.posTo,
+          ],
         )
       }
       for (const tag of note.tags) {
@@ -190,7 +204,7 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
 
     removeNote: (path) => removeNote(db, path),
 
-    moveNote: (from, to) => {
+    moveNote: (from, to, toPathKey, toBasenameKey) => {
       const occupied = db.selectValue('SELECT 1 FROM notes WHERE path = ?', [to])
       if (occupied !== undefined) {
         throw new ReflectError('io', `cannot move note: ${to} is already indexed`)
@@ -201,7 +215,11 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
       db.exec('BEGIN')
       try {
         db.exec('PRAGMA defer_foreign_keys = ON')
-        run(db, 'UPDATE notes SET path = ? WHERE path = ?', [to, from])
+        run(
+          db,
+          "UPDATE notes SET path = ?, path_key = ?, basename_key = ?, file_hash = '' WHERE path = ?",
+          [to, toPathKey, toBasenameKey, from],
+        )
         run(db, 'UPDATE note_text SET note_path = ? WHERE note_path = ?', [to, from])
         run(db, 'UPDATE links SET source_path = ? WHERE source_path = ?', [to, from])
         run(db, 'UPDATE tags SET note_path = ? WHERE note_path = ?', [to, from])
@@ -253,16 +271,17 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
         db,
         `INSERT INTO chat_messages(
             id, conversation_id, seq, user_text, attachments, parts,
-            response_messages, created_ms)
+            response_messages, privacy_fingerprint, created_ms)
          VALUES (
             ?1, ?2,
             (SELECT COALESCE(MAX(seq) + 1, 0) FROM chat_messages WHERE conversation_id = ?2),
-            ?3, ?4, ?5, ?6, ?7)
+            ?3, ?4, ?5, ?6, ?7, ?8)
          ON CONFLICT(id) DO UPDATE SET
             user_text = excluded.user_text,
             attachments = excluded.attachments,
             parts = excluded.parts,
-            response_messages = excluded.response_messages`,
+            response_messages = excluded.response_messages,
+            privacy_fingerprint = excluded.privacy_fingerprint`,
         [
           message.id,
           message.conversationId,
@@ -270,6 +289,7 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
           message.attachments,
           message.parts,
           message.responseMessages,
+          message.privacyFingerprint,
           message.createdMs,
         ],
       )

@@ -45,6 +45,9 @@ beforeEach(() => {
     if (command === 'note_read') {
       return '# Meeting\n'
     }
+    if (command === 'note_write_if_unchanged') {
+      return { kind: 'written', modifiedMs: null }
+    }
     return null
   })
 })
@@ -69,7 +72,8 @@ describe('NoteActionsMenu', () => {
     await user.click(view.getByRole('button', { name: 'Pin' }))
 
     await waitFor(() => {
-      const write = calls.find((call) => call.command === 'note_write')
+      const write = calls.find((call) => call.command === 'note_write_if_unchanged')
+      expect(write?.args['expected']).toBe('# Meeting\n')
       expect(write?.args['contents']).toContain('pinned: true')
     })
   })

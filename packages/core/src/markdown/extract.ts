@@ -1,15 +1,28 @@
 import type { SyntaxNode } from '@lezer/common'
+import { isReflectManagedNotePath, isValidReflectNoteId } from '../graph/note-management'
 import { dateFromDailyPath, isDaily } from '../graph/paths'
+import {
+  isAuthoredLocalReference,
+  isMarkdownNoteHref,
+  managedAssetPath,
+  managedWikiEmbedAssetPath,
+} from './attachment-reference'
 import { parseFrontmatter, splitFrontmatter } from './frontmatter'
 import { parseBody } from './grammar'
 import { foldTag } from './keys'
 import { parseInlineLink } from './link-syntax'
 import { buildPlainText, plainTextOfRange, unescapeMarkdownText } from './plain-text'
+import {
+  collectReferenceDefinitions,
+  resolveReferenceLink,
+  type ReferenceDefinitions,
+} from './reference-links'
 import { normalizeWikiTarget } from './resolve'
 import { taskBreadcrumbs } from './task-breadcrumbs'
 import { parseTaskMarker } from './task-marker'
 import type {
   AssetRef,
+  AuthoredAttachmentReference,
   Frontmatter,
   Heading,
   MarkdownLink,
@@ -34,7 +47,6 @@ const TAG_RE = /(^|\s)#(\p{L}[\p{L}\p{N}/_-]*)/gu
 // The name grammar alone (no `#`, anchored) — the single source for "could
 // this string ever be a tag?" checks (e.g. settings' pinned filter tags).
 const TAG_NAME_RE = /^\p{L}[\p{L}\p{N}/_-]*$/u
-
 /**
  * Is `value` a possible tag name (the `#tag` grammar without the `#`)? A name
  * this rejects — spaces, leading digit, empty — can never be produced by the
@@ -56,7 +68,8 @@ function isTagExcludedNode(name: string): boolean {
     name === 'FencedCode' ||
     name === 'CodeBlock' ||
     name === 'URL' ||
-    name === 'WikiLink'
+    name === 'WikiLink' ||
+    name === 'WikiEmbed'
   )
 }
 
@@ -99,57 +112,28 @@ function hostOf(href: string): string | undefined {
   return undefined
 }
 
-function isAssetHref(href: string): boolean {
-  if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('//') || href.startsWith('#')) {
-    return false // external scheme, protocol-relative, or in-page anchor
+function wikiEmbedReference(
+  body: string,
+  sourcePath: string,
+  from: number,
+  to: number,
+  offset: number,
+): AuthoredAttachmentReference {
+  const inner = body.slice(from + 3, to - 2)
+  const pipe = inner.indexOf('|')
+  const targetSource = pipe === -1 ? inner : inner.slice(0, pipe)
+  const leadingWhitespace = targetSource.length - targetSource.trimStart().length
+  const trailingWhitespace = targetSource.length - targetSource.trimEnd().length
+  const destinationFrom = from + 3 + leadingWhitespace
+  const destinationTo = from + 3 + targetSource.length - trailingWhitespace
+  return {
+    sourcePath,
+    kind: 'wikiEmbed',
+    rawReference: unescapeMarkdownText(targetSource.trim()),
+    from: from + offset,
+    to: to + offset,
+    destination: { from: destinationFrom + offset, to: destinationTo + offset },
   }
-  return /(^|\/)assets\//.test(href)
-}
-
-/**
- * Canonicalize an asset href to the on-disk path. A note body may write the same
- * file many ways — percent-encoded (`assets/my%20photo.png`), `./`-prefixed
- * (`./assets/a.png`), with `..`/empty segments — while the file on disk (and the
- * watcher / `dir_list` / `readAsset` paths) is the collapsed `assets/...` form.
- * The index projection and the asset-description privacy gate key off this
- * canonical form, so every spelling of one file collapses to one key — a private
- * referer can't hide behind an alternate encoding *or* an alternate path shape.
- *
- * Decodes percent-escapes (a malformed escape keeps the raw href), then resolves
- * `.`/`..`/empty segments. The `AssetRef` span still points at the raw body text;
- * only the logical `path` is canonicalized.
- */
-function decodeAssetPath(href: string): string {
-  let decoded: string
-  try {
-    decoded = decodeURIComponent(href)
-  } catch {
-    decoded = href
-  }
-  const segments: string[] = []
-  for (const segment of decoded.split('/')) {
-    if (segment === '' || segment === '.') {
-      continue
-    }
-    if (segment === '..') {
-      segments.pop()
-      continue
-    }
-    segments.push(segment)
-  }
-  return segments.join('/')
-}
-
-/**
- * The canonical on-disk path for an asset href, or `null` when the href is
- * not an asset link at all. The public entry point for callers holding an
- * href copied from raw markdown — e.g. the chat read_assets tool, whose
- * model-supplied paths are the verbatim link targets from note bodies —
- * applying the same {@link decodeAssetPath} rule the index projection uses,
- * so every spelling resolves to the indexed key.
- */
-export function canonicalAssetPath(href: string): string | null {
-  return isAssetHref(href) ? decodeAssetPath(href) : null
 }
 
 function stringField(frontmatter: Frontmatter, key: string): string | undefined {
@@ -171,13 +155,43 @@ function readWikiLink(body: string, from: number, to: number, offset: number): W
   return { target, alias, from: from + offset, to: to + offset }
 }
 
-function readLink(body: string, from: number, to: number, offset: number): MarkdownLink | null {
+function readLink(
+  body: string,
+  node: SyntaxNode,
+  offset: number,
+  definitions: ReferenceDefinitions,
+): MarkdownLink | null {
+  const { from, to } = node
   const parsed = parseInlineLink(body.slice(from, to))
-  if (!parsed) {
-    return null // reference-style or otherwise non-inline link — skipped this wave
+  if (parsed !== null) {
+    const { href, text, destination } = parsed
+    return {
+      href,
+      text,
+      from: from + offset,
+      to: to + offset,
+      destination: {
+        from: from + destination.from + offset,
+        to: from + destination.to + offset,
+      },
+      domain: hostOf(href),
+    }
   }
-  const { href, text } = parsed
-  return { href, text, from: from + offset, to: to + offset, domain: hostOf(href) }
+  const reference = resolveReferenceLink(body, node, definitions)
+  return reference === null
+    ? null
+    : {
+        href: reference.href,
+        text: reference.text,
+        from: from + offset,
+        to: to + offset,
+        destination: {
+          from: reference.destination.from + offset,
+          to: reference.destination.to + offset,
+        },
+        reference: { key: reference.key, duplicate: reference.duplicate },
+        domain: hostOf(reference.href),
+      }
 }
 
 /**
@@ -312,10 +326,14 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
   const { raw, body, bodyOffset } = splitFrontmatter(source)
   const { data: frontmatter, warning } = parseFrontmatter(raw)
   const tree = parseBody(body)
+  const referenceDefinitions = collectReferenceDefinitions(body, tree)
+  const allowLegacyRootAssetHref =
+    isReflectManagedNotePath(path) && isValidReflectNoteId(frontmatter.id)
 
   const wikiLinks: WikiLink[] = []
   const links: MarkdownLink[] = []
   const headings: Heading[] = []
+  const attachmentReferences: AuthoredAttachmentReference[] = []
   const assets: AssetRef[] = []
   const cuts: Span[] = [] // body coords — syntax to drop from plain text
   const tagExcluded: Span[] = [] // body coords — regions that don't yield tags
@@ -348,6 +366,16 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
         return false
       }
 
+      if (name === 'WikiEmbed') {
+        const reference = wikiEmbedReference(body, path, from, to, bodyOffset)
+        attachmentReferences.push(reference)
+        const assetPath = managedWikiEmbedAssetPath(reference.rawReference)
+        if (assetPath !== null) {
+          assets.push({ path: assetPath, from: from + bodyOffset, to: to + bodyOffset })
+        }
+        return false
+      }
+
       const headingLevel = headingLevelOf(name)
       if (headingLevel) {
         const text = cleanHeadingText(body.slice(from, to))
@@ -356,12 +384,27 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
       }
 
       if (name === 'Link' || name === 'Image') {
-        const link = readLink(body, from, to, bodyOffset)
+        const link = readLink(body, node.node, bodyOffset, referenceDefinitions)
         if (link) {
-          const assetPath = canonicalAssetPath(link.href)
+          if (isAuthoredLocalReference(link.href)) {
+            attachmentReferences.push({
+              sourcePath: path,
+              kind: 'markdown',
+              rawReference: link.href,
+              from: link.from,
+              to: link.to,
+              destination: link.destination,
+            })
+          }
+          // A nested directory named `assets` is an ordinary note location;
+          // explicit Markdown note links must reach the link projection before
+          // the legacy Reflect-managed `assets/` privacy classification.
+          const assetPath = name === 'Link' && isMarkdownNoteHref(link.href)
+            ? null
+            : managedAssetPath(path, link.href, allowLegacyRootAssetHref)
           if (assetPath !== null) {
             assets.push({ path: assetPath, from: link.from, to: link.to })
-          } else {
+          } else if (name === 'Link') {
             links.push(link)
           }
         }
@@ -393,6 +436,7 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
     links,
     tags: [...tags.values()],
     headings,
+    attachmentReferences,
     assets,
     tasks,
     text: buildPlainText(body, cuts, literalPlainText),

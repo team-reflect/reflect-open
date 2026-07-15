@@ -1,14 +1,19 @@
 import { act, render, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ReactElement } from 'react'
-import { setBridge } from '@reflect/core'
+import { StrictMode, type ReactElement } from 'react'
+import { emitFileChanges, setBridge } from '@reflect/core'
 import { PaletteProvider, usePalette } from '@/components/command-palette/palette-provider'
 import { flushOpenDocuments } from '@/editor/open-documents'
 import type { NoteEditorHandle } from '@/editor/note-editor'
 import { RouterProvider } from '@/routing/router'
 import type { Route } from '@/routing/route'
 import { setPlatformSurface } from '@/lib/platform-surface'
+import {
+  consumeNewNoteCreationClaim,
+  grantNewNoteCreation,
+  hasNewNoteCreationClaim,
+} from '@/lib/new-note-creation-claims'
 import { RouteContent } from './route-content'
 
 /**
@@ -53,6 +58,7 @@ vi.mock('@/editor/note-editor', async () => {
           getMarkdown: () => markdownRef.current,
           insertMarkdown: () => {},
           focus: () => editorProbe.focusCalls.push('focus'),
+          revealHeading: () => false,
           setSelection: () => {},
           getSelectedText: () => '',
           openSelectionMenu: () => {},
@@ -86,9 +92,12 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   getBacklinksWithContext: indexFns.getBacklinksWithContext,
   relatedNotes: indexFns.relatedNotes,
 }))
+const graphState = vi.hoisted(() => ({
+  graph: { root: '/g', name: 'g', generation: 1 },
+}))
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({
-    graph: { root: '/g', name: 'g', generation: 1 },
+    graph: graphState.graph,
     indexing: false,
   }),
 }))
@@ -135,6 +144,8 @@ setBridge({
 })
 
 beforeEach(() => {
+  graphState.graph = { root: '/g', name: 'g', generation: 1 }
+  consumeNewNoteCreationClaim(graphState.graph, NEW_NOTE_PATH)
   files = {}
   writes = []
   editorProbe.onChange = null
@@ -155,6 +166,19 @@ beforeEach(() => {
       writes.push({ path, contents })
       return null
     }
+    if (command === 'note_write_if_unchanged') {
+      const { path, contents, expected } = args as {
+        path: string
+        contents: string
+        expected: string | null
+      }
+      if ((files[path] ?? null) !== expected) {
+        return { kind: 'changed' }
+      }
+      files[path] = contents
+      writes.push({ path, contents })
+      return { kind: 'written', modifiedMs: null }
+    }
     if (command === 'db_query') {
       return []
     }
@@ -171,9 +195,9 @@ function PaletteProbe(): ReactElement {
   return <output data-testid="palette">{JSON.stringify({ open, query })}</output>
 }
 
-function renderRoute(route: Route) {
+function renderRoute(route: Route, strict = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
+  const content = (
     <QueryClientProvider client={client}>
       <RouterProvider initialRoute={route}>
         <PaletteProvider>
@@ -181,8 +205,9 @@ function renderRoute(route: Route) {
           <PaletteProbe />
         </PaletteProvider>
       </RouterProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   )
+  return render(strict ? <StrictMode>{content}</StrictMode> : content)
 }
 
 describe('RouteContent', () => {
@@ -223,6 +248,7 @@ describe('RouteContent', () => {
   })
 
   it('opens a missing note seeded with an empty focused title, writing nothing', async () => {
+    grantNewNoteCreation(graphState.graph, NEW_NOTE_PATH)
     const view = renderRoute({ kind: 'note', path: NEW_NOTE_PATH })
 
     await view.findByLabelText(`Editing ${NEW_NOTE_PATH}`)
@@ -239,6 +265,7 @@ describe('RouteContent', () => {
   })
 
   it('creates the file once the user actually edits the seeded note', async () => {
+    grantNewNoteCreation(graphState.graph, NEW_NOTE_PATH)
     const view = renderRoute({ kind: 'note', path: NEW_NOTE_PATH })
     await view.findByLabelText(`Editing ${NEW_NOTE_PATH}`)
 
@@ -251,6 +278,81 @@ describe('RouteContent', () => {
     view.unmount()
   })
 
+  it('keeps the scoped creation grant stable through Strict Mode render replay', async () => {
+    grantNewNoteCreation(graphState.graph, NEW_NOTE_PATH)
+    const view = renderRoute({ kind: 'note', path: NEW_NOTE_PATH }, true)
+    await view.findByLabelText(`Editing ${NEW_NOTE_PATH}`)
+
+    act(() => editorProbe.onChange?.('# Strict note\n'))
+    await act(() => flushOpenDocuments())
+
+    expect(writes).toHaveLength(1)
+    expect(files[NEW_NOTE_PATH]).toMatch(/# Strict note\n$/)
+    view.unmount()
+  })
+
+  it('does not recreate a managed Reflect note removed while its editor is open', async () => {
+    const source = `---\nid: ${NEW_NOTE_PATH.slice('notes/'.length, -'.md'.length)}\n---\n# Existing draft\n`
+    files[NEW_NOTE_PATH] = source
+    const view = renderRoute({ kind: 'note', path: NEW_NOTE_PATH })
+    await view.findByLabelText(`Editing ${NEW_NOTE_PATH}`)
+
+    delete files[NEW_NOTE_PATH]
+    act(() => emitFileChanges([{ path: NEW_NOTE_PATH, kind: 'remove' }]))
+    act(() => editorProbe.onChange?.('# Existing draft\n\nPreserved only in the editor.\n'))
+    await act(() => flushOpenDocuments())
+
+    expect(files[NEW_NOTE_PATH]).toBeUndefined()
+    expect(writes).toEqual([])
+    view.unmount()
+  })
+
+  it('does not infer a fresh creation grant from a missing ULID-shaped route', async () => {
+    const view = renderRoute({ kind: 'note', path: NEW_NOTE_PATH })
+
+    await view.findByText(new RegExp(`Couldn’t open ${NEW_NOTE_PATH}: missing`))
+    expect(view.queryByTestId('fake-editor')).toBeNull()
+    expect(files[NEW_NOTE_PATH]).toBeUndefined()
+    view.unmount()
+  })
+
+  it('does not restore a consumed New Note grant after deletion and remount', async () => {
+    grantNewNoteCreation(graphState.graph, NEW_NOTE_PATH)
+    const first = renderRoute({ kind: 'note', path: NEW_NOTE_PATH })
+    await first.findByLabelText(`Editing ${NEW_NOTE_PATH}`)
+    act(() => editorProbe.onChange?.('# Created once\n'))
+    await act(() => flushOpenDocuments())
+    first.unmount()
+
+    delete files[NEW_NOTE_PATH]
+    const reopened = renderRoute({ kind: 'note', path: NEW_NOTE_PATH })
+    await reopened.findByText(new RegExp(`Couldn’t open ${NEW_NOTE_PATH}: missing`))
+    expect(reopened.queryByTestId('fake-editor')).toBeNull()
+    expect(writes).toHaveLength(1)
+    reopened.unmount()
+  })
+
+  it('never carries an unconsumed New Note grant across a graph switch or reopen', async () => {
+    const originalGraph = { ...graphState.graph }
+    grantNewNoteCreation(originalGraph, NEW_NOTE_PATH)
+    const otherScopes = [
+      { root: '/other-vault', name: 'other', generation: originalGraph.generation },
+      { ...originalGraph, generation: originalGraph.generation + 1 },
+    ]
+
+    for (const scope of otherScopes) {
+      graphState.graph = scope
+      const view = renderRoute({ kind: 'note', path: NEW_NOTE_PATH })
+
+      await view.findByText(new RegExp(`Couldn’t open ${NEW_NOTE_PATH}: missing`))
+      expect(view.queryByTestId('fake-editor')).toBeNull()
+      expect(files[NEW_NOTE_PATH]).toBeUndefined()
+      expect(hasNewNoteCreationClaim(scope, NEW_NOTE_PATH)).toBe(false)
+      view.unmount()
+    }
+    expect(hasNewNoteCreationClaim(originalGraph, NEW_NOTE_PATH)).toBe(true)
+  })
+
   it('never recreates an arbitrary missing vault path', async () => {
     const view = renderRoute({ kind: 'note', path: 'Projects/missing.md' })
 
@@ -260,6 +362,26 @@ describe('RouteContent', () => {
     expect(writes).toEqual([])
     expect(files['Projects/missing.md']).toBeUndefined()
     view.unmount()
+  })
+
+  it('does not recreate an adopted vault note removed while its editor is open', async () => {
+    const path = 'Projects/adopted.md'
+    files[path] = '# Adopted\n'
+    const view = renderRoute({ kind: 'note', path })
+    await view.findByLabelText(`Editing ${path}`)
+
+    delete files[path]
+    act(() => emitFileChanges([{ path, kind: 'remove' }]))
+    expect(view.getByText(/Reflect can’t safely save to this missing path/)).toBeDefined()
+    act(() => editorProbe.onChange?.('# Preserved only in the editor\n'))
+    await act(() => flushOpenDocuments())
+
+    expect(files[path]).toBeUndefined()
+    expect(writes).toEqual([])
+
+    view.unmount()
+    expect(files[path]).toBeUndefined()
+    expect(writes).toEqual([])
   })
 
   it('opens a note the editor cannot round-trip as read-only, never editable', async () => {

@@ -17,8 +17,8 @@ interface AppliedChunk {
 /**
  * Bridge fake for the pipeline: a note on "disk", stored hash+model rows for
  * the db_query the diff makes, and capture of embed_texts / embed_apply.
- * `descriptions` answers reads of `<asset>.reflect.md` sidecars; any other
- * sidecar read gets the Rust layer's notFound.
+ * `descriptions` answers the narrow managed-description command by source
+ * asset path. Missing descriptions mirror the Rust command's `null` result.
  */
 function fakePipelineBridge(options: {
   content: string
@@ -27,18 +27,16 @@ function fakePipelineBridge(options: {
 }) {
   const embedded: string[][] = []
   const applied: { path: string; chunks: AppliedChunk[] }[] = []
+  const managedDescriptionReads: Array<{ path: string; generation: number | undefined }> = []
   setBridge({
     invoke: async (command, args) => {
       if (command === 'note_read') {
-        const path = (args as { path: string }).path
-        if (path.endsWith('.reflect.md')) {
-          const description = options.descriptions?.[path]
-          if (description === undefined) {
-            throw { kind: 'notFound', message: `no description at ${path}` }
-          }
-          return description
-        }
         return options.content
+      }
+      if (command === 'managed_asset_description_read') {
+        const { path, generation } = args as { path: string; generation?: number }
+        managedDescriptionReads.push({ path, generation })
+        return options.descriptions?.[path] ?? null
       }
       if (command === 'db_query') {
         return options.storedRows
@@ -61,7 +59,7 @@ function fakePipelineBridge(options: {
     },
     listen: async () => () => {},
   })
-  return { embedded, applied }
+  return { embedded, applied, managedDescriptionReads }
 }
 
 const MODEL = 'all-MiniLM-L6-v2'
@@ -151,15 +149,15 @@ describe('embedNote', () => {
     expect(applied).toEqual([{ path: 'notes/a.md', chunks: [] }])
   })
 
-  const IMAGE_NOTE = '# Trip\n\nSome notes about the day.\n\n![photo](assets/pic.png)\n'
+  const IMAGE_NOTE = '# Trip\n\nSome notes about the day.\n\n![photo](../assets/pic.png)\n'
   const PIC_DESCRIPTION =
     '---\nreflectAsset: true\nsource: assets/pic.png\n---\n\nA red bridge over a misty river at dawn.\n'
 
   it('embeds asset description chunks after the note’s own chunks', async () => {
-    const { applied } = fakePipelineBridge({
+    const { applied, managedDescriptionReads } = fakePipelineBridge({
       content: IMAGE_NOTE,
       storedRows: [],
-      descriptions: { 'assets/pic.png.reflect.md': PIC_DESCRIPTION },
+      descriptions: { 'assets/pic.png': PIC_DESCRIPTION },
     })
     const count = await embedNote({ path: 'notes/a.md', generation: 1, modelId: MODEL })
     expect(count).toBeGreaterThanOrEqual(2) // note chunk(s) + the asset chunk
@@ -172,6 +170,7 @@ describe('embedNote', () => {
     // Synthetic positions live past the note source, so asset chunks order last.
     expect(assetChunk.posFrom).toBeGreaterThan(IMAGE_NOTE.length)
     expect(chunks.slice(0, -1).every((chunk) => chunk.posFrom < IMAGE_NOTE.length)).toBe(true)
+    expect(managedDescriptionReads).toEqual([{ path: 'assets/pic.png', generation: 1 }])
   })
 
   it('a note without a description for its asset embeds only its own text', async () => {
@@ -180,8 +179,23 @@ describe('embedNote', () => {
     expect(applied[0]!.chunks.every((chunk) => chunk.posFrom < IMAGE_NOTE.length)).toBe(true)
   })
 
+  it('does not embed a legacy source/root-ambiguous asset candidate', async () => {
+    const content =
+      '---\nid: 01abcdefghjkmnpqrstvwxyz00\n---\n# Trip\n\n![photo](assets/pic.png)\n'
+    const { embedded, applied } = fakePipelineBridge({
+      content,
+      storedRows: [],
+      descriptions: { 'assets/pic.png': PIC_DESCRIPTION },
+    })
+
+    await embedNote({ path: 'notes/a.md', generation: 1, modelId: MODEL })
+
+    expect(embedded.flat().join('\n')).not.toContain('red bridge over a misty river')
+    expect(applied[0]!.chunks.every((chunk) => chunk.posFrom < content.length)).toBe(true)
+  })
+
   it('the hash-skip covers unchanged asset description chunks', async () => {
-    const descriptions = { 'assets/pic.png.reflect.md': PIC_DESCRIPTION }
+    const descriptions = { 'assets/pic.png': PIC_DESCRIPTION }
     const first = fakePipelineBridge({ content: IMAGE_NOTE, storedRows: [], descriptions })
     await embedNote({ path: 'notes/a.md', generation: 1, modelId: MODEL })
     const storedRows = first.applied[0]!.chunks.map((chunk) => ({
@@ -199,7 +213,7 @@ describe('embedNote', () => {
     const first = fakePipelineBridge({
       content: IMAGE_NOTE,
       storedRows: [],
-      descriptions: { 'assets/pic.png.reflect.md': PIC_DESCRIPTION },
+      descriptions: { 'assets/pic.png': PIC_DESCRIPTION },
     })
     await embedNote({ path: 'notes/a.md', generation: 1, modelId: MODEL })
     const storedRows = first.applied[0]!.chunks.map((chunk) => ({
@@ -211,7 +225,7 @@ describe('embedNote', () => {
       content: IMAGE_NOTE,
       storedRows,
       descriptions: {
-        'assets/pic.png.reflect.md': '---\nreflectAsset: true\n---\n\nNow a snowy mountain pass.\n',
+        'assets/pic.png': '---\nreflectAsset: true\n---\n\nNow a snowy mountain pass.\n',
       },
     })
     const count = await embedNote({ path: 'notes/a.md', generation: 1, modelId: MODEL })

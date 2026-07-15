@@ -1,11 +1,17 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { setBridge } from '../ipc/bridge'
 import {
   bestChunkPerNote,
   fuseRanked,
   mergeNearestFirst,
+  retrieve,
   type ChunkHitRow,
   type RetrievalHit,
 } from './retrieve'
+
+afterEach(() => {
+  setBridge(null)
+})
 
 function hit(path: string, overrides?: Partial<RetrievalHit>): RetrievalHit {
   return {
@@ -29,6 +35,68 @@ function row(path: string, distance: number, overrides?: Partial<ChunkHitRow>): 
     distance,
     ...overrides,
   }
+}
+
+const ASSET_SENTINEL = 'asset-description-sentinel-01k0'
+
+interface RetrievalBridgeOptions {
+  readonly lexical?: ReadonlyArray<{
+    readonly path: string
+    readonly title: string
+    readonly snippet: string
+  }>
+  readonly semantic?: readonly ChunkHitRow[]
+  readonly previews: Readonly<Record<string, string>>
+  readonly privatePaths?: readonly string[]
+}
+
+/** Bridge fake that exposes distinct FTS, embedding, privacy-flag, and preview queries. */
+function installRetrievalBridge(options: RetrievalBridgeOptions): void {
+  const privatePaths = new Set(options.privatePaths ?? [])
+  setBridge({
+    invoke: async (command, args) => {
+      if (command === 'embed_texts') {
+        return [[0.5, 0.5]]
+      }
+      if (command !== 'db_query') {
+        throw new Error(`unexpected command: ${command}`)
+      }
+
+      const query = String(args['sql'])
+      if (query.includes('embedding_vectors') && query.includes('embedding MATCH')) {
+        return (options.semantic ?? []).map((entry) => ({
+          path: entry.path,
+          title: entry.title,
+          heading: entry.heading,
+          text: entry.text,
+          is_private: entry.isPrivate,
+          distance: entry.distance,
+        }))
+      }
+      if (query.includes('search_fts')) {
+        return (options.lexical ?? []).map((entry, index) => ({
+          path: entry.path,
+          title: entry.title,
+          daily_date: null,
+          preview: options.previews[entry.path] ?? '',
+          mtime: 1_000 - index,
+          is_pinned: 0,
+          fts_highlighted_title: entry.title,
+          snippet: entry.snippet,
+        }))
+      }
+      if (query.includes('"is_private"')) {
+        return [...new Set([...(options.lexical ?? []).map((entry) => entry.path)])].map(
+          (path) => ({ path, is_private: privatePaths.has(path) ? 1 : 0 }),
+        )
+      }
+      if (query.includes('"preview"')) {
+        return Object.entries(options.previews).map(([path, preview]) => ({ path, preview }))
+      }
+      throw new Error(`unexpected db query: ${query}`)
+    },
+    listen: async () => () => {},
+  })
 }
 
 describe('bestChunkPerNote', () => {
@@ -123,5 +191,119 @@ describe('fuseRanked (reciprocal rank fusion)', () => {
   it('keeps the private flag through fusion', () => {
     const fused = fuseRanked([[hit('p', { isPrivate: true })]], 5)
     expect(fused[0]!.isPrivate).toBe(true)
+  })
+})
+
+describe('retrieve — external AI snippets', () => {
+  it('replaces lexical FTS asset text with note-only previews and keeps private hits empty', async () => {
+    installRetrievalBridge({
+      lexical: [
+        { path: 'notes/public.md', title: 'Public', snippet: ASSET_SENTINEL },
+        { path: 'notes/private.md', title: 'Private', snippet: ASSET_SENTINEL },
+      ],
+      previews: {
+        'notes/public.md': 'Public note-only preview.',
+        'notes/private.md': 'Private note-only preview.',
+      },
+      privatePaths: ['notes/private.md'],
+    })
+
+    const hits = await retrieve('sentinel', {
+      mode: 'lexical',
+      excludePrivateContent: true,
+    })
+
+    expect(hits.map((entry) => entry.path)).toEqual(['notes/public.md', 'notes/private.md'])
+    expect(hits[0]).toMatchObject({
+      snippet: 'Public note-only preview.',
+      heading: null,
+      isPrivate: false,
+    })
+    expect(hits[1]).toMatchObject({ snippet: '', heading: null, isPrivate: true })
+    expect(JSON.stringify(hits)).not.toContain(ASSET_SENTINEL)
+    expect(JSON.stringify(hits)).not.toContain('Private note-only preview.')
+  })
+
+  it('replaces semantic asset chunks with note-only previews and clears their headings', async () => {
+    installRetrievalBridge({
+      semantic: [
+        row('notes/public.md', 0.1, {
+          heading: 'private-scan.pdf',
+          text: ASSET_SENTINEL,
+        }),
+        row('notes/private.md', 0.2, {
+          heading: 'private-photo.png',
+          text: ASSET_SENTINEL,
+          isPrivate: 1,
+        }),
+      ],
+      previews: {
+        'notes/public.md': 'Public semantic preview.',
+        'notes/private.md': 'Private semantic preview.',
+      },
+    })
+
+    const hits = await retrieve('sentinel', {
+      mode: 'semantic',
+      excludePrivateContent: true,
+    })
+
+    expect(hits[0]).toMatchObject({
+      path: 'notes/public.md',
+      snippet: 'Public semantic preview.',
+      heading: null,
+    })
+    expect(hits[1]).toMatchObject({
+      path: 'notes/private.md',
+      snippet: '',
+      heading: null,
+    })
+    expect(JSON.stringify(hits)).not.toContain(ASSET_SENTINEL)
+    expect(JSON.stringify(hits)).not.toContain('private-scan.pdf')
+  })
+
+  it('preserves hybrid ranking and rich local snippets while sanitizing cloud results', async () => {
+    installRetrievalBridge({
+      lexical: [
+        { path: 'notes/both.md', title: 'Both', snippet: `lexical ${ASSET_SENTINEL}` },
+        { path: 'notes/lexical.md', title: 'Lexical', snippet: `lexical ${ASSET_SENTINEL}` },
+      ],
+      semantic: [
+        row('notes/semantic.md', 0.1, {
+          heading: 'diagram.png',
+          text: `semantic ${ASSET_SENTINEL}`,
+        }),
+        row('notes/both.md', 0.2, {
+          heading: 'shared.pdf',
+          text: `semantic ${ASSET_SENTINEL}`,
+        }),
+      ],
+      previews: {
+        'notes/both.md': 'Both note preview.',
+        'notes/lexical.md': 'Lexical note preview.',
+        'notes/semantic.md': 'Semantic note preview.',
+      },
+    })
+
+    const local = await retrieve('sentinel', {
+      mode: 'hybrid',
+      excludePrivateContent: false,
+    })
+    const external = await retrieve('sentinel', {
+      mode: 'hybrid',
+      excludePrivateContent: true,
+    })
+
+    expect(external.map(({ path, score }) => ({ path, score }))).toEqual(
+      local.map(({ path, score }) => ({ path, score })),
+    )
+    expect(JSON.stringify(local)).toContain(ASSET_SENTINEL)
+    expect(Object.fromEntries(external.map((entry) => [entry.path, entry.snippet]))).toEqual({
+      'notes/both.md': 'Both note preview.',
+      'notes/lexical.md': 'Lexical note preview.',
+      'notes/semantic.md': 'Semantic note preview.',
+    })
+    expect(external.every((entry) => entry.heading === null)).toBe(true)
+    expect(JSON.stringify(external)).not.toContain(ASSET_SENTINEL)
   })
 })

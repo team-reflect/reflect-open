@@ -35,6 +35,7 @@ pub struct ChatMessageRow {
     pub(super) attachments: String,
     pub(super) parts: String,
     pub(super) response_messages: String,
+    pub(super) privacy_fingerprint: Option<String>,
     pub(super) created_ms: i64,
 }
 
@@ -68,16 +69,17 @@ pub(super) fn save_message(
     conn.prepare_cached(
         "INSERT INTO chat_messages(
             id, conversation_id, seq, user_text, attachments, parts,
-            response_messages, created_ms)
+            response_messages, privacy_fingerprint, created_ms)
          VALUES (
             ?1, ?2,
             (SELECT COALESCE(MAX(seq) + 1, 0) FROM chat_messages WHERE conversation_id = ?2),
-            ?3, ?4, ?5, ?6, ?7)
+            ?3, ?4, ?5, ?6, ?7, ?8)
          ON CONFLICT(id) DO UPDATE SET
             user_text = excluded.user_text,
             attachments = excluded.attachments,
             parts = excluded.parts,
-            response_messages = excluded.response_messages",
+            response_messages = excluded.response_messages,
+            privacy_fingerprint = excluded.privacy_fingerprint",
     )?
     .execute(params![
         message.id,
@@ -86,6 +88,7 @@ pub(super) fn save_message(
         message.attachments,
         message.parts,
         message.response_messages,
+        message.privacy_fingerprint,
         message.created_ms,
     ])?;
     Ok(())

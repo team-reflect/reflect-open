@@ -37,12 +37,14 @@ describe('resolveWikiLink', () => {
     byDate: (date) => (date === '2026-06-09' ? 'daily/2026-06-09.md' : undefined),
     byTitle: (key) => (key === 'project x' ? 'notes/project-x.md' : undefined),
     byAlias: (key) => (key === 'pjx' ? 'notes/project-x.md' : undefined),
+    byBasename: (key) => (key === 'filename' ? 'Archive/filename.md' : undefined),
   }
 
   it('resolves by date, title, then alias', () => {
     expect(resolveWikiLink('2026-06-09', lookup)).toEqual({ kind: 'resolved', ref: 'daily/2026-06-09.md' })
     expect(resolveWikiLink('Project X', lookup)).toEqual({ kind: 'resolved', ref: 'notes/project-x.md' })
     expect(resolveWikiLink('pjx', lookup)).toEqual({ kind: 'resolved', ref: 'notes/project-x.md' })
+    expect(resolveWikiLink('filename', lookup)).toEqual({ kind: 'resolved', ref: 'Archive/filename.md' })
   })
 
   it('returns the original text when unresolved', () => {
@@ -51,11 +53,13 @@ describe('resolveWikiLink', () => {
 })
 
 describe('resolveWikiLinkAsync', () => {
-  it('applies the same date → title → alias precedence', async () => {
+  it('applies the same date → title → alias → basename precedence', async () => {
     const lookup: AsyncWikiLookup = {
       byDate: async (date) => (date === '2026-06-09' ? 'daily/2026-06-09.md' : undefined),
       byTitle: async (key) => (key === 'project x' ? 'notes/project-x.md' : undefined),
       byAlias: async (key) => (key === 'pjx' ? 'notes/project-x.md' : undefined),
+      byBasename: async (key) =>
+        key === 'filename' ? 'Archive/filename.md' : undefined,
     }
     expect(await resolveWikiLinkAsync('2026-06-09', lookup)).toEqual({
       kind: 'resolved',
@@ -69,6 +73,10 @@ describe('resolveWikiLinkAsync', () => {
       kind: 'resolved',
       ref: 'notes/project-x.md',
     })
+    expect(await resolveWikiLinkAsync('filename', lookup)).toEqual({
+      kind: 'resolved',
+      ref: 'Archive/filename.md',
+    })
     expect(await resolveWikiLinkAsync('Unknown', lookup)).toEqual({
       kind: 'unresolved',
       text: 'Unknown',
@@ -81,6 +89,7 @@ describe('resolveWikiLinkAsync', () => {
       byDate: async () => undefined,
       byTitle: async () => 'notes/hit.md',
       byAlias,
+      byBasename: async () => undefined,
     }
     expect(await resolveWikiLinkAsync('Anything', lookup)).toEqual({
       kind: 'resolved',
@@ -95,6 +104,7 @@ describe('resolveWikiLinkAsync', () => {
       byDate,
       byTitle: async () => undefined,
       byAlias: async () => 'notes/alias.md',
+      byBasename: async () => undefined,
     }
     expect(await resolveWikiLinkAsync('Some Title', lookup)).toEqual({
       kind: 'resolved',

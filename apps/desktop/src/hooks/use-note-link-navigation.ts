@@ -1,4 +1,5 @@
 import { useCallback, useLayoutEffect, useRef } from 'react'
+import type { NoteHeadingReveal } from '@reflect/core'
 import {
   isNewWindowClick,
   openRouteInNewWindow,
@@ -12,7 +13,15 @@ import { useRouter } from '@/routing/router'
 export type NoteLinkNavigation = (
   route: NoteRoute,
   event?: NewWindowClickEvent,
+  options?: NoteLinkNavigationOptions,
 ) => void
+
+export interface NoteLinkNavigationOptions {
+  /** Runs only when this window will navigate, immediately before the route change. */
+  readonly beforeInWindowNavigate?: () => void
+  /** Carries a heading reveal into a successfully opened secondary window. */
+  readonly headingReveal?: NoteHeadingReveal
+}
 
 /**
  * Apply the app-wide note-link convention: a plain click navigates in the
@@ -37,9 +46,10 @@ export function useNoteLinkNavigation(scopeKey?: string | number | null): NoteLi
   }, [scopeKey])
 
   return useCallback(
-    (target, event) => {
+    (target, event, options) => {
       const isStale = beginLinkIntent()
       if (!isNewWindowClick(event)) {
+        options?.beforeInWindowNavigate?.()
         navigate(target)
         return
       }
@@ -48,13 +58,17 @@ export function useNoteLinkNavigation(scopeKey?: string | number | null): NoteLi
       void (async () => {
         let opened = false
         try {
-          opened = await openRouteInNewWindow(target)
+          opened =
+            options?.headingReveal === undefined
+              ? await openRouteInNewWindow(target)
+              : await openRouteInNewWindow(target, options.headingReveal)
         } catch {
           // Treat a native open failure like a declined open and fall back below.
         }
         if (opened || isStale() || !Object.is(scopeKeyRef.current, startedInScope)) {
           return
         }
+        options?.beforeInWindowNavigate?.()
         navigate(target)
       })()
     },

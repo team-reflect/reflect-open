@@ -1,14 +1,15 @@
 import {
-  availableTemplatePath,
+  createNoteIfAbsent,
   errorMessage,
   hasAuthoredTitle,
   parseNote,
   readNote,
   slugForTitle,
   splitFrontmatter,
+  templatePath,
   templateSlugPathForTitle,
   upsertFrontmatter,
-  writeNote,
+  writeNoteIfUnchanged,
 } from '@reflect/core'
 import { moveNoteCarryingSession } from '@/editor/move-note'
 import type { NoteEditorHandle } from '@/editor/note-editor'
@@ -61,13 +62,27 @@ export async function insertTemplate(
  * authored H1 still works (and inserts) when the user wants one. Returns the
  * new graph-relative path. The first template write also creates the
  * `templates/` folder — it is not bootstrapped with the graph (no-litter).
+ * Each suffix is claimed atomically, so a concurrent winner is preserved and
+ * advances this creation to the next suffix without a check-then-write gap.
  */
 export async function createTemplate(name: string, generation: number): Promise<string> {
   const title = name.trim()
-  const path = await availableTemplatePath(slugForTitle(title))
-  await writeNote(path, upsertFrontmatter('', { title }), generation)
-  return path
+  const slug = slugForTitle(title)
+  const source = upsertFrontmatter('', { title })
+  for (let attempt = 1; attempt <= MAX_TEMPLATE_CREATE_ATTEMPTS; attempt += 1) {
+    const path = templatePath(attempt === 1 ? slug : `${slug}-${attempt}`)
+    const outcome = await createNoteIfAbsent(path, source, generation)
+    if (outcome.kind === 'created') {
+      return path
+    }
+  }
+  throw new Error(
+    `no available template path for slug "${slug}" after ${MAX_TEMPLATE_CREATE_ATTEMPTS} attempts`,
+  )
 }
+
+/** Far beyond a plausible collision run; fail loud if availability never advances. */
+const MAX_TEMPLATE_CREATE_ATTEMPTS = 1000
 
 /**
  * Rename a template to `name`: move the file onto the new name's slug
@@ -104,11 +119,27 @@ async function retitleTemplate(path: string, title: string, generation: number):
     if (h1.text === title) {
       return
     }
-    await writeNote(path, `${source.slice(0, h1.from)}# ${title}${source.slice(h1.to)}`, generation)
+    const outcome = await writeNoteIfUnchanged(
+      path,
+      source,
+      `${source.slice(0, h1.from)}# ${title}${source.slice(h1.to)}`,
+      generation,
+    )
+    if (outcome.kind === 'changed') {
+      throw new Error('The template changed or was removed before its title update landed.')
+    }
     return
   }
   if (hasAuthoredTitle(parsed)) {
     // No display-driving H1, so the authored title is frontmatter `title:`.
-    await writeNote(path, upsertFrontmatter(source, { title }), generation)
+    const outcome = await writeNoteIfUnchanged(
+      path,
+      source,
+      upsertFrontmatter(source, { title }),
+      generation,
+    )
+    if (outcome.kind === 'changed') {
+      throw new Error('The template changed or was removed before its title update landed.')
+    }
   }
 }

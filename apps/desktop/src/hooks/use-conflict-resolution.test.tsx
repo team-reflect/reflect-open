@@ -5,7 +5,7 @@ import {
   indexNote,
   readNote,
   resolveConflictMarkers,
-  writeNote,
+  writeNoteIfUnchanged,
   type GraphInfo,
 } from '@reflect/core'
 import { invalidateIndexQueries } from '@/lib/query-client'
@@ -14,7 +14,7 @@ import { useConflictResolution } from './use-conflict-resolution'
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   readNote: vi.fn(),
-  writeNote: vi.fn(async () => {}),
+  writeNoteIfUnchanged: vi.fn(async () => ({ kind: 'written', modifiedMs: null })),
   indexNote: vi.fn(async () => {}),
   emitFileChanges: vi.fn(),
 }))
@@ -55,7 +55,12 @@ describe('useConflictResolution', () => {
     })
 
     const resolved = resolveConflictMarkers(SOURCE, 'ours')
-    expect(vi.mocked(writeNote)).toHaveBeenCalledWith('notes/clash.md', resolved, 3)
+    expect(vi.mocked(writeNoteIfUnchanged)).toHaveBeenCalledWith(
+      'notes/clash.md',
+      SOURCE,
+      resolved,
+      3,
+    )
     expect(vi.mocked(indexNote)).toHaveBeenCalledWith('notes/clash.md', {
       generation: 7,
       content: resolved,
@@ -69,7 +74,7 @@ describe('useConflictResolution', () => {
   })
 
   it('a failed write surfaces the error and notifies nothing', async () => {
-    vi.mocked(writeNote).mockRejectedValueOnce({ kind: 'io', message: 'disk full' })
+    vi.mocked(writeNoteIfUnchanged).mockRejectedValueOnce({ kind: 'io', message: 'disk full' })
     const { result } = renderHook(() => useConflictResolution('notes/clash.md'))
 
     await act(async () => {
@@ -77,6 +82,22 @@ describe('useConflictResolution', () => {
     })
 
     expect(result.current.error).toBe('disk full')
+    expect(vi.mocked(emitFileChanges)).not.toHaveBeenCalled()
+    expect(vi.mocked(invalidateIndexQueries)).not.toHaveBeenCalled()
+  })
+
+  it('refuses to overwrite a note changed or removed after the read', async () => {
+    vi.mocked(writeNoteIfUnchanged).mockResolvedValueOnce({ kind: 'changed' })
+    const { result } = renderHook(() => useConflictResolution('Projects/clash.md'))
+
+    await act(async () => {
+      await result.current.resolve('theirs')
+    })
+
+    expect(result.current.error).toBe(
+      'This note changed or was removed before conflict resolution landed.',
+    )
+    expect(vi.mocked(indexNote)).not.toHaveBeenCalled()
     expect(vi.mocked(emitFileChanges)).not.toHaveBeenCalled()
     expect(vi.mocked(invalidateIndexQueries)).not.toHaveBeenCalled()
   })
@@ -103,6 +124,6 @@ describe('useConflictResolution', () => {
     })
 
     expect(vi.mocked(readNote)).not.toHaveBeenCalled()
-    expect(vi.mocked(writeNote)).not.toHaveBeenCalled()
+    expect(vi.mocked(writeNoteIfUnchanged)).not.toHaveBeenCalled()
   })
 })

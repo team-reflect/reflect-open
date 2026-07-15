@@ -20,7 +20,6 @@ import { useContactsAuthorization } from '@/hooks/use-contacts-authorization'
 import { formatDayLabel, todayIso } from '@/lib/dates'
 import { createPersonNoteFromContact } from '@/lib/note-contact'
 import { startOperation } from '@/lib/operations'
-import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
 
 /** The `[[` and `#` autocomplete search handlers a {@link NoteEditor} wires up. */
@@ -29,6 +28,11 @@ export interface EditorAutocomplete {
   onWikilinkSearch: WikilinkSearchHandler
   /** Search tags for the `#` menu, most-used first. */
   onTagSearch: TagSearchHandler
+}
+
+function suggestionParentPath(path: string): string {
+  const separator = path.lastIndexOf('/')
+  return separator === -1 ? 'Vault root' : path.slice(0, separator)
 }
 
 /**
@@ -43,11 +47,9 @@ export interface EditorAutocomplete {
  * both take `onWikilinkSearch` and `onTagSearch` — so returning both here never
  * forces a menu onto an editor that doesn't pass it through.
  */
-export function useEditorAutocomplete(): EditorAutocomplete {
-  const { graph } = useGraph()
+export function useEditorAutocomplete(generation: number | null): EditorAutocomplete {
   const { settings } = useSettings()
   const authorization = useContactsAuthorization()
-  const generation = graph?.generation ?? null
   // Contacts join the `[[` menu (v1's backlink-menu behavior) only while the
   // integration is on and the permission readable.
   const contactsInMenu =
@@ -66,6 +68,10 @@ export function useEditorAutocomplete(): EditorAutocomplete {
           startOperation('Creating note').fail(
             `Couldn’t create “${title}” while a potentially matching note is unavailable. Try again when it is available on this device.`,
           )
+        } else if (outcome.kind === 'invalid') {
+          startOperation('Creating note').fail(
+            `Couldn’t create “${title}” because it isn’t a valid note title or path.`,
+          )
         }
       }
     },
@@ -74,15 +80,20 @@ export function useEditorAutocomplete(): EditorAutocomplete {
 
   const onWikilinkSearch = useCallback(
     async (query: string): Promise<WikilinkItem[]> => {
-      if (!hasBridge() || graph === null) {
+      if (!hasBridge() || generation === null) {
         return []
       }
       const [suggestions, contacts] = await Promise.all([
-        suggestWikiTargets(query, 8, {
-          today: todayIso(),
-          dateFormat: settings.dateFormat,
-          weekStartDay: settings.weekStartDay,
-        }),
+        suggestWikiTargets(
+          query,
+          8,
+          {
+            today: todayIso(),
+            dateFormat: settings.dateFormat,
+            weekStartDay: settings.weekStartDay,
+          },
+          generation,
+        ),
         // A contacts hiccup (permission revoked mid-session, store error)
         // must cost only its own rows, never the note suggestions.
         contactsInMenu
@@ -129,14 +140,14 @@ export function useEditorAutocomplete(): EditorAutocomplete {
             },
           }
         }
-        const { target, title, alias, date, path, generated } = entry.suggestion
+        const { target, title, alias, date, path, generated, disambiguated } = entry.suggestion
         // A generated date leads with its phrase ("Next Friday"), resolved day
         // as the detail; everything else keeps the title/alias/daily form.
         if (generated !== undefined && date !== null) {
           return { target, label: generated.phrase, detail: formatDayLabel(date, settings.dateFormat) }
         }
         const label = date !== null ? formatDayLabel(date, settings.dateFormat) : title
-        const detail =
+        const semanticDetail =
           alias !== null
             ? `${alias} → ${title}`
             : date !== null
@@ -144,11 +155,13 @@ export function useEditorAutocomplete(): EditorAutocomplete {
                 ? `${date} · new`
                 : date
               : undefined
-        return { target, label, ...(detail !== undefined ? { detail } : {}) }
+        const pathDetail =
+          disambiguated === true && path !== null ? suggestionParentPath(path) : undefined
+        const detail = [semanticDetail, pathDetail].filter((value) => value !== undefined).join(' · ')
+        return { target, label, ...(detail !== '' ? { detail } : {}) }
       })
     },
     [
-      graph,
       settings.dateFormat,
       settings.weekStartDay,
       resolveOrCreateFromAutocomplete,
@@ -159,13 +172,13 @@ export function useEditorAutocomplete(): EditorAutocomplete {
 
   const onTagSearch = useCallback(
     async (query: string): Promise<TagItem[]> => {
-      if (!hasBridge() || graph === null) {
+      if (!hasBridge() || generation === null) {
         return []
       }
       const tags = await suggestTags(query)
       return tags.map((tag) => ({ tag: tag.tag }))
     },
-    [graph],
+    [generation],
   )
 
   return { onWikilinkSearch, onTagSearch }

@@ -28,6 +28,14 @@ tauri-plugin-opener = "2.5.4"
 # Decodes `reflect-asset://` request paths (`fs/asset_protocol.rs`); the same
 # crate tauri itself uses for its protocol URLs.
 percent-encoding = "2.3.2"
+# Attachment reads use a generation-pinned directory capability and no-follow
+# component opens so a concurrent symlink/root swap cannot escape the vault.
+cap-std = "4.0.2"
+cap-fs-ext = "4.0.2"
+same-file = "1.0.6"
+# Exclusive descriptor-relative rename keeps no-clobber note claims and moves
+# atomic on Apple/Linux/Android filesystems.
+rustix = { version = "1.1.4", features = ["fs"] }
 # `time` backs the bounded wait in `windows::close_note_windows` (tauri
 # already runs on tokio; this only makes the sleep primitive addressable).
 tokio = { version = "1.52.3", features = ["time"] }

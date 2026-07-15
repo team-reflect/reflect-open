@@ -1,16 +1,20 @@
 import {
   errorMessage,
-  getLinkSources,
   isReflectManagedNote,
+  isReflectManagedNotePath,
+  listFiles,
+  prepareNoteMoveRewrites,
   readNote,
-  resolveWikiTarget,
+  resolveExistingWikiTarget,
   rewriteLinksForTitleChange,
   slugPathForTitle,
-  writeNote,
+  type PreparedNoteMoveRewrite,
+  writeNoteIfUnchanged,
 } from '@reflect/core'
 import { placeOldTitleAlias } from './alias-placement'
 import { moveNoteCarryingSession } from './move-note'
 import type { NoteContentOrigin } from './note-session'
+import { openSession } from './open-documents'
 import { composeRenameFailure, type RenamePhaseFailures } from './rename-failure'
 import { startOperation } from '@/lib/operations'
 import { createTitleRenameTracker } from './title-rename'
@@ -61,6 +65,8 @@ export interface RenameCoordinatorOptions {
 export interface RenameCoordinator {
   /** Wire into the session's `onContent` stream (load/external/saved). */
   content(content: string, origin: NoteContentOrigin): void
+  /** Follow the live session when a file move retargets it. */
+  retarget(to: string): void
   /** A settle point (blur, teardown, quit): fire any pending rename now. */
   settle(): void
   /** Resolves once settled renames' writes have landed (quit awaits this). */
@@ -72,20 +78,101 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
   const { generation, canFire } = options
   /** The note's current path — a landed move advances it (Plan 17). */
   let currentPath = options.path
+  let latestContent: string | null = null
   /** Serializes rewrites — a second settle waits for the first. */
   let chain: Promise<void> = Promise.resolve()
+
+  /**
+   * Compare-and-swap a rewrite through a live session when one owns the
+   * source. Closed sources use the generation-pinned native conditional write
+   * so the expected-byte comparison no longer spans an IPC round-trip.
+   */
+  async function commitExactRewrite(
+    path: string,
+    expected: string,
+    replacement: string,
+    gen: number,
+  ): Promise<void> {
+    const owner = openSession(path)
+    if (owner !== null) {
+      if (!(await owner.commitExactContentReplacement(expected, replacement))) {
+        throw new Error(`local link source changed before rewrite: ${path}`)
+      }
+      return
+    }
+    const outcome = await writeNoteIfUnchanged(path, expected, replacement, gen)
+    if (outcome.kind === 'changed') {
+      throw new Error(`local link source changed before rewrite: ${path}`)
+    }
+  }
+
+  async function rollbackPreparedRewrites(
+    rewrites: readonly PreparedNoteMoveRewrite[],
+    gen: number,
+  ): Promise<string[]> {
+    const failed: string[] = []
+    for (const rewrite of [...rewrites].reverse()) {
+      try {
+        await commitExactRewrite(rewrite.path, rewrite.after, rewrite.before, gen)
+      } catch {
+        failed.push(rewrite.path)
+      }
+    }
+    return failed
+  }
 
   /**
    * Move the file onto its title's slug path (Plan 17). A failed move leaves
    * the filename drifting (cosmetic — resolution never reads filenames) until
    * the next settled rename re-derives it.
    */
-  const runMove = async (title: string, gen: number): Promise<void> => {
+  const runMove = async (
+    title: string,
+    gen: number,
+    manifest?: readonly string[],
+  ): Promise<void> => {
     const target = await slugPathForTitle(currentPath, title)
     if (target === currentPath) {
       return
     }
-    await moveNoteCarryingSession(currentPath, target, gen)
+    const notePaths = manifest ?? (await listFiles(gen)).map((file) => file.path)
+    const prepared = await prepareNoteMoveRewrites({
+      fromPath: currentPath,
+      toPath: target,
+      notePaths,
+      read: async (path) => {
+        const owner = openSession(path)
+        if (owner === null) {
+          return readNote(path, gen)
+        }
+        const live = owner.liveContent()
+        if (live === null) {
+          throw new Error(`local link source is not loaded: ${path}`)
+        }
+        return live
+      },
+    })
+    if (prepared.failed.length > 0) {
+      throw new Error(
+        `could not safely rewrite local links in: ${prepared.failed.join(', ')}`,
+      )
+    }
+    const applied: PreparedNoteMoveRewrite[] = []
+    try {
+      for (const rewrite of prepared.rewrites) {
+        await commitExactRewrite(rewrite.path, rewrite.before, rewrite.after, gen)
+        applied.push(rewrite)
+      }
+      await moveNoteCarryingSession(currentPath, target, gen)
+    } catch (cause) {
+      const rollbackFailures = await rollbackPreparedRewrites(applied, gen)
+      if (rollbackFailures.length > 0) {
+        throw new Error(
+          `${errorMessage(cause)}; additionally failed to restore links in: ${rollbackFailures.join(', ')}`,
+        )
+      }
+      throw cause
+    }
     currentPath = target
   }
 
@@ -129,20 +216,51 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
       const failures: RenamePhaseFailures = { rewrite: null, alias: null, move: null }
       try {
         let collision = false
+        let liveNotePaths: string[] | null = null
         try {
+          liveNotePaths = (await listFiles(gen)).map((file) => file.path)
+          const expectedBySource = new Map<string, string>()
           const result = await rewriteLinksForTitleChange({
             path: currentPath,
             from,
             to: rename.to,
             io: {
-              sources: getLinkSources,
-              read: readNote,
-              write: (forPath, contents) => writeNote(forPath, contents, gen),
-              resolve: resolveWikiTarget,
+              // Scan every live note, not only indexed backlink candidates:
+              // a just-authored [[old title]] must not be missed during lag.
+              sources: async () => liveNotePaths ?? [],
+              read: async (forPath) => {
+                const owner = openSession(forPath)
+                let content: string
+                if (owner === null) {
+                  content = await readNote(forPath, gen)
+                } else {
+                  const live = owner.liveContent()
+                  if (live === null) {
+                    throw new Error(`local link source is not loaded: ${forPath}`)
+                  }
+                  content = live
+                }
+                expectedBySource.set(forPath, content)
+                return content
+              },
+              write: async (forPath, contents) => {
+                const expected = expectedBySource.get(forPath)
+                if (expected === undefined) {
+                  throw new Error(`local link source was not read before rewrite: ${forPath}`)
+                }
+                expectedBySource.delete(forPath)
+                await commitExactRewrite(forPath, expected, contents, gen)
+              },
+              resolve: (target) => resolveExistingWikiTarget(target, gen),
             },
             onProgress: operation.progress,
           })
           collision = result.collision
+          if (result.failed.length > 0) {
+            throw new Error(
+              `could not safely rewrite title links in: ${result.failed.join(', ')}`,
+            )
+          }
         } catch (cause) {
           // A failed rewrite must NOT skip the alias below: the tracker's
           // baseline has already advanced (re-arming would re-fire with a
@@ -164,7 +282,7 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
         // alias is claimed. The *filename* derives from the NEW title, so the
         // move happens regardless.
         try {
-          await runMove(rename.to, gen)
+          await runMove(rename.to, gen, liveNotePaths ?? undefined)
         } catch (cause) {
           failures.move = errorMessage(cause)
           console.error('note file move failed:', cause)
@@ -188,6 +306,7 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
 
   return {
     content(content: string, origin: NoteContentOrigin): void {
+      latestContent = content
       if (origin === 'saved') {
         // Only direct `notes/*.md` files carrying a valid Reflect ULID opt in
         // to graph-wide automation. Adopted vault files save their content in
@@ -199,6 +318,17 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
         }
       } else {
         tracker.baseline(content) // load/external: new ground truth, no rewrite
+      }
+    },
+    retarget(to: string): void {
+      const leftManagedTree =
+        isReflectManagedNotePath(currentPath) && !isReflectManagedNotePath(to)
+      currentPath = to
+      // A saved title may still be waiting for the quiet-period settle. Once
+      // the file is adopted outside direct notes/, cancel that pending managed
+      // automation against the latest bytes.
+      if (leftManagedTree && latestContent !== null) {
+        tracker.baseline(latestContent)
       }
     },
     settle(): void {

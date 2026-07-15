@@ -1,6 +1,5 @@
-import { isAppError } from '../errors'
-import { readNote } from '../graph/commands'
-import { descriptionPathFor } from '../graph/paths'
+import { isEligibleAssetPath } from '../actions/asset-description-helpers'
+import { readManagedAssetDescription } from '../graph/commands'
 import { splitFrontmatter } from '../markdown/frontmatter'
 
 /**
@@ -33,12 +32,13 @@ export interface AssetDescriptionBody {
  * empty bodies are skipped; a repeated asset contributes once. Accumulation
  * stops once the combined length reaches {@link MAX_ASSET_TEXT_CHARS} (the
  * body that crosses the cap is kept whole — consumers apply their own final
- * cap). Reads are unpinned, matching the indexer's own note reads (the
- * *write* is generation-pinned, so a graph switch drops the stale row
- * regardless).
+ * cap). `generation` pins callers whose surrounding operation is already
+ * generation-scoped; indexer callers may omit it because their final write is
+ * independently generation-pinned.
  */
 export async function gatherAssetDescriptionBodies(
   assetPaths: readonly string[],
+  generation?: number,
 ): Promise<AssetDescriptionBody[]> {
   if (assetPaths.length === 0) {
     return []
@@ -47,18 +47,13 @@ export async function gatherAssetDescriptionBodies(
   const bodies: AssetDescriptionBody[] = []
   let total = 0
   for (const assetPath of assetPaths) {
-    if (seen.has(assetPath)) {
+    if (!isEligibleAssetPath(assetPath) || seen.has(assetPath)) {
       continue // an asset referenced twice in one note contributes once
     }
     seen.add(assetPath)
-    let source: string
-    try {
-      source = await readNote(descriptionPathFor(assetPath))
-    } catch (cause) {
-      if (isAppError(cause) && cause.kind === 'notFound') {
-        continue // no description for this asset (not generated yet, or none)
-      }
-      throw cause
+    const source = await readManagedAssetDescription(assetPath, generation)
+    if (source === null) {
+      continue // no description for this asset (not generated yet, or none)
     }
     const body = splitFrontmatter(source).body.trim()
     if (body === '') {

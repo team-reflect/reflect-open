@@ -164,6 +164,7 @@ describe('buildHistory', () => {
         responseMessages: [
           { role: 'assistant', content: 'In [[Atlas]].' },
         ],
+        privacyFingerprint: 'privacy-a',
         status: 'done',
       },
       {
@@ -172,10 +173,11 @@ describe('buildHistory', () => {
         attachments: [],
         parts: [],
         responseMessages: [{ role: 'assistant', content: 'In [[Q3 Budget]].' }],
+        privacyFingerprint: 'privacy-a',
         status: 'done',
       },
     ]
-    expect(buildHistory(turns)).toEqual([
+    expect(buildHistory(turns, 'privacy-a')).toEqual([
       { role: 'user', content: 'where is the plan?' },
       { role: 'assistant', content: 'In [[Atlas]].' },
       { role: 'user', content: 'and the budget?' },
@@ -193,6 +195,7 @@ describe('buildHistory', () => {
         attachments: [],
         parts: [{ kind: 'notice', tone: 'error', text: 'No API key found' }],
         responseMessages: [],
+        privacyFingerprint: 'privacy-a',
         status: 'done',
       },
       {
@@ -201,10 +204,11 @@ describe('buildHistory', () => {
         attachments: [],
         parts: [],
         responseMessages: [{ role: 'assistant', content: 'Answer.' }],
+        privacyFingerprint: 'privacy-a',
         status: 'done',
       },
     ]
-    expect(buildHistory(turns)).toEqual([
+    expect(buildHistory(turns, 'privacy-a')).toEqual([
       { role: 'user', content: 'this one worked' },
       { role: 'assistant', content: 'Answer.' },
     ])
@@ -224,15 +228,55 @@ describe('buildHistory', () => {
         attachments: [photo],
         parts: [],
         responseMessages: [{ role: 'assistant', content: 'A cat.' }],
+        privacyFingerprint: 'privacy-a',
         status: 'done',
       },
     ]
-    expect(buildHistory(turns)).toEqual([
+    expect(buildHistory(turns, 'privacy-a')).toEqual([
       {
         role: 'user',
         content: [{ type: 'image', image: photo.dataUrl, mediaType: 'image/png' }],
       },
       { role: 'assistant', content: 'A cat.' },
+    ])
+  })
+
+  it('fails closed for legacy, changed, or unavailable privacy snapshots', () => {
+    const responseMessages = [{ role: 'assistant' as const, content: 'Previously public.' }]
+    const turns: ChatTurn[] = [
+      {
+        id: 'legacy',
+        userText: 'legacy question',
+        attachments: [],
+        parts: [],
+        responseMessages,
+        privacyFingerprint: null,
+        status: 'done',
+      },
+      {
+        id: 'old-snapshot',
+        userText: 'old question',
+        attachments: [],
+        parts: [],
+        responseMessages,
+        privacyFingerprint: 'privacy-before',
+        status: 'done',
+      },
+      {
+        id: 'current-snapshot',
+        userText: 'current question',
+        attachments: [],
+        parts: [],
+        responseMessages,
+        privacyFingerprint: 'privacy-after',
+        status: 'done',
+      },
+    ]
+
+    expect(buildHistory(turns, null)).toEqual([])
+    expect(buildHistory(turns, 'privacy-after')).toEqual([
+      { role: 'user', content: 'current question' },
+      ...responseMessages,
     ])
   })
 })

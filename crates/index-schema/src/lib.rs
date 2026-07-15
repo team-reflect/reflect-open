@@ -23,7 +23,7 @@ pub const INDEX_FILE: &str = "index.sqlite";
 /// `user_version` after every migration has run. Read-only consumers compare
 /// this against `PRAGMA user_version` to detect an index written by a newer
 /// (or older) app than they were built for.
-pub const LATEST_SCHEMA_VERSION: usize = 17;
+pub const LATEST_SCHEMA_VERSION: usize = 19;
 
 /// The `index_meta` key holding the TS-owned projection version (the rows'
 /// derivation version, distinct from the schema version above).
@@ -60,6 +60,10 @@ mod schema {
             M::up(include_str!("../migrations/0015_note_kind_invariant.sql")),
             M::up(include_str!("../migrations/0016_note_emails.sql")),
             M::up(include_str!("../migrations/0017_task_breadcrumbs.sql")),
+            M::up(include_str!("../migrations/0018_note_path_keys.sql")),
+            M::up(include_str!(
+                "../migrations/0019_chat_privacy_fingerprint.sql"
+            )),
         ])
     });
 
@@ -197,6 +201,33 @@ mod schema {
                 .query_row("PRAGMA user_version", [], |row| row.get(0))
                 .unwrap();
             assert_eq!(version, crate::LATEST_SCHEMA_VERSION as i64);
+        }
+
+        #[test]
+        fn chat_privacy_fingerprint_migration_preserves_legacy_turns_as_null() {
+            let mut conn = open_in_memory().unwrap();
+            migrate_to(&mut conn, 18).unwrap();
+            conn.execute_batch(
+                "INSERT INTO chat_conversations(id, title, created_ms, updated_ms)
+                   VALUES('c1', 'Legacy', 1, 1);
+                 INSERT INTO chat_messages(
+                   id, conversation_id, seq, user_text, attachments, parts,
+                   response_messages, created_ms)
+                   VALUES('m1', 'c1', 0, 'question', '[]', '[]', '[]', 1);",
+            )
+            .unwrap();
+
+            migrate(&mut conn).unwrap();
+
+            let (user_text, privacy_fingerprint): (String, Option<String>) = conn
+                .query_row(
+                    "SELECT user_text, privacy_fingerprint FROM chat_messages WHERE id = 'm1'",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .unwrap();
+            assert_eq!(user_text, "question");
+            assert_eq!(privacy_fingerprint, None);
         }
     }
 }

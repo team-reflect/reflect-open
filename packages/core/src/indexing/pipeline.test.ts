@@ -89,6 +89,23 @@ describe('indexNote', () => {
     expect(args.note['fileHash']).toMatch(/^[0-9a-f]{64}$/)
     expect((args.note['links'] as { targetKey: string }[]).map((link) => link.targetKey)).toContain('world')
   })
+
+  it('does not fold a source/root-ambiguous legacy asset description into FTS', async () => {
+    const content =
+      '---\nid: 01abcdefghjkmnpqrstvwxyz00\n---\n# Note\n\n![](assets/pic.png)\n'
+    await indexNote('notes/a.md', { generation: 7, content, mtime: 5 })
+
+    const apply = mockInvoke.mock.calls.find(([command]) => command === 'index_apply')
+    const note = (apply![1] as { note: { assetText: string } }).note
+    expect(note.assetText).toBe('')
+    expect(
+      mockInvoke.mock.calls.some(
+        ([command, args]) =>
+          command === 'note_read' &&
+          (args as { path?: string }).path === 'assets/pic.png.reflect.md',
+      ),
+    ).toBe(false)
+  })
 })
 
 describe('reindexNotesReferencing', () => {
@@ -490,8 +507,8 @@ describe('Kysely → db_query bridge', () => {
 
 describe('reconcileIndex move healing (Plan 17)', () => {
   const OLD = 'notes/01arz3ndektsv4rrffq69g5fav.md'
-  const NEW = 'notes/meeting-notes.md'
-  const CONTENT = '---\nid: 01abcdefghjkmnpqrstvwxyz00\n---\n# Meeting Notes\n'
+  const NEW = 'Projects/meeting-notes.md'
+  const CONTENT = '---\nid: 01abcdefghjkmnpqrstvwxyz00\n---\n# Meeting Notes\n\n[Sibling](Sibling.md)\n'
 
   /** A graph where OLD's row remains but the file now lives at NEW. */
   function renameFake(options: { storedHash: string; content?: string }) {
@@ -522,7 +539,7 @@ describe('reconcileIndex move healing (Plan 17)', () => {
     return calls
   }
 
-  it('moves the rows and skips the re-index when content is unchanged', async () => {
+  it('moves the rows and reprojects path-dependent links when content is unchanged', async () => {
     const calls = renameFake({ storedHash: await hashContent(CONTENT) })
 
     await reconcileIndex({ generation: 4 })
@@ -530,11 +547,26 @@ describe('reconcileIndex move healing (Plan 17)', () => {
     const commands = calls.map(([command]) => command)
     expect(commands).toContain('index_move')
     const move = calls.find(([command]) => command === 'index_move')
-    expect(move?.[1]).toEqual({ from: OLD, to: NEW, generation: 4 })
-    // The moved row carried its hash: identical content means no re-apply —
-    // and crucially no remove, so embeddings survived.
-    expect(commands).not.toContain('index_apply')
-    expect(commands).not.toContain('index_apply_batch')
+    expect(move?.[1]).toEqual({
+      request: {
+        from: OLD,
+        to: NEW,
+        toPathKey: NEW.toLowerCase(),
+        toBasenameKey: 'meeting-notes',
+        generation: 4,
+      },
+    })
+    // The projection is reapplied because relative Markdown candidates depend
+    // on the source directory. Embedding chunks live outside this apply and
+    // survive; the old row is never removed.
+    const apply = calls.find(([command]) => command === 'index_apply_batch')
+    expect(apply).toBeDefined()
+    const notes = apply?.[1]['notes'] as Array<{
+      path: string
+      links: Array<{ pathKey: string | null }>
+    }>
+    expect(notes[0]?.path).toBe(NEW)
+    expect(notes[0]?.links[0]?.pathKey).toBe('projects/sibling.md')
     expect(commands).not.toContain('index_remove')
   })
 

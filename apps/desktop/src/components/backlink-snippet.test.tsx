@@ -17,6 +17,16 @@ vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 7 } }),
 }))
 
+const inertAttachmentProps = {
+  onMarkdownLinkClick: () => false,
+  resolveImageUrl: () => undefined,
+  resolveFileLink: () => false,
+  resolveWikiEmbed: () => undefined,
+  resolveFileInfo: async () => undefined,
+  openAttachment: async () => {},
+  resolverRevision: 0,
+}
+
 /**
  * A context with one round task, one square box, and a nested round task —
  * the anchors mirror what `extractSnippetTasks` produces for this markdown
@@ -47,7 +57,7 @@ function renderSnippet(tasks: SnippetTask[] = anchors()) {
         notePath="notes/meeting.md"
         tasks={tasks}
         onWikilinkClick={() => {}}
-        resolveImageUrl={() => undefined}
+        {...inertAttachmentProps}
       />
     </QueryClientProvider>,
   )
@@ -120,13 +130,135 @@ describe('BacklinkSnippet task checkboxes', () => {
           notePath="notes/meeting.md"
           tasks={squareOnly}
           onWikilinkClick={() => {}}
-          resolveImageUrl={() => undefined}
+          {...inertAttachmentProps}
         />
       </QueryClientProvider>,
     )
     const box = view.container.querySelector('input[type="checkbox"]')!
     await userEvent.click(box)
     expect(toggleTask).not.toHaveBeenCalled()
+    view.unmount()
+  })
+})
+
+describe('BacklinkSnippet attachments', () => {
+  it('resolves nested-source Markdown and wiki attachments and opens file pills', async () => {
+    const resolveImageUrl = vi.fn(
+      (sourcePath: string, src: string) => `asset://${sourcePath}/${src}`,
+    )
+    const resolveFileLink = vi.fn(
+      (_sourcePath: string, { href }: { href: string }) => href.endsWith('.pdf'),
+    )
+    const resolveWikiEmbed = vi.fn(
+      (_sourcePath: string, { target }: { target: string }) =>
+        target.endsWith('.png')
+          ? { kind: 'image' as const, src: '/Media/wiki.png' }
+          : { kind: 'file' as const, href: '/Media/wiki.pdf', name: 'Wiki PDF' },
+    )
+    const resolveFileInfo = vi.fn(async () => ({ size: 84 }))
+    const openAttachment = vi.fn(async () => {})
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const view = render(
+      <QueryClientProvider client={client}>
+        <BacklinkSnippet
+          text={[
+            '![](../../Media/standard.png)',
+            '![[../../Media/wiki.png]]',
+            '[Manual](../../Media/manual.pdf)',
+            '![[../../Media/wiki.pdf]]',
+          ].join('\n\n')}
+          notePath="Projects/2026/Plan.md"
+          tasks={[]}
+          onWikilinkClick={() => {}}
+          onMarkdownLinkClick={() => false}
+          resolveImageUrl={resolveImageUrl}
+          resolveFileLink={resolveFileLink}
+          resolveWikiEmbed={resolveWikiEmbed}
+          resolveFileInfo={resolveFileInfo}
+          openAttachment={openAttachment}
+          resolverRevision={3}
+        />
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(view.container.querySelectorAll('[data-testid="image-preview"] img')).toHaveLength(2)
+      expect(view.getAllByTestId('file-pill')).toHaveLength(2)
+    })
+    expect(resolveImageUrl).toHaveBeenCalledWith(
+      'Projects/2026/Plan.md',
+      '../../Media/standard.png',
+    )
+    expect(resolveImageUrl).toHaveBeenCalledWith('Projects/2026/Plan.md', '/Media/wiki.png')
+    expect(resolveFileLink).toHaveBeenCalledWith(
+      'Projects/2026/Plan.md',
+      expect.objectContaining({ href: '../../Media/manual.pdf' }),
+    )
+    expect(resolveWikiEmbed).toHaveBeenCalledWith(
+      'Projects/2026/Plan.md',
+      expect.objectContaining({ target: '../../Media/wiki.png' }),
+    )
+    expect(resolveFileInfo).toHaveBeenCalledWith(
+      'Projects/2026/Plan.md',
+      '../../Media/manual.pdf',
+    )
+
+    const pills = view.getAllByTestId('file-pill')
+    await userEvent.click(pills[0]!)
+    await userEvent.click(pills[1]!)
+    expect(openAttachment).toHaveBeenNthCalledWith(
+      1,
+      'Projects/2026/Plan.md',
+      '../../Media/manual.pdf',
+    )
+    expect(openAttachment).toHaveBeenNthCalledWith(
+      2,
+      'Projects/2026/Plan.md',
+      '/Media/wiki.pdf',
+    )
+  })
+})
+
+describe('BacklinkSnippet note links', () => {
+  it('preserves the source path for same-note wiki headings and relative Markdown links', async () => {
+    const onWikilinkClick = vi.fn()
+    const onMarkdownLinkClick = vi.fn(() => true)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const view = render(
+      <QueryClientProvider client={client}>
+        <BacklinkSnippet
+          text={'[[#Decisions]] and [Plan](../Plan.md#Scope)'}
+          notePath="Projects/Meetings/Review.md"
+          tasks={[]}
+          onWikilinkClick={onWikilinkClick}
+          onMarkdownLinkClick={onMarkdownLinkClick}
+          resolveImageUrl={() => undefined}
+          resolveFileLink={() => false}
+          resolveWikiEmbed={() => undefined}
+          resolveFileInfo={async () => undefined}
+          openAttachment={async () => {}}
+          resolverRevision={0}
+        />
+      </QueryClientProvider>,
+    )
+
+    await userEvent.click(view.getByTestId('wikilink'))
+    const markdownLink = view.container.querySelector<HTMLAnchorElement>(
+      'a[href="../Plan.md#Scope"]',
+    )
+    if (markdownLink === null) {
+      throw new Error('expected the relative Markdown link to render')
+    }
+    await userEvent.click(markdownLink)
+
+    expect(onWikilinkClick).toHaveBeenCalledWith(
+      'Projects/Meetings/Review.md',
+      expect.objectContaining({ target: '#Decisions' }),
+    )
+    expect(onMarkdownLinkClick).toHaveBeenCalledWith(
+      'Projects/Meetings/Review.md',
+      expect.objectContaining({ href: '../Plan.md#Scope' }),
+    )
     view.unmount()
   })
 })

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { ToolCallOptions } from 'ai'
 import type { RetrievalHit, RetrieveOptions } from '../../embeddings/retrieve'
 import type { DailyNoteRow, DailyNotesRange } from '../../indexing/queries'
@@ -71,6 +71,20 @@ function dailyRow(date: string, overrides: Partial<DailyNoteRow> = {}): DailyNot
     ...overrides,
   }
 }
+
+describe('buildNoteTools asset discovery overrides', () => {
+  it('requires legacy note and attachment listings as one privacy snapshot pair', () => {
+    expect(() => buildNoteTools({ listFilesFn: async () => [] })).toThrow(
+      'listFilesFn and listAttachmentsFn must be provided together',
+    )
+    expect(() => buildNoteTools({ listAttachmentsFn: async () => [] })).toThrow(
+      'listFilesFn and listAttachmentsFn must be provided together',
+    )
+    expect(() =>
+      buildNoteTools({ listFilesFn: async () => [], listAttachmentsFn: async () => [] }),
+    ).not.toThrow()
+  })
+})
 
 function isAsyncIterable(value: object): value is AsyncIterable<unknown> {
   return Symbol.asyncIterator in value
@@ -223,6 +237,21 @@ describe('search_notes', () => {
     expect(JSON.stringify(output)).not.toContain(PRIVATE_TITLE)
   })
 
+  it('fails closed on malformed or unterminated live frontmatter', async () => {
+    for (const source of [
+      '---\nprivate: [\n---\n# Diary\n',
+      '---\nprivate: false\n# Diary\n',
+    ]) {
+      const tools = buildNoteTools({
+        retrieveFn: async () => [hit({ path: PRIVATE_PATH, title: PRIVATE_TITLE })],
+        readNoteFn: async () => source,
+      })
+      const output = await runSearch(tools, { query: 'diary' })
+      expect(output.hits).toEqual([])
+      expect(JSON.stringify(output)).not.toContain(PRIVATE_TITLE)
+    }
+  })
+
   it('fails closed: an unreadable hit is dropped, not sent', async () => {
     const tools = buildNoteTools({
       retrieveFn: async () => [hit({ path: PRIVATE_PATH, title: PRIVATE_TITLE })],
@@ -294,6 +323,45 @@ describe('read_notes', () => {
     expect(JSON.stringify(output)).not.toContain(PRIVATE_BODY)
   })
 
+  it('refuses BOM-prefixed and CR-only private frontmatter', async () => {
+    for (const source of [
+      `\uFEFF---\nprivate: true\n---\n${PRIVATE_BODY}`,
+      `---\rprivate: true\r---\r${PRIVATE_BODY}`,
+    ]) {
+      const output = await runRead(
+        buildNoteTools({ readNoteFn: async () => source }),
+        PRIVATE_PATH,
+      )
+      expect(output.ok).toBe(false)
+      expect(JSON.stringify(output)).not.toContain(PRIVATE_BODY)
+    }
+  })
+
+  it('rejects non-note paths without reading them', async () => {
+    const readNoteFn = vi.fn(async () => 'sensitive bytes')
+    const tools = buildNoteTools({ readNoteFn })
+
+    for (const path of ['assets/a.svg', 'assets/a.png.reflect.md', '.git/config', '.hidden.md']) {
+      const output = await runRead(tools, path)
+      expect(output).toMatchObject({ ok: false, path })
+    }
+    expect(readNoteFn).not.toHaveBeenCalled()
+  })
+
+  it('refuses note content when frontmatter privacy is indeterminate', async () => {
+    for (const source of [
+      `---\nprivate: [\n---\n# Diary\n\n${PRIVATE_BODY}\n`,
+      `---\nprivate: false\n# Diary\n\n${PRIVATE_BODY}\n`,
+    ]) {
+      const output = await runRead(
+        buildNoteTools({ readNoteFn: async () => source }),
+        PRIVATE_PATH,
+      )
+      expect(output.ok).toBe(false)
+      expect(JSON.stringify(output)).not.toContain(PRIVATE_BODY)
+    }
+  })
+
   it('reports a missing note instead of throwing', async () => {
     const tools = buildNoteTools({
       readNoteFn: async () => {
@@ -326,8 +394,17 @@ describe('read_assets', () => {
   const PUBLIC_REF = '# Board deck\n\n![chart](assets/chart.png)\n'
   const PRIVATE_REF = `---\nprivate: true\n---\n# Diary\n\n![chart](assets/chart.png)\n`
 
-  /** Tools over an in-memory file map + a fixed referencing-notes answer. */
-  function assetTools(files: Record<string, string>, refs: string[]): NoteTools {
+  /** Tools over an in-memory file map + the complete live note listing. */
+  function assetTools(
+    files: Record<string, string>,
+    notePaths: string[],
+    listAttachmentsFn = async () =>
+      [ASSET, 'assets/chart one.png', 'assets/undescribed.pdf'].map((path) => ({
+        path,
+        size: 1,
+        modifiedMs: 1,
+      })),
+  ): NoteTools {
     return buildNoteTools({
       readNoteFn: async (path) => {
         const source = files[path]
@@ -336,7 +413,9 @@ describe('read_assets', () => {
         }
         return source
       },
-      assetReferencingNotePathsFn: async () => refs,
+      listFilesFn: async () =>
+        notePaths.map((path) => ({ path, size: 1, modifiedMs: 1 })),
+      listAttachmentsFn,
     })
   }
 
@@ -363,7 +442,7 @@ describe('read_assets', () => {
       {
         [SIDECAR]: `---\nreflectAsset: true\n---\n${DESCRIPTION_BODY}\n`,
         [spacedSidecar]: `---\nreflectAsset: true\n---\n${DESCRIPTION_BODY}\n`,
-        'notes/deck.md': '# Deck\n\n![a](./assets/chart.png)\n\n![b](assets/chart%20one.png)\n',
+        'notes/deck.md': '# Deck\n\n![a](../assets/chart.png)\n\n![b](../assets/chart%20one.png)\n',
       },
       ['notes/deck.md'],
     )
@@ -384,7 +463,7 @@ describe('read_assets', () => {
     const tools = assetTools(
       {
         [SIDECAR]: `---\nreflectAsset: true\n---\n${DESCRIPTION_BODY}\n`,
-        'notes/deck.md': PUBLIC_REF,
+        'notes/deck.md': `${PUBLIC_REF}\n![appendix](../assets/undescribed.pdf)\n`,
       },
       ['notes/deck.md'],
     )
@@ -397,7 +476,7 @@ describe('read_assets', () => {
     })
   })
 
-  it('refuses when any referencing note is private — live, and without the description', async () => {
+  it('blocks a newly added private reference without any derived-index candidate', async () => {
     const tools = assetTools(
       {
         [SIDECAR]: `---\nreflectAsset: true\n---\n${DESCRIPTION_BODY}\n`,
@@ -411,6 +490,37 @@ describe('read_assets', () => {
       expect.unreachable('expected a refusal')
     }
     expect(output.error).toBe(ASSET_UNAVAILABLE_ERROR)
+    expect(JSON.stringify(output)).not.toContain(DESCRIPTION_BODY)
+  })
+
+  it('uses one fresh native-shaped snapshot and sees a private note absent from cached listings', async () => {
+    const staleCachedFiles = [{ path: 'notes/deck.md', size: 1, modifiedMs: 1 }]
+    const privacySnapshotFn = vi.fn(async () => ({
+      revision: 9,
+      notes: [
+        { path: 'notes/deck.md', source: PUBLIC_REF },
+        { path: PRIVATE_PATH, source: PRIVATE_REF },
+      ],
+      attachments: [{ path: ASSET, size: 1, modifiedMs: 1 }],
+    }))
+    const readAssetDescriptionFn = vi.fn(async () =>
+      `---\nreflectAsset: true\nsource: ${ASSET}\n---\n${DESCRIPTION_BODY}\n`,
+    )
+    const tools = buildNoteTools({
+      privacySnapshotFn,
+      readAssetDescriptionFn,
+      // This represents the already-populated ordinary catalog. Supplying the
+      // native snapshot seam must bypass it completely.
+      listFilesFn: async () => staleCachedFiles,
+      listAttachmentsFn: async () => [{ path: ASSET, size: 1, modifiedMs: 1 }],
+      readNoteFn: async () => PUBLIC_REF,
+    })
+
+    const output = await runReadAsset(tools, ASSET)
+
+    expect(output).toEqual({ ok: false, path: ASSET, error: ASSET_UNAVAILABLE_ERROR })
+    expect(privacySnapshotFn).toHaveBeenCalledTimes(1)
+    expect(readAssetDescriptionFn).not.toHaveBeenCalled()
     expect(JSON.stringify(output)).not.toContain(DESCRIPTION_BODY)
   })
 
@@ -435,7 +545,8 @@ describe('read_assets', () => {
         }
         throw { kind: 'io', message: 'disk error' }
       },
-      assetReferencingNotePathsFn: async () => ['notes/deck.md'],
+      listFilesFn: async () => [{ path: 'notes/deck.md', size: 1, modifiedMs: 1 }],
+      listAttachmentsFn: async () => [{ path: ASSET, size: 1, modifiedMs: 1 }],
     })
     const output = await runReadAsset(tools, ASSET)
     if (output.ok) {
@@ -451,9 +562,15 @@ describe('read_assets', () => {
         reads.push(path)
         throw { kind: 'notFound', message: 'no such file' }
       },
-      assetReferencingNotePathsFn: async () => [],
+      listFilesFn: async () => [],
+      listAttachmentsFn: async () => [],
     })
-    for (const path of ['notes/secret.md', 'assets/chart.png.reflect.md']) {
+    for (const path of [
+      'notes/secret.md',
+      'assets/chart.png.reflect.md',
+      'assets/recording.mp3',
+      'assets/readme.txt',
+    ]) {
       const output = await runReadAsset(tools, path)
       if (output.ok) {
         expect.unreachable('expected a refusal')
@@ -461,6 +578,167 @@ describe('read_assets', () => {
       expect(output.error).toBe(NOT_AN_ASSET_ERROR)
     }
     expect(reads).toEqual([])
+  })
+
+  it('checks privacy before probing a missing or user-authored sidecar', async () => {
+    for (const sidecar of [undefined, '# User-authored notes\n']) {
+      const reads: string[] = []
+      const files: Record<string, string> = {
+        [PRIVATE_PATH]: PRIVATE_REF,
+        ...(sidecar === undefined ? {} : { [SIDECAR]: sidecar }),
+      }
+      const tools = buildNoteTools({
+        readNoteFn: async (path) => {
+          reads.push(path)
+          const source = files[path]
+          if (source === undefined) {
+            throw { kind: 'notFound', message: 'missing' }
+          }
+          return source
+        },
+        listFilesFn: async () => [{ path: PRIVATE_PATH, size: 1, modifiedMs: 1 }],
+        listAttachmentsFn: async () => [{ path: ASSET, size: 1, modifiedMs: 1 }],
+      })
+
+      const output = await runReadAsset(tools, ASSET)
+      expect(output).toEqual({ ok: false, path: ASSET, error: ASSET_UNAVAILABLE_ERROR })
+      expect(reads).toEqual([PRIVATE_PATH])
+    }
+  })
+
+  it('returns only Reflect-managed descriptions for the requested source asset', async () => {
+    for (const sidecar of [
+      '# User-authored notes\n',
+      '---\nreflectAsset: true\nsource: assets/other.png\n---\nsecret body\n',
+    ]) {
+      const tools = assetTools({ [SIDECAR]: sidecar, 'notes/deck.md': PUBLIC_REF }, ['notes/deck.md'])
+      const output = await runReadAsset(tools, ASSET)
+      expect(output).toEqual({ ok: false, path: ASSET, error: NO_ASSET_DESCRIPTION_ERROR })
+      expect(JSON.stringify(output)).not.toContain('secret body')
+    }
+  })
+
+  it('returns no description bytes when the native managed-sidecar read refuses a symlink', async () => {
+    const readAssetDescriptionFn = vi.fn(async () => {
+      throw { kind: 'traversal', message: 'symlinked sidecar' }
+    })
+    const tools = buildNoteTools({
+      privacySnapshotFn: async () => ({
+        revision: 1,
+        notes: [{ path: 'notes/deck.md', source: PUBLIC_REF }],
+        attachments: [{ path: ASSET, size: 1, modifiedMs: 1 }],
+      }),
+      readAssetDescriptionFn,
+    })
+
+    await expect(runReadAsset(tools, ASSET)).resolves.toEqual({
+      ok: false,
+      path: ASSET,
+      error: ASSET_UNAVAILABLE_ERROR,
+    })
+    expect(readAssetDescriptionFn).toHaveBeenCalledTimes(1)
+  })
+
+  it('revokes a bare wiki embed when the live catalog becomes ambiguous', async () => {
+    let catalog = [{ path: ASSET, size: 1, modifiedMs: 1 }]
+    const tools = assetTools(
+      {
+        [SIDECAR]: `---\nreflectAsset: true\nsource: ${ASSET}\n---\n${DESCRIPTION_BODY}\n`,
+        'Projects/deck.md': '![[chart.png]]',
+      },
+      ['Projects/deck.md'],
+      async () => catalog,
+    )
+
+    await expect(runReadAsset(tools, ASSET)).resolves.toMatchObject({ ok: true })
+    catalog = [...catalog, { path: 'Media/chart.png', size: 1, modifiedMs: 1 }]
+    await expect(runReadAsset(tools, ASSET)).resolves.toEqual({
+      ok: false,
+      path: ASSET,
+      error: ASSET_UNAVAILABLE_ERROR,
+    })
+  })
+
+  it('fails closed on a catalog error without probing the sidecar', async () => {
+    const reads: string[] = []
+    const tools = buildNoteTools({
+      readNoteFn: async (path) => {
+        reads.push(path)
+        throw { kind: 'notFound', message: 'missing' }
+      },
+      listFilesFn: async () => [{ path: 'notes/deck.md', size: 1, modifiedMs: 1 }],
+      listAttachmentsFn: async () => {
+        throw new Error('catalog unavailable')
+      },
+    })
+
+    await expect(runReadAsset(tools, ASSET)).resolves.toEqual({
+      ok: false,
+      path: ASSET,
+      error: ASSET_UNAVAILABLE_ERROR,
+    })
+    expect(reads).toEqual([])
+  })
+
+  it('scans live notes once for a ten-asset read batch', async () => {
+    const paths = Array.from({ length: 10 }, (_, index) => `assets/${index}.png`)
+    const notePath = 'Projects/all-assets.md'
+    const noteSource = paths.map((path) => `![](../${path})`).join('\n')
+    const reads: string[] = []
+    const listFilesFn = vi.fn(async () => [{ path: notePath, size: 1, modifiedMs: 1 }])
+    const listAttachmentsFn = vi.fn(async () =>
+      paths.map((path) => ({ path, size: 1, modifiedMs: 1 })),
+    )
+    const tools = buildNoteTools({
+      listFilesFn,
+      listAttachmentsFn,
+      readNoteFn: async (path) => {
+        reads.push(path)
+        if (path === notePath) return noteSource
+        const assetPath = path.replace(/\.reflect\.md$/, '')
+        if (paths.includes(assetPath)) {
+          return `---\nreflectAsset: true\nsource: ${assetPath}\n---\nDescription for ${assetPath}`
+        }
+        throw { kind: 'notFound', message: 'missing' }
+      },
+    })
+
+    const output = await runReadAssets(tools, paths)
+
+    expect(output.assets.every((asset) => asset.ok)).toBe(true)
+    expect(listFilesFn).toHaveBeenCalledTimes(1)
+    expect(listAttachmentsFn).toHaveBeenCalledTimes(1)
+    expect(reads.filter((path) => path === notePath)).toHaveLength(1)
+    expect(reads.filter((path) => path.endsWith('.reflect.md'))).toHaveLength(10)
+  })
+
+  it('blocks the whole batch before sidecars when any live note is unavailable', async () => {
+    const paths = [ASSET, 'assets/other.png']
+    for (const noteFile of [
+      { path: 'Projects/remote.md', size: 1, modifiedMs: 1, placeholder: true },
+      { path: 'Projects/missing.md', size: 1, modifiedMs: 1 },
+    ]) {
+      const reads: string[] = []
+      const tools = buildNoteTools({
+        listFilesFn: async () => [noteFile],
+        listAttachmentsFn: async () =>
+          paths.map((path) => ({ path, size: 1, modifiedMs: 1 })),
+        readNoteFn: async (path) => {
+          reads.push(path)
+          throw { kind: 'notFound', message: 'missing' }
+        },
+      })
+
+      const output = await runReadAssets(tools, paths)
+
+      expect(output.assets).toEqual(
+        paths.map((path) => ({ ok: false, path, error: ASSET_UNAVAILABLE_ERROR })),
+      )
+      expect(reads.every((path) => !path.endsWith('.reflect.md'))).toBe(true)
+      if (noteFile.placeholder === true) {
+        expect(reads).toEqual([])
+      }
+    }
   })
 
   it('treats an empty sidecar body as no description', async () => {
@@ -490,7 +768,7 @@ describe('read_assets', () => {
   it('caps an oversized description and flags the cut', async () => {
     const tools = assetTools(
       {
-        [SIDECAR]: 'x'.repeat(MAX_ASSET_DESCRIPTION_CHARS + 10),
+        [SIDECAR]: `---\nreflectAsset: true\nsource: ${ASSET}\n---\n${'x'.repeat(MAX_ASSET_DESCRIPTION_CHARS + 10)}`,
         'notes/deck.md': PUBLIC_REF,
       },
       ['notes/deck.md'],

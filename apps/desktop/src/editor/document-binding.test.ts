@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createDocumentBinding, type BindFactories } from './document-binding'
 import type { NoteSession } from './note-session'
-import { openSession } from './open-documents'
+import { openSession, retargetOpenDocument } from './open-documents'
 import type { RenameCoordinator } from './rename-coordinator'
 
 /**
@@ -26,6 +26,7 @@ function fakeSession(path: string) {
     load: () => {},
     editorChanged: () => {},
     externalChanged: () => {},
+    externalRemoved: () => {},
     flush,
     keepMine: () => {},
     isDirty: () => false,
@@ -34,6 +35,7 @@ function fakeSession(path: string) {
     content: () => '',
     liveContent: () => '',
     updateFrontmatter: () => true,
+    commitExactContentReplacement: async () => false,
     commitTaskToggle: async () => false,
     commitTaskEdit: async () => false,
     commitTaskRemove: async () => false,
@@ -48,13 +50,15 @@ function fakeSession(path: string) {
 function fakeCoordinator() {
   const settle = vi.fn()
   const dispose = vi.fn()
+  const retarget = vi.fn()
   const coordinator: RenameCoordinator = {
     content: () => {},
+    retarget,
     settle,
     settled: async () => {},
     dispose,
   }
-  return { coordinator, settle, dispose }
+  return { coordinator, settle, dispose, retarget }
 }
 
 function factories(session: NoteSession, coordinator: RenameCoordinator | null): BindFactories {
@@ -112,6 +116,19 @@ describe('createDocumentBinding', () => {
 
     binding.unbind('notes/renamed.md')
     expect(moved.dispose).toHaveBeenCalled()
+  })
+
+  it('retargets the registered coordinator with the live session path', () => {
+    const binding = createDocumentBinding()
+    const moved = fakeSession('notes/a.md')
+    const { coordinator, retarget } = fakeCoordinator()
+    binding.bind('notes/a.md', factories(moved.session, coordinator))
+
+    moved.session.retarget('Projects/a.md')
+    retargetOpenDocument('notes/a.md', 'Projects/a.md', moved.session)
+
+    expect(retarget).toHaveBeenCalledWith('Projects/a.md')
+    binding.unbind('Projects/a.md')
   })
 
   it('tears a retargeted session down when nothing adopts it (real unmount)', async () => {

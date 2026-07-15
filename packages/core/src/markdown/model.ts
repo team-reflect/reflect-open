@@ -136,10 +136,22 @@ export interface WikiLink extends Span {
   alias?: string | undefined
 }
 
+/** Metadata carried by a Markdown link resolved through a CommonMark definition. */
+export interface MarkdownLinkReference {
+  /** Normalized definition label. */
+  key: string
+  /** A later definition repeats this key; automated writes must fail closed. */
+  duplicate: boolean
+}
+
 /** A standard markdown link or autolink `[text](href)`. */
 export interface MarkdownLink extends Span {
   href: string
   text: string
+  /** Source range of the destination itself, excluding optional `<…>` brackets. */
+  destination: Span
+  /** Present when this occurrence resolves through a CommonMark definition. */
+  reference?: MarkdownLinkReference | undefined
   /** Host for external `http(s)` links, else undefined. */
   domain?: string | undefined
 }
@@ -205,8 +217,23 @@ export interface ParsedTask extends TaskMarker {
  * 1 — Plan 03 baseline · 2 — `tasks: ParsedTask[]` (with `dueDate`) added (Plan 18) ·
  * 3 — tasks limited to round Meowdown `+ [ ]` / `+ [x]` syntax; square checklist
  * checkboxes are excluded.
- * 4 — task rows carry parent outline/list breadcrumbs. */
-export const PARSED_NOTE_VERSION = 4
+ * 4 — task rows carry parent outline/list breadcrumbs.
+ * 5 — Markdown links carry destination spans and CommonMark reference metadata.
+ * 6 — authored local attachment references preserve their syntax and source spans.
+ * 7 — image syntax is excluded from the note-link projection. */
+export const PARSED_NOTE_VERSION = 7
+
+/** An authored path that may resolve to a supported local attachment. */
+export interface AuthoredAttachmentReference extends Span {
+  /** Graph-relative note path whose directory gives Markdown references their base. */
+  sourcePath: string
+  /** Resolution semantics selected by the authored syntax. */
+  kind: 'markdown' | 'wikiEmbed'
+  /** Authored target before URL decoding or catalog resolution. */
+  rawReference: string
+  /** Source span of the target itself (a definition destination for reference links). */
+  destination: Span
+}
 
 /** The full parse of one note — the stable contract downstream plans depend on. */
 export interface ParsedNote {
@@ -224,6 +251,8 @@ export interface ParsedNote {
   /** Body `#tag` names (without the leading `#`), deduped, in document order. */
   tags: string[]
   headings: Heading[]
+  /** Local attachment candidates, including unresolved and ambiguous authored paths. */
+  attachmentReferences: AuthoredAttachmentReference[]
   assets: AssetRef[]
   /** Reflect task items in document order — the Tasks projection (Plan 18). */
   tasks: ParsedTask[]

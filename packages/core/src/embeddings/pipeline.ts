@@ -1,6 +1,7 @@
 import { readNote } from '../graph/commands'
 import { isTemplatePath } from '../graph/paths'
 import { gatherAssetDescriptionBodies } from '../indexing/asset-description-text'
+import { unambiguousManagedAttachmentPaths } from '../indexing/asset-reference-keys'
 import { db } from '../indexing/db'
 import { parseNote } from '../markdown'
 import { chunkAssetDescriptions, chunkNote } from './chunk'
@@ -46,7 +47,10 @@ export async function embedNote(options: EmbedNoteOptions): Promise<number> {
   }
 
   const parsed = parseNote({ path, source: content })
-  const assetBodies = await gatherAssetDescriptionBodies(parsed.assets.map((asset) => asset.path))
+  const assetBodies = await gatherAssetDescriptionBodies(
+    unambiguousManagedAttachmentPaths(parsed.attachmentReferences),
+    generation,
+  )
   const chunks = [
     ...(await chunkNote(path, content, parsed)),
     ...(await chunkAssetDescriptions(assetBodies, content.length + 1)),

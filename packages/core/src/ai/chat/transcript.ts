@@ -43,6 +43,8 @@ export interface ChatTurn {
   parts: AssistantPart[]
   /** The model-facing messages this turn contributed once it settled. */
   responseMessages: ModelMessage[]
+  /** Live private/uncertain-note set when this turn was sent; null fails closed. */
+  privacyFingerprint: string | null
   status: 'streaming' | 'done'
 }
 
@@ -168,10 +170,25 @@ export function userMessage(
  * unanswered question would break the role alternation some providers
  * enforce, and invite the model to answer a question the transcript shows
  * as failed.
+ *
+ * A settled turn is also omitted unless its non-null privacy fingerprint
+ * matches the current live snapshot. Stored UI history remains visible, but
+ * output produced before a note became private never returns to a provider.
  */
-export function buildHistory(turns: readonly ChatTurn[]): ModelMessage[] {
+export function buildHistory(
+  turns: readonly ChatTurn[],
+  currentPrivacyFingerprint: string | null,
+): ModelMessage[] {
+  if (currentPrivacyFingerprint === null) {
+    return []
+  }
   return turns
-    .filter((turn) => turn.responseMessages.length > 0)
+    .filter(
+      (turn) =>
+        turn.responseMessages.length > 0 &&
+        turn.privacyFingerprint !== null &&
+        turn.privacyFingerprint === currentPrivacyFingerprint,
+    )
     .flatMap((turn): ModelMessage[] => [
       userMessage(turn.userText, turn.attachments),
       ...turn.responseMessages,

@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react'
+import { useEffect, useRef, useState, type ReactElement } from 'react'
 import type { AiProvidersState } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import {
@@ -30,6 +30,16 @@ export function DescribeAssetsField(): ReactElement {
 
   const hasProvider = settings.aiProviders.length > 0
   const generation = graph?.generation ?? null
+  const liveGeneration = useRef<number | null>(generation)
+  useEffect(() => {
+    liveGeneration.current = generation
+  }, [generation])
+  useEffect(
+    () => () => {
+      liveGeneration.current = null
+    },
+    [],
+  )
 
   const runBackfill = async (): Promise<void> => {
     setConfirming(false)
@@ -42,7 +52,11 @@ export function DescribeAssetsField(): ReactElement {
     }
     setRunning(true)
     try {
-      await backfillAssetDescriptionsVisibly(generation, providers)
+      await backfillAssetDescriptionsVisibly(
+        generation,
+        providers,
+        () => liveGeneration.current !== generation,
+      )
     } finally {
       setRunning(false)
     }

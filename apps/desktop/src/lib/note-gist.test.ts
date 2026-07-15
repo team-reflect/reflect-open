@@ -1,10 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { gistBodyHash, upsertFrontmatter } from '@reflect/core'
+import { gistBodyHash, upsertFrontmatter, type NoteWriteIfUnchangedOutcome } from '@reflect/core'
 import type { NoteSession } from '@/editor/note-session'
 import { getNoteRowOverlay, resetNoteRowOverlays } from '@/hooks/note-row-overlay'
 
 const readNote = vi.hoisted(() => vi.fn<(path: string) => Promise<string>>())
-const writeNote = vi.hoisted(() => vi.fn(async () => {}))
+const writeNoteIfUnchanged = vi.hoisted(() =>
+  vi.fn<
+    (
+      path: string,
+      expected: string | null,
+      contents: string,
+      generation: number,
+    ) => Promise<NoteWriteIfUnchangedOutcome>
+  >(async () => ({ kind: 'written', modifiedMs: null })),
+)
 const getGithubToken = vi.hoisted(() => vi.fn(async (): Promise<string | null> => 'tok'))
 const createGist = vi.hoisted(() => vi.fn())
 const updateGist = vi.hoisted(() => vi.fn())
@@ -19,7 +28,7 @@ const startOperation = vi.hoisted(() =>
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   readNote,
-  writeNote,
+  writeNoteIfUnchanged,
   getGithubToken,
   createGist,
   updateGist,
@@ -40,7 +49,7 @@ const REPUBLISH_SOURCE = upsertFrontmatter(BODY, {
 
 beforeEach(() => {
   readNote.mockReset()
-  writeNote.mockClear()
+  writeNoteIfUnchanged.mockReset().mockResolvedValue({ kind: 'written', modifiedMs: null })
   getGithubToken.mockReset().mockResolvedValue('tok')
   createGist.mockReset().mockResolvedValue(PUBLISHED)
   updateGist.mockReset().mockResolvedValue(PUBLISHED)
@@ -73,7 +82,12 @@ describe('publishNoteToGist', () => {
       expect.any(Function),
     )
     const gist = { id: 'g1', url: PUBLISHED.htmlUrl, file: 'A.md', hash: gistBodyHash(BODY) }
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', upsertFrontmatter(BODY, { gist }), 3)
+    expect(writeNoteIfUnchanged).toHaveBeenCalledWith(
+      'notes/a.md',
+      BODY,
+      upsertFrontmatter(BODY, { gist }),
+      3,
+    )
   })
 
   it('republishes to the same gist, addressing the file by its previous name', async () => {
@@ -96,8 +110,8 @@ describe('publishNoteToGist', () => {
     await expect(publishNoteToGist('notes/a.md', 3)).resolves.toBe(PUBLISHED.htmlUrl)
 
     expect(createGist).toHaveBeenCalled()
-    const written = writeNote.mock.calls[0] as unknown as [string, string, number]
-    expect(written[1]).toContain('id: g1')
+    const written = writeNoteIfUnchanged.mock.calls[0]
+    expect(written?.[2]).toContain('id: g1')
   })
 
   it('routes the frontmatter write through the live session when the note is open', async () => {
@@ -108,7 +122,17 @@ describe('publishNoteToGist', () => {
     expect(commitFrontmatter).toHaveBeenCalledWith({
       gist: { id: 'g1', url: PUBLISHED.htmlUrl, file: 'A.md', hash: gistBodyHash(BODY) },
     })
-    expect(writeNote).not.toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
+  })
+
+  it('compensates a fresh gist when the live-session record save fails', async () => {
+    const { session, commitFrontmatter } = fakeSession(BODY)
+    commitFrontmatter.mockRejectedValueOnce(new Error('disk full'))
+    openSession.mockReturnValue(session)
+
+    await expect(publishNoteToGist('notes/a.md', 3)).rejects.toThrow('disk full')
+    expect(deleteGist).toHaveBeenCalledWith('tok', 'g1', expect.any(Function))
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
   })
 
   it('falls back to disk when the session cannot take the patch', async () => {
@@ -116,7 +140,7 @@ describe('publishNoteToGist', () => {
     openSession.mockReturnValue(session)
     readNote.mockResolvedValue(BODY)
     await publishNoteToGist('notes/a.md', 3)
-    expect(writeNote).toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).toHaveBeenCalled()
   })
 
   it('reads disk, not the empty buffer, when the open session is still loading', async () => {
@@ -133,7 +157,7 @@ describe('publishNoteToGist', () => {
       { name: 'A.md', content: BODY },
       expect.any(Function),
     )
-    expect(writeNote).toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).toHaveBeenCalled()
   })
 
   it('refuses to publish a private note before anything leaves the device', async () => {
@@ -175,26 +199,47 @@ describe('publishNoteToGist', () => {
 
   it('deletes a freshly created gist when recording it locally fails (no orphans)', async () => {
     readNote.mockResolvedValue(BODY)
-    writeNote.mockRejectedValueOnce(new Error('disk on fire'))
+    writeNoteIfUnchanged.mockRejectedValueOnce(new Error('disk on fire'))
     await expect(publishNoteToGist('notes/a.md', 3)).rejects.toMatchObject({
       message: 'disk on fire',
     })
     expect(deleteGist).toHaveBeenCalledWith('tok', 'g1', expect.any(Function))
   })
 
+  it('deletes a freshly created gist when the local CAS loses its race', async () => {
+    readNote.mockResolvedValue(BODY)
+    writeNoteIfUnchanged.mockResolvedValueOnce({ kind: 'changed' })
+
+    await expect(publishNoteToGist('notes/a.md', 3)).rejects.toThrow(
+      /changed or was removed/,
+    )
+    expect(deleteGist).toHaveBeenCalledWith('tok', 'g1', expect.any(Function))
+  })
+
   it('never deletes the existing gist when recording a republish fails (shared links survive)', async () => {
     readNote.mockResolvedValue(REPUBLISH_SOURCE)
     updateGist.mockResolvedValue({ id: 'g0', htmlUrl: 'https://gist.github.com/alex/g0' })
-    writeNote.mockRejectedValueOnce(new Error('disk on fire'))
+    writeNoteIfUnchanged.mockRejectedValueOnce(new Error('disk on fire'))
     await expect(publishNoteToGist('notes/a.md', 3)).rejects.toMatchObject({
       message: 'disk on fire',
     })
     expect(deleteGist).not.toHaveBeenCalled()
   })
 
+  it('never deletes the existing gist when a republish record CAS loses its race', async () => {
+    readNote.mockResolvedValue(REPUBLISH_SOURCE)
+    updateGist.mockResolvedValue({ id: 'g0', htmlUrl: 'https://gist.github.com/alex/g0' })
+    writeNoteIfUnchanged.mockResolvedValueOnce({ kind: 'changed' })
+
+    await expect(publishNoteToGist('notes/a.md', 3)).rejects.toThrow(
+      /changed or was removed/,
+    )
+    expect(deleteGist).not.toHaveBeenCalled()
+  })
+
   it('still surfaces the record failure when the compensating delete also fails', async () => {
     readNote.mockResolvedValue(BODY)
-    writeNote.mockRejectedValueOnce(new Error('disk on fire'))
+    writeNoteIfUnchanged.mockRejectedValueOnce(new Error('disk on fire'))
     deleteGist.mockRejectedValueOnce(new Error('network down'))
     await expect(publishNoteToGist('notes/a.md', 3)).rejects.toMatchObject({
       message: 'disk on fire',
@@ -208,17 +253,32 @@ describe('unpublishNoteGist', () => {
     await expect(unpublishNoteGist('notes/a.md', 3)).resolves.toBeUndefined()
 
     expect(deleteGist).toHaveBeenCalledWith('tok', 'g0', expect.any(Function))
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', BODY, 3)
+    expect(writeNoteIfUnchanged).toHaveBeenCalledWith(
+      'notes/a.md',
+      REPUBLISH_SOURCE,
+      BODY,
+      3,
+    )
   })
 
   it('does not delete the remote gist when clearing local frontmatter fails', async () => {
     readNote.mockResolvedValue(REPUBLISH_SOURCE)
-    writeNote.mockRejectedValueOnce(new Error('disk on fire'))
+    writeNoteIfUnchanged.mockRejectedValueOnce(new Error('disk on fire'))
 
     await expect(unpublishNoteGist('notes/a.md', 3)).rejects.toMatchObject({
       message: 'disk on fire',
     })
 
+    expect(deleteGist).not.toHaveBeenCalled()
+  })
+
+  it('does not delete the remote gist when the local clear CAS loses its race', async () => {
+    readNote.mockResolvedValue(REPUBLISH_SOURCE)
+    writeNoteIfUnchanged.mockResolvedValueOnce({ kind: 'changed' })
+
+    await expect(unpublishNoteGist('notes/a.md', 3)).rejects.toThrow(
+      /changed or was removed/,
+    )
     expect(deleteGist).not.toHaveBeenCalled()
   })
 
@@ -233,8 +293,20 @@ describe('unpublishNoteGist', () => {
       message: 'network down',
     })
 
-    expect(writeNote).toHaveBeenNthCalledWith(1, 'notes/a.md', BODY, 3)
-    expect(writeNote).toHaveBeenNthCalledWith(2, 'notes/a.md', REPUBLISH_SOURCE, 3)
+    expect(writeNoteIfUnchanged).toHaveBeenNthCalledWith(
+      1,
+      'notes/a.md',
+      REPUBLISH_SOURCE,
+      BODY,
+      3,
+    )
+    expect(writeNoteIfUnchanged).toHaveBeenNthCalledWith(
+      2,
+      'notes/a.md',
+      BODY,
+      REPUBLISH_SOURCE,
+      3,
+    )
   })
 
   it('routes the gist removal through the live session when the note is open', async () => {
@@ -244,7 +316,17 @@ describe('unpublishNoteGist', () => {
     await unpublishNoteGist('notes/a.md', 3)
 
     expect(commitFrontmatter).toHaveBeenCalledWith({ gist: false })
-    expect(writeNote).not.toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
+  })
+
+  it('does not delete the remote gist when the live-session clear save fails', async () => {
+    const { session, commitFrontmatter } = fakeSession(REPUBLISH_SOURCE)
+    commitFrontmatter.mockRejectedValueOnce(new Error('disk full'))
+    openSession.mockReturnValue(session)
+
+    await expect(unpublishNoteGist('notes/a.md', 3)).rejects.toThrow('disk full')
+    expect(deleteGist).not.toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
   })
 
   it('is a no-op when the note has no gist block', async () => {
@@ -253,7 +335,7 @@ describe('unpublishNoteGist', () => {
     await unpublishNoteGist('notes/a.md', 3)
 
     expect(deleteGist).not.toHaveBeenCalled()
-    expect(writeNote).not.toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
   })
 
   it('asks for a GitHub connection before deleting the gist', async () => {

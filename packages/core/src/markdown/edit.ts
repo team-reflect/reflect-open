@@ -6,6 +6,7 @@ import { foldKey } from './keys'
 import { normalizeWikiTarget } from './resolve'
 import { scanInlineWikiLinks } from './scan'
 import { parseTaskMarker } from './task-marker'
+import { renamedBareWikiTarget } from './wiki-link-rewrite'
 import type { Heading, TaskMarker, WikiLink } from './model'
 
 /**
@@ -290,9 +291,9 @@ function applySplices(source: string, splices: Splice[]): string {
 }
 
 /**
- * Rewrite the target of every `[[from]]` / `[[from|alias]]` to `to`
- * (case-insensitive match on the trimmed target), preserving each alias and all
- * surrounding text. Used by the rename-rewrite flow.
+ * Rewrite every bare-title spelling of `from` to `to`, preserving an optional
+ * `.md`, heading fragment, alias, and all surrounding text. Path-qualified
+ * targets are deliberately excluded: note moves rewrite those by exact path.
  */
 export function renameWikiLink(source: string, from: string, to: string): string {
   // `[[…]]` has no escaping, so a target can't contain the bracket/pipe/newline
@@ -300,15 +301,26 @@ export function renameWikiLink(source: string, from: string, to: string): string
   if (/[[\]|\r\n]/.test(to)) {
     throw new Error(`invalid wiki-link target (cannot contain [ ] | or a newline): ${to}`)
   }
-  const fromKey = from.trim().toLowerCase()
+  const fromKey = foldKey(from)
   const { wikiLinks } = parseNote({ path: '', source })
   const splices = wikiLinks
-    .filter((link) => link.target.toLowerCase() === fromKey)
-    .map<Splice>((link) => ({
-      from: link.from,
-      to: link.to,
-      text: link.alias ? `[[${to}|${link.alias}]]` : `[[${to}]]`,
-    }))
+    .map((link): Splice | null => {
+      const target = renamedBareWikiTarget(link.target, fromKey, to)
+      if (target === null) {
+        return null
+      }
+      const authored = source.slice(link.from + 2, link.to - 2)
+      const pipe = authored.indexOf('|')
+      const hash = authored.slice(0, pipe === -1 ? authored.length : pipe).indexOf('#')
+      const fragment = hash === -1 ? '' : authored.slice(hash, pipe === -1 ? authored.length : pipe)
+      const alias = pipe === -1 ? '' : authored.slice(pipe)
+      return {
+        from: link.from,
+        to: link.to,
+        text: `[[${target}${fragment}${alias}]]`,
+      }
+    })
+    .filter((splice): splice is Splice => splice !== null)
   return applySplices(source, splices)
 }
 

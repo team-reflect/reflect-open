@@ -1,4 +1,7 @@
-import { z } from 'zod'
+import {
+  noteWindowNavigationSchema,
+  type NoteWindowNavigation,
+} from '../graph/schemas'
 import { getBridge, type Unlisten } from '../ipc/bridge'
 
 /**
@@ -9,14 +12,16 @@ import { getBridge, type Unlisten } from '../ipc/bridge'
 /**
  * Delivered to an existing note window when its target is ⌘-clicked again:
  * the window may have navigated elsewhere, so the shell focuses it AND sends
- * the original deep link to re-navigate it to the clicked note.
+ * the route/reveal intent to re-navigate it to the clicked note.
  */
 export const WINDOW_NAVIGATE_EVENT = 'window:navigate'
 
-/** Subscribe to shell-directed navigation requests (`reflect://` links). */
-export function subscribeWindowNavigate(handler: (url: string) => void): Promise<Unlisten> {
+/** Subscribe to shell-directed route/reveal requests. */
+export function subscribeWindowNavigate(
+  handler: (navigation: NoteWindowNavigation) => void,
+): Promise<Unlisten> {
   return getBridge().listen(WINDOW_NAVIGATE_EVENT, (payload) => {
-    const parsed = z.string().safeParse(payload)
+    const parsed = noteWindowNavigationSchema.safeParse(payload)
     if (parsed.success) {
       handler(parsed.data)
     } else {

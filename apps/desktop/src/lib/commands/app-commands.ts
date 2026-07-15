@@ -5,17 +5,17 @@ import {
   hasBridge,
   randomNotePath,
   toggleDevtools,
-  untitledNotePath,
 } from '@reflect/core'
 import { attachFilesToNote } from '@/lib/attach-files'
 import { runCopyDeepLink } from '@/lib/note-deep-link'
 import { runGistPublish } from '@/lib/note-gist'
 import { toggleNotePinned } from '@/lib/note-pin'
 import { toggleNotePrivate } from '@/lib/note-private'
+import { newNoteRoute } from '@/lib/new-note-route'
 import { startOperation } from '@/lib/operations'
 import { rebuildIndexVisibly } from '@/lib/rebuild-index'
 import { openRouteInNewWindow } from '@/lib/windows/open-in-new-window'
-import { routeForPath, type Route } from '@/routing/route'
+import { routeForPath } from '@/routing/route'
 import { registerCommands } from './registry'
 import type { AppCommand, CommandContext } from './types'
 
@@ -26,15 +26,6 @@ import type { AppCommand, CommandContext } from './types'
  */
 
 /**
- * A fresh note route; the file itself is created lazily on the first keystroke
- * (the same contract as daily notes). Shared by ⌘N and the All Notes screen's
- * New note button so "what a new note is" stays one definition.
- */
-export function newNoteRoute(): Route {
-  return { kind: 'note', path: untitledNotePath() }
-}
-
-/**
  * ⌘N from the daily stream leaves its saved scroll offsets behind as stale
  * state: the fresh note is where attention moves, so a later return to the
  * stream — ⌘[ back or the Daily nav tab — should re-anchor to its target, not
@@ -42,11 +33,15 @@ export function newNoteRoute(): Route {
  * stream re-anchors around note creation.
  */
 function openNewNote(context: CommandContext): void {
+  const graph = context.graph()
+  if (graph === null) {
+    return
+  }
   const route = context.route()
   if (route.kind === 'today' || route.kind === 'daily') {
     context.clearScrollState()
   }
-  context.navigate(newNoteRoute())
+  context.navigate(newNoteRoute(graph))
 }
 
 const GRAPH_SWITCH_COMMANDS: AppCommand[] = Array.from({ length: 9 }, (_, index) => {
@@ -386,3 +381,4 @@ export function registerAppCommands(): void {
 }
 
 export { APP_COMMANDS }
+export { newNoteRoute }

@@ -16,6 +16,8 @@ function note(
     path: `notes/${title.toLowerCase().replaceAll(' ', '-')}.md`,
     title,
     titleKey: title.toLowerCase(),
+    authoredTitleKey: title.toLowerCase(),
+    basenameKey: title.toLowerCase().replaceAll(' ', '-'),
     dailyDate: null,
     mtime,
     ...extra,
@@ -42,6 +44,48 @@ describe('rankWikiSuggestions', () => {
     const result = rankWikiSuggestions('meetco', [note('Meetco', 1)], [viaAlias], 8)
     expect(result.map((s) => s.title)).toEqual(['Meetco', 'Acme Corp'])
     expect(result[1]!.alias).toBe('meetco')
+  })
+
+  it('matches an authored note by its filename stem and inserts that bare stem', () => {
+    const result = rankWikiSuggestions(
+      'plan',
+      [
+        note('Quarterly roadmap', 1, {
+          path: 'Projects/Plan.md',
+          basenameKey: 'plan',
+        }),
+      ],
+      [],
+      8,
+    )
+
+    expect(result).toEqual([
+      {
+        target: 'Plan',
+        path: 'Projects/Plan.md',
+        title: 'Quarterly roadmap',
+        alias: null,
+        date: null,
+      },
+    ])
+  })
+
+  it('uses resolver precedence when equal matches come from different key tiers', () => {
+    const basenameMatch = note('Quarterly roadmap', 2, {
+      path: 'Projects/Plan.md',
+      basenameKey: 'plan',
+    })
+    const titleMatch = note('Plan', 1, {
+      path: 'notes/title-owner.md',
+      basenameKey: 'title-owner',
+    })
+
+    const result = rankWikiSuggestions('plan', [basenameMatch, titleMatch], [], 8)
+
+    expect(result.map((suggestion) => suggestion.path)).toEqual([
+      'notes/title-owner.md',
+      'Projects/Plan.md',
+    ])
   })
 
   it('ties break on recency, then title', () => {

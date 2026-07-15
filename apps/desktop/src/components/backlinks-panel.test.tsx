@@ -16,13 +16,15 @@ const { getBacklinksWithContext, getBacklinksPage } = vi.hoisted(() => {
   })
   return { getBacklinksWithContext, getBacklinksPage }
 })
-const resolveOrCreateNoteWithTitle = vi.hoisted(() => vi.fn())
+const resolveOrCreateWikiTarget = vi.hoisted(() => vi.fn())
+const resolveExistingMarkdownTarget = vi.hoisted(() => vi.fn())
 const openRouteInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
   getBacklinksWithContext: getBacklinksPage,
-  resolveOrCreateNoteWithTitle,
+  resolveOrCreateWikiTarget,
+  resolveExistingMarkdownTarget,
 }))
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 1 } }),
@@ -57,7 +59,8 @@ beforeEach(() => {
   window.sessionStorage.clear()
   getBacklinksWithContext.mockReset()
   getBacklinksPage.mockClear()
-  resolveOrCreateNoteWithTitle.mockReset()
+  resolveOrCreateWikiTarget.mockReset()
+  resolveExistingMarkdownTarget.mockReset()
   openRouteInNewWindow.mockReset().mockResolvedValue(true)
 })
 
@@ -103,7 +106,7 @@ describe('BacklinksPanel', () => {
         tasks: [],
       },
     ])
-    resolveOrCreateNoteWithTitle.mockResolvedValue({
+    resolveOrCreateWikiTarget.mockResolvedValue({
       kind: 'resolved',
       path: 'notes/roadmap.md',
     })
@@ -117,6 +120,47 @@ describe('BacklinksPanel', () => {
     await userEvent.click(chip)
     await waitFor(() =>
       expect(view.getByTestId('route').textContent).toContain('notes/roadmap.md'),
+    )
+    expect(resolveOrCreateWikiTarget).toHaveBeenCalledWith(
+      'Roadmap',
+      'notes/meeting.md',
+      1,
+    )
+    view.unmount()
+  })
+
+  it('resolves a relative Markdown link from the backlink source note', async () => {
+    getBacklinksWithContext.mockResolvedValue([
+      {
+        sourcePath: 'Projects/Meetings/Review.md',
+        sourceTitle: 'Review',
+        snippet: '[Plan](../Plan.md#Scope)',
+        posFrom: 12,
+        tasks: [],
+      },
+    ])
+    resolveExistingMarkdownTarget.mockResolvedValue({
+      kind: 'resolved',
+      path: 'Projects/Plan.md',
+    })
+    const view = renderPanel('notes/source.md')
+
+    await view.findByText('Plan')
+    const markdownLink = view.container.querySelector<HTMLAnchorElement>(
+      'a[href="../Plan.md#Scope"]',
+    )
+    if (markdownLink === null) {
+      throw new Error('expected the relative Markdown link to render')
+    }
+    await userEvent.click(markdownLink)
+
+    await waitFor(() =>
+      expect(view.getByTestId('route').textContent).toContain('Projects/Plan.md'),
+    )
+    expect(resolveExistingMarkdownTarget).toHaveBeenCalledWith(
+      '../Plan.md#Scope',
+      'Projects/Meetings/Review.md',
+      1,
     )
     view.unmount()
   })

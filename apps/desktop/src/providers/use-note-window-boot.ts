@@ -6,8 +6,10 @@ import {
   subscribeWindowNavigate,
   windowBootstrap,
   type AppPlatform,
+  type NoteWindowNavigation,
   type WindowBootstrap,
 } from '@reflect/core'
+import { requestNoteHeadingReveal } from '@/editor/editor-handle-registry'
 import { dispatchDeepLink } from '@/lib/deep-links/intake'
 import { throttledInvalidateIndexQueries } from '@/lib/query-client'
 import { trackSubscriptions } from '@/lib/subscriptions'
@@ -24,6 +26,20 @@ export interface NoteWindowBootOptions {
   onAdopted: (boot: WindowBootstrap) => void
   /** Park the window on the error screen (never the chooser). */
   onFailed: (message: string) => void
+}
+
+function deliverWindowNavigation(
+  navigation: NoteWindowNavigation,
+  generation: number,
+): void {
+  if (navigation.headingReveal !== null) {
+    requestNoteHeadingReveal(
+      navigation.headingReveal.path,
+      navigation.headingReveal.fragment,
+      generation,
+    )
+  }
+  dispatchDeepLink(navigation.deepLink)
 }
 
 /**
@@ -56,18 +72,26 @@ export function useNoteWindowBoot({ platform, onAdopted, onFailed }: NoteWindowB
         // act on it even if this effect was superseded (StrictMode's probe
         // mount) — the route slot and the intake both outlive the effect,
         // serving whichever mount survives.
-        const seeded = initialRouteForDeepLink(boot.initialDeepLink)
+        const seeded = initialRouteForDeepLink(boot.initialNavigation?.deepLink ?? null)
         if (seeded !== null) {
+          const reveal = boot.initialNavigation?.headingReveal ?? null
+          if (reveal !== null) {
+            requestNoteHeadingReveal(reveal.path, reveal.fragment, boot.graph.generation)
+          }
           setInitialWindowRoute(seeded)
-        } else if (boot.initialDeepLink !== null) {
-          dispatchDeepLink(boot.initialDeepLink)
+        } else if (boot.initialNavigation !== null) {
+          deliverWindowNavigation(boot.initialNavigation, boot.graph.generation)
         }
         await subscriptions.add(subscribeIndexWritten(throttledInvalidateIndexQueries))
         // (Rename follow-through lives in desktop-root — every window needs
         // it, not just this one.)
         // Re-⌘-clicking this window's target focuses it AND re-navigates it
         // there (it may have navigated elsewhere since it opened).
-        await subscriptions.add(subscribeWindowNavigate(dispatchDeepLink))
+        await subscriptions.add(
+          subscribeWindowNavigate((navigation) =>
+            deliverWindowNavigation(navigation, boot.graph.generation),
+          ),
+        )
         if (!active) {
           return
         }

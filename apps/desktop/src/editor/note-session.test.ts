@@ -29,13 +29,22 @@ interface Harness {
 }
 
 function harness(options?: {
+  path?: string
   write?: false
   classify?: (markdown: string) => RoundTripFidelity
   /** `null` simulates a missing file: reads throw the notFound AppError. */
   disk?: string | null
   createIfMissing?: boolean
+  recreateAfterRemoval?: boolean
   missingSeed?: string
   reconcilePendingEditorInput?: () => void
+  readOverride?: (contents: string | null) => Promise<string | null>
+  beforeWrite?: (
+    path: string,
+    contents: string,
+    expected: string | null,
+  ) => Promise<void>
+  afterWrite?: () => Promise<void>
 }): Harness {
   const snapshots: NoteSessionSnapshot[] = []
   const writes: Array<{ path: string; contents: string }> = []
@@ -44,23 +53,32 @@ function harness(options?: {
   let disk = options?.disk === undefined ? '# Hello\n' : options.disk
   let writeFailure: string | null = null
   const session = createNoteSession({
-    path: 'notes/a.md',
+    path: options?.path ?? 'notes/a.md',
     io: {
       read: async () => {
-        if (disk === null) {
+        const contents = options?.readOverride === undefined
+          ? disk
+          : await options.readOverride(disk)
+        if (contents === null) {
           throw { kind: 'notFound', message: 'missing' } // AppError shape
         }
-        return disk
+        return contents
       },
       write:
         options?.write === false
           ? null
-          : async (path, contents) => {
+          : async (path, contents, expected) => {
+              await options?.beforeWrite?.(path, contents, expected)
               if (writeFailure !== null) {
                 throw new Error(writeFailure)
               }
+              if (disk !== expected) {
+                return false
+              }
               writes.push({ path, contents })
               disk = contents
+              await options?.afterWrite?.()
+              return true
             },
     },
     classify: options?.classify ?? (() => 'exact'),
@@ -75,6 +93,7 @@ function harness(options?: {
       contents.push({ content, origin })
     },
     createIfMissing: options?.createIfMissing,
+    recreateAfterRemoval: options?.recreateAfterRemoval,
     missingSeed: options?.missingSeed,
     saveDebounceMs: 10,
   })
@@ -375,6 +394,58 @@ describe('frontmatter ownership (Plan 07b)', () => {
     expect(h.snapshots.at(-1)?.dirty).toBe(false)
   })
 
+  it('commitFrontmatter rolls back and rejects when its exact save fails', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const h = harness({ disk: '# Hello\n' })
+    h.session.load()
+    await vi.runAllTimersAsync()
+    h.failWrites('disk full')
+
+    await expect(h.session.commitFrontmatter({ pinned: true })).rejects.toThrow('disk full')
+    expect(h.session.content()).toBe('# Hello\n')
+    expect(h.snapshots.at(-1)?.dirty).toBe(false)
+    expect(h.writes).toEqual([])
+    consoleError.mockRestore()
+  })
+
+  it('commitFrontmatter accepts CAS convergence to the patched live document', async () => {
+    let h: Harness
+    h = harness({
+      disk: '# Hello\n',
+      beforeWrite: async (_path, contents) => {
+        h.setDisk(contents)
+      },
+    })
+    h.session.load()
+    await vi.runAllTimersAsync()
+
+    await expect(h.session.commitFrontmatter({ pinned: true })).resolves.toBe(true)
+    expect(h.session.content()).toBe('---\npinned: true\n---\n# Hello\n')
+    expect(h.snapshots.at(-1)?.conflict).toBeNull()
+    expect(h.snapshots.at(-1)?.dirty).toBe(false)
+    expect(h.writes).toEqual([])
+  })
+
+  it('commitFrontmatter rolls back when its CAS reread is divergent', async () => {
+    let h: Harness
+    h = harness({
+      disk: '# Hello\n',
+      beforeWrite: async () => {
+        h.setDisk('# External\n')
+      },
+    })
+    h.session.load()
+    await vi.runAllTimersAsync()
+
+    await expect(h.session.commitFrontmatter({ pinned: true })).rejects.toThrow(
+      /frontmatter update could not be saved/,
+    )
+    expect(h.session.content()).toBe('# Hello\n')
+    expect(h.snapshots.at(-1)?.conflict).toBe('# External\n')
+    expect(h.snapshots.at(-1)?.dirty).toBe(true)
+    expect(h.writes).toEqual([])
+  })
+
   it('commitFrontmatter declines when the session has no write channel', async () => {
     // No graph generation → no `io.write`. The patch can't land, so report
     // false rather than the in-memory success that would let publish/pin/private
@@ -419,6 +490,153 @@ describe('frontmatter ownership (Plan 07b)', () => {
     h.session.keepMine()
     await vi.runAllTimersAsync()
     expect(h.writes.at(-1)?.contents).toBe('---\npinned: true\n---\n# Mine\n')
+  })
+
+  it('commitFrontmatter clears a conflict when CAS rereads the patched live document', async () => {
+    let h: Harness
+    h = harness({
+      beforeWrite: async () => {
+        h.setDisk('---\npinned: true\n---\n# Mine\n')
+      },
+    })
+    h.session.load()
+    await vi.runAllTimersAsync()
+    h.session.editorChanged('# Mine\n')
+    h.setDisk('# Theirs\n')
+    h.session.externalChanged()
+    await vi.runAllTimersAsync()
+    expect(h.snapshots.at(-1)?.conflict).toBe('# Theirs\n')
+
+    await expect(h.session.commitFrontmatter({ pinned: true })).resolves.toBe(true)
+    expect(h.session.content()).toBe('---\npinned: true\n---\n# Mine\n')
+    expect(h.snapshots.at(-1)?.conflict).toBeNull()
+    expect(h.snapshots.at(-1)?.dirty).toBe(false)
+    expect(h.writes).toEqual([])
+  })
+
+  it('commitFrontmatter preserves and acknowledges a newer patched watcher upsert', async () => {
+    const newer = '---\npinned: true\n---\n# Newer\n'
+    let h: Harness
+    h = harness({
+      afterWrite: async () => {
+        h.setDisk(newer)
+        h.session.externalChanged()
+        await Promise.resolve()
+      },
+    })
+    h.session.load()
+    await vi.runAllTimersAsync()
+    h.session.editorChanged('# Mine\n')
+    h.setDisk('# Theirs\n')
+    h.session.externalChanged()
+    await vi.runAllTimersAsync()
+
+    await expect(h.session.commitFrontmatter({ pinned: true })).resolves.toBe(true)
+    expect(h.snapshots.at(-1)?.conflict).toBe(newer)
+    expect(h.snapshots.at(-1)?.dirty).toBe(true)
+    h.session.loadTheirs()
+    expect(h.session.content()).toBe(newer)
+  })
+
+  it('a stale watcher read cannot overwrite the later privacy CAS reconciliation', async () => {
+    const newer = '---\nprivate: true\n---\n# Newer\n'
+    let deferWatcherRead = false
+    let markWatcherReadStarted: () => void = () => {}
+    const watcherReadStarted = new Promise<void>((resolve) => {
+      markWatcherReadStarted = resolve
+    })
+    let releaseWatcherRead: () => void = () => {}
+    const watcherReadGate = new Promise<void>((resolve) => {
+      releaseWatcherRead = resolve
+    })
+    let markWatcherReadReturned: () => void = () => {}
+    const watcherReadReturned = new Promise<void>((resolve) => {
+      markWatcherReadReturned = resolve
+    })
+    let h: Harness
+    h = harness({
+      readOverride: async (contents) => {
+        if (!deferWatcherRead) {
+          return contents
+        }
+        deferWatcherRead = false
+        markWatcherReadStarted()
+        await watcherReadGate
+        markWatcherReadReturned()
+        return contents
+      },
+      afterWrite: async () => {
+        deferWatcherRead = true
+        h.session.externalChanged()
+        await watcherReadStarted
+        h.setDisk(newer)
+      },
+    })
+    h.session.load()
+    await vi.runAllTimersAsync()
+    h.session.editorChanged('# Mine\n')
+    h.setDisk('# Theirs\n')
+    h.session.externalChanged()
+    await vi.runAllTimersAsync()
+
+    await expect(h.session.commitFrontmatter({ private: true })).resolves.toBe(true)
+    expect(h.snapshots.at(-1)?.conflict).toBe(newer)
+
+    releaseWatcherRead()
+    await watcherReadReturned
+    await vi.advanceTimersByTimeAsync(0)
+    expect(h.snapshots.at(-1)?.conflict).toBe(newer)
+    h.session.loadTheirs()
+    expect(h.session.content()).toBe(newer)
+  })
+
+  it('commitFrontmatter does not overwrite or acknowledge a newer unpatched watcher upsert', async () => {
+    const newer = '# Newer\n'
+    let h: Harness
+    h = harness({
+      afterWrite: async () => {
+        h.setDisk(newer)
+        h.session.externalChanged()
+        await Promise.resolve()
+      },
+    })
+    h.session.load()
+    await vi.runAllTimersAsync()
+    h.session.editorChanged('# Mine\n')
+    h.setDisk('# Theirs\n')
+    h.session.externalChanged()
+    await vi.runAllTimersAsync()
+
+    await expect(h.session.commitFrontmatter({ pinned: true })).rejects.toThrow(
+      /changed again/,
+    )
+    expect(h.session.content()).toBe('# Mine\n')
+    expect(h.snapshots.at(-1)?.conflict).toBe(newer)
+    expect(h.snapshots.at(-1)?.dirty).toBe(true)
+  })
+
+  it('commitFrontmatter preserves a watcher removal and does not acknowledge persistence', async () => {
+    let h: Harness
+    h = harness({
+      afterWrite: async () => {
+        h.setDisk(null)
+        h.session.externalRemoved()
+      },
+    })
+    h.session.load()
+    await vi.runAllTimersAsync()
+    h.session.editorChanged('# Mine\n')
+    h.setDisk('# Theirs\n')
+    h.session.externalChanged()
+    await vi.runAllTimersAsync()
+
+    await expect(h.session.commitFrontmatter({ pinned: true })).rejects.toThrow(
+      /changed again/,
+    )
+    expect(h.session.content()).toBe('# Mine\n')
+    expect(h.snapshots.at(-1)?.missing).toBe(true)
+    expect(h.snapshots.at(-1)?.saveBlockedByRemoval).toBe(true)
+    expect(h.snapshots.at(-1)?.conflict).toBeNull()
   })
 
   it('onContent reports full joined content with the right origins', async () => {
@@ -568,42 +786,254 @@ describe('missing-note seed (new ordinary notes)', () => {
     expect(h.writes).toEqual([])
   })
 
-  it('an external delete reconciles to a no-op: the buffer survives, edits still save', async () => {
-    // createIfMissing applies only to the initial load; a deletion mid-session
-    // must not error the session or empty the editor — the buffer is the user's.
+  it('parks an adopted note after external removal without dropping its buffer', async () => {
     const h = harness({ disk: '# Hello\n' })
     h.session.load()
     await settled()
 
     h.setDisk(null) // deleted out from under us
-    h.session.externalChanged()
+    h.session.externalRemoved()
     await settled()
 
     const after = h.snapshots.at(-1)
     expect(after?.status).toBe('ready')
     expect(after?.error).toBeNull()
+    expect(after?.missing).toBe(true)
     expect(h.applied).toEqual([]) // nothing pushed into the editor
 
-    // The next edit recreates the file through the normal save path.
+    // The buffer remains editable and dirty, but debounce, explicit flush, and
+    // teardown all stay parked rather than recreating an adopted path.
     h.session.editorChanged('# Hello again\n')
     await settled()
-    expect(h.writes).toEqual([{ path: 'notes/a.md', contents: '# Hello again\n' }])
+    expect(h.session.content()).toBe('# Hello again\n')
+    expect(h.snapshots.at(-1)?.dirty).toBe(true)
+    expect(h.writes).toEqual([])
+
+    await h.session.flush()
+    expect(h.session.updateFrontmatter({ pinned: true })).toBe(false)
+    await expect(h.session.commitFrontmatter({ pinned: true })).rejects.toThrow(
+      /removed from disk/,
+    )
+    await expect(h.session.commitBodyAppend('Blocked append')).resolves.toBe(false)
+    h.session.dispose()
+    await settled()
+    expect(h.writes).toEqual([])
   })
 
-  it('a delete racing unsaved edits neither conflicts nor drops them', async () => {
+  it('an external removal cancels an adopted note’s pending debounce', async () => {
     const h = harness({ disk: '# Hello\n' })
     h.session.load()
     await settled()
 
     h.session.editorChanged('# Unsaved\n')
     h.setDisk(null)
-    h.session.externalChanged() // read fails: nothing to park a conflict against
+    h.session.externalRemoved()
     await settled()
 
     const after = h.snapshots.at(-1)
     expect(after?.conflict).toBeNull()
-    expect(after?.dirty).toBe(false) // the debounced save already landed…
-    expect(h.writes.at(-1)).toEqual({ path: 'notes/a.md', contents: '# Unsaved\n' }) // …recreating the file
+    expect(after?.dirty).toBe(true)
+    expect(after?.missing).toBe(true)
+    expect(h.session.content()).toBe('# Unsaved\n')
+    expect(h.writes).toEqual([])
+  })
+
+  it('a daily note may recreate after external removal', async () => {
+    const path = 'daily/2026-07-14.md'
+    const h = harness({
+      path,
+      disk: '# Hello\n',
+      createIfMissing: true,
+      recreateAfterRemoval: true,
+    })
+    h.session.load()
+    await settled()
+
+    h.setDisk(null)
+    h.session.externalRemoved()
+    h.session.editorChanged('# Hello again\n')
+    await settled()
+
+    expect(h.writes).toEqual([{ path, contents: '# Hello again\n' }])
+    expect(h.snapshots.at(-1)?.missing).toBe(false)
+    expect(h.snapshots.at(-1)?.dirty).toBe(false)
+  })
+
+  it('an existing ULID route does not inherit recreation from lazy-open policy', async () => {
+    const path = 'notes/01arz3ndektsv4rrffq69g5fav.md'
+    const h = harness({ path, disk: '# Existing\n', createIfMissing: true })
+    h.session.load()
+    await settled()
+
+    h.setDisk(null)
+    h.session.externalRemoved()
+    h.session.editorChanged('# Must stay buffered\n')
+    await settled()
+
+    expect(h.writes).toEqual([])
+    expect(h.snapshots.at(-1)?.missing).toBe(true)
+    expect(h.snapshots.at(-1)?.dirty).toBe(true)
+  })
+
+  it('a fresh missing ULID may create once but not recreate after removal', async () => {
+    const path = 'notes/01arz3ndektsv4rrffq69g5fav.md'
+    const h = harness({ path, disk: null, createIfMissing: true })
+    h.session.load()
+    await settled()
+
+    h.session.editorChanged('# First save\n')
+    await settled()
+    expect(h.writes).toEqual([{ path, contents: '# First save\n' }])
+
+    h.setDisk(null)
+    h.session.externalRemoved()
+    h.session.editorChanged('# Do not recreate\n')
+    await settled()
+    expect(h.writes).toEqual([{ path, contents: '# First save\n' }])
+    expect(h.snapshots.at(-1)?.dirty).toBe(true)
+  })
+
+  it('does not retry an absent fresh path after a create landed but its response failed', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const path = 'notes/01arz3ndektsv4rrffq69g5fav.md'
+    const h = harness({
+      path,
+      disk: null,
+      createIfMissing: true,
+      afterWrite: async () => {
+        throw new Error('response lost')
+      },
+    })
+    h.session.load()
+    await settled()
+
+    h.session.editorChanged('# First dispatch\n')
+    await settled()
+    expect(h.writes).toEqual([{ path, contents: '# First dispatch\n' }])
+    expect(h.snapshots.at(-1)?.saveBlockedByRemoval).toBe(true)
+
+    // A watcher echo proves the ambiguous command landed. Identical bytes are
+    // an acknowledgement, not a second version requiring conflict UI.
+    h.session.externalChanged()
+    await settled()
+    expect(h.snapshots.at(-1)?.conflict).toBeNull()
+    expect(h.snapshots.at(-1)?.dirty).toBe(false)
+    expect(h.snapshots.at(-1)?.saveBlockedByRemoval).toBe(false)
+    expect(h.snapshots.at(-1)?.error).toBeNull()
+
+    // The command may really have landed before transport failed. If that file
+    // is then removed, another edit/flush must not treat the route as fresh.
+    h.setDisk(null)
+    h.session.editorChanged('# Must remain buffered\n')
+    await h.session.flush()
+    await settled()
+
+    expect(h.writes).toEqual([{ path, contents: '# First dispatch\n' }])
+    expect(h.snapshots.at(-1)?.saveBlockedByRemoval).toBe(true)
+    consoleError.mockRestore()
+  })
+
+  it('parks a fresh route removed after its first create lands but before the response', async () => {
+    const responseGate: { release: (() => void) | null } = { release: null }
+    let writeLanded: (() => void) | null = null
+    const landed = new Promise<void>((resolve) => {
+      writeLanded = resolve
+    })
+    const path = 'notes/01arz3ndektsv4rrffq69g5fav.md'
+    const h = harness({
+      path,
+      disk: null,
+      createIfMissing: true,
+      afterWrite: () =>
+        new Promise<void>((resolve) => {
+          responseGate.release = resolve
+          writeLanded?.()
+        }),
+    })
+    h.session.load()
+    await settled()
+
+    h.session.editorChanged('# First save\n')
+    const flush = h.session.flush()
+    await landed
+    h.setDisk(null)
+    h.session.externalRemoved()
+    responseGate.release?.()
+    await flush
+
+    expect(h.snapshots.at(-1)?.missing).toBe(true)
+    expect(h.snapshots.at(-1)?.dirty).toBe(true)
+    expect(h.writes).toEqual([{ path, contents: '# First save\n' }])
+
+    h.session.editorChanged('# Must remain buffered\n')
+    await settled()
+    expect(h.writes).toEqual([{ path, contents: '# First save\n' }])
+  })
+
+  it('retargeting revokes an unclaimed fresh-path creation capability', async () => {
+    const h = harness({
+      path: 'notes/01arz3ndektsv4rrffq69g5fav.md',
+      disk: null,
+      createIfMissing: true,
+    })
+    h.session.load()
+    await settled()
+
+    h.session.retarget('notes/retargeted.md')
+    h.session.editorChanged('# Must not appear at the new path\n')
+    await settled()
+
+    expect(h.writes).toEqual([])
+    expect(h.snapshots.at(-1)?.dirty).toBe(true)
+  })
+
+  it('does not recreate an adopted note deleted after its save was dispatched', async () => {
+    const writeGate: { release: (() => void) | null } = { release: null }
+    let writeStarted: (() => void) | null = null
+    const started = new Promise<void>((resolve) => {
+      writeStarted = resolve
+    })
+    const h = harness({
+      disk: '# Existing\n',
+      beforeWrite: () =>
+        new Promise<void>((resolve) => {
+          writeGate.release = resolve
+          writeStarted?.()
+        }),
+    })
+    h.session.load()
+    await settled()
+
+    h.session.editorChanged('# Edited\n')
+    const flush = h.session.flush()
+    await started
+    h.setDisk(null)
+    writeGate.release?.()
+    await flush
+
+    expect(h.writes).toEqual([])
+    expect(h.snapshots.at(-1)?.missing).toBe(true)
+    expect(h.snapshots.at(-1)?.dirty).toBe(true)
+  })
+
+  it('unparks an adopted buffer only after an upsert can be read', async () => {
+    const h = harness({ disk: '# Hello\n' })
+    h.session.load()
+    await settled()
+
+    h.setDisk(null)
+    h.session.externalRemoved()
+    h.session.editorChanged('# Unsaved\n')
+    await settled()
+    expect(h.writes).toEqual([])
+
+    h.setDisk('# Hello\n')
+    h.session.externalChanged()
+    await settled()
+
+    expect(h.writes).toEqual([{ path: 'notes/a.md', contents: '# Unsaved\n' }])
+    expect(h.snapshots.at(-1)?.missing).toBe(false)
+    expect(h.snapshots.at(-1)?.dirty).toBe(false)
   })
 
   it('a failed save surfaces the error and a later save clears it', async () => {
@@ -656,6 +1086,142 @@ describe('missing-note seed (new ordinary notes)', () => {
     } finally {
       consoleError.mockRestore()
     }
+  })
+})
+
+describe('commitExactContentReplacement', () => {
+  it('updates the live editor and save state, and supports the inverse rollback', async () => {
+    const before = '---\nid: 01abc\n---\n# Source\n\n[[notes/old]]\n'
+    const after = '---\nid: 01abc\n---\n# Source\n\n[[notes/new]]\n'
+    const h = harness({ disk: before })
+    h.session.load()
+    await settled()
+
+    expect(await h.session.commitExactContentReplacement(before, after)).toBe(true)
+    expect(h.session.content()).toBe(after)
+    expect(h.applied.at(-1)).toBe('# Source\n\n[[notes/new]]\n')
+    expect(h.writes.at(-1)).toEqual({ path: 'notes/a.md', contents: after })
+    expect(h.contents.at(-1)).toEqual({ content: after, origin: 'saved' })
+    expect(h.snapshots.at(-1)?.dirty).toBe(false)
+
+    expect(await h.session.commitExactContentReplacement(after, before)).toBe(true)
+    expect(h.session.content()).toBe(before)
+    expect(h.applied.at(-1)).toBe('# Source\n\n[[notes/old]]\n')
+    expect(h.writes.at(-1)).toEqual({ path: 'notes/a.md', contents: before })
+  })
+
+  it('accepts a refused CAS when the reread is already the prepared replacement', async () => {
+    const before = '[[notes/old]]\n'
+    const after = '[[notes/new]]\n'
+    let h: Harness
+    h = harness({
+      disk: before,
+      beforeWrite: async (_path, contents) => {
+        // Another writer lands the exact prepared bytes before this session's
+        // CAS reaches its comparison. The refusal is convergence, not failure.
+        h.setDisk(contents)
+      },
+    })
+    h.session.load()
+    await settled()
+
+    await expect(h.session.commitExactContentReplacement(before, after)).resolves.toBe(true)
+    expect(h.session.content()).toBe(after)
+    expect(h.applied.at(-1)).toBe(after)
+    expect(h.snapshots.at(-1)?.dirty).toBe(false)
+    expect(h.writes).toEqual([])
+  })
+
+  it('refuses a dirty or mismatched live document without writing the rewrite', async () => {
+    const h = harness({ disk: '[[notes/old]]\n' })
+    h.session.load()
+    await settled()
+
+    h.session.editorChanged('Unsaved thought\n[[notes/old]]\n')
+    expect(
+      await h.session.commitExactContentReplacement(
+        '[[notes/old]]\n',
+        '[[notes/new]]\n',
+      ),
+    ).toBe(false)
+    expect(h.session.content()).toBe('Unsaved thought\n[[notes/old]]\n')
+    expect(h.applied).toEqual([])
+    expect(h.writes).toEqual([])
+    h.session.discard()
+  })
+
+  it('reconciles pending native input before checking the expected content', async () => {
+    let target: ReturnType<typeof createNoteSession> | null = null
+    const reconcilePendingEditorInput = vi.fn(() => {
+      target?.editorChanged('Native input\n[[notes/old]]\n')
+    })
+    const h = harness({ disk: '[[notes/old]]\n', reconcilePendingEditorInput })
+    target = h.session
+    h.session.load()
+    await settled()
+
+    expect(
+      await h.session.commitExactContentReplacement(
+        '[[notes/old]]\n',
+        '[[notes/new]]\n',
+      ),
+    ).toBe(false)
+    expect(reconcilePendingEditorInput).toHaveBeenCalledOnce()
+    expect(h.session.content()).toBe('Native input\n[[notes/old]]\n')
+    expect(h.writes).toEqual([])
+    h.session.discard()
+  })
+
+  it('refuses loading, protected, conflicted, and removed sessions', async () => {
+    const loading = harness({ disk: 'before\n' })
+    expect(await loading.session.commitExactContentReplacement('before\n', 'after\n')).toBe(
+      false,
+    )
+
+    const protectedNote = harness({ disk: 'before\n', classify: () => 'lossy' })
+    protectedNote.session.load()
+    await settled()
+    expect(
+      await protectedNote.session.commitExactContentReplacement('before\n', 'after\n'),
+    ).toBe(false)
+
+    const conflicted = harness({ disk: 'before\n' })
+    conflicted.session.load()
+    await settled()
+    conflicted.session.editorChanged('mine\n')
+    conflicted.setDisk('theirs\n')
+    conflicted.session.externalChanged()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(await conflicted.session.commitExactContentReplacement('mine\n', 'after\n')).toBe(
+      false,
+    )
+    conflicted.session.discard()
+
+    const removed = harness({ disk: 'before\n' })
+    removed.session.load()
+    await settled()
+    removed.setDisk(null)
+    removed.session.externalRemoved()
+    expect(await removed.session.commitExactContentReplacement('before\n', 'after\n')).toBe(
+      false,
+    )
+    expect(removed.writes).toEqual([])
+  })
+
+  it('restores the editor when persistence fails', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const h = harness({ disk: '[[notes/old]]\n' })
+    h.session.load()
+    await settled()
+    h.failWrites('disk full')
+
+    await expect(
+      h.session.commitExactContentReplacement('[[notes/old]]\n', '[[notes/new]]\n'),
+    ).rejects.toThrow('disk full')
+    expect(h.session.content()).toBe('[[notes/old]]\n')
+    expect(h.applied.at(-1)).toBe('[[notes/old]]\n')
+    expect(h.snapshots.at(-1)?.dirty).toBe(false)
+    consoleError.mockRestore()
   })
 })
 
@@ -726,6 +1292,54 @@ describe('retarget (Plan 17)', () => {
   })
 })
 
+describe('commitBodyAppend', () => {
+  it('accepts a queued attempt when the prior save already landed its freshest body', async () => {
+    let markFirstWriteStarted: () => void = () => {}
+    const firstWriteStarted = new Promise<void>((resolve) => {
+      markFirstWriteStarted = resolve
+    })
+    let releaseFirstWrite: () => void = () => {}
+    const firstWriteGate = new Promise<void>((resolve) => {
+      releaseFirstWrite = resolve
+    })
+    let writeCount = 0
+    const h = harness({
+      disk: '# Base\n',
+      beforeWrite: async () => {
+        writeCount += 1
+        if (writeCount === 1) {
+          markFirstWriteStarted()
+          await firstWriteGate
+        }
+      },
+    })
+    h.session.load()
+    await settled()
+
+    h.session.editorChanged('# Pending\n')
+    const priorFlush = h.session.flush()
+    await firstWriteStarted
+    const firstAppend = h.session.commitBodyAppend('First')
+    const secondAppend = h.session.commitBodyAppend('Second')
+    const freshest = h.session.content()
+
+    releaseFirstWrite()
+    await expect(Promise.all([priorFlush, firstAppend, secondAppend])).resolves.toEqual([
+      undefined,
+      true,
+      true,
+    ])
+    expect(h.writes).toHaveLength(2)
+    expect(h.writes.at(-1)?.contents).toBe(freshest)
+    expect(h.session.content()).toBe(freshest)
+    expect(h.snapshots.at(-1)?.dirty).toBe(false)
+
+    await h.session.flush()
+    expect(h.writes).toHaveLength(2)
+    expect(h.session.content()).toBe(freshest)
+  })
+})
+
 describe('commitTaskToggle', () => {
   it('toggles the marker while preserving unsaved edits, and reflects it in the editor', async () => {
     const source = '# Todo\n\n+ [ ] buy milk\n'
@@ -791,6 +1405,37 @@ describe('commitTaskToggle', () => {
     expect(h.session.content()).toBe('+ [ ] x\n')
     expect(h.applied.at(-1)).toBe('+ [ ] x\n')
     expect(h.snapshots.at(-1)?.error).toBeNull()
+  })
+
+  it('preserves a newer editor change when the transactional write fails in flight', async () => {
+    const source = '+ [ ] x\n'
+    let markWriteStarted: () => void = () => {}
+    const writeStarted = new Promise<void>((resolve) => {
+      markWriteStarted = resolve
+    })
+    let releaseWrite: () => void = () => {}
+    const writeGate = new Promise<void>((resolve) => {
+      releaseWrite = resolve
+    })
+    const h = harness({
+      disk: source,
+      beforeWrite: async () => {
+        markWriteStarted()
+        await writeGate
+      },
+    })
+    h.session.load()
+    await settled()
+    h.failWrites('disk full')
+
+    const toggling = h.session.commitTaskToggle(firstTask(source))
+    await writeStarted
+    h.session.editorChanged('+ [x] x\nnewer user edit\n')
+    releaseWrite()
+
+    await expect(toggling).rejects.toThrow('disk full')
+    expect(h.session.content()).toBe('+ [x] x\nnewer user edit\n')
+    expect(h.applied.at(-1)).toBe('+ [x] x\n')
   })
 
   it('propagates TaskStaleError when the task line is gone', async () => {

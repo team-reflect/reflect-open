@@ -39,6 +39,7 @@ function fakeEditor(): NoteEditorHandle & { applied: string[] } {
     getMarkdown: () => '',
     insertMarkdown: () => {},
     focus: () => {},
+    revealHeading: () => false,
     setSelection: () => {},
     getSelectedText: () => '',
     openSelectionMenu: () => {},
@@ -57,6 +58,15 @@ beforeEach(() => {
   mockInvoke.mockImplementation(async (command, args) => {
     if (command === 'note_read') {
       return disk
+    }
+    if (command === 'note_write_if_unchanged') {
+      const { contents, expected } = args as { contents: string; expected: string | null }
+      if (disk !== expected) {
+        return { kind: 'changed' }
+      }
+      disk = contents
+      writes.push(contents)
+      return { kind: 'written', modifiedMs: null }
     }
     if (command === 'note_write') {
       const contents = (args as { contents: string }).contents
@@ -80,17 +90,40 @@ interface GraphFakeOptions {
   linkSources?: () => Array<{ source_path: string }>
   /** Path returned by title resolution (simulates a title collision). */
   resolveTitleTo?: string
+  /** Live manifest paths whose bytes are unavailable during a rename scan. */
+  unreadablePaths?: readonly string[]
 }
 
 /** One bridge fake for the rename scenarios: a files map + the index queries. */
-function installGraphFake({ files, linkSources, resolveTitleTo }: GraphFakeOptions) {
+function installGraphFake({
+  files,
+  linkSources,
+  resolveTitleTo,
+  unreadablePaths = [],
+}: GraphFakeOptions) {
   mockInvoke.mockImplementation(async (command, args) => {
     if (command === 'note_read') {
-      const content = files[(args as { path: string }).path]
+      const readPath = (args as { path: string }).path
+      if (unreadablePaths.includes(readPath)) {
+        throw { kind: 'notFound', message: `unavailable: ${readPath}` }
+      }
+      const content = files[readPath]
       if (content === undefined) {
         throw { kind: 'notFound', message: 'missing' }
       }
       return content
+    }
+    if (command === 'note_write_if_unchanged') {
+      const { path: writePath, contents, expected } = args as {
+        path: string
+        contents: string
+        expected: string | null
+      }
+      if ((files[writePath] ?? null) !== expected) {
+        return { kind: 'changed' }
+      }
+      files[writePath] = contents
+      return { kind: 'written', modifiedMs: null }
     }
     if (command === 'note_write') {
       const { path: writePath, contents } = args as { path: string; contents: string }
@@ -99,6 +132,9 @@ function installGraphFake({ files, linkSources, resolveTitleTo }: GraphFakeOptio
     }
     if (command === 'db_query') {
       const sql = String((args as { sql: string }).sql)
+      if (sql.includes('"file_hash"') && sql.includes('"mtime"')) {
+        return Object.keys(files).map((path) => ({ path, file_hash: `hash:${path}`, mtime: 1 }))
+      }
       if (sql.includes('"links"')) {
         return linkSources ? linkSources() : []
       }
@@ -110,8 +146,15 @@ function installGraphFake({ files, linkSources, resolveTitleTo }: GraphFakeOptio
     if (command === 'note_exists') {
       return files[(args as { path: string }).path] !== undefined
     }
+    if (command === 'list_files') {
+      return Object.entries(files).map(([path, contents]) => ({
+        path,
+        size: contents.length,
+        modifiedMs: 1,
+      }))
+    }
     if (command === 'note_move_indexed') {
-      const { from, to } = args as { from: string; to: string }
+      const { from, to } = (args as { request: { from: string; to: string } }).request
       // Mirrors the Rust command for the paths these tests exercise: a free
       // destination renames (occupied ones refuse, but no test stages that).
       if (files[to] === undefined && files[from] !== undefined) {
@@ -130,6 +173,26 @@ describe('useNoteDocument', () => {
     const { result } = await readyHook()
     expect(result.current.initialContent).toBe('# Hello\n')
     expect(result.current.dirty).toBe(false)
+  })
+
+  it('does not rebind the live session when the create-consumed callback identity changes', async () => {
+    const firstCallback = vi.fn()
+    const secondCallback = vi.fn()
+    const hook = renderHook(
+      ({ onConsumed }: { onConsumed: () => void }) =>
+        useNoteDocument('notes/a.md', 1, { onInitialCreateConsumed: onConsumed }),
+      { initialProps: { onConsumed: firstCallback } },
+    )
+    await waitFor(() => expect(hook.result.current.status).toBe('ready'))
+    expect(firstCallback).toHaveBeenCalledOnce()
+    const initialEpoch = hook.result.current.sessionEpoch
+
+    hook.rerender({ onConsumed: secondCallback })
+    await act(async () => Promise.resolve())
+
+    expect(hook.result.current.sessionEpoch).toBe(initialEpoch)
+    expect(mockInvoke.mock.calls.filter(([command]) => command === 'note_read')).toHaveLength(1)
+    expect(secondCallback).not.toHaveBeenCalled()
   })
 
   it('debounces edits into an atomic write and clears dirty', async () => {
@@ -327,7 +390,7 @@ describe('useNoteDocument', () => {
     }
   })
 
-  it('a failed rewrite still records the alias (the resolve safety net)', async () => {
+  it('an unavailable live source keeps the move closed but still records the alias', async () => {
     vi.useFakeTimers()
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {
@@ -337,9 +400,7 @@ describe('useNoteDocument', () => {
       }
       installGraphFake({
         files,
-        linkSources: () => {
-          throw new Error('index unavailable') // the rewrite cannot run
-        },
+        unreadablePaths: ['notes/src.md'],
       })
 
       const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
@@ -351,11 +412,13 @@ describe('useNoteDocument', () => {
       })
       await act(() => vi.runAllTimersAsync())
 
-      // The rewrite failed, the baseline has advanced — the alias is what
-      // keeps [[Old Title]] resolving here, so it must land regardless.
+      // The title rewrite and full move scan both fail closed. The baseline
+      // has advanced, so the alias still lands at the original path and keeps
+      // [[Old Title]] resolving without pretending the filename move held.
       expect(files['notes/src.md']).toBe('see [[Old Title]]\n')
-      expect(files['notes/new-title.md']).toContain('aliases:')
-      expect(files['notes/new-title.md']).toContain('Old Title')
+      expect(files['notes/a.md']).toContain('aliases:')
+      expect(files['notes/a.md']).toContain('Old Title')
+      expect(files['notes/new-title.md']).toBeUndefined()
       hook.unmount()
     } finally {
       errorSpy.mockRestore()
@@ -772,11 +835,15 @@ describe('useNoteDocument', () => {
         if (command === 'note_read') {
           return disk
         }
-        if (command === 'note_write') {
-          disk = (args as { contents: string }).contents
+        if (command === 'note_write_if_unchanged') {
+          const { contents, expected } = args as { contents: string; expected: string | null }
+          if (disk !== expected) {
+            return { kind: 'changed' }
+          }
+          disk = contents
           writes.push(disk)
-          return new Promise<null>((resolve) => {
-            resolveWrite = () => resolve(null)
+          return new Promise<{ kind: 'written'; modifiedMs: null }>((resolve) => {
+            resolveWrite = () => resolve({ kind: 'written', modifiedMs: null })
           })
         }
         return null
@@ -814,16 +881,20 @@ describe('useNoteDocument', () => {
         if (command === 'note_read') {
           return disk
         }
-        if (command === 'note_write') {
-          disk = (args as { contents: string }).contents
+        if (command === 'note_write_if_unchanged') {
+          const { contents, expected } = args as { contents: string; expected: string | null }
+          if (disk !== expected) {
+            return { kind: 'changed' }
+          }
+          disk = contents
           writes.push(disk)
           writeCount += 1
           if (writeCount === 1) {
-            return new Promise<null>((resolve) => {
-              resolveWrite = () => resolve(null)
+            return new Promise<{ kind: 'written'; modifiedMs: null }>((resolve) => {
+              resolveWrite = () => resolve({ kind: 'written', modifiedMs: null })
             })
           }
-          return null
+          return { kind: 'written', modifiedMs: null }
         }
         return null
       })
@@ -859,14 +930,18 @@ describe('useNoteDocument', () => {
         if (command === 'note_read') {
           return disk
         }
-        if (command === 'note_write') {
+        if (command === 'note_write_if_unchanged') {
           if (failNext) {
             failNext = false
             throw new Error('disk full')
           }
+          const { expected } = args as { expected: string | null }
+          if (disk !== expected) {
+            return { kind: 'changed' }
+          }
           disk = (args as { contents: string }).contents
           writes.push(disk)
-          return null
+          return { kind: 'written', modifiedMs: null }
         }
         return null
       })
@@ -897,10 +972,10 @@ describe('useNoteDocument', () => {
         if (command === 'note_read') {
           return disk
         }
-        if (command === 'note_write') {
+        if (command === 'note_write_if_unchanged') {
           const { path, contents } = args as { path: string; contents: string }
           written.push({ path, contents })
-          return null
+          return { kind: 'written', modifiedMs: null }
         }
         return null
       })
@@ -964,10 +1039,10 @@ describe('useNoteDocument', () => {
         if (command === 'note_read') {
           throw { kind: 'notFound', message: 'missing' } // AppError shape
         }
-        if (command === 'note_write') {
+        if (command === 'note_write_if_unchanged') {
           disk = (args as { contents: string }).contents
           writes.push(disk)
-          return null
+          return { kind: 'written', modifiedMs: null }
         }
         return null
       })
@@ -1000,6 +1075,27 @@ describe('useNoteDocument', () => {
     await waitFor(() => expect(hook.result.current.status).toBe('error'))
   })
 
+  it('parks writes when the watcher removes an adopted vault note', async () => {
+    vi.useFakeTimers()
+    try {
+      const hook = renderHook(() => useNoteDocument('Projects/plan.md', 1))
+      await act(() => vi.advanceTimersByTimeAsync(0))
+      expect(hook.result.current.status).toBe('ready')
+
+      act(() => emitChange?.([{ path: 'Projects/plan.md', kind: 'remove' }]))
+      expect(hook.result.current.missing).toBe(true)
+
+      act(() => hook.result.current.onEditorChange('# Kept in the buffer\n'))
+      await act(() => vi.advanceTimersByTimeAsync(1000))
+      await act(() => flushOpenDocuments())
+
+      expect(hook.result.current.dirty).toBe(true)
+      expect(writes).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('a same-graph generation bump keeps unsaved edits and saves with the new generation', async () => {
     vi.useFakeTimers()
     try {
@@ -1008,10 +1104,10 @@ describe('useNoteDocument', () => {
         if (command === 'note_read') {
           return disk
         }
-        if (command === 'note_write') {
+        if (command === 'note_write_if_unchanged') {
           const { contents, generation } = args as { contents: string; generation: number }
           written.push({ contents, generation })
-          return null
+          return { kind: 'written', modifiedMs: null }
         }
         return null
       })

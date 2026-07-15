@@ -418,7 +418,18 @@ mod platform {
             full_round(&query, roots)
         };
 
-        crate::fs::invalidate_file_catalog(&app.state::<crate::fs::GraphState>(), graph_root);
+        let graph = app.state::<crate::fs::GraphState>();
+        if emit_file_changes {
+            // On iOS this metadata query is the sole external-change source.
+            // Placeholder eviction emits no `index:changed` row by design,
+            // but attachment resolvers must still drop their cached positive
+            // match until the bytes materialize again.
+            crate::fs::invalidate_file_catalog_and_emit(app, &graph, graph_root);
+        } else {
+            // Desktop's recursive filesystem watcher emits the catalog event;
+            // avoid a second whole-vault attachment refresh for the same write.
+            crate::fs::invalidate_file_catalog(&graph, graph_root);
+        }
 
         if emit_file_changes && !round.changes.is_empty() {
             let _ = app.emit("index:changed", round.changes);

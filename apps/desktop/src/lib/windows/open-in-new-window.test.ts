@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { NoteWindowNavigation } from '@reflect/core'
 
 const hasBridge = vi.hoisted(() => vi.fn(() => true))
-const openNoteWindow = vi.hoisted(() => vi.fn<(link: string) => Promise<void>>())
+const openNoteWindow = vi.hoisted(() =>
+  vi.fn<(navigation: NoteWindowNavigation) => Promise<void>>(),
+)
 const isMobileSurface = vi.hoisted(() => vi.fn(() => false))
 
 vi.mock('@reflect/core', async (importOriginal) => ({
@@ -45,7 +48,23 @@ describe('isNewWindowClick', () => {
 describe('openRouteInNewWindow', () => {
   it('opens the route’s deep link', async () => {
     await expect(openRouteInNewWindow({ kind: 'note', path: 'notes/foo.md' })).resolves.toBe(true)
-    expect(openNoteWindow).toHaveBeenCalledWith('reflect://note/notes%2Ffoo.md')
+    expect(openNoteWindow).toHaveBeenCalledWith({
+      deepLink: 'reflect://note/notes%2Ffoo.md',
+      headingReveal: null,
+    })
+  })
+
+  it('carries a heading reveal beside the route without changing window identity', async () => {
+    await expect(
+      openRouteInNewWindow(
+        { kind: 'note', path: 'Projects/Plan.md' },
+        { path: 'Projects/Plan.md', fragment: 'Roadmap' },
+      ),
+    ).resolves.toBe(true)
+    expect(openNoteWindow).toHaveBeenCalledWith({
+      deepLink: 'reflect://note/Projects%2FPlan.md',
+      headingReveal: { path: 'Projects/Plan.md', fragment: 'Roadmap' },
+    })
   })
 
   it('shares one native request between concurrent opens of the same note', async () => {
@@ -95,7 +114,10 @@ describe('openRouteInNewWindow', () => {
 describe('openDeepLinkInNewWindow', () => {
   it('opens addressing links verbatim', async () => {
     await expect(openDeepLinkInNewWindow('reflect://note/Some%20Note')).resolves.toBe(true)
-    expect(openNoteWindow).toHaveBeenCalledWith('reflect://note/Some%20Note')
+    expect(openNoteWindow).toHaveBeenCalledWith({
+      deepLink: 'reflect://note/Some%20Note',
+      headingReveal: null,
+    })
   })
 
   it('declines capture links — they are writes, not places', async () => {

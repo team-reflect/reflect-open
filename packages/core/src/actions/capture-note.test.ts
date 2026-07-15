@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { retitleDailyEntry, withTitle } from './capture-note'
+import { notePrivate, retitleDailyEntry, withTitle } from './capture-note'
 
 const BASE = 'capture-2026-06-11-153022-845-7c9e'
+
+describe('notePrivate', () => {
+  it('fails closed when frontmatter is malformed or unterminated', () => {
+    expect(notePrivate('---\nprivate: [\n---\n# Capture\n')).toBe(true)
+    expect(notePrivate('---\nprivate: false\n# Capture\n')).toBe(true)
+    expect(notePrivate('---\nprivate: false\n---\n# Capture\n')).toBe(false)
+  })
+})
 
 describe('retitleDailyEntry', () => {
   it('rewrites the entry when the link text still mirrors the old title', () => {

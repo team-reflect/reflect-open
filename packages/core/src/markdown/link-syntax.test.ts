@@ -7,6 +7,7 @@ describe('parseInlineLink', () => {
       isImage: false,
       text: 'text',
       href: 'https://example.com/page',
+      destination: { from: 7, to: 31 },
     })
   })
 
@@ -15,11 +16,13 @@ describe('parseInlineLink', () => {
       isImage: false,
       text: 'x',
       href: 'https://example.com',
+      destination: { from: 4, to: 23 },
     })
     expect(parseInlineLink("[x](assets/a.png 'single quoted')")).toEqual({
       isImage: false,
       text: 'x',
       href: 'assets/a.png',
+      destination: { from: 4, to: 16 },
     })
   })
 
@@ -28,6 +31,7 @@ describe('parseInlineLink', () => {
       isImage: false,
       text: 't',
       href: 'assets/with space.png',
+      destination: { from: 5, to: 26 },
     })
   })
 
@@ -36,11 +40,13 @@ describe('parseInlineLink', () => {
       isImage: true,
       text: '',
       href: 'assets/a.png',
+      destination: { from: 4, to: 16 },
     })
     expect(parseInlineLink('![alt text](assets/b.png)')).toEqual({
       isImage: true,
       text: 'alt text',
       href: 'assets/b.png',
+      destination: { from: 12, to: 24 },
     })
   })
 

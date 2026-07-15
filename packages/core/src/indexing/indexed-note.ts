@@ -7,14 +7,21 @@ import {
   foldKey,
   foldTag,
   gistBodyHash,
+  hasAuthoredTitle,
   isPinned,
-  normalizeWikiTarget,
   pinnedOrder,
   splitFrontmatter,
   subjectAliases,
   type ParsedNote,
 } from '../markdown'
+import {
+  indexMarkdownNoteReference,
+  indexWikiNoteReference,
+  noteBasenameKey,
+  notePathKey,
+} from '../graph/local-note-reference'
 import { previewSnippet } from './snippet'
+import { noteAttachmentIndexKeys } from './asset-reference-keys'
 
 /**
  * The index write payload (Plan 04): a {@link ParsedNote} (Plan 03) flattened into
@@ -65,14 +72,25 @@ import { previewSnippet } from './snippet'
  * until reprojected, so the bump backfills them.
  * 15 — task parent outline/list breadcrumbs: existing task rows carry empty
  * breadcrumbs until reprojected.
+ * 16 — exact note path/basename keys and local-link path candidates for
+ * arbitrary Markdown vault resolution.
+ * 17 — CommonMark reference-style links participate in local-path resolution
+ * and backlinks using their resolved definition destinations.
+ * 18 — authored attachment candidates include exact paths and bare-wiki
+ * basename sentinels for live catalog-aware privacy resolution.
+ * 19 — image syntax is excluded from the note-link/backlink projection.
  */
-export const PROJECTION_VERSION = 15
+export const PROJECTION_VERSION = 19
 
 export const indexedLinkSchema = z.object({
   kind: z.enum(['wiki', 'md']),
   targetRaw: z.string(),
-  /** Normalized match key: case-folded wiki target, or the lowercased href for md links. */
+  /** Bare wiki lookup key; empty for exact paths and Markdown/external links. */
   targetKey: z.string(),
+  /** Primary exact graph-path candidate, or null for a bare/external target. */
+  pathKey: z.string().nullable(),
+  /** Alternate exact candidate for an ambiguous unqualified Markdown path. */
+  alternatePathKey: z.string().nullable(),
   alias: z.string().nullable(),
   posFrom: z.number(),
   posTo: z.number(),
@@ -140,6 +158,10 @@ export const indexedNoteSchema = z.object({
   id: z.string().nullable(),
   title: z.string(),
   titleKey: z.string(),
+  /** Authored frontmatter/H1 title; null when display title falls back to filename. */
+  authoredTitleKey: z.string().nullable(),
+  pathKey: z.string(),
+  basenameKey: z.string(),
   /** Derived from the path; templates are excluded from note surfaces. */
   kind: noteKindSchema,
   dailyDate: z.string().nullable(),
@@ -170,6 +192,7 @@ export const indexedNoteSchema = z.object({
   aliases: z.array(indexedAliasSchema),
   /** Emails the note owns via `- Email:` contact-field bullets. */
   emails: z.array(indexedEmailSchema),
+  /** Privacy-candidate keys only; may contain the reserved bare-wiki sentinel. */
   assets: z.array(z.string()),
   /** Reflect task rows for the Tasks projection (Plan 18). */
   tasks: z.array(indexedTaskSchema),
@@ -208,22 +231,32 @@ export function buildIndexedNote(
   parsed: ParsedNote,
   meta: { fileHash: string; mtime: number; source: string; assetText?: string },
 ): IndexedNote {
-  const wikiLinks: IndexedLink[] = parsed.wikiLinks.map((link) => ({
-    kind: 'wiki',
-    targetRaw: link.target,
-    targetKey: normalizeWikiTarget(link.target).key,
-    alias: link.alias ?? null,
-    posFrom: link.from,
-    posTo: link.to,
-  }))
-  const mdLinks: IndexedLink[] = parsed.links.map((link) => ({
-    kind: 'md',
-    targetRaw: link.href,
-    targetKey: link.href.toLowerCase(),
-    alias: null,
-    posFrom: link.from,
-    posTo: link.to,
-  }))
+  const wikiLinks: IndexedLink[] = parsed.wikiLinks.map((link) => {
+    const reference = indexWikiNoteReference(parsed.path, link.target)
+    return {
+      kind: 'wiki',
+      targetRaw: link.target,
+      targetKey: reference?.targetKey ?? '',
+      pathKey: reference?.pathKey ?? null,
+      alternatePathKey: reference?.alternatePathKey ?? null,
+      alias: link.alias ?? null,
+      posFrom: link.from,
+      posTo: link.to,
+    }
+  })
+  const mdLinks: IndexedLink[] = parsed.links.map((link) => {
+    const reference = indexMarkdownNoteReference(parsed.path, link.href)
+    return {
+      kind: 'md',
+      targetRaw: link.href,
+      targetKey: '',
+      pathKey: reference?.pathKey ?? null,
+      alternatePathKey: reference?.alternatePathKey ?? null,
+      alias: null,
+      posFrom: link.from,
+      posTo: link.to,
+    }
+  })
   const body = splitFrontmatter(meta.source).body
 
   return {
@@ -231,6 +264,9 @@ export function buildIndexedNote(
     id: parsed.id ?? null,
     title: parsed.title,
     titleKey: foldKey(parsed.title),
+    authoredTitleKey: hasAuthoredTitle(parsed) ? foldKey(parsed.title) : null,
+    pathKey: notePathKey(parsed.path),
+    basenameKey: noteBasenameKey(parsed.path),
     kind: isDaily(parsed.path) ? 'daily' : isTemplatePath(parsed.path) ? 'template' : 'note',
     dailyDate: isDaily(parsed.path) ? dateFromDailyPath(parsed.path) : null,
     isPrivate: parsed.frontmatter.private,
@@ -252,7 +288,7 @@ export function buildIndexedNote(
     tags: parsed.tags.map((tag) => ({ tag, tagKey: foldTag(tag) })),
     aliases: noteAliases(parsed),
     emails: extractEmailFields(body).map((email) => ({ email, emailKey: foldEmail(email) })),
-    assets: parsed.assets.map((asset) => asset.path),
+    assets: noteAttachmentIndexKeys(parsed.attachmentReferences),
     tasks: parsed.tasks.map((task) => ({
       markerOffset: task.markerOffset,
       text: task.text,

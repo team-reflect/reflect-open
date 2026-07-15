@@ -46,6 +46,7 @@ pub fn classify_normalized(path: &str) -> Option<GraphPathKind> {
         || path.ends_with('/')
         || path.contains('\\')
         || has_windows_drive_prefix(path)
+        || path.contains('\0')
     {
         return None;
     }
@@ -139,9 +140,11 @@ fn visible_components(path: &Path) -> Option<Vec<&str>> {
     let components: Vec<&str> = path
         .components()
         .map(|component| match component {
-            Component::Normal(value) => value
-                .to_str()
-                .filter(|component| !component.starts_with('.') && !component.contains('\\')),
+            Component::Normal(value) => value.to_str().filter(|component| {
+                !component.starts_with('.')
+                    && !component.contains('\\')
+                    && !component.contains('\0')
+            }),
             _ => None,
         })
         .collect::<Option<_>>()?;
@@ -205,5 +208,12 @@ mod tests {
         let drive_relative = Path::new("C:relative.md");
         assert_eq!(classify(drive_relative), None);
         assert!(!is_safe_visible_relative(drive_relative));
+    }
+
+    #[test]
+    fn native_paths_reject_nul_bytes() {
+        let nul_path = Path::new("Projects/plan\0.md");
+        assert_eq!(classify(nul_path), None);
+        assert!(!is_safe_visible_relative(nul_path));
     }
 }

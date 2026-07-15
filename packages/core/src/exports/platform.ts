@@ -98,17 +98,30 @@ export {
   recentGraphSchema,
   fileMetaSchema,
   noteCreateOutcomeSchema,
+  noteWriteIfUnchangedOutcomeSchema,
   graphImportProgressSchema,
   graphImportSummarySchema,
+  noteHeadingRevealSchema,
+  noteWindowNavigationSchema,
   windowBootstrapSchema,
   type GraphInfo,
   type RecentGraph,
   type FileMeta,
+  type AssetPrivacySnapshot,
+  type AssetPrivacySnapshotNote,
   type NoteCreateOutcome,
   type GraphImportProgress,
   type GraphImportSummary,
+  type NoteHeadingReveal,
+  type NoteWindowNavigation,
+  type NoteWriteIfUnchangedOutcome,
   type WindowBootstrap,
 } from '../graph/schemas'
+export {
+  FILE_CATALOG_CHANGED_EVENT,
+  subscribeFileCatalogChanged,
+  type FileCatalogChanged,
+} from '../graph/catalog-changes'
 export {
   openGraph,
   openNoteWindow,
@@ -121,14 +134,20 @@ export {
   markReflectV1ImportOwnWrites,
   readNote,
   writeNote,
+  writeNoteIfUnchanged,
   createNoteIfAbsent,
   writeAsset,
   readAsset,
+  readManagedAsset,
+  readManagedAssetDescription,
   openAsset,
+  resolveAttachment,
   listDir,
   noteExists,
   deleteNote,
   listFiles,
+  listAttachments,
+  assetPrivacySnapshot,
   recentGraphs,
   forgetRecent,
   deleteGraph,
@@ -142,6 +161,27 @@ export {
   captureSharedInboxRelay,
   promoteCaptureScreenshot,
 } from '../graph/commands'
+export {
+  attachmentReferenceKindSchema,
+  attachmentReferenceSchema,
+  attachmentResolveRequestSchema,
+  attachmentRenderKindSchema,
+  attachmentPathSchema,
+  attachmentFileMetaSchema,
+  attachmentResolveOutcomeSchema,
+  attachmentRenderKind,
+  attachmentReferenceCandidates,
+  prepareAttachmentCatalog,
+  resolveAttachmentFromCatalog,
+  type AttachmentReferenceKind,
+  type AttachmentReference,
+  type AttachmentResolveRequest,
+  type AttachmentRenderKind,
+  type AttachmentFileMeta,
+  type AttachmentResolveOutcome,
+  type AttachmentCatalogResolveOutcome,
+  type PreparedAttachmentCatalog,
+} from '../graph/attachment-resolution'
 export { createAsset, importAsset } from '../graph/assets'
 export { assetFileName } from '../graph/asset-names'
 export {
@@ -152,12 +192,20 @@ export {
   isUntitledNotePath,
   createNoteWithTitle,
   resolveOrCreateNoteWithTitle,
+  resolveOrCreateWikiTarget,
   type ResolveOrCreateNoteResult,
 } from '../graph/create-note'
 export {
+  resolveExistingMarkdownTarget,
   resolveExistingWikiTarget,
   type ExistingWikiTargetResolution,
 } from '../graph/resolve-existing-wiki-target'
+export {
+  bareWikiTitle,
+  indexMarkdownNoteReference,
+  indexWikiNoteReference,
+  type IndexedNoteReference,
+} from '../graph/local-note-reference'
 export {
   settingsSchema,
   editorMarkdownSyntaxSchema,

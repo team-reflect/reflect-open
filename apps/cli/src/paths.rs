@@ -34,11 +34,12 @@ pub fn parse_calendar_date(value: &str) -> Option<&str> {
     Some(value)
 }
 
-/// Extract the ISO date from a daily-note path (`daily/YYYY-MM-DD.md`), or
-/// `None` if it isn't one. Shape-only, like the TS `dateFromDailyPath`.
+/// Extract a real calendar date from a daily-note path
+/// (`daily/YYYY-MM-DD.md`), or `None` if it isn't one. Impossible date-shaped
+/// filenames remain ordinary notes, matching the TypeScript resolver/index.
 pub fn date_from_daily_path(path: &str) -> Option<&str> {
     let date = path.strip_prefix("daily/")?.strip_suffix(".md")?;
-    is_date_shaped(date).then_some(date)
+    parse_calendar_date(date)
 }
 
 /// Today's local date as `YYYY-MM-DD` (timezone- and DST-correct via jiff,
@@ -60,6 +61,7 @@ mod tests {
         );
         assert_eq!(date_from_daily_path("notes/2026-06-11.md"), None);
         assert_eq!(date_from_daily_path("daily/nope.md"), None);
+        assert_eq!(date_from_daily_path("daily/2026-02-31.md"), None);
     }
 
     /// Parity with `paths.ts`/`resolve.ts`: shape-valid but impossible dates

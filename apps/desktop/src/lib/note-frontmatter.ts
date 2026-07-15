@@ -1,4 +1,10 @@
-import { upsertFrontmatter, writeNote } from '@reflect/core'
+import {
+  isAppError,
+  isDaily,
+  readNote,
+  upsertFrontmatter,
+  writeNoteIfUnchanged,
+} from '@reflect/core'
 import { frontmatterPatchToYaml, type FrontmatterPatch } from '@/editor/note-session'
 import { openSession } from '@/editor/open-documents'
 import { readNoteOrEmpty } from '@/lib/note-read'
@@ -42,9 +48,23 @@ export async function commitNoteFrontmatter(
   if (owner !== null && (await owner.commitFrontmatter(patch))) {
     return
   }
-  const onDisk = await readNoteOrEmpty(path)
+  let onDisk: string
+  let expected: string | null
+  try {
+    onDisk = await readNote(path)
+    expected = onDisk
+  } catch (cause) {
+    if (!isAppError(cause) || cause.kind !== 'notFound' || !isDaily(path)) {
+      throw cause
+    }
+    onDisk = ''
+    expected = null
+  }
   const patched = upsertFrontmatter(onDisk, frontmatterPatchToYaml(patch))
   if (patched !== onDisk) {
-    await writeNote(path, patched, generation)
+    const outcome = await writeNoteIfUnchanged(path, expected, patched, generation)
+    if (outcome.kind === 'changed') {
+      throw new Error('This note changed or was removed before the frontmatter update landed.')
+    }
   }
 }

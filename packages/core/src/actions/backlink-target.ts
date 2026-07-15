@@ -20,7 +20,11 @@ export async function ensureBacklinkTarget(title: string, generation: number): P
     return title
   }
   const path =
-    outcome.kind === 'ambiguous' ? [...outcome.paths].sort().at(0) : outcome.path
+    outcome.kind === 'ambiguous'
+      ? [...outcome.paths].sort().at(0)
+      : outcome.kind === 'invalid'
+        ? undefined
+        : outcome.path
   if (path === undefined) {
     throw new ReflectError(
       'unknown',

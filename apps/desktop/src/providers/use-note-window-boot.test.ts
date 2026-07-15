@@ -1,16 +1,17 @@
 import { renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { WindowBootstrap } from '@reflect/core'
+import type { NoteWindowNavigation, WindowBootstrap } from '@reflect/core'
 
 const windowBootstrap = vi.hoisted(() => vi.fn<() => Promise<WindowBootstrap>>())
 const subscribeIndexWritten = vi.hoisted(() =>
   vi.fn<(handler: () => void) => Promise<() => void>>(),
 )
 const subscribeWindowNavigate = vi.hoisted(() =>
-  vi.fn<(handler: (url: string) => void) => Promise<() => void>>(),
+  vi.fn<(handler: (navigation: NoteWindowNavigation) => void) => Promise<() => void>>(),
 )
 const isMainWindow = vi.hoisted(() => vi.fn(() => false))
 const dispatchDeepLink = vi.hoisted(() => vi.fn())
+const requestNoteHeadingReveal = vi.hoisted(() => vi.fn())
 const throttledInvalidateIndexQueries = vi.hoisted(() => vi.fn())
 
 vi.mock('@reflect/core', async (importOriginal) => ({
@@ -21,6 +22,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
 }))
 vi.mock('@/lib/windows/window-role', () => ({ isMainWindow }))
 vi.mock('@/lib/deep-links/intake', () => ({ dispatchDeepLink }))
+vi.mock('@/editor/editor-handle-registry', () => ({ requestNoteHeadingReveal }))
 vi.mock('@/lib/query-client', () => ({ throttledInvalidateIndexQueries }))
 
 import {
@@ -32,7 +34,10 @@ import { useNoteWindowBoot } from './use-note-window-boot'
 const BOOT: WindowBootstrap = {
   graph: { root: '/g', name: 'g', generation: 3 },
   indexGeneration: 5,
-  initialDeepLink: 'reflect://note/notes%2Ffoo.md',
+  initialNavigation: {
+    deepLink: 'reflect://note/notes%2Ffoo.md',
+    headingReveal: null,
+  },
 }
 
 function mount() {
@@ -66,11 +71,38 @@ describe('useNoteWindowBoot', () => {
     // indexer — and honors focus-renavigate requests from a repeat ⌘-click
     // on its target. (Rename follow-through is desktop-root's, all windows.)
     expect(subscribeIndexWritten).toHaveBeenCalledWith(throttledInvalidateIndexQueries)
-    expect(subscribeWindowNavigate).toHaveBeenCalledWith(dispatchDeepLink)
+    expect(subscribeWindowNavigate).toHaveBeenCalledWith(expect.any(Function))
+  })
+
+  it('queues the initial heading reveal before the secondary editor mounts', async () => {
+    windowBootstrap.mockResolvedValue({
+      ...BOOT,
+      initialNavigation: {
+        deepLink: 'reflect://note/Projects%2FPlan.md',
+        headingReveal: { path: 'Projects/Plan.md', fragment: 'Roadmap' },
+      },
+    })
+
+    const { onAdopted } = mount()
+
+    await waitFor(() => expect(onAdopted).toHaveBeenCalled())
+    expect(getInitialWindowRoute()).toEqual({ kind: 'note', path: 'Projects/Plan.md' })
+    expect(requestNoteHeadingReveal).toHaveBeenCalledWith(
+      'Projects/Plan.md',
+      'Roadmap',
+      3,
+    )
+    expect(dispatchDeepLink).not.toHaveBeenCalled()
   })
 
   it('falls back to the intake for a target only the index can answer', async () => {
-    windowBootstrap.mockResolvedValue({ ...BOOT, initialDeepLink: 'reflect://note/Meeting%20Notes' })
+    windowBootstrap.mockResolvedValue({
+      ...BOOT,
+      initialNavigation: {
+        deepLink: 'reflect://note/Meeting%20Notes',
+        headingReveal: null,
+      },
+    })
     const { onAdopted } = mount()
     await waitFor(() => expect(onAdopted).toHaveBeenCalled())
     expect(getInitialWindowRoute()).toBeNull()
@@ -78,7 +110,7 @@ describe('useNoteWindowBoot', () => {
   })
 
   it('skips the deep-link dispatch when none is pending (a reload)', async () => {
-    windowBootstrap.mockResolvedValue({ ...BOOT, initialDeepLink: null })
+    windowBootstrap.mockResolvedValue({ ...BOOT, initialNavigation: null })
     const { onAdopted } = mount()
     await waitFor(() => expect(onAdopted).toHaveBeenCalled())
     expect(dispatchDeepLink).not.toHaveBeenCalled()
@@ -111,5 +143,28 @@ describe('useNoteWindowBoot', () => {
     view.unmount()
     expect(unlistenWritten).toHaveBeenCalled()
     expect(unlistenNavigate).toHaveBeenCalled()
+  })
+
+  it('reveals the heading carried by a focus-and-renavigate event', async () => {
+    const { onAdopted } = mount()
+    await waitFor(() => expect(onAdopted).toHaveBeenCalled())
+    const handler = subscribeWindowNavigate.mock.calls[0]?.[0]
+    if (handler === undefined) {
+      throw new Error('expected the window navigation subscription')
+    }
+
+    handler({
+      deepLink: 'reflect://note/Projects%2FPlan.md',
+      headingReveal: { path: 'Projects/Plan.md', fragment: 'Decisions' },
+    })
+
+    expect(requestNoteHeadingReveal).toHaveBeenCalledWith(
+      'Projects/Plan.md',
+      'Decisions',
+      3,
+    )
+    expect(dispatchDeepLink).toHaveBeenCalledWith(
+      'reflect://note/Projects%2FPlan.md',
+    )
   })
 })

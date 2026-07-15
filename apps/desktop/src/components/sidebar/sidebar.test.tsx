@@ -145,6 +145,7 @@ function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?: Route
     newChat: vi.fn(),
     switchGraph: vi.fn(),
     toggleAudioMemo: vi.fn(),
+    graph: () => GRAPH,
     generation: () => 1,
     openPalette,
     openShortcuts: vi.fn(),

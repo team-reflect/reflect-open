@@ -223,7 +223,7 @@ export async function applyIndexChanges(
         continue
       }
       const facts = stored.get(change.path)
-      if (matchesTrustedMtime(facts?.mtime, change.modifiedMs, now)) {
+      if (facts?.fileHash !== '' && matchesTrustedMtime(facts?.mtime, change.modifiedMs, now)) {
         continue // already indexed at this mtime — e.g. the watch's initial gather
       }
       const content = await readNote(change.path)

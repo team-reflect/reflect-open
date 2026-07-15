@@ -148,6 +148,7 @@ const responseMessagesSchema = z.array(
     content: z.unknown(),
   }),
 )
+const privacyFingerprintSchema = z.string().nullable()
 
 /**
  * Save one turn (and upsert its conversation row) for `generation`. The
@@ -173,6 +174,7 @@ export async function saveChatMessage(input: {
         attachments: JSON.stringify(input.turn.attachments),
         parts: JSON.stringify(input.turn.parts),
         responseMessages: JSON.stringify(input.turn.responseMessages),
+        privacyFingerprint: input.turn.privacyFingerprint,
         createdMs: input.createdMs,
       },
       generation: input.generation,
@@ -204,7 +206,14 @@ export async function listChatConversations(limit = 50): Promise<ChatConversatio
 export async function loadChatMessages(conversationId: string): Promise<ChatTurn[]> {
   const rows = await db
     .selectFrom('chatMessages')
-    .select(['id', 'userText', 'attachments', 'parts', 'responseMessages'])
+    .select([
+      'id',
+      'userText',
+      'attachments',
+      'parts',
+      'responseMessages',
+      'privacyFingerprint',
+    ])
     .where('conversationId', '=', conversationId)
     .orderBy('seq', 'asc')
     .execute()
@@ -224,13 +233,20 @@ interface StoredMessageRow {
   attachments: string
   parts: string
   responseMessages: string
+  privacyFingerprint: string | null
 }
 
 function parseTurn(row: StoredMessageRow): ChatTurn | null {
   const attachments = parseJson(row.attachments, attachmentsSchema)
   const parts = parseJson(row.parts, partsSchema)
   const responseMessages = parseJson(row.responseMessages, responseMessagesSchema)
-  if (attachments === null || parts === null || responseMessages === null) {
+  const privacyFingerprint = privacyFingerprintSchema.safeParse(row.privacyFingerprint)
+  if (
+    attachments === null ||
+    parts === null ||
+    responseMessages === null ||
+    !privacyFingerprint.success
+  ) {
     return null
   }
   return {
@@ -240,6 +256,7 @@ function parseTurn(row: StoredMessageRow): ChatTurn | null {
     parts,
     // See responseMessagesSchema: envelope-validated, shape owned by the SDK.
     responseMessages: responseMessages as ModelMessage[],
+    privacyFingerprint: privacyFingerprint.data,
     status: 'done',
   }
 }

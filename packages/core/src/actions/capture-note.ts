@@ -3,7 +3,12 @@ import { isAppError } from '../errors'
 import { readNote } from '../graph/commands'
 import { hashContent } from '../indexing/hash'
 import { wikiLinkSafe } from '../markdown/edit'
-import { parseFrontmatter, splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter'
+import {
+  hasUnterminatedLeadingFrontmatter,
+  parseFrontmatter,
+  splitFrontmatter,
+  upsertFrontmatter,
+} from '../markdown/frontmatter'
 import type { Frontmatter } from '../markdown/model'
 import type { CaptureIdentity } from './capture-identity'
 import type { CaptureEnvelope } from './capture-envelope'
@@ -131,7 +136,11 @@ export async function noteSource(path: string, generation: number): Promise<stri
 }
 
 export function notePrivate(source: string): boolean {
-  return parseFrontmatter(splitFrontmatter(source).raw).data.private
+  if (hasUnterminatedLeadingFrontmatter(source)) {
+    return true
+  }
+  const parsed = parseFrontmatter(splitFrontmatter(source).raw)
+  return parsed.warning !== undefined || parsed.data.private
 }
 
 export function metadataValue(text: string): string {

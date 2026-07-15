@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { hasAuthoredTitle, isTagName, parseNote } from './extract'
 
-function parse(source: string, path = 'notes/test.md') {
+function parse(source: string, path = 'test.md') {
   return parseNote({ path, source })
 }
 
 describe('parseNote — wiki links', () => {
+  it('does not project wiki embeds as note links', () => {
+    const note = parseNote({ path: 'notes/a.md', source: '![[Media/photo.png|640]]\n' })
+    expect(note.wikiLinks).toEqual([])
+    expect(note.links).toEqual([])
+  })
+
   it('extracts plain, aliased, and date targets with positions', () => {
     const note = parse('See [[Charlotte]] and [[Project X|the project]] on [[2026-06-09]].')
     expect(note.wikiLinks.map((w) => ({ target: w.target, alias: w.alias }))).toEqual([
@@ -99,6 +105,167 @@ describe('parseNote — links, assets, tags, text', () => {
     expect(note.assets).toEqual([expect.objectContaining({ path: 'assets/photo.png' })])
   })
 
+  it('resolves full, collapsed, and shortcut CommonMark references document-wide', () => {
+    const source =
+      'See [Full label][plan], [plan][], and [PLAN].\n\n[plan]: <../Plans/Plan.md#Scope> "Keep title"'
+    const note = parse(source, 'Projects/source.md')
+
+    expect(
+      note.links.map((link) => ({
+        text: link.text,
+        href: link.href,
+        source: source.slice(link.from, link.to),
+        destination: source.slice(link.destination.from, link.destination.to),
+        reference: link.reference,
+      })),
+    ).toEqual([
+      {
+        text: 'Full label',
+        href: '../Plans/Plan.md#Scope',
+        source: '[Full label][plan]',
+        destination: '../Plans/Plan.md#Scope',
+        reference: { key: 'PLAN', duplicate: false },
+      },
+      {
+        text: 'plan',
+        href: '../Plans/Plan.md#Scope',
+        source: '[plan][]',
+        destination: '../Plans/Plan.md#Scope',
+        reference: { key: 'PLAN', duplicate: false },
+      },
+      {
+        text: 'PLAN',
+        href: '../Plans/Plan.md#Scope',
+        source: '[PLAN]',
+        destination: '../Plans/Plan.md#Scope',
+        reference: { key: 'PLAN', duplicate: false },
+      },
+    ])
+    expect(new Set(note.links.map((link) => link.destination.from)).size).toBe(1)
+  })
+
+  it('uses the first duplicate definition and marks it unsafe for automated rewrites', () => {
+    const note = parse(
+      '[Plan][doc]\n\n[doc]: first.md "First"\n\n[ DOC ]: second.md "Second"',
+    )
+    expect(note.links).toEqual([
+      expect.objectContaining({
+        href: 'first.md',
+        reference: { key: 'DOC', duplicate: true },
+      }),
+    ])
+  })
+
+  it('uses CommonMark Unicode label folding, preserves escapes, and decodes destinations', () => {
+    const source =
+      '[street][STRASSE] [escaped][A\\*] [plain][A*]\n\n' +
+      '[Straße]: Plans/A&amp;B.md\n[A\\*]: Escaped.md\n[A*]: Plain.md'
+    const note = parse(source)
+
+    expect(note.links.map((link) => ({ href: link.href, reference: link.reference }))).toEqual([
+      { href: 'Plans/A&B.md', reference: { key: 'STRASSE', duplicate: false } },
+      { href: 'Escaped.md', reference: { key: 'A\\*', duplicate: false } },
+      { href: 'Plain.md', reference: { key: 'A*', duplicate: false } },
+    ])
+  })
+
+  it('leaves unresolved and malformed references out of the link projection', () => {
+    const note = parse('[Missing][id] [shortcut]\n\n[id] not-a-definition')
+    expect(note.links).toEqual([])
+  })
+
+  it('resolves reference images before classifying managed assets', () => {
+    const source = '![Diagram][asset]\n\n[asset]: ../assets/diagram.png "Diagram"'
+    const note = parse(source, 'Projects/source.md')
+    expect(note.assets).toEqual([
+      expect.objectContaining({
+        path: 'assets/diagram.png',
+        from: source.indexOf('![Diagram]'),
+        to: source.indexOf('![Diagram]') + '![Diagram][asset]'.length,
+      }),
+    ])
+    expect(note.attachmentReferences).toEqual([
+      {
+        sourcePath: 'Projects/source.md',
+        kind: 'markdown',
+        rawReference: '../assets/diagram.png',
+        from: source.indexOf('![Diagram]'),
+        to: source.indexOf('![Diagram]') + '![Diagram][asset]'.length,
+        destination: {
+          from: source.indexOf('../assets/diagram.png'),
+          to: source.indexOf('../assets/diagram.png') + '../assets/diagram.png'.length,
+        },
+      },
+    ])
+    expect(note.links).toEqual([])
+  })
+
+  it('never projects inline or reference images as note links', () => {
+    const source =
+      '![markdown](Target.md) ![extensionless](Target) ![reference][picture]\n\n' +
+      '[picture]: Target.md'
+    const note = parse(source)
+
+    expect(note.links).toEqual([])
+    expect(note.attachmentReferences.map((reference) => reference.rawReference)).toEqual([
+      'Target.md',
+      'Target',
+      'Target.md',
+    ])
+  })
+
+  it('projects path-qualified wiki embeds into root managed assets before size syntax', () => {
+    const source =
+      '![[assets%2Froot.png|320]] ![[assets/relative%20file.pdf|640x480]] ![[Media/local.png]] ![[bare.png]]'
+    const note = parse(source, 'Projects/source.md')
+    expect(note.assets).toEqual([
+      {
+        path: 'assets/root.png',
+        from: source.indexOf('![[assets%2Froot.png'),
+        to: source.indexOf('![[assets%2Froot.png') + '![[assets%2Froot.png|320]]'.length,
+      },
+      {
+        path: 'assets/relative file.pdf',
+        from: source.indexOf('![[assets/relative%20file.pdf'),
+        to:
+          source.indexOf('![[assets/relative%20file.pdf') +
+          '![[assets/relative%20file.pdf|640x480]]'.length,
+      },
+    ])
+    expect(note.attachmentReferences.map((reference) => ({
+      sourcePath: reference.sourcePath,
+      kind: reference.kind,
+      rawReference: reference.rawReference,
+      destination: source.slice(reference.destination.from, reference.destination.to),
+    }))).toEqual([
+      { sourcePath: 'Projects/source.md', kind: 'wikiEmbed', rawReference: 'assets%2Froot.png', destination: 'assets%2Froot.png' },
+      { sourcePath: 'Projects/source.md', kind: 'wikiEmbed', rawReference: 'assets/relative%20file.pdf', destination: 'assets/relative%20file.pdf' },
+      { sourcePath: 'Projects/source.md', kind: 'wikiEmbed', rawReference: 'Media/local.png', destination: 'Media/local.png' },
+      { sourcePath: 'Projects/source.md', kind: 'wikiEmbed', rawReference: 'bare.png', destination: 'bare.png' },
+    ])
+  })
+
+  it('projects local Markdown references but excludes external and same-note links', () => {
+    const source = '[file](../assets/a.png) [web](https://example.com/a.png) [heading](#Part)'
+    const note = parse(source, 'Projects/source.md')
+
+    expect(note.attachmentReferences).toEqual([
+      expect.objectContaining({
+        sourcePath: 'Projects/source.md',
+        kind: 'markdown',
+        rawReference: '../assets/a.png',
+      }),
+    ])
+  })
+
+  it('rejects hidden and escaping wiki-embed asset paths', () => {
+    const note = parse(
+      '![[assets/.private/a.png]] ![[../assets/out.png]] ![[/assets/good.png]]',
+      'Projects/source.md',
+    )
+    expect(note.assets.map((asset) => asset.path)).toEqual(['assets/good.png'])
+  })
+
   it('decodes percent-encoded asset hrefs to the on-disk path', () => {
     const note = parse('![pic](assets/my%20photo.png) and ![two](assets/a%2Bb.pdf)')
     expect(note.assets.map((asset) => asset.path)).toEqual([
@@ -114,6 +281,41 @@ describe('parseNote — links, assets, tags, text', () => {
       'assets/b.png',
       'assets/c.png',
     ])
+  })
+
+  it('keeps Markdown note links inside nested assets directories as links', () => {
+    const note = parse('[Plan](assets/Plan.md)', 'Projects/Today.md')
+
+    expect(note.links).toEqual([
+      expect.objectContaining({ href: 'assets/Plan.md', text: 'Plan' }),
+    ])
+    expect(note.assets).toEqual([])
+  })
+
+  it('projects only attachments that resolve into Reflect-managed root assets', () => {
+    const imported = parse(
+      '![](assets/local.png) ![](../assets/root.png)',
+      'Projects/Today.md',
+    )
+    expect(imported.assets.map((asset) => asset.path)).toEqual(['assets/root.png'])
+    expect(imported.links).toEqual([])
+
+    const managed = parse(
+      '---\nid: 01abcdefghjkmnpqrstvwxyz00\n---\n![](assets/legacy.png)',
+      'notes/managed.md',
+    )
+    expect(managed.assets.map((asset) => asset.path)).toEqual(['assets/legacy.png'])
+
+    const adopted = parse('![](assets/not-root.png)', 'notes/adopted.md')
+    expect(adopted.assets).toEqual([])
+  })
+
+  it('does not reinterpret encoded explicit Markdown prefixes as vault-root assets', () => {
+    const managed = parse(
+      '---\nid: 01abcdefghjkmnpqrstvwxyz00\n---\n![](.%2Fassets/not-root.png)',
+      'notes/managed.md',
+    )
+    expect(managed.assets).toEqual([])
   })
 
   it('extracts body #tags only, deduped case-insensitively', () => {

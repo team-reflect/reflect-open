@@ -23,6 +23,7 @@ mod write;
 use std::sync::{Mutex, MutexGuard};
 
 use rusqlite::{params, Connection};
+use serde::Deserialize;
 use serde_json::{Map, Value};
 use tauri::State;
 
@@ -49,6 +50,10 @@ pub use write::IndexedNote;
 #[derive(Default)]
 struct IndexInner {
     generation: u64,
+    /// Graph session whose root this connection projects. Read-only queries
+    /// may pin this independently from the index write generation so a graph
+    /// switch cannot combine an old file listing with the new vault's rows.
+    graph_generation: Option<u64>,
     conn: Option<Connection>,
 }
 
@@ -112,22 +117,24 @@ pub fn index_open(
     background_tasks: State<BackgroundTaskState>,
 ) -> AppResult<u64> {
     let _background_task = background_task::scoped(&background_tasks, "Reflect index open");
-    let root = graph
-        .0
-        .lock()
-        .map_err(|err| {
+    let (root, graph_generation) = {
+        let state = graph.0.lock().map_err(|err| {
             tracing::error!(?err, "graph state lock poisoned by an earlier panic");
             AppError::io("graph state lock poisoned")
-        })?
-        .root
-        .clone()
-        .ok_or_else(AppError::no_graph)?;
+        })?;
+        (
+            state.root.clone().ok_or_else(AppError::no_graph)?,
+            state.generation,
+        )
+    };
     let mut state = lock_state(&index)?;
     state.generation += 1;
     // Drop the old connection before opening; if the open fails we return with
     // `conn = None` (reads then error) rather than a stale connection.
     state.conn = None;
+    state.graph_generation = None;
     state.conn = Some(migrations::open_index_at(&root)?);
+    state.graph_generation = Some(graph_generation);
     Ok(state.generation)
 }
 
@@ -243,27 +250,46 @@ pub fn index_remove<R: tauri::Runtime>(
 /// together on graph open, and the projection is rebuildable in the worst case.
 ///
 /// The rename pipeline end-to-end: `docs/readable-filenames.md`.
-#[tauri::command]
-pub fn note_move_indexed<R: tauri::Runtime>(
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NoteMoveIndexedRequest {
     from: String,
     to: String,
+    from_path_key: String,
+    from_basename_key: String,
+    to_path_key: String,
+    to_basename_key: String,
     generation: u64,
+}
+
+#[tauri::command]
+pub fn note_move_indexed<R: tauri::Runtime>(
+    request: NoteMoveIndexedRequest,
     app: tauri::AppHandle<R>,
     graph: State<GraphState>,
     index: State<IndexState>,
     background_tasks: State<BackgroundTaskState>,
 ) -> AppResult<()> {
+    let NoteMoveIndexedRequest {
+        from,
+        to,
+        from_path_key,
+        from_basename_key,
+        to_path_key,
+        to_basename_key,
+        generation,
+    } = request;
     let _background_task = background_task::scoped(&background_tasks, "Reflect note move");
-    let root = crate::fs::root_for_generation(&graph, generation)?;
+    let root = crate::fs::pinned_root_for_generation_inner(&graph, generation)?;
     {
         let mut state = lock_state(&index)?;
         let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
-        move_rows(conn, &from, &to)?;
+        move_rows(conn, &from, &to, &to_path_key, &to_basename_key)?;
         if let Err(err) = crate::fs::move_note_file(&root, &from, &to) {
             // Compensate: the disk refused, so the rows go back. Best-effort —
             // a failed compensation must surface the *original* error, and the
             // reconcile heals any residue by id.
-            if let Err(comp) = move_rows(conn, &to, &from) {
+            if let Err(comp) = move_rows(conn, &to, &from, &from_path_key, &from_basename_key) {
                 tracing::error!(
                     ?comp,
                     "rename compensation failed; reconcile will heal by id"
@@ -272,19 +298,25 @@ pub fn note_move_indexed<R: tauri::Runtime>(
             return Err(err);
         }
     }
-    crate::fs::invalidate_file_catalog(&graph, &root);
+    crate::fs::invalidate_file_catalog(&graph, root.path());
     emit_index_written(&app);
     emit_note_moved(&app, &from, &to);
     Ok(())
 }
 
 /// One committed row-move transaction (the rename pipeline's halves).
-fn move_rows(conn: &mut Connection, from: &str, to: &str) -> AppResult<()> {
+fn move_rows(
+    conn: &mut Connection,
+    from: &str,
+    to: &str,
+    to_path_key: &str,
+    to_basename_key: &str,
+) -> AppResult<()> {
     let tx = conn.transaction()?;
     // Child tables FK `notes(path)`; deferring lets the parent key move first
     // and the constraint re-check at commit, when the children have followed.
     tx.execute_batch("PRAGMA defer_foreign_keys = ON;")?;
-    write::move_note(&tx, from, to)?;
+    write::move_note(&tx, from, to, to_path_key, to_basename_key)?;
     tx.commit()?;
     Ok(())
 }
@@ -296,15 +328,30 @@ fn move_rows(conn: &mut Connection, from: &str, to: &str) -> AppResult<()> {
 /// content costs the user BYOK money). No filesystem half, and unlike
 /// `note_move_indexed` this is gated on the **index** generation like every
 /// other reconcile-path write — a superseded pass must no-op.
-#[tauri::command]
-pub fn index_move<R: tauri::Runtime>(
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct IndexMoveRequest {
     from: String,
     to: String,
+    to_path_key: String,
+    to_basename_key: String,
     generation: u64,
+}
+
+#[tauri::command]
+pub fn index_move<R: tauri::Runtime>(
+    request: IndexMoveRequest,
     app: tauri::AppHandle<R>,
     index: State<IndexState>,
     background_tasks: State<BackgroundTaskState>,
 ) -> AppResult<()> {
+    let IndexMoveRequest {
+        from,
+        to,
+        to_path_key,
+        to_basename_key,
+        generation,
+    } = request;
     let _background_task = background_task::scoped(&background_tasks, "Reflect index move");
     {
         let mut state = lock_state(&index)?;
@@ -312,7 +359,7 @@ pub fn index_move<R: tauri::Runtime>(
             return Ok(());
         }
         let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
-        move_rows(conn, &from, &to)?;
+        move_rows(conn, &from, &to, &to_path_key, &to_basename_key)?;
     }
     emit_index_written(&app);
     emit_note_moved(&app, &from, &to);
@@ -518,9 +565,15 @@ pub fn embed_remove(
 pub fn db_query(
     sql: String,
     params: Vec<Value>,
+    graph_generation: Option<u64>,
     index: State<IndexState>,
 ) -> AppResult<Vec<Map<String, Value>>> {
     let state = lock_state(&index)?;
+    if graph_generation.is_some() && state.graph_generation != graph_generation {
+        return Err(AppError::io(
+            "the graph changed since this index query was issued; dropping it",
+        ));
+    }
     let conn = state.conn.as_ref().ok_or_else(AppError::no_graph)?;
     query::run_query(conn, &sql, &params)
 }

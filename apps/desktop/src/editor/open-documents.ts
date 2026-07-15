@@ -19,6 +19,8 @@ import type { NoteSession } from './note-session'
 
 export interface OpenDocument {
   session: NoteSession
+  /** Keep path-sensitive session automation aligned with a file move. */
+  retarget?: ((to: string) => void) | undefined
   /** Fire pending settle-time work (title renames) now. */
   settle?: () => void
   /** Resolves once fired settle-time work has landed. */
@@ -77,6 +79,7 @@ export function retargetOpenDocument(from: string, to: string, session: NoteSess
   if (document !== undefined && document.session === session) {
     documents.delete(from)
     documents.set(to, document)
+    document.retarget?.(to)
   }
 }
 

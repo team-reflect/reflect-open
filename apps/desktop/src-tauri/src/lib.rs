@@ -198,7 +198,7 @@ pub fn run() {
     });
 
     builder
-        // Serves note images (`assets/…`) to the webview. Registered as an
+        // Serves supported in-vault attachments to the webview. Registered as an
         // *asynchronous* protocol on purpose: WebKit delivers custom-scheme
         // requests on the main thread, and a synchronous handler (like the
         // built-in `asset:` protocol this replaces) freezes the whole app for
@@ -239,8 +239,13 @@ pub fn run() {
             fs::note_read,
             fs::note_create,
             fs::note_write,
+            fs::note_write_if_unchanged,
             fs::asset_write,
             fs::asset_read,
+            fs::managed_asset_read,
+            fs::managed_asset_description_read,
+            fs::managed_asset_description_write,
+            fs::attachment_resolve,
             fs::asset_open,
             fs::assets::asset_upload_begin,
             fs::assets::asset_upload_append,
@@ -252,6 +257,7 @@ pub fn run() {
             fs::note_delete,
             fs::list_files,
             fs::list_attachments,
+            fs::asset_privacy_snapshot,
             recents::recent_graphs,
             recents::forget_recent,
             settings::settings_load,

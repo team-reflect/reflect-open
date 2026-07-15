@@ -204,7 +204,7 @@ export interface CloudAssetDescription {
  * outbound payload. Callers pass the asset's **live** privacy verdict as
  * `isPrivate` — sendable only when the asset is referenced by ≥1 public note
  * and 0 private notes, decided from each referencing note's markdown at call
- * time (`classifyAssetFromNotes`), because the sidecar on disk can predate a
+ * time (`classifyLiveAssetBatch`), because the sidecar on disk can predate a
  * note turning private. A blocked asset throws {@link PrivateNoteError}
  * before any description text is minted.
  */

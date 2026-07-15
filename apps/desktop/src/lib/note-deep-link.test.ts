@@ -2,14 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NoteSession } from '@/editor/note-session'
 
 const readNote = vi.hoisted(() => vi.fn<(path: string) => Promise<string>>())
-const writeNote = vi.hoisted(() => vi.fn(async () => {}))
+const writeNoteIfUnchanged = vi.hoisted(() =>
+  vi.fn(async () => ({ kind: 'written' as const, modifiedMs: null })),
+)
 const indexNote = vi.hoisted(() => vi.fn(async () => {}))
 const openSession = vi.hoisted(() => vi.fn<(path: string) => NoteSession | null>(() => null))
 
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   readNote,
-  writeNote,
+  writeNoteIfUnchanged,
   indexNote,
 }))
 vi.mock('@/editor/open-documents', () => ({ openSession }))
@@ -20,7 +22,7 @@ const ULID_RE = /^[0-9a-hjkmnp-tv-z]{26}$/
 
 beforeEach(() => {
   readNote.mockReset()
-  writeNote.mockClear()
+  writeNoteIfUnchanged.mockReset().mockResolvedValue({ kind: 'written', modifiedMs: null })
   indexNote.mockClear()
   openSession.mockReset()
   openSession.mockReturnValue(null)
@@ -32,7 +34,7 @@ describe('deepLinkForNote', () => {
       'reflect://daily/2026-07-01',
     )
     expect(readNote).not.toHaveBeenCalled()
-    expect(writeNote).not.toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
   })
 
   it('addresses an impossible-date daily file like a plain note (mints an id)', async () => {
@@ -43,7 +45,7 @@ describe('deepLinkForNote', () => {
     const url = await deepLinkForNote('daily/2026-02-31.md', 3)
 
     expect(url.startsWith('reflect://note/')).toBe(true)
-    expect(writeNote).toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).toHaveBeenCalled()
   })
 
   it('uses the existing frontmatter id without writing or reindexing', async () => {
@@ -52,7 +54,7 @@ describe('deepLinkForNote', () => {
     await expect(deepLinkForNote('notes/a.md', 3)).resolves.toBe(
       'reflect://note/01hzy3v9k2m4n6p8q0r2s4t6vw',
     )
-    expect(writeNote).not.toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
     expect(indexNote).not.toHaveBeenCalled()
   })
 
@@ -63,7 +65,7 @@ describe('deepLinkForNote', () => {
 
     const id = decodeURIComponent(url.replace('reflect://note/', ''))
     expect(id).toMatch(ULID_RE)
-    expect(writeNote).toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).toHaveBeenCalled()
   })
 
   it('mints a ULID id on first copy, lands it on disk, and indexes it immediately', async () => {
@@ -73,7 +75,12 @@ describe('deepLinkForNote', () => {
 
     const id = decodeURIComponent(url.replace('reflect://note/', ''))
     expect(id).toMatch(ULID_RE)
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', `---\nid: ${id}\n---\n# A\n`, 3)
+    expect(writeNoteIfUnchanged).toHaveBeenCalledWith(
+      'notes/a.md',
+      '# A\n',
+      `---\nid: ${id}\n---\n# A\n`,
+      3,
+    )
     // The index trails local writes by a watcher debounce; without this the
     // just-copied link answers "Note not found" until the reindex.
     expect(indexNote).toHaveBeenCalledWith('notes/a.md', { generation: 3 })
@@ -99,6 +106,6 @@ describe('deepLinkForNote', () => {
 
     const id = decodeURIComponent(url.replace('reflect://note/', ''))
     expect(commitFrontmatter).toHaveBeenCalledWith({ id })
-    expect(writeNote).not.toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
   })
 })

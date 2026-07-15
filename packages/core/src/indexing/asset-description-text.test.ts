@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { readNote } from '../graph/commands'
+import { readManagedAssetDescription } from '../graph/commands'
 import {
   gatherAssetDescriptionBodies,
   gatherAssetDescriptionText,
@@ -7,12 +7,10 @@ import {
 } from './asset-description-text'
 
 vi.mock('../graph/commands', () => ({
-  readNote: vi.fn(),
+  readManagedAssetDescription: vi.fn(),
 }))
 
-const readNoteMock = vi.mocked(readNote)
-
-const notFound = (): unknown => ({ kind: 'notFound', message: 'missing' })
+const readDescriptionMock = vi.mocked(readManagedAssetDescription)
 
 /** Description files keyed by their `.reflect.md` path. */
 const files = new Map<string, string>()
@@ -20,18 +18,27 @@ const files = new Map<string, string>()
 beforeEach(() => {
   files.clear()
   vi.clearAllMocks()
-  readNoteMock.mockImplementation(async (path: string) => {
-    const value = files.get(path)
-    if (value === undefined) {
-      throw notFound()
-    }
-    return value
-  })
+  readDescriptionMock.mockImplementation(async (path: string) =>
+    files.get(`${path}.reflect.md`) ?? null,
+  )
 })
 
 describe('gatherAssetDescriptionText', () => {
   it('returns empty for no assets', async () => {
     expect(await gatherAssetDescriptionText([])).toBe('')
+  })
+
+  it('ignores index sentinels, imported paths, and unsupported managed files', async () => {
+    const text = await gatherAssetDescriptionText([
+      ':reflect:attachment-basename:a.png',
+      'Media/a.png',
+      'assets/audio.mp3',
+      'assets/readme.txt',
+      'assets/../secret.png',
+    ])
+
+    expect(text).toBe('')
+    expect(readDescriptionMock).not.toHaveBeenCalled()
   })
 
   it('reads each asset description body, stripping frontmatter, joined', async () => {
@@ -56,7 +63,7 @@ describe('gatherAssetDescriptionText', () => {
   it('folds an asset referenced twice only once', async () => {
     files.set('assets/a.png.reflect.md', '---\nreflectAsset: true\n---\n\nOnce.\n')
     expect(await gatherAssetDescriptionText(['assets/a.png', 'assets/a.png'])).toBe('Once.')
-    expect(readNoteMock).toHaveBeenCalledTimes(1)
+    expect(readDescriptionMock).toHaveBeenCalledTimes(1)
   })
 
   it('also folds a user-authored description file (no managed marker)', async () => {
@@ -72,12 +79,20 @@ describe('gatherAssetDescriptionText', () => {
   })
 
   it('propagates a non-notFound read error', async () => {
-    readNoteMock.mockRejectedValueOnce({ kind: 'io', message: 'disk error' })
+    readDescriptionMock.mockRejectedValueOnce({ kind: 'io', message: 'disk error' })
     await expect(gatherAssetDescriptionText(['assets/a.png'])).rejects.toMatchObject({ kind: 'io' })
   })
 })
 
 describe('gatherAssetDescriptionBodies', () => {
+  it('pins managed description reads to the caller generation', async () => {
+    files.set('assets/a.png.reflect.md', 'Pinned description.\n')
+
+    await gatherAssetDescriptionBodies(['assets/a.png'], 7)
+
+    expect(readDescriptionMock).toHaveBeenCalledWith('assets/a.png', 7)
+  })
+
   it('returns per-asset bodies attributed to their asset paths', async () => {
     files.set('assets/a.png.reflect.md', '---\nreflectAsset: true\n---\n\nA flow diagram.\n')
     files.set('assets/b.pdf.reflect.md', '---\nreflectAsset: true\n---\n\nQ4 revenue report.\n')
@@ -102,7 +117,7 @@ describe('gatherAssetDescriptionBodies', () => {
     ])
 
     expect(bodies).toEqual([{ assetPath: 'assets/a.png', body: 'Described.' }])
-    expect(readNoteMock).toHaveBeenCalledTimes(3) // the repeat never re-reads
+    expect(readDescriptionMock).toHaveBeenCalledTimes(3) // the repeat never re-reads
   })
 
   it('stops accumulating once the combined length reaches the cap', async () => {

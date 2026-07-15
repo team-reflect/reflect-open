@@ -110,13 +110,17 @@ Resolves `<note>` and prints the raw markdown. Resolution order:
 1. A calendar-valid `YYYY-MM-DD` → that daily note.
 2. An explicit path (graph-relative like `notes/foo.md`, or absolute inside
    the graph).
-3. A title match (case-insensitive, trimmed).
+3. An authored title match (frontmatter `title` or the first H1;
+   case-insensitive and trimmed).
 4. An alias match (from `aliases:` frontmatter, or a v1 subject-alias
    segment of a `//` title like `Charlotte MacCaw // Mum`).
+5. A unique filename-stem match.
 
-Works with or without the index — when the index is missing, titles/aliases
-are derived by scanning the files. Ambiguous matches resolve to the first path
-alphabetically and list the others on stderr.
+Resolution always scans the current eligible Markdown files, even when an
+index exists, so external additions, edits, and deletions take effect
+immediately. An unavailable iCloud placeholder or unreadable candidate fails
+the lookup closed. Ambiguous matches resolve to the first path alphabetically
+and list the others on stderr.
 
 ```jsonc
 // reflect show "Project X" --json   ("date" is null for non-dailies)

@@ -20,6 +20,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
 function fakeSession(path: string) {
   let current = path
   const flush = vi.fn(async () => {})
+  const externalChanged = vi.fn()
   const session: NoteSession = {
     get path() {
       return current
@@ -29,7 +30,8 @@ function fakeSession(path: string) {
     },
     load: () => {},
     editorChanged: () => {},
-    externalChanged: () => {},
+    externalChanged,
+    externalRemoved: () => {},
     flush,
     keepMine: () => {},
     isDirty: () => false,
@@ -38,6 +40,7 @@ function fakeSession(path: string) {
     content: () => '',
     liveContent: () => '',
     updateFrontmatter: () => true,
+    commitExactContentReplacement: async () => false,
     commitTaskToggle: async () => false,
     commitTaskEdit: async () => false,
     commitTaskRemove: async () => false,
@@ -46,7 +49,7 @@ function fakeSession(path: string) {
     dispose: () => {},
     discard: () => {},
   }
-  return { session, flush }
+  return { session, flush, externalChanged }
 }
 
 beforeEach(() => {
@@ -116,7 +119,7 @@ describe('moveNoteCarryingSession', () => {
 
 describe('followHealedMove', () => {
   it('carries a live session to the healed path and announces', () => {
-    const { session } = fakeSession('notes/a.md')
+    const { session, externalChanged } = fakeSession('notes/a.md')
     const unregister = registerOpenDocument({ session })
     const moves: Array<[string, string]> = []
     const unsubscribe = onNoteMoved((from, to) => moves.push([from, to]))
@@ -128,6 +131,7 @@ describe('followHealedMove', () => {
       expect(session.path).toBe('notes/renamed.md')
       expect(openSession('notes/renamed.md')).toBe(session)
       expect(openSession('notes/a.md')).toBeNull()
+      expect(externalChanged).toHaveBeenCalledOnce()
       expect(moves).toEqual([['notes/a.md', 'notes/renamed.md']])
     } finally {
       unsubscribe()

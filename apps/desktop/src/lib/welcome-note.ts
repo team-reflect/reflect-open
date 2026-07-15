@@ -1,4 +1,5 @@
 import {
+  createNoteIfAbsent,
   getIndexMeta,
   listFiles,
   newNoteId,
@@ -6,7 +7,6 @@ import {
   setIndexMeta,
   slugForTitle,
   upsertFrontmatter,
-  writeNote,
 } from '@reflect/core'
 
 /**
@@ -58,19 +58,22 @@ export interface EnsureWelcomeNoteOptions {
  * nested note means this is someone's existing data and only gets marked.
  * Either way the marker lands,
  * so deleting the note — or emptying the graph entirely — never re-onboards.
- * The marker is stamped after the write: a failed seed retries on the next
- * open, and a retry that finds the note already on disk converges to marking.
- * Returns whether a seed happened.
+ * The marker is stamped after the atomic create attempt: a file that appears
+ * after the empty listing wins without being overwritten, and converges to a
+ * marked, unseeded graph. A failed create retries on the next open, while a
+ * response-lost create is found by that retry's listing. Returns whether this
+ * call created the seed.
  */
 export async function ensureWelcomeNote(options: EnsureWelcomeNoteOptions): Promise<boolean> {
   if ((await getIndexMeta(WELCOME_SEEDED_META_KEY)) !== null) {
     return false
   }
   const files = await listFiles(options.fileGeneration)
-  const seeded = files.length === 0
-  if (seeded) {
+  let seeded = false
+  if (files.length === 0) {
     const source = upsertFrontmatter(WELCOME_BODY, { id: newNoteId(), pinned: true })
-    await writeNote(WELCOME_NOTE_PATH, source, options.fileGeneration)
+    const outcome = await createNoteIfAbsent(WELCOME_NOTE_PATH, source, options.fileGeneration)
+    seeded = outcome.kind === 'created'
   }
   await setIndexMeta(WELCOME_SEEDED_META_KEY, 'true', options.indexGeneration)
   return seeded

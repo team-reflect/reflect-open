@@ -10,21 +10,37 @@ interface WrittenNote {
 interface FakeGraph {
   written: WrittenNote[]
   meta: Record<string, string>
+  files: Record<string, string>
 }
 
 function installFakeBridge(options: {
   existingFiles?: string[]
   meta?: Record<string, string>
+  raceFile?: WrittenNote
 }): FakeGraph {
-  const graph: FakeGraph = { written: [], meta: { ...options.meta } }
+  const graph: FakeGraph = {
+    written: [],
+    meta: { ...options.meta },
+    files: Object.fromEntries((options.existingFiles ?? []).map((path) => [path, 'existing bytes'])),
+  }
   setBridge({
     invoke: async (command, args) => {
       switch (command) {
         case 'list_files':
-          return (options.existingFiles ?? []).map((path) => ({ path, size: 0, modifiedMs: 0 }))
-        case 'note_write':
-          graph.written.push({ path: String(args['path']), contents: String(args['contents']) })
-          return null
+          return Object.keys(graph.files).map((path) => ({ path, size: 0, modifiedMs: 0 }))
+        case 'note_create': {
+          if (options.raceFile !== undefined) {
+            graph.files[options.raceFile.path] = options.raceFile.contents
+          }
+          const path = String(args['path'])
+          if (path in graph.files) {
+            return { kind: 'collision' }
+          }
+          const contents = String(args['contents'])
+          graph.files[path] = contents
+          graph.written.push({ path, contents })
+          return { kind: 'created', modifiedMs: 1 }
+        }
         case 'index_meta_set':
           graph.meta[String(args['key'])] = String(args['value'])
           return null
@@ -75,6 +91,16 @@ describe('ensureWelcomeNote', () => {
       expect(graph.meta[WELCOME_SEEDED_META_KEY]).toBe('true')
     },
   )
+
+  it('preserves a file that appears after the empty listing and only marks the graph', async () => {
+    const adopted = { path: WELCOME_NOTE_PATH, contents: '# My existing note\n\nKeep these bytes.\n' }
+    const graph = installFakeBridge({ raceFile: adopted })
+
+    expect(await ensureWelcomeNote(GENERATIONS)).toBe(false)
+    expect(graph.written).toHaveLength(0)
+    expect(graph.files[WELCOME_NOTE_PATH]).toBe(adopted.contents)
+    expect(graph.meta[WELCOME_SEEDED_META_KEY]).toBe('true')
+  })
 
   it('does nothing once marked — an emptied graph is not re-onboarded', async () => {
     const graph = installFakeBridge({ meta: { [WELCOME_SEEDED_META_KEY]: 'true' } })

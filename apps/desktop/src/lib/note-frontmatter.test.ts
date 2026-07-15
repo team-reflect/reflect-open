@@ -1,14 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { NoteWriteIfUnchangedOutcome } from '@reflect/core'
 import type { NoteSession } from '@/editor/note-session'
 
 const readNote = vi.hoisted(() => vi.fn<(path: string) => Promise<string>>())
-const writeNote = vi.hoisted(() => vi.fn(async () => {}))
+const writeNoteIfUnchanged = vi.hoisted(() =>
+  vi.fn<
+    (
+      path: string,
+      expected: string | null,
+      contents: string,
+      generation: number,
+    ) => Promise<NoteWriteIfUnchangedOutcome>
+  >(async () => ({ kind: 'written', modifiedMs: null })),
+)
 const openSession = vi.hoisted(() => vi.fn<(path: string) => NoteSession | null>(() => null))
 
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   readNote,
-  writeNote,
+  writeNoteIfUnchanged,
 }))
 vi.mock('@/editor/open-documents', () => ({ openSession }))
 
@@ -25,7 +35,7 @@ function fakeSession(options: { live?: string | null; canCommit?: boolean }) {
 
 beforeEach(() => {
   readNote.mockReset()
-  writeNote.mockClear()
+  writeNoteIfUnchanged.mockReset().mockResolvedValue({ kind: 'written', modifiedMs: null })
   openSession.mockReset().mockReturnValue(null)
 })
 
@@ -56,7 +66,7 @@ describe('commitNoteFrontmatter', () => {
     await commitNoteFrontmatter('notes/a.md', { pinned: true }, 3)
 
     expect(commitFrontmatter).toHaveBeenCalledWith({ pinned: true })
-    expect(writeNote).not.toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
   })
 
   it('falls back to a disk patch when the session declines the patch', async () => {
@@ -65,7 +75,12 @@ describe('commitNoteFrontmatter', () => {
 
     await commitNoteFrontmatter('notes/a.md', { pinned: true }, 3)
 
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\npinned: true\n---\n# A\n', 3)
+    expect(writeNoteIfUnchanged).toHaveBeenCalledWith(
+      'notes/a.md',
+      '# A\n',
+      '---\npinned: true\n---\n# A\n',
+      3,
+    )
   })
 
   it('patches disk directly when no session is open', async () => {
@@ -73,7 +88,12 @@ describe('commitNoteFrontmatter', () => {
 
     await commitNoteFrontmatter('notes/a.md', { private: true }, 3)
 
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\nprivate: true\n---\n# A\n', 3)
+    expect(writeNoteIfUnchanged).toHaveBeenCalledWith(
+      'notes/a.md',
+      '# A\n',
+      '---\nprivate: true\n---\n# A\n',
+      3,
+    )
   })
 
   it('writes nothing when the patch changes nothing', async () => {
@@ -81,6 +101,38 @@ describe('commitNoteFrontmatter', () => {
 
     await commitNoteFrontmatter('notes/a.md', { pinned: true }, 3)
 
-    expect(writeNote).not.toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
+  })
+
+  it('does not create an arbitrary missing note from a stale frontmatter action', async () => {
+    readNote.mockRejectedValue({ kind: 'notFound', message: 'missing' })
+
+    await expect(
+      commitNoteFrontmatter('Projects/deleted.md', { private: true }, 3),
+    ).rejects.toMatchObject({ kind: 'notFound' })
+
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
+  })
+
+  it('may create a missing daily through an absent-path conditional write', async () => {
+    readNote.mockRejectedValue({ kind: 'notFound', message: 'missing' })
+
+    await commitNoteFrontmatter('daily/2026-07-14.md', { pinned: true }, 3)
+
+    expect(writeNoteIfUnchanged).toHaveBeenCalledWith(
+      'daily/2026-07-14.md',
+      null,
+      '---\npinned: true\n---\n',
+      3,
+    )
+  })
+
+  it('fails closed when disk changes after the frontmatter read', async () => {
+    readNote.mockResolvedValue('# A\n')
+    writeNoteIfUnchanged.mockResolvedValue({ kind: 'changed' })
+
+    await expect(commitNoteFrontmatter('notes/a.md', { pinned: true }, 3)).rejects.toThrow(
+      /changed or was removed/,
+    )
   })
 })

@@ -1,3 +1,4 @@
+import type { GraphInfo } from '@reflect/core'
 import type { Route } from '@/routing/route'
 import type { NavigateOptions } from '@/routing/router'
 
@@ -33,9 +34,15 @@ export interface CommandContext {
   /** Start an audio memo, or stop-and-save the one recording. */
   toggleAudioMemo: () => void
   /**
+   * The active graph identity, read at command execution time. New-note
+   * creation claims bind to both root and file-session generation so a route
+   * minted in one graph can never authorize the same path in another.
+   */
+  graph: () => GraphInfo | null
+  /**
    * The open **index session** generation (`index_open`), or null when none —
    * what index/embedding commands echo. File writes (`note_write`) take
-   * `graph.generation` instead; no current command needs that one.
+   * `graph.generation` instead.
    */
   generation: () => number | null
   /** Open the ⌘K palette (optionally pre-filled). */

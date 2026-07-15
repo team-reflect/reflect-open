@@ -18,11 +18,13 @@ export interface InlineLinkParts {
   text: string
   /** The href with any `<…>` brackets removed. */
   href: string
+  /** Source range of the href, excluding optional `<…>` brackets. */
+  destination: { from: number; to: number }
 }
 
 /**
  * Decompose the source of an inline link/image node, or `null` when it isn't
- * the inline form (e.g. a reference-style link — skipped this wave).
+ * the inline form (for example, a reference-style link).
  */
 export function parseInlineLink(source: string): InlineLinkParts | null {
   const match = INLINE_LINK_RE.exec(source)
@@ -31,9 +33,19 @@ export function parseInlineLink(source: string): InlineLinkParts | null {
   }
   // All three groups are mandatory in INLINE_LINK_RE, so a successful match
   // always populates them.
+  const rawHref = match[3]!
+  const hrefOffset = source.indexOf(rawHref, source.indexOf('](') + 2)
+  if (hrefOffset === -1) {
+    return null
+  }
+  const bracketed = rawHref.startsWith('<') && rawHref.endsWith('>')
   return {
     isImage: match[1] === '!',
     text: match[2]!,
-    href: match[3]!.replace(/^<|>$/g, ''),
+    href: bracketed ? rawHref.slice(1, -1) : rawHref,
+    destination: {
+      from: hrefOffset + (bracketed ? 1 : 0),
+      to: hrefOffset + rawHref.length - (bracketed ? 1 : 0),
+    },
   }
 }

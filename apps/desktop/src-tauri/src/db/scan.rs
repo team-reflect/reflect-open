@@ -103,7 +103,10 @@ pub(super) fn scan_reconcile(
         }
         let facts = stored.get(&file.path);
         let settled = now_ms.saturating_sub(file.modified_ms) >= MTIME_TRUST_AGE_MS;
-        if settled && facts.is_some_and(|(mtime, _)| *mtime == file.modified_ms as i64) {
+        if settled
+            && facts
+                .is_some_and(|(mtime, hash)| *mtime == file.modified_ms as i64 && !hash.is_empty())
+        {
             continue; // untouched since it was indexed
         }
         candidates.push(ScanCandidate {

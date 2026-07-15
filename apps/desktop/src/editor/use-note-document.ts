@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { readNote, writeNote, type FileChange } from '@reflect/core'
+import { isDaily, readNote, writeNoteIfUnchanged, type FileChange } from '@reflect/core'
 import { useFileChanges } from '@/lib/use-file-changes'
 import { createDocumentBinding, type DocumentBinding } from './document-binding'
 import type { NoteEditorHandle } from './note-editor'
@@ -43,9 +43,12 @@ export interface NoteDocumentOptions {
   /**
    * Treat a missing file as an empty note instead of an error. The file is then
    * created by the first save — Plan 06's lazy daily-note contract: opening a
-   * day never litters the graph; writing does.
+   * day never litters the graph; writing does. This grants one initial claim;
+   * only daily paths retain recreation after a later removal.
    */
   createIfMissing?: boolean
+  /** Revoke the host's ephemeral New Note route grant once this session spends it. */
+  onInitialCreateConsumed?: (() => void) | undefined
   /**
    * Auto-rewrite inbound `[[links]]` (and move the file onto its title's slug,
    * Plan 17) when this note's settled title changes. The coordinator still
@@ -73,12 +76,24 @@ export function useNoteDocument(
   options?: NoteDocumentOptions,
 ): NoteDocument {
   const createIfMissing = options?.createIfMissing ?? false
+  const onInitialCreateConsumed = options?.onInitialCreateConsumed
   const trackRenames = options?.trackRenames ?? false
   const missingSeed = options?.missingSeed
   const [snapshot, setSnapshot] = useState<NoteSessionSnapshot>(INITIAL_NOTE_SNAPSHOT)
   const editorRef = useRef<NoteEditorHandle | null>(null)
+  const initialCreateConsumedRef = useRef(onInitialCreateConsumed)
+  // The host may recreate this callback while consuming the route-level
+  // claim. Keep the session wired to a stable proxy so that callback identity
+  // alone never disposes and reloads the live document.
+  // eslint-disable-next-line react-hooks/refs
+  initialCreateConsumedRef.current = onInitialCreateConsumed
+  const reportInitialCreateConsumed = useCallback(() => {
+    initialCreateConsumedRef.current?.()
+  }, [])
   /** Mirrors the snapshot's conflict for non-reactive checks (rename gating). */
   const conflictRef = useRef<string | null>(null)
+  /** A removed path must not enter settled rename/move automation. */
+  const missingRef = useRef(false)
   /** The pane's lifecycle policy object — one per hook instance. */
   const [binding] = useState<DocumentBinding>(() => createDocumentBinding())
 
@@ -111,7 +126,7 @@ export function useNoteDocument(
           ? createRenameCoordinator({
               path,
               generation: () => generationRef.current,
-              canFire: () => conflictRef.current === null,
+              canFire: () => conflictRef.current === null && !missingRef.current,
             })
           : null,
       session: (coordinator) =>
@@ -120,18 +135,21 @@ export function useNoteDocument(
           io: {
             read: readNote,
             write: canWrite
-              ? (forPath, contents) => {
+              ? (forPath, contents, expected) => {
                   const current = generationRef.current
                   if (current === null) {
                     return Promise.reject(new Error('no graph generation available for save'))
                   }
-                  return writeNote(forPath, contents, current)
+                  return writeNoteIfUnchanged(forPath, expected, contents, current).then(
+                    (outcome) => outcome.kind === 'written',
+                  )
                 }
               : null,
           },
           classify: checkRoundTrip,
           onSnapshot: (next) => {
             conflictRef.current = next.conflict
+            missingRef.current = next.missing
             setSnapshot(next)
           },
           applyContent: (markdown) => editorRef.current?.setMarkdown(markdown),
@@ -144,6 +162,8 @@ export function useNoteDocument(
           },
           onContent: coordinator ? coordinator.content : undefined,
           createIfMissing,
+          onInitialCreateConsumed: reportInitialCreateConsumed,
+          recreateAfterRemoval: createIfMissing && isDaily(path),
           missingSeed,
         }),
     })
@@ -151,7 +171,15 @@ export function useNoteDocument(
       session.load()
     }
     return () => binding.unbind(path)
-  }, [binding, path, canWrite, createIfMissing, trackRenames, missingSeed])
+  }, [
+    binding,
+    path,
+    canWrite,
+    createIfMissing,
+    reportInitialCreateConsumed,
+    trackRenames,
+    missingSeed,
+  ])
 
   // External-change reconciliation via the watcher (Plan 04b events). The
   // comparison reads the session's CURRENT path, not the route prop: a rename
@@ -164,8 +192,16 @@ export function useNoteDocument(
       if (session === null) {
         return
       }
-      if (changes.some((change) => change.path === session.path && change.kind === 'upsert')) {
+      let change: FileChange | undefined
+      for (const candidate of changes) {
+        if (candidate.path === session.path) {
+          change = candidate // the last same-path event is the final batch state
+        }
+      }
+      if (change?.kind === 'upsert') {
         session.externalChanged()
+      } else if (change?.kind === 'remove') {
+        session.externalRemoved()
       }
     },
     [binding],

@@ -101,6 +101,7 @@ describe('streamChatTurn', () => {
     const events = await collect(
       streamChatTurn(model, {
         messages: [{ role: 'user', content: 'where is the launch plan?' }],
+        generation: 7,
         today: '2026-06-11',
         semanticSearchEnabled: true,
         context: null,
@@ -140,6 +141,7 @@ describe('streamChatTurn', () => {
     await collect(
       streamChatTurn(model, {
         messages: [{ role: 'user', content: 'what do my notes say?' }],
+        generation: 7,
         today: '2026-06-11',
         semanticSearchEnabled: true,
         context: null,
@@ -161,6 +163,7 @@ describe('streamChatTurn', () => {
     await collect(
       streamChatTurn(model, {
         messages: [{ role: 'user', content: 'hi' }],
+        generation: 7,
         today: '2026-06-11',
         semanticSearchEnabled: true,
         context: cloudSafeGraphContext({
@@ -193,6 +196,7 @@ describe('streamChatTurn', () => {
     const events = await collect(
       streamChatTurn(model, {
         messages: [{ role: 'user', content: 'hi' }],
+        generation: 7,
         today: '2026-06-11',
         semanticSearchEnabled: true,
         context: null,
@@ -217,6 +221,7 @@ describe('streamChatTurn', () => {
     const events = await collect(
       streamChatTurn(model, {
         messages: [{ role: 'user', content: 'where is the launch plan?' }],
+        generation: 7,
         today: '2026-06-11',
         semanticSearchEnabled: true,
         context: null,
@@ -255,6 +260,7 @@ describe('streamChatTurn', () => {
     const events = await collect(
       streamChatTurn(model, {
         messages: [{ role: 'user', content: 'plan and budget?' }],
+        generation: 7,
         today: '2026-06-11',
         semanticSearchEnabled: true,
         context: null,
@@ -291,6 +297,7 @@ describe('streamChatTurn', () => {
     const events = await collect(
       streamChatTurn(model, {
         messages: [{ role: 'user', content: 'summarize everything' }],
+        generation: 7,
         today: '2026-06-11',
         semanticSearchEnabled: true,
         context: null,

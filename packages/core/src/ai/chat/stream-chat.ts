@@ -45,6 +45,8 @@ export interface StreamChatOptions {
   fetchFn: typeof fetch
   /** Full model-facing history including the new user message. */
   messages: ModelMessage[]
+  /** Open graph generation that pins filesystem-backed tool reads. */
+  generation: number
   /** Local ISO date for the system prompt (daily-note key space). */
   today: string
   /** Whether note search can use embeddings for meaning-based recall. */
@@ -87,6 +89,7 @@ export function streamChat(options: StreamChatOptions): AsyncGenerator<ChatStrea
   })
   return streamChatTurn(languageModel(options.config, options.apiKey, options.fetchFn), {
     messages,
+    generation: options.generation,
     today: options.today,
     semanticSearchEnabled: options.semanticSearchEnabled,
     context: options.context,
@@ -98,6 +101,8 @@ export function streamChat(options: StreamChatOptions): AsyncGenerator<ChatStrea
 export interface ChatTurnOptions {
   /** Full model-facing history including the new user message. */
   messages: ModelMessage[]
+  /** Open graph generation that pins filesystem-backed tool reads. */
+  generation: number
   /** Local ISO date for the system prompt (daily-note key space). */
   today: string
   /** Whether note search can use embeddings for meaning-based recall. */
@@ -126,6 +131,7 @@ export async function* streamChatTurn(
 ): AsyncGenerator<ChatStreamEvent> {
   const tools = buildNoteTools({
     ...options.toolDeps,
+    generation: options.generation,
     semanticSearchEnabled: options.semanticSearchEnabled,
   })
 

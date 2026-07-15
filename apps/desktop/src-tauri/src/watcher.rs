@@ -293,6 +293,13 @@ fn may_affect_catalog(path: &Path, root: &Path) -> bool {
         .is_some_and(|relative| reflect_graph_paths::classify_normalized(&relative).is_some())
 }
 
+fn reports_attachment_change(changes: &[FileChange]) -> bool {
+    changes.iter().any(|change| {
+        reflect_graph_paths::classify_normalized(&change.path)
+            == Some(reflect_graph_paths::GraphPathKind::Attachment)
+    })
+}
+
 fn has_catalog_descendant(snapshot: &CatalogSnapshot, relative: &str) -> bool {
     let prefix = format!("{relative}/");
     snapshot.keys().any(|path| path.starts_with(&prefix))
@@ -447,7 +454,12 @@ fn schedule_catalog_retry(
                         break;
                     }
                     if catalog_changed {
-                        crate::fs::invalidate_file_catalog(&app.state::<GraphState>(), &root);
+                        let graph = app.state::<GraphState>();
+                        if reports_attachment_change(&changes) {
+                            crate::fs::invalidate_file_catalog(&graph, &root);
+                        } else {
+                            crate::fs::invalidate_file_catalog_and_emit(&app, &graph, &root);
+                        }
                     }
                     if !changes.is_empty() {
                         let _ = app.emit(CHANGE_EVENT, changes);
@@ -588,10 +600,24 @@ pub fn watch_start(
                     .iter()
                     .any(|path| may_affect_catalog(path, &handler_root))
             {
-                crate::fs::invalidate_file_catalog(
-                    &handler_app.state::<GraphState>(),
-                    &handler_root,
-                );
+                let graph = handler_app.state::<GraphState>();
+                let attachment_refresh_needed = !reports_attachment_change(&changes)
+                    && (needs_diff
+                        || paths.iter().any(|path| {
+                            tracked_relpath(path, &handler_root).is_some_and(|relative| {
+                                reflect_graph_paths::classify_normalized(&relative)
+                                    == Some(reflect_graph_paths::GraphPathKind::Attachment)
+                            })
+                        }));
+                if attachment_refresh_needed {
+                    crate::fs::invalidate_file_catalog_and_emit(
+                        &handler_app,
+                        &graph,
+                        &handler_root,
+                    );
+                } else {
+                    crate::fs::invalidate_file_catalog(&graph, &handler_root);
+                }
             }
             if !changes.is_empty() {
                 let _ = handler_app.emit(CHANGE_EVENT, changes);
@@ -619,7 +645,11 @@ pub fn watch_start(
     *lock_watcher(&watcher)? = Some(active_watcher);
     drop(graph_guard);
     if catalog_changed {
-        crate::fs::invalidate_file_catalog(&graph, &root);
+        if reports_attachment_change(&catch_up) {
+            crate::fs::invalidate_file_catalog(&graph, &root);
+        } else {
+            crate::fs::invalidate_file_catalog_and_emit(&app, &graph, &root);
+        }
     }
     if !catch_up.is_empty() {
         let _ = app.emit(CHANGE_EVENT, catch_up);
@@ -1001,7 +1031,7 @@ mod tests {
     }
 
     #[test]
-    fn placeholder_events_track_as_their_logical_note() {
+    fn placeholder_events_track_as_their_logical_catalog_path() {
         let root = Path::new("/g");
         assert_eq!(
             tracked_relpath(Path::new("/g/notes/.a.md.icloud"), root).as_deref(),
@@ -1010,6 +1040,10 @@ mod tests {
         assert_eq!(
             tracked_relpath(Path::new("/g/audio-memos/.memo.m4a.icloud"), root).as_deref(),
             Some("audio-memos/memo.m4a")
+        );
+        assert_eq!(
+            tracked_relpath(Path::new("/g/Media/.photo.png.icloud"), root).as_deref(),
+            Some("Media/photo.png")
         );
         // The logical file must still pass the tracking rules.
         assert_eq!(

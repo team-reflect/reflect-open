@@ -1,13 +1,14 @@
 import { useCallback, type ReactElement } from 'react'
-import { untitledNotePath } from '@reflect/core'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { newNoteRoute } from '@/lib/new-note-route'
 import { useToday } from '@/lib/use-today'
 import { AudioMemoFab } from '@/mobile/audio-memo-fab'
 import { CalendarStrip } from '@/mobile/calendar-strip'
 import { DayCarousel } from '@/mobile/day-carousel'
 import { useDailyArrivals } from '@/mobile/use-daily-arrivals'
 import { useSwipeTarget } from '@/mobile/use-swipe-target'
+import { useGraph } from '@/providers/graph-provider'
 import { useRouter } from '@/routing/router'
 
 /**
@@ -24,6 +25,7 @@ import { useRouter } from '@/routing/router'
  */
 export function MobileDaily({ date }: { date: string }): ReactElement {
   const { navigate, entryId, arrivalSeq, arrivalFocusEditor } = useRouter()
+  const { graph } = useGraph()
   // One live `today` for the whole surface: the strip marks today's cell and
   // the `select` below decide "is this today?" from the *same* value, so they
   // can't disagree across the midnight rollover (which would otherwise route a
@@ -73,9 +75,14 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
       <Button
         size="icon"
         aria-label="New note"
+        disabled={graph === null}
         className="fixed right-4 z-40 size-12 rounded-full shadow-lg"
         style={{ bottom: 'calc(max(env(safe-area-inset-bottom), var(--keyboard-height, 0px)) + 4.25rem)' }}
-        onClick={() => navigate({ kind: 'note', path: untitledNotePath() })}
+        onClick={() => {
+          if (graph !== null) {
+            navigate(newNoteRoute(graph))
+          }
+        }}
       >
         <Plus className="size-6" />
       </Button>

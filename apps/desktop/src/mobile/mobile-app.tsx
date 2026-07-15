@@ -1,4 +1,5 @@
 import { useEffect, type ReactElement } from 'react'
+import { AmbiguousNoteChooser } from '@/editor/ambiguous-note-chooser'
 import { installBackgroundFlush } from '@/lib/background-flush'
 import { MobileAudioMemoProvider } from '@/mobile/audio-memo-provider'
 import { MobileErrorBoundary } from '@/mobile/mobile-error-boundary'
@@ -9,6 +10,7 @@ import { RecordingDrawer } from '@/mobile/recording-drawer'
 import { useICloudRefresh } from '@/mobile/use-icloud-refresh'
 import { useKeyboardCaretReveal, useKeyboardHeightVar } from '@/mobile/use-keyboard'
 import { useTaskCheckboxHaptics } from '@/mobile/use-task-haptics'
+import { AttachmentCatalogProvider } from '@/providers/attachment-catalog-provider'
 import { CaptureProvider } from '@/providers/capture-provider'
 import { ChatProvider } from '@/providers/chat-provider'
 import { useGraph } from '@/providers/graph-provider'
@@ -49,32 +51,38 @@ export function MobileApp(): ReactElement {
     return (
       <MobileErrorBoundary>
         <RouterProvider key={graph.root}>
-          {/* Same engine, contracts, and triggers as desktop (Plan 12) — the
-              controller owns resume/edit/online; mobile adds only the
-              plain-language status pill (step 10). */}
-          <SyncProvider graph={graph}>
-            {/* Link capture (Plan 11, iOS share extension): relay the App
-                Group inbox + drain on launch and on every resume. */}
-            <CaptureProvider graph={graph}>
-              {/* Same chat session engine as desktop (Plan 23): the
-                  conversation and composer draft live here so the Chat tab
-                  survives tab switches; semantic search is forced off on
-                  this surface inside the provider. */}
-              <ChatProvider graph={graph}>
-                {/* Native recording over the shared capture pipeline — the
-                    mobile leg of desktop's audio memos. Mounted here so the
-                    queue, the reconciler, and the orphan scan survive tab
-                    switches. */}
-                <MobileAudioMemoProvider graph={graph}>
-                  <MobileShell />
-                  <MobileStatusLayer />
-                  {/* Mounted beside the shell (not inside the daily screen)
-                      so a live recording's sheet survives tab switches. */}
-                  <RecordingDrawer />
-                </MobileAudioMemoProvider>
-              </ChatProvider>
-            </CaptureProvider>
-          </SyncProvider>
+          <AttachmentCatalogProvider
+            key={`${graph.root}:${graph.generation}`}
+            generation={graph.generation}
+          >
+            {/* Same engine, contracts, and triggers as desktop (Plan 12) — the
+                controller owns resume/edit/online; mobile adds only the
+                plain-language status pill (step 10). */}
+            <SyncProvider graph={graph}>
+              {/* Link capture (Plan 11, iOS share extension): relay the App
+                  Group inbox + drain on launch and on every resume. */}
+              <CaptureProvider graph={graph}>
+                {/* Same chat session engine as desktop (Plan 23): the
+                    conversation and composer draft live here so the Chat tab
+                    survives tab switches; semantic search is forced off on
+                    this surface inside the provider. */}
+                <ChatProvider graph={graph}>
+                  {/* Native recording over the shared capture pipeline — the
+                      mobile leg of desktop's audio memos. Mounted here so the
+                      queue, the reconciler, and the orphan scan survive tab
+                      switches. */}
+                  <MobileAudioMemoProvider graph={graph}>
+                    <MobileShell />
+                    <MobileStatusLayer />
+                    {/* Mounted beside the shell (not inside the daily screen)
+                        so a live recording's sheet survives tab switches. */}
+                    <RecordingDrawer />
+                    <AmbiguousNoteChooser />
+                  </MobileAudioMemoProvider>
+                </ChatProvider>
+              </CaptureProvider>
+            </SyncProvider>
+          </AttachmentCatalogProvider>
         </RouterProvider>
       </MobileErrorBoundary>
     )

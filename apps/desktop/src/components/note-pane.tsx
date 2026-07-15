@@ -1,11 +1,17 @@
-import { memo, useCallback, useMemo, useRef, useState, type ReactElement } from 'react'
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from 'react'
 import type { ExitBoundaryHandler } from '@meowdown/core'
 import {
   detectConflictMarkers,
   isDaily,
-  isReflectManagedNotePath,
   isTemplatePath,
-  isUntitledNotePath,
   untitledNoteSeed,
 } from '@reflect/core'
 import { BacklinksPanel } from '@/components/backlinks-panel'
@@ -24,14 +30,20 @@ import {
 } from '@/editor/editor-handle-registry'
 import { markModeFromSyntax } from '@/editor/mark-mode'
 import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor'
-import { resolveAssetFileLink, useAssetPersistence } from '@/editor/use-asset-persistence'
+import { useAssetPersistence } from '@/editor/use-asset-persistence'
 import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete'
+import { useMarkdownLinkNavigation } from '@/editor/use-markdown-link-navigation'
 import { useNoteDocument } from '@/editor/use-note-document'
 import { useTagNavigation } from '@/editor/use-tag-navigation'
 import { useTemplateSlashItems } from '@/editor/use-template-slash-items'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
 import { useWikiLinkHoverPreview } from '@/editor/use-wiki-link-hover-preview'
 import { isTouchEditorSurface } from '@/lib/platform-surface'
+import {
+  consumeNewNoteCreationClaim,
+  hasNewNoteCreationClaim,
+  type NewNoteCreationScope,
+} from '@/lib/new-note-creation-claims'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
@@ -103,6 +115,41 @@ interface NotePaneProps {
   onExitBoundary?: (date: string, direction: 'up' | 'down') => boolean
 }
 
+interface NewNoteGrantSnapshot {
+  readonly key: string
+  readonly granted: boolean
+}
+
+function creationClaimKey(scope: NewNoteCreationScope | null, path: string): string {
+  return scope === null
+    ? JSON.stringify([null, null, path])
+    : JSON.stringify([scope.root, scope.generation, path])
+}
+
+/**
+ * Snapshot one route claim for the current pane/path lifetime. The lookup is
+ * side-effect free, so Strict Mode can initialize it twice. When the same pane
+ * follows a different route or graph, the guarded render-time adjustment
+ * immediately snapshots that route before children render. React permits
+ * this previous-prop adjustment pattern: it converges in one re-render, and
+ * Strict Mode replay is safe because the lookup has no side effects. Claim
+ * consumption remains exclusively in the document session's effects.
+ */
+function useNewNoteGrant(scope: NewNoteCreationScope | null, path: string): boolean {
+  const key = creationClaimKey(scope, path)
+  const read = (): NewNoteGrantSnapshot => ({
+    key,
+    granted: scope !== null && hasNewNoteCreationClaim(scope, path),
+  })
+  const [stored, setStored] = useState<NewNoteGrantSnapshot>(read)
+  if (stored.key !== key) {
+    const next = read()
+    setStored(next)
+    return next.granted
+  }
+  return stored.granted
+}
+
 /**
  * One open note: the editor bound to its on-disk document via the Plan 05 save
  * pipeline (debounced atomic writes, watcher-driven external reload, and a
@@ -132,8 +179,21 @@ export function NotePaneComponent({
   const { graph } = useGraph()
   const { settings } = useSettings()
   const generation = graph?.generation ?? null
+  const graphRoot = graph?.root ?? null
+  const creationScope =
+    graphRoot === null || generation === null ? null : { root: graphRoot, generation }
   const dailyNote = isDaily(path)
-  const lazyCreate = lazy && (dailyNote || isUntitledNotePath(path))
+  // Snapshot the route grant for this pane lifetime. Reading is side-effect
+  // free (React Strict Mode may initialize twice); the session consumes the
+  // global grant only once its existing-file check or first create settles the
+  // authority. A later pane mount then cannot infer creation from ULID shape.
+  const newNoteGrant = useNewNoteGrant(creationScope, path)
+  const lazyCreate = lazy && (dailyNote || newNoteGrant)
+  const consumeInitialCreate = useCallback(() => {
+    if (graphRoot !== null && generation !== null) {
+      consumeNewNoteCreationClaim({ root: graphRoot, generation }, path)
+    }
+  }, [generation, graphRoot, path])
   // Templates rename via file operations only (settings, or outside the app):
   // the rename pipeline's slug targets live under `notes/`, so tracking a
   // template's title would move it out of `templates/`. The untitled `id:`
@@ -151,10 +211,15 @@ export function NotePaneComponent({
   }
   const document = useNoteDocument(path, generation, {
     createIfMissing: lazyCreate,
+    ...(newNoteGrant ? { onInitialCreateConsumed: consumeInitialCreate } : {}),
     // Only direct `notes/*.md` paths can be Reflect-managed. The coordinator
     // verifies valid ULID frontmatter before any automation; adopted notes,
     // templates, dailies, and arbitrary vault paths save content in place.
-    trackRenames: isReflectManagedNotePath(path),
+    // Every pane keeps a coordinator so an id-healed move across the managed
+    // `notes/` boundary can update policy without replacing the live editor.
+    // The coordinator itself still requires a direct path + valid ULID before
+    // any rewrite, alias, or filename move.
+    trackRenames: true,
     // A missing ordinary note opens as a name-me template (old Reflect's
     // new-note flow): the seed — `id:` frontmatter plus an empty H1 the
     // caret lands in, ghosted "Untitled" by the title placeholder — only
@@ -164,22 +229,35 @@ export function NotePaneComponent({
   })
   const {
     resolveImageUrl,
+    resolveImageUrlFromSource,
     resolveAssetOpenPath,
+    resolveAssetOpenPathFromSource,
+    resolveFileLink,
+    resolveFileLinkFromSource,
+    resolveWikiEmbed,
+    resolveWikiEmbedFromSource,
     openAsset,
     saveFile,
     resolveFileInfo,
+    resolveFileInfoFromSource,
+    attachmentCatalogRevision,
     saveError,
   } = useAssetPersistence(generation, path)
   const renderWikilinkHoverCard = useWikiLinkHoverPreview({
     generation,
     graphKey: graph?.root ?? null,
     dateFormat: settings.dateFormat,
-    resolveImageUrl,
-    resolveAssetOpenPath,
+    resolverRevision: attachmentCatalogRevision,
+    resolveImageUrlFromSource,
+    resolveAssetOpenPathFromSource,
+    resolveFileLinkFromSource,
+    resolveWikiEmbedFromSource,
+    resolveFileInfoFromSource,
   })
-  const onWikiLinkClick = useWikiLinkNavigation(generation)
+  const onWikiLinkClick = useWikiLinkNavigation(generation, path)
+  const onMarkdownNoteLinkClick = useMarkdownLinkNavigation(generation, path)
   const onTagClick = useTagNavigation()
-  const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
+  const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete(generation)
 
   const bindEditor = document.bindEditor
   const aiEditorRef = useRef<NoteEditorHandle | null>(null)
@@ -205,7 +283,7 @@ export function NotePaneComponent({
           registeredHandle.current = null
         }
       } else {
-        registerNoteEditorHandle(path, handle)
+        registerNoteEditorHandle(path, handle, generation)
         registeredHandle.current = { path, handle }
       }
       if (dailyDate !== undefined) {
@@ -222,8 +300,31 @@ export function NotePaneComponent({
         onAutoFocused?.()
       }
     },
-    [bindEditor, path, dailyDate, registerHandle, autoFocus, autoFocusSelection, onAutoFocused],
+    [
+      bindEditor,
+      path,
+      generation,
+      dailyDate,
+      registerHandle,
+      autoFocus,
+      autoFocusSelection,
+      onAutoFocused,
+    ],
   )
+
+  const appliedAttachmentCatalogRevision = useRef(attachmentCatalogRevision)
+  const appliedAttachmentSourcePath = useRef(path)
+  useEffect(() => {
+    if (
+      appliedAttachmentCatalogRevision.current === attachmentCatalogRevision &&
+      appliedAttachmentSourcePath.current === path
+    ) {
+      return
+    }
+    appliedAttachmentCatalogRevision.current = attachmentCatalogRevision
+    appliedAttachmentSourcePath.current = path
+    registeredHandle.current?.handle.refreshMarkdownRendering?.()
+  }, [attachmentCatalogRevision, path])
 
   const aiMenu = useEditorAiMenu({
     path,
@@ -307,10 +408,17 @@ export function NotePaneComponent({
   return (
     <div className={cn('relative', className)} aria-label={`Editing ${path}`}>
       <div className={gutterClassName}>
-        {document.error !== null ? (
+        {document.error !== null && !document.saveBlockedByRemoval ? (
           <InlineAlert tone="error" className="mb-4">
             Saving failed: {document.error}. Your edits are kept in the editor and the next
             successful save will persist them.
+          </InlineAlert>
+        ) : null}
+
+        {document.saveBlockedByRemoval ? (
+          <InlineAlert tone="error" className="mb-4">
+            Reflect can’t safely save to this missing path. Your edits are kept in this editor,
+            but Reflect won’t create or recreate it. Restore the file to resume saving.
           </InlineAlert>
         ) : null}
 
@@ -357,9 +465,11 @@ export function NotePaneComponent({
         // Claims `assets/…` links (what saveFile inserts for a dropped
         // non-image file) so they render as file pills, sized by
         // resolveFileInfo.
-        resolveFileLink={resolveAssetFileLink}
+        resolveFileLink={resolveFileLink}
+        resolveWikiEmbed={resolveWikiEmbed}
         resolveFileInfo={resolveFileInfo}
         onWikiLinkClick={onWikiLinkClick}
+        onMarkdownNoteLinkClick={onMarkdownNoteLinkClick}
         {...(generation !== null && !isTouchEditorSurface()
           ? { renderWikilinkHoverCard }
           : {})}

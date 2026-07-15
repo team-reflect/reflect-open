@@ -10,7 +10,7 @@ import {
   parseNote,
   slugForTitle,
   splitFrontmatter,
-  writeNote,
+  writeNoteIfUnchanged,
   type ContactMatch,
 } from '@reflect/core'
 import { openSession } from '@/editor/open-documents'
@@ -80,7 +80,15 @@ export async function addContactToNote(
   }
   // Reuse the validated snapshot — with no session, `source` came from disk.
   // A second read here would reopen the window between the check and the write.
-  await writeNote(path, appendContactDetails(source, contact), generation)
+  const outcome = await writeNoteIfUnchanged(
+    path,
+    source,
+    appendContactDetails(source, contact),
+    generation,
+  )
+  if (outcome.kind === 'changed') {
+    throw new Error('This note changed or was removed before the contact update landed.')
+  }
 }
 
 /**

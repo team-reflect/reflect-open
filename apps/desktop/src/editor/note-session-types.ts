@@ -23,10 +23,18 @@ export interface NoteSessionSnapshot {
   /** True while the buffer has changes not yet written to disk. */
   dirty: boolean
   /**
-   * True when the initial load found no file (the lazy-create contract): the
-   * note exists only as this buffer until the first save lands.
+   * True while no file exists at the session path. On initial load this is the
+   * lazy-create contract: the note exists only as this buffer until the first
+   * save lands. When an existing note is removed externally, the buffer stays
+   * open but writes remain parked unless this is an approved lazy route.
    */
   missing: boolean
+  /**
+   * True when `missing` is an externally removed or otherwise exhausted path
+   * that this session is forbidden to create. The editor keeps its buffer, but
+   * every save remains parked until a readable file returns at the path.
+   */
+  saveBlockedByRemoval: boolean
   /** External content waiting on the user's choice (set only when dirty). */
   conflict: string | null
   error: string | null
@@ -39,6 +47,7 @@ export const INITIAL_NOTE_SNAPSHOT: NoteSessionSnapshot = {
   protected: false,
   dirty: false,
   missing: false,
+  saveBlockedByRemoval: false,
   conflict: null,
   error: null,
 }
@@ -47,11 +56,15 @@ export const INITIAL_NOTE_SNAPSHOT: NoteSessionSnapshot = {
 export interface NoteSessionIo {
   read: (path: string) => Promise<string>
   /**
-   * Atomic write, with the graph generation pre-bound by the host. `null` when
-   * no generation is available — the session then tracks dirtiness but never
-   * writes.
+   * Native compare-and-swap write, with the graph generation pre-bound by the
+   * host. `expected: null` claims an absent path without clobbering a racing
+   * creator. Resolves true only when the bytes landed; false means the path
+   * changed and the session must reconcile. `null` when no generation is
+   * available — the session then tracks dirtiness but never writes.
    */
-  write: ((path: string, contents: string) => Promise<void>) | null
+  write:
+    | ((path: string, contents: string, expected: string | null) => Promise<boolean>)
+    | null
 }
 
 /** Why {@link NoteSessionOptions.onContent} fired. */
@@ -89,11 +102,24 @@ export interface NoteSessionOptions {
   /**
    * Treat a missing file as an empty note on load instead of an error; the
    * file is then created by the first save — Plan 06's lazy daily-note
-   * contract: opening a day never litters the graph, writing does. Applies
-   * only to the initial load: a note deleted mid-session still reconciles to
-   * a no-op rather than silently emptying the editor.
+   * contract: opening a day never litters the graph, writing does. This is a
+   * one-time initial create capability. Once a fresh note lands (or the initial
+   * read finds an existing file), removal does not silently grant recreation.
    */
   createIfMissing?: boolean | undefined
+  /**
+   * Called exactly once when the session's one-time ordinary-note creation
+   * authority is no longer reusable: an existing file loaded, the first
+   * create was dispatched, external content arrived, or the session retargeted.
+   * The host uses this to revoke the route-level grant for future pane mounts.
+   */
+  onInitialCreateConsumed?: (() => void) | undefined
+  /**
+   * Preserve create capability after an existing file is removed. This is the
+   * daily-note contract only; fresh ULID routes use `createIfMissing` once and
+   * adopted/existing notes leave this false. Any session retarget revokes it.
+   */
+  recreateAfterRemoval?: boolean | undefined
   /**
    * Markdown to seed a **missing** note's buffer with (only meaningful with
    * `createIfMissing`) — the new-note title template. The seed is adopted as
@@ -123,6 +149,13 @@ export interface NoteSession {
   editorChanged: (markdown: string) => void
   /** The watcher reported an on-disk change to this note; reconcile. */
   externalChanged: () => void
+  /**
+   * The watcher reported that this note was removed from disk. The live buffer
+   * is preserved, but ordinary/adopted paths stop writing so a later edit or
+   * teardown cannot recreate the file. Approved lazy routes may still be born
+   * again through their existing create-if-missing contract.
+   */
+  externalRemoved: () => void
   /**
    * Persist pending edits now (e.g. on window blur). Resolves once the
    * flushed write has settled — quit-time teardown awaits this so the webview
@@ -171,6 +204,16 @@ export interface NoteSession {
    * resolution instead (the rename alias), use `updateFrontmatter`.
    */
   commitFrontmatter: (patch: FrontmatterPatch) => Promise<boolean>
+  /**
+   * Apply one prepared link rewrite to an open note, including a path-move
+   * rollback (`expected` = prepared `after`, `replacement` = prepared
+   * `before`). This is a session-local compare-and-swap: pending native input is reconciled,
+   * then the full live document must still equal `expected` and be clean,
+   * loaded, editable, present, and conflict-free. On success the replacement
+   * is pushed through the editor and normal save pipeline before resolving.
+   * Returns false without changing anything when those preconditions fail.
+   */
+  commitExactContentReplacement: (expected: string, replacement: string) => Promise<boolean>
   /**
    * Toggle a GFM checkbox in the body from the Tasks view (Plan 18), applied to
    * the live buffer so unsaved edits survive, then flushed now. The caller routes

@@ -52,7 +52,7 @@ describe('DescribeAssetsField', () => {
   })
 
   it('confirms the cost before running the backfill, then runs it pinned to the graph', () => {
-    render(<DescribeAssetsField />)
+    const view = render(<DescribeAssetsField />)
     fireEvent.click(screen.getByRole('button', { name: /backfill assets/i }))
 
     // The cost warning appears; nothing is sent until the user confirms.
@@ -60,10 +60,20 @@ describe('DescribeAssetsField', () => {
     expect(backfill).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: /^backfill assets$/i }))
-    expect(backfill).toHaveBeenCalledWith(5, {
-      providers: [PROVIDER],
-      defaultProviderId: 'cfg',
-    })
+    expect(backfill).toHaveBeenCalledWith(
+      5,
+      {
+        providers: [PROVIDER],
+        defaultProviderId: 'cfg',
+      },
+      expect.any(Function),
+    )
+    const call = backfill.mock.calls[0] as unknown as [number, unknown, () => boolean]
+    const isStale = call[2]
+    expect(isStale()).toBe(false)
+    graphRef.current = { generation: 6 }
+    view.rerender(<DescribeAssetsField />)
+    expect(isStale()).toBe(true)
   })
 
   it('cancels without sending anything', () => {

@@ -43,6 +43,7 @@ export interface ChatMessages {
   createdMs: number;
   id: string;
   parts: string;
+  privacyFingerprint: string | null;
   responseMessages: string;
   seq: number;
   userText: string;
@@ -66,7 +67,9 @@ export interface IndexMeta {
 
 export interface Links {
   alias: string | null;
+  alternatePathKey: string | null;
   kind: string;
+  pathKey: string | null;
   posFrom: number;
   posTo: number;
   sourcePath: string;
@@ -83,9 +86,12 @@ export interface NoteEmails {
 export interface NoteKeys {
   key: string | null;
   notePath: string | null;
+  priority: string | null;
 }
 
 export interface Notes {
+  authoredTitleKey: string | null;
+  basenameKey: Generated<string>;
   dailyDate: string | null;
   fileHash: string;
   gistStale: Generated<number>;
@@ -97,6 +103,7 @@ export interface Notes {
   kind: Generated<string>;
   mtime: Generated<number>;
   path: string;
+  pathKey: Generated<string>;
   pinnedOrder: number | null;
   preview: Generated<string>;
   title: string;

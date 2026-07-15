@@ -2,14 +2,19 @@ import { useCallback, type ReactNode } from 'react'
 import type { WikilinkHoverHit } from '@meowdown/core'
 import { resolveExistingWikiTarget, splitFrontmatter, type DateFormat } from '@reflect/core'
 import { WikiLinkHoverPreview } from '@/components/wiki-link-hover-preview'
+import type { AssetPersistence } from '@/editor/use-asset-persistence'
 import { readExistingNoteSource } from '@/lib/read-existing-note-source'
 
 interface WikiLinkHoverPreviewOptions {
   generation: number | null
   graphKey: string | null
   dateFormat: DateFormat
-  resolveImageUrl: (src: string) => string | null
-  resolveAssetOpenPath: (src: string) => string | null
+  resolverRevision: number
+  resolveImageUrlFromSource: (sourcePath: string, src: string) => string | null
+  resolveAssetOpenPathFromSource: (sourcePath: string, src: string) => string | null
+  resolveFileLinkFromSource: AssetPersistence['resolveFileLinkFromSource']
+  resolveWikiEmbedFromSource: AssetPersistence['resolveWikiEmbedFromSource']
+  resolveFileInfoFromSource: AssetPersistence['resolveFileInfoFromSource']
 }
 
 function isSvgAsset(path: string): boolean {
@@ -33,25 +38,13 @@ export function useWikiLinkHoverPreview({
   generation,
   graphKey,
   dateFormat,
-  resolveImageUrl,
-  resolveAssetOpenPath,
+  resolverRevision,
+  resolveImageUrlFromSource,
+  resolveAssetOpenPathFromSource,
+  resolveFileLinkFromSource,
+  resolveWikiEmbedFromSource,
+  resolveFileInfoFromSource,
 }: WikiLinkHoverPreviewOptions): (hit: WikilinkHoverHit) => Promise<ReactNode> {
-  const resolvePreviewImageUrl = useCallback(
-    (source: string): string | null => {
-      const assetPath = resolveAssetOpenPath(source)
-      // SVG can contain external subresource references. The filename check
-      // avoids an unnecessary request; the query also makes the asset protocol
-      // enforce a sniffed raster MIME allowlist, so renamed SVG bytes cannot
-      // bypass the passive card's no-network boundary.
-      if (assetPath === null || isSvgAsset(assetPath)) {
-        return null
-      }
-      const url = resolveImageUrl(assetPath)
-      return url === null ? null : previewRasterUrl(url)
-    },
-    [resolveAssetOpenPath, resolveImageUrl],
-  )
-
   return useCallback(
     async ({ target }: WikilinkHoverHit): Promise<ReactNode> => {
       if (generation === null || graphKey === null) {
@@ -63,18 +56,44 @@ export function useWikiLinkHoverPreview({
           return null
         }
         const source = await readExistingNoteSource(resolution.path, generation)
+        const resolvePreviewImageUrl = (imageSource: string): string | null => {
+          const assetPath = resolveAssetOpenPathFromSource(resolution.path, imageSource)
+          // SVG can contain external subresource references. The filename check
+          // avoids an unnecessary request; the query also makes the asset protocol
+          // enforce a sniffed raster MIME allowlist, so renamed SVG bytes cannot
+          // bypass the passive card's no-network boundary.
+          if (assetPath === null || isSvgAsset(assetPath)) {
+            return null
+          }
+          const url = resolveImageUrlFromSource(resolution.path, imageSource)
+          return url === null ? null : previewRasterUrl(url)
+        }
         return (
           <WikiLinkHoverPreview
             path={resolution.path}
             markdown={splitFrontmatter(source).body}
             dateFormat={dateFormat}
             resolveImageUrl={resolvePreviewImageUrl}
+            resolveFileLinkFromSource={resolveFileLinkFromSource}
+            resolveWikiEmbedFromSource={resolveWikiEmbedFromSource}
+            resolveFileInfoFromSource={resolveFileInfoFromSource}
+            resolverRevision={resolverRevision}
           />
         )
       } catch {
         return null
       }
     },
-    [dateFormat, generation, graphKey, resolvePreviewImageUrl],
+    [
+      dateFormat,
+      generation,
+      graphKey,
+      resolverRevision,
+      resolveAssetOpenPathFromSource,
+      resolveFileInfoFromSource,
+      resolveFileLinkFromSource,
+      resolveImageUrlFromSource,
+      resolveWikiEmbedFromSource,
+    ],
   )
 }

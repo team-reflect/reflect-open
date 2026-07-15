@@ -21,6 +21,9 @@ pub struct IndexedNote {
     pub(super) id: Option<String>,
     pub(super) title: String,
     pub(super) title_key: String,
+    pub(super) authored_title_key: Option<String>,
+    pub(super) path_key: String,
+    pub(super) basename_key: String,
     /// 'daily' | 'note' | 'template' — templates are excluded from note surfaces.
     pub(super) kind: String,
     pub(super) daily_date: Option<String>,
@@ -46,6 +49,8 @@ pub struct IndexedNote {
     pub(super) aliases: Vec<IndexedAlias>,
     /// Emails the note owns via `- Email:` contact-field bullets.
     pub(super) emails: Vec<IndexedEmail>,
+    /// Privacy-candidate keys: canonical managed paths or the reserved
+    /// bare-wiki basename sentinel. Never attachment-description content.
     pub(super) assets: Vec<String>,
     pub(super) tasks: Vec<IndexedTask>,
 }
@@ -56,6 +61,8 @@ pub(super) struct IndexedLink {
     pub(super) kind: String,
     pub(super) target_raw: String,
     pub(super) target_key: String,
+    pub(super) path_key: Option<String>,
+    pub(super) alternate_path_key: Option<String>,
     pub(super) alias: Option<String>,
     pub(super) pos_from: i64,
     pub(super) pos_to: i64,
@@ -110,14 +117,17 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
     remove_note(conn, &note.path)?;
 
     conn.prepare_cached(
-        "INSERT INTO notes(path, id, title, title_key, kind, daily_date, is_private, is_pinned, pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at, preview)
-         VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?14, ?15)",
+        "INSERT INTO notes(path, id, title, title_key, authored_title_key, path_key, basename_key, kind, daily_date, is_private, is_pinned, pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at, preview)
+         VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?17, ?18)",
     )?
     .execute(params![
         note.path,
         note.id,
         note.title,
         note.title_key,
+        note.authored_title_key,
+        note.path_key,
+        note.basename_key,
         note.kind,
         note.daily_date,
         i64::from(note.is_private),
@@ -134,8 +144,8 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
         .execute(params![note.path, note.text])?;
     {
         let mut stmt = conn.prepare_cached(
-            "INSERT INTO links(source_path, kind, target_raw, target_key, alias, pos_from, pos_to)
-             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO links(source_path, kind, target_raw, target_key, path_key, alternate_path_key, alias, pos_from, pos_to)
+             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         )?;
         for link in &note.links {
             stmt.execute(params![
@@ -143,6 +153,8 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
                 link.kind,
                 link.target_raw,
                 link.target_key,
+                link.path_key,
+                link.alternate_path_key,
                 link.alias,
                 link.pos_from,
                 link.pos_to
@@ -218,6 +230,12 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
 /// chunks, whose vectors must survive a rename — re-embedding costs the user
 /// real BYOK money for identical content.
 ///
+/// The row's file hash is deliberately cleared. Outgoing relative Markdown-link
+/// candidates are derived from the source path, so a move must be reprojected
+/// even when its bytes are unchanged. Normal move flows reapply immediately;
+/// the dirty sentinel makes a suspended live flow converge on the next reconcile
+/// without temporarily changing the note's user-visible modification time.
+///
 /// Caller wraps this in a transaction with `defer_foreign_keys` ON: the child
 /// tables reference `notes(path)` and SQLite would otherwise reject updating
 /// the parent key while children point at it.
@@ -228,7 +246,13 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
 /// drifts until the next settled rename retries. One rule, no adoption
 /// heuristics. A missing `from` row is fine: an unindexed file can still be
 /// renamed, and the watcher indexes it at the new path.
-pub(super) fn move_note(conn: &Connection, from: &str, to: &str) -> AppResult<()> {
+pub(super) fn move_note(
+    conn: &Connection,
+    from: &str,
+    to: &str,
+    to_path_key: &str,
+    to_basename_key: &str,
+) -> AppResult<()> {
     let occupied: bool = conn
         .prepare_cached("SELECT 1 FROM notes WHERE path = ?1")?
         .exists(params![to])?;
@@ -237,8 +261,12 @@ pub(super) fn move_note(conn: &Connection, from: &str, to: &str) -> AppResult<()
             "cannot move note: {to} is already indexed"
         )));
     }
-    conn.prepare_cached("UPDATE notes SET path = ?2 WHERE path = ?1")?
-        .execute(params![from, to])?;
+    conn.prepare_cached(
+        "UPDATE notes
+         SET path = ?2, path_key = ?3, basename_key = ?4, file_hash = ''
+         WHERE path = ?1",
+    )?
+    .execute(params![from, to, to_path_key, to_basename_key])?;
     conn.prepare_cached("UPDATE note_text SET note_path = ?2 WHERE note_path = ?1")?
         .execute(params![from, to])?;
     conn.prepare_cached("UPDATE links SET source_path = ?2 WHERE source_path = ?1")?

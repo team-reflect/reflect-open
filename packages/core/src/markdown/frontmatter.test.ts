@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { parseFrontmatter, splitFrontmatter, upsertFrontmatter } from './frontmatter'
+import {
+  hasUnterminatedLeadingFrontmatter,
+  parseFrontmatter,
+  splitFrontmatter,
+  upsertFrontmatter,
+} from './frontmatter'
 import { isPinned, pinnedOrder } from './model'
 
 describe('splitFrontmatter', () => {
@@ -29,6 +34,26 @@ describe('splitFrontmatter', () => {
     const split = splitFrontmatter('---\r\nid: x\r\n---\r\nbody')
     expect(split.raw).toBe('id: x')
     expect(split.body).toBe('body')
+  })
+
+  it('recognizes a UTF-8 BOM without shifting or changing the body', () => {
+    const source = '\uFEFF---\nprivate: true\n---\nbody'
+    const split = splitFrontmatter(source)
+    expect(split.raw).toBe('private: true')
+    expect(split.body).toBe('body')
+    expect(source.slice(split.bodyOffset)).toBe('body')
+  })
+
+  it('handles CR-only frontmatter while preserving the body offset', () => {
+    const source = '---\rprivate: true\r---\rbody\rbytes'
+    const split = splitFrontmatter(source)
+    expect(split.raw).toBe('private: true')
+    expect(split.body).toBe('body\rbytes')
+    expect(source.slice(split.bodyOffset)).toBe('body\rbytes')
+  })
+
+  it('recognizes an unterminated BOM-prefixed fence for fail-closed gates', () => {
+    expect(hasUnterminatedLeadingFrontmatter('\uFEFF---\rprivate: true\rbody')).toBe(true)
   })
 })
 
@@ -138,6 +163,16 @@ describe('upsertFrontmatter', () => {
     const pinned = upsertFrontmatter(source, { pinned: true })
     expect(pinned).toBe('---\npinned: true\n---\n# Body\n\ntext')
     expect(upsertFrontmatter(pinned, { pinned: undefined })).toBe(source)
+  })
+
+  it('preserves a UTF-8 BOM when creating, updating, and removing frontmatter', () => {
+    const source = '\uFEFF# Body\rbytes'
+    const withFrontmatter = upsertFrontmatter(source, { private: true })
+    expect(withFrontmatter).toBe('\uFEFF---\nprivate: true\n---\n# Body\rbytes')
+    const updated = upsertFrontmatter(withFrontmatter, { private: false })
+    expect(updated.startsWith('\uFEFF---\n')).toBe(true)
+    expect(updated.endsWith('# Body\rbytes')).toBe(true)
+    expect(upsertFrontmatter(updated, { private: undefined })).toBe(source)
   })
 
   it('writes a nested mapping (the gist block) and round-trips it through the parser', () => {

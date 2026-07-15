@@ -2,13 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NoteSession } from '@/editor/note-session'
 
 const readNote = vi.hoisted(() => vi.fn<(path: string) => Promise<string>>())
-const writeNote = vi.hoisted(() => vi.fn(async () => {}))
+const writeNoteIfUnchanged = vi.hoisted(() =>
+  vi.fn(async () => ({ kind: 'written' as const, modifiedMs: null })),
+)
 const openSession = vi.hoisted(() => vi.fn<(path: string) => NoteSession | null>(() => null))
 
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   readNote,
-  writeNote,
+  writeNoteIfUnchanged,
 }))
 vi.mock('@/editor/open-documents', () => ({ openSession }))
 
@@ -16,7 +18,7 @@ const { toggleNotePrivate } = await import('./note-private')
 
 beforeEach(() => {
   readNote.mockReset()
-  writeNote.mockClear()
+  writeNoteIfUnchanged.mockReset().mockResolvedValue({ kind: 'written', modifiedMs: null })
   openSession.mockReset()
   openSession.mockReturnValue(null)
 })
@@ -35,13 +37,23 @@ describe('toggleNotePrivate', () => {
   it('marks an unopened note private via read-patch-write on disk', async () => {
     readNote.mockResolvedValue('# A\n')
     await expect(toggleNotePrivate('notes/a.md', 3)).resolves.toBe(true)
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\nprivate: true\n---\n# A\n', 3)
+    expect(writeNoteIfUnchanged).toHaveBeenCalledWith(
+      'notes/a.md',
+      '# A\n',
+      '---\nprivate: true\n---\n# A\n',
+      3,
+    )
   })
 
   it('un-marks on disk by removing the key (back to no frontmatter)', async () => {
     readNote.mockResolvedValue('---\nprivate: true\n---\n# A\n')
     await expect(toggleNotePrivate('notes/a.md', 3)).resolves.toBe(false)
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '# A\n', 3)
+    expect(writeNoteIfUnchanged).toHaveBeenCalledWith(
+      'notes/a.md',
+      '---\nprivate: true\n---\n# A\n',
+      '# A\n',
+      3,
+    )
   })
 
   it('treats the YAML 1.1-style `private: yes` as private and un-marking clears it', async () => {
@@ -49,13 +61,23 @@ describe('toggleNotePrivate', () => {
     // honours it, so the toggle must too — re-marking would be a silent no-op.
     readNote.mockResolvedValue('---\nprivate: yes\n---\n# A\n')
     await expect(toggleNotePrivate('notes/a.md', 3)).resolves.toBe(false)
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '# A\n', 3)
+    expect(writeNoteIfUnchanged).toHaveBeenCalledWith(
+      'notes/a.md',
+      '---\nprivate: yes\n---\n# A\n',
+      '# A\n',
+      3,
+    )
   })
 
   it('replaces an explicit `private: false` with `private: true` when toggling on', async () => {
     readNote.mockResolvedValue('---\nprivate: false\n---\n# A\n')
     await expect(toggleNotePrivate('notes/a.md', 3)).resolves.toBe(true)
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\nprivate: true\n---\n# A\n', 3)
+    expect(writeNoteIfUnchanged).toHaveBeenCalledWith(
+      'notes/a.md',
+      '---\nprivate: false\n---\n# A\n',
+      '---\nprivate: true\n---\n# A\n',
+      3,
+    )
   })
 
   it('routes through the live session, which owns landing the patch', async () => {
@@ -64,7 +86,16 @@ describe('toggleNotePrivate', () => {
     await expect(toggleNotePrivate('notes/a.md', 3)).resolves.toBe(true)
     expect(commitFrontmatter).toHaveBeenCalledWith({ private: true })
     expect(readNote).not.toHaveBeenCalled()
-    expect(writeNote).not.toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
+  })
+
+  it('does not report privacy persisted or fall back to disk when the live save fails', async () => {
+    const { session, commitFrontmatter } = fakeSession('# A\n')
+    commitFrontmatter.mockRejectedValueOnce(new Error('disk full'))
+    openSession.mockReturnValue(session)
+
+    await expect(toggleNotePrivate('notes/a.md', 3)).rejects.toThrow('disk full')
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
   })
 
   it('toggles off through the session when the open note is private', async () => {
@@ -79,7 +110,12 @@ describe('toggleNotePrivate', () => {
     openSession.mockReturnValue(session)
     readNote.mockResolvedValue('# A\n')
     await expect(toggleNotePrivate('notes/a.md', 3)).resolves.toBe(true)
-    expect(writeNote).toHaveBeenCalledWith('notes/a.md', '---\nprivate: true\n---\n# A\n', 3)
+    expect(writeNoteIfUnchanged).toHaveBeenCalledWith(
+      'notes/a.md',
+      '# A\n',
+      '---\nprivate: true\n---\n# A\n',
+      3,
+    )
   })
 
   it('marks a not-yet-created note private by creating its file (the lazy contract)', async () => {
@@ -88,13 +124,18 @@ describe('toggleNotePrivate', () => {
     openSession.mockReturnValue(session)
     readNote.mockRejectedValue({ kind: 'notFound', message: 'no such note' })
     await expect(toggleNotePrivate('daily/2026-06-10.md', 3)).resolves.toBe(true)
-    expect(writeNote).toHaveBeenCalledWith('daily/2026-06-10.md', '---\nprivate: true\n---\n', 3)
+    expect(writeNoteIfUnchanged).toHaveBeenCalledWith(
+      'daily/2026-06-10.md',
+      null,
+      '---\nprivate: true\n---\n',
+      3,
+    )
   })
 
   it('still surfaces non-notFound read failures', async () => {
     openSession.mockReturnValue(null)
     readNote.mockRejectedValue({ kind: 'io', message: 'disk on fire' })
     await expect(toggleNotePrivate('notes/a.md', 3)).rejects.toMatchObject({ kind: 'io' })
-    expect(writeNote).not.toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
   })
 })

@@ -148,8 +148,12 @@ export {
   type SearchHit,
 } from './filtered-search'
 export {
+  prepareNoteMoveRewrites,
   rewriteLinksForTitleChange,
   nextAliases,
+  type PreparedNoteMoveRewrite,
+  type PreparedNoteMoveRewrites,
+  type PrepareNoteMoveRewritesOptions,
   type RenameIo,
   type TitleRenameRewriteOptions,
   type TitleRenameRewriteResult,

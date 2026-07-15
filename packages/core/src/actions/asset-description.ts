@@ -3,8 +3,13 @@ import { defaultAiProvider, type AiProvidersState } from '../ai/provider-config'
 import { aiKeySecretName } from '../ai/secrets'
 import { base64ToBytes } from '../ai/transcribe'
 import { errorMessage, isAppError, toAppError } from '../errors'
-import { listDir, readAsset, readNote, writeNote } from '../graph/commands'
-import { ASSETS_DIR, descriptionPathFor } from '../graph/paths'
+import {
+  listDir,
+  readManagedAsset,
+  readManagedAssetDescription,
+  writeManagedAssetDescription,
+} from '../graph/commands'
+import { ASSETS_DIR } from '../graph/paths'
 import type { FileMeta } from '../graph/schemas'
 import { hashContent } from '../indexing/hash'
 import { getSecret } from '../secrets/keychain'
@@ -18,7 +23,7 @@ import {
   readManagedDescription,
   type ManagedDescription,
 } from './asset-description-helpers'
-import { classifyAsset } from './asset-privacy'
+import { classifyAssetBatch } from './asset-privacy'
 export {
   assetTypeFor,
   base64ByteLength,
@@ -29,7 +34,17 @@ export {
   type AssetType,
   type ManagedDescription,
 } from './asset-description-helpers'
-export { classifyAsset, classifyAssetFromNotes, type AssetVerdict } from './asset-privacy'
+export {
+  classifyAsset,
+  classifyAssetBatch,
+  classifyAssetBatchFromNotes,
+  classifyAssetBatchFromSnapshot,
+  classifyLiveAssetBatch,
+  type AssetPrivacyDiscovery,
+  type AssetPrivacyNote,
+  type AssetVerdict,
+  type AssetVerdicts,
+} from './asset-privacy'
 
 /**
  * Asset descriptions (Plan 20). For each eligible image/PDF under `assets/`
@@ -152,37 +167,11 @@ function utf8FromBase64(base64: string): string {
   return new TextDecoder().decode(base64ToBytes(base64))
 }
 
-async function readDescriptionSource(path: string, generation: number): Promise<string | null> {
-  try {
-    return await readNote(path, generation)
-  } catch (cause) {
-    if (isAppError(cause) && cause.kind === 'notFound') {
-      return null
-    }
-    throw cause
-  }
-}
-
 /** Process one asset. Throws on transient (auth/network) failure to stop the pass. */
 async function processAsset(assetPath: string, ctx: AssetContext): Promise<AssetStep> {
   const assetType = assetTypeFor(assetPath)
   if (assetType === null) {
     return { kind: 'skipped', reason: 'gone' } // defensive: an ineligible path slipped in
-  }
-
-  // Gate first, on the notes index: never read or send an asset's bytes until a
-  // non-private note is associated with it (and no private note is). Waiting for
-  // the association before attempting keeps private and unreferenced assets
-  // entirely untouched — they are never read, hashed, or sent to a provider.
-  const verdict = await classifyAsset(assetPath, ctx.generation)
-  if (ctx.isStale()) {
-    return { kind: 'stop', stopped: STALE }
-  }
-  if (verdict === 'skip-private') {
-    return { kind: 'skipped', reason: 'private' }
-  }
-  if (verdict === 'skip-unreferenced') {
-    return { kind: 'skipped', reason: 'unreferenced' }
   }
 
   // Read the (small) description and identify a user-authored file we must never
@@ -192,8 +181,7 @@ async function processAsset(assetPath: string, ctx: AssetContext): Promise<Asset
   // hashes for the same reason (see indexing/hash). The stat is used only for the
   // pre-read size cap.
   const stat = ctx.statByPath.get(assetPath)
-  const descriptionPath = descriptionPathFor(assetPath)
-  const existing = await readDescriptionSource(descriptionPath, ctx.generation)
+  const existing = await readManagedAssetDescription(assetPath, ctx.generation)
   let managed: ManagedDescription | null = null
   if (existing !== null) {
     managed = readManagedDescription(existing)
@@ -210,7 +198,7 @@ async function processAsset(assetPath: string, ctx: AssetContext): Promise<Asset
 
   let base64: string
   try {
-    base64 = await readAsset(assetPath, ctx.generation)
+    base64 = await readManagedAsset(assetPath, ctx.generation)
   } catch (cause) {
     if (isAppError(cause) && cause.kind === 'notFound') {
       return { kind: 'skipped', reason: 'gone' } // removed since it was observed
@@ -256,8 +244,8 @@ async function processAsset(assetPath: string, ctx: AssetContext): Promise<Asset
     return { kind: 'refused' } // an empty description is as useless as a refusal
   }
 
-  await writeNote(
-    descriptionPath,
+  await writeManagedAssetDescription(
+    assetPath,
     buildDescriptionSource(
       {
         source: assetPath,
@@ -352,6 +340,27 @@ export async function reconcileAssetDescriptions(
     return outcome(0, null)
   }
 
+  // One live, generation-pinned graph snapshot for the whole pass. This scan
+  // is intentionally independent of SQLite's derived asset rows: a private
+  // reference blocks immediately even when the watcher has not indexed it.
+  const verdicts = await classifyAssetBatch(candidate.paths, input.generation)
+  if (input.isStale?.() === true) {
+    return outcome(total, STALE)
+  }
+  if (!candidate.paths.some((path) => verdicts.get(path) === 'send')) {
+    let processed = 0
+    for (const assetPath of candidate.paths) {
+      if (verdicts.get(assetPath) === 'skip-private') {
+        tally.skippedPrivate += 1
+      } else {
+        tally.skippedUnreferenced += 1
+      }
+      processed += 1
+      input.onProgress?.(processed, total)
+    }
+    return outcome(total, null)
+  }
+
   // Re-resolved every pass: a provider added in Settings mid-session must be
   // seen by the very next pass. Unlike capture there is no non-AI fallback —
   // no provider means nothing can be described, so the pass stops.
@@ -381,6 +390,13 @@ export async function reconcileAssetDescriptions(
   for (const assetPath of candidate.paths) {
     if (ctx.isStale()) {
       return outcome(total, STALE)
+    }
+    const verdict = verdicts.get(assetPath) ?? 'skip-unreferenced'
+    if (verdict !== 'send') {
+      tally[verdict === 'skip-private' ? 'skippedPrivate' : 'skippedUnreferenced'] += 1
+      processed += 1
+      input.onProgress?.(processed, total)
+      continue
     }
     let step: AssetStep
     try {

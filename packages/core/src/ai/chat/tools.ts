@@ -1,13 +1,26 @@
 import { tool, type TypedToolCall, type TypedToolResult } from 'ai'
 import { z } from 'zod'
-import { readNote } from '../../graph/commands'
+import {
+  assetPrivacySnapshot,
+  listAttachments,
+  listFiles,
+  readManagedAssetDescription,
+  readNote,
+} from '../../graph/commands'
+import type { AttachmentFileMeta } from '../../graph/attachment-resolution'
+import type { AssetPrivacySnapshot, FileMeta } from '../../graph/schemas'
+import { descriptionPathFor } from '../../graph/paths'
+import { isAppError } from '../../errors'
 import { retrieve, type RetrievalHit, type RetrieveOptions } from '../../embeddings/retrieve'
-import { assetReferencingNotePaths } from '../../indexing/asset-refs'
 import { listDailyNotes, type DailyNoteRow, type DailyNotesRange } from '../../indexing/queries'
 import { listRecentNotes, type RecentNoteRow, type RecentNotesOptions } from '../../indexing/note-list'
-import { parseFrontmatter, splitFrontmatter } from '../../markdown/frontmatter'
+import {
+  hasUnterminatedLeadingFrontmatter,
+  parseFrontmatter,
+  splitFrontmatter,
+} from '../../markdown/frontmatter'
 import { isTagName } from '../../markdown/extract'
-import { buildReadOneAsset, readAssetsInput, type ReadAssetsOutput } from './read-assets'
+import { buildReadAssets, readAssetsInput, type ReadAssetsOutput } from './read-assets'
 import { buildReadOneNote, readNotesInput, type ReadNotesOutput } from './read-notes'
 import {
   cloudSafeNoteListings,
@@ -49,10 +62,15 @@ export interface NoteToolDeps {
   readNoteFn?: (path: string) => Promise<string>
   listRecentNotesFn?: (options: RecentNotesOptions) => Promise<RecentNoteRow[]>
   listDailyNotesFn?: (range: DailyNotesRange) => Promise<DailyNoteRow[]>
-  assetReferencingNotePathsFn?: (assetPath: string) => Promise<string[]>
+  listFilesFn?: () => Promise<FileMeta[]>
+  listAttachmentsFn?: () => Promise<AttachmentFileMeta[]>
+  privacySnapshotFn?: () => Promise<AssetPrivacySnapshot>
+  readAssetDescriptionFn?: (assetPath: string) => Promise<string | null>
 }
 
 export interface BuildNoteToolsOptions extends NoteToolDeps {
+  /** Open graph generation used to pin production filesystem reads. */
+  generation?: number
   /**
    * Whether note search can use embeddings for meaning-based recall. When
    * false, `search_notes` stays lexical so disabled semantic search is honored.
@@ -140,10 +158,56 @@ function listingCandidate(
  */
 export function buildNoteTools(options: BuildNoteToolsOptions = {}) {
   const retrieveFn = options.retrieveFn ?? retrieve
-  const readNoteFn = options.readNoteFn ?? readNote
+  const readNoteFn = options.readNoteFn ?? ((path: string) => readNote(path, options.generation))
   const listRecentNotesFn = options.listRecentNotesFn ?? listRecentNotes
   const listDailyNotesFn = options.listDailyNotesFn ?? listDailyNotes
-  const assetRefsFn = options.assetReferencingNotePathsFn ?? assetReferencingNotePaths
+  const listFilesFn = options.listFilesFn ?? (() => listFiles(options.generation))
+  const listAttachmentsFn =
+    options.listAttachmentsFn ?? (() => listAttachments(options.generation))
+  const hasListFilesOverride = options.listFilesFn !== undefined
+  const hasListAttachmentsOverride = options.listAttachmentsFn !== undefined
+  if (hasListFilesOverride !== hasListAttachmentsOverride) {
+    throw new Error('listFilesFn and listAttachmentsFn must be provided together')
+  }
+  const usesLegacyAssetDiscovery = hasListFilesOverride && hasListAttachmentsOverride
+  const privacySnapshotFn =
+    options.privacySnapshotFn ??
+    (usesLegacyAssetDiscovery
+      ? async (): Promise<AssetPrivacySnapshot> => {
+          const [files, attachments] = await Promise.all([
+            listFilesFn(),
+            listAttachmentsFn(),
+          ])
+          if (files.some((file) => file.placeholder === true)) {
+            throw new Error('a live note is unavailable')
+          }
+          return {
+            revision: 0,
+            notes: await Promise.all(
+              [...new Set(files.map((file) => file.path))].map(async (path) => ({
+                path,
+                source: await readNoteFn(path),
+              })),
+            ),
+            attachments,
+          }
+        }
+      : () => assetPrivacySnapshot(options.generation ?? -1))
+  const readAssetDescriptionFn =
+    options.readAssetDescriptionFn ??
+    (usesLegacyAssetDiscovery
+      ? async (assetPath: string): Promise<string | null> => {
+          try {
+            return await readNoteFn(descriptionPathFor(assetPath))
+          } catch (cause) {
+            if (isAppError(cause) && cause.kind === 'notFound') {
+              return null
+            }
+            throw cause
+          }
+        }
+      : (assetPath: string) =>
+          readManagedAssetDescription(assetPath, options.generation ?? -1))
   const searchMode: RetrieveOptions['mode'] =
     options.semanticSearchEnabled === false ? 'lexical' : 'hybrid'
 
@@ -153,8 +217,12 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}) {
   // for sending.
   const isPrivateLive = async (path: string): Promise<boolean> => {
     try {
-      const { raw } = splitFrontmatter(await readNoteFn(path))
-      return parseFrontmatter(raw).data.private
+      const source = await readNoteFn(path)
+      if (hasUnterminatedLeadingFrontmatter(source)) {
+        return true
+      }
+      const parsed = parseFrontmatter(splitFrontmatter(source).raw)
+      return parsed.warning !== undefined || parsed.data.private
     } catch {
       return true
     }
@@ -162,9 +230,9 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}) {
 
   const readOneNote = buildReadOneNote({ readNoteFn })
 
-  const readOneAsset = buildReadOneAsset({
-    readNoteFn,
-    assetReferencingNotePathsFn: assetRefsFn,
+  const readAssets = buildReadAssets({
+    privacySnapshotFn,
+    readDescriptionFn: readAssetDescriptionFn,
   })
 
   return {
@@ -235,13 +303,14 @@ export function buildNoteTools(options: BuildNoteToolsOptions = {}) {
     read_assets: tool({
       description:
         'Read the stored text description and OCR transcription of image or PDF ' +
-        'attachments that notes embed as assets/… markdown links, e.g. ' +
-        '![sketch](assets/sketch.png). Returns descriptive text about each file, not ' +
+        'attachments managed under the graph-root assets/ tree. A nested note may ' +
+        'write ../assets/sketch.png; pass its canonical path assets/sketch.png. ' +
+        'Returns descriptive text about each file, not ' +
         'the file itself. Pass every attachment you need in a single call. ' +
         'Attachments of private notes cannot be read.',
       inputSchema: readAssetsInput,
       execute: async ({ paths }): Promise<ReadAssetsOutput> => {
-        return { assets: await Promise.all(paths.map(readOneAsset)) }
+        return readAssets(paths)
       },
     }),
   }

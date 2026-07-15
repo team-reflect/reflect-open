@@ -27,7 +27,11 @@ export interface RetrievalHit {
 export interface RetrieveOptions {
   limit?: number
   mode?: 'semantic' | 'lexical' | 'hybrid'
-  /** AI callers set true: private hits keep title/flag but lose content. */
+  /**
+   * AI callers set true: public hits expose only the note-only preview, while
+   * private hits keep their title/flag but lose content. Retrieval ranking may
+   * use local asset-description text, but that text never leaves this boundary.
+   */
   excludePrivateContent?: boolean
 }
 
@@ -153,12 +157,37 @@ export function fuseRanked(lists: RetrievalHit[][], limit: number): RetrievalHit
     .map(({ hit, score }) => ({ ...hit, score }))
 }
 
-/** Strip private notes' content while keeping the hit + flag. */
-function withPrivacy(hits: RetrievalHit[], excludePrivateContent: boolean): RetrievalHit[] {
+/**
+ * Shape retrieval content for an external AI caller. Ranking remains exactly
+ * as produced by lexical/semantic retrieval, but rich snippets are local-only:
+ * they may originate from FTS asset text or synthetic asset embedding chunks.
+ * Public hits therefore receive the note-only `notes.preview` projection and
+ * private hits remain blank. A missing preview row fails closed to empty text.
+ */
+async function withPrivacy(
+  hits: RetrievalHit[],
+  excludePrivateContent: boolean,
+): Promise<RetrievalHit[]> {
   if (!excludePrivateContent) {
     return hits
   }
-  return hits.map((hit) => (hit.isPrivate ? { ...hit, snippet: '', heading: null } : hit))
+
+  const publicPaths = hits.filter((hit) => !hit.isPrivate).map((hit) => hit.path)
+  const previewRows =
+    publicPaths.length === 0
+      ? []
+      : await db
+          .selectFrom('notes')
+          .where('path', 'in', publicPaths)
+          .select(['path', 'preview'])
+          .execute()
+  const previewByPath = new Map(previewRows.map((row) => [row.path, row.preview]))
+
+  return hits.map((hit) => ({
+    ...hit,
+    snippet: hit.isPrivate ? '' : (previewByPath.get(hit.path) ?? ''),
+    heading: null,
+  }))
 }
 
 export async function retrieve(query: string, options?: RetrieveOptions): Promise<RetrievalHit[]> {

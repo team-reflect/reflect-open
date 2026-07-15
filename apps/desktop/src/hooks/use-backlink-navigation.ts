@@ -1,7 +1,11 @@
 import { useCallback } from 'react'
-import type { WikilinkClickHandler } from '@meowdown/core'
-import { useAssetPersistence } from '@/editor/use-asset-persistence'
-import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
+import type { LinkClickHandler, WikilinkClickHandler } from '@meowdown/core'
+import {
+  useAssetPersistence,
+  type AssetPersistence,
+} from '@/editor/use-asset-persistence'
+import { useMarkdownLinkNavigationFromSource } from '@/editor/use-markdown-link-navigation'
+import { useWikiLinkNavigationFromSource } from '@/editor/use-wiki-link-navigation'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
 import { useGraph } from '@/providers/graph-provider'
@@ -23,9 +27,27 @@ export interface BacklinkNavigation {
    * target the same way the editor does, distinct from {@link openSource}.
    * Stable, so it never rebuilds the snippet trees.
    */
-  onWikilinkClick: WikilinkClickHandler
+  onWikilinkClick: (
+    sourcePath: string,
+    payload: Parameters<WikilinkClickHandler>[0],
+  ) => void
+  /** Navigate a standard Markdown note link inside its source snippet. */
+  onMarkdownLinkClick: (
+    sourcePath: string,
+    payload: Parameters<LinkClickHandler>[0],
+  ) => boolean
   /** Resolve `![…](…)` sources inside a snippet to displayable URLs. Stable. */
-  resolveImageUrl: (src: string) => string | undefined
+  resolveImageUrl: (sourcePath: string, src: string) => string | undefined
+  /** Claim source-relative Markdown attachment links inside snippets. */
+  resolveFileLink: AssetPersistence['resolveFileLinkFromSource']
+  /** Classify source-relative wiki embeds inside snippets. */
+  resolveWikiEmbed: AssetPersistence['resolveWikiEmbedFromSource']
+  /** Resolve source-relative attachment metadata inside snippets. */
+  resolveFileInfo: AssetPersistence['resolveFileInfoFromSource']
+  /** Resolve and open a source-relative attachment from an interactive snippet. */
+  openAttachment: AssetPersistence['openAttachmentFromSource']
+  /** Changes when snippets must rebuild their attachment rendering. */
+  resolverRevision: number
 }
 
 /**
@@ -44,16 +66,39 @@ export function useBacklinkNavigation(): BacklinkNavigation {
     [navigateNoteLink],
   )
 
-  const navigateWikiLink = useWikiLinkNavigation(graph?.generation ?? null)
-  const { resolveImageUrl } = useAssetPersistence(graph?.generation ?? null)
-  const onWikilinkClick = useCallback<WikilinkClickHandler>(
-    ({ target, event }) => navigateWikiLink(target, event),
+  const generation = graph?.generation ?? null
+  const navigateWikiLink = useWikiLinkNavigationFromSource(generation)
+  const navigateMarkdownLink = useMarkdownLinkNavigationFromSource(generation)
+  const {
+    resolveImageUrlFromSource,
+    resolveFileLinkFromSource,
+    resolveWikiEmbedFromSource,
+    resolveFileInfoFromSource,
+    openAttachmentFromSource,
+    attachmentCatalogRevision,
+  } = useAssetPersistence(generation)
+  const onWikilinkClick = useCallback<BacklinkNavigation['onWikilinkClick']>(
+    (sourcePath, { target, event }) => navigateWikiLink(sourcePath, target, event),
     [navigateWikiLink],
   )
+  const onMarkdownLinkClick = useCallback<BacklinkNavigation['onMarkdownLinkClick']>(
+    (sourcePath, { href, event }) => navigateMarkdownLink(sourcePath, href, event),
+    [navigateMarkdownLink],
+  )
   const resolveImageUrlStable = useCallback(
-    (src: string) => resolveImageUrl(src) ?? undefined,
-    [resolveImageUrl],
+    (sourcePath: string, src: string) => resolveImageUrlFromSource(sourcePath, src) ?? undefined,
+    [resolveImageUrlFromSource],
   )
 
-  return { openSource, onWikilinkClick, resolveImageUrl: resolveImageUrlStable }
+  return {
+    openSource,
+    onWikilinkClick,
+    onMarkdownLinkClick,
+    resolveImageUrl: resolveImageUrlStable,
+    resolveFileLink: resolveFileLinkFromSource,
+    resolveWikiEmbed: resolveWikiEmbedFromSource,
+    resolveFileInfo: resolveFileInfoFromSource,
+    openAttachment: openAttachmentFromSource,
+    resolverRevision: attachmentCatalogRevision,
+  }
 }

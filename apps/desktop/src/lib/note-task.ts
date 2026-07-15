@@ -3,12 +3,13 @@ import {
   appendTaskLine,
   editTaskLine,
   isAppError,
+  isDaily,
   parseNote,
   readNote,
   removeTaskLine,
   taskLineToBullet,
   toggleTaskMarker,
-  writeNote,
+  writeNoteIfUnchanged,
   type TaskMarker,
 } from '@reflect/core'
 import type { NoteSession } from '@/editor/note-session'
@@ -109,7 +110,15 @@ function applyTaskChange(
       throw new NoteBusyError('This note can’t be updated right now — try again in a moment.')
     }
     const source = await readNote(task.notePath)
-    await writeNote(task.notePath, viaDisk(source, marker), generation)
+    const outcome = await writeNoteIfUnchanged(
+      task.notePath,
+      source,
+      viaDisk(source, marker),
+      generation,
+    )
+    if (outcome.kind === 'changed') {
+      throw new NoteBusyError('This note changed or was removed — refresh Tasks and try again.')
+    }
   })
 }
 
@@ -232,7 +241,10 @@ export function continueTaskInContext(
     if (created === undefined) {
       throw new Error(`contextual task insertion failed at offset ${markerOffset}`)
     }
-    await writeNote(task.notePath, nextSource, generation)
+    const outcome = await writeNoteIfUnchanged(task.notePath, source, nextSource, generation)
+    if (outcome.kind === 'changed') {
+      throw new NoteBusyError('This note changed or was removed — refresh Tasks and try again.')
+    }
     return {
       created: { markerOffset: created.markerOffset, raw: created.raw },
       offsetChanges,
@@ -254,17 +266,23 @@ export function insertTask(notePath: string, generation: number): Promise<number
       throw new NoteBusyError('This note is open — add the task in the note itself.')
     }
     let source: string
+    let expected: string | null
     try {
       source = await readNote(notePath)
+      expected = source
     } catch (cause) {
-      if (isAppError(cause) && cause.kind === 'notFound') {
+      if (isAppError(cause) && cause.kind === 'notFound' && isDaily(notePath)) {
         source = '' // a not-yet-created daily note: the first task creates it
+        expected = null
       } else {
         throw cause
       }
     }
     const { source: next, markerOffset } = appendTaskLine(source)
-    await writeNote(notePath, next, generation)
+    const outcome = await writeNoteIfUnchanged(notePath, expected, next, generation)
+    if (outcome.kind === 'changed') {
+      throw new NoteBusyError('This note changed before the new task landed — try again.')
+    }
     return markerOffset
   })
 }

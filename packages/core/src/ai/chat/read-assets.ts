@@ -1,8 +1,11 @@
 import { z } from 'zod'
-import { classifyAssetFromNotes } from '../../actions/asset-privacy'
-import { isAppError } from '../../errors'
-import { descriptionPathFor, isAssetPath } from '../../graph/paths'
-import { canonicalAssetPath } from '../../markdown/extract'
+import {
+  isEligibleAssetPath,
+  readManagedDescription,
+} from '../../actions/asset-description-helpers'
+import { classifyAssetBatchFromSnapshot } from '../../actions/asset-privacy'
+import type { AssetPrivacySnapshot } from '../../graph/schemas'
+import { canonicalAssetPath } from '../../markdown/attachment-reference'
 import { splitFrontmatter } from '../../markdown/frontmatter'
 import {
   cloudSafeAssetDescription,
@@ -41,7 +44,7 @@ export const ASSET_UNAVAILABLE_ERROR = 'This asset cannot be read by AI.'
 
 /** read_assets refusal for a path that is not an `assets/` attachment. */
 export const NOT_AN_ASSET_ERROR =
-  'Not an asset path — pass assets/… paths exactly as they appear in note markdown.'
+  'Not an asset path — pass a canonical assets/… path from the graph root.'
 
 /** One asset in a {@link ReadAssetsOutput}: its stored description, or a structured miss/refusal. */
 export type ReadAssetResult =
@@ -59,67 +62,117 @@ export const readAssetsInput = z.object({
     .min(1)
     .max(MAX_READ_ASSETS)
     .describe(
-      'Graph-relative asset paths as they appear in note markdown, e.g. ' +
-        `["assets/photo.png"]. Pass every attachment you need in one call, up to ${MAX_READ_ASSETS}.`,
+      'Canonical graph-root managed asset paths, e.g. ["assets/photo.png"]. ' +
+        'Normalize a nested note href such as ../assets/photo.png to assets/photo.png. ' +
+        `Pass every attachment you need in one call, up to ${MAX_READ_ASSETS}.`,
     ),
 })
 
-/** The effects {@link buildReadOneAsset} needs, already defaulted by the caller. */
+/** The effects {@link buildReadAssets} needs, already defaulted by the caller. */
 export interface ReadAssetDeps {
-  readNoteFn: (path: string) => Promise<string>
-  assetReferencingNotePathsFn: (assetPath: string) => Promise<string[]>
+  privacySnapshotFn: () => Promise<AssetPrivacySnapshot>
+  readDescriptionFn: (assetPath: string) => Promise<string | null>
 }
 
 /**
- * Build the per-asset reader for read_assets: the sidecar body (frontmatter
- * stripped, capped), or a structured per-asset miss/refusal. The model copies
- * paths verbatim from note markdown, so the href is first collapsed to the
- * canonical `assets/…` form the sidecar, index, and privacy gate all key off
- * (`./`-prefixes, percent-escapes). Existence is checked next — a missing
- * sidecar reveals nothing — then the live privacy verdict over the
- * referencing notes (the sidecar on disk can predate a note turning private)
- * gates the mint, failing closed. Once a sidecar exists, the verdict outranks
- * everything else about it — even an empty body answers "unavailable", not
- * "no description", when the asset is blocked.
+ * Read one already-authorized managed description. Classification happens for
+ * the complete tool batch before this function is called, so no sidecar body
+ * can be observed while the live graph snapshot is still incomplete.
  */
-export function buildReadOneAsset(deps: ReadAssetDeps) {
-  return async function readOneAsset(path: string): Promise<ReadAssetResult> {
-    const canonical = canonicalAssetPath(path)
-    if (canonical === null || !isAssetPath(canonical)) {
-      return { ok: false, path, error: NOT_AN_ASSET_ERROR }
+async function readAuthorizedAsset(
+  path: string,
+  canonical: string,
+  readDescriptionFn: (assetPath: string) => Promise<string | null>,
+): Promise<ReadAssetResult> {
+  let source: string | null
+  try {
+    source = await readDescriptionFn(canonical)
+  } catch {
+    return { ok: false, path, error: ASSET_UNAVAILABLE_ERROR }
+  }
+  if (source === null) {
+    return { ok: false, path, error: NO_ASSET_DESCRIPTION_ERROR }
+  }
+  const managed = readManagedDescription(source)
+  if (
+    managed === null ||
+    (managed.sourcePath !== null && managed.sourcePath !== canonical)
+  ) {
+    return { ok: false, path, error: NO_ASSET_DESCRIPTION_ERROR }
+  }
+  const body = splitFrontmatter(source).body.trim()
+  const truncated = body.length > MAX_ASSET_DESCRIPTION_CHARS
+  try {
+    const asset = cloudSafeAssetDescription({
+      path: canonical,
+      isPrivate: false,
+      description: truncated ? body.slice(0, MAX_ASSET_DESCRIPTION_CHARS) : body,
+      truncated,
+    })
+    if (body === '') {
+      return { ok: false, path, error: NO_ASSET_DESCRIPTION_ERROR }
     }
-    let source: string
-    try {
-      source = await deps.readNoteFn(descriptionPathFor(canonical))
-    } catch (cause) {
-      if (isAppError(cause) && cause.kind === 'notFound') {
-        return { ok: false, path, error: NO_ASSET_DESCRIPTION_ERROR }
-      }
-      throw cause
+    return { ok: true, asset }
+  } catch (cause) {
+    if (isPrivateNoteError(cause)) {
+      return { ok: false, path, error: ASSET_UNAVAILABLE_ERROR }
     }
-    const body = splitFrontmatter(source).body.trim()
-    const candidates = await deps.assetReferencingNotePathsFn(canonical)
-    const verdict = await classifyAssetFromNotes(canonical, candidates, deps.readNoteFn)
-    const truncated = body.length > MAX_ASSET_DESCRIPTION_CHARS
-    try {
-      const asset = cloudSafeAssetDescription({
-        path: canonical,
-        isPrivate: verdict !== 'send',
-        description: truncated ? body.slice(0, MAX_ASSET_DESCRIPTION_CHARS) : body,
-        truncated,
-      })
-      if (body === '') {
-        // An existing-but-empty sidecar reads as "no description" — but only
-        // for a sendable asset; a blocked one threw above, so the two miss
-        // messages stay consistent with the privacy contract.
-        return { ok: false, path, error: NO_ASSET_DESCRIPTION_ERROR }
+    throw cause
+  }
+}
+
+interface AssetRequest {
+  readonly path: string
+  readonly canonical: string | null
+}
+
+/**
+ * Build the read_assets batch executor. Every valid requested path is
+ * classified from one live note/catalog snapshot before any sidecar is
+ * probed. Invalid paths remain per-item input errors; a discovery/read failure
+ * makes every managed request generically unavailable.
+ */
+export function buildReadAssets(
+  deps: ReadAssetDeps,
+): (paths: readonly string[]) => Promise<ReadAssetsOutput> {
+  return async function readAssets(paths: readonly string[]): Promise<ReadAssetsOutput> {
+    const requests: AssetRequest[] = paths.map((path) => {
+      const canonical = canonicalAssetPath(path)
+      return {
+        path,
+        canonical:
+          canonical !== null && isEligibleAssetPath(canonical) ? canonical : null,
       }
-      return { ok: true, asset }
-    } catch (cause) {
-      if (isPrivateNoteError(cause)) {
-        return { ok: false, path, error: ASSET_UNAVAILABLE_ERROR }
+    })
+    const canonicalPaths = requests.flatMap((request) =>
+      request.canonical === null ? [] : [request.canonical],
+    )
+    let verdicts: ReturnType<typeof classifyAssetBatchFromSnapshot>
+    if (canonicalPaths.length === 0) {
+      verdicts = new Map()
+    } else {
+      try {
+        verdicts = classifyAssetBatchFromSnapshot(
+          canonicalPaths,
+          await deps.privacySnapshotFn(),
+        )
+      } catch {
+        verdicts = new Map(canonicalPaths.map((path) => [path, 'skip-private' as const]))
       }
-      throw cause
+    }
+
+    return {
+      assets: await Promise.all(
+        requests.map(async (request): Promise<ReadAssetResult> => {
+          if (request.canonical === null) {
+            return { ok: false, path: request.path, error: NOT_AN_ASSET_ERROR }
+          }
+          if (verdicts.get(request.canonical) !== 'send') {
+            return { ok: false, path: request.path, error: ASSET_UNAVAILABLE_ERROR }
+          }
+          return readAuthorizedAsset(request.path, request.canonical, deps.readDescriptionFn)
+        }),
+      ),
     }
   }
 }

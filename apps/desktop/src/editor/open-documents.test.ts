@@ -9,6 +9,7 @@ function fakeSession(path: string, log: string[]): NoteSession {
     load: () => {},
     editorChanged: () => {},
     externalChanged: () => {},
+    externalRemoved: () => {},
     flush: async () => {
       log.push(`flush:${path}`)
     },
@@ -19,6 +20,7 @@ function fakeSession(path: string, log: string[]): NoteSession {
     content: () => '',
     liveContent: () => '',
     updateFrontmatter: () => true,
+    commitExactContentReplacement: async () => false,
     commitTaskToggle: async () => false,
     commitTaskEdit: async () => false,
     commitTaskRemove: async () => false,

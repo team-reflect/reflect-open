@@ -77,6 +77,7 @@ vi.mock('@/editor/note-editor', async () => {
           focus: () => {
             editorProbe.focusCalls += 1
           },
+          revealHeading: () => false,
           setSelection: (position: 'start' | 'end') => {
             editorProbe.selectionCalls.push(position)
           },
@@ -223,6 +224,16 @@ beforeEach(() => {
       }))
     }
     if (command === 'db_query') {
+      const sql = String(args['sql'] ?? '')
+      // The manifest resolver fails closed while any file is missing from the
+      // projection, so this end-to-end bridge keeps its fake index in sync.
+      if (sql.includes('"file_hash"') && sql.includes('"mtime"')) {
+        return Object.keys(files).map((path) => ({
+          path,
+          file_hash: `hash:${path}`,
+          mtime: 1,
+        }))
+      }
       return []
     }
     return null

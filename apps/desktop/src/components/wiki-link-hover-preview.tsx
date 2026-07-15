@@ -1,6 +1,8 @@
-import { useLayoutEffect, useState, type ReactElement } from 'react'
+import { useCallback, useLayoutEffect, useState, type ReactElement } from 'react'
+import type { FileInfoResolver, FileLinkResolver, WikiEmbedResolver } from '@meowdown/core'
 import { dateFromDailyPath, type DateFormat } from '@reflect/core'
 import { MarkdownPreview } from '@/editor/markdown-preview'
+import type { AssetPersistence } from '@/editor/use-asset-persistence'
 import { formatDayLabel } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 
@@ -10,6 +12,10 @@ interface WikiLinkHoverPreviewProps {
   markdown: string
   dateFormat: DateFormat
   resolveImageUrl: (src: string) => string | null
+  resolveFileLinkFromSource: AssetPersistence['resolveFileLinkFromSource']
+  resolveWikiEmbedFromSource: AssetPersistence['resolveWikiEmbedFromSource']
+  resolveFileInfoFromSource: AssetPersistence['resolveFileInfoFromSource']
+  resolverRevision: number
 }
 
 /**
@@ -58,10 +64,26 @@ export function WikiLinkHoverPreview({
   markdown,
   dateFormat,
   resolveImageUrl,
+  resolveFileLinkFromSource,
+  resolveWikiEmbedFromSource,
+  resolveFileInfoFromSource,
+  resolverRevision,
 }: WikiLinkHoverPreviewProps): ReactElement {
   const dailyDate = dateFromDailyPath(path)
   const empty = markdown.trim().length === 0
   const { setRoot, overflowing } = useOverflowing()
+  const resolveFileLink = useCallback<FileLinkResolver>(
+    (payload) => resolveFileLinkFromSource(path, payload),
+    [path, resolveFileLinkFromSource],
+  )
+  const resolveWikiEmbed = useCallback<WikiEmbedResolver>(
+    (embed) => resolveWikiEmbedFromSource(path, embed),
+    [path, resolveWikiEmbedFromSource],
+  )
+  const resolveFileInfo = useCallback<FileInfoResolver>(
+    (href) => resolveFileInfoFromSource(path, href),
+    [path, resolveFileInfoFromSource],
+  )
 
   return (
     <div
@@ -82,6 +104,10 @@ export function WikiLinkHoverPreview({
           <MarkdownPreview
             content={markdown}
             resolveImageUrl={resolveImageUrl}
+            resolveFileLink={resolveFileLink}
+            resolveWikiEmbed={resolveWikiEmbed}
+            resolveFileInfo={resolveFileInfo}
+            resolverRevision={resolverRevision}
             interactive={false}
             className="text-xs leading-relaxed"
           />

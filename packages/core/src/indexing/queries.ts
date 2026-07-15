@@ -6,7 +6,7 @@ import {
   resolveWikiLinkAsync,
   type Resolution,
 } from '../markdown'
-import { db } from './db'
+import { db, type IndexDatabase } from './db'
 import { inClauseChunks } from './query-utils'
 export {
   getBacklinks,
@@ -262,8 +262,10 @@ export interface IndexedFileFacts {
  * a streamed/keyset scan if graphs grow large (tracked with the Plan 04b
  * watcher).
  */
-export async function getIndexedFileFacts(): Promise<Map<string, IndexedFileFacts>> {
-  const rows = await db.selectFrom('notes').select(['path', 'fileHash', 'mtime']).execute()
+export async function getIndexedFileFacts(
+  database: IndexDatabase = db,
+): Promise<Map<string, IndexedFileFacts>> {
+  const rows = await database.selectFrom('notes').select(['path', 'fileHash', 'mtime']).execute()
   return new Map(rows.map((row) => [row.path, { fileHash: row.fileHash, mtime: row.mtime }]))
 }
 
@@ -342,55 +344,51 @@ export async function noteTitleOwningEmail(email: string): Promise<string | null
   return owner?.title ?? null
 }
 
-/** Exact indexed date/title/alias candidates, preserving ambiguity within the winning tier. */
+/** Exact indexed date/title/alias/basename candidates, preserving winning-tier ambiguity. */
 export type ExactWikiTargetMatch =
   | { readonly kind: 'date'; readonly paths: readonly string[] }
   | { readonly kind: 'title'; readonly paths: readonly string[] }
   | { readonly kind: 'alias'; readonly paths: readonly string[] }
+  | { readonly kind: 'basename'; readonly paths: readonly string[] }
   | { readonly kind: 'missing'; readonly paths: readonly [] }
 
-/**
- * Find every indexed path that exactly claims `target`, with ordinary wiki
- * resolution precedence: calendar date, then title, then alias. Unlike
- * {@link resolveWikiTarget}, this does not collapse a tier to its first path;
- * callers that may create on a miss need to distinguish one existing note
- * from several notes claiming the same spelling.
- */
-export async function findExactWikiTargetMatches(
+/** All bare-wiki candidates before precedence is applied. */
+export interface WikiTargetMatchTiers {
+  readonly date: readonly string[]
+  readonly title: readonly string[]
+  readonly alias: readonly string[]
+  readonly basename: readonly string[]
+}
+
+/** Query every bare-wiki resolution tier without collapsing lower priorities. */
+export async function findWikiTargetMatchTiers(
   target: string,
-): Promise<ExactWikiTargetMatch> {
+  database: IndexDatabase = db,
+): Promise<WikiTargetMatchTiers> {
   const normalized = normalizeWikiTarget(target)
   if (normalized.key === '') {
-    return { kind: 'missing', paths: [] }
+    return { date: [], title: [], alias: [], basename: [] }
   }
 
-  if (normalized.date !== undefined) {
-    const dateRows = await db
-      .selectFrom('notes')
-      .where('dailyDate', '=', normalized.date)
-      .where('kind', '!=', 'template')
-      .select('path')
-      .distinct()
-      .orderBy('path')
-      .execute()
-    if (dateRows.length > 0) {
-      return { kind: 'date', paths: dateRows.map((row) => row.path) }
-    }
-  }
-
-  const titleRows = await db
+  const dateRows = normalized.date === undefined
+    ? []
+    : await database
+        .selectFrom('notes')
+        .where('dailyDate', '=', normalized.date)
+        .where('kind', '!=', 'template')
+        .select('path')
+        .distinct()
+        .orderBy('path')
+        .execute()
+  const titleRows = await database
     .selectFrom('notes')
-    .where('titleKey', '=', normalized.key)
+    .where('authoredTitleKey', '=', normalized.key)
     .where('kind', '!=', 'template')
     .select('path')
     .distinct()
     .orderBy('path')
     .execute()
-  if (titleRows.length > 0) {
-    return { kind: 'title', paths: titleRows.map((row) => row.path) }
-  }
-
-  const aliasRows = await db
+  const aliasRows = await database
     .selectFrom('aliases')
     .innerJoin('notes', 'notes.path', 'aliases.notePath')
     .where('aliasKey', '=', normalized.key)
@@ -399,20 +397,51 @@ export async function findExactWikiTargetMatches(
     .distinct()
     .orderBy('notePath')
     .execute()
-  if (aliasRows.length > 0) {
-    return { kind: 'alias', paths: aliasRows.map((row) => row.notePath) }
+  const basenameRows = await database
+    .selectFrom('notes')
+    .where('basenameKey', '=', normalized.key)
+    .where('kind', '!=', 'template')
+    .select('path')
+    .distinct()
+    .orderBy('path')
+    .execute()
+
+  return {
+    date: dateRows.map((row) => row.path),
+    title: titleRows.map((row) => row.path),
+    alias: aliasRows.map((row) => row.notePath),
+    basename: basenameRows.map((row) => row.path),
+  }
+}
+
+/**
+ * Find every indexed path that exactly claims `target`, with ordinary wiki
+ * resolution precedence: calendar date, then title, then alias, then basename.
+ * Unlike {@link resolveWikiTarget}, this does not collapse a tier to its first
+ * path; callers that may create on a miss need to distinguish one existing
+ * note from several notes claiming the same spelling.
+ */
+export async function findExactWikiTargetMatches(
+  target: string,
+): Promise<ExactWikiTargetMatch> {
+  const tiers = await findWikiTargetMatchTiers(target)
+  for (const kind of ['date', 'title', 'alias', 'basename'] as const) {
+    if (tiers[kind].length > 0) {
+      return { kind, paths: tiers[kind] }
+    }
   }
   return { kind: 'missing', paths: [] }
 }
 
 /**
  * Resolve a `[[target]]` against the index, returning the note ref (its path).
- * The resolution *policy* (prefer daily-date, then title, then alias) lives once
- * in {@link resolveWikiLinkAsync}; this is only the DB-backed data access.
+ * The resolution *policy* (prefer daily-date, then title, then alias, then
+ * basename) lives once in {@link resolveWikiLinkAsync}; this is only the
+ * DB-backed data access.
  *
- * Each lookup `orderBy`s before taking the first row so a title/alias/date
- * collision resolves to the same note every time (otherwise the row order is
- * undefined).
+ * Each lookup `orderBy`s before taking the first row so a
+ * title/alias/date/basename collision resolves to the same note every time
+ * (otherwise the row order is undefined).
  */
 export function resolveWikiTarget(target: string): Promise<Resolution> {
   // Templates are excluded from every lookup, mirroring the `note_keys` view:
@@ -431,7 +460,7 @@ export function resolveWikiTarget(target: string): Promise<Resolution> {
       (
         await db
           .selectFrom('notes')
-          .where('titleKey', '=', key)
+          .where('authoredTitleKey', '=', key)
           .where('kind', '!=', 'template')
           .select('path')
           .orderBy('path')
@@ -448,5 +477,15 @@ export function resolveWikiTarget(target: string): Promise<Resolution> {
           .orderBy('notePath')
           .executeTakeFirst()
       )?.notePath,
+    byBasename: async (key) =>
+      (
+        await db
+          .selectFrom('notes')
+          .where('basenameKey', '=', key)
+          .where('kind', '!=', 'template')
+          .select('path')
+          .orderBy('path')
+          .executeTakeFirst()
+      )?.path,
   })
 }

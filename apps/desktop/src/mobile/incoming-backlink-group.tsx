@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from 'react'
 import { ChevronRight } from 'lucide-react'
-import type { WikilinkClickHandler } from '@meowdown/core'
 import { BacklinkSnippet } from '@/components/backlink-snippet'
+import type { BacklinkNavigation } from '@/hooks/use-backlink-navigation'
 import type { BacklinkSource } from '@/lib/group-backlinks'
 import { cn } from '@/lib/utils'
 
@@ -17,9 +17,16 @@ interface IncomingBacklinkGroupProps {
   /** Open the source note (the section wires this to the router). */
   onOpen: (path: string) => void
   /** Navigate a clicked `[[wiki link]]` inside a snippet to its target. */
-  onWikilinkClick: WikilinkClickHandler
+  onWikilinkClick: BacklinkNavigation['onWikilinkClick']
+  /** Navigate a standard Markdown note link inside a snippet. */
+  onMarkdownLinkClick: BacklinkNavigation['onMarkdownLinkClick']
   /** Resolve `![…](…)` sources inside a snippet to displayable URLs. */
-  resolveImageUrl: (src: string) => string | undefined
+  resolveImageUrl: (sourcePath: string, src: string) => string | undefined
+  resolveFileLink: BacklinkNavigation['resolveFileLink']
+  resolveWikiEmbed: BacklinkNavigation['resolveWikiEmbed']
+  resolveFileInfo: BacklinkNavigation['resolveFileInfo']
+  openAttachment: BacklinkNavigation['openAttachment']
+  resolverRevision: number
 }
 
 /**
@@ -39,7 +46,13 @@ export function IncomingBacklinkGroup({
   expanded: expandedOverride,
   onOpen,
   onWikilinkClick,
+  onMarkdownLinkClick,
   resolveImageUrl,
+  resolveFileLink,
+  resolveWikiEmbed,
+  resolveFileInfo,
+  openAttachment,
+  resolverRevision,
 }: IncomingBacklinkGroupProps): ReactElement {
   const [expanded, setExpanded] = useState(expandedOverride)
 
@@ -91,7 +104,13 @@ export function IncomingBacklinkGroup({
               notePath={source.path}
               tasks={snippet.tasks}
               onWikilinkClick={onWikilinkClick}
+              onMarkdownLinkClick={onMarkdownLinkClick}
               resolveImageUrl={resolveImageUrl}
+              resolveFileLink={resolveFileLink}
+              resolveWikiEmbed={resolveWikiEmbed}
+              resolveFileInfo={resolveFileInfo}
+              openAttachment={openAttachment}
+              resolverRevision={resolverRevision}
             />
           ))}
         </div>

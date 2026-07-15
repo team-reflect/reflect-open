@@ -35,6 +35,8 @@ export function seedGraphFiles(): Record<string, string> {
       `- [ ] Reply to the beta feedback thread`,
       `- Started reading [[Atomic Habits]] on the train #book`,
       ``,
+      `![A tiny seeded attachment](/Media/reflect-dev.png)`,
+      ``,
     ].join('\n'),
     [`daily/${yesterday}.md`]: [
       `- Pairing session on the day carousel swipe physics`,
@@ -132,5 +134,15 @@ export function seedGraphFiles(): Record<string, string> {
       `Marked private — content here must never reach an external service.`,
       ``,
     ].join('\n'),
+  }
+}
+
+/** Supported binary files seeded into the plain-browser demo vault. */
+export function seedGraphAttachments(): Record<string, string> {
+  return {
+    // One opaque 1×1 PNG. Keeping a real image in the seed makes the mobile
+    // browser harness exercise attachment discovery and rendering on boot.
+    'Media/reflect-dev.png':
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
   }
 }

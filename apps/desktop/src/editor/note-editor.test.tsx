@@ -22,6 +22,12 @@ interface CapturedEditorProps {
   onTagClick?: (payload: { tag: string; event: MouseEvent }) => void
   onFilePaste?: (file: File) => Promise<string | undefined>
   resolveFileLink?: (payload: { href: string; label: string; title: string }) => boolean
+  resolveWikiEmbed?: (payload: {
+    target: string
+    display: string
+    width: number | null
+    height: number | null
+  }) => { kind: 'image' | 'file' | 'note' } | undefined
   resolveFileInfo?: (
     href: string,
   ) => { size: number } | undefined | Promise<{ size: number } | undefined>
@@ -68,7 +74,7 @@ vi.mock('@meowdown/react', () => ({
       <div className={props.editorClassName}>
         <span className="md-image-view-preview">
           <img
-            src={props.resolveImageUrl?.('assets/cat.png') ?? ''}
+            src={props.resolveImageUrl?.('assets/cat.png') || undefined}
             alt="Cat"
             data-testid="inline-image"
           />
@@ -420,6 +426,22 @@ describe('NoteEditor image lightbox', () => {
 })
 
 describe('NoteEditor link opening', () => {
+  it('lets the host claim an in-vault Markdown note link before URL handling', () => {
+    const onMarkdownNoteLinkClick = vi.fn(() => true)
+    render(
+      <NoteEditor
+        initialContent="[Plan](../Plan.md)"
+        onMarkdownNoteLinkClick={onMarkdownNoteLinkClick}
+      />,
+    )
+
+    const event = new MouseEvent('click')
+    act(() => captured.props?.onLinkClick?.({ href: '../Plan.md', event }))
+
+    expect(onMarkdownNoteLinkClick).toHaveBeenCalledWith('../Plan.md', event)
+    expect(openUrl).not.toHaveBeenCalled()
+  })
+
   it('opens external links via onLinkClick', () => {
     renderEditor()
     expect(captured.props?.onLinkClick).toBeTypeOf('function')
@@ -497,15 +519,40 @@ describe('NoteEditor link opening', () => {
 })
 
 describe('NoteEditor file pills', () => {
-  it('passes the file-link resolver through unchanged (meowdown reads it once)', () => {
-    const resolveFileLink = vi.fn(() => true)
-    render(<NoteEditor initialContent="" resolveFileLink={resolveFileLink} />)
-    expect(captured.props?.resolveFileLink).toBe(resolveFileLink)
+  it('gives meowdown one stable file resolver that forwards to the latest host', () => {
+    const first = vi.fn(() => true)
+    const second = vi.fn(() => false)
+    const view = render(<NoteEditor initialContent="" resolveFileLink={first} />)
+    const stableResolver = captured.props?.resolveFileLink
+    const payload = { href: 'Media/report.pdf', label: 'Report', title: '' }
+    expect(stableResolver?.(payload)).toBe(true)
+    expect(first).toHaveBeenCalledWith(payload)
+
+    view.rerender(<NoteEditor initialContent="" resolveFileLink={second} />)
+    expect(captured.props?.resolveFileLink).toBe(stableResolver)
+    expect(stableResolver?.(payload)).toBe(false)
+    expect(second).toHaveBeenCalledWith(payload)
   })
 
-  it('omits the resolver when the host claims no file links', () => {
+  it('declines through the stable resolver when the host claims no file links', () => {
     render(<NoteEditor initialContent="" />)
-    expect('resolveFileLink' in (captured.props ?? {})).toBe(false)
+    expect(
+      captured.props?.resolveFileLink?.({ href: 'Media/report.pdf', label: 'Report', title: '' }),
+    ).toBe(false)
+  })
+
+  it('gives meowdown one stable wiki-embed resolver that forwards to the latest host', () => {
+    const first = vi.fn(() => ({ kind: 'image' as const }))
+    const second = vi.fn(() => ({ kind: 'file' as const }))
+    const view = render(<NoteEditor initialContent="" resolveWikiEmbed={first} />)
+    const stableResolver = captured.props?.resolveWikiEmbed
+    const payload = { target: 'photo.png', display: '', width: null, height: null }
+    expect(stableResolver?.(payload)).toEqual({ kind: 'image' })
+
+    view.rerender(<NoteEditor initialContent="" resolveWikiEmbed={second} />)
+    expect(captured.props?.resolveWikiEmbed).toBe(stableResolver)
+    expect(stableResolver?.(payload)).toEqual({ kind: 'file' })
+    expect(second).toHaveBeenCalledWith(payload)
   })
 
   it('opens a clicked assets/ pill through the graph asset opener, not the URL opener', () => {

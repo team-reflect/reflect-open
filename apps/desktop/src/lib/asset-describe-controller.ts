@@ -1,8 +1,11 @@
 import {
+  ASSETS_DIR,
+  attachmentReferenceCandidates,
   hasBridge,
   isEligibleAssetPath,
   isNotePath,
   isSilentStop,
+  listDir,
   parseNote,
   readNote,
   reconcileAssetDescriptions,
@@ -154,6 +157,7 @@ export function createAssetDescribeController(
    */
   async function markAssetsFromNotes(notePaths: readonly string[]): Promise<void> {
     const referenced = new Set<string>()
+    const bareBasenames = new Set<string>()
     for (const notePath of notePaths) {
       if (loop.isStale()) {
         return
@@ -164,10 +168,43 @@ export function createAssetDescribeController(
       } catch {
         continue // deleted/unreadable since the change — nothing to re-evaluate
       }
-      for (const asset of parseNote({ path: notePath, source }).assets) {
-        if (isEligibleAssetPath(asset.path)) {
-          referenced.add(asset.path)
+      for (const authored of parseNote({ path: notePath, source }).attachmentReferences) {
+        const candidates = attachmentReferenceCandidates({
+          sourcePath: authored.sourcePath,
+          reference: authored.rawReference,
+          referenceKind: authored.kind,
+        })
+        if (candidates === null) {
+          continue
         }
+        for (const path of candidates.exactPaths) {
+          if (isEligibleAssetPath(path)) {
+            referenced.add(path)
+          }
+        }
+        if (candidates.basename !== null) {
+          bareBasenames.add(candidates.basename)
+        }
+      }
+    }
+    if (bareBasenames.size > 0 && !loop.isStale()) {
+      try {
+        for (const file of await listDir(ASSETS_DIR, options.generation)) {
+          const basename = file.path.split('/').at(-1)?.replace(/[A-Z]/g, (character) =>
+            character.toLowerCase(),
+          )
+          if (
+            file.placeholder !== true &&
+            basename !== undefined &&
+            bareBasenames.has(basename) &&
+            isEligibleAssetPath(file.path)
+          ) {
+            referenced.add(file.path)
+          }
+        }
+      } catch {
+        // Exact managed candidates collected above remain useful. A later
+        // attachment upsert will independently trigger any bare-name match.
       }
     }
     if (referenced.size > 0 && !loop.isStale()) {

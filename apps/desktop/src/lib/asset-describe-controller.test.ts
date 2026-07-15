@@ -17,6 +17,9 @@ const subscribeIndexApplied = vi.hoisted(() =>
   vi.fn<(handler: (changes: readonly FileChange[]) => void) => () => void>(),
 )
 const readNote = vi.hoisted(() => vi.fn<(path: string, generation?: number) => Promise<string>>())
+const listDir = vi.hoisted(() =>
+  vi.fn<(dir: string, generation?: number) => Promise<import('@reflect/core').FileMeta[]>>(),
+)
 const reindexNotesReferencing = vi.hoisted(() =>
   vi.fn<(assetPaths: readonly string[], generation: number) => Promise<void>>(),
 )
@@ -28,6 +31,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   reconcileAssetDescriptions,
   subscribeIndexApplied,
   readNote,
+  listDir,
   reindexNotesReferencing,
   hasBridge: () => true,
 }))
@@ -99,6 +103,7 @@ beforeEach(() => {
   reconcileAssetDescriptions.mockResolvedValue(outcome())
   reindexNotesReferencing.mockResolvedValue(undefined)
   readNote.mockResolvedValue('# A note with no asset references\n')
+  listDir.mockResolvedValue([])
   subscribeIndexApplied.mockImplementation((handler) => {
     onApplied = handler
     return unlisten
@@ -181,6 +186,22 @@ describe('createAssetDescribeController', () => {
     await flush()
 
     expect(readNote).toHaveBeenCalledWith('notes/x.md', 3)
+    expect(reconcileAssetDescriptions).toHaveBeenCalledTimes(1)
+    expect(reconcileAssetDescriptions.mock.calls[0]![0].changed).toEqual(['assets/a.png'])
+  })
+
+  it('re-evaluates a managed asset selected by a bare wiki embed', async () => {
+    readNote.mockResolvedValue('# Now public\n\n![[a.png]]\n')
+    listDir.mockResolvedValue([
+      { path: 'assets/a.png', size: 1, modifiedMs: 1 },
+      { path: 'assets/other.png', size: 1, modifiedMs: 1 },
+    ])
+    create().start()
+    await flush()
+    emitApplied([upsert('notes/x.md')])
+    await flush()
+
+    expect(listDir).toHaveBeenCalledWith('assets', 3)
     expect(reconcileAssetDescriptions).toHaveBeenCalledTimes(1)
     expect(reconcileAssetDescriptions.mock.calls[0]![0].changed).toEqual(['assets/a.png'])
   })

@@ -122,7 +122,11 @@ export function createDocumentBinding(): DocumentBinding {
       unregister = registerOpenDocument({
         session: bound,
         ...(owner
-          ? { settle: () => owner.settle(), settled: () => owner.settled() }
+          ? {
+              retarget: (to) => owner.retarget(to),
+              settle: () => owner.settle(),
+              settled: () => owner.settled(),
+            }
           : {}),
       })
       return { session: bound, coordinator: owner, created: adopted === null }

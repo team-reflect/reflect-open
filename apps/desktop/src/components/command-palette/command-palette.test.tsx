@@ -107,6 +107,7 @@ function renderPalette(query: string, context?: Partial<CommandContext>) {
     newChat: vi.fn(),
     switchGraph: vi.fn(),
     toggleAudioMemo: vi.fn(),
+    graph: () => ({ root: '/g', name: 'g', generation: 1 }),
     generation: () => 1,
     openPalette: vi.fn(),
     openShortcuts: vi.fn(),

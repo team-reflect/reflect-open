@@ -41,6 +41,23 @@ export const fileMetaSchema = z.object({
 })
 export type FileMeta = z.infer<typeof fileMetaSchema>
 
+/** One live note body captured by the native AI privacy snapshot. */
+export interface AssetPrivacySnapshotNote {
+  readonly path: string
+  readonly source: string
+}
+
+/**
+ * Uncached, generation-pinned note + attachment snapshot used to authorize a
+ * managed-asset AI batch before any sidecar, keychain entry, or source bytes
+ * are inspected.
+ */
+export interface AssetPrivacySnapshot {
+  readonly revision: number
+  readonly notes: readonly AssetPrivacySnapshotNote[]
+  readonly attachments: readonly FileMeta[]
+}
+
 /** Result of the native no-clobber note claim. */
 export const noteCreateOutcomeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('created'), modifiedMs: z.number().nullable() }),
@@ -48,18 +65,45 @@ export const noteCreateOutcomeSchema = z.discriminatedUnion('kind', [
 ])
 export type NoteCreateOutcome = z.infer<typeof noteCreateOutcomeSchema>
 
+/** Result of a native compare-and-swap note write. */
+export const noteWriteIfUnchangedOutcomeSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('written'), modifiedMs: z.number().nullable() }),
+  z.object({ kind: z.literal('changed') }),
+])
+export type NoteWriteIfUnchangedOutcome = z.infer<
+  typeof noteWriteIfUnchangedOutcomeSchema
+>
+
+/** A heading to reveal after a secondary note window reaches `path`. */
+export const noteHeadingRevealSchema = z.object({
+  /** Graph-relative path of the note that owns the heading. */
+  path: z.string(),
+  /** Decoded Markdown heading fragment, without the leading `#`. */
+  fragment: z.string(),
+})
+export type NoteHeadingReveal = z.infer<typeof noteHeadingRevealSchema>
+
+/** One route/reveal intent sent to a secondary note window. */
+export const noteWindowNavigationSchema = z.object({
+  /** Addressable `reflect://` route used for window identity and navigation. */
+  deepLink: z.string(),
+  /** Heading reveal to run after the target editor mounts, when requested. */
+  headingReveal: noteHeadingRevealSchema.nullable(),
+})
+export type NoteWindowNavigation = z.infer<typeof noteWindowNavigationSchema>
+
 /**
  * What a secondary note window needs to boot (mirrors the Rust
  * `WindowBootstrap`): the open graph's identity with both session generations
- * **unbumped** — adoption is a read, never a re-open — plus the one-shot deep
- * link the window was created to show.
+ * **unbumped** — adoption is a read, never a re-open — plus the one-shot
+ * navigation intent the window was created to show.
  */
 export const windowBootstrapSchema = z.object({
   graph: graphInfoSchema,
   /** The open index session's generation, or null when no index is open. */
   indexGeneration: z.number().nullable(),
-  /** The `reflect://` link this window was opened for; absent on a reload. */
-  initialDeepLink: z.string().nullable(),
+  /** The route/reveal intent this window was opened for; absent on a reload. */
+  initialNavigation: noteWindowNavigationSchema.nullable(),
 })
 export type WindowBootstrap = z.infer<typeof windowBootstrapSchema>
 

@@ -3,24 +3,70 @@ import { echoLocalWrite } from '../indexing/local-write-echo'
 import { getBridge, type Unlisten } from '../ipc/bridge'
 import { call } from '../ipc/invoke'
 import {
+  attachmentFileMetaSchema,
+  attachmentResolveOutcomeSchema,
+  attachmentResolveRequestSchema,
+  type AttachmentFileMeta,
+  type AttachmentResolveOutcome,
+  type AttachmentResolveRequest,
+} from './attachment-resolution'
+import {
   fileMetaSchema,
   graphImportProgressSchema,
   graphImportSummarySchema,
   graphInfoSchema,
   noteCreateOutcomeSchema,
+  noteWriteIfUnchangedOutcomeSchema,
+  noteWindowNavigationSchema,
   recentGraphSchema,
   windowBootstrapSchema,
   type FileMeta,
+  type AssetPrivacySnapshot,
   type GraphImportProgress,
   type GraphImportSummary,
   type GraphInfo,
   type NoteCreateOutcome,
+  type NoteWriteIfUnchangedOutcome,
+  type NoteWindowNavigation,
   type RecentGraph,
   type WindowBootstrap,
 } from './schemas'
+import {
+  ASSETS_DIR,
+  AUDIO_MEMOS_DIR,
+  isAttachmentPath,
+  isNotePath,
+  descriptionPathFor,
+} from './paths'
 
 /** Commands that return `()` from Rust serialize as `null` over IPC. */
 const voidSchema = z.null()
+
+const eligibleNotePathSchema = z.string().refine(isNotePath, {
+  message: 'expected an eligible visible Markdown note path',
+})
+const reservedAttachmentPathSchema = z.string().refine(
+  (path) =>
+    isAttachmentPath(path) &&
+    (path.startsWith(`${ASSETS_DIR}/`) || path.startsWith(`${AUDIO_MEMOS_DIR}/`)),
+  { message: 'expected a supported attachment under assets/ or audio-memos/' },
+)
+const attachmentRootSchema = z.enum([ASSETS_DIR, AUDIO_MEMOS_DIR])
+
+const assetPrivacySnapshotSchema: z.ZodType<AssetPrivacySnapshot> = z
+  .object({
+    revision: z.number().int().nonnegative(),
+    notes: z.array(
+      z
+        .object({
+          path: z.string().refine(isNotePath, { message: 'expected an eligible Markdown path' }),
+          source: z.string(),
+        })
+        .strict(),
+    ),
+    attachments: z.array(attachmentFileMetaSchema),
+  })
+  .strict()
 
 /** Open an existing graph at `path` (ensures the standard layout exists). */
 export async function openGraph(path: string): Promise<GraphInfo> {
@@ -28,19 +74,24 @@ export async function openGraph(path: string): Promise<GraphInfo> {
 }
 
 /**
- * Open (or focus) a secondary note window on a `reflect://` route link
- * (⌘-click a note link). Desktop-only; requires an open graph, which the new
- * window adopts — see {@link windowBootstrap}.
+ * Open (or focus) a secondary note window on a route/reveal intent. Desktop-
+ * only; requires an open graph, which the new window adopts — see
+ * {@link windowBootstrap}.
  */
-export async function openNoteWindow(deepLink: string): Promise<void> {
-  await call('open_note_window', { deepLink }, voidSchema)
+export async function openNoteWindow(navigation: NoteWindowNavigation): Promise<void> {
+  await call(
+    'open_note_window',
+    { navigation: noteWindowNavigationSchema.parse(navigation) },
+    voidSchema,
+  )
 }
 
 /**
  * Adopt the already-open graph for a secondary note window: a pure read of
  * the current graph + index sessions (never `graph_open`/`index_open`, whose
  * generation bumps would strand the main window's pinned commands) plus the
- * one-shot deep link the window was created for. Errors when no graph is open.
+ * one-shot navigation intent the window was created for. Errors when no graph
+ * is open.
  */
 export async function windowBootstrap(): Promise<WindowBootstrap> {
   return call('window_bootstrap', {}, windowBootstrapSchema)
@@ -123,7 +174,7 @@ export function markReflectV1ImportOwnWrites(summary: GraphImportSummary): void 
  * span a graph switch must pin every read; UI reads of the open graph omit it.
  */
 export async function readNote(path: string, generation?: number): Promise<string> {
-  return call('note_read', { path, generation }, z.string())
+  return call('note_read', { path: eligibleNotePathSchema.parse(path), generation }, z.string())
 }
 
 /**
@@ -138,8 +189,38 @@ export async function readNote(path: string, generation?: number): Promise<strin
  * can't report one.
  */
 export async function writeNote(path: string, contents: string, generation: number): Promise<void> {
-  const modifiedMs = await call('note_write', { path, contents, generation }, z.number().nullable())
-  echoLocalWrite({ path, kind: 'upsert', modifiedMs: modifiedMs ?? Date.now() })
+  const eligiblePath = eligibleNotePathSchema.parse(path)
+  const modifiedMs = await call(
+    'note_write',
+    { path: eligiblePath, contents, generation },
+    z.number().nullable(),
+  )
+  echoLocalWrite({ path: eligiblePath, kind: 'upsert', modifiedMs: modifiedMs ?? Date.now() })
+}
+
+/**
+ * Optimistically replace a note after its current bytes match `expected` in
+ * the native command's final validation. `null` means the path must still be
+ * absent and uses the native create-if-absent path. A changed result never
+ * writes. The filesystem watcher remains authoritative for a non-cooperating
+ * external writer that races the final atomic rename.
+ */
+export async function writeNoteIfUnchanged(
+  path: string,
+  expected: string | null,
+  contents: string,
+  generation: number,
+): Promise<NoteWriteIfUnchangedOutcome> {
+  const eligiblePath = eligibleNotePathSchema.parse(path)
+  const outcome = await call(
+    'note_write_if_unchanged',
+    { path: eligiblePath, expected, contents, generation },
+    noteWriteIfUnchangedOutcomeSchema,
+  )
+  if (outcome.kind === 'written') {
+    echoLocalWrite({ path: eligiblePath, kind: 'upsert', modifiedMs: outcome.modifiedMs ?? Date.now() })
+  }
+  return outcome
 }
 
 /**
@@ -152,13 +233,14 @@ export async function createNoteIfAbsent(
   contents: string,
   generation: number,
 ): Promise<NoteCreateOutcome> {
+  const eligiblePath = eligibleNotePathSchema.parse(path)
   const outcome = await call(
     'note_create',
-    { path, contents, generation },
+    { path: eligiblePath, contents, generation },
     noteCreateOutcomeSchema,
   )
   if (outcome.kind === 'created') {
-    echoLocalWrite({ path, kind: 'upsert', modifiedMs: outcome.modifiedMs ?? Date.now() })
+    echoLocalWrite({ path: eligiblePath, kind: 'upsert', modifiedMs: outcome.modifiedMs ?? Date.now() })
   }
   return outcome
 }
@@ -172,8 +254,9 @@ export async function writeAsset(
   contentsBase64: string,
   generation: number,
 ): Promise<void> {
-  await call('asset_write', { path, contentsBase64, generation }, voidSchema)
-  echoLocalWrite({ path, kind: 'upsert', modifiedMs: Date.now() })
+  const eligiblePath = reservedAttachmentPathSchema.parse(path)
+  await call('asset_write', { path: eligiblePath, contentsBase64, generation }, voidSchema)
+  echoLocalWrite({ path: eligiblePath, kind: 'upsert', modifiedMs: Date.now() })
 }
 
 /**
@@ -183,7 +266,50 @@ export async function writeAsset(
  * would resolve against the new graph's same-named file.
  */
 export async function readAsset(path: string, generation: number): Promise<string> {
-  return call('asset_read', { path, generation }, z.string())
+  return call(
+    'asset_read',
+    { path: reservedAttachmentPathSchema.parse(path), generation },
+    z.string(),
+  )
+}
+
+/**
+ * Read a Reflect-managed AI asset through the native no-follow root
+ * capability. This narrower command is used only after a live privacy
+ * snapshot authorizes the asset.
+ */
+export async function readManagedAsset(path: string, generation: number): Promise<string> {
+  return call('managed_asset_read', { path, generation }, z.string())
+}
+
+/**
+ * Read the managed description beside an AI asset without following symlinks.
+ * Missing descriptions are represented as `null`; unsafe paths reject.
+ */
+export async function readManagedAssetDescription(
+  path: string,
+  generation?: number,
+): Promise<string | null> {
+  return call('managed_asset_description_read', { path, generation }, z.string().nullable())
+}
+
+/** Write the managed description beside an AI asset through its narrow IPC boundary. */
+export async function writeManagedAssetDescription(
+  path: string,
+  contents: string,
+  generation: number,
+): Promise<void> {
+  const eligiblePath = reservedAttachmentPathSchema.parse(path)
+  const modifiedMs = await call(
+    'managed_asset_description_write',
+    { path: eligiblePath, contents, generation },
+    z.number().nullable(),
+  )
+  echoLocalWrite({
+    path: descriptionPathFor(eligiblePath),
+    kind: 'upsert',
+    modifiedMs: modifiedMs ?? Date.now(),
+  })
 }
 
 /**
@@ -197,12 +323,29 @@ export async function openAsset(path: string, generation: number): Promise<void>
 }
 
 /**
- * List every file (any extension) under a graph-relative directory, e.g.
- * `audio-memos`. A missing directory lists as empty. Pinned to `generation`
- * for the same reason as {@link readAsset}.
+ * Resolve one local Markdown or wiki-embed attachment without exposing an
+ * absolute filesystem path. The request and response are both validated;
+ * unsafe authored paths reject at the native boundary instead of being
+ * interpreted by UI code.
+ */
+export async function resolveAttachment(
+  request: AttachmentResolveRequest,
+): Promise<AttachmentResolveOutcome> {
+  const parsed = attachmentResolveRequestSchema.parse(request)
+  return call('attachment_resolve', { request: parsed }, attachmentResolveOutcomeSchema)
+}
+
+/**
+ * List files under a reserved attachment root (`assets` or `audio-memos`). A
+ * missing directory lists as empty. Pinned to `generation` for the same reason
+ * as {@link readAsset}.
  */
 export async function listDir(dir: string, generation: number): Promise<FileMeta[]> {
-  return call('dir_list', { dir, generation }, z.array(fileMetaSchema))
+  return call(
+    'dir_list',
+    { dir: attachmentRootSchema.parse(dir), generation },
+    z.array(fileMetaSchema),
+  )
 }
 
 /**
@@ -210,13 +353,14 @@ export async function listDir(dir: string, generation: number): Promise<FileMeta
  * filesystem directly — unlike an index lookup, this can't lag the watcher.
  */
 export async function noteExists(path: string): Promise<boolean> {
-  return call('note_exists', { path }, z.boolean())
+  return call('note_exists', { path: eligibleNotePathSchema.parse(path) }, z.boolean())
 }
 
 /** Send a note to the OS trash (recoverable; pinned to `generation`). */
 export async function deleteNote(path: string, generation: number): Promise<void> {
-  await call('note_delete', { path, generation }, voidSchema)
-  echoLocalWrite({ path, kind: 'remove' })
+  const eligiblePath = eligibleNotePathSchema.parse(path)
+  await call('note_delete', { path: eligiblePath, generation }, voidSchema)
+  echoLocalWrite({ path: eligiblePath, kind: 'remove' })
 }
 
 /**
@@ -225,6 +369,23 @@ export async function deleteNote(path: string, generation: number): Promise<void
  */
 export async function listFiles(generation?: number): Promise<FileMeta[]> {
   return call('list_files', { generation }, z.array(fileMetaSchema))
+}
+
+/**
+ * List supported local attachments from the open graph's shared file catalog.
+ * `generation` pins the manifest to the graph session that requested it.
+ */
+export async function listAttachments(generation?: number): Promise<AttachmentFileMeta[]> {
+  return call('list_attachments', { generation }, z.array(attachmentFileMetaSchema))
+}
+
+/**
+ * Capture one uncached, revision-stable view of every live note body and
+ * supported attachment. AI asset batches call this exactly once before any
+ * sidecar, keychain entry, provider call, or source-byte read.
+ */
+export async function assetPrivacySnapshot(generation: number): Promise<AssetPrivacySnapshot> {
+  return call('asset_privacy_snapshot', { generation }, assetPrivacySnapshotSchema)
 }
 
 /**

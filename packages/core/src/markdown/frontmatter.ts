@@ -18,9 +18,19 @@ export interface FrontmatterSplit {
   bodyOffset: number
 }
 
-const OPEN_FENCE = /^---[ \t]*\r?\n/
+const BYTE_ORDER_MARK = '\uFEFF'
+const OPEN_FENCE = /^(?:\uFEFF)?---[ \t]*(?:\r\n|\n|\r)/
 /** A closing `---` line: at the block start (empty frontmatter) or after a newline. */
-const CLOSE_FENCE = /(?:^|\r?\n)---[ \t]*(?:\r?\n|$)/
+const CLOSE_FENCE = /(?:^|\r\n|\n|\r)---[ \t]*(?:\r\n|\n|\r|$)/
+
+/**
+ * Whether `source` starts a YAML frontmatter block but never closes it. Normal
+ * Markdown parsing remains tolerant, but privacy gates use this signal to fail
+ * closed instead of treating an indeterminate `private` field as public.
+ */
+export function hasUnterminatedLeadingFrontmatter(source: string): boolean {
+  return OPEN_FENCE.test(source) && splitFrontmatter(source).raw === null
+}
 
 /** Carve a leading YAML frontmatter block off `source`, preserving offsets. */
 export function splitFrontmatter(source: string): FrontmatterSplit {
@@ -93,6 +103,7 @@ export function upsertFrontmatter(source: string, patch: Record<string, unknown>
   }
 
   const { raw, body } = splitFrontmatter(source)
+  const byteOrderMark = source.startsWith(BYTE_ORDER_MARK) ? BYTE_ORDER_MARK : ''
 
   if (raw === null) {
     // Deletions of keys that were never there can't create a block.
@@ -103,7 +114,7 @@ export function upsertFrontmatter(source: string, patch: Record<string, unknown>
       return source
     }
     const doc = new Document(defined)
-    return `---\n${ensureTrailingNewline(String(doc))}---\n${source}`
+    return `${byteOrderMark}---\n${ensureTrailingNewline(String(doc))}---\n${source.slice(byteOrderMark.length)}`
   }
 
   const doc = parseDocument(raw)
@@ -121,9 +132,9 @@ export function upsertFrontmatter(source: string, patch: Record<string, unknown>
     }
   }
   if (isEmptyDocument(doc)) {
-    return body
+    return `${byteOrderMark}${body}`
   }
-  return `---\n${ensureTrailingNewline(String(doc))}---\n${body}`
+  return `${byteOrderMark}---\n${ensureTrailingNewline(String(doc))}---\n${body}`
 }
 
 /**

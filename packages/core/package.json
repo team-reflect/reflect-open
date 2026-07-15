@@ -22,6 +22,8 @@
     "@reflect/utils": "workspace:*",
     "ai": "^6.0.211",
     "kysely": "^0.28.17",
+    "micromark-util-decode-string": "^2.0.1",
+    "micromark-util-normalize-identifier": "^2.0.1",
     "ulidx": "^2.4.1",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"

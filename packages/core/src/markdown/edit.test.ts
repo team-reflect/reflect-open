@@ -34,6 +34,20 @@ describe('renameWikiLink', () => {
     expect(renameWikiLink(source, 'Foo', 'Baz')).toBe('[[Baz]] and [[Baz]] and [[Baz|bar]]')
   })
 
+  it('preserves optional Markdown extensions, fragments, and aliases', () => {
+    const source = '[[Old.md#Part|label]] [[old.MD#Other\\*]] [[Old#Final|exact\\*label]]'
+    expect(renameWikiLink(source, 'Old', 'New')).toBe(
+      '[[New.md#Part|label]] [[New.MD#Other\\*]] [[New#Final|exact\\*label]]',
+    )
+  })
+
+  it('preserves percent-encoded bare-title spelling and skips qualified paths', () => {
+    const source = '[[Old%20Title.md#Next%20step|label]] [[Folder/Old Title#Part]]'
+    expect(renameWikiLink(source, 'Old Title', 'New Title')).toBe(
+      '[[New%20Title.md#Next%20step|label]] [[Folder/Old Title#Part]]',
+    )
+  })
+
   it('rejects a destination target containing wiki-link syntax', () => {
     expect(() => renameWikiLink('[[Foo]]', 'Foo', 'A|B')).toThrow(/invalid wiki-link target/i)
   })

@@ -104,6 +104,10 @@ export {
   type ChatTurn,
 } from '../ai/chat/transcript'
 export {
+  liveChatPrivacyFingerprint,
+  privacyFingerprintFromNotes,
+} from '../ai/chat/privacy-fingerprint'
+export {
   deleteChatConversation,
   listChatConversations,
   loadChatMessages,
@@ -218,12 +222,19 @@ export {
 export {
   buildDescriptionSource,
   classifyAsset,
+  classifyAssetBatch,
+  classifyAssetBatchFromNotes,
+  classifyAssetBatchFromSnapshot,
+  classifyLiveAssetBatch,
   isEligibleAssetPath,
   reconcileAssetDescriptions,
   readManagedDescription,
   type AssetDescriptionMeta,
   type AssetDescriptionMode,
+  type AssetPrivacyDiscovery,
+  type AssetPrivacyNote,
   type AssetVerdict,
+  type AssetVerdicts,
   type ReconcileAssetDescriptionsInput,
   type ReconcileAssetDescriptionsOutcome,
 } from '../actions/asset-description'

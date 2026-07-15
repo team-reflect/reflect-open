@@ -189,6 +189,7 @@ export function useAppShortcuts(): CommandContext {
   // that created the context (palette open across an index rebuild, etc.).
   const generationRef = useRef<number | null>(graph?.generation ?? null)
   const graphRootRef = useRef<string | null>(graph?.root ?? null)
+  const graphRef = useRef(graph)
   const recentsRef = useRef(recents)
   const openRecentRef = useRef(openRecent)
   const routeRef = useRef(route)
@@ -199,6 +200,7 @@ export function useAppShortcuts(): CommandContext {
     templatesOpenRef.current = templatePickerOpen || templateCreateOpen
     generationRef.current = graph?.generation ?? null
     graphRootRef.current = graph?.root ?? null
+    graphRef.current = graph
     recentsRef.current = recents
     openRecentRef.current = openRecent
     routeRef.current = route
@@ -232,6 +234,7 @@ export function useAppShortcuts(): CommandContext {
         void openRecentRef.current(recent.root)
       },
       toggleAudioMemo,
+      graph: () => graphRef.current,
       generation: () => generationRef.current,
       openPalette,
       openShortcuts,

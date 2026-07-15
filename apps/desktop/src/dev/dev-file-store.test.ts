@@ -21,3 +21,15 @@ describe('dev file store discovery', () => {
     ])
   })
 })
+
+describe('dev file store conditional writes', () => {
+  it('compares current contents and never recreates an expected-present file', () => {
+    const files = createDevFileStore({ 'notes/source.md': 'before\n' })
+    files.remove('notes/source.md')
+
+    expect(files.writeIfUnchanged('notes/source.md', 'before\n', 'after\n')).toEqual({
+      kind: 'changed',
+    })
+    expect(files.read('notes/source.md')).toBeNull()
+  })
+})

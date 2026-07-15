@@ -5,7 +5,7 @@ import {
   indexNote,
   readNote,
   resolveConflictMarkers,
-  writeNote,
+  writeNoteIfUnchanged,
   type ConflictResolution,
 } from '@reflect/core'
 import { invalidateIndexQueries } from '@/lib/query-client'
@@ -42,7 +42,10 @@ export function useConflictResolution(path: string): ConflictResolutionState {
     try {
       const source = await readNote(path)
       const resolved = resolveConflictMarkers(source, keep)
-      await writeNote(path, resolved, writeGeneration)
+      const outcome = await writeNoteIfUnchanged(path, source, resolved, writeGeneration)
+      if (outcome.kind === 'changed') {
+        throw new Error('This note changed or was removed before conflict resolution landed.')
+      }
       wrote = true
       if (indexGeneration !== null) {
         await indexNote(path, { generation: indexGeneration, content: resolved })

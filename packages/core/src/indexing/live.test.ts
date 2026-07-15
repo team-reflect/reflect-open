@@ -364,7 +364,15 @@ describe('applyIndexChanges move healing (Plan 17)', () => {
     expect(commands).toContain('index_move')
     expect(commands).not.toContain('index_remove')
     const move = calls.find(([command]) => command === 'index_move')
-    expect(move?.[1]).toEqual({ from: OLD, to: NEW, generation: 7 })
+    expect(move?.[1]).toEqual({
+      request: {
+        from: OLD,
+        to: NEW,
+        toPathKey: NEW,
+        toBasenameKey: 'meeting-notes',
+        generation: 7,
+      },
+    })
     const apply = calls.find(([command]) => command === 'index_apply')
     expect(apply).toBeDefined()
     if (apply === undefined) {
@@ -390,6 +398,45 @@ describe('applyIndexChanges move healing (Plan 17)', () => {
     )
 
     expect(moves).toEqual([[OLD, NEW]])
+  })
+
+  it('leaves a committed move for reconcile when suspension interrupts reprojection', async () => {
+    let canApply = true
+    const calls: Array<[string, Record<string, unknown>]> = []
+    fakeBridge(async (command, args) => {
+      calls.push([command, args])
+      if (command === 'note_read') {
+        return CONTENT
+      }
+      if (command === 'db_query') {
+        const params = (args['params'] as unknown[]) ?? []
+        return params.includes(OLD)
+          ? [{ path: OLD, id: '01abcdefghjkmnpqrstvwxyz00' }]
+          : []
+      }
+      if (command === 'index_move') {
+        // The native move dirties mtime before returning, ensuring the next
+        // foreground reconcile reprojects source-path-dependent links.
+        canApply = false
+      }
+      return null
+    })
+
+    await applyIndexChanges(
+      [
+        { path: OLD, kind: 'remove' },
+        { path: NEW, kind: 'upsert', modifiedMs: 42 },
+      ],
+      7,
+      undefined,
+      undefined,
+      () => canApply,
+    )
+
+    const commands = calls.map(([command]) => command)
+    expect(commands).toContain('index_move')
+    expect(commands).not.toContain('index_apply')
+    expect(commands).not.toContain('index_apply_batch')
   })
 
   it('falls back to delete+create when the ids do not match', async () => {

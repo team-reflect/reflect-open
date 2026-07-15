@@ -1,15 +1,28 @@
 import {
+  ASSETS_DIR,
+  AUDIO_MEMOS_DIR,
+  attachmentResolveRequestSchema,
   indexedNoteSchema,
+  isAttachmentPath,
+  isNotePath,
   ReflectError,
+  resolveAttachmentFromCatalog,
   type AppPlatform,
   type IpcBridge,
 } from '@reflect/core'
 import { z } from 'zod'
+import {
+  createDevAttachmentStore,
+  type DevAttachmentStore,
+} from '@/dev/dev-attachment-store'
 import type { DevFileStore } from '@/dev/dev-file-store'
 import type { DevIndexDb } from '@/dev/dev-index-db'
 
 /** The fixed fake graph root the dev bridge reports (mirrors `mobile_storage`). */
 export const DEV_GRAPH_ROOT = '/dev-graph'
+
+/** The fixed graph generation shared by the dev graph and attachment store. */
+export const DEV_GRAPH_GENERATION = 1
 
 /** Everything the command router needs; assembled by `installDevBridge`. */
 export interface DevBridgeBackend {
@@ -17,13 +30,55 @@ export interface DevBridgeBackend {
   platform: AppPlatform
   files: DevFileStore
   index: DevIndexDb
+  /** Binary files and their generation-pinned browser display URLs. */
+  attachments?: DevAttachmentStore
 }
 
 const dbQueryArgsSchema = z.object({ sql: z.string(), params: z.array(z.unknown()) })
 const pathArgsSchema = z.object({ path: z.string() })
-const writeArgsSchema = z.object({ path: z.string(), contents: z.string() })
+const eligibleNotePathSchema = z.string().refine(isNotePath)
+const reservedAttachmentPathSchema = z.string().refine(
+  (path) =>
+    isAttachmentPath(path) &&
+    (path.startsWith(`${ASSETS_DIR}/`) || path.startsWith(`${AUDIO_MEMOS_DIR}/`)),
+)
+const notePathArgsSchema = z.object({ path: eligibleNotePathSchema })
+const writeArgsSchema = z.object({ path: eligibleNotePathSchema, contents: z.string() })
 const createArgsSchema = writeArgsSchema.extend({ generation: z.number().int().nonnegative() })
-const moveArgsSchema = z.object({ from: z.string(), to: z.string() })
+const conditionalWriteArgsSchema = createArgsSchema.extend({ expected: z.string().nullable() })
+const generationArgsSchema = z.object({ generation: z.number().int().nonnegative() })
+const assetPathArgsSchema = z.object({
+  path: z.string().refine(isAttachmentPath),
+  generation: z.number().int().nonnegative(),
+})
+const reservedAssetPathArgsSchema = z.object({
+  path: reservedAttachmentPathSchema,
+  generation: z.number().int().nonnegative(),
+})
+const assetWriteArgsSchema = reservedAssetPathArgsSchema.extend({ contentsBase64: z.string() })
+const managedDescriptionArgsSchema = z.object({
+  path: reservedAttachmentPathSchema,
+  generation: z.number().int().nonnegative().optional(),
+})
+const uploadIdArgsSchema = z.object({ id: z.string().min(1) })
+const uploadCommitArgsSchema = uploadIdArgsSchema.extend({
+  desiredName: z.string().min(1),
+  generation: z.number().int().nonnegative(),
+})
+const moveArgsSchema = z.object({
+  from: eligibleNotePathSchema,
+  to: eligibleNotePathSchema,
+  toPathKey: z.string(),
+  toBasenameKey: z.string(),
+  generation: z.number().int().nonnegative(),
+})
+const moveRequestArgsSchema = z.object({ request: moveArgsSchema })
+const noteMoveRequestArgsSchema = z.object({
+  request: moveArgsSchema.extend({
+    fromPathKey: z.string(),
+    fromBasenameKey: z.string(),
+  }),
+})
 const metaArgsSchema = z.object({ key: z.string(), value: z.string() })
 const touchArgsSchema = z.object({
   entries: z.array(z.object({ path: z.string(), mtime: z.number() })),
@@ -47,6 +102,7 @@ const chatSaveArgsSchema = z.object({
     attachments: z.string(),
     parts: z.string(),
     responseMessages: z.string(),
+    privacyFingerprint: z.string().nullable(),
     createdMs: z.number(),
   }),
 })
@@ -65,9 +121,14 @@ const chatDeleteArgsSchema = z.object({ id: z.string() })
  */
 export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
   const { platform, files, index } = backend
-  const graphInfo = { root: DEV_GRAPH_ROOT, name: 'Dev Graph', generation: 1 }
+  const graphInfo = { root: DEV_GRAPH_ROOT, name: 'Dev Graph', generation: DEV_GRAPH_GENERATION }
+  const attachments = backend.attachments ?? createDevAttachmentStore(graphInfo.generation)
   let settingsDocument: Record<string, unknown> = { mobileOnboarded: true }
-  const assets = new Map<string, string>()
+  const uploads = new Map<
+    string,
+    { readonly generation: number; readonly chunks: Uint8Array[]; size: number }
+  >()
+  let nextUploadId = 1
   // In-memory keychain stand-in so the AI-provider settings flow (and chat,
   // against a CORS-permissive provider) works end-to-end in the harness.
   const secrets = new Map<string, string>()
@@ -111,7 +172,7 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         return 0
 
       case 'note_read': {
-        const { path } = pathArgsSchema.parse(args)
+        const { path } = notePathArgsSchema.parse(args)
         const contents = files.read(path)
         if (contents === null) {
           throw new ReflectError('notFound', `no such note: ${path}`)
@@ -121,6 +182,11 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
       case 'note_write': {
         const { path, contents } = writeArgsSchema.parse(args)
         return files.write(path, contents)
+      }
+      case 'note_write_if_unchanged': {
+        const { path, expected, contents, generation } = conditionalWriteArgsSchema.parse(args)
+        assertDevGeneration(generation, graphInfo.generation)
+        return files.writeIfUnchanged(path, expected, contents)
       }
       case 'note_create': {
         const { path, contents, generation } = createArgsSchema.parse(args)
@@ -133,17 +199,21 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         return files.create(path, contents)
       }
       case 'note_exists':
-        return files.exists(pathArgsSchema.parse(args).path)
+        return files.exists(notePathArgsSchema.parse(args).path)
       case 'note_delete': {
-        files.remove(pathArgsSchema.parse(args).path)
+        files.remove(notePathArgsSchema.parse(args).path)
         return null
       }
       case 'list_files':
         return files.list()
       case 'dir_list':
-        return files.listDir(z.object({ dir: z.string() }).parse(args).dir)
+        return files.listDir(
+          z.object({ dir: z.enum([ASSETS_DIR, AUDIO_MEMOS_DIR]) }).parse(args).dir,
+        )
       case 'note_move_indexed': {
-        const { from, to } = moveArgsSchema.parse(args)
+        const { from, to, toPathKey, toBasenameKey, generation } =
+          noteMoveRequestArgsSchema.parse(args).request
+        assertDevGeneration(generation, graphInfo.generation)
         if (!files.exists(from)) {
           throw new ReflectError('notFound', `cannot move note: ${from} does not exist`)
         }
@@ -153,28 +223,117 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         // Index first: it can refuse (occupied path), and a refused move must
         // leave the file untouched — the in-memory stand-in for Rust's
         // file+rows transaction.
-        index.moveNote(from, to)
+        index.moveNote(from, to, toPathKey, toBasenameKey)
         files.move(from, to)
         return null
       }
 
       case 'asset_write': {
-        const { path, contentsBase64 } = z
-          .object({ path: z.string(), contentsBase64: z.string() })
-          .parse(args)
-        assets.set(path, contentsBase64)
+        const { path, contentsBase64, generation } = assetWriteArgsSchema.parse(args)
+        assertDevGeneration(generation, graphInfo.generation)
+        attachments.writeBase64(path, contentsBase64)
         return null
       }
       case 'asset_read': {
-        const { path } = pathArgsSchema.parse(args)
-        const contents = assets.get(path)
-        if (contents === undefined) {
+        const { path, generation } = reservedAssetPathArgsSchema.parse(args)
+        assertDevGeneration(generation, graphInfo.generation)
+        const contentsBase64 = attachments.readBase64(path)
+        if (contentsBase64 === null) {
           throw new ReflectError('notFound', `asset not found: ${path}`)
         }
-        return contents
+        return contentsBase64
       }
-      case 'asset_open':
+      case 'managed_asset_read': {
+        const { path, generation } = reservedAssetPathArgsSchema.parse(args)
+        assertDevGeneration(generation, graphInfo.generation)
+        const contentsBase64 = attachments.readBase64(path)
+        if (contentsBase64 === null) {
+          throw new ReflectError('notFound', `managed asset not found: ${path}`)
+        }
+        return contentsBase64
+      }
+      case 'managed_asset_description_read': {
+        const { path, generation } = managedDescriptionArgsSchema.parse(args)
+        if (generation !== undefined) {
+          assertDevGeneration(generation, graphInfo.generation)
+        }
+        return files.read(`${path}.reflect.md`)
+      }
+      case 'managed_asset_description_write': {
+        const { path, generation, contents } = managedDescriptionArgsSchema
+          .extend({ generation: z.number().int().nonnegative(), contents: z.string() })
+          .parse(args)
+        assertDevGeneration(generation, graphInfo.generation)
+        return files.write(`${path}.reflect.md`, contents)
+      }
+      case 'asset_upload_begin': {
+        const { generation } = generationArgsSchema.parse(args)
+        assertDevGeneration(generation, graphInfo.generation)
+        const id = `upload-${nextUploadId++}`
+        uploads.set(id, { generation, chunks: [], size: 0 })
+        return id
+      }
+      case 'asset_upload_commit': {
+        const { id, desiredName, generation } = uploadCommitArgsSchema.parse(args)
+        assertDevGeneration(generation, graphInfo.generation)
+        const upload = uploads.get(id)
+        if (upload === undefined) {
+          throw new ReflectError('notFound', `unknown upload: ${id}`)
+        }
+        uploads.delete(id)
+        if (upload.generation !== generation) {
+          throw new ReflectError('io', 'upload belongs to a different graph session')
+        }
+        const path = uniqueDevAssetPath(attachments, desiredName)
+        attachments.writeBytes(path, concatenateChunks(upload.chunks, upload.size))
+        return path
+      }
+      case 'asset_upload_abort':
+        uploads.delete(uploadIdArgsSchema.parse(args).id)
         return null
+      case 'asset_open':
+        assertDevGeneration(assetPathArgsSchema.parse(args).generation, graphInfo.generation)
+        return null
+      case 'list_attachments': {
+        assertDevGeneration(generationArgsSchema.parse(args).generation, graphInfo.generation)
+        return attachments.list()
+      }
+      case 'asset_privacy_snapshot': {
+        const { generation } = generationArgsSchema.parse(args)
+        assertDevGeneration(generation, graphInfo.generation)
+        return {
+          revision: 0,
+          notes: files.list().map((file) => ({
+            path: file.path,
+            source: files.read(file.path) ?? '',
+          })),
+          attachments: attachments.list(),
+        }
+      }
+      case 'attachment_resolve': {
+        const request = attachmentResolveRequestSchema.parse(
+          z.object({ request: z.unknown() }).parse(args).request,
+        )
+        if (request.generation !== graphInfo.generation) {
+          throw new ReflectError(
+            'io',
+            'the graph changed since this command was issued; dropping it',
+          )
+        }
+        const catalog = attachments.list()
+        const outcome = resolveAttachmentFromCatalog(
+          {
+            sourcePath: request.sourcePath,
+            reference: request.reference,
+            referenceKind: request.referenceKind,
+          },
+          catalog,
+        )
+        if (outcome.kind === 'invalid') {
+          throw new ReflectError('traversal', 'invalid local attachment reference')
+        }
+        return outcome
+      }
 
       case 'db_query': {
         const { sql, params } = dbQueryArgsSchema.parse(args)
@@ -197,8 +356,12 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         return null
       }
       case 'index_move': {
-        const { from, to } = moveArgsSchema.parse(args)
-        index.moveNote(from, to)
+        const { from, to, toPathKey, toBasenameKey, generation } =
+          moveRequestArgsSchema.parse(args).request
+        if (generation !== graphInfo.generation) {
+          return null
+        }
+        index.moveNote(from, to, toPathKey, toBasenameKey)
         return null
       }
       case 'index_touch': {
@@ -274,11 +437,70 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
 
   return {
     invoke,
+    invokeBinary: async (command, body, headers) => {
+      if (command !== 'asset_upload_append') {
+        throw new ReflectError('unknown', `dev bridge: unimplemented binary command "${command}"`)
+      }
+      const id = headers['x-upload-id']
+      if (id === undefined) {
+        throw new ReflectError('io', 'missing x-upload-id header')
+      }
+      const upload = uploads.get(id)
+      if (upload === undefined) {
+        throw new ReflectError('notFound', `unknown upload: ${id}`)
+      }
+      upload.chunks.push(body.slice())
+      upload.size += body.byteLength
+      return null
+    },
     // Native event streams (watcher, embeddings, EventKit) don't exist in the
     // browser; subscriptions succeed and simply never fire. Local writes still
     // refresh the UI through core's in-process local-write echo.
     listen: async () => () => {},
   }
+}
+
+function assertDevGeneration(actual: number, expected: number): void {
+  if (actual !== expected) {
+    throw new ReflectError('io', 'the graph changed since this command was issued; dropping it')
+  }
+}
+
+function concatenateChunks(chunks: readonly Uint8Array[], size: number): Uint8Array {
+  const contents = new Uint8Array(size)
+  let offset = 0
+  for (const chunk of chunks) {
+    contents.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return contents
+}
+
+function uniqueDevAssetPath(
+  assets: Pick<DevAttachmentStore, 'has'>,
+  desiredName: string,
+): string {
+  if (
+    desiredName.includes('/') ||
+    desiredName.includes('\\') ||
+    desiredName.includes('\0') ||
+    desiredName === '.' ||
+    desiredName === '..'
+  ) {
+    throw new ReflectError('traversal', `asset name must be a plain filename: ${desiredName}`)
+  }
+  const separator = desiredName.lastIndexOf('.')
+  const hasExtension = separator > 0
+  const stem = hasExtension ? desiredName.slice(0, separator) : desiredName
+  const extension = hasExtension ? desiredName.slice(separator) : ''
+  for (let attempt = 1; attempt <= 1_000; attempt += 1) {
+    const fileName = attempt === 1 ? desiredName : `${stem}-${attempt}${extension}`
+    const path = `assets/${fileName}`
+    if (!assets.has(path)) {
+      return path
+    }
+  }
+  throw new ReflectError('io', `no free asset name for ${desiredName}`)
 }
 
 /** Mirrors `MTIME_TRUST_AGE_MS` in core's hash.ts and Rust's scan.rs. */

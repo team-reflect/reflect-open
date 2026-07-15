@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { type AssetKind } from '../ai/describe-asset'
-import { ASSETS_DIR, DESCRIPTION_SUFFIX } from '../graph/paths'
+import { ASSETS_DIR, DESCRIPTION_SUFFIX, isSafeVisibleGraphPath } from '../graph/paths'
 import { parseFrontmatter, splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter'
 
 /** The eligible asset type and how it enters a provider request. */
@@ -21,11 +21,16 @@ const ASSET_TYPES: Readonly<Record<string, AssetType>> = {
 
 /**
  * The asset type for a graph-relative path, or `null` when it is not an
- * eligible asset: outside `assets/`, a description itself, or an unsupported
- * extension. Pure — the watcher's Rust filter mirrors this rule.
+ * eligible asset: unsafe/noncanonical, outside `assets/`, a description
+ * itself, or an unsupported extension. Pure — the watcher's Rust filter
+ * mirrors this rule.
  */
 export function assetTypeFor(path: string): AssetType | null {
-  if (!path.startsWith(`${ASSETS_DIR}/`) || path.endsWith(DESCRIPTION_SUFFIX)) {
+  if (
+    !isSafeVisibleGraphPath(path) ||
+    !path.startsWith(`${ASSETS_DIR}/`) ||
+    path.endsWith(DESCRIPTION_SUFFIX)
+  ) {
     return null
   }
   const dot = path.lastIndexOf('.')
@@ -59,6 +64,7 @@ export interface AssetDescriptionMeta {
 /** The managed marker; its presence means Reflect owns the file. */
 const managedDescriptionSchema = z.object({
   reflectAsset: z.literal(true),
+  source: z.string().optional(),
   sourceHash: z.string().optional(),
   sourceSize: z.number().optional(),
   generatedAt: z.string().optional(),
@@ -66,6 +72,8 @@ const managedDescriptionSchema = z.object({
 
 /** A managed description's identity, as read back from disk. */
 export interface ManagedDescription {
+  /** Recorded graph-relative source path, or null for an older managed sidecar. */
+  sourcePath: string | null
   /** The recorded source hash, or `null` if absent (forces a rewrite). */
   sourceHash: string | null
   /** The recorded source size in bytes, or `null` if absent. */
@@ -85,6 +93,7 @@ export function readManagedDescription(source: string): ManagedDescription | nul
   }
   const generatedAtMs = parsed.data.generatedAt ? Date.parse(parsed.data.generatedAt) : Number.NaN
   return {
+    sourcePath: parsed.data.source ?? null,
     sourceHash: parsed.data.sourceHash ?? null,
     sourceSize: parsed.data.sourceSize ?? null,
     generatedAtMs: Number.isNaN(generatedAtMs) ? null : generatedAtMs,
@@ -113,4 +122,3 @@ export function base64ByteLength(base64: string): number {
   const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0
   return Math.floor((length * 3) / 4) - padding
 }
-

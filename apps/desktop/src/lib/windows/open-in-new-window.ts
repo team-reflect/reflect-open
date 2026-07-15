@@ -1,4 +1,10 @@
-import { errorMessage, hasBridge, openNoteWindow } from '@reflect/core'
+import {
+  errorMessage,
+  hasBridge,
+  openNoteWindow,
+  type NoteHeadingReveal,
+  type NoteWindowNavigation,
+} from '@reflect/core'
 import { deepLinkForRoute } from '@/lib/deep-links/format'
 import { parseDeepLink } from '@/lib/deep-links/parse'
 import { isMobileSurface } from '@/lib/platform-surface'
@@ -41,7 +47,10 @@ export function isNewWindowClick(event: NewWindowClickEvent | undefined): boolea
  * name, or a failed command). Modifier-click callers then navigate in place,
  * so the gesture degrades to a plain click instead of doing nothing.
  */
-export async function openRouteInNewWindow(route: Route): Promise<boolean> {
+export async function openRouteInNewWindow(
+  route: Route,
+  headingReveal?: NoteHeadingReveal,
+): Promise<boolean> {
   if (!hasBridge() || isMobileSurface()) {
     return false
   }
@@ -49,7 +58,7 @@ export async function openRouteInNewWindow(route: Route): Promise<boolean> {
   if (link === null) {
     return false
   }
-  return openWindowFor(link)
+  return openWindowFor({ deepLink: link, headingReveal: headingReveal ?? null })
 }
 
 /**
@@ -66,28 +75,32 @@ export async function openDeepLinkInNewWindow(href: string): Promise<boolean> {
   if (link === null || link.kind === 'capture') {
     return false
   }
-  return openWindowFor(href)
+  return openWindowFor({ deepLink: href, headingReveal: null })
 }
 
-async function openWindowFor(link: string): Promise<boolean> {
-  const pending = pendingWindowOpens.get(link)
+async function openWindowFor(navigation: NoteWindowNavigation): Promise<boolean> {
+  // Identical route/reveal requests coalesce while native window creation is
+  // pending. Different headings intentionally remain distinct requests: the
+  // shell dedupes by route and forwards the latest reveal to that one window.
+  const requestKey = JSON.stringify(navigation)
+  const pending = pendingWindowOpens.get(requestKey)
   if (pending !== undefined) {
     return pending
   }
 
   const opening = (async (): Promise<boolean> => {
     try {
-      await openNoteWindow(link)
+      await openNoteWindow(navigation)
       return true
     } catch (cause) {
       console.error('open in new window failed:', errorMessage(cause))
       return false
     }
   })()
-  pendingWindowOpens.set(link, opening)
+  pendingWindowOpens.set(requestKey, opening)
   void opening.finally(() => {
-    if (pendingWindowOpens.get(link) === opening) {
-      pendingWindowOpens.delete(link)
+    if (pendingWindowOpens.get(requestKey) === opening) {
+      pendingWindowOpens.delete(requestKey)
     }
   })
   return opening

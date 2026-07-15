@@ -39,6 +39,7 @@ const turn: ChatTurn = {
     { kind: 'notice', tone: 'info', text: 'Stopped.' },
   ],
   responseMessages: [{ role: 'assistant', content: 'A cat, per [[Cats]].' }],
+  privacyFingerprint: 'privacy-v1:test',
   status: 'done',
 }
 
@@ -59,6 +60,7 @@ describe('saveChatMessage', () => {
         attachments: JSON.stringify(turn.attachments),
         parts: JSON.stringify(turn.parts),
         responseMessages: JSON.stringify(turn.responseMessages),
+        privacyFingerprint: 'privacy-v1:test',
         createdMs: 2_000,
       },
       generation: 7,
@@ -74,6 +76,7 @@ describe('loadChatMessages', () => {
       attachments: JSON.stringify(turn.attachments),
       parts: JSON.stringify(turn.parts),
       response_messages: JSON.stringify(turn.responseMessages),
+      privacy_fingerprint: turn.privacyFingerprint,
       ...overrides,
     }
   }
@@ -86,6 +89,13 @@ describe('loadChatMessages', () => {
     const [command, args] = invoke.mock.calls[0]!
     expect(command).toBe('db_query')
     expect(args).toMatchObject({ params: ['conv-1'] })
+  })
+
+  it('loads legacy rows with a null fingerprint but keeps them out of model history', async () => {
+    invoke.mockResolvedValue([messageRow({ privacy_fingerprint: null })])
+    await expect(loadChatMessages('conv-1')).resolves.toEqual([
+      { ...turn, privacyFingerprint: null },
+    ])
   })
 
   it('drops an unreadable row but keeps the rest', async () => {
@@ -104,6 +114,12 @@ describe('loadChatMessages', () => {
     invoke.mockResolvedValue([
       messageRow({ parts: JSON.stringify([{ kind: 'mystery' }]) }),
     ])
+    expect(await loadChatMessages('conv-1')).toEqual([])
+  })
+
+  it('drops a row whose privacy fingerprint is malformed', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    invoke.mockResolvedValue([messageRow({ privacy_fingerprint: 42 })])
     expect(await loadChatMessages('conv-1')).toEqual([])
   })
 

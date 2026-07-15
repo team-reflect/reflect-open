@@ -61,6 +61,11 @@ export function followHealedMove(from: string, to: string): void {
   if (owner !== null) {
     owner.retarget(to)
     retargetOpenDocument(from, to, owner)
+    // The watcher batch that healed the move contains a remove for `from` and
+    // an upsert for `to`. The editor saw the remove while it was still bound
+    // to the old path, so prove the retargeted file exists and release that
+    // removal park now; otherwise its next edit would stay blocked forever.
+    owner.externalChanged()
   }
   emitNoteMoved(from, to)
 }

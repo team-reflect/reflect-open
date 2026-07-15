@@ -1,4 +1,10 @@
 import { useCallback, useEffect, useRef, type ReactElement } from 'react'
+import type {
+  FileClickHandler,
+  FileInfoResolver,
+  FileLinkResolver,
+  WikiEmbedResolver,
+} from '@meowdown/core'
 import { MarkdownView } from '@meowdown/react'
 import { useOpenExternalLink } from '@/editor/open-external-link'
 import { cn } from '@/lib/utils'
@@ -19,6 +25,16 @@ interface MarkdownPreviewProps {
   content: string
   /** Resolve `![…](…)` sources to displayable URLs; unresolved images are skipped. */
   resolveImageUrl?: (src: string) => string | null
+  /** Claim local Markdown links as attachment pills. */
+  resolveFileLink?: FileLinkResolver
+  /** Classify Obsidian-style wiki embeds as images, files, or notes. */
+  resolveWikiEmbed?: WikiEmbedResolver
+  /** Resolve metadata shown beside a rendered file pill. */
+  resolveFileInfo?: FileInfoResolver
+  /** Open a clicked attachment pill. Omitted for passive previews. */
+  onFileClick?: FileClickHandler
+  /** Changes when a stable resolver's backing attachment catalog changes. */
+  resolverRevision?: number
   /**
    * Navigate a clicked `[[wiki link]]` target. Omitted, links render as
    * inert chips (the palette preview's behavior). `event` carries the
@@ -38,19 +54,24 @@ interface MarkdownPreviewProps {
 export function MarkdownPreview({
   content,
   resolveImageUrl,
+  resolveFileLink,
+  resolveWikiEmbed,
+  resolveFileInfo,
+  onFileClick,
+  resolverRevision = 0,
   onWikiLinkClick,
   interactive = true,
   className,
 }: MarkdownPreviewProps): ReactElement {
   const openExternalLink = useOpenExternalLink()
-  // The resolver and click handler are read through refs so a changing prop
-  // never gives MarkdownView a new callback identity (which would re-render its
-  // whole tree).
-  const resolveRef = useRef(resolveImageUrl)
+  // Navigation stays behind a ref; attachment resolution intentionally gets a
+  // new callback when its resolver/revision changes so MarkdownView rebuilds
+  // stale image and embed atoms.
   const navigateRef = useRef(onWikiLinkClick)
+  const fileClickRef = useRef(onFileClick)
   useEffect(() => {
-    resolveRef.current = resolveImageUrl
     navigateRef.current = onWikiLinkClick
+    fileClickRef.current = onFileClick
   })
 
   // Hosts either always pass the handler (chat) or never do (palette
@@ -59,13 +80,41 @@ export function MarkdownPreview({
   // navigation.
   const navigates = interactive && onWikiLinkClick != null
 
-  const resolveImageUrlStable = useCallback(
-    (src: string) => resolveRef.current?.(src) ?? undefined,
-    [],
+  const resolveImageUrlVersioned = useCallback(
+    (src: string) => {
+      void resolverRevision
+      return resolveImageUrl?.(src) ?? undefined
+    },
+    [resolveImageUrl, resolverRevision],
+  )
+  const resolveFileLinkVersioned = useCallback<FileLinkResolver>(
+    (payload) => {
+      void resolverRevision
+      return resolveFileLink?.(payload) ?? false
+    },
+    [resolveFileLink, resolverRevision],
+  )
+  const resolveWikiEmbedVersioned = useCallback<WikiEmbedResolver>(
+    (embed) => {
+      void resolverRevision
+      return resolveWikiEmbed?.(embed)
+    },
+    [resolveWikiEmbed, resolverRevision],
+  )
+  const resolveFileInfoVersioned = useCallback<FileInfoResolver>(
+    (href) => {
+      void resolverRevision
+      return resolveFileInfo?.(href)
+    },
+    [resolveFileInfo, resolverRevision],
   )
   const onWikilinkClickStable = useCallback(
     (payload: { target: string; event: MouseEvent | KeyboardEvent }) =>
       navigateRef.current?.(payload.target, payload.event),
+    [],
+  )
+  const onFileClickStable = useCallback<FileClickHandler>(
+    (payload) => fileClickRef.current?.(payload),
     [],
   )
 
@@ -74,8 +123,12 @@ export function MarkdownPreview({
       markdown={content}
       markMode="hide"
       interactive={interactive}
-      resolveImageUrl={resolveImageUrlStable}
+      resolveImageUrl={resolveImageUrlVersioned}
+      resolveFileLink={resolveFileLinkVersioned}
+      resolveWikiEmbed={resolveWikiEmbedVersioned}
+      resolveFileInfo={resolveFileInfoVersioned}
       {...(interactive ? { onLinkClick: openExternalLink } : {})}
+      {...(interactive && onFileClick !== undefined ? { onFileClick: onFileClickStable } : {})}
       {...(navigates ? { onWikilinkClick: onWikilinkClickStable } : {})}
       className={cn('reflect-editor', className)}
     />

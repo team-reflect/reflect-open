@@ -1,9 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ContactMatch } from '@reflect/core'
+import type { ContactMatch, NoteWriteIfUnchangedOutcome } from '@reflect/core'
 import type { NoteSession } from '@/editor/note-session'
 
 const readNote = vi.hoisted(() => vi.fn<(path: string) => Promise<string>>())
-const writeNote = vi.hoisted(() => vi.fn(async () => {}))
+const writeNoteIfUnchanged = vi.hoisted(() =>
+  vi.fn<
+    (
+      path: string,
+      expected: string | null,
+      contents: string,
+      generation: number,
+    ) => Promise<NoteWriteIfUnchangedOutcome>
+  >(async () => ({ kind: 'written', modifiedMs: null })),
+)
 const noteExists = vi.hoisted(() => vi.fn(async () => false))
 const openSession = vi.hoisted(() => vi.fn<(path: string) => NoteSession | null>(() => null))
 const createNoteWithTitle = vi.hoisted(() => vi.fn(async () => 'notes/created.md'))
@@ -11,7 +20,7 @@ const createNoteWithTitle = vi.hoisted(() => vi.fn(async () => 'notes/created.md
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   readNote,
-  writeNote,
+  writeNoteIfUnchanged,
   noteExists,
   createNoteWithTitle,
 }))
@@ -33,7 +42,7 @@ const ADA_BLOCK = '- Type: #person\n- Email: ada@example.com\n- Phone: +1 555 01
 
 beforeEach(() => {
   readNote.mockReset()
-  writeNote.mockClear()
+  writeNoteIfUnchanged.mockReset().mockResolvedValue({ kind: 'written', modifiedMs: null })
   noteExists.mockReset()
   noteExists.mockResolvedValue(false)
   createNoteWithTitle.mockClear()
@@ -63,7 +72,7 @@ describe('addContactToNote', () => {
     expect(commitBodyAppend).toHaveBeenCalledWith(ADA_BLOCK)
     // No frontmatter mark: the appended details suppress the card by content.
     expect(commitFrontmatter).not.toHaveBeenCalled()
-    expect(writeNote).not.toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
   })
 
   it('refuses rather than clobber when the open session cannot take the append', async () => {
@@ -73,7 +82,7 @@ describe('addContactToNote', () => {
     await expect(addContactToNote('notes/Ada Lovelace.md', ADA, 3)).rejects.toThrow(
       /can’t be updated right now/,
     )
-    expect(writeNote).not.toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
   })
 
   it('patches a closed note on disk in one write', async () => {
@@ -81,11 +90,21 @@ describe('addContactToNote', () => {
 
     await addContactToNote('notes/Ada Lovelace.md', ADA, 3)
 
-    expect(writeNote).toHaveBeenCalledTimes(1)
-    expect(writeNote).toHaveBeenCalledWith(
+    expect(writeNoteIfUnchanged).toHaveBeenCalledTimes(1)
+    expect(writeNoteIfUnchanged).toHaveBeenCalledWith(
       'notes/Ada Lovelace.md',
+      '# Ada Lovelace\n',
       `# Ada Lovelace\n\n${ADA_BLOCK}\n`,
       3,
+    )
+  })
+
+  it('does not recreate a closed adopted note removed after validation', async () => {
+    readNote.mockResolvedValue('# Ada Lovelace\n')
+    writeNoteIfUnchanged.mockResolvedValue({ kind: 'changed' })
+
+    await expect(addContactToNote('Projects/Ada.md', ADA, 3)).rejects.toThrow(
+      /changed or was removed/,
     )
   })
 
@@ -97,7 +116,7 @@ describe('addContactToNote', () => {
       /no longer matches/,
     )
     expect(commitBodyAppend).not.toHaveBeenCalled()
-    expect(writeNote).not.toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
   })
 
   it('appends only the details to an already-typed person note (meeting flow, link menu)', async () => {
@@ -116,7 +135,7 @@ describe('addContactToNote', () => {
 
     await addContactToNote('notes/Ada Lovelace.md', ADA, 3)
 
-    expect(writeNote).not.toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
   })
 
   it('skips when the body already has hand-typed details (stale card)', async () => {
@@ -130,7 +149,7 @@ describe('addContactToNote', () => {
     await addContactToNote('notes/Ada Lovelace.md', ADA, 3)
 
     expect(commitBodyAppend).not.toHaveBeenCalled()
-    expect(writeNote).not.toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
   })
 
   it('writes nothing for a contact with no details', async () => {
@@ -139,7 +158,7 @@ describe('addContactToNote', () => {
 
     await addContactToNote('notes/Ada Lovelace.md', bare, 3)
 
-    expect(writeNote).not.toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
   })
 })
 
@@ -176,8 +195,9 @@ describe('ignoreContactSuggestion', () => {
 
     await ignoreContactSuggestion('notes/Ada Lovelace.md', ADA, 3)
 
-    expect(writeNote).toHaveBeenCalledWith(
+    expect(writeNoteIfUnchanged).toHaveBeenCalledWith(
       'notes/Ada Lovelace.md',
+      '---\nignoredContacts:\n  - Grace Hopper\n---\n# Ada Lovelace\n',
       '---\nignoredContacts:\n  - Grace Hopper\n  - Ada Lovelace\n---\n# Ada Lovelace\n',
       3,
     )
@@ -188,7 +208,7 @@ describe('ignoreContactSuggestion', () => {
 
     await ignoreContactSuggestion('notes/Ada Lovelace.md', ADA, 3)
 
-    expect(writeNote).not.toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
   })
 
   it('skips the write when the title no longer matches (stale card)', async () => {
@@ -200,6 +220,6 @@ describe('ignoreContactSuggestion', () => {
     await ignoreContactSuggestion('notes/Ada Lovelace.md', ADA, 3)
 
     expect(commitFrontmatter).not.toHaveBeenCalled()
-    expect(writeNote).not.toHaveBeenCalled()
+    expect(writeNoteIfUnchanged).not.toHaveBeenCalled()
   })
 })

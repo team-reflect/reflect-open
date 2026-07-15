@@ -1,4 +1,9 @@
-import { isNotePath, type FileMeta, type NoteCreateOutcome } from '@reflect/core'
+import {
+  isNotePath,
+  type FileMeta,
+  type NoteCreateOutcome,
+  type NoteWriteIfUnchangedOutcome,
+} from '@reflect/core'
 
 /** One in-memory markdown file: contents plus a last-modified stamp. */
 interface DevFile {
@@ -23,6 +28,12 @@ export interface DevFileStore {
   /** Write a file and return the `modifiedMs` it was stamped with (the
    * `note_write` contract: the caller's index echo carries this stamp). */
   write: (path: string, contents: string) => number
+  /** Replace only when current bytes equal `expected` (`null` = absent). */
+  writeIfUnchanged: (
+    path: string,
+    expected: string | null,
+    contents: string,
+  ) => NoteWriteIfUnchangedOutcome
   /** Create a file only when its path is free; never replaces existing bytes. */
   create: (path: string, contents: string) => NoteCreateOutcome
   /** Delete a path; a missing path is a no-op (mirrors trashing semantics). */
@@ -71,6 +82,20 @@ export function createDevFileStore(seed: Record<string, string>): DevFileStore {
       const modifiedMs = Date.now()
       files.set(path, { contents, modifiedMs })
       return modifiedMs
+    },
+    writeIfUnchanged: (path, expected, contents) => {
+      const current = files.get(path)?.contents ?? null
+      if (current !== expected) {
+        return { kind: 'changed' }
+      }
+      if (expected === null) {
+        if (files.has(path)) {
+          return { kind: 'changed' }
+        }
+      }
+      const modifiedMs = Date.now()
+      files.set(path, { contents, modifiedMs })
+      return { kind: 'written', modifiedMs }
     },
     create: (path, contents) => {
       if (files.has(path)) {

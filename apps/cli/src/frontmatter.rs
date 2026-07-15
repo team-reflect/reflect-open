@@ -1,8 +1,10 @@
 //! Tolerant, read-only frontmatter — the Rust mirror of
 //! `packages/core/src/markdown/frontmatter.ts` (split semantics) and
 //! `model.ts` (field coercions), restricted to the fields the CLI needs:
-//! `id`, `title`, `aliases`, `private`. Broken YAML degrades to "no
-//! frontmatter", never an unreadable note. The CLI never writes frontmatter.
+//! `id`, `title`, `aliases`, `private`. Broken YAML still degrades to "no
+//! frontmatter" for metadata derivation, but its privacy state is reported as
+//! uncertain so read surfaces can fail closed. The CLI never writes
+//! frontmatter.
 
 use saphyr::{LoadableYamlNode, Scalar, Yaml};
 
@@ -23,6 +25,14 @@ pub struct FrontmatterSplit<'source> {
     pub raw: Option<&'source str>,
     /// Everything after the closing fence (the markdown body).
     pub body: &'source str,
+    /// An opening fence was present but no closing fence could be found.
+    pub unterminated: bool,
+}
+
+/// Tolerant frontmatter data plus whether privacy could be verified.
+pub(crate) struct ParsedFrontmatter {
+    pub frontmatter: Frontmatter,
+    pub privacy_uncertain: bool,
 }
 
 /// Length of a fence line (`---[ \t]*` then newline-or-EOF) at the start of
@@ -38,49 +48,66 @@ fn fence_line_len(text: &str) -> Option<usize> {
         None => Some(3 + index),
         Some(b'\n') => Some(3 + index + 1),
         Some(b'\r') if bytes.get(index + 1) == Some(&b'\n') => Some(3 + index + 2),
+        Some(b'\r') => Some(3 + index + 1),
         _ => None,
     }
 }
 
 /// Carve a leading YAML frontmatter block off `source`. Mirrors
-/// `splitFrontmatter`: the opening fence must be the very first line; an
-/// unterminated block is tolerated as plain body.
+/// `splitFrontmatter`: the opening fence must be the first line (after an
+/// optional UTF-8 BOM). An unterminated block remains plain body, but is
+/// flagged so callers enforcing privacy can fail closed.
 pub fn split_frontmatter(source: &str) -> FrontmatterSplit<'_> {
     let no_block = FrontmatterSplit {
         raw: None,
         body: source,
+        unterminated: false,
     };
-    let Some(open_len) = fence_line_len(source) else {
+    let frontmatter_source = source.strip_prefix('\u{feff}').unwrap_or(source);
+    let Some(open_len) = fence_line_len(frontmatter_source) else {
         return no_block;
     };
-    let rest = &source[open_len..];
+    let rest = &frontmatter_source[open_len..];
 
-    // Empty frontmatter: the closing fence sits immediately after the opener.
-    if let Some(close_len) = fence_line_len(rest) {
-        return FrontmatterSplit {
-            raw: Some(""),
-            body: &rest[close_len..],
-        };
-    }
-    // Otherwise the closing fence starts right after a newline. The raw block
-    // excludes that newline (and a preceding `\r`), matching the TS regex.
-    let mut search_from = 0;
-    while let Some(newline_at) = rest[search_from..].find('\n').map(|at| search_from + at) {
-        let line_start = newline_at + 1;
+    // Check each physical line start, accepting LF, CRLF, and legacy lone-CR
+    // files. The raw block excludes the line break immediately before the
+    // closing fence.
+    let mut line_start = 0;
+    loop {
         if let Some(close_len) = fence_line_len(&rest[line_start..]) {
-            let raw_end = if newline_at > 0 && rest.as_bytes()[newline_at - 1] == b'\r' {
-                newline_at - 1
+            let raw_end = if line_start == 0 {
+                0
+            } else if rest[..line_start].ends_with("\r\n") {
+                line_start - 2
             } else {
-                newline_at
+                line_start - 1
             };
             return FrontmatterSplit {
                 raw: Some(&rest[..raw_end]),
                 body: &rest[line_start + close_len..],
+                unterminated: false,
             };
         }
-        search_from = line_start;
+        let Some(line_break_at) = rest.as_bytes()[line_start..]
+            .iter()
+            .position(|byte| *byte == b'\n' || *byte == b'\r')
+            .map(|offset| line_start + offset)
+        else {
+            break;
+        };
+        line_start = if rest.as_bytes()[line_break_at] == b'\r'
+            && rest.as_bytes().get(line_break_at + 1) == Some(&b'\n')
+        {
+            line_break_at + 2
+        } else {
+            line_break_at + 1
+        };
     }
-    no_block
+    FrontmatterSplit {
+        raw: None,
+        body: source,
+        unterminated: true,
+    }
 }
 
 /// The TS `coercePrivate`: explicit truthy boolean/number/string only; the
@@ -117,40 +144,65 @@ fn coerce_aliases(node: &Yaml) -> Vec<String> {
     aliases
 }
 
-/// Parse the YAML from [`split_frontmatter`]. Never fails: malformed or
-/// non-mapping YAML yields defaults, like the TS `parseFrontmatter`.
-pub fn parse_frontmatter(raw: Option<&str>) -> Frontmatter {
+/// Parse the YAML from [`split_frontmatter`]. Malformed or non-mapping YAML
+/// yields defaults for tolerant metadata derivation and marks privacy as
+/// uncertain so content/address surfaces can refuse the note.
+pub(crate) fn parse_frontmatter_checked(raw: Option<&str>) -> ParsedFrontmatter {
     let Some(raw) = raw else {
-        return Frontmatter::default();
+        return ParsedFrontmatter {
+            frontmatter: Frontmatter::default(),
+            privacy_uncertain: false,
+        };
     };
     if raw.trim().is_empty() {
-        return Frontmatter::default();
+        return ParsedFrontmatter {
+            frontmatter: Frontmatter::default(),
+            privacy_uncertain: false,
+        };
     }
     let Ok(documents) = Yaml::load_from_str(raw) else {
-        return Frontmatter::default();
+        return ParsedFrontmatter {
+            frontmatter: Frontmatter::default(),
+            privacy_uncertain: true,
+        };
     };
-    let Some(document) = documents.first() else {
-        return Frontmatter::default();
+    let Some(document) = documents
+        .first()
+        .filter(|document| document.as_mapping().is_some())
+    else {
+        return ParsedFrontmatter {
+            frontmatter: Frontmatter::default(),
+            privacy_uncertain: true,
+        };
     };
-    Frontmatter {
-        // `id` and `title` must be strings (the TS `stringField`); other
-        // types are ignored.
-        id: document
-            .as_mapping_get("id")
-            .and_then(|node| node.as_str())
-            .map(str::to_string),
-        title: document
-            .as_mapping_get("title")
-            .and_then(|node| node.as_str())
-            .map(str::to_string),
-        aliases: document
-            .as_mapping_get("aliases")
-            .map(coerce_aliases)
-            .unwrap_or_default(),
-        private: document
-            .as_mapping_get("private")
-            .is_some_and(coerce_private),
+    ParsedFrontmatter {
+        frontmatter: Frontmatter {
+            // `id` and `title` must be strings (the TS `stringField`); other
+            // types are ignored.
+            id: document
+                .as_mapping_get("id")
+                .and_then(|node| node.as_str())
+                .map(str::to_string),
+            title: document
+                .as_mapping_get("title")
+                .and_then(|node| node.as_str())
+                .map(str::to_string),
+            aliases: document
+                .as_mapping_get("aliases")
+                .map(coerce_aliases)
+                .unwrap_or_default(),
+            private: document
+                .as_mapping_get("private")
+                .is_some_and(coerce_private),
+        },
+        privacy_uncertain: false,
     }
+}
+
+/// Tolerant metadata-only parser, matching the TypeScript behavior. Privacy
+/// enforcement must use [`parse_frontmatter_checked`] instead.
+pub fn parse_frontmatter(raw: Option<&str>) -> Frontmatter {
+    parse_frontmatter_checked(raw).frontmatter
 }
 
 #[cfg(test)]
@@ -176,6 +228,7 @@ mod tests {
         let split = split_frontmatter("---\ntitle: Foo\n---\nbody text\n");
         assert_eq!(split.raw, Some("title: Foo"));
         assert_eq!(split.body, "body text\n");
+        assert!(!split.unterminated);
     }
 
     #[test]
@@ -191,9 +244,11 @@ mod tests {
     fn tolerates_unterminated_and_empty_blocks() {
         let unterminated = split_frontmatter("---\ntitle: Foo\nno closing fence");
         assert_eq!(unterminated.raw, None);
+        assert!(unterminated.unterminated);
         let empty = split_frontmatter("---\n---\nbody");
         assert_eq!(empty.raw, Some(""));
         assert_eq!(empty.body, "body");
+        assert!(!empty.unterminated);
     }
 
     #[test]
@@ -201,6 +256,17 @@ mod tests {
         let split = split_frontmatter("---\r\ntitle: Foo\r\n---\r\nbody");
         assert_eq!(split.raw, Some("title: Foo"));
         assert_eq!(split.body, "body");
+    }
+
+    #[test]
+    fn bom_and_lone_cr_frontmatter_split_cleanly() {
+        let bom = split_frontmatter("\u{feff}---\ntitle: Foo\n---\nbody");
+        assert_eq!(bom.raw, Some("title: Foo"));
+        assert_eq!(bom.body, "body");
+
+        let lone_cr = split_frontmatter("---\rtitle: Foo\r---\rbody");
+        assert_eq!(lone_cr.raw, Some("title: Foo"));
+        assert_eq!(lone_cr.body, "body");
     }
 
     /// Parity with `coercePrivate` (`model.ts`): explicit truthy values only.
@@ -232,5 +298,19 @@ mod tests {
             Frontmatter::default()
         );
         assert_eq!(parse("---\ntitle: 123\n---\n").title, None);
+    }
+
+    #[test]
+    fn malformed_frontmatter_marks_privacy_as_uncertain() {
+        let valid = parse_frontmatter_checked(Some("private: false"));
+        assert!(!valid.privacy_uncertain);
+
+        let malformed = parse_frontmatter_checked(Some("[broken yaml"));
+        assert_eq!(malformed.frontmatter, Frontmatter::default());
+        assert!(malformed.privacy_uncertain);
+
+        let non_mapping = parse_frontmatter_checked(Some("- a list\n- not a map"));
+        assert_eq!(non_mapping.frontmatter, Frontmatter::default());
+        assert!(non_mapping.privacy_uncertain);
     }
 }

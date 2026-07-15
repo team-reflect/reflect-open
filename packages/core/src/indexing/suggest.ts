@@ -1,9 +1,10 @@
 /**
- * Pure ranking for `[[` autocomplete (Plan 07): merges title and alias matches
- * from the index into one ordered candidate list. The SQL layer (`queries.ts`)
- * only guarantees "contains the query somewhere"; the ordering policy — exact
- * before prefix before substring, titles before aliases, recent before stale —
- * lives here where it can be unit-tested without a database.
+ * Pure ranking for `[[` autocomplete (Plan 07): merges date, authored-title,
+ * alias, and filename-stem matches from the index into one ordered candidate
+ * list. The SQL layer only guarantees "contains the query somewhere"; the
+ * ordering policy — exact before prefix before substring, resolver precedence
+ * within a match rank, recent before stale — lives here where it can be
+ * unit-tested without a database.
  */
 
 import { foldKey } from '../markdown/keys'
@@ -35,13 +36,17 @@ export interface WikiSuggestion {
   date: string | null
   /** Set only on rows the date generator synthesised; see {@link GeneratedDate}. */
   generated?: GeneratedDate
+  /** True when duplicate owners require the path-qualified target and path detail. */
+  disambiguated?: boolean
 }
 
-/** One `notes` row considered for suggestion (a title match or recency fill). */
+/** One `notes` row considered for suggestion (a note-key match or recency fill). */
 export interface TitleCandidate {
   path: string
   title: string
   titleKey: string
+  authoredTitleKey: string | null
+  basenameKey: string
   dailyDate: string | null
   mtime: number
 }
@@ -69,11 +74,47 @@ interface Scored {
   mtime: number
 }
 
+const MATCH_TIER_COUNT = 4
+
+function basenameTarget(path: string): string {
+  const filename = path.split('/').at(-1) ?? path
+  return filename.endsWith('.md') ? filename.slice(0, -3) : filename
+}
+
+function candidateSuggestion(
+  row: TitleCandidate,
+  target: string,
+  alias: string | null,
+): WikiSuggestion {
+  return {
+    target,
+    path: row.path,
+    title: row.title,
+    alias,
+    date: row.dailyDate,
+  }
+}
+
+function scoredCandidate(
+  row: TitleCandidate,
+  key: string,
+  candidateKey: string,
+  precedence: number,
+  target: string,
+  alias: string | null = null,
+): Scored {
+  return {
+    suggestion: candidateSuggestion(row, target, alias),
+    score: matchRank(key, candidateKey) * MATCH_TIER_COUNT + precedence,
+    mtime: row.mtime,
+  }
+}
+
 /**
- * Merge and order candidates for `key` (the case-folded query). Alias hits
- * rank just behind the equivalent title hit, ties break on file recency, and a
- * note appears once — its best-scoring entry wins (so a note whose title *and*
- * alias both match shows as the plain title row).
+ * Merge and order candidates for `key` (the case-folded query). Within an
+ * equivalent match rank, candidates follow bare-wikilink resolution order:
+ * daily date, authored title, alias, then filename stem. Ties break on file
+ * recency, and a note appears once — its best-scoring entry wins.
  */
 export function rankWikiSuggestions(
   key: string,
@@ -81,31 +122,36 @@ export function rankWikiSuggestions(
   aliases: AliasCandidate[],
   limit: number,
 ): WikiSuggestion[] {
-  const scored: Scored[] = [
-    ...titles.map((row) => ({
-      suggestion: {
-        target: row.dailyDate ?? row.title,
-        path: row.path,
-        title: row.title,
-        alias: null,
-        date: row.dailyDate,
-      },
-      // ×2 leaves room for the alias penalty between match ranks.
-      score: matchRank(key, row.titleKey) * 2,
-      mtime: row.mtime,
-    })),
-    ...aliases.map((row) => ({
-      suggestion: {
-        target: row.dailyDate ?? row.title,
-        path: row.path,
-        title: row.title,
-        alias: row.alias,
-        date: row.dailyDate,
-      },
-      score: matchRank(key, row.aliasKey) * 2 + 1,
-      mtime: row.mtime,
-    })),
-  ]
+  const scored: Scored[] = []
+
+  for (const row of titles) {
+    if (key === '') {
+      scored.push({
+        suggestion: candidateSuggestion(row, row.dailyDate ?? row.title, null),
+        score: matchRank(key, row.titleKey) * MATCH_TIER_COUNT,
+        mtime: row.mtime,
+      })
+      continue
+    }
+
+    if (row.dailyDate?.includes(key) === true) {
+      scored.push(scoredCandidate(row, key, row.dailyDate, 0, row.dailyDate))
+    }
+    if (row.authoredTitleKey?.includes(key) === true) {
+      scored.push(
+        scoredCandidate(row, key, row.authoredTitleKey, 1, row.dailyDate ?? row.title),
+      )
+    }
+    if (row.basenameKey.includes(key)) {
+      scored.push(scoredCandidate(row, key, row.basenameKey, 3, basenameTarget(row.path)))
+    }
+  }
+
+  for (const row of aliases) {
+    scored.push(
+      scoredCandidate(row, key, row.aliasKey, 2, row.dailyDate ?? row.title, row.alias),
+    )
+  }
 
   scored.sort(
     (a, b) =>

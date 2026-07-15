@@ -1,4 +1,10 @@
-import { nextAliases, parseNote, readNote, upsertFrontmatter, writeNote } from '@reflect/core'
+import {
+  nextAliases,
+  parseNote,
+  readNote,
+  upsertFrontmatter,
+  writeNoteIfUnchanged,
+} from '@reflect/core'
 import { openSession } from './open-documents'
 
 /**
@@ -57,7 +63,10 @@ export async function placeOldTitleAlias(
     if (aliases !== null) {
       const patched = upsertFrontmatter(content, { aliases })
       if (patched !== content) {
-        await writeNote(path, patched, generation)
+        const outcome = await writeNoteIfUnchanged(path, content, patched, generation)
+        if (outcome.kind === 'changed') {
+          throw new Error('The note changed or was removed before alias placement landed.')
+        }
       }
     }
   }

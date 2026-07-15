@@ -17,6 +17,7 @@ import {
   getSecret,
   hasBridge,
   listChatConversations,
+  liveChatPrivacyFingerprint,
   loadChatGraphContext,
   loadChatMessages,
   resolveChatModel,
@@ -226,13 +227,13 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
       setAttachments([])
 
       const turnId = crypto.randomUUID()
-      const messages = [...buildHistory(turnsRef.current), userMessage(trimmed, attached)]
+      const previousTurns = turnsRef.current
       // Everything the settle-time save needs, captured now: a turn detached
       // by New chat (or a conversation switch) still persists into the
       // conversation it was sent under.
       const sendConversationId = conversationIdRef.current
       const turnCreatedMs = Date.now()
-      const title = conversationTitle(turnsRef.current[0]?.userText ?? trimmed)
+      const title = conversationTitle(previousTurns[0]?.userText ?? trimmed)
       const conversationMeta = (): ChatConversation => ({
         id: sendConversationId,
         title,
@@ -247,6 +248,7 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
         attachments: attached,
         parts: [],
         responseMessages: [],
+        privacyFingerprint: null,
         status: 'streaming',
       }
 
@@ -279,13 +281,18 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
       try {
         // The graph overview degrades to null (prompt without the block)
         // rather than blocking the turn — a cold index shouldn't kill chat.
-        const [apiKey, context] = await Promise.all([
+        const [apiKey, context, privacyFingerprint] = await Promise.all([
           getSecret(aiKeySecretName(config.id)),
           loadChatGraphContext(graph.name).catch((cause: unknown) => {
             console.error('chat graph context failed:', errorMessage(cause))
             return null
           }),
+          liveChatPrivacyFingerprint(graph.generation).catch((cause: unknown) => {
+            console.error('chat privacy snapshot failed:', errorMessage(cause))
+            return null
+          }),
         ])
+        updateTurn((turn) => ({ ...turn, privacyFingerprint }))
         if (apiKey === null) {
           applyEvent({
             type: 'error',
@@ -294,11 +301,16 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
           })
           return
         }
+        const messages = [
+          ...buildHistory(previousTurns, privacyFingerprint),
+          userMessage(trimmed, attached),
+        ]
         const events = streamChat({
           config,
           apiKey,
           fetchFn: providerFetch,
           messages,
+          generation: graph.generation,
           today: todayIso(),
           semanticSearchEnabled: semanticSearchEnabledRef.current,
           context,
@@ -331,7 +343,7 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
         }
       }
     },
-    [graph.name, persistTurn],
+    [graph.generation, graph.name, persistTurn],
   )
 
   const stop = useCallback(() => {
@@ -459,4 +471,3 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
   )
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>
 }
-

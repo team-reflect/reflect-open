@@ -110,12 +110,14 @@ describe('graph paths', () => {
 
   it('recognizes daily-note paths', () => {
     expect(isDaily('daily/2026-06-09.md')).toBe(true)
+    expect(isDaily('daily/2026-02-31.md')).toBe(false)
     expect(isDaily('notes/foo.md')).toBe(false)
     expect(isDaily('daily/not-a-date.md')).toBe(false)
   })
 
   it('extracts the date from a daily path, else null', () => {
     expect(dateFromDailyPath('daily/2026-06-09.md')).toBe('2026-06-09')
+    expect(dateFromDailyPath('daily/2026-02-31.md')).toBeNull()
     expect(dateFromDailyPath('notes/foo.md')).toBeNull()
   })
 })

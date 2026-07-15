@@ -40,12 +40,15 @@ function installFakeBridge(authorization = 'authorized'): void {
           return [ADA]
         case 'note_read':
           return noteSource
-        case 'note_write': {
+        case 'note_write_if_unchanged': {
+          if (args['expected'] !== noteSource) {
+            return { kind: 'changed' }
+          }
           const path = String(args['path'])
           const contents = String(args['contents'])
           written.push({ path, contents })
           noteSource = contents
-          return null
+          return { kind: 'written', modifiedMs: null }
         }
         default:
           throw new Error(`unexpected command ${command}`)

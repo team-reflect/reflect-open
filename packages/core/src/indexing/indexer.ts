@@ -13,6 +13,7 @@ import {
   type IndexedNoteTouch,
 } from './commands'
 import { assetReferencingNotePaths } from './asset-refs'
+import { unambiguousManagedAttachmentPaths } from './asset-reference-keys'
 import { gatherAssetDescriptionText } from './asset-description-text'
 import { emitIndexApplied } from './index-applied'
 import { hashContent } from './hash'
@@ -81,7 +82,9 @@ export async function buildNoteProjection(
   facts: { fileHash: string; mtime: number },
 ): Promise<IndexedNote> {
   const parsed = parseNote({ path, source: content })
-  const assetText = await gatherAssetDescriptionText(parsed.assets.map((asset) => asset.path))
+  const assetText = await gatherAssetDescriptionText(
+    unambiguousManagedAttachmentPaths(parsed.attachmentReferences),
+  )
   return buildIndexedNote(parsed, {
     fileHash: facts.fileHash,
     mtime: facts.mtime,
@@ -418,6 +421,8 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
   }
   /** Rows to drop at the end: scan orphans, minus heals, plus TOCTOU ghosts. */
   const removals = new Map(scan.orphans.map((orphan) => [orphan.path, orphan]))
+  /** Moved sources must be reprojected because relative Markdown keys depend on their path. */
+  const healedPaths = new Set<string>()
 
   // Id-based move healing (Plan 17): a row whose file vanished plus a new
   // file carrying the same frontmatter id is a rename observed after the
@@ -453,6 +458,7 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
       if (orphan !== undefined) {
         facts.set(move.to, { mtime: orphan.storedMtime, fileHash: orphan.storedHash })
       }
+      healedPaths.add(move.to)
       onMoved?.(move.from, move.to)
     }
   } catch (err) {
@@ -498,7 +504,7 @@ export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
       }
     }
     const fileHash = await hashContent(content)
-    if (stored?.fileHash === fileHash) {
+    if (stored?.fileHash === fileHash && !healedPaths.has(candidate.path)) {
       // Content unchanged. If the stored mtime doesn't match the listing (an
       // echo-time stamp, or a provider rewrote it), re-stamp it so the next
       // pass takes the read-free path — left alone it mismatches forever.

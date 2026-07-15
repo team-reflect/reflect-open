@@ -26,6 +26,7 @@ import { ChatProvider, useChatSession } from '@/providers/chat-provider'
 const core = vi.hoisted(() => ({
   streamChat: vi.fn<(options: StreamChatOptions) => AsyncGenerator<ChatStreamEvent>>(),
   getSecret: vi.fn<(name: string) => Promise<string | null>>(),
+  liveChatPrivacyFingerprint: vi.fn<(generation: number) => Promise<string>>(),
   hasBridge: vi.fn<() => boolean>(),
   loadChatGraphContext: vi.fn<(graphName: string) => Promise<null>>(),
   listChatConversations: vi.fn<(limit?: number) => Promise<ChatConversation[]>>(),
@@ -84,6 +85,7 @@ const RESTORED_TURN: ChatTurn = {
   attachments: [],
   parts: [{ kind: 'text', text: 'Three notes.' }],
   responseMessages: [{ role: 'assistant', content: 'Three notes.' }],
+  privacyFingerprint: 'privacy-a',
   status: 'done',
 }
 
@@ -127,6 +129,7 @@ beforeEach(() => {
   settingsState.semanticSearchEnabled = false
   core.hasBridge.mockReturnValue(true)
   core.getSecret.mockResolvedValue('sk-test')
+  core.liveChatPrivacyFingerprint.mockResolvedValue('privacy-a')
   core.loadChatGraphContext.mockResolvedValue(null)
   core.listChatConversations.mockResolvedValue([])
   core.loadChatMessages.mockResolvedValue([RESTORED_TURN])
@@ -218,6 +221,59 @@ describe('ChatProvider persistence', () => {
       conversation: { id: 'conv-1', title: 'what did I write yesterday?' },
       turn: { userText: 'and today?' },
     })
+  })
+
+  it('resends settled history only while the live privacy fingerprint matches', async () => {
+    core.listChatConversations.mockResolvedValue([conversation()])
+    scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: 'More.' }] }])
+    renderProvider()
+    await waitFor(() => expect(session?.turns).toHaveLength(1))
+
+    await act(() => session?.send('and today?'))
+
+    expect(core.liveChatPrivacyFingerprint).toHaveBeenCalledWith(GRAPH.generation)
+    expect(core.streamChat).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: [
+          { role: 'user', content: RESTORED_TURN.userText },
+          ...RESTORED_TURN.responseMessages,
+          { role: 'user', content: 'and today?' },
+        ],
+      }),
+    )
+  })
+
+  it('drops historical model output after a public note becomes private', async () => {
+    core.listChatConversations.mockResolvedValue([conversation()])
+    core.liveChatPrivacyFingerprint.mockResolvedValue('privacy-after-public-became-private')
+    scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: 'Fresh.' }] }])
+    renderProvider()
+    await waitFor(() => expect(session?.turns).toHaveLength(1))
+
+    await act(() => session?.send('fresh question'))
+
+    expect(core.streamChat).toHaveBeenCalledWith(
+      expect.objectContaining({ messages: [{ role: 'user', content: 'fresh question' }] }),
+    )
+    const saved = core.saveChatMessage.mock.calls.at(-1)![0] as { turn: ChatTurn }
+    expect(saved.turn.privacyFingerprint).toBe('privacy-after-public-became-private')
+  })
+
+  it('fails closed on a privacy snapshot error without hiding stored history', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    core.listChatConversations.mockResolvedValue([conversation()])
+    core.liveChatPrivacyFingerprint.mockRejectedValue(new Error('snapshot unavailable'))
+    scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: 'Fresh.' }] }])
+    renderProvider()
+    await waitFor(() => expect(session?.turns).toHaveLength(1))
+
+    await act(() => session?.send('fresh question'))
+
+    expect(core.streamChat).toHaveBeenCalledWith(
+      expect.objectContaining({ messages: [{ role: 'user', content: 'fresh question' }] }),
+    )
+    expect(session?.turns[0]).toEqual(RESTORED_TURN)
+    expect(session?.turns.at(-1)?.privacyFingerprint).toBeNull()
   })
 
   it('passes the semantic search setting into chat turns', async () => {

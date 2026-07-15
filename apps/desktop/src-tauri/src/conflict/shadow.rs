@@ -80,6 +80,7 @@ impl ShadowStore {
 
     /// Carry base + pair across a rename so the ancestor survives Plan 17's
     /// settled-title file moves. Best-effort: a miss just degrades one merge.
+    #[cfg(test)]
     pub fn record_move(&self, from: &str, to: &str) {
         for suffix in ["", ".pair"] {
             let (Some(source), Some(target)) =

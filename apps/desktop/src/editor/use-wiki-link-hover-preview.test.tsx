@@ -1,7 +1,12 @@
 import { render, renderHook, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
-import type { WikilinkHoverHit } from '@meowdown/core'
+import type {
+  FileInfoResolver,
+  FileLinkResolver,
+  WikiEmbedResolver,
+  WikilinkHoverHit,
+} from '@meowdown/core'
 import { useWikiLinkHoverPreview } from './use-wiki-link-hover-preview'
 
 const mocks = vi.hoisted(() => ({
@@ -23,6 +28,10 @@ interface MarkdownPreviewProps {
   content: string
   interactive: boolean
   resolveImageUrl: (src: string) => string | null
+  resolveFileLink: FileLinkResolver
+  resolveWikiEmbed: WikiEmbedResolver
+  resolveFileInfo: FileInfoResolver
+  onFileClick?: unknown
 }
 
 vi.mock('@/editor/markdown-preview', () => ({
@@ -44,9 +53,13 @@ function setupRenderer(
       generation: 7,
       graphKey: '/graph',
       dateFormat: 'mdy',
-      resolveImageUrl: (source) => `reflect-asset://${source}`,
-      resolveAssetOpenPath: (source) =>
+      resolverRevision: 0,
+      resolveImageUrlFromSource: (_sourcePath, source) => `reflect-asset://${source}`,
+      resolveAssetOpenPathFromSource: (_sourcePath, source) =>
         source.startsWith('assets/') && !source.includes('..') ? source : null,
+      resolveFileLinkFromSource: () => false,
+      resolveWikiEmbedFromSource: () => undefined,
+      resolveFileInfoFromSource: async () => undefined,
       ...overrides,
     }),
   )
@@ -130,6 +143,52 @@ describe('useWikiLinkHoverPreview', () => {
     expect(props.resolveImageUrl('assets/cat.png')).toBe(
       'reflect-asset://assets/cat.png?reflect-preview=raster',
     )
+  })
+
+  it('binds wiki embeds and file pills to the hovered note while keeping them passive', async () => {
+    mocks.resolveExistingWikiTarget.mockResolvedValue({
+      kind: 'resolved',
+      path: 'Projects/2026/Plan.md',
+    })
+    mocks.readExistingNoteSource.mockResolvedValue(
+      '![[../../Media/photo.png]]\n\n[Manual](../../Media/manual.pdf)',
+    )
+    const resolveFileLinkFromSource = vi.fn(() => true)
+    const resolveWikiEmbedFromSource = vi.fn(() => ({
+      kind: 'image' as const,
+      src: '/Media/photo.png',
+    }))
+    const resolveFileInfoFromSource = vi.fn(async () => ({ size: 84 }))
+    const renderBody = setupRenderer({
+      resolveFileLinkFromSource,
+      resolveWikiEmbedFromSource,
+      resolveFileInfoFromSource,
+    })
+
+    render(<>{await renderBody(hoverHit('Plan'))}</>)
+
+    const props = mocks.markdownPreview.mock.calls.at(-1)?.[0] as MarkdownPreviewProps
+    const filePayload = { href: '../../Media/manual.pdf', label: 'Manual', title: '' }
+    expect(props.resolveFileLink(filePayload)).toBe(true)
+    expect(resolveFileLinkFromSource).toHaveBeenCalledWith('Projects/2026/Plan.md', filePayload)
+    const embed = {
+      target: '../../Media/photo.png',
+      display: '',
+      width: null,
+      height: null,
+    }
+    expect(props.resolveWikiEmbed(embed)).toEqual({
+      kind: 'image',
+      src: '/Media/photo.png',
+    })
+    expect(resolveWikiEmbedFromSource).toHaveBeenCalledWith('Projects/2026/Plan.md', embed)
+    expect(await props.resolveFileInfo('../../Media/manual.pdf')).toEqual({ size: 84 })
+    expect(resolveFileInfoFromSource).toHaveBeenCalledWith(
+      'Projects/2026/Plan.md',
+      '../../Media/manual.pdf',
+    )
+    expect(props.interactive).toBe(false)
+    expect(props.onFileClick).toBeUndefined()
   })
 
   it('shows a formatted subject and Empty note for an empty daily note', async () => {

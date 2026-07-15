@@ -13,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::sync::{Mutex, MutexGuard};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 
 use crate::db::{self, IndexState};
@@ -39,7 +39,23 @@ pub struct WindowInit {
 #[derive(Default)]
 struct WindowRegistry {
     preferred_destinations: HashMap<String, String>,
-    pending_bootstraps: HashMap<String, String>,
+    pending_bootstraps: HashMap<String, NoteWindowNavigation>,
+}
+
+/// A decoded heading reveal carried beside a secondary window's route.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteHeadingReveal {
+    pub path: String,
+    pub fragment: String,
+}
+
+/// One route/reveal intent delivered at bootstrap or to an existing window.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteWindowNavigation {
+    pub deep_link: String,
+    pub heading_reveal: Option<NoteHeadingReveal>,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -168,17 +184,25 @@ impl WindowRegistry {
     /// earlier preferred destination.
     fn plan_open(
         &mut self,
-        deep_link: &str,
+        navigation: &NoteWindowNavigation,
         invoking_label: &str,
         live_labels: &HashSet<String>,
     ) -> WindowOpenPlan {
+        let deep_link = &navigation.deep_link;
         if let Some(preferred_label) = self.preferred_destinations.get(deep_link).cloned() {
             if preferred_label != invoking_label {
                 if live_labels.contains(&preferred_label) {
+                    // A live window can still be waiting to drain its one-shot
+                    // bootstrap. Keep that payload aligned with the focus
+                    // event, which may arrive before the webview subscribes.
+                    if self.pending_bootstraps.contains_key(&preferred_label) {
+                        self.pending_bootstraps
+                            .insert(preferred_label.clone(), navigation.clone());
+                    }
                     return WindowOpenPlan::Focus(preferred_label);
                 }
                 self.pending_bootstraps
-                    .insert(preferred_label.clone(), deep_link.to_owned());
+                    .insert(preferred_label.clone(), navigation.clone());
                 return WindowOpenPlan::Create(preferred_label);
             }
         }
@@ -206,7 +230,7 @@ impl WindowRegistry {
         self.preferred_destinations
             .insert(deep_link.to_owned(), label.clone());
         self.pending_bootstraps
-            .insert(label.clone(), deep_link.to_owned());
+            .insert(label.clone(), navigation.clone());
         WindowOpenPlan::Create(label)
     }
 }
@@ -218,7 +242,7 @@ impl WindowRegistry {
 fn focus_existing(
     app: &tauri::AppHandle,
     label: &str,
-    deep_link: &str,
+    navigation: &NoteWindowNavigation,
     invoking_label: &str,
 ) -> bool {
     if label == invoking_label {
@@ -229,7 +253,7 @@ fn focus_existing(
     };
     let _ = existing.show();
     let _ = existing.set_focus();
-    let _ = app.emit_to(label, WINDOW_NAVIGATE_EVENT, deep_link);
+    let _ = app.emit_to(label, WINDOW_NAVIGATE_EVENT, navigation);
     true
 }
 
@@ -254,16 +278,17 @@ fn cascade_offset(app: &tauri::AppHandle) -> f64 {
 /// platforms (Tauri's own guidance).
 #[tauri::command]
 pub async fn open_note_window(
-    deep_link: String,
+    navigation: NoteWindowNavigation,
     window: tauri::WebviewWindow,
     app: tauri::AppHandle,
     graph: State<'_, GraphState>,
     init: State<'_, WindowInit>,
     quit: State<'_, QuitState>,
 ) -> AppResult<()> {
-    if !deep_link.starts_with("reflect://") {
+    if !navigation.deep_link.starts_with("reflect://") {
         return Err(AppError::parse(format!(
-            "not a reflect:// link: {deep_link}"
+            "not a reflect:// link: {}",
+            navigation.deep_link
         )));
     }
     let issued_generation = fs::current_graph_info(&graph)?.generation;
@@ -293,11 +318,11 @@ pub async fn open_note_window(
         let plan = {
             let mut registry = lock_registry(&init)?;
             let live_labels: HashSet<String> = app.webview_windows().into_keys().collect();
-            registry.plan_open(&deep_link, &invoking_label, &live_labels)
+            registry.plan_open(&navigation, &invoking_label, &live_labels)
         };
         match plan {
             WindowOpenPlan::Focus(preferred_label) => {
-                if focus_existing(&app, &preferred_label, &deep_link, &invoking_label) {
+                if focus_existing(&app, &preferred_label, &navigation, &invoking_label) {
                     return Ok(());
                 }
                 // The window closed after the locked snapshot. Re-plan from a
@@ -331,7 +356,7 @@ pub async fn open_note_window(
     if let Err(err) = builder.build() {
         // Be defensive if a window created outside this command claimed the
         // reserved label: surface it and preserve its one-shot bootstrap.
-        if focus_existing(&app, &label, &deep_link, &invoking_label) {
+        if focus_existing(&app, &label, &navigation, &invoking_label) {
             return Ok(());
         }
         // Keep the pending bootstrap for a later serialized retry, which
@@ -386,9 +411,9 @@ pub struct WindowBootstrap {
     /// The open index session's generation, or null when the main window's
     /// index failed to open (the note window then boots without index reads).
     pub index_generation: Option<u64>,
-    /// The `reflect://` link this window was opened for — one-shot, absent on
-    /// a reload (the router simply stays where the reloaded window was).
-    pub initial_deep_link: Option<String>,
+    /// The route/reveal intent this window was opened for — one-shot, absent
+    /// on a reload (the router simply stays where the reloaded window was).
+    pub initial_navigation: Option<NoteWindowNavigation>,
 }
 
 /// Adopt the open graph for a secondary window: a pure read of the current
@@ -405,19 +430,26 @@ pub fn window_bootstrap(
 ) -> AppResult<WindowBootstrap> {
     let graph = fs::current_graph_info(&graph)?;
     let index_generation = db::current_generation(&index)?;
-    let initial_deep_link = lock_registry(&init)?
+    let initial_navigation = lock_registry(&init)?
         .pending_bootstraps
         .remove(window.label());
     Ok(WindowBootstrap {
         graph,
         index_generation,
-        initial_deep_link,
+        initial_navigation,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn navigation(deep_link: &str) -> NoteWindowNavigation {
+        NoteWindowNavigation {
+            deep_link: deep_link.to_owned(),
+            heading_reveal: None,
+        }
+    }
 
     #[cfg(desktop)]
     #[test]
@@ -465,11 +497,12 @@ mod tests {
     #[test]
     fn invoking_window_is_replaced_as_the_preferred_target_destination() {
         let deep_link = "reflect://note/notes/a.md";
+        let navigation = navigation(deep_link);
         let mut registry = WindowRegistry::default();
         let mut live_labels = HashSet::from([MAIN_WINDOW_LABEL.to_owned()]);
 
         let WindowOpenPlan::Create(original_label) =
-            registry.plan_open(deep_link, MAIN_WINDOW_LABEL, &live_labels)
+            registry.plan_open(&navigation, MAIN_WINDOW_LABEL, &live_labels)
         else {
             panic!("first open should create a note window");
         };
@@ -477,7 +510,7 @@ mod tests {
         live_labels.insert(original_label.clone());
 
         let WindowOpenPlan::Create(replacement_label) =
-            registry.plan_open(deep_link, &original_label, &live_labels)
+            registry.plan_open(&navigation, &original_label, &live_labels)
         else {
             panic!("opening from the preferred window should create a replacement");
         };
@@ -487,7 +520,7 @@ mod tests {
         registry.pending_bootstraps.remove(&replacement_label);
         live_labels.insert(replacement_label.clone());
         assert_eq!(
-            registry.plan_open(deep_link, MAIN_WINDOW_LABEL, &live_labels),
+            registry.plan_open(&navigation, MAIN_WINDOW_LABEL, &live_labels),
             WindowOpenPlan::Focus(replacement_label)
         );
     }
@@ -495,14 +528,49 @@ mod tests {
     #[test]
     fn repeated_same_target_creations_share_the_reserved_label() {
         let deep_link = "reflect://note/notes/a.md";
+        let navigation = navigation(deep_link);
         let mut registry = WindowRegistry::default();
         let live_labels = HashSet::from([MAIN_WINDOW_LABEL.to_owned()]);
 
-        let first_plan = registry.plan_open(deep_link, MAIN_WINDOW_LABEL, &live_labels);
-        let repeated_plan = registry.plan_open(deep_link, MAIN_WINDOW_LABEL, &live_labels);
+        let first_plan = registry.plan_open(&navigation, MAIN_WINDOW_LABEL, &live_labels);
+        let repeated_plan = registry.plan_open(&navigation, MAIN_WINDOW_LABEL, &live_labels);
 
         assert_eq!(repeated_plan, first_plan);
         assert!(matches!(first_plan, WindowOpenPlan::Create(_)));
+    }
+
+    #[test]
+    fn heading_variants_share_a_window_and_refresh_its_pending_bootstrap() {
+        let deep_link = "reflect://note/notes/a.md";
+        let first = NoteWindowNavigation {
+            deep_link: deep_link.to_owned(),
+            heading_reveal: Some(NoteHeadingReveal {
+                path: "notes/a.md".to_owned(),
+                fragment: "Alpha".to_owned(),
+            }),
+        };
+        let second = NoteWindowNavigation {
+            deep_link: deep_link.to_owned(),
+            heading_reveal: Some(NoteHeadingReveal {
+                path: "notes/a.md".to_owned(),
+                fragment: "Bravo".to_owned(),
+            }),
+        };
+        let mut registry = WindowRegistry::default();
+        let mut live_labels = HashSet::from([MAIN_WINDOW_LABEL.to_owned()]);
+
+        let WindowOpenPlan::Create(label) =
+            registry.plan_open(&first, MAIN_WINDOW_LABEL, &live_labels)
+        else {
+            panic!("first heading should create a note window");
+        };
+        live_labels.insert(label.clone());
+
+        assert_eq!(
+            registry.plan_open(&second, MAIN_WINDOW_LABEL, &live_labels),
+            WindowOpenPlan::Focus(label.clone())
+        );
+        assert_eq!(registry.pending_bootstraps.get(&label), Some(&second));
     }
 
     #[test]

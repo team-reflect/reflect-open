@@ -105,6 +105,19 @@ function installFakeBridge(): void {
           return generation
         case 'list_files':
           return storedFiles
+        case 'note_create': {
+          const path = String(args['path'])
+          if (storedFiles.some((file) => file.path === path)) {
+            return { kind: 'collision' }
+          }
+          const contents = String(args['contents'])
+          storedFiles.push({
+            path,
+            size: new TextEncoder().encode(contents).byteLength,
+            modifiedMs: 1,
+          })
+          return { kind: 'created', modifiedMs: 1 }
+        }
         case 'index_meta_set':
           metaStore[String(args['key'])] = String(args['value'])
           return null
@@ -310,7 +323,7 @@ describe('GraphProvider welcome seeding', () => {
     })
 
     expect(result.current.status).toBe('ready')
-    expect(invokeLog).toContain('note_write')
+    expect(invokeLog).toContain('note_create')
     expect(metaStore['welcomeSeeded']).toBe('true')
   })
 
@@ -325,7 +338,7 @@ describe('GraphProvider welcome seeding', () => {
     })
     await waitFor(() => expect(result.current.status).toBe('ready'))
 
-    expect(invokeLog).not.toContain('note_write')
+    expect(invokeLog).not.toContain('note_create')
   })
 
   it('marks an unmarked graph with existing notes without writing into it', async () => {
@@ -339,7 +352,7 @@ describe('GraphProvider welcome seeding', () => {
     })
     await waitFor(() => expect(result.current.status).toBe('ready'))
 
-    expect(invokeLog).not.toContain('note_write')
+    expect(invokeLog).not.toContain('note_create')
     // Onboarding was considered: emptying this graph later won't re-seed.
     expect(metaStore['welcomeSeeded']).toBe('true')
   })

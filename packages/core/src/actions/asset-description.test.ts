@@ -2,11 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AssetDescriptionRejectedError, describeAsset } from '../ai/describe-asset'
 import type { AiProvidersState } from '../ai/provider-config'
 import { ReflectError } from '../errors'
-import { listDir, readAsset, readNote, writeNote } from '../graph/commands'
-import { assetReferencingNotePaths } from '../indexing/asset-refs'
+import {
+  assetPrivacySnapshot,
+  listDir,
+  readManagedAsset,
+  readManagedAssetDescription,
+  writeManagedAssetDescription,
+} from '../graph/commands'
 import { hashContent } from '../indexing/hash'
 import { getSecret } from '../secrets/keychain'
-import { descriptionPathFor } from '../graph/paths'
+import { descriptionPathFor, isNotePath } from '../graph/paths'
 import {
   assetTypeFor,
   base64ByteLength,
@@ -19,13 +24,11 @@ import {
 } from './asset-description'
 
 vi.mock('../graph/commands', () => ({
+  assetPrivacySnapshot: vi.fn(),
   listDir: vi.fn(),
-  readAsset: vi.fn(),
-  readNote: vi.fn(),
-  writeNote: vi.fn(),
-}))
-vi.mock('../indexing/asset-refs', () => ({
-  assetReferencingNotePaths: vi.fn(),
+  readManagedAsset: vi.fn(),
+  readManagedAssetDescription: vi.fn(),
+  writeManagedAssetDescription: vi.fn(),
 }))
 vi.mock('../secrets/keychain', () => ({
   getSecret: vi.fn(),
@@ -36,10 +39,10 @@ vi.mock('../ai/describe-asset', async (importOriginal) => ({
 }))
 
 const listDirMock = vi.mocked(listDir)
-const readAssetMock = vi.mocked(readAsset)
-const readNoteMock = vi.mocked(readNote)
-const writeNoteMock = vi.mocked(writeNote)
-const assetRefsMock = vi.mocked(assetReferencingNotePaths)
+const assetPrivacySnapshotMock = vi.mocked(assetPrivacySnapshot)
+const readManagedAssetMock = vi.mocked(readManagedAsset)
+const readManagedAssetDescriptionMock = vi.mocked(readManagedAssetDescription)
+const writeDescriptionMock = vi.mocked(writeManagedAssetDescription)
 const getSecretMock = vi.mocked(getSecret)
 const describeMock = vi.mocked(describeAsset)
 
@@ -54,28 +57,26 @@ const NOW = (): Date => new Date('2026-06-16T00:00:00.000Z')
 
 const notFound = (): unknown => ({ kind: 'notFound', message: 'missing' })
 
-/** In-memory graph: notes + descriptions by path, assets by path, and the index refs. */
+/** In-memory graph: notes + descriptions by path, and assets by path. */
 const files = new Map<string, string>()
 const assets = new Map<string, string>()
-const refs = new Map<string, string[]>()
 
 beforeEach(() => {
   files.clear()
   assets.clear()
-  refs.clear()
   vi.clearAllMocks()
 
-  readNoteMock.mockImplementation(async (path: string) => {
-    const value = files.get(path)
+  readManagedAssetDescriptionMock.mockImplementation(async (path: string) => {
+    const value = files.get(descriptionPathFor(path))
     if (value === undefined) {
-      throw notFound()
+      return null
     }
     return value
   })
-  writeNoteMock.mockImplementation(async (path: string, contents: string) => {
-    files.set(path, contents)
+  writeDescriptionMock.mockImplementation(async (path: string, contents: string) => {
+    files.set(descriptionPathFor(path), contents)
   })
-  readAssetMock.mockImplementation(async (path: string) => {
+  readManagedAssetMock.mockImplementation(async (path: string) => {
     const value = assets.get(path)
     if (value === undefined) {
       throw notFound()
@@ -92,19 +93,29 @@ beforeEach(() => {
       modifiedMs: 1, // epoch+1ms — far before any ISO `generatedAt`
     }))
   })
-  assetRefsMock.mockImplementation(async (assetPath: string) => refs.get(assetPath) ?? [])
+  assetPrivacySnapshotMock.mockImplementation(async () => ({
+    revision: 1,
+    notes: [...files.entries()]
+      .filter(([path]) => isNotePath(path))
+      .map(([path, source]) => ({ path, source })),
+    attachments: [...assets.entries()].map(([path, value]) => ({
+      path,
+      size: base64ByteLength(value),
+      modifiedMs: 1,
+    })),
+  }))
   getSecretMock.mockResolvedValue('sk-live')
   describeMock.mockResolvedValue('A flow diagram.')
 })
 
 /** A public note referencing `assetPath`. */
 function publicNote(assetPath: string): string {
-  return `# Diagram\n\n![](${assetPath})\n`
+  return `---\nid: 01abcdefghjkmnpqrstvwxyz00\n---\n# Diagram\n\n![](${assetPath})\n`
 }
 
 /** A private note referencing `assetPath`. */
 function privateNote(assetPath: string): string {
-  return `---\nprivate: true\n---\n\n![](${assetPath})\n`
+  return `---\nid: 01abcdefghjkmnpqrstvwxyz01\nprivate: true\n---\n\n![](${assetPath})\n`
 }
 
 function input(overrides: Partial<ReconcileAssetDescriptionsInput> = {}): ReconcileAssetDescriptionsInput {
@@ -130,6 +141,9 @@ describe('pure helpers', () => {
     expect(assetTypeFor('assets/a.txt')).toBeNull()
     expect(assetTypeFor('notes/a.png')).toBeNull()
     expect(assetTypeFor('assets/a.png.reflect.md')).toBeNull() // never describe a description
+    expect(assetTypeFor('assets/../secret.png')).toBeNull()
+    expect(assetTypeFor('assets/.hidden/a.png')).toBeNull()
+    expect(assetTypeFor('assets//a.png')).toBeNull()
     expect(assetTypeFor('assets/noext')).toBeNull()
   })
 
@@ -158,6 +172,7 @@ describe('pure helpers', () => {
       'A flow diagram.',
     )
     expect(readManagedDescription(built)).toEqual({
+      sourcePath: 'assets/a.png',
       sourceHash: 'abc',
       sourceSize: 5,
       generatedAtMs: Date.parse('2026-06-16T00:00:00.000Z'),
@@ -172,37 +187,52 @@ describe('pure helpers', () => {
 
 describe('classifyAsset (privacy gate)', () => {
   it('sends when referenced only by public notes', async () => {
+    assets.set('assets/a.png', 'aGVsbG8=')
     files.set('notes/pub.md', publicNote('assets/a.png'))
-    refs.set('assets/a.png', ['notes/pub.md'])
     expect(await classifyAsset('assets/a.png', GENERATION)).toBe('send')
+    expect(assetPrivacySnapshotMock).toHaveBeenCalledWith(GENERATION)
   })
 
   it('blocks when any referer is private', async () => {
+    assets.set('assets/a.png', 'aGVsbG8=')
     files.set('notes/pub.md', publicNote('assets/a.png'))
     files.set('notes/secret.md', privateNote('assets/a.png'))
-    refs.set('assets/a.png', ['notes/pub.md', 'notes/secret.md'])
+    expect(await classifyAsset('assets/a.png', GENERATION)).toBe('skip-private')
+  })
+
+  it('blocks when a private referer uses Obsidian wiki-embed syntax', async () => {
+    assets.set('assets/a.png', 'aGVsbG8=')
+    files.set('notes/pub.md', publicNote('assets/a.png'))
+    files.set(
+      'notes/secret.md',
+      '---\nid: 01abcdefghjkmnpqrstvwxyz01\nprivate: true\n---\n\n![[assets/a.png]]\n',
+    )
+
     expect(await classifyAsset('assets/a.png', GENERATION)).toBe('skip-private')
   })
 
   it('skips when unreferenced', async () => {
-    refs.set('assets/a.png', [])
     expect(await classifyAsset('assets/a.png', GENERATION)).toBe('skip-unreferenced')
   })
 
-  it('ignores a stale index referer whose live body no longer references the asset', async () => {
+  it('uses the live body rather than stale derived reference rows', async () => {
     files.set('notes/stale.md', '# Moved on\n\nno image here\n')
-    refs.set('assets/a.png', ['notes/stale.md'])
     expect(await classifyAsset('assets/a.png', GENERATION)).toBe('skip-unreferenced')
   })
 
-  it('fails closed when a referer cannot be read', async () => {
-    readNoteMock.mockRejectedValueOnce(new ReflectError('io', 'disk error'))
-    refs.set('assets/a.png', ['notes/pub.md'])
+  it('fails closed when a listed live note cannot be read', async () => {
+    assetPrivacySnapshotMock.mockRejectedValueOnce(new ReflectError('io', 'disk error'))
     expect(await classifyAsset('assets/a.png', GENERATION)).toBe('skip-private')
   })
 
-  it('treats a deleted referer (notFound) as not a live referer', async () => {
-    refs.set('assets/a.png', ['notes/gone.md']) // never seeded → readNote throws notFound
+  it('fails closed when the generation-pinned attachment catalog is unavailable', async () => {
+    files.set('notes/pub.md', publicNote('assets/a.png'))
+    assetPrivacySnapshotMock.mockRejectedValueOnce(new ReflectError('io', 'catalog error'))
+
+    expect(await classifyAsset('assets/a.png', GENERATION)).toBe('skip-private')
+  })
+
+  it('ignores a deleted note regardless of stale derived reference rows', async () => {
     expect(await classifyAsset('assets/a.png', GENERATION)).toBe('skip-unreferenced')
   })
 })
@@ -211,7 +241,6 @@ describe('reconcileAssetDescriptions', () => {
   it('describes a public asset and writes a managed, generation-pinned description', async () => {
     assets.set('assets/a.png', 'aGVsbG8=')
     files.set('notes/pub.md', publicNote('assets/a.png'))
-    refs.set('assets/a.png', ['notes/pub.md'])
 
     const outcome = await reconcileAssetDescriptions(input())
 
@@ -224,13 +253,12 @@ describe('reconcileAssetDescriptions', () => {
     expect(written).toContain('A flow diagram.')
     expect(written).toContain('provider: anthropic')
     expect(written).toContain('generatedAt: 2026-06-16T00:00:00.000Z')
-    expect(writeNoteMock).toHaveBeenCalledWith('assets/a.png.reflect.md', expect.any(String), GENERATION)
+    expect(writeDescriptionMock).toHaveBeenCalledWith('assets/a.png', expect.any(String), GENERATION)
   })
 
   it('skips an up-to-date managed description without calling the provider', async () => {
     assets.set('assets/a.png', 'aGVsbG8=')
     files.set('notes/pub.md', publicNote('assets/a.png'))
-    refs.set('assets/a.png', ['notes/pub.md'])
     const hash = await hashContent('aGVsbG8=')
     files.set(
       'assets/a.png.reflect.md',
@@ -252,7 +280,6 @@ describe('reconcileAssetDescriptions', () => {
     // content. The hash differs, so it must be re-described — never stat-skipped.
     assets.set('assets/a.png', 'Ym9keTI=') // "body2", 5 bytes
     files.set('notes/pub.md', publicNote('assets/a.png'))
-    refs.set('assets/a.png', ['notes/pub.md'])
     files.set(
       'assets/a.png.reflect.md',
       buildDescriptionSource(
@@ -270,7 +297,7 @@ describe('reconcileAssetDescriptions', () => {
 
     const outcome = await reconcileAssetDescriptions(input())
 
-    expect(readAssetMock).toHaveBeenCalled() // the bytes are read + rehashed
+    expect(readManagedAssetMock).toHaveBeenCalled() // the bytes are read + rehashed
     expect(outcome.described).toBe(1) // hash differs → re-described, not skipped
     expect(outcome.skippedUpToDate).toBe(0)
   })
@@ -278,7 +305,6 @@ describe('reconcileAssetDescriptions', () => {
   it('regenerates a managed description when the source hash changed', async () => {
     assets.set('assets/a.png', 'bmV3Qnl0ZXM=') // different bytes
     files.set('notes/pub.md', publicNote('assets/a.png'))
-    refs.set('assets/a.png', ['notes/pub.md'])
     files.set(
       'assets/a.png.reflect.md',
       buildDescriptionSource(
@@ -296,7 +322,6 @@ describe('reconcileAssetDescriptions', () => {
   it('never overwrites a user-authored description', async () => {
     assets.set('assets/a.png', 'aGVsbG8=')
     files.set('notes/pub.md', publicNote('assets/a.png'))
-    refs.set('assets/a.png', ['notes/pub.md'])
     files.set('assets/a.png.reflect.md', '# My own caption\n')
 
     const outcome = await reconcileAssetDescriptions(input())
@@ -307,22 +332,49 @@ describe('reconcileAssetDescriptions', () => {
     expect(describeMock).not.toHaveBeenCalled()
   })
 
-  it('blocks an asset referenced by a private note', async () => {
+  it('blocks a newly private reference absent from every derived index row', async () => {
     assets.set('assets/a.png', 'aGVsbG8=')
     files.set('notes/secret.md', privateNote('assets/a.png'))
-    refs.set('assets/a.png', ['notes/secret.md'])
 
     const outcome = await reconcileAssetDescriptions(input())
 
     expect(outcome.skippedPrivate).toBe(1)
     expect(outcome.described).toBe(0)
+    expect(getSecretMock).not.toHaveBeenCalled()
+    expect(readManagedAssetMock).not.toHaveBeenCalled()
     expect(describeMock).not.toHaveBeenCalled()
+    expect(writeDescriptionMock).not.toHaveBeenCalled()
     expect(files.has('assets/a.png.reflect.md')).toBe(false)
+  })
+
+  it('never reaches the provider or output when a managed sidecar or asset read is unsafe', async () => {
+    for (const unsafe of ['sidecar', 'asset'] as const) {
+      vi.clearAllMocks()
+      assets.set('assets/a.png', 'aGVsbG8=')
+      files.set('notes/pub.md', publicNote('assets/a.png'))
+      getSecretMock.mockResolvedValue('sk-live')
+      describeMock.mockResolvedValue('must not be emitted')
+      if (unsafe === 'sidecar') {
+        readManagedAssetDescriptionMock.mockRejectedValueOnce(
+          new ReflectError('traversal', 'symlinked sidecar'),
+        )
+      } else {
+        readManagedAssetMock.mockRejectedValueOnce(
+          new ReflectError('traversal', 'symlinked asset'),
+        )
+      }
+
+      const outcome = await reconcileAssetDescriptions(input())
+
+      expect(outcome.described).toBe(0)
+      expect(outcome.stopped?.reason).toBe('traversal')
+      expect(describeMock).not.toHaveBeenCalled()
+      expect(writeDescriptionMock).not.toHaveBeenCalled()
+    }
   })
 
   it('skips an unreferenced asset', async () => {
     assets.set('assets/a.png', 'aGVsbG8=')
-    refs.set('assets/a.png', [])
 
     const outcome = await reconcileAssetDescriptions(input())
 
@@ -334,8 +386,6 @@ describe('reconcileAssetDescriptions', () => {
     assets.set('assets/secret.png', 'aGVsbG8=')
     assets.set('assets/orphan.png', 'aGVsbG8=')
     files.set('notes/secret.md', privateNote('assets/secret.png'))
-    refs.set('assets/secret.png', ['notes/secret.md']) // referenced only by a private note
-    refs.set('assets/orphan.png', []) // referenced by nothing
 
     const outcome = await reconcileAssetDescriptions(
       input({ changed: ['assets/secret.png', 'assets/orphan.png'] }),
@@ -343,16 +393,61 @@ describe('reconcileAssetDescriptions', () => {
 
     expect(outcome.skippedPrivate).toBe(1)
     expect(outcome.skippedUnreferenced).toBe(1)
-    expect(readAssetMock).not.toHaveBeenCalled() // bytes never touched
+    expect(readManagedAssetDescriptionMock).not.toHaveBeenCalled()
+    expect(getSecretMock).not.toHaveBeenCalled()
+    expect(readManagedAssetMock).not.toHaveBeenCalled() // bytes never touched
     expect(describeMock).not.toHaveBeenCalled()
+  })
+
+  it('classifies a ten-asset reconcile batch with one live graph scan', async () => {
+    const paths = Array.from({ length: 10 }, (_, index) => `assets/${index}.png`)
+    for (const path of paths) {
+      assets.set(path, 'aGVsbG8=')
+    }
+    files.set(
+      'Projects/all-assets.md',
+      paths.map((path) => `![](../${path})`).join('\n'),
+    )
+
+    const outcome = await reconcileAssetDescriptions(input({ changed: paths }))
+
+    expect(outcome.described).toBe(10)
+    expect(assetPrivacySnapshotMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('blocks the whole reconcile batch before sidecars, bytes, or providers when a note is unavailable', async () => {
+    const paths = ['assets/a.png', 'assets/b.png']
+    for (const path of paths) {
+      assets.set(path, 'aGVsbG8=')
+    }
+
+    for (const unavailable of ['placeholder', 'missing'] as const) {
+      vi.clearAllMocks()
+      getSecretMock.mockResolvedValue('sk-live')
+      describeMock.mockResolvedValue('A flow diagram.')
+      assetPrivacySnapshotMock.mockRejectedValueOnce(
+        new ReflectError('notFound', `${unavailable} note unavailable`),
+      )
+
+      const outcome = await reconcileAssetDescriptions(input({ changed: paths }))
+
+      expect(outcome.skippedPrivate).toBe(2)
+      expect(outcome.described).toBe(0)
+      expect(readManagedAssetDescriptionMock).not.toHaveBeenCalled()
+      expect(getSecretMock).not.toHaveBeenCalled()
+      expect(readManagedAssetMock).not.toHaveBeenCalled()
+      expect(describeMock).not.toHaveBeenCalled()
+      expect(writeDescriptionMock).not.toHaveBeenCalled()
+    }
   })
 
   it('logs a permanent refusal and writes no description, continuing the pass', async () => {
     assets.set('assets/a.png', 'aGVsbG8=')
     assets.set('assets/b.pdf', 'JVBERg==')
-    files.set('notes/pub.md', `# Both\n\n![](assets/a.png)\n![](assets/b.pdf)\n`)
-    refs.set('assets/a.png', ['notes/pub.md'])
-    refs.set('assets/b.pdf', ['notes/pub.md'])
+    files.set(
+      'notes/pub.md',
+      '---\nid: 01abcdefghjkmnpqrstvwxyz00\n---\n# Both\n\n![](assets/a.png)\n![](assets/b.pdf)\n',
+    )
     describeMock
       .mockRejectedValueOnce(new AssetDescriptionRejectedError('unsupported'))
       .mockResolvedValueOnce('A PDF.')
@@ -369,7 +464,6 @@ describe('reconcileAssetDescriptions', () => {
   it('stops the pass on a transient (network) provider error for a later retry', async () => {
     assets.set('assets/a.png', 'aGVsbG8=')
     files.set('notes/pub.md', publicNote('assets/a.png'))
-    refs.set('assets/a.png', ['notes/pub.md'])
     describeMock.mockRejectedValueOnce(new ReflectError('network', 'offline'))
 
     const outcome = await reconcileAssetDescriptions(input())
@@ -381,7 +475,7 @@ describe('reconcileAssetDescriptions', () => {
 
   it('stops with a config reason when no provider is configured', async () => {
     assets.set('assets/a.png', 'aGVsbG8=')
-    refs.set('assets/a.png', ['notes/pub.md'])
+    files.set('notes/pub.md', publicNote('assets/a.png'))
 
     const outcome = await reconcileAssetDescriptions(input({ providers: NO_PROVIDERS }))
 
@@ -391,7 +485,7 @@ describe('reconcileAssetDescriptions', () => {
 
   it('stops with a config reason when the API key is missing from the keychain', async () => {
     assets.set('assets/a.png', 'aGVsbG8=')
-    refs.set('assets/a.png', ['notes/pub.md'])
+    files.set('notes/pub.md', publicNote('assets/a.png'))
     getSecretMock.mockRejectedValue(new Error('no key'))
 
     const outcome = await reconcileAssetDescriptions(input())
@@ -403,7 +497,6 @@ describe('reconcileAssetDescriptions', () => {
   it('aborts before processing when the graph session ends', async () => {
     assets.set('assets/a.png', 'aGVsbG8=')
     files.set('notes/pub.md', publicNote('assets/a.png'))
-    refs.set('assets/a.png', ['notes/pub.md'])
 
     const outcome = await reconcileAssetDescriptions(input({ isStale: () => true }))
 
@@ -416,9 +509,10 @@ describe('reconcileAssetDescriptions', () => {
     assets.set('assets/a.png', 'aGVsbG8=')
     assets.set('assets/b.pdf', 'JVBERg==')
     assets.set('assets/notes.txt', 'aGk=') // ineligible — never listed as a candidate
-    files.set('notes/pub.md', `# Both\n\n![](assets/a.png)\n![](assets/b.pdf)\n`)
-    refs.set('assets/a.png', ['notes/pub.md'])
-    refs.set('assets/b.pdf', ['notes/pub.md'])
+    files.set(
+      'notes/pub.md',
+      '---\nid: 01abcdefghjkmnpqrstvwxyz00\n---\n# Both\n\n![](assets/a.png)\n![](assets/b.pdf)\n',
+    )
     const progress: Array<[number, number]> = []
 
     const outcome = await reconcileAssetDescriptions(

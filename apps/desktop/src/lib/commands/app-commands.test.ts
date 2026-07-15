@@ -3,9 +3,11 @@ import type { EmbedStatus, NoteRow, PinnedNote } from '@reflect/core'
 import { notePathForRoute, type Route } from '@/routing/route'
 import type { NavigateOptions } from '@/routing/router'
 import { resetOperations } from '@/lib/operations'
+import { hasNewNoteCreationClaim } from '@/lib/new-note-creation-claims'
 import type { CommandContext } from './types'
 
 const TODAY = '2026-06-09'
+const COMMAND_GRAPH = { root: '/g', name: 'g', generation: 7 }
 
 const randomNotePath = vi.hoisted(() => vi.fn())
 const rebuildIndex = vi.hoisted(() => vi.fn())
@@ -80,6 +82,7 @@ function fakeContext(overrides?: Partial<CommandContext>) {
     newChat: vi.fn(),
     switchGraph: vi.fn(),
     toggleAudioMemo: vi.fn(),
+    graph: () => COMMAND_GRAPH,
     generation: () => 7,
     openPalette: vi.fn(),
     openShortcuts: vi.fn(),
@@ -219,7 +222,9 @@ describe('app commands', () => {
     expect(navigated).toHaveLength(1)
     const route = navigated[0]!
     expect(route.kind).toBe('note')
-    expect((route as { kind: 'note'; path: string }).path).toMatch(/^notes\/[0-9a-z]+\.md$/)
+    const path = (route as { kind: 'note'; path: string }).path
+    expect(path).toMatch(/^notes\/[0-9a-z]+\.md$/)
+    expect(hasNewNoteCreationClaim(COMMAND_GRAPH, path)).toBe(true)
   })
 
   it('note.new leaves non-daily route scroll restoration intact', async () => {

@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { isAppError } from '../../errors'
+import { isNotePath } from '../../graph/paths'
 import { parseNote } from '../../markdown/extract'
-import { splitFrontmatter } from '../../markdown/frontmatter'
+import { hasUnterminatedLeadingFrontmatter, splitFrontmatter } from '../../markdown/frontmatter'
 import {
   cloudSafeNoteContent,
   isPrivateNoteError,
@@ -59,6 +60,9 @@ export interface ReadNoteDeps {
  */
 export function buildReadOneNote(deps: ReadNoteDeps) {
   return async function readOneNote(path: string): Promise<ReadNoteResult> {
+    if (!isNotePath(path)) {
+      return { ok: false, path, error: 'This path is not an eligible Markdown note.' }
+    }
     let source: string
     try {
       source = await deps.readNoteFn(path)
@@ -69,6 +73,8 @@ export function buildReadOneNote(deps: ReadNoteDeps) {
       throw cause
     }
     const parsed = parseNote({ path, source })
+    const privacyUncertain =
+      hasUnterminatedLeadingFrontmatter(source) || parsed.frontmatterWarning !== undefined
     const { body } = splitFrontmatter(source)
     const truncated = body.length > MAX_NOTE_CONTENT_CHARS
     try {
@@ -76,7 +82,7 @@ export function buildReadOneNote(deps: ReadNoteDeps) {
         ok: true,
         note: cloudSafeNoteContent({
           path,
-          isPrivate: parsed.frontmatter.private,
+          isPrivate: privacyUncertain || parsed.frontmatter.private,
           title: parsed.title,
           content: truncated ? body.slice(0, MAX_NOTE_CONTENT_CHARS) : body,
           truncated,

@@ -63,7 +63,9 @@ below. The command is also exposed in the native Window menu.
    references share `useNoteLinkNavigation`, which applies the convention and
    delegates to `openRouteInNewWindow`; raw in-note links use
    `openDeepLinkInNewWindow` (`src/lib/windows/open-in-new-window.ts`). Routes
-   serialize through the existing deep-link grammar (`deepLinkForRoute`);
+   serialize through the existing deep-link grammar (`deepLinkForRoute`), and
+   an optional decoded `{ path, fragment }` heading reveal travels beside the
+   route in a typed window-navigation envelope;
    capture links (`append`, `task`) are writes, not places, and never
    window-ify. A declined or failed open falls back to in-window navigation
    while its originating link intent remains current; a newer navigation drops
@@ -72,22 +74,23 @@ below. The command is also exposed in the native Window menu.
    graph, after a graph switch, or while a quit is in flight. An app-wide
    creation gate serializes target selection and Tauri's non-atomic native
    build, then the registry selects the target's preferred destination, stores
-   the deep link in `WindowInit`'s label-keyed one-shot bootstrap map, and
-   builds the window — cascade offset by the live note-window count, main-window
-   chrome (overlay titlebar, native drag-drop off), excluded from window-state
-   tracking. The invoking window is never a valid destination. If it was
+   the route/reveal intent in `WindowInit`'s label-keyed one-shot bootstrap
+   map, and builds the window — cascade offset by the live note-window count,
+   main-window chrome (overlay titlebar, native drag-drop off), excluded from
+   window-state tracking. The invoking window is never a valid destination. If it was
    preferred for that target, a distinct suffixed `note-*` window is created
    and becomes preferred instead.
 3. The new webview boots the ordinary desktop tree. `GraphProvider` sees a
    non-main label and takes the adoption leg (`useNoteWindowBoot`):
    `window_bootstrap` returns the graph info + index generation (unbumped —
    pinned by the `session_adoption_reads_never_bump_generations` test) and
-   drains the pending deep link. Because ⌘-click builds **path-shaped**
+   drains the pending navigation intent. Because ⌘-click builds **path-shaped**
    links, the route usually derives synchronously
    (`initialRouteForDeepLink`) and seeds the router directly — the window's
    first workspace render is already the clicked note, no flash of today's
-   daily note. Only a target that needs the index (an id/title-shaped link)
-   rides the normal deep-link intake, buffering until the workspace's
+   daily note. A carried heading reveal is queued before the editor mounts, so
+   the destination scrolls after startup. Only a target that needs the index
+   (an id/title-shaped link) rides the normal deep-link intake, buffering until the workspace's
    `DeepLinkProvider` attaches — the same path an OS-delivered `reflect://`
    URL takes, including `openNote` resolution and error surfacing.
 4. The window renders `NoteWindowContent`: the routed view only, with daily
@@ -110,7 +113,7 @@ asymmetry is what each broadcast below exists to bridge.
 | `index:changed` | file watcher (`watcher.rs`) | every window | Open editors reconcile external changes; the main window's indexer applies the batch. Pre-dates multi-window; note windows get editor freshness from it for free. |
 | `index:written` | index write commands after a **committed** write (`db/mod.rs`) | note windows only | Refetch index-backed queries (backlinks, lists). The main window invalidates in-process via its indexer and must not subscribe — it would refetch twice. |
 | `note:moved` | `note_move_indexed` / `index_move` after rows commit | **every** window (`desktop-root.tsx`) | Retarget open sessions + router history after a rename. Renames can originate in any window (a title edit), and a window left behind would resurrect the dead path on its next save. The origin window's in-process handling makes the echo idempotent. |
-| `window:navigate` | `open_note_window` on a preferred-destination hit (targeted `emit_to`) | that note window | Reopening a target focuses its window *and* re-navigates it there — it may have browsed elsewhere since opening. The invoking window is excluded, so modifier-open never redirects its source. |
+| `window:navigate` | `open_note_window` on a preferred-destination hit (targeted `emit_to`) | that note window | Reopening a target focuses its window, re-navigates it there, and repeats any heading reveal — it may have browsed elsewhere since opening. The invoking window is excluded, so modifier-open never redirects its source. |
 | `app:quit-requested` | the run loop on a deferred ⌘Q (`lib.rs`) | every window | Each window flushes its own dirty buffers, then confirms. |
 
 The write path that ties it together: a note window saves via the ordinary

@@ -45,10 +45,20 @@ impl Fixture {
             } else {
                 "note"
             };
+            let basename_key = fold_key(
+                note.rel_path
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or(&note.rel_path)
+                    .strip_suffix(".md")
+                    .unwrap_or(&note.rel_path),
+            );
+            let authored_title_key = meta.authored_title.then(|| fold_key(&meta.title));
             conn.execute(
-                "INSERT INTO notes(path, id, title, title_key, kind, daily_date, is_private,
-                                   is_pinned, pinned_order, file_hash, mtime, updated_at, preview)
-                 VALUES(?1, ?8, ?2, ?3, ?9, ?4, ?5, 0, NULL, ?6, ?7, ?7, '')",
+                "INSERT INTO notes(path, id, title, title_key, authored_title_key, path_key,
+                                   basename_key, kind, daily_date, is_private, is_pinned,
+                                   pinned_order, file_hash, mtime, updated_at, preview)
+                 VALUES(?1, ?8, ?2, ?3, ?10, ?11, ?12, ?9, ?4, ?5, 0, NULL, ?6, ?7, ?7, '')",
                 params![
                     note.rel_path,
                     meta.title,
@@ -59,6 +69,9 @@ impl Fixture {
                     note.mtime_ms as i64,
                     meta.id,
                     kind,
+                    authored_title_key,
+                    note.rel_path.to_lowercase(),
+                    basename_key,
                 ],
             )
             .unwrap();
@@ -541,7 +554,111 @@ fn show_resolves_by_title_and_alias_without_an_index() {
 }
 
 #[test]
-fn show_blocks_a_private_note_even_when_the_index_says_public() {
+fn resolution_uses_a_title_edited_after_indexing() {
+    let fixture = graph();
+    let note = fixture.write_note("notes/project.md", "# Old title\nold body\n");
+    fixture.build_index();
+    fs::write(note, "# New title\nnew body\n").unwrap();
+
+    let current = reflect(&fixture, &["show", "New title"]);
+    assert!(current.status.success(), "stderr: {}", stderr(&current));
+    assert!(stdout(&current).contains("new body"));
+
+    let stale = reflect(&fixture, &["show", "Old title"]);
+    assert_eq!(stale.status.code(), Some(3));
+}
+
+#[test]
+fn resolution_sees_an_unindexed_duplicate() {
+    let fixture = graph();
+    fixture.write_note("Projects/Plan.md", "# Plan\nindexed owner\n");
+    fixture.build_index();
+    fixture.write_note("Archive/Plan.md", "# Plan\nnew owner\n");
+
+    let output = reflect(&fixture, &["show", "Plan"]);
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    assert!(stdout(&output).contains("new owner"));
+    assert!(stderr(&output).contains("1 other match"));
+    assert!(!stderr(&output).contains("Projects/Plan.md"));
+}
+
+#[test]
+fn ambiguity_warning_never_discloses_a_private_duplicate_path() {
+    let fixture = graph();
+    fixture.write_note(
+        "A-Private/sensitive-client-name.md",
+        "---\nprivate: true\n---\n# Plan\nsecret owner\n",
+    );
+    fixture.write_note("Z-Public/Plan.md", "# Plan\npublic owner\n");
+
+    let output = reflect(&fixture, &["show", "Plan"]);
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    assert_eq!(stdout(&output), "# Plan\npublic owner\n");
+    assert!(!stderr(&output).contains("other match"));
+    assert!(!stderr(&output).contains("Private"));
+    assert!(!stderr(&output).contains("sensitive-client-name"));
+}
+
+#[test]
+fn bare_resolution_failures_never_disclose_unverified_note_paths() {
+    let placeholder_fixture = graph();
+    let placeholder_dir = placeholder_fixture.root().join("Sensitive-Client");
+    fs::create_dir_all(&placeholder_dir).unwrap();
+    fs::write(
+        placeholder_dir.join(".Unannounced-Merger.md.icloud"),
+        b"placeholder",
+    )
+    .unwrap();
+
+    let placeholder = reflect(&placeholder_fixture, &["show", "Plan"]);
+    assert!(!placeholder.status.success());
+    assert_eq!(stdout(&placeholder), "");
+    assert!(stderr(&placeholder).contains("unavailable"));
+    assert!(!stderr(&placeholder).contains("Sensitive-Client"));
+    assert!(!stderr(&placeholder).contains("Unannounced-Merger"));
+
+    let unreadable_fixture = graph();
+    let unreadable_dir = unreadable_fixture.root().join("Sensitive-Client");
+    fs::create_dir_all(&unreadable_dir).unwrap();
+    fs::write(unreadable_dir.join("Stealth-Launch.md"), [0xff]).unwrap();
+
+    let unreadable = reflect(&unreadable_fixture, &["show", "Plan"]);
+    assert!(!unreadable.status.success());
+    assert_eq!(stdout(&unreadable), "");
+    assert!(stderr(&unreadable).contains("could not be read"));
+    assert!(!stderr(&unreadable).contains("Sensitive-Client"));
+    assert!(!stderr(&unreadable).contains("Stealth-Launch"));
+}
+
+#[test]
+fn explicit_unreadable_path_keeps_its_user_supplied_diagnostic() {
+    let fixture = graph();
+    let rel_path = "Sensitive-Client/Stealth-Launch.md";
+    let absolute = fixture.root().join(rel_path);
+    fs::create_dir_all(absolute.parent().unwrap()).unwrap();
+    fs::write(absolute, [0xff]).unwrap();
+
+    let output = reflect(&fixture, &["show", rel_path]);
+    assert!(!output.status.success());
+    assert_eq!(stdout(&output), "");
+    assert!(stderr(&output).contains(rel_path));
+}
+
+#[test]
+fn resolution_drops_a_deleted_index_owner_before_applying_fallback_tiers() {
+    let fixture = graph();
+    let authored = fixture.write_note("notes/authored.md", "# Target\nstale owner\n");
+    fixture.write_note("Projects/Target.md", "filename fallback\n");
+    fixture.build_index();
+    fs::remove_file(authored).unwrap();
+
+    let output = reflect(&fixture, &["show", "Target"]);
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    assert_eq!(stdout(&output), "filename fallback\n");
+}
+
+#[test]
+fn bare_resolution_hides_a_private_note_even_when_the_index_says_public() {
     let fixture = graph();
     let note = fixture.write_note("notes/a.md", "# Alpha\npublic at index time\n");
     fixture.build_index();
@@ -550,10 +667,64 @@ fn show_blocks_a_private_note_even_when_the_index_says_public() {
     let output = reflect(&fixture, &["show", "Alpha"]);
     assert_eq!(output.status.code(), Some(3));
     assert_eq!(stdout(&output), "");
-    assert!(stderr(&output).contains("private"));
+    assert!(stderr(&output).contains("no note matching"));
+    assert!(!stderr(&output).contains("private"));
+    assert!(!stderr(&output).contains("notes/a.md"));
 
     let path_output = reflect(&fixture, &["path", "Alpha"]);
     assert_eq!(path_output.status.code(), Some(3));
+    assert!(stderr(&path_output).contains("no note matching"));
+    assert!(!stderr(&path_output).contains("private"));
+}
+
+#[test]
+fn all_read_surfaces_fail_closed_for_nonstandard_or_unverifiable_frontmatter() {
+    let cases = [
+        (
+            "bom",
+            "\u{feff}---\nprivate: true\n---\n# Alpha\nprivacy-needle\n",
+        ),
+        (
+            "lone-cr",
+            "---\rprivate: true\r---\r# Alpha\rprivacy-needle\r",
+        ),
+        (
+            "malformed",
+            "---\nprivate: [broken\n---\n# Alpha\nprivacy-needle\n",
+        ),
+        (
+            "unterminated",
+            "---\nprivate: true\n# Alpha\nprivacy-needle\n",
+        ),
+    ];
+
+    for (name, source) in cases {
+        let fixture = graph();
+        let rel_path = format!("notes/{name}.md");
+        fixture.write_note(&rel_path, source);
+        fixture.build_index();
+
+        for args in [
+            vec!["show", rel_path.as_str()],
+            vec!["path", rel_path.as_str()],
+            vec!["open", rel_path.as_str(), "--print"],
+        ] {
+            let output = reflect(&fixture, &args);
+            assert_eq!(
+                output.status.code(),
+                Some(3),
+                "{name} {:?}: {}",
+                args,
+                stderr(&output)
+            );
+            assert_eq!(stdout(&output), "", "{name} {:?}", args);
+            assert!(stderr(&output).contains("private"), "{name} {:?}", args);
+        }
+
+        let search = reflect(&fixture, &["search", "privacy-needle"]);
+        assert!(search.status.success(), "{name}: {}", stderr(&search));
+        assert_eq!(stdout(&search), "", "{name}");
+    }
 }
 
 #[test]
@@ -566,6 +737,30 @@ fn show_json_includes_the_daily_date() {
     assert_eq!(value["path"], "daily/2026-01-02.md");
     assert_eq!(value["title"], "2026-01-02");
     assert_eq!(value["content"], "daily body\n");
+}
+
+#[test]
+fn impossible_daily_filenames_are_regular_notes_in_json_outputs() {
+    let fixture = graph();
+    fixture.write_note("daily/2026-02-31.md", "ordinary note\n");
+    fixture.build_index();
+
+    let shown = json(&reflect(&fixture, &["show", "2026-02-31", "--json"]));
+    assert_eq!(shown["path"], "daily/2026-02-31.md");
+    assert_eq!(shown["title"], "2026-02-31");
+    assert!(shown["date"].is_null());
+
+    let path = json(&reflect(&fixture, &["path", "2026-02-31", "--json"]));
+    assert_eq!(path["path"], "daily/2026-02-31.md");
+    assert!(path.get("date").is_none());
+
+    let opened = json(&reflect(
+        &fixture,
+        &["open", "2026-02-31", "--print", "--json"],
+    ));
+    assert_eq!(opened["path"], "daily/2026-02-31.md");
+    assert!(opened.get("date").is_none());
+    assert_eq!(opened["url"], "reflect://note/daily%2F2026-02-31.md");
 }
 
 #[test]

@@ -7,12 +7,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  */
 const io = vi.hoisted(() => ({
   readNote: vi.fn(),
-  writeNote: vi.fn(),
+  writeNoteIfUnchanged: vi.fn(),
 }))
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   readNote: io.readNote,
-  writeNote: io.writeNote,
+  writeNoteIfUnchanged: io.writeNoteIfUnchanged,
 }))
 
 const docs = vi.hoisted(() => ({ openSession: vi.fn() }))
@@ -27,7 +27,7 @@ const RENAME = { from: 'Old Title', to: 'New Title', previousAutoAlias: null }
 
 beforeEach(() => {
   io.readNote.mockReset()
-  io.writeNote.mockReset().mockResolvedValue(undefined)
+  io.writeNoteIfUnchanged.mockReset().mockResolvedValue({ kind: 'written', modifiedMs: null })
   docs.openSession.mockReset().mockReturnValue(null)
 })
 
@@ -45,9 +45,10 @@ describe('placeOldTitleAlias', () => {
 
     await placeOldTitleAlias(PATH, RENAME, 7)
 
-    expect(io.writeNote).toHaveBeenCalledTimes(1)
-    const [path, content, generation] = io.writeNote.mock.calls[0]!
+    expect(io.writeNoteIfUnchanged).toHaveBeenCalledTimes(1)
+    const [path, expected, content, generation] = io.writeNoteIfUnchanged.mock.calls[0]!
     expect(path).toBe(PATH)
+    expect(expected).toBe('# Old Title\n\nbody\n')
     expect(content).toContain('aliases:')
     expect(content).toContain('Old Title')
     expect(content).toContain('# Old Title\n\nbody\n') // body untouched
@@ -63,7 +64,7 @@ describe('placeOldTitleAlias', () => {
     expect(session.updateFrontmatter).toHaveBeenCalledWith({ aliases: ['Old Title'] })
     expect(session.flush).toHaveBeenCalledTimes(1)
     expect(io.readNote).not.toHaveBeenCalled()
-    expect(io.writeNote).not.toHaveBeenCalled()
+    expect(io.writeNoteIfUnchanged).not.toHaveBeenCalled()
   })
 
   it('falls back to disk when the session cannot take the patch', async () => {
@@ -74,7 +75,7 @@ describe('placeOldTitleAlias', () => {
     await placeOldTitleAlias(PATH, RENAME, 7)
 
     expect(session.flush).not.toHaveBeenCalled()
-    expect(io.writeNote).toHaveBeenCalledTimes(1)
+    expect(io.writeNoteIfUnchanged).toHaveBeenCalledTimes(1)
   })
 
   it('writes nothing when the alias would be redundant', async () => {
@@ -87,7 +88,7 @@ describe('placeOldTitleAlias', () => {
 
     expect(session.updateFrontmatter).not.toHaveBeenCalled()
     expect(session.flush).not.toHaveBeenCalled()
-    expect(io.writeNote).not.toHaveBeenCalled()
+    expect(io.writeNoteIfUnchanged).not.toHaveBeenCalled()
   })
 
   it('computes against the session buffer, preserving concurrently-gained aliases', async () => {
@@ -101,5 +102,12 @@ describe('placeOldTitleAlias', () => {
     expect(session.updateFrontmatter).toHaveBeenCalledWith({
       aliases: ['Gained Elsewhere', 'Old Title'],
     })
+  })
+
+  it('does not recreate a note removed after the disk read', async () => {
+    io.readNote.mockResolvedValue('# Old Title\n\nbody\n')
+    io.writeNoteIfUnchanged.mockResolvedValue({ kind: 'changed' })
+
+    await expect(placeOldTitleAlias(PATH, RENAME, 7)).rejects.toThrow(/changed or was removed/)
   })
 })

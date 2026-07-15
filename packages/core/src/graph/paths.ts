@@ -1,3 +1,5 @@
+import { isCalendarDate } from '@reflect/utils'
+
 /**
  * Pure helpers for the graph's on-disk path conventions (Plan 02). These build
  * and recognize **graph-relative** paths; the Rust layer owns the root and the
@@ -110,7 +112,7 @@ export function isAssetPath(path: string): boolean {
 
 /** Is this graph-relative path a daily note (`daily/YYYY-MM-DD.md`)? */
 export function isDaily(path: string): boolean {
-  return DAILY_PATH_RE.test(path)
+  return dateFromDailyPath(path) !== null
 }
 
 /**
@@ -119,7 +121,13 @@ export function isDaily(path: string): boolean {
  * cannot reveal what an entry points at.
  */
 export function isSafeVisibleGraphPath(path: string): boolean {
-  if (path === '' || path.startsWith('/') || path.includes('\\') || /^[A-Za-z]:/.test(path)) {
+  if (
+    path === '' ||
+    path.startsWith('/') ||
+    path.includes('\\') ||
+    path.includes('\0') ||
+    /^[A-Za-z]:/.test(path)
+  ) {
     return false
   }
   const components = path.split('/')
@@ -182,5 +190,6 @@ export function isTemplatePath(path: string): boolean {
 
 /** Extract the ISO date from a daily-note path, or `null` if it isn't one. */
 export function dateFromDailyPath(path: string): string | null {
-  return DAILY_PATH_RE.exec(path)?.[1] ?? null
+  const date = DAILY_PATH_RE.exec(path)?.[1]
+  return date !== undefined && isCalendarDate(date) ? date : null
 }
