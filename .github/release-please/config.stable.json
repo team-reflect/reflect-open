@@ -6,6 +6,7 @@
   "draft": true,
   "force-tag-creation": true,
   "always-update": true,
+  "pull-request-title-pattern": "chore: release ${version}",
   "packages": {
     ".": {
       "package-name": "reflect-open",
@@ -16,6 +17,11 @@
           "type": "json",
           "path": "apps/desktop/package.json",
           "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": ".github/release-please/manifest.beta.json",
+          "jsonpath": "$['.']"
         }
       ]
     }

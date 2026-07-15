@@ -2,8 +2,8 @@ name: CI
 
 on:
   push:
-    # next is the development default; master only advances on release merges.
-    branches: [master, next]
+    # master is the only long-lived branch.
+    branches: [master]
   pull_request:
   workflow_dispatch:
 

@@ -9,9 +9,11 @@
   "draft": true,
   "force-tag-creation": true,
   "always-update": true,
+  "pull-request-title-pattern": "chore: release ${version}",
   "packages": {
     ".": {
       "package-name": "reflect-open",
+      "component": "reflect-open-beta",
       "changelog-path": "apps/desktop/CHANGELOG.beta.md",
       "exclude-paths": ["docs", "fixtures", ".github", "apps/extension"],
       "extra-files": [
