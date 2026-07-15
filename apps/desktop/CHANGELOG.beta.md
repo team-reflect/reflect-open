@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.6.1-beta.2...v0.7.0-beta.2) (2026-07-15)
+
+
+### Features
+
+* configure AI chat system prompts ([#775](https://github.com/team-reflect/reflect-open/issues/775)) ([091519d](https://github.com/team-reflect/reflect-open/commit/091519d926148afe996997934f459b4e8251daf7))
+
+
+### Bug Fixes
+
+* allow changing AI provider default models ([#810](https://github.com/team-reflect/reflect-open/issues/810)) ([554bdea](https://github.com/team-reflect/reflect-open/commit/554bdeade18031744af8207870d079c895c2438a))
+* keep app running when closing Mac window ([#808](https://github.com/team-reflect/reflect-open/issues/808)) ([e98f4d3](https://github.com/team-reflect/reflect-open/commit/e98f4d36dae621e182cf92f25b443e18bbfea321))
+
 ## [0.6.1-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.6.1-beta.1...v0.6.1-beta.2) (2026-07-14)
 
 
