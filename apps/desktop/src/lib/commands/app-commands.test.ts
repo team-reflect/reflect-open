@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { EmbedStatus, NoteRow, PinnedNote } from '@reflect/core'
+import type { EmbedStatus, NoteRow, PinnedNote, RecentGraph } from '@reflect/core'
 import { notePathForRoute, type Route } from '@/routing/route'
 import type { NavigateOptions } from '@/routing/router'
 import { resetOperations } from '@/lib/operations'
@@ -49,7 +49,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
 }))
 
 // Importing registers the commands (module side effect, like production).
-const { APP_COMMANDS, keybindingFor } = await import('./app-commands')
+const { APP_COMMANDS, keybindingFor, reconcileStableGraphOrder } = await import('./app-commands')
 
 function command(id: string) {
   const found = APP_COMMANDS.find((entry) => entry.id === id)
@@ -102,6 +102,32 @@ function noteRow(isPrivate: boolean): NoteRow {
     gistStale: false,
   }
 }
+
+function recentGraph(root: string, openedMs: number): RecentGraph {
+  return { root, name: root, openedMs }
+}
+
+describe('reconcileStableGraphOrder', () => {
+  it('keeps graph positions fixed when opening a graph reorders recents', () => {
+    const graphA = recentGraph('/graphs/a', 2)
+    const graphB = recentGraph('/graphs/b', 1)
+    const initialOrder = reconcileStableGraphOrder([], [graphA, graphB])
+
+    expect(initialOrder).toEqual(['/graphs/a', '/graphs/b'])
+    expect(reconcileStableGraphOrder(initialOrder, [graphB, graphA])).toEqual(initialOrder)
+  })
+
+  it('drops forgotten graphs and appends newly seen graphs without reshuffling survivors', () => {
+    const previousOrder = ['/graphs/a', '/graphs/b']
+    const graphB = recentGraph('/graphs/b', 2)
+    const graphC = recentGraph('/graphs/c', 1)
+
+    expect(reconcileStableGraphOrder(previousOrder, [graphC, graphB])).toEqual([
+      '/graphs/b',
+      '/graphs/c',
+    ])
+  })
+})
 
 describe('keybindingFor', () => {
   it('returns the binding UI hints derive from', () => {

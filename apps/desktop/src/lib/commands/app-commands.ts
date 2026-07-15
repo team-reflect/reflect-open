@@ -6,6 +6,7 @@ import {
   randomNotePath,
   toggleDevtools,
   untitledNotePath,
+  type RecentGraph,
 } from '@reflect/core'
 import { attachFilesToNote } from '@/lib/attach-files'
 import { runCopyDeepLink } from '@/lib/note-deep-link'
@@ -47,6 +48,35 @@ function openNewNote(context: CommandContext): void {
     context.clearScrollState()
   }
   context.navigate(newNoteRoute())
+}
+
+/**
+ * Keep numbered graph slots in first-seen order while the persisted recents
+ * list reshuffles by most-recently-used. Forgotten graphs leave the order and
+ * newly discovered graphs append without moving the remaining slots.
+ */
+export function reconcileStableGraphOrder(
+  currentOrder: readonly string[],
+  recents: readonly RecentGraph[],
+): string[] {
+  const availableRoots = new Set(recents.map((recent) => recent.root))
+  const nextOrder: string[] = []
+  const orderedRoots = new Set<string>()
+
+  for (const root of currentOrder) {
+    if (availableRoots.has(root) && !orderedRoots.has(root)) {
+      nextOrder.push(root)
+      orderedRoots.add(root)
+    }
+  }
+  for (const recent of recents) {
+    if (!orderedRoots.has(recent.root)) {
+      nextOrder.push(recent.root)
+      orderedRoots.add(recent.root)
+    }
+  }
+
+  return nextOrder
 }
 
 const GRAPH_SWITCH_COMMANDS: AppCommand[] = Array.from({ length: 9 }, (_, index) => {
