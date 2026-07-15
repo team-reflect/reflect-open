@@ -84,6 +84,23 @@ mod app_metadata_tests {
     }
 }
 
+#[cfg(test)]
+mod capability_tests {
+    #[test]
+    fn desktop_capability_allows_main_window_hide() {
+        let capability: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/default.json"))
+                .expect("valid default capability");
+        let permissions = capability["permissions"]
+            .as_array()
+            .expect("capability permissions");
+
+        assert!(permissions
+            .iter()
+            .any(|permission| permission.as_str() == Some("core:window:allow-hide")));
+    }
+}
+
 /// Which UI family this build serves. The frontend's root gate (Plan 19)
 /// switches between the desktop and mobile surface trees on this answer.
 #[tauri::command]
