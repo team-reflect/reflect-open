@@ -62,6 +62,9 @@ const EDITOR_BINDINGS = Object.fromEntries(
 /** The editor-scope binding that opens the AI menu on the current selection. */
 export const AI_MENU_BINDING = 'Mod-Shift-j'
 
+/** The editor-scope binding that inserts the current time at the caret. */
+export const TIMESTAMP_BINDING = 'Mod-Shift-t'
+
 /**
  * Reflect's own editor-scope bindings (bound via `useKeymap` inside the
  * editor, not by meowdown's engine). Declared here, next to meowdown's, so
@@ -70,6 +73,7 @@ export const AI_MENU_BINDING = 'Mod-Shift-j'
  */
 const REFLECT_EDITOR_BINDINGS: Record<string, string> = {
   [AI_MENU_BINDING]: 'Open the AI menu on the selection',
+  [TIMESTAMP_BINDING]: 'Insert the current time',
 }
 
 export const EDITOR_BINDING_DESCRIPTIONS: Record<string, string> = registerKeymap('editor', {

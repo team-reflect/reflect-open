@@ -15,6 +15,7 @@ import {
   registerNoteEditorHandle,
   unregisterNoteEditorHandle,
 } from '@/editor/editor-handle-registry'
+import { EditorTimestampKeymap } from '@/editor/editor-timestamp-keymap'
 import { markModeFromSyntax } from '@/editor/mark-mode'
 import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor'
 import { resolveAssetFileLink, useAssetPersistence } from '@/editor/use-asset-persistence'
@@ -372,6 +373,7 @@ export function NotePaneComponent({
         onExitBoundary={handleExitBoundary}
       >
         <EditorAiKeymap onTrigger={aiMenu.openMenu} />
+        <EditorTimestampKeymap timeFormat={settings.timeFormat} />
       </NoteEditor>
 
       {showBacklinks ? (
