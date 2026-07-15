@@ -1,0 +1,4 @@
+reviews:
+  tools:
+    eslint:
+      enabled: false
