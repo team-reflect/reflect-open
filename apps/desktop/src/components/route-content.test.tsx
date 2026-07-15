@@ -99,6 +99,7 @@ vi.mock('@/providers/settings-provider', () => ({
       allNotesFilterTags: ['book', 'link', 'person'],
       aiProviders: [],
       defaultAiProviderId: null,
+      chatSystemPrompt: '',
       aiPrompts: [],
     },
     updateSettings: async () => {},

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_SETTINGS, settingsSchema } from './schema'
+import { CHAT_SYSTEM_PROMPT_MAX_LENGTH, DEFAULT_SETTINGS, settingsSchema } from './schema'
 
 describe('settingsSchema', () => {
   it('defaults every key on an empty document (fresh install)', () => {
@@ -29,6 +29,7 @@ describe('settingsSchema', () => {
       aiProviders: [],
       defaultAiProviderId: null,
       chatModelSelection: null,
+      chatSystemPrompt: '',
       aiPrompts: [],
     })
     expect(DEFAULT_SETTINGS.editorMarkdownSyntax).toBe('hide')
@@ -55,6 +56,7 @@ describe('settingsSchema', () => {
     expect(DEFAULT_SETTINGS.aiProviders).toEqual([])
     expect(DEFAULT_SETTINGS.defaultAiProviderId).toBeNull()
     expect(DEFAULT_SETTINGS.chatModelSelection).toBeNull()
+    expect(DEFAULT_SETTINGS.chatSystemPrompt).toBe('')
     expect(DEFAULT_SETTINGS.aiPrompts).toEqual([])
   })
 
@@ -111,6 +113,17 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ calendarIds: [] }).calendarIds).toEqual([])
     expect(settingsSchema.parse({ mobileStorage: 'icloud' }).mobileStorage).toBe('icloud')
     expect(settingsSchema.parse({ mobileStorage: 'local' }).mobileStorage).toBe('local')
+    expect(
+      settingsSchema.parse({ chatSystemPrompt: 'Answer as a Socratic coach.\nBe concise.' })
+        .chatSystemPrompt,
+    ).toBe('Answer as a Socratic coach.\nBe concise.')
+    expect(settingsSchema.parse({ chatSystemPrompt: '  Be concise.  ' }).chatSystemPrompt).toBe(
+      'Be concise.',
+    )
+    const oversizedPrompt = `${'x'.repeat(CHAT_SYSTEM_PROMPT_MAX_LENGTH)}trailing text`
+    expect(settingsSchema.parse({ chatSystemPrompt: oversizedPrompt }).chatSystemPrompt).toBe(
+      oversizedPrompt.slice(0, CHAT_SYSTEM_PROMPT_MAX_LENGTH),
+    )
   })
 
   it('degrades an invalid value to its default instead of failing the load', () => {
@@ -169,6 +182,7 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ calendarIds: [7] }).calendarIds).toEqual([])
     expect(settingsSchema.parse({ mobileStorage: 'dropbox' }).mobileStorage).toBe('local')
     expect(settingsSchema.parse({ mobileStorage: 1 }).mobileStorage).toBe('local')
+    expect(settingsSchema.parse({ chatSystemPrompt: 42 }).chatSystemPrompt).toBe('')
   })
 
   it('preserves unknown keys so newer-version settings survive a round trip', () => {
@@ -199,6 +213,7 @@ describe('settingsSchema', () => {
       aiProviders: [],
       defaultAiProviderId: null,
       chatModelSelection: null,
+      chatSystemPrompt: '',
       aiPrompts: [],
       futureKey: true,
     })

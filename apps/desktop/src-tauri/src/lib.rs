@@ -84,6 +84,23 @@ mod app_metadata_tests {
     }
 }
 
+#[cfg(test)]
+mod capability_tests {
+    #[test]
+    fn desktop_capability_allows_main_window_hide() {
+        let capability: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/default.json"))
+                .expect("valid default capability");
+        let permissions = capability["permissions"]
+            .as_array()
+            .expect("capability permissions");
+
+        assert!(permissions
+            .iter()
+            .any(|permission| permission.as_str() == Some("core:window:allow-hide")));
+    }
+}
+
 /// Which UI family this build serves. The frontend's root gate (Plan 19)
 /// switches between the desktop and mobile surface trees on this answer.
 #[tauri::command]
@@ -324,8 +341,8 @@ pub fn run() {
                 windows::surface_main_window(app);
             }
             // Clicking the Dock icon is macOS's recovery path when an app has
-            // no visible windows. Surface a hidden/minimized main window, or
-            // recreate it if the user previously closed it with ⌘W.
+            // no visible windows. Surface the hidden/minimized main window,
+            // or recreate it after an unexpected destruction.
             #[cfg(target_os = "macos")]
             tauri::RunEvent::Reopen {
                 has_visible_windows,

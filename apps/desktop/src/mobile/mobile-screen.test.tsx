@@ -144,6 +144,7 @@ vi.mock('@/providers/settings-provider', () => ({
       weekStartDay: 'monday',
       aiProviders: [],
       defaultAiProviderId: null,
+      chatSystemPrompt: '',
       aiPrompts: [],
     },
     updateSettings: async () => {},

@@ -1,4 +1,5 @@
 import type { CloudGraphContext, CloudSafe } from '../checkers'
+import { normalizeChatSystemPrompt } from '../../settings/schema'
 
 /**
  * The grounded chat system prompt (Plan 10). Reflect's chat is deliberately
@@ -15,6 +16,8 @@ export interface SystemPromptInput {
    * semantic matching.
    */
   semanticSearchEnabled: boolean
+  /** User-authored instructions appended after Reflect's built-in rules. */
+  customSystemPrompt: string
   /**
    * Graph-level grounding block ({@link CloudGraphContext}), or `null` when
    * it could not be loaded — the prompt then simply omits the overview.
@@ -27,7 +30,9 @@ export function chatSystemPrompt({
   today,
   context,
   semanticSearchEnabled,
+  customSystemPrompt,
 }: SystemPromptInput): string {
+  const customInstructions = normalizeChatSystemPrompt(customSystemPrompt)
   return [
     'You are Reflect’s assistant, embedded in the user’s personal note graph.',
     `Today’s date is ${today}. Daily notes are markdown files named daily/YYYY-MM-DD.md; other notes live under notes/.`,
@@ -44,6 +49,13 @@ export function chatSystemPrompt({
     '- Private notes are excluded from search and cannot be read. If a tool reports a note is private, tell the user that — never speculate about its contents.',
     '',
     'Style: answer in concise markdown. Prefer short paragraphs and lists over headings.',
+    ...(customInstructions === ''
+      ? []
+      : [
+          '',
+          'User-configured system prompt (follow this unless it conflicts with the grounding and privacy rules above):',
+          customInstructions,
+        ]),
   ].join('\n')
 }
 

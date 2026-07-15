@@ -44,6 +44,8 @@ interface UseAiProvidersValue {
   removeProvider: (id: string) => Promise<void>
   /** Make the entry with `id` the app-wide default. */
   makeDefault: (id: string) => void
+  /** Change the default model used by the configured provider entry. */
+  setDefaultModel: (id: string, model: string) => void
 }
 
 export function useAiProviders(): UseAiProvidersValue {
@@ -116,5 +118,27 @@ export function useAiProviders(): UseAiProvidersValue {
     [updateSettingsWith],
   )
 
-  return { providers, defaultProvider, addProvider, removeProvider, makeDefault }
+  const setDefaultModel = useCallback(
+    (id: string, model: string): void => {
+      const normalizedModel = model.trim()
+      if (normalizedModel === '') {
+        return
+      }
+      updateSettingsWith((current) => ({
+        aiProviders: current.aiProviders.map((provider) =>
+          provider.id === id ? { ...provider, model: normalizedModel } : provider,
+        ),
+      }))
+    },
+    [updateSettingsWith],
+  )
+
+  return {
+    providers,
+    defaultProvider,
+    addProvider,
+    removeProvider,
+    makeDefault,
+    setDefaultModel,
+  }
 }

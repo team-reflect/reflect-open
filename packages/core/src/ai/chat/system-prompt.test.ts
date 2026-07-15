@@ -24,6 +24,7 @@ describe('chatSystemPrompt', () => {
       today: '2026-06-12',
       context: null,
       semanticSearchEnabled: true,
+      customSystemPrompt: '',
     })
     expect(prompt).toContain('Today’s date is 2026-06-12.')
     expect(prompt).toContain('Grounding rules:')
@@ -35,6 +36,7 @@ describe('chatSystemPrompt', () => {
       today: '2026-06-12',
       context: null,
       semanticSearchEnabled: true,
+      customSystemPrompt: '',
     })
     expect(prompt).toContain('search_notes matches on both keywords and meaning')
     expect(prompt).toContain('raise its “limit” (up to 20) in one call')
@@ -47,6 +49,7 @@ describe('chatSystemPrompt', () => {
       today: '2026-06-12',
       context: null,
       semanticSearchEnabled: true,
+      customSystemPrompt: '',
     })
     expect(prompt).toContain('pass asset paths to read_assets')
     expect(prompt).toContain('may mention your query only inside an attachment')
@@ -57,6 +60,7 @@ describe('chatSystemPrompt', () => {
       today: '2026-06-12',
       context: null,
       semanticSearchEnabled: false,
+      customSystemPrompt: '',
     })
     expect(prompt).toContain('search_notes uses lexical full-text search')
     expect(prompt).toContain('try one broader lexical query')
@@ -68,6 +72,7 @@ describe('chatSystemPrompt', () => {
       today: '2026-06-12',
       context: context(),
       semanticSearchEnabled: true,
+      customSystemPrompt: '',
     })
     expect(prompt).toContain('Graph overview (private notes are excluded from every figure):')
     expect(prompt).toContain('“atlas-graph” — 12 notes and 4 daily notes')
@@ -82,6 +87,7 @@ describe('chatSystemPrompt', () => {
       today: '2026-06-12',
       context: context({ tagsTruncated: true }),
       semanticSearchEnabled: true,
+      customSystemPrompt: '',
     })
     expect(prompt).toContain('Most-used tags')
     expect(prompt).toContain('More tags exist beyond these.')
@@ -93,6 +99,7 @@ describe('chatSystemPrompt', () => {
       today: '2026-06-12',
       context: context({ tags: [] }),
       semanticSearchEnabled: true,
+      customSystemPrompt: '',
     })
     expect(prompt).toContain('No tags are in use — never pass a tag filter.')
   })
@@ -102,8 +109,35 @@ describe('chatSystemPrompt', () => {
       today: '2026-06-12',
       context: context({ dailyNoteCount: 0, earliestDailyDate: null, latestDailyDate: null }),
       semanticSearchEnabled: true,
+      customSystemPrompt: '',
     })
     expect(prompt).toContain('0 daily notes')
     expect(prompt).not.toContain('Daily notes span')
+  })
+
+  it('appends nonblank user instructions without removing Reflect’s built-in rules', () => {
+    const prompt = chatSystemPrompt({
+      today: '2026-06-12',
+      context: null,
+      semanticSearchEnabled: true,
+      customSystemPrompt: '\n  Challenge my assumptions.\nAnswer with a short recommendation.  \n',
+    })
+
+    expect(prompt).toContain('Grounding rules:')
+    expect(prompt).toContain('Private notes are excluded from search')
+    expect(prompt).toContain('User-configured system prompt')
+    expect(prompt).toContain('Challenge my assumptions.\nAnswer with a short recommendation.')
+    expect(prompt).not.toContain('\n  Challenge my assumptions.')
+  })
+
+  it('omits the user-configured block for a whitespace-only prompt', () => {
+    const prompt = chatSystemPrompt({
+      today: '2026-06-12',
+      context: null,
+      semanticSearchEnabled: true,
+      customSystemPrompt: ' \n ',
+    })
+
+    expect(prompt).not.toContain('User-configured system prompt')
   })
 })

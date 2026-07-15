@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.7.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.2...v0.7.0-beta.3) (2026-07-15)
+
+
+### Bug Fixes
+
+* let the Mac close button hide the app ([#811](https://github.com/team-reflect/reflect-open/issues/811)) ([df0e6fa](https://github.com/team-reflect/reflect-open/commit/df0e6fa7a7fbffd491f6386b439952589f6b8ef0))
+
+## [0.7.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.6.1-beta.2...v0.7.0-beta.2) (2026-07-15)
+
+
+### Features
+
+* configure AI chat system prompts ([#775](https://github.com/team-reflect/reflect-open/issues/775)) ([091519d](https://github.com/team-reflect/reflect-open/commit/091519d926148afe996997934f459b4e8251daf7))
+
+
+### Bug Fixes
+
+* allow changing AI provider default models ([#810](https://github.com/team-reflect/reflect-open/issues/810)) ([554bdea](https://github.com/team-reflect/reflect-open/commit/554bdeade18031744af8207870d079c895c2438a))
+* keep app running when closing Mac window ([#808](https://github.com/team-reflect/reflect-open/issues/808)) ([e98f4d3](https://github.com/team-reflect/reflect-open/commit/e98f4d36dae621e182cf92f25b443e18bbfea321))
+
+## [0.6.1-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.6.1-beta.1...v0.6.1-beta.2) (2026-07-14)
+
+
+### Bug Fixes
+
+* update meowdown to ^0.50.0 ([#798](https://github.com/team-reflect/reflect-open/issues/798)) ([559de5c](https://github.com/team-reflect/reflect-open/commit/559de5cf98800228c8e149cc78d252546cd345fb))
+
+## [0.6.1-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.6.1-beta...v0.6.1-beta.1) (2026-07-14)
+
+
+### Bug Fixes
+
+* update meowdown to ^0.49.0 ([#796](https://github.com/team-reflect/reflect-open/issues/796)) ([2d1f91a](https://github.com/team-reflect/reflect-open/commit/2d1f91ad218e10fff5c7dd26a0911e8f34f5a655))
+
+## [0.6.1-beta](https://github.com/team-reflect/reflect-open/compare/v0.6.0...v0.6.1-beta) (2026-07-14)
+
+
+### Bug Fixes
+
+* capture iOS audio memos from Bluetooth headsets ([#789](https://github.com/team-reflect/reflect-open/issues/789)) ([8a4e2ea](https://github.com/team-reflect/reflect-open/commit/8a4e2eaa6f04283c3a1669893b45e1d5655f64a2))
+
 ## [0.6.0-beta.17](https://github.com/team-reflect/reflect-open/compare/v0.6.0-beta.16...v0.6.0-beta.17) (2026-07-13)
 
 

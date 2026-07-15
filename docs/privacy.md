@@ -16,10 +16,12 @@ disk at call time), and it is covered by tests.
 
 - **Where:** directly to the provider whose API key *you* added — OpenAI, Anthropic,
   Google, or OpenRouter. Keys are bring-your-own; Reflect proxies nothing.
-- **What:** your chat messages, plus what the model's tools read from your graph:
-  search snippets, note content, and note listings. Private notes are dropped from
-  every tool result, and reading one is refused outright — the model sees a refusal,
-  not the content.
+- **What:** your chat messages and configured system prompt, plus what the model's
+  tools read from your graph: search snippets, note content, and note listings. The
+  configured prompt is stored in the device's ordinary settings file and is sent with
+  every chat turn. Private notes are dropped from every tool result, and reading one is
+  refused outright — the model sees a refusal, not the content. That protection cannot
+  identify note content you manually paste into a message or the configured prompt.
 - **When:** only while you use chat (⌘J). No background calls.
 
 ## Audio memos (off until you add a key)
@@ -124,7 +126,7 @@ API keys and tokens live in the **OS keychain only** — never in markdown, neve
 
 | Call | Destination | Carries note content? | Off by default? |
 | --- | --- | --- | --- |
-| AI chat | Your chosen provider | Yes — never private notes | Yes (needs your key) |
+| AI chat | Your chosen provider | Yes — private-note tool reads are blocked | Yes (needs your key) |
 | Transcription | Your chosen provider | No — audio bytes only | Yes (needs your key) |
 | Embeddings | Nowhere (on-device) | — | Yes (opt-in download) |
 | Model download | Hugging Face | No | Yes (opt-in) |

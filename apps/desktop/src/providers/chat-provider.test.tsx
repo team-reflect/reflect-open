@@ -43,6 +43,7 @@ const settingsState = vi.hoisted(() => ({
   defaultId: null as string | null,
   selection: null as ChatModelSelection | null,
   semanticSearchEnabled: false,
+  chatSystemPrompt: '',
 }))
 const updateSettings = vi.hoisted(() => vi.fn<(patch: Partial<Settings>) => void>())
 // Stateful like the real provider: a chatModelSelection patch re-renders with
@@ -58,6 +59,7 @@ vi.mock('@/providers/settings-provider', async () => {
           defaultAiProviderId: settingsState.defaultId,
           chatModelSelection: selection,
           semanticSearchEnabled: settingsState.semanticSearchEnabled,
+          chatSystemPrompt: settingsState.chatSystemPrompt,
         },
         updateSettings: (patch: Partial<Settings>) => {
           updateSettings(patch)
@@ -125,6 +127,7 @@ beforeEach(() => {
   settingsState.defaultId = 'm1'
   settingsState.selection = null
   settingsState.semanticSearchEnabled = false
+  settingsState.chatSystemPrompt = ''
   core.hasBridge.mockReturnValue(true)
   core.getSecret.mockResolvedValue('sk-test')
   core.loadChatGraphContext.mockResolvedValue(null)
@@ -230,6 +233,26 @@ describe('ChatProvider persistence', () => {
 
     expect(core.streamChat).toHaveBeenCalledWith(
       expect.objectContaining({ semanticSearchEnabled: true }),
+    )
+  })
+
+  it('passes the latest configured system prompt into the next chat turn', async () => {
+    const view = renderProvider()
+    await waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+    settingsState.chatSystemPrompt = 'Answer like a rigorous research partner.'
+    view.rerender(
+      <ChatProvider graph={GRAPH}>
+        <Probe />
+      </ChatProvider>,
+    )
+    scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] }])
+
+    await act(() => session?.send('hello'))
+
+    expect(core.streamChat).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customSystemPrompt: 'Answer like a rigorous research partner.',
+      }),
     )
   })
 

@@ -2,8 +2,10 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { confirmQuit, hasBridge, subscribeQuitRequested } from '@reflect/core'
 import { flushOpenDocuments } from '@/editor/open-documents'
 import { flushBackup } from '@/lib/backup-flush'
+import { isMacosDesktop } from '@/lib/platform'
 import { flushSettings } from '@/lib/settings-flush'
 import { trackSubscriptions } from '@/lib/subscriptions'
+import { isMainWindow } from '@/lib/windows/window-role'
 
 /**
  * Quit-time persistence: the webview never dies with dirty note buffers still
@@ -12,7 +14,9 @@ import { trackSubscriptions } from '@/lib/subscriptions'
  *
  * - **Window close** (red button, ⌘W): registering a JS `onCloseRequested`
  *   listener defers the close until the handler returns, so the flush is
- *   awaited before the window is destroyed.
+ *   awaited before the window is destroyed. On macOS the main window stays
+ *   alive and is hidden after flushing, preserving normal last-window close
+ *   behavior without terminating the app; secondary windows still close.
  * - **App quit** (⌘Q): never reaches close-requested — the Rust shell defers
  *   `ExitRequested` once and emits `app:quit-requested`; we flush, then
  *   `confirmQuit()` exits for real (even if a flush failed: its error is
@@ -33,13 +37,23 @@ export function installQuitFlush(): () => void {
   // A subscription can resolve after teardown (StrictMode's probe mount) —
   // the tracker disposes it on the spot.
   const subscriptions = trackSubscriptions()
+  const currentWindow = getCurrentWindow()
 
   // Note buffers land first, then the backup commit captures them (a local
   // git commit only — pushing on the way out could stall the quit).
   void subscriptions.add(
-    getCurrentWindow().onCloseRequested(async () => {
-      await Promise.all([flushOpenDocuments(), flushSettings()])
+    currentWindow.onCloseRequested(async (event) => {
+      const shouldHide = isMacosDesktop && isMainWindow()
+      if (shouldHide) {
+        // Prevent synchronously: waiting until after the flush lets AppKit
+        // destroy the last window (and Tauri then terminates the process).
+        event.preventDefault()
+      }
+      await Promise.allSettled([flushOpenDocuments(), flushSettings()])
       await flushBackup()
+      if (shouldHide) {
+        await currentWindow.hide()
+      }
     }),
   )
 

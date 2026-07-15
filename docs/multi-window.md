@@ -134,13 +134,17 @@ silently dropped the note window's initial link.
 
 - **Window close (⌘W / red button):** each webview's `onCloseRequested`
   flushes its own note buffers and settings; the backup commit hook is only
-  registered in main. Per-window JS state makes this correct with no
-  coordination.
-- **Closing the main window closes every note window.** Note windows adopt
-  main's graph session and would degrade silently without it — edits still
-  land on disk, but nothing indexes, syncs, or propagates renames. Rather
-  than run in that half-alive state, they close with their owner (via
-  `close()`, so each child's flush runs exactly like ⌘W — no data loss).
+  registered in main. On macOS the main window prevents destruction and hides
+  after flushing, so closing the last window leaves Reflect running like a
+  native Mac app. Note windows still close normally. Per-window JS state makes
+  both paths correct with no coordination.
+- **Destroying the main window closes every note window.** This is a fallback
+  for shell-driven teardown rather than the macOS user-close path (which hides
+  main). Note windows adopt main's graph session and would degrade silently
+  without it — edits still land on disk, but nothing indexes, syncs, or
+  propagates renames. Rather than run in that half-alive state, they close with
+  their owner (via `close()`, so each child's flush runs exactly like ⌘W — no
+  data loss).
 - **Switching or deleting the graph closes note windows first.** They
   adopted the outgoing session, so `GraphProvider` awaits
   `close_note_windows` **before** anything bumps the generations: each
@@ -170,9 +174,9 @@ can contend; the writer connection carries a 5s `busy_timeout`
 ## Deliberate v1 limits
 
 - Note windows are **same-graph only**; switching graphs lives in main.
-- Note windows close with the main window (above) — "promote a note window
-  to session owner", which would let one survive as a focus surface, is the
-  eventual alternative if that usage ever matters.
+- Note windows close if the main window is destroyed (above) — "promote a note
+  window to session owner", which would let one survive as a focus surface,
+  is the eventual alternative if that usage ever matters.
 - The same note open in two windows converges through the existing
   external-change reconciliation, the same path an iCloud edit takes.
 - The native macOS application menu is installed by the main window only.

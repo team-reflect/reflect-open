@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import type { ModelMessage } from 'ai'
+import { describe, expect, it, vi } from 'vitest'
 import { convertArrayToReadableStream, MockLanguageModelV3 } from 'ai/test'
 import type {
   LanguageModelV3StreamPart,
@@ -7,7 +8,24 @@ import type {
 } from '@ai-sdk/provider'
 import type { RetrievalHit } from '../../embeddings/retrieve'
 import { cloudSafeGraphContext } from '../checkers'
-import { MAX_STEPS, streamChatTurn, type ChatStreamEvent } from './stream-chat'
+import { languageModel } from '../language-model'
+import { fitToContextWindow } from './context-window'
+import { MAX_STEPS, streamChat, streamChatTurn, type ChatStreamEvent } from './stream-chat'
+
+vi.mock('../language-model', () => ({
+  languageModel: vi.fn(),
+}))
+
+vi.mock('./context-window', async (importOriginal) => {
+  const original = await importOriginal<typeof import('./context-window')>()
+  return {
+    ...original,
+    fitToContextWindow: vi.fn(original.fitToContextWindow),
+  }
+})
+
+const languageModelMock = vi.mocked(languageModel)
+const fitToContextWindowMock = vi.mocked(fitToContextWindow)
 
 const USAGE: LanguageModelV3Usage = {
   inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined },
@@ -93,6 +111,43 @@ const PRIVATE_HIT: RetrievalHit = {
   isPrivate: true,
 }
 
+describe('streamChat', () => {
+  it('uses the custom system prompt for context accounting and the provider request', async () => {
+    const customSystemPrompt = 'sentinel-custom-system-prompt-01jxq3'
+    const messages: ModelMessage[] = [{ role: 'user', content: 'hello' }]
+    const model = new MockLanguageModelV3({ doStream: sequence([textTurn('hi')]) })
+    languageModelMock.mockReturnValue(model)
+
+    await collect(
+      streamChat({
+        config: {
+          id: 'cfg-openai',
+          provider: 'openai',
+          model: 'gpt-5.5',
+          keyHint: 'wxyz1',
+        },
+        apiKey: 'sk-live-key',
+        fetchFn: globalThis.fetch,
+        messages,
+        today: '2026-06-11',
+        semanticSearchEnabled: true,
+        customSystemPrompt,
+        context: null,
+      }),
+    )
+
+    const fitCall = fitToContextWindowMock.mock.calls.at(-1)
+    if (fitCall === undefined) {
+      expect.unreachable('expected context-window fitting')
+    }
+    expect(fitCall[0]).toBe(messages)
+    expect(fitCall[1].systemPrompt).toContain(customSystemPrompt)
+
+    expect(model.doStreamCalls).toHaveLength(1)
+    expect(JSON.stringify(model.doStreamCalls[0]?.prompt)).toContain(customSystemPrompt)
+  })
+})
+
 describe('streamChatTurn', () => {
   it('streams tool activity, text, and a terminal complete event', async () => {
     const model = new MockLanguageModelV3({
@@ -103,6 +158,7 @@ describe('streamChatTurn', () => {
         messages: [{ role: 'user', content: 'where is the launch plan?' }],
         today: '2026-06-11',
         semanticSearchEnabled: true,
+        customSystemPrompt: '',
         context: null,
         toolDeps: { retrieveFn: async () => [PUBLIC_HIT, PRIVATE_HIT], readNoteFn: async () => 'launch plan\n' },
       }),
@@ -142,6 +198,7 @@ describe('streamChatTurn', () => {
         messages: [{ role: 'user', content: 'what do my notes say?' }],
         today: '2026-06-11',
         semanticSearchEnabled: true,
+        customSystemPrompt: '',
         context: null,
         toolDeps: { retrieveFn: async () => [PUBLIC_HIT, PRIVATE_HIT], readNoteFn: async () => 'launch plan\n' },
       }),
@@ -163,6 +220,7 @@ describe('streamChatTurn', () => {
         messages: [{ role: 'user', content: 'hi' }],
         today: '2026-06-11',
         semanticSearchEnabled: true,
+        customSystemPrompt: 'Challenge my assumptions before answering.',
         context: cloudSafeGraphContext({
           graphName: 'atlas-graph',
           noteCount: 7,
@@ -179,6 +237,7 @@ describe('streamChatTurn', () => {
     expect(outbound).toContain('atlas-graph')
     expect(outbound).toContain('#book (2)')
     expect(outbound).toContain('Daily notes span 2026-06-01 to 2026-06-10.')
+    expect(outbound).toContain('Challenge my assumptions before answering.')
   })
 
   it('yields a terminal error event when the stream errors', async () => {
@@ -195,6 +254,7 @@ describe('streamChatTurn', () => {
         messages: [{ role: 'user', content: 'hi' }],
         today: '2026-06-11',
         semanticSearchEnabled: true,
+        customSystemPrompt: '',
         context: null,
       }),
     )
@@ -219,6 +279,7 @@ describe('streamChatTurn', () => {
         messages: [{ role: 'user', content: 'where is the launch plan?' }],
         today: '2026-06-11',
         semanticSearchEnabled: true,
+        customSystemPrompt: '',
         context: null,
         toolDeps: { retrieveFn: async () => [PUBLIC_HIT], readNoteFn: async () => 'launch plan\n' },
       }),
@@ -257,6 +318,7 @@ describe('streamChatTurn', () => {
         messages: [{ role: 'user', content: 'plan and budget?' }],
         today: '2026-06-11',
         semanticSearchEnabled: true,
+        customSystemPrompt: '',
         context: null,
         toolDeps: { retrieveFn: async () => [PUBLIC_HIT], readNoteFn: async () => 'launch plan\n' },
       }),
@@ -293,6 +355,7 @@ describe('streamChatTurn', () => {
         messages: [{ role: 'user', content: 'summarize everything' }],
         today: '2026-06-11',
         semanticSearchEnabled: true,
+        customSystemPrompt: '',
         context: null,
         toolDeps: { retrieveFn: async () => [PUBLIC_HIT], readNoteFn: async () => 'body\n' },
       }),

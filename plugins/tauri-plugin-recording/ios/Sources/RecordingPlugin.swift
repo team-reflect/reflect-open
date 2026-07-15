@@ -357,7 +357,7 @@ class RecordingPlugin: Plugin {
 
   private func beginRecording(maxDurationMs: Double) throws {
     let audioSession = AVAudioSession.sharedInstance()
-    try audioSession.setCategory(.record, mode: .default)
+    try audioSession.setCategory(.record, mode: .default, options: [.allowBluetoothHFP])
     try audioSession.setActive(true)
 
     let directory = try stagingDirectory()

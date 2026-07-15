@@ -14,8 +14,9 @@ export function App(): ReactElement {
   const { status, graph, error } = useGraph()
 
   // Quit-time persistence: flush dirty note buffers before the webview dies
-  // (window close, ⌘Q, reload) — unmount effects don't run on those paths.
-  // installQuitFlush returns its teardown, which the effect returns as cleanup.
+  // (secondary-window close, ⌘Q, reload) or the macOS main window hides.
+  // Unmount effects don't run on those paths. installQuitFlush returns its
+  // teardown, which the effect returns as cleanup.
   useEffect(() => {
     return installQuitFlush()
   }, [])

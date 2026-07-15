@@ -40,6 +40,7 @@ vi.mock('@/providers/settings-provider', () => ({
       editorSpellCheck: true,
       aiProviders: [],
       defaultAiProviderId: null,
+      chatSystemPrompt: '',
       aiPrompts: [],
     },
     updateSettings: async () => {},

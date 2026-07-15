@@ -347,6 +347,24 @@ export const chatModelSelectionSchema = z
 /** A chat model choice — a configured provider entry + a model within it. */
 export type ChatModelSelection = NonNullable<z.infer<typeof chatModelSelectionSchema>>
 
+/** Maximum user-configured system prompt size (~5,000 prose tokens). */
+export const CHAT_SYSTEM_PROMPT_MAX_LENGTH = 20_000
+
+/** Canonicalize a user-configured chat prompt before storing or sending it. */
+export function normalizeChatSystemPrompt(value: string): string {
+  return value.trim().slice(0, CHAT_SYSTEM_PROMPT_MAX_LENGTH)
+}
+
+/**
+ * Additional instructions the user wants included in every AI chat system
+ * prompt. Reflect's built-in grounding and privacy rules remain in place;
+ * this text is appended after them so users can configure tone, format, and
+ * other assistant behavior. Empty (the default) adds nothing. Oversized
+ * hand-edited values are truncated so the prompt cannot consume the model's
+ * context window on its own.
+ */
+export const chatSystemPromptSchema = z.string().catch('').transform(normalizeChatSystemPrompt)
+
 /**
  * The configured AI providers. Resilience is per entry, not per list: a
  * corrupt entry is dropped while the rest load, so one bad hand-edit can't
@@ -431,6 +449,7 @@ export const settingsSchema = z
     aiProviders: aiProvidersSchema,
     defaultAiProviderId: defaultAiProviderIdSchema,
     chatModelSelection: chatModelSelectionSchema,
+    chatSystemPrompt: chatSystemPromptSchema,
     aiPrompts: aiPromptsSchema,
   })
 

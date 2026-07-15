@@ -55,6 +55,15 @@ vi.mock('@/providers/sync-provider', () => ({
   useSyncContext: () => sync.value,
 }))
 
+// vaul's gestures need browser APIs jsdom does not provide. The prompt
+// editor's state and save wiring still render through this open-state shell.
+vi.mock('@/components/ui/drawer', () => ({
+  Drawer: ({ open, children }: { open?: boolean; children?: import('react').ReactNode }) =>
+    open ? <div data-testid="drawer">{children}</div> : null,
+  DrawerContent: ({ children }: { children?: import('react').ReactNode }) => <div>{children}</div>,
+  DrawerTitle: ({ children }: { children?: import('react').ReactNode }) => <h2>{children}</h2>,
+}))
+
 // The sheet itself is covered by connect-github-drawer.test.tsx; the screen
 // test only cares that Settings opens it.
 vi.mock('@/mobile/connect-github-drawer', () => ({
@@ -91,8 +100,8 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-function mount(): void {
-  render(
+function mount(): ReturnType<typeof render> {
+  return render(
     <QueryClientProvider client={queryClient}>
       <MobileSettings />
     </QueryClientProvider>,
@@ -131,6 +140,58 @@ describe('MobileSettings', () => {
 
     await user.click(screen.getByRole('switch', { name: 'Bullet after a heading' }))
     expect(updateSettings).toHaveBeenCalledWith({ editorBulletAfterHeading: false })
+  })
+
+  it('edits the AI chat system prompt', async () => {
+    const user = userEvent.setup()
+    mount()
+
+    await user.click(screen.getByRole('button', { name: /System prompt.*Default/ }))
+    const textarea = screen.getByRole('textbox', { name: 'System prompt instructions' })
+    await user.type(textarea, 'Challenge my assumptions.')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      chatSystemPrompt: 'Challenge my assumptions.',
+    })
+  })
+
+  it('tracks a prompt that hydrates while its editor is open', async () => {
+    const user = userEvent.setup()
+    const view = mount()
+    await user.click(screen.getByRole('button', { name: /System prompt.*Default/ }))
+
+    settingsState.current = {
+      ...settingsState.current,
+      chatSystemPrompt: 'Persisted instructions loaded from disk.',
+    }
+    view.rerender(
+      <QueryClientProvider client={queryClient}>
+        <MobileSettings />
+      </QueryClientProvider>,
+    )
+
+    const textarea = screen.getByRole('textbox', { name: 'System prompt instructions' })
+    expect((textarea as HTMLTextAreaElement).value).toBe('Persisted instructions loaded from disk.')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(updateSettings).toHaveBeenCalledWith({
+      chatSystemPrompt: 'Persisted instructions loaded from disk.',
+    })
+  })
+
+  it('restores the default prompt immediately from the mobile editor', async () => {
+    const user = userEvent.setup()
+    settingsState.current = {
+      ...settingsState.current,
+      chatSystemPrompt: 'Always answer in haiku.',
+    }
+    mount()
+
+    await user.click(screen.getByRole('button', { name: /System prompt.*Custom/ }))
+    await user.click(screen.getByRole('button', { name: 'Use default' }))
+
+    expect(updateSettings).toHaveBeenCalledWith({ chatSystemPrompt: '' })
+    expect(screen.queryByRole('textbox', { name: 'System prompt instructions' })).toBeNull()
   })
 
   it('shows the connected repo and the live plain-language status', async () => {

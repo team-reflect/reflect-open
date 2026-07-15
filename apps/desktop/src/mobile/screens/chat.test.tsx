@@ -42,6 +42,7 @@ vi.mock('@/providers/settings-provider', () => ({
       aiProviders: settingsState.models,
       defaultAiProviderId: settingsState.defaultId,
       chatModelSelection: null as ChatModelSelection | null,
+      chatSystemPrompt: '',
     },
     updateSettings: (_patch: Partial<Settings>) => {},
   }),

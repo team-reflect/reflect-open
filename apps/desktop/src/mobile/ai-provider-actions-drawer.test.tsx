@@ -23,11 +23,13 @@ const PROVIDER: AiProviderConfig = {
 }
 
 const onMakeDefault = vi.fn<(id: string) => void>()
+const onSetDefaultModel = vi.fn<(id: string, model: string) => void>()
 const onRemove = vi.fn<(id: string) => Promise<void>>()
 const onOpenChange = vi.fn<(open: boolean) => void>()
 
 beforeEach(() => {
   onMakeDefault.mockReset()
+  onSetDefaultModel.mockReset()
   onRemove.mockReset().mockResolvedValue(undefined)
   onOpenChange.mockReset()
 })
@@ -40,6 +42,7 @@ function renderSheet(isDefault = false) {
       open
       onOpenChange={onOpenChange}
       onMakeDefault={onMakeDefault}
+      onSetDefaultModel={onSetDefaultModel}
       onRemove={onRemove}
     />,
   )
@@ -61,6 +64,15 @@ describe('AiProviderActionsDrawer', () => {
     expect(
       (screen.getByRole('button', { name: 'Default provider' }) as HTMLButtonElement).disabled,
     ).toBe(true)
+  })
+
+  it('changes the provider default model and closes', () => {
+    renderSheet()
+
+    fireEvent.click(screen.getByRole('button', { name: 'GPT-5.4 mini' }))
+
+    expect(onSetDefaultModel).toHaveBeenCalledWith('p1', 'gpt-5.4-mini')
+    expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
   it('removes the provider and closes once the removal lands', async () => {

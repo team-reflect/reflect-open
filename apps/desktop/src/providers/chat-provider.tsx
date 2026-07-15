@@ -104,6 +104,7 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
   // stray enabled flag must still lose to the platform here.
   const semanticSearchEnabled = settings.semanticSearchEnabled && !isMobileSurface()
   const semanticSearchEnabledRef = useRef(semanticSearchEnabled)
+  const chatSystemPromptRef = useRef(settings.chatSystemPrompt)
   useEffect(() => {
     turnsRef.current = turns
     attachmentsRef.current = attachments
@@ -111,6 +112,7 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
     conversationIdRef.current = conversationId
     generationRef.current = indexGeneration
     semanticSearchEnabledRef.current = semanticSearchEnabled
+    chatSystemPromptRef.current = settings.chatSystemPrompt
   })
 
   // The in-flight send, tracked synchronously — the no-concurrent-sends
@@ -227,6 +229,7 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
 
       const turnId = crypto.randomUUID()
       const messages = [...buildHistory(turnsRef.current), userMessage(trimmed, attached)]
+      const customSystemPrompt = chatSystemPromptRef.current
       // Everything the settle-time save needs, captured now: a turn detached
       // by New chat (or a conversation switch) still persists into the
       // conversation it was sent under.
@@ -301,6 +304,7 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
           messages,
           today: todayIso(),
           semanticSearchEnabled: semanticSearchEnabledRef.current,
+          customSystemPrompt,
           context,
           signal: controller.signal,
         })
@@ -459,4 +463,3 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
   )
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>
 }
-

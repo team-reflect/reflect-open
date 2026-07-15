@@ -49,6 +49,8 @@ export interface StreamChatOptions {
   today: string
   /** Whether note search can use embeddings for meaning-based recall. */
   semanticSearchEnabled: boolean
+  /** User-authored instructions appended to Reflect's built-in system prompt. */
+  customSystemPrompt: string
   /**
    * Graph overview for the system prompt (`loadChatGraphContext`), or
    * `null` to send the prompt without it — required so call sites decide
@@ -83,12 +85,14 @@ export function streamChat(options: StreamChatOptions): AsyncGenerator<ChatStrea
       today: options.today,
       context: options.context,
       semanticSearchEnabled: options.semanticSearchEnabled,
+      customSystemPrompt: options.customSystemPrompt,
     }),
   })
   return streamChatTurn(languageModel(options.config, options.apiKey, options.fetchFn), {
     messages,
     today: options.today,
     semanticSearchEnabled: options.semanticSearchEnabled,
+    customSystemPrompt: options.customSystemPrompt,
     context: options.context,
     signal: options.signal,
   })
@@ -102,6 +106,8 @@ export interface ChatTurnOptions {
   today: string
   /** Whether note search can use embeddings for meaning-based recall. */
   semanticSearchEnabled: boolean
+  /** User-authored instructions appended to Reflect's built-in system prompt. */
+  customSystemPrompt: string
   /** Graph overview for the system prompt, or `null` to omit the block. */
   context: CloudSafe<CloudGraphContext> | null
   /** Aborts the provider call mid-stream (the UI's stop button). */
@@ -145,6 +151,7 @@ export async function* streamChatTurn(
         today: options.today,
         context: options.context,
         semanticSearchEnabled: options.semanticSearchEnabled,
+        customSystemPrompt: options.customSystemPrompt,
       }),
       messages: options.messages,
       tools,
