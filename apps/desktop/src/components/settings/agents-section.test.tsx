@@ -80,6 +80,9 @@ afterEach(() => {
 describe('AgentsSection', () => {
   it('installs the skill with the graph generation pinned', async () => {
     renderSection()
+    expect(
+      await screen.findByText(/read and manage “Personal” with the reflect CLI/),
+    ).toBeTruthy()
     fireEvent.click(await screen.findByRole('button', { name: 'Install skill' }))
 
     await waitFor(() => expect(screen.getByText('Installed')).toBeTruthy())

@@ -6,6 +6,7 @@ use crate::commands::open_index_for_resolution;
 use crate::commands::output::{print_content, print_json, NoteJson};
 use crate::error::CliError;
 use crate::graph::Graph;
+use crate::hash::hash_content;
 use crate::note_file::read_note;
 use crate::paths::date_from_daily_path;
 use crate::resolve::{resolve_note, ResolvedNote};
@@ -31,6 +32,7 @@ pub fn run(graph: &Graph, json: bool, note_arg: &str) -> Result<(), CliError> {
             absolute_path: graph.root.join(rel_path).display().to_string(),
             title: &note.meta.title,
             content: &note.content,
+            hash: hash_content(&note.content),
         });
     }
     print_content(&note.content);

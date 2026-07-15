@@ -1,7 +1,7 @@
 [package]
 name = "reflect-cli"
 version = "0.1.0"
-description = "Read/discovery CLI over a Reflect graph (Plan 14)"
+description = "Scriptable read and write access to a Reflect graph"
 edition = "2021"
 
 [[bin]]
@@ -18,7 +18,9 @@ jiff = "0.2.28"
 sha2 = { workspace = true }
 pulldown-cmark = "0.13.4"
 saphyr = "0.0.6"
+tempfile = { workspace = true }
+ulid = "1.2.1"
+unicode-normalization = "0.1.25"
 
 [dev-dependencies]
-tempfile = { workspace = true }
 reflect-index-schema = { path = "../../crates/index-schema" }

@@ -664,3 +664,235 @@ fn open_json_shape() {
     assert_eq!(daily["path"], "daily/2026-01-02.md");
     assert_eq!(daily["url"], "reflect://daily/2026-01-02");
 }
+
+// ---- full graph management ----------------------------------------------------
+
+#[test]
+fn create_append_write_move_delete_and_restore_round_trip() {
+    let fixture = graph();
+
+    let created = json(&reflect(
+        &fixture,
+        &[
+            "create",
+            "Project Atlas",
+            "--body",
+            "Initial body",
+            "--json",
+        ],
+    ));
+    assert_eq!(created["action"], "create");
+    assert_eq!(created["path"], "notes/project-atlas.md");
+    let created_hash = created["hash"].as_str().unwrap();
+    let source = fs::read_to_string(fixture.root().join("notes/project-atlas.md")).unwrap();
+    assert!(source.contains("id:"));
+    assert!(source.contains("# Project Atlas\n\nInitial body\n"));
+
+    let appended = json(&reflect(
+        &fixture,
+        &[
+            "append",
+            "notes/project-atlas.md",
+            "--text",
+            "Second block",
+            "--expect-hash",
+            created_hash,
+            "--json",
+        ],
+    ));
+    assert_eq!(appended["action"], "append");
+    let appended_hash = appended["hash"].as_str().unwrap();
+    assert_ne!(created_hash, appended_hash);
+
+    let stale = reflect(
+        &fixture,
+        &[
+            "write",
+            "notes/project-atlas.md",
+            "--content",
+            "# Wrong\n",
+            "--expect-hash",
+            created_hash,
+        ],
+    );
+    assert_eq!(stale.status.code(), Some(5));
+    assert!(stderr(&stale).contains("changed since it was read"));
+
+    let written = json(&reflect(
+        &fixture,
+        &[
+            "write",
+            "notes/project-atlas.md",
+            "--content",
+            "# Project Atlas\n\nReplaced\n",
+            "--expect-hash",
+            appended_hash,
+            "--json",
+        ],
+    ));
+    let written_hash = written["hash"].as_str().unwrap();
+
+    let moved = json(&reflect(
+        &fixture,
+        &[
+            "move",
+            "notes/project-atlas.md",
+            "notes/archive/project-atlas.md",
+            "--expect-hash",
+            written_hash,
+            "--json",
+        ],
+    ));
+    assert_eq!(moved["path"], "notes/archive/project-atlas.md");
+    assert_eq!(moved["previousPath"], "notes/project-atlas.md");
+
+    let deleted = json(&reflect(
+        &fixture,
+        &[
+            "delete",
+            "notes/archive/project-atlas.md",
+            "--expect-hash",
+            written_hash,
+            "--json",
+        ],
+    ));
+    let trash_path = deleted["trashPath"].as_str().unwrap();
+    assert!(trash_path.starts_with(".reflect/trash/"));
+    assert!(!fixture
+        .root()
+        .join("notes/archive/project-atlas.md")
+        .exists());
+
+    let restored = json(&reflect(&fixture, &["restore", trash_path, "--json"]));
+    assert_eq!(restored["action"], "restore");
+    assert_eq!(restored["path"], "notes/archive/project-atlas.md");
+    assert!(fixture
+        .root()
+        .join("notes/archive/project-atlas.md")
+        .exists());
+}
+
+#[test]
+fn create_claims_collision_suffixes_and_rejects_path_traversal() {
+    let fixture = graph();
+    let first = json(&reflect(&fixture, &["create", "Same Title", "--json"]));
+    let second = json(&reflect(&fixture, &["create", "Same Title", "--json"]));
+    assert_eq!(first["path"], "notes/same-title.md");
+    assert_eq!(second["path"], "notes/same-title-2.md");
+
+    let escaped = reflect(&fixture, &["create", "Escape", "--path", "../escape.md"]);
+    assert_eq!(escaped.status.code(), Some(1));
+    assert!(!fixture.root().parent().unwrap().join("escape.md").exists());
+}
+
+#[test]
+fn task_creates_today_and_private_notes_remain_immutable() {
+    let fixture = graph();
+    let task = json(&reflect(
+        &fixture,
+        &["task", "Buy milk", "--due", "2026-07-20", "--json"],
+    ));
+    assert_eq!(task["action"], "task");
+    assert_eq!(task["path"], daily_path(&today_date()));
+    let daily = fs::read_to_string(fixture.root().join(daily_path(&today_date()))).unwrap();
+    assert_eq!(daily, "+ [ ] Buy milk [[2026-07-20]]\n");
+
+    fixture.write_note(
+        "notes/private.md",
+        "---\nprivate: true\n---\n# Private\nsecret\n",
+    );
+    for args in [
+        vec!["append", "notes/private.md", "--text", "nope"],
+        vec!["write", "notes/private.md", "--content", "nope"],
+        vec!["delete", "notes/private.md"],
+    ] {
+        let output = reflect(&fixture, &args);
+        assert_eq!(output.status.code(), Some(3), "args: {args:?}");
+    }
+    assert!(fixture.root().join("notes/private.md").exists());
+}
+
+#[test]
+fn list_is_live_and_excludes_private_notes() {
+    let fixture = graph();
+    fixture.write_note("notes/public.md", "# Public\n");
+    fixture.write_note("notes/private.md", "---\nprivate: true\n---\n# Private\n");
+    fixture.write_note("daily/2026-07-01.md", "daily\n");
+
+    let all = json(&reflect(&fixture, &["list", "--json"]));
+    let paths = all["results"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| row["path"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    assert!(paths.contains(&"notes/public.md"));
+    assert!(paths.contains(&"daily/2026-07-01.md"));
+    assert!(!paths.contains(&"notes/private.md"));
+
+    let notes = json(&reflect(&fixture, &["list", "--kind", "note", "--json"]));
+    assert_eq!(notes["results"].as_array().unwrap().len(), 1);
+}
+
+#[test]
+fn backlinks_tasks_and_tags_drop_sources_made_private_after_indexing() {
+    let fixture = graph();
+    fixture.write_note("notes/target.md", "# Target\n");
+    let source = fixture.write_note(
+        "notes/source.md",
+        "# Source\n[[Target]] #Work\n+ [ ] Ship it\n",
+    );
+    fixture.build_index();
+    let conn = rusqlite::Connection::open(fixture.root().join(".reflect/index.sqlite")).unwrap();
+    conn.execute(
+        "INSERT INTO links(source_path, kind, target_raw, target_key, alias, pos_from, pos_to)
+         VALUES('notes/source.md', 'wiki', 'Target', 'target', NULL, 9, 19)",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO tags(note_path, tag, tag_key) VALUES('notes/source.md', 'Work', 'work')",
+        [],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO tasks(note_path, marker_offset, text, raw, checked, due_date, breadcrumbs)
+         VALUES('notes/source.md', 29, 'Ship it', '[ ] Ship it', 0, NULL, '[]')",
+        [],
+    )
+    .unwrap();
+    drop(conn);
+
+    assert_eq!(
+        json(&reflect(&fixture, &["backlinks", "Target", "--json"]))["results"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        json(&reflect(&fixture, &["tasks", "--json"]))["results"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        json(&reflect(&fixture, &["tags", "--json"]))["results"][0]["tag"],
+        "Work"
+    );
+
+    fs::write(
+        source,
+        "---\nprivate: true\n---\n# Source\n[[Target]] #Work\n+ [ ] Ship it\n",
+    )
+    .unwrap();
+    for args in [
+        vec!["backlinks", "Target", "--json"],
+        vec!["tasks", "--json"],
+        vec!["tags", "--json"],
+    ] {
+        let value = json(&reflect(&fixture, &args));
+        assert!(value["results"].as_array().unwrap().is_empty(), "{args:?}");
+    }
+}

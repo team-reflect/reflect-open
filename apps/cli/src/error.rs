@@ -4,7 +4,7 @@
 use std::fmt;
 
 /// Exit codes: `0` ok · `1` runtime error · `2` usage (clap) · `3` not found
-/// or private · `4` index missing/unusable (`search` only).
+/// or private · `4` index missing/unusable · `5` write conflict.
 #[derive(Debug)]
 pub enum CliError {
     /// IO/SQL/graph-resolution failures (exit 1).
@@ -14,8 +14,10 @@ pub enum CliError {
     /// The note exists but carries `private: true` (exit 3 — indistinguishable
     /// from not-found by exit code; the stderr message says why).
     Private(String),
-    /// `search` needs the index and it is missing or unusable (exit 4).
+    /// An index-backed command needs the index and it is missing or unusable (exit 4).
     NoIndex(String),
+    /// A create collision or optimistic-concurrency mismatch (exit 5).
+    Conflict(String),
 }
 
 impl CliError {
@@ -28,6 +30,7 @@ impl CliError {
             CliError::Runtime(_) => 1,
             CliError::NotFound(_) | CliError::Private(_) => 3,
             CliError::NoIndex(_) => 4,
+            CliError::Conflict(_) => 5,
         }
     }
 }
@@ -38,7 +41,8 @@ impl fmt::Display for CliError {
             CliError::Runtime(message)
             | CliError::NotFound(message)
             | CliError::Private(message)
-            | CliError::NoIndex(message) => write!(formatter, "{message}"),
+            | CliError::NoIndex(message)
+            | CliError::Conflict(message) => write!(formatter, "{message}"),
         }
     }
 }

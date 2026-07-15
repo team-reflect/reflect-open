@@ -16,6 +16,8 @@ pub struct NoteJson<'a> {
     pub absolute_path: String,
     pub title: &'a str,
     pub content: &'a str,
+    /// SHA-256 of the full source; pass it to mutation commands as `--expect-hash`.
+    pub hash: String,
 }
 
 /// `path` / `today --path`: a resolved location (the file may not exist yet
@@ -61,6 +63,86 @@ pub struct HitJson {
     pub snippet: String,
     /// bm25 rank (more negative = better match); `0` for title-only substring hits.
     pub score: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteSummaryJson {
+    pub path: String,
+    pub absolute_path: String,
+    pub title: String,
+    pub kind: String,
+    pub mtime: u64,
+    pub hash: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListJson {
+    pub results: Vec<NoteSummaryJson>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BacklinkJson {
+    pub source_path: String,
+    pub source_title: String,
+    pub target_raw: String,
+    pub alias: Option<String>,
+    pub pos_from: i64,
+    pub pos_to: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BacklinksJson {
+    pub target_path: String,
+    pub results: Vec<BacklinkJson>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskJson {
+    pub note_path: String,
+    pub note_title: String,
+    pub marker_offset: i64,
+    pub text: String,
+    pub raw: String,
+    pub checked: bool,
+    pub due_date: Option<String>,
+    pub breadcrumbs: Vec<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TasksJson {
+    pub results: Vec<TaskJson>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TagJson {
+    pub tag: String,
+    pub count: usize,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TagsJson {
+    pub results: Vec<TagJson>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MutationJson {
+    pub action: &'static str,
+    pub path: String,
+    pub absolute_path: String,
+    pub hash: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub previous_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trash_path: Option<String>,
 }
 
 pub fn print_json<T: Serialize>(value: &T) -> Result<(), CliError> {

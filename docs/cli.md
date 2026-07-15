@@ -1,17 +1,29 @@
 # The `reflect` CLI
 
-A small, self-contained read/discovery CLI over a Reflect graph (Plan 14). It
-reads the graph's markdown files directly and opens `.reflect/index.sqlite`
-strictly read-only — no running desktop app required. It never writes: markdown
-edits are the write path, and the index is refreshed by the desktop app.
+A small, self-contained management CLI over a Reflect graph. It reads and
+atomically mutates the graph's markdown files directly, while opening
+`.reflect/index.sqlite` strictly read-only. No running desktop app is required.
+When the app is running its watcher indexes file changes; otherwise the next
+open reconciles them.
 
 ```
 reflect today              # print today's daily note
 reflect today --path       # its absolute path (works before the file exists)
 reflect search <query>     # ranked full-text search over the index
+reflect list               # list current public notes from disk
 reflect show <note>        # print a note by date, path, title, or alias
 reflect path <note>        # resolve a note to its absolute path
 reflect open <note>        # open a note in the app (reflect:// deep link)
+reflect backlinks <note>   # list incoming wiki links
+reflect tasks              # list indexed tasks
+reflect tags               # list indexed tag facets
+reflect create <title>     # create a note
+reflect append <note> ...  # append markdown
+reflect task <text>        # append a task to today's daily note
+reflect write <note> ...   # replace complete markdown source
+reflect move <note> <path> # move a note
+reflect delete <note>      # move a note to recoverable trash
+reflect restore <trash>    # restore a deleted note
 ```
 
 Built from `apps/cli` (`cargo build -p reflect-cli`); bundled with the desktop
@@ -33,12 +45,24 @@ the CLI stays deterministic for scripts and agents.
 
 ## Privacy
 
-Notes with `private: true` frontmatter are **invisible through the CLI** — no
-content, no paths, no search hits — and there is no flag that overrides this.
-`search` filters them out; `show`/`today`/`path` print nothing to stdout,
-explain on stderr, and exit `3`. The check reads the resolved file's own
-frontmatter (never just the index row), so a stale index can't leak a
-just-flagged note.
+Notes with `private: true` frontmatter are **invisible and immutable through
+the CLI** — no content, no paths, no search hits, no mutations — and there is
+no flag that overrides this. Every read and existing-note mutation checks the
+resolved file's current frontmatter, never just an index row, so a stale index
+cannot leak or mutate a just-flagged note.
+
+## Mutation safety
+
+- Existing-note commands accept `--expect-hash`. Obtain the SHA-256 hash from
+  `reflect show <note> --json`, then pass it to `append`, `task`, `write`,
+  `move`, or `delete`. A mismatch exits `5`; re-read and reconcile the note.
+- Writes stage under `.reflect/tmp/` and atomically replace or create the
+  markdown file. New destinations never overwrite an existing file.
+- Writable paths are restricted to `.md` files under `daily/`, `notes/`, or
+  `templates/`; path traversal and symlink escapes are rejected.
+- `delete` moves the source to `.reflect/trash/` and returns the restore path.
+- The CLI never writes `.reflect/index.sqlite`; it remains a rebuildable
+  projection owned by the desktop app.
 
 ## Output contract
 
@@ -53,7 +77,8 @@ just-flagged note.
 | 1 | runtime error (no graph, IO/SQL failure) |
 | 2 | usage error |
 | 3 | note not found, or note is private |
-| 4 | search index missing or unusable (`search` only) |
+| 4 | index missing or unusable for an index-backed command |
+| 5 | write conflict (hash mismatch or destination collision) |
 
 ## Commands
 
@@ -71,7 +96,8 @@ this is how editors/scripts create them).
   "path": "daily/2026-06-11.md",
   "absolutePath": "/…/graph/daily/2026-06-11.md",
   "title": "2026-06-11",
-  "content": "…"
+  "content": "…",
+  "hash": "e3b0c442…"
 }
 // reflect today --path --json adds "exists" and omits title/content:
 { "date": "…", "path": "…", "absolutePath": "…", "exists": false }
@@ -86,11 +112,11 @@ terms in scripts written without spaces (Japanese, Chinese, Korean, Thai, …)
 match anywhere in the title, since FTS alone cannot see inside their
 uninterrupted title runs. Body matches include snippets. Terms are matched
 literally (FTS5 operators in the query have no special meaning); a title-only
-JSON result has an empty snippet and score `0`. Requires the index: if `.reflect/index.sqlite` is missing
-the exit code is `4` — open the graph in Reflect to build it; the CLI never runs
-the indexer. If files on disk diverge from the index (checked by mtime, then
-content hash), a staleness warning goes to stderr and `"stale": true` is set —
-results still return.
+JSON result has an empty snippet and score `0`. Requires the index: if
+`.reflect/index.sqlite` is missing the exit code is `4` — open the graph in
+Reflect to build it; the CLI never runs the indexer. If files on disk diverge
+from the index (checked by mtime, then content hash), a staleness warning goes
+to stderr and `"stale": true` is set — results still return.
 
 ```jsonc
 // reflect search "meeting notes" --json
@@ -102,6 +128,12 @@ results still return.
   ]
 }
 ```
+
+### `reflect list [--kind all|note|daily|template] [--limit N] [--json]`
+
+Lists current public markdown files directly from disk, newest first. It does
+not require the index. JSON rows include `path`, `absolutePath`, `title`,
+`kind`, `mtime`, and `hash`.
 
 ### `reflect show <note> [--json]`
 
@@ -120,7 +152,7 @@ alphabetically and list the others on stderr.
 
 ```jsonc
 // reflect show "Project X" --json   ("date" is null for non-dailies)
-{ "date": null, "path": "notes/project-x.md", "absolutePath": "…", "title": "Project X", "content": "…" }
+{ "date": null, "path": "notes/project-x.md", "absolutePath": "…", "title": "Project X", "content": "…", "hash": "e3b0c442…" }
 ```
 
 ### `reflect path <note> [--json]`
@@ -141,7 +173,7 @@ opener the note's `reflect://` deep link ([docs/deep-links.md](deep-links.md)).
 The URL prefers the most durable address the note has: the date form for
 dailies (which need not exist yet — navigation creates them lazily), the
 frontmatter `id` form when the note carries one (it survives renames), else
-the graph-relative path form. The CLI never writes, so it does not mint ids —
+the graph-relative path form. The `open` command does not mint missing ids;
 "Copy deep link" in the app does that.
 
 The URL is always printed to stdout; `--print` skips launching the opener —
@@ -153,13 +185,68 @@ CLI surface, before their address leaks.
 { "path": "notes/project-x.md", "url": "reflect://note/01hzy3…", "launched": false }
 ```
 
+### `reflect backlinks <note> [--limit N] [--json]`
+
+Lists indexed incoming wiki links to a public note. The target and every
+source are rechecked from disk for privacy. Requires the index.
+
+### `reflect tasks [--state open|done|all] [--limit N] [--json]`
+
+Lists the indexed task projection from public, non-template notes. JSON rows
+include note path/title, marker offset, text, raw source, checked state, due
+date, and heading breadcrumbs. Requires the index.
+
+### `reflect tags [--json]`
+
+Lists indexed tag facets and public-note occurrence counts. Requires the
+index and rechecks source privacy from disk.
+
+### `reflect create <title> [--body TEXT|--stdin] [--path PATH] [--json]`
+
+Creates a note with generated ULID frontmatter and an H1 title. The default
+path is `notes/<title-slug>.md`; collisions claim `-2`, `-3`, and so on. An
+explicit path can target `notes/`, `daily/`, or `templates/` and never replaces
+an existing file.
+
+### `reflect append <note> (--text TEXT|--stdin) [--expect-hash HASH] [--json]`
+
+Appends a markdown block with one blank line of separation. A missing daily
+date is created lazily; other missing notes fail.
+
+### `reflect task <text> [--note NOTE] [--due YYYY-MM-DD] [--expect-hash HASH] [--json]`
+
+Appends Reflect's round task syntax (`+ [ ] text`) to today's daily note by
+default. `--note` selects another public note. `--due` appends a daily wiki
+link such as `[[2026-07-20]]`.
+
+### `reflect write <note> (--content TEXT|--stdin) [--expect-hash HASH] [--json]`
+
+Atomically replaces the note's complete markdown source. Use stdin for
+multiline content and guard the write with the hash returned by `show --json`.
+
+### `reflect move <note> <destination> [--expect-hash HASH] [--json]`
+
+Moves a public note to an unoccupied valid note path. It does not rewrite the
+note's title or inbound wiki links; callers must make those semantic edits
+explicitly when needed.
+
+### `reflect delete <note> [--expect-hash HASH] [--json]`
+
+Moves a public note into graph-local recoverable trash. Human output is the
+trash path. JSON includes the original `path`, `hash`, and `trashPath`.
+
+### `reflect restore <trash-path> [--to PATH] [--json]`
+
+Restores a deleted public note to its original path, or to `--to`. Existing
+destinations are never replaced. Private trashed content remains inaccessible.
+
 ## For agents
 
-The five commands plus `--json` are the supported automation surface (e.g.
-`~/.agents` discovery workflows). The JSON field names and exit codes above
-are stable; new fields may be added, existing ones won't change meaning.
-Reading a private note is not possible through this surface by design — don't
-work around it by reading graph files directly unless the user asked for that.
+These commands plus `--json` are the supported automation surface (for
+example, `~/.agents` discovery workflows). The JSON field names and exit codes
+above are stable; new fields may be added, existing ones will not change
+meaning. Reading or mutating a private note is impossible through this surface
+by design. Do not work around it by reading graph files directly.
 
 Settings → Agents installs a per-graph agent skill
 (`~/.agents/skills/reflect-<graph-slug>/SKILL.md`) that teaches coding agents
@@ -170,14 +257,13 @@ app can refresh its own installs without ever overwriting a hand-edited one
 
 ## Development notes
 
-- The CLI deliberately duplicates a thin read-side contract from
+- The CLI deliberately duplicates a thin graph contract from
   `@reflect/core` (path conventions, fold keys, frontmatter coercions, title
-  derivation, SHA-256 hashing, FTS match syntax). Each Rust module names its
-  TS counterpart, and the contract is pinned by the shared parity corpus in
-  [`fixtures/parity/`](../fixtures/parity/README.md): TS generates
-  `expected.json` from the real core pipeline, the Rust tests assert against
-  it, so neither side can change without the other following in the same PR.
-  Don't grow the surface.
+  and slug derivation, SHA-256 hashing, FTS match syntax). Read-side modules
+  name their TS counterpart, and the contract is pinned by the shared parity
+  corpus in [`fixtures/parity/`](../fixtures/parity/README.md): TS generates
+  `expected.json` from the real core pipeline, the Rust tests assert against it,
+  so neither side can change without the other following in the same PR.
 - The sidecar is staged by `apps/desktop/scripts/build-sidecar.mjs` into
   `apps/desktop/src-tauri/binaries/` (gitignored), which Tauri's
   `bundle.externalBin` (desktop platform overlay configs) picks up. tauri-build

@@ -4,6 +4,7 @@
 use crate::commands::output::{print_content, print_json, NoteJson, PathJson};
 use crate::error::CliError;
 use crate::graph::Graph;
+use crate::hash::hash_content;
 use crate::note_file::{ensure_not_private, read_note};
 use crate::paths::{daily_path, today_date};
 
@@ -41,6 +42,7 @@ pub fn run(graph: &Graph, json: bool, path_only: bool) -> Result<(), CliError> {
             absolute_path: absolute.display().to_string(),
             title: &note.meta.title,
             content: &note.content,
+            hash: hash_content(&note.content),
         });
     }
     print_content(&note.content);

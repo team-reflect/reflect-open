@@ -18,9 +18,10 @@ import { useGraph } from '@/providers/graph-provider'
 /**
  * Settings → Agents: one-click install of a per-graph agent skill under
  * `~/.agents/skills/`. The skill is named after the graph and teaches coding
- * agents (Claude Code and friends) to read this graph through the bundled
- * `reflect` CLI. macOS desktop only, like the iCloud section — the navigator
- * hides the entry through the same gate (see use-visible-settings-sections).
+ * agents (Claude Code and friends) to read and manage this graph through the
+ * bundled `reflect` CLI. macOS desktop only, like the iCloud section — the
+ * navigator hides the entry through the same gate (see
+ * use-visible-settings-sections).
  */
 export function AgentsSection(): ReactElement | null {
   const { graph } = useGraph()
@@ -58,7 +59,7 @@ export function AgentsSection(): ReactElement | null {
     <SettingsSection id="agents">
       <SettingsField
         legend="Agent skill"
-        description={`Teach Claude Code and other agents to read “${graph.name}” with the reflect CLI.`}
+        description={`Teach Claude Code and other agents to read and manage “${graph.name}” with the reflect CLI.`}
       >
         {status !== undefined ? (
           <div className="mt-2 flex flex-col gap-2">
