@@ -20,6 +20,7 @@ import {
   createTauriBuildArgs,
   createUpdaterArchiveArgs,
   createUpdaterManifest,
+  describeError,
   macosEntitlementsPath,
   macosProvisioningProfilePath,
   macosTargetResourceConfig,
@@ -565,4 +566,19 @@ test('macOS keychain list output is parsed as paths', () => {
     "/Library/Keychains/System.keychain"
 `),
   ).toEqual(['/Users/runner/Library/Keychains/login.keychain-db', '/Library/Keychains/System.keychain'])
+})
+
+test('described errors keep the stdout and stderr captured by execFileSync', () => {
+  const error = new Error('Command failed: plutil -extract Entitlements json -o - -')
+  error.stdout = '<stdin>: Could not extract value\n'
+  error.stderr = ''
+
+  expect(describeError(error)).toBe(
+    'Command failed: plutil -extract Entitlements json -o - -\nstdout:\n<stdin>: Could not extract value',
+  )
+})
+
+test('described errors without captured output stay a plain message', () => {
+  expect(describeError(new Error('boom'))).toBe('boom')
+  expect(describeError('not an error')).toBe('not an error')
 })
