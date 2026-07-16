@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.4...v0.7.0-beta.5) (2026-07-16)
+
+
+### Features
+
+* add a smooth caret animation setting ([#840](https://github.com/team-reflect/reflect-open/issues/840)) ([bc1f201](https://github.com/team-reflect/reflect-open/commit/bc1f2012476cd82f7f2ef6d4294bcccca968af28))
+* render Mermaid code blocks ([#841](https://github.com/team-reflect/reflect-open/issues/841)) ([a7b7c8d](https://github.com/team-reflect/reflect-open/commit/a7b7c8dd3d320d87d7c48ed2e905be08aee6030c))
+
+
+### Bug Fixes
+
+* update meowdown to ^0.51.0 ([#837](https://github.com/team-reflect/reflect-open/issues/837)) ([41b6a85](https://github.com/team-reflect/reflect-open/commit/41b6a8507fcc7e03496fbeb7afd75e5eec546c74))
+
 ## [0.7.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.3...v0.7.0-beta.4) (2026-07-16)
 
 
