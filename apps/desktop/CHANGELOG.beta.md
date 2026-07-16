@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.3...v0.7.0-beta.4) (2026-07-16)
+
+
+### Bug Fixes
+
+* rename GitHub backup to GitHub sync in settings ([#830](https://github.com/team-reflect/reflect-open/issues/830)) ([69a3a29](https://github.com/team-reflect/reflect-open/commit/69a3a29817668275261b7b967b62576571b26955))
+
 ## [0.7.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.2...v0.7.0-beta.3) (2026-07-15)
 
 
