@@ -115,6 +115,25 @@ describe('blockContextAt', () => {
     )
   })
 
+  // Repro for https://github.com/team-reflect/reflect-open/issues/832
+  // A `+` bullet marker means the item is collapsed (see meowdown's
+  // md-to-pm.ts: collapsed = kind === 'bullet' && marker === '+'). The parent
+  // line is sliced from source verbatim, so its collapsed marker rides along
+  // into the snippet text. BacklinkSnippet renders that text through the same
+  // MarkdownView used for live notes, which folds anything starting with `+`
+  // — hiding the very child branch this function just went out of its way to
+  // include, even though the returned string still contains it.
+  it('does not carry the parent line collapsed marker into the context', () => {
+    const content = [
+      '+ parent line',
+      '  - mention of [[Target]]',
+      '',
+    ].join('\n')
+    expect(blockContextAt(content, posOf(content, '[[Target]]'))).toBe(
+      '- parent line\n  - mention of [[Target]]',
+    )
+  })
+
   it('keeps sibling branches that mention the same target', () => {
     const content = [
       '- parent line',

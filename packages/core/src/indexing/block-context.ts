@@ -231,6 +231,33 @@ function containsPos(node: SyntaxNode, pos: number): boolean {
 }
 
 /**
+ * Does `item`'s own marker mean meowdown renders it collapsed? A bullet
+ * item's `+` marker means collapsed (`-`/`*` mean expanded); task items keep
+ * `+` for a circle checkbox instead, so this only matches a bare `ListMark`,
+ * never a `TaskMarker` (see meowdown's md-to-pm.ts: `collapsed = !isTask &&
+ * kind === 'bullet' && marker === '+'`).
+ */
+function isCollapsedListItem(body: string, item: SyntaxNode): boolean {
+  const marker = item.firstChild
+  return marker != null && marker.name === 'ListMark' && body.slice(marker.from, marker.to) === '+'
+}
+
+/**
+ * A backlink context must never hide the structure it exists to show: normalize
+ * a collapsed `+` marker to `-` on the context's first line only — display-only,
+ * so {@link ContextLines.sourceLines} still matches the source for write-back.
+ * Without this, a folded item's own children render hidden in the panel even
+ * though this module already went out of its way to include them in the
+ * returned text. See https://github.com/team-reflect/reflect-open/issues/832.
+ */
+function withExpandedMarker(body: string, item: SyntaxNode, context: ContextLines): ContextLines {
+  if (isCollapsedListItem(body, item) && context.lines.length > 0) {
+    context.lines[0] = `-${context.lines[0]!.slice(1)}`
+  }
+  return context
+}
+
+/**
  * Context for a mention inside a list item, per old Reflect's rules: a
  * top-level item yields its whole subtree; a nested item yields the parent
  * item's own line plus the branches under it that mention the same target
@@ -245,16 +272,18 @@ function listItemContext(
   const parentItem = selfOrAncestor(item.parent, (node) => node.name === 'ListItem')
   const lead = parentItem ? leadTextblock(parentItem) : null
   if (!parentItem || !lead) {
-    return dedentedBlockAt(body, item.from, item.to)
+    return withExpandedMarker(body, item, dedentedBlockAt(body, item.from, item.to))
   }
 
   const indent = body.slice(lineStartAt(body, parentItem.from), parentItem.from)
-  const pieces: ContextLines[] = [dedentedBlockAt(body, parentItem.from, lead.to)]
+  const pieces: ContextLines[] = [
+    withExpandedMarker(body, parentItem, dedentedBlockAt(body, parentItem.from, lead.to)),
+  ]
   for (let child = lead.nextSibling; child; child = child.nextSibling) {
     const branches = isListName(child.name) ? child.getChildren('ListItem') : [child]
     for (const branch of branches) {
       if (branchMentions(body, branch, targetKeys) || containsPos(branch, bodyPos)) {
-        pieces.push(dedentedSlice(body, branch.from, branch.to, indent))
+        pieces.push(withExpandedMarker(body, branch, dedentedSlice(body, branch.from, branch.to, indent)))
       }
     }
   }
