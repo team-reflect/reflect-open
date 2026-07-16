@@ -59,8 +59,9 @@ can still build unsigned bundles with plain `pnpm tauri build`.
 3. Runs `pnpm tauri build --target <target> --bundles app`, which stages the `reflect`
    CLI sidecar for that target and signs the app bundle. The release helper then
    re-signs the bundled sidecars without the app's restricted entitlements, re-signs the
-   `.app` with its entitlement file, notarizes the finalized `.app` via `notarytool`,
-   staples the ticket, and verifies the sidecars launch.
+   `.app` with its entitlement file plus the flavor-specific identity entitlements from
+   its embedded provisioning profile, notarizes the finalized `.app` via `notarytool`,
+   staples the ticket, and verifies the signed identity entitlements and sidecars.
    Intel builds also download Microsoft's official ONNX Runtime macOS x86_64 archive
    into `src-tauri/resources/onnxruntime/` and bundle `libonnxruntime.dylib` as a
    Tauri resource before signing; that directory is generated and gitignored.
