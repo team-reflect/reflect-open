@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.5...v0.7.0-beta.6) (2026-07-16)
+
+
+### Bug Fixes
+
+* prevent macOS iCloud launch crashes ([#846](https://github.com/team-reflect/reflect-open/issues/846)) ([df42bd8](https://github.com/team-reflect/reflect-open/commit/df42bd80c3759fac526fe729a0a59f3eaae9f4bc))
+* update meowdown to ^0.52.1 ([#847](https://github.com/team-reflect/reflect-open/issues/847)) ([aee87be](https://github.com/team-reflect/reflect-open/commit/aee87bebbe91a5495949e900644958e8fad6335c))
+
 ## [0.7.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.4...v0.7.0-beta.5) (2026-07-16)
 
 
