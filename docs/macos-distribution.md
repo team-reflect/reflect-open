@@ -322,8 +322,8 @@ Stable installs are unaffected (same identifier and the shipped icon).
 `.github/workflows/release.yml` first runs the publish preflights, then builds two
 signed/notarized macOS artifacts in parallel:
 
-- Apple Silicon: `macos-latest`, `--target=aarch64-apple-darwin`
-- Intel: `macos-15-intel`, `--target=x86_64-apple-darwin`
+- Apple Silicon: `macos-26`, `--target=aarch64-apple-darwin`
+- Intel: `macos-26-intel`, `--target=x86_64-apple-darwin`
 
 Each build job runs the same DMG notarization, Gatekeeper checks, and updater artifact
 signing as a local release, then uploads its artifacts to the workflow. A final publish
