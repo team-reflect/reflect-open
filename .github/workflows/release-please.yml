@@ -1,12 +1,13 @@
 name: Release PR
 
-# Two release-please channels share the master branch: every push maintains
-# both Release PRs side by side. Merging the beta PR (version X.Y.Z-beta.N)
-# publishes a prerelease; merging the stable PR (version X.Y.Z) publishes a
-# stable release. The channel is carried entirely by the version suffix, so
-# release.yml and testflight.yml need no channel knowledge. Everything runs on
-# GITHUB_TOKEN (no PAT), and tags created with GITHUB_TOKEN cannot start
-# workflows, so publishing chains through job outputs instead of tag pushes.
+# Stable and beta Release PRs share master but use separate lifecycle labels
+# and head branches. A merged PR in one channel therefore cannot block the
+# other channel from refreshing its open PR. Beta versions use a prerelease
+# suffix (for example, X.Y.Z-beta or X.Y.Z-beta.N); release.yml derives the
+# prerelease/latest flags from that suffix.
+#
+# Everything runs on GITHUB_TOKEN. Tags created with that token do not trigger
+# tag-push workflows, so publishing is called directly through job outputs.
 
 on:
   push:
@@ -37,11 +38,11 @@ jobs:
       beta_tag: ${{ steps.beta.outputs.tag_name }}
       beta_commit: ${{ steps.beta.outputs.sha }}
     steps:
-      # The stable pass must run first. The stable Release PR also advances
-      # manifest.beta.json to the stable version (an extra-file in
-      # config.stable.json), so the push that merges it has to create the
-      # v<version> tag before the beta pass goes looking for that tag as its
-      # new anchor.
+      # Stable runs first because a stable promotion advances
+      # manifest.beta.json. Creating the stable tag before the beta pass gives
+      # beta a valid anchor for the next prerelease cycle. Separate lifecycle
+      # labels also let this pass refresh the stable PR immediately after a
+      # beta PR is merged, before beta creates its tag below.
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: stable
         with:
@@ -49,11 +50,9 @@ jobs:
           config-file: .github/release-please/config.stable.json
           manifest-file: .github/release-please/manifest.stable.json
 
-      # After a stable release this pass finds no releasable commits and
-      # leaves the superseded beta Release PR alone. That PR's diff conflicts
-      # with master (the stable PR rewrote the same files), so it cannot be
-      # merged by accident; the next releasable commit rewrites it in place,
-      # because release-please reuses the per-component head branch.
+      # After a stable promotion, beta reads the new stable tag and manifest
+      # before the superseded beta PR is closed below. After a beta release,
+      # this pass creates the beta tag and clears beta's pending label.
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: beta
         with:
