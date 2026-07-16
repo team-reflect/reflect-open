@@ -641,6 +641,9 @@ function prepareMacosSigningEntitlements({ app, flavor }) {
   const tempDir = mkdtempSync(join(tmpdir(), 'reflect-signing-entitlements-'))
   const path = join(tempDir, 'Entitlements.plist')
   try {
+    // The plist round-trips through JSON, which only preserves strings,
+    // booleans, and arrays — every entitlement today. A number or <data>
+    // entitlement would lose its exact plist type here.
     writeFileSync(path, `${JSON.stringify(mergedEntitlements, null, 2)}\n`, { mode: 0o600 })
     execFileSync('plutil', ['-convert', 'xml1', path])
   } catch (error) {

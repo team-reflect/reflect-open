@@ -232,7 +232,13 @@ mod platform {
         query.setPredicate(Some(&predicate));
 
         let queue = NSOperationQueue::new();
-        // NSMetadataQuery requires a serial operation queue for result delivery.
+        // Must stay serial: CloudDocs (BRQuery) schedules its own internal,
+        // unsynchronized gatherer work on this queue — not just notification
+        // delivery. On the default concurrent queue the initial gather and
+        // update batches classify items in parallel and corrupt BRQuery's
+        // result index sets, aborting with an uncaught NSRangeException
+        // (crash: NSMutableIndexSet addIndexesInRange in
+        // _handleReplacedItemsNotifications, ~10s after launch).
         queue.setMaxConcurrentOperationCount(1);
         unsafe { query.setOperationQueue(Some(&queue)) };
 
