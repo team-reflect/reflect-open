@@ -1,4 +1,4 @@
-import type { SyntaxNode } from '@lezer/common'
+import type { SyntaxNode } from '@meowdown/markdown'
 import { parseBody } from '../markdown/grammar'
 import { parseTaskMarker } from '../markdown/task-marker'
 

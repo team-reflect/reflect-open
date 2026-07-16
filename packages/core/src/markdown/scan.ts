@@ -1,5 +1,6 @@
 import { parseBody } from './grammar'
 import { parseInlineLink } from './link-syntax'
+import { isWikiNodeName, wikiBracketStart } from './wiki-nodes'
 
 /**
  * Inline scanning for the editor (Plan 05). The editor decorates `[[wiki
@@ -81,8 +82,9 @@ export function scanInlineSegments(text: string): InlineSegment[] {
   const found: Array<{ from: number; to: number; segment: InlineSegment }> = []
   parseBody(text).iterate({
     enter: (node) => {
-      const { name, from, to } = node
-      if (name === 'WikiLink') {
+      const { name, to } = node
+      if (isWikiNodeName(name)) {
+        const from = wikiBracketStart(node)
         const inner = text.slice(from + 2, to - 2)
         const pipe = inner.indexOf('|')
         const target = (pipe === -1 ? inner : inner.slice(0, pipe)).trim()
@@ -90,6 +92,7 @@ export function scanInlineSegments(text: string): InlineSegment[] {
         found.push({ from, to, segment: { kind: 'wikiLink', target, alias } })
         return false
       }
+      const { from } = node
       if (name === 'Link' || name === 'Image') {
         const parsed = parseInlineLink(text.slice(from, to))
         if (parsed === null) {
@@ -137,10 +140,11 @@ export function scanInlineWikiLinks(text: string): InlineWikiLink[] {
   const links: InlineWikiLink[] = []
   parseBody(text).iterate({
     enter: (node) => {
-      if (node.name !== 'WikiLink') {
+      if (!isWikiNodeName(node.name)) {
         return true
       }
-      const { from, to } = node
+      const { to } = node
+      const from = wikiBracketStart(node)
       const inner = text.slice(from + 2, to - 2)
       const pipe = inner.indexOf('|')
       const target = (pipe === -1 ? inner : inner.slice(0, pipe)).trim()

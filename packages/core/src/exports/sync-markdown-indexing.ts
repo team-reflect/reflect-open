@@ -85,8 +85,6 @@ export {
   type ConflictSegment,
   type ConflictSide,
   parseBody,
-  reflectMarkdownParser,
-  wikiLinkExtension,
   scanInlineWikiLinks,
   scanInlineImages,
   scanInlineSegments,
