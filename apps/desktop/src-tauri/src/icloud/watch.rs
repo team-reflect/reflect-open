@@ -232,6 +232,8 @@ mod platform {
         query.setPredicate(Some(&predicate));
 
         let queue = NSOperationQueue::new();
+        // NSMetadataQuery requires a serial operation queue for result delivery.
+        queue.setMaxConcurrentOperationCount(1);
         unsafe { query.setOperationQueue(Some(&queue)) };
 
         let handler_roots = roots.clone();

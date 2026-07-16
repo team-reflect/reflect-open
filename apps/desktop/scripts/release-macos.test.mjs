@@ -5,6 +5,7 @@ import { expect, test } from 'vitest'
 
 import {
   appendMacDownloadNotice,
+  assertMacosProfileIdentityEntitlements,
   canLaunchTarget,
   compareReleaseVersions,
   createBetaFeedReleaseArgs,
@@ -20,7 +21,9 @@ import {
   createUpdaterArchiveArgs,
   createUpdaterManifest,
   macosEntitlementsPath,
+  macosProvisioningProfilePath,
   macosTargetResourceConfig,
+  mergeMacosProfileIdentityEntitlements,
   newestBetaVersionFromTags,
   parseKeychainList,
   signDmgArgs,
@@ -348,6 +351,111 @@ test('macOS entitlements resolve through platform and flavor overlays', () => {
   expect(macosEntitlementsPath('stable')).toBe(join(srcTauri, 'Entitlements.plist'))
   expect(macosEntitlementsPath('beta')).toBe(join(srcTauri, 'Entitlements.plist'))
   expect(macosEntitlementsPath('dev')).toBe(join(srcTauri, 'Entitlements.dev.plist'))
+})
+
+test('macOS provisioning profiles resolve per flavor and dev remains unprovisioned', () => {
+  const srcTauri = join(process.cwd(), 'src-tauri')
+
+  expect(macosProvisioningProfilePath('stable')).toBe(join(srcTauri, 'Reflect.provisionprofile'))
+  expect(macosProvisioningProfilePath('beta')).toBe(join(srcTauri, 'Reflect-beta.provisionprofile'))
+  expect(macosProvisioningProfilePath('dev')).toBeNull()
+})
+
+test('macOS signing keeps app entitlements and adds only profile identity entitlements', () => {
+  const appEntitlements = {
+    'com.apple.developer.icloud-services': ['CloudDocuments'],
+    'com.apple.security.device.audio-input': true,
+  }
+  const profileEntitlements = {
+    'com.apple.application-identifier': '789ULN5MZB.app.reflect.desktop.beta',
+    'com.apple.developer.team-identifier': '789ULN5MZB',
+    'keychain-access-groups': ['789ULN5MZB.*'],
+  }
+
+  expect(
+    mergeMacosProfileIdentityEntitlements({
+      appEntitlements,
+      bundleIdentifier: 'app.reflect.desktop.beta',
+      profileEntitlements,
+    }),
+  ).toEqual({
+    ...appEntitlements,
+    'com.apple.application-identifier': '789ULN5MZB.app.reflect.desktop.beta',
+    'com.apple.developer.team-identifier': '789ULN5MZB',
+  })
+})
+
+test('macOS signing rejects a provisioning profile for another flavor', () => {
+  expect(() =>
+    mergeMacosProfileIdentityEntitlements({
+      appEntitlements: { 'com.apple.security.device.audio-input': true },
+      bundleIdentifier: 'app.reflect.desktop.beta',
+      profileEntitlements: {
+        'com.apple.application-identifier': '789ULN5MZB.app.reflect.desktop',
+        'com.apple.developer.team-identifier': '789ULN5MZB',
+      },
+    }),
+  ).toThrow('does not match bundle identifier "app.reflect.desktop.beta"')
+})
+
+test('macOS signing compares the full profile bundle identifier, not only its suffix', () => {
+  expect(() =>
+    mergeMacosProfileIdentityEntitlements({
+      appEntitlements: {},
+      bundleIdentifier: 'app.reflect.desktop.beta',
+      profileEntitlements: {
+        'com.apple.application-identifier': '789ULN5MZB.other.app.reflect.desktop.beta',
+        'com.apple.developer.team-identifier': '789ULN5MZB',
+      },
+    }),
+  ).toThrow('does not match bundle identifier "app.reflect.desktop.beta"')
+})
+
+test.each(['com.apple.application-identifier', 'com.apple.developer.team-identifier'])(
+  'macOS signing rejects a profile missing %s',
+  (missingEntitlement) => {
+    const profileEntitlements = {
+      'com.apple.application-identifier': '789ULN5MZB.app.reflect.desktop.beta',
+      'com.apple.developer.team-identifier': '789ULN5MZB',
+    }
+    delete profileEntitlements[missingEntitlement]
+
+    expect(() =>
+      mergeMacosProfileIdentityEntitlements({
+        appEntitlements: {},
+        bundleIdentifier: 'app.reflect.desktop.beta',
+        profileEntitlements,
+      }),
+    ).toThrow(`missing string entitlement "${missingEntitlement}"`)
+  },
+)
+
+test('macOS signing rejects a conflicting identity in the app entitlement file', () => {
+  expect(() =>
+    mergeMacosProfileIdentityEntitlements({
+      appEntitlements: { 'com.apple.developer.team-identifier': 'WRONGTEAM' },
+      bundleIdentifier: 'app.reflect.desktop',
+      profileEntitlements: {
+        'com.apple.application-identifier': '789ULN5MZB.app.reflect.desktop',
+        'com.apple.developer.team-identifier': '789ULN5MZB',
+      },
+    }),
+  ).toThrow('but the embedded provisioning profile requires "789ULN5MZB"')
+})
+
+test('macOS verification rejects a signed app that lost a profile identity entitlement', () => {
+  expect(() =>
+    assertMacosProfileIdentityEntitlements({
+      bundleIdentifier: 'app.reflect.desktop.beta',
+      profileEntitlements: {
+        'com.apple.application-identifier': '789ULN5MZB.app.reflect.desktop.beta',
+        'com.apple.developer.team-identifier': '789ULN5MZB',
+      },
+      signedEntitlements: {
+        'com.apple.application-identifier': '789ULN5MZB.app.reflect.desktop.beta',
+      },
+    }),
+  ).toThrow('signed app entitlement "com.apple.developer.team-identifier" is undefined')
 })
 
 test('sidecar launch checks cover native targets and Intel under Rosetta', () => {
