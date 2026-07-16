@@ -34,11 +34,11 @@ importers:
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.7)
       '@meowdown/core':
-        specifier: ^0.51.0
-        version: 0.51.0(@shikijs/types@4.3.1)(@types/hast@3.0.4)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)
+        specifier: ^0.52.0
+        version: 0.52.0(@shikijs/types@4.3.1)(@types/hast@3.0.4)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)
       '@meowdown/react':
-        specifier: ^0.51.0
-        version: 0.51.0(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.3.1)(@types/hast@3.0.4)(@types/react@19.2.17)(date-fns@4.4.0)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)(react-dom@19.2.7)(react@19.2.7)
+        specifier: ^0.52.0
+        version: 0.52.0(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.3.1)(@types/hast@3.0.4)(@types/react@19.2.17)(date-fns@4.4.0)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)(react-dom@19.2.7)(react@19.2.7)
       '@reflect/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -1065,11 +1065,11 @@ packages:
   '@marijn/find-cluster-break@1.0.3':
     resolution: {integrity: sha512-FY+MKLBoTsLNJF/eLWaOsXGdz6uh3Iu1axjPf6TUq92IYumcTcXWHoS747JARLkcdlJ/Waiaxc5wQfFO8jC6NA==}
 
-  '@meowdown/core@0.51.0':
-    resolution: {integrity: sha512-XdC4OdpWZNQ9GrnOpqjYYzhywcnH9kCA8FTy6Mv8JLM5lCtneI/GFO9TOorW6CzfuzDFptkkdpMYk2lzhfaRDA==}
+  '@meowdown/core@0.52.0':
+    resolution: {integrity: sha512-TW0oM/6Rv0AMvnxNQwAQZ1ETsoSOlU0b0O5qt8B+ulNHmEvKN9sEUCHF8Cs2y365KvGUebcH6gLJXSjK4RpLUg==}
 
-  '@meowdown/react@0.51.0':
-    resolution: {integrity: sha512-+X6Rn0MzzYLZaXJnspQIbbxt3uTCpK1fy10vHXPre8UCjWz1t3g/q3kcekdT7BAckrGzSLgr/+F0Ryb7b2ZSBg==}
+  '@meowdown/react@0.52.0':
+    resolution: {integrity: sha512-rNFa3VHigszu/Zr71KyxiLCpd1Zl3Ay7S+yXbrLTNDa9ptXZNw9oTepwV7srZEJ8erYYyUargSwhaMMzyTvQow==}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
@@ -3030,6 +3030,9 @@ packages:
     engines: {node: '>=6.0.0'}
     hasBin: true
 
+  beautiful-mermaid@1.1.3:
+    resolution: {integrity: sha512-TItrtrAyHp1vwFfFVYauWGrquouk/6SS21Aq3RsxindSYZODcN4xYrPZD6BiZRU+o5mKJzDPz9MUSMvELdylyg==}
+
   better-sqlite3@12.11.1:
     resolution: {integrity: sha512-dq9AtApgg5PGFtBzPFSBl3HZQjHok5gaQCM6zh2Yk0aSmDCs1CbnVI8/HgASQkNKsWFpseIO9beg5xxpYhbIfA==}
     engines: {node: 20.x || 22.x || 23.x || 24.x || 25.x || 26.x}
@@ -3489,6 +3492,9 @@ packages:
 
   electron-to-chromium@1.5.387:
     resolution: {integrity: sha512-TaxwufTFDufvPEoXdhwVrA3UdFWBeWGkYoJ1K8ldF1xe6gKfth6iRNS5lTQ5JPNOHdGQm8PT1QYKUqFLCiUefQ==}
+
+  elkjs@0.11.1:
+    resolution: {integrity: sha512-zxxR9k+rx5ktMwT/FwyLdPCrq7xN6e4VGGHH8hA01vVYKjTFik7nHOxBnAYtrgYUB1RpAiLvA1/U2YraWxyKKg==}
 
   embla-carousel-react@8.6.0:
     resolution: {integrity: sha512-0/PjqU7geVmo6F734pmPqpyHqiM99olvyecY7zdweCw+6tKEXnrE90pBiBbMMU8s5tICemzpQ3hi5EpxzGW+JA==}
@@ -7197,7 +7203,7 @@ snapshots:
 
   '@marijn/find-cluster-break@1.0.3': {}
 
-  '@meowdown/core@0.51.0(@shikijs/types@4.3.1)(@types/hast@3.0.4)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)':
+  '@meowdown/core@0.52.0(@shikijs/types@4.3.1)(@types/hast@3.0.4)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)':
     dependencies:
       '@codemirror/language': 6.12.4
       '@codemirror/language-data': 6.5.2
@@ -7235,14 +7241,15 @@ snapshots:
       - y-prosemirror
       - yjs
 
-  '@meowdown/react@0.51.0(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.3.1)(@types/hast@3.0.4)(@types/react@19.2.17)(date-fns@4.4.0)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)(react-dom@19.2.7)(react@19.2.7)':
+  '@meowdown/react@0.52.0(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.3.1)(@types/hast@3.0.4)(@types/react@19.2.17)(date-fns@4.4.0)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)(react-dom@19.2.7)(react@19.2.7)':
     dependencies:
       '@base-ui/react': 1.6.0(@types/react@19.2.17)(date-fns@4.4.0)(react-dom@19.2.7)(react@19.2.7)
-      '@meowdown/core': 0.51.0(@shikijs/types@4.3.1)(@types/hast@3.0.4)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)
+      '@meowdown/core': 0.52.0(@shikijs/types@4.3.1)(@types/hast@3.0.4)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)
       '@ocavue/utils': 1.7.0
       '@prosekit/core': 0.13.0-beta.6(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)
       '@prosekit/pm': 0.1.19-beta.3
       '@prosekit/react': 0.8.0-beta.21(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.3.1)(@types/hast@3.0.4)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)(react-dom@19.2.7)(react@19.2.7)
+      beautiful-mermaid: 1.1.3
       clsx: 2.1.1
       github-slugger: 2.0.0
       lucide-react: 1.24.0(react@19.2.7)
@@ -9161,6 +9168,11 @@ snapshots:
 
   baseline-browser-mapping@2.10.42: {}
 
+  beautiful-mermaid@1.1.3:
+    dependencies:
+      elkjs: 0.11.1
+      entities: 7.0.1
+
   better-sqlite3@12.11.1:
     dependencies:
       bindings: 1.5.0
@@ -9596,6 +9608,8 @@ snapshots:
   ee-first@1.1.1: {}
 
   electron-to-chromium@1.5.387: {}
+
+  elkjs@0.11.1: {}
 
   embla-carousel-react@8.6.0(react@19.2.7):
     dependencies:
