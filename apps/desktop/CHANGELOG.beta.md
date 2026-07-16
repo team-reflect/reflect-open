@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.7...v0.7.0-beta.8) (2026-07-16)
+
+
+### Bug Fixes
+
+* preserve note aliases in links and backlinks ([#861](https://github.com/team-reflect/reflect-open/issues/861)) ([cb1a3dc](https://github.com/team-reflect/reflect-open/commit/cb1a3dc48945c486042b28555579b11ded5a2d4f))
+
 ## [0.7.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.6...v0.7.0-beta.7) (2026-07-16)
 
 
