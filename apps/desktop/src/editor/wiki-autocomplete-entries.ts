@@ -68,9 +68,14 @@ export function buildAutocompleteEntries<Suggestion extends WikiSuggestion>(
 
   // Exact folding matches ordinary link resolution. The fallback set also
   // prevents a contact action from creating through the same leading-emoji
-  // collision this menu protects for bare Create rows.
+  // collision this menu protects for bare Create rows. It starts from the
+  // claimed keys, not only the surviving rows: a claim filtered out as
+  // ambiguous or unsafe still collides with the writable resolver's fallback
+  // matching, so it must keep suppressing Create and contact rows.
   const resolvable = new Set<string>()
-  const fallbackResolvable = new Set<string>()
+  const fallbackResolvable = new Set(
+    [...claimedTargetKeys].map(foldFallbackTitleKey),
+  )
   for (const suggestion of suggestions) {
     resolvable.add(foldKey(suggestion.target))
     fallbackResolvable.add(foldFallbackTitleKey(suggestion.target))

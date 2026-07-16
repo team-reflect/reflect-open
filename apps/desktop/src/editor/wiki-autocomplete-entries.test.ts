@@ -147,6 +147,18 @@ describe('buildAutocompleteEntries', () => {
     ).toEqual([])
   })
 
+  it('suppresses create and contact rows for a filtered fallback collision', () => {
+    // Two notes titled `🧠 Ideas` are dropped by address verification, so the
+    // fallback collision arrives only through the claimed keys. Creating a
+    // bare `Ideas` would be refused by the writable resolver's fallback guard.
+    const entries = buildAutocompleteEntries('Ideas', [], {
+      offerCreate: true,
+      contacts: [contact({ fullName: 'Ideas' })],
+      claimedTargetKeys: ['🧠 ideas'],
+    })
+    expect(entries).toEqual([])
+  })
+
   it('drops a claimed contact found by a partial query', () => {
     const entries = buildAutocompleteEntries('Road', [], {
       offerCreate: true,

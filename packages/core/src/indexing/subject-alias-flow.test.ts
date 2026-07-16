@@ -282,6 +282,12 @@ describe('v1 subject alias flow', () => {
       // neither title-only candidate is selectable irrespective of recency.
       project('notes/a-roadmap.md', '# Roadmap\n', 20),
       project('notes/z-roadmap.md', '# Roadmap\n', 100),
+      // A leading-emoji duplicate collides with a bare query only through
+      // fallback folding; the filtered claim must still reach the editor.
+      // The paths are the slug family `slugForTitle` really produces, the
+      // same family the writable resolver's disk guard scans.
+      project('notes/ideas.md', '# 🧠 Ideas\n', 22),
+      project('notes/ideas-2.md', '# 🧠 Ideas\n', 102),
       // Date-shaped duplicate titles are ambiguous for the writable click
       // path, exactly like other duplicates, so neither twin is selectable.
       project('notes/a-date-twin.md', '# 2026-07-12\n', 25),
@@ -364,6 +370,15 @@ describe('v1 subject alias flow', () => {
         'notes/z-roadmap.md',
         'notes/a-roadmap.md',
       ])
+
+      // Both `🧠 Ideas` twins are filtered, but their claimed key still
+      // reaches the editor so its fallback folding can suppress a Create row
+      // that the writable resolver would refuse as ambiguous.
+      await expect(suggestWikiLinkTargets('Ideas')).resolves.toEqual({
+        suggestions: [],
+        claimedTargetKeys: ['🧠 ideas'],
+        queryReadsAsDate: false,
+      })
 
       // A duplicate date-shaped title would open an ambiguity error, not the
       // suggested note, so it is omitted like any other duplicate title.
