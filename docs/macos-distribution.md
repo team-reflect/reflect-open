@@ -323,8 +323,7 @@ Stable installs are unaffected (same identifier and the shipped icon).
 signed/notarized macOS artifacts in parallel:
 
 - Apple Silicon: `macos-26`, `--target=aarch64-apple-darwin`
-- Intel: `macos-26`, `--target=x86_64-apple-darwin` (cross-compiled; the sidecar
-  launch checks run under Rosetta 2, preinstalled on GitHub's arm64 images)
+- Intel: `macos-26`, `--target=x86_64-apple-darwin`
 
 Each build job runs the same DMG notarization, Gatekeeper checks, and updater artifact
 signing as a local release, then uploads its artifacts to the workflow. A final publish

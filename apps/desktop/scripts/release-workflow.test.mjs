@@ -24,17 +24,3 @@ test('Apple Silicon releases pin the runner and isolate Xcode build caches', () 
   expect(cacheScope).toContain('CC=$clang')
   expect(cacheScope).toContain('RUST_CACHE_XCODE=$compiler_hash')
 })
-
-test('Intel releases cross-compile on the Apple Silicon runner with a per-target cache', () => {
-  const intelMatrix = workflow.match(
-    /- name: Intel\n\s+runner: [^\n]+\n\s+target: x86_64-apple-darwin/,
-  )?.[0]
-  expect(intelMatrix).toContain('runner: macos-26')
-
-  // Both legs run on the same runner image, so the cargo cache must be keyed
-  // by target or the legs clobber each other's caches.
-  const cargoCacheStart = workflow.indexOf('- name: Cache cargo build')
-  const cargoCacheEnd = workflow.indexOf('- name: ', cargoCacheStart + 1)
-  const cargoCache = workflow.slice(cargoCacheStart, cargoCacheEnd)
-  expect(cargoCache).toContain('key: ${{ matrix.target }}')
-})

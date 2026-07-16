@@ -88,9 +88,6 @@ jobs:
           - name: Apple Silicon
             runner: macos-26
             target: aarch64-apple-darwin
-          # Cross-compiled on the Apple Silicon runner; the sidecar launch
-          # checks run the x86_64 binaries under Rosetta 2, which GitHub's
-          # arm64 macOS images preinstall.
           - name: Intel
             runner: macos-26
             target: x86_64-apple-darwin
@@ -165,7 +162,7 @@ jobs:
           # Both matrix legs run on the same runner image, so rust-cache's
           # default key (OS, rustc, Cargo.lock, job id) would collide across
           # legs and they would clobber each other's caches.
-          key: ${{ matrix.target }}
+          key: ${{ matrix.runner }}-${{ matrix.target }}
           # A failed notarization still compiled everything; keep the cache.
           cache-on-failure: true
 
