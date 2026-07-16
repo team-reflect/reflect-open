@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { resolved, unresolved } from '../markdown'
 import { nextAliases, rewriteLinksForTitleChange, type RenameIo } from './rename'
 
-function fakeIo(files: Record<string, string>, options?: { resolveTo?: string }) {
+function fakeIo(
+  files: Record<string, string>,
+  options?: { resolveTo?: string; resolveByTarget?: Record<string, string> },
+) {
   const writes: Record<string, string> = {}
   const io: RenameIo = {
     sources: async () => Object.keys(files).sort(),
@@ -16,8 +19,13 @@ function fakeIo(files: Record<string, string>, options?: { resolveTo?: string })
     write: async (path, content) => {
       writes[path] = content
     },
-    resolve: async () =>
-      options?.resolveTo !== undefined ? resolved(options.resolveTo) : unresolved('x'),
+    resolve: async (target) => {
+      const mapped = options?.resolveByTarget?.[target]
+      if (mapped !== undefined) {
+        return resolved(mapped)
+      }
+      return options?.resolveTo !== undefined ? resolved(options.resolveTo) : unresolved('x')
+    },
   }
   return { io, writes }
 }
@@ -34,7 +42,12 @@ describe('rewriteLinksForTitleChange', () => {
       to: 'New Title',
       io,
     })
-    expect(result).toEqual({ rewritten: ['notes/a.md', 'notes/b.md'], failed: [], collision: false })
+    expect(result).toEqual({
+      rewritten: ['notes/a.md', 'notes/b.md'],
+      failed: [],
+      collision: false,
+      destinationBlocked: false,
+    })
     expect(writes['notes/a.md']).toBe('See [[New Title]] for context.\n')
     expect(writes['notes/b.md']).toBe('Alias form: [[New Title|the doc]].\n')
   })
@@ -187,6 +200,7 @@ describe('rewriteLinksForTitleChange — rich titles', () => {
       rewritten: ['notes/source.md'],
       failed: [],
       collision: false,
+      destinationBlocked: false,
     })
     expect(writes['notes/source.md']).toBe('See [[Meeting with Grace]] tomorrow.')
   })
@@ -212,5 +226,84 @@ describe('rewriteLinksForTitleChange — rich titles', () => {
         previousAutoAlias: null,
       }),
     ).toEqual(['Meeting with [[Ada Lovelace|Ada]]'])
+  })
+})
+
+describe('rewriteLinksForTitleChange — destination guard', () => {
+  it('does not rewrite when the new derived target already belongs to another note', async () => {
+    const { io, writes } = fakeIo(
+      { 'notes/source.md': 'See [[Old Meeting]].\n' },
+      { resolveByTarget: { 'Meeting with Ada': 'notes/plain.md' } },
+    )
+    const result = await rewriteLinksForTitleChange({
+      path: 'notes/a.md',
+      from: 'Old Meeting',
+      to: 'Meeting with [[Ada Lovelace|Ada]]',
+      io,
+    })
+    expect(result).toEqual({
+      rewritten: [],
+      failed: [],
+      collision: false,
+      destinationBlocked: true,
+    })
+    expect(writes).toEqual({})
+  })
+
+  it('does not rewrite into an unserializable derived target', async () => {
+    const { io, writes } = fakeIo({ 'notes/source.md': 'See [[Old Meeting]].\n' })
+    const result = await rewriteLinksForTitleChange({
+      path: 'notes/a.md',
+      from: 'Old Meeting',
+      to: 'C:\\notes [[Ada Lovelace|Ada]]',
+      io,
+    })
+    expect(result).toEqual({
+      rewritten: [],
+      failed: [],
+      collision: false,
+      destinationBlocked: true,
+    })
+    expect(writes).toEqual({})
+  })
+
+  it('a destination already resolving to the renamed note itself is not blocked', async () => {
+    const { io, writes } = fakeIo(
+      { 'notes/source.md': 'See [[Old Meeting]].\n' },
+      { resolveByTarget: { 'Meeting with Ada': 'notes/a.md' } },
+    )
+    const result = await rewriteLinksForTitleChange({
+      path: 'notes/a.md',
+      from: 'Old Meeting',
+      to: 'Meeting with [[Ada Lovelace|Ada]]',
+      io,
+    })
+    expect(result.destinationBlocked).toBe(false)
+    expect(writes['notes/source.md']).toBe('See [[Meeting with Ada]].\n')
+  })
+
+  it('a source collision wins over a destination block (no alias may be claimed)', async () => {
+    const { io, writes } = fakeIo(
+      { 'notes/source.md': 'See [[Old Meeting]].\n' },
+      {
+        resolveByTarget: {
+          'Old Meeting': 'notes/other-owner.md',
+          'Meeting with Ada': 'notes/plain.md',
+        },
+      },
+    )
+    const result = await rewriteLinksForTitleChange({
+      path: 'notes/a.md',
+      from: 'Old Meeting',
+      to: 'Meeting with [[Ada Lovelace|Ada]]',
+      io,
+    })
+    expect(result).toEqual({
+      rewritten: [],
+      failed: [],
+      collision: true,
+      destinationBlocked: false,
+    })
+    expect(writes).toEqual({})
   })
 })

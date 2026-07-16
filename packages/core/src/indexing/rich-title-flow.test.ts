@@ -7,7 +7,8 @@ import {
   openMigratedIndex,
   project,
 } from './flow-test-harness'
-import { resolveWikiTarget, suggestWikiLinkTargets, suggestWikiTargets } from './queries'
+import { getLinkSources, resolveWikiTarget, suggestWikiLinkTargets, suggestWikiTargets } from './queries'
+import { rewriteLinksForTitleChange } from './rename'
 
 /**
  * End-to-end flow for rich titles (titles that embed `[[wiki links]]`): the
@@ -79,6 +80,43 @@ describe('rich title flow', () => {
         'notes/meeting-with-ada.md',
         'notes/plain.md',
       ])
+    } finally {
+      setBridge(null)
+      database.close()
+    }
+  })
+
+  it('rename refuses a derived destination another note already owns', async () => {
+    const database = openMigratedIndex()
+    applyProjection(database, project('notes/a.md', '# Old Meeting\n', 10))
+    applyProjection(database, project('notes/plain.md', '# Meeting with Ada\n', 20))
+    applyProjection(database, project('notes/source.md', 'See [[Old Meeting]].\n', 30))
+    connectIndex(database)
+    try {
+      // Renaming A to a rich title whose derived target is plain.md's title:
+      // rewriting `[[Old Meeting]]` to `[[Meeting with Ada]]` would silently
+      // repoint the link at plain.md (title tier wins), so nothing is written.
+      const writes: string[] = []
+      const result = await rewriteLinksForTitleChange({
+        path: 'notes/a.md',
+        from: 'Old Meeting',
+        to: 'Meeting with [[Ada Lovelace|Ada]]',
+        io: {
+          sources: getLinkSources,
+          read: async () => 'See [[Old Meeting]].\n',
+          write: async (path) => {
+            writes.push(path)
+          },
+          resolve: resolveWikiTarget,
+        },
+      })
+      expect(result).toEqual({
+        rewritten: [],
+        failed: [],
+        collision: false,
+        destinationBlocked: true,
+      })
+      expect(writes).toEqual([])
     } finally {
       setBridge(null)
       database.close()
