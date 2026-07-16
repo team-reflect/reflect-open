@@ -54,6 +54,10 @@ const INTEL_ONNX_RUNTIME_RESOURCE_SOURCE = `resources/onnxruntime/${ONNX_RUNTIME
 const RELEASE_NOTES_FILENAME = 'release-notes.md'
 const MAC_DOWNLOAD_NOTICE_HEADING = '## Which Mac download should I choose?'
 const MACOS_SIDECARS = ['reflect', 'reflect-capture-host']
+const MACOS_PROFILE_IDENTITY_ENTITLEMENTS = [
+  'com.apple.application-identifier',
+  'com.apple.developer.team-identifier',
+]
 const RELEASE_VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)(?:-beta(?:\.(\d+))?)?$/
 const NOTARIZATION_ENV_VARS = [
   'APPLE_ID',
@@ -492,6 +496,81 @@ function codesignArgs({ entitlements, identity, keychain, path }) {
   return args
 }
 
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function macosProfileIdentityEntitlements({ bundleIdentifier, profileEntitlements }) {
+  if (typeof bundleIdentifier !== 'string' || bundleIdentifier.length === 0) {
+    throw new Error('macOS flavor has no bundle identifier')
+  }
+  if (!isRecord(profileEntitlements)) {
+    throw new Error('embedded provisioning profile has no entitlements dictionary')
+  }
+
+  const identityEntitlements = {}
+  for (const key of MACOS_PROFILE_IDENTITY_ENTITLEMENTS) {
+    const value = profileEntitlements[key]
+    if (typeof value !== 'string' || value.length === 0) {
+      throw new Error(`embedded provisioning profile is missing string entitlement "${key}"`)
+    }
+    identityEntitlements[key] = value
+  }
+
+  const applicationIdentifier = identityEntitlements['com.apple.application-identifier']
+  const prefixSeparator = applicationIdentifier.indexOf('.')
+  const profileBundleIdentifier = applicationIdentifier.slice(prefixSeparator + 1)
+  if (prefixSeparator <= 0 || profileBundleIdentifier !== bundleIdentifier) {
+    throw new Error(
+      `embedded provisioning profile application identifier "${applicationIdentifier}" ` +
+        `does not match bundle identifier "${bundleIdentifier}"`,
+    )
+  }
+  return identityEntitlements
+}
+
+/**
+ * Add the identity entitlements supplied by a flavor's provisioning profile
+ * without importing unrelated wildcard grants from that profile.
+ */
+export function mergeMacosProfileIdentityEntitlements({
+  appEntitlements,
+  bundleIdentifier,
+  profileEntitlements,
+}) {
+  if (!isRecord(appEntitlements)) throw new Error('configured macOS entitlements are not a dictionary')
+  const identityEntitlements = macosProfileIdentityEntitlements({ bundleIdentifier, profileEntitlements })
+
+  for (const [key, value] of Object.entries(identityEntitlements)) {
+    if (Object.hasOwn(appEntitlements, key) && appEntitlements[key] !== value) {
+      throw new Error(
+        `configured macOS entitlement "${key}" is "${appEntitlements[key]}", ` +
+          `but the embedded provisioning profile requires "${value}"`,
+      )
+    }
+  }
+  return { ...appEntitlements, ...identityEntitlements }
+}
+
+/** Assert that a signed app retained the profile-owned identity entitlements. */
+export function assertMacosProfileIdentityEntitlements({
+  bundleIdentifier,
+  profileEntitlements,
+  signedEntitlements,
+}) {
+  if (!isRecord(signedEntitlements)) throw new Error('signed macOS entitlements are not a dictionary')
+  const identityEntitlements = macosProfileIdentityEntitlements({ bundleIdentifier, profileEntitlements })
+
+  for (const [key, value] of Object.entries(identityEntitlements)) {
+    if (signedEntitlements[key] !== value) {
+      throw new Error(
+        `signed app entitlement "${key}" is ${JSON.stringify(signedEntitlements[key])}, ` +
+          `expected "${value}" from the embedded provisioning profile`,
+      )
+    }
+  }
+}
+
 export function macosEntitlementsPath(flavor) {
   const entitlements = readFlavorConf(flavor).bundle?.macOS?.entitlements
   if (typeof entitlements !== 'string') {
@@ -500,24 +579,116 @@ export function macosEntitlementsPath(flavor) {
   return join(appDir, 'src-tauri', entitlements)
 }
 
+/** Resolve the provisioning profile embedded for a flavor, if it has one. */
+export function macosProvisioningProfilePath(flavor) {
+  const profile = readFlavorConf(flavor).bundle?.macOS?.files?.['embedded.provisionprofile']
+  if (profile === undefined) return null
+  if (typeof profile !== 'string' || profile.length === 0) {
+    fail(`macOS flavor "${flavor}" has an invalid embedded provisioning profile`)
+  }
+  return join(appDir, 'src-tauri', profile)
+}
+
+function parsePlistJson(output, description) {
+  const value = JSON.parse(output)
+  if (!isRecord(value)) throw new Error(`${description} is not a dictionary`)
+  return value
+}
+
+function readEntitlementsPlist(path) {
+  return parsePlistJson(capture('plutil', ['-convert', 'json', '-o', '-', '--', path]), path)
+}
+
+function readProvisioningProfileEntitlements(path) {
+  const profile = capture('security', ['cms', '-D', '-i', path])
+  const entitlements = capture('plutil', ['-extract', 'Entitlements', 'json', '-o', '-', '-'], {
+    input: profile,
+  })
+  return parsePlistJson(entitlements, `${path} entitlements`)
+}
+
+function readCodeSigningEntitlements(app) {
+  const entitlements = capture('codesign', ['--display', '--entitlements', '-', '--xml', app], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  const json = capture('plutil', ['-convert', 'json', '-o', '-', '-'], { input: entitlements })
+  return parsePlistJson(json, `${app} code-signing entitlements`)
+}
+
+function prepareMacosSigningEntitlements({ app, flavor }) {
+  const appEntitlementsPath = macosEntitlementsPath(flavor)
+  const configuredProfilePath = macosProvisioningProfilePath(flavor)
+  if (!configuredProfilePath) {
+    return { cleanup: () => {}, description: basename(appEntitlementsPath), path: appEntitlementsPath }
+  }
+
+  const embeddedProfilePath = join(app, 'Contents', 'embedded.provisionprofile')
+  if (!existsSync(embeddedProfilePath)) {
+    throw new Error(
+      `${basename(configuredProfilePath)} was configured for macOS flavor "${flavor}", ` +
+        `but ${embeddedProfilePath} does not exist`,
+    )
+  }
+
+  const bundleIdentifier = readFlavorConf(flavor).identifier
+  const appEntitlements = readEntitlementsPlist(appEntitlementsPath)
+  const profileEntitlements = readProvisioningProfileEntitlements(embeddedProfilePath)
+  const mergedEntitlements = mergeMacosProfileIdentityEntitlements({
+    appEntitlements,
+    bundleIdentifier,
+    profileEntitlements,
+  })
+  const tempDir = mkdtempSync(join(tmpdir(), 'reflect-signing-entitlements-'))
+  const path = join(tempDir, 'Entitlements.plist')
+  try {
+    // The plist round-trips through JSON, which only preserves strings,
+    // booleans, and arrays — every entitlement today. A number or <data>
+    // entitlement would lose its exact plist type here.
+    writeFileSync(path, `${JSON.stringify(mergedEntitlements, null, 2)}\n`, { mode: 0o600 })
+    execFileSync('plutil', ['-convert', 'xml1', path])
+  } catch (error) {
+    rmSync(tempDir, { recursive: true, force: true })
+    throw error
+  }
+  return {
+    cleanup: () => rmSync(tempDir, { recursive: true, force: true }),
+    description: `${basename(appEntitlementsPath)} + identity from ${basename(configuredProfilePath)}`,
+    path,
+  }
+}
+
 function macosSidecarPaths(app) {
   return MACOS_SIDECARS.map((binary) => join(app, 'Contents', 'MacOS', binary))
 }
 
 function resignMacosApp({ flavor, identity, keychain, target }) {
   const { app } = bundlePaths(flavor, target)
-  const entitlements = macosEntitlementsPath(flavor)
   for (const sidecar of macosSidecarPaths(app)) {
     if (!existsSync(sidecar)) fail(`${sidecar} does not exist — Tauri did not bundle the sidecar`)
   }
 
-  log('re-signing macOS sidecars without app entitlements…')
-  for (const sidecar of macosSidecarPaths(app)) {
-    execFileSync('codesign', codesignArgs({ identity, keychain, path: sidecar }), { stdio: 'inherit' })
+  let signingEntitlements
+  try {
+    signingEntitlements = prepareMacosSigningEntitlements({ app, flavor })
+  } catch (error) {
+    fail(`preparing macOS signing entitlements failed: ${error instanceof Error ? error.message : String(error)}`)
   }
 
-  log(`re-signing ${basename(app)} with ${basename(entitlements)}…`)
-  execFileSync('codesign', codesignArgs({ entitlements, identity, keychain, path: app }), { stdio: 'inherit' })
+  try {
+    log('re-signing macOS sidecars without app entitlements…')
+    for (const sidecar of macosSidecarPaths(app)) {
+      execFileSync('codesign', codesignArgs({ identity, keychain, path: sidecar }), { stdio: 'inherit' })
+    }
+
+    log(`re-signing ${basename(app)} with ${signingEntitlements.description}…`)
+    execFileSync(
+      'codesign',
+      codesignArgs({ entitlements: signingEntitlements.path, identity, keychain, path: app }),
+      { stdio: 'inherit' },
+    )
+  } finally {
+    signingEntitlements.cleanup()
+  }
 }
 
 function importSigningCertificate() {
@@ -694,6 +865,22 @@ function verifySidecarsLaunch({ flavor, target }) {
   }
 }
 
+function verifyMacosProfileIdentityEntitlements({ app, flavor }) {
+  const configuredProfilePath = macosProvisioningProfilePath(flavor)
+  if (!configuredProfilePath) return
+
+  const embeddedProfilePath = join(app, 'Contents', 'embedded.provisionprofile')
+  if (!existsSync(embeddedProfilePath)) {
+    throw new Error(`${app} is missing ${basename(configuredProfilePath)}`)
+  }
+  assertMacosProfileIdentityEntitlements({
+    bundleIdentifier: readFlavorConf(flavor).identifier,
+    profileEntitlements: readProvisioningProfileEntitlements(embeddedProfilePath),
+    signedEntitlements: readCodeSigningEntitlements(app),
+  })
+  log('profile identity entitlements: ok')
+}
+
 /** Verify the built bundles match the expected distribution state. */
 function verify({ notarized, flavor, target }) {
   const { app, dmg } = bundlePaths(flavor, target)
@@ -704,6 +891,11 @@ function verify({ notarized, flavor, target }) {
     'valid on disk',
     'satisfies its Designated Requirement',
   ])
+  try {
+    verifyMacosProfileIdentityEntitlements({ app, flavor })
+  } catch (error) {
+    fail(`profile identity entitlement verification failed: ${error instanceof Error ? error.message : String(error)}`)
+  }
   verifySidecarsLaunch({ flavor, target })
 
   if (!notarized) {
