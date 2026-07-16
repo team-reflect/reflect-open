@@ -5,11 +5,13 @@
  * to where its `[[` begins so both shapes share the same slicing arithmetic.
  */
 
+import type { LezerNodeName } from "@meowdown/markdown";
+
 export function isWikiNodeName(name: string): boolean {
-  return name === 'Wikilink' || name === 'WikiEmbed'
+  return name === ('Wikilink' satisfies LezerNodeName) || name === ('WikiEmbed' satisfies LezerNodeName)
 }
 
 /** Offset of the node's `[[`: a `WikiEmbed` skips its leading `!`. */
 export function wikiBracketStart(node: { name: string; from: number }): number {
-  return node.name === 'WikiEmbed' ? node.from + 1 : node.from
+  return node.name === ('WikiEmbed' satisfies LezerNodeName) ? node.from + 1 : node.from
 }
