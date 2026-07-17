@@ -50,8 +50,15 @@ let onFileChanges: ((changes: FileChange[]) => void) | null = null
 const unlisten = vi.fn()
 let reconciler: TranscriptionReconciler | null = null
 
-function create(providers: AiProvidersState = PROVIDERS): TranscriptionReconciler {
-  reconciler = createTranscriptionReconciler({ generation: 3, getProviders: () => providers })
+function create(
+  providers: AiProvidersState = PROVIDERS,
+  getTranscriptionFormat: () => boolean = () => true,
+): TranscriptionReconciler {
+  reconciler = createTranscriptionReconciler({
+    generation: 3,
+    getProviders: () => providers,
+    getTranscriptionFormat,
+  })
   return reconciler
 }
 
@@ -82,7 +89,30 @@ describe('createTranscriptionReconciler', () => {
 
     expect(reconcileAudioMemos).toHaveBeenCalledTimes(1)
     expect(reconcileAudioMemos).toHaveBeenCalledWith(
-      expect.objectContaining({ providers: PROVIDERS, generation: 3 }),
+      expect.objectContaining({
+        providers: PROVIDERS,
+        generation: 3,
+        formatTranscript: true,
+      }),
+    )
+  })
+
+  it('reads the formatting preference lazily for every pass', async () => {
+    let formatTranscript = true
+    const subject = create(PROVIDERS, () => formatTranscript)
+    subject.start()
+    await flush()
+
+    expect(reconcileAudioMemos).toHaveBeenLastCalledWith(
+      expect.objectContaining({ formatTranscript: true }),
+    )
+
+    formatTranscript = false
+    subject.schedule()
+    await flush()
+
+    expect(reconcileAudioMemos).toHaveBeenLastCalledWith(
+      expect.objectContaining({ formatTranscript: false }),
     )
   })
 

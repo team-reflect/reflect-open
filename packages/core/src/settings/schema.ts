@@ -200,6 +200,14 @@ export const semanticSearchEnabledSchema = z.boolean().catch(false)
 export const describeAssetsSchema = z.boolean().catch(true)
 
 /**
+ * Whether audio-memo transcripts receive a best-effort AI formatting pass
+ * before they are written as Markdown. On by default, matching the original
+ * Reflect preference. Turning it off keeps the transcription provider's raw
+ * body; transcript-derived title generation remains enabled.
+ */
+export const transcriptionFormatSchema = z.boolean().catch(true)
+
+/**
  * Whether the user has finished the mobile onboarding choice (Plan 19, step
  * 6): iCloud Drive or this device. Off by default — a fresh install shows
  * the onboarding screen before anything seeds a graph. Once set, later
@@ -441,6 +449,7 @@ export const settingsSchema = z
     contextSidebarWidth: contextSidebarWidthSchema,
     semanticSearchEnabled: semanticSearchEnabledSchema,
     describeAssets: describeAssetsSchema,
+    transcriptionFormat: transcriptionFormatSchema,
     contactsEnabled: contactsEnabledSchema,
     mobileOnboarded: mobileOnboardedSchema,
     mobileStorage: mobileStorageKindSchema,

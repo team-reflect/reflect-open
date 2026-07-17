@@ -15,6 +15,7 @@ describe('settingsSchema', () => {
       contextSidebarWidth: 320,
       semanticSearchEnabled: false,
       describeAssets: true,
+      transcriptionFormat: true,
       contactsEnabled: false,
       mobileOnboarded: false,
       mobileStorage: 'local',
@@ -44,6 +45,7 @@ describe('settingsSchema', () => {
     expect(DEFAULT_SETTINGS.contextSidebarWidth).toBe(320)
     expect(DEFAULT_SETTINGS.semanticSearchEnabled).toBe(false)
     expect(DEFAULT_SETTINGS.describeAssets).toBe(true)
+    expect(DEFAULT_SETTINGS.transcriptionFormat).toBe(true)
     expect(DEFAULT_SETTINGS.contactsEnabled).toBe(false)
     expect(DEFAULT_SETTINGS.mobileOnboarded).toBe(false)
     expect(DEFAULT_SETTINGS.mobileStorage).toBe('local')
@@ -106,6 +108,8 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ semanticSearchEnabled: false }).semanticSearchEnabled).toBe(false)
     expect(settingsSchema.parse({ describeAssets: true }).describeAssets).toBe(true)
     expect(settingsSchema.parse({ describeAssets: false }).describeAssets).toBe(false)
+    expect(settingsSchema.parse({ transcriptionFormat: true }).transcriptionFormat).toBe(true)
+    expect(settingsSchema.parse({ transcriptionFormat: false }).transcriptionFormat).toBe(false)
     expect(settingsSchema.parse({ contactsEnabled: true }).contactsEnabled).toBe(true)
     expect(settingsSchema.parse({ contactsEnabled: false }).contactsEnabled).toBe(false)
     expect(
@@ -178,6 +182,8 @@ describe('settingsSchema', () => {
     // back to the default rather than failing the whole settings load.
     expect(settingsSchema.parse({ describeAssets: 'yes' }).describeAssets).toBe(true)
     expect(settingsSchema.parse({ describeAssets: 0 }).describeAssets).toBe(true)
+    expect(settingsSchema.parse({ transcriptionFormat: 'yes' }).transcriptionFormat).toBe(true)
+    expect(settingsSchema.parse({ transcriptionFormat: 0 }).transcriptionFormat).toBe(true)
     expect(settingsSchema.parse({ contactsEnabled: 'yes' }).contactsEnabled).toBe(false)
     expect(settingsSchema.parse({ contactsEnabled: 1 }).contactsEnabled).toBe(false)
     expect(settingsSchema.parse({ allNotesFilterTags: 'book' }).allNotesFilterTags).toEqual([
@@ -213,6 +219,7 @@ describe('settingsSchema', () => {
       contextSidebarWidth: 320,
       semanticSearchEnabled: false,
       describeAssets: true,
+      transcriptionFormat: true,
       contactsEnabled: false,
       mobileOnboarded: false,
       mobileStorage: 'local',

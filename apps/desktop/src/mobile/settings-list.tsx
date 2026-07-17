@@ -23,11 +23,18 @@ interface SettingsGroupProps {
   header?: string
   /** Explanatory text below the card (iOS section footer). */
   footer?: string | null
+  /** Optional id for associating the footer with a control in the group. */
+  footerId?: string
   children: ReactNode
 }
 
 /** One inset-grouped section: header caption, rounded card, footer text. */
-export function SettingsGroup({ header, footer, children }: SettingsGroupProps): ReactElement {
+export function SettingsGroup({
+  header,
+  footer,
+  footerId,
+  children,
+}: SettingsGroupProps): ReactElement {
   return (
     <section className="flex flex-col">
       {header !== undefined ? (
@@ -36,7 +43,11 @@ export function SettingsGroup({ header, footer, children }: SettingsGroupProps):
       <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
         {children}
       </div>
-      {footer != null ? <p className="px-4 pt-1.5 text-[13px] text-text-muted">{footer}</p> : null}
+      {footer != null ? (
+        <p id={footerId} className="px-4 pt-1.5 text-[13px] text-text-muted">
+          {footer}
+        </p>
+      ) : null}
     </section>
   )
 }
@@ -80,6 +91,8 @@ interface SettingsSwitchRowProps {
   label: string
   checked: boolean
   onCheckedChange: (checked: boolean) => void
+  /** Id of explanatory copy announced after the switch label. */
+  descriptionId?: string
 }
 
 /** A toggle row. The whole row is the label, so tapping anywhere flips it. */
@@ -87,11 +100,16 @@ export function SettingsSwitchRow({
   label,
   checked,
   onCheckedChange,
+  descriptionId,
 }: SettingsSwitchRowProps): ReactElement {
   return (
     <label className={ROW_CLASS}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} />
+      <Switch
+        aria-describedby={descriptionId}
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+      />
     </label>
   )
 }

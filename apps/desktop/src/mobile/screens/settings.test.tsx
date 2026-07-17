@@ -145,6 +145,22 @@ describe('MobileSettings', () => {
     expect(updateSettings).toHaveBeenCalledWith({ editorBulletAfterHeading: false })
   })
 
+  it('toggles audio transcription formatting', async () => {
+    const user = userEvent.setup()
+    mount()
+
+    const toggle = screen.getByRole('switch', { name: 'Transcription auto-format' })
+    const descriptionId = toggle.getAttribute('aria-describedby')
+    expect(descriptionId).not.toBeNull()
+    expect(document.getElementById(descriptionId ?? '')?.textContent).toContain(
+      'Uses AI to add punctuation, paragraphs, and light Markdown',
+    )
+
+    await user.click(toggle)
+
+    expect(updateSettings).toHaveBeenCalledWith({ transcriptionFormat: false })
+  })
+
   it('edits the AI chat system prompt', async () => {
     const user = userEvent.setup()
     mount()

@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react'
+import { useId, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   aiProvider,
@@ -77,6 +77,7 @@ export function MobileSettings(): ReactElement {
   } = useAiProviders()
   const [addProviderOpen, setAddProviderOpen] = useState(false)
   const [systemPromptOpen, setSystemPromptOpen] = useState(false)
+  const audioMemoDescriptionId = useId()
   // The managed provider sticks around after close so the exit animation has
   // content; `manageOpen` alone drives visibility (the edit-sheet pattern).
   const [managedProvider, setManagedProvider] = useState<AiProviderConfig | null>(null)
@@ -201,6 +202,21 @@ export function MobileSettings(): ReactElement {
               label="System prompt"
               value={normalizeChatSystemPrompt(settings.chatSystemPrompt) === '' ? 'Default' : 'Custom'}
               onPress={() => setSystemPromptOpen(true)}
+            />
+          </SettingsGroup>
+
+          <SettingsGroup
+            header="Audio memos"
+            footer="Uses AI to add punctuation, paragraphs, and light Markdown."
+            footerId={audioMemoDescriptionId}
+          >
+            <SettingsSwitchRow
+              label="Transcription auto-format"
+              checked={settings.transcriptionFormat}
+              descriptionId={audioMemoDescriptionId}
+              onCheckedChange={(transcriptionFormat) =>
+                updateSettings({ transcriptionFormat })
+              }
             />
           </SettingsGroup>
 

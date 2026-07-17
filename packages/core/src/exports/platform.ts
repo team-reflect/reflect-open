@@ -164,6 +164,7 @@ export {
   clampSidebarWidth,
   semanticSearchEnabledSchema,
   describeAssetsSchema,
+  transcriptionFormatSchema,
   contactsEnabledSchema,
   themePreferenceSchema,
   timeFormatSchema,
