@@ -8,7 +8,14 @@ import type { Frontmatter } from '../markdown/model'
 import type { CaptureIdentity } from './capture-identity'
 import type { CaptureEnvelope } from './capture-envelope'
 
-/** Enrichment lifecycle of a capture note, in its frontmatter. */
+/**
+ * Enrichment lifecycle of a capture note, in its frontmatter. `skipped` means
+ * enrichment stopped touching the note — an edit, a privacy flip, or a
+ * deletion race won. Any checkpoint persisted before the skip, including AI
+ * content and its `captureProvider`/`captureModel` provenance, stays exactly
+ * as written: the stamps describe who authored the persisted text, not
+ * whether the capture finished.
+ */
 export type CaptureStatus = 'pending' | 'done' | 'skipped'
 
 const captureNoteMetaSchema = z.object({

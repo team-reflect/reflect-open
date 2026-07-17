@@ -286,6 +286,10 @@ export async function reconcileCaptureEnrichment(
 
       let pageMeta: PageMeta | null = null
       if (metadataComplete) {
+        // Deliberately lossy resume: the checkpoint keeps only what the note
+        // shows, so a retried AI call sees the current H1 as the meta title
+        // and loses `siteName` — close enough that persisting the raw scrape
+        // isn't worth another frontmatter field.
         pageMeta = {
           title: snapshot.title,
           description: captureDescriptionFromBody(snapshot.body) ?? null,
@@ -331,6 +335,10 @@ export async function reconcileCaptureEnrichment(
 
       if (config === null) {
         const titleChanged = metadataDisplayTitle !== snapshot.title
+        // Two persists on purpose: the retitle commits as `pending` first so
+        // an interrupted Daily write resumes as `pending`, letting a provider
+        // configured between passes still run AI on this capture. Only after
+        // the retitle fully lands does the second persist stamp `done`.
         const captureHash = await persistCaptureEnrichment({
           identity,
           expectedHash: snapshot.meta.captureHash,
@@ -450,5 +458,7 @@ export async function reconcileCaptureEnrichment(
       return outcome({ reason: toAppError(cause).kind, message: errorMessage(cause) })
     }
   }
+  // `waitingForKey` is only ever set when a provider is configured without a
+  // usable key, which is exactly when `providerStop` was populated above.
   return outcome(waitingForKey ? providerStop : null)
 }
