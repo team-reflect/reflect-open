@@ -573,7 +573,7 @@ mod platform {
     }
 
     /// The watcher's note-tracking rule, over absolute metadata paths:
-    /// `.md` under `daily/`, `notes/`, or `templates/`, graph-relative. Tries
+    /// `.md` under `journal/`, `notes/`, or `templates/`, graph-relative. Tries
     /// every root variant — Spotlight may report either side of the
     /// `/var` ↔ `/private/var` symlink. Variants are slash-terminated
     /// ([`root_variants`]), so the strip is a path boundary, not a string
@@ -582,7 +582,7 @@ mod platform {
         let rel = roots
             .iter()
             .find_map(|root| path.strip_prefix(root.as_str()))?;
-        let tracked = (rel.starts_with("daily/")
+        let tracked = (rel.starts_with("journal/")
             || rel.starts_with("notes/")
             || rel.starts_with("templates/"))
             && rel.ends_with(".md");
@@ -787,8 +787,8 @@ mod platform {
             // Spotlight may report the resolved (/private) side of the root
             // symlink; either variant must strip.
             assert_eq!(
-                tracked_note_relpath("/var/mobile/Containers/Notes/daily/2026-07-04.md", &roots),
-                Some("daily/2026-07-04.md".to_string())
+                tracked_note_relpath("/var/mobile/Containers/Notes/journal/2026-07-04.md", &roots),
+                Some("journal/2026-07-04.md".to_string())
             );
             assert_eq!(
                 tracked_note_relpath("/private/var/mobile/Containers/Notes/notes/idea.md", &roots),

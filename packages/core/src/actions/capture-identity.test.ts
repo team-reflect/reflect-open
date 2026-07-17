@@ -32,7 +32,7 @@ describe('captureFromPath', () => {
     expect(captureFromPath('notes/capture-2026-06-11-153022-845.md')).toBeNull() // no id suffix
     expect(captureFromPath('notes/capture-2026-13-40-153022-845-7c9e.md')).toBeNull()
     expect(captureFromPath('notes/capture-2026-06-11-993022-845-7c9e.md')).toBeNull()
-    expect(captureFromPath('daily/capture-2026-06-11-153022-845-7c9e.md')).toBeNull()
+    expect(captureFromPath('journal/capture-2026-06-11-153022-845-7c9e.md')).toBeNull()
     expect(captureFromPath('notes/audio-memo-2026-06-11-153022-845.md')).toBeNull()
   })
 })

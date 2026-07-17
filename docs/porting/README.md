@@ -64,7 +64,7 @@ contracts. Those docs defer to
 
 ## Conventions
 
-- "Graph" is a notes folder; "daily note" is `daily/YYYY-MM-DD.md`.
+- "Graph" is a notes folder; "daily note" is `journal/YYYY-MM-DD.md`.
 - `mod` is ⌘ on macOS and Ctrl elsewhere; v2 currently ships on macOS only.
 - Architecture references use real paths in this repo, following the
   load-bearing rule from the top-level README: **TypeScript owns policy,

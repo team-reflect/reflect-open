@@ -182,7 +182,7 @@ CREATE INDEX tasks_open_by_date ON tasks (checked, scheduled);
   checklists, grouped Overdue / Today / Upcoming / Unscheduled, with source-note
   context; completed tasks sit collapsed below; the whole flow works without the mouse.
 - A task containing `[[2026-07-01]]` schedules for that date; a bare task in
-  `daily/2026-06-12.md` schedules for 2026-06-12 and turns Overdue the next day; a
+  `journal/2026-06-12.md` schedules for 2026-06-12 and turns Overdue the next day; a
   bare task in a regular note is Unscheduled.
 - Toggling from the Tasks view updates the markdown file, the index, and an open
   editor; toggling against a stale index refuses loudly and recovers via reindex —

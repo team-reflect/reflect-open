@@ -18,7 +18,7 @@ import { useRouter } from '@/routing/router'
  * Which day in the daily stream currently holds the user's focus, so the
  * context sidebar can describe *that* day rather than the routed one.
  *
- * The daily stream is a run of per-day editors under a single `daily/:date`
+ * The daily stream is a run of per-day editors under a single `journal/:date`
  * route: scrolling or clicking to another day moves focus but never changes the
  * route (only the calendar does). Without this, the right sidebar — derived
  * purely from the route — stays pinned to the routed day while the user edits a
@@ -62,7 +62,7 @@ export function useSetFocusedDailyDate(): (date: string | null) => void {
  * in the daily stream and snapping back to the routed subject on navigation.
  *
  * On a daily view the sidebar describes the focused day, not the routed one (the
- * stream keeps a single `daily/:date` route as focus moves between days) — the
+ * stream keeps a single `journal/:date` route as focus moves between days) — the
  * {@link effectiveDailyDate} precedence the note-scoped commands share. Focus
  * deliberately *stays* through transient moves — opening ⌘K, clicking a sidebar
  * button — rather than flicking back and out again: what restores the routed day

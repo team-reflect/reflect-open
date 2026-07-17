@@ -59,7 +59,7 @@ before the editor, and the editor lands before search/AI.
 | # | Plan | Delivers |
 |---|------|----------|
 | 01 | [Foundation & toolchain](01-foundation-and-toolchain.md) | Tauri/React/TS app shell, Tailwind + shadcn + Lucide, zod, Kysely wiring, test/lint, design-system, IPC conventions |
-| 02 | [Graph & file storage](02-graph-and-file-storage.md) | Graph folder (`daily/`, `notes/`, `assets/`, `.reflect/`), Rust file IO, frontmatter + note identity, graph open/create |
+| 02 | [Graph & file storage](02-graph-and-file-storage.md) | Graph folder (`journal/`, `notes/`, `assets/`, `.reflect/`), Rust file IO, frontmatter + note identity, graph open/create |
 | 03 | [Markdown document model](03-markdown-document-model.md) | Canonical AST, frontmatter + wiki-link parsing, lossless serialization, zod schemas, external-edit tolerance |
 | 04 | [Local index (SQLite)](04-local-index-sqlite.md) | SQLite-in-Rust + Kysely query builder, projections, FTS, file watching, incremental indexing, rebuild/repair |
 | 05 | [Markdown editor](05-markdown-editor.md) | Integrate **meowdown** (ProseKit/ProseMirror over `@lezer/markdown`), keyboard-native; add wiki-link/image/checkbox extensions |

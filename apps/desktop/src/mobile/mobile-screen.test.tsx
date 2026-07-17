@@ -312,7 +312,7 @@ function otherDayInWeek(date: string): string {
 describe('MobileShell', () => {
   it('renders today as the daily spine with its note content', async () => {
     const today = todayIso()
-    files[`daily/${today}.md`] = 'captured on the go'
+    files[`journal/${today}.md`] = 'captured on the go'
     const view = mount({ kind: 'today' })
 
     // The header is the month; the carousel mounts today's slide (±1
@@ -428,7 +428,7 @@ describe('MobileShell', () => {
     // Beyond the ±366-day window — only reachable as a date-link navigation,
     // which forces the carousel to rebuild its window around the day.
     const farDay = addDaysIso(todayIso(), 400)
-    files[`daily/${farDay}.md`] = 'far future plans'
+    files[`journal/${farDay}.md`] = 'far future plans'
     const view = mount({ kind: 'today' }, { kind: 'daily', date: farDay })
 
     await user.click(view.getByRole('button', { name: 'probe-navigate' }))
@@ -537,7 +537,7 @@ describe('MobileShell', () => {
 
   it('double-tapping Daily while already on today focuses the editor at its end', async () => {
     const today = todayIso()
-    files[`daily/${today}.md`] = 'first thought'
+    files[`journal/${today}.md`] = 'first thought'
     const view = mount({ kind: 'today' })
     await waitFor(() => {
       const editors = view.getAllByTestId('fake-editor')

@@ -58,7 +58,7 @@ The defining V1 mobile design decision is that **critical capture paths do not d
 
 ## Main App Surfaces
 
-Navigation is an Ionic tab bar with three tabs, plus modals. Routing is Ionic React Router (react-router v5) with routes like `/:graph/daily/:id`, `/:graph/all/:id`, `/:graph/all/tag/:tag`, `/:graph/tasks`, and `/:graph/all/ai-chat`.
+Navigation is an Ionic tab bar with three tabs, plus modals. Routing is Ionic React Router (react-router v5) with routes like `/:graph/journal/:id`, `/:graph/all/:id`, `/:graph/all/tag/:tag`, `/:graph/tasks`, and `/:graph/all/ai-chat`.
 
 ### Daily (default tab)
 

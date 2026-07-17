@@ -70,7 +70,7 @@ Very little, by design — this surface is the one V1 got most right:
 - **Embla replaces Swiper** (recorded in
   [libraries](../../plans/libraries.md)); the virtual-window + re-center
   behavior must be reproduced there.
-- Date-keyed encrypted documents become **`daily/YYYY-MM-DD.md` files**.
+- Date-keyed encrypted documents become **`journal/YYYY-MM-DD.md` files**.
   Creation-on-reach maps onto desktop's lazy daily-placeholder behavior:
   an empty slide creates **no file** until the first keystroke — swiping
   past days must not materialize files (or dirty sync).

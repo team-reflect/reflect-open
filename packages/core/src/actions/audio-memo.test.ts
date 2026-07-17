@@ -229,7 +229,7 @@ describe('reconcileAudioMemos', () => {
         3,
       ],
       [
-        'daily/2026-06-11.md',
+        'journal/2026-06-11.md',
         'morning thoughts\n\n## [[Audio memos]]\n\n- [[audio-memo-2026-06-11-153022-845|Memo Transcript]]\n',
         3,
       ],
@@ -271,7 +271,7 @@ describe('reconcileAudioMemos', () => {
       3,
     )
     expect(writeNoteMock).toHaveBeenCalledWith(
-      'daily/2026-06-11.md',
+      'journal/2026-06-11.md',
       expect.stringContaining(
         '- [[audio-memo-2026-06-11-153022-845|Planning the launch]]',
       ),
@@ -381,7 +381,7 @@ describe('reconcileAudioMemos', () => {
     await reconcile()
 
     expect(writeNoteMock).toHaveBeenCalledWith(
-      'daily/2026-06-11.md',
+      'journal/2026-06-11.md',
       '## [[Audio memos]]\n\n- [[audio-memo-2026-06-11-153022-845|Memo Transcript]]\n',
       3,
     )
@@ -396,7 +396,7 @@ describe('reconcileAudioMemos', () => {
     await reconcile()
 
     expect(writeNoteMock).toHaveBeenCalledWith(
-      'daily/2026-06-11.md',
+      'journal/2026-06-11.md',
       '## [[Audio memos]]\n\n- [[audio-memo-2026-06-10-090000-000|Yesterday]]\n\n- [[audio-memo-2026-06-11-153022-845|Memo Transcript]]\n',
       3,
     )
@@ -409,7 +409,7 @@ describe('reconcileAudioMemos', () => {
     await reconcile()
 
     expect(writeNoteMock).toHaveBeenCalledWith(
-      'daily/2026-06-11.md',
+      'journal/2026-06-11.md',
       expect.stringContaining('## [[Voice notes]]'),
       3,
     )
@@ -530,7 +530,7 @@ describe('reconcileAudioMemos', () => {
       3,
     )
     expect(writeNoteMock).toHaveBeenCalledWith(
-      'daily/2026-06-11.md',
+      'journal/2026-06-11.md',
       expect.stringContaining('- [[audio-memo-2026-06-11-153022-845|Memo Transcript]]'),
       3,
     )
@@ -550,7 +550,7 @@ describe('reconcileAudioMemos', () => {
       3,
     )
     expect(writeNoteMock).toHaveBeenCalledWith(
-      'daily/2026-06-11.md',
+      'journal/2026-06-11.md',
       expect.stringContaining('- [[audio-memo-2026-06-11-153022-845|Audio memo 2026-06-11 15:30:22]]'),
       3,
     )
@@ -572,7 +572,7 @@ describe('reconcileAudioMemos', () => {
       3,
     )
     expect(writeNoteMock).toHaveBeenCalledWith(
-      'daily/2026-06-11.md',
+      'journal/2026-06-11.md',
       expect.stringContaining(
         '- [[audio-memo-2026-06-11-153022-845|Audio memo 2026-06-11 15:30:22]]',
       ),

@@ -73,7 +73,7 @@ than inventing a second grammar:
 
 ```text
 reflect://today                     { kind: 'today' }
-reflect://daily/2026-07-01          { kind: 'daily', date }
+reflect://journal/2026-07-01          { kind: 'daily', date }
 reflect://note/<target>             { kind: 'note', path }  — see resolution
 reflect://search?q=meeting          { kind: 'search', query }
 reflect://tasks                     { kind: 'tasks' }

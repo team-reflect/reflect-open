@@ -116,8 +116,8 @@ command can revisit this later.
 
 **File layer** (always available; no index required):
 
-- Path conventions mirrored from `packages/core/src/graph/paths.ts`: `daily/YYYY-MM-DD.md`
-  (calendar-validated), `notes/<slug>.md`; only `daily/` + `notes/` are note dirs.
+- Path conventions mirrored from `packages/core/src/graph/paths.ts`: `journal/YYYY-MM-DD.md`
+  (calendar-validated), `notes/<slug>.md`; only `journal/` + `notes/` are note dirs.
 - Tolerant frontmatter read (title, `aliases`, `private` only): a broken YAML block
   degrades to "no frontmatter", matching the TS layer's tolerance. Read-only — the CLI
   never writes, so no round-trip machinery.
@@ -136,7 +136,7 @@ command can revisit this later.
   update Reflect") and still attempt the stable query subset: `notes`, `aliases`,
   `note_keys`, `search_fts`, `index_meta`. Never touch `embedding_*`/vec tables (the vec0
   module is not loaded; querying them would error).
-- **Staleness detection** (drives the `search` warning): walk `daily/`+`notes/` `.md`
+- **Staleness detection** (drives the `search` warning): walk `journal/`+`notes/` `.md`
   files and compare against `notes` rows — a file missing from the index, an indexed path
   missing on disk, or (for mtime mismatches only) a SHA-256 content hash ≠ `file_hash`
   marks the index stale. The hash matches the indexer's (lowercase-hex SHA-256,
@@ -200,7 +200,7 @@ with markdown frontmatter where sensible):
 
 ```jsonc
 // today / show
-{ "date": "2026-06-11", "path": "daily/2026-06-11.md", "absolutePath": "/…",
+{ "date": "2026-06-11", "path": "journal/2026-06-11.md", "absolutePath": "/…",
   "title": "2026-06-11", "content": "…" }
 // search
 { "query": "…", "stale": false,

@@ -39,7 +39,7 @@ beforeEach(() => {
 
 describe('handleDeepLink', () => {
   it('navigates self-contained routes directly, with no status noise', async () => {
-    await handle('reflect://daily/2026-07-01')
+    await handle('reflect://journal/2026-07-01')
     expect(navigate).toHaveBeenCalledWith({ kind: 'daily', date: '2026-07-01' })
     expect(resolveMock).not.toHaveBeenCalled()
     expect(startOperationMock).not.toHaveBeenCalled()
@@ -55,7 +55,7 @@ describe('handleDeepLink', () => {
   })
 
   it('routes a daily-path resolution to the daily view', async () => {
-    resolveMock.mockResolvedValue('daily/2026-07-01.md')
+    resolveMock.mockResolvedValue('journal/2026-07-01.md')
 
     await handle('reflect://note/2026-07-01')
 

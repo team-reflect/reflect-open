@@ -12,9 +12,9 @@ export function noteDeepLink(target: string): string {
   return `${DEEP_LINK_SCHEME}://note/${encodeURIComponent(target)}`
 }
 
-/** `reflect://daily/<date>` for an ISO `YYYY-MM-DD` date. */
+/** `reflect://journal/<date>` for an ISO `YYYY-MM-DD` date. */
 export function dailyDeepLink(date: string): string {
-  return `${DEEP_LINK_SCHEME}://daily/${date}`
+  return `${DEEP_LINK_SCHEME}://journal/${date}`
 }
 
 /**

@@ -129,7 +129,7 @@ describe('buildIndexedNote', () => {
   })
 
   it('marks daily notes with their date and carries no id', () => {
-    const indexed = buildIndexedNote(parseNote({ path: 'daily/2026-06-09.md', source: 'today' }), {
+    const indexed = buildIndexedNote(parseNote({ path: 'journal/2026-06-09.md', source: 'today' }), {
       fileHash: 'h',
       mtime: 0,
       source: 'today',
@@ -148,7 +148,7 @@ describe('buildIndexedNote', () => {
         mtime: 0,
         source: 'body',
       }).kind
-    expect(kindOf('daily/2026-06-09.md')).toBe('daily')
+    expect(kindOf('journal/2026-06-09.md')).toBe('daily')
     expect(kindOf('notes/n.md')).toBe('note')
     expect(kindOf('templates/journal.md')).toBe('template')
   })

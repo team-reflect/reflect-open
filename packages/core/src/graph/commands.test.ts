@@ -93,7 +93,7 @@ describe('graph commands', () => {
       failedAssetDownloads: 0,
       renamedFiles: 0,
       mergedFiles: 0,
-      changedPaths: ['notes/a.md', 'daily/2026-07-04.md'],
+      changedPaths: ['notes/a.md', 'journal/2026-07-04.md'],
     }))
     setBridge({ invoke, listen: async () => () => {} })
     const summary = await importReflectV1Zip('/tmp/reflect-v1.zip', 7)
@@ -109,7 +109,7 @@ describe('graph commands', () => {
       failedAssetDownloads: 0,
       renamedFiles: 0,
       mergedFiles: 0,
-      changedPaths: ['notes/a.md', 'daily/2026-07-04.md'],
+      changedPaths: ['notes/a.md', 'journal/2026-07-04.md'],
     })
   })
 
@@ -160,10 +160,10 @@ describe('graph commands', () => {
         failedAssetDownloads: 0,
         renamedFiles: 0,
         mergedFiles: 0,
-        changedPaths: ['notes/a.md', 'daily/2026-07-04.md'],
+        changedPaths: ['notes/a.md', 'journal/2026-07-04.md'],
       })
 
-      expect(seen).toEqual(['notes/a.md', 'daily/2026-07-04.md'])
+      expect(seen).toEqual(['notes/a.md', 'journal/2026-07-04.md'])
     } finally {
       unlisten()
     }

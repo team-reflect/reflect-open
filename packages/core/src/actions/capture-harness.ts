@@ -57,7 +57,7 @@ export const NO_PROVIDERS: AiProvidersState = { providers: [], defaultProviderId
 /** 2026-06-11 15:30:22.845 local — every derived name is asserted from it. */
 export const CAPTURED_AT = new Date(2026, 5, 11, 15, 30, 22, 845)
 export const IDENTITY = captureIdentity(CAPTURED_AT, '7c9e6679-7425-40de-944b-e07fc1f90ae7')
-export const DAILY = 'daily/2026-06-11.md'
+export const DAILY = 'journal/2026-06-11.md'
 export const CAPTURE_URL = 'https://example.com/article'
 
 const notFound = () => ({ kind: 'notFound', message: 'missing' })

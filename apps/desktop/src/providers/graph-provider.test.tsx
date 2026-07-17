@@ -330,7 +330,7 @@ describe('GraphProvider welcome seeding', () => {
 
   it('marks an unmarked graph with existing notes without writing into it', async () => {
     storedRecents = [{ root: '/existing', name: 'existing', openedMs: 1 }]
-    storedFiles = [{ path: 'daily/2026-06-12.md', size: 10, modifiedMs: 0 }]
+    storedFiles = [{ path: 'journal/2026-06-12.md', size: 10, modifiedMs: 0 }]
     const { result } = renderHook(() => useGraph(), { wrapper })
 
     await act(async () => {

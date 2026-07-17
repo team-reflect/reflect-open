@@ -160,11 +160,11 @@ describe('findExactWikiTargetMatches', () => {
   })
 
   it('preserves daily-date precedence before titles and aliases', async () => {
-    mockInvoke.mockResolvedValue([{ path: 'daily/2026-06-09.md' }])
+    mockInvoke.mockResolvedValue([{ path: 'journal/2026-06-09.md' }])
 
     await expect(findExactWikiTargetMatches('2026-06-09')).resolves.toEqual({
       kind: 'date',
-      paths: ['daily/2026-06-09.md'],
+      paths: ['journal/2026-06-09.md'],
     })
 
     expect(mockInvoke).toHaveBeenCalledTimes(1)
@@ -178,7 +178,7 @@ describe('listDailyNotes', () => {
   it('selects public dailies in the inclusive range, most recent first, capped', async () => {
     mockInvoke.mockResolvedValue([
       {
-        path: 'daily/2026-06-09.md',
+        path: 'journal/2026-06-09.md',
         title: '2026-06-09',
         daily_date: '2026-06-09',
         preview: 'Stand-up notes.',
@@ -191,7 +191,7 @@ describe('listDailyNotes', () => {
 
     expect(rows).toEqual([
       {
-        path: 'daily/2026-06-09.md',
+        path: 'journal/2026-06-09.md',
         title: '2026-06-09',
         dailyDate: '2026-06-09',
         preview: 'Stand-up notes.',
@@ -282,7 +282,7 @@ describe('getBacklinksWithContext', () => {
       indexedLinkCount: 3,
       sources: [
         {
-          path: 'daily/2026-07-01.md',
+          path: 'journal/2026-07-01.md',
           title: '2026-07-01',
           recencyMs: 2_000,
           content: 'daily [[target]]',
@@ -311,7 +311,7 @@ describe('getBacklinksWithContext', () => {
     })
 
     expect(page.contexts.map((row) => row.sourcePath)).toEqual([
-      'daily/2026-07-01.md',
+      'journal/2026-07-01.md',
       'notes/older.md',
     ])
     expect(page.nextCursor).toEqual({ recencyMs: 1_000, sourcePath: 'notes/older.md' })
@@ -320,7 +320,7 @@ describe('getBacklinksWithContext', () => {
       mockInvoke.mock.calls
         .filter(([command]) => command === 'note_read')
         .map(([, args]) => args['path']),
-    ).toEqual(['daily/2026-07-01.md', 'notes/older.md'])
+    ).toEqual(['journal/2026-07-01.md', 'notes/older.md'])
 
     const sourceQuery = dbQueries().find(({ sql }) => sql.includes('select distinct'))
     expect(sourceQuery).toBeDefined()

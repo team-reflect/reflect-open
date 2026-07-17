@@ -51,7 +51,7 @@ export function routesEqual(a: Route, b: Route): boolean {
 
 /**
  * The route a resolved note path navigates to: a real-calendar daily date opens
- * the daily view; anything else — including a `daily/…` file whose name is a
+ * the daily view; anything else — including a `journal/…` file whose name is a
  * well-formed but impossible date (e.g. `2026-02-31`), which `dailyPath` would
  * reject — opens as a plain note so navigation can never crash the workspace.
  */
@@ -62,7 +62,7 @@ export function routeForPath(path: string): NoteRoute {
 
 /**
  * The daily date a route is anchored on: today's date for the `today` route
- * (hence the `today` parameter), the route's own date for `daily/:date`, and
+ * (hence the `today` parameter), the route's own date for `journal/:date`, and
  * null for any route that isn't a daily view (notes, search, chat, settings).
  */
 function dailyDateForRoute(route: Route, today: string): string | null {
@@ -81,7 +81,7 @@ function dailyDateForRoute(route: Route, today: string): string | null {
  * daily stream when there is one, otherwise the route's own daily date. Null
  * when the route isn't a daily view, where the focused day is irrelevant.
  *
- * The stream keeps a single `daily/:date` route as focus moves between days, so
+ * The stream keeps a single `journal/:date` route as focus moves between days, so
  * the focused day — not the routed one — is what both the context sidebar and
  * note-scoped commands must point at. This is the one place that precedence
  * lives, so those two surfaces can never disagree about which day they target.

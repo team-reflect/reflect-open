@@ -31,7 +31,7 @@ use super::{ConflictSide, Resolution};
 
 /// Everything the ladder needs to know about one conflicted note.
 pub struct ConflictInput<'a> {
-    /// Graph-relative path — `daily/` notes qualify for append-union.
+    /// Graph-relative path — `journal/` notes qualify for append-union.
     pub path: &'a str,
     /// The shadow base (last synced content), when the store has one.
     pub base: Option<&'a str>,
@@ -83,7 +83,7 @@ pub fn resolve(input: ConflictInput<'_>) -> AppResult<Resolution> {
         return Ok(Resolution::Merged { content });
     }
 
-    if input.creation_collision || input.path.starts_with("daily/") {
+    if input.creation_collision || input.path.starts_with("journal/") {
         if let Some(content) = append_union(&first.content, &second.content) {
             return Ok(Resolution::Merged { content });
         }
@@ -233,7 +233,7 @@ mod tests {
         // (same-position append), the union rule resolves it.
         let base = "# 2026-07-04\n\n- seed\n";
         let result = resolve(input(
-            "daily/2026-07-04.md",
+            "journal/2026-07-04.md",
             Some(base),
             (
                 side("# 2026-07-04\n\n- seed\n- mac\n", "Mac", 1),
@@ -254,8 +254,8 @@ mod tests {
         let older = side("- seed\n- older tail\n", "Mac", 1);
         let newer = side("- seed\n- newer tail\n", "iPhone", 2);
         // Same pair, both argument orders → identical bytes (convergence).
-        let one = resolve(input("daily/x.md", None, (older.clone(), newer.clone()))).unwrap();
-        let two = resolve(input("daily/x.md", None, (newer, older))).unwrap();
+        let one = resolve(input("journal/x.md", None, (older.clone(), newer.clone()))).unwrap();
+        let two = resolve(input("journal/x.md", None, (newer, older))).unwrap();
         assert_eq!(one, two);
         assert_eq!(
             one,

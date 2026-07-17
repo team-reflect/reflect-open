@@ -77,11 +77,11 @@ describe('useSimilarNotes', () => {
   it('returns an empty array and never queries related notes for an empty daily note', async () => {
     readNote.mockResolvedValue('- \n')
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    const { result } = renderHook(() => useSimilarNotes('daily/2026-06-09.md'), {
+    const { result } = renderHook(() => useSimilarNotes('journal/2026-06-09.md'), {
       wrapper: wrapper(client),
     })
 
-    await waitFor(() => expect(readNote).toHaveBeenCalledWith('daily/2026-06-09.md'))
+    await waitFor(() => expect(readNote).toHaveBeenCalledWith('journal/2026-06-09.md'))
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(relatedNotes).not.toHaveBeenCalled()
     expect(result.current).toEqual([])
@@ -90,12 +90,12 @@ describe('useSimilarNotes', () => {
   it('queries related notes for a daily note once it has authored content', async () => {
     readNote.mockResolvedValue('- real entry\n')
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    const { result } = renderHook(() => useSimilarNotes('daily/2026-06-09.md'), {
+    const { result } = renderHook(() => useSimilarNotes('journal/2026-06-09.md'), {
       wrapper: wrapper(client),
     })
 
     await waitFor(() => expect(result.current.length).toBe(2))
-    expect(readNote).toHaveBeenCalledWith('daily/2026-06-09.md')
-    expect(relatedNotes).toHaveBeenCalledWith('daily/2026-06-09.md', 6)
+    expect(readNote).toHaveBeenCalledWith('journal/2026-06-09.md')
+    expect(relatedNotes).toHaveBeenCalledWith('journal/2026-06-09.md', 6)
   })
 })

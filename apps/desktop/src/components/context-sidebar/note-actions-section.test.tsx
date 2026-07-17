@@ -72,11 +72,11 @@ describe('NoteActionsSection pin toggle', () => {
   })
 
   it('offers Un-pin this note when the index lists the note as pinned', async () => {
-    getPinnedNotes.mockResolvedValue([{ path: 'daily/2026-06-10.md', title: 'June 10th, 2026', dailyDate: '2026-06-10' }])
-    const view = renderSection('daily/2026-06-10.md')
+    getPinnedNotes.mockResolvedValue([{ path: 'journal/2026-06-10.md', title: 'June 10th, 2026', dailyDate: '2026-06-10' }])
+    const view = renderSection('journal/2026-06-10.md')
     await view.findByText('Un-pin this note')
     await userEvent.click(view.getByRole('button', { name: /Un-pin this note/ }))
-    expect(toggleNotePinned).toHaveBeenCalledWith('daily/2026-06-10.md', 7)
+    expect(toggleNotePinned).toHaveBeenCalledWith('journal/2026-06-10.md', 7)
     view.unmount()
   })
 
@@ -151,11 +151,11 @@ describe('NoteActionsSection private toggle', () => {
   })
 
   it('offers Unlock note when the index reports the note private', async () => {
-    getNote.mockResolvedValue(noteRow('daily/2026-06-10.md', true))
-    const view = renderSection('daily/2026-06-10.md')
+    getNote.mockResolvedValue(noteRow('journal/2026-06-10.md', true))
+    const view = renderSection('journal/2026-06-10.md')
     await view.findByText('Unlock note')
     await userEvent.click(view.getByRole('button', { name: /Unlock note/ }))
-    expect(toggleNotePrivate).toHaveBeenCalledWith('daily/2026-06-10.md', 7)
+    expect(toggleNotePrivate).toHaveBeenCalledWith('journal/2026-06-10.md', 7)
     view.unmount()
   })
 
@@ -212,7 +212,7 @@ describe('NoteActionsSection trash action', () => {
   })
 
   it('does not offer trash for daily notes even if enabled', () => {
-    const view = renderSection('daily/2026-06-10.md', true)
+    const view = renderSection('journal/2026-06-10.md', true)
     expect(view.queryByRole('button', { name: 'Trash note' })).toBeNull()
     view.unmount()
   })

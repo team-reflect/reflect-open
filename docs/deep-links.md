@@ -10,7 +10,7 @@ app state, never a remote control.
 
 ```text
 reflect://today                     the daily stream, on today
-reflect://daily/2026-07-01          a specific day (ISO YYYY-MM-DD)
+reflect://journal/2026-07-01          a specific day (ISO YYYY-MM-DD)
 reflect://note/<target>             a note — see resolution below
 reflect://search?q=meeting          the search screen, query prefilled
 reflect://tasks                     the tasks view

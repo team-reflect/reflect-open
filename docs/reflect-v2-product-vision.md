@@ -186,7 +186,7 @@ Notes should be stored as markdown files on disk.
 Recommended default:
 
 - One note per markdown file.
-- Daily notes stored in `daily/YYYY-MM-DD.md`.
+- Daily notes stored in `journal/YYYY-MM-DD.md`.
 - Regular notes stored in `notes/`.
 - Attachments stored in `assets/` and referenced with relative markdown links.
 - File names should be stable and human-readable where possible.
@@ -272,7 +272,7 @@ Standard markdown links should also be supported for external links and file/pat
 
 Daily notes should have stable markdown files and predictable note identities.
 
-Daily notes should default to `daily/YYYY-MM-DD.md`. The date should be derivable from the path; title frontmatter should not be required for normal daily notes.
+Daily notes should default to `journal/YYYY-MM-DD.md`. The date should be derivable from the path; title frontmatter should not be required for normal daily notes.
 
 V2 should support `[[2026-06-08]]` as a date-note link. Natural-language date links can be explored later, but ISO date links should be the first stable contract.
 
@@ -557,9 +557,9 @@ These may come later, but should not define the first wave:
 
 Implementation details are not final, but future agents should start from these defaults unless the product direction changes:
 
-- **Workspace**: a local folder/vault with `daily/`, `notes/`, `assets/`, and ignored `.reflect/`.
+- **Workspace**: a local folder/vault with `journal/`, `notes/`, `assets/`, and ignored `.reflect/`.
 - **Source of truth**: markdown files.
-- **Daily notes**: `daily/YYYY-MM-DD.md`.
+- **Daily notes**: `journal/YYYY-MM-DD.md`.
 - **Note identity**: readable filenames plus stable frontmatter IDs.
 - **Projection layer**: SQLite under ignored `.reflect/`, rebuilt from files wherever practical.
 - **Backlinks**: `[[Wiki Links]]`, stable identity resolution, rename rewrite plus aliases.

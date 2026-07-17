@@ -467,7 +467,7 @@ fn show_resolves_by_title_alias_date_and_path() {
         "notes/project-x.md",
         "---\naliases: [PX]\n---\n# Project X\nthe plan\n",
     );
-    fixture.write_note("daily/2026-01-02.md", "daily body\n");
+    fixture.write_note("journal/2026-01-02.md", "daily body\n");
     fixture.build_index();
 
     for arg in ["Project X", "project x", "PX", "notes/project-x.md"] {
@@ -520,11 +520,11 @@ fn show_blocks_a_private_note_even_when_the_index_says_public() {
 #[test]
 fn show_json_includes_the_daily_date() {
     let fixture = graph();
-    fixture.write_note("daily/2026-01-02.md", "daily body\n");
+    fixture.write_note("journal/2026-01-02.md", "daily body\n");
 
     let value = json(&reflect(&fixture, &["show", "2026-01-02", "--json"]));
     assert_eq!(value["date"], "2026-01-02");
-    assert_eq!(value["path"], "daily/2026-01-02.md");
+    assert_eq!(value["path"], "journal/2026-01-02.md");
     assert_eq!(value["title"], "2026-01-02");
     assert_eq!(value["content"], "daily body\n");
 }
@@ -541,7 +541,7 @@ fn path_resolves_notes_and_would_be_dailies() {
 
     let value = json(&reflect(&fixture, &["path", "2099-01-01", "--json"]));
     assert_eq!(value["date"], "2099-01-01");
-    assert_eq!(value["path"], "daily/2099-01-01.md");
+    assert_eq!(value["path"], "journal/2099-01-01.md");
     assert_eq!(value["exists"], false);
 
     let existing = json(&reflect(
@@ -591,12 +591,12 @@ fn open_print_gives_dailies_the_date_form_even_before_the_file_exists() {
 
     let would_be = reflect(&fixture, &["open", "2099-01-01", "--print"]);
     assert!(would_be.status.success(), "stderr: {}", stderr(&would_be));
-    assert_eq!(stdout(&would_be), "reflect://daily/2099-01-01\n");
+    assert_eq!(stdout(&would_be), "reflect://journal/2099-01-01\n");
 
     // An existing daily resolved by explicit path gets the date form too.
-    fixture.write_note("daily/2026-01-02.md", "daily body\n");
-    let by_path = reflect(&fixture, &["open", "daily/2026-01-02.md", "--print"]);
-    assert_eq!(stdout(&by_path), "reflect://daily/2026-01-02\n");
+    fixture.write_note("journal/2026-01-02.md", "daily body\n");
+    let by_path = reflect(&fixture, &["open", "journal/2026-01-02.md", "--print"]);
+    assert_eq!(stdout(&by_path), "reflect://journal/2026-01-02\n");
 }
 
 #[test]
@@ -661,6 +661,6 @@ fn open_json_shape() {
         &["open", "2026-01-02", "--json", "--print"],
     ));
     assert_eq!(daily["date"], "2026-01-02");
-    assert_eq!(daily["path"], "daily/2026-01-02.md");
-    assert_eq!(daily["url"], "reflect://daily/2026-01-02");
+    assert_eq!(daily["path"], "journal/2026-01-02.md");
+    assert_eq!(daily["url"], "reflect://journal/2026-01-02");
 }

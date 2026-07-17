@@ -51,7 +51,7 @@ surface yet.
 | Legacy source | Responsibility |
 | --- | --- |
 | `reflect-editor/src/types.ts`, `components/reflect-editor.props.ts`, and `extensions/backlink/backlink-hover-plugin.ts` | Exposed `(event, backlink, hovering)`, delegated editor mouse events, recovered the backlink node, and de-duplicated repeated hits. |
-| `reflect/client/models/note/note-document-view.ts`, `screens/main/note-edit/note-edit-main.tsx`, and `screens/main/notes-daily/note-item.tsx` | Looked up `backlink.id`, held preview state, and wired the same card into regular/split and daily editors. |
+| `reflect/client/models/note/note-document-view.ts`, `screens/main/note-edit/note-edit-main.tsx`, and `screens/main/notes-journal/note-item.tsx` | Looked up `backlink.id`, held preview state, and wired the same card into regular/split and daily editors. |
 | `reflect/components/pointer-card/pointer-card-anchor.tsx`, `note-preview/note-preview-popover.tsx`, and `ui/popover.tsx` | Followed the pointer with a virtual Radix anchor, handled collisions, portaled the card, and preserved editor focus. |
 | `reflect/components/note-preview/popover/note-content.tsx`, `note-book.tsx`, and `utils.ts` | Rendered stored `note.documentHtml` in the clipped static editor or selected the ASIN-specific book card. |
 

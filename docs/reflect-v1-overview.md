@@ -628,7 +628,7 @@ Useful starting points:
 - `client/screens/main/notes-sidebar/notes-sidebar.tsx`: primary app navigation.
 - `client/screens/main/main-tabgroup.tsx`: main screen selection.
 - `client/screens/main/note-edit/note-edit-main.tsx`: editor integration.
-- `client/screens/main/notes-daily/`: daily notes UI.
+- `client/screens/main/notes-journal/`: daily notes UI.
 - `client/screens/main/notes-list/`: all-notes table UI.
 - `client/screens/main/notes-search/`: search modal and AI chat.
 - `client/screens/main/tasks/`: task list experience.

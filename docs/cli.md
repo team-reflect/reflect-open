@@ -59,7 +59,7 @@ just-flagged note.
 
 ### `reflect today [--path] [--json]`
 
-Prints today's daily note (`daily/YYYY-MM-DD.md`, local timezone). File-only —
+Prints today's daily note (`journal/YYYY-MM-DD.md`, local timezone). File-only —
 works with no index. A missing daily is exit `3`; with `--path` the would-be
 path is printed even before the file exists (dailies are created lazily, so
 this is how editors/scripts create them).
@@ -68,8 +68,8 @@ this is how editors/scripts create them).
 // reflect today --json
 {
   "date": "2026-06-11",
-  "path": "daily/2026-06-11.md",
-  "absolutePath": "/…/graph/daily/2026-06-11.md",
+  "path": "journal/2026-06-11.md",
+  "absolutePath": "/…/graph/journal/2026-06-11.md",
   "title": "2026-06-11",
   "content": "…"
 }
@@ -131,7 +131,7 @@ prints the would-be daily path even before the file exists.
 
 ```jsonc
 // reflect path 2099-01-01 --json   ("date" only appears for dailies)
-{ "date": "2099-01-01", "path": "daily/2099-01-01.md", "absolutePath": "…", "exists": false }
+{ "date": "2099-01-01", "path": "journal/2099-01-01.md", "absolutePath": "…", "exists": false }
 ```
 
 ### `reflect open <note> [--print] [--json]`

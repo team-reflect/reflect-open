@@ -3,7 +3,7 @@ import { effectiveDailyDate, notePathForRoute, routeForPath, routesEqual } from 
 
 describe('routeForPath', () => {
   it('routes real daily paths to the daily view', () => {
-    expect(routeForPath('daily/2026-06-09.md')).toEqual({ kind: 'daily', date: '2026-06-09' })
+    expect(routeForPath('journal/2026-06-09.md')).toEqual({ kind: 'daily', date: '2026-06-09' })
   })
 
   it('routes regular notes to the note view', () => {
@@ -12,9 +12,9 @@ describe('routeForPath', () => {
 
   it('routes a daily file with an impossible calendar date as a plain note', () => {
     // dailyPath() would throw on 2026-02-31 — navigation must not crash.
-    expect(routeForPath('daily/2026-02-31.md')).toEqual({
+    expect(routeForPath('journal/2026-02-31.md')).toEqual({
       kind: 'note',
-      path: 'daily/2026-02-31.md',
+      path: 'journal/2026-02-31.md',
     })
   })
 })
@@ -43,9 +43,9 @@ describe('notePathForRoute', () => {
   it('resolves the file note-scoped commands act on', () => {
     expect(notePathForRoute({ kind: 'note', path: 'notes/a.md' }, TODAY)).toBe('notes/a.md')
     expect(notePathForRoute({ kind: 'daily', date: '2026-06-09' }, TODAY)).toBe(
-      'daily/2026-06-09.md',
+      'journal/2026-06-09.md',
     )
-    expect(notePathForRoute({ kind: 'today' }, TODAY)).toBe('daily/2026-06-10.md')
+    expect(notePathForRoute({ kind: 'today' }, TODAY)).toBe('journal/2026-06-10.md')
   })
 
   it('is null on screens that edit no note', () => {

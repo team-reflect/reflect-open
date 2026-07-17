@@ -92,7 +92,7 @@ present) · `Backup failed` (action needed). Git mechanics never surface.
    `git_push` (rejections returned as data). Health checks: refuse foreign states —
    detached HEAD, in-progress rebase — with a typed error, never guess. Remote-agnostic;
    credentials via callback from the keychain. `.reflect/` stays gitignored (Plan 02);
-   the watcher only tracks `daily/` + `notes/`, so `.git/` is never watched.
+   the watcher only tracks `journal/` + `notes/`, so `.git/` is never watched.
 
 2. **GitHub module** (`sync/github.ts` in core): device flow + silent token refresh,
    repo creation + metadata (visibility, default branch), `GET /user` identity, and an
@@ -134,7 +134,7 @@ present) · `Backup failed` (action needed). Git mechanics never surface.
      external-change reconciliation (clean buffer reloads; dirty buffer prompts).
    - **Daily notes are the common collision** (two devices, same day). Markers +
      keep-both cover it first wave; future: a custom merge driver (libgit2 registers
-     them in code) for append-friendly merging of `daily/*.md`. *(That future work
+     them in code) for append-friendly merging of `journal/*.md`. *(That future work
      shipped via [Plan 21](./21-icloud-drive-sync.md) as the resolution ladder's
      append-union rung — on the iCloud path, not as a libgit2 merge driver.)*
 

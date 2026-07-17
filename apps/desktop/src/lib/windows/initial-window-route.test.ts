@@ -10,7 +10,7 @@ beforeEach(resetInitialWindowRouteForTests)
 
 describe('initialRouteForDeepLink', () => {
   it('derives navigate links directly', () => {
-    expect(initialRouteForDeepLink('reflect://daily/2026-07-05')).toEqual({
+    expect(initialRouteForDeepLink('reflect://journal/2026-07-05')).toEqual({
       kind: 'daily',
       date: '2026-07-05',
     })

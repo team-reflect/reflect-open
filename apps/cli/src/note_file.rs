@@ -324,7 +324,7 @@ pub fn ensure_not_private(root: &Path, rel_path: &str) -> Result<(), CliError> {
     Ok(())
 }
 
-/// Every `.md` under `daily/` + `notes/`, recursively — same contract as the
+/// Every `.md` under `journal/` + `notes/`, recursively — same contract as the
 /// desktop's `collect_markdown`: symlinks are skipped, paths come back
 /// graph-relative and forward-slashed.
 pub fn walk_notes(root: &Path) -> Result<Vec<DiskNote>, CliError> {
@@ -393,7 +393,7 @@ mod tests {
         let meta = parse_note_meta("notes/a.md", "## only an h2\n");
         assert_eq!(meta.title, "a");
 
-        let meta = parse_note_meta("daily/2026-06-11.md", "plain text\n");
+        let meta = parse_note_meta("journal/2026-06-11.md", "plain text\n");
         assert_eq!(meta.title, "2026-06-11");
 
         let meta = parse_note_meta("notes/Fancy Name.md", "no headings\n");

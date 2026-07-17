@@ -242,7 +242,7 @@ describe('app commands', () => {
     })
 
     const { context: focusedDaily } = fakeContext({
-      notePath: () => 'daily/2026-06-18.md',
+      notePath: () => 'journal/2026-06-18.md',
     })
     await command('note.openInNewWindow').run(focusedDaily)
     expect(openRouteInNewWindow).toHaveBeenLastCalledWith({ kind: 'daily', date: '2026-06-18' })
@@ -273,11 +273,11 @@ describe('app commands', () => {
     expect(toggleNotePinned).toHaveBeenCalledWith('notes/a.md', 7)
   })
 
-  it('note.togglePin targets the daily file on daily/today routes', async () => {
+  it('note.togglePin targets the daily file on journal/today routes', async () => {
     toggleNotePinned.mockClear()
     const { context } = fakeContext({ route: () => ({ kind: 'daily', date: '2026-06-09' }) })
     await command('note.togglePin').run(context)
-    expect(toggleNotePinned).toHaveBeenCalledWith('daily/2026-06-09.md', 7)
+    expect(toggleNotePinned).toHaveBeenCalledWith('journal/2026-06-09.md', 7)
   })
 
   it('note.togglePin reports a failed pin as "Pinning note", never an unhandled throw', async () => {

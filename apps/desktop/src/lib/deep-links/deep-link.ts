@@ -21,7 +21,7 @@ export const DEEP_LINK_TEXT_MAX_LENGTH = TEXT_CAPTURE_MAX_LENGTH
 /**
  * A parsed deep link:
  *
- * - `navigate` — self-contained routes (`today`, `daily/<date>`, `search`,
+ * - `navigate` — self-contained routes (`today`, `journal/<date>`, `search`,
  *   `tasks`) that map straight onto {@link Route}.
  * - `openNote` — `note/<target>`, where `<target>` still needs resolution
  *   (frontmatter id → date → title → alias) against the open graph's index.

@@ -156,7 +156,7 @@ pub async fn icloud_pending_count(root: String, notes_only: bool) -> AppResult<u
 
 /// The graph's note directories — the download-scope filter and the
 /// graph-detection probe share one list.
-const NOTE_DIRS: [&str; 3] = ["daily", "notes", "templates"];
+const NOTE_DIRS: [&str; 3] = ["journal", "notes", "templates"];
 
 /// Whether a placeholder found under `rel_dir` (the stub's directory,
 /// graph-relative) standing for `target` falls in the notes-only download
@@ -197,7 +197,7 @@ fn find_graph_dirs(documents: &Path) -> Vec<PathBuf> {
 ///
 /// Looks one level into the standard note directories rather than requiring
 /// `.reflect/meta.json`: the index directory is excluded from sync on
-/// purpose, so a synced-down graph arrives as bare `daily/`/`notes/` content.
+/// purpose, so a synced-down graph arrives as bare `journal/`/`notes/` content.
 fn dir_has_notes(root: &Path) -> bool {
     NOTE_DIRS.iter().any(|dir| {
         let Ok(entries) = std::fs::read_dir(root.join(dir)) else {
@@ -512,7 +512,7 @@ mod tests {
         assert_eq!(find_graph_dirs(documents.path()), Vec::<PathBuf>::new());
 
         std::fs::create_dir_all(documents.path().join("Notes/daily")).expect("mkdir");
-        std::fs::write(documents.path().join("Notes/daily/2026-07-04.md"), b"# hi").expect("write");
+        std::fs::write(documents.path().join("Notes/journal/2026-07-04.md"), b"# hi").expect("write");
         assert_eq!(
             find_graph_dirs(documents.path()),
             vec![documents.path().join("Notes")]
@@ -620,10 +620,10 @@ mod tests {
         let root = tempfile::tempdir().expect("tempdir");
         assert!(!dir_has_notes(root.path()));
 
-        std::fs::create_dir_all(root.path().join("daily")).expect("mkdir");
+        std::fs::create_dir_all(root.path().join("journal")).expect("mkdir");
         assert!(!dir_has_notes(root.path()));
 
-        std::fs::write(root.path().join("daily/.2026-07-04.md.icloud"), b"stub").expect("write");
+        std::fs::write(root.path().join("journal/.2026-07-04.md.icloud"), b"stub").expect("write");
         assert!(dir_has_notes(root.path()));
 
         let downloaded = tempfile::tempdir().expect("tempdir");
@@ -636,7 +636,7 @@ mod tests {
     fn note_scope_covers_markdown_under_note_dirs_only() {
         // Markdown in the tracked directories (nested included) is in scope.
         assert!(placeholder_in_note_scope(
-            Path::new("daily"),
+            Path::new("journal"),
             "2026-07-04.md"
         ));
         assert!(placeholder_in_note_scope(Path::new("notes"), "idea.md"));

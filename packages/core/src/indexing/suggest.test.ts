@@ -179,7 +179,7 @@ describe('mergeDateSuggestions', () => {
   it('reuses an existing daily row (real path) and marks it generated once', () => {
     const existingDaily = ranked('2020-01-06', {
       target: '2020-01-06',
-      path: 'daily/2020-01-06.md',
+      path: 'journal/2020-01-06.md',
       date: '2020-01-06',
     })
     const result = mergeDateSuggestions(
@@ -189,7 +189,7 @@ describe('mergeDateSuggestions', () => {
     )
     expect(result).toHaveLength(2)
     expect(result[0]).toMatchObject({
-      path: 'daily/2020-01-06.md',
+      path: 'journal/2020-01-06.md',
       generated: { phrase: 'This Monday' },
     })
     expect(result.map((row) => row.target)).toEqual(['2020-01-06', 'Other'])

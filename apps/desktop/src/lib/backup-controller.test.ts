@@ -576,7 +576,7 @@ describe('createBackupController', () => {
         conflictedPaths: [],
         changedFiles: [
           { path: 'notes/from-b.md', kind: 'upsert', modifiedMs: 123 },
-          { path: 'daily/2026-06-11.md', kind: 'remove' },
+          { path: 'journal/2026-06-11.md', kind: 'remove' },
           // Not a note — but a pulled recording must still reach the
           // audio-memo reconciler, which subscribes to this same channel.
           {
@@ -597,7 +597,7 @@ describe('createBackupController', () => {
     })
     expect(batches[0]).toEqual([
       { path: 'notes/from-b.md', kind: 'upsert', modifiedMs: 123 },
-      { path: 'daily/2026-06-11.md', kind: 'remove' },
+      { path: 'journal/2026-06-11.md', kind: 'remove' },
       { path: 'audio-memos/audio-memo-2026-06-11-090000-000.m4a', kind: 'upsert', modifiedMs: 456 },
     ])
     controller.dispose()

@@ -928,7 +928,7 @@ describe('useNoteDocument', () => {
       })
 
       const hook = renderHook(() =>
-        useNoteDocument('daily/2026-06-09.md', 1, { createIfMissing: true }),
+        useNoteDocument('journal/2026-06-09.md', 1, { createIfMissing: true }),
       )
       await act(() => vi.advanceTimersByTimeAsync(0))
       expect(hook.result.current.status).toBe('ready')

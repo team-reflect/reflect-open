@@ -30,7 +30,7 @@ layout:
 
 ```text
 <graph>/
-├── daily/YYYY-MM-DD.md      # daily notes; date derivable from path
+├── journal/YYYY-MM-DD.md      # daily notes; date derivable from path
 ├── notes/<slug>.md          # regular notes; readable filenames
 ├── assets/                  # attachments; referenced via relative md links
 ├── audio-memos/             # raw memo recordings (created on demand, not
@@ -86,7 +86,7 @@ private: true      # optional; hard-blocks cloud AI/capture for this note
    the OS app-config dir). A `GraphProvider` + `useGraph` hook exposes the
    active graph root and ready-state to the UI.
 
-4. **`.reflect/` bootstrap.** On open, ensure `daily/`, `notes/`, `assets/`,
+4. **`.reflect/` bootstrap.** On open, ensure `journal/`, `notes/`, `assets/`,
    `.reflect/` exist; write a graph `.gitignore` (ignoring `.reflect/`) and a tiny
    `.reflect/meta.json` (schema version) so upgrades can detect format changes.
 
@@ -126,10 +126,10 @@ private: true      # optional; hard-blocks cloud AI/capture for this note
 
 ## Acceptance criteria
 
-- User picks a folder; app scaffolds `daily/ notes/ assets/ .reflect/` + `.gitignore`.
+- User picks a folder; app scaffolds `journal/ notes/ assets/ .reflect/` + `.gitignore`.
 - A note can be written and read back byte-identical through the IPC layer.
 - Deleting a note moves it to OS trash; reopening the graph still works.
-- Path helpers have unit tests covering daily/regular/asset and traversal rejection.
+- Path helpers have unit tests covering journal/regular/asset and traversal rejection.
 - `pnpm typecheck` + targeted tests pass.
 
 ## Risks

@@ -146,7 +146,7 @@ Mirror the indexing-strategy projection table list:
 
 4. **File watching + echo suppression.** Rust `notify`-based watcher over the graph
    (excluding `.reflect/`). Debounce + enqueue; do not parse inline. **Only index `.md`
-   under `daily/`+`notes/` (and track `assets/`); ignore everything else** (other apps'
+   under `journal/`+`notes/` (and track `assets/`); ignore everything else** (other apps'
    files, `.DS_Store`, dotfiles). Handle create/modify/delete/rename, editor temp files,
    sync duplicate-conflict files (`note 2.md`), and not-yet-downloaded placeholder files
    (skip + retry). **Suppress our own writes** so autosave doesn't loop: the writer

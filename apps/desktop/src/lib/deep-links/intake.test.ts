@@ -130,11 +130,11 @@ describe('deep-link intake', () => {
     setDeepLinkHandler(first)
     setDeepLinkHandler(null)
 
-    pluginDeliver(['reflect://daily/2026-07-01'])
+    pluginDeliver(['reflect://journal/2026-07-01'])
     expect(first).not.toHaveBeenCalled()
 
     const second = vi.fn()
     setDeepLinkHandler(second)
-    expect(second).toHaveBeenCalledWith('reflect://daily/2026-07-01')
+    expect(second).toHaveBeenCalledWith('reflect://journal/2026-07-01')
   })
 })

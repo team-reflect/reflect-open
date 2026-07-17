@@ -50,7 +50,7 @@ describe('buildPaletteSections', () => {
     })
     expect(result.notes.map((note) => note.path)).toEqual([
       'notes/monday-standup.md',
-      'daily/2020-01-06.md',
+      'journal/2020-01-06.md',
     ])
     expect(result.notes.find((note) => note.date === '2020-01-06')?.phrase).toBe('This Monday')
   })
@@ -97,7 +97,7 @@ describe('buildPaletteSections', () => {
   it('a daily body hit keeps its day label in the merge', () => {
     const result = sections({
       query: 'standup',
-      hits: [hit('daily/2026-06-05.md', '2026-06-05', 'standup notes', '2026-06-05')],
+      hits: [hit('journal/2026-06-05.md', '2026-06-05', 'standup notes', '2026-06-05')],
     })
     expect(result.notes[0]!.date).toBe('2026-06-05')
   })
@@ -111,7 +111,7 @@ describe('buildPaletteSections', () => {
     })
     expect(result.notes).toEqual([
       {
-        path: 'daily/2026-08-01.md',
+        path: 'journal/2026-08-01.md',
         title: '2026-08-01',
         date: '2026-08-01',
         snippet: null,
@@ -141,13 +141,13 @@ describe('buildPaletteSections', () => {
       query: '#work is:daily',
       suggestions: [suggestion('notes/ignored.md', 'Ignored')],
       hits: [
-        hit('daily/2026-06-08.md', '2026-06-08', null, '2026-06-08'),
+        hit('journal/2026-06-08.md', '2026-06-08', null, '2026-06-08'),
         hit('notes/w.md', 'Work log', 'tagged …'),
       ],
       filtered: true,
       commands: COMMANDS,
     })
-    expect(result.notes.map((note) => note.path)).toEqual(['daily/2026-06-08.md', 'notes/w.md'])
+    expect(result.notes.map((note) => note.path)).toEqual(['journal/2026-06-08.md', 'notes/w.md'])
     expect(result.notes[0]!.date).toBe('2026-06-08')
     expect(result.commands).toEqual([])
   })
@@ -197,7 +197,7 @@ describe('buildPaletteSections', () => {
       suggestions: [
         {
           target: '2026-06-09',
-          path: 'daily/2026-06-09.md',
+          path: 'journal/2026-06-09.md',
           title: '2026-06-09',
           alias: null,
           date: '2026-06-09',

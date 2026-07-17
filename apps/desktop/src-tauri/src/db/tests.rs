@@ -271,7 +271,7 @@ fn backlink_resolution_uses_daily_then_title_then_alias_precedence() {
     )
     .unwrap();
     apply_note(&conn, &note("notes/titled-date.md", "2026-07-10", vec![])).unwrap();
-    apply_note(&conn, &daily_note("daily/2026-07-10.md", "2026-07-10")).unwrap();
+    apply_note(&conn, &daily_note("journal/2026-07-10.md", "2026-07-10")).unwrap();
     apply_note(
         &conn,
         &note(
@@ -304,7 +304,7 @@ fn backlink_resolution_uses_daily_then_title_then_alias_precedence() {
     assert_eq!(rows[0]["source_path"], Value::from("notes/dad-source.md"));
     assert_eq!(rows[0]["target_path"], Value::from("notes/dad.md"));
     assert_eq!(rows[1]["source_path"], Value::from("notes/date-source.md"));
-    assert_eq!(rows[1]["target_path"], Value::from("daily/2026-07-10.md"));
+    assert_eq!(rows[1]["target_path"], Value::from("journal/2026-07-10.md"));
 }
 
 #[test]
@@ -832,7 +832,7 @@ fn open_tasks_read_includes_private_notes_and_excludes_completed() {
     // to note context, completed tasks excluded, and `private: true` notes' tasks
     // INCLUDED (the Tasks view is a local-only surface, like local search).
     let conn = migrated();
-    let mut public = note("daily/2026-06-10.md", "A", vec![]);
+    let mut public = note("journal/2026-06-10.md", "A", vec![]);
     public.kind = "daily".to_string();
     public.daily_date = Some("2026-06-10".to_string());
     public.tasks = vec![task(2, "open a", false)];
@@ -853,7 +853,7 @@ fn open_tasks_read_includes_private_notes_and_excludes_completed() {
     .unwrap();
 
     assert_eq!(rows.len(), 2); // both open tasks; the completed one is gone
-    assert_eq!(rows[0]["note_path"], Value::from("daily/2026-06-10.md"));
+    assert_eq!(rows[0]["note_path"], Value::from("journal/2026-06-10.md"));
     assert_eq!(rows[0]["text"], Value::from("open a"));
     assert_eq!(rows[0]["note_title"], Value::from("A"));
     assert_eq!(rows[0]["daily_date"], Value::from("2026-06-10"));
@@ -896,7 +896,7 @@ fn note_kind_daily_date_invariant_is_enforced() {
 
     let daily_without_date = conn.execute(
         "INSERT INTO notes(path, title, title_key, kind, daily_date, file_hash)
-         VALUES('daily/2026-07-01.md', 'July 1st, 2026', 'july 1st, 2026', 'daily', NULL, 'h')",
+         VALUES('journal/2026-07-01.md', 'July 1st, 2026', 'july 1st, 2026', 'daily', NULL, 'h')",
         [],
     );
     assert!(
@@ -917,7 +917,7 @@ fn note_kind_daily_date_invariant_is_enforced() {
     // The three shapes buildIndexedNote actually emits all pass.
     conn.execute_batch(
         "INSERT INTO notes(path, title, title_key, kind, daily_date, file_hash) VALUES
-           ('daily/2026-07-01.md', 'July 1st, 2026', 'july 1st, 2026', 'daily', '2026-07-01', 'h'),
+           ('journal/2026-07-01.md', 'July 1st, 2026', 'july 1st, 2026', 'daily', '2026-07-01', 'h'),
            ('notes/a.md', 'A', 'a', 'note', NULL, 'h'),
            ('templates/j.md', 'J', 'j', 'template', NULL, 'h');",
     )
@@ -935,7 +935,7 @@ fn kind_invariant_migration_wipes_the_projection_for_reindex() {
     migrate_to(&mut conn, 14).expect("migrate to v14");
     conn.execute_batch(
         "INSERT INTO notes(path, title, title_key, kind, daily_date, file_hash) VALUES
-           ('daily/2026-07-01.md', 'July 1st, 2026', 'july 1st, 2026', 'daily', '2026-07-01', 'h1'),
+           ('journal/2026-07-01.md', 'July 1st, 2026', 'july 1st, 2026', 'daily', '2026-07-01', 'h1'),
            ('notes/a.md', 'A', 'a', 'note', NULL, 'h2');
          INSERT INTO note_text(note_path, text) VALUES('notes/a.md', 'A body');
          INSERT INTO links(source_path, kind, target_raw, target_key, pos_from, pos_to)

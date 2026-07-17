@@ -38,7 +38,7 @@ export const ESTIMATED_DAY_HEIGHT = 220
  * The daily stream (Plan 06b): a virtualized chronological run of days — past
  * above, future below — where **every day is a virtual note**. Each visible row
  * mounts the Plan 05 editor lazily (`createIfMissing`), so a day only becomes a
- * real `daily/*.md` when edited. Offscreen rows unmount and flush through the
+ * real `journal/*.md` when edited. Offscreen rows unmount and flush through the
  * save pipeline's final-flush path. The window is a fixed ±range around today
  * (virtual rows are free), so there is no bidirectional infinite-scroll
  * bookkeeping; index↔date is pure offset math.

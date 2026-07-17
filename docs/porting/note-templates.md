@@ -22,12 +22,12 @@ substitution — bodies were inserted verbatim.
 
 ### Templates are files
 
-A `templates/` folder at the graph root, as a sibling of `daily/` and
+A `templates/` folder at the graph root, as a sibling of `journal/` and
 `notes/`:
 
 ```text
 my-graph/
-├── daily/
+├── journal/
 ├── notes/
 ├── templates/
 │   ├── journal.md

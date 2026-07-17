@@ -52,7 +52,7 @@ describe('deleteOpenNote', () => {
   it('rejects daily notes without touching disk', async () => {
     isDailyMock.mockReturnValue(true)
 
-    await expect(deleteOpenNote('daily/2026-06-10.md', 3)).rejects.toThrow(
+    await expect(deleteOpenNote('journal/2026-06-10.md', 3)).rejects.toThrow(
       'Daily notes cannot be deleted',
     )
 

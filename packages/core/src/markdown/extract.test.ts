@@ -60,7 +60,7 @@ describe('parseNote — headings & title', () => {
     expect(parse('---\ntitle: From FM\n---\n# Ignored').title).toBe('From FM')
     expect(parse('# The H1\n\nbody').title).toBe('The H1')
     expect(parse('no heading', 'notes/charlotte-maccaw.md').title).toBe('charlotte-maccaw')
-    expect(parse('no heading', 'daily/2026-06-09.md').title).toBe('2026-06-09')
+    expect(parse('no heading', 'journal/2026-06-09.md').title).toBe('2026-06-09')
   })
 
   it('hasAuthoredTitle mirrors the derivation: true iff the title is not a path fallback', () => {
@@ -69,7 +69,7 @@ describe('parseNote — headings & title', () => {
     expect(hasAuthoredTitle(parse('no heading', 'notes/charlotte-maccaw.md'))).toBe(false)
     expect(hasAuthoredTitle(parse('## only a section', 'notes/x.md'))).toBe(false)
     expect(hasAuthoredTitle(parse('---\ntitle: "  "\n---\nbody'))).toBe(false)
-    expect(hasAuthoredTitle(parse('no heading', 'daily/2026-06-09.md'))).toBe(false)
+    expect(hasAuthoredTitle(parse('no heading', 'journal/2026-06-09.md'))).toBe(false)
   })
 })
 

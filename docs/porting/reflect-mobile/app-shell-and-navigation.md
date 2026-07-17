@@ -12,7 +12,7 @@ measured against, and the pieces v2 deliberately changed.
 The app is an Ionic tab shell (`client/core/router-tabs.tsx`) with three
 bottom tabs and a floating action button:
 
-- **Daily** (pencil icon) → `/:graph/daily/:id` — the default surface.
+- **Daily** (pencil icon) → `/:graph/journal/:id` — the default surface.
 - **Tasks** (checkmark icon) → `/:graph/tasks`.
 - **All** (list icon) → `/:graph/all`, with a detail stack
   (`/:graph/all/:id`), tag filters (`/:graph/all/tag/:tag`), and the AI

@@ -2,7 +2,7 @@
 
 > **Status (2026-06-14):** Closed by product decision. We are **not** building a
 > dedicated import/export portability surface. Reflect's portability contract is the
-> graph itself: ordinary markdown files in `daily/`, `notes/`, and `assets/`, plus a
+> graph itself: ordinary markdown files in `journal/`, `notes/`, and `assets/`, plus a
 > rebuildable `.reflect/` index that can be deleted at any time.
 
 ## Decision
@@ -22,7 +22,7 @@ exported graph folder directly.
 ## Portability Contract
 
 - The graph folder is the export. Copy or zip the folder directly.
-- `daily/`, `notes/`, and `assets/` contain the user-owned durable data.
+- `journal/`, `notes/`, and `assets/` contain the user-owned durable data.
 - `.reflect/` is excluded from the portability contract. It is a rebuildable local
   projection, except for explicitly documented durable local tables such as `chat_*`.
 - Markdown frontmatter carries minimal metadata such as stable IDs, aliases, `private`,

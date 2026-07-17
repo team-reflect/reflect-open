@@ -20,7 +20,7 @@ Three rules make the whole system hang together:
    zero links by construction. This is the keystone: everything below is
    cheap *because* links never reference filenames.
 
-Daily notes are untouched by all of this — `daily/YYYY-MM-DD.md` is already
+Daily notes are untouched by all of this — `journal/YYYY-MM-DD.md` is already
 the readable contract, and their date labels never rename.
 
 ## The slug

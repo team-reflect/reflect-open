@@ -624,7 +624,7 @@ fn move_to_graph_trash(root: &Path, abs: &Path) -> AppResult<()> {
     Ok(())
 }
 
-/// List markdown notes under `daily/` and `notes/`. `generation`, when given,
+/// List markdown notes under `journal/` and `notes/`. `generation`, when given,
 /// pins the listing to the issuing graph session (see [`root_for`]).
 #[tauri::command]
 pub fn list_files(generation: Option<u64>, state: State<GraphState>) -> AppResult<Vec<FileMeta>> {

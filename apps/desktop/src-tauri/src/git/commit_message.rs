@@ -473,7 +473,7 @@ fn clean_heading_text(raw: &str) -> String {
 }
 
 fn daily_date(path: &str) -> Option<&str> {
-    let date = path.strip_prefix("daily/")?.strip_suffix(".md")?;
+    let date = path.strip_prefix("journal/")?.strip_suffix(".md")?;
     is_date_shaped(date).then_some(date)
 }
 

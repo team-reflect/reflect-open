@@ -61,7 +61,7 @@ function renderSidebar(date: string) {
 
 function noteRow(overrides: Partial<NoteRow> = {}): NoteRow {
   return {
-    path: 'daily/2026-06-09.md',
+    path: 'journal/2026-06-09.md',
     title: '2026-06-09',
     dailyDate: '2026-06-09',
     isPrivate: false,
@@ -190,7 +190,7 @@ describe('DailyContextSidebar calendar', () => {
 describe('DailyContextSidebar related notes', () => {
   it('renders no Similar notes section without results', async () => {
     const view = renderSidebar('2026-06-09')
-    await waitFor(() => expect(relatedNotes).toHaveBeenCalledWith('daily/2026-06-09.md', 6))
+    await waitFor(() => expect(relatedNotes).toHaveBeenCalledWith('journal/2026-06-09.md', 6))
     expect(view.queryByText('Similar notes')).toBeNull()
     view.unmount()
   })
@@ -198,7 +198,7 @@ describe('DailyContextSidebar related notes', () => {
   it('does not calculate Similar notes for an empty-bullet daily note', async () => {
     readNote.mockResolvedValue('- \n')
     const view = renderSidebar('2026-06-09')
-    await waitFor(() => expect(readNote).toHaveBeenCalledWith('daily/2026-06-09.md'))
+    await waitFor(() => expect(readNote).toHaveBeenCalledWith('journal/2026-06-09.md'))
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(relatedNotes).not.toHaveBeenCalled()
     expect(view.queryByText('Similar notes')).toBeNull()

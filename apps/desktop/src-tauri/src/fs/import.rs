@@ -1,7 +1,7 @@
 //! Reflect V1 export import.
 //!
 //! Reflect V1 now exports the same markdown graph layout Reflect Open reads:
-//! `daily/`, `notes/`, optional `assets/`, plus ignorable local metadata. The
+//! `journal/`, `notes/`, optional `assets/`, plus ignorable local metadata. The
 //! import path is therefore a bounded archive extraction into the active graph,
 //! not a content migration — with one addition: attachments the notes link
 //! straight to Firebase Storage or Reflect's asset CDN are downloaded into
@@ -243,7 +243,7 @@ fn ensure_has_notes(entries: &[ImportEntry]) -> AppResult<()> {
         .any(|entry| is_note_markdown(&entry.relative))
     {
         return Err(AppError::not_found(
-            "that doesn't look like a Reflect V1 export — no notes found under daily/ or notes/",
+            "that doesn't look like a Reflect V1 export — no notes found under journal/ or notes/",
         ));
     }
     Ok(())
@@ -635,12 +635,12 @@ fn without_leading_h1(text: &str) -> &str {
     }
 }
 
-/// Is this relative path a daily note (`daily/YYYY-MM-DD.md`)? Mirrors the
+/// Is this relative path a daily note (`journal/YYYY-MM-DD.md`)? Mirrors the
 /// frontend's `DAILY_PATH_RE` — only dated names are part of the daily
-/// stream; anything else under `daily/` is an ordinary note.
+/// stream; anything else under `journal/` is an ordinary note.
 fn is_daily_note(relative: &str) -> bool {
     let Some(stem) = relative
-        .strip_prefix("daily/")
+        .strip_prefix("journal/")
         .and_then(|name| name.strip_suffix(".md"))
     else {
         return false;
@@ -737,7 +737,7 @@ fn wrapper_prefix(paths: &[String]) -> Option<String> {
         }
     }
     let shared = shared?;
-    if matches!(shared, "daily" | "notes" | "assets" | ".reflect") {
+    if matches!(shared, "journal" | "notes" | "assets" | ".reflect") {
         return None;
     }
     Some(shared.to_string())
@@ -798,7 +798,7 @@ fn is_note_markdown(relative: &str) -> bool {
     let Some(first) = parts.next() else {
         return false;
     };
-    matches!(first, "daily" | "notes")
+    matches!(first, "journal" | "notes")
         && Path::new(relative)
             .extension()
             .and_then(|value| value.to_str())
@@ -967,7 +967,7 @@ mod tests {
             root.path(),
             entries(&[
                 ("notes/a.md", "# A\n"),
-                ("daily/2026-07-04.md", "Today\n"),
+                ("journal/2026-07-04.md", "Today\n"),
                 ("assets/pic.bin", "raw"),
             ]),
         )
@@ -987,7 +987,7 @@ mod tests {
                 changed_paths: vec![
                     "assets/pic.bin".to_string(),
                     "notes/a.md".to_string(),
-                    "daily/2026-07-04.md".to_string()
+                    "journal/2026-07-04.md".to_string()
                 ],
             }
         );
@@ -996,7 +996,7 @@ mod tests {
             "# A\n"
         );
         assert_eq!(
-            fs::read_to_string(root.path().join("daily/2026-07-04.md")).unwrap(),
+            fs::read_to_string(root.path().join("journal/2026-07-04.md")).unwrap(),
             "Today\n"
         );
         assert_eq!(
@@ -1062,9 +1062,9 @@ mod tests {
     #[test]
     fn conflicting_daily_notes_merge_into_the_existing_note() {
         let root = tempdir().unwrap();
-        fs::create_dir_all(root.path().join("daily")).unwrap();
+        fs::create_dir_all(root.path().join("journal")).unwrap();
         fs::write(
-            root.path().join("daily/2026-07-04.md"),
+            root.path().join("journal/2026-07-04.md"),
             "# July 4th, 2026\n\n- written in V2\n",
         )
         .unwrap();
@@ -1072,7 +1072,7 @@ mod tests {
         let summary = import_entries_into_graph(
             root.path(),
             entries(&[(
-                "daily/2026-07-04.md",
+                "journal/2026-07-04.md",
                 "---\nid: abc\n---\n\n# July 4th, 2026\n\n- written in V1\n",
             )]),
         )
@@ -1082,10 +1082,10 @@ mod tests {
         assert_eq!(summary.merged_files, 1);
         assert_eq!(
             summary.changed_paths,
-            vec!["daily/2026-07-04.md".to_string()]
+            vec!["journal/2026-07-04.md".to_string()]
         );
         assert_eq!(
-            fs::read_to_string(root.path().join("daily/2026-07-04.md")).unwrap(),
+            fs::read_to_string(root.path().join("journal/2026-07-04.md")).unwrap(),
             "# July 4th, 2026\n\n- written in V2\n\n- written in V1\n"
         );
     }
@@ -1095,14 +1095,14 @@ mod tests {
     #[test]
     fn reimporting_after_a_daily_merge_is_idempotent() {
         let root = tempdir().unwrap();
-        fs::create_dir_all(root.path().join("daily")).unwrap();
+        fs::create_dir_all(root.path().join("journal")).unwrap();
         fs::write(
-            root.path().join("daily/2026-07-04.md"),
+            root.path().join("journal/2026-07-04.md"),
             "# July 4th, 2026\n\n- written in V2\n",
         )
         .unwrap();
         let pairs = [(
-            "daily/2026-07-04.md",
+            "journal/2026-07-04.md",
             "# July 4th, 2026\n\n- written in V1\n",
         )];
         import_entries_into_graph(root.path(), entries(&pairs)).unwrap();
@@ -1113,7 +1113,7 @@ mod tests {
         assert_eq!(second.skipped_files, 1);
         assert!(second.changed_paths.is_empty());
         assert_eq!(
-            fs::read_to_string(root.path().join("daily/2026-07-04.md")).unwrap(),
+            fs::read_to_string(root.path().join("journal/2026-07-04.md")).unwrap(),
             "# July 4th, 2026\n\n- written in V2\n\n- written in V1\n"
         );
     }
@@ -1123,43 +1123,43 @@ mod tests {
     #[test]
     fn empty_daily_bodies_do_not_merge() {
         let root = tempdir().unwrap();
-        fs::create_dir_all(root.path().join("daily")).unwrap();
+        fs::create_dir_all(root.path().join("journal")).unwrap();
         fs::write(
-            root.path().join("daily/2026-07-04.md"),
+            root.path().join("journal/2026-07-04.md"),
             "# July 4th, 2026\n\n- kept\n",
         )
         .unwrap();
 
         let summary = import_entries_into_graph(
             root.path(),
-            entries(&[("daily/2026-07-04.md", "# July 4th, 2026\n")]),
+            entries(&[("journal/2026-07-04.md", "# July 4th, 2026\n")]),
         )
         .unwrap();
 
         assert_eq!(summary.merged_files, 0);
         assert_eq!(summary.skipped_files, 1);
         assert_eq!(
-            fs::read_to_string(root.path().join("daily/2026-07-04.md")).unwrap(),
+            fs::read_to_string(root.path().join("journal/2026-07-04.md")).unwrap(),
             "# July 4th, 2026\n\n- kept\n"
         );
     }
 
-    /// Non-dated files under `daily/` are ordinary notes: conflicts rename
+    /// Non-dated files under `journal/` are ordinary notes: conflicts rename
     /// rather than merge.
     #[test]
     fn undated_daily_conflicts_rename_instead_of_merging() {
         let root = tempdir().unwrap();
-        fs::create_dir_all(root.path().join("daily")).unwrap();
-        fs::write(root.path().join("daily/scratch.md"), "# Mine\n").unwrap();
+        fs::create_dir_all(root.path().join("journal")).unwrap();
+        fs::write(root.path().join("journal/scratch.md"), "# Mine\n").unwrap();
 
         let summary =
-            import_entries_into_graph(root.path(), entries(&[("daily/scratch.md", "# V1\n")]))
+            import_entries_into_graph(root.path(), entries(&[("journal/scratch.md", "# V1\n")]))
                 .unwrap();
 
         assert_eq!(summary.renamed_files, 1);
         assert_eq!(summary.merged_files, 0);
         assert_eq!(
-            fs::read_to_string(root.path().join("daily/scratch-2.md")).unwrap(),
+            fs::read_to_string(root.path().join("journal/scratch-2.md")).unwrap(),
             "# V1\n"
         );
     }
@@ -1542,7 +1542,7 @@ mod tests {
         let markdown = format!(
             "![]({base}photo?alt=media\\&token=t)\n\n[memo.m4a]({base}memo?alt=media\\&token=u)\n\n![]({base}users%2Fabc%2F9c2c28?alt=media\\&token=v)\n"
         );
-        write_zip(&zip_path, &[("daily/2026-07-04.md", markdown.as_str())]);
+        write_zip(&zip_path, &[("journal/2026-07-04.md", markdown.as_str())]);
 
         let summary = import_zip_downloading_from(root.path(), &zip_path, &base).unwrap();
 
@@ -1567,7 +1567,7 @@ mod tests {
             fs::read(root.path().join("assets/9c2c28.png")).unwrap(),
             b"png bytes"
         );
-        let note = fs::read_to_string(root.path().join("daily/2026-07-04.md")).unwrap();
+        let note = fs::read_to_string(root.path().join("journal/2026-07-04.md")).unwrap();
         assert_eq!(
             note,
             "![](assets/trip-photo.webp)\n\n[memo.m4a](assets/memo.m4a)\n\n![](assets/9c2c28.png)\n"
@@ -1585,7 +1585,7 @@ mod tests {
         let markdown = (0..ASSET_COUNT)
             .map(|index| format!("![]({base}asset-{index}?alt=media\\&token={index})\n"))
             .collect::<String>();
-        write_zip(&zip_path, &[("daily/2026-07-04.md", markdown.as_str())]);
+        write_zip(&zip_path, &[("journal/2026-07-04.md", markdown.as_str())]);
 
         let prepared = prepare_zip_import_from(root.path(), &zip_path, &[&base]).unwrap();
         let Some(before) = open_fd_count() else {
@@ -1640,7 +1640,7 @@ mod tests {
         let zip_path = root.path().join("export.zip");
         let markdown =
             format!("![]({base}a?alt=media\\&token=t)\n\n![]({base}b?alt=media\\&token=u)\n");
-        write_zip(&zip_path, &[("daily/2026-07-04.md", markdown.as_str())]);
+        write_zip(&zip_path, &[("journal/2026-07-04.md", markdown.as_str())]);
 
         let summary = import_zip_downloading_from(root.path(), &zip_path, &base).unwrap();
 
@@ -1652,7 +1652,7 @@ mod tests {
             .collect();
         assert_eq!(asset_paths, ["assets/pic.png"]);
         assert!(!root.path().join("assets/pic-2.png").exists());
-        let note = fs::read_to_string(root.path().join("daily/2026-07-04.md")).unwrap();
+        let note = fs::read_to_string(root.path().join("journal/2026-07-04.md")).unwrap();
         assert_eq!(note, "![](assets/pic.png)\n\n![](assets/pic.png)\n");
     }
 
@@ -1662,14 +1662,14 @@ mod tests {
         let base = serve(vec![], 1);
         let zip_path = root.path().join("export.zip");
         let markdown = format!("![]({base}deleted?alt=media\\&token=t)\n");
-        write_zip(&zip_path, &[("daily/2026-07-04.md", markdown.as_str())]);
+        write_zip(&zip_path, &[("journal/2026-07-04.md", markdown.as_str())]);
 
         let summary = import_zip_downloading_from(root.path(), &zip_path, &base).unwrap();
 
         assert_eq!(summary.imported_files, 1);
         assert_eq!(summary.downloaded_assets, 0);
         assert_eq!(summary.failed_asset_downloads, 1);
-        let note = fs::read_to_string(root.path().join("daily/2026-07-04.md")).unwrap();
+        let note = fs::read_to_string(root.path().join("journal/2026-07-04.md")).unwrap();
         assert_eq!(note, markdown);
         assert!(!root.path().join("assets").join("deleted").exists());
     }
@@ -1698,7 +1698,7 @@ mod tests {
         let markdown = (0..3)
             .map(|index| format!("![]({base}asset-{index}?alt=media\\&token={index})\n"))
             .collect::<String>();
-        write_zip(&zip_path, &[("daily/2026-07-04.md", markdown.as_str())]);
+        write_zip(&zip_path, &[("journal/2026-07-04.md", markdown.as_str())]);
         let prepared = prepare_zip_import_from(root.path(), &zip_path, &[&base]).unwrap();
         let seen = Arc::new(Mutex::new(Vec::new()));
         let record = Arc::clone(&seen);
@@ -1724,7 +1724,7 @@ mod tests {
         let base = serve_generated_assets(1);
         let zip_path = root.path().join("export.zip");
         let markdown = format!("![]({base}photo?alt=media\\&token=t)\n");
-        write_zip(&zip_path, &[("daily/2026-07-04.md", markdown.as_str())]);
+        write_zip(&zip_path, &[("journal/2026-07-04.md", markdown.as_str())]);
         let prepared = prepare_zip_import_from(root.path(), &zip_path, &[&base]).unwrap();
         let cancelled = Arc::new(AtomicBool::new(true));
 
@@ -1738,7 +1738,7 @@ mod tests {
             Some(AppError::Io { message }) => assert!(message.contains("cancelled")),
             other => panic!("expected a cancellation error, got {other:?}"),
         }
-        assert!(!root.path().join("daily/2026-07-04.md").exists());
+        assert!(!root.path().join("journal/2026-07-04.md").exists());
         assert!(!root.path().join("assets").exists());
     }
 
@@ -1747,7 +1747,7 @@ mod tests {
         let root = tempdir().unwrap();
         let entries = entries(&[
             ("notes/a.md", "# A\n"),
-            ("daily/2026-07-04.md", "Today\n"),
+            ("journal/2026-07-04.md", "Today\n"),
             ("assets/pic.bin", "raw"),
         ]);
         let prepared = PreparedImport {
@@ -1778,12 +1778,12 @@ mod tests {
         drop(dead);
         let zip_path = root.path().join("export.zip");
         let markdown = format!("![]({base}photo?alt=media\\&token=t)\n");
-        write_zip(&zip_path, &[("daily/2026-07-04.md", markdown.as_str())]);
+        write_zip(&zip_path, &[("journal/2026-07-04.md", markdown.as_str())]);
 
         let result = import_zip_downloading_from(root.path(), &zip_path, &base);
 
         assert!(matches!(result.unwrap_err(), AppError::Network { .. }));
-        assert!(!root.path().join("daily/2026-07-04.md").exists());
+        assert!(!root.path().join("journal/2026-07-04.md").exists());
     }
 
     #[test]
@@ -1800,7 +1800,7 @@ mod tests {
         );
         let zip_path = root.path().join("export.zip");
         let markdown = format!("![]({base}photo?alt=media\\&token=t)\n");
-        write_zip(&zip_path, &[("daily/2026-07-04.md", markdown.as_str())]);
+        write_zip(&zip_path, &[("journal/2026-07-04.md", markdown.as_str())]);
 
         let first = import_zip_downloading_from(root.path(), &zip_path, &base).unwrap();
         assert_eq!(first.imported_files, 1);
@@ -1825,7 +1825,7 @@ mod tests {
             Some("export".to_string())
         );
         assert_eq!(
-            wrapper_prefix(&["notes/a.md".to_string(), "daily/2026-07-04.md".to_string()]),
+            wrapper_prefix(&["notes/a.md".to_string(), "journal/2026-07-04.md".to_string()]),
             None
         );
     }

@@ -62,7 +62,7 @@ function recentRow(overrides: Partial<RecentNoteRow>): RecentNoteRow {
 /** A public daily query row for `date`, overridable per test. */
 function dailyRow(date: string, overrides: Partial<DailyNoteRow> = {}): DailyNoteRow {
   return {
-    path: `daily/${date}.md`,
+    path: `journal/${date}.md`,
     title: date,
     dailyDate: date,
     preview: 'a daily preview',
@@ -650,7 +650,7 @@ describe('list_daily_notes', () => {
     const output = await runDailies(tools, { start: '2026-06-01', end: '2026-06-30' })
     expect(output.truncated).toBe(false)
     expect(output.days.map((day) => day.dailyDate)).toEqual(['2026-06-10', '2026-06-09'])
-    expect(output.days[0]?.path).toBe('daily/2026-06-10.md')
+    expect(output.days[0]?.path).toBe('journal/2026-06-10.md')
   })
 
   it('cuts an over-cap range to the cap and flags the truncation', async () => {

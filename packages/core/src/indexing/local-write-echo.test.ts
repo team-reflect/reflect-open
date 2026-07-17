@@ -26,10 +26,10 @@ describe('local write echo (Plan 19, decision 5)', () => {
       seen.push(changes)
     })
 
-    await writeNote('daily/2026-06-12.md', 'hello', 1)
+    await writeNote('journal/2026-06-12.md', 'hello', 1)
 
     expect(seen).toHaveLength(1)
-    expect(seen[0]![0]).toMatchObject({ path: 'daily/2026-06-12.md', kind: 'upsert' })
+    expect(seen[0]![0]).toMatchObject({ path: 'journal/2026-06-12.md', kind: 'upsert' })
     expect(seen[0]![0]!.modifiedMs).toBeTypeOf('number')
     unlisten()
   })
@@ -72,7 +72,7 @@ describe('local write echo (Plan 19, decision 5)', () => {
     const handler = vi.fn()
     const unlisten = await subscribeFileChanges(handler)
 
-    await writeNote('daily/2026-06-12.md', 'hello', 1)
+    await writeNote('journal/2026-06-12.md', 'hello', 1)
 
     expect(handler).not.toHaveBeenCalled()
     unlisten()
@@ -89,7 +89,7 @@ describe('local write echo (Plan 19, decision 5)', () => {
     const handler = vi.fn()
     const unlisten = await subscribeFileChanges(handler)
 
-    await expect(writeNote('daily/2026-06-12.md', 'hello', 1)).rejects.toThrow()
+    await expect(writeNote('journal/2026-06-12.md', 'hello', 1)).rejects.toThrow()
 
     expect(handler).not.toHaveBeenCalled()
     unlisten()

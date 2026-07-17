@@ -65,7 +65,7 @@ back up, sync, or edit with other tools:
 
 ```text
 my-graph/
-├── daily/2026-06-12.md     # Daily notes, named by date
+├── journal/2026-06-12.md     # Daily notes, named by date
 ├── notes/some-title.md     # Other notes, named from their titles
 ├── assets/                 # Images and attachments
 └── audio-memos/            # Audio recordings and transcripts

@@ -251,7 +251,7 @@ modes). The hash/marker idempotency makes both modes safe to re-run.
 
 ### Watcher extension — `apps/desktop/src-tauri/src/watcher.rs`
 
-Today `tracked_relpath` reports `.md` under `daily/`/`notes/`, anything under
+Today `tracked_relpath` reports `.md` under `journal/`/`notes/`, anything under
 `audio-memos/`, and `.reflect/inbox/*.json`. **Add** eligible asset files:
 
 ```rust

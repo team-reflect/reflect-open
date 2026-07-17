@@ -18,7 +18,7 @@ use super::FileMeta;
 
 pub(super) const REFLECT_DIR: &str = ".reflect";
 const META_SCHEMA_VERSION: u32 = 1;
-pub(super) const TOP_LEVEL_DIRS: [&str; 4] = ["daily", "notes", "assets", REFLECT_DIR];
+pub(super) const TOP_LEVEL_DIRS: [&str; 4] = ["journal", "notes", "assets", REFLECT_DIR];
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 const APPLE_EXCLUSION_KEYS: [&str; 2] = [
     "NSURLUbiquitousItemIsExcludedFromSyncKey",
@@ -31,7 +31,7 @@ const LOCAL_ONLY_XATTRS: [(&str, &[u8]); 2] = [
 ];
 /// Directories scanned by `list_files` for markdown notes. `templates/` is
 /// not bootstrapped (no-litter) — the first template write creates it.
-pub(super) const NOTE_DIRS: [&str; 3] = ["daily", "notes", "templates"];
+pub(super) const NOTE_DIRS: [&str; 3] = ["journal", "notes", "templates"];
 
 /// Create the standard graph layout + ignore/meta files (idempotent).
 pub(super) fn bootstrap(root: &Path) -> AppResult<()> {
@@ -519,7 +519,7 @@ mod tests {
         let dir = tempdir().unwrap();
         bootstrap(dir.path()).unwrap();
         atomic_write(dir.path(), &dir.path().join("notes/a.md"), "a").unwrap();
-        atomic_write(dir.path(), &dir.path().join("daily/2026-06-09.md"), "b").unwrap();
+        atomic_write(dir.path(), &dir.path().join("journal/2026-06-09.md"), "b").unwrap();
         atomic_write(dir.path(), &dir.path().join("templates/journal.md"), "t").unwrap();
         atomic_write(dir.path(), &dir.path().join("notes/skip.txt"), "c").unwrap();
 
@@ -529,7 +529,7 @@ mod tests {
         }
         let paths: Vec<&str> = out.iter().map(|f| f.path.as_str()).collect();
         assert!(paths.contains(&"notes/a.md"));
-        assert!(paths.contains(&"daily/2026-06-09.md"));
+        assert!(paths.contains(&"journal/2026-06-09.md"));
         assert!(paths.contains(&"templates/journal.md"));
         assert!(!paths.iter().any(|p| p.ends_with(".txt")));
     }

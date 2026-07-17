@@ -29,30 +29,30 @@ export function seedGraphFiles(): Record<string, string> {
   const nextWeek = isoDay(-7)
 
   return {
-    [`daily/${today}.md`]: [
+    [`journal/${today}.md`]: [
       `- Morning review with [[Sarah Chen]] about the [[Reflect V2]] launch`,
       `- [ ] Ship the mobile filter badges [[${today}]]`,
       `- [ ] Reply to the beta feedback thread`,
       `- Started reading [[Atomic Habits]] on the train #book`,
       ``,
     ].join('\n'),
-    [`daily/${yesterday}.md`]: [
+    [`journal/${yesterday}.md`]: [
       `- Pairing session on the day carousel swipe physics`,
       `- [x] Fix the week-strip echo guard`,
       `- Lunch with [[James Clear]] — talked habit loops #person`,
       ``,
     ].join('\n'),
-    [`daily/${isoDay(2)}.md`]: [
+    [`journal/${isoDay(2)}.md`]: [
       `- Sketched the [[Quarterly Goals]] doc`,
       `- [ ] Book flights for the offsite [[${nextWeek}]]`,
       ``,
     ].join('\n'),
-    [`daily/${isoDay(4)}.md`]: [
+    [`journal/${isoDay(4)}.md`]: [
       `- Deep-work day on sync conflict handling`,
       `- Saved [Local-first software](https://www.inkandswitch.com/local-first/) #link`,
       ``,
     ].join('\n'),
-    [`daily/${isoDay(7)}.md`]: [
+    [`journal/${isoDay(7)}.md`]: [
       `- Weekly planning: reviewed [[Reading List]]`,
       `- [x] Cut the 0.2 beta release`,
       ``,

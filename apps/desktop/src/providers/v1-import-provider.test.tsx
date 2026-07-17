@@ -48,7 +48,7 @@ function summary(overrides: Partial<SummaryFixture> = {}): SummaryFixture {
     failedAssetDownloads: 0,
     renamedFiles: 0,
     mergedFiles: 0,
-    changedPaths: ['notes/a.md', 'daily/2026-07-04.md'],
+    changedPaths: ['notes/a.md', 'journal/2026-07-04.md'],
     ...overrides,
   }
 }

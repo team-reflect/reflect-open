@@ -30,7 +30,7 @@ impl ResolvedNote {
 }
 
 /// Interpret `arg` as an explicit note path (graph-relative, or absolute
-/// inside the graph). Only existing `.md` files under `daily/`/`notes/`
+/// inside the graph). Only existing `.md` files under `journal/`/`notes/`
 /// qualify; anything else falls through to title/alias matching.
 fn as_graph_path(arg: &str, root: &Path) -> Option<String> {
     let candidate = Path::new(arg);

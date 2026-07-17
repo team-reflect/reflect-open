@@ -332,11 +332,11 @@ describe('createIcloudController', () => {
   })
 
   it('dirty open notes ride skipPaths so their conflicts defer', async () => {
-    seams.dirtyOpenPaths.mockReturnValue(['daily/2026-07-04.md'])
+    seams.dirtyOpenPaths.mockReturnValue(['journal/2026-07-04.md'])
     const icloud = controller()
     await icloud.start()
     await settleScan()
 
-    expect(scanCalls[0]?.skipPaths).toEqual(['daily/2026-07-04.md'])
+    expect(scanCalls[0]?.skipPaths).toEqual(['journal/2026-07-04.md'])
   })
 })

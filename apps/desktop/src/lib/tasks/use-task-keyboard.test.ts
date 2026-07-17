@@ -293,14 +293,14 @@ describe('useTaskKeyboard', () => {
   })
 
   it('Return adds a task to today’s daily when nothing is selected', async () => {
-    const created = task({ notePath: 'daily/2026-06-15.md', markerOffset: 0, text: '' })
+    const created = task({ notePath: 'journal/2026-06-15.md', markerOffset: 0, text: '' })
     const insert = vi.fn().mockResolvedValue(created)
     const { selection } = mount({ actions: makeActions({ insert }), today: '2026-06-15' })
 
     const event = press(root, 'Enter')
     expect(event.defaultPrevented).toBe(true)
     expect(insert).toHaveBeenCalledWith({
-      notePath: 'daily/2026-06-15.md',
+      notePath: 'journal/2026-06-15.md',
       noteTitle: '2026-06-15',
       dailyDate: '2026-06-15',
       isPinned: false,
@@ -400,7 +400,7 @@ describe('useTaskKeyboard', () => {
 
     press(root, 'Enter')
     expect(insert).toHaveBeenCalledWith({
-      notePath: 'daily/2026-06-15.md',
+      notePath: 'journal/2026-06-15.md',
       noteTitle: '2026-06-15',
       dailyDate: '2026-06-15',
       isPinned: false,

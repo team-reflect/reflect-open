@@ -13,7 +13,7 @@ import {
 
 describe('graph paths', () => {
   it('builds daily-note paths from ISO dates', () => {
-    expect(dailyPath('2026-06-09')).toBe('daily/2026-06-09.md')
+    expect(dailyPath('2026-06-09')).toBe('journal/2026-06-09.md')
   })
 
   it('rejects non-ISO daily dates', () => {
@@ -35,7 +35,7 @@ describe('graph paths', () => {
 
   it('recognizes indexable note paths, never recordings or assets', () => {
     expect(isNotePath('notes/a.md')).toBe(true)
-    expect(isNotePath('daily/2026-06-12.md')).toBe(true)
+    expect(isNotePath('journal/2026-06-12.md')).toBe(true)
     expect(isNotePath('notes/sub/deep.md')).toBe(true)
     expect(isNotePath('templates/journal.md')).toBe(true)
     expect(isNotePath('notes/a.txt')).toBe(false)
@@ -51,13 +51,13 @@ describe('graph paths', () => {
   })
 
   it('recognizes daily-note paths', () => {
-    expect(isDaily('daily/2026-06-09.md')).toBe(true)
+    expect(isDaily('journal/2026-06-09.md')).toBe(true)
     expect(isDaily('notes/foo.md')).toBe(false)
-    expect(isDaily('daily/not-a-date.md')).toBe(false)
+    expect(isDaily('journal/not-a-date.md')).toBe(false)
   })
 
   it('extracts the date from a daily path, else null', () => {
-    expect(dateFromDailyPath('daily/2026-06-09.md')).toBe('2026-06-09')
+    expect(dateFromDailyPath('journal/2026-06-09.md')).toBe('2026-06-09')
     expect(dateFromDailyPath('notes/foo.md')).toBeNull()
   })
 })

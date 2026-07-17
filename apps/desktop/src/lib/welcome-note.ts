@@ -54,7 +54,7 @@ export interface EnsureWelcomeNoteOptions {
 /**
  * Consider onboarding for this graph **exactly once** (find-or-create): when
  * the `welcomeSeeded` marker is absent, an **empty** graph (no markdown under
- * `daily/` or `notes/`) gets the welcome note, a graph with any note at all is
+ * `journal/` or `notes/`) gets the welcome note, a graph with any note at all is
  * someone's existing data and only gets marked. Either way the marker lands,
  * so deleting the note — or emptying the graph entirely — never re-onboards.
  * The marker is stamped after the write: a failed seed retries on the next

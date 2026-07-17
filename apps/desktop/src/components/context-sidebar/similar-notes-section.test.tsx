@@ -57,8 +57,8 @@ beforeEach(() => {
 
 describe('SimilarNotesSection', () => {
   it('renders nothing at all when the note has no semantic neighbors', async () => {
-    const view = renderSimilar('daily/2026-06-09.md', false)
-    await waitFor(() => expect(relatedNotes).toHaveBeenCalledWith('daily/2026-06-09.md', 6))
+    const view = renderSimilar('journal/2026-06-09.md', false)
+    await waitFor(() => expect(relatedNotes).toHaveBeenCalledWith('journal/2026-06-09.md', 6))
     expect(view.container.firstChild).toBeNull()
     view.unmount()
   })
@@ -144,7 +144,7 @@ describe('SimilarNotesSection', () => {
         isPrivate: false,
       },
     ])
-    const view = renderSimilar('daily/2026-06-09.md')
+    const view = renderSimilar('journal/2026-06-09.md')
     await userEvent.click(await view.findByText('Gardening'))
     expect(view.getByTestId('route').textContent).toContain('"kind":"note"')
     expect(view.getByTestId('route').textContent).toContain('notes/gardening.md')
@@ -162,7 +162,7 @@ describe('SimilarNotesSection', () => {
         isPrivate: false,
       },
     ])
-    const view = renderSimilar('daily/2026-06-09.md')
+    const view = renderSimilar('journal/2026-06-09.md')
 
     fireEvent.click(await view.findByRole('button', { name: 'Gardening' }), {
       metaKey: true,

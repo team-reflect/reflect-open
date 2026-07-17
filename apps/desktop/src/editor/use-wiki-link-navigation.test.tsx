@@ -133,7 +133,7 @@ describe('useWikiLinkNavigation', () => {
   it('does not choose between ambiguous ISO-date targets', async () => {
     resolveExistingWikiTarget.mockResolvedValue({
       kind: 'ambiguous',
-      paths: ['daily/2026-06-09.md', 'daily/2026-06-09-2.md'],
+      paths: ['journal/2026-06-09.md', 'journal/2026-06-09-2.md'],
     })
     const view = renderHost()
 
@@ -148,7 +148,7 @@ describe('useWikiLinkNavigation', () => {
   it('does not turn an unavailable ISO-date target into a lazy daily route', async () => {
     resolveExistingWikiTarget.mockResolvedValue({
       kind: 'unavailable',
-      paths: ['daily/2026-06-09.md'],
+      paths: ['journal/2026-06-09.md'],
     })
     const view = renderHost()
 
@@ -166,7 +166,7 @@ describe('useWikiLinkNavigation', () => {
   it('routes a resolved daily alias through the daily view', async () => {
     resolveOrCreateNoteWithTitle.mockResolvedValue({
       kind: 'resolved',
-      path: 'daily/2026-06-09.md',
+      path: 'journal/2026-06-09.md',
     })
     const view = renderHost()
 

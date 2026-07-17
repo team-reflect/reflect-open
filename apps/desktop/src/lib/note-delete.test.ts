@@ -41,7 +41,7 @@ describe('deleteOpenNote', () => {
   })
 
   it('refuses to delete a daily note and never touches disk or sessions', async () => {
-    await expect(deleteOpenNote('daily/2026-06-15.md', 7)).rejects.toThrow(/daily/i)
+    await expect(deleteOpenNote('journal/2026-06-15.md', 7)).rejects.toThrow(/journal/i)
 
     expect(mockInvoke).not.toHaveBeenCalled()
     expect(openSession).not.toHaveBeenCalled()

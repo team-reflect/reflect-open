@@ -1,5 +1,5 @@
 //! Graph path conventions — the Rust mirror of `packages/core/src/graph/paths.ts`.
-//! Dailies live at `daily/YYYY-MM-DD.md`; regular notes under `notes/`; note
+//! Dailies live at `journal/YYYY-MM-DD.md`; regular notes under `notes/`; note
 //! templates under `templates/` (indexed, but excluded from search/resolution).
 
 pub const DAILY_DIR: &str = "daily";
@@ -38,10 +38,10 @@ pub fn parse_calendar_date(value: &str) -> Option<&str> {
     Some(value)
 }
 
-/// Extract the ISO date from a daily-note path (`daily/YYYY-MM-DD.md`), or
+/// Extract the ISO date from a daily-note path (`journal/YYYY-MM-DD.md`), or
 /// `None` if it isn't one. Shape-only, like the TS `dateFromDailyPath`.
 pub fn date_from_daily_path(path: &str) -> Option<&str> {
-    let date = path.strip_prefix("daily/")?.strip_suffix(".md")?;
+    let date = path.strip_prefix("journal/")?.strip_suffix(".md")?;
     is_date_shaped(date).then_some(date)
 }
 
@@ -57,13 +57,13 @@ mod tests {
 
     #[test]
     fn daily_paths_round_trip() {
-        assert_eq!(daily_path("2026-06-11"), "daily/2026-06-11.md");
+        assert_eq!(daily_path("2026-06-11"), "journal/2026-06-11.md");
         assert_eq!(
-            date_from_daily_path("daily/2026-06-11.md"),
+            date_from_daily_path("journal/2026-06-11.md"),
             Some("2026-06-11")
         );
         assert_eq!(date_from_daily_path("notes/2026-06-11.md"), None);
-        assert_eq!(date_from_daily_path("daily/nope.md"), None);
+        assert_eq!(date_from_daily_path("journal/nope.md"), None);
     }
 
     /// Parity with `paths.ts`/`resolve.ts`: shape-valid but impossible dates

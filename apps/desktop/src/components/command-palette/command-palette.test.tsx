@@ -263,7 +263,7 @@ describe('CommandPalette', () => {
     suggestWikiTargets.mockClear()
     suggestWikiTargets.mockResolvedValue([])
     searchWithFilters.mockResolvedValue([
-      { path: 'daily/2026-06-08.md', title: '2026-06-08', dailyDate: '2026-06-08', snippet: null },
+      { path: 'journal/2026-06-08.md', title: '2026-06-08', dailyDate: '2026-06-08', snippet: null },
       { path: 'notes/w.md', title: 'Work log', dailyDate: null, snippet: null },
     ])
     const { view } = renderPalette('#work is:daily')
@@ -384,7 +384,7 @@ describe('CommandPalette', () => {
     suggestWikiTargets.mockResolvedValue([
       {
         target: '2026-06-09',
-        path: 'daily/2026-06-09.md',
+        path: 'journal/2026-06-09.md',
         title: '2026-06-09',
         alias: null,
         date: '2026-06-09',

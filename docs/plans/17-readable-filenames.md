@@ -55,7 +55,7 @@ hierarchy), id-based routes (routes stay path-based), rewriting inbound
 **markdown-style** `[text](notes/foo.md)` links on rename (the app writes wiki
 links; path-style links are an external-tool edge — recorded as a risk),
 automatic same-`id` duplicate repair after sync (detection ships, repair is a
-later surface), daily notes (untouched in every respect — `daily/YYYY-MM-DD.md`
+later surface), daily notes (untouched in every respect — `journal/YYYY-MM-DD.md`
 *is* the readable contract).
 
 ## Delivery split

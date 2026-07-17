@@ -41,7 +41,7 @@ describe('resolveNoteTarget', () => {
   it('resolves a calendar date to the daily path even when the file does not exist', async () => {
     mockInvoke.mockResolvedValueOnce([]) // no id match
 
-    await expect(resolveNoteTarget('2026-07-01')).resolves.toBe('daily/2026-07-01.md')
+    await expect(resolveNoteTarget('2026-07-01')).resolves.toBe('journal/2026-07-01.md')
     expect(queryCalls()).toHaveLength(1)
   })
 

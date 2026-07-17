@@ -55,12 +55,12 @@ pub fn run(graph: &Graph, json: bool, note_arg: &str, print: bool) -> Result<(),
 /// never writes, so a note without an id gets the path form instead.
 fn deep_link_url(root: &Path, resolved: &ResolvedNote) -> String {
     if let Some(date) = date_from_daily_path(resolved.rel_path()).and_then(parse_calendar_date) {
-        // Calendar-validated: a daily/ file with an impossible date opens as
+        // Calendar-validated: a journal/ file with an impossible date opens as
         // a plain note in the app, so it gets a note-form address below.
-        return format!("reflect://daily/{date}");
+        return format!("reflect://journal/{date}");
     }
     match resolved {
-        ResolvedNote::Daily { date, .. } => format!("reflect://daily/{date}"),
+        ResolvedNote::Daily { date, .. } => format!("reflect://journal/{date}"),
         ResolvedNote::File { rel_path } => {
             let id = fs::read_to_string(root.join(rel_path))
                 .ok()
@@ -150,11 +150,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let resolved = ResolvedNote::Daily {
             date: "2026-07-01".to_string(),
-            rel_path: "daily/2026-07-01.md".to_string(),
+            rel_path: "journal/2026-07-01.md".to_string(),
         };
         assert_eq!(
             deep_link_url(dir.path(), &resolved),
-            "reflect://daily/2026-07-01"
+            "reflect://journal/2026-07-01"
         );
     }
 
@@ -162,11 +162,11 @@ mod tests {
     fn a_daily_file_resolved_by_path_still_gets_the_date_form() {
         let dir = tempfile::tempdir().unwrap();
         let resolved = ResolvedNote::File {
-            rel_path: "daily/2026-07-01.md".to_string(),
+            rel_path: "journal/2026-07-01.md".to_string(),
         };
         assert_eq!(
             deep_link_url(dir.path(), &resolved),
-            "reflect://daily/2026-07-01"
+            "reflect://journal/2026-07-01"
         );
     }
 
@@ -174,7 +174,7 @@ mod tests {
     fn an_impossible_date_daily_file_gets_the_path_form() {
         let dir = tempfile::tempdir().unwrap();
         let resolved = ResolvedNote::File {
-            rel_path: "daily/2026-02-31.md".to_string(),
+            rel_path: "journal/2026-02-31.md".to_string(),
         };
         assert_eq!(
             deep_link_url(dir.path(), &resolved),

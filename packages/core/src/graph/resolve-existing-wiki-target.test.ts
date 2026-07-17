@@ -132,12 +132,12 @@ describe('resolveExistingWikiTarget', () => {
   it('accepts an indexed daily before probing disk or lower index tiers', async () => {
     const invoke = bindBridge({
       query: (sql) =>
-        sql.includes('"daily_date" = ?') ? [{ path: 'daily/2026-06-09.md' }] : [],
+        sql.includes('"daily_date" = ?') ? [{ path: 'journal/2026-06-09.md' }] : [],
     })
 
     await expect(resolveExistingWikiTarget('2026-06-09', 7)).resolves.toEqual({
       kind: 'resolved',
-      path: 'daily/2026-06-09.md',
+      path: 'journal/2026-06-09.md',
     })
     expect(invoke.mock.calls.some(([command]) => command === 'note_read')).toBe(false)
     expect(invoke.mock.calls.some(([command]) => command === 'list_files')).toBe(false)
@@ -146,17 +146,17 @@ describe('resolveExistingWikiTarget', () => {
 
   it('lets an index-lagging daily file outrank an indexed regular date title', async () => {
     const invoke = bindBridge({
-      files: { 'daily/2026-06-09.md': 'Daily contents\n' },
+      files: { 'journal/2026-06-09.md': 'Daily contents\n' },
       query: (sql) =>
         sql.includes('"title_key" = ?') ? [{ path: 'notes/date-title.md' }] : [],
     })
 
     await expect(resolveExistingWikiTarget('2026-06-09', 17)).resolves.toEqual({
       kind: 'resolved',
-      path: 'daily/2026-06-09.md',
+      path: 'journal/2026-06-09.md',
     })
     expect(invoke).toHaveBeenCalledWith('note_read', {
-      path: 'daily/2026-06-09.md',
+      path: 'journal/2026-06-09.md',
       generation: 17,
     })
     expectNoWrites(invoke)
@@ -173,7 +173,7 @@ describe('resolveExistingWikiTarget', () => {
       path: 'notes/date-title.md',
     })
     expect(invoke).toHaveBeenCalledWith('note_read', {
-      path: 'daily/2026-06-09.md',
+      path: 'journal/2026-06-09.md',
       generation: 7,
     })
     expectNoWrites(invoke)
@@ -190,21 +190,21 @@ describe('resolveExistingWikiTarget', () => {
 
     await expect(resolveExistingWikiTarget('2026-06-09', 7)).resolves.toEqual({
       kind: 'unavailable',
-      paths: ['daily/2026-06-09.md'],
+      paths: ['journal/2026-06-09.md'],
     })
     expectNoWrites(invoke)
   })
 
   it('reports an evicted daily placeholder as unavailable instead of missing', async () => {
     const invoke = bindBridge({
-      placeholders: ['daily/2026-06-09.md'],
+      placeholders: ['journal/2026-06-09.md'],
       query: (sql) =>
         sql.includes('"title_key" = ?') ? [{ path: 'notes/date-title.md' }] : [],
     })
 
     await expect(resolveExistingWikiTarget('2026-06-09', 7)).resolves.toEqual({
       kind: 'unavailable',
-      paths: ['daily/2026-06-09.md'],
+      paths: ['journal/2026-06-09.md'],
     })
     expect(invoke).toHaveBeenCalledWith('list_files', { generation: 7 })
     expectNoWrites(invoke)
@@ -306,7 +306,7 @@ describe('resolveExistingWikiTarget', () => {
     let dailyReads = 0
     const invoke = bindBridge({
       read: async (path) => {
-        if (path !== 'daily/2026-06-09.md') {
+        if (path !== 'journal/2026-06-09.md') {
           throw { kind: 'notFound', message: 'missing' }
         }
         dailyReads += 1
@@ -319,7 +319,7 @@ describe('resolveExistingWikiTarget', () => {
 
     await expect(resolveExistingWikiTarget('2026-06-09', 7)).resolves.toEqual({
       kind: 'resolved',
-      path: 'daily/2026-06-09.md',
+      path: 'journal/2026-06-09.md',
     })
     expect(dailyReads).toBe(2)
     expectNoWrites(invoke)

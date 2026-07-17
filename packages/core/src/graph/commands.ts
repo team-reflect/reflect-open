@@ -220,7 +220,7 @@ export async function deleteNote(path: string, generation: number): Promise<void
 }
 
 /**
- * List markdown notes under `daily/` and `notes/`. `generation` pins the
+ * List markdown notes under `journal/` and `notes/`. `generation` pins the
  * listing like {@link readNote}'s.
  */
 export async function listFiles(generation?: number): Promise<FileMeta[]> {

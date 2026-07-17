@@ -145,7 +145,7 @@ Every capture lands in two phases so saving never waits on the network or AI:
      The watcher only fires on *new* events and will miss pre-existing spool files.
    - **On watcher event:** drain the newly created file as it lands.
 
-   Extend the Rust watcher (currently `daily/`+`notes/` `.md` only) to also report the
+   Extend the Rust watcher (currently `journal/`+`notes/` `.md` only) to also report the
    inbox dir.
 
 5. **Async enrichment (desktop-owned, never in the extension).** Runs after the raw

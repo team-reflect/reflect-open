@@ -135,7 +135,7 @@ describe('useWikiLinkHoverPreview', () => {
   it('shows a formatted subject and Empty note for an empty daily note', async () => {
     mocks.resolveExistingWikiTarget.mockResolvedValue({
       kind: 'resolved',
-      path: 'daily/2026-06-09.md',
+      path: 'journal/2026-06-09.md',
     })
     mocks.readExistingNoteSource.mockResolvedValue('---\nid: day\n---\n\n')
     const renderBody = setupRenderer()

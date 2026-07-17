@@ -167,7 +167,7 @@ describe('resolveOrCreateNoteWithTitle', () => {
     const invoke = bindBridge({
       query: (sql) => {
         if (sql.includes('"daily_date" = ?')) {
-          return [{ path: 'daily/2026-06-09.md' }]
+          return [{ path: 'journal/2026-06-09.md' }]
         }
         if (sql.includes('"title_key" = ?')) {
           return [{ path: 'notes/date-title.md' }]
@@ -178,7 +178,7 @@ describe('resolveOrCreateNoteWithTitle', () => {
 
     await expect(resolveOrCreateNoteWithTitle('2026-06-09', 7)).resolves.toEqual({
       kind: 'resolved',
-      path: 'daily/2026-06-09.md',
+      path: 'journal/2026-06-09.md',
     })
     expect(
       invoke.mock.calls.some(
@@ -190,15 +190,15 @@ describe('resolveOrCreateNoteWithTitle', () => {
 
   it('reuses an unindexed daily file instead of creating a regular date-titled note', async () => {
     const invoke = bindBridge({
-      files: { 'daily/2026-06-09.md': 'Daily contents\n' },
+      files: { 'journal/2026-06-09.md': 'Daily contents\n' },
     })
 
     await expect(resolveOrCreateNoteWithTitle('2026-06-09', 7)).resolves.toEqual({
       kind: 'resolved',
-      path: 'daily/2026-06-09.md',
+      path: 'journal/2026-06-09.md',
     })
     expect(invoke).toHaveBeenCalledWith('note_read', {
-      path: 'daily/2026-06-09.md',
+      path: 'journal/2026-06-09.md',
       generation: 7,
     })
     expect(invoke.mock.calls.some(([command]) => command === 'note_create')).toBe(false)
@@ -470,7 +470,7 @@ describe('isUntitledNotePath', () => {
 
   it('rejects slug-named, daily, and near-miss paths', () => {
     expect(isUntitledNotePath('notes/meeting-notes.md')).toBe(false)
-    expect(isUntitledNotePath('daily/2026-06-12.md')).toBe(false)
+    expect(isUntitledNotePath('journal/2026-06-12.md')).toBe(false)
     // Right length, but `u` is outside the Crockford base32 alphabet.
     expect(isUntitledNotePath('notes/uuuuuuuuuuuuuuuuuuuuuuuuuu.md')).toBe(false)
     // A ULID-shaped name outside notes/ is not a placeholder.

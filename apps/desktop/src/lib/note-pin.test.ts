@@ -83,8 +83,8 @@ describe('toggleNotePinned', () => {
     const { session } = fakeSession('', false, null)
     openSession.mockReturnValue(session)
     readNote.mockRejectedValue({ kind: 'notFound', message: 'no such note' })
-    await expect(toggleNotePinned('daily/2026-06-10.md', 3)).resolves.toBe(true)
-    expect(writeNote).toHaveBeenCalledWith('daily/2026-06-10.md', '---\npinned: true\n---\n', 3)
+    await expect(toggleNotePinned('journal/2026-06-10.md', 3)).resolves.toBe(true)
+    expect(writeNote).toHaveBeenCalledWith('journal/2026-06-10.md', '---\npinned: true\n---\n', 3)
   })
 
   it('still surfaces non-notFound read failures', async () => {

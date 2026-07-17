@@ -1001,7 +1001,7 @@ Current AI is mostly prompt palette. V2 could support:
 - Summarize a person/company/project note from backlinks
 - Extract tasks from meeting notes
 - Suggest backlinks as user types
-- Generate daily/weekly reviews
+- Generate journal/weekly reviews
 - Clean up audio transcripts
 - Turn raw capture into structured notes
 - Detect duplicate notes/entities
@@ -1042,7 +1042,7 @@ The docs make data portability part of Reflect's values. V2 should satisfy that 
 
 Minimum viable V2 portability:
 
-- Notes are plain markdown files under `daily/` and `notes/`.
+- Notes are plain markdown files under `journal/` and `notes/`.
 - Attachments live as normal files under `assets/` and use relative markdown links.
 - Backlinks, tags, tasks, and daily-note dates remain readable in markdown.
 - `.reflect/` stays out of the durable portability contract except for deliberately documented durable local tables such as `chat_*`.

@@ -15,7 +15,7 @@ use super::{setup, status, MAX_FILE_BYTES};
 
 /// Scaffold a minimal graph layout (what `fs::bootstrap` produces).
 fn scaffold_graph(root: &Path) {
-    for dir in ["daily", "notes", "assets", ".reflect"] {
+    for dir in ["journal", "notes", "assets", ".reflect"] {
         fs::create_dir_all(root.join(dir)).unwrap();
     }
     fs::write(
@@ -229,12 +229,12 @@ fn commit_summarizes_note_batches() {
     let fixture = fixture();
     let root = &fixture.graph_a;
 
-    write(root, "daily/2026-06-23.md", "# Daily\n");
+    write(root, "journal/2026-06-23.md", "# Daily\n");
     write(root, "notes/project-atlas.md", "# Project Atlas\n");
     commit_all(root, "Update notes", MAX_FILE_BYTES).unwrap();
     assert_eq!(head_message(root), "Add 2 notes");
 
-    write(root, "daily/2026-06-23.md", "# Daily\n\n- one\n");
+    write(root, "journal/2026-06-23.md", "# Daily\n\n- one\n");
     write(
         root,
         "notes/project-atlas.md",

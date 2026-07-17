@@ -4,7 +4,7 @@
  * traversal guard. Shared by every later phase (daily notes, backlinks, CLI).
  */
 
-export const DAILY_DIR = 'daily'
+export const DAILY_DIR = 'journal'
 export const NOTES_DIR = 'notes'
 /** Note templates — indexed as their own kind, excluded from note surfaces. */
 export const TEMPLATES_DIR = 'templates'
@@ -13,7 +13,7 @@ export const ASSETS_DIR = 'assets'
 export const AUDIO_MEMOS_DIR = 'audio-memos'
 
 /** Matches a daily-note path and captures its ISO date. */
-const DAILY_PATH_RE = /^daily\/(\d{4}-\d{2}-\d{2})\.md$/
+const DAILY_PATH_RE = /^journal\/(\d{4}-\d{2}-\d{2})\.md$/
 /** A bare ISO date (`YYYY-MM-DD`). */
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -78,14 +78,14 @@ export function isAssetPath(path: string): boolean {
   return path.startsWith(`${ASSETS_DIR}/`) && !path.endsWith(DESCRIPTION_SUFFIX)
 }
 
-/** Is this graph-relative path a daily note (`daily/YYYY-MM-DD.md`)? */
+/** Is this graph-relative path a daily note (`journal/YYYY-MM-DD.md`)? */
 export function isDaily(path: string): boolean {
   return DAILY_PATH_RE.test(path)
 }
 
 /**
  * Is this graph-relative path an indexable markdown note (`.md` under
- * `daily/`, `notes/`, or `templates/`)? The file-change stream carries more
+ * `journal/`, `notes/`, or `templates/`)? The file-change stream carries more
  * than notes — the watcher also reports `audio-memos/` recordings — so
  * consumers that read or index note *content* gate on this. Templates count:
  * they are indexed and editable like notes, just excluded from note surfaces

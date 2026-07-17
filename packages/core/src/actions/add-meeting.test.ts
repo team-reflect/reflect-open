@@ -26,7 +26,7 @@ const createNoteMock = vi.mocked(createNoteWithTitle)
 const resolveMock = vi.mocked(resolveWikiTarget)
 const owningNoteMock = vi.mocked(noteTitleOwningEmail)
 
-const DAILY = 'daily/2026-07-01.md'
+const DAILY = 'journal/2026-07-01.md'
 const GENERATION = 3
 
 const notFound = () => ({ kind: 'notFound', message: 'missing' })

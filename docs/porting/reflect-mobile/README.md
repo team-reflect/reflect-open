@@ -72,7 +72,7 @@ never lost. That behavior is what these docs pin down.
   `apps/desktop/src/mobile/…` and `packages/core/…` are in **this repo**
   (mobile is a build target of the one app — there is no `apps/mobile`).
 - "Graph" is the user's workspace: in v2 a folder of markdown files with
-  daily notes at `daily/YYYY-MM-DD.md`; in V1 mobile a set of encrypted
+  daily notes at `journal/YYYY-MM-DD.md`; in V1 mobile a set of encrypted
   documents with date IDs (`YYYY-MM-DD`).
 - In `reflect-mobile`, directories under `client/actions`, most of
   `client/models`, `helpers`, `lib`, `shared`, and `services` are

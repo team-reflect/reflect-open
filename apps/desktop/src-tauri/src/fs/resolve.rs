@@ -81,7 +81,7 @@ mod tests {
         assert!(ensure_relative("/etc/passwd").is_err());
         assert!(ensure_relative("notes/../../escape.md").is_err());
         assert!(ensure_relative("notes/ok.md").is_ok());
-        assert!(ensure_relative("./daily/2026-06-09.md").is_ok());
+        assert!(ensure_relative("./journal/2026-06-09.md").is_ok());
     }
 
     #[test]

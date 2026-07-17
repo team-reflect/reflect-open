@@ -22,7 +22,7 @@ import { startOperation } from '@/lib/operations'
 export async function deepLinkForNote(path: string, generation: number): Promise<string> {
   if (isDaily(path)) {
     const date = dateFromDailyPath(path)
-    // Calendar-validated like `routeForPath`: a daily/ file with an impossible
+    // Calendar-validated like `routeForPath`: a journal/ file with an impossible
     // date (2026-02-31) routes as a plain note everywhere else, so it gets a
     // note address too — a date form would be a link the parser rejects.
     if (date !== null && isIsoDate(date)) {

@@ -67,7 +67,7 @@ describe('ensureWelcomeNote', () => {
   })
 
   it('marks a graph with existing notes without writing into it', async () => {
-    const graph = installFakeBridge({ existingFiles: ['daily/2026-06-12.md'] })
+    const graph = installFakeBridge({ existingFiles: ['journal/2026-06-12.md'] })
     expect(await ensureWelcomeNote(GENERATIONS)).toBe(false)
     expect(graph.written).toHaveLength(0)
     expect(graph.meta[WELCOME_SEEDED_META_KEY]).toBe('true')

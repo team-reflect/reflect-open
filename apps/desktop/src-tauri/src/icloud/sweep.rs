@@ -635,7 +635,7 @@ fn fold_duplicate(
     }
 }
 
-/// `daily/2026-07-04 2.md` → `Some("daily/2026-07-04.md")`; `None` for
+/// `journal/2026-07-04 2.md` → `Some("journal/2026-07-04.md")`; `None` for
 /// anything else. **Daily notes only, with a strict date stem**: their
 /// filenames are machine-chosen dates, so a ` <digit>` suffix there can only
 /// be iCloud's collision rename (two devices creating the same day offline —
@@ -644,7 +644,7 @@ fn fold_duplicate(
 /// folding one of those would merge two intentional notes — titled notes'
 /// same-name collisions simply coexist until the user merges them.
 fn collision_canonical(rel: &str) -> Option<String> {
-    let stem = rel.strip_prefix("daily/")?.strip_suffix(".md")?;
+    let stem = rel.strip_prefix("journal/")?.strip_suffix(".md")?;
     let (date, suffix) = stem.rsplit_once(' ')?;
     if !is_daily_date_stem(date) {
         return None;
@@ -656,7 +656,7 @@ fn collision_canonical(rel: &str) -> Option<String> {
     if !('2'..='9').contains(&digit) {
         return None;
     }
-    Some(format!("daily/{date}.md"))
+    Some(format!("journal/{date}.md"))
 }
 
 /// Exactly `YYYY-MM-DD` — the shape the app names daily notes with.
@@ -693,7 +693,7 @@ mod tests {
 
     fn graph() -> tempfile::TempDir {
         let dir = tempdir().unwrap();
-        for sub in ["daily", "notes", ".reflect"] {
+        for sub in ["journal", "notes", ".reflect"] {
             fs::create_dir_all(dir.path().join(sub)).unwrap();
         }
         dir
@@ -706,54 +706,54 @@ mod tests {
     #[test]
     fn collision_names_parse_strictly() {
         assert_eq!(
-            collision_canonical("daily/2026-07-04 2.md"),
-            Some("daily/2026-07-04.md".to_string())
+            collision_canonical("journal/2026-07-04 2.md"),
+            Some("journal/2026-07-04.md".to_string())
         );
         assert_eq!(
-            collision_canonical("daily/2026-07-04 9.md"),
-            Some("daily/2026-07-04.md".to_string())
+            collision_canonical("journal/2026-07-04 9.md"),
+            Some("journal/2026-07-04.md".to_string())
         );
         // Titled notes never fold — `notes/chapter 2.md` is indistinguishable
         // from a user-authored title, and merging intentional notes is worse
         // than leaving a real collision pair side by side.
         assert_eq!(collision_canonical("notes/meeting 9.md"), None);
         assert_eq!(collision_canonical("notes/chapter 2.md"), None);
-        // Inside daily/, only the strict machine date-stem shape qualifies.
-        assert_eq!(collision_canonical("daily/2026-07-04-2.md"), None);
-        assert_eq!(collision_canonical("daily/2026-07-04.md"), None);
-        assert_eq!(collision_canonical("daily/2026-07-04 10.md"), None);
-        assert_eq!(collision_canonical("daily/journal 2.md"), None);
-        assert_eq!(collision_canonical("daily/2026-7-04 2.md"), None);
+        // Inside journal/, only the strict machine date-stem shape qualifies.
+        assert_eq!(collision_canonical("journal/2026-07-04-2.md"), None);
+        assert_eq!(collision_canonical("journal/2026-07-04.md"), None);
+        assert_eq!(collision_canonical("journal/2026-07-04 10.md"), None);
+        assert_eq!(collision_canonical("journal/journal 2.md"), None);
+        assert_eq!(collision_canonical("journal/2026-7-04 2.md"), None);
     }
 
     #[test]
     fn daily_collision_duplicates_union_into_the_canonical_file() {
         let root = graph();
-        write(root.path(), "daily/2026-07-04.md", "# Day\n\n- from mac\n");
+        write(root.path(), "journal/2026-07-04.md", "# Day\n\n- from mac\n");
         write(
             root.path(),
-            "daily/2026-07-04 2.md",
+            "journal/2026-07-04 2.md",
             "# Day\n\n- from phone\n",
         );
         // A base recorded for the duplicate (an earlier external ingest of
         // it) must not outlive the file the fold removes this same pass.
         ShadowStore::new(root.path())
-            .record("daily/2026-07-04 2.md", "# Day\n\n- from phone\n")
+            .record("journal/2026-07-04 2.md", "# Day\n\n- from phone\n")
             .unwrap();
 
         let outcome = run_sweep(root.path(), &[], &[], false).unwrap();
 
         assert_eq!(outcome.auto_resolved, 1);
         assert!(outcome.needs_review.is_empty());
-        assert!(!root.path().join("daily/2026-07-04 2.md").exists());
+        assert!(!root.path().join("journal/2026-07-04 2.md").exists());
         assert_eq!(
-            fs::read_to_string(root.path().join("daily/2026-07-04.md")).unwrap(),
+            fs::read_to_string(root.path().join("journal/2026-07-04.md")).unwrap(),
             "# Day\n\n- from mac\n- from phone\n"
         );
         // The duplicate's content is archived, not just deleted.
         let archive_dir = root
             .path()
-            .join(".reflect/conflict-archive/daily/2026-07-04 2.md");
+            .join(".reflect/conflict-archive/journal/2026-07-04 2.md");
         assert_eq!(fs::read_dir(archive_dir).unwrap().count(), 1);
         // Changes report the remove + the rewrite for direct reindexing.
         let kinds: Vec<(&str, &str)> = outcome
@@ -761,41 +761,41 @@ mod tests {
             .iter()
             .map(|change| (change.path.as_str(), change.kind.as_str()))
             .collect();
-        assert!(kinds.contains(&("daily/2026-07-04 2.md", "remove")));
-        assert!(kinds.contains(&("daily/2026-07-04.md", "upsert")));
+        assert!(kinds.contains(&("journal/2026-07-04 2.md", "remove")));
+        assert!(kinds.contains(&("journal/2026-07-04.md", "upsert")));
         // The base the fold just recorded survives the same pass's orphan
         // pruning (the keep-set includes this sweep's own upserts) — while
         // the removed duplicate's base is pruned in the same pass, not left
         // to linger until the next sweep's listing misses it.
         let shadow = ShadowStore::new(root.path());
         assert_eq!(
-            shadow.base("daily/2026-07-04.md"),
+            shadow.base("journal/2026-07-04.md"),
             Some("# Day\n\n- from mac\n- from phone\n".to_string())
         );
-        assert_eq!(shadow.base("daily/2026-07-04 2.md"), None);
+        assert_eq!(shadow.base("journal/2026-07-04 2.md"), None);
     }
 
     #[test]
     fn an_orphaned_duplicate_takes_the_free_canonical_name() {
         let root = graph();
-        write(root.path(), "daily/2026-07-04 2.md", "- phone only\n");
+        write(root.path(), "journal/2026-07-04 2.md", "- phone only\n");
         // A base lingering from the canonical path's previous life belongs to
         // a dead lineage — adopting the duplicate must drop it, or a later
         // diff3 would merge against the wrong ancestor.
         let shadow = ShadowStore::new(root.path());
         shadow
-            .record("daily/2026-07-04.md", "- old lineage\n")
+            .record("journal/2026-07-04.md", "- old lineage\n")
             .unwrap();
 
         let outcome = run_sweep(root.path(), &[], &[], false).unwrap();
 
-        assert!(root.path().join("daily/2026-07-04.md").exists());
-        assert!(!root.path().join("daily/2026-07-04 2.md").exists());
+        assert!(root.path().join("journal/2026-07-04.md").exists());
+        assert!(!root.path().join("journal/2026-07-04 2.md").exists());
         assert_eq!(outcome.needs_review.len(), 0);
         // The dead lineage's ancestor is gone — the adopted content is the
         // base now, matching what peers record when the rename syncs over.
         assert_eq!(
-            shadow.base("daily/2026-07-04.md"),
+            shadow.base("journal/2026-07-04.md"),
             Some("- phone only\n".to_string())
         );
     }
@@ -806,14 +806,14 @@ mod tests {
         // duplicate must wait (folding retries once the content downloads),
         // never rename itself onto the reserved name.
         let root = graph();
-        write(root.path(), "daily/.2026-07-04.md.icloud", "stub");
-        write(root.path(), "daily/2026-07-04 2.md", "- phone only\n");
+        write(root.path(), "journal/.2026-07-04.md.icloud", "stub");
+        write(root.path(), "journal/2026-07-04 2.md", "- phone only\n");
 
         let outcome = run_sweep(root.path(), &[], &[], false).unwrap();
 
-        assert!(!root.path().join("daily/2026-07-04.md").exists());
-        assert!(root.path().join("daily/2026-07-04 2.md").exists());
-        assert!(root.path().join("daily/.2026-07-04.md.icloud").exists());
+        assert!(!root.path().join("journal/2026-07-04.md").exists());
+        assert!(root.path().join("journal/2026-07-04 2.md").exists());
+        assert!(root.path().join("journal/.2026-07-04.md.icloud").exists());
         assert!(outcome.changed.is_empty());
     }
 
@@ -825,12 +825,12 @@ mod tests {
         // the labels are the two filenames the content came from.
         write(
             root.path(),
-            "daily/2026-07-04.md",
+            "journal/2026-07-04.md",
             "- shared\n- mac wording\n- common tail\n",
         );
         write(
             root.path(),
-            "daily/2026-07-04 2.md",
+            "journal/2026-07-04 2.md",
             "- shared\n- phone wording\n- common tail\n",
         );
 
@@ -838,11 +838,11 @@ mod tests {
 
         assert_eq!(
             outcome.needs_review,
-            vec!["daily/2026-07-04.md".to_string()]
+            vec!["journal/2026-07-04.md".to_string()]
         );
-        let merged = fs::read_to_string(root.path().join("daily/2026-07-04.md")).unwrap();
+        let merged = fs::read_to_string(root.path().join("journal/2026-07-04.md")).unwrap();
         assert!(markers::contains_conflict_markers(&merged));
-        assert!(merged.contains("daily/2026-07-04.md") && merged.contains("daily/2026-07-04 2.md"));
+        assert!(merged.contains("journal/2026-07-04.md") && merged.contains("journal/2026-07-04 2.md"));
     }
 
     #[test]
@@ -865,19 +865,19 @@ mod tests {
     #[test]
     fn skip_paths_defer_collision_folding() {
         let root = graph();
-        write(root.path(), "daily/2026-07-04.md", "- a\n");
-        write(root.path(), "daily/2026-07-04 2.md", "- b\n");
+        write(root.path(), "journal/2026-07-04.md", "- a\n");
+        write(root.path(), "journal/2026-07-04 2.md", "- b\n");
 
         let outcome = run_sweep(
             root.path(),
-            &["daily/2026-07-04.md".to_string()],
+            &["journal/2026-07-04.md".to_string()],
             &[],
             false,
         )
         .unwrap();
 
-        assert_eq!(outcome.deferred, vec!["daily/2026-07-04 2.md".to_string()]);
-        assert!(root.path().join("daily/2026-07-04 2.md").exists());
+        assert_eq!(outcome.deferred, vec!["journal/2026-07-04 2.md".to_string()]);
+        assert!(root.path().join("journal/2026-07-04 2.md").exists());
     }
 
     #[test]
@@ -958,15 +958,15 @@ mod tests {
         // VersionRefs are just paths — fabricate a conflict version the way
         // the version store would hold it and run the real fold.
         let root = graph();
-        write(root.path(), "daily/2026-07-04.md", "- seed\n- mac line\n");
+        write(root.path(), "journal/2026-07-04.md", "- seed\n- mac line\n");
         let store = root.path().join(".reflect/fake-version-store.md");
         fs::write(&store, "- seed\n- phone line\n").unwrap();
         let shadow = ShadowStore::new(root.path());
-        shadow.record("daily/2026-07-04.md", "- seed\n").unwrap();
+        shadow.record("journal/2026-07-04.md", "- seed\n").unwrap();
 
         let resolution = resolve_file(
             root.path(),
-            "daily/2026-07-04.md",
+            "journal/2026-07-04.md",
             2_000,
             vec![VersionRef {
                 store_path: store,
@@ -988,7 +988,7 @@ mod tests {
         // Both originals are archived before anything is written.
         let archived = root
             .path()
-            .join(".reflect/conflict-archive/daily/2026-07-04.md");
+            .join(".reflect/conflict-archive/journal/2026-07-04.md");
         assert_eq!(fs::read_dir(archived).unwrap().count(), 2);
     }
 
@@ -1043,13 +1043,13 @@ mod tests {
         // Three devices appended apart: both fold steps stay clean, all
         // three tails land, and nothing is marked.
         let root = graph();
-        write(root.path(), "daily/2026-07-04.md", "- seed\n- mac line\n");
+        write(root.path(), "journal/2026-07-04.md", "- seed\n- mac line\n");
         let shadow = ShadowStore::new(root.path());
-        shadow.record("daily/2026-07-04.md", "- seed\n").unwrap();
+        shadow.record("journal/2026-07-04.md", "- seed\n").unwrap();
 
         let resolution = resolve_file(
             root.path(),
-            "daily/2026-07-04.md",
+            "journal/2026-07-04.md",
             3_000,
             vec![
                 fake_version(
@@ -1135,14 +1135,14 @@ mod tests {
         // order the platform lists them in, the fold must emit identical
         // bytes — the tiebreak is content, exactly like the ladder's rule.
         fn run(root: &Path, first: &str, second: &str) -> String {
-            fs::write(root.join("daily/2026-07-04.md"), "- seed\n- mac\n").unwrap();
+            fs::write(root.join("journal/2026-07-04.md"), "- seed\n- mac\n").unwrap();
             let shadow = ShadowStore::new(root);
-            shadow.record("daily/2026-07-04.md", "- seed\n").unwrap();
+            shadow.record("journal/2026-07-04.md", "- seed\n").unwrap();
             let versions = vec![
                 fake_version(root, "va.md", first, 1_000, "iPhone"),
                 fake_version(root, "vb.md", second, 1_000, "iPad"),
             ];
-            resolve_file(root, "daily/2026-07-04.md", 2_000, versions, &shadow)
+            resolve_file(root, "journal/2026-07-04.md", 2_000, versions, &shadow)
                 .unwrap()
                 .final_content
         }

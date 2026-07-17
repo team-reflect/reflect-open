@@ -455,8 +455,8 @@ describe('ChatScreen', () => {
           start: '2026-06-01',
           end: '2026-06-11',
           days: [
-            { path: 'daily/2026-06-10.md', title: '2026-06-10' },
-            { path: 'daily/2026-06-09.md', title: '2026-06-09' },
+            { path: 'journal/2026-06-10.md', title: '2026-06-10' },
+            { path: 'journal/2026-06-09.md', title: '2026-06-09' },
           ],
         },
       },

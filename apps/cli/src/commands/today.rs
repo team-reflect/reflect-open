@@ -1,5 +1,5 @@
 //! `reflect today` — print today's daily note. File-only: resolved straight
-//! from the local date and the `daily/YYYY-MM-DD.md` convention, no index.
+//! from the local date and the `journal/YYYY-MM-DD.md` convention, no index.
 
 use crate::commands::output::{print_content, print_json, NoteJson, PathJson};
 use crate::error::CliError;

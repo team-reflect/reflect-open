@@ -13,7 +13,7 @@ interface DevFile {
  * hash-reconcile behave like real files.
  */
 export interface DevFileStore {
-  /** Every markdown note under `daily/` and `notes/` (the `list_files` view). */
+  /** Every markdown note under `journal/` and `notes/` (the `list_files` view). */
   list: () => FileMeta[]
   /** Files under a graph-relative directory prefix (the `dir_list` view). */
   listDir: (dir: string) => FileMeta[]
@@ -61,7 +61,7 @@ export function createDevFileStore(seed: Record<string, string>): DevFileStore {
       [...files.entries()]
         .filter(
           ([path]) =>
-            (path.startsWith('daily/') || path.startsWith('notes/')) && path.endsWith('.md'),
+            (path.startsWith('journal/') || path.startsWith('notes/')) && path.endsWith('.md'),
         )
         .map(toMeta),
     listDir: (dir) => {

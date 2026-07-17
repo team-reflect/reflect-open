@@ -87,7 +87,7 @@ describe('searchWithFilters', () => {
   it('applies non-tag filters on the tag-first recall path', async () => {
     mockInvoke.mockResolvedValueOnce([
       {
-        path: 'daily/2026-01-02.md',
+        path: 'journal/2026-01-02.md',
         title: '2026-01-02',
         daily_date: '2026-01-02',
         preview: 'Standup notes.',
@@ -101,7 +101,7 @@ describe('searchWithFilters', () => {
 
     expect(hits).toEqual([
       {
-        path: 'daily/2026-01-02.md',
+        path: 'journal/2026-01-02.md',
         title: '2026-01-02',
         highlightedTitle: '2026-01-02',
         dailyDate: '2026-01-02',

@@ -137,7 +137,7 @@ export const indexedTaskSchema = z.object({
 })
 export type IndexedTask = z.infer<typeof indexedTaskSchema>
 
-/** What a `notes` row is: part of the graph (daily/note) or a template. */
+/** What a `notes` row is: part of the graph (journal/note) or a template. */
 export const noteKindSchema = z.enum(['daily', 'note', 'template'])
 export type NoteKind = z.infer<typeof noteKindSchema>
 

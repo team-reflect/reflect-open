@@ -75,7 +75,7 @@ or exposing its current or historical content unless the user explicitly asks.
    work around this by reading graph files directly unless the user
    explicitly asks for that.
 2. **The CLI never writes.** Notes are plain markdown under the graph root
-   (`daily/YYYY-MM-DD.md`, `notes/*.md`). To change a note, edit the file the
+   (`journal/YYYY-MM-DD.md`, `notes/*.md`). To change a note, edit the file the
    CLI resolves (`reflect path <note>`); the running app picks the edit up.
 3. **Prefer search over enumeration.** `reflect search` uses the app's own
    ranked index; don't grep the whole graph when a search will do.

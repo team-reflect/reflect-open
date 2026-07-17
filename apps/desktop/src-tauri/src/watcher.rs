@@ -4,7 +4,7 @@
 //! for incremental re-indexing: an edit (ours or external) writes the markdown
 //! file, the watcher fires, and the frontend re-indexes that file. The index
 //! lives under `.reflect/`, which is filtered out here, so index writes can't
-//! loop back. The watcher reports `.md` under `daily/` and `notes/`, plus
+//! loop back. The watcher reports `.md` under `journal/` and `notes/`, plus
 //! anything under `audio-memos/` (recordings feed the sync debounce and the
 //! transcription reconciler, not the index) and eligible image/PDF files under
 //! `assets/` (which feed the asset-description controller — Plan 20 — not the
@@ -65,7 +65,7 @@ fn is_eligible_asset(rel_str: &str) -> bool {
 }
 
 /// Graph-relative path if `path` is tracked: a markdown note (`.md` under
-/// `daily/`, `notes/`, or `templates/`), an audio-memo recording (anything under
+/// `journal/`, `notes/`, or `templates/`), an audio-memo recording (anything under
 /// `audio-memos/`), a spooled capture envelope (`.json` under `.reflect/inbox/`
 /// — the one carve-out from the `.reflect/` blackout; the envelope is the
 /// spool's commit point and triggers the capture drain), or an eligible asset
@@ -78,7 +78,7 @@ fn tracked_relpath(path: &Path, root: &Path) -> Option<String> {
     // eviction/re-download events must never read as a stub appearing or the
     // note being deleted (Plan 21).
     let rel_str = evicted_logical_relpath(&rel_str).unwrap_or(rel_str);
-    let note = (rel_str.starts_with("daily/")
+    let note = (rel_str.starts_with("journal/")
         || rel_str.starts_with("notes/")
         || rel_str.starts_with("templates/"))
         && rel_str.ends_with(".md");
@@ -221,8 +221,8 @@ mod tests {
             Some("notes/a.md")
         );
         assert_eq!(
-            tracked_relpath(Path::new("/g/daily/2026-06-09.md"), root).as_deref(),
-            Some("daily/2026-06-09.md")
+            tracked_relpath(Path::new("/g/journal/2026-06-09.md"), root).as_deref(),
+            Some("journal/2026-06-09.md")
         );
         // Templates are tracked like notes; only `.md` files count.
         assert_eq!(

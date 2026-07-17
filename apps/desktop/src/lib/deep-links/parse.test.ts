@@ -31,12 +31,12 @@ describe('parseDeepLink', () => {
   })
 
   it('parses calendar-valid daily dates and rejects impossible ones', () => {
-    expect(parseDeepLink('reflect://daily/2026-07-01')).toEqual({
+    expect(parseDeepLink('reflect://journal/2026-07-01')).toEqual({
       kind: 'navigate',
       route: { kind: 'daily', date: '2026-07-01' },
     })
-    expect(parseDeepLink('reflect://daily/2026-02-31')).toBeNull()
-    expect(parseDeepLink('reflect://daily/not-a-date')).toBeNull()
+    expect(parseDeepLink('reflect://journal/2026-02-31')).toBeNull()
+    expect(parseDeepLink('reflect://journal/not-a-date')).toBeNull()
     expect(parseDeepLink('reflect://daily')).toBeNull()
   })
 

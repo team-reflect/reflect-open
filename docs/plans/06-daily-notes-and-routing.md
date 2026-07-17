@@ -43,7 +43,7 @@ seam).
      Dynamic row heights via `measureElement` (editors grow while typing); overscan
      ~2 so only a handful of ProseKit instances are live; offscreen days unmount and
      flush through the save pipeline's final-flush path (built in Plan 05).
-  3. **Routes drive the stream.** `today` and `daily/:date` both render the stream
+  3. **Routes drive the stream.** `today` and `journal/:date` both render the stream
      scrolled to the target date; prev/next become scroll + `⌘` navigation rather
      than separate pages.
   4. **Scroll/focus restore (step 4 tail).** History entries become
@@ -63,7 +63,7 @@ seam).
 
 ## Steps
 
-1. **Today on launch.** On graph ready, resolve today's `daily/YYYY-MM-DD.md` (local
+1. **Today on launch.** On graph ready, resolve today's `journal/YYYY-MM-DD.md` (local
    timezone). If absent, create lazily on first keystroke (don't litter the graph with
    empty files for days never written). Land focus in the editor.
 
@@ -82,7 +82,7 @@ seam).
 4. **Route model (designed with the data model, not bolted on).** Define typed,
    shareable app routes and a small router over them:
    - `today`
-   - `daily/:date` (`YYYY-MM-DD`)
+   - `journal/:date` (`YYYY-MM-DD`)
    - `note/:path` (regular note — path-as-identity, Plan 03; `id` joins later)
    - `search/:query` (Plan 08)
    These are **product routes**, not page names. Back/forward (`⌘[` / `⌘]`) traverse a
@@ -124,7 +124,7 @@ seam).
 - `[[2026-06-08]]` opens/creates that daily note.
 - Navigating prev/next day works and stays fast on a large graph.
 - `pnpm typecheck` + tests pass. **M1 demo:** write across several days, quit, reopen —
-  notes are on disk as `daily/*.md` and indexed.
+  notes are on disk as `journal/*.md` and indexed.
 
 ## Risks
 
