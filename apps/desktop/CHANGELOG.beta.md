@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0-beta.9](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.8...v0.7.0-beta.9) (2026-07-17)
+
+
+### Features
+
+* format audio transcriptions automatically ([#873](https://github.com/team-reflect/reflect-open/issues/873)) ([c994a2e](https://github.com/team-reflect/reflect-open/commit/c994a2ee2d803a1b751303c67aacac6e2dfb6a4e))
+
+
+### Bug Fixes
+
+* enrich URL-only mobile link captures ([#872](https://github.com/team-reflect/reflect-open/issues/872)) ([88f163b](https://github.com/team-reflect/reflect-open/commit/88f163bb679d84d267c0005d2ad04323034e61a4))
+
 ## [0.7.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.7...v0.7.0-beta.8) (2026-07-17)
 
 
