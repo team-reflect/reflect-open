@@ -14,6 +14,7 @@ import { captureFromPath, type CaptureIdentity } from './capture-identity'
 import {
   captureNoteMeta,
   capturePageTextFromBody,
+  displayTitle,
   hasDescription,
   metadataValue,
   notePrivate,
@@ -132,8 +133,8 @@ async function generateEnrichment(input: GenerateEnrichmentInput): Promise<PageE
 }
 
 /**
- * Enrich every pending capture: scrape the page's meta tags, generate the AI
- * description and cleaned-up display title when a provider is configured
+ * Enrich every pending capture: scrape the page's description and display
+ * title, optionally replace them with AI output when a provider is configured
  * (retitling the note's H1 and the daily entry's link text), and stamp
  * `captureStatus: done`. Never throws.
  */
@@ -254,6 +255,12 @@ export async function reconcileCaptureEnrichment(
         }
       }
       const aiTitle = generated?.title ?? null
+      const placeholderTitle = displayTitle({ title: '', url: meta.captureUrl })
+      const metadataTitle =
+        title === placeholderTitle && pageMeta?.title
+          ? displayTitle({ title: pageMeta.title, url: meta.captureUrl })
+          : null
+      const enrichedTitle = aiTitle ?? metadataTitle
       const description = generated?.description ?? null
 
       const usedAiDescription = description !== null && metadataValue(description) !== ''
@@ -264,8 +271,8 @@ export async function reconcileCaptureEnrichment(
           ? null
           : pageMeta?.description ?? null
       let newBody = text !== null ? withDescription(split.body, text) : split.body
-      if (aiTitle !== null) {
-        newBody = withTitle(newBody, aiTitle)
+      if (enrichedTitle !== null) {
+        newBody = withTitle(newBody, enrichedTitle)
       }
       const reassembled = source.slice(0, split.bodyOffset) + newBody
       await writeNote(
@@ -278,11 +285,11 @@ export async function reconcileCaptureEnrichment(
         }),
         input.generation,
       )
-      if (aiTitle !== null && aiTitle !== title) {
-        // Re-read the daily: the provider call above is slow, and the
-        // pre-call snapshot would silently drop anything written meanwhile.
+      if (enrichedTitle !== null && enrichedTitle !== title) {
+        // Re-read the daily: the network work above is slow, and the pre-call
+        // snapshot would silently drop anything written meanwhile.
         const freshDaily = await noteSource(dailyPath(identity.date), input.generation)
-        const retitled = retitleDailyEntry(freshDaily, identity.base, title, aiTitle)
+        const retitled = retitleDailyEntry(freshDaily, identity.base, title, enrichedTitle)
         if (retitled !== freshDaily) {
           await writeNote(dailyPath(identity.date), retitled, input.generation)
         }

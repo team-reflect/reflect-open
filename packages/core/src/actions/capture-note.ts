@@ -39,7 +39,7 @@ const PAGE_TEXT_START = '<!-- reflect-capture-page-text:start -->'
 const PAGE_TEXT_END = '<!-- reflect-capture-page-text:end -->'
 
 /** The capture's display title: the page title, else the URL's host. */
-export function displayTitle(envelope: CaptureEnvelope): string {
+export function displayTitle(envelope: Pick<CaptureEnvelope, 'title' | 'url'>): string {
   const title = wikiLinkSafe(envelope.title)
   return title !== '' ? title : urlHost(envelope.url)
 }

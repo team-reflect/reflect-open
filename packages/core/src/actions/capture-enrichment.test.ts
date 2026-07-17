@@ -154,6 +154,48 @@ describe('reconcileCaptureEnrichment', () => {
     expect(getSecretMock).not.toHaveBeenCalled()
   })
 
+  it('retitles a URL-only iOS share from scraped metadata without AI', async () => {
+    addSpool(envelope({ source: 'ios-share', title: '' }), { screenshot: false })
+    expect((await drain()).stopped).toBeNull()
+    writeNoteMock.mockClear()
+    scrapeMock.mockResolvedValue({
+      title: 'An article from its metadata',
+      description: 'A scraped description.',
+      siteName: 'Example',
+    })
+
+    const outcome = await reconcile({ providers: NO_PROVIDERS })
+
+    expect(outcome).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
+    const note = files.get(IDENTITY.notePath) ?? ''
+    expect(note).toContain('# An article from its metadata')
+    expect(note).toContain('- Description: A scraped description.')
+    expect(note).toContain('captureStatus: done')
+    expect(note).not.toContain('captureProvider')
+    const daily = files.get(DAILY) ?? ''
+    expect(daily).toContain(
+      '- [[capture-2026-06-11-153022-845-7c9e|An article from its metadata]]',
+    )
+    expect(daily).not.toContain('|example.com]]')
+    expect(describeMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps a supplied capture title when scraped metadata differs', async () => {
+    await drainOne({ source: 'ios-share', title: 'The title supplied by the app' })
+    scrapeMock.mockResolvedValue({
+      title: 'A different metadata title',
+      description: 'A scraped description.',
+      siteName: 'Example',
+    })
+
+    const outcome = await reconcile({ providers: NO_PROVIDERS })
+
+    expect(outcome.enriched).toBe(1)
+    expect(files.get(IDENTITY.notePath)).toContain('# The title supplied by the app')
+    expect(files.get(DAILY)).toContain('|The title supplied by the app]]')
+    expect(files.get(DAILY)).not.toContain('|A different metadata title]]')
+  })
+
   it('stops on a configured provider whose key is missing from the keychain', async () => {
     await drainOne()
     getSecretMock.mockResolvedValue(null)
