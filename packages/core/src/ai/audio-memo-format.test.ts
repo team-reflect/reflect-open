@@ -183,6 +183,18 @@ describe('formatAudioMemoTranscript', () => {
     expect(result.title).not.toBe('Changed number')
   })
 
+  it.each([
+    ['a Roman numeral to ASCII letters', 'Phase Ⅳ starts tomorrow', 'Phase IV starts tomorrow.'],
+    ['full-width digits to ASCII digits', 'Invite ５０ people', 'Invite 50 people.'],
+    ['accounting parentheses', 'The loss was ($50) today', 'The loss was $50 today.'],
+  ])('falls back when formatting changes %s', async (_case, transcript, body) => {
+    modelAnswering({ title: 'Changed notation', body })
+
+    const result = await request(transcript)
+    expect(result.body).toBe(transcript)
+    expect(result.title).not.toBe('Changed notation')
+  })
+
   it('does not call a model for an empty transcript', async () => {
     modelAnswering({ title: 'Ignored', body: 'Ignored' })
 

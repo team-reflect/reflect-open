@@ -10,7 +10,7 @@ import { languageModel } from './language-model'
 
 const FORMAT_TIMEOUT_MS = 60_000
 const NUMBER_SIGNATURE_PATTERN =
-  /(?:(?:[+\-−±~≈#]|\p{Sc})+\p{N}+|(?:[+\-−±~≈#]\p{Sc}|\p{Sc}[+\-−±~≈#]?)\s+\p{N}+|\p{N}+)(?:[.,:/\-\u066B\u066C]\p{N}+)*(?:\s*(?:\p{Sc}|[%‰‱°]))?/gu
+  /(?:(?:[+\-−±~≈#(]|\p{Sc})+\p{N}+|(?:[+\-−±~≈#(]\p{Sc}|\p{Sc}[+\-−±~≈#(]?)\s+\p{N}+|\p{N}+)(?:[.,:/\-\u066B\u066C]\p{N}+)*(?:\s*(?:\p{Sc}|[%‰‱°)]))?/gu
 
 const formattedAudioMemoSchema = z.object({
   title: z.string(),
@@ -30,11 +30,11 @@ const FORMAT_SYSTEM_PROMPT = [
 ].join(' ')
 
 function normalizedTranscriptContent(value: string): string {
-  return value.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{M}\p{N}]/gu, '')
+  return value.normalize('NFC').toLowerCase().replace(/[^\p{L}\p{M}\p{N}]/gu, '')
 }
 
 function numberSignatures(value: string): readonly string[] {
-  return (value.normalize('NFKC').match(NUMBER_SIGNATURE_PATTERN) ?? []).map((match) =>
+  return (value.normalize('NFC').match(NUMBER_SIGNATURE_PATTERN) ?? []).map((match) =>
     match.replace(/\s/gu, ''),
   )
 }
