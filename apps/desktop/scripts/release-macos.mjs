@@ -1545,9 +1545,9 @@ function syncBetaFeed() {
  * apps/desktop/package.json). The normal flow fills the asset-less draft
  * release that release-please created when the Release PR merged; the manual
  * fallback creates the release itself. A version with a prerelease segment
- * (e.g. `0.2.0-beta.1`, the `next`-branch convention) publishes as a GitHub
- * pre-release. All preflight checks run before the build so a doomed publish
- * fails in seconds, not after notarization.
+ * (e.g. `0.2.0-beta.1`) publishes as a GitHub pre-release. All preflight checks
+ * run before the build so a doomed publish fails in seconds, not after
+ * notarization.
  */
 function ensurePublishableRelease({ flavorFlag }) {
   ensureGhReady()
