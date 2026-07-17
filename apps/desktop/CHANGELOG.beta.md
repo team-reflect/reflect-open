@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0-beta.10](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.9...v0.7.0-beta.10) (2026-07-17)
+
+
+### Bug Fixes
+
+* enrich shared links before AI finishes ([#877](https://github.com/team-reflect/reflect-open/issues/877)) ([74a137b](https://github.com/team-reflect/reflect-open/commit/74a137b90e23c9d56b24aa6ee4caf9ca8acd24a9))
+
 ## [0.7.0-beta.9](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.8...v0.7.0-beta.9) (2026-07-17)
 
 
