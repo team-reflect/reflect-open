@@ -290,7 +290,7 @@ describe('reconcileCaptureEnrichment', () => {
     expect(enrichedNote).toContain('- Description: An AI description of the page.')
     expect(enrichedNote).toContain('captureStatus: done')
     expect(enrichedNote).toContain('captureProvider: openai')
-    expect(scrapeMock).toHaveBeenCalledTimes(1)
+    expect(scrapeMock).not.toHaveBeenCalled()
     expect(describeMock).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'First Chair on Instagram',
@@ -504,6 +504,23 @@ describe('reconcileCaptureEnrichment', () => {
     expect(note).toContain('captureStatus: pending')
     expect(note).not.toContain('captureProvider')
     expect(files.get(DAILY)).toContain('|A title available without AI]]')
+
+    scrapeMock.mockClear()
+    scrapeMock.mockRejectedValue(new ReflectError('network', 'offline'))
+    describeMock.mockResolvedValue({ title: null, description: 'A description from the retry.' })
+    const retry = await reconcile()
+
+    expect(retry).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
+    expect(scrapeMock).not.toHaveBeenCalled()
+    expect(describeMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        title: 'A title available without AI',
+        metaTitle: 'A title available without AI',
+        metaDescription: 'A description available without AI.',
+      }),
+    )
+    expect(files.get(IDENTITY.notePath)).toContain('- Description: A description from the retry.')
+    expect(files.get(IDENTITY.notePath)).toContain('captureStatus: done')
   })
 
   it('retitles the note H1, screenshot alt, and daily link text from the AI title', async () => {

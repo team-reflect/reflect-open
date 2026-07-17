@@ -141,13 +141,26 @@ export function metadataValue(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
 }
 
+const DESCRIPTION_PREFIX = '- Description: '
+
 function descriptionLineIndex(metadataLines: readonly string[]): number {
-  return metadataLines.findIndex((candidate) => candidate.startsWith('- Description: '))
+  return metadataLines.findIndex((candidate) => candidate.startsWith(DESCRIPTION_PREFIX))
 }
 
 /** Does the raw body already carry a description metadata bullet? */
 export function hasDescription(body: string): boolean {
   return descriptionLineIndex(body.slice(0, firstSectionStart(body)).split('\n')) !== -1
+}
+
+/** The capture's persisted metadata description, when present. */
+export function captureDescriptionFromBody(body: string): string | undefined {
+  const metadataLines = body.slice(0, firstSectionStart(body)).split('\n')
+  const descriptionLine = descriptionLineIndex(metadataLines)
+  if (descriptionLine === -1) {
+    return undefined
+  }
+  const description = metadataValue(metadataLines[descriptionLine]!.slice(DESCRIPTION_PREFIX.length))
+  return description === '' ? undefined : description
 }
 
 /**
@@ -209,7 +222,7 @@ export function retitleDailyEntry(
  * raw body has a `- Type: #link` anchor.
  */
 export function withDescription(body: string, description: string): string {
-  const line = `- Description: ${metadataValue(description)}`
+  const line = `${DESCRIPTION_PREFIX}${metadataValue(description)}`
   const metadataEnd = firstSectionStart(body)
   const metadataLines = body.slice(0, metadataEnd).split('\n')
   const descriptionLine = descriptionLineIndex(metadataLines)

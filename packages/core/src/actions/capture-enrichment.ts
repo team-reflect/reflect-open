@@ -18,6 +18,7 @@ import {
 } from './capture-enrichment-write'
 import { captureFromPath, type CaptureIdentity } from './capture-identity'
 import {
+  captureDescriptionFromBody,
   captureNoteMeta,
   capturePageTextFromBody,
   displayTitle,
@@ -254,7 +255,8 @@ export async function reconcileCaptureEnrichment(
           continue
         }
       }
-      if (snapshot.meta.captureMetadataStatus === 'done' && apiKey === null) {
+      const metadataComplete = snapshot.meta.captureMetadataStatus === 'done'
+      if (metadataComplete && apiKey === null) {
         if (config !== null) {
           waitingForKey = true
           continue
@@ -278,14 +280,22 @@ export async function reconcileCaptureEnrichment(
       }
 
       let pageMeta: PageMeta | null = null
-      try {
-        pageMeta = await scrapePageMeta(snapshot.meta.captureUrl)
-      } catch (cause) {
-        const kind = toAppError(cause).kind
-        if (kind === 'network' || kind === 'auth') {
-          throw cause
+      if (metadataComplete) {
+        pageMeta = {
+          title: snapshot.title,
+          description: captureDescriptionFromBody(snapshot.body) ?? null,
+          siteName: null,
         }
-        pageMeta = null
+      } else {
+        try {
+          pageMeta = await scrapePageMeta(snapshot.meta.captureUrl)
+        } catch (cause) {
+          const kind = toAppError(cause).kind
+          if (kind === 'network' || kind === 'auth') {
+            throw cause
+          }
+          pageMeta = null
+        }
       }
       if (stale()) {
         return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
@@ -331,19 +341,23 @@ export async function reconcileCaptureEnrichment(
         continue
       }
 
-      const metadataHash = await persistCaptureEnrichment({
-        identity,
-        expectedHash: snapshot.meta.captureHash,
-        body: metadataBody,
-        fromTitle: snapshot.title,
-        toTitle: metadataDisplayTitle,
-        status: 'pending',
-        provider: null,
-        generation: input.generation,
-      })
-      if (metadataHash === null) {
-        await skipPending(identity)
-        continue
+      let metadataHash = snapshot.meta.captureHash
+      if (!metadataComplete) {
+        const persistedHash = await persistCaptureEnrichment({
+          identity,
+          expectedHash: snapshot.meta.captureHash,
+          body: metadataBody,
+          fromTitle: snapshot.title,
+          toTitle: metadataDisplayTitle,
+          status: 'pending',
+          provider: null,
+          generation: input.generation,
+        })
+        if (persistedHash === null) {
+          await skipPending(identity)
+          continue
+        }
+        metadataHash = persistedHash
       }
       if (stale()) {
         return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
