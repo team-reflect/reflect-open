@@ -171,11 +171,16 @@ export async function reconcileCaptureEnrichment(
 
   const config = defaultAiProvider(input.providers)
   let apiKey: string | null = null
-  let missingKeyStop: ReconcileStop | null = null
+  let providerStop: ReconcileStop | null = null
   if (config !== null) {
-    apiKey = await getSecret(aiKeySecretName(config.id)).catch(() => null)
-    if (apiKey === null) {
-      missingKeyStop = {
+    try {
+      apiKey = await getSecret(aiKeySecretName(config.id))
+    } catch (cause) {
+      const error = toAppError(cause)
+      providerStop = { reason: error.kind, message: error.message }
+    }
+    if (apiKey === null && providerStop === null) {
+      providerStop = {
         reason: 'config',
         message: `The API key for the configured ${config.provider} model is missing from the keychain.`,
       }
@@ -294,6 +299,8 @@ export async function reconcileCaptureEnrichment(
           if (kind === 'network' || kind === 'auth') {
             throw cause
           }
+          // Invalid URLs, non-HTML responses, and non-success statuses are
+          // permanent for this capture; checkpoint the no-metadata result.
           pageMeta = null
         }
       }
@@ -426,5 +433,5 @@ export async function reconcileCaptureEnrichment(
       return outcome({ reason: toAppError(cause).kind, message: errorMessage(cause) })
     }
   }
-  return outcome(waitingForKey ? missingKeyStop : null)
+  return outcome(waitingForKey ? providerStop : null)
 }

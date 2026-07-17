@@ -16,11 +16,17 @@ import {
 } from './capture-note'
 
 export interface PendingCaptureSnapshot {
+  /** Full source, including frontmatter, used to preserve unrelated keys. */
   source: string
+  /** Markdown body whose hash guards against concurrent edits. */
   body: string
+  /** Body start within `source`; the prefix is retained when replacing `body`. */
   bodyOffset: number
+  /** Current note title used to keep the Daily alias in sync. */
   title: string
+  /** Parsed hard privacy gate for every external enrichment call. */
   isPrivate: boolean
+  /** Validated capture lifecycle and transaction frontmatter. */
   meta: CaptureNoteMeta
 }
 

@@ -300,6 +300,26 @@ describe('reconcileCaptureEnrichment', () => {
     )
   })
 
+  it('applies scraped metadata while preserving a keychain failure', async () => {
+    await drainOne({ source: 'ios-share', title: '' })
+    scrapeMock.mockResolvedValue({
+      title: 'A title available without the keychain',
+      description: 'A description available without the keychain.',
+      siteName: null,
+    })
+    getSecretMock.mockRejectedValue(new ReflectError('io', 'keychain is unavailable'))
+
+    const outcome = await reconcile()
+
+    expect(outcome.stopped).toEqual({ reason: 'io', message: 'keychain is unavailable' })
+    const note = files.get(IDENTITY.notePath) ?? ''
+    expect(note).toContain('# A title available without the keychain')
+    expect(note).toContain('- Description: A description available without the keychain.')
+    expect(note).toContain('captureStatus: pending')
+    expect(note).toContain('captureMetadataStatus: done')
+    expect(describeMock).not.toHaveBeenCalled()
+  })
+
   it('skips an edited capture instead of clobbering it — zero outbound', async () => {
     await drainOne()
     const source = files.get(IDENTITY.notePath) ?? ''

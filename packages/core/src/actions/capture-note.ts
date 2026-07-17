@@ -14,8 +14,11 @@ export type CaptureStatus = 'pending' | 'done' | 'skipped'
 const captureNoteMetaSchema = z.object({
   captureUrl: z.string(),
   captureStatus: z.enum(['pending', 'done', 'skipped']),
+  /** The metadata attempt completed, including a permanently unsuitable page. */
   captureMetadataStatus: z.literal('done').optional(),
+  /** Prior Daily alias; paired with `captureFinalizeStatus` during a retitle. */
   captureDailyFromTitle: z.string().optional(),
+  /** Status to commit after the paired Daily alias update succeeds. */
   captureFinalizeStatus: z.enum(['pending', 'done']).optional(),
   captureHash: z.string(),
   captureSelectionHash: z.string().optional(),
