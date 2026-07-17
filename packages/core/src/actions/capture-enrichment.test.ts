@@ -154,8 +154,11 @@ describe('reconcileCaptureEnrichment', () => {
     expect(getSecretMock).not.toHaveBeenCalled()
   })
 
-  it('retitles a URL-only iOS share from scraped metadata without AI', async () => {
-    addSpool(envelope({ source: 'ios-share', title: '' }), { screenshot: false })
+  it.each([
+    ['an empty title', ''],
+    ['a host-equivalent title', 'example.com'],
+  ])('retitles a URL-only iOS share with %s from scraped metadata', async (_label, title) => {
+    addSpool(envelope({ source: 'ios-share', title }), { screenshot: false })
     expect((await drain()).stopped).toBeNull()
     writeNoteMock.mockClear()
     scrapeMock.mockResolvedValue({
