@@ -20,6 +20,22 @@ describe('parsePageMeta', () => {
     })
   })
 
+  it('parses the OpenGraph shape returned for an Instagram reel', () => {
+    const meta = parsePageMeta(`
+      <html><head>
+        <meta property="og:title" content="First Chair on Instagram: &quot;A walnut lounge chair&quot;">
+        <meta property="og:description" content="Furniture &amp; decor from an independent studio.">
+        <meta property="og:site_name" content="Instagram">
+      </head><body></body></html>
+    `)
+
+    expect(meta).toEqual({
+      title: 'First Chair on Instagram: "A walnut lounge chair"',
+      description: 'Furniture & decor from an independent studio.',
+      siteName: 'Instagram',
+    })
+  })
+
   it('falls back to <title> and the meta description', () => {
     const meta = parsePageMeta(
       '<html><head><title>Doc title</title><meta name="description" content="Plain"></head></html>',

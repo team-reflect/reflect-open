@@ -14,6 +14,9 @@ export type CaptureStatus = 'pending' | 'done' | 'skipped'
 const captureNoteMetaSchema = z.object({
   captureUrl: z.string(),
   captureStatus: z.enum(['pending', 'done', 'skipped']),
+  captureMetadataStatus: z.literal('done').optional(),
+  captureDailyFromTitle: z.string().optional(),
+  captureFinalizeStatus: z.enum(['pending', 'done']).optional(),
   captureHash: z.string(),
   captureSelectionHash: z.string().optional(),
   captureScreenshot: z.string().optional(),
