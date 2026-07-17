@@ -330,19 +330,36 @@ export async function reconcileCaptureEnrichment(
       }
 
       if (config === null) {
+        const titleChanged = metadataDisplayTitle !== snapshot.title
         const captureHash = await persistCaptureEnrichment({
           identity,
           expectedHash: snapshot.meta.captureHash,
           body: metadataBody,
           fromTitle: snapshot.title,
           toTitle: metadataDisplayTitle,
-          status: 'done',
+          status: titleChanged ? 'pending' : 'done',
           provider: null,
           generation: input.generation,
         })
         if (captureHash === null) {
           await skipPending(identity)
           continue
+        }
+        if (titleChanged) {
+          const finalizedHash = await persistCaptureEnrichment({
+            identity,
+            expectedHash: captureHash,
+            body: metadataBody,
+            fromTitle: metadataDisplayTitle,
+            toTitle: metadataDisplayTitle,
+            status: 'done',
+            provider: null,
+            generation: input.generation,
+          })
+          if (finalizedHash === null) {
+            await skipPending(identity)
+            continue
+          }
         }
         enriched += 1
         continue

@@ -623,7 +623,7 @@ describe('reconcileCaptureEnrichment', () => {
     expect(files.get(IDENTITY.notePath)).toContain('# A title from metadata')
     expect(files.get(IDENTITY.notePath)).toContain('captureStatus: pending')
     expect(files.get(IDENTITY.notePath)).toContain('captureDailyFromTitle: example.com')
-    expect(files.get(IDENTITY.notePath)).toContain('captureFinalizeStatus: done')
+    expect(files.get(IDENTITY.notePath)).toContain('captureFinalizeStatus: pending')
 
     scrapeMock.mockResolvedValue({
       title: 'A different title on retry',
@@ -641,6 +641,65 @@ describe('reconcileCaptureEnrichment', () => {
     expect(files.get(IDENTITY.notePath)).not.toContain('captureDailyFromTitle')
     expect(files.get(IDENTITY.notePath)).not.toContain('captureFinalizeStatus')
     expect(scrapeMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('runs newly configured AI after resuming a metadata-only daily retitle', async () => {
+    await drainOne({ source: 'ios-share', title: '' })
+    scrapeMock.mockResolvedValue({
+      title: 'A title from metadata',
+      description: 'A scraped description.',
+      siteName: null,
+    })
+    writeNoteMock
+      .mockImplementationOnce(async (path, contents) => {
+        files.set(path, contents)
+      })
+      .mockRejectedValueOnce(new ReflectError('io', 'disk full'))
+
+    const first = await reconcile({ providers: NO_PROVIDERS })
+
+    expect(first.stopped?.reason).toBe('io')
+    expect(files.get(IDENTITY.notePath)).toContain('captureFinalizeStatus: pending')
+
+    scrapeMock.mockClear()
+    getSecretMock.mockResolvedValue(null)
+    const waiting = await reconcile()
+
+    expect(waiting).toEqual({
+      pending: 1,
+      enriched: 0,
+      skipped: 0,
+      stopped: expect.objectContaining({ reason: 'config' }),
+    })
+    expect(scrapeMock).not.toHaveBeenCalled()
+    expect(describeMock).not.toHaveBeenCalled()
+    expect(files.get(DAILY)).toContain('|A title from metadata]]')
+    expect(files.get(IDENTITY.notePath)).toContain('captureStatus: pending')
+    expect(files.get(IDENTITY.notePath)).not.toContain('captureFinalizeStatus')
+
+    getSecretMock.mockResolvedValue('sk-live-key')
+    describeMock.mockResolvedValue({
+      title: 'A title from AI',
+      description: 'An AI description.',
+    })
+    const retry = await reconcile()
+
+    expect(retry).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
+    expect(scrapeMock).not.toHaveBeenCalled()
+    expect(describeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'A title from metadata',
+        metaTitle: 'A title from metadata',
+        metaDescription: 'A scraped description.',
+      }),
+    )
+    const note = files.get(IDENTITY.notePath) ?? ''
+    expect(note).toContain('# A title from AI')
+    expect(note).toContain('- Description: An AI description.')
+    expect(note).toContain('captureStatus: done')
+    expect(note).toContain('captureProvider: openai')
+    expect(note).not.toContain('captureFinalizeStatus')
+    expect(files.get(DAILY)).toContain('|A title from AI]]')
   })
 
   it('preserves privacy set while a metadata retitle writes the daily backlink', async () => {
