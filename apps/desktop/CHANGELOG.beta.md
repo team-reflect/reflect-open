@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0-beta.11](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.10...v0.7.0-beta.11) (2026-07-18)
+
+
+### Bug Fixes
+
+* retry rate-limited link previews and clean up share-sheet titles ([#884](https://github.com/team-reflect/reflect-open/issues/884)) ([dfb6d29](https://github.com/team-reflect/reflect-open/commit/dfb6d29d3d76a1de088016f290cc8966da69bdfc))
+
 ## [0.7.0-beta.10](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.9...v0.7.0-beta.10) (2026-07-17)
 
 
