@@ -529,6 +529,12 @@ fn classify_fetch_status(url: &str, status: reqwest::StatusCode) -> Option<AppEr
 /// the webview's HTTP-plugin capability to every URL — the only thing that
 /// can reach arbitrary hosts is this bounded, HTML-only primitive, and the
 /// privacy gate in `@reflect/core` runs before it is ever called.
+///
+/// Deliberately *not* host-vetted the way `capture_image_fetch` is: the
+/// capture URL is one the user chose to share (user intent, possibly a
+/// private-network page they legitimately want captured), whereas the image
+/// URL comes from page content. The response is only ever parsed for text
+/// metadata. Revisit if scrape targets ever become content-controlled.
 #[tauri::command]
 pub async fn capture_meta_fetch(url: String) -> AppResult<String> {
     if !url.starts_with("https://") && !url.starts_with("http://") {
@@ -630,10 +636,11 @@ fn public_address(addr: &std::net::IpAddr) -> bool {
 }
 
 /// Resolve one redirect hop's host and refuse it unless every address is
-/// public ({@link public_address}); returns the vetted socket address so the
-/// caller can pin the connection to it (resolving again at connect time
-/// would reopen the DNS-rebinding window this check closes).
-async fn vetted_image_addr(target: &reqwest::Url) -> AppResult<std::net::SocketAddr> {
+/// public ([`public_address`]); returns the full vetted address list so the
+/// caller can pin the connection to it — all of it, keeping the resolver's
+/// v4/v6 fallback — because resolving again at connect time would reopen
+/// the DNS-rebinding window this check closes.
+async fn vetted_image_addrs(target: &reqwest::Url) -> AppResult<Vec<std::net::SocketAddr>> {
     let host = target
         .host_str()
         .ok_or_else(|| AppError::parse(format!("{target} has no host")))?;
@@ -658,7 +665,7 @@ async fn vetted_image_addr(target: &reqwest::Url) -> AppResult<std::net::SocketA
             )));
         }
     }
-    Ok(addrs[0])
+    Ok(addrs)
 }
 
 /// Fetch a captured page's own preview image (its `og:image`) and store it
@@ -688,13 +695,13 @@ pub async fn capture_image_fetch(
         if target.scheme() != "https" && target.scheme() != "http" {
             return Err(AppError::parse(format!("not an http(s) url: {target}")));
         }
-        let addr = vetted_image_addr(&target).await?;
+        let addrs = vetted_image_addrs(&target).await?;
         let host = target.host_str().unwrap_or_default().to_owned();
         // Redirects are followed manually (with the host re-vetted each hop)
-        // and the connection pinned to the vetted address.
+        // and the connection pinned to the vetted addresses.
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
-            .resolve(&host, addr)
+            .resolve_to_addrs(&host, &addrs)
             .timeout(META_FETCH_TIMEOUT)
             .user_agent(META_FETCH_USER_AGENT)
             .build()
