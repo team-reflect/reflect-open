@@ -18,6 +18,7 @@ import {
   wireCaptureMocks,
   writeNoteMock,
 } from './capture-harness'
+import { captureIdentity } from './capture'
 import type { CaptureEnvelope } from './capture-envelope'
 
 const ensureBacklinkTargetMock = vi.hoisted(() => vi.fn())
@@ -181,6 +182,27 @@ describe('reconcileCaptureEnrichment', () => {
     )
     expect(daily).not.toContain('|example.com]]')
     expect(describeMock).not.toHaveBeenCalled()
+  })
+
+  it('clips a runaway scraped title at a word boundary', async () => {
+    addSpool(envelope({ source: 'ios-share', title: '' }), { screenshot: false })
+    expect((await drain()).stopped).toBeNull()
+    writeNoteMock.mockClear()
+    scrapeMock.mockResolvedValue({
+      title: `${'lengthy '.repeat(20)}tail`,
+      description: 'A scraped description.',
+      siteName: 'Instagram',
+    })
+
+    const outcome = await reconcile({ providers: NO_PROVIDERS })
+
+    expect(outcome.enriched).toBe(1)
+    const note = files.get(IDENTITY.notePath) ?? ''
+    const heading = note.split('\n').find((line) => line.startsWith('# '))
+    expect(heading).toBeDefined()
+    expect(heading!.length).toBeLessThanOrEqual('# '.length + 100)
+    expect(heading).not.toContain('tail')
+    expect(files.get(DAILY)).toContain(`|${heading!.slice('# '.length)}]]`)
   })
 
   it('keeps a supplied capture title when scraped metadata differs', async () => {
@@ -434,7 +456,7 @@ describe('reconcileCaptureEnrichment', () => {
     expect(describeMock).not.toHaveBeenCalled()
   })
 
-  it('a transient scrape failure stops the pass; the next pass retries', async () => {
+  it('a transient scrape failure leaves the capture pending; the next pass retries', async () => {
     await drainOne()
     scrapeMock.mockRejectedValueOnce(new ReflectError('network', 'offline'))
 
@@ -444,6 +466,92 @@ describe('reconcileCaptureEnrichment', () => {
 
     const second = await reconcile()
     expect(second.enriched).toBe(1)
+  })
+
+  it('a rate-limited page leaves its capture pending without starving the queue', async () => {
+    const laterAt = new Date(2026, 5, 11, 16, 0, 0, 0)
+    const laterId = '9d0f7780-8536-4a1e-a55c-f18fd2a01bf8'
+    const laterIdentity = captureIdentity(laterAt, laterId)
+    addSpool(
+      envelope({ source: 'ios-share', url: 'https://www.instagram.com/reel/example/', title: '' }),
+      { screenshot: false },
+    )
+    addSpool(
+      envelope({ id: laterId, capturedAt: laterAt.toISOString(), title: 'An article' }),
+      { screenshot: false },
+    )
+    expect((await drain()).stopped).toBeNull()
+    writeNoteMock.mockClear()
+    scrapeMock.mockImplementation(async (url) => {
+      if (url.includes('instagram')) {
+        throw new ReflectError('network', 'https://www.instagram.com answered 429')
+      }
+      return { title: 'An article', description: 'A scraped description.', siteName: null }
+    })
+
+    const outcome = await reconcile({ providers: NO_PROVIDERS })
+
+    expect(outcome).toEqual({
+      pending: 2,
+      enriched: 1,
+      skipped: 0,
+      stopped: expect.objectContaining({ reason: 'network' }),
+    })
+    expect(files.get(IDENTITY.notePath)).toContain('captureStatus: pending')
+    expect(files.get(laterIdentity.notePath)).toContain('captureStatus: done')
+    expect(files.get(laterIdentity.notePath)).toContain('- Description: A scraped description.')
+
+    scrapeMock.mockResolvedValue({
+      title: 'First Chair on Instagram',
+      description: 'An Instagram reel about furniture and decor.',
+      siteName: 'Instagram',
+    })
+    const retry = await reconcile({ providers: NO_PROVIDERS })
+
+    expect(retry).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
+    expect(files.get(IDENTITY.notePath)).toContain('# First Chair on Instagram')
+    expect(files.get(IDENTITY.notePath)).toContain('captureStatus: done')
+  })
+
+  it('a rate-limited provider leaves its capture pending without starving the queue', async () => {
+    const laterAt = new Date(2026, 5, 11, 16, 0, 0, 0)
+    const laterId = '9d0f7780-8536-4a1e-a55c-f18fd2a01bf8'
+    const laterIdentity = captureIdentity(laterAt, laterId)
+    addSpool(envelope({ url: 'https://example.com/first', title: 'The first article' }), {
+      screenshot: false,
+    })
+    addSpool(
+      envelope({
+        id: laterId,
+        capturedAt: laterAt.toISOString(),
+        url: 'https://example.com/second',
+        title: 'The second article',
+      }),
+      { screenshot: false },
+    )
+    expect((await drain()).stopped).toBeNull()
+    writeNoteMock.mockClear()
+    describeMock.mockImplementation(async (request) => {
+      if (request.url.endsWith('/first')) {
+        throw new ReflectError('network', 'the provider is unavailable (429)')
+      }
+      return { title: null, description: 'An AI description of the page.' }
+    })
+
+    const outcome = await reconcile()
+
+    expect(outcome).toEqual({
+      pending: 2,
+      enriched: 1,
+      skipped: 0,
+      stopped: expect.objectContaining({ reason: 'network' }),
+    })
+    expect(files.get(IDENTITY.notePath)).toContain('captureStatus: pending')
+    expect(files.get(IDENTITY.notePath)).toContain('captureMetadataStatus: done')
+    expect(files.get(laterIdentity.notePath)).toContain('captureStatus: done')
+    expect(files.get(laterIdentity.notePath)).toContain(
+      '- Description: An AI description of the page.',
+    )
   })
 
   it('a permanent scrape failure enriches without meta tags', async () => {
