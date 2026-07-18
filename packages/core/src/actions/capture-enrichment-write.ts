@@ -39,6 +39,12 @@ interface PersistCaptureEnrichmentInput {
   status: Exclude<CaptureStatus, 'skipped'>
   provider: AiProviderConfig | null
   generation: number
+  /**
+   * Newly fetched preview-image asset to stamp as `captureScreenshot`.
+   * Omitted (`undefined`) leaves any existing stamp untouched — an
+   * `undefined` in the frontmatter patch would delete it.
+   */
+  screenshot?: string | undefined
 }
 
 interface CaptureWriteTransaction {
@@ -186,6 +192,7 @@ export async function persistCaptureEnrichment(
       captureModel: input.provider?.model,
       captureDailyFromTitle: titleChanged ? input.fromTitle : undefined,
       captureFinalizeStatus: titleChanged ? input.status : undefined,
+      ...(input.screenshot === undefined ? {} : { captureScreenshot: input.screenshot }),
     }),
     input.generation,
   )

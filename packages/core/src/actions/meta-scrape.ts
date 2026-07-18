@@ -15,6 +15,12 @@ export interface PageMeta {
   description: string | null
   /** `og:site_name`. */
   siteName: string | null
+  /**
+   * The page's preview image (`og:image`, falling back to `twitter:image`),
+   * resolved to an absolute http(s) URL — the capture's screenshot stand-in
+   * for shares that carry no pixels of their own.
+   */
+  image: string | null
 }
 
 /** Caps how much of a meta value survives — these render inline in notes. */
@@ -32,8 +38,31 @@ function metaContent(document: Document, selector: string): string | null {
   return clean(document.querySelector(selector)?.getAttribute('content'))
 }
 
-/** Extract {@link PageMeta} from an HTML document's text. Never throws. */
-export function parsePageMeta(html: string): PageMeta {
+/**
+ * Resolve a scraped image reference to an absolute http(s) URL, or `null`
+ * when it is not one (a data: URI, a protocol we would refuse to fetch, an
+ * unparseable value). URLs are never truncated — a clipped URL is broken.
+ */
+function imageUrl(value: string | null | undefined, baseUrl: string): string | null {
+  const trimmed = value?.trim() ?? ''
+  if (trimmed === '') {
+    return null
+  }
+  try {
+    const resolved = new URL(trimmed, baseUrl)
+    return resolved.protocol === 'https:' || resolved.protocol === 'http:'
+      ? resolved.toString()
+      : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Extract {@link PageMeta} from an HTML document's text; `baseUrl` resolves
+ * relative image references. Never throws.
+ */
+export function parsePageMeta(html: string, baseUrl: string): PageMeta {
   const document = new DOMParser().parseFromString(html, 'text/html')
   return {
     title:
@@ -43,6 +72,11 @@ export function parsePageMeta(html: string): PageMeta {
       metaContent(document, 'meta[property="og:description"]') ??
       metaContent(document, 'meta[name="description"]'),
     siteName: metaContent(document, 'meta[property="og:site_name"]'),
+    image: imageUrl(
+      document.querySelector('meta[property="og:image"]')?.getAttribute('content') ??
+        document.querySelector('meta[name="twitter:image"]')?.getAttribute('content'),
+      baseUrl,
+    ),
   }
 }
 
@@ -52,5 +86,5 @@ export function parsePageMeta(html: string): PageMeta {
  * retry, `io`/`parse` for permanent ones it should write through without).
  */
 export async function scrapePageMeta(url: string): Promise<PageMeta> {
-  return parsePageMeta(await captureMetaFetch(url))
+  return parsePageMeta(await captureMetaFetch(url), url)
 }

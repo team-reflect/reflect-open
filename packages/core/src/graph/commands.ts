@@ -310,6 +310,21 @@ export async function captureMetaFetch(url: string): Promise<string> {
   return call('capture_meta_fetch', { url }, z.string())
 }
 
+/**
+ * Fetch a captured page's own preview image (its `og:image`) into the graph
+ * as the capture's screenshot asset. Same bounded fetch rules as
+ * {@link captureMetaFetch} — image content only, downscaled and re-encoded on
+ * the Rust side before it touches the graph.
+ */
+export async function captureImageFetch(
+  url: string,
+  assetPath: string,
+  maxDim: number,
+  generation: number,
+): Promise<void> {
+  await call('capture_image_fetch', { url, assetPath, maxDim, generation }, voidSchema)
+}
+
 /** The recently-opened graphs, newest first. */
 export async function recentGraphs(): Promise<RecentGraph[]> {
   return call('recent_graphs', {}, z.array(recentGraphSchema))

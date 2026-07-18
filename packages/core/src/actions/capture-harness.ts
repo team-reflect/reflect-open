@@ -2,6 +2,7 @@ import { vi } from 'vitest'
 import { describePage } from '../ai/describe-page'
 import type { AiProvidersState } from '../ai/provider-config'
 import {
+  captureImageFetch,
   captureInboxList,
   captureInboxRead,
   captureInboxReject,
@@ -41,6 +42,7 @@ export const inboxRejectMock = vi.mocked(captureInboxReject)
 export const inboxRemoveMock = vi.mocked(captureInboxRemove)
 export const listFilesMock = vi.mocked(listFiles)
 export const promoteMock = vi.mocked(promoteCaptureScreenshot)
+export const imageFetchMock = vi.mocked(captureImageFetch)
 export const readAssetMock = vi.mocked(readAsset)
 export const readNoteMock = vi.mocked(readNote)
 export const writeNoteMock = vi.mocked(writeNote)
@@ -151,7 +153,13 @@ export function wireCaptureMocks(): void {
     [...files.keys()].map((path) => ({ path, size: 1, modifiedMs: 0 })),
   )
   readAssetMock.mockResolvedValue(btoa('jpeg-bytes'))
+  imageFetchMock.mockResolvedValue(undefined)
   getSecretMock.mockResolvedValue('sk-live-key')
-  scrapeMock.mockResolvedValue({ title: 'An article', description: null, siteName: null })
+  scrapeMock.mockResolvedValue({
+    title: 'An article',
+    description: null,
+    siteName: null,
+    image: null,
+  })
   describeMock.mockResolvedValue({ title: null, description: 'An AI description of the page.' })
 }

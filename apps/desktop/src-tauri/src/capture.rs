@@ -445,6 +445,25 @@ fn downscale_jpeg(bytes: &[u8], max_dim: u32) -> AppResult<Vec<u8>> {
     Ok(out)
 }
 
+/// Write asset bytes into the graph atomically: a same-directory temp file
+/// first, then a rename — readers never see a half-written asset.
+fn persist_asset(root: &std::path::Path, asset_path: &str, bytes: &[u8]) -> AppResult<()> {
+    let target = crate::fs::resolve_in_graph(root, asset_path)?;
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut tmp = tempfile::NamedTempFile::new_in(
+        target
+            .parent()
+            .ok_or_else(|| AppError::io("asset path has no parent"))?,
+    )?;
+    tmp.write_all(bytes)?;
+    tmp.flush()?;
+    tmp.persist(&target)
+        .map_err(|err| AppError::io(err.to_string()))?;
+    Ok(())
+}
+
 /// Copy a spooled screenshot into the graph as a downscaled JPEG asset. Copy,
 /// not move — the drain removes spool files only after the note is written,
 /// so a crash mid-drain re-runs cleanly.
@@ -459,20 +478,7 @@ pub fn capture_screenshot_promote(
     let root = root_for_generation(&state, generation)?;
     let bytes = fs::read(inbox_file(&root, &spool_name)?)?;
     let jpeg = downscale_jpeg(&bytes, max_dim)?;
-    let target = crate::fs::resolve_in_graph(&root, &asset_path)?;
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let mut tmp = tempfile::NamedTempFile::new_in(
-        target
-            .parent()
-            .ok_or_else(|| AppError::io("asset path has no parent"))?,
-    )?;
-    tmp.write_all(&jpeg)?;
-    tmp.flush()?;
-    tmp.persist(&target)
-        .map_err(|err| AppError::io(err.to_string()))?;
-    Ok(())
+    persist_asset(&root, &asset_path, &jpeg)
 }
 
 // ---- meta fetch -----------------------------------------------------------------
@@ -579,9 +585,96 @@ pub async fn capture_meta_fetch(url: String) -> AppResult<String> {
     Ok(String::from_utf8_lossy(&body).into_owned())
 }
 
+/// Cap on a fetched preview image's raw bytes. Unlike the HTML fetch, a
+/// truncated image is useless, so an oversized answer fails instead of
+/// being cut off; the downscale pass below bounds what lands in the graph.
+const IMAGE_FETCH_MAX_BYTES: usize = 8 * 1024 * 1024;
+
+/// Is this Content-Type an image? Parameters (`; charset=…`) don't matter;
+/// case doesn't either (the caller lowercases).
+fn image_content_type(content_type: &str) -> bool {
+    content_type.trim_start().starts_with("image/")
+}
+
+/// Fetch a captured page's own preview image (its `og:image`) and store it
+/// as the capture's screenshot asset. Same bounded shape as the meta fetch —
+/// http(s) only, timeout, redirect limit, byte cap, browser presentation —
+/// plus image-only content and the screenshot downscale/re-encode, so a
+/// hostile URL can neither widen the webview's HTTP capability nor land
+/// oversized or non-image bytes in the graph. The privacy gate in
+/// `@reflect/core` runs before it is ever called.
+#[tauri::command]
+pub async fn capture_image_fetch(
+    url: String,
+    asset_path: String,
+    max_dim: u32,
+    generation: u64,
+    state: State<'_, GraphState>,
+) -> AppResult<()> {
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Err(AppError::parse(format!("not an http(s) url: {url}")));
+    }
+    let root = root_for_generation(&state, generation)?;
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::limited(5))
+        .timeout(META_FETCH_TIMEOUT)
+        .user_agent(META_FETCH_USER_AGENT)
+        .build()
+        .map_err(|err| AppError::io(err.to_string()))?;
+    let response = client
+        .get(&url)
+        // What a browser sends when a page loads a cross-site image.
+        .header(
+            "Accept",
+            "image/avif,image/webp,image/png,image/*;q=0.8,*/*;q=0.5",
+        )
+        .header("Accept-Language", "en-US,en;q=0.9")
+        .header("Sec-Fetch-Dest", "image")
+        .header("Sec-Fetch-Mode", "no-cors")
+        .header("Sec-Fetch-Site", "cross-site")
+        .send()
+        .await
+        .map_err(classify_fetch_error)?;
+
+    if let Some(err) = classify_fetch_status(&url, response.status()) {
+        return Err(err);
+    }
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if !image_content_type(&content_type) {
+        return Err(AppError::parse(format!(
+            "{url} is not an image ({content_type})"
+        )));
+    }
+
+    let mut bytes: Vec<u8> = Vec::new();
+    let mut response = response;
+    while let Some(chunk) = response.chunk().await.map_err(classify_fetch_error)? {
+        if bytes.len() + chunk.len() > IMAGE_FETCH_MAX_BYTES {
+            return Err(AppError::io(format!("{url} exceeds the preview image cap")));
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    let jpeg = downscale_jpeg(&bytes, max_dim)?;
+    persist_asset(&root, &asset_path, &jpeg)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn image_content_types_gate_on_the_image_family() {
+        assert!(image_content_type("image/jpeg"));
+        assert!(image_content_type("image/webp; charset=binary"));
+        assert!(!image_content_type("text/html"));
+        assert!(!image_content_type("application/octet-stream"));
+        assert!(!image_content_type(""));
+    }
 
     #[test]
     fn meta_fetch_statuses_classify_rate_limits_as_retryable() {

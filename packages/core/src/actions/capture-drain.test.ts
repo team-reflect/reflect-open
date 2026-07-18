@@ -21,6 +21,7 @@ import type { TextCaptureEnvelope } from './capture-envelope'
 const ensureBacklinkTargetMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../graph/commands', () => ({
+  captureImageFetch: vi.fn(),
   captureInboxList: vi.fn(),
   captureInboxRead: vi.fn(),
   captureInboxReject: vi.fn(),

@@ -315,6 +315,7 @@ pub fn run() {
             capture::capture_shared_inbox_relay,
             capture::capture_screenshot_promote,
             capture::capture_meta_fetch,
+            capture::capture_image_fetch,
             git::git_status,
             git::git_setup,
             git::git_disconnect,
