@@ -128,13 +128,19 @@ function describePrompt(request: DescribePageRequest): string {
   }
   lines.push(
     'Ground both fields in the extracted page text when present, and the screenshot when one is attached.',
-    "title: the page's own title cleaned up for display — drop the site name, separators, and SEO clutter; keep the page's language and its plain wording. Never invent an editorial retitle; when the captured title is already clean, return it unchanged.",
+    "title: the page's own title cleaned up for display — drop the site name, separators, and SEO clutter; keep the page's language and its plain wording. The captured title may not describe the page at all: share sheets often supply boilerplate (\"See this Instagram post by @user\"), a bare domain, or message text — in that case build the title from the meta title, page text, or screenshot instead of keeping it. Never invent an editorial retitle; when the captured title already describes the page cleanly, return it unchanged.",
     'description: one or two plain sentences describing the page — no preamble, no markdown.',
   )
   return lines.join('\n')
 }
 
-function normalizedTitle(candidate: string): string | null {
+/**
+ * Sanitize a candidate display title — from the model or from scraped meta
+ * tags — for use as a capture note's H1 and wiki-link display text: wiki-link
+ * safe and clipped at a word boundary, or `null` when nothing displayable
+ * survives (the caller keeps the current title).
+ */
+export function normalizedPageTitle(candidate: string): string | null {
   const safe = clipAtWordBoundary(wikiLinkSafe(candidate), MAX_TITLE_CHARS)
   return safe === '' ? null : safe
 }
@@ -165,7 +171,7 @@ export async function describePage(request: DescribePageRequest): Promise<PageEn
       maxRetries: 0,
     })
     return {
-      title: normalizedTitle(result.object.title),
+      title: normalizedPageTitle(result.object.title),
       description: result.object.description.trim(),
     }
   } catch (cause) {

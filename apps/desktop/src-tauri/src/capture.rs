@@ -492,6 +492,22 @@ fn classify_fetch_error(err: reqwest::Error) -> AppError {
     }
 }
 
+/// Map a meta-fetch response status to its error: `None` for success,
+/// retryable `Network` for server errors and rate limiting (sites like
+/// Instagram answer `429` to bursts and recover — the enrichment pass keeps
+/// the capture pending and tries again later), permanent `io` for everything
+/// else.
+fn classify_fetch_status(url: &str, status: reqwest::StatusCode) -> Option<AppError> {
+    if status.is_success() {
+        return None;
+    }
+    let message = format!("{url} answered {status}");
+    if status.is_server_error() || status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+        return Some(AppError::Network { message });
+    }
+    Some(AppError::io(message))
+}
+
 /// Fetch a captured page's HTML for meta-tag scraping, hard-capped (timeout,
 /// byte cap, redirect limit, http(s) only). Lives here rather than widening
 /// the webview's HTTP-plugin capability to every URL — the only thing that
@@ -518,14 +534,8 @@ pub async fn capture_meta_fetch<R: tauri::Runtime>(
         .await
         .map_err(classify_fetch_error)?;
 
-    let status = response.status();
-    if status.is_server_error() {
-        return Err(AppError::Network {
-            message: format!("{url} answered {status}"),
-        });
-    }
-    if !status.is_success() {
-        return Err(AppError::io(format!("{url} answered {status}")));
+    if let Some(err) = classify_fetch_status(&url, response.status()) {
+        return Err(err);
     }
     let content_type = response
         .headers()
@@ -554,6 +564,29 @@ pub async fn capture_meta_fetch<R: tauri::Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn meta_fetch_statuses_classify_rate_limits_as_retryable() {
+        use reqwest::StatusCode;
+        let url = "https://www.instagram.com/reel/example/";
+        assert!(classify_fetch_status(url, StatusCode::OK).is_none());
+        assert!(matches!(
+            classify_fetch_status(url, StatusCode::TOO_MANY_REQUESTS),
+            Some(AppError::Network { .. })
+        ));
+        assert!(matches!(
+            classify_fetch_status(url, StatusCode::BAD_GATEWAY),
+            Some(AppError::Network { .. })
+        ));
+        assert!(matches!(
+            classify_fetch_status(url, StatusCode::NOT_FOUND),
+            Some(AppError::Io { .. })
+        ));
+        assert!(matches!(
+            classify_fetch_status(url, StatusCode::FORBIDDEN),
+            Some(AppError::Io { .. })
+        ));
+    }
 
     #[test]
     fn manifest_pins_name_path_and_origins() {

@@ -1,4 +1,9 @@
-import { describePage, isDescriptionRejected, type PageEnrichment } from '../ai/describe-page'
+import {
+  describePage,
+  isDescriptionRejected,
+  normalizedPageTitle,
+  type PageEnrichment,
+} from '../ai/describe-page'
 import { defaultAiProvider, type AiProvidersState } from '../ai/provider-config'
 import { aiKeySecretName } from '../ai/secrets'
 import { errorMessage, isAppError, toAppError } from '../errors'
@@ -190,6 +195,7 @@ export async function reconcileCaptureEnrichment(
   let enriched = 0
   let skipped = 0
   let waitingForKey = false
+  let transientStop: ReconcileStop | null = null
   const stale = (): boolean => input.isStale?.() === true
   const outcome = (stopped: ReconcileStop | null): ReconcileCaptureEnrichmentOutcome => ({
     pending: pending.length,
@@ -303,8 +309,9 @@ export async function reconcileCaptureEnrichment(
           if (kind === 'network' || kind === 'auth') {
             throw cause
           }
-          // Invalid URLs, non-HTML responses, and non-success statuses are
+          // Invalid URLs, non-HTML responses, and non-retryable statuses are
           // permanent for this capture; checkpoint the no-metadata result.
+          // (Rate limits and server errors arrive as `network` and retry.)
           pageMeta = null
         }
       }
@@ -319,7 +326,7 @@ export async function reconcileCaptureEnrichment(
       const placeholderTitle = displayTitle({ title: '', url: snapshot.meta.captureUrl })
       const metadataTitle =
         snapshot.title === placeholderTitle && pageMeta?.title
-          ? displayTitle({ title: pageMeta.title, url: snapshot.meta.captureUrl })
+          ? normalizedPageTitle(pageMeta.title)
           : null
       const metadataDisplayTitle = metadataTitle ?? snapshot.title
       const metadataDescription = hasDescription(snapshot.body)
@@ -455,10 +462,22 @@ export async function reconcileCaptureEnrichment(
       }
       enriched += 1
     } catch (cause) {
-      return outcome({ reason: toAppError(cause).kind, message: errorMessage(cause) })
+      const error = toAppError(cause)
+      // A transient failure — offline, a rate-limited page, an unavailable
+      // provider — leaves this capture pending for the next pass, but must
+      // not starve the captures queued behind it. Anything else (auth, an
+      // unexpected write failure) affects every capture alike, so it aborts
+      // the pass.
+      if (error.kind === 'network') {
+        transientStop ??= { reason: error.kind, message: errorMessage(cause) }
+        continue
+      }
+      return outcome({ reason: error.kind, message: errorMessage(cause) })
     }
   }
   // `waitingForKey` is only ever set when a provider is configured without a
-  // usable key, which is exactly when `providerStop` was populated above.
-  return outcome(waitingForKey ? providerStop : null)
+  // usable key, which is exactly when `providerStop` was populated above. It
+  // outranks a transient stop: a keychain failure is persistent and surfaced
+  // to the user, and a silent network stop must not mask it.
+  return outcome((waitingForKey ? providerStop : null) ?? transientStop)
 }
