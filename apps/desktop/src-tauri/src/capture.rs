@@ -487,8 +487,10 @@ const META_FETCH_TIMEOUT: Duration = Duration::from_secs(15);
 /// user agents with login walls or challenges a normal browser request never
 /// sees. Safari's platform token is frozen upstream, so the string stays
 /// plausible without tracking macOS releases.
-const META_FETCH_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) \
-     AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15";
+const META_FETCH_USER_AGENT: &str = concat!(
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ",
+    "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
+);
 
 fn classify_fetch_error(err: reqwest::Error) -> AppError {
     if err.is_timeout() || err.is_connect() || err.is_request() {
