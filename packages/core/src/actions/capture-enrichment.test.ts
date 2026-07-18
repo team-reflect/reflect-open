@@ -535,6 +535,9 @@ describe('reconcileCaptureEnrichment', () => {
 
     const outcome = await reconcile()
 
+    expect(scrapeMock).toHaveBeenCalledTimes(2)
+    expect(scrapeMock).toHaveBeenNthCalledWith(1, expect.stringContaining('instagram'))
+    expect(scrapeMock.mock.calls[1]?.[0]).not.toContain('instagram')
     expect(outcome.stopped).toEqual({ reason: 'io', message: 'keychain is unavailable' })
     expect(outcome.pending).toBe(2)
     expect(describeMock).not.toHaveBeenCalled()
