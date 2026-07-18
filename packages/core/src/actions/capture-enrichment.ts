@@ -476,6 +476,8 @@ export async function reconcileCaptureEnrichment(
     }
   }
   // `waitingForKey` is only ever set when a provider is configured without a
-  // usable key, which is exactly when `providerStop` was populated above.
-  return outcome(transientStop ?? (waitingForKey ? providerStop : null))
+  // usable key, which is exactly when `providerStop` was populated above. It
+  // outranks a transient stop: a keychain failure is persistent and surfaced
+  // to the user, and a silent network stop must not mask it.
+  return outcome((waitingForKey ? providerStop : null) ?? transientStop)
 }

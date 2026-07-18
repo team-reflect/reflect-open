@@ -513,6 +513,33 @@ describe('reconcileCaptureEnrichment', () => {
     expect(files.get(IDENTITY.notePath)).toContain('captureStatus: done')
   })
 
+  it('a keychain failure outranks a transient stop — the toast is never masked', async () => {
+    const laterAt = new Date(2026, 5, 11, 16, 0, 0, 0)
+    const laterId = '9d0f7780-8536-4a1e-a55c-f18fd2a01bf8'
+    addSpool(envelope({ url: 'https://www.instagram.com/reel/example/', title: '' }), {
+      screenshot: false,
+    })
+    addSpool(
+      envelope({ id: laterId, capturedAt: laterAt.toISOString(), title: 'An article' }),
+      { screenshot: false },
+    )
+    expect((await drain()).stopped).toBeNull()
+    writeNoteMock.mockClear()
+    scrapeMock.mockImplementation(async (url) => {
+      if (url.includes('instagram')) {
+        throw new ReflectError('network', 'https://www.instagram.com answered 429')
+      }
+      return { title: 'An article', description: 'A scraped description.', siteName: null }
+    })
+    getSecretMock.mockRejectedValue(new ReflectError('io', 'keychain is unavailable'))
+
+    const outcome = await reconcile()
+
+    expect(outcome.stopped).toEqual({ reason: 'io', message: 'keychain is unavailable' })
+    expect(outcome.pending).toBe(2)
+    expect(describeMock).not.toHaveBeenCalled()
+  })
+
   it('a rate-limited provider leaves its capture pending without starving the queue', async () => {
     const laterAt = new Date(2026, 5, 11, 16, 0, 0, 0)
     const laterId = '9d0f7780-8536-4a1e-a55c-f18fd2a01bf8'
