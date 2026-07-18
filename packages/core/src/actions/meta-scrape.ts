@@ -90,5 +90,8 @@ export function parsePageMeta(html: string, baseUrl: string): PageMeta {
  * retry, `io`/`parse` for permanent ones it should write through without).
  */
 export async function scrapePageMeta(url: string): Promise<PageMeta> {
-  return parsePageMeta(await captureMetaFetch(url), url)
+  const fetched = await captureMetaFetch(url)
+  // Redirects were followed server-side: relative references in the HTML
+  // belong to the URL that served it, not the one the capture started from.
+  return parsePageMeta(fetched.html, fetched.finalUrl)
 }

@@ -524,6 +524,17 @@ fn classify_fetch_status(url: &str, status: reqwest::StatusCode) -> Option<AppEr
     Some(AppError::io(message))
 }
 
+/// What the meta fetch hands back: the capped HTML plus the URL that
+/// actually served it — redirects are followed, so relative references in
+/// the HTML (an `og:image` path) must resolve against `final_url`, not the
+/// URL the capture started from.
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetaFetchResponse {
+    pub html: String,
+    pub final_url: String,
+}
+
 /// Fetch a captured page's HTML for meta-tag scraping, hard-capped (timeout,
 /// byte cap, redirect limit, http(s) only). Lives here rather than widening
 /// the webview's HTTP-plugin capability to every URL — the only thing that
@@ -536,7 +547,7 @@ fn classify_fetch_status(url: &str, status: reqwest::StatusCode) -> Option<AppEr
 /// URL comes from page content. The response is only ever parsed for text
 /// metadata. Revisit if scrape targets ever become content-controlled.
 #[tauri::command]
-pub async fn capture_meta_fetch(url: String) -> AppResult<String> {
+pub async fn capture_meta_fetch(url: String) -> AppResult<MetaFetchResponse> {
     if !url.starts_with("https://") && !url.starts_with("http://") {
         return Err(AppError::parse(format!("not an http(s) url: {url}")));
     }
@@ -579,6 +590,7 @@ pub async fn capture_meta_fetch(url: String) -> AppResult<String> {
         )));
     }
 
+    let final_url = response.url().to_string();
     let mut body: Vec<u8> = Vec::new();
     let mut response = response;
     while let Some(chunk) = response.chunk().await.map_err(classify_fetch_error)? {
@@ -588,7 +600,10 @@ pub async fn capture_meta_fetch(url: String) -> AppResult<String> {
             break;
         }
     }
-    Ok(String::from_utf8_lossy(&body).into_owned())
+    Ok(MetaFetchResponse {
+        html: String::from_utf8_lossy(&body).into_owned(),
+        final_url,
+    })
 }
 
 /// Cap on a fetched preview image's raw bytes. Unlike the HTML fetch, a
@@ -990,8 +1005,34 @@ mod tests {
 
         let fetched = capture_meta_fetch(format!("{base}/page")).await.unwrap();
 
-        assert_eq!(fetched.len(), META_FETCH_MAX_BYTES);
-        assert!(fetched.contains("<title>Big page</title>"));
+        assert_eq!(fetched.html.len(), META_FETCH_MAX_BYTES);
+        assert!(fetched.html.contains("<title>Big page</title>"));
+        assert_eq!(fetched.final_url, format!("{base}/page"));
+    }
+
+    #[tokio::test]
+    async fn meta_fetch_reports_the_redirected_final_url() {
+        let base = serve(vec![
+            (
+                "/moved",
+                response("301 Moved Permanently", &[("Location", "/final/page")], b""),
+            ),
+            (
+                "/final/page",
+                response(
+                    "200 OK",
+                    &[("Content-Type", "text/html")],
+                    b"<html><head><title>Landed</title></head></html>",
+                ),
+            ),
+        ])
+        .await;
+
+        let fetched = capture_meta_fetch(format!("{base}/moved")).await.unwrap();
+
+        // Relative references in the HTML must resolve against this URL.
+        assert_eq!(fetched.final_url, format!("{base}/final/page"));
+        assert!(fetched.html.contains("Landed"));
     }
 
     #[tokio::test]

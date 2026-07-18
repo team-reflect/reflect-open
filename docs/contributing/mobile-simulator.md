@@ -72,12 +72,15 @@ With the app running and a local graph created:
 GROUP=$(xcrun simctl get_app_container booted app.reflect.ios.dev groups \
   | grep group.app.reflect.dev | awk '{print $2}')
 
-# 2. Spool a link-capture envelope, exactly as the extension would
+# 2. Spool a link-capture envelope, exactly as the extension would:
+#    write a .tmp sibling, then rename — the relay only picks up committed
+#    .json files, so it can never see a half-written envelope
 ID=$(uuidgen | tr 'A-Z' 'a-z')
 NOW=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
 mkdir -p "$GROUP/inbox"
 printf '{"version":1,"id":"%s","url":"https://example.com/article","title":"","capturedAt":"%s","source":"ios-share"}' \
-  "$ID" "$NOW" > "$GROUP/inbox/$ID.json"
+  "$ID" "$NOW" > "$GROUP/inbox/$ID.json.tmp"
+mv "$GROUP/inbox/$ID.json.tmp" "$GROUP/inbox/$ID.json"
 
 # 3. Trigger the relay: background the app, then foreground it
 xcrun simctl launch booted com.apple.mobilesafari
