@@ -301,9 +301,6 @@ export async function reconcileCaptureEnrichment(
           pageMeta = null
         }
       }
-      const fetchedScreenshot = metadataComplete
-        ? null
-        : await fetchPreviewScreenshot(pageMeta, snapshot.meta, identity, input.generation)
       if (stale()) {
         return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
       }
@@ -312,6 +309,11 @@ export async function reconcileCaptureEnrichment(
       if (snapshot === null) {
         continue
       }
+      // After the privacy/edit re-check on purpose: a capture made private
+      // while the scrape ran must not trigger even this outbound fetch.
+      const fetchedScreenshot = metadataComplete
+        ? null
+        : await fetchPreviewScreenshot(pageMeta, snapshot.meta, identity, input.generation)
       const placeholderTitle = displayTitle({ title: '', url: snapshot.meta.captureUrl })
       const metadataTitle =
         snapshot.title === placeholderTitle && pageMeta?.title

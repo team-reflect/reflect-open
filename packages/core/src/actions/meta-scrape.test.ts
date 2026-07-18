@@ -95,6 +95,17 @@ describe('parsePageMeta', () => {
     expect(meta.image).toBe(`https://example.com${longPath}`)
   })
 
+  it('falls back to twitter:image when og:image is blank or invalid', () => {
+    const meta = parsePageMeta(
+      `<html><head>
+        <meta property="og:image" content="   ">
+        <meta name="twitter:image" content="https://example.com/card.png">
+      </head></html>`,
+      BASE_URL,
+    )
+    expect(meta.image).toBe('https://example.com/card.png')
+  })
+
   it('falls back to twitter:image when og:image is absent', () => {
     const meta = parsePageMeta(
       '<html><head><meta name="twitter:image" content="https://example.com/card.png"></head></html>',

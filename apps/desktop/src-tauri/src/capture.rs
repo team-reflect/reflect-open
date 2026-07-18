@@ -596,13 +596,80 @@ fn image_content_type(content_type: &str) -> bool {
     content_type.trim_start().starts_with("image/")
 }
 
+/// Is this an address the preview-image fetch may connect to? The image URL
+/// comes from page *content* — attacker-controlled, unlike the user-shared
+/// capture URL — so the fetch must never become a bridge onto localhost, the
+/// user's LAN, carrier-grade NAT space, or link-local metadata endpoints.
+fn public_address(addr: &std::net::IpAddr) -> bool {
+    match addr {
+        std::net::IpAddr::V4(v4) => {
+            let octets = v4.octets();
+            let cgnat = octets[0] == 100 && (octets[1] & 0xc0) == 64; // 100.64/10
+            !(v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                || v4.is_broadcast()
+                || v4.is_multicast()
+                || v4.is_unspecified()
+                || cgnat)
+        }
+        std::net::IpAddr::V6(v6) => {
+            if let Some(mapped) = v6.to_ipv4_mapped() {
+                return public_address(&std::net::IpAddr::V4(mapped));
+            }
+            let segments = v6.segments();
+            let unique_local = (segments[0] & 0xfe00) == 0xfc00; // fc00::/7
+            let link_local = (segments[0] & 0xffc0) == 0xfe80; // fe80::/10
+            !(v6.is_loopback()
+                || v6.is_unspecified()
+                || v6.is_multicast()
+                || unique_local
+                || link_local)
+        }
+    }
+}
+
+/// Resolve one redirect hop's host and refuse it unless every address is
+/// public ({@link public_address}); returns the vetted socket address so the
+/// caller can pin the connection to it (resolving again at connect time
+/// would reopen the DNS-rebinding window this check closes).
+async fn vetted_image_addr(target: &reqwest::Url) -> AppResult<std::net::SocketAddr> {
+    let host = target
+        .host_str()
+        .ok_or_else(|| AppError::parse(format!("{target} has no host")))?;
+    let port = target
+        .port_or_known_default()
+        .ok_or_else(|| AppError::parse(format!("{target} has no port")))?;
+    let addrs: Vec<std::net::SocketAddr> = tokio::net::lookup_host((host, port))
+        .await
+        .map_err(|err| AppError::Network {
+            message: format!("{host} did not resolve: {err}"),
+        })?
+        .collect();
+    if addrs.is_empty() {
+        return Err(AppError::Network {
+            message: format!("{host} did not resolve"),
+        });
+    }
+    for addr in &addrs {
+        if !public_address(&addr.ip()) {
+            return Err(AppError::parse(format!(
+                "{host} resolves to a non-public address"
+            )));
+        }
+    }
+    Ok(addrs[0])
+}
+
 /// Fetch a captured page's own preview image (its `og:image`) and store it
 /// as the capture's screenshot asset. Same bounded shape as the meta fetch —
 /// http(s) only, timeout, redirect limit, byte cap, browser presentation —
-/// plus image-only content and the screenshot downscale/re-encode, so a
-/// hostile URL can neither widen the webview's HTTP capability nor land
-/// oversized or non-image bytes in the graph. The privacy gate in
-/// `@reflect/core` runs before it is ever called.
+/// plus image-only content, public-address-only hosts (checked per redirect
+/// hop, connections pinned to the vetted address), and the screenshot
+/// downscale/re-encode, so a hostile URL can neither widen the webview's
+/// HTTP capability, reach into the local network, nor land oversized or
+/// non-image bytes in the graph. The privacy gate in `@reflect/core` runs
+/// before it is ever called.
 #[tauri::command]
 pub async fn capture_image_fetch(
     url: String,
@@ -611,30 +678,57 @@ pub async fn capture_image_fetch(
     generation: u64,
     state: State<'_, GraphState>,
 ) -> AppResult<()> {
-    if !url.starts_with("https://") && !url.starts_with("http://") {
-        return Err(AppError::parse(format!("not an http(s) url: {url}")));
+    // Fail fast before any network work; the root is re-derived after it.
+    root_for_generation(&state, generation)?;
+
+    let mut target =
+        reqwest::Url::parse(&url).map_err(|err| AppError::parse(format!("{url}: {err}")))?;
+    let mut response: Option<reqwest::Response> = None;
+    for _hop in 0..=5 {
+        if target.scheme() != "https" && target.scheme() != "http" {
+            return Err(AppError::parse(format!("not an http(s) url: {target}")));
+        }
+        let addr = vetted_image_addr(&target).await?;
+        let host = target.host_str().unwrap_or_default().to_owned();
+        // Redirects are followed manually (with the host re-vetted each hop)
+        // and the connection pinned to the vetted address.
+        let client = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .resolve(&host, addr)
+            .timeout(META_FETCH_TIMEOUT)
+            .user_agent(META_FETCH_USER_AGENT)
+            .build()
+            .map_err(|err| AppError::io(err.to_string()))?;
+        let hop_response = client
+            .get(target.clone())
+            // What a browser sends when a page loads a cross-site image.
+            .header(
+                "Accept",
+                "image/avif,image/webp,image/png,image/*;q=0.8,*/*;q=0.5",
+            )
+            .header("Accept-Language", "en-US,en;q=0.9")
+            .header("Sec-Fetch-Dest", "image")
+            .header("Sec-Fetch-Mode", "no-cors")
+            .header("Sec-Fetch-Site", "cross-site")
+            .send()
+            .await
+            .map_err(classify_fetch_error)?;
+        if hop_response.status().is_redirection() {
+            let location = hop_response
+                .headers()
+                .get(reqwest::header::LOCATION)
+                .and_then(|value| value.to_str().ok())
+                .ok_or_else(|| AppError::io(format!("{target} redirected without a location")))?;
+            target = target
+                .join(location)
+                .map_err(|err| AppError::parse(format!("{target} redirected badly: {err}")))?;
+            continue;
+        }
+        response = Some(hop_response);
+        break;
     }
-    let root = root_for_generation(&state, generation)?;
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::limited(5))
-        .timeout(META_FETCH_TIMEOUT)
-        .user_agent(META_FETCH_USER_AGENT)
-        .build()
-        .map_err(|err| AppError::io(err.to_string()))?;
-    let response = client
-        .get(&url)
-        // What a browser sends when a page loads a cross-site image.
-        .header(
-            "Accept",
-            "image/avif,image/webp,image/png,image/*;q=0.8,*/*;q=0.5",
-        )
-        .header("Accept-Language", "en-US,en;q=0.9")
-        .header("Sec-Fetch-Dest", "image")
-        .header("Sec-Fetch-Mode", "no-cors")
-        .header("Sec-Fetch-Site", "cross-site")
-        .send()
-        .await
-        .map_err(classify_fetch_error)?;
+    let response =
+        response.ok_or_else(|| AppError::io(format!("{url} redirected too many times")))?;
 
     if let Some(err) = classify_fetch_status(&url, response.status()) {
         return Err(err);
@@ -660,12 +754,34 @@ pub async fn capture_image_fetch(
         bytes.extend_from_slice(&chunk);
     }
     let jpeg = downscale_jpeg(&bytes, max_dim)?;
+    // Re-pin the graph: a 15s fetch is long enough for a graph switch, and
+    // persisting into a stale root would resurrect files under it.
+    let root = root_for_generation(&state, generation)?;
     persist_asset(&root, &asset_path, &jpeg)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn public_addresses_exclude_every_local_network_family() {
+        use std::net::IpAddr;
+        let public = |candidate: &str| public_address(&candidate.parse::<IpAddr>().unwrap());
+        assert!(public("93.184.216.34"));
+        assert!(public("2606:2800:220:1:248:1893:25c8:1946"));
+        assert!(!public("127.0.0.1")); // loopback
+        assert!(!public("10.0.0.8")); // private
+        assert!(!public("172.16.4.1")); // private
+        assert!(!public("192.168.1.1")); // private
+        assert!(!public("169.254.169.254")); // link-local (cloud metadata)
+        assert!(!public("100.64.0.1")); // carrier-grade NAT
+        assert!(!public("0.0.0.0")); // unspecified
+        assert!(!public("::1")); // v6 loopback
+        assert!(!public("fd12:3456:789a::1")); // v6 unique-local
+        assert!(!public("fe80::1")); // v6 link-local
+        assert!(!public("::ffff:192.168.1.1")); // v4-mapped private
+    }
 
     #[test]
     fn image_content_types_gate_on_the_image_family() {

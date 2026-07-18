@@ -72,11 +72,15 @@ export function parsePageMeta(html: string, baseUrl: string): PageMeta {
       metaContent(document, 'meta[property="og:description"]') ??
       metaContent(document, 'meta[name="description"]'),
     siteName: metaContent(document, 'meta[property="og:site_name"]'),
-    image: imageUrl(
-      document.querySelector('meta[property="og:image"]')?.getAttribute('content') ??
+    image:
+      imageUrl(
+        document.querySelector('meta[property="og:image"]')?.getAttribute('content'),
+        baseUrl,
+      ) ??
+      imageUrl(
         document.querySelector('meta[name="twitter:image"]')?.getAttribute('content'),
-      baseUrl,
-    ),
+        baseUrl,
+      ),
   }
 }
 

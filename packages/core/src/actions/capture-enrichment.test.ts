@@ -501,14 +501,16 @@ describe('reconcileCaptureEnrichment', () => {
   })
 
   it('does not send capture content to AI when the day becomes private during metadata fetch', async () => {
-    await drainOne()
+    addSpool(envelope({ source: 'ios-share', title: '' }), { screenshot: false })
+    expect((await drain()).stopped).toBeNull()
+    writeNoteMock.mockClear()
     scrapeMock.mockImplementation(async () => {
       files.set(DAILY, `---\nprivate: true\n---\n\n${files.get(DAILY) ?? ''}`)
       return {
         title: 'An article',
         description: 'A scraped description.',
         siteName: null,
-        image: null,
+        image: 'https://cdn.example.com/cover.jpg',
       }
     })
 
@@ -518,6 +520,8 @@ describe('reconcileCaptureEnrichment', () => {
     expect(files.get(IDENTITY.notePath)).toContain('captureStatus: skipped')
     expect(describeMock).not.toHaveBeenCalled()
     expect(readAssetMock).not.toHaveBeenCalled()
+    // Even the preview-image fetch stays behind the privacy gate.
+    expect(imageFetchMock).not.toHaveBeenCalled()
   })
 
   it('does not send capture content to AI when the day becomes private while loading its screenshot', async () => {
