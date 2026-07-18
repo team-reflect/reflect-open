@@ -178,3 +178,6 @@ tauri-plugin-recording = { path = "../../../plugins/tauri-plugin-recording" }
 
 [dev-dependencies]
 tauri = { version = "2.11.2", features = ["test"] }
+# The capture fetch integration tests drive the async primitives against a
+# local server; the extra features are test-only (prod inherits tauri's).
+tokio = { version = "1.52.3", features = ["macros", "rt", "net", "io-util"] }
