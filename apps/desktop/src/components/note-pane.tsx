@@ -10,6 +10,7 @@ import { SuggestedContactCard } from '@/components/suggested-contact-card'
 import { SyncConflictNotice } from '@/components/sync-conflict-notice'
 import { EditorAiKeymap } from '@/editor/ai-menu/editor-ai-keymap'
 import { useEditorAiMenu } from '@/editor/ai-menu/use-editor-ai-menu'
+import { DailyNoteAutoTimestampExtension } from '@/editor/daily-note-auto-timestamp-extension'
 import { editorBodyWithDefaultBullet } from '@/editor/default-bullet'
 import {
   registerNoteEditorHandle,
@@ -373,6 +374,7 @@ export function NotePaneComponent({
         onExitBoundary={handleExitBoundary}
       >
         <EditorAiKeymap onTrigger={aiMenu.openMenu} />
+        {dailyNote && settings.editorDailyNoteAutoTimestamp ? <DailyNoteAutoTimestampExtension /> : null}
       </NoteEditor>
 
       {showBacklinks ? (

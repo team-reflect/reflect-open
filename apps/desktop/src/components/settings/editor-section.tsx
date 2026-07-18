@@ -174,6 +174,13 @@ export function EditorSection(): ReactElement {
       />
 
       <SettingsSwitchField
+        legend="Daily note auto-timestamp"
+        description="In daily notes, a bullet line is prefixed with the current time (like `14:30`) the moment you start writing it."
+        checked={settings.editorDailyNoteAutoTimestamp}
+        onCheckedChange={(checked) => updateSettings({ editorDailyNoteAutoTimestamp: checked })}
+      />
+
+      <SettingsSwitchField
         legend="Smooth caret animation"
         description="Animate the text cursor as it moves while editing."
         checked={settings.editorSmoothCaretAnimation}

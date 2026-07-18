@@ -231,6 +231,7 @@ describe('SettingsScreen', () => {
           editorSpellCheck: true,
           editorDefaultBullet: true,
           editorBulletAfterHeading: true,
+          editorDailyNoteAutoTimestamp: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
           editorFullWidth: false,
@@ -283,6 +284,7 @@ describe('SettingsScreen', () => {
           editorSpellCheck: true,
           editorDefaultBullet: true,
           editorBulletAfterHeading: true,
+          editorDailyNoteAutoTimestamp: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'large',
           editorFullWidth: false,
@@ -349,6 +351,7 @@ describe('SettingsScreen', () => {
           editorSpellCheck: false,
           editorDefaultBullet: true,
           editorBulletAfterHeading: true,
+          editorDailyNoteAutoTimestamp: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
           editorFullWidth: false,
@@ -422,6 +425,7 @@ describe('SettingsScreen', () => {
           editorSpellCheck: true,
           editorDefaultBullet: false,
           editorBulletAfterHeading: true,
+          editorDailyNoteAutoTimestamp: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
           editorFullWidth: false,
@@ -474,6 +478,7 @@ describe('SettingsScreen', () => {
           editorSpellCheck: true,
           editorDefaultBullet: true,
           editorBulletAfterHeading: false,
+          editorDailyNoteAutoTimestamp: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
           editorFullWidth: false,
@@ -519,6 +524,7 @@ describe('SettingsScreen', () => {
           editorSpellCheck: true,
           editorDefaultBullet: true,
           editorBulletAfterHeading: true,
+          editorDailyNoteAutoTimestamp: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
           editorFullWidth: false,
@@ -577,6 +583,7 @@ describe('SettingsScreen', () => {
           editorSpellCheck: true,
           editorDefaultBullet: true,
           editorBulletAfterHeading: true,
+          editorDailyNoteAutoTimestamp: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
           editorFullWidth: false,
@@ -628,6 +635,7 @@ describe('SettingsScreen', () => {
           editorSpellCheck: true,
           editorDefaultBullet: true,
           editorBulletAfterHeading: true,
+          editorDailyNoteAutoTimestamp: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
           editorFullWidth: false,
@@ -685,6 +693,7 @@ describe('SettingsScreen', () => {
           editorSpellCheck: true,
           editorDefaultBullet: true,
           editorBulletAfterHeading: true,
+          editorDailyNoteAutoTimestamp: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
           editorFullWidth: false,
@@ -739,6 +748,7 @@ describe('SettingsScreen', () => {
           editorSpellCheck: true,
           editorDefaultBullet: true,
           editorBulletAfterHeading: true,
+          editorDailyNoteAutoTimestamp: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
           editorFullWidth: false,
@@ -784,6 +794,7 @@ describe('SettingsScreen', () => {
           editorSpellCheck: true,
           editorDefaultBullet: true,
           editorBulletAfterHeading: true,
+          editorDailyNoteAutoTimestamp: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
           editorFullWidth: false,
@@ -861,6 +872,7 @@ describe('SettingsScreen', () => {
           editorSpellCheck: true,
           editorDefaultBullet: true,
           editorBulletAfterHeading: true,
+          editorDailyNoteAutoTimestamp: true,
           editorSmoothCaretAnimation: true,
           editorTextSize: 'small',
           editorFullWidth: false,
@@ -899,7 +911,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorSmoothCaretAnimation: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: true, describeAssets: true, transcriptionFormat: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [] },
+        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorDailyNoteAutoTimestamp: true, editorSmoothCaretAnimation: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: true, describeAssets: true, transcriptionFormat: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [] },
       ]),
     )
     // The control flips to the loading state (EmbeddingsSync owns the actual
@@ -928,7 +940,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorSmoothCaretAnimation: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: false, describeAssets: true, transcriptionFormat: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [] },
+        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorDailyNoteAutoTimestamp: true, editorSmoothCaretAnimation: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: false, describeAssets: true, transcriptionFormat: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [] },
       ]),
     )
     expect(screen.getByRole('button', { name: /enable semantic search/i })).toBeTruthy()
@@ -951,7 +963,7 @@ describe('SettingsScreen', () => {
     await waitFor(() => expect(invoked).toContain('embed_ensure'))
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorSmoothCaretAnimation: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: true, describeAssets: true, transcriptionFormat: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [] },
+        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorDailyNoteAutoTimestamp: true, editorSmoothCaretAnimation: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: true, describeAssets: true, transcriptionFormat: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [] },
       ]),
     )
   })
@@ -970,7 +982,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorSmoothCaretAnimation: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: false, describeAssets: true, transcriptionFormat: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [] },
+        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorDailyNoteAutoTimestamp: true, editorSmoothCaretAnimation: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: false, describeAssets: true, transcriptionFormat: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [] },
       ]),
     )
     expect(screen.getByRole('button', { name: /enable semantic search/i })).toBeTruthy()
@@ -1066,7 +1078,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorSmoothCaretAnimation: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: false, describeAssets: true, transcriptionFormat: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [{ id: expect.any(String), label: 'Translate to French', body: 'Translate to French.\n\n{{selectedText}}', mode: 'replace' }] },
+        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorDailyNoteAutoTimestamp: true, editorSmoothCaretAnimation: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: false, describeAssets: true, transcriptionFormat: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [{ id: expect.any(String), label: 'Translate to French', body: 'Translate to French.\n\n{{selectedText}}', mode: 'replace' }] },
       ]),
     )
     expect(within(section).getByText('Translate to French')).toBeTruthy()
@@ -1088,7 +1100,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorSmoothCaretAnimation: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: false, describeAssets: true, transcriptionFormat: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [] },
+        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorDailyNoteAutoTimestamp: true, editorSmoothCaretAnimation: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: false, describeAssets: true, transcriptionFormat: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [] },
       ]),
     )
   })
@@ -1112,7 +1124,7 @@ describe('SettingsScreen', () => {
 
     await waitFor(() =>
       expect(saved).toEqual([
-        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorSmoothCaretAnimation: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: false, describeAssets: true, transcriptionFormat: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [{ id: 'p1', label: 'Translate to German', body: '{{selectedText}}', mode: 'replace' }] },
+        { editorMarkdownSyntax: 'hide', editorSpellCheck: true, editorDefaultBullet: true, editorBulletAfterHeading: true, editorDailyNoteAutoTimestamp: true, editorSmoothCaretAnimation: true, editorTextSize: 'small', editorFullWidth: false, sidebarWidth: 260, contextSidebarWidth: 320, semanticSearchEnabled: false, describeAssets: true, transcriptionFormat: true, contactsEnabled: false, mobileOnboarded: false, mobileStorage: 'local', mobileGraphName: '', theme: 'system', timeFormat: '12h', dateFormat: 'mdy', weekStartDay: 'monday', allNotesFilterTags: ['book', 'link', 'person'], calendarEnabled: false, calendarIds: [], graphColors: {}, aiProviders: [], defaultAiProviderId: null, chatModelSelection: null, chatSystemPrompt: '', aiPrompts: [{ id: 'p1', label: 'Translate to German', body: '{{selectedText}}', mode: 'replace' }] },
       ]),
     )
   })

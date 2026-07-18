@@ -8,6 +8,7 @@ describe('settingsSchema', () => {
       editorSpellCheck: true,
       editorDefaultBullet: true,
       editorBulletAfterHeading: true,
+      editorDailyNoteAutoTimestamp: true,
       editorSmoothCaretAnimation: true,
       editorTextSize: 'small',
       editorFullWidth: false,
@@ -38,6 +39,7 @@ describe('settingsSchema', () => {
     expect(DEFAULT_SETTINGS.editorSpellCheck).toBe(true)
     expect(DEFAULT_SETTINGS.editorDefaultBullet).toBe(true)
     expect(DEFAULT_SETTINGS.editorBulletAfterHeading).toBe(true)
+    expect(DEFAULT_SETTINGS.editorDailyNoteAutoTimestamp).toBe(true)
     expect(DEFAULT_SETTINGS.editorSmoothCaretAnimation).toBe(true)
     expect(DEFAULT_SETTINGS.editorTextSize).toBe('small')
     expect(DEFAULT_SETTINGS.editorFullWidth).toBe(false)
@@ -77,6 +79,12 @@ describe('settingsSchema', () => {
     ).toBe(false)
     expect(
       settingsSchema.parse({ editorBulletAfterHeading: true }).editorBulletAfterHeading,
+    ).toBe(true)
+    expect(
+      settingsSchema.parse({ editorDailyNoteAutoTimestamp: false }).editorDailyNoteAutoTimestamp,
+    ).toBe(false)
+    expect(
+      settingsSchema.parse({ editorDailyNoteAutoTimestamp: true }).editorDailyNoteAutoTimestamp,
     ).toBe(true)
     expect(
       settingsSchema.parse({ editorSmoothCaretAnimation: false }).editorSmoothCaretAnimation,
@@ -150,6 +158,10 @@ describe('settingsSchema', () => {
     ).toBe(true)
     expect(settingsSchema.parse({ editorBulletAfterHeading: 0 }).editorBulletAfterHeading).toBe(true)
     expect(
+      settingsSchema.parse({ editorDailyNoteAutoTimestamp: 'on' }).editorDailyNoteAutoTimestamp,
+    ).toBe(true)
+    expect(settingsSchema.parse({ editorDailyNoteAutoTimestamp: 0 }).editorDailyNoteAutoTimestamp).toBe(true)
+    expect(
       settingsSchema.parse({ editorSmoothCaretAnimation: 'on' }).editorSmoothCaretAnimation,
     ).toBe(true)
     expect(
@@ -212,6 +224,7 @@ describe('settingsSchema', () => {
       editorSpellCheck: true,
       editorDefaultBullet: true,
       editorBulletAfterHeading: true,
+      editorDailyNoteAutoTimestamp: true,
       editorSmoothCaretAnimation: true,
       editorTextSize: 'small',
       editorFullWidth: false,

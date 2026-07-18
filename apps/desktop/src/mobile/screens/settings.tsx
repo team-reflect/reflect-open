@@ -180,6 +180,13 @@ export function MobileSettings(): ReactElement {
                 updateSettings({ editorBulletAfterHeading })
               }
             />
+            <SettingsSwitchRow
+              label="Daily note auto-timestamp"
+              checked={settings.editorDailyNoteAutoTimestamp}
+              onCheckedChange={(editorDailyNoteAutoTimestamp) =>
+                updateSettings({ editorDailyNoteAutoTimestamp })
+              }
+            />
           </SettingsGroup>
 
           <SettingsGroup
