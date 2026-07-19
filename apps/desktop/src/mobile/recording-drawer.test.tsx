@@ -98,7 +98,7 @@ describe('RecordingDrawer', () => {
     const user = userEvent.setup()
     const view = render(<RecordingDrawer />)
 
-    expect(view.getByText(/OpenAI or Gemini API key/)).not.toBeNull()
+    expect(view.getByText(/send the recording to OpenAI or Google Gemini/)).not.toBeNull()
     expect(view.queryByRole('button', { name: 'Stop recording' })).toBeNull()
 
     await user.click(view.getByRole('button', { name: 'Open Settings' }))
