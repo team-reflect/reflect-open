@@ -353,7 +353,9 @@ mod tests {
         let graph = tempdir().unwrap();
         bootstrap(graph.path()).unwrap();
         let temp = temp_in(graph.path(), b"opus bytes");
-        let target = graph.path().join("audio-memos/audio-memo-2026-07-19-090000-000.m4a");
+        let target = graph
+            .path()
+            .join("audio-memos/audio-memo-2026-07-19-090000-000.m4a");
         persist_exact(temp, &target).unwrap();
         assert_eq!(fs::read(&target).unwrap(), b"opus bytes");
     }

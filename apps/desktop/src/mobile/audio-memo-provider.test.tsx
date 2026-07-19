@@ -1,13 +1,14 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { useState, type ReactElement, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type {
-  AiProvidersState,
-  AudioMemoIdentity,
-  CaptureAudioMemoInput,
-  CaptureAudioMemoOutcome,
-  GraphInfo,
-  Settings,
+import {
+  AUDIO_MEMO_MAX_DURATION_MS,
+  type AiProvidersState,
+  type AudioMemoIdentity,
+  type CaptureAudioMemoInput,
+  type CaptureAudioMemoOutcome,
+  type GraphInfo,
+  type Settings,
 } from '@reflect/core'
 import type { NativeRecorderResult } from '@/mobile/use-native-audio-recorder'
 
@@ -207,7 +208,7 @@ describe('MobileAudioMemoProvider', () => {
   it('toggle records with the drawer open, then stops, captures, and deletes the staged file', async () => {
     const { result } = renderHook(() => useMobileAudioMemo(), { wrapper })
     expect(result.current.available).toBe(true)
-    expect(recorderControls.options?.maxDurationMs).toBe(10 * 60_000)
+    expect(recorderControls.options?.maxDurationMs).toBe(AUDIO_MEMO_MAX_DURATION_MS)
 
     await act(async () => {
       result.current.toggle()
