@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.0-beta.12](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.11...v0.7.0-beta.12) (2026-07-19)
+
+
+### Features
+
+* **mobile:** add AI provider consent block ([#891](https://github.com/team-reflect/reflect-open/issues/891)) ([595a215](https://github.com/team-reflect/reflect-open/commit/595a2157d920cba258a93180c2bc44e22188efe4))
+
+
+### Bug Fixes
+
+* fetch link previews like a normal browser request ([#886](https://github.com/team-reflect/reflect-open/issues/886)) ([cab03fb](https://github.com/team-reflect/reflect-open/commit/cab03fb324984d88dfb72a553e767a8db615e5ee))
+* update meowdown to ^0.55.1 ([#865](https://github.com/team-reflect/reflect-open/issues/865)) ([71e2fe9](https://github.com/team-reflect/reflect-open/commit/71e2fe90f29db3372020dfec317b2c9d384b0d6e))
+
 ## [0.7.0-beta.11](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.10...v0.7.0-beta.11) (2026-07-18)
 
 
