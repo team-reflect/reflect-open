@@ -30,8 +30,8 @@ export function AiProviderConsent({
         When you use AI features, Reflect sends data directly to {provider.label} using this
         key: AI chat sends your messages and the notes the assistant reads
         {sendsAudio ? ', and audio memos send the recording audio for transcription' : ''}.
-        Nothing passes through a Reflect server, and notes marked{' '}
-        <code>private: true</code> are never sent.{' '}
+        Nothing passes through a Reflect server, and notes you mark as private are never
+        sent.{' '}
         <button
           type="button"
           className="underline"
