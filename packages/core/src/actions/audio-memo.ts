@@ -12,13 +12,9 @@ import {
   type AudioMemoEnrichmentCredentials,
 } from '../ai/audio-memo-title'
 import { buildAudioMemoTranscript } from '../ai/audio-memo-transcript'
-import {
-  AUDIO_EXTENSION_BY_MIME,
-  base64ToBytes,
-  baseMimeType,
-  bytesToBase64,
-  transcriptionByteLimit,
-} from '../ai/transcribe'
+import { AUDIO_EXTENSION_BY_MIME, baseMimeType } from '../ai/audio-mime'
+import { routeTranscription } from '../ai/transcription-routing'
+import { base64ToBytes, bytesToBase64 } from '../lib/base64'
 import {
   listDir,
   listFiles,
@@ -241,6 +237,18 @@ function hasBacklink(source: string, memo: AudioMemoIdentity): boolean {
   return source.includes(`[[${memo.base}`)
 }
 
+/** A memo awaiting transcription, with the size its routing decision needs. */
+export interface PendingAudioMemo {
+  /** Everything derivable from the recording's basename. */
+  memo: AudioMemoIdentity
+  /**
+   * Recording size on disk, from the directory listing — provider routing
+   * (see `ai/transcription-routing`) decides on it *before* any bytes are
+   * read, so an unroutable memo costs nothing per pass.
+   */
+  sizeBytes: number
+}
+
 /**
  * Memos awaiting transcription, oldest first: a recording under
  * `audio-memos/` with no same-named transcription note and no daily-note
@@ -248,7 +256,7 @@ function hasBacklink(source: string, memo: AudioMemoIdentity): boolean {
  * is pinned to `generation` — recordings, notes, and daily-note tombstones
  * must come from one graph session, never a mix across a switch.
  */
-export async function listPendingAudioMemos(generation: number): Promise<AudioMemoIdentity[]> {
+export async function listPendingAudioMemos(generation: number): Promise<PendingAudioMemo[]> {
   const [recordings, notes] = await Promise.all([
     listDir(AUDIO_MEMOS_DIR, generation),
     listFiles(generation),
@@ -259,14 +267,14 @@ export async function listPendingAudioMemos(generation: number): Promise<AudioMe
     // aren't local — reading it would abort the pass. It transcribes on a
     // later pass, once downloaded (Plan 21).
     .filter((file) => file.placeholder !== true)
-    .map((file) => audioMemoFromPath(file.path))
-    .filter((memo): memo is AudioMemoIdentity => memo !== null)
-    .filter((memo) => !existingNotes.has(memo.notePath))
-    .sort((first, second) => first.base.localeCompare(second.base))
-  const pending: AudioMemoIdentity[] = []
-  for (const memo of candidates) {
-    if (!hasBacklink(await dailyNoteSource(memo.date, generation), memo)) {
-      pending.push(memo)
+    .map((file) => ({ memo: audioMemoFromPath(file.path), sizeBytes: file.size }))
+    .filter((entry): entry is PendingAudioMemo => entry.memo !== null)
+    .filter(({ memo }) => !existingNotes.has(memo.notePath))
+    .sort((first, second) => first.memo.base.localeCompare(second.memo.base))
+  const pending: PendingAudioMemo[] = []
+  for (const entry of candidates) {
+    if (!hasBacklink(await dailyNoteSource(entry.memo.date, generation), entry.memo)) {
+      pending.push(entry)
     }
   }
   return pending
@@ -377,7 +385,7 @@ export interface ReconcileAudioMemosOutcome {
 export async function reconcileAudioMemos(
   input: ReconcileAudioMemosInput,
 ): Promise<ReconcileAudioMemosOutcome> {
-  let pending: AudioMemoIdentity[]
+  let pending: PendingAudioMemo[]
   try {
     pending = await listPendingAudioMemos(input.generation)
   } catch (cause) {
@@ -434,39 +442,18 @@ export async function reconcileAudioMemos(
         ? { config: fallbackEnrichmentConfig, apiKey }
         : null
 
-  // Long-recording routing: OpenAI has a hard 25 MB request ceiling with no
-  // large-file mechanism behind it, while Gemini's Files API takes
-  // meeting-length audio. A memo the picked provider can't fit is routed to a
-  // configured Google entry; with none, it's *skipped* (left pending), never
-  // tombstoned — adding a Google key later transcribes it. Sizes come from
-  // the directory listing so an unroutable memo is never even read.
-  const googleConfig =
-    config.provider === 'google'
-      ? config
-      : pickProviderTranscriptionConfig(input.providers, 'google')
-  let googleApiKey: string | null = config.provider === 'google' ? apiKey : null
-  const googleCredentials = async (): Promise<
-    { config: TranscriptionConfig; apiKey: string } | null
-  > => {
-    if (googleConfig === null) {
-      return null
+  // Long-recording routing (`ai/transcription-routing`): a memo the picked
+  // provider can't fit routes to a configured Google entry; with none it's
+  // *skipped* (left pending), never tombstoned — adding a Google key later
+  // transcribes it. Keys are fetched lazily and memoized per entry, so a
+  // pass with no oversized memos never touches the keychain twice.
+  const googleConfig = pickProviderTranscriptionConfig(input.providers, 'google')
+  const apiKeys = new Map<string, string | null>([[config.id, apiKey]])
+  const apiKeyFor = async (target: TranscriptionConfig): Promise<string | null> => {
+    if (!apiKeys.has(target.id)) {
+      apiKeys.set(target.id, await getSecret(aiKeySecretName(target.id)).catch(() => null))
     }
-    googleApiKey ??= await getSecret(aiKeySecretName(googleConfig.id)).catch(() => null)
-    return googleApiKey === null ? null : { config: googleConfig, apiKey: googleApiKey }
-  }
-  let recordingSizes: Map<string, number>
-  try {
-    recordingSizes = new Map(
-      (await listDir(AUDIO_MEMOS_DIR, input.generation)).map((file) => [file.path, file.size]),
-    )
-  } catch (cause) {
-    return {
-      pending: pending.length,
-      transcribed: 0,
-      rejected: 0,
-      skipped: 0,
-      stopped: { reason: toAppError(cause).kind, message: errorMessage(cause) },
-    }
+    return apiKeys.get(target.id) ?? null
   }
 
   let transcribed = 0
@@ -486,25 +473,16 @@ export async function reconcileAudioMemos(
     skipped,
     stopped: { reason: 'stale', message: 'the graph session ended mid-pass' },
   })
-  for (const memo of pending) {
+  for (const { memo, sizeBytes } of pending) {
     if (stale()) {
       return stalled()
     }
     try {
-      let memoConfig = config
-      let memoApiKey = apiKey
-      const sizeBytes = recordingSizes.get(memo.audioPath) ?? 0
-      if (sizeBytes > transcriptionByteLimit(config.provider)) {
-        const fallback = await googleCredentials()
-        if (
-          fallback === null ||
-          sizeBytes > transcriptionByteLimit(fallback.config.provider)
-        ) {
-          skipped += 1
-          continue
-        }
-        memoConfig = fallback.config
-        memoApiKey = fallback.apiKey
+      const target = routeTranscription(input.providers, config, sizeBytes)
+      const memoApiKey = target === null ? null : await apiKeyFor(target)
+      if (target === null || memoApiKey === null) {
+        skipped += 1
+        continue
       }
       memosNoteTitle ??= await ensureBacklinkTarget(MEMOS_NOTE_TITLE, input.generation)
       if (stale()) return stalled()
@@ -518,7 +496,7 @@ export async function reconcileAudioMemos(
       const note = await buildAudioMemoTranscript({
         audio,
         mimeType: memo.mimeType,
-        config: memoConfig,
+        config: target,
         apiKey: memoApiKey,
         enrichmentCredentials,
         formatTranscript: input.formatTranscript,

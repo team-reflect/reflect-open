@@ -3,6 +3,7 @@ import { audioMemoCapWarning } from '@reflect/core'
 import { Square, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
+import { formatRecordingElapsed } from '@/lib/recording-time'
 import { useMobileAudioMemo } from '@/mobile/audio-memo-provider'
 import { RecordingLevelWaveform } from '@/mobile/recording-level-waveform'
 import { useRouter } from '@/routing/router'
@@ -122,7 +123,7 @@ function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactEleme
         )}
       </div>
       <div className="flex flex-col items-center">
-        <span className="text-lg font-medium tabular-nums">{formatElapsed(memo.elapsedMs)}</span>
+        <span className="text-lg font-medium tabular-nums">{formatRecordingElapsed(memo.elapsedMs)}</span>
         {capWarning !== null ? <span className="text-xs text-text-muted">{capWarning}</span> : null}
       </div>
       <div className="flex w-full flex-col items-center gap-3">
@@ -149,11 +150,4 @@ function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactEleme
       </div>
     </div>
   )
-}
-
-function formatElapsed(elapsedMs: number): string {
-  const totalSeconds = Math.floor(elapsedMs / 1000)
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}:${String(seconds).padStart(2, '0')}`
 }

@@ -120,19 +120,19 @@ export {
   AUDIO_MEMO_MAX_DURATION_MS,
   audioMemoCapWarning,
 } from '../ai/audio-memo-limits'
+export { base64ToBytes } from '../lib/base64'
 export {
-  base64ToBytes,
   isTranscriptionRejected,
-  transcribeAudio,
   TranscriptionRejectedError,
-  type TranscriptionRequest,
-} from '../ai/transcribe'
+} from '../ai/transcribe-http'
+export { transcribeAudio, type TranscriptionRequest } from '../ai/transcribe'
 export {
   audioMemoFromPath,
   audioMemoIdentity,
   captureAudioMemo,
   isSilentStop,
   listPendingAudioMemos,
+  type PendingAudioMemo,
   reconcileAudioMemos,
   type AudioMemoIdentity,
   type CaptureAudioMemoInput,

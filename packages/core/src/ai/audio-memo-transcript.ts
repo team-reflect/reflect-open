@@ -4,7 +4,8 @@ import type { AudioMemoEnrichmentCredentials } from './audio-memo-title'
 import { generateAudioMemoTitle } from './audio-memo-title'
 import { formatAudioMemoTranscript } from './audio-memo-format'
 import { APP_REVIEW_STUB_KEY, stubTranscriptBody } from './audio-memo-review-stub'
-import { isTranscriptionRejected, transcribeAudio } from './transcribe'
+import { isTranscriptionRejected } from './transcribe-http'
+import { transcribeAudio } from './transcribe'
 
 export interface BuildAudioMemoTranscriptInput {
   /** The recording bytes read back from the graph. */

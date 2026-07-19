@@ -23,11 +23,9 @@ import {
   writeAsset,
   writeNote,
 } from '../graph/commands'
-import {
-  OPENAI_TRANSCRIPTION_MAX_BYTES,
-  transcribeAudio,
-  TranscriptionRejectedError,
-} from '../ai/transcribe'
+import { transcribeAudio } from '../ai/transcribe'
+import { TranscriptionRejectedError } from '../ai/transcribe-http'
+import { OPENAI_TRANSCRIPTION_MAX_BYTES } from '../ai/transcription-routing'
 import { getSecret } from '../secrets/keychain'
 import { setBridge } from '../ipc/bridge'
 

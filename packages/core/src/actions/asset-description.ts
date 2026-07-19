@@ -1,7 +1,7 @@
 import { describeAsset, isAssetDescriptionRejected } from '../ai/describe-asset'
 import { defaultAiProvider, type AiProvidersState } from '../ai/provider-config'
 import { aiKeySecretName } from '../ai/secrets'
-import { base64ToBytes } from '../ai/transcribe'
+import { base64ToBytes } from '../lib/base64'
 import { errorMessage, isAppError, toAppError } from '../errors'
 import { listDir, readAsset, readNote, writeNote } from '../graph/commands'
 import { ASSETS_DIR, descriptionPathFor } from '../graph/paths'

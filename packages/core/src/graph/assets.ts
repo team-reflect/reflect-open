@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { echoLocalWrite } from '../indexing/local-write-echo'
 import { call, callBinary } from '../ipc/invoke'
+import { blobChunks } from '../lib/blob'
 
 /** Commands that return `()` from Rust serialize as `null` over IPC. */
 const voidSchema = z.null()
@@ -14,12 +15,6 @@ const CHUNK_BYTES = 4 * 1024 * 1024
 
 /** The header carrying the upload id on raw-body append calls. */
 const UPLOAD_ID_HEADER = 'x-upload-id'
-
-async function* chunksOf(contents: Blob): AsyncGenerator<Uint8Array> {
-  for (let offset = 0; offset < contents.size; offset += CHUNK_BYTES) {
-    yield new Uint8Array(await contents.slice(offset, offset + CHUNK_BYTES).arrayBuffer())
-  }
-}
 
 /**
  * Stream a pasted/dropped file's bytes into the graph's `assets/` folder as
@@ -37,8 +32,13 @@ export async function createAsset(
 ): Promise<string> {
   const id = await call('asset_upload_begin', { generation }, z.string())
   try {
-    for await (const chunk of chunksOf(contents)) {
-      await callBinary('asset_upload_append', chunk, { [UPLOAD_ID_HEADER]: id }, voidSchema)
+    for (const chunk of blobChunks(contents, CHUNK_BYTES)) {
+      await callBinary(
+        'asset_upload_append',
+        new Uint8Array(await chunk.arrayBuffer()),
+        { [UPLOAD_ID_HEADER]: id },
+        voidSchema,
+      )
     }
     const path = await call('asset_upload_commit', { id, desiredName, generation }, z.string())
     echoLocalWrite({ path, kind: 'upsert', modifiedMs: Date.now() })
@@ -67,8 +67,13 @@ export async function writeAssetStreamed(
 ): Promise<void> {
   const id = await call('asset_upload_begin', { generation }, z.string())
   try {
-    for await (const chunk of chunksOf(contents)) {
-      await callBinary('asset_upload_append', chunk, { [UPLOAD_ID_HEADER]: id }, voidSchema)
+    for (const chunk of blobChunks(contents, CHUNK_BYTES)) {
+      await callBinary(
+        'asset_upload_append',
+        new Uint8Array(await chunk.arrayBuffer()),
+        { [UPLOAD_ID_HEADER]: id },
+        voidSchema,
+      )
     }
     await call('asset_upload_commit_path', { id, path, generation }, voidSchema)
     echoLocalWrite({ path, kind: 'upsert', modifiedMs: Date.now() })

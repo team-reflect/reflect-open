@@ -94,6 +94,7 @@ fn persist_unique(
     assets_dir: &Path,
     desired: &str,
 ) -> AppResult<String> {
+    temp.as_file().sync_all()?;
     let (stem, ext) = split_name(desired);
     for attempt in 1..=MAX_NAME_PROBES {
         let candidate = if attempt == 1 {
@@ -202,14 +203,15 @@ pub fn asset_upload_commit(
         ));
     }
     let assets_dir = assets_dir_for(&state, generation, &desired_name)?;
-    upload.file.as_file().sync_all()?;
     let final_name = persist_unique(upload.file, &assets_dir, &desired_name)?;
     Ok(format!("assets/{final_name}"))
 }
 
 /// Persist a staged upload at an exact target path, creating parent
 /// directories. No-clobber: the temp file only ever *claims* a free path, so
-/// a concurrent writer's file is never overwritten.
+/// a concurrent writer's file is never overwritten. Like [`persist_unique`],
+/// fsyncs before the rename — durability is the persist helpers' job, never
+/// their callers'.
 fn persist_exact(temp: tempfile::NamedTempFile, target: &Path) -> AppResult<()> {
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent)?;
@@ -274,7 +276,6 @@ pub fn asset_import(
     let root = root_for_generation(&state, generation)?;
     let mut temp = tempfile::NamedTempFile::new_in(staging_dir(&root)?)?;
     std::io::copy(&mut fs::File::open(source)?, temp.as_file_mut())?;
-    temp.as_file().sync_all()?;
     let assets_dir = assets_dir_for(&state, generation, &desired_name)?;
     let final_name = persist_unique(temp, &assets_dir, &desired_name)?;
     Ok(format!("assets/{final_name}"))

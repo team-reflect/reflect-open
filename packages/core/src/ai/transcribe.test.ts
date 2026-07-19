@@ -5,11 +5,10 @@ import {
   GOOGLE_TRANSCRIPTION_MODEL,
   OPENAI_TRANSCRIPTION_FALLBACK_MODEL,
   OPENAI_TRANSCRIPTION_MODEL,
-  bytesToBase64,
-  isTranscriptionRejected,
   transcribeAudio,
   type TranscriptionRequest,
 } from './transcribe'
+import { isTranscriptionRejected } from './transcribe-http'
 
 interface RecordedCall {
   url: string
@@ -285,26 +284,52 @@ describe('transcribeAudio (google)', () => {
     uri: 'https://generativelanguage.googleapis.com/v1beta/files/memo-1',
   }
 
-  function startResponse(): Response {
-    return new Response('{}', { status: 200, headers: { 'x-goog-upload-url': UPLOAD_URL } })
+  /** A recording just over the inline budget — uploads as two chunks. */
+  function largeAudio(): Blob {
+    return new Blob([new Uint8Array(GEMINI_INLINE_MAX_BYTES + 1)], { type: 'audio/mp4' })
   }
 
-  it('routes a recording over the inline budget through the Files API and deletes the file', async () => {
-    const calls: RecordedCall[] = []
-    const fetchFn = recordingFetch(calls, (call, index) => {
-      if (index === 0) return startResponse()
+  /**
+   * Scripted fetch for the Files API flow, routed by protocol step (session
+   * start → upload chunks → state poll → generateContent → delete) so each
+   * test overrides only the step under test.
+   */
+  function filesApiFetch(
+    calls: RecordedCall[],
+    overrides: {
+      finalizeState?: string
+      chunk?: (call: RecordedCall) => Response | null
+    } = {},
+  ): typeof fetch {
+    return recordingFetch(calls, (call, index) => {
+      if (index === 0) {
+        return new Response('{}', { status: 200, headers: { 'x-goog-upload-url': UPLOAD_URL } })
+      }
       if (call.url === UPLOAD_URL) {
+        const overridden = overrides.chunk?.(call) ?? null
+        if (overridden !== null) {
+          return overridden
+        }
         return call.headers['X-Goog-Upload-Command'] === 'upload, finalize'
-          ? jsonResponse(200, { file: { ...FILE_RESOURCE, state: 'PROCESSING' } })
+          ? jsonResponse(200, {
+              file: { ...FILE_RESOURCE, state: overrides.finalizeState ?? 'PROCESSING' },
+            })
           : new Response('{}', { status: 200 })
       }
       if (call.url.endsWith('/v1beta/files/memo-1') && call.method === 'GET') {
         return jsonResponse(200, { ...FILE_RESOURCE, state: 'ACTIVE' })
       }
-      if (call.method === 'DELETE') return new Response('{}', { status: 200 })
+      if (call.method === 'DELETE') {
+        return new Response('{}', { status: 200 })
+      }
       return geminiResponse('meeting transcript')
     })
-    const audio = new Blob([new Uint8Array(GEMINI_INLINE_MAX_BYTES + 1)], { type: 'audio/mp4' })
+  }
+
+  it('routes a recording over the inline budget through the Files API and deletes the file', async () => {
+    const calls: RecordedCall[] = []
+    const fetchFn = filesApiFetch(calls)
+    const audio = largeAudio()
 
     const text = await transcribeAudio(request({ provider: 'google', fetchFn, audio }))
 
@@ -329,22 +354,31 @@ describe('transcribeAudio (google)', () => {
 
   it('tombstones a recording the Files API cannot process — the same bytes would fail again', async () => {
     const calls: RecordedCall[] = []
-    const fetchFn = recordingFetch(calls, (call, index) => {
-      if (index === 0) return startResponse()
-      if (call.url === UPLOAD_URL) {
-        return jsonResponse(200, { file: { ...FILE_RESOURCE, state: 'FAILED' } })
-      }
-      return new Response('{}', { status: 200 })
-    })
-    const audio = new Blob([new Uint8Array(GEMINI_INLINE_MAX_BYTES + 1)], { type: 'audio/mp4' })
+    const fetchFn = filesApiFetch(calls, { finalizeState: 'FAILED' })
 
     const failure: unknown = await transcribeAudio(
-      request({ provider: 'google', fetchFn, audio }),
+      request({ provider: 'google', fetchFn, audio: largeAudio() }),
     ).catch((cause: unknown) => cause)
 
     expect(isTranscriptionRejected(failure)).toBe(true)
-    // start + one 8 MiB chunk + finalize — never generateContent on a dead file.
+    // Never generateContent on a dead file.
     expect(calls.filter((call) => call.url.includes(':generateContent'))).toHaveLength(0)
+  })
+
+  it('a failed upload chunk is a retryable network error, not a rejection', async () => {
+    const calls: RecordedCall[] = []
+    const fetchFn = filesApiFetch(calls, {
+      chunk: () => jsonResponse(500, { error: { message: 'backend unavailable' } }),
+    })
+
+    const failure: unknown = await transcribeAudio(
+      request({ provider: 'google', fetchFn, audio: largeAudio() }),
+    ).catch((cause: unknown) => cause)
+
+    expect(isTranscriptionRejected(failure)).toBe(false)
+    expect(failure).toMatchObject({ kind: 'network' })
+    // The flow stops at the first failed chunk: start + that chunk, no more.
+    expect(calls).toHaveLength(2)
   })
 
   it('returns an empty transcript when no candidates come back', async () => {
@@ -361,16 +395,5 @@ describe('transcribeAudio (google)', () => {
     await expect(transcribeAudio(request({ provider: 'google', fetchFn }))).rejects.toMatchObject({
       kind: 'auth',
     })
-  })
-})
-
-describe('bytesToBase64', () => {
-  it('matches btoa on small payloads', () => {
-    expect(bytesToBase64(new TextEncoder().encode('abc'))).toBe(btoa('abc'))
-  })
-
-  it('survives payloads beyond one chunk', () => {
-    const bytes = new Uint8Array(0x8000 * 2 + 7).fill(65)
-    expect(bytesToBase64(bytes)).toBe(btoa('A'.repeat(bytes.length)))
   })
 })
