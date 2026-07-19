@@ -61,8 +61,8 @@ function KeySetupControls({ memo }: LiveRecordingControlsProps): ReactElement {
   return (
     <div className="flex flex-col items-center gap-4 px-4 pb-2 text-center">
       <p className="text-sm text-text-muted">
-        Audio memos are transcribed into your notes with your own OpenAI or Gemini API key. Add
-        one in Settings to start recording.
+        Audio memos send the recording to OpenAI or Google Gemini for transcription into your
+        notes, using your own API key. Add one in Settings to start recording.
       </p>
       <Button
         onClick={() => {

@@ -32,6 +32,9 @@ vi.mock('@/providers/graph-provider', () => ({
 }))
 vi.mock('@/hooks/use-app-version', () => ({ useAppVersion: () => '1.2.3-beta.4' }))
 
+const openUrl = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl }))
+
 const settingsState = vi.hoisted(() => ({ current: {} as Settings }))
 const updateSettings = vi.hoisted(() => vi.fn())
 vi.mock('@/providers/settings-provider', () => ({
@@ -118,6 +121,15 @@ describe('MobileSettings', () => {
     await user.click(graphRow)
 
     expect(navigate).toHaveBeenCalledWith({ kind: 'graphs' })
+  })
+
+  it('opens the privacy policy from the About group', async () => {
+    const user = userEvent.setup()
+    mount()
+
+    await user.click(screen.getByRole('button', { name: 'Privacy Policy' }))
+
+    expect(openUrl).toHaveBeenCalledWith('https://reflect.app/privacy')
   })
 
   it('writes appearance choices to the settings document', async () => {

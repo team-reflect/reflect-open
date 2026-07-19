@@ -10,12 +10,14 @@ import {
   type EditorTextSize,
   type ThemePreference,
 } from '@reflect/core'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { useAiProviders } from '@/hooks/use-ai-providers'
 import { useAppVersion } from '@/hooks/use-app-version'
 import { marketingVersion } from '@/lib/marketing-version'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer'
 import { AiProviderActionsDrawer } from '@/mobile/ai-provider-actions-drawer'
+import { PRIVACY_POLICY_URL } from '@/mobile/ai-provider-consent'
 import { ChatSystemPromptDrawer } from '@/mobile/chat-system-prompt-drawer'
 import { ConnectGithubDrawer } from '@/mobile/connect-github-drawer'
 import { MobileScreenHeader } from '@/mobile/screen-header'
@@ -255,6 +257,12 @@ export function MobileSettings(): ReactElement {
             <SettingsValueRow
               label="Version"
               value={version === null ? '…' : marketingVersion(version)}
+            />
+            <SettingsActionRow
+              label="Privacy Policy"
+              onPress={() => {
+                void openUrl(PRIVACY_POLICY_URL).catch(() => {})
+              }}
             />
           </SettingsGroup>
         </div>

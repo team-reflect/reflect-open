@@ -18,6 +18,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   validateApiKey,
 }))
 vi.mock('@/lib/provider-fetch', () => ({ providerFetch: vi.fn() }))
+vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl: vi.fn(() => Promise.resolve()) }))
 
 // vaul needs browser APIs jsdom doesn't provide; passthrough so the sheet
 // content renders inline.
@@ -48,8 +49,13 @@ function renderSheet() {
   render(<AddAiProviderDrawer open onOpenChange={onOpenChange} onAdd={onAdd} />)
 }
 
+function consentCheckbox() {
+  return screen.getByRole('checkbox', { name: /I understand this data will be sent/ })
+}
+
 async function typeKeyAndSubmit(key: string, submitLabel = 'Add provider') {
   fireEvent.change(screen.getByLabelText('API key'), { target: { value: key } })
+  fireEvent.click(consentCheckbox())
   fireEvent.click(screen.getByRole('button', { name: submitLabel }))
 }
 
@@ -97,5 +103,38 @@ describe('AddAiProviderDrawer', () => {
     )
     // The unverified key was saved once, without a second validation probe.
     expect(validateApiKey).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the submit disabled until the data-sharing consent is checked', () => {
+    renderSheet()
+
+    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'sk-key' } })
+    expect(screen.getByRole('button', { name: 'Add provider' })).toHaveProperty('disabled', true)
+
+    fireEvent.click(consentCheckbox())
+    expect(screen.getByRole('button', { name: 'Add provider' })).toHaveProperty('disabled', false)
+  })
+
+  it('resets consent when the provider changes', async () => {
+    renderSheet()
+
+    fireEvent.click(consentCheckbox())
+    expect(consentCheckbox()).toHaveProperty('checked', true)
+
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Provider' }), { key: 'ArrowDown' })
+    fireEvent.keyDown(await screen.findByRole('option', { name: 'Anthropic' }), { key: 'Enter' })
+
+    expect(consentCheckbox()).toHaveProperty('checked', false)
+  })
+
+  it('mentions audio only for transcription-capable providers', async () => {
+    renderSheet()
+
+    expect(screen.getByText(/audio memos send the recording/)).toBeDefined()
+
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Provider' }), { key: 'ArrowDown' })
+    fireEvent.keyDown(await screen.findByRole('option', { name: 'Anthropic' }), { key: 'Enter' })
+
+    expect(screen.queryByText(/audio memos send the recording/)).toBeNull()
   })
 })

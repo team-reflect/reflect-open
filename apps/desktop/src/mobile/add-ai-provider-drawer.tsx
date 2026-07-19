@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useAddAiProviderSubmit } from '@/hooks/use-add-ai-provider-submit'
+import { AiProviderConsent } from '@/mobile/ai-provider-consent'
 import type { NewAiProvider } from '@/hooks/use-ai-providers'
 
 interface AddAiProviderDrawerProps {
@@ -58,6 +59,7 @@ function AddAiProviderSheet({
   const [model, setModel] = useState(AI_PROVIDERS[0].models[0].id)
   const [apiKey, setApiKey] = useState('')
   const [isDefault, setIsDefault] = useState(false)
+  const [consented, setConsented] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const { submitError, unverified, resetUnverified, submit } = useAddAiProviderSubmit({
     onAdd,
@@ -91,6 +93,7 @@ function AddAiProviderSheet({
               const next = aiProvider(aiProviderIdSchema.parse(value))
               setProviderId(next.id)
               setModel(next.models[0].id)
+              setConsented(false)
               resetUnverified()
             }}
           >
@@ -138,6 +141,12 @@ function AddAiProviderSheet({
           />
         </label>
 
+        <AiProviderConsent
+          provider={provider}
+          consented={consented}
+          onConsentedChange={setConsented}
+        />
+
         <label className="flex items-center gap-2 py-1">
           <input
             type="checkbox"
@@ -154,7 +163,10 @@ function AddAiProviderSheet({
             Couldn’t reach {provider.label} to verify the key. Submit again to save it unverified.
           </InlineAlert>
         ) : null}
-        <Button disabled={apiKey.trim() === '' || submitting} onClick={() => void submitDraft()}>
+        <Button
+          disabled={apiKey.trim() === '' || !consented || submitting}
+          onClick={() => void submitDraft()}
+        >
           {unverified ? 'Save anyway' : 'Add provider'}
         </Button>
       </div>
