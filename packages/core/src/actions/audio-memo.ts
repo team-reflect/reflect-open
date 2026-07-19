@@ -449,11 +449,27 @@ export async function reconcileAudioMemos(
   // pass with no oversized memos never touches the keychain twice.
   const googleConfig = pickProviderTranscriptionConfig(input.providers, 'google')
   const apiKeys = new Map<string, string | null>([[config.id, apiKey]])
-  const apiKeyFor = async (target: TranscriptionConfig): Promise<string | null> => {
-    if (!apiKeys.has(target.id)) {
-      apiKeys.set(target.id, await getSecret(aiKeySecretName(target.id)).catch(() => null))
+  let skippedForMissingGoogleKey = false
+  /** Route a recording of `bytes` with its entry's key; `null` = skip the memo. */
+  const resolveTarget = async (
+    bytes: number,
+  ): Promise<{ config: TranscriptionConfig; apiKey: string } | null> => {
+    const routed = routeTranscription(input.providers, config, bytes)
+    if (routed === null) {
+      return null
     }
-    return apiKeys.get(target.id) ?? null
+    if (!apiKeys.has(routed.id)) {
+      apiKeys.set(routed.id, await getSecret(aiKeySecretName(routed.id)).catch(() => null))
+    }
+    const routedKey = apiKeys.get(routed.id) ?? null
+    if (routedKey === null) {
+      // Only a fallback entry can land here (the preferred key is pre-seeded
+      // and non-null) — remember why we skipped, so the surfaced hint names
+      // the missing key rather than blaming the recording's size.
+      skippedForMissingGoogleKey = true
+      return null
+    }
+    return { config: routed, apiKey: routedKey }
   }
 
   let transcribed = 0
@@ -478,26 +494,36 @@ export async function reconcileAudioMemos(
       return stalled()
     }
     try {
-      const target = routeTranscription(input.providers, config, sizeBytes)
-      const memoApiKey = target === null ? null : await apiKeyFor(target)
-      if (target === null || memoApiKey === null) {
+      let target = await resolveTarget(sizeBytes)
+      if (target === null) {
         skipped += 1
         continue
       }
+      if (stale()) return stalled()
       memosNoteTitle ??= await ensureBacklinkTarget(MEMOS_NOTE_TITLE, input.generation)
       if (stale()) return stalled()
       const bytes = hasBinaryIpc()
         ? await readAssetBinary(memo.audioPath, input.generation)
         : base64ToBytes(await readAsset(memo.audioPath, input.generation))
       const audio = new Blob([bytes], { type: memo.mimeType })
+      if (audio.size > sizeBytes) {
+        // The listing raced a rewrite and undersold the recording. Re-route
+        // on what was actually read: an oversize file must never reach a
+        // provider that will refuse it, because refusal tombstones.
+        target = await resolveTarget(audio.size)
+        if (target === null) {
+          skipped += 1
+          continue
+        }
+      }
       if (stale()) {
         return stalled()
       }
       const note = await buildAudioMemoTranscript({
         audio,
         mimeType: memo.mimeType,
-        config: target,
-        apiKey: memoApiKey,
+        config: target.config,
+        apiKey: target.apiKey,
         enrichmentCredentials,
         formatTranscript: input.formatTranscript,
         fallbackTitle: memo.title,
@@ -534,10 +560,23 @@ export async function reconcileAudioMemos(
         ? null
         : {
             reason: 'oversize',
-            message:
-              googleConfig === null
-                ? 'A recording is too long for OpenAI transcription. Add a Google Gemini model in Settings to transcribe long memos.'
-                : 'A recording is too large for the configured transcription providers.',
+            message: oversizeStopMessage(googleConfig !== null, skippedForMissingGoogleKey),
           },
   }
+}
+
+/**
+ * The surfaced hint when memos were skipped as unroutable — specific about
+ * the actual remedy: add a Google entry, fix its missing key, or (the
+ * practically unreachable case) accept that no provider takes a file this
+ * large.
+ */
+function oversizeStopMessage(hasGoogleEntry: boolean, missingGoogleKey: boolean): string {
+  if (!hasGoogleEntry) {
+    return 'A recording is too long for OpenAI transcription. Add a Google Gemini model in Settings to transcribe long memos.'
+  }
+  if (missingGoogleKey) {
+    return 'A recording needs the configured Google Gemini model to transcribe, but its API key is missing from the keychain.'
+  }
+  return 'A recording is too large for the configured transcription providers.'
 }

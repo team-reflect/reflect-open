@@ -50,9 +50,14 @@ export const GEMINI_FILE_TRANSCRIBE_TIMEOUT_MS = 10 * 60_000
 /** Upload chunk size — a multiple of 256 KiB, as the protocol requires. */
 const GEMINI_UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024
 
-/** Poll cadence and budget while an uploaded recording is `PROCESSING`. */
+/**
+ * Poll cadence and budget while an uploaded recording is `PROCESSING` —
+ * sized for the biggest real upload (a 4-hour memo, ~200 MB), which can take
+ * Google minutes to decode. Running out is a retryable `network` error, but
+ * the retry re-uploads from scratch, so the budget errs generous.
+ */
 const GEMINI_FILE_POLL_INTERVAL_MS = 2_000
-const GEMINI_FILE_MAX_POLLS = 90
+const GEMINI_FILE_MAX_POLLS = 150
 
 /** What {@link uploadToGeminiFiles} needs from a transcription request. */
 export interface GeminiFileUploadRequest {

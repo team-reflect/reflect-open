@@ -24,6 +24,7 @@ import {
   writeNote,
 } from '../graph/commands'
 import { transcribeAudio } from '../ai/transcribe'
+import { bytesToBase64 } from '../lib/base64'
 import { TranscriptionRejectedError } from '../ai/transcribe-http'
 import { OPENAI_TRANSCRIPTION_MAX_BYTES } from '../ai/transcription-routing'
 import { getSecret } from '../secrets/keychain'
@@ -646,11 +647,13 @@ describe('reconcileAudioMemos', () => {
   it('the abort gate stops between memos', async () => {
     const earlier = audioMemoIdentity(new Date(2026, 5, 10, 9, 0, 0, 0), 'audio/mp4')
     listDirMock.mockResolvedValue([fileMeta(earlier.audioPath), fileMeta(MEMO.audioPath)])
-    // The first memo checks at loop start, after category resolution, after
-    // the asset read, between transcription and enrichment, and after
-    // enrichment; stop at the next loop start.
+    // The first memo checks at loop start, after provider routing (the
+    // keychain await), after category resolution, after the asset read,
+    // between transcription and enrichment, and after enrichment; stop at
+    // the next loop start.
     const isStale = vi
       .fn()
+      .mockReturnValueOnce(false)
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(false)
@@ -768,6 +771,52 @@ describe('reconcileAudioMemos', () => {
     expect(transcribeMock).not.toHaveBeenCalled()
     expect(writeNoteMock).not.toHaveBeenCalled()
     expect(readAssetMock).not.toHaveBeenCalled()
+  })
+
+  it('names the missing Google key when that is why an oversized memo skipped', async () => {
+    const providers: AiProvidersState = {
+      providers: [
+        { id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' },
+        { id: 'cfg-google', provider: 'google', model: 'gemini-2.5-pro', keyHint: 'wxyz2' },
+      ],
+      defaultProviderId: 'cfg-openai',
+    }
+    getSecretMock.mockImplementation(async (name) => {
+      if (name === 'ai-api-key:cfg-google') {
+        throw { kind: 'notFound', message: 'no such secret' }
+      }
+      return 'sk-live-key'
+    })
+    listDirMock.mockResolvedValue([
+      { path: MEMO.audioPath, size: OPENAI_TRANSCRIPTION_MAX_BYTES + 1, modifiedMs: 0 },
+    ])
+
+    const outcome = await reconcile({ providers })
+
+    expect(outcome).toMatchObject({
+      skipped: 1,
+      stopped: {
+        reason: 'oversize',
+        message: expect.stringContaining('API key is missing'),
+      },
+    })
+    expect(transcribeMock).not.toHaveBeenCalled()
+  })
+
+  it('re-routes on the actual bytes when the listing undersold the recording', async () => {
+    // The listing claims a tiny file (routes to OpenAI), but the read comes
+    // back over OpenAI's budget — with no Google entry the memo must skip,
+    // never reach a provider whose refusal would tombstone it.
+    listDirMock.mockResolvedValue([{ path: MEMO.audioPath, size: 1, modifiedMs: 0 }])
+    readAssetMock.mockResolvedValue(
+      bytesToBase64(new Uint8Array(OPENAI_TRANSCRIPTION_MAX_BYTES + 1)),
+    )
+
+    const outcome = await reconcile()
+
+    expect(outcome).toMatchObject({ transcribed: 0, rejected: 0, skipped: 1 })
+    expect(transcribeMock).not.toHaveBeenCalled()
+    expect(writeNoteMock).not.toHaveBeenCalled()
   })
 
   it('a listing failure is reported, never thrown — reconcile runs unattended', async () => {
