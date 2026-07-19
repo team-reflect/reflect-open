@@ -22,5 +22,10 @@ export function audioMemoCapWarning(elapsedMs: number): string | null {
   if (remainingMs > AUDIO_MEMO_CAP_WARNING_MS) {
     return null
   }
-  return `Stops in ${Math.max(1, Math.ceil(remainingMs / 60_000))}m`
+  if (remainingMs < 60_000) {
+    // Whole minutes would read "1m" for the entire final minute — switch to
+    // seconds so the label tracks the actual stop.
+    return `Stops in ${Math.max(1, Math.ceil(remainingMs / 1000))}s`
+  }
+  return `Stops in ${Math.ceil(remainingMs / 60_000)}m`
 }

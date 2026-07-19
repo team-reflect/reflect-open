@@ -819,6 +819,20 @@ describe('reconcileAudioMemos', () => {
     expect(writeNoteMock).not.toHaveBeenCalled()
   })
 
+  it('classifies an error thrown after the switch as stale, not by its symptom', async () => {
+    listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
+    let closed = false
+    transcribeMock.mockImplementation(async () => {
+      closed = true // the switch lands while the provider call is in flight…
+      throw { kind: 'network', message: 'the graph session ended mid-transcription' }
+    })
+
+    const outcome = await reconcile({ isStale: () => closed })
+
+    expect(outcome).toMatchObject({ stopped: { reason: 'stale' } })
+    expect(writeNoteMock).not.toHaveBeenCalled()
+  })
+
   it('a listing failure is reported, never thrown — reconcile runs unattended', async () => {
     listDirMock.mockRejectedValue({ kind: 'noGraph', message: 'no graph open' })
 

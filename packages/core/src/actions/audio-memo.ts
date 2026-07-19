@@ -541,6 +541,12 @@ export async function reconcileAudioMemos(
         transcribed += 1
       }
     } catch (cause) {
+      // A graph switch mid-flight surfaces as whatever the in-flight call
+      // threw (usually `network`, from the gated send) — but the truth is
+      // the session ended. Classify by the gate, not the symptom.
+      if (stale()) {
+        return stalled()
+      }
       return {
         pending: pending.length,
         transcribed,
