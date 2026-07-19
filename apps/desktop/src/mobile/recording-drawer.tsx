@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
-import { AUDIO_MEMO_MAX_DURATION_LABEL } from '@reflect/core'
+import { audioMemoCapWarning } from '@reflect/core'
 import { Square, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
@@ -80,6 +80,7 @@ function KeySetupControls({ memo }: LiveRecordingControlsProps): ReactElement {
 function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactElement {
   const [discardArmed, setDiscardArmed] = useState(false)
   const discardResetTimer = useRef<number | null>(null)
+  const capWarning = audioMemoCapWarning(memo.elapsedMs)
 
   const clearDiscardReset = (): void => {
     if (discardResetTimer.current !== null) {
@@ -122,7 +123,7 @@ function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactEleme
       </div>
       <div className="flex flex-col items-center">
         <span className="text-lg font-medium tabular-nums">{formatElapsed(memo.elapsedMs)}</span>
-        <span className="text-xs text-text-muted">Up to {AUDIO_MEMO_MAX_DURATION_LABEL}</span>
+        {capWarning !== null ? <span className="text-xs text-text-muted">{capWarning}</span> : null}
       </div>
       <div className="flex w-full flex-col items-center gap-3">
         <Button

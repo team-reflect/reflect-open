@@ -23,7 +23,10 @@ export interface BuildAudioMemoTranscriptInput {
   readonly fallbackTitle: string
   /** Host transport (the Tauri HTTP plugin's fetch; tests pass a stub). */
   readonly fetchFn?: typeof fetch | undefined
-  /** Abort gate checked between speech-to-text and optional enrichment. */
+  /**
+   * Abort gate, threaded into every transcription provider call (a Files API
+   * flow is multi-request) and checked again before optional enrichment.
+   */
   readonly isStale?: (() => boolean) | undefined
 }
 
@@ -70,6 +73,7 @@ export async function buildAudioMemoTranscript(
       audio: input.audio,
       mimeType: input.mimeType,
       fetchFn: input.fetchFn,
+      isStale: input.isStale,
     })
     if (input.isStale?.() === true) {
       return { status: 'stale' }

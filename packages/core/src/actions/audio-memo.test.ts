@@ -23,7 +23,11 @@ import {
   writeAsset,
   writeNote,
 } from '../graph/commands'
-import { transcribeAudio, TranscriptionRejectedError } from '../ai/transcribe'
+import {
+  OPENAI_TRANSCRIPTION_MAX_BYTES,
+  transcribeAudio,
+  TranscriptionRejectedError,
+} from '../ai/transcribe'
 import { getSecret } from '../secrets/keychain'
 import { setBridge } from '../ipc/bridge'
 
@@ -41,6 +45,7 @@ vi.mock('../graph/commands', () => ({
   listDir: vi.fn(),
   listFiles: vi.fn(),
   readAsset: vi.fn(),
+  readAssetBinary: vi.fn(),
   readNote: vi.fn(),
   writeAsset: vi.fn(),
   writeNote: vi.fn(),
@@ -167,13 +172,14 @@ describe('captureAudioMemo', () => {
     expect(writeAssetMock).toHaveBeenCalledWith(MEMO.audioPath, btoa('audio'), 3)
   })
 
-  it('writes through raw binary IPC when the host supports it', async () => {
-    const invokeBinary = vi.fn(async (_command: string, _body: Uint8Array, _headers: Record<string, string>) => null)
-    setBridge({
-      invoke: vi.fn(),
-      listen: vi.fn(),
-      invokeBinary,
-    })
+  it('streams the recording through the staged upload when the host has binary IPC', async () => {
+    const invoke = vi.fn(async (command: string) =>
+      command === 'asset_upload_begin' ? 'upload-7' : null,
+    )
+    const invokeBinary = vi.fn(
+      async (_command: string, _body: Uint8Array, _headers: Record<string, string>) => null,
+    )
+    setBridge({ invoke, listen: vi.fn(), invokeBinary })
 
     const outcome = await captureAudioMemo({
       audio: new Blob(['audio'], { type: 'audio/webm' }),
@@ -183,11 +189,17 @@ describe('captureAudioMemo', () => {
     })
 
     expect(outcome).toEqual({ ok: true, memo: MEMO })
+    expect(invoke).toHaveBeenCalledWith('asset_upload_begin', { generation: 3 })
     expect(invokeBinary).toHaveBeenCalledWith(
-      'asset_write_binary',
+      'asset_upload_append',
       new TextEncoder().encode('audio'),
-      { path: MEMO.audioPath, generation: '3' },
+      { 'x-upload-id': 'upload-7' },
     )
+    expect(invoke).toHaveBeenCalledWith('asset_upload_commit_path', {
+      id: 'upload-7',
+      path: MEMO.audioPath,
+      generation: 3,
+    })
     expect(writeAssetMock).not.toHaveBeenCalled()
   })
 
@@ -213,7 +225,7 @@ describe('reconcileAudioMemos', () => {
     const onPending = vi.fn()
     const outcome = await reconcile({ onPending })
 
-    expect(outcome).toEqual({ pending: 0, transcribed: 0, rejected: 0, stopped: null })
+    expect(outcome).toEqual({ pending: 0, transcribed: 0, rejected: 0, skipped: 0, stopped: null })
     expect(onPending).toHaveBeenCalledWith(0)
     expect(transcribeMock).not.toHaveBeenCalled()
     expect(getSecretMock).not.toHaveBeenCalled()
@@ -224,7 +236,7 @@ describe('reconcileAudioMemos', () => {
 
     const outcome = await reconcile()
 
-    expect(outcome).toEqual({ pending: 0, transcribed: 0, rejected: 0, stopped: null })
+    expect(outcome).toEqual({ pending: 0, transcribed: 0, rejected: 0, skipped: 0, stopped: null })
     expect(transcribeMock).not.toHaveBeenCalled()
   })
 
@@ -233,7 +245,7 @@ describe('reconcileAudioMemos', () => {
 
     const outcome = await reconcile()
 
-    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, stopped: null })
+    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, skipped: 0, stopped: null })
     expect(getSecretMock).toHaveBeenCalledWith('ai-api-key:cfg-openai')
     expect(readAssetMock).toHaveBeenCalledWith(MEMO.audioPath, 3)
     expect(transcribeMock).toHaveBeenCalledWith(
@@ -278,7 +290,7 @@ describe('reconcileAudioMemos', () => {
 
     const outcome = await reconcile({ formatTranscript: true })
 
-    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, stopped: null })
+    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, skipped: 0, stopped: null })
     expect(formatAudioMemoTranscriptMock).toHaveBeenCalledWith({
       credentials: {
         config: { ...PROVIDERS.providers[0], model: 'gpt-5.4-nano' },
@@ -366,7 +378,7 @@ describe('reconcileAudioMemos', () => {
 
     const outcome = await reconcile()
 
-    expect(outcome).toEqual({ pending: 2, transcribed: 1, rejected: 1, stopped: null })
+    expect(outcome).toEqual({ pending: 2, transcribed: 1, rejected: 1, skipped: 0, stopped: null })
     expect(writeNoteMock).toHaveBeenCalledWith(
       earlier.notePath,
       expect.stringContaining(
@@ -392,6 +404,7 @@ describe('reconcileAudioMemos', () => {
       pending: 1,
       transcribed: 0,
       rejected: 0,
+      skipped: 0,
       stopped: { reason: 'io', message: 'disk full' },
     })
     // Only the note write was attempted: no backlink means no tombstone, so
@@ -451,6 +464,7 @@ describe('reconcileAudioMemos', () => {
       pending: 1,
       transcribed: 0,
       rejected: 0,
+      skipped: 0,
       stopped: { reason: 'io', message: 'disk full' },
     })
     expect(writeNoteMock).not.toHaveBeenCalled()
@@ -466,7 +480,7 @@ describe('reconcileAudioMemos', () => {
     const onPending = vi.fn()
     const outcome = await reconcile({ onPending })
 
-    expect(outcome).toEqual({ pending: 0, transcribed: 0, rejected: 0, stopped: null })
+    expect(outcome).toEqual({ pending: 0, transcribed: 0, rejected: 0, skipped: 0, stopped: null })
     expect(onPending).toHaveBeenCalledWith(0)
     expect(transcribeMock).not.toHaveBeenCalled()
     expect(writeNoteMock).not.toHaveBeenCalled()
@@ -482,7 +496,7 @@ describe('reconcileAudioMemos', () => {
 
     const outcome = await reconcile()
 
-    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, stopped: null })
+    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, skipped: 0, stopped: null })
     expect(formatAudioMemoTranscriptMock).not.toHaveBeenCalled()
     expect(writeNoteMock).toHaveBeenCalledWith(
       MEMO.notePath,
@@ -497,7 +511,7 @@ describe('reconcileAudioMemos', () => {
 
     const outcome = await reconcile({ formatTranscript: true })
 
-    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, stopped: null })
+    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, skipped: 0, stopped: null })
     expect(formatAudioMemoTranscriptMock).not.toHaveBeenCalled()
     expect(writeNoteMock).toHaveBeenCalledWith(
       MEMO.notePath,
@@ -529,6 +543,7 @@ describe('reconcileAudioMemos', () => {
       pending: 2,
       transcribed: 0,
       rejected: 0,
+      skipped: 0,
       stopped: { reason: 'network', message: 'provider down' },
     })
     expect(transcribeMock).toHaveBeenCalledTimes(1)
@@ -549,7 +564,7 @@ describe('reconcileAudioMemos', () => {
     // the same on-disk state and drains it.
     const relaunched = await reconcile()
 
-    expect(relaunched).toEqual({ pending: 1, transcribed: 1, rejected: 0, stopped: null })
+    expect(relaunched).toEqual({ pending: 1, transcribed: 1, rejected: 0, skipped: 0, stopped: null })
     expect(writeNoteMock).toHaveBeenCalledWith(
       MEMO.notePath,
       expect.stringContaining('memo transcript'),
@@ -568,7 +583,7 @@ describe('reconcileAudioMemos', () => {
 
     const outcome = await reconcile()
 
-    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, stopped: null })
+    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, skipped: 0, stopped: null })
     expect(generateAudioMemoTitleMock).not.toHaveBeenCalled()
     expect(writeNoteMock).toHaveBeenCalledWith(
       MEMO.notePath,
@@ -588,7 +603,7 @@ describe('reconcileAudioMemos', () => {
 
     const outcome = await reconcile({ formatTranscript: true })
 
-    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, stopped: null })
+    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, skipped: 0, stopped: null })
     expect(transcribeMock).not.toHaveBeenCalled()
     expect(generateAudioMemoTitleMock).not.toHaveBeenCalled()
     expect(formatAudioMemoTranscriptMock).not.toHaveBeenCalled()
@@ -716,6 +731,47 @@ describe('reconcileAudioMemos', () => {
     expect(writeNoteMock).not.toHaveBeenCalled()
   })
 
+  it('routes a recording too large for OpenAI to a configured Google entry', async () => {
+    const providers: AiProvidersState = {
+      providers: [
+        { id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' },
+        { id: 'cfg-google', provider: 'google', model: 'gemini-2.5-pro', keyHint: 'wxyz2' },
+      ],
+      defaultProviderId: 'cfg-openai',
+    }
+    listDirMock.mockResolvedValue([
+      { path: MEMO.audioPath, size: OPENAI_TRANSCRIPTION_MAX_BYTES + 1, modifiedMs: 0 },
+    ])
+
+    const outcome = await reconcile({ providers })
+
+    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, skipped: 0, stopped: null })
+    expect(getSecretMock).toHaveBeenCalledWith('ai-api-key:cfg-google')
+    expect(transcribeMock).toHaveBeenCalledWith(expect.objectContaining({ provider: 'google' }))
+  })
+
+  it('skips — never tombstones — a recording too large for every configured provider', async () => {
+    listDirMock.mockResolvedValue([
+      { path: MEMO.audioPath, size: OPENAI_TRANSCRIPTION_MAX_BYTES + 1, modifiedMs: 0 },
+    ])
+
+    const outcome = await reconcile()
+
+    expect(outcome).toEqual({
+      pending: 1,
+      transcribed: 0,
+      rejected: 0,
+      skipped: 1,
+      stopped: {
+        reason: 'oversize',
+        message: expect.stringContaining('Google Gemini'),
+      },
+    })
+    expect(transcribeMock).not.toHaveBeenCalled()
+    expect(writeNoteMock).not.toHaveBeenCalled()
+    expect(readAssetMock).not.toHaveBeenCalled()
+  })
+
   it('a listing failure is reported, never thrown — reconcile runs unattended', async () => {
     listDirMock.mockRejectedValue({ kind: 'noGraph', message: 'no graph open' })
 
@@ -725,6 +781,7 @@ describe('reconcileAudioMemos', () => {
       pending: 0,
       transcribed: 0,
       rejected: 0,
+      skipped: 0,
       stopped: { reason: 'noGraph', message: 'no graph open' },
     })
   })
@@ -755,5 +812,6 @@ describe('isSilentStop', () => {
     expect(isSilentStop(stop('auth'))).toBe(false)
     expect(isSilentStop(stop('io'))).toBe(false)
     expect(isSilentStop(stop('unknown'))).toBe(false)
+    expect(isSilentStop(stop('oversize'))).toBe(false)
   })
 })

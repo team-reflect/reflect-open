@@ -41,6 +41,7 @@ const DRAINED: ReconcileAudioMemosOutcome = {
   pending: 0,
   transcribed: 0,
   rejected: 0,
+  skipped: 0,
   stopped: null,
 }
 
@@ -208,7 +209,7 @@ describe('createTranscriptionReconciler', () => {
     expect(subject.getTranscribing()).toBe(true)
     expect(notifications).toHaveBeenCalledTimes(1)
 
-    release({ pending: 2, transcribed: 2, rejected: 0, stopped: null })
+    release({ pending: 2, transcribed: 2, rejected: 0, skipped: 0, stopped: null })
     await flush()
     expect(subject.getTranscribing()).toBe(false)
     expect(notifications).toHaveBeenCalledTimes(2)
@@ -219,6 +220,7 @@ describe('createTranscriptionReconciler', () => {
       pending: 1,
       transcribed: 0,
       rejected: 0,
+      skipped: 0,
       stopped: { reason: 'auth', message: 'openai rejected the API key (401)' },
     })
     create().start()
@@ -236,6 +238,7 @@ describe('createTranscriptionReconciler', () => {
       pending: 1,
       transcribed: 0,
       rejected: 0,
+      skipped: 0,
       stopped: { reason: 'network', message: 'provider down' },
     })
     create().start()

@@ -1,16 +1,23 @@
 import { z } from 'zod'
 import { ReflectError } from '../errors'
 import type { TranscriptionProvider } from './provider-config'
-import { AUDIO_TRANSCRIPTION_SEGMENT_BYTES } from './audio-memo-limits'
 
 /**
- * BYOK audio transcription (audio memos): one logical recording in, plain
- * text out. Long recordings are split before provider upload and stitched OpenAI is served by its dedicated transcription endpoint, Gemini by a
- * `generateContent` call with inline audio. Both run on fixed transcription
- * models — the configured entry only picks the provider and key (see
- * `pickTranscriptionConfig`); chat-model choices don't transfer because chat
- * models can't take this endpoint (OpenAI) or would bill pro-tier rates for
- * speech-to-text (Gemini).
+ * BYOK audio transcription (audio memos): one recording in, plain text out.
+ * OpenAI is served by its dedicated transcription endpoint, Gemini by a
+ * `generateContent` call — inline audio for small recordings, the Files API
+ * for meeting-length ones (see {@link GEMINI_INLINE_MAX_BYTES}). Both run on
+ * fixed transcription models — the configured entry only picks the provider
+ * and key (see `pickTranscriptionConfig`); chat-model choices don't transfer
+ * because chat models can't take this endpoint (OpenAI) or would bill
+ * pro-tier rates for speech-to-text (Gemini).
+ *
+ * The recording is **never split client-side**: it's a compressed container
+ * (fMP4/WebM), and a byte-slice from its middle has no header, so providers
+ * can't decode it. Size policy instead lives in provider byte budgets — the
+ * caller routes a recording to a provider whose {@link transcriptionByteLimit}
+ * it fits (see `reconcileAudioMemos`), and Gemini's Files API carries what
+ * inline requests can't.
  */
 
 export const OPENAI_TRANSCRIPTION_MODEL = 'gpt-4o-mini-transcribe'
@@ -30,6 +37,32 @@ export const GOOGLE_TRANSCRIPTION_MODEL = 'gemini-3.5-flash'
  */
 export const GOOGLE_TRANSCRIPTION_FALLBACK_MODEL = 'gemini-2.5-flash'
 
+/**
+ * OpenAI's documented per-request ceiling for the transcription endpoint
+ * (25 MB). There is no large-file mechanism behind it, so this is also
+ * OpenAI's total budget per recording.
+ */
+export const OPENAI_TRANSCRIPTION_MAX_BYTES = 25 * 1024 * 1024
+
+/**
+ * Raw-audio budget for a Gemini *inline* request: the whole JSON body must
+ * stay under Gemini's 20 MB request cap, and inline audio rides it
+ * base64-encoded (~1.33×). Recordings over this go through the Files API.
+ */
+export const GEMINI_INLINE_MAX_BYTES = 12 * 1024 * 1024
+
+/** The Files API per-file ceiling (2 GB) — Gemini's total budget per recording. */
+export const GEMINI_FILE_MAX_BYTES = 2 * 1024 * 1024 * 1024
+
+/**
+ * The largest recording `provider` can transcribe at all. The reconcile pass
+ * uses this to route a memo to a capable provider (or leave it pending)
+ * *before* reading and uploading it.
+ */
+export function transcriptionByteLimit(provider: TranscriptionProvider): number {
+  return provider === 'openai' ? OPENAI_TRANSCRIPTION_MAX_BYTES : GEMINI_FILE_MAX_BYTES
+}
+
 export interface TranscriptionRequest {
   provider: TranscriptionProvider
   apiKey: string
@@ -42,6 +75,12 @@ export interface TranscriptionRequest {
    * (CORS-free); `@reflect/core` itself stays platform-agnostic.
    */
   fetchFn?: typeof fetch | undefined
+  /**
+   * Abort gate consulted before **every** provider call — a Files API
+   * transcription is a multi-request flow, and a graph switch mid-flow must
+   * not bill another call. Firing reads as a retryable `network` error.
+   */
+  isStale?: (() => boolean) | undefined
 }
 
 /**
@@ -51,29 +90,9 @@ export interface TranscriptionRequest {
  * shape is unrecognizable.
  */
 export async function transcribeAudio(request: TranscriptionRequest): Promise<string> {
-  const segments = audioSegments(request.audio, AUDIO_TRANSCRIPTION_SEGMENT_BYTES)
-  const transcripts: string[] = []
-  for (const [index, audio] of segments.entries()) {
-    const transcript = request.provider === 'openai'
-      ? await transcribeWithOpenAi({ ...request, audio }, index)
-      : await transcribeWithGemini({ ...request, audio })
-    if (transcript !== '') {
-      transcripts.push(transcript)
-    }
-  }
-  return transcripts.join('\n\n').trim()
-}
-
-/** Split before provider upload so long memos never wait for a provider 413. */
-export function audioSegments(audio: Blob, maxSegmentBytes: number): Blob[] {
-  if (audio.size <= maxSegmentBytes) {
-    return [audio]
-  }
-  const segments: Blob[] = []
-  for (let offset = 0; offset < audio.size; offset += maxSegmentBytes) {
-    segments.push(audio.slice(offset, Math.min(offset + maxSegmentBytes, audio.size), audio.type))
-  }
-  return segments
+  return request.provider === 'openai'
+    ? transcribeWithOpenAi(request)
+    : transcribeWithGemini(request)
 }
 
 /** `audio/webm;codecs=opus` → `audio/webm` — parameters confuse provider sniffing. */
@@ -96,9 +115,8 @@ export const AUDIO_EXTENSION_BY_MIME: Record<string, string> = {
   'audio/mpeg': 'mp3',
 }
 
-function uploadFilename(mimeType: string, segmentIndex = 0): string {
-  const suffix = segmentIndex === 0 ? '' : `-${segmentIndex + 1}`
-  return `memo${suffix}.${AUDIO_EXTENSION_BY_MIME[baseMimeType(mimeType)] ?? 'm4a'}`
+function uploadFilename(mimeType: string): string {
+  return `memo.${AUDIO_EXTENSION_BY_MIME[baseMimeType(mimeType)] ?? 'm4a'}`
 }
 
 /** The provider's own error message when the body carries one, else the raw body. */
@@ -164,18 +182,44 @@ function httpError(provider: TranscriptionProvider, status: number, body: string
 /**
  * Bounds a provider connection that accepts and then stalls — the UI must
  * always settle into success or a retryable error, never hang transcribing.
+ * This is the control-plane budget (upload session start, state polls,
+ * deletes); payload-bearing calls get {@link TRANSCRIPTION_TRANSFER_TIMEOUT_MS}.
  */
-export const TRANSCRIPTION_TIMEOUT_MS = 5 * 60_000
+export const TRANSCRIPTION_TIMEOUT_MS = 120_000
+
+/**
+ * Budget for calls that carry audio bytes (multipart uploads, inline
+ * requests, Files API chunks) — sized for tens of megabytes on a slow uplink,
+ * where the control-plane budget would abort a healthy transfer.
+ */
+export const TRANSCRIPTION_TRANSFER_TIMEOUT_MS = 5 * 60_000
+
+/**
+ * Budget for a `generateContent` call over an uploaded file: the model
+ * listens to hours of audio and streams nothing back until done.
+ */
+export const GEMINI_FILE_TRANSCRIBE_TIMEOUT_MS = 10 * 60_000
+
+interface SendOptions {
+  timeoutMs?: number
+  /** {@link TranscriptionRequest.isStale} — checked before the call is issued. */
+  isStale?: (() => boolean) | undefined
+}
 
 async function send(
   fetchFn: typeof fetch,
   input: string,
   init: RequestInit,
+  options: SendOptions = {},
 ): Promise<Response> {
+  if (options.isStale?.() === true) {
+    throw new ReflectError('network', 'the graph session ended mid-transcription')
+  }
+  const timeoutMs = options.timeoutMs ?? TRANSCRIPTION_TIMEOUT_MS
   try {
     return await fetchFn(input, {
       ...init,
-      signal: AbortSignal.timeout(TRANSCRIPTION_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     })
   } catch (cause) {
     if (
@@ -184,7 +228,7 @@ async function send(
     ) {
       throw new ReflectError(
         'network',
-        `transcription request timed out after ${TRANSCRIPTION_TIMEOUT_MS / 1000}s`,
+        `transcription request timed out after ${timeoutMs / 1000}s`,
       )
     }
     throw new ReflectError('network', cause instanceof Error ? cause.message : String(cause))
@@ -200,22 +244,31 @@ function isModelNotFound(body: string): boolean {
   return parsed.success && parsed.data.error.code === 'model_not_found'
 }
 
-async function transcribeWithOpenAi(request: TranscriptionRequest, segmentIndex = 0): Promise<string> {
+async function transcribeWithOpenAi(request: TranscriptionRequest): Promise<string> {
   const fetchFn = request.fetchFn ?? fetch
   const attempt = (model: string): Promise<Response> => {
     const form = new FormData()
-    form.append('file', request.audio, uploadFilename(request.mimeType, segmentIndex))
+    form.append('file', request.audio, uploadFilename(request.mimeType))
     form.append('model', model)
-    return send(fetchFn, 'https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${request.apiKey}` },
-      body: form,
-    })
+    return send(
+      fetchFn,
+      'https://api.openai.com/v1/audio/transcriptions',
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${request.apiKey}` },
+        body: form,
+      },
+      { timeoutMs: TRANSCRIPTION_TRANSFER_TIMEOUT_MS, isStale: request.isStale },
+    )
   }
 
   let response = await attempt(OPENAI_TRANSCRIPTION_MODEL)
   let body = await response.text()
-  if (!response.ok && isModelNotFound(body)) {
+  // Fall back on a missing model (project-scoped keys) — and on a recording
+  // rejection: the 4o transcription models cap audio *duration* well below
+  // whisper-1's, so a long memo the primary refuses can still transcribe.
+  // Costs one duplicate upload only when the recording is already doomed.
+  if (!response.ok && (isModelNotFound(body) || isRecordingRejection(response.status))) {
     response = await attempt(OPENAI_TRANSCRIPTION_FALLBACK_MODEL)
     body = await response.text()
   }
@@ -268,26 +321,63 @@ export function base64ToBytes(base64: string): Uint8Array<ArrayBuffer> {
 }
 
 const GEMINI_INSTRUCTION =
-  'Transcribe this audio segment verbatim. Return only the transcribed text, with no commentary or formatting. Reflect will concatenate adjacent segments in order.'
+  'Transcribe this audio recording verbatim. Return only the transcribed text, with no commentary or formatting.'
+
+const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com'
 
 async function transcribeWithGemini(request: TranscriptionRequest): Promise<string> {
-  const fetchFn = request.fetchFn ?? fetch
-  const data = bytesToBase64(new Uint8Array(await request.audio.arrayBuffer()))
-  const attempt = (model: string): Promise<Response> =>
-    send(fetchFn, `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: 'POST',
-      headers: { 'x-goog-api-key': request.apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: GEMINI_INSTRUCTION },
-              { inline_data: { mime_type: baseMimeType(request.mimeType), data } },
-            ],
+  const audioPart =
+    request.audio.size <= GEMINI_INLINE_MAX_BYTES
+      ? {
+          inline_data: {
+            mime_type: baseMimeType(request.mimeType),
+            data: bytesToBase64(new Uint8Array(await request.audio.arrayBuffer())),
           },
-        ],
-      }),
-    })
+        }
+      : { file_data: await uploadToGeminiFiles(request) }
+  try {
+    return await geminiGenerateTranscript(request, audioPart)
+  } finally {
+    if ('file_data' in audioPart) {
+      await deleteGeminiFile(request, audioPart.file_data.file_name)
+    }
+  }
+}
+
+type GeminiAudioPart =
+  | { inline_data: { mime_type: string; data: string } }
+  | { file_data: GeminiUploadedFile }
+
+/** `generateContent` over inline audio or an uploaded file, with model fallback. */
+async function geminiGenerateTranscript(
+  request: TranscriptionRequest,
+  audioPart: GeminiAudioPart,
+): Promise<string> {
+  const fetchFn = request.fetchFn ?? fetch
+  const timeoutMs =
+    'file_data' in audioPart ? GEMINI_FILE_TRANSCRIBE_TIMEOUT_MS : TRANSCRIPTION_TRANSFER_TIMEOUT_MS
+  const part =
+    'file_data' in audioPart
+      ? {
+          file_data: {
+            mime_type: audioPart.file_data.mime_type,
+            file_uri: audioPart.file_data.file_uri,
+          },
+        }
+      : audioPart
+  const attempt = (model: string): Promise<Response> =>
+    send(
+      fetchFn,
+      `${GEMINI_BASE_URL}/v1beta/models/${model}:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'x-goog-api-key': request.apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: GEMINI_INSTRUCTION }, part] }],
+        }),
+      },
+      { timeoutMs, isStale: request.isStale },
+    )
 
   let response = await attempt(GOOGLE_TRANSCRIPTION_MODEL)
   let body = await response.text()
@@ -306,4 +396,153 @@ async function transcribeWithGemini(request: TranscriptionRequest): Promise<stri
   }
   const parts = parsed.data.candidates?.[0]?.content?.parts ?? []
   return parts.map((part) => part.text ?? '').join('').trim()
+}
+
+/** Files API upload chunk size — a multiple of 256 KiB, as the protocol requires. */
+const GEMINI_UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024
+
+/** Poll cadence and budget while an uploaded recording is `PROCESSING`. */
+const GEMINI_FILE_POLL_INTERVAL_MS = 2_000
+const GEMINI_FILE_MAX_POLLS = 90
+
+interface GeminiUploadedFile {
+  /** Resource name (`files/<id>`) — addresses state polls and the delete. */
+  file_name: string
+  file_uri: string
+  mime_type: string
+}
+
+const geminiFileResourceSchema = z.object({
+  name: z.string(),
+  uri: z.string(),
+  // The API always sends `state` in practice; treat an absent one as ready
+  // and let `generateContent` be the loud failure if it wasn't.
+  state: z.string().optional(),
+})
+
+const geminiFinalizeSchema = z.object({ file: geminiFileResourceSchema })
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * Push a meeting-length recording through the Files API resumable-upload
+ * protocol: open a session, stream the bytes in {@link GEMINI_UPLOAD_CHUNK_BYTES}
+ * chunks, then poll until the file is `ACTIVE`. Files live under the user's
+ * own key and self-expire after 48 hours; we still delete promptly after
+ * transcribing (see `deleteGeminiFile`).
+ */
+async function uploadToGeminiFiles(request: TranscriptionRequest): Promise<GeminiUploadedFile> {
+  const fetchFn = request.fetchFn ?? fetch
+  const mimeType = baseMimeType(request.mimeType)
+  const sendOptions = { isStale: request.isStale }
+
+  const start = await send(
+    fetchFn,
+    `${GEMINI_BASE_URL}/upload/v1beta/files`,
+    {
+      method: 'POST',
+      headers: {
+        'x-goog-api-key': request.apiKey,
+        'X-Goog-Upload-Protocol': 'resumable',
+        'X-Goog-Upload-Command': 'start',
+        'X-Goog-Upload-Header-Content-Length': String(request.audio.size),
+        'X-Goog-Upload-Header-Content-Type': mimeType,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ file: { display_name: 'reflect-audio-memo' } }),
+    },
+    sendOptions,
+  )
+  if (!start.ok) {
+    throw httpError('google', start.status, await start.text())
+  }
+  const uploadUrl = start.headers.get('x-goog-upload-url')
+  if (uploadUrl === null) {
+    throw new ReflectError('network', 'gemini upload session came back without an upload URL')
+  }
+
+  let finalBody = ''
+  for (let offset = 0; offset < request.audio.size; offset += GEMINI_UPLOAD_CHUNK_BYTES) {
+    const chunk = request.audio.slice(offset, offset + GEMINI_UPLOAD_CHUNK_BYTES)
+    const isLast = offset + chunk.size >= request.audio.size
+    const response = await send(
+      fetchFn,
+      uploadUrl,
+      {
+        method: 'POST',
+        headers: {
+          'X-Goog-Upload-Offset': String(offset),
+          'X-Goog-Upload-Command': isLast ? 'upload, finalize' : 'upload',
+        },
+        body: chunk,
+      },
+      { timeoutMs: TRANSCRIPTION_TRANSFER_TIMEOUT_MS, isStale: request.isStale },
+    )
+    const body = await response.text()
+    if (!response.ok) {
+      throw httpError('google', response.status, body)
+    }
+    if (isLast) {
+      finalBody = body
+    }
+  }
+
+  const finalized = geminiFinalizeSchema.safeParse(safeJson(finalBody))
+  if (!finalized.success) {
+    throw new ReflectError(
+      'parse',
+      `unrecognized gemini upload response: ${finalBody.slice(0, 200)}`,
+    )
+  }
+
+  let { name, uri, state } = finalized.data.file
+  for (let polls = 0; state !== undefined && state !== 'ACTIVE'; polls += 1) {
+    if (state === 'FAILED') {
+      // Gemini decoded the upload and gave up on the bytes themselves — the
+      // same recording would fail again, so this must tombstone, not retry.
+      throw new TranscriptionRejectedError('google could not process the uploaded recording')
+    }
+    if (polls >= GEMINI_FILE_MAX_POLLS) {
+      throw new ReflectError('network', 'timed out waiting for the uploaded recording to process')
+    }
+    if (polls > 0) {
+      await sleep(GEMINI_FILE_POLL_INTERVAL_MS)
+    }
+    const response = await send(
+      fetchFn,
+      `${GEMINI_BASE_URL}/v1beta/${name}`,
+      { headers: { 'x-goog-api-key': request.apiKey } },
+      sendOptions,
+    )
+    const body = await response.text()
+    if (!response.ok) {
+      throw httpError('google', response.status, body)
+    }
+    const resource = geminiFileResourceSchema.safeParse(safeJson(body))
+    if (!resource.success) {
+      throw new ReflectError('parse', `unrecognized gemini file state: ${body.slice(0, 200)}`)
+    }
+    ;({ name, uri, state } = resource.data)
+  }
+
+  return { file_name: name, file_uri: uri, mime_type: mimeType }
+}
+
+/**
+ * Best-effort cleanup of an uploaded recording — the transcript is local now,
+ * so the copy on Google's side has no reason to live out its 48-hour TTL.
+ * Skipped after a stale gate fired (no more calls once the session ended);
+ * failures are ignored because expiry cleans up regardless.
+ */
+async function deleteGeminiFile(request: TranscriptionRequest, fileName: string): Promise<void> {
+  if (request.isStale?.() === true) {
+    return
+  }
+  const fetchFn = request.fetchFn ?? fetch
+  await send(fetchFn, `${GEMINI_BASE_URL}/v1beta/${fileName}`, {
+    method: 'DELETE',
+    headers: { 'x-goog-api-key': request.apiKey },
+  }).catch(() => {})
 }

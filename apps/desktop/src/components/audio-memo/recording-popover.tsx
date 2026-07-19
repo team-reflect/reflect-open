@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { AUDIO_MEMO_MAX_DURATION_LABEL } from '@reflect/core'
+import { audioMemoCapWarning } from '@reflect/core'
 import { RecordingWaveform } from '@/components/audio-memo/recording-waveform'
 import { Button } from '@/components/ui/button'
 import { PopoverContent } from '@/components/ui/popover'
@@ -19,6 +19,7 @@ import { useAudioMemo } from '@/providers/audio-memo-provider'
  */
 export function RecordingPopover(): ReactElement {
   const memo = useAudioMemo()
+  const capWarning = audioMemoCapWarning(memo.elapsedMs)
 
   return (
     <PopoverContent
@@ -60,7 +61,9 @@ export function RecordingPopover(): ReactElement {
           {memo.stream ? <RecordingWaveform stream={memo.stream} /> : null}
           <div className="flex flex-col">
             <span className="text-sm font-medium tabular-nums">{formatElapsed(memo.elapsedMs)}</span>
-            <span className="text-[11px] text-text-muted">Up to {AUDIO_MEMO_MAX_DURATION_LABEL}</span>
+            {capWarning !== null ? (
+              <span className="text-[11px] text-text-muted">{capWarning}</span>
+            ) : null}
           </div>
         </div>
       )}

@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import {
+  GEMINI_INLINE_MAX_BYTES,
   GOOGLE_TRANSCRIPTION_FALLBACK_MODEL,
   GOOGLE_TRANSCRIPTION_MODEL,
   OPENAI_TRANSCRIPTION_FALLBACK_MODEL,
   OPENAI_TRANSCRIPTION_MODEL,
-  audioSegments,
   bytesToBase64,
   isTranscriptionRejected,
   transcribeAudio,
   type TranscriptionRequest,
 } from './transcribe'
-import { AUDIO_TRANSCRIPTION_SEGMENT_BYTES } from './audio-memo-limits'
 
 interface RecordedCall {
   url: string
+  method: string
   headers: Record<string, string>
   body: RequestInit['body']
 }
@@ -25,6 +25,7 @@ function recordingFetch(
   return async (input, init) => {
     const call: RecordedCall = {
       url: String(input),
+      method: init?.method ?? 'GET',
       headers: (init?.headers ?? {}) as Record<string, string>,
       body: init?.body ?? null,
     }
@@ -92,16 +93,18 @@ describe('transcribeAudio (openai)', () => {
     expect((calls[1]!.body as FormData).get('model')).toBe(OPENAI_TRANSCRIPTION_FALLBACK_MODEL)
   })
 
-  it('splits long recordings before OpenAI upload and stitches transcripts in order', async () => {
+  it('rescues a primary-model refusal through whisper-1 — its duration ceiling is higher', async () => {
     const calls: RecordedCall[] = []
-    const fetchFn = recordingFetch(calls, (_call, index) => jsonResponse(200, { text: `part ${index + 1}` }))
-    const audio = new Blob([new Uint8Array(AUDIO_TRANSCRIPTION_SEGMENT_BYTES + 2)])
+    const fetchFn = recordingFetch(calls, (call) =>
+      (call.body as FormData).get('model') === OPENAI_TRANSCRIPTION_FALLBACK_MODEL
+        ? jsonResponse(200, { text: 'long meeting transcript' })
+        : jsonResponse(400, { error: { message: 'Audio duration exceeds the limit.', code: null } }),
+    )
 
-    const text = await transcribeAudio(request({ fetchFn, audio }))
+    const text = await transcribeAudio(request({ fetchFn }))
 
-    expect(text).toBe('part 1\n\npart 2')
+    expect(text).toBe('long meeting transcript')
     expect(calls).toHaveLength(2)
-    expect(((calls[1]!.body as FormData).get('file') as File).name).toBe('memo-2.m4a')
   })
 
   it('marks a refused recording as a rejection — retrying the same bytes cannot help', async () => {
@@ -116,7 +119,19 @@ describe('transcribeAudio (openai)', () => {
 
     expect(isTranscriptionRejected(failure)).toBe(true)
     expect(failure).toMatchObject({ message: expect.stringContaining('Invalid file format.') })
-    expect(calls).toHaveLength(1)
+    // The whisper-1 rescue attempt ran (and was refused) before tombstoning.
+    expect(calls).toHaveLength(2)
+    expect((calls[1]!.body as FormData).get('model')).toBe(OPENAI_TRANSCRIPTION_FALLBACK_MODEL)
+  })
+
+  it('never issues a provider call after the stale gate fires', async () => {
+    const calls: RecordedCall[] = []
+    const fetchFn = recordingFetch(calls, () => jsonResponse(200, { text: 'never' }))
+
+    await expect(
+      transcribeAudio(request({ fetchFn, isStale: () => true })),
+    ).rejects.toMatchObject({ kind: 'network', message: expect.stringContaining('graph session') })
+    expect(calls).toHaveLength(0)
   })
 
   it('an oversized payload is a rejection; a rate limit stays a retryable network error', async () => {
@@ -252,18 +267,6 @@ describe('transcribeAudio (google)', () => {
     expect(calls).toHaveLength(1)
   })
 
-  it('splits long recordings before OpenAI upload and stitches transcripts in order', async () => {
-    const calls: RecordedCall[] = []
-    const fetchFn = recordingFetch(calls, (_call, index) => jsonResponse(200, { text: `part ${index + 1}` }))
-    const audio = new Blob([new Uint8Array(AUDIO_TRANSCRIPTION_SEGMENT_BYTES + 2)])
-
-    const text = await transcribeAudio(request({ fetchFn, audio }))
-
-    expect(text).toBe('part 1\n\npart 2')
-    expect(calls).toHaveLength(2)
-    expect(((calls[1]!.body as FormData).get('file') as File).name).toBe('memo-2.m4a')
-  })
-
   it('marks a refused recording as a rejection', async () => {
     const fetchFn = recordingFetch([], () =>
       jsonResponse(400, { error: { message: 'Invalid audio content.' } }),
@@ -276,15 +279,72 @@ describe('transcribeAudio (google)', () => {
     expect(isTranscriptionRejected(failure)).toBe(true)
   })
 
-  it('splits long recordings before Gemini inline encoding and stitches transcripts', async () => {
+  const UPLOAD_URL = 'https://upload.example/session-1'
+  const FILE_RESOURCE = {
+    name: 'files/memo-1',
+    uri: 'https://generativelanguage.googleapis.com/v1beta/files/memo-1',
+  }
+
+  function startResponse(): Response {
+    return new Response('{}', { status: 200, headers: { 'x-goog-upload-url': UPLOAD_URL } })
+  }
+
+  it('routes a recording over the inline budget through the Files API and deletes the file', async () => {
     const calls: RecordedCall[] = []
-    const fetchFn = recordingFetch(calls, (_call, index) => geminiResponse(`segment ${index + 1}`))
-    const audio = new Blob([new Uint8Array(AUDIO_TRANSCRIPTION_SEGMENT_BYTES + 1)])
+    const fetchFn = recordingFetch(calls, (call, index) => {
+      if (index === 0) return startResponse()
+      if (call.url === UPLOAD_URL) {
+        return call.headers['X-Goog-Upload-Command'] === 'upload, finalize'
+          ? jsonResponse(200, { file: { ...FILE_RESOURCE, state: 'PROCESSING' } })
+          : new Response('{}', { status: 200 })
+      }
+      if (call.url.endsWith('/v1beta/files/memo-1') && call.method === 'GET') {
+        return jsonResponse(200, { ...FILE_RESOURCE, state: 'ACTIVE' })
+      }
+      if (call.method === 'DELETE') return new Response('{}', { status: 200 })
+      return geminiResponse('meeting transcript')
+    })
+    const audio = new Blob([new Uint8Array(GEMINI_INLINE_MAX_BYTES + 1)], { type: 'audio/mp4' })
 
     const text = await transcribeAudio(request({ provider: 'google', fetchFn, audio }))
 
-    expect(text).toBe('segment 1\n\nsegment 2')
-    expect(calls).toHaveLength(2)
+    expect(text).toBe('meeting transcript')
+    expect(calls.map((call) => call.method)).toEqual(['POST', 'POST', 'POST', 'GET', 'POST', 'DELETE'])
+    expect(calls[0]!.url).toBe('https://generativelanguage.googleapis.com/upload/v1beta/files')
+    expect(calls[0]!.headers['X-Goog-Upload-Command']).toBe('start')
+    expect(calls[0]!.headers['X-Goog-Upload-Header-Content-Length']).toBe(String(audio.size))
+    expect(calls[1]!.headers['X-Goog-Upload-Offset']).toBe('0')
+    expect(calls[1]!.headers['X-Goog-Upload-Command']).toBe('upload')
+    expect(calls[2]!.headers['X-Goog-Upload-Offset']).toBe(String(8 * 1024 * 1024))
+    expect(calls[2]!.headers['X-Goog-Upload-Command']).toBe('upload, finalize')
+    const generate = JSON.parse(String(calls[4]!.body)) as {
+      contents: { parts: { file_data?: { mime_type: string; file_uri: string } }[] }[]
+    }
+    expect(generate.contents[0]!.parts[1]!.file_data).toEqual({
+      mime_type: 'audio/mp4',
+      file_uri: FILE_RESOURCE.uri,
+    })
+    expect(calls[5]!.url).toBe('https://generativelanguage.googleapis.com/v1beta/files/memo-1')
+  })
+
+  it('tombstones a recording the Files API cannot process — the same bytes would fail again', async () => {
+    const calls: RecordedCall[] = []
+    const fetchFn = recordingFetch(calls, (call, index) => {
+      if (index === 0) return startResponse()
+      if (call.url === UPLOAD_URL) {
+        return jsonResponse(200, { file: { ...FILE_RESOURCE, state: 'FAILED' } })
+      }
+      return new Response('{}', { status: 200 })
+    })
+    const audio = new Blob([new Uint8Array(GEMINI_INLINE_MAX_BYTES + 1)], { type: 'audio/mp4' })
+
+    const failure: unknown = await transcribeAudio(
+      request({ provider: 'google', fetchFn, audio }),
+    ).catch((cause: unknown) => cause)
+
+    expect(isTranscriptionRejected(failure)).toBe(true)
+    // start + one 8 MiB chunk + finalize — never generateContent on a dead file.
+    expect(calls.filter((call) => call.url.includes(':generateContent'))).toHaveLength(0)
   })
 
   it('returns an empty transcript when no candidates come back', async () => {
@@ -312,17 +372,5 @@ describe('bytesToBase64', () => {
   it('survives payloads beyond one chunk', () => {
     const bytes = new Uint8Array(0x8000 * 2 + 7).fill(65)
     expect(bytesToBase64(bytes)).toBe(btoa('A'.repeat(bytes.length)))
-  })
-})
-
-describe('audioSegments', () => {
-  it('keeps one logical memo when the blob fits', () => {
-    const audio = new Blob(['abc'], { type: 'audio/mp4' })
-    expect(audioSegments(audio, 10)).toEqual([audio])
-  })
-
-  it('splits on the configured byte boundary', () => {
-    const segments = audioSegments(new Blob([new Uint8Array(11)]), 5)
-    expect(segments.map((segment) => segment.size)).toEqual([5, 5, 1])
   })
 })

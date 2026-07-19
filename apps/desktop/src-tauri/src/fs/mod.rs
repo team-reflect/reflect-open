@@ -18,7 +18,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use serde::Serialize;
-use tauri::ipc::{InvokeBody, Request};
 use tauri::{Emitter, State};
 use tauri_plugin_opener::OpenerExt;
 
@@ -378,30 +377,18 @@ pub fn asset_write(
     Ok(())
 }
 
-/// Atomically write a binary asset from a raw IPC body. Large audio memos use
-/// this path to avoid JSON/base64 inflation across the webview/native bridge.
+/// Read a binary asset's bytes as a **raw IPC response** — no base64, no
+/// JSON. Long audio memos read back for transcription would otherwise cross
+/// the bridge ~1.33× inflated inside one giant JSON string. Pinned to
+/// `generation` for the same reason as [`asset_read`].
 #[tauri::command]
-pub fn asset_write_binary(request: Request<'_>, state: State<GraphState>) -> AppResult<()> {
-    let path = request
-        .headers()
-        .get("path")
-        .and_then(|value| value.to_str().ok())
-        .ok_or_else(|| AppError::io("missing path header"))?;
-    let generation = request
-        .headers()
-        .get("generation")
-        .and_then(|value| value.to_str().ok())
-        .ok_or_else(|| AppError::io("missing generation header"))?
-        .parse::<u64>()
-        .map_err(|err| AppError::io(format!("invalid generation header: {err}")))?;
-    let InvokeBody::Raw(bytes) = request.body() else {
-        return Err(AppError::io(
-            "asset_write_binary expects a raw binary body, got JSON",
-        ));
-    };
+pub fn asset_read_binary(
+    path: String,
+    generation: u64,
+    state: State<GraphState>,
+) -> AppResult<tauri::ipc::Response> {
     let root = root_for_generation(&state, generation)?;
-    atomic_write_bytes(&root, &resolve(&root, path)?, bytes)?;
-    Ok(())
+    Ok(tauri::ipc::Response::new(fs::read(resolve(&root, &path)?)?))
 }
 
 /// Read a binary asset's bytes, base64-encoded for the JSON IPC (e.g. audio

@@ -52,6 +52,33 @@ export async function createAsset(
 }
 
 /**
+ * Stream a blob's bytes to an **exact graph-relative path** — the audio-memo
+ * intake, where the path is the memo's identity and collision renaming would
+ * corrupt it. Same transport as {@link createAsset}: raw binary IPC bodies in
+ * {@link CHUNK_BYTES} chunks staged under `.reflect/tmp/`, so neither webview
+ * IPC nor the file watcher ever sees the whole file in flight. Requires a
+ * binary-capable bridge (see `hasBinaryIpc`); hosts without one use the
+ * base64 `writeAsset` fallback instead.
+ */
+export async function writeAssetStreamed(
+  path: string,
+  contents: Blob,
+  generation: number,
+): Promise<void> {
+  const id = await call('asset_upload_begin', { generation }, z.string())
+  try {
+    for await (const chunk of chunksOf(contents)) {
+      await callBinary('asset_upload_append', chunk, { [UPLOAD_ID_HEADER]: id }, voidSchema)
+    }
+    await call('asset_upload_commit_path', { id, path, generation }, voidSchema)
+    echoLocalWrite({ path, kind: 'upsert', modifiedMs: Date.now() })
+  } catch (error) {
+    await call('asset_upload_abort', { id }, voidSchema).catch(() => {})
+    throw error
+  }
+}
+
+/**
  * Copy a file the OS handed us a real path for (file picker) into the graph's
  * `assets/` folder as `desiredName`, with the same collision policy and
  * return value as {@link createAsset}. The copy happens file-to-file in Rust;
