@@ -257,6 +257,7 @@ pub fn run() {
             fs::note_create,
             fs::note_write,
             fs::asset_write,
+            fs::asset_write_binary,
             fs::asset_read,
             fs::asset_open,
             fs::assets::asset_upload_begin,

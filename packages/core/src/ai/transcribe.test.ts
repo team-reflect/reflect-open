@@ -4,11 +4,13 @@ import {
   GOOGLE_TRANSCRIPTION_MODEL,
   OPENAI_TRANSCRIPTION_FALLBACK_MODEL,
   OPENAI_TRANSCRIPTION_MODEL,
+  audioSegments,
   bytesToBase64,
   isTranscriptionRejected,
   transcribeAudio,
   type TranscriptionRequest,
 } from './transcribe'
+import { AUDIO_TRANSCRIPTION_SEGMENT_BYTES } from './audio-memo-limits'
 
 interface RecordedCall {
   url: string
@@ -88,6 +90,18 @@ describe('transcribeAudio (openai)', () => {
     expect(text).toBe('fallback worked')
     expect(calls).toHaveLength(2)
     expect((calls[1]!.body as FormData).get('model')).toBe(OPENAI_TRANSCRIPTION_FALLBACK_MODEL)
+  })
+
+  it('splits long recordings before OpenAI upload and stitches transcripts in order', async () => {
+    const calls: RecordedCall[] = []
+    const fetchFn = recordingFetch(calls, (_call, index) => jsonResponse(200, { text: `part ${index + 1}` }))
+    const audio = new Blob([new Uint8Array(AUDIO_TRANSCRIPTION_SEGMENT_BYTES + 2)])
+
+    const text = await transcribeAudio(request({ fetchFn, audio }))
+
+    expect(text).toBe('part 1\n\npart 2')
+    expect(calls).toHaveLength(2)
+    expect(((calls[1]!.body as FormData).get('file') as File).name).toBe('memo-2.m4a')
   })
 
   it('marks a refused recording as a rejection — retrying the same bytes cannot help', async () => {
@@ -238,6 +252,18 @@ describe('transcribeAudio (google)', () => {
     expect(calls).toHaveLength(1)
   })
 
+  it('splits long recordings before OpenAI upload and stitches transcripts in order', async () => {
+    const calls: RecordedCall[] = []
+    const fetchFn = recordingFetch(calls, (_call, index) => jsonResponse(200, { text: `part ${index + 1}` }))
+    const audio = new Blob([new Uint8Array(AUDIO_TRANSCRIPTION_SEGMENT_BYTES + 2)])
+
+    const text = await transcribeAudio(request({ fetchFn, audio }))
+
+    expect(text).toBe('part 1\n\npart 2')
+    expect(calls).toHaveLength(2)
+    expect(((calls[1]!.body as FormData).get('file') as File).name).toBe('memo-2.m4a')
+  })
+
   it('marks a refused recording as a rejection', async () => {
     const fetchFn = recordingFetch([], () =>
       jsonResponse(400, { error: { message: 'Invalid audio content.' } }),
@@ -248,6 +274,17 @@ describe('transcribeAudio (google)', () => {
     ).catch((cause: unknown) => cause)
 
     expect(isTranscriptionRejected(failure)).toBe(true)
+  })
+
+  it('splits long recordings before Gemini inline encoding and stitches transcripts', async () => {
+    const calls: RecordedCall[] = []
+    const fetchFn = recordingFetch(calls, (_call, index) => geminiResponse(`segment ${index + 1}`))
+    const audio = new Blob([new Uint8Array(AUDIO_TRANSCRIPTION_SEGMENT_BYTES + 1)])
+
+    const text = await transcribeAudio(request({ provider: 'google', fetchFn, audio }))
+
+    expect(text).toBe('segment 1\n\nsegment 2')
+    expect(calls).toHaveLength(2)
   })
 
   it('returns an empty transcript when no candidates come back', async () => {
@@ -275,5 +312,17 @@ describe('bytesToBase64', () => {
   it('survives payloads beyond one chunk', () => {
     const bytes = new Uint8Array(0x8000 * 2 + 7).fill(65)
     expect(bytesToBase64(bytes)).toBe(btoa('A'.repeat(bytes.length)))
+  })
+})
+
+describe('audioSegments', () => {
+  it('keeps one logical memo when the blob fits', () => {
+    const audio = new Blob(['abc'], { type: 'audio/mp4' })
+    expect(audioSegments(audio, 10)).toEqual([audio])
+  })
+
+  it('splits on the configured byte boundary', () => {
+    const segments = audioSegments(new Blob([new Uint8Array(11)]), 5)
+    expect(segments.map((segment) => segment.size)).toEqual([5, 5, 1])
   })
 })

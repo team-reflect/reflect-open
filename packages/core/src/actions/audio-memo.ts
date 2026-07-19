@@ -1,4 +1,6 @@
+import { z } from 'zod'
 import { errorMessage, isAppError, toAppError, type AppError } from '../errors'
+import { echoLocalWrite } from '../indexing/local-write-echo'
 import {
   pickTranscriptionConfig,
   type AiProvidersState,
@@ -20,6 +22,8 @@ import { listDir, listFiles, readAsset, readNote, writeAsset, writeNote } from '
 import { AUDIO_MEMOS_DIR, audioMemoPath, dailyPath, notePath } from '../graph/paths'
 import { appendUnderBacklinkedHeading, wikiLinkSafe } from '../markdown/edit'
 import { getSecret } from '../secrets/keychain'
+import { callBinary } from '../ipc/invoke'
+import { getBridge, hasBridge } from '../ipc/bridge'
 import { ensureBacklinkTarget } from './backlink-target'
 
 /**
@@ -182,13 +186,22 @@ export type CaptureAudioMemoOutcome =
  * Persist one recording into the graph — the durable step, no network. The
  * transcription happens later, in {@link reconcileAudioMemos}.
  */
+async function writeAudioMemoAsset(path: string, audio: Blob, generation: number): Promise<void> {
+  const bytes = new Uint8Array(await audio.arrayBuffer())
+  if (hasBridge() && getBridge().invokeBinary !== undefined) {
+    await callBinary('asset_write_binary', bytes, { path, generation: String(generation) }, z.null())
+    echoLocalWrite({ path, kind: 'upsert', modifiedMs: Date.now() })
+    return
+  }
+  await writeAsset(path, bytesToBase64(bytes), generation)
+}
+
 export async function captureAudioMemo(
   input: CaptureAudioMemoInput,
 ): Promise<CaptureAudioMemoOutcome> {
   const memo = audioMemoIdentity(input.recordedAt, input.mimeType)
   try {
-    const encoded = bytesToBase64(new Uint8Array(await input.audio.arrayBuffer()))
-    await writeAsset(memo.audioPath, encoded, input.generation)
+    await writeAudioMemoAsset(memo.audioPath, input.audio, input.generation)
   } catch (cause) {
     return { ok: false, message: errorMessage(cause) }
   }

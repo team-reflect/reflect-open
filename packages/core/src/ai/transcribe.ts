@@ -1,10 +1,11 @@
 import { z } from 'zod'
 import { ReflectError } from '../errors'
 import type { TranscriptionProvider } from './provider-config'
+import { AUDIO_TRANSCRIPTION_SEGMENT_BYTES } from './audio-memo-limits'
 
 /**
- * BYOK audio transcription (audio memos): one short recording in, plain text
- * out. OpenAI is served by its dedicated transcription endpoint, Gemini by a
+ * BYOK audio transcription (audio memos): one logical recording in, plain
+ * text out. Long recordings are split before provider upload and stitched OpenAI is served by its dedicated transcription endpoint, Gemini by a
  * `generateContent` call with inline audio. Both run on fixed transcription
  * models — the configured entry only picks the provider and key (see
  * `pickTranscriptionConfig`); chat-model choices don't transfer because chat
@@ -50,9 +51,29 @@ export interface TranscriptionRequest {
  * shape is unrecognizable.
  */
 export async function transcribeAudio(request: TranscriptionRequest): Promise<string> {
-  return request.provider === 'openai'
-    ? transcribeWithOpenAi(request)
-    : transcribeWithGemini(request)
+  const segments = audioSegments(request.audio, AUDIO_TRANSCRIPTION_SEGMENT_BYTES)
+  const transcripts: string[] = []
+  for (const [index, audio] of segments.entries()) {
+    const transcript = request.provider === 'openai'
+      ? await transcribeWithOpenAi({ ...request, audio }, index)
+      : await transcribeWithGemini({ ...request, audio })
+    if (transcript !== '') {
+      transcripts.push(transcript)
+    }
+  }
+  return transcripts.join('\n\n').trim()
+}
+
+/** Split before provider upload so long memos never wait for a provider 413. */
+export function audioSegments(audio: Blob, maxSegmentBytes: number): Blob[] {
+  if (audio.size <= maxSegmentBytes) {
+    return [audio]
+  }
+  const segments: Blob[] = []
+  for (let offset = 0; offset < audio.size; offset += maxSegmentBytes) {
+    segments.push(audio.slice(offset, Math.min(offset + maxSegmentBytes, audio.size), audio.type))
+  }
+  return segments
 }
 
 /** `audio/webm;codecs=opus` → `audio/webm` — parameters confuse provider sniffing. */
@@ -75,8 +96,9 @@ export const AUDIO_EXTENSION_BY_MIME: Record<string, string> = {
   'audio/mpeg': 'mp3',
 }
 
-function uploadFilename(mimeType: string): string {
-  return `memo.${AUDIO_EXTENSION_BY_MIME[baseMimeType(mimeType)] ?? 'm4a'}`
+function uploadFilename(mimeType: string, segmentIndex = 0): string {
+  const suffix = segmentIndex === 0 ? '' : `-${segmentIndex + 1}`
+  return `memo${suffix}.${AUDIO_EXTENSION_BY_MIME[baseMimeType(mimeType)] ?? 'm4a'}`
 }
 
 /** The provider's own error message when the body carries one, else the raw body. */
@@ -143,7 +165,7 @@ function httpError(provider: TranscriptionProvider, status: number, body: string
  * Bounds a provider connection that accepts and then stalls — the UI must
  * always settle into success or a retryable error, never hang transcribing.
  */
-export const TRANSCRIPTION_TIMEOUT_MS = 120_000
+export const TRANSCRIPTION_TIMEOUT_MS = 5 * 60_000
 
 async function send(
   fetchFn: typeof fetch,
@@ -178,11 +200,11 @@ function isModelNotFound(body: string): boolean {
   return parsed.success && parsed.data.error.code === 'model_not_found'
 }
 
-async function transcribeWithOpenAi(request: TranscriptionRequest): Promise<string> {
+async function transcribeWithOpenAi(request: TranscriptionRequest, segmentIndex = 0): Promise<string> {
   const fetchFn = request.fetchFn ?? fetch
   const attempt = (model: string): Promise<Response> => {
     const form = new FormData()
-    form.append('file', request.audio, uploadFilename(request.mimeType))
+    form.append('file', request.audio, uploadFilename(request.mimeType, segmentIndex))
     form.append('model', model)
     return send(fetchFn, 'https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
@@ -246,7 +268,7 @@ export function base64ToBytes(base64: string): Uint8Array<ArrayBuffer> {
 }
 
 const GEMINI_INSTRUCTION =
-  'Transcribe this audio recording verbatim. Return only the transcribed text, with no commentary or formatting.'
+  'Transcribe this audio segment verbatim. Return only the transcribed text, with no commentary or formatting. Reflect will concatenate adjacent segments in order.'
 
 async function transcribeWithGemini(request: TranscriptionRequest): Promise<string> {
   const fetchFn = request.fetchFn ?? fetch

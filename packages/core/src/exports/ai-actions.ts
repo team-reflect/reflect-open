@@ -117,7 +117,13 @@ export {
 } from '../ai/chat/context-window'
 export type { ModelMessage as ChatModelMessage } from 'ai'
 export {
+  AUDIO_MEMO_MAX_DURATION_LABEL,
+  AUDIO_MEMO_MAX_DURATION_MS,
+  AUDIO_TRANSCRIPTION_SEGMENT_BYTES,
+} from '../ai/audio-memo-limits'
+export {
   base64ToBytes,
+  audioSegments,
   isTranscriptionRejected,
   transcribeAudio,
   TranscriptionRejectedError,

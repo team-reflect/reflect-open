@@ -25,6 +25,7 @@ import {
 } from '../graph/commands'
 import { transcribeAudio, TranscriptionRejectedError } from '../ai/transcribe'
 import { getSecret } from '../secrets/keychain'
+import { setBridge } from '../ipc/bridge'
 
 const generateAudioMemoTitleMock = vi.hoisted(() =>
   vi.fn<(request: GenerateAudioMemoTitleRequest) => Promise<string>>(),
@@ -102,6 +103,7 @@ function reconcile(overrides: Partial<ReconcileAudioMemosInput> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  setBridge(null)
   listDirMock.mockResolvedValue([])
   listFilesMock.mockResolvedValue([])
   readAssetMock.mockResolvedValue(btoa('audio-bytes'))
@@ -153,7 +155,7 @@ describe('audioMemoFromPath', () => {
 })
 
 describe('captureAudioMemo', () => {
-  it('writes the recording base64-encoded under audio-memos/, pinned to the generation', async () => {
+  it('falls back to base64 JSON asset writes when the host has no binary transport', async () => {
     const outcome = await captureAudioMemo({
       audio: new Blob(['audio'], { type: 'audio/webm' }),
       mimeType: 'audio/webm;codecs=opus',
@@ -163,6 +165,30 @@ describe('captureAudioMemo', () => {
 
     expect(outcome).toEqual({ ok: true, memo: MEMO })
     expect(writeAssetMock).toHaveBeenCalledWith(MEMO.audioPath, btoa('audio'), 3)
+  })
+
+  it('writes through raw binary IPC when the host supports it', async () => {
+    const invokeBinary = vi.fn(async (_command: string, _body: Uint8Array, _headers: Record<string, string>) => null)
+    setBridge({
+      invoke: vi.fn(),
+      listen: vi.fn(),
+      invokeBinary,
+    })
+
+    const outcome = await captureAudioMemo({
+      audio: new Blob(['audio'], { type: 'audio/webm' }),
+      mimeType: 'audio/webm;codecs=opus',
+      recordedAt: RECORDED_AT,
+      generation: 3,
+    })
+
+    expect(outcome).toEqual({ ok: true, memo: MEMO })
+    expect(invokeBinary).toHaveBeenCalledWith(
+      'asset_write_binary',
+      new TextEncoder().encode('audio'),
+      { path: MEMO.audioPath, generation: '3' },
+    )
+    expect(writeAssetMock).not.toHaveBeenCalled()
   })
 
   it('reports a write failure as data — the caller retries with the same recording', async () => {

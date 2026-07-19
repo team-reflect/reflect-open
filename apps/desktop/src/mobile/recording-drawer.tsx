@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
+import { AUDIO_MEMO_MAX_DURATION_LABEL } from '@reflect/core'
 import { Square, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
@@ -119,7 +120,10 @@ function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactEleme
           <p className="text-sm text-text-muted">Waiting for the microphone…</p>
         )}
       </div>
-      <span className="text-lg font-medium tabular-nums">{formatElapsed(memo.elapsedMs)}</span>
+      <div className="flex flex-col items-center">
+        <span className="text-lg font-medium tabular-nums">{formatElapsed(memo.elapsedMs)}</span>
+        <span className="text-xs text-text-muted">Up to {AUDIO_MEMO_MAX_DURATION_LABEL}</span>
+      </div>
       <div className="flex w-full flex-col items-center gap-3">
         <Button
           variant="destructive"
