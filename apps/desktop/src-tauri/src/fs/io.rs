@@ -243,9 +243,55 @@ pub(crate) fn modified_ms(meta: &fs::Metadata) -> Option<u64> {
 /// Storage replaces a not-downloaded file with such a stub; to the rest of the
 /// app the file still exists — it just isn't readable until re-downloaded
 /// (Plan 21: eviction must never read as deletion).
+///
+/// This stub grammar is the **iOS / legacy** eviction form. Modern macOS
+/// (FileProvider, 12.3+) evicts to a *dataless* file at the real path instead
+/// — see [`is_dataless`]; both forms must read as "present but not local".
 pub(crate) fn icloud_placeholder_target(file_name: &str) -> Option<&str> {
     let name = file_name.strip_prefix('.')?.strip_suffix(".icloud")?;
     (!name.is_empty()).then_some(name)
+}
+
+/// The kernel's dataless-file flag (`SF_DATALESS` in `<sys/stat.h>`): set on
+/// files whose bytes have been evicted to a file provider (modern macOS
+/// iCloud Drive). The file keeps its real path, logical size, and mtime, but
+/// any read blocks while `fileproviderd` re-materializes the bytes — so bulk
+/// passes must check this before reading, or a single pass turns into
+/// thousands of serial on-demand downloads.
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const SF_DATALESS: u32 = 0x4000_0000;
+
+/// Pure half of [`is_dataless`], split out because userland cannot *set*
+/// `SF_DATALESS` (it is kernel-owned), so only the flag decode is unit
+/// testable. Deliberately not `st_blocks == 0`: transparently-compressed
+/// (decmpfs) files also allocate zero data blocks, and misreading one as
+/// evicted would silently drop it from indexing forever.
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+fn dataless_flags(flags: u32) -> bool {
+    flags & SF_DATALESS != 0
+}
+
+/// True when `meta` describes an evicted dataless file (bytes remote, path
+/// and stat intact). Always `false` off Apple platforms.
+#[cfg(target_os = "macos")]
+pub(crate) fn is_dataless(meta: &fs::Metadata) -> bool {
+    use std::os::macos::fs::MetadataExt;
+    dataless_flags(meta.st_flags())
+}
+
+/// True when `meta` describes an evicted dataless file (bytes remote, path
+/// and stat intact). Always `false` off Apple platforms.
+#[cfg(target_os = "ios")]
+pub(crate) fn is_dataless(meta: &fs::Metadata) -> bool {
+    use std::os::ios::fs::MetadataExt;
+    dataless_flags(meta.st_flags())
+}
+
+/// True when `meta` describes an evicted dataless file (bytes remote, path
+/// and stat intact). Always `false` off Apple platforms.
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+pub(crate) fn is_dataless(_meta: &fs::Metadata) -> bool {
+    false
 }
 
 /// The placeholder path iCloud leaves behind when it evicts `logical`
@@ -324,7 +370,10 @@ pub(super) fn collect_files(
                 path: rel.to_string_lossy().replace('\\', "/"),
                 size: meta.len(),
                 modified_ms: modified_ms(&meta).unwrap_or(0),
-                placeholder,
+                // Two eviction forms fold into one flag: the legacy `.icloud`
+                // stub (detected by name above) and the modern dataless file
+                // (kernel flag on the real path).
+                placeholder: placeholder || is_dataless(&meta),
             });
         }
     }
@@ -343,6 +392,24 @@ fn evicted_logical_path(path: &Path) -> Option<PathBuf> {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    #[test]
+    fn dataless_decodes_only_the_kernel_flag() {
+        assert!(dataless_flags(SF_DATALESS));
+        assert!(dataless_flags(SF_DATALESS | 0x1));
+        assert!(!dataless_flags(0));
+        // Other BSD flags (UF_HIDDEN, UF_COMPRESSED, …) are not eviction.
+        assert!(!dataless_flags(0x8000 | 0x20));
+    }
+
+    #[test]
+    fn a_regular_file_is_not_dataless() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("note.md");
+        fs::write(&path, b"hello").unwrap();
+        assert!(!is_dataless(&fs::metadata(&path).unwrap()));
+    }
 
     #[test]
     fn bootstrap_creates_layout() {

@@ -1,5 +1,5 @@
 import { isAppError } from '../errors'
-import { readNote } from '../graph/commands'
+import { readNoteLocal } from '../graph/commands'
 import { descriptionPathFor } from '../graph/paths'
 import { splitFrontmatter } from '../markdown/frontmatter'
 
@@ -51,16 +51,22 @@ export async function gatherAssetDescriptionBodies(
       continue // an asset referenced twice in one note contributes once
     }
     seen.add(assetPath)
-    let source: string
+    let read: Awaited<ReturnType<typeof readNoteLocal>>
     try {
-      source = await readNote(descriptionPathFor(assetPath))
+      read = await readNoteLocal(descriptionPathFor(assetPath))
     } catch (cause) {
       if (isAppError(cause) && cause.kind === 'notFound') {
         continue // no description for this asset (not generated yet, or none)
       }
       throw cause
     }
-    const body = splitFrontmatter(source).body.trim()
+    if (read.kind === 'evicted') {
+      // iCloud-evicted sidecar: reading it would force an on-demand download
+      // mid-pass. Skip — the fold catches up when the note is next re-indexed
+      // with the sidecar local.
+      continue
+    }
+    const body = splitFrontmatter(read.content).body.trim()
     if (body === '') {
       continue
     }

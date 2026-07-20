@@ -86,6 +86,15 @@ const reconcileScanSchema = z.object({
   total: z.number(),
   candidates: z.array(scanCandidateSchema),
   orphans: z.array(scanOrphanSchema),
+  /**
+   * Evicted files whose content the index lacks: no stored row, or a listed
+   * mtime differing from the stored row (a remote edit synced while
+   * evicted). Never candidates — they can't be read without forcing an
+   * on-demand download — so the reconcile surfaces them for a targeted
+   * `icloud_request_downloads`; the materialized files then arrive as
+   * ordinary watcher upserts.
+   */
+  stalePlaceholders: z.array(z.string()),
 })
 
 /** One file the reconcile must read — see {@link reconcileScan}. */

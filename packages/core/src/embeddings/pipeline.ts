@@ -1,4 +1,4 @@
-import { readNote } from '../graph/commands'
+import { readNoteLocal } from '../graph/commands'
 import { isTemplatePath } from '../graph/paths'
 import { gatherAssetDescriptionBodies } from '../indexing/asset-description-text'
 import { db } from '../indexing/db'
@@ -38,11 +38,21 @@ export async function embedNote(options: EmbedNoteOptions): Promise<number> {
   }
   let content = options.content
   if (content === undefined) {
+    let read: Awaited<ReturnType<typeof readNoteLocal>>
     try {
-      content = await readNote(path)
+      read = await readNoteLocal(path)
     } catch {
       return 0 // deleted between event and read; the remove path handles it
     }
+    if (read.kind === 'evicted') {
+      // iCloud-evicted: reading would force an on-demand download, and the
+      // backfill sweeping a whole evicted graph would turn into thousands of
+      // serial blocking downloads. The pre-eviction vectors stay valid (rows
+      // survive eviction); if the note re-materializes with new content, the
+      // index-applied follow-up re-embeds it then.
+      return 0
+    }
+    content = read.content
   }
 
   const parsed = parseNote({ path, source: content })

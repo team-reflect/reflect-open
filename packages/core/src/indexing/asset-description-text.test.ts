@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { readNote } from '../graph/commands'
+import { readNoteLocal } from '../graph/commands'
 import {
   gatherAssetDescriptionBodies,
   gatherAssetDescriptionText,
@@ -7,10 +7,10 @@ import {
 } from './asset-description-text'
 
 vi.mock('../graph/commands', () => ({
-  readNote: vi.fn(),
+  readNoteLocal: vi.fn(),
 }))
 
-const readNoteMock = vi.mocked(readNote)
+const readNoteMock = vi.mocked(readNoteLocal)
 
 const notFound = (): unknown => ({ kind: 'notFound', message: 'missing' })
 
@@ -25,7 +25,7 @@ beforeEach(() => {
     if (value === undefined) {
       throw notFound()
     }
-    return value
+    return { kind: 'content', content: value }
   })
 })
 
@@ -69,6 +69,13 @@ describe('gatherAssetDescriptionText', () => {
     files.set('assets/a.png.reflect.md', 'x'.repeat(MAX_ASSET_TEXT_CHARS + 5_000))
     const text = await gatherAssetDescriptionText(['assets/a.png'])
     expect(text.length).toBe(MAX_ASSET_TEXT_CHARS)
+  })
+
+  it('skips an iCloud-evicted description instead of forcing a download', async () => {
+    files.set('assets/b.pdf.reflect.md', '---\nreflectAsset: true\n---\n\nStill local.\n')
+    readNoteMock.mockResolvedValueOnce({ kind: 'evicted' }) // assets/a.png's sidecar
+    const text = await gatherAssetDescriptionText(['assets/a.png', 'assets/b.pdf'])
+    expect(text).toBe('Still local.')
   })
 
   it('propagates a non-notFound read error', async () => {

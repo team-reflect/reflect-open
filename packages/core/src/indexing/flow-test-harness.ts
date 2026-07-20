@@ -131,7 +131,7 @@ export function connectIndex(database: DatabaseSync): void {
       if (command === 'list_files') {
         return Promise.resolve([])
       }
-      if (command === 'note_read') {
+      if (command === 'note_read' || command === 'note_read_local') {
         return Promise.reject({ kind: 'notFound', message: 'not on disk' })
       }
       if (command !== 'db_query') {

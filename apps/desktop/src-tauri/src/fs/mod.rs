@@ -50,6 +50,10 @@ pub(crate) use self::io::file_occupied;
 /// The one home of the `.{name}.icloud` placeholder grammar, shared with the
 /// desktop watcher and the iCloud container discovery (`icloud::storage`).
 pub(crate) use self::io::icloud_placeholder_target;
+/// Dataless-file probe (modern macOS eviction: bytes remote, real path
+/// intact), shared with the desktop watcher and the iCloud pending walk —
+/// every place that must not mistake an evicted note for a readable one.
+pub(crate) use self::io::is_dataless;
 /// Sync-exclusion marking, shared with `git::repo` (a freshly initialized
 /// backup repo must never ride a file-sync provider — Plan 21).
 pub(crate) use self::io::mark_dir_local_only;
@@ -97,10 +101,12 @@ pub struct FileMeta {
     pub size: u64,
     /// Last-modified time in epoch milliseconds.
     pub modified_ms: u64,
-    /// True when the file is an iCloud eviction placeholder: the note exists
-    /// but its content is not on disk until re-downloaded. Consumers must not
-    /// read it — and must not treat it as deleted (Plan 21). `size` and
-    /// `modified_ms` describe the placeholder stub, not the real file.
+    /// True when the file is iCloud-evicted: the note exists but its content
+    /// is not on disk until re-downloaded. Consumers must not read it — a
+    /// read blocks on an on-demand download — and must not treat it as
+    /// deleted (Plan 21). Covers both eviction forms: for a legacy `.icloud`
+    /// stub, `size` and `modified_ms` describe the stub; for a modern
+    /// dataless file they are the real (preserved) values.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub placeholder: bool,
 }
@@ -321,6 +327,56 @@ pub fn note_read(
 ) -> AppResult<String> {
     let root = root_for(&state, generation)?;
     Ok(fs::read_to_string(resolve(&root, &path)?)?)
+}
+
+/// How a [`note_read_local`] request found the note on disk.
+#[derive(Debug, Serialize)]
+#[serde(
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    tag = "kind"
+)]
+pub enum LocalNoteRead {
+    /// The bytes are local; here they are.
+    Content { content: String },
+    /// The note is iCloud-evicted (a dataless file, or an `.icloud` stub in
+    /// the logical path's place). Reading it would block on an on-demand
+    /// download — this command refuses instead.
+    Evicted,
+}
+
+/// Read a note's markdown **only when its bytes are local**. Bulk background
+/// passes (the embedding backfill, asset-description gathering) must use this
+/// instead of [`note_read`]: reading an evicted note makes `fileproviderd`
+/// materialize it on demand, and a whole-graph pass over an evicted iCloud
+/// graph becomes thousands of serial blocking downloads. Runs off the main
+/// thread — even a local read must not stall the UI under a busy provider.
+/// The check is stat-then-read, so a racing eviction can still materialize
+/// one file; the pass-level storm is what this prevents.
+#[tauri::command]
+pub async fn note_read_local(
+    path: String,
+    generation: Option<u64>,
+    state: State<'_, GraphState>,
+) -> AppResult<LocalNoteRead> {
+    let root = root_for(&state, generation)?;
+    let abs = resolve(&root, &path)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        match fs::metadata(&abs) {
+            Ok(meta) if io::is_dataless(&meta) => return Ok(LocalNoteRead::Evicted),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                if io::eviction_placeholder(&abs).is_some_and(|stub| stub.exists()) {
+                    return Ok(LocalNoteRead::Evicted);
+                }
+            }
+            _ => {}
+        }
+        Ok(LocalNoteRead::Content {
+            content: fs::read_to_string(&abs)?,
+        })
+    })
+    .await
+    .map_err(|err| AppError::io(err.to_string()))?
 }
 
 /// Atomically write a note's markdown by graph-relative path. `generation` pins

@@ -117,6 +117,12 @@ fn collect_changes(paths: &[PathBuf], root: &Path) -> Vec<FileChange> {
             // from the event path, and it is what consumers read.
             let logical = root.join(&rel);
             let change = match std::fs::metadata(&logical) {
+                // A dataless file (modern macOS eviction) stats fine but its
+                // bytes are remote: emitting an upsert would send the live
+                // pass into a blocking on-demand download. Same rule as the
+                // stub form below — evicted, not deleted, no event; the
+                // re-download (or a targeted request) emits the real upsert.
+                Ok(meta) if crate::fs::is_dataless(&meta) => continue,
                 Ok(meta) => FileChange {
                     path: rel.clone(),
                     kind: "upsert".to_string(),
