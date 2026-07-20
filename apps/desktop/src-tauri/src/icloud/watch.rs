@@ -378,16 +378,19 @@ mod platform {
     }
 
     /// Pure half of the nudge bookkeeping: the placeholders this round should
-    /// request downloads for. Only content the device *lacks* is nudged — an
-    /// item new to the snapshot (e.g. a note created on another device), or
-    /// one whose content-change date moved (a remote edit reaching an evicted
-    /// item). An eviction of already-seen content is deliberately silent:
-    /// re-downloading whatever the OS just evicted turns Optimize Storage
-    /// into a tug-of-war that keeps `fileproviderd` pinned for as long as the
-    /// app runs. Gather rounds never nudge (see [`handle_notification`]) —
-    /// open-path catch-up belongs to the reconcile's targeted
-    /// `icloud_request_downloads`, which consults the *index* rather than
-    /// this watch's session-local snapshot.
+    /// request downloads for. Only content the device *provably lacks* is
+    /// nudged — an item new to the snapshot (e.g. a note created on another
+    /// device), or one whose content-change date moved to a *known different*
+    /// date (a remote edit reaching an evicted item). Everything ambiguous
+    /// stays silent: an eviction of already-seen content, and any report
+    /// without a usable date on either side — re-downloading whatever the OS
+    /// just evicted turns Optimize Storage into a tug-of-war that keeps
+    /// `fileproviderd` pinned for as long as the app runs, and a genuinely
+    /// missed remote edit is caught by the reconcile's mtime comparison on
+    /// the next pass. Gather rounds never nudge (see
+    /// [`handle_notification`]) — open-path catch-up belongs to the
+    /// reconcile's targeted `icloud_request_downloads`, which consults the
+    /// *index* rather than this watch's session-local snapshot.
     fn plan_nudges(
         nudged: &mut HashMap<String, Option<u64>>,
         snapshot: &HashMap<String, TrackedState>,
@@ -401,8 +404,10 @@ mod platform {
             }
             let missing = match snapshot.get(&item.rel) {
                 None => true, // an arrival: content this device has never had
-                Some(TrackedState::Local(mtime)) => item.mtime != Some(*mtime),
-                Some(TrackedState::Evicted(mtime)) => item.mtime != *mtime,
+                Some(TrackedState::Local(mtime)) => item.mtime.is_some_and(|date| date != *mtime),
+                Some(TrackedState::Evicted(previous)) => item
+                    .mtime
+                    .is_some_and(|date| previous.is_some_and(|prev| date != prev)),
             };
             if !missing || nudged.get(&item.rel) == Some(&item.mtime) {
                 continue;
@@ -780,6 +785,24 @@ mod platform {
             let snapshot = state(&[("notes/a.md", local(5))]);
             let evictee = item("notes/a.md", false, Some(5));
             assert!(plan_nudges(&mut nudged, &snapshot, std::slice::from_ref(&evictee)).is_empty());
+        }
+
+        #[test]
+        fn plan_nudges_stays_silent_when_the_content_date_is_unknown() {
+            let mut nudged: HashMap<String, Option<u64>> = HashMap::new();
+            // An eviction reported without a content-change date must not
+            // read as "missing" — that would re-request what the OS just
+            // offloaded, the exact tug-of-war the policy forbids. A missed
+            // real edit is caught by the reconcile's mtime comparison.
+            let snapshot = state(&[("notes/a.md", local(5)), ("notes/b.md", evicted(None))]);
+            let dateless = item("notes/a.md", false, None);
+            assert!(
+                plan_nudges(&mut nudged, &snapshot, std::slice::from_ref(&dateless)).is_empty()
+            );
+            // A date appearing on an item whose previous date was unknown is
+            // metadata arriving, not a provable remote edit — silent too.
+            let dated = item("notes/b.md", false, Some(7));
+            assert!(plan_nudges(&mut nudged, &snapshot, std::slice::from_ref(&dated)).is_empty());
         }
 
         #[test]
