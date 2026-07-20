@@ -254,11 +254,17 @@ export function NotePaneComponent({
   )
 
   useEffect(() => {
+    // Protected notes (sync conflicts land here) render raw, conflict-marked
+    // content instead of the editor, so parsing `editorSeed` would outline
+    // headings from both conflict sides rather than the note's real structure.
+    if (document.protected) {
+      return
+    }
     publishOutlineFromMarkdown(path, editorSeed)
     return () => {
       clearOutline(path)
     }
-  }, [path, editorSeed])
+  }, [path, editorSeed, document.protected])
 
   if (document.status === 'loading') {
     // `reflect-note-loading` keeps the hint invisible for the first beat:

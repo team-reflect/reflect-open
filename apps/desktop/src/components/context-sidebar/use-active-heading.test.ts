@@ -127,6 +127,32 @@ describe('useActiveHeading', () => {
     expect(result.current).toBe(0)
   })
 
+  it('keeps the active index when only the heading count changes (same note)', () => {
+    // Editing a heading elsewhere in the same note changes headingCount but
+    // must not reset the reader's current position.
+    const root = mountPane('notes/a.md', [-100, -50, LINE - 1])
+    const { result, rerender } = renderHook(
+      ({ path, headingCount }: { path: string; headingCount: number }) =>
+        useActiveHeading(path, headingCount),
+      { initialProps: { path: 'notes/a.md', headingCount: 3 } },
+    )
+    act(() => {
+      flushRaf()
+    })
+    expect(result.current).toBe(2)
+
+    // A fourth heading appears further down; the reader hasn't scrolled, so the
+    // active index stays put rather than snapping back to 0.
+    const fourth = window.document.createElement('h4')
+    setTop(fourth, 800)
+    root.appendChild(fourth)
+    rerender({ path: 'notes/a.md', headingCount: 4 })
+    act(() => {
+      flushRaf()
+    })
+    expect(result.current).toBe(2)
+  })
+
   it('recovers when heading DOM is painted after the effect runs (no open-time race)', async () => {
     // Editor root exists but its headings have not been painted yet.
     const pane = window.document.createElement('div')

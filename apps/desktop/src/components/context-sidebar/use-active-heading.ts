@@ -38,10 +38,13 @@ function findScrollParent(element: Element): HTMLElement | null {
 export function useActiveHeading(path: string, headingCount: number): number {
   const [active, setActive] = useState(0)
 
-  const paneKey = `${path}:${headingCount}`
-  const [previousPaneKey, setPreviousPaneKey] = useState(paneKey)
-  if (previousPaneKey !== paneKey) {
-    setPreviousPaneKey(paneKey)
+  // Reset only when the note itself changes. Keying on `headingCount` too would
+  // reset to 0 on every heading edit within the same note — the exact
+  // live-editing case this feature tracks — and the out-of-range case is
+  // already clamped by `Math.min(next, headingCount - 1)` in `compute`.
+  const [previousPath, setPreviousPath] = useState(path)
+  if (previousPath !== path) {
+    setPreviousPath(path)
     setActive(0)
   }
 
