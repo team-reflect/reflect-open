@@ -5,9 +5,9 @@ import { recallOrder } from './filtered-search'
 
 /**
  * The All Notes list: every regular note, pinned first then newest, optionally
- * narrowed to one tag. Daily notes are excluded by design — the stream is
- * their home — and templates are boilerplate, not graph content;
- * `kind = 'note'` expresses both (mirroring the original app's `isDaily = 0`).
+ * narrowed to one tag. The unfiltered list excludes daily notes — the stream is
+ * their home — but a tag filter includes tagged daily notes alongside regular
+ * notes. Templates remain boilerplate, not graph content.
  * Uncapped: the screen virtualizes, the row
  * snippet is the stored `preview` column (derived once at index time), and
  * neither query carries a per-row parameter, so list size has no SQL ceiling.
@@ -33,8 +33,10 @@ export interface NoteListOptions {
 }
 
 /**
- * Non-daily notes for the All Notes screen: pinned first (explicit pin order,
- * then unordered pins), then most recently edited — V1's list order.
+ * Notes for the All Notes screen: unfiltered lists include non-daily notes only;
+ * tag-filtered lists include both regular and daily notes carrying the tag.
+ * Pinned notes appear first (explicit pin order, then unordered pins), then most
+ * recently edited — V1's list order.
  */
 export async function listNotes(options: NoteListOptions = {}): Promise<NoteListEntry[]> {
   const tag = options.tag ?? null
@@ -56,7 +58,7 @@ export async function listNotes(options: NoteListOptions = {}): Promise<NoteList
           .selectFrom('tags')
           .innerJoin('notes', 'notes.path', 'tags.notePath')
           .where('tags.tagKey', '=', foldTag(tag))
-          .where('notes.kind', '=', 'note')
+          .where('notes.kind', 'in', ['note', 'daily'])
           .select([
             'notes.path',
             'notes.title',
@@ -94,7 +96,7 @@ export async function listNotes(options: NoteListOptions = {}): Promise<NoteList
           .innerJoin('notes', 'notes.path', 'tags.notePath')
           .innerJoin('tags as filterTags', 'filterTags.notePath', 'notes.path')
           .where('filterTags.tagKey', '=', foldTag(tag))
-          .where('notes.kind', '=', 'note')
+          .where('notes.kind', 'in', ['note', 'daily'])
           .select(['tags.notePath', 'tags.tag'])
           .distinct()
           .orderBy('tags.tagKey')

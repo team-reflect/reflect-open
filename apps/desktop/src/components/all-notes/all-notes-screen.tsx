@@ -27,7 +27,8 @@ interface AllNotesScreenProps {
  * The All Notes screen (a routed view, like settings): every non-daily note,
  * newest first, filterable by tag. The active tag lives on the route so
  * back/forward and "open a note, come back" keep the filter. Daily notes are
- * deliberately absent — the stream is their home.
+ * deliberately absent from the unfiltered view, but appear when they match the
+ * active tag.
  *
  * Rows are multi-selectable (V1 parity): click to select (⌘ toggle, Shift
  * range), the indicator gutter toggles, the subject or a double-click opens.
