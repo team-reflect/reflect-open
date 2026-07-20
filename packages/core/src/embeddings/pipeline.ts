@@ -56,10 +56,19 @@ export async function embedNote(options: EmbedNoteOptions): Promise<number> {
   }
 
   const parsed = parseNote({ path, source: content })
-  const assetBodies = await gatherAssetDescriptionBodies(parsed.assets.map((asset) => asset.path))
+  const gathered = await gatherAssetDescriptionBodies(parsed.assets.map((asset) => asset.path))
+  if (gathered.evicted.length > 0) {
+    // A referenced sidecar is iCloud-evicted. `embedApply` replaces the
+    // note's *entire* chunk set, so applying without that sidecar's body
+    // would silently drop its previously embedded chunks — and sidecars are
+    // untracked by the watcher, so nothing would ever restore them. Skip the
+    // whole note this pass; the stored vectors stay valid until the sidecar
+    // is local again.
+    return 0
+  }
   const chunks = [
     ...(await chunkNote(path, content, parsed)),
-    ...(await chunkAssetDescriptions(assetBodies, content.length + 1)),
+    ...(await chunkAssetDescriptions(gathered.bodies, content.length + 1)),
   ]
   if (chunks.length === 0) {
     await embedRemove(path, generation)

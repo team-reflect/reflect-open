@@ -89,19 +89,23 @@ describe('gatherAssetDescriptionBodies', () => {
     files.set('assets/a.png.reflect.md', '---\nreflectAsset: true\n---\n\nA flow diagram.\n')
     files.set('assets/b.pdf.reflect.md', '---\nreflectAsset: true\n---\n\nQ4 revenue report.\n')
 
-    const bodies = await gatherAssetDescriptionBodies(['assets/a.png', 'assets/b.pdf'])
+    const { bodies, evicted } = await gatherAssetDescriptionBodies([
+      'assets/a.png',
+      'assets/b.pdf',
+    ])
 
     expect(bodies).toEqual([
       { assetPath: 'assets/a.png', body: 'A flow diagram.' },
       { assetPath: 'assets/b.pdf', body: 'Q4 revenue report.' },
     ])
+    expect(evicted).toEqual([])
   })
 
   it('skips missing descriptions, empty bodies, and repeated assets', async () => {
     files.set('assets/a.png.reflect.md', '---\nreflectAsset: true\n---\n\nDescribed.\n')
     files.set('assets/empty.png.reflect.md', '---\nreflectAsset: true\n---\n\n  \n')
 
-    const bodies = await gatherAssetDescriptionBodies([
+    const { bodies } = await gatherAssetDescriptionBodies([
       'assets/a.png',
       'assets/a.png',
       'assets/empty.png',
@@ -116,9 +120,22 @@ describe('gatherAssetDescriptionBodies', () => {
     files.set('assets/a.png.reflect.md', 'x'.repeat(MAX_ASSET_TEXT_CHARS))
     files.set('assets/b.png.reflect.md', 'never reached')
 
-    const bodies = await gatherAssetDescriptionBodies(['assets/a.png', 'assets/b.png'])
+    const { bodies } = await gatherAssetDescriptionBodies(['assets/a.png', 'assets/b.png'])
 
     expect(bodies).toHaveLength(1)
     expect(bodies[0]!.assetPath).toBe('assets/a.png')
+  })
+
+  it('reports an evicted sidecar so full-replace consumers can skip the write', async () => {
+    files.set('assets/b.pdf.reflect.md', '---\nreflectAsset: true\n---\n\nStill local.\n')
+    readNoteMock.mockResolvedValueOnce({ kind: 'evicted' }) // assets/a.png's sidecar
+
+    const { bodies, evicted } = await gatherAssetDescriptionBodies([
+      'assets/a.png',
+      'assets/b.pdf',
+    ])
+
+    expect(bodies).toEqual([{ assetPath: 'assets/b.pdf', body: 'Still local.' }])
+    expect(evicted).toEqual(['assets/a.png'])
   })
 })

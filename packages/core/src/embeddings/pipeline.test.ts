@@ -26,6 +26,8 @@ function fakePipelineBridge(options: {
   descriptions?: Record<string, string>
   /** Report the note itself as iCloud-evicted (bytes not local). */
   evicted?: boolean
+  /** Sidecar paths (`<asset>.reflect.md`) to report as iCloud-evicted. */
+  evictedSidecars?: string[]
 }) {
   const embedded: string[][] = []
   const applied: { path: string; chunks: AppliedChunk[] }[] = []
@@ -34,6 +36,9 @@ function fakePipelineBridge(options: {
       if (command === 'note_read_local') {
         const path = (args as { path: string }).path
         if (path.endsWith('.reflect.md')) {
+          if (options.evictedSidecars?.includes(path) === true) {
+            return { kind: 'evicted' }
+          }
           const description = options.descriptions?.[path]
           if (description === undefined) {
             throw { kind: 'notFound', message: `no description at ${path}` }
@@ -192,6 +197,21 @@ describe('embedNote', () => {
     // Synthetic positions live past the note source, so asset chunks order last.
     expect(assetChunk.posFrom).toBeGreaterThan(IMAGE_NOTE.length)
     expect(chunks.slice(0, -1).every((chunk) => chunk.posFrom < IMAGE_NOTE.length)).toBe(true)
+  })
+
+  it('skips the whole note while a referenced sidecar is evicted — chunks survive', async () => {
+    // embed_apply replaces the note's entire chunk set; applying without the
+    // evicted sidecar's body would silently drop its previously embedded
+    // chunks, and sidecars are untracked so nothing would restore them.
+    const { embedded, applied } = fakePipelineBridge({
+      content: IMAGE_NOTE,
+      storedRows: [{ content_hash: 'previously-stored', model_id: MODEL }],
+      evictedSidecars: ['assets/pic.png.reflect.md'],
+    })
+    const count = await embedNote({ path: 'notes/a.md', generation: 1, modelId: MODEL })
+    expect(count).toBe(0)
+    expect(embedded).toHaveLength(0)
+    expect(applied).toHaveLength(0) // neither embed_apply nor embed_remove
   })
 
   it('a note without a description for its asset embeds only its own text', async () => {
