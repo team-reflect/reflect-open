@@ -27,7 +27,12 @@ export {
   endBackgroundTask,
   type BackgroundTaskToken,
 } from '../app/background-task'
-export { WINDOW_NAVIGATE_EVENT, subscribeWindowNavigate } from '../app/window-events'
+export {
+  WINDOW_NAVIGATE_EVENT,
+  PASTE_AND_MATCH_STYLE_EVENT,
+  subscribeWindowNavigate,
+  subscribePasteAndMatchStyle,
+} from '../app/window-events'
 export { toggleDevtools } from '../app/devtools'
 export {
   agentSkillStatus,

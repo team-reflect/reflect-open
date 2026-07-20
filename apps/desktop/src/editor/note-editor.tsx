@@ -31,6 +31,7 @@ import {
 } from '@meowdown/react'
 import { EditorInputTraits } from '@/editor/editor-input-traits'
 import { FormattingToolbarBridge } from '@/editor/formatting-toolbar-bridge'
+import { PasteAndMatchStyleBridge } from '@/editor/paste-and-match-style-bridge'
 import {
   IMAGE_LIGHTBOX_TRANSITION_NAME,
   ImageLightbox,
@@ -434,6 +435,7 @@ export function NoteEditor({
       >
         <EditorInputTraits />
         <FormattingToolbarBridge />
+        <PasteAndMatchStyleBridge />
         {renderWikilinkHoverCard !== undefined ? (
           <WikilinkHoverCard className="reflect-hover-card">
             {renderWikilinkHoverCard}

@@ -24,3 +24,23 @@ export function subscribeWindowNavigate(handler: (url: string) => void): Promise
     }
   })
 }
+
+/**
+ * Delivered to the focused window when Edit > "Paste and Match Style" (⌘⇧V)
+ * is invoked. The accelerator is an app-menu key equivalent, so the webview
+ * never sees the keystroke — the shell reads the pasteboard itself and hands
+ * the plain text over; the focused editor pastes it without formatting.
+ */
+export const PASTE_AND_MATCH_STYLE_EVENT = 'menu:paste-and-match-style'
+
+/** Subscribe to the shell menu's plain-text paste requests. */
+export function subscribePasteAndMatchStyle(handler: (text: string) => void): Promise<Unlisten> {
+  return getBridge().listen(PASTE_AND_MATCH_STYLE_EVENT, (payload) => {
+    const parsed = z.string().safeParse(payload)
+    if (parsed.success) {
+      handler(parsed.data)
+    } else {
+      console.error('invalid menu:paste-and-match-style payload:', parsed.error)
+    }
+  })
+}

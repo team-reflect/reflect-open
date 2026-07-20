@@ -11,6 +11,7 @@
 //! [`skill`] (per-graph agent-skill install under `~/.agents/skills/`),
 //! [`calendar`] (read-only Apple Calendar access),
 //! [`contacts`] (live Apple Contacts lookups),
+//! [`menu`] (the macOS app menu, incl. Paste and Match Style),
 //! [`error`] (the shared error contract).
 
 mod background_task;
@@ -25,6 +26,8 @@ mod fs;
 mod git;
 mod graph_gitignore;
 mod icloud;
+#[cfg(target_os = "macos")]
+mod menu;
 mod quit;
 mod recents;
 mod secrets;
@@ -141,6 +144,17 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init());
+
+    // The app menu is macOS-only (like Tauri's own default menu): the default
+    // set plus Edit > "Paste and Match Style", whose ⌘⇧V key equivalent is the
+    // only way WKWebView users get paste-without-formatting (menu.rs). The
+    // clipboard plugin backs its click handler's pasteboard read; the webview
+    // never talks to it, so no capability grant is needed.
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .menu(menu::build)
+        .on_menu_event(menu::on_menu_event);
 
     // Deep links (`reflect://`) are desktop-only for now: the scheme is
     // registered at bundle time (`plugins.deep-link` in tauri.conf.json) and
