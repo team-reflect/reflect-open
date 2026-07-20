@@ -1,6 +1,7 @@
 import type { Database } from '@reflect/db'
 import { sql, type Selectable } from 'kysely'
 import { readNote } from '../graph/commands'
+import { dateFromDailyPath } from '../graph/paths'
 import { blockContextLinesAt, prepareBlockContext, type BlockContextSource } from './block-context'
 import { db } from './db'
 import { extractSnippetTasks, type SnippetTask } from './snippet-tasks'
@@ -10,13 +11,56 @@ export type Backlink = Pick<
   'sourcePath' | 'targetRaw' | 'alias' | 'posFrom' | 'posTo'
 >
 
-/** Notes that link to `path` (resolved at query time via the `backlinks` view). */
-export function getBacklinks(path: string): Promise<Backlink[]> {
+/**
+ * Every index key that resolves to `path`: its `note_keys` rows (title,
+ * aliases, daily date) plus, for a daily path, the date derived from the path
+ * itself. The derived date is what lets links to a daily that has no file yet
+ * (a future date carrying reminders) resolve — the `backlinks` view can't
+ * serve those, because its `note_keys` join requires an indexed target note.
+ */
+async function targetKeysFor(path: string): Promise<string[]> {
+  const keys = new Set(
+    (await db.selectFrom('noteKeys').where('notePath', '=', path).select('key').execute())
+      .map((row) => row.key)
+      .filter((key): key is string => typeof key === 'string'),
+  )
+  const dailyDate = dateFromDailyPath(path)
+  if (dailyDate !== null) {
+    keys.add(dailyDate)
+  }
+  return [...keys]
+}
+
+/**
+ * Inbound wiki links whose target resolves to one of `targetKeys`, with the
+ * source note joined for recency/title. Semantically the `backlinks` view
+ * (wiki links only, template sources excluded) rebuilt over `links` directly,
+ * so a target that is not an indexed note yet still finds its inbound links.
+ */
+function inboundLinks(targetKeys: string[]) {
   return db
-    .selectFrom('backlinks')
-    .where('targetPath', '=', path)
-    .select(['sourcePath', 'targetRaw', 'alias', 'posFrom', 'posTo'])
-    .orderBy('sourcePath')
+    .selectFrom('links')
+    .innerJoin('notes', 'notes.path', 'links.sourcePath')
+    .where('links.kind', '=', 'wiki')
+    .where('links.targetKey', 'in', targetKeys)
+    .where('notes.kind', '!=', 'template')
+}
+
+/** Notes that link to `path` (resolved at query time against the link keys). */
+export async function getBacklinks(path: string): Promise<Backlink[]> {
+  const targetKeys = await targetKeysFor(path)
+  if (targetKeys.length === 0) {
+    return []
+  }
+  return inboundLinks(targetKeys)
+    .select([
+      'links.sourcePath',
+      'links.targetRaw',
+      'links.alias',
+      'links.posFrom',
+      'links.posTo',
+    ])
+    .orderBy('links.sourcePath')
     .execute()
 }
 
@@ -81,7 +125,7 @@ function afterSource(cursor: BacklinkSourceCursor) {
   return sql<boolean>`(
     ${sourceRecency} < ${cursor.recencyMs}
     or (${sourceRecency} = ${cursor.recencyMs}
-      and "backlinks"."source_path" > ${cursor.sourcePath})
+      and "links"."source_path" > ${cursor.sourcePath})
   )`
 }
 
@@ -89,7 +133,7 @@ function throughSource(cursor: BacklinkSourceCursor) {
   return sql<boolean>`(
     ${sourceRecency} > ${cursor.recencyMs}
     or (${sourceRecency} = ${cursor.recencyMs}
-      and "backlinks"."source_path" <= ${cursor.sourcePath})
+      and "links"."source_path" <= ${cursor.sourcePath})
   )`
 }
 
@@ -103,6 +147,10 @@ function throughSource(cursor: BacklinkSourceCursor) {
  * complete source notes rather than raw links: `limit` sources are selected by
  * recency/path keyset, then every matching position in those sources is
  * processed. Consequently `contexts.length` may be greater than `limit`.
+ *
+ * Resolution runs over the link keys rather than the `backlinks` view, so a
+ * daily note that has no file yet (a future date) still lists the notes that
+ * already point at it.
  */
 export async function getBacklinksWithContext(
   path: string,
@@ -112,12 +160,14 @@ export async function getBacklinksWithContext(
     throw new RangeError('backlink page limit must be a positive safe integer')
   }
 
-  let sourceQuery = db
-    .selectFrom('backlinks')
-    .innerJoin('notes', 'notes.path', 'backlinks.sourcePath')
-    .where('targetPath', '=', path)
+  const targetKeyList = await targetKeysFor(path)
+  if (targetKeyList.length === 0) {
+    return { contexts: [], nextCursor: null, indexedLinkCount: 0 }
+  }
+
+  let sourceQuery = inboundLinks(targetKeyList)
     .select([
-      'backlinks.sourcePath',
+      'links.sourcePath',
       'notes.title as sourceTitle',
       sourceRecency.as('recencyMs'),
     ])
@@ -132,13 +182,10 @@ export async function getBacklinksWithContext(
   const [candidateSources, countRow] = await Promise.all([
     sourceQuery
       .orderBy(sourceRecency, 'desc')
-      .orderBy('backlinks.sourcePath')
+      .orderBy('links.sourcePath')
       .limit(candidateLimit)
       .execute(),
-    db
-      .selectFrom('backlinks')
-      .innerJoin('notes', 'notes.path', 'backlinks.sourcePath')
-      .where('targetPath', '=', path)
+    inboundLinks(targetKeyList)
       .select(sql<number>`count(*)`.as('count'))
       .executeTakeFirst(),
   ])
@@ -158,23 +205,20 @@ export async function getBacklinksWithContext(
   // source path. This keeps arbitrarily large safe limits below SQLite's bound
   // parameter ceiling; the selected-path guard below also closes the tiny race
   // where an index write lands between the source and context queries.
-  let contextRowQuery = db
-    .selectFrom('backlinks')
-    .innerJoin('notes', 'notes.path', 'backlinks.sourcePath')
-    .where('targetPath', '=', path)
+  let contextRowQuery = inboundLinks(targetKeyList)
     .where(throughSource({
       recencyMs: lastSource.recencyMs,
       sourcePath: lastSource.sourcePath,
     }))
-    .select(['backlinks.sourcePath', 'backlinks.posFrom'])
+    .select(['links.sourcePath', 'links.posFrom'])
     .$narrowType<{ sourcePath: string; posFrom: number }>()
   if (options.cursor !== null) {
     contextRowQuery = contextRowQuery.where(afterSource(options.cursor))
   }
   const rows = await contextRowQuery
     .orderBy(sourceRecency, 'desc')
-    .orderBy('backlinks.sourcePath')
-    .orderBy('backlinks.posFrom')
+    .orderBy('links.sourcePath')
+    .orderBy('links.posFrom')
     .execute()
 
   const selectedSourcePaths = new Set(pageSources.map((source) => source.sourcePath))
@@ -194,11 +238,7 @@ export async function getBacklinksWithContext(
   // Every spelling that resolves to the target (title, aliases, daily date),
   // so sibling branches co-group under any of them — old Reflect compared
   // resolved note ids, not link text.
-  const targetKeys = new Set(
-    (await db.selectFrom('noteKeys').where('notePath', '=', path).select('key').execute())
-      .map((row) => row.key)
-      .filter((key): key is string => typeof key === 'string'),
-  )
+  const targetKeys = new Set(targetKeyList)
 
   // One read *and one parse* per distinct source: a well-linked source
   // contributes many rows, and context extraction walks the parsed body.
