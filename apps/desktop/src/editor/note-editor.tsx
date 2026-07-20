@@ -85,6 +85,12 @@ export interface NoteEditorHandle {
    * previous day / the start of the next day).
    */
   setSelection(position: 'start' | 'end'): void
+  /**
+   * Move the caret to the first heading matching `fragment`
+   * (case-insensitive, whitespace-collapsed) and scroll it into view.
+   * Returns false when no heading matches. Drives the outline sidebar.
+   */
+  revealHeading(fragment: string): boolean
   /** The current selection's text (blocks separated by blank lines). */
   getSelectedText(): string
   /** Open the selection AI menu (no-op on an empty selection). */
@@ -278,6 +284,7 @@ export function NoteEditor({
       insertMarkdown: (markdown) => innerRef.current?.insertMarkdown(markdown),
       focus: () => innerRef.current?.focus(),
       setSelection: (position) => innerRef.current?.setSelection(position),
+      revealHeading: (fragment) => innerRef.current?.revealHeading(fragment) ?? false,
       getSelectedText: () => innerRef.current?.getSelectedText() ?? '',
       openSelectionMenu: () => innerRef.current?.openSelectionMenu(),
       startPendingReplacement: (options) =>

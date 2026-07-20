@@ -34,6 +34,7 @@ function fakeEditor(): NoteEditorHandle & { applied: string[] } {
     insertMarkdown: () => {},
     focus: () => {},
     setSelection: () => {},
+    revealHeading: () => false,
     getSelectedText: () => '',
     openSelectionMenu: () => {},
     startPendingReplacement: () => false,
