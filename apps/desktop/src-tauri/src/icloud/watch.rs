@@ -735,8 +735,10 @@ mod platform {
 
         #[test]
         fn eviction_is_not_deletion_but_disappearance_is() {
-            let mut snapshot =
-                state(&[("notes/evicted.md", local(1)), ("notes/deleted.md", local(1))]);
+            let mut snapshot = state(&[
+                ("notes/evicted.md", local(1)),
+                ("notes/deleted.md", local(1)),
+            ]);
             // The evicted note stays listed placeholder-state; the deleted one
             // is gone from the listing entirely.
             let listing = vec![item("notes/evicted.md", false, None)];

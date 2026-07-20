@@ -364,10 +364,11 @@ pub async fn note_read_local(
     tauri::async_runtime::spawn_blocking(move || {
         match fs::metadata(&abs) {
             Ok(meta) if io::is_dataless(&meta) => return Ok(LocalNoteRead::Evicted),
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-                if io::eviction_placeholder(&abs).is_some_and(|stub| stub.exists()) {
-                    return Ok(LocalNoteRead::Evicted);
-                }
+            Err(err)
+                if err.kind() == std::io::ErrorKind::NotFound
+                    && io::eviction_placeholder(&abs).is_some_and(|stub| stub.exists()) =>
+            {
+                return Ok(LocalNoteRead::Evicted);
             }
             _ => {}
         }
