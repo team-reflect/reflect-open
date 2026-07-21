@@ -3,11 +3,11 @@ import {
   findExactWikiTargetMatches,
   type ExactWikiTargetMatch,
 } from '../indexing/queries'
+import { projectNoteAliases } from '../indexing/indexed-note'
 import { foldFallbackTitleKey, foldKey } from '../markdown/keys'
 import { parseNote } from '../markdown/extract'
 import { normalizeWikiTarget } from '../markdown/resolve'
 import { slugForTitle } from '../markdown/slug'
-import { subjectAliases } from '../markdown/subject-aliases'
 import { listFiles, readNote } from './commands'
 import { dailyPath, NOTES_DIR } from './paths'
 
@@ -94,7 +94,9 @@ async function matchTitleOnDisk(
       continue
     }
     const parsed = parseNote({ path: candidate.path, source })
-    const aliases = [...parsed.frontmatter.aliases, ...subjectAliases(parsed.title)]
+    // Same alias derivation the index projection uses (frontmatter, linkable
+    // rich-title form, subject aliases), so disk fallback and index agree.
+    const aliases = projectNoteAliases(parsed).map((row) => row.alias)
     if (foldKey(parsed.title) === targetKey) {
       exactTitlePaths.push(candidate.path)
       continue

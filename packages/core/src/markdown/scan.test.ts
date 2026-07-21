@@ -90,3 +90,27 @@ describe('scanInlineSegments', () => {
     ])
   })
 })
+
+describe('scan — meowdown grammar recovery & embeds', () => {
+  it('segments only the inner link of a nested opener', () => {
+    expect(scanInlineSegments('x [[a [[b]] y')).toEqual([
+      { kind: 'text', text: 'x [[a ' },
+      { kind: 'wikiLink', target: 'b', alias: null },
+      { kind: 'text', text: ' y' },
+    ])
+  })
+
+  it('segments a ![[x]] embed as a wiki link, keeping the ! as text', () => {
+    expect(scanInlineSegments('a ![[photo.png]] b')).toEqual([
+      { kind: 'text', text: 'a !' },
+      { kind: 'wikiLink', target: 'photo.png', alias: null },
+      { kind: 'text', text: ' b' },
+    ])
+  })
+
+  it('scanInlineWikiLinks anchors an embed at its brackets', () => {
+    expect(scanInlineWikiLinks('![[x]]')).toEqual([
+      { from: 1, to: 6, target: 'x', alias: null, displayFrom: 3, displayTo: 4 },
+    ])
+  })
+})

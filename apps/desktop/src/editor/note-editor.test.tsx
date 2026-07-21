@@ -13,6 +13,7 @@ interface CapturedEditorProps {
   mode?: 'hide' | 'focus' | 'show' | 'source'
   editorClassName?: string
   spellCheck?: boolean
+  caretGlide?: boolean
   blockHandle?: boolean
   timeFormat?: '12' | '24'
   children?: ReactNode
@@ -196,6 +197,18 @@ describe('NoteEditor time format', () => {
   it("maps the 24h setting to meowdown's 24-hour clock", () => {
     render(<NoteEditor initialContent="" timeFormat="24h" />)
     expect(captured.props?.timeFormat).toBe('24')
+  })
+})
+
+describe('NoteEditor smooth caret animation', () => {
+  it('enables caret glide by default', () => {
+    renderEditor()
+    expect(captured.props?.caretGlide).toBe(true)
+  })
+
+  it('disables caret glide when smooth caret animation is off', () => {
+    render(<NoteEditor initialContent="" smoothCaretAnimation={false} />)
+    expect(captured.props?.caretGlide).toBe(false)
   })
 })
 

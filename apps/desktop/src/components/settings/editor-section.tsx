@@ -173,6 +173,13 @@ export function EditorSection(): ReactElement {
         onCheckedChange={(checked) => updateSettings({ editorBulletAfterHeading: checked })}
       />
 
+      <SettingsSwitchField
+        legend="Smooth caret animation"
+        description="Animate the text cursor as it moves while editing."
+        checked={settings.editorSmoothCaretAnimation}
+        onCheckedChange={(checked) => updateSettings({ editorSmoothCaretAnimation: checked })}
+      />
+
       <KeyboardShortcutsField />
     </SettingsSection>
   )

@@ -8,12 +8,25 @@ import type { Frontmatter } from '../markdown/model'
 import type { CaptureIdentity } from './capture-identity'
 import type { CaptureEnvelope } from './capture-envelope'
 
-/** Enrichment lifecycle of a capture note, in its frontmatter. */
+/**
+ * Enrichment lifecycle of a capture note, in its frontmatter. `skipped` means
+ * enrichment stopped touching the note — an edit, a privacy flip, or a
+ * deletion race won. Any checkpoint persisted before the skip, including AI
+ * content and its `captureProvider`/`captureModel` provenance, stays exactly
+ * as written: the stamps describe who authored the persisted text, not
+ * whether the capture finished.
+ */
 export type CaptureStatus = 'pending' | 'done' | 'skipped'
 
 const captureNoteMetaSchema = z.object({
   captureUrl: z.string(),
   captureStatus: z.enum(['pending', 'done', 'skipped']),
+  /** The metadata attempt completed, including a permanently unsuitable page. */
+  captureMetadataStatus: z.literal('done').optional(),
+  /** Prior Daily alias; paired with `captureFinalizeStatus` during a retitle. */
+  captureDailyFromTitle: z.string().optional(),
+  /** Status to commit after the paired Daily alias update succeeds. */
+  captureFinalizeStatus: z.enum(['pending', 'done']).optional(),
   captureHash: z.string(),
   captureSelectionHash: z.string().optional(),
   captureScreenshot: z.string().optional(),
@@ -39,7 +52,7 @@ const PAGE_TEXT_START = '<!-- reflect-capture-page-text:start -->'
 const PAGE_TEXT_END = '<!-- reflect-capture-page-text:end -->'
 
 /** The capture's display title: the page title, else the URL's host. */
-export function displayTitle(envelope: CaptureEnvelope): string {
+export function displayTitle(envelope: Pick<CaptureEnvelope, 'title' | 'url'>): string {
   const title = wikiLinkSafe(envelope.title)
   return title !== '' ? title : urlHost(envelope.url)
 }
@@ -138,13 +151,26 @@ export function metadataValue(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
 }
 
+const DESCRIPTION_PREFIX = '- Description: '
+
 function descriptionLineIndex(metadataLines: readonly string[]): number {
-  return metadataLines.findIndex((candidate) => candidate.startsWith('- Description: '))
+  return metadataLines.findIndex((candidate) => candidate.startsWith(DESCRIPTION_PREFIX))
 }
 
 /** Does the raw body already carry a description metadata bullet? */
 export function hasDescription(body: string): boolean {
   return descriptionLineIndex(body.slice(0, firstSectionStart(body)).split('\n')) !== -1
+}
+
+/** The capture's persisted metadata description, when present. */
+export function captureDescriptionFromBody(body: string): string | undefined {
+  const metadataLines = body.slice(0, firstSectionStart(body)).split('\n')
+  const descriptionLine = descriptionLineIndex(metadataLines)
+  if (descriptionLine === -1) {
+    return undefined
+  }
+  const description = metadataValue(metadataLines[descriptionLine]!.slice(DESCRIPTION_PREFIX.length))
+  return description === '' ? undefined : description
 }
 
 /**
@@ -206,7 +232,7 @@ export function retitleDailyEntry(
  * raw body has a `- Type: #link` anchor.
  */
 export function withDescription(body: string, description: string): string {
-  const line = `- Description: ${metadataValue(description)}`
+  const line = `${DESCRIPTION_PREFIX}${metadataValue(description)}`
   const metadataEnd = firstSectionStart(body)
   const metadataLines = body.slice(0, metadataEnd).split('\n')
   const descriptionLine = descriptionLineIndex(metadataLines)

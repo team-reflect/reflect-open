@@ -12,9 +12,11 @@ import {
   pinnedOrder,
   splitFrontmatter,
   subjectAliases,
+  wikiLinkTargetForTitle,
   type ParsedNote,
 } from '../markdown'
 import { previewSnippet } from './snippet'
+import { serializeWikiSuggestionAddress } from './suggest'
 
 /**
  * The index write payload (Plan 04): a {@link ParsedNote} (Plan 03) flattened into
@@ -65,8 +67,12 @@ import { previewSnippet } from './snippet'
  * until reprojected, so the bump backfills them.
  * 15 — task parent outline/list breadcrumbs: existing task rows carry empty
  * breadcrumbs until reprojected.
+ * 16 - meowdown-aligned wiki-link parsing (the editor's own `gfmParser`) and
+ * derived linkable aliases for rich titles and rich frontmatter aliases:
+ * existing notes must reproject for both the recovery-semantics convergence
+ * and the backfilled alias rows.
  */
-export const PROJECTION_VERSION = 15
+export const PROJECTION_VERSION = 16
 
 export const indexedLinkSchema = z.object({
   kind: z.enum(['wiki', 'md']),
@@ -177,17 +183,35 @@ export const indexedNoteSchema = z.object({
 export type IndexedNote = z.infer<typeof indexedNoteSchema>
 
 /**
- * The `aliases` projection: `aliases:` frontmatter verbatim, then the v1
- * subject aliases derived from the title (`Charlotte MacCaw // Mum`), skipping
- * segments a frontmatter alias already claims. The derived rows are index-only
- * compatibility — the file's frontmatter is never rewritten to hold them.
+ * The `aliases` projection: `aliases:` frontmatter verbatim, then the linkable
+ * form of any rich title or rich frontmatter alias ({@link wikiLinkTargetForTitle}),
+ * then the v1 subject aliases derived from the title (`Charlotte MacCaw // Mum`);
+ * later stages skip keys an earlier row already claims. The derived rows are
+ * index-only — the file's frontmatter is never rewritten to hold them. A
+ * linkable-form row is only projected when it is an address `note_keys` can
+ * actually serve: distinct from its source's key and serializable as wiki-link
+ * text ({@link serializeWikiSuggestionAddress}). Shared with the disk-fallback
+ * resolver so index and disk derive one truth (exported as `projectNoteAliases`).
  */
-function noteAliases(parsed: ParsedNote): IndexedAlias[] {
+export function projectNoteAliases(parsed: ParsedNote): IndexedAlias[] {
   const aliases: IndexedAlias[] = parsed.frontmatter.aliases.map((alias) => ({
     alias,
     aliasKey: foldKey(alias),
   }))
   const claimed = new Set(aliases.map((row) => row.aliasKey))
+  for (const richText of [parsed.title, ...parsed.frontmatter.aliases]) {
+    const linkTarget = wikiLinkTargetForTitle(richText)
+    const linkTargetKey = foldKey(linkTarget)
+    if (
+      linkTargetKey === foldKey(richText) ||
+      claimed.has(linkTargetKey) ||
+      serializeWikiSuggestionAddress(linkTarget, null) === null
+    ) {
+      continue
+    }
+    claimed.add(linkTargetKey)
+    aliases.push({ alias: linkTarget, aliasKey: linkTargetKey })
+  }
   for (const alias of subjectAliases(parsed.title)) {
     const aliasKey = foldKey(alias)
     if (claimed.has(aliasKey)) {
@@ -250,7 +274,7 @@ export function buildIndexedNote(
     preview: previewSnippet(parsed.text, parsed.title),
     links: [...wikiLinks, ...mdLinks],
     tags: parsed.tags.map((tag) => ({ tag, tagKey: foldTag(tag) })),
-    aliases: noteAliases(parsed),
+    aliases: projectNoteAliases(parsed),
     emails: extractEmailFields(body).map((email) => ({ email, emailKey: foldEmail(email) })),
     assets: parsed.assets.map((asset) => asset.path),
     tasks: parsed.tasks.map((task) => ({

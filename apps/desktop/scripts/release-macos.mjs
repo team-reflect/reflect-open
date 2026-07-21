@@ -113,6 +113,17 @@ function capture(command, args, options = {}) {
   return execFileSync(command, args, { encoding: 'utf8', ...options })
 }
 
+/** Format an error for fail(), keeping any stdout/stderr captured by execFileSync. */
+export function describeError(error) {
+  if (!(error instanceof Error)) return String(error)
+  const parts = [error.message]
+  for (const stream of ['stdout', 'stderr']) {
+    const text = typeof error[stream] === 'string' ? error[stream].trim() : ''
+    if (text) parts.push(`${stream}:\n${text}`)
+  }
+  return parts.join('\n')
+}
+
 /** Run a command and return { status, output } with stdout+stderr combined. */
 function run(command, args) {
   const result = spawnSync(command, args, { encoding: 'utf8' })
@@ -671,7 +682,7 @@ function resignMacosApp({ flavor, identity, keychain, target }) {
   try {
     signingEntitlements = prepareMacosSigningEntitlements({ app, flavor })
   } catch (error) {
-    fail(`preparing macOS signing entitlements failed: ${error instanceof Error ? error.message : String(error)}`)
+    fail(`preparing macOS signing entitlements failed: ${describeError(error)}`)
   }
 
   try {
@@ -894,7 +905,7 @@ function verify({ notarized, flavor, target }) {
   try {
     verifyMacosProfileIdentityEntitlements({ app, flavor })
   } catch (error) {
-    fail(`profile identity entitlement verification failed: ${error instanceof Error ? error.message : String(error)}`)
+    fail(`profile identity entitlement verification failed: ${describeError(error)}`)
   }
   verifySidecarsLaunch({ flavor, target })
 
@@ -1266,8 +1277,7 @@ function generateReleaseNotesBody({ commit, tag }) {
   try {
     generated = JSON.parse(result.stdout)
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    fail(`GitHub release notes response was not JSON: ${message}`)
+    fail(`GitHub release notes response was not JSON: ${describeError(error)}`)
   }
 
   if (!generated || typeof generated !== 'object' || typeof generated.body !== 'string') {
@@ -1433,8 +1443,7 @@ function findNewestPublishedBetaVersion() {
   try {
     return newestBetaVersionFromTags((result.stdout ?? '').split('\n'))
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    fail(message)
+    fail(describeError(error))
   }
 }
 
@@ -1536,9 +1545,9 @@ function syncBetaFeed() {
  * apps/desktop/package.json). The normal flow fills the asset-less draft
  * release that release-please created when the Release PR merged; the manual
  * fallback creates the release itself. A version with a prerelease segment
- * (e.g. `0.2.0-beta.1`, the `next`-branch convention) publishes as a GitHub
- * pre-release. All preflight checks run before the build so a doomed publish
- * fails in seconds, not after notarization.
+ * (e.g. `0.2.0-beta.1`) publishes as a GitHub pre-release. All preflight checks
+ * run before the build so a doomed publish fails in seconds, not after
+ * notarization.
  */
 function ensurePublishableRelease({ flavorFlag }) {
   ensureGhReady()

@@ -482,6 +482,16 @@ pub fn capture_screenshot_promote(
 const META_FETCH_MAX_BYTES: usize = 512 * 1024;
 const META_FETCH_TIMEOUT: Duration = Duration::from_secs(15);
 
+/// The meta fetch presents as a mainstream browser navigation: sites that
+/// gate on client fingerprint (Instagram among them) can answer bare app
+/// user agents with login walls or challenges a normal browser request never
+/// sees. Safari's platform token is frozen upstream, so the string stays
+/// plausible without tracking macOS releases.
+const META_FETCH_USER_AGENT: &str = concat!(
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ",
+    "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
+);
+
 fn classify_fetch_error(err: reqwest::Error) -> AppError {
     if err.is_timeout() || err.is_connect() || err.is_request() {
         AppError::Network {
@@ -492,40 +502,58 @@ fn classify_fetch_error(err: reqwest::Error) -> AppError {
     }
 }
 
+/// Map a meta-fetch response status to its error: `None` for success,
+/// retryable `Network` for server errors and rate limiting (sites like
+/// Instagram answer `429` to bursts and recover — the enrichment pass keeps
+/// the capture pending and tries again later), permanent `io` for everything
+/// else.
+fn classify_fetch_status(url: &str, status: reqwest::StatusCode) -> Option<AppError> {
+    if status.is_success() {
+        return None;
+    }
+    let message = format!("{url} answered {status}");
+    if status.is_server_error() || status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+        return Some(AppError::Network { message });
+    }
+    Some(AppError::io(message))
+}
+
 /// Fetch a captured page's HTML for meta-tag scraping, hard-capped (timeout,
 /// byte cap, redirect limit, http(s) only). Lives here rather than widening
 /// the webview's HTTP-plugin capability to every URL — the only thing that
 /// can reach arbitrary hosts is this bounded, HTML-only primitive, and the
 /// privacy gate in `@reflect/core` runs before it is ever called.
 #[tauri::command]
-pub async fn capture_meta_fetch<R: tauri::Runtime>(
-    url: String,
-    app: tauri::AppHandle<R>,
-) -> AppResult<String> {
+pub async fn capture_meta_fetch(url: String) -> AppResult<String> {
     if !url.starts_with("https://") && !url.starts_with("http://") {
         return Err(AppError::parse(format!("not an http(s) url: {url}")));
     }
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::limited(5))
         .timeout(META_FETCH_TIMEOUT)
-        .user_agent(crate::app_user_agent(&app))
+        .user_agent(META_FETCH_USER_AGENT)
         .build()
         .map_err(|err| AppError::io(err.to_string()))?;
     let response = client
         .get(&url)
-        .header("Accept", "text/html,application/xhtml+xml")
+        // The full header set a browser sends on a typed-URL navigation —
+        // absent Sec-Fetch/Accept-Language headers are themselves a bot
+        // signal to fingerprinting CDNs.
+        .header(
+            "Accept",
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        )
+        .header("Accept-Language", "en-US,en;q=0.9")
+        .header("Sec-Fetch-Dest", "document")
+        .header("Sec-Fetch-Mode", "navigate")
+        .header("Sec-Fetch-Site", "none")
+        .header("Upgrade-Insecure-Requests", "1")
         .send()
         .await
         .map_err(classify_fetch_error)?;
 
-    let status = response.status();
-    if status.is_server_error() {
-        return Err(AppError::Network {
-            message: format!("{url} answered {status}"),
-        });
-    }
-    if !status.is_success() {
-        return Err(AppError::io(format!("{url} answered {status}")));
+    if let Some(err) = classify_fetch_status(&url, response.status()) {
+        return Err(err);
     }
     let content_type = response
         .headers()
@@ -554,6 +582,29 @@ pub async fn capture_meta_fetch<R: tauri::Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn meta_fetch_statuses_classify_rate_limits_as_retryable() {
+        use reqwest::StatusCode;
+        let url = "https://www.instagram.com/reel/example/";
+        assert!(classify_fetch_status(url, StatusCode::OK).is_none());
+        assert!(matches!(
+            classify_fetch_status(url, StatusCode::TOO_MANY_REQUESTS),
+            Some(AppError::Network { .. })
+        ));
+        assert!(matches!(
+            classify_fetch_status(url, StatusCode::BAD_GATEWAY),
+            Some(AppError::Network { .. })
+        ));
+        assert!(matches!(
+            classify_fetch_status(url, StatusCode::NOT_FOUND),
+            Some(AppError::Io { .. })
+        ));
+        assert!(matches!(
+            classify_fetch_status(url, StatusCode::FORBIDDEN),
+            Some(AppError::Io { .. })
+        ));
+    }
 
     #[test]
     fn manifest_pins_name_path_and_origins() {

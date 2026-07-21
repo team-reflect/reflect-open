@@ -26,10 +26,16 @@ disk at call time), and it is covered by tests.
 
 ## Audio memos (off until you add a key)
 
-- **Where:** the transcription provider you configured (OpenAI or Google).
-- **What:** the recorded **audio bytes only** — never any note content. The transcript
-  is written locally. Because no note content is read, recording works even when
-  today's note is private.
+- **Where:** directly to your configured providers. OpenAI or Google receives the
+  recording for speech-to-text. A small text model from your configured OpenAI,
+  Anthropic, or Google provider receives the fresh transcript to create the memo
+  title and, when Transcription auto-format is enabled, add punctuation, paragraphs,
+  and light Markdown to the body.
+- **What:** the recorded audio bytes and the transcript produced from that recording.
+  Existing note content is never read or sent. The resulting Markdown is written
+  locally. Because no note content is read, recording works even when today's note is
+  private. Turn Transcription auto-format off in Settings to store the raw provider
+  transcript; the title-generation call still receives that transcript.
 - **When:** when you record a memo, and on retry for memos still awaiting
   transcription.
 
@@ -91,12 +97,14 @@ disk at call time), and it is covered by tests.
 
 - **Where:** Sentry, for errors raised in the React/WebView layer. Native process crashes
   remain covered by the operating system's crash reporting.
-- **What:** an allow-listed diagnostic containing the exception class, redacted exception
-  text, sanitized JavaScript stack locations, the app version, and whether React handled
-  the error. Stack filenames are reduced to bundle basenames. Request data, note content,
-  note titles, graph paths, local filesystem paths, breadcrumbs, console output, session
-  replay, tracing, and user identifiers are not collected. Sentry is also configured not
-  to store the transport IP address with events.
+- **What:** an allow-listed diagnostic containing the exception class, sanitized
+  JavaScript stack locations, the app version, and whether the exception was marked
+  handled. A small set of vetted structural error messages that cannot contain document
+  data is kept; all other exception text is redacted. Stack filenames are reduced to
+  bundle basenames. Request
+  data, note content, note titles, graph paths, local filesystem paths, breadcrumbs,
+  console output, session replay, tracing, and user identifiers are not collected. Sentry
+  is also configured not to store the transport IP address with events.
 - **When:** only when an official desktop or iOS release raises an uncaught JavaScript
   error, an unhandled promise rejection, or a caught/recoverable React error. Development
   and self-built apps without the release DSN do not initialize Sentry.
@@ -127,7 +135,7 @@ API keys and tokens live in the **OS keychain only** — never in markdown, neve
 | Call | Destination | Carries note content? | Off by default? |
 | --- | --- | --- | --- |
 | AI chat | Your chosen provider | Yes — private-note tool reads are blocked | Yes (needs your key) |
-| Transcription | Your chosen provider | No — audio bytes only | Yes (needs your key) |
+| Audio transcription | Your chosen providers | No existing note content; audio and its fresh transcript | Yes (needs your key) |
 | Embeddings | Nowhere (on-device) | — | Yes (opt-in download) |
 | Model download | Hugging Face | No | Yes (opt-in) |
 | Backup | Your git repository | Yes — including private notes | Yes (needs connecting) |
@@ -135,4 +143,4 @@ API keys and tokens live in the **OS keychain only** — never in markdown, neve
 | Update check | GitHub Releases | No | On in packaged builds |
 | Browser capture | Nowhere (local host on disk) | — (stays on your machine) | — (only when you capture) |
 | Contacts lookup | Nowhere (on-device OS store) | — (stays on your machine) | Yes (opt-in) |
-| Exception diagnostics | Sentry | No — messages and context are redacted | No (official releases) |
+| Exception diagnostics | Sentry | No — free-form messages and context are redacted | No (official releases) |

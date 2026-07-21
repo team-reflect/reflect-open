@@ -28,14 +28,14 @@ PR titles must follow [Conventional Commits](https://www.conventionalcommits.org
 — CI enforces the format. The repo squash-merges, so your PR title becomes the
 commit message and, for `feat`/`fix`, the user-facing changelog entry.
 
-- `feat: …` — new behavior; bumps the minor version (on `next`: the next beta).
-- `fix: …` — a fix; bumps the patch version (on `next`: the next beta).
+- `feat: …` — new behavior; bumps the minor version (of the next beta and stable).
+- `fix: …` — a fix; bumps the patch version (of the next beta and stable).
 - `docs:` / `chore:` / `ci:` / `test:` / `refactor:` / `build:` — no release,
   no changelog entry.
 - Reflect is an app, not a library: `feat!:` and `BREAKING CHANGE:` footers are
-  not used (CI rejects `!`). Going 1.0 someday is a product decision: open the
-  1.0 beta cycle through the beta release manifest, then the stable promotion
-  carries `1.0.0-beta.N` to `1.0.0` automatically.
+  not used (CI rejects `!`). Going 1.0 someday is a product decision: set a
+  one-time `release-as` in the release-please configs so the Release PRs offer
+  `1.0.0-beta.N` and `1.0.0`, then drop it once both have merged.
 - Write the title as user-visible behavior (`fix: keep the daily caret in view
   on long iOS notes`), not implementation detail.
 - The changelog is scoped to `apps/desktop/`: a change that should appear in it

@@ -1,6 +1,6 @@
 /**
  * `@reflect/core` markdown document model (Plan 03) — the one canonical
- * parse/extract/edit layer over `@lezer/markdown` + `yaml`, shared by the
+ * parse/extract/edit layer over `@meowdown/markdown` + `yaml`, shared by the
  * indexer (Plan 04), editor (Plan 05), backlinks (Plan 07), and CLI (Plan 14).
  */
 export {
@@ -26,7 +26,7 @@ export {
   type FrontmatterSplit,
   type ParsedFrontmatter,
 } from './frontmatter'
-export { parseBody, reflectMarkdownParser, wikiLinkExtension } from './grammar'
+export { parseBody } from './grammar'
 export { parseNote, isTagName, hasAuthoredTitle } from './extract'
 export {
   scanInlineWikiLinks,
@@ -51,6 +51,7 @@ export {
   toggleTaskMarker,
   TaskStaleError,
 } from './edit'
+export { displayNoteTitle, wikiLinkTargetForTitle } from './note-title'
 export { parseTaskMarker } from './task-marker'
 export {
   conflictMarkerBlockCount,

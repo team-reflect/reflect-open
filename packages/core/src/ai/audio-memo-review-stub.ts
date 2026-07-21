@@ -4,9 +4,9 @@
  * the app behave as if a real key was entered while never touching the
  * network. Exactly two places consult it: `validateApiKey` accepts it without
  * probing the provider (a real probe would 401 and block saving it), and
- * `memoNoteBody` in `actions/audio-memo` returns a canned local transcript
- * instead of calling any provider. Capture and note plumbing run exactly as
- * in production.
+ * `buildAudioMemoTranscript` in `ai/audio-memo-transcript` returns a canned
+ * local transcript instead of calling any provider. Capture and note plumbing
+ * run exactly as in production.
  */
 export const APP_REVIEW_STUB_KEY = 'sk-demo'
 

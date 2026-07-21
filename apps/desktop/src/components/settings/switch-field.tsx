@@ -23,6 +23,7 @@ export function SettingsSwitchField({
   onCheckedChange,
 }: SettingsSwitchFieldProps): ReactElement {
   const labelId = useId()
+  const descriptionId = useId()
 
   return (
     <div className="flex items-center justify-between gap-4 px-4 py-3.5">
@@ -30,10 +31,13 @@ export function SettingsSwitchField({
         <div id={labelId} className="text-sm font-medium text-text">
           {legend}
         </div>
-        <p className="mt-0.5 text-xs text-text-muted">{description}</p>
+        <p id={descriptionId} className="mt-0.5 text-xs text-text-muted">
+          {description}
+        </p>
       </div>
       <Switch
         aria-labelledby={labelId}
+        aria-describedby={descriptionId}
         checked={checked}
         onCheckedChange={onCheckedChange}
         className="shrink-0"

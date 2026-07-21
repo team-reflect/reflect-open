@@ -16,8 +16,7 @@
     "@ai-sdk/anthropic": "^3.0.96",
     "@ai-sdk/google": "^3.0.84",
     "@ai-sdk/openai": "^3.0.84",
-    "@lezer/common": "^1.5.2",
-    "@lezer/markdown": "^1.6.4",
+    "@meowdown/markdown": "^0.55.1",
     "@reflect/db": "workspace:*",
     "@reflect/utils": "workspace:*",
     "ai": "^6.0.211",
@@ -29,6 +28,7 @@
   "devDependencies": {
     "@ai-sdk/provider": "^3.0.11",
     "jsdom": "^29.1.1",
+    "sqlite-vec": "^0.1.9",
     "typescript": "~6.0.3",
     "vitest": "^4.1.9"
   }

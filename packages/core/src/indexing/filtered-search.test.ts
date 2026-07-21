@@ -228,7 +228,7 @@ describe('searchWithFilters', () => {
   })
 
   it('resolves links: tokens by title before filtering (token behavior unchanged)', async () => {
-    mockInvoke.mockResolvedValueOnce([{ path: 'notes/alpha-1.md' }])
+    mockInvoke.mockResolvedValueOnce([{ note_path: 'notes/alpha-1.md' }])
     mockInvoke.mockResolvedValueOnce([])
 
     await searchWithFilters(parseSearchQuery('links:Alpha'))

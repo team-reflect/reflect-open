@@ -1,5 +1,87 @@
 # Changelog
 
+## [0.7.0-beta.12](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.11...v0.7.0-beta.12) (2026-07-19)
+
+
+### Features
+
+* **mobile:** add AI provider consent block ([#891](https://github.com/team-reflect/reflect-open/issues/891)) ([595a215](https://github.com/team-reflect/reflect-open/commit/595a2157d920cba258a93180c2bc44e22188efe4))
+
+
+### Bug Fixes
+
+* fetch link previews like a normal browser request ([#886](https://github.com/team-reflect/reflect-open/issues/886)) ([cab03fb](https://github.com/team-reflect/reflect-open/commit/cab03fb324984d88dfb72a553e767a8db615e5ee))
+* update meowdown to ^0.55.1 ([#865](https://github.com/team-reflect/reflect-open/issues/865)) ([71e2fe9](https://github.com/team-reflect/reflect-open/commit/71e2fe90f29db3372020dfec317b2c9d384b0d6e))
+
+## [0.7.0-beta.11](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.10...v0.7.0-beta.11) (2026-07-18)
+
+
+### Bug Fixes
+
+* retry rate-limited link previews and clean up share-sheet titles ([#884](https://github.com/team-reflect/reflect-open/issues/884)) ([dfb6d29](https://github.com/team-reflect/reflect-open/commit/dfb6d29d3d76a1de088016f290cc8966da69bdfc))
+
+## [0.7.0-beta.10](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.9...v0.7.0-beta.10) (2026-07-17)
+
+
+### Bug Fixes
+
+* enrich shared links before AI finishes ([#877](https://github.com/team-reflect/reflect-open/issues/877)) ([74a137b](https://github.com/team-reflect/reflect-open/commit/74a137b90e23c9d56b24aa6ee4caf9ca8acd24a9))
+
+## [0.7.0-beta.9](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.8...v0.7.0-beta.9) (2026-07-17)
+
+
+### Features
+
+* format audio transcriptions automatically ([#873](https://github.com/team-reflect/reflect-open/issues/873)) ([c994a2e](https://github.com/team-reflect/reflect-open/commit/c994a2ee2d803a1b751303c67aacac6e2dfb6a4e))
+
+
+### Bug Fixes
+
+* enrich URL-only mobile link captures ([#872](https://github.com/team-reflect/reflect-open/issues/872)) ([88f163b](https://github.com/team-reflect/reflect-open/commit/88f163bb679d84d267c0005d2ad04323034e61a4))
+
+## [0.7.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.7...v0.7.0-beta.8) (2026-07-17)
+
+
+### Bug Fixes
+
+* allow linking notes whose titles contain wikilinks ([#864](https://github.com/team-reflect/reflect-open/issues/864)) ([8332444](https://github.com/team-reflect/reflect-open/commit/8332444f3242f6c68ee42cbbcdb11740378d41f2))
+* preserve note aliases in links and backlinks ([#861](https://github.com/team-reflect/reflect-open/issues/861)) ([cb1a3dc](https://github.com/team-reflect/reflect-open/commit/cb1a3dc48945c486042b28555579b11ded5a2d4f))
+
+## [0.7.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.6...v0.7.0-beta.7) (2026-07-16)
+
+
+### Bug Fixes
+
+* update meowdown to ^0.52.2 ([#853](https://github.com/team-reflect/reflect-open/issues/853)) ([49546ee](https://github.com/team-reflect/reflect-open/commit/49546ee1bb7bb636e0cbcdf70863bdeb325600f9))
+
+## [0.7.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.5...v0.7.0-beta.6) (2026-07-16)
+
+
+### Bug Fixes
+
+* prevent macOS iCloud launch crashes ([#846](https://github.com/team-reflect/reflect-open/issues/846)) ([df42bd8](https://github.com/team-reflect/reflect-open/commit/df42bd80c3759fac526fe729a0a59f3eaae9f4bc))
+* update meowdown to ^0.52.1 ([#847](https://github.com/team-reflect/reflect-open/issues/847)) ([aee87be](https://github.com/team-reflect/reflect-open/commit/aee87bebbe91a5495949e900644958e8fad6335c))
+
+## [0.7.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.4...v0.7.0-beta.5) (2026-07-16)
+
+
+### Features
+
+* add a smooth caret animation setting ([#840](https://github.com/team-reflect/reflect-open/issues/840)) ([bc1f201](https://github.com/team-reflect/reflect-open/commit/bc1f2012476cd82f7f2ef6d4294bcccca968af28))
+* render Mermaid code blocks ([#841](https://github.com/team-reflect/reflect-open/issues/841)) ([a7b7c8d](https://github.com/team-reflect/reflect-open/commit/a7b7c8dd3d320d87d7c48ed2e905be08aee6030c))
+
+
+### Bug Fixes
+
+* update meowdown to ^0.51.0 ([#837](https://github.com/team-reflect/reflect-open/issues/837)) ([41b6a85](https://github.com/team-reflect/reflect-open/commit/41b6a8507fcc7e03496fbeb7afd75e5eec546c74))
+
+## [0.7.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.3...v0.7.0-beta.4) (2026-07-16)
+
+
+### Bug Fixes
+
+* rename GitHub backup to GitHub sync in settings ([#830](https://github.com/team-reflect/reflect-open/issues/830)) ([69a3a29](https://github.com/team-reflect/reflect-open/commit/69a3a29817668275261b7b967b62576571b26955))
+
 ## [0.7.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.2...v0.7.0-beta.3) (2026-07-15)
 
 

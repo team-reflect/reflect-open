@@ -1,28 +1,39 @@
-import { describePage, isDescriptionRejected, type PageEnrichment } from '../ai/describe-page'
+import {
+  describePage,
+  isDescriptionRejected,
+  normalizedPageTitle,
+  type PageEnrichment,
+} from '../ai/describe-page'
 import { defaultAiProvider, type AiProvidersState } from '../ai/provider-config'
 import { aiKeySecretName } from '../ai/secrets'
 import { errorMessage, isAppError, toAppError } from '../errors'
 import { listFiles, readAsset, readNote, writeNote } from '../graph/commands'
 import { dailyPath } from '../graph/paths'
 import { hashContent } from '../indexing/hash'
-import { parseNote } from '../markdown/extract'
 import { parseFrontmatter, splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter'
 import { getSecret } from '../secrets/keychain'
 import type { AiProviderConfig } from '../settings/schema'
 import type { ReconcileStop } from './audio-memo'
+import {
+  finishCaptureWrite,
+  hasCaptureWriteTransaction,
+  persistCaptureEnrichment,
+  readPendingCaptureSnapshot,
+  type PendingCaptureSnapshot,
+} from './capture-enrichment-write'
 import { captureFromPath, type CaptureIdentity } from './capture-identity'
 import {
+  captureDescriptionFromBody,
   captureNoteMeta,
   capturePageTextFromBody,
+  displayTitle,
   hasDescription,
   metadataValue,
   notePrivate,
   noteSource,
-  retitleDailyEntry,
   withDescription,
   withTitle,
   type CaptureNoteMeta,
-  type CaptureStatus,
 } from './capture-note'
 import { scrapePageMeta, type PageMeta } from './meta-scrape'
 
@@ -90,26 +101,15 @@ interface GenerateEnrichmentInput {
   scraped: PageMeta | null
   /** The raw drain-written body (page text is extracted from it). */
   body: string
-  generation: number
+  screenshotBase64?: string | undefined
 }
 
 /**
- * The AI leg of one capture's enrichment: read the screenshot asset, make the
- * one-shot provider call, and treat a provider refusal as "no enrichment"
- * (`null`) — the scraped meta is the fallback. Transient failures (`auth`,
- * `network`) propagate for the pass to retry later.
+ * The AI leg of one capture's enrichment: make the one-shot provider call and
+ * treat a provider refusal as "no enrichment" (`null`) — the scraped meta is
+ * the fallback. Transient failures (`auth`, `network`) propagate for retry.
  */
 async function generateEnrichment(input: GenerateEnrichmentInput): Promise<PageEnrichment | null> {
-  let screenshotBase64: string | undefined
-  if (input.meta.captureScreenshot) {
-    try {
-      screenshotBase64 = await readAsset(input.meta.captureScreenshot, input.generation)
-    } catch (cause) {
-      if (!isAppError(cause) || cause.kind !== 'notFound') {
-        throw cause
-      }
-    }
-  }
   try {
     return await describePage({
       config: input.config,
@@ -121,7 +121,7 @@ async function generateEnrichment(input: GenerateEnrichmentInput): Promise<PageE
       siteName: input.scraped?.siteName ?? undefined,
       metaDescription: input.scraped?.description ?? undefined,
       contentText: capturePageTextFromBody(input.body),
-      screenshotBase64,
+      screenshotBase64: input.screenshotBase64,
     })
   } catch (cause) {
     if (!isDescriptionRejected(cause)) {
@@ -131,11 +131,29 @@ async function generateEnrichment(input: GenerateEnrichmentInput): Promise<PageE
   }
 }
 
+async function readCaptureScreenshot(
+  meta: CaptureNoteMeta,
+  generation: number,
+): Promise<string | undefined> {
+  if (!meta.captureScreenshot) {
+    return undefined
+  }
+  try {
+    return await readAsset(meta.captureScreenshot, generation)
+  } catch (cause) {
+    if (!isAppError(cause) || cause.kind !== 'notFound') {
+      throw cause
+    }
+    return undefined
+  }
+}
+
 /**
- * Enrich every pending capture: scrape the page's meta tags, generate the AI
- * description and cleaned-up display title when a provider is configured
- * (retitling the note's H1 and the daily entry's link text), and stamp
- * `captureStatus: done`. Never throws.
+ * Enrich every pending capture: scrape the page's description and display
+ * title and persist those before the optional AI call. A provider failure
+ * therefore leaves a useful capture pending for retry instead of hiding the
+ * metadata work; a completed/no-provider pass stamps `captureStatus: done`.
+ * Never throws.
  */
 export async function reconcileCaptureEnrichment(
   input: ReconcileCaptureEnrichmentInput,
@@ -158,23 +176,26 @@ export async function reconcileCaptureEnrichment(
 
   const config = defaultAiProvider(input.providers)
   let apiKey: string | null = null
+  let providerStop: ReconcileStop | null = null
   if (config !== null) {
-    apiKey = await getSecret(aiKeySecretName(config.id)).catch(() => null)
-    if (apiKey === null) {
-      return {
-        pending: pending.length,
-        enriched: 0,
-        skipped: 0,
-        stopped: {
-          reason: 'config',
-          message: `The API key for the configured ${config.provider} model is missing from the keychain.`,
-        },
+    try {
+      apiKey = await getSecret(aiKeySecretName(config.id))
+    } catch (cause) {
+      const error = toAppError(cause)
+      providerStop = { reason: error.kind, message: error.message }
+    }
+    if (apiKey === null && providerStop === null) {
+      providerStop = {
+        reason: 'config',
+        message: `The API key for the configured ${config.provider} model is missing from the keychain.`,
       }
     }
   }
 
   let enriched = 0
   let skipped = 0
+  let waitingForKey = false
+  let transientStop: ReconcileStop | null = null
   const stale = (): boolean => input.isStale?.() === true
   const outcome = (stopped: ReconcileStop | null): ReconcileCaptureEnrichmentOutcome => ({
     pending: pending.length,
@@ -185,10 +206,40 @@ export async function reconcileCaptureEnrichment(
   const markSkipped = async (source: string, identity: CaptureIdentity): Promise<void> => {
     await writeNote(
       identity.notePath,
-      upsertFrontmatter(source, { captureStatus: 'skipped' }),
+      upsertFrontmatter(source, {
+        captureStatus: 'skipped',
+        captureDailyFromTitle: undefined,
+        captureFinalizeStatus: undefined,
+      }),
       input.generation,
     )
     skipped += 1
+  }
+  const skipPending = async (identity: CaptureIdentity): Promise<void> => {
+    const snapshot = await readPendingCaptureSnapshot(identity, input.generation)
+    if (snapshot !== null) {
+      await markSkipped(snapshot.source, identity)
+    }
+  }
+  const currentCapture = async (
+    identity: CaptureIdentity,
+    expectedHash?: string,
+  ): Promise<PendingCaptureSnapshot | null> => {
+    const snapshot = await readPendingCaptureSnapshot(identity, input.generation)
+    if (snapshot === null) {
+      return null
+    }
+    const dailySource = await noteSource(dailyPath(identity.date), input.generation)
+    const bodyHash = await hashContent(snapshot.body)
+    if (
+      snapshot.isPrivate ||
+      notePrivate(dailySource) ||
+      bodyHash !== (expectedHash ?? snapshot.meta.captureHash)
+    ) {
+      await markSkipped(snapshot.source, identity)
+      return null
+    }
+    return snapshot
   }
 
   for (const identity of pending) {
@@ -196,101 +247,237 @@ export async function reconcileCaptureEnrichment(
       return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
     }
     try {
-      let source: string
-      try {
-        source = await readNote(identity.notePath, input.generation)
-      } catch (cause) {
-        if (isAppError(cause) && cause.kind === 'notFound') {
+      let snapshot = await currentCapture(identity)
+      if (snapshot === null) {
+        continue
+      }
+      if (hasCaptureWriteTransaction(snapshot.meta)) {
+        const finalized = await finishCaptureWrite(identity, input.generation)
+        if (finalized === null) {
+          await skipPending(identity)
           continue
         }
-        throw cause
+        if (finalized === 'done') {
+          enriched += 1
+          continue
+        }
+        snapshot = await currentCapture(identity)
+        if (snapshot === null) {
+          continue
+        }
       }
-      const split = splitFrontmatter(source)
-      const frontmatter = parseFrontmatter(split.raw).data
-      const meta = captureNoteMeta(frontmatter)
-      if (meta === null || meta.captureStatus !== 'pending') {
-        continue
-      }
-
-      const dailySource = await noteSource(dailyPath(identity.date), input.generation)
-      if (frontmatter.private || notePrivate(dailySource)) {
-        await markSkipped(source, identity)
-        continue
-      }
-      if ((await hashContent(split.body)) !== meta.captureHash) {
-        await markSkipped(source, identity)
+      const metadataComplete = snapshot.meta.captureMetadataStatus === 'done'
+      if (metadataComplete && apiKey === null) {
+        if (config !== null) {
+          waitingForKey = true
+          continue
+        }
+        const captureHash = await persistCaptureEnrichment({
+          identity,
+          expectedHash: snapshot.meta.captureHash,
+          body: snapshot.body,
+          fromTitle: snapshot.title,
+          toTitle: snapshot.title,
+          status: 'done',
+          provider: null,
+          generation: input.generation,
+        })
+        if (captureHash === null) {
+          await skipPending(identity)
+          continue
+        }
+        enriched += 1
         continue
       }
 
       let pageMeta: PageMeta | null = null
-      try {
-        pageMeta = await scrapePageMeta(meta.captureUrl)
-      } catch (cause) {
-        const kind = toAppError(cause).kind
-        if (kind === 'network' || kind === 'auth') {
-          throw cause
+      if (metadataComplete) {
+        // Deliberately lossy resume: the checkpoint keeps only what the note
+        // shows, so a retried AI call sees the current H1 as the meta title
+        // and loses `siteName` — close enough that persisting the raw scrape
+        // isn't worth another frontmatter field.
+        pageMeta = {
+          title: snapshot.title,
+          description: captureDescriptionFromBody(snapshot.body) ?? null,
+          siteName: null,
         }
-        pageMeta = null
+      } else {
+        try {
+          pageMeta = await scrapePageMeta(snapshot.meta.captureUrl)
+        } catch (cause) {
+          const kind = toAppError(cause).kind
+          if (kind === 'network' || kind === 'auth') {
+            throw cause
+          }
+          // Invalid URLs, non-HTML responses, and non-retryable statuses are
+          // permanent for this capture; checkpoint the no-metadata result.
+          // (Rate limits and server errors arrive as `network` and retry.)
+          pageMeta = null
+        }
       }
       if (stale()) {
         return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
       }
 
-      const title = parseNote({ path: identity.notePath, source }).title
-      let generated: PageEnrichment | null = null
-      if (config !== null && apiKey !== null) {
-        generated = await generateEnrichment({
-          config,
-          apiKey,
-          fetchFn: input.fetchFn,
-          meta,
-          title,
-          scraped: pageMeta,
-          body: split.body,
+      snapshot = await currentCapture(identity)
+      if (snapshot === null) {
+        continue
+      }
+      const placeholderTitle = displayTitle({ title: '', url: snapshot.meta.captureUrl })
+      const metadataTitle =
+        snapshot.title === placeholderTitle && pageMeta?.title
+          ? normalizedPageTitle(pageMeta.title)
+          : null
+      const metadataDisplayTitle = metadataTitle ?? snapshot.title
+      const metadataDescription = hasDescription(snapshot.body)
+        ? null
+        : pageMeta?.description ?? null
+      let metadataBody =
+        metadataDescription !== null
+          ? withDescription(snapshot.body, metadataDescription)
+          : snapshot.body
+      if (metadataTitle !== null) {
+        metadataBody = withTitle(metadataBody, metadataTitle)
+      }
+
+      if (config === null) {
+        const titleChanged = metadataDisplayTitle !== snapshot.title
+        // Two persists on purpose: the retitle commits as `pending` first so
+        // an interrupted Daily write resumes as `pending`, letting a provider
+        // configured between passes still run AI on this capture. Only after
+        // the retitle fully lands does the second persist stamp `done`.
+        const captureHash = await persistCaptureEnrichment({
+          identity,
+          expectedHash: snapshot.meta.captureHash,
+          body: metadataBody,
+          fromTitle: snapshot.title,
+          toTitle: metadataDisplayTitle,
+          status: titleChanged ? 'pending' : 'done',
+          provider: null,
           generation: input.generation,
         })
-        if (stale()) {
-          return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
+        if (captureHash === null) {
+          await skipPending(identity)
+          continue
         }
+        if (titleChanged) {
+          const finalizedHash = await persistCaptureEnrichment({
+            identity,
+            expectedHash: captureHash,
+            body: metadataBody,
+            fromTitle: metadataDisplayTitle,
+            toTitle: metadataDisplayTitle,
+            status: 'done',
+            provider: null,
+            generation: input.generation,
+          })
+          if (finalizedHash === null) {
+            await skipPending(identity)
+            continue
+          }
+        }
+        enriched += 1
+        continue
+      }
+
+      let metadataHash = snapshot.meta.captureHash
+      if (!metadataComplete) {
+        const persistedHash = await persistCaptureEnrichment({
+          identity,
+          expectedHash: snapshot.meta.captureHash,
+          body: metadataBody,
+          fromTitle: snapshot.title,
+          toTitle: metadataDisplayTitle,
+          status: 'pending',
+          provider: null,
+          generation: input.generation,
+        })
+        if (persistedHash === null) {
+          await skipPending(identity)
+          continue
+        }
+        metadataHash = persistedHash
+      }
+      if (stale()) {
+        return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
+      }
+      if (apiKey === null) {
+        waitingForKey = true
+        continue
+      }
+
+      snapshot = await currentCapture(identity, metadataHash)
+      if (snapshot === null) {
+        continue
+      }
+      const screenshotBase64 = await readCaptureScreenshot(snapshot.meta, input.generation)
+      if (stale()) {
+        return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
+      }
+      snapshot = await currentCapture(identity, metadataHash)
+      if (snapshot === null) {
+        continue
+      }
+      const generated: PageEnrichment | null = await generateEnrichment({
+        config,
+        apiKey,
+        fetchFn: input.fetchFn,
+        meta: snapshot.meta,
+        title: snapshot.title,
+        scraped: pageMeta,
+        body: snapshot.body,
+        screenshotBase64,
+      })
+      if (stale()) {
+        return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
+      }
+
+      snapshot = await currentCapture(identity, metadataHash)
+      if (snapshot === null) {
+        continue
       }
       const aiTitle = generated?.title ?? null
+      const enrichedTitle = aiTitle ?? snapshot.title
       const description = generated?.description ?? null
 
       const usedAiDescription = description !== null && metadataValue(description) !== ''
-      const usedAi = (usedAiDescription || aiTitle !== null) && config !== null
-      const text = usedAiDescription
-        ? description
-        : hasDescription(split.body)
-          ? null
-          : pageMeta?.description ?? null
-      let newBody = text !== null ? withDescription(split.body, text) : split.body
+      const usedAi = usedAiDescription || aiTitle !== null
+      let newBody = usedAiDescription ? withDescription(snapshot.body, description) : snapshot.body
       if (aiTitle !== null) {
         newBody = withTitle(newBody, aiTitle)
       }
-      const reassembled = source.slice(0, split.bodyOffset) + newBody
-      await writeNote(
-        identity.notePath,
-        upsertFrontmatter(reassembled, {
-          captureStatus: 'done' satisfies CaptureStatus,
-          captureHash: await hashContent(newBody),
-          captureProvider: usedAi ? config.provider : undefined,
-          captureModel: usedAi ? config.model : undefined,
-        }),
-        input.generation,
-      )
-      if (aiTitle !== null && aiTitle !== title) {
-        // Re-read the daily: the provider call above is slow, and the
-        // pre-call snapshot would silently drop anything written meanwhile.
-        const freshDaily = await noteSource(dailyPath(identity.date), input.generation)
-        const retitled = retitleDailyEntry(freshDaily, identity.base, title, aiTitle)
-        if (retitled !== freshDaily) {
-          await writeNote(dailyPath(identity.date), retitled, input.generation)
-        }
+      const captureHash = await persistCaptureEnrichment({
+        identity,
+        expectedHash: metadataHash,
+        body: newBody,
+        fromTitle: snapshot.title,
+        toTitle: enrichedTitle,
+        status: 'done',
+        provider: usedAi ? config : null,
+        generation: input.generation,
+      })
+      if (captureHash === null) {
+        await skipPending(identity)
+        continue
       }
       enriched += 1
     } catch (cause) {
-      return outcome({ reason: toAppError(cause).kind, message: errorMessage(cause) })
+      const error = toAppError(cause)
+      // A transient failure — offline, a rate-limited page, an unavailable
+      // provider — leaves this capture pending for the next pass, but must
+      // not starve the captures queued behind it. Anything else (auth, an
+      // unexpected write failure) affects every capture alike, so it aborts
+      // the pass.
+      if (error.kind === 'network') {
+        transientStop ??= { reason: error.kind, message: errorMessage(cause) }
+        continue
+      }
+      return outcome({ reason: error.kind, message: errorMessage(cause) })
     }
   }
-  return outcome(null)
+  // `waitingForKey` is only ever set when a provider is configured without a
+  // usable key, which is exactly when `providerStop` was populated above. It
+  // outranks a transient stop: a keychain failure is persistent and surfaced
+  // to the user, and a silent network stop must not mask it.
+  return outcome((waitingForKey ? providerStop : null) ?? transientStop)
 }

@@ -60,7 +60,9 @@ git2 = { version = "0.21.0", default-features = false, features = [
   "vendored-libgit2",
   "vendored-openssl",
 ] }
-tauri-plugin-http = "2.5.9"
+# unsafe-headers lets provider-fetch.ts pass an explicit empty Origin, which
+# the plugin treats as "send no Origin header" (see providerFetch's doc).
+tauri-plugin-http = { version = "2.5.9", features = ["unsafe-headers"] }
 # Link capture (Plan 11): screenshot downscale + the bounded meta-scrape fetch.
 # reqwest 0.12 rides the exact version tauri-plugin-http already compiles.
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }

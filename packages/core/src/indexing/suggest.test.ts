@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { parseNote } from '../markdown'
+import { foldKey } from '../markdown/keys'
 import {
   mergeDateSuggestions,
   rankWikiSuggestions,
+  serializeWikiSuggestionAddress,
   type AliasCandidate,
   type TitleCandidate,
   type WikiSuggestion,
@@ -80,7 +83,60 @@ describe('rankWikiSuggestions', () => {
   })
 })
 
-function ranked(title: string, extra?: Partial<WikiSuggestion>): WikiSuggestion {
+describe('wiki suggestion serialization', () => {
+  it('preserves an alias as display text while targeting the canonical note', () => {
+    const suggestion = rankWikiSuggestions(
+      'dad',
+      [],
+      [alias(note('Tim MacCaw // Dad'), 'Dad')],
+      8,
+    )[0]!
+
+    const insertText = serializeWikiSuggestionAddress(
+      suggestion.target,
+      suggestion.alias,
+    )
+    expect(insertText).toBe('Tim MacCaw // Dad|Dad')
+    expect(parseNote({ path: 'notes/source.md', source: `[[${insertText}]]` }).wikiLinks).toEqual([
+      expect.objectContaining({ target: 'Tim MacCaw // Dad', alias: 'Dad' }),
+    ])
+  })
+
+  it('round-trips every accepted target and display value exactly', () => {
+    const accepted = [
+      { target: 'Road.map!', display: null },
+      { target: 'Tim MacCaw // Dad', display: 'D.ad!?' },
+      { target: 'Café — plans', display: '計画' },
+    ]
+    for (const { target, display } of accepted) {
+      const insertText = serializeWikiSuggestionAddress(target, display)
+      expect(insertText).not.toBeNull()
+      const links = parseNote({
+        path: 'notes/source.md',
+        source: `[[${insertText}]]`,
+      }).wikiLinks
+      expect(links).toHaveLength(1)
+      expect(links[0]!.target).toBe(target)
+      expect(links[0]!.alias ?? null).toBe(display)
+    }
+  })
+
+  it('rejects every unescaped wiki-link delimiter in targets and display text', () => {
+    for (const reserved of ['[', ']', '|', '\\', '\r', '\n']) {
+      expect(serializeWikiSuggestionAddress(`Road${reserved}map`, null)).toBeNull()
+      expect(serializeWikiSuggestionAddress('Roadmap', `Plan${reserved}`)).toBeNull()
+    }
+  })
+
+  it('rejects a blank target rather than inserting an empty link', () => {
+    expect(serializeWikiSuggestionAddress('   ', null)).toBeNull()
+  })
+})
+
+function ranked(
+  title: string,
+  extra?: Partial<WikiSuggestion>,
+): WikiSuggestion {
   return {
     target: title,
     path: `notes/${title.toLowerCase().replaceAll(' ', '-')}.md`,
@@ -155,5 +211,57 @@ describe('mergeDateSuggestions', () => {
     })
     expect(result).toHaveLength(5)
     expect(result[0]!.target).toBe('2020-01-02')
+  })
+})
+
+describe('rankWikiSuggestions — rich titles', () => {
+  const rich = note('Meeting with [[Ada Lovelace|Ada]]', 0, {
+    path: 'notes/meeting.md',
+  })
+
+  it('targets the linkable form while the title stays raw', () => {
+    const [row] = rankWikiSuggestions('meeting', [rich], [], 8)
+    expect(row).toMatchObject({
+      target: 'Meeting with Ada',
+      title: 'Meeting with [[Ada Lovelace|Ada]]',
+      alias: null,
+    })
+  })
+
+  it('folds the derived alias row into a plain suggestion (no self-alias)', () => {
+    const derived = alias(rich, 'Meeting with Ada')
+    const [row] = rankWikiSuggestions('meeting with ada', [], [derived], 8)
+    expect(row).toMatchObject({ target: 'Meeting with Ada', alias: null })
+  })
+
+  it('keeps a real alias as display text on a rich-title note', () => {
+    const standup = alias(rich, 'Standup')
+    const [row] = rankWikiSuggestions('standup', [], [standup], 8)
+    expect(row).toMatchObject({ target: 'Meeting with Ada', alias: 'Standup' })
+  })
+
+  it('keeps an authored alias that differs from the target only by case', () => {
+    const plain = note('Meeting with Ada', 0, { path: 'notes/meeting.md' })
+    const authored = alias(plain, 'meeting with ada')
+    const [row] = rankWikiSuggestions('meeting with ada', [], [authored], 8)
+    expect(row).toMatchObject({ target: 'Meeting with Ada', alias: 'meeting with ada' })
+  })
+})
+
+describe('mergeDateSuggestions — rich titles', () => {
+  it('an exact raw-title hit keeps the top slot ahead of generated dates', () => {
+    const [ranked] = rankWikiSuggestions(
+      foldKey('3 days ago [[Trip]]'),
+      [note('3 days ago [[Trip]]')],
+      [],
+      8,
+    )
+    const merged = mergeDateSuggestions(
+      [ranked!],
+      [{ date: '2026-07-14', phrase: '3 days ago' }],
+      { key: foldKey('3 days ago [[Trip]]'), limit: 8 },
+    )
+    expect(merged[0]).toBe(ranked)
+    expect(merged[1]).toMatchObject({ date: '2026-07-14' })
   })
 })

@@ -107,119 +107,96 @@ deferred.
 The version lives in one place: `version` in `apps/desktop/package.json`.
 `tauri.conf.json` points its `version` at that file, the crate version in
 `src-tauri/Cargo.toml` is frozen at `0.0.0`, and `Cargo.lock` never changes for a
-release. release-please maintains the version: on every push to `next` (beta channel)
-and `master` (stable channel), `.github/workflows/release-please.yml` updates that
-branch's **Release PR**, which bumps `apps/desktop/package.json` and prepends the
-channel changelog (`apps/desktop/CHANGELOG.beta.md` on `next`,
-`apps/desktop/CHANGELOG.md` on `master`) from the conventional-commit PR titles landed
-since the last release.
+release. release-please maintains the version: on every push to `master`,
+`.github/workflows/release-please.yml` runs two release-please passes (one per
+channel) that keep two **Release PRs** open side by side:
 
-**Merging the Release PR is the technical release boundary.** release-please then
-creates a draft GitHub release (with its `v<version>` tag — `force-tag-creation`, so
-later release-please runs can always anchor on the previous release) and hands the tag
-name to the Release workflow, which builds, signs, notarizes, uploads the assets, and
-undrafts the release. Humans merge beta Release PRs and Release PRs for stable
-hotfixes. In the normal stable-promotion path, the workflow mechanically merges the
-stable Release PR after a human approves the promotion PR. Nothing is visible to users
-(and `releases/latest` does not move) until every asset is in place. The caller resolves
-the release tag to its immutable commit once; macOS, TestFlight, promotion, feed sync,
-and back-merge jobs all check out that SHA rather than resolving a tag name independently.
+- The **beta** Release PR (`chore: release X.Y.Z-beta.N`) bumps
+  `apps/desktop/package.json`, advances `.github/release-please/manifest.beta.json`,
+  and prepends `apps/desktop/CHANGELOG.beta.md` with the conventional-commit PR titles
+  landed since the last beta release.
+- The **stable** Release PR (`chore: release X.Y.Z`) does the same with
+  `manifest.stable.json` and `apps/desktop/CHANGELOG.md`, aggregating everything since
+  the last stable release. It also advances `manifest.beta.json` to the stable
+  version, so the next beta cycle starts above the released version.
 
-Merge methods matter:
+**Merging a Release PR is the release, and the merge is the only human action.** Both
+Release PRs squash-merge (the default). release-please then creates a draft GitHub
+release (with its `v<version>` tag — `force-tag-creation`, so later release-please
+runs can always anchor on the previous release) and hands the tag name to the Release
+workflow, which builds, signs, notarizes, uploads the assets, and undrafts the
+release. Nothing is visible to users (and `releases/latest` does not move) until
+every asset is in place. The workflow resolves the release tag to its immutable
+commit once; the macOS, TestFlight, and feed sync jobs all check out that SHA rather
+than resolving a tag name independently.
 
-- **Release PRs: squash** (the default, including the mechanically merged stable one).
-- **Promotion and back-merge PRs: "Create a merge commit"** — squashing one collapses a
-  whole branch's history into a single non-conventional commit, blinding the other
-  channel's version calculation and changelog, and the two branches' histories diverge
-  for good.
+PRs created with `GITHUB_TOKEN` do not start `pull_request` workflows, so checks do
+not appear automatically on the bot-created Release PRs. Use the run-checks button
+before merging one.
 
-PRs created with `GITHUB_TOKEN` do not start `pull_request` workflows, so checks do not
-appear automatically on the bot-created Release, promotion, and post-stable back-merge
-PRs. Use the run-checks button before a human merge. The stable Release PR in the normal
-promotion path is not a second review point: it contains generated release metadata for
-the already-approved snapshot and the workflow squash-merges it mechanically.
+### Beta (the everyday release)
 
-### Beta (the everyday release, on `next`)
-
-1. Land PRs on `next` as usual.
-2. When it's time to ship, open the Release PR (`chore: release X.Y.Z-beta.N`), polish
-   the changelog if needed (edit the PR branch — release-please regenerates the PR when
-   new commits land, so polish last), and **merge it**.
-3. Everything else is automatic, ending with the `updater-beta` feed refresh. Installed
-   Reflect Beta apps pick up the update.
-4. Only after the GitHub/macOS release and TestFlight upload both succeed, the workflow
-   creates or advances the open promotion PR. Its head is a bot-owned snapshot pinned
-   to that beta tag, not the moving `next` branch. Commits that land on `next` after the
-   tag are therefore excluded until a newer beta publishes successfully. A failed beta
-   leaves the promotion PR at the last fully published beta; rerun the failed publishing
-   job to advance it.
+1. Land PRs on `master` as usual.
+2. When it's time to ship, open the beta Release PR (`chore: release X.Y.Z-beta.N`),
+   polish the changelog if needed (edit the PR branch — release-please regenerates the
+   PR when new commits land, so polish last), and **merge it**.
+3. Everything else is automatic, ending with the `updater-beta` feed refresh and the
+   TestFlight upload. Installed Reflect Beta apps pick up the update.
+4. The stable Release PR stays open and is rebased by the next push; merge it whenever
+   the channel is ready to graduate.
 
 ### Stable
 
-1. Review the bot-maintained promotion PR (`chore: promote vX.Y.Z-beta.N to stable
-   X.Y.Z`). It targets `master` from the exact commit tagged by the latest fully
-   published beta, so its diff cannot acquire newer, unshipped work from `next` while it
-   waits for review. Newer successful betas advance the same open PR.
-2. Run its checks, then merge it with a **merge commit**. This is the sole human release
-   approval. The automation only advances the promotion PR when `master` is already an
-   ancestor of the published beta snapshot, so this merge stays conflict-free. If a
-   hotfix shipped, merge its post-stable back-merge into `next` before publishing the
-   next beta; otherwise promotion stops instead of offering a conflicted snapshot.
-3. The workflow waits for release-please to create the stable Release PR on `master`,
-   pins its version to the stable base of the approved beta tag, then squash-merges that
-   generated PR mechanically. Its merge creates the stable tag and draft release and
-   starts the macOS/GitHub and TestFlight publishing workflows; there is no second
-   human approval. The explicit version pin means a major beta such as
-   `v1.0.0-beta.4` promotes directly to `v1.0.0` rather than relying on conventional
-   commits to infer the major bump.
-4. After the stable release is healthy, merge the post-stable PR
-   (`chore: merge master back into next`) with a **merge commit**. The workflow opens it
-   automatically to back-merge `master` and advance the beta manifest so the next beta
-   cycle starts above the released version.
+1. Review the stable Release PR (`chore: release X.Y.Z`). Its changelog aggregates
+   every change since the last stable release, including everything already shipped
+   in betas.
+2. Run its checks, then **merge it** (squash, like any Release PR). The same pipeline
+   publishes the stable flavor and `releases/latest` moves.
+3. The merge supersedes the open beta Release PR: its diff now conflicts with
+   `master`, so it cannot merge by accident. Leave it alone; the next releasable
+   commit rewrites it in place to the next beta version (release-please reuses the
+   per-channel head branch). Closing it by hand is harmless.
 
-If stable Release PR creation or its mechanical merge fails after the promotion merge,
-rerun the failed Release PR workflow rather than opening or merging another promotion.
-If macOS publishing or TestFlight fails after the stable Release PR merged, the stable
-tag and GitHub release record already exist (the release may still be a draft): rerun
-**Actions → Release** or **Actions → TestFlight** on the stable commit as appropriate.
-Leave the post-stable back-merge PR unmerged until both publishing paths are healthy.
+The stable release builds `master` as of the stable Release PR's merge, which may
+include commits that never shipped in a beta. To ship a beta-tested snapshot, merge
+the stable Release PR right after a healthy beta, before landing new work.
 
-### Hotfix (directly on `master`)
+If macOS publishing or TestFlight fails after a Release PR merged, the tag and GitHub
+release record already exist (the release may still be a draft): rerun
+**Actions → Release** or **Actions → TestFlight** on the release commit as
+appropriate.
 
-1. Branch from `master`, fix, PR back to `master` with a `fix:` title.
-2. Merge the stable Release PR (`chore: release X.Y.Z`) that appears on `master`
-   manually. A direct hotfix has no approved promotion snapshot, so the workflow does
-   not auto-merge its Release PR.
-3. After publishing succeeds, merge the auto-opened post-stable back-merge PR into
-   `next` with a merge commit.
+### Hotfix
+
+A hotfix is a normal PR: land the `fix:` on `master`, then merge the stable Release
+PR that now offers the patch release. If `master` already carries unreleased work
+that must not ship in the fix, there is no Release PR shortcut: branch from the
+released tag, cherry-pick the fix, bump `version` in `apps/desktop/package.json` on
+that branch, run the manual fallback below on it, and land the fix on `master` as
+usual.
 
 ### Release automation files
 
-Every release-please state file is owned by exactly one branch, so promote and
-back-merge never conflict on them:
+Each release-please state file is owned by one channel:
 
 | File | Written by |
 | --- | --- |
-| `.github/release-please/config.beta.json` | humans (same content on both branches) |
-| `.github/release-please/manifest.beta.json` | the Release PR on `next` (plus the post-stable PR) |
-| `.github/release-please/config.stable.json` | humans (same content on both branches) |
-| `.github/release-please/manifest.stable.json` | the Release PR on `master` |
-| `apps/desktop/CHANGELOG.beta.md` | the Release PR on `next` |
-| `apps/desktop/CHANGELOG.md` | the Release PR on `master` |
+| `.github/release-please/config.beta.json` | humans |
+| `.github/release-please/manifest.beta.json` | the beta Release PR, plus the stable Release PR (advancing it to the stable version) |
+| `.github/release-please/config.stable.json` | humans |
+| `.github/release-please/manifest.stable.json` | the stable Release PR |
+| `apps/desktop/CHANGELOG.beta.md` | the beta Release PR |
+| `apps/desktop/CHANGELOG.md` | the stable Release PR |
 
-The manifests are the per-channel source of truth for "last released version". The only
-file both channels write is `apps/desktop/package.json` (`version`); on a merge
-conflict, take either side — the next Release PR rewrites it. Do not hand-edit the
-changelogs or manifests outside the flows above.
-
-In normal release-please flows, human version interventions go through the manifest
-files; the no-Release-PR fallback below is the explicit exception. **Never use
-`Release-As:` commit footers**: they stay in `next`'s history and leak into `master`'s
-version calculation at the next promote. The promotion workflow does supply an
-ephemeral `release-as` CLI override derived from the approved beta tag; it does not
-enter Git history and guarantees that `vX.Y.Z-beta.N` becomes stable `vX.Y.Z`. The
-first beta of a new cycle is tagged without a number (`v0.6.0-beta`, then `-beta.1`,
-`-beta.2`, …) — a release-please naming quirk, not a bug.
+The manifests are the per-channel source of truth for "last released version". Both
+Release PRs write `apps/desktop/package.json` (`version`); whichever merges second is
+regenerated on the next push, so there is nothing to reconcile by hand. Do not
+hand-edit the changelogs or manifests outside the flows above, and do not use
+`Release-As:` commit footers: human version interventions go through the manifest
+files (the no-Release-PR fallback below is the explicit exception), and a major
+graduation such as `1.0.0` is a one-time `release-as` in both config files. The first beta of
+a new cycle is tagged without a number (`v0.6.0-beta`, then `-beta.1`, `-beta.2`, …)
+— a release-please naming quirk, not a bug.
 
 ### Manual fallback (no Release PR)
 
@@ -268,11 +245,10 @@ from the GitHub UI.
 
 ## Beta releases
 
-Development happens on `next` (the repo default branch); `master` only advances when
-`next` is merged into it for a public release. On `next`, `version` in
-`tauri.conf.json` carries a prerelease suffix (e.g. `0.2.0-beta.1`), and `publish`
-turns that suffix into a GitHub **pre-release** automatically. `releases/latest` ignores
-pre-releases, so stable installs never see a beta.
+Between stable releases, `version` in `apps/desktop/package.json` carries a
+prerelease suffix (e.g. `0.7.0-beta.3`), and `publish` turns that suffix into a
+GitHub **pre-release** automatically. `releases/latest` ignores pre-releases, so
+stable installs never see a beta.
 
 Beta builds use the dedicated `updater-beta` release instead. Every non-draft beta
 publish replaces its `latest.json`, `Reflect.Beta_aarch64.dmg`, and
@@ -290,19 +266,18 @@ the beta feed, a plain version to the stable feed. The beta and dev flavor overl
 their own feeds, and `release-macos.mjs` pins the stable feed into stable builds at
 build time, so releases are branch-independent.
 
-Cutting a beta is the normal Release PR flow on `next`; a stable release is the
-single-approval promotion flow into `master` (see
-[Cutting a release](#cutting-a-release-release-prs) above).
+Cutting a beta means merging the beta Release PR; a stable release means merging the
+stable Release PR (see [Cutting a release](#cutting-a-release-release-prs) above).
 
 ## Build flavors (Reflect / Reflect Beta / Reflect Dev)
 
 Three flavors ship as distinct, coexisting apps:
 
-| Flavor       | Branch   | productName  | identifier                 | Icon         | Updater feed      |
-| ------------ | -------- | ------------ | -------------------------- | ------------ | ----------------- |
-| Reflect      | `master` | Reflect      | `app.reflect.desktop`      | blue/violet  | `releases/latest` |
-| Reflect Beta | `next`   | Reflect Beta | `app.reflect.desktop.beta` | purple/violet | `updater-beta`    |
-| Reflect Dev  | local    | Reflect Dev  | `app.reflect.desktop.dev`  | green        | `updater-dev-noop` (no-op) |
+| Flavor       | Version        | productName  | identifier                 | Icon         | Updater feed      |
+| ------------ | -------------- | ------------ | -------------------------- | ------------ | ----------------- |
+| Reflect      | `X.Y.Z`        | Reflect      | `app.reflect.desktop`      | blue/violet  | `releases/latest` |
+| Reflect Beta | `X.Y.Z-beta.N` | Reflect Beta | `app.reflect.desktop.beta` | purple/violet | `updater-beta`    |
+| Reflect Dev  | local builds   | Reflect Dev  | `app.reflect.desktop.dev`  | green        | `updater-dev-noop` (no-op) |
 
 The base `tauri.conf.json` is the stable flavor and uses the shipped gradient icon
 (`icons/`). Beta and dev are config overlays (`src-tauri/tauri.beta.conf.json`,
@@ -347,8 +322,8 @@ Stable installs are unaffected (same identifier and the shipped icon).
 `.github/workflows/release.yml` first runs the publish preflights, then builds two
 signed/notarized macOS artifacts in parallel:
 
-- Apple Silicon: `macos-latest`, `--target=aarch64-apple-darwin`
-- Intel: `macos-15-intel`, `--target=x86_64-apple-darwin`
+- Apple Silicon: `macos-26`, `--target=aarch64-apple-darwin`
+- Intel: `macos-26`, `--target=x86_64-apple-darwin`
 
 Each build job runs the same DMG notarization, Gatekeeper checks, and updater artifact
 signing as a local release, then uploads its artifacts to the workflow. A final publish

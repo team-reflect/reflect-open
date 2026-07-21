@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useEditorAutocomplete } from './use-editor-autocomplete'
 
 const resolveOrCreateNoteWithTitle = vi.hoisted(() => vi.fn())
+const suggestWikiLinkTargets = vi.hoisted(() => vi.fn())
 const operationFail = vi.hoisted(() => vi.fn())
 const startOperation = vi.hoisted(() => vi.fn(() => ({ fail: operationFail })))
 
@@ -10,6 +11,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
   suggestWikiTargets: async () => [],
+  suggestWikiLinkTargets,
   suggestTags: async () => [],
   resolveOrCreateNoteWithTitle,
 }))
@@ -32,11 +34,28 @@ vi.mock('@/lib/operations', () => ({ startOperation }))
 
 beforeEach(() => {
   resolveOrCreateNoteWithTitle.mockReset()
+  suggestWikiLinkTargets.mockReset()
+  suggestWikiLinkTargets.mockResolvedValue({
+    suggestions: [],
+    claimedTargetKeys: [],
+    queryReadsAsDate: false,
+  })
   operationFail.mockReset()
   startOperation.mockClear()
 })
 
 describe('useEditorAutocomplete', () => {
+  it('does not offer create when the exact query has an unaddressable claim', async () => {
+    suggestWikiLinkTargets.mockResolvedValue({
+      suggestions: [],
+      claimedTargetKeys: ['roadmap'],
+      queryReadsAsDate: false,
+    })
+    const { result } = renderHook(() => useEditorAutocomplete())
+
+    await expect(result.current.onWikilinkSearch('Roadmap')).resolves.toEqual([])
+  })
+
   it('reports an ambiguous background create instead of silently doing nothing', async () => {
     resolveOrCreateNoteWithTitle.mockResolvedValue({
       kind: 'ambiguous',

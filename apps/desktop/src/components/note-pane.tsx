@@ -335,6 +335,7 @@ export function NotePaneComponent({
         onChange={document.onEditorChange}
         markMode={markModeFromSyntax(settings.editorMarkdownSyntax)}
         spellCheck={settings.editorSpellCheck}
+        smoothCaretAnimation={settings.editorSmoothCaretAnimation}
         timeFormat={settings.timeFormat}
         bulletAfterHeading={settings.editorBulletAfterHeading}
         // The grip drag-reorders blocks and the "+" inserts a paragraph below.

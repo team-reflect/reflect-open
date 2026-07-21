@@ -11,6 +11,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'all-notes', title: 'All notes' },
   { id: 'search', title: 'Search' },
   { id: 'ai-providers', title: 'AI providers' },
+  { id: 'audio-memos', title: 'Audio memos' },
   { id: 'ai-chat', title: 'AI chat' },
   { id: 'ai-prompts', title: 'AI prompts' },
   // macOS only — installs files under ~/.agents for terminal coding agents.

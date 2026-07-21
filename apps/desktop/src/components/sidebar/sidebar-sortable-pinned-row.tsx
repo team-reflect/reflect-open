@@ -2,7 +2,7 @@ import { memo, useCallback, type CSSProperties, type MouseEvent, type ReactEleme
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useQueryClient } from '@tanstack/react-query'
-import { errorMessage } from '@reflect/core'
+import { displayNoteTitle, errorMessage } from '@reflect/core'
 import type { PinnedNote } from '@reflect/core'
 import {
   invalidatePinnedNotesCache,
@@ -11,7 +11,6 @@ import {
 import { formatDayLabel } from '@/lib/dates'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { openNativeContextMenu } from '@/lib/native-menu/context-menu'
-import { displayNoteTitle } from '@/lib/note-title-display'
 import { unpinNote } from '@/lib/note-pin'
 import { startOperation } from '@/lib/operations'
 import { useGraph } from '@/providers/graph-provider'

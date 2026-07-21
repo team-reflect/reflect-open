@@ -1,12 +1,10 @@
 /**
  * Wiki-link resolution model (Plan 03) — the **rules**, not the data. This layer
- * is pure: the actual title/alias/date lookup is injected (DI per conventions
- * §3) so the index-backed resolver can land in Plan 04/07 without this module
- * depending on the database.
+ * is pure: callers that do not have the index's canonical `note_keys` mapping
+ * can inject their own title/alias/date lookups without depending on a database.
  *
- * Note identity in the first wave is the file path; the lookup returns whatever
- * ref the index uses (a note's `id` when it has one, else its path), so "prefer
- * id when present" is honoured at the lookup layer.
+ * Note identity in the first wave is the file path; an injected lookup may
+ * return whatever stable ref its caller uses.
  */
 
 import { isCalendarDate } from '@reflect/utils'
@@ -78,9 +76,8 @@ export function resolveWikiLink(target: string, lookup: WikiLookup): Resolution 
 }
 
 /**
- * Async counterpart of {@link WikiLookup} for lookups that hit the database. The
- * index-backed resolver (Plan 04) queries SQLite over IPC, so its lookups are
- * inherently asynchronous; the resolution rules are otherwise identical.
+ * Async counterpart of {@link WikiLookup} for callers whose injected lookups
+ * require I/O; the resolution rules are otherwise identical.
  */
 export interface AsyncWikiLookup {
   byDate(date: string): Promise<string | undefined>
@@ -89,11 +86,9 @@ export interface AsyncWikiLookup {
 }
 
 /**
- * Resolve a `[[target]]` against an async (DB-backed) lookup, with the same
- * precedence as {@link resolveWikiLink}: explicit daily-date, then title, then
- * alias. The `??` chain short-circuits, so a title hit means the alias lookup is
- * never queried. This keeps the resolution *policy* in one place — the
- * index-backed `resolveWikiTarget` supplies only the data access.
+ * Resolve a `[[target]]` against an async lookup, with the same precedence as
+ * {@link resolveWikiLink}: explicit daily-date, then title, then alias. The `??`
+ * chain short-circuits, so a title hit means the alias lookup is never queried.
  */
 export async function resolveWikiLinkAsync(
   target: string,

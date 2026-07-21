@@ -32,6 +32,9 @@ vi.mock('@/providers/graph-provider', () => ({
 }))
 vi.mock('@/hooks/use-app-version', () => ({ useAppVersion: () => '1.2.3-beta.4' }))
 
+const openUrl = vi.hoisted(() => vi.fn(() => Promise.resolve()))
+vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl }))
+
 const settingsState = vi.hoisted(() => ({ current: {} as Settings }))
 const updateSettings = vi.hoisted(() => vi.fn())
 vi.mock('@/providers/settings-provider', () => ({
@@ -120,6 +123,15 @@ describe('MobileSettings', () => {
     expect(navigate).toHaveBeenCalledWith({ kind: 'graphs' })
   })
 
+  it('opens the privacy policy from the About group', async () => {
+    const user = userEvent.setup()
+    mount()
+
+    await user.click(screen.getByRole('button', { name: 'Privacy Policy' }))
+
+    expect(openUrl).toHaveBeenCalledWith('https://reflect.app/privacy')
+  })
+
   it('writes appearance choices to the settings document', async () => {
     const user = userEvent.setup()
     mount()
@@ -135,11 +147,30 @@ describe('MobileSettings', () => {
     const user = userEvent.setup()
     mount()
 
+    await user.click(screen.getByRole('switch', { name: 'Smooth caret animation' }))
+    expect(updateSettings).toHaveBeenCalledWith({ editorSmoothCaretAnimation: false })
+
     await user.click(screen.getByRole('switch', { name: 'Start with a bullet' }))
     expect(updateSettings).toHaveBeenCalledWith({ editorDefaultBullet: false })
 
     await user.click(screen.getByRole('switch', { name: 'Bullet after a heading' }))
     expect(updateSettings).toHaveBeenCalledWith({ editorBulletAfterHeading: false })
+  })
+
+  it('toggles audio transcription formatting', async () => {
+    const user = userEvent.setup()
+    mount()
+
+    const toggle = screen.getByRole('switch', { name: 'Transcription auto-format' })
+    const descriptionId = toggle.getAttribute('aria-describedby')
+    expect(descriptionId).not.toBeNull()
+    expect(document.getElementById(descriptionId ?? '')?.textContent).toContain(
+      'Uses AI to add punctuation, paragraphs, and light Markdown',
+    )
+
+    await user.click(toggle)
+
+    expect(updateSettings).toHaveBeenCalledWith({ transcriptionFormat: false })
   })
 
   it('edits the AI chat system prompt', async () => {

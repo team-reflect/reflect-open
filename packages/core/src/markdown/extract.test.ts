@@ -275,3 +275,38 @@ describe('parseNote — tasks', () => {
     ])
   })
 })
+
+describe('parseNote — meowdown grammar recovery & new inline nodes', () => {
+  it('rejects a candidate whose first ] does not pair into ]]', () => {
+    expect(parse('[[a]b]]').wikiLinks).toEqual([])
+  })
+
+  it('resolves a nested opener to the inner link', () => {
+    const note = parse('[[a [[b]]')
+    expect(note.wikiLinks).toEqual([{ target: 'b', alias: undefined, from: 4, to: 9 }])
+  })
+
+  it('rejects a whitespace-only target', () => {
+    expect(parse('[[ ]]').wikiLinks).toEqual([])
+  })
+
+  it('projects a ![[x]] embed as a wiki link row spanning only the brackets', () => {
+    const note = parse('See ![[photo.png]] here')
+    expect(note.wikiLinks).toEqual([{ target: 'photo.png', alias: undefined, from: 5, to: 18 }])
+  })
+
+  it('strips highlight and inline-math marks from plain text, like other marks', () => {
+    const note = parse('mark ==hi== and $x+y$ math')
+    expect(note.text).toBe('mark hi and x+y math')
+  })
+
+  it('drops a bare autolinked domain from plain text, same as other URLs', () => {
+    const note = parse('visit google.com today')
+    expect(note.text).toBe('visit today')
+  })
+
+  it('still extracts #tags next to the new inline nodes', () => {
+    const note = parse('==hi== #alpha and google.com #beta')
+    expect(note.tags).toEqual(['alpha', 'beta'])
+  })
+})
