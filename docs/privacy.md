@@ -97,10 +97,11 @@ disk at call time), and it is covered by tests.
 
 - **Where:** Sentry, for errors raised in the React/WebView layer. Native process crashes
   remain covered by the operating system's crash reporting.
-- **What:** an allow-listed diagnostic containing the exception class, sanitized JavaScript
-  stack locations, the app version, and whether React handled the error. A small set of
-  vetted structural error messages that cannot contain document data is kept; all other
-  exception text is redacted. Stack filenames are reduced to bundle basenames. Request
+- **What:** an allow-listed diagnostic containing the exception class, sanitized
+  JavaScript stack locations, the app version, and whether the exception was marked
+  handled. A small set of vetted structural error messages that cannot contain document
+  data is kept; all other exception text is redacted. Stack filenames are reduced to
+  bundle basenames. Request
   data, note content, note titles, graph paths, local filesystem paths, breadcrumbs,
   console output, session replay, tracing, and user identifiers are not collected. Sentry
   is also configured not to store the transport IP address with events.

@@ -12,6 +12,7 @@ import { z } from 'zod'
 const REDACTED_VALUE = '[redacted]'
 const MAX_EXCEPTION_COUNT = 3
 const MAX_STACK_FRAME_COUNT = 50
+const REACT_ERROR_BOUNDARY_PREFIX = 'React ErrorBoundary '
 
 const SAFE_EXCEPTION_TYPES = new Set([
   'AbortError',
@@ -75,18 +76,26 @@ export function parseExceptionTelemetryDsn(value: string | undefined): string | 
   return parsed.success ? parsed.data : null
 }
 
+function getExceptionCauseType(type: string | undefined): string | undefined {
+  return type?.startsWith(REACT_ERROR_BOUNDARY_PREFIX)
+    ? type.slice(REACT_ERROR_BOUNDARY_PREFIX.length)
+    : type
+}
+
 function scrubExceptionType(type: string | undefined): string {
-  if (type?.startsWith('React ErrorBoundary ')) {
-    const causeType = type.slice('React ErrorBoundary '.length)
-    return SAFE_EXCEPTION_TYPES.has(causeType) ? `ReactErrorBoundary<${causeType}>` : 'ReactErrorBoundary<Error>'
+  const causeType = getExceptionCauseType(type)
+  if (type?.startsWith(REACT_ERROR_BOUNDARY_PREFIX)) {
+    return causeType && SAFE_EXCEPTION_TYPES.has(causeType)
+      ? `ReactErrorBoundary<${causeType}>`
+      : 'ReactErrorBoundary<Error>'
   }
-  return type && SAFE_EXCEPTION_TYPES.has(type) ? type : 'Error'
+  return causeType && SAFE_EXCEPTION_TYPES.has(causeType) ? causeType : 'Error'
 }
 
 function scrubExceptionValue(exception: Exception): string {
   const value = exception.value
   if (
-    exception.type === 'TransformError' &&
+    getExceptionCauseType(exception.type) === 'TransformError' &&
     value &&
     SAFE_TRANSFORM_ERROR_VALUES.some((pattern) => pattern.test(value))
   ) {

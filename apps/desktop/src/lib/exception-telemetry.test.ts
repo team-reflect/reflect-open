@@ -202,6 +202,27 @@ describe('scrubExceptionEvent', () => {
     ])
   })
 
+  it('keeps allow-listed diagnostics for React ErrorBoundary TransformErrors', () => {
+    const event: ErrorEvent = {
+      type: undefined,
+      exception: {
+        values: [
+          {
+            type: 'React ErrorBoundary TransformError',
+            value: 'Invalid content for node paragraph',
+          },
+        ],
+      },
+    }
+
+    expect(scrubExceptionEvent(event)?.exception?.values).toEqual([
+      {
+        type: 'ReactErrorBoundary<TransformError>',
+        value: 'Invalid content for node paragraph',
+      },
+    ])
+  })
+
   it('redacts free-form values from otherwise trusted exception types', () => {
     const event: ErrorEvent = {
       type: undefined,
