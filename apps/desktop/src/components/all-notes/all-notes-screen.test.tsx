@@ -550,6 +550,23 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     view.unmount()
   })
 
+  it('does not offer bulk trash for a tagged daily note', async () => {
+    const view = renderScreen()
+    await view.findByText('Health Stacked')
+
+    fireEvent.click(view.getByRole('button', { name: /Custom/ }))
+    fireEvent.click(view.getByRole('option', { name: /#travel/ }))
+    await view.findByText('June 9, 2026')
+
+    fireEvent.click(view.getByText('Daily travel notes.'))
+    expect(view.queryByRole('button', { name: /Trash \(/ })).toBeNull()
+
+    fireEvent.keyDown(view.getByLabelText('All notes'), { key: 'Backspace', metaKey: true })
+    expect(view.queryByText('Trash 1 note?')).toBeNull()
+    expect(mockInvoke.mock.calls.some(([command]) => command === 'note_delete')).toBe(false)
+    view.unmount()
+  })
+
   it('does not open a note when Return activates a focused header button', async () => {
     const view = renderScreen()
     await view.findByText('Health Stacked')
