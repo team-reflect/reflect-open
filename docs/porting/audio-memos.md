@@ -23,7 +23,13 @@ touches a Reflect server, because there isn't one.
   the audio.
 - **Transcription.** Runs against the user's own OpenAI or Gemini key
   (chosen by `pickTranscriptionConfig` in `@reflect/core`; keys in the OS
-  keychain via `apps/desktop/src-tauri/src/secrets.rs`). The reconciler
+  keychain via `apps/desktop/src-tauri/src/secrets.rs`). By default, the fresh
+  transcript receives one best-effort small-model pass that adds punctuation,
+  paragraphs, light Markdown, and a title without changing its meaning. With
+  `Transcription auto-format` disabled, that pass generates only the title and
+  the note stores the raw provider transcript. Formatting failures also fall
+  back to the raw text and a local title rather than retrying speech-to-text.
+  The reconciler
   (`apps/desktop/src/lib/transcription-reconciler.ts`) writes a dedicated
   transcript note, resolves or creates the `Audio memos` category note, and
   backlinks both from the daily note under `## [[Audio memos]]`. Pending memos
@@ -39,10 +45,12 @@ touches a Reflect server, because there isn't one.
 | Transcription quota tied to plan         | No quotas; provider bills the user directly           |
 | Audio stored in the cloud account        | Audio is a file in the graph (`audio-memos/`), backed up by git like everything else |
 | Works only online                        | Recording works offline; transcription catches up later |
+| Optional transcript auto-formatting      | Default-on in the BYOK title pass; disable body formatting in Settings |
 
 ## Notes and follow-ups
 
-- Sending audio to a provider is an explicit, user-initiated network call
+- Sending audio and its fresh transcript to the configured providers is an
+  explicit, user-initiated network call
   and is documented in [docs/privacy.md](../privacy.md).
 - The `private: true` flag applies to note content; audio memos are captured
   before they belong to any note, so the flag has no bite at record time.

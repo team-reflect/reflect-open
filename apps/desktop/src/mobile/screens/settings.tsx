@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react'
+import { useId, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   aiProvider,
@@ -10,12 +10,14 @@ import {
   type EditorTextSize,
   type ThemePreference,
 } from '@reflect/core'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { useAiProviders } from '@/hooks/use-ai-providers'
 import { useAppVersion } from '@/hooks/use-app-version'
 import { marketingVersion } from '@/lib/marketing-version'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer'
 import { AiProviderActionsDrawer } from '@/mobile/ai-provider-actions-drawer'
+import { PRIVACY_POLICY_URL } from '@/mobile/ai-provider-consent'
 import { ChatSystemPromptDrawer } from '@/mobile/chat-system-prompt-drawer'
 import { ConnectGithubDrawer } from '@/mobile/connect-github-drawer'
 import { MobileScreenHeader } from '@/mobile/screen-header'
@@ -77,6 +79,7 @@ export function MobileSettings(): ReactElement {
   } = useAiProviders()
   const [addProviderOpen, setAddProviderOpen] = useState(false)
   const [systemPromptOpen, setSystemPromptOpen] = useState(false)
+  const audioMemoDescriptionId = useId()
   // The managed provider sticks around after close so the exit animation has
   // content; `manageOpen` alone drives visibility (the edit-sheet pattern).
   const [managedProvider, setManagedProvider] = useState<AiProviderConfig | null>(null)
@@ -161,6 +164,13 @@ export function MobileSettings(): ReactElement {
 
           <SettingsGroup header="Editor">
             <SettingsSwitchRow
+              label="Smooth caret animation"
+              checked={settings.editorSmoothCaretAnimation}
+              onCheckedChange={(editorSmoothCaretAnimation) =>
+                updateSettings({ editorSmoothCaretAnimation })
+              }
+            />
+            <SettingsSwitchRow
               label="Start with a bullet"
               checked={settings.editorDefaultBullet}
               onCheckedChange={(editorDefaultBullet) => updateSettings({ editorDefaultBullet })}
@@ -194,6 +204,21 @@ export function MobileSettings(): ReactElement {
               label="System prompt"
               value={normalizeChatSystemPrompt(settings.chatSystemPrompt) === '' ? 'Default' : 'Custom'}
               onPress={() => setSystemPromptOpen(true)}
+            />
+          </SettingsGroup>
+
+          <SettingsGroup
+            header="Audio memos"
+            footer="Uses AI to add punctuation, paragraphs, and light Markdown."
+            footerId={audioMemoDescriptionId}
+          >
+            <SettingsSwitchRow
+              label="Transcription auto-format"
+              checked={settings.transcriptionFormat}
+              descriptionId={audioMemoDescriptionId}
+              onCheckedChange={(transcriptionFormat) =>
+                updateSettings({ transcriptionFormat })
+              }
             />
           </SettingsGroup>
 
@@ -232,6 +257,12 @@ export function MobileSettings(): ReactElement {
             <SettingsValueRow
               label="Version"
               value={version === null ? '…' : marketingVersion(version)}
+            />
+            <SettingsActionRow
+              label="Privacy Policy"
+              onPress={() => {
+                void openUrl(PRIVACY_POLICY_URL).catch(() => {})
+              }}
             />
           </SettingsGroup>
         </div>

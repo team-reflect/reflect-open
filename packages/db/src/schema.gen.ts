@@ -81,6 +81,7 @@ export interface NoteEmails {
 }
 
 export interface NoteKeys {
+  claimCount: string | null;
   key: string | null;
   notePath: string | null;
 }

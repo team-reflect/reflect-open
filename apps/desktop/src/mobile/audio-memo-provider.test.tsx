@@ -44,8 +44,11 @@ const reconcilerControls = vi.hoisted(() => {
 })
 const createTranscriptionReconciler = vi.hoisted(() =>
   vi.fn(
-    (_options: { generation: number; getProviders: () => AiProvidersState }) =>
-      reconcilerControls.fake,
+    (_options: {
+      generation: number
+      getProviders: () => AiProvidersState
+      getTranscriptionFormat: () => boolean
+    }) => reconcilerControls.fake,
   ),
 )
 
@@ -142,6 +145,7 @@ const SETTINGS = vi.hoisted(() => ({
   current: {
     aiProviders: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
     defaultAiProviderId: 'cfg-openai',
+    transcriptionFormat: true,
   },
 }))
 
@@ -188,6 +192,7 @@ beforeEach(() => {
   SETTINGS.current = {
     aiProviders: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
     defaultAiProviderId: 'cfg-openai',
+    transcriptionFormat: true,
   }
   captureAudioMemo.mockResolvedValue({ ok: true, memo: MEMO })
   invoke.mockResolvedValue({ files: [] })
@@ -502,6 +507,7 @@ describe('MobileAudioMemoProvider', () => {
         { id: 'claude', provider: 'anthropic', model: 'claude-fable-5', keyHint: 'wxyz1' },
       ],
       defaultAiProviderId: 'claude',
+      transcriptionFormat: true,
     }
     const { result } = renderHook(() => useMobileAudioMemo(), { wrapper })
 

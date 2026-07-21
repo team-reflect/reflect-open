@@ -3,7 +3,8 @@ import {
   foldEmail,
   foldTag,
   normalizeWikiTarget,
-  resolveWikiLinkAsync,
+  resolved,
+  unresolved,
   type Resolution,
 } from '../markdown'
 import { db } from './db'
@@ -20,8 +21,10 @@ export {
 export { getCompletedTasks, getOpenTasks, type OpenTask } from './queries-tasks'
 export {
   suggestTags,
+  suggestWikiLinkTargets,
   suggestWikiTargets,
   type TagSuggestion,
+  type WikiLinkSuggestionResult,
 } from './queries-suggestions'
 
 /**
@@ -407,46 +410,20 @@ export async function findExactWikiTargetMatches(
 
 /**
  * Resolve a `[[target]]` against the index, returning the note ref (its path).
- * The resolution *policy* (prefer daily-date, then title, then alias) lives once
- * in {@link resolveWikiLinkAsync}; this is only the DB-backed data access.
- *
- * Each lookup `orderBy`s before taking the first row so a title/alias/date
- * collision resolves to the same note every time (otherwise the row order is
- * undefined).
+ * `note_keys` is the canonical resolved-address map: it contains exactly one
+ * winning path per folded textual key after applying daily-date, title, alias,
+ * and path precedence. Navigation and backlinks therefore cannot drift onto
+ * different claimants.
  */
-export function resolveWikiTarget(target: string): Promise<Resolution> {
-  // Templates are excluded from every lookup, mirroring the `note_keys` view:
-  // a `[[target]]` must never resolve to a template.
-  return resolveWikiLinkAsync(target, {
-    byDate: async (date) =>
-      (
-        await db
-          .selectFrom('notes')
-          .where('dailyDate', '=', date)
-          .select('path')
-          .orderBy('path')
-          .executeTakeFirst()
-      )?.path,
-    byTitle: async (key) =>
-      (
-        await db
-          .selectFrom('notes')
-          .where('titleKey', '=', key)
-          .where('kind', '!=', 'template')
-          .select('path')
-          .orderBy('path')
-          .executeTakeFirst()
-      )?.path,
-    byAlias: async (key) =>
-      (
-        await db
-          .selectFrom('aliases')
-          .innerJoin('notes', 'notes.path', 'aliases.notePath')
-          .where('aliasKey', '=', key)
-          .where('notes.kind', '!=', 'template')
-          .select('notePath')
-          .orderBy('notePath')
-          .executeTakeFirst()
-      )?.notePath,
-  })
+export async function resolveWikiTarget(target: string): Promise<Resolution> {
+  const normalized = normalizeWikiTarget(target)
+  if (normalized.key === '') {
+    return unresolved(normalized.raw)
+  }
+  const winner = await db
+    .selectFrom('noteKeys')
+    .where('key', '=', normalized.key)
+    .select('notePath')
+    .executeTakeFirst()
+  return winner?.notePath ? resolved(winner.notePath) : unresolved(normalized.raw)
 }

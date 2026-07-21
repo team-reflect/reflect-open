@@ -49,6 +49,7 @@ beforeEach(() => {
       case 'db_query':
         if (sql.includes('index_meta')) return metaRows
         if (sql.includes('from "assets"')) return [{ note_path: 'notes/a.md' }]
+        if (sql.includes('note_keys')) return [{ note_path: 'notes/a.md' }]
         if (sql.includes('search_fts')) {
           return [
             {

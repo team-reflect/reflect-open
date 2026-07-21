@@ -1,8 +1,9 @@
-import type { SyntaxNode, Tree } from '@lezer/common'
+import type { SyntaxNode, Tree } from '@meowdown/markdown'
 import { parseFrontmatter, splitFrontmatter } from '../markdown/frontmatter'
 import { parseBody } from '../markdown/grammar'
 import { unescapeMarkdownText } from '../markdown/plain-text'
 import { normalizeWikiTarget } from '../markdown/resolve'
+import { isWikiNodeName, wikiBracketStart } from '../markdown/wiki-nodes'
 
 /**
  * Block-level context extraction for the backlinks panel, ported from old
@@ -60,9 +61,9 @@ function selfOrAncestor(
   return null
 }
 
-/** The normalized match key of a `[[…]]` node, or `null` for a blank target. */
+/** The normalized match key of a `[[…]]` / `![[…]]` node, or `null` for a blank target. */
 function wikiTargetKeyOf(body: string, link: SyntaxNode): string | null {
-  const inner = body.slice(link.from + 2, link.to - 2)
+  const inner = body.slice(wikiBracketStart(link) + 2, link.to - 2)
   const pipe = inner.indexOf('|')
   const target = unescapeMarkdownText((pipe === -1 ? inner : inner.slice(0, pipe)).trim())
   return target === '' ? null : normalizeWikiTarget(target).key
@@ -71,7 +72,7 @@ function wikiTargetKeyOf(body: string, link: SyntaxNode): string | null {
 /** Does the textblock's inline content hold a wiki link with one of these match keys? */
 function textblockMentions(body: string, block: SyntaxNode, keys: ReadonlySet<string>): boolean {
   for (let child = block.firstChild; child; child = child.nextSibling) {
-    if (child.name === 'WikiLink') {
+    if (isWikiNodeName(child.name)) {
       const key = wikiTargetKeyOf(body, child)
       if (key !== null && keys.has(key)) {
         return true
@@ -319,7 +320,7 @@ function contextLinesAt(
   const bodyPos = Math.max(0, Math.min(pos - bodyOffset, body.length))
   const leaf: SyntaxNode = tree.resolveInner(bodyPos, 1)
 
-  const link = selfOrAncestor(leaf, (node) => node.name === 'WikiLink')
+  const link = selfOrAncestor(leaf, (node) => isWikiNodeName(node.name))
   const posKey = link ? wikiTargetKeyOf(body, link) : null
   const keys = new Set(targetKeys)
   if (posKey !== null) {

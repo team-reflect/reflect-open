@@ -108,6 +108,8 @@ interface NoteEditorProps {
   markMode?: MarkMode
   /** Whether the browser underlines misspelled words (default on). */
   spellCheck?: boolean
+  /** Whether the caret animates between positions (default on). */
+  smoothCaretAnimation?: boolean
   /**
    * Clock format for the time the `/now` slash command inserts (the
    * `timeFormat` setting). Defaults to `12h`.
@@ -208,6 +210,7 @@ export function NoteEditor({
   onChange,
   markMode = 'hide',
   spellCheck = true,
+  smoothCaretAnimation = true,
   timeFormat = '12h',
   bulletAfterHeading = false,
   blockHandle = false,
@@ -406,6 +409,7 @@ export function NoteEditor({
         // Reflect's implementation-neutral `12h`/`24h` maps to meowdown's
         // `12`/`24` here at the boundary, like `markModeFromSyntax`.
         timeFormat={timeFormat === '24h' ? '24' : '12'}
+        caretGlide={smoothCaretAnimation}
         bulletAfterHeading={bulletAfterHeading}
         // Pinned off on the touch surface regardless of the caller: the grip is
         // revealed on hover and drag-reorders blocks with a pointer, neither of

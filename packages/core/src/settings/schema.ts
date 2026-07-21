@@ -57,6 +57,12 @@ export const editorDefaultBulletSchema = z.boolean().catch(true)
 export const editorBulletAfterHeadingSchema = z.boolean().catch(true)
 
 /**
+ * Whether the caret animates smoothly between positions while editing. On by
+ * default. Display-only; it never changes the document or stored Markdown.
+ */
+export const editorSmoothCaretAnimationSchema = z.boolean().catch(true)
+
+/**
  * The editor's reading text size. `small` (the default) is one design-system
  * size down from the prose size (14px); `medium` is the DS prose size (16px)
  * and `large` steps one DS size up (18px). Display-only — it scales the editor
@@ -192,6 +198,14 @@ export const semanticSearchEnabledSchema = z.boolean().catch(false)
  * entirely.
  */
 export const describeAssetsSchema = z.boolean().catch(true)
+
+/**
+ * Whether audio-memo transcripts receive a best-effort AI formatting pass
+ * before they are written as Markdown. On by default, matching the original
+ * Reflect preference. Turning it off keeps the transcription provider's raw
+ * body; transcript-derived title generation remains enabled.
+ */
+export const transcriptionFormatSchema = z.boolean().catch(true)
 
 /**
  * Whether the user has finished the mobile onboarding choice (Plan 19, step
@@ -428,12 +442,14 @@ export const settingsSchema = z
     editorSpellCheck: editorSpellCheckSchema,
     editorDefaultBullet: editorDefaultBulletSchema,
     editorBulletAfterHeading: editorBulletAfterHeadingSchema,
+    editorSmoothCaretAnimation: editorSmoothCaretAnimationSchema,
     editorTextSize: editorTextSizeSchema,
     editorFullWidth: editorFullWidthSchema,
     sidebarWidth: sidebarWidthSchema,
     contextSidebarWidth: contextSidebarWidthSchema,
     semanticSearchEnabled: semanticSearchEnabledSchema,
     describeAssets: describeAssetsSchema,
+    transcriptionFormat: transcriptionFormatSchema,
     contactsEnabled: contactsEnabledSchema,
     mobileOnboarded: mobileOnboardedSchema,
     mobileStorage: mobileStorageKindSchema,

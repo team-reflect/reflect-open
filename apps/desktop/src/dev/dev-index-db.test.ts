@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  buildIndexedNote,
   parseHighlights,
+  parseNote,
   parseSearchQuery,
+  resolveWikiTarget,
   searchNotes,
   searchWithFilters,
   setBridge,
+  suggestWikiLinkTargets,
   type IndexedNote,
 } from '@reflect/core'
 import { createDevIndexDb, type DevIndexDb } from '@/dev/dev-index-db'
@@ -352,6 +356,33 @@ describe('createDevIndexDb', () => {
       { text: 'Mac', highlighted: true },
       { text: 'Caw', highlighted: false },
     ])
+  })
+
+  it('serves a rich title end to end: derived alias suggests, inserts, resolves', async () => {
+    const db = await openDb()
+    const source = '# Meeting with [[Ada Lovelace|Ada]]\n'
+    db.applyNote(
+      buildIndexedNote(parseNote({ path: 'notes/meeting.md', source }), {
+        fileHash: 'hash-rich',
+        mtime: 1,
+        source,
+      }),
+    )
+    installQueryBridge(db)
+
+    const { suggestions } = await suggestWikiLinkTargets('meeting with ada')
+    expect(suggestions).toMatchObject([
+      {
+        path: 'notes/meeting.md',
+        title: 'Meeting with [[Ada Lovelace|Ada]]',
+        target: 'Meeting with Ada',
+        insertText: 'Meeting with Ada',
+      },
+    ])
+    await expect(resolveWikiTarget(suggestions[0]!.insertText)).resolves.toEqual({
+      kind: 'resolved',
+      ref: 'notes/meeting.md',
+    })
   })
 
   it('re-applying a note replaces its rows instead of duplicating them', async () => {

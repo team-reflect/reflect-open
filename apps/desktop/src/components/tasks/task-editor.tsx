@@ -216,6 +216,7 @@ export function TaskEditor({
         onChange={onChange}
         markMode={markModeFromSyntax(settings.editorMarkdownSyntax)}
         spellCheck={settings.editorSpellCheck}
+        smoothCaretAnimation={settings.editorSmoothCaretAnimation}
         timeFormat={settings.timeFormat}
         // A one-line editor has nothing to reorder, so keep the gutter grip off.
         blockHandle={false}

@@ -135,6 +135,10 @@ export function useAudioMemoPipeline(
       defaultProviderId: settings.defaultAiProviderId,
     }
   })
+  const transcriptionFormatRef = useRef(settings.transcriptionFormat)
+  useEffect(() => {
+    transcriptionFormatRef.current = settings.transcriptionFormat
+  })
 
   // One reconciler per graph session (the hosting provider remounts per
   // graph). It owns the launch pass and all retry triggers; the pump only
@@ -148,6 +152,7 @@ export function useAudioMemoPipeline(
     const next = createTranscriptionReconciler({
       generation: graph.generation,
       getProviders: () => providersRef.current,
+      getTranscriptionFormat: () => transcriptionFormatRef.current,
     })
     setReconciler(next)
     reconcilerRef.current = next

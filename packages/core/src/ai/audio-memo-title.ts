@@ -1,4 +1,4 @@
-import { generateObject } from 'ai'
+import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import type { AiProvidersState } from './provider-config'
 import type { AiProviderConfig } from '../settings/schema'
@@ -10,16 +10,16 @@ const TITLE_TIMEOUT_MS = 30_000
 const MAX_TRANSCRIPT_CHARS = 4_000
 const MAX_TITLE_CHARS = 80
 const MAX_FALLBACK_WORDS = 8
-const OPENAI_AUDIO_MEMO_TITLE_MODEL = 'gpt-5.4-nano'
-const ANTHROPIC_AUDIO_MEMO_TITLE_MODEL = 'claude-haiku-4-5'
-const GOOGLE_AUDIO_MEMO_TITLE_MODEL = 'gemini-3.1-flash-lite'
+const OPENAI_AUDIO_MEMO_ENRICHMENT_MODEL = 'gpt-5.4-nano'
+const ANTHROPIC_AUDIO_MEMO_ENRICHMENT_MODEL = 'claude-haiku-4-5'
+const GOOGLE_AUDIO_MEMO_ENRICHMENT_MODEL = 'gemini-3.1-flash-lite'
 
 const audioMemoTitleSchema = z.object({
   title: z.string(),
 })
 
-interface AudioMemoTitleCredentials {
-  /** The provider entry whose provider selects the fixed small title model. */
+export interface AudioMemoEnrichmentCredentials {
+  /** The provider entry whose provider selects the fixed small enrichment model. */
   readonly config: AiProviderConfig
   /** The BYOK API key, read from the OS keychain by the caller. */
   readonly apiKey: string
@@ -27,7 +27,7 @@ interface AudioMemoTitleCredentials {
 
 export interface GenerateAudioMemoTitleRequest {
   /** Optional title-generation credentials; omitted means local fallback only. */
-  readonly credentials?: AudioMemoTitleCredentials | undefined
+  readonly credentials?: AudioMemoEnrichmentCredentials | undefined
   /** Host transport (the Tauri HTTP plugin's fetch; tests pass a stub). */
   readonly fetchFn?: typeof fetch | undefined
   /** The memo transcript to name. */
@@ -36,33 +36,34 @@ export interface GenerateAudioMemoTitleRequest {
   readonly fallbackTitle: string
 }
 
-function audioMemoTitleConfig(config: AiProviderConfig): AiProviderConfig | null {
+/** Replace a configured model with the provider's fixed small audio-enrichment model. */
+export function audioMemoEnrichmentConfig(config: AiProviderConfig): AiProviderConfig | null {
   switch (config.provider) {
     case 'openai':
-      return { ...config, model: OPENAI_AUDIO_MEMO_TITLE_MODEL }
+      return { ...config, model: OPENAI_AUDIO_MEMO_ENRICHMENT_MODEL }
     case 'anthropic':
-      return { ...config, model: ANTHROPIC_AUDIO_MEMO_TITLE_MODEL }
+      return { ...config, model: ANTHROPIC_AUDIO_MEMO_ENRICHMENT_MODEL }
     case 'google':
-      return { ...config, model: GOOGLE_AUDIO_MEMO_TITLE_MODEL }
+      return { ...config, model: GOOGLE_AUDIO_MEMO_ENRICHMENT_MODEL }
     case 'openrouter':
       return null
   }
 }
 
 /**
- * Pick the small-model provider for audio memo title generation. The user's
- * default provider wins when it has a fixed small title model; otherwise the
+ * Pick the small-model provider for audio memo enrichment. The user's
+ * default provider wins when it has a fixed small model; otherwise the
  * first supported configured provider is used. OpenRouter is skipped because
  * `openrouter/auto` is not a small-model guarantee.
  */
-export function pickAudioMemoTitleConfig(state: AiProvidersState): AiProviderConfig | null {
+export function pickAudioMemoEnrichmentConfig(state: AiProvidersState): AiProviderConfig | null {
   const preferred = state.providers.find((provider) => provider.id === state.defaultProviderId)
   const ordered =
     preferred === undefined
       ? state.providers
       : [preferred, ...state.providers.filter((provider) => provider.id !== preferred.id)]
   for (const provider of ordered) {
-    const titleConfig = audioMemoTitleConfig(provider)
+    const titleConfig = audioMemoEnrichmentConfig(provider)
     if (titleConfig !== null) {
       return titleConfig
     }
@@ -77,7 +78,8 @@ function firstContentLine(text: string): string {
     .find((line) => line !== '') ?? ''
 }
 
-function normalizedTitle(candidate: string): string | null {
+/** Sanitize and length-bound a generated title for Markdown and wiki-link use. */
+export function normalizedAudioMemoTitle(candidate: string): string | null {
   const safe = wikiLinkSafe(firstContentLine(candidate)).replace(/[.!?]+$/u, '').trim()
   const clipped = clipAtWordBoundary(safe, MAX_TITLE_CHARS)
   return clipped === '' ? null : clipped
@@ -95,9 +97,10 @@ function titleCaseFallback(text: string): string {
     .join(' ')
 }
 
-function transcriptFallbackTitle(transcript: string, fallbackTitle: string): string {
+/** Derive a short local title from the transcript without making a provider call. */
+export function transcriptFallbackTitle(transcript: string, fallbackTitle: string): string {
   const firstSentence = firstContentLine(transcript).split(/[.!?]/u)[0] ?? ''
-  const normalized = normalizedTitle(titleCaseFallback(firstSentence))
+  const normalized = normalizedAudioMemoTitle(titleCaseFallback(firstSentence))
   return normalized ?? fallbackTitle
 }
 
@@ -127,23 +130,23 @@ export async function generateAudioMemoTitle(
   if (request.credentials === undefined) {
     return fallback
   }
-  const titleConfig = audioMemoTitleConfig(request.credentials.config)
+  const titleConfig = audioMemoEnrichmentConfig(request.credentials.config)
   if (titleConfig === null) {
     return fallback
   }
   try {
-    const result = await generateObject({
+    const result = await generateText({
       model: languageModel(
         titleConfig,
         request.credentials.apiKey,
         request.fetchFn ?? fetch,
       ),
-      schema: audioMemoTitleSchema,
+      output: Output.object({ schema: audioMemoTitleSchema }),
       prompt: titlePrompt(request.transcript),
       abortSignal: AbortSignal.timeout(TITLE_TIMEOUT_MS),
       maxRetries: 0,
     })
-    return normalizedTitle(result.object.title) ?? fallback
+    return normalizedAudioMemoTitle(result.output.title) ?? fallback
   } catch {
     return fallback
   }

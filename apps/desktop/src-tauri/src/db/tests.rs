@@ -12,8 +12,8 @@ use super::migrations::{migrate, migrate_to, open_in_memory, open_index_at, vali
 use super::query::run_query;
 use super::scan::scan_reconcile;
 use super::write::{
-    apply_note, clear_index, move_note, touch_note, IndexedEmail, IndexedLink, IndexedNote,
-    IndexedTag, IndexedTask,
+    apply_note, clear_index, move_note, touch_note, IndexedAlias, IndexedEmail, IndexedLink,
+    IndexedNote, IndexedTag, IndexedTask,
 };
 
 fn migrated() -> Connection {
@@ -62,6 +62,22 @@ fn wiki(target: &str) -> IndexedLink {
         pos_from: 0,
         pos_to: 0,
     }
+}
+
+fn aliased_note(path: &str, title: &str, alias: &str) -> IndexedNote {
+    let mut indexed = note(path, title, vec![]);
+    indexed.aliases = vec![IndexedAlias {
+        alias: alias.to_string(),
+        alias_key: alias.to_lowercase(),
+    }];
+    indexed
+}
+
+fn daily_note(path: &str, date: &str) -> IndexedNote {
+    let mut indexed = note(path, date, vec![]);
+    indexed.kind = "daily".to_string();
+    indexed.daily_date = Some(date.to_string());
+    indexed
 }
 
 fn task(marker_offset: i64, text: &str, checked: bool) -> IndexedTask {
@@ -221,6 +237,180 @@ fn backlinks_resolve_by_title_at_query_time() {
     .unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0]["source_path"], Value::from("notes/a.md"));
+}
+
+#[test]
+fn backlinks_resolve_by_alias_when_the_key_has_no_stronger_claimant() {
+    let conn = migrated();
+    apply_note(
+        &conn,
+        &aliased_note("notes/tim-maccaw-dad.md", "Tim MacCaw // Dad", "Dad"),
+    )
+    .unwrap();
+    apply_note(&conn, &note("notes/source.md", "Source", vec![wiki("Dad")])).unwrap();
+
+    let rows = run_query(
+        &conn,
+        "SELECT target_path FROM backlinks WHERE source_path = 'notes/source.md'",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(
+        rows[0]["target_path"],
+        Value::from("notes/tim-maccaw-dad.md")
+    );
+}
+
+#[test]
+fn backlink_resolution_uses_daily_then_title_then_alias_precedence() {
+    let conn = migrated();
+    apply_note(
+        &conn,
+        &aliased_note("notes/aliased-date.md", "Release Day", "2026-07-10"),
+    )
+    .unwrap();
+    apply_note(&conn, &note("notes/titled-date.md", "2026-07-10", vec![])).unwrap();
+    apply_note(&conn, &daily_note("daily/2026-07-10.md", "2026-07-10")).unwrap();
+    apply_note(
+        &conn,
+        &note(
+            "notes/date-source.md",
+            "Date Source",
+            vec![wiki("2026-07-10")],
+        ),
+    )
+    .unwrap();
+
+    apply_note(
+        &conn,
+        &aliased_note("notes/tim-maccaw-dad.md", "Tim MacCaw // Dad", "Dad"),
+    )
+    .unwrap();
+    apply_note(&conn, &note("notes/dad.md", "Dad", vec![])).unwrap();
+    apply_note(
+        &conn,
+        &note("notes/dad-source.md", "Dad Source", vec![wiki("Dad")]),
+    )
+    .unwrap();
+
+    let rows = run_query(
+        &conn,
+        "SELECT source_path, target_path FROM backlinks ORDER BY source_path",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0]["source_path"], Value::from("notes/dad-source.md"));
+    assert_eq!(rows[0]["target_path"], Value::from("notes/dad.md"));
+    assert_eq!(rows[1]["source_path"], Value::from("notes/date-source.md"));
+    assert_eq!(rows[1]["target_path"], Value::from("daily/2026-07-10.md"));
+}
+
+#[test]
+fn note_key_precedence_migration_preserves_existing_projection_rows() {
+    let mut conn = open_in_memory().expect("open");
+    conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+    migrate_to(&mut conn, 17).expect("stage v17");
+
+    apply_note(
+        &conn,
+        &aliased_note("notes/tim-maccaw-dad.md", "Tim MacCaw // Dad", "Dad"),
+    )
+    .unwrap();
+    apply_note(&conn, &note("notes/dad.md", "Dad", vec![])).unwrap();
+    apply_note(&conn, &note("notes/source.md", "Source", vec![wiki("Dad")])).unwrap();
+
+    let counts_before: Vec<i64> = ["notes", "links", "aliases"]
+        .iter()
+        .map(|table| {
+            conn.query_row(&format!("SELECT count(*) FROM {table}"), [], |row| {
+                row.get(0)
+            })
+            .unwrap()
+        })
+        .collect();
+
+    migrate(&mut conn).expect("migrate to v18");
+
+    let counts_after: Vec<i64> = ["notes", "links", "aliases"]
+        .iter()
+        .map(|table| {
+            conn.query_row(&format!("SELECT count(*) FROM {table}"), [], |row| {
+                row.get(0)
+            })
+            .unwrap()
+        })
+        .collect();
+    assert_eq!(counts_after, counts_before);
+
+    let rows = run_query(
+        &conn,
+        "SELECT target_path FROM backlinks WHERE source_path = 'notes/source.md'",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["target_path"], Value::from("notes/dad.md"));
+}
+
+#[test]
+fn alias_collisions_choose_the_first_path_for_backlinks() {
+    let conn = migrated();
+    apply_note(&conn, &aliased_note("notes/zeta.md", "Zeta", "Shared Name")).unwrap();
+    apply_note(
+        &conn,
+        &aliased_note("notes/alpha.md", "Alpha", "Shared Name"),
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO aliases(note_path, alias, alias_key) VALUES (?1, ?2, ?3)",
+        ["notes/alpha.md", "SHARED NAME", "shared name"],
+    )
+    .unwrap();
+    apply_note(
+        &conn,
+        &note("notes/source.md", "Source", vec![wiki("Shared Name")]),
+    )
+    .unwrap();
+
+    let rows = run_query(
+        &conn,
+        "SELECT target_path FROM backlinks WHERE source_path = 'notes/source.md'",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["target_path"], Value::from("notes/alpha.md"));
+
+    let keys = run_query(
+        &conn,
+        "SELECT note_path, claim_count FROM note_keys WHERE key = 'shared name'",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(keys.len(), 1);
+    assert_eq!(keys[0]["note_path"], Value::from("notes/alpha.md"));
+    assert_eq!(keys[0]["claim_count"], Value::from(2));
+
+    conn.execute("DELETE FROM notes WHERE path = ?1", ["notes/alpha.md"])
+        .unwrap();
+    let fallback = run_query(
+        &conn,
+        "SELECT target_path FROM backlinks WHERE source_path = 'notes/source.md'",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(fallback.len(), 1);
+    assert_eq!(fallback[0]["target_path"], Value::from("notes/zeta.md"));
+    let fallback_key = run_query(
+        &conn,
+        "SELECT note_path, claim_count FROM note_keys WHERE key = 'shared name'",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(fallback_key[0]["note_path"], Value::from("notes/zeta.md"));
+    assert_eq!(fallback_key[0]["claim_count"], Value::from(1));
 }
 
 #[test]

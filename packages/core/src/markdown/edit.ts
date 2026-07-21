@@ -1,4 +1,4 @@
-import type { SyntaxNode } from '@lezer/common'
+import type { SyntaxNode } from '@meowdown/markdown'
 import { parseNote } from './extract'
 import { splitFrontmatter } from './frontmatter'
 import { parseBody } from './grammar'

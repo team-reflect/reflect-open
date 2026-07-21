@@ -43,6 +43,8 @@ export interface TranscriptionReconcilerOptions {
    * by the very next pass.
    */
   getProviders: () => AiProvidersState
+  /** Read lazily so a settings toggle applies to the next reconcile pass. */
+  getTranscriptionFormat: () => boolean
 }
 
 /** Build the reconciler for one graph session. `dispose()` is terminal. */
@@ -89,6 +91,7 @@ export function createTranscriptionReconciler(
     const outcome = await reconcileAudioMemos({
       providers: options.getProviders(),
       generation: options.generation,
+      formatTranscript: options.getTranscriptionFormat(),
       fetchFn: providerFetch,
       isStale,
       onPending: (count) => setTranscribing(count > 0),

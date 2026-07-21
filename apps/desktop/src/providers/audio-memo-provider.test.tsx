@@ -43,7 +43,13 @@ const reconcilerControls = vi.hoisted(() => {
   }
 })
 const createTranscriptionReconciler = vi.hoisted(() =>
-  vi.fn((_options: { generation: number; getProviders: () => AiProvidersState }) => reconcilerControls.fake),
+  vi.fn(
+    (_options: {
+      generation: number
+      getProviders: () => AiProvidersState
+      getTranscriptionFormat: () => boolean
+    }) => reconcilerControls.fake,
+  ),
 )
 
 const recorderControls = vi.hoisted(() => ({
@@ -111,6 +117,7 @@ const SETTINGS = vi.hoisted(() => ({
   current: {
     aiProviders: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
     defaultAiProviderId: 'cfg-openai',
+    transcriptionFormat: true,
   },
 }))
 
@@ -163,6 +170,7 @@ beforeEach(() => {
   SETTINGS.current = {
     aiProviders: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
     defaultAiProviderId: 'cfg-openai',
+    transcriptionFormat: true,
   }
   captureAudioMemo.mockResolvedValue({ ok: true, memo: MEMO })
   reconcilerControls.fake.getTranscribing.mockReturnValue(false)
@@ -195,15 +203,23 @@ describe('AudioMemoProvider', () => {
     })
   })
 
-  it('mounts one reconciler per graph session, started immediately, disposed on unmount', () => {
-    const { unmount } = renderHook(() => useAudioMemo(), { wrapper })
+  it('mounts one reconciler per graph session and reads formatting lazily', async () => {
+    const { rerender, unmount } = renderHook(() => useAudioMemo(), { wrapper })
 
     expect(createTranscriptionReconciler).toHaveBeenCalledTimes(1)
     const options = createTranscriptionReconciler.mock.calls[0]?.[0]
     expect(options?.generation).toBe(3)
     // Models are read lazily, so a key added mid-session reaches the next pass.
     expect(options?.getProviders().defaultProviderId).toBe('cfg-openai')
+    expect(options?.getTranscriptionFormat()).toBe(true)
     expect(reconcilerControls.fake.start).toHaveBeenCalledTimes(1)
+
+    SETTINGS.current = { ...SETTINGS.current, transcriptionFormat: false }
+    await act(async () => {
+      rerender()
+    })
+    expect(options?.getTranscriptionFormat()).toBe(false)
+    expect(createTranscriptionReconciler).toHaveBeenCalledTimes(1)
 
     unmount()
     expect(reconcilerControls.fake.dispose).toHaveBeenCalledTimes(1)
@@ -229,6 +245,7 @@ describe('AudioMemoProvider', () => {
         { id: 'claude', provider: 'anthropic', model: 'claude-fable-5', keyHint: 'wxyz1' },
       ],
       defaultAiProviderId: 'claude',
+      transcriptionFormat: true,
     }
     const { rerender } = renderHook(() => useAudioMemo(), { wrapper })
     expect(reconcilerControls.fake.schedule).not.toHaveBeenCalled()
@@ -236,6 +253,7 @@ describe('AudioMemoProvider', () => {
     SETTINGS.current = {
       aiProviders: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
       defaultAiProviderId: 'cfg-openai',
+      transcriptionFormat: true,
     }
     await act(async () => {
       rerender()
@@ -625,6 +643,7 @@ describe('AudioMemoProvider', () => {
         { id: 'claude', provider: 'anthropic', model: 'claude-fable-5', keyHint: 'wxyz1' },
       ],
       defaultAiProviderId: 'claude',
+      transcriptionFormat: true,
     }
     const { result } = renderHook(() => useAudioMemo(), { wrapper })
 

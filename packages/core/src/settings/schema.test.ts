@@ -8,12 +8,14 @@ describe('settingsSchema', () => {
       editorSpellCheck: true,
       editorDefaultBullet: true,
       editorBulletAfterHeading: true,
+      editorSmoothCaretAnimation: true,
       editorTextSize: 'small',
       editorFullWidth: false,
       sidebarWidth: 260,
       contextSidebarWidth: 320,
       semanticSearchEnabled: false,
       describeAssets: true,
+      transcriptionFormat: true,
       contactsEnabled: false,
       mobileOnboarded: false,
       mobileStorage: 'local',
@@ -36,12 +38,14 @@ describe('settingsSchema', () => {
     expect(DEFAULT_SETTINGS.editorSpellCheck).toBe(true)
     expect(DEFAULT_SETTINGS.editorDefaultBullet).toBe(true)
     expect(DEFAULT_SETTINGS.editorBulletAfterHeading).toBe(true)
+    expect(DEFAULT_SETTINGS.editorSmoothCaretAnimation).toBe(true)
     expect(DEFAULT_SETTINGS.editorTextSize).toBe('small')
     expect(DEFAULT_SETTINGS.editorFullWidth).toBe(false)
     expect(DEFAULT_SETTINGS.sidebarWidth).toBe(260)
     expect(DEFAULT_SETTINGS.contextSidebarWidth).toBe(320)
     expect(DEFAULT_SETTINGS.semanticSearchEnabled).toBe(false)
     expect(DEFAULT_SETTINGS.describeAssets).toBe(true)
+    expect(DEFAULT_SETTINGS.transcriptionFormat).toBe(true)
     expect(DEFAULT_SETTINGS.contactsEnabled).toBe(false)
     expect(DEFAULT_SETTINGS.mobileOnboarded).toBe(false)
     expect(DEFAULT_SETTINGS.mobileStorage).toBe('local')
@@ -74,6 +78,12 @@ describe('settingsSchema', () => {
     expect(
       settingsSchema.parse({ editorBulletAfterHeading: true }).editorBulletAfterHeading,
     ).toBe(true)
+    expect(
+      settingsSchema.parse({ editorSmoothCaretAnimation: false }).editorSmoothCaretAnimation,
+    ).toBe(false)
+    expect(
+      settingsSchema.parse({ editorSmoothCaretAnimation: true }).editorSmoothCaretAnimation,
+    ).toBe(true)
     expect(settingsSchema.parse({ editorTextSize: 'small' }).editorTextSize).toBe('small')
     expect(settingsSchema.parse({ editorTextSize: 'medium' }).editorTextSize).toBe('medium')
     expect(settingsSchema.parse({ editorTextSize: 'large' }).editorTextSize).toBe('large')
@@ -98,6 +108,8 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ semanticSearchEnabled: false }).semanticSearchEnabled).toBe(false)
     expect(settingsSchema.parse({ describeAssets: true }).describeAssets).toBe(true)
     expect(settingsSchema.parse({ describeAssets: false }).describeAssets).toBe(false)
+    expect(settingsSchema.parse({ transcriptionFormat: true }).transcriptionFormat).toBe(true)
+    expect(settingsSchema.parse({ transcriptionFormat: false }).transcriptionFormat).toBe(false)
     expect(settingsSchema.parse({ contactsEnabled: true }).contactsEnabled).toBe(true)
     expect(settingsSchema.parse({ contactsEnabled: false }).contactsEnabled).toBe(false)
     expect(
@@ -137,6 +149,12 @@ describe('settingsSchema', () => {
       settingsSchema.parse({ editorBulletAfterHeading: 'on' }).editorBulletAfterHeading,
     ).toBe(true)
     expect(settingsSchema.parse({ editorBulletAfterHeading: 0 }).editorBulletAfterHeading).toBe(true)
+    expect(
+      settingsSchema.parse({ editorSmoothCaretAnimation: 'on' }).editorSmoothCaretAnimation,
+    ).toBe(true)
+    expect(
+      settingsSchema.parse({ editorSmoothCaretAnimation: 0 }).editorSmoothCaretAnimation,
+    ).toBe(true)
     expect(settingsSchema.parse({ editorTextSize: 'huge' }).editorTextSize).toBe('small')
     expect(settingsSchema.parse({ editorTextSize: 3 }).editorTextSize).toBe('small')
     expect(settingsSchema.parse({ editorFullWidth: 'yes' }).editorFullWidth).toBe(false)
@@ -164,6 +182,8 @@ describe('settingsSchema', () => {
     // back to the default rather than failing the whole settings load.
     expect(settingsSchema.parse({ describeAssets: 'yes' }).describeAssets).toBe(true)
     expect(settingsSchema.parse({ describeAssets: 0 }).describeAssets).toBe(true)
+    expect(settingsSchema.parse({ transcriptionFormat: 'yes' }).transcriptionFormat).toBe(true)
+    expect(settingsSchema.parse({ transcriptionFormat: 0 }).transcriptionFormat).toBe(true)
     expect(settingsSchema.parse({ contactsEnabled: 'yes' }).contactsEnabled).toBe(false)
     expect(settingsSchema.parse({ contactsEnabled: 1 }).contactsEnabled).toBe(false)
     expect(settingsSchema.parse({ allNotesFilterTags: 'book' }).allNotesFilterTags).toEqual([
@@ -192,12 +212,14 @@ describe('settingsSchema', () => {
       editorSpellCheck: true,
       editorDefaultBullet: true,
       editorBulletAfterHeading: true,
+      editorSmoothCaretAnimation: true,
       editorTextSize: 'small',
       editorFullWidth: false,
       sidebarWidth: 260,
       contextSidebarWidth: 320,
       semanticSearchEnabled: false,
       describeAssets: true,
+      transcriptionFormat: true,
       contactsEnabled: false,
       mobileOnboarded: false,
       mobileStorage: 'local',

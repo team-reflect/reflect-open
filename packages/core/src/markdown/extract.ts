@@ -1,4 +1,4 @@
-import type { SyntaxNode } from '@lezer/common'
+import type { SyntaxNode } from '@meowdown/markdown'
 import { dateFromDailyPath, isDaily } from '../graph/paths'
 import { parseFrontmatter, splitFrontmatter } from './frontmatter'
 import { parseBody } from './grammar'
@@ -8,6 +8,7 @@ import { buildPlainText, plainTextOfRange, unescapeMarkdownText } from './plain-
 import { normalizeWikiTarget } from './resolve'
 import { taskBreadcrumbs } from './task-breadcrumbs'
 import { parseTaskMarker } from './task-marker'
+import { isWikiNodeName, wikiBracketStart } from './wiki-nodes'
 import type {
   AssetRef,
   Frontmatter,
@@ -56,7 +57,7 @@ function isTagExcludedNode(name: string): boolean {
     name === 'FencedCode' ||
     name === 'CodeBlock' ||
     name === 'URL' ||
-    name === 'WikiLink'
+    isWikiNodeName(name)
   )
 }
 
@@ -343,8 +344,8 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
         literalPlainText.push({ from, to })
       }
 
-      if (name === 'WikiLink') {
-        wikiLinks.push(readWikiLink(body, from, to, bodyOffset))
+      if (isWikiNodeName(name)) {
+        wikiLinks.push(readWikiLink(body, wikiBracketStart(node), to, bodyOffset))
         return false
       }
 

@@ -50,11 +50,11 @@ Drawn from the product docs — read these for deeper context:
 
 ### Development workflow
 
-Development happens on `next` (the default branch); branch from it and target it with
-PRs. `master` is the public-release branch and only advances when `next` is merged
-into it for a stable release. Versions on `next` carry a prerelease suffix
-(`0.2.0-beta.1`), which the release pipeline publishes as GitHub pre-releases — see
-[docs/macos-distribution.md](docs/macos-distribution.md).
+Development happens on `master` (the only long-lived branch); branch from it and
+target it with PRs. release-please keeps a beta and a stable Release PR open side by
+side; merging one publishes that channel. Between stable releases the version carries
+a prerelease suffix (`0.7.0-beta.3`), which the release pipeline publishes as GitHub
+pre-releases. See [docs/macos-distribution.md](docs/macos-distribution.md).
 
 PR titles must be conventional commits (`feat:` / `fix:` / `chore:` …, enforced by
 CI). The title becomes the squash-commit message, drives the release-please version

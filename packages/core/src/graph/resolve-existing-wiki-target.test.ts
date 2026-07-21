@@ -334,3 +334,35 @@ describe('resolveExistingWikiTarget', () => {
     expectNoWrites(invoke)
   })
 })
+
+describe('resolveExistingWikiTarget — rich titles on disk', () => {
+  it('resolves a rich-title note through its derived linkable alias', async () => {
+    const invoke = bindBridge({
+      files: { 'notes/meeting-with-ada.md': '# Meeting with [[Ada]]\n' },
+    })
+
+    await expect(resolveExistingWikiTarget('Meeting with Ada', 7)).resolves.toEqual({
+      kind: 'resolved',
+      path: 'notes/meeting-with-ada.md',
+    })
+    expectNoWrites(invoke)
+  })
+
+  it('stays missing when the rich note lives outside the derived slug family', async () => {
+    // The bounded disk scan inspects only `slugForTitle(target)`'s filename
+    // family. A rich note's own family derives from its *raw* title, so a
+    // derived-form lookup cannot reach it until the index projects the alias
+    // row. Pinned deliberately: this is the fallback's known boundary, not a
+    // full-graph alias scan.
+    const invoke = bindBridge({
+      files: {
+        'notes/meeting-with-ada-lovelaceada.md': '# Meeting with [[Ada Lovelace|Ada]]\n',
+      },
+    })
+
+    await expect(resolveExistingWikiTarget('Meeting with Ada', 7)).resolves.toEqual({
+      kind: 'missing',
+    })
+    expectNoWrites(invoke)
+  })
+})

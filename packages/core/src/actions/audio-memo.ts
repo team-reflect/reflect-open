@@ -2,24 +2,24 @@ import { errorMessage, isAppError, toAppError, type AppError } from '../errors'
 import {
   pickTranscriptionConfig,
   type AiProvidersState,
-  type TranscriptionConfig,
 } from '../ai/provider-config'
 import { aiKeySecretName } from '../ai/secrets'
-import { generateAudioMemoTitle, pickAudioMemoTitleConfig } from '../ai/audio-memo-title'
-import { APP_REVIEW_STUB_KEY, stubTranscriptBody } from '../ai/audio-memo-review-stub'
+import {
+  audioMemoEnrichmentConfig,
+  pickAudioMemoEnrichmentConfig,
+  type AudioMemoEnrichmentCredentials,
+} from '../ai/audio-memo-title'
+import { buildAudioMemoTranscript } from '../ai/audio-memo-transcript'
 import {
   AUDIO_EXTENSION_BY_MIME,
   base64ToBytes,
   baseMimeType,
   bytesToBase64,
-  isTranscriptionRejected,
-  transcribeAudio,
 } from '../ai/transcribe'
 import { listDir, listFiles, readAsset, readNote, writeAsset, writeNote } from '../graph/commands'
 import { AUDIO_MEMOS_DIR, audioMemoPath, dailyPath, notePath } from '../graph/paths'
 import { appendUnderBacklinkedHeading, wikiLinkSafe } from '../markdown/edit'
 import { getSecret } from '../secrets/keychain'
-import type { AiProviderConfig } from '../settings/schema'
 import { ensureBacklinkTarget } from './backlink-target'
 
 /**
@@ -34,8 +34,9 @@ import { ensureBacklinkTarget } from './backlink-target'
  * 2. **Reconcile** ({@link reconcileAudioMemos}): a memo's transcription is a
  *    note with the **same basename** (`notes/<base>.md`). Any memo without
  *    one resolves or creates the `Audio memos` category note, is transcribed
- *    (BYOK provider), named from that transcript, written to its transcription
- *    note, and backlinked from its day's daily note — transcript note first,
+ *    (BYOK provider), optionally formatted and named in one best-effort
+ *    small-model pass, written to its transcription note, and backlinked from
+ *    its day's daily note — transcript note first,
  *    because it carries the result: a failure between
  *    the two writes leaves an unlinked note, never a tombstoned memo whose
  *    transcript was dropped. A
@@ -54,9 +55,10 @@ import { ensureBacklinkTarget } from './backlink-target'
  * stopped within the same second (whose display titles collide) can never
  * tombstone each other, and the link survives a note-title rename.
  *
- * Privacy: only the captured audio is sent to the provider — never any note
- * content — and all transcription output is written locally, so recording is
- * allowed even when the daily note is `private: true`.
+ * Privacy: the captured audio and its fresh transcript (for naming and optional
+ * formatting) are sent to user-configured providers — never any existing note
+ * content. All output is written locally, so recording is allowed even when the
+ * daily note is `private: true`.
  */
 
 /** Everything derivable from a memo's shared basename. */
@@ -254,60 +256,6 @@ function transcriptionNote(memo: AudioMemoIdentity, title: string, body: string)
   return `---\naliases: [${memo.base}]\n---\n\n# ${title}\n\n[Recording](${memo.audioPath})\n\n${body}\n`
 }
 
-/**
- * The note body for one memo: the transcript, a placeholder for silence, or
- * — when the provider refuses the recording itself — a failure notice that
- * tombstones the memo. Anything transient (offline, auth, rate limit)
- * rethrows and stops the pass.
- */
-async function memoNoteBody(input: {
-  audio: Blob
-  memo: AudioMemoIdentity
-  config: TranscriptionConfig
-  apiKey: string
-  titleCredentials: { config: AiProviderConfig; apiKey: string } | null
-  fetchFn?: typeof fetch | undefined
-}): Promise<{ body: string; title: string; rejected: boolean }> {
-  if (input.apiKey === APP_REVIEW_STUB_KEY) {
-    return { body: stubTranscriptBody(), title: input.memo.title, rejected: false }
-  }
-  try {
-    const text = await transcribeAudio({
-      provider: input.config.provider,
-      apiKey: input.apiKey,
-      audio: input.audio,
-      mimeType: input.memo.mimeType,
-      fetchFn: input.fetchFn,
-    })
-    const title =
-      text === ''
-        ? input.memo.title
-        : await generateAudioMemoTitle({
-            ...(input.titleCredentials !== null
-              ? {
-                  credentials: {
-                    config: input.titleCredentials.config,
-                    apiKey: input.titleCredentials.apiKey,
-                  },
-                }
-              : {}),
-            fetchFn: input.fetchFn,
-            transcript: text,
-            fallbackTitle: input.memo.title,
-          })
-    return { body: text === '' ? 'No speech detected.' : text, title, rejected: false }
-  } catch (cause) {
-    if (!isTranscriptionRejected(cause)) {
-      throw cause
-    }
-    return {
-      body: `Transcription failed: ${errorMessage(cause)}`,
-      title: input.memo.title,
-      rejected: true,
-    }
-  }
-}
-
 /** The category note every audio-memo section backlinks. */
 const MEMOS_NOTE_TITLE = 'Audio memos'
 /**
@@ -359,6 +307,8 @@ export interface ReconcileAudioMemosInput {
   providers: AiProvidersState
   /** `GraphInfo.generation` — pins every write to the issuing graph. */
   generation: number
+  /** Whether a best-effort text-model pass formats each fresh transcript. */
+  formatTranscript: boolean
   /** Host transport for the provider call (the Tauri HTTP plugin's fetch). */
   fetchFn?: typeof fetch
   /** Abort gate, checked between memos (graph switch / unmount). */
@@ -431,15 +381,20 @@ export async function reconcileAudioMemos(
       },
     }
   }
-  const titleConfig = pickAudioMemoTitleConfig(input.providers)
-  const titleApiKey =
-    titleConfig === null
+  const enrichmentConfig = pickAudioMemoEnrichmentConfig(input.providers)
+  const enrichmentApiKey =
+    enrichmentConfig === null
       ? null
-      : titleConfig.id === config.id
+      : enrichmentConfig.id === config.id
         ? apiKey
-        : await getSecret(aiKeySecretName(titleConfig.id)).catch(() => null)
-  const titleCredentials =
-    titleConfig !== null && titleApiKey !== null ? { config: titleConfig, apiKey: titleApiKey } : null
+        : await getSecret(aiKeySecretName(enrichmentConfig.id)).catch(() => null)
+  const fallbackEnrichmentConfig = audioMemoEnrichmentConfig(config)
+  const enrichmentCredentials: AudioMemoEnrichmentCredentials | null =
+    enrichmentConfig !== null && enrichmentApiKey !== null
+      ? { config: enrichmentConfig, apiKey: enrichmentApiKey }
+      : fallbackEnrichmentConfig !== null
+        ? { config: fallbackEnrichmentConfig, apiKey }
+        : null
 
   let transcribed = 0
   let rejected = 0
@@ -469,15 +424,18 @@ export async function reconcileAudioMemos(
       if (stale()) {
         return stalled()
       }
-      const note = await memoNoteBody({
+      const note = await buildAudioMemoTranscript({
         audio,
-        memo,
+        mimeType: memo.mimeType,
         config,
         apiKey,
-        titleCredentials,
+        enrichmentCredentials,
+        formatTranscript: input.formatTranscript,
+        fallbackTitle: memo.title,
         fetchFn: input.fetchFn,
+        isStale: stale,
       })
-      if (stale()) {
+      if (note.status === 'stale' || stale()) {
         return stalled()
       }
       await writeNote(memo.notePath, transcriptionNote(memo, note.title, note.body), input.generation)

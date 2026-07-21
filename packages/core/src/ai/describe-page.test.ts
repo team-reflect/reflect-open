@@ -120,6 +120,16 @@ describe('describePage', () => {
     expect(parts.map((part) => part.type)).toEqual(['text'])
   })
 
+  it('tells the model to rebuild share-sheet boilerplate titles from the page', async () => {
+    const calls = modelAnsweringObject('A title', 'A description.')
+
+    await request()
+
+    const text = userText(calls)
+    expect(text).toContain('share sheets often supply boilerplate')
+    expect(text).toContain('build the title from the meta title, page text, or screenshot')
+  })
+
   it('sanitizes the returned title for wiki-link display', async () => {
     modelAnsweringObject(' An [article] | Site\nName ', 'A description.')
 

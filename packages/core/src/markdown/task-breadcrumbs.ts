@@ -1,4 +1,4 @@
-import type { SyntaxNode } from '@lezer/common'
+import type { SyntaxNode } from '@meowdown/markdown'
 import type { Span } from './model'
 import { plainTextOfRange } from './plain-text'
 

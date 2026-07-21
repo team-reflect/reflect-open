@@ -40,7 +40,7 @@ designs simply don't survive the move:
 
 | Doc                                                                 | v1 feature               | v2 status                                        |
 | ------------------------------------------------------------------- | ------------------------ | ------------------------------------------------ |
-| [Note aliases](./note-aliases.md)                                   | `//` title aliases       | **Ported** (frontmatter `aliases`) — mapping doc |
+| [Note aliases](./note-aliases.md)                                   | `//` title aliases       | **Ported** (`//` + frontmatter aliases)          |
 | [Backlink hover previews](./backlink-hover-previews.md)             | Wiki-link preview        | **Ported** (passive local desktop card)          |
 | [Audio memos](./audio-memos.md)                                     | Voice notes + transcript | **Ported** (BYOK transcription) — mapping doc    |
 | [AI menu and prompts](./ai-menu-and-prompts.md)                     | Selection AI + prompts   | Planned — needs meowdown + app work              |

@@ -3,8 +3,8 @@ import { gistBodyHash, parseNote } from '../markdown'
 import { buildIndexedNote, indexedNoteSchema, PROJECTION_VERSION } from './indexed-note'
 
 describe('buildIndexedNote', () => {
-  it('carries the projection version that backfills task breadcrumbs', () => {
-    expect(PROJECTION_VERSION).toBe(15)
+  it('carries the projection version that backfills linkable rich-title aliases', () => {
+    expect(PROJECTION_VERSION).toBe(16)
   })
 
   it('flattens a parsed note into the index payload', () => {
@@ -270,5 +270,56 @@ describe('buildIndexedNote', () => {
       source,
     })
     expect(() => indexedNoteSchema.parse(indexed)).not.toThrow()
+  })
+})
+
+describe('projectNoteAliases — derived linkable rich-title aliases', () => {
+  function aliasesOf(source: string, path = 'notes/rich.md') {
+    return buildIndexedNote(parseNote({ path, source }), {
+      fileHash: 'h',
+      mtime: 0,
+      source,
+    }).aliases
+  }
+
+  it('derives a linkable alias from a rich title, keeping the raw title', () => {
+    const source = '# Meeting with [[Ada Lovelace|Ada]]\n\nHi.'
+    const indexed = buildIndexedNote(parseNote({ path: 'notes/rich.md', source }), {
+      fileHash: 'h',
+      mtime: 0,
+      source,
+    })
+    expect(indexed.title).toBe('Meeting with [[Ada Lovelace|Ada]]')
+    expect(indexed.aliases).toEqual([
+      { alias: 'Meeting with Ada', aliasKey: 'meeting with ada' },
+    ])
+  })
+
+  it('does not duplicate a frontmatter alias that owns the same key', () => {
+    expect(
+      aliasesOf(
+        '---\naliases: ["Meeting with Ada"]\n---\n# Meeting with [[Ada Lovelace|Ada]]\n',
+      ),
+    ).toEqual([{ alias: 'Meeting with Ada', aliasKey: 'meeting with ada' }])
+  })
+
+  it('derives from a rich frontmatter alias too', () => {
+    expect(
+      aliasesOf('---\naliases: ["Meeting with [[Ada Lovelace|Ada]]"]\n---\n# Plain Title\n'),
+    ).toEqual([
+      {
+        alias: 'Meeting with [[Ada Lovelace|Ada]]',
+        aliasKey: 'meeting with [[ada lovelace|ada]]',
+      },
+      { alias: 'Meeting with Ada', aliasKey: 'meeting with ada' },
+    ])
+  })
+
+  it('projects nothing for a degenerate rich title', () => {
+    expect(aliasesOf('# [[ [ ]]\n')).toEqual([])
+  })
+
+  it('skips a derived form the wiki-link syntax cannot address', () => {
+    expect(aliasesOf('# C:\\notes [[Ada Lovelace|Ada]]\n')).toEqual([])
   })
 })

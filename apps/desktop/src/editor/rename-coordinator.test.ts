@@ -212,6 +212,26 @@ describe('rename coordinator', () => {
     expect(operationLog.records[0]!.outcome).toBe('done')
   })
 
+  it('a blocked destination skips the rewrite but still places the old-title alias', async () => {
+    // The new title's derived target belongs to another note (or cannot be
+    // serialized): sources keep their old links, so the old-title alias is
+    // the only thing keeping them resolving to this note. Unlike a source
+    // collision, it MUST be placed.
+    io.rewriteLinksForTitleChange.mockResolvedValue({
+      rewritten: [],
+      failed: [],
+      collision: false,
+      destinationBlocked: true,
+    })
+    io.readNote.mockResolvedValue('# New Title\n')
+    const coordinator = makeCoordinator()
+    await renameOnce(coordinator, 'Old Title', 'New Title')
+
+    const expected = upsertFrontmatter('# New Title\n', { aliases: ['Old Title'] })
+    expect(io.writeNote).toHaveBeenCalledWith(PATH, expected, 7)
+    expect(operationLog.records[0]!.outcome).toBe('done')
+  })
+
   it('a failed rewrite still places the alias (the safety net) and says so', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     io.rewriteLinksForTitleChange.mockRejectedValue(new Error('index unavailable'))

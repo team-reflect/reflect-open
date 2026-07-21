@@ -1,6 +1,7 @@
 import {
   foldFallbackTitleKey,
   foldKey,
+  serializeWikiSuggestionAddress,
   type ContactMatch,
   type WikiSuggestion,
 } from '@reflect/core'
@@ -14,8 +15,8 @@ import {
  * are unit-testable (the popover itself needs real custom elements + layout).
  */
 
-export type AutocompleteEntry =
-  | { kind: 'suggestion'; suggestion: WikiSuggestion }
+export type AutocompleteEntry<Suggestion extends WikiSuggestion = WikiSuggestion> =
+  | { kind: 'suggestion'; suggestion: Suggestion }
   | { kind: 'contact'; contact: ContactMatch }
   | { kind: 'create'; title: string }
 
@@ -32,23 +33,49 @@ export interface EntryOptions {
    * the note row already covers it, exactly v1's dedup.
    */
   contacts?: readonly ContactMatch[]
+  /**
+   * Drop raw Create/contact text that cannot be embedded in `[[…]]` without
+   * changing what Markdown parses. False for non-markdown consumers such as
+   * the attendee combobox.
+   */
+  requireSerializableWikiText?: boolean
+  /**
+   * The raw query parses as a date phrase ("tomorrow", "next friday").
+   * Callers with a date-suggestion context pass this so the Create row stays
+   * suppressed even when address verification dropped the generated date row
+   * itself (its key can be owned by a non-daily note).
+   */
+  queryReadsAsDate?: boolean
+  /**
+   * Folded targets already owned by indexed notes, including claims whose
+   * suggestion rows were filtered as ambiguous or unsafe.
+   */
+  claimedTargetKeys?: readonly string[]
 }
 
-export function buildAutocompleteEntries(
+export function buildAutocompleteEntries<Suggestion extends WikiSuggestion>(
   query: string,
-  suggestions: WikiSuggestion[],
+  suggestions: readonly Suggestion[],
   options: EntryOptions = { offerCreate: true },
-): AutocompleteEntry[] {
-  const entries: AutocompleteEntry[] = suggestions.map((suggestion) => ({
+): AutocompleteEntry<Suggestion>[] {
+  const entries: AutocompleteEntry<Suggestion>[] = suggestions.map((suggestion) => ({
     kind: 'suggestion',
     suggestion,
   }))
+  const title = query.trim()
+  const key = foldKey(title)
+  const claimedTargetKeys = new Set(options.claimedTargetKeys ?? [])
 
   // Exact folding matches ordinary link resolution. The fallback set also
   // prevents a contact action from creating through the same leading-emoji
-  // collision this menu protects for bare Create rows.
+  // collision this menu protects for bare Create rows. It starts from the
+  // claimed keys, not only the surviving rows: a claim filtered out as
+  // ambiguous or unsafe still collides with the writable resolver's fallback
+  // matching, so it must keep suppressing Create and contact rows.
   const resolvable = new Set<string>()
-  const fallbackResolvable = new Set<string>()
+  const fallbackResolvable = new Set(
+    [...claimedTargetKeys].map(foldFallbackTitleKey),
+  )
   for (const suggestion of suggestions) {
     resolvable.add(foldKey(suggestion.target))
     fallbackResolvable.add(foldFallbackTitleKey(suggestion.target))
@@ -57,36 +84,54 @@ export function buildAutocompleteEntries(
       fallbackResolvable.add(foldFallbackTitleKey(suggestion.alias))
     }
   }
-  const contacts = (options.contacts ?? []).filter(
-    (contact) =>
-      !resolvable.has(foldKey(contact.fullName)) &&
-      !fallbackResolvable.has(foldFallbackTitleKey(contact.fullName)),
-  )
+  const contacts = (options.contacts ?? []).filter((contact) => {
+    if (
+      claimedTargetKeys.has(foldKey(contact.fullName)) ||
+      resolvable.has(foldKey(contact.fullName)) ||
+      fallbackResolvable.has(foldFallbackTitleKey(contact.fullName))
+    ) {
+      return false
+    }
+    return (
+      !options.requireSerializableWikiText ||
+      serializeWikiSuggestionAddress(contact.fullName, null) !== null
+    )
+  })
   entries.push(...contacts.map((contact) => ({ kind: 'contact' as const, contact })))
 
-  const title = query.trim()
   if (title === '' || !options.offerCreate) {
     return entries
   }
-  const key = foldKey(title)
   // An exact title, alias, or date hit means the link would resolve as typed —
   // nothing to create. (A full `YYYY-MM-DD` query always has its daily
   // suggestion injected by the query layer, so dates never offer a create.)
   const resolvesAsTyped = resolvable.has(key)
+  // A query that reads as a date — "3 days ago", "next friday" — means a note
+  // with that literal title would be noise. The surviving suggestions alone
+  // can't decide this: verification may have dropped the generated date row.
+  const hasDateSuggestion =
+    options.queryReadsAsDate === true ||
+    suggestions.some((suggestion) => suggestion.generated !== undefined)
+  // A contact row for the exact typed name IS the create action (prefilled) —
+  // a bare Create row beside it would just be the worse duplicate.
+  const contactCoversQuery = contacts.some((contact) => foldKey(contact.fullName) === key)
+  const canSerializeCreate =
+    !options.requireSerializableWikiText ||
+    serializeWikiSuggestionAddress(title, null) !== null
   // A leading-emoji/whitespace fallback candidate is either the existing note
   // to reuse or an ambiguity to leave unresolved. Neither case may offer a
   // duplicate-creating row.
   const fallbackKey = foldFallbackTitleKey(title)
   const hasFallbackCollision =
     fallbackKey !== '' && fallbackResolvable.has(fallbackKey)
-  // A generated date suggestion means the query reads as a date — "3 days ago",
-  // "next friday" — so offering to create a note with that literal title would
-  // be noise.
-  const hasDateSuggestion = suggestions.some((suggestion) => suggestion.generated !== undefined)
-  // A contact row for the exact typed name IS the create action (prefilled) —
-  // a bare Create row beside it would just be the worse duplicate.
-  const contactCoversQuery = contacts.some((contact) => foldKey(contact.fullName) === key)
-  if (!resolvesAsTyped && !hasFallbackCollision && !hasDateSuggestion && !contactCoversQuery) {
+  if (
+    !resolvesAsTyped &&
+    !claimedTargetKeys.has(key) &&
+    !hasFallbackCollision &&
+    !hasDateSuggestion &&
+    !contactCoversQuery &&
+    canSerializeCreate
+  ) {
     entries.push({ kind: 'create', title })
   }
   return entries

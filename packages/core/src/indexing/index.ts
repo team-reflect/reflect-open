@@ -74,6 +74,7 @@ export {
   getCompletedTasks,
   getPinnedNotes,
   suggestWikiTargets,
+  suggestWikiLinkTargets,
   suggestTags,
   getIndexedFileFacts,
   getIndexedFileFactsByPath,
@@ -92,6 +93,7 @@ export {
   type OpenTask,
   type PinnedNote,
   type TagSuggestion,
+  type WikiLinkSuggestionResult,
 } from './queries'
 export { resolveNoteTarget } from './resolve-target'
 export {
@@ -115,6 +117,8 @@ export {
 export {
   rankWikiSuggestions,
   mergeDateSuggestions,
+  serializeWikiSuggestionAddress,
+  type WikiLinkSuggestion,
   type WikiSuggestion,
   type GeneratedDate,
 } from './suggest'

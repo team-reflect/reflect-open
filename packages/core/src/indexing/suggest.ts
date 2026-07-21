@@ -7,6 +7,7 @@
  */
 
 import { foldKey } from '../markdown/keys'
+import { wikiLinkTargetForTitle } from '../markdown/note-title'
 import type { DateSuggestion } from './date-suggestions'
 
 /**
@@ -21,20 +22,58 @@ export interface GeneratedDate {
   phrase: string
 }
 
-/** A `[[` autocomplete candidate. */
+/** A ranked note/date suggestion used by navigation and autocomplete surfaces. */
 export interface WikiSuggestion {
-  /** What `[[…]]` should contain when chosen (the canonical title, or an ISO date). */
+  /** Canonical resolution target (a linkable title form, or an ISO date). */
   target: string
   /** The note it resolves to — `null` for a daily whose file doesn't exist yet. */
   path: string | null
   /** Display title (for dailies this is the ISO date; hosts format it). */
   title: string
-  /** Set when the match came in via an alias (display as "alias → title"). */
+  /** Set for an alias hit; shown in the menu and preserved as the link's display text. */
   alias: string | null
   /** Set on daily-note suggestions. */
   date: string | null
   /** Set only on rows the date generator synthesised; see {@link GeneratedDate}. */
   generated?: GeneratedDate
+}
+
+/**
+ * A selectable `[[` autocomplete suggestion. `insertText` is present only after
+ * the query layer has verified that clicking its parsed target opens `path`:
+ * the target has exactly one claimant in its winning resolution tier, so the
+ * read resolver and the ambiguity-refusing writable resolver agree on it.
+ * Consequently, a note with no safe, unambiguous textual address is not
+ * selectable.
+ */
+export interface WikiLinkSuggestion extends WikiSuggestion {
+  /** Validated text to place inside `[[…]]`. */
+  insertText: string
+}
+
+const WIKI_LINK_RESERVED_CHARACTERS = /[[\]|\\\r\n]/u
+
+/**
+ * Serialize one textual wiki-link address and optional display label.
+ *
+ * Wiki-link syntax has no way to preserve its delimiters, and Markdown consumes
+ * backslash escapes before extraction, so either makes the original address
+ * unrepresentable and returns `null`. In particular, callers must never clean a
+ * target and pretend it still identifies the same note: changing the target
+ * changes its folded resolution key.
+ */
+export function serializeWikiSuggestionAddress(
+  target: string,
+  display: string | null,
+): string | null {
+  if (
+    target.trim() === '' ||
+    WIKI_LINK_RESERVED_CHARACTERS.test(target) ||
+    (display !== null && WIKI_LINK_RESERVED_CHARACTERS.test(display))
+  ) {
+    return null
+  }
+  return display === null ? target : `${target}|${display}`
 }
 
 /** One `notes` row considered for suggestion (a title match or recency fill). */
@@ -70,6 +109,27 @@ interface Scored {
 }
 
 /**
+ * One candidate scored for ranking. The target is the note's linkable form
+ * ({@link wikiLinkTargetForTitle}), not the raw title: for a rich title the
+ * two differ, and only the linkable form can live inside `[[…]]`. A matched
+ * alias byte-identical to the target is the derived linkable-form row
+ * matching itself (projection writes it with exactly this function's output),
+ * so it collapses to `null`; without that, address serialization would emit
+ * a self-referential `Meeting with Ada|Meeting with Ada`. The comparison is
+ * deliberately exact, not fold-based: an authored alias differing only by
+ * case is a real display preference and keeps its promised text.
+ */
+function toScored(row: TitleCandidate, matchedAlias: string | null, score: number): Scored {
+  const target = row.dailyDate ?? wikiLinkTargetForTitle(row.title)
+  const alias = matchedAlias === target ? null : matchedAlias
+  return {
+    suggestion: { target, path: row.path, title: row.title, alias, date: row.dailyDate },
+    score,
+    mtime: row.mtime,
+  }
+}
+
+/**
  * Merge and order candidates for `key` (the case-folded query). Alias hits
  * rank just behind the equivalent title hit, ties break on file recency, and a
  * note appears once — its best-scoring entry wins (so a note whose title *and*
@@ -82,29 +142,9 @@ export function rankWikiSuggestions(
   limit: number,
 ): WikiSuggestion[] {
   const scored: Scored[] = [
-    ...titles.map((row) => ({
-      suggestion: {
-        target: row.dailyDate ?? row.title,
-        path: row.path,
-        title: row.title,
-        alias: null,
-        date: row.dailyDate,
-      },
-      // ×2 leaves room for the alias penalty between match ranks.
-      score: matchRank(key, row.titleKey) * 2,
-      mtime: row.mtime,
-    })),
-    ...aliases.map((row) => ({
-      suggestion: {
-        target: row.dailyDate ?? row.title,
-        path: row.path,
-        title: row.title,
-        alias: row.alias,
-        date: row.dailyDate,
-      },
-      score: matchRank(key, row.aliasKey) * 2 + 1,
-      mtime: row.mtime,
-    })),
+    // ×2 leaves room for the alias penalty between match ranks.
+    ...titles.map((row) => toScored(row, null, matchRank(key, row.titleKey) * 2)),
+    ...aliases.map((row) => toScored(row, row.alias, matchRank(key, row.aliasKey) * 2 + 1)),
   ]
 
   scored.sort(
@@ -181,6 +221,7 @@ export function mergeDateSuggestions(
   const exactIndex = rest.findIndex(
     (suggestion) =>
       foldKey(suggestion.target) === options.key ||
+      foldKey(suggestion.title) === options.key ||
       (suggestion.alias !== null && foldKey(suggestion.alias) === options.key),
   )
   const exact = exactIndex >= 0 ? rest[exactIndex] : undefined

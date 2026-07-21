@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import type { ContactMatch, WikiSuggestion } from '@reflect/core'
+import type { ContactMatch, WikiLinkSuggestion } from '@reflect/core'
 import { buildAutocompleteEntries } from './wiki-autocomplete-entries'
 
-function suggestion(overrides: Partial<WikiSuggestion>): WikiSuggestion {
+function suggestion(overrides: Partial<WikiLinkSuggestion>): WikiLinkSuggestion {
+  const target = overrides.target ?? 'Note'
+  const alias = overrides.alias ?? null
   return {
-    target: 'Note',
+    target,
+    insertText: alias === null ? target : `${target}|${alias}`,
     path: 'notes/note.md',
     title: 'Note',
-    alias: null,
+    alias,
     date: null,
     ...overrides,
   }
@@ -87,6 +90,19 @@ describe('buildAutocompleteEntries', () => {
     expect(buildAutocompleteEntries('  ', [])).toEqual([])
   })
 
+  it('omits unsafe Create and contact rows when the consumer inserts wikilinks', () => {
+    for (const reserved of ['[', ']', '|', '\\', '\r', '\n']) {
+      const unsafeName = `A${reserved}B`
+      expect(
+        buildAutocompleteEntries(unsafeName, [], {
+          offerCreate: true,
+          contacts: [contact({ fullName: unsafeName })],
+          requireSerializableWikiText: true,
+        }),
+      ).toEqual([])
+    }
+  })
+
   it('does not offer create when a generated date suggestion is present', () => {
     const entries = buildAutocompleteEntries('3 days ago', [
       suggestion({
@@ -98,6 +114,68 @@ describe('buildAutocompleteEntries', () => {
       }),
     ])
     expect(entries.every((entry) => entry.kind === 'suggestion')).toBe(true)
+  })
+
+  it('does not offer create when the query reads as a date whose suggestion was filtered', () => {
+    // Address verification drops a generated date whose key is owned by a
+    // non-daily note; the query still reads as a date, so a note literally
+    // titled "tomorrow" stays as noisy as ever.
+    expect(
+      buildAutocompleteEntries('tomorrow', [], {
+        offerCreate: true,
+        queryReadsAsDate: true,
+      }),
+    ).toEqual([])
+  })
+
+  it('does not offer create when an existing claim was filtered from suggestions', () => {
+    expect(
+      buildAutocompleteEntries('Roadmap', [], {
+        offerCreate: true,
+        claimedTargetKeys: ['roadmap'],
+      }),
+    ).toEqual([])
+  })
+
+  it('drops an exact-name contact when the query already has an existing claim', () => {
+    expect(
+      buildAutocompleteEntries('Ada Lovelace', [], {
+        offerCreate: true,
+        contacts: [contact({})],
+        claimedTargetKeys: ['ada lovelace'],
+      }),
+    ).toEqual([])
+  })
+
+  it('suppresses create and contact rows for a filtered fallback collision', () => {
+    // Two notes titled `🧠 Ideas` are dropped by address verification, so the
+    // fallback collision arrives only through the claimed keys. Creating a
+    // bare `Ideas` would be refused by the writable resolver's fallback guard.
+    const entries = buildAutocompleteEntries('Ideas', [], {
+      offerCreate: true,
+      contacts: [contact({ fullName: 'Ideas' })],
+      claimedTargetKeys: ['🧠 ideas'],
+    })
+    expect(entries).toEqual([])
+  })
+
+  it('drops a claimed contact found by a partial query', () => {
+    const entries = buildAutocompleteEntries('Road', [], {
+      offerCreate: true,
+      contacts: [contact({ fullName: 'Roadmap' })],
+      claimedTargetKeys: ['roadmap'],
+    })
+    expect(entries).toEqual([{ kind: 'create', title: 'Road' }])
+  })
+
+  it('keeps an unclaimed contact when another candidate key is claimed', () => {
+    const ada = contact({})
+    const entries = buildAutocompleteEntries('Ada Lovelace', [], {
+      offerCreate: true,
+      contacts: [ada],
+      claimedTargetKeys: ['roadmap'],
+    })
+    expect(entries).toEqual([{ kind: 'contact', contact: ada }])
   })
 
   it('never offers create from unsettled (in-flight) suggestions', () => {
@@ -163,5 +241,32 @@ describe('buildAutocompleteEntries', () => {
       contacts: [contact({})],
     })
     expect(entries.map((entry) => entry.kind)).toEqual(['contact'])
+  })
+})
+
+describe('buildAutocompleteEntries — rich titles', () => {
+  it('does not offer create when the raw rich title is already claimed', () => {
+    const entries = buildAutocompleteEntries(
+      'Meeting with [[Ada Lovelace|Ada]]',
+      [
+        suggestion({
+          target: 'Meeting with Ada',
+          title: 'Meeting with [[Ada Lovelace|Ada]]',
+        }),
+      ],
+      {
+        offerCreate: true,
+        claimedTargetKeys: ['meeting with [[ada lovelace|ada]]'],
+      },
+    )
+    expect(entries.some((entry) => entry.kind === 'create')).toBe(false)
+  })
+
+  it('does not offer create for a derived form whose key is claimed by a filtered note', () => {
+    const entries = buildAutocompleteEntries('Meeting with Ada', [], {
+      offerCreate: true,
+      claimedTargetKeys: ['meeting with ada'],
+    })
+    expect(entries).toEqual([])
   })
 })

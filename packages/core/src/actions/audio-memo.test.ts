@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AiProvidersState } from '../ai/provider-config'
 import type { GenerateAudioMemoTitleRequest } from '../ai/audio-memo-title'
+import type {
+  FormatAudioMemoTranscriptRequest,
+  FormattedAudioMemoTranscript,
+} from '../ai/audio-memo-format'
 import {
   audioMemoFromPath,
   audioMemoIdentity,
@@ -25,6 +29,11 @@ import { getSecret } from '../secrets/keychain'
 const generateAudioMemoTitleMock = vi.hoisted(() =>
   vi.fn<(request: GenerateAudioMemoTitleRequest) => Promise<string>>(),
 )
+const formatAudioMemoTranscriptMock = vi.hoisted(() =>
+  vi.fn<
+    (request: FormatAudioMemoTranscriptRequest) => Promise<FormattedAudioMemoTranscript>
+  >(),
+)
 const ensureBacklinkTargetMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../graph/commands', () => ({
@@ -42,6 +51,9 @@ vi.mock('../ai/transcribe', async (importOriginal) => ({
 vi.mock('../ai/audio-memo-title', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../ai/audio-memo-title')>()),
   generateAudioMemoTitle: generateAudioMemoTitleMock,
+}))
+vi.mock('../ai/audio-memo-format', () => ({
+  formatAudioMemoTranscript: formatAudioMemoTranscriptMock,
 }))
 vi.mock('./backlink-target', () => ({
   ensureBacklinkTarget: ensureBacklinkTargetMock,
@@ -80,7 +92,12 @@ function fileMeta(path: string): { path: string; size: number; modifiedMs: numbe
 }
 
 function reconcile(overrides: Partial<ReconcileAudioMemosInput> = {}) {
-  return reconcileAudioMemos({ providers: PROVIDERS, generation: 3, ...overrides })
+  return reconcileAudioMemos({
+    providers: PROVIDERS,
+    generation: 3,
+    formatTranscript: false,
+    ...overrides,
+  })
 }
 
 beforeEach(() => {
@@ -94,6 +111,10 @@ beforeEach(() => {
   getSecretMock.mockResolvedValue('sk-live-key')
   transcribeMock.mockResolvedValue('memo transcript')
   generateAudioMemoTitleMock.mockResolvedValue('Memo Transcript')
+  formatAudioMemoTranscriptMock.mockResolvedValue({
+    title: 'Planning the launch',
+    body: 'We reviewed the launch.\n\n## Next steps\n\n- Invite beta users',
+  })
   ensureBacklinkTargetMock.mockResolvedValue('Audio memos')
 })
 
@@ -223,6 +244,39 @@ describe('reconcileAudioMemos', () => {
       transcript: 'memo transcript',
       fallbackTitle: 'Audio memo 2026-06-11 15:30:22',
     })
+    expect(formatAudioMemoTranscriptMock).not.toHaveBeenCalled()
+  })
+
+  it('formats and names a fresh transcript in one best-effort AI pass when enabled', async () => {
+    listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
+
+    const outcome = await reconcile({ formatTranscript: true })
+
+    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, stopped: null })
+    expect(formatAudioMemoTranscriptMock).toHaveBeenCalledWith({
+      credentials: {
+        config: { ...PROVIDERS.providers[0], model: 'gpt-5.4-nano' },
+        apiKey: 'sk-live-key',
+      },
+      fetchFn: undefined,
+      transcript: 'memo transcript',
+      fallbackTitle: 'Audio memo 2026-06-11 15:30:22',
+    })
+    expect(generateAudioMemoTitleMock).not.toHaveBeenCalled()
+    expect(writeNoteMock).toHaveBeenCalledWith(
+      MEMO.notePath,
+      expect.stringContaining(
+        '# Planning the launch\n\n[Recording](audio-memos/audio-memo-2026-06-11-153022-845.webm)\n\nWe reviewed the launch.\n\n## Next steps\n\n- Invite beta users',
+      ),
+      3,
+    )
+    expect(writeNoteMock).toHaveBeenCalledWith(
+      'daily/2026-06-11.md',
+      expect.stringContaining(
+        '- [[audio-memo-2026-06-11-153022-845|Planning the launch]]',
+      ),
+      3,
+    )
   })
 
   it('uses the default Anthropic Haiku entry to name a memo when configured', async () => {
@@ -249,6 +303,30 @@ describe('reconcileAudioMemos', () => {
       transcript: 'memo transcript',
       fallbackTitle: 'Audio memo 2026-06-11 15:30:22',
     })
+  })
+
+  it('uses the working transcription key when the preferred enrichment key is missing', async () => {
+    listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
+    getSecretMock.mockImplementation(async (name) =>
+      name === 'ai-api-key:cfg-anthropic' ? null : 'sk-live-key',
+    )
+
+    await reconcile({
+      providers: {
+        providers: [...PROVIDERS.providers, ANTHROPIC_CONFIG],
+        defaultProviderId: ANTHROPIC_CONFIG.id,
+      },
+      formatTranscript: true,
+    })
+
+    expect(formatAudioMemoTranscriptMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        credentials: {
+          config: { ...PROVIDERS.providers[0], model: 'gpt-5.4-nano' },
+          apiKey: 'sk-live-key',
+        },
+      }),
+    )
   })
 
   it('a provider-refused recording is tombstoned with a failure note; the pass continues', async () => {
@@ -379,6 +457,7 @@ describe('reconcileAudioMemos', () => {
     const outcome = await reconcile()
 
     expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, stopped: null })
+    expect(formatAudioMemoTranscriptMock).not.toHaveBeenCalled()
     expect(writeNoteMock).toHaveBeenCalledWith(
       MEMO.notePath,
       expect.stringContaining('memo transcript'),
@@ -390,9 +469,10 @@ describe('reconcileAudioMemos', () => {
     listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
     transcribeMock.mockResolvedValue('')
 
-    const outcome = await reconcile()
+    const outcome = await reconcile({ formatTranscript: true })
 
     expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, stopped: null })
+    expect(formatAudioMemoTranscriptMock).not.toHaveBeenCalled()
     expect(writeNoteMock).toHaveBeenCalledWith(
       MEMO.notePath,
       expect.stringContaining('No speech detected.'),
@@ -417,7 +497,7 @@ describe('reconcileAudioMemos', () => {
     listDirMock.mockResolvedValue([fileMeta(earlier.audioPath), fileMeta(MEMO.audioPath)])
     transcribeMock.mockRejectedValue({ kind: 'network', message: 'provider down' })
 
-    const outcome = await reconcile()
+    const outcome = await reconcile({ formatTranscript: true })
 
     expect(outcome).toEqual({
       pending: 2,
@@ -480,11 +560,12 @@ describe('reconcileAudioMemos', () => {
     listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
     getSecretMock.mockResolvedValue(APP_REVIEW_STUB_KEY)
 
-    const outcome = await reconcile()
+    const outcome = await reconcile({ formatTranscript: true })
 
     expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, stopped: null })
     expect(transcribeMock).not.toHaveBeenCalled()
     expect(generateAudioMemoTitleMock).not.toHaveBeenCalled()
+    expect(formatAudioMemoTranscriptMock).not.toHaveBeenCalled()
     expect(writeNoteMock).toHaveBeenCalledWith(
       MEMO.notePath,
       expect.stringContaining('demo transcription'),
@@ -527,9 +608,11 @@ describe('reconcileAudioMemos', () => {
     const earlier = audioMemoIdentity(new Date(2026, 5, 10, 9, 0, 0, 0), 'audio/mp4')
     listDirMock.mockResolvedValue([fileMeta(earlier.audioPath), fileMeta(MEMO.audioPath)])
     // The first memo checks at loop start, after category resolution, after
-    // the asset read, and after transcription; stop at the next loop start.
+    // the asset read, between transcription and enrichment, and after
+    // enrichment; stop at the next loop start.
     const isStale = vi
       .fn()
+      .mockReturnValueOnce(false)
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(false)
@@ -561,6 +644,29 @@ describe('reconcileAudioMemos', () => {
       transcribed: 0,
       stopped: { reason: 'stale' },
     })
+    expect(formatAudioMemoTranscriptMock).not.toHaveBeenCalled()
+    expect(writeNoteMock).not.toHaveBeenCalled()
+  })
+
+  it('a graph switch during formatting stops before any write', async () => {
+    listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
+    let closed = false
+    formatAudioMemoTranscriptMock.mockImplementation(async () => {
+      closed = true
+      return { title: 'Formatted title', body: 'Formatted transcript' }
+    })
+
+    const outcome = await reconcile({
+      formatTranscript: true,
+      isStale: () => closed,
+    })
+
+    expect(outcome).toMatchObject({
+      pending: 1,
+      transcribed: 0,
+      stopped: { reason: 'stale' },
+    })
+    expect(formatAudioMemoTranscriptMock).toHaveBeenCalledTimes(1)
     expect(writeNoteMock).not.toHaveBeenCalled()
   })
 
