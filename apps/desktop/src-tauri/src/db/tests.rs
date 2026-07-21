@@ -308,6 +308,110 @@ fn backlink_resolution_uses_daily_then_title_then_alias_precedence() {
 }
 
 #[test]
+fn backlinks_resolve_lazy_daily_dates_before_the_target_file_exists() {
+    let conn = migrated();
+    let mut source = daily_note("daily/2026-07-16.md", "2026-07-16");
+    source.links = vec![wiki("2026-07-27"), wiki("2026-02-31")];
+    apply_note(&conn, &source).unwrap();
+
+    let unresolved = run_query(
+        &conn,
+        "SELECT target_path, target_raw FROM backlinks WHERE source_path = ?1",
+        &[Value::from("daily/2026-07-16.md")],
+    )
+    .unwrap();
+    assert_eq!(
+        unresolved.len(),
+        1,
+        "impossible dates must not become daily routes"
+    );
+    assert_eq!(
+        unresolved[0]["target_path"],
+        Value::from("daily/2026-07-27.md")
+    );
+    assert_eq!(unresolved[0]["target_raw"], Value::from("2026-07-27"));
+
+    // Until the daily exists, an ordinary title keeps the normal title tier.
+    apply_note(&conn, &note("notes/release-day.md", "2026-07-27", vec![])).unwrap();
+    let titled = run_query(
+        &conn,
+        "SELECT target_path FROM backlinks WHERE source_path = ?1",
+        &[Value::from("daily/2026-07-16.md")],
+    )
+    .unwrap();
+    assert_eq!(titled.len(), 1);
+    assert_eq!(
+        titled[0]["target_path"],
+        Value::from("notes/release-day.md")
+    );
+
+    // Materializing the lazy daily immediately promotes the same link to the
+    // highest-precedence date tier without reindexing its source.
+    apply_note(&conn, &daily_note("daily/2026-07-27.md", "2026-07-27")).unwrap();
+    let materialized = run_query(
+        &conn,
+        "SELECT target_path FROM backlinks WHERE source_path = ?1",
+        &[Value::from("daily/2026-07-16.md")],
+    )
+    .unwrap();
+    assert_eq!(materialized.len(), 1);
+    assert_eq!(
+        materialized[0]["target_path"],
+        Value::from("daily/2026-07-27.md")
+    );
+}
+
+#[test]
+fn lazy_daily_backlink_migration_preserves_existing_projection_rows() {
+    let mut conn = open_in_memory().expect("open");
+    conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+    migrate_to(&mut conn, 18).expect("stage v18");
+    apply_note(
+        &conn,
+        &note("notes/source.md", "Source", vec![wiki("2026-07-27")]),
+    )
+    .unwrap();
+
+    let before = run_query(
+        &conn,
+        "SELECT target_path FROM backlinks WHERE source_path = 'notes/source.md'",
+        &[],
+    )
+    .unwrap();
+    assert!(before.is_empty());
+    let counts_before: Vec<i64> = ["notes", "links"]
+        .iter()
+        .map(|table| {
+            conn.query_row(&format!("SELECT count(*) FROM {table}"), [], |row| {
+                row.get(0)
+            })
+            .unwrap()
+        })
+        .collect();
+
+    migrate(&mut conn).expect("migrate to v19");
+
+    let counts_after: Vec<i64> = ["notes", "links"]
+        .iter()
+        .map(|table| {
+            conn.query_row(&format!("SELECT count(*) FROM {table}"), [], |row| {
+                row.get(0)
+            })
+            .unwrap()
+        })
+        .collect();
+    assert_eq!(counts_after, counts_before);
+    let rows = run_query(
+        &conn,
+        "SELECT target_path FROM backlinks WHERE source_path = 'notes/source.md'",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["target_path"], Value::from("daily/2026-07-27.md"));
+}
+
+#[test]
 fn note_key_precedence_migration_preserves_existing_projection_rows() {
     let mut conn = open_in_memory().expect("open");
     conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
