@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0-beta.14](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.13...v0.7.0-beta.14) (2026-07-21)
+
+
+### Bug Fixes
+
+* expand collapsed list items in backlink snippets ([#906](https://github.com/team-reflect/reflect-open/issues/906)) ([c397551](https://github.com/team-reflect/reflect-open/commit/c3975518ab6d4e92d9d88716be51ac2b993b1132))
+
 ## [0.7.0-beta.13](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.12...v0.7.0-beta.13) (2026-07-21)
 
 
