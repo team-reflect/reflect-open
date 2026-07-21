@@ -25,7 +25,9 @@ interface BacklinkSnippetProps {
  * source. The context is a whole block (old Reflect's rules — a paragraph, the
  * containing list item with its children, or a heading's section), so it
  * renders unclamped: truncating would cut the nested structure the context
- * exists to show. Round `+ [ ]` task checkboxes are live — a click writes the
+ * exists to show. The source's fold state must not hide it either:
+ * `expandCollapsed` renders `+` collapsed items expanded at every depth.
+ * Round `+ [ ]` task checkboxes are live — a click writes the
  * toggle through to the source note ({@link useSnippetTaskToggle}), old
  * Reflect's backlink-context behavior — while square GFM boxes stay read-only
  * (the `reflect-backlink-snippet` CSS keeps them inert-looking). The
@@ -46,6 +48,7 @@ export function BacklinkSnippet({
       <MarkdownView
         className="reflect-editor"
         markdown={text}
+        expandCollapsed
         onWikilinkClick={onWikilinkClick}
         onLinkClick={openExternalLink}
         {...(onTaskClick ? { onTaskClick } : {})}
