@@ -2,7 +2,7 @@ import { ulid } from 'ulidx'
 import { upsertFrontmatter } from '../markdown/frontmatter'
 import { slugForTitle } from '../markdown/slug'
 import { createNoteIfAbsent } from './commands'
-import { notePath } from './paths'
+import { dailyPath, notePath } from './paths'
 import {
   resolveExistingWikiTarget,
   type ExistingWikiTargetResolution,
@@ -79,6 +79,19 @@ export async function createNoteWithTitle(
 ): Promise<string> {
   const claimed = await claimNotePathForSlug(slugForTitle(title), newNoteSource(title, body), generation)
   return claimed.path
+}
+
+/**
+ * Materialize a daily note selected from wiki-link autocomplete without
+ * replacing one created concurrently. Daily notes have no title seed: their
+ * date path is their identity, and an empty file is the canonical new state.
+ *
+ * @returns The graph-relative daily-note path.
+ */
+export async function materializeDailyNote(date: string, generation: number): Promise<string> {
+  const path = dailyPath(date)
+  await createNoteIfAbsent(path, '', generation)
+  return path
 }
 
 /** Far beyond any real graph's same-slug population; fail loud instead of spinning. */

@@ -3,6 +3,7 @@ import { setBridge } from '../ipc/bridge'
 import {
   createNoteWithTitle,
   isUntitledNotePath,
+  materializeDailyNote,
   resolveOrCreateNoteWithTitle,
   untitledNotePath,
   untitledNoteSeed,
@@ -143,6 +144,43 @@ describe('createNoteWithTitle', () => {
     expect(args.contents).toMatch(
       /^---\nid: [0-9a-z]{26}\n---\n# Ada Lovelace\n\n- Type: #person\n$/,
     )
+  })
+})
+
+describe('materializeDailyNote', () => {
+  it('atomically creates an empty daily file at the date path', async () => {
+    const invoke = bindBridge()
+
+    await expect(materializeDailyNote('2026-07-27', 7)).resolves.toBe(
+      'daily/2026-07-27.md',
+    )
+    expect(invoke).toHaveBeenCalledWith('note_create', {
+      path: 'daily/2026-07-27.md',
+      contents: '',
+      generation: 7,
+    })
+  })
+
+  it('does not replace an existing daily file', async () => {
+    const invoke = bindBridge({ files: { 'daily/2026-07-27.md': 'existing\n' } })
+
+    await expect(materializeDailyNote('2026-07-27', 7)).resolves.toBe(
+      'daily/2026-07-27.md',
+    )
+    expect(invoke).toHaveBeenCalledWith('note_create', {
+      path: 'daily/2026-07-27.md',
+      contents: '',
+      generation: 7,
+    })
+  })
+
+  it('rejects impossible dates before attempting a write', async () => {
+    const invoke = bindBridge()
+
+    await expect(materializeDailyNote('2026-02-31', 7)).rejects.toThrow(
+      'dailyPath expects a valid calendar date',
+    )
+    expect(invoke.mock.calls.some(([command]) => command === 'note_create')).toBe(false)
   })
 })
 

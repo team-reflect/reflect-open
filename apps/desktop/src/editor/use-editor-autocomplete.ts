@@ -11,6 +11,7 @@ import {
   errorMessage,
   hasBridge,
   isContactsReadable,
+  materializeDailyNote,
   resolveOrCreateNoteWithTitle,
   suggestTags,
   suggestWikiLinkTargets,
@@ -69,6 +70,19 @@ export function useEditorAutocomplete(): EditorAutocomplete {
           )
         }
       }
+    },
+    [generation],
+  )
+
+  const materializeDailyFromAutocomplete = useCallback(
+    (date: string): void => {
+      if (generation === null) {
+        return
+      }
+      void materializeDailyNote(date, generation).catch((error: unknown) => {
+        console.error('create-daily-from-autocomplete failed:', error)
+        startOperation('Creating daily note').fail(errorMessage(error))
+      })
     },
     [generation],
   )
@@ -135,10 +149,22 @@ export function useEditorAutocomplete(): EditorAutocomplete {
           }
         }
         const { title, alias, date, path, generated, insertText: target } = entry.suggestion
+        // Selecting a pathless date is the create action: materialize its empty
+        // daily file in the background so the inserted link resolves and gains
+        // a backlink without requiring the user to visit or edit that day.
+        const dateSelection =
+          date !== null && path === null
+            ? { onSelect: () => materializeDailyFromAutocomplete(date) }
+            : {}
         // A generated date leads with its phrase ("Next Friday"), resolved day
         // as the detail; everything else keeps the title/alias/daily form.
         if (generated !== undefined && date !== null) {
-          return { target, label: generated.phrase, detail: formatDayLabel(date, settings.dateFormat) }
+          return {
+            target,
+            label: generated.phrase,
+            detail: formatDayLabel(date, settings.dateFormat),
+            ...dateSelection,
+          }
         }
         // A rich title reads as its rendered form; the raw form stays the identity.
         const displayedTitle = displayNoteTitle(title)
@@ -151,7 +177,12 @@ export function useEditorAutocomplete(): EditorAutocomplete {
                 ? `${date} · new`
                 : date
               : undefined
-        return { target, label, ...(detail !== undefined ? { detail } : {}) }
+        return {
+          target,
+          label,
+          ...(detail !== undefined ? { detail } : {}),
+          ...dateSelection,
+        }
       })
     },
     [
@@ -159,6 +190,7 @@ export function useEditorAutocomplete(): EditorAutocomplete {
       settings.dateFormat,
       settings.weekStartDay,
       resolveOrCreateFromAutocomplete,
+      materializeDailyFromAutocomplete,
       contactsInMenu,
       generation,
     ],

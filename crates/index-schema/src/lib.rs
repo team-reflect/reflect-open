@@ -23,7 +23,7 @@ pub const INDEX_FILE: &str = "index.sqlite";
 /// `user_version` after every migration has run. Read-only consumers compare
 /// this against `PRAGMA user_version` to detect an index written by a newer
 /// (or older) app than they were built for.
-pub const LATEST_SCHEMA_VERSION: usize = 19;
+pub const LATEST_SCHEMA_VERSION: usize = 18;
 
 /// The `index_meta` key holding the TS-owned projection version (the rows'
 /// derivation version, distinct from the schema version above).
@@ -61,7 +61,6 @@ mod schema {
             M::up(include_str!("../migrations/0016_note_emails.sql")),
             M::up(include_str!("../migrations/0017_task_breadcrumbs.sql")),
             M::up(include_str!("../migrations/0018_note_key_precedence.sql")),
-            M::up(include_str!("../migrations/0019_lazy_daily_backlinks.sql")),
         ])
     });
 
