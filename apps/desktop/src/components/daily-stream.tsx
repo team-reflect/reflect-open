@@ -83,6 +83,9 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
   // render time), so a virtualizer re-render before the lazy load completes
   // can't drop the focus.
   const focusPending = useRef<{ date: string; selection: 'start' | 'end' } | null>(null)
+  const focusArrivalKey = `${entryId}:${arrivalSeq}`
+  const [cancelledFocusArrivalKey, setCancelledFocusArrivalKey] = useState<string | null>(null)
+  const focusArrivalCancelled = cancelledFocusArrivalKey === focusArrivalKey
   const consumeFocus = useCallback(() => {
     focusPending.current = null
   }, [])
@@ -106,6 +109,28 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
     // meowdown's setSelection also scrolls the caret into view.
     handle.setSelection(position)
   }, [])
+
+  const focusDayAtStart = useCallback(
+    (date: string) => {
+      // Date activation is an explicit focus target, including from the
+      // keyboard, so it supersedes any arrival or boundary focus still queued.
+      focusPending.current = null
+      pendingFocusRef.current = null
+      // The target NotePane may already have rendered the old arrival intent
+      // while its document was loading. Re-render that captured autofocus off
+      // so it cannot override this newer start selection when the editor mounts.
+      setCancelledFocusArrivalKey(focusArrivalKey)
+      const handle = dayHandlesRef.current.get(date)
+      if (handle !== undefined) {
+        focusDay(handle, 'start')
+        return
+      }
+      // The date chrome renders before its lazy editor may be ready. Keep the
+      // request until the pane registers instead of dropping an early click.
+      pendingFocusRef.current = { date, position: 'start' }
+    },
+    [focusArrivalKey, focusDay],
+  )
 
   const registerHandle = useCallback(
     (date: string, handle: NoteEditorHandle | null) => {
@@ -208,7 +233,9 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
           const isPast = date < today
           const pendingFocus = focusPending.current
           const focusSelection =
-            pendingFocus !== null && pendingFocus.date === date ? pendingFocus.selection : null
+            !focusArrivalCancelled && pendingFocus !== null && pendingFocus.date === date
+              ? pendingFocus.selection
+              : null
           const autoFocus = focusSelection !== null
           return (
             <section
@@ -221,10 +248,18 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
             >
               {/* V1 renders the date as the note's H1-sized subject, with
                   today's tinted brand (its `highlightSubject`). */}
-              <h2
-                className={cn('reflect-daily-subject mb-3', CONTENT_GUTTER, isToday && 'text-accent')}
-              >
-                {formatDayLabel(date, settings.dateFormat)}
+              <h2 className="mb-3">
+                <button
+                  type="button"
+                  className={cn(
+                    'reflect-daily-subject block w-full cursor-text text-left focus-visible:underline focus-visible:outline-none',
+                    CONTENT_GUTTER,
+                    isToday && 'text-accent',
+                  )}
+                  onClick={() => focusDayAtStart(date)}
+                >
+                  {formatDayLabel(date, settings.dateFormat)}
+                </button>
               </h2>
               <NotePane
                 path={dailyPath(date)}
