@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.0-beta.13](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.12...v0.7.0-beta.13) (2026-07-21)
+
+
+### Bug Fixes
+
+* accept Anthropic API keys from orgs that disallow browser CORS requests ([#879](https://github.com/team-reflect/reflect-open/issues/879)) ([15b6f13](https://github.com/team-reflect/reflect-open/commit/15b6f13a21d9bb2e097db57138c31b0e766448db))
+* clicking a daily note's date heading focuses the note ([#904](https://github.com/team-reflect/reflect-open/issues/904)) ([2cbe463](https://github.com/team-reflect/reflect-open/commit/2cbe463e5302e9eca8282947eade40f7de5ab7df))
+* make page breaks visible in the editor ([#850](https://github.com/team-reflect/reflect-open/issues/850)) ([2a48e03](https://github.com/team-reflect/reflect-open/commit/2a48e033ca5adfc4ef66126e559fe87f1ff46304))
+* preserve safe editor transform diagnostics ([#851](https://github.com/team-reflect/reflect-open/issues/851)) ([628c2c7](https://github.com/team-reflect/reflect-open/commit/628c2c7077cefe0dcf08add03dd955b915e06533))
+* show tagged daily notes in all notes ([#897](https://github.com/team-reflect/reflect-open/issues/897)) ([0fa6db0](https://github.com/team-reflect/reflect-open/commit/0fa6db01261c836f6d5c932e0407e52a1c9515fc))
+
 ## [0.7.0-beta.12](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.11...v0.7.0-beta.12) (2026-07-19)
 
 
