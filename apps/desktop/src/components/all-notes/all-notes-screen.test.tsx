@@ -555,7 +555,7 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     await view.findByText('Health Stacked')
 
     fireEvent.click(view.getByRole('button', { name: /Custom/ }))
-    fireEvent.click(view.getByRole('option', { name: /#travel/ }))
+    fireEvent.click(await view.findByRole('option', { name: /#travel/ }))
     await view.findByText('June 9, 2026')
 
     fireEvent.click(view.getByText('Daily travel notes.'))
