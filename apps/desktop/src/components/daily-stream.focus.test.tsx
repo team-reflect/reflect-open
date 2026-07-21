@@ -187,7 +187,10 @@ describe('DailyStream arrival focus', () => {
     view.unmount()
   })
 
-  it('a drag-selection over the date text does not steal focus on click', async () => {
+  it('a heading click focuses even while a selection stands elsewhere', async () => {
+    // The heading is unselectable chrome (`user-select: none`), so mousedown
+    // on it leaves an editor selection uncollapsed — the click must still
+    // focus rather than treating the stale selection as a copy gesture.
     const today = todayIso()
     const { view, anchored, paneFor } = renderStream()
     await anchored(today)
@@ -202,7 +205,7 @@ describe('DailyStream arrival focus', () => {
     selection?.addRange(range)
     fireEvent.click(heading!)
 
-    expect(focusLog.calls).toEqual([])
+    expect(focusLog.calls).toEqual([`focus:${today}`, `setSelection:${today}:start`])
     selection?.removeAllRanges()
     view.unmount()
   })

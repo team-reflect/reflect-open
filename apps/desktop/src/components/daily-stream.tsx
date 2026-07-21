@@ -130,12 +130,10 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
   // area via the full-width content gutter.
   const handleSubjectClick = useCallback(
     (date: string) => {
-      // A drag-select across the date text is a copy gesture, not a focus
-      // request — stealing the caret would dissolve the selection.
-      const selection = window.getSelection()
-      if (selection !== null && !selection.isCollapsed) {
-        return
-      }
+      // No selection guard: the heading is unselectable chrome (the global
+      // `user-select: none`), so there is no copy gesture to protect — and
+      // mousedown on unselectable chrome leaves an editor selection standing,
+      // so gating on `getSelection()` would swallow exactly these clicks.
       const mounted = dayHandlesRef.current.get(date)
       if (mounted) {
         focusDay(mounted, 'start')
