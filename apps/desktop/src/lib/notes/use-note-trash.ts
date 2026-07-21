@@ -33,8 +33,8 @@ export interface NoteTrash {
  *   prunes only vanished rows — so the user can retry it without re-selecting.
  * - **{@link deleteOpenNote}, not raw `deleteNote`.** It discards any open
  *   editor session for the note after the file is gone, so a teardown flush
- *   can't recreate the file. It also guards daily notes (which All Notes never
- *   lists, so this is only defense in depth).
+ *   can't recreate the file. It also guards daily notes as defense in depth;
+ *   All Notes filters them out of the selected trash targets before calling.
  * - **Per-note failures don't strand the rest.** Deletes run sequentially and a
  *   failure is recorded, not rethrown mid-batch, so the remaining notes still
  *   trash; the toast reports the count couldn't-trash via the last error.

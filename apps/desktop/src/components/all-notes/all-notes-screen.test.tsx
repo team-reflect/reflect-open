@@ -70,9 +70,16 @@ const noteRows = [
     preview: 'Dandelion chocolate.',
   },
 ]
+const taggedDailyRow = {
+  path: 'daily/2026-06-09.md',
+  title: 'June 9, 2026',
+  mtime: TOKYO_MTIME,
+  preview: 'Daily travel notes.',
+}
 const tagRows = [
   { note_path: 'notes/health.md', tag: 'link' },
   { note_path: 'notes/tokyo.md', tag: 'link' },
+  { note_path: 'daily/2026-06-09.md', tag: 'travel' },
 ]
 const facetRows = [
   { tag: 'book', count: 3 },
@@ -101,7 +108,7 @@ beforeEach(() => {
       // A tag-filtered list starts from the folded tag key — only `travel`
       // has matches in this fixture.
       if (sql.includes('from "tags"')) {
-        return params.includes('travel') ? [noteRows[1]] : []
+        return params.includes('travel') ? [taggedDailyRow] : []
       }
       return noteRows
     }
@@ -364,12 +371,15 @@ describe('AllNotesScreen', () => {
     fireEvent.click(view.getByRole('option', { name: /#travel/ }))
 
     expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: 'travel' })
-    await view.findByText('Tokyo Gâteau')
+    await view.findByText('June 9, 2026')
+    expect(view.getByText('Daily travel notes.')).toBeDefined()
     expect(view.queryByText('Health Stacked')).toBeNull()
     // The trigger adopts the active custom tag.
     await waitFor(() =>
       expect(view.getByRole('button', { name: /#travel/, expanded: false })).toBeDefined(),
     )
+    fireEvent.click(view.getByRole('button', { name: 'June 9, 2026' }))
+    expect(probedRoute(view)).toEqual({ kind: 'daily', date: '2026-06-09' })
     view.unmount()
   })
 
@@ -537,6 +547,23 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     fireEvent.keyDown(surface, { key: 'Backspace', metaKey: true })
 
     expect(await view.findByText('Trash 1 note?')).toBeDefined()
+    view.unmount()
+  })
+
+  it('does not offer bulk trash for a tagged daily note', async () => {
+    const view = renderScreen()
+    await view.findByText('Health Stacked')
+
+    fireEvent.click(view.getByRole('button', { name: /Custom/ }))
+    fireEvent.click(await view.findByRole('option', { name: /#travel/ }))
+    await view.findByText('June 9, 2026')
+
+    fireEvent.click(view.getByText('Daily travel notes.'))
+    expect(view.queryByRole('button', { name: /Trash \(/ })).toBeNull()
+
+    fireEvent.keyDown(view.getByLabelText('All notes'), { key: 'Backspace', metaKey: true })
+    expect(view.queryByText('Trash 1 note?')).toBeNull()
+    expect(mockInvoke.mock.calls.some(([command]) => command === 'note_delete')).toBe(false)
     view.unmount()
   })
 

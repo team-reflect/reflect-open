@@ -548,6 +548,15 @@ html:root {
   padding-left: 1em;
 }
 
+/* A thematic break is content, not chrome. Keep it at V1's stronger rule
+   colors instead of inheriting Reflect's deliberately quiet app hairline. */
+.reflect-editor hr {
+  border-top-color: var(--coolgray-200);
+}
+.dark .reflect-editor hr {
+  border-top-color: var(--coolgray-700);
+}
+
 /* Inline code now inherits meowdown's neutral default (text color + the
    `--meowdown-code-bg` surface we map below), so it needs no override. The code
    block keeps Reflect's radius/padding and its block margin. */

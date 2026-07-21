@@ -34,11 +34,11 @@ importers:
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.7)
       '@meowdown/core':
-        specifier: ^0.55.1
-        version: 0.55.1(@lezer/common@1.5.2)(@shikijs/types@4.3.1)(@types/hast@3.0.4)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)
+        specifier: ^0.56.0
+        version: 0.56.0(@lezer/common@1.5.2)(@shikijs/types@4.3.1)(@types/hast@3.0.4)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)
       '@meowdown/react':
-        specifier: ^0.55.1
-        version: 0.55.1(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.3.1)(@types/hast@3.0.4)(@types/react@19.2.17)(date-fns@4.4.0)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)(react-dom@19.2.7)(react@19.2.7)
+        specifier: ^0.56.0
+        version: 0.56.0(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.3.1)(@types/hast@3.0.4)(@types/react@19.2.17)(date-fns@4.4.0)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)(react-dom@19.2.7)(react@19.2.7)
       '@reflect/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -254,8 +254,8 @@ importers:
         specifier: ^3.0.84
         version: 3.0.84(zod@4.4.3)
       '@meowdown/markdown':
-        specifier: ^0.55.1
-        version: 0.55.1
+        specifier: ^0.56.0
+        version: 0.56.0
       '@reflect/db':
         specifier: workspace:*
         version: link:../db
@@ -1065,14 +1065,14 @@ packages:
   '@marijn/find-cluster-break@1.0.3':
     resolution: {integrity: sha512-FY+MKLBoTsLNJF/eLWaOsXGdz6uh3Iu1axjPf6TUq92IYumcTcXWHoS747JARLkcdlJ/Waiaxc5wQfFO8jC6NA==}
 
-  '@meowdown/core@0.55.1':
-    resolution: {integrity: sha512-OXsdj4X1YjaOj68Uw2U29rxaCmKfVitP5/4iQ5G8NMuirt6/pHiAVZCmU9FSo65UgBWtq0qDsUlpAFEryUAYTA==}
+  '@meowdown/core@0.56.0':
+    resolution: {integrity: sha512-QwuBzfo340ZIpOP+jtDDPuGLZX9AyejQrDPPTd8M9bYXx0Y6gC9iMkdOcXB74ABFcMrB9Cs8RRJeV9LqZIeU4A==}
 
-  '@meowdown/markdown@0.55.1':
-    resolution: {integrity: sha512-Xeq+RiC8IDgo2ETuZnzPCMNXCcYEPqoHR0rMFa/2/9ukFZOokn20GcTLS0qoa4W7BsRKNj1Z96nAewl5Cfm4Vw==}
+  '@meowdown/markdown@0.56.0':
+    resolution: {integrity: sha512-85wuPDojUrMt9WBobSLnTbW9LB4XrijRngHKeVL4Pg3n4FLJ7xnOx7H6I/Pgc20+SKOGPKLfqu1LfEv4lYKDHA==}
 
-  '@meowdown/react@0.55.1':
-    resolution: {integrity: sha512-iEn7eUyo+QVDxyxrp6wx8C+MP7HqCRXnE2oQS4ROjsoufPF0CWO9hJhdEhjbz/1prYZaJLXC1Y2CyjkaaJgdLg==}
+  '@meowdown/react@0.56.0':
+    resolution: {integrity: sha512-A6kthIzbIBQlEnisN8a3UPiQNgkGLq8tVdMpFrLGYCFFexTPDrVPnfBbFhwPo+kqwR8J9fNj6aG/Wuw1oDlAgQ==}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
@@ -7206,13 +7206,13 @@ snapshots:
 
   '@marijn/find-cluster-break@1.0.3': {}
 
-  '@meowdown/core@0.55.1(@lezer/common@1.5.2)(@shikijs/types@4.3.1)(@types/hast@3.0.4)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)':
+  '@meowdown/core@0.56.0(@lezer/common@1.5.2)(@shikijs/types@4.3.1)(@types/hast@3.0.4)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)':
     dependencies:
       '@codemirror/language': 6.12.4
       '@codemirror/language-data': 6.5.2
       '@floating-ui/dom': 1.8.0
       '@lezer/highlight': 1.2.3
-      '@meowdown/markdown': 0.55.1
+      '@meowdown/markdown': 0.56.0
       '@ocavue/utils': 1.7.0
       '@prosekit/core': 0.13.0-beta.6(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)
       '@prosekit/extensions': 0.18.0-beta.16(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.3.1)(@types/hast@3.0.4)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)
@@ -7244,15 +7244,15 @@ snapshots:
       - y-prosemirror
       - yjs
 
-  '@meowdown/markdown@0.55.1':
+  '@meowdown/markdown@0.56.0':
     dependencies:
       '@lezer/common': 1.5.2
       '@lezer/markdown': 1.7.1
 
-  '@meowdown/react@0.55.1(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.3.1)(@types/hast@3.0.4)(@types/react@19.2.17)(date-fns@4.4.0)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)(react-dom@19.2.7)(react@19.2.7)':
+  '@meowdown/react@0.56.0(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.3.1)(@types/hast@3.0.4)(@types/react@19.2.17)(date-fns@4.4.0)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)(react-dom@19.2.7)(react@19.2.7)':
     dependencies:
       '@base-ui/react': 1.6.0(@types/react@19.2.17)(date-fns@4.4.0)(react-dom@19.2.7)(react@19.2.7)
-      '@meowdown/core': 0.55.1(@lezer/common@1.5.2)(@shikijs/types@4.3.1)(@types/hast@3.0.4)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)
+      '@meowdown/core': 0.56.0(@lezer/common@1.5.2)(@shikijs/types@4.3.1)(@types/hast@3.0.4)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.1)
       '@ocavue/utils': 1.7.0
       '@prosekit/core': 0.13.0-beta.6(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)
       '@prosekit/pm': 0.1.19-beta.3

@@ -123,6 +123,30 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
     [focusDay],
   )
 
+  // The date heading is stream chrome outside the editor, so a click on it
+  // would otherwise land nowhere; make it focus that day's note at the top.
+  // The listener lives on the H2 itself rather than section-level hit-testing:
+  // every other part of the row already belongs to the editor's click-to-focus
+  // area via the full-width content gutter.
+  const handleSubjectClick = useCallback(
+    (date: string) => {
+      // No selection guard: the heading is unselectable chrome (the global
+      // `user-select: none`), so there is no copy gesture to protect — and
+      // mousedown on unselectable chrome leaves an editor selection standing,
+      // so gating on `getSelection()` would swallow exactly these clicks.
+      const mounted = dayHandlesRef.current.get(date)
+      if (mounted) {
+        focusDay(mounted, 'start')
+        return
+      }
+      // The row is on screen but its lazy editor hasn't mounted yet: queue the
+      // focus for `registerHandle`. Set after the container's pointerdown
+      // clear (click fires on pointerup), so the slot survives to the mount.
+      pendingFocusRef.current = { date, position: 'start' }
+    },
+    [focusDay],
+  )
+
   const handleExitBoundary = useCallback(
     (date: string, direction: 'up' | 'down'): boolean => {
       const target = neighborDate(dayWindow, date, direction === 'up' ? -1 : 1)
@@ -223,6 +247,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
                   today's tinted brand (its `highlightSubject`). */}
               <h2
                 className={cn('reflect-daily-subject mb-3', CONTENT_GUTTER, isToday && 'text-accent')}
+                onClick={() => handleSubjectClick(date)}
               >
                 {formatDayLabel(date, settings.dateFormat)}
               </h2>
