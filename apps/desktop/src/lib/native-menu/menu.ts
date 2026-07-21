@@ -1,4 +1,4 @@
-import { isTauri } from '@tauri-apps/api/core'
+import { invoke, isTauri } from '@tauri-apps/api/core'
 import {
   Menu,
   Submenu,
@@ -218,4 +218,9 @@ export async function installNativeMenu(): Promise<void> {
       await submenu.setAsHelpMenuForNSApp()
     }
   }
+  // Same post-install timing as the roles above: Edit > "Paste and Match
+  // Style" (⌘⇧V) is a selector-backed NSMenuItem (WKWebView's native
+  // `pasteAsPlainText:`), which the menu API cannot express, so the shell
+  // patches it into the installed menu (menu.rs).
+  await invoke('menu_install_paste_and_match_style')
 }

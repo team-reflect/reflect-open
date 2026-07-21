@@ -13,6 +13,7 @@ interface SubmenuOptionsForTest {
 }
 
 const isTauri = vi.hoisted(() => vi.fn(() => true))
+const invoke = vi.hoisted(() => vi.fn(async () => undefined))
 const isMainWindow = vi.hoisted(() => vi.fn(() => true))
 const setAsAppMenu = vi.hoisted(() => vi.fn(async () => null))
 const setAsWindowsMenuForNSApp = vi.hoisted(() => vi.fn(async () => {}))
@@ -25,7 +26,7 @@ const submenuNew = vi.hoisted(() =>
 )
 const menuNew = vi.hoisted(() => vi.fn(async () => ({ setAsAppMenu })))
 
-vi.mock('@tauri-apps/api/core', () => ({ isTauri }))
+vi.mock('@tauri-apps/api/core', () => ({ isTauri, invoke }))
 vi.mock('@tauri-apps/api/menu', () => ({
   Menu: { new: menuNew },
   Submenu: { new: submenuNew },
@@ -45,6 +46,7 @@ beforeEach(() => {
   setAsAppMenu.mockClear()
   setAsWindowsMenuForNSApp.mockClear()
   setAsHelpMenuForNSApp.mockClear()
+  invoke.mockClear()
 })
 
 afterEach(() => {
@@ -126,6 +128,7 @@ describe('installNativeMenu', () => {
     expect(dispatch).toHaveBeenCalledWith('sidebar.toggle')
     expect(menuNew).toHaveBeenCalledTimes(1)
     expect(setAsAppMenu).toHaveBeenCalledTimes(1)
+    expect(invoke).toHaveBeenCalledExactlyOnceWith('menu_install_paste_and_match_style')
     expect(isNativeMenuInstalled()).toBe(true)
   })
 
