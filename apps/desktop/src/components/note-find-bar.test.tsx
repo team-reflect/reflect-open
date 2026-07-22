@@ -183,19 +183,20 @@ describe('NoteFindBar', () => {
     unregisterNoteEditorHandle(NOTE_PATH, handle)
   })
 
-  it('opens while a note loads and starts the retained query when its editor mounts', () => {
+  it('opens while a note loads and retains navigation until its editor mounts', () => {
     const handle = editorHandle()
     renderFindBar()
 
     fireEvent.click(screen.getByRole('button', { name: 'Open find' }))
     const input = screen.getByRole<HTMLInputElement>('textbox', { name: 'Find in note' })
     fireEvent.change(input, { target: { value: 'alpha' } })
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true })
     expect(handle.beginFind).not.toHaveBeenCalled()
 
     act(() => registerNoteEditorHandle(NOTE_PATH, handle))
 
     expect(screen.getByRole('search')).not.toBeNull()
-    expect(handle.beginFind).toHaveBeenCalledWith('alpha')
+    expect(handle.beginFind).toHaveBeenCalledWith('alpha', { direction: 'previous' })
 
     unregisterNoteEditorHandle(NOTE_PATH, handle)
   })

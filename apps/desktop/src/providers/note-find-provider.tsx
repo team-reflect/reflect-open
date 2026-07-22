@@ -34,7 +34,7 @@ import { useRouter } from '@/routing/router'
 interface ActiveFindSession {
   readonly path: string
   handle: NoteEditorHandle | null
-  readonly beginOptions: NoteFindBeginOptions | undefined
+  beginOptions: NoteFindBeginOptions | undefined
   unsubscribeFind: () => void
   unsubscribeHandle: () => void
 }
@@ -177,20 +177,26 @@ export function NoteFindProvider({ children }: { children: ReactNode }): ReactEl
   )
 
   const next = useCallback((): void => {
-    const handle = sessionRef.current?.handle
+    const session = sessionRef.current
+    const handle = session?.handle
     if (handle !== null && handle !== undefined) {
       setSnapshot(handle.findNext())
-    } else if (sessionRef.current === null) {
+    } else if (session === null) {
       resume('next')
+    } else {
+      session.beginOptions = { ...session.beginOptions, direction: 'next' }
     }
   }, [resume])
 
   const previous = useCallback((): void => {
-    const handle = sessionRef.current?.handle
+    const session = sessionRef.current
+    const handle = session?.handle
     if (handle !== null && handle !== undefined) {
       setSnapshot(handle.findPrevious())
-    } else if (sessionRef.current === null) {
+    } else if (session === null) {
       resume('previous')
+    } else {
+      session.beginOptions = { ...session.beginOptions, direction: 'previous' }
     }
   }, [resume])
 

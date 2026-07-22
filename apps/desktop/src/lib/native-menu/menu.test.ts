@@ -198,6 +198,21 @@ describe('installNativeMenu', () => {
     expect(dispatch).not.toHaveBeenCalled()
   })
 
+  it('does not guess the main note when no webview is focused', async () => {
+    const dispatch = vi.fn()
+    setMenuCommandDispatch(dispatch)
+    getAllWebviewWindows.mockResolvedValue([
+      { label: 'main', isFocused: vi.fn(async () => false) },
+      { label: 'note-1', isFocused: vi.fn(async () => false) },
+    ])
+
+    dispatchMenuCommand('note.find')
+
+    await vi.waitFor(() => expect(getAllWebviewWindows).toHaveBeenCalledTimes(1))
+    expect(emitTo).not.toHaveBeenCalled()
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+
   it('never falls back to the main note when focused-window delivery fails', async () => {
     const dispatch = vi.fn()
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})

@@ -51,7 +51,14 @@ async function dispatchToFocusedWindow(commandId: FocusedNoteMenuCommand): Promi
     return
   }
 
-  if (focusedLabel !== null && focusedLabel !== 'main') {
+  if (focusedLabel === null) {
+    // A menu activation can briefly leave macOS without a focused webview.
+    // Never guess `main`: acting on the wrong note is worse than leaving this
+    // one activation inert.
+    return
+  }
+
+  if (focusedLabel !== 'main') {
     try {
       await emitTo(
         { kind: 'WebviewWindow', label: focusedLabel },
