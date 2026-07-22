@@ -198,6 +198,26 @@ describe('installNativeMenu', () => {
     expect(dispatch).not.toHaveBeenCalled()
   })
 
+  it('ignores a closing window while finding the focused note window', async () => {
+    const dispatch = vi.fn()
+    setMenuCommandDispatch(dispatch)
+    getAllWebviewWindows.mockResolvedValue([
+      { label: 'closing', isFocused: vi.fn(async () => Promise.reject(new Error('closed'))) },
+      { label: 'note-1', isFocused: vi.fn(async () => true) },
+    ])
+
+    dispatchMenuCommand('note.findNext')
+
+    await vi.waitFor(() => {
+      expect(emitTo).toHaveBeenCalledWith(
+        { kind: 'WebviewWindow', label: 'note-1' },
+        'reflect://focused-note-menu-command',
+        'note.findNext',
+      )
+    })
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+
   it('does not guess the main note when no webview is focused', async () => {
     const dispatch = vi.fn()
     setMenuCommandDispatch(dispatch)

@@ -42,7 +42,14 @@ async function dispatchToFocusedWindow(commandId: FocusedNoteMenuCommand): Promi
   try {
     const windows = await getAllWebviewWindows()
     const focusedWindows = await Promise.all(
-      windows.map(async (window) => ((await window.isFocused()) ? window : null)),
+      windows.map(async (window) => {
+        try {
+          return (await window.isFocused()) ? window : null
+        } catch {
+          // A window can close between enumeration and the focus check.
+          return null
+        }
+      }),
     )
     const focusedWindow = focusedWindows.find((window) => window !== null)
     focusedLabel = focusedWindow?.label ?? null
