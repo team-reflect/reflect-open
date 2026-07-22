@@ -54,6 +54,7 @@ vi.mock('@/editor/note-editor', async () => {
           insertMarkdown: () => {},
           focus: () => editorProbe.focusCalls.push('focus'),
           setSelection: () => {},
+          revealHeading: () => false,
           getSelectedText: () => '',
           openSelectionMenu: () => {},
           startPendingReplacement: () => false,

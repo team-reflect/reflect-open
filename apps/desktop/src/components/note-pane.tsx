@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useRef, useState, type ReactElement } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import type { ExitBoundaryHandler } from '@meowdown/core'
 import { detectConflictMarkers, isDaily, isTemplatePath, untitledNoteSeed } from '@reflect/core'
 import { BacklinksPanel } from '@/components/backlinks-panel'
@@ -17,6 +17,7 @@ import {
 } from '@/editor/editor-handle-registry'
 import { markModeFromSyntax } from '@/editor/mark-mode'
 import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor'
+import { clearOutline, publishOutlineFromMarkdown } from '@/editor/note-outline-store'
 import { resolveAssetFileLink, useAssetPersistence } from '@/editor/use-asset-persistence'
 import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete'
 import { useNoteDocument } from '@/editor/use-note-document'
@@ -230,6 +231,41 @@ export function NotePaneComponent({
     }
   }, [dailyDate, onExitBoundary])
 
+  // A note that opens with an empty body starts on an empty bullet when the
+  // setting is on (old Reflect's every-note default). The seed only changes what
+  // the editor shows; persistence is untouched, so a not-yet-created daily
+  // placeholder stays uncreated until the user types — see `default-bullet.ts`.
+  // Computed here — before the loading/error/protected early returns below —
+  // so the outline-publish effect can depend on it while every hook call
+  // below stays unconditional; `document.initialContent` is always a string,
+  // even before the note finishes loading.
+  const editorSeed = editorBodyWithDefaultBullet(
+    document.initialContent,
+    settings.editorDefaultBullet,
+  )
+
+  const onDocumentEditorChange = document.onEditorChange
+  const onEditorChange = useCallback(
+    (markdown: string) => {
+      onDocumentEditorChange(markdown)
+      publishOutlineFromMarkdown(path, markdown)
+    },
+    [onDocumentEditorChange, path],
+  )
+
+  useEffect(() => {
+    // Protected notes (sync conflicts land here) render raw, conflict-marked
+    // content instead of the editor, so parsing `editorSeed` would outline
+    // headings from both conflict sides rather than the note's real structure.
+    if (document.protected) {
+      return
+    }
+    publishOutlineFromMarkdown(path, editorSeed)
+    return () => {
+      clearOutline(path)
+    }
+  }, [path, editorSeed, document.protected])
+
   if (document.status === 'loading') {
     // `reflect-note-loading` keeps the hint invisible for the first beat:
     // local reads resolve in milliseconds, and the text flashing on every
@@ -284,15 +320,6 @@ export function NotePaneComponent({
     )
   }
 
-  // A note that opens with an empty body starts on an empty bullet when the
-  // setting is on (old Reflect's every-note default). The seed only changes what
-  // the editor shows; persistence is untouched, so a not-yet-created daily
-  // placeholder stays uncreated until the user types — see `default-bullet.ts`.
-  const editorSeed = editorBodyWithDefaultBullet(
-    document.initialContent,
-    settings.editorDefaultBullet,
-  )
-
   return (
     <div className={cn('relative', className)} aria-label={`Editing ${path}`}>
       <div className={gutterClassName}>
@@ -332,7 +359,7 @@ export function NotePaneComponent({
         // for that would throw away the cursor mid-thought.
         key={document.sessionEpoch}
         initialContent={editorSeed}
-        onChange={document.onEditorChange}
+        onChange={onEditorChange}
         markMode={markModeFromSyntax(settings.editorMarkdownSyntax)}
         spellCheck={settings.editorSpellCheck}
         smoothCaretAnimation={settings.editorSmoothCaretAnimation}
