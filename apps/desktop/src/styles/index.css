@@ -316,6 +316,33 @@ html:root {
   font-size: var(--editor-font-size, var(--text-base));
 }
 
+/* Find in note paints the rendered document, never its layout: no padding or
+   border may change line wrapping while a query is active. Atom and math
+   views keep their raw Markdown in an invisible content span, so :has mirrors
+   the range decoration onto the visible preview. */
+.reflect-editor .ProseMirror-search-match {
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.reflect-editor .ProseMirror-active-search-match {
+  background: var(--accent-soft);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--accent) 55%, transparent);
+  scroll-margin: 3rem 0;
+}
+.reflect-editor .md-atom-view:has(.ProseMirror-search-match) > .md-atom-view-preview,
+.reflect-editor .md-math-view:has(.ProseMirror-search-match) > .md-math-view-preview {
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+.reflect-editor .md-atom-view:has(.ProseMirror-active-search-match) > .md-atom-view-preview,
+.reflect-editor
+  .md-math-view:has(.ProseMirror-active-search-match)
+  > .md-math-view-preview {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 62%, transparent);
+}
+
 :root[data-editor-full-width='true'] {
   --editor-content-gutter: 2rem;
 }

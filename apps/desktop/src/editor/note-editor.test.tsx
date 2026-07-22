@@ -59,6 +59,7 @@ vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
 // `useEditor` backs `EditorInputTraits` (mounted inside the editor).
 vi.mock('@meowdown/react', () => ({
   useEditor: () => editorStub,
+  useExtension: vi.fn(),
   WikilinkHoverCard: ({ children }: { children: unknown }) => {
     captured.hoverRenderer = children
     return <div data-testid="wikilink-hover-card" />

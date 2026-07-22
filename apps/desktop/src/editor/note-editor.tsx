@@ -2,6 +2,7 @@ import {
   useCallback,
   useImperativeHandle,
   useLayoutEffect,
+  useMemo,
   useRef,
   type ReactElement,
   type ReactNode,
@@ -31,6 +32,12 @@ import {
 } from '@meowdown/react'
 import { EditorInputTraits } from '@/editor/editor-input-traits'
 import { FormattingToolbarBridge } from '@/editor/formatting-toolbar-bridge'
+import {
+  createNoteFindController,
+  NoteFindExtension,
+  type NoteFindBeginOptions,
+  type NoteFindSnapshot,
+} from '@/editor/note-find'
 import {
   IMAGE_LIGHTBOX_TRANSITION_NAME,
   ImageLightbox,
@@ -97,6 +104,18 @@ export interface NoteEditorHandle {
   acceptPendingReplacement(options?: AcceptPendingReplacementOptions): void
   /** Clear the staged replacement without touching the document. */
   discardPendingReplacement(): void
+  /** Start Find in note from the current caret. */
+  beginFind(query: string, options?: NoteFindBeginOptions): NoteFindSnapshot
+  /** Update the Find query without changing its starting point. */
+  updateFindQuery(query: string): NoteFindSnapshot
+  /** Select and reveal the next match, wrapping at the document end. */
+  findNext(): NoteFindSnapshot
+  /** Select and reveal the previous match, wrapping at the document start. */
+  findPrevious(): NoteFindSnapshot
+  /** Clear Find decorations and collapse the active match to a safe caret. */
+  clearFind(): void
+  /** Observe match count/current-match changes for the active Find session. */
+  subscribeFind(listener: (snapshot: NoteFindSnapshot) => void): () => void
 }
 
 interface NoteEditorProps {
@@ -236,7 +255,13 @@ export function NoteEditor({
   handleRef,
 }: NoteEditorProps): ReactElement {
   const innerRef = useRef<EditorHandle>(null)
+  const findController = useMemo(() => createNoteFindController(), [])
   const followDeepLink = useFollowDeepLink()
+
+  useLayoutEffect(() => {
+    findController.bind(innerRef.current?.editor, markMode)
+    return () => findController.bind(undefined, markMode)
+  }, [findController, markMode])
 
   // Latest callbacks, read through refs so a changing prop identity never
   // rebuilds meowdown's extensions (the uncontrolled-editor contract).
@@ -272,7 +297,10 @@ export function NoteEditor({
     handleRef,
     (): NoteEditorHandle => ({
       getMarkdown: () => innerRef.current?.getMarkdown() ?? '',
-      setMarkdown: (markdown) => innerRef.current?.setMarkdown(markdown),
+      setMarkdown: (markdown) => {
+        innerRef.current?.setMarkdown(markdown)
+        findController.refresh()
+      },
       // meowdown ≥0.33 collapses an active selection itself, so an insert
       // can never delete selected text — plain delegation is the whole story.
       insertMarkdown: (markdown) => innerRef.current?.insertMarkdown(markdown),
@@ -286,13 +314,20 @@ export function NoteEditor({
         innerRef.current?.appendPendingReplacementText(text),
       acceptPendingReplacement: (options) => innerRef.current?.acceptPendingReplacement(options),
       discardPendingReplacement: () => innerRef.current?.discardPendingReplacement(),
+      beginFind: findController.begin,
+      updateFindQuery: findController.updateQuery,
+      findNext: findController.next,
+      findPrevious: findController.previous,
+      clearFind: findController.clear,
+      subscribeFind: findController.subscribe,
     }),
-    [],
+    [findController],
   )
 
   const handleDocChange = useCallback(() => {
     onChangeRef.current?.(innerRef.current?.getMarkdown() ?? '')
-  }, [])
+    findController.refresh()
+  }, [findController])
 
   const handleExitBoundary: ExitBoundaryHandler = useCallback(
     (options) => onExitBoundaryRef.current?.(options) ?? false,
@@ -438,6 +473,7 @@ export function NoteEditor({
       >
         <EditorInputTraits />
         <FormattingToolbarBridge />
+        <NoteFindExtension />
         {renderWikilinkHoverCard !== undefined ? (
           <WikilinkHoverCard className="reflect-hover-card">
             {renderWikilinkHoverCard}

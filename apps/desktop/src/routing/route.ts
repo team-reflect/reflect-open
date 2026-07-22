@@ -109,6 +109,21 @@ export function notePathForRoute(route: Route, today: string): string | null {
 }
 
 /**
+ * The note file the user is currently working in. Daily views resolve through
+ * the focused stream day; all other routes use their directly addressed note.
+ * This is the shared target for note-scoped commands and transient note chrome
+ * such as Find, so neither can drift to a different virtualized day.
+ */
+export function focusedNotePathForRoute(
+  route: Route,
+  today: string,
+  focusedDailyDate: string | null,
+): string | null {
+  const daily = effectiveDailyDate(route, today, focusedDailyDate)
+  return daily !== null ? dailyPath(daily) : notePathForRoute(route, today)
+}
+
+/**
  * The invariant the router maintains on every entry: a `daily` route never
  * carries an impossible calendar date past the boundary (`dailyPath` would
  * throw on one downstream). A malformed date collapses to the `today` route —

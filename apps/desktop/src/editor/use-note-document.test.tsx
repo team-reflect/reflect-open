@@ -40,6 +40,12 @@ function fakeEditor(): NoteEditorHandle & { applied: string[] } {
     appendPendingReplacementText: () => {},
     acceptPendingReplacement: () => {},
     discardPendingReplacement: () => {},
+    beginFind: () => ({ active: 0, total: 0 }),
+    updateFindQuery: () => ({ active: 0, total: 0 }),
+    findNext: () => ({ active: 0, total: 0 }),
+    findPrevious: () => ({ active: 0, total: 0 }),
+    clearFind: () => {},
+    subscribeFind: () => () => {},
   }
 }
 

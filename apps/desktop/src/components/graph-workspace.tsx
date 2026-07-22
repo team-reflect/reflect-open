@@ -12,6 +12,7 @@ import { CaptureProvider } from '@/providers/capture-provider'
 import { ChatProvider } from '@/providers/chat-provider'
 import { DeepLinkProvider } from '@/providers/deep-link-provider'
 import { NoteTemplatesProvider } from '@/providers/note-templates-provider'
+import { NoteFindProvider } from '@/providers/note-find-provider'
 import { ShortcutsProvider } from '@/providers/shortcuts-provider'
 import { SidebarProvider } from '@/providers/sidebar-provider'
 import { SyncProvider } from '@/providers/sync-provider'
@@ -53,19 +54,21 @@ export function GraphWorkspace({ graph }: GraphWorkspaceProps): ReactElement {
                           {/* Tracks the focused day in the daily stream so the right
                               sidebar describes it, not just the routed day. */}
                           <FocusedDailyProvider>
-                            {/* A ⌘-clicked note window is chrome-free: the
-                                routed view only, no sidebar/palette shell.
-                                The V1 import lives above the routed views so
-                                closing settings can't orphan a running
-                                import; main window only — its dialog is the
-                                import's single face. */}
-                            {isMainWindow() ? (
-                              <V1ImportProvider graph={graph}>
-                                <WorkspaceContent graph={graph} />
-                              </V1ImportProvider>
-                            ) : (
-                              <NoteWindowContent />
-                            )}
+                            <NoteFindProvider>
+                              {/* A ⌘-clicked note window is chrome-free: the
+                                  routed view only, no sidebar/palette shell.
+                                  The V1 import lives above the routed views so
+                                  closing settings can't orphan a running
+                                  import; main window only — its dialog is the
+                                  import's single face. */}
+                              {isMainWindow() ? (
+                                <V1ImportProvider graph={graph}>
+                                  <WorkspaceContent graph={graph} />
+                                </V1ImportProvider>
+                              ) : (
+                                <NoteWindowContent />
+                              )}
+                            </NoteFindProvider>
                           </FocusedDailyProvider>
                         </ChatProvider>
                       </AssetDescribeProvider>

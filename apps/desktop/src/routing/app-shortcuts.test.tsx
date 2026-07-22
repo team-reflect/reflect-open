@@ -14,6 +14,9 @@ import { RouterProvider, useRouter } from './router'
 const newChat = vi.hoisted(() => vi.fn())
 const openRecent = vi.hoisted(() => vi.fn())
 const openRouteInNewWindow = vi.hoisted(() => vi.fn(async () => true))
+const openNoteFindForPath = vi.hoisted(() => vi.fn(() => true))
+const findNextInNote = vi.hoisted(() => vi.fn())
+const findPreviousInNote = vi.hoisted(() => vi.fn())
 const platform = vi.hoisted(() => ({ isMacosDesktop: false }))
 const nativeMenu = vi.hoisted(() => ({ installed: false }))
 
@@ -25,6 +28,13 @@ vi.mock('@/lib/platform', () => ({
   get isMacosDesktop() {
     return platform.isMacosDesktop
   },
+}))
+vi.mock('@/providers/note-find-provider', () => ({
+  useNoteFindActions: () => ({
+    openForPath: openNoteFindForPath,
+    next: findNextInNote,
+    previous: findPreviousInNote,
+  }),
 }))
 
 vi.mock('@/providers/graph-provider', () => ({
@@ -65,6 +75,9 @@ afterEach(() => {
   cleanup()
   openRecent.mockClear()
   openRouteInNewWindow.mockClear()
+  openNoteFindForPath.mockClear()
+  findNextInNote.mockClear()
+  findPreviousInNote.mockClear()
 })
 
 function shortcutsHook() {
@@ -121,6 +134,9 @@ describe('app shortcuts', () => {
       'Mod-n',
       'Mod-Shift-n',
       'Mod-Shift-o',
+      'Mod-f',
+      'Mod-g',
+      'Mod-Shift-g',
       'Mod-[',
       'Mod-]',
       'Mod-k',
@@ -218,6 +234,24 @@ describe('app shortcuts', () => {
     expect(result.current.palette.open).toBe(false)
     act(() => press('k'))
     expect(result.current.palette.open).toBe(true)
+  })
+
+  it('⌘F targets the current note and ⌘G traverses its matches', () => {
+    const { result } = shortcutsHook()
+    act(() => press('n'))
+    const opened = result.current.router.route
+    if (opened.kind !== 'note') {
+      throw new Error('expected the new-note route')
+    }
+
+    act(() => press('f'))
+    expect(openNoteFindForPath).toHaveBeenCalledWith(opened.path)
+
+    act(() => press('g'))
+    expect(findNextInNote).toHaveBeenCalledTimes(1)
+
+    act(() => press('g', { shiftKey: true }))
+    expect(findPreviousInNote).toHaveBeenCalledTimes(1)
   })
 
   it('⌘\\ toggles the sidebar in both directions', () => {

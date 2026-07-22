@@ -12,10 +12,18 @@ import type { NoteEditorHandle } from '@/editor/note-editor'
  * React state or re-renders (the same shape as `operations.ts`).
  */
 const handles = new Map<string, NoteEditorHandle>()
+const listeners = new Map<string, Set<(handle: NoteEditorHandle | null) => void>>()
+
+function publishHandle(path: string, handle: NoteEditorHandle | null): void {
+  for (const listener of listeners.get(path) ?? []) {
+    listener(handle)
+  }
+}
 
 /** Make `handle` the editor for `path` (the pane's ref callback, on mount). */
 export function registerNoteEditorHandle(path: string, handle: NoteEditorHandle): void {
   handles.set(path, handle)
+  publishHandle(path, handle)
 }
 
 /**
@@ -26,10 +34,30 @@ export function registerNoteEditorHandle(path: string, handle: NoteEditorHandle)
 export function unregisterNoteEditorHandle(path: string, handle: NoteEditorHandle): void {
   if (handles.get(path) === handle) {
     handles.delete(path)
+    publishHandle(path, null)
   }
 }
 
 /** The mounted editor for a note path, or null when none is on screen. */
 export function noteEditorHandleFor(path: string): NoteEditorHandle | null {
   return handles.get(path) ?? null
+}
+
+/**
+ * Observe the mounted editor for one note. Find uses this to close its
+ * transient session if virtualization or navigation unmounts the target.
+ */
+export function subscribeNoteEditorHandle(
+  path: string,
+  listener: (handle: NoteEditorHandle | null) => void,
+): () => void {
+  const pathListeners = listeners.get(path) ?? new Set()
+  pathListeners.add(listener)
+  listeners.set(path, pathListeners)
+  return () => {
+    pathListeners.delete(listener)
+    if (pathListeners.size === 0) {
+      listeners.delete(path)
+    }
+  }
 }
