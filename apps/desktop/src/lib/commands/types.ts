@@ -28,6 +28,12 @@ export interface CommandContext {
   toggleSidebar: () => void
   /** Start a fresh chat conversation. */
   newChat: () => void
+  /** Open Find for the note currently targeted by {@link notePath}. */
+  openNoteFind: () => void
+  /** Advance the active or most recently closed note Find query. */
+  findNextInNote: () => void
+  /** Move backward through the active or most recently closed Find query. */
+  findPreviousInNote: () => void
   /** Switch to a recent graph by zero-based position in the graph switcher. */
   switchGraph: (index: number) => void
   /** Start an audio memo, or stop-and-save the one recording. */

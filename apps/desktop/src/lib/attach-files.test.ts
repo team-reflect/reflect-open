@@ -21,6 +21,9 @@ function contextFor(notePath: string | null, generation: number | null): Command
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
     newChat: vi.fn(),
+    openNoteFind: vi.fn(),
+    findNextInNote: vi.fn(),
+    findPreviousInNote: vi.fn(),
     switchGraph: vi.fn(),
     toggleAudioMemo: vi.fn(),
     generation: () => generation,
@@ -48,6 +51,12 @@ function editorHandle(): NoteEditorHandle & {
     appendPendingReplacementText: () => {},
     acceptPendingReplacement: () => {},
     discardPendingReplacement: () => {},
+    beginFind: () => ({ active: 0, total: 0 }),
+    updateFindQuery: () => ({ active: 0, total: 0 }),
+    findNext: () => ({ active: 0, total: 0 }),
+    findPrevious: () => ({ active: 0, total: 0 }),
+    clearFind: () => {},
+    subscribeFind: () => () => {},
   }
 }
 
