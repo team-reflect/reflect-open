@@ -35,6 +35,15 @@ export function NoteFindBar(): ReactElement | null {
   const hasQuery = find.query.length > 0
   const canNavigate = total > 0
 
+  function handleSearchKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+    if (event.key !== 'Escape' || event.nativeEvent.isComposing) {
+      return
+    }
+    event.preventDefault()
+    event.stopPropagation()
+    find.close()
+  }
+
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
     if (event.nativeEvent.isComposing) {
       return
@@ -66,11 +75,6 @@ export function NoteFindBar(): ReactElement | null {
       }
       return
     }
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      event.stopPropagation()
-      find.close()
-    }
   }
 
   return (
@@ -78,6 +82,7 @@ export function NoteFindBar(): ReactElement | null {
       role="search"
       aria-label="Find in note"
       className="absolute right-3 top-2 z-40 w-80 max-w-[calc(100%_-_1.5rem)]"
+      onKeyDown={handleSearchKeyDown}
     >
       <InputGroup className="h-9 rounded-[7px] border-border-strong bg-input-bg shadow-pop">
         <InputGroupInput

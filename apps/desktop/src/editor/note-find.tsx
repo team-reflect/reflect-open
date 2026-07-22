@@ -76,6 +76,8 @@ function createController(
   let origin = 0
   let direction: NoteFindDirection = 'next'
   let currentQueryText = ''
+  let queryActive = false
+  let queryNeedsSync = false
   let resumeMatch: MatchBookmark | null = null
   let lastMatch: MatchBookmark | null = null
 
@@ -105,13 +107,16 @@ function createController(
   }
 
   function setQuery(queryText: string): NoteFindSnapshot {
+    currentQueryText = queryText
+    const query = queryFor(queryText, boundMarkMode)
+    queryActive = query.valid
     const editor = currentEditor()
     if (editor === null) {
+      queryNeedsSync = true
       return publish(EMPTY_NOTE_FIND_SNAPSHOT)
     }
 
-    currentQueryText = queryText
-    const query = queryFor(queryText, boundMarkMode)
+    queryNeedsSync = false
     const { selection } = editor.state
     const selectionIsFindMatch = getMatchHighlights(editor.state)
       .find()
@@ -170,21 +175,30 @@ function createController(
   }
 
   function bind(editor: TypedEditor | undefined, markMode: MarkMode): void {
+    const editorChanged = boundEditor !== editor
+    const searchProjectionChanged =
+      (boundMarkMode === 'show') !== (markMode === 'show')
     boundMarkMode = markMode
-    if (boundEditor === editor && disposeSelectionObserver !== null) {
-      return
+    if (editorChanged || disposeSelectionObserver === null) {
+      disposeSelectionObserver?.()
+      boundEditor = editor
+      disposeSelectionObserver =
+        editor?.use(
+          defineUpdateHandler((view, previousState) => {
+            if (!view.state.selection.eq(previousState.selection)) {
+              publishEditor(editor)
+            }
+          }),
+        ) ?? null
     }
 
-    disposeSelectionObserver?.()
-    boundEditor = editor
-    disposeSelectionObserver =
-      editor?.use(
-        defineUpdateHandler((view, previousState) => {
-          if (!view.state.selection.eq(previousState.selection)) {
-            publishEditor(editor)
-          }
-        }),
-      ) ?? null
+    if (
+      (queryNeedsSync ||
+        (queryActive && (editorChanged || searchProjectionChanged))) &&
+      currentEditor() !== null
+    ) {
+      setQuery(currentQueryText)
+    }
   }
 
   const controller: NoteFindController = {
@@ -201,26 +215,14 @@ function createController(
           : null
       return setQuery(query)
     },
-    updateQuery: setQuery,
+    updateQuery: (query) => {
+      direction = 'next'
+      return setQuery(query)
+    },
     next: () => move(findNext),
     previous: () => move(findPrev),
     clear: () => {
-      const editor = currentEditor()
-      if (editor === null) {
-        return
-      }
-      const { selection } = editor.state
-      const activeMatch = getMatchHighlights(editor.state)
-        .find()
-        .some((match) => match.from === selection.from && match.to === selection.to)
-      let transaction = setSearchState(editor.state.tr, queryFor('', boundMarkMode))
-      if (activeMatch && !selection.empty) {
-        transaction = transaction.setSelection(
-          TextSelection.create(transaction.doc, selection.to),
-        )
-      }
-      editor.view.dispatch(transaction)
-      publish(EMPTY_NOTE_FIND_SNAPSHOT)
+      setQuery('')
     },
     refresh: () => {
       const editor = currentEditor()

@@ -166,7 +166,7 @@ describe('NoteFindBar', () => {
     unregisterNoteEditorHandle(NOTE_PATH, handle)
   })
 
-  it('closes on Escape after focus moves back into the note surface', () => {
+  it('closes on Escape without stealing focus from another control', () => {
     const handle = editorHandle()
     registerNoteEditorHandle(NOTE_PATH, handle)
     renderFindBar()
@@ -175,6 +175,24 @@ describe('NoteFindBar', () => {
     const outside = screen.getByRole('button', { name: 'Leave note' })
     outside.focus()
     fireEvent.keyDown(outside, { key: 'Escape' })
+
+    expect(screen.queryByRole('search')).toBeNull()
+    expect(handle.clearFind).toHaveBeenCalledTimes(1)
+    expect(handle.focus).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(outside)
+
+    unregisterNoteEditorHandle(NOTE_PATH, handle)
+  })
+
+  it('restores editor focus when Escape is pressed from a Find control', () => {
+    const handle = editorHandle()
+    registerNoteEditorHandle(NOTE_PATH, handle)
+    renderFindBar()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open find' }))
+    const closeButton = screen.getByRole('button', { name: 'Close find' })
+    closeButton.focus()
+    fireEvent.keyDown(closeButton, { key: 'Escape' })
 
     expect(screen.queryByRole('search')).toBeNull()
     expect(handle.clearFind).toHaveBeenCalledTimes(1)
@@ -197,6 +215,23 @@ describe('NoteFindBar', () => {
 
     expect(screen.getByRole('search')).not.toBeNull()
     expect(handle.beginFind).toHaveBeenCalledWith('alpha', { direction: 'previous' })
+
+    unregisterNoteEditorHandle(NOTE_PATH, handle)
+  })
+
+  it('resets pending navigation when the query changes before the editor mounts', () => {
+    const handle = editorHandle()
+    renderFindBar()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open find' }))
+    const input = screen.getByRole<HTMLInputElement>('textbox', { name: 'Find in note' })
+    fireEvent.change(input, { target: { value: 'alpha' } })
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true })
+    fireEvent.change(input, { target: { value: 'alphabet' } })
+
+    act(() => registerNoteEditorHandle(NOTE_PATH, handle))
+
+    expect(handle.beginFind).toHaveBeenCalledWith('alphabet', { direction: 'next' })
 
     unregisterNoteEditorHandle(NOTE_PATH, handle)
   })

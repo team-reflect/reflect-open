@@ -92,6 +92,43 @@ describe('NoteFindController', () => {
     unsubscribe()
   })
 
+  it('searches forward from the session origin when the query changes', () => {
+    const editor = findEditorFor('cat car cat')
+    const controller = createNoteFindController(editor)
+
+    expect(controller.begin('ca')).toEqual({ active: 1, total: 3 })
+    expect(controller.previous()).toEqual({ active: 3, total: 3 })
+    expect(controller.updateQuery('cat')).toEqual({ active: 1, total: 2 })
+  })
+
+  it('retains query changes while the editor is temporarily unbound', () => {
+    const editor = findEditorFor('one two one')
+    const controller = createNoteFindController(editor)
+    const listener = vi.fn()
+    controller.subscribe(listener)
+
+    expect(controller.begin('one')).toEqual({ active: 1, total: 2 })
+    controller.bind(undefined, 'hide')
+    expect(controller.updateQuery('two')).toEqual({ active: 0, total: 0 })
+
+    controller.bind(editor, 'hide')
+    expect(listener).toHaveBeenLastCalledWith({ active: 1, total: 1 })
+    expect(
+      editor.state.doc.textBetween(
+        editor.state.selection.from,
+        editor.state.selection.to,
+      ),
+    ).toBe('two')
+
+    controller.bind(undefined, 'hide')
+    controller.clear()
+    expect(listener).toHaveBeenLastCalledWith({ active: 0, total: 0 })
+
+    controller.bind(editor, 'hide')
+    expect(getMatchHighlights(editor.state).find()).toHaveLength(0)
+    expect(editor.state.selection.empty).toBe(true)
+  })
+
   it('searches visible Markdown source when syntax is configured to show', () => {
     const editor = findEditorFor('A [label](https://example.com)')
     const controller = createNoteFindController(editor, 'show')
@@ -101,6 +138,28 @@ describe('NoteFindController', () => {
       editor.state.selection.from,
       editor.state.selection.to,
     )).toBe('https://example.com')
+  })
+
+  it('refreshes an active query when syntax visibility changes', () => {
+    const editor = findEditorFor('A [label](https://example.com)')
+    const controller = createNoteFindController(editor, 'hide')
+    const listener = vi.fn()
+    controller.subscribe(listener)
+
+    expect(controller.begin('https://example.com')).toEqual({ active: 0, total: 0 })
+
+    controller.bind(editor, 'show')
+    expect(listener).toHaveBeenLastCalledWith({ active: 1, total: 1 })
+    expect(getMatchHighlights(editor.state).find()).toHaveLength(1)
+
+    controller.bind(editor, 'focus')
+    expect(listener).toHaveBeenLastCalledWith({ active: 0, total: 0 })
+    expect(getMatchHighlights(editor.state).find()).toHaveLength(0)
+    expect(editor.state.selection.empty).toBe(true)
+
+    controller.clear()
+    controller.bind(editor, 'show')
+    expect(getMatchHighlights(editor.state).find()).toHaveLength(0)
   })
 
   it('refreshes subscribers after document changes and honors unsubscribe', () => {

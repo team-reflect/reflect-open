@@ -157,9 +157,12 @@ export function NoteFindProvider({ children }: { children: ReactNode }): ReactEl
   const updateQuery = useCallback((nextQuery: string): void => {
     queryRef.current = nextQuery
     setQuery(nextQuery)
-    const handle = sessionRef.current?.handle
+    const session = sessionRef.current
+    const handle = session?.handle
     if (handle !== null && handle !== undefined) {
       setSnapshot(handle.updateFindQuery(nextQuery))
+    } else if (session !== null) {
+      session.beginOptions = { direction: 'next' }
     }
   }, [])
 
@@ -218,12 +221,12 @@ export function NoteFindProvider({ children }: { children: ReactNode }): ReactEl
         sessionRef.current !== null
       ) {
         event.preventDefault()
-        close()
+        closeSession(false)
       }
     }
     window.addEventListener('keydown', onEscape)
     return () => window.removeEventListener('keydown', onEscape)
-  }, [close])
+  }, [closeSession])
 
   useEffect(() => {
     if (isMainWindow()) {
