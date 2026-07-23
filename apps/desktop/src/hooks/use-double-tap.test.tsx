@@ -1,9 +1,10 @@
-import { act, cleanup, renderHook } from '@testing-library/react'
+import { act } from 'react'
+import { cleanup, renderHook } from 'vitest-browser-react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useDoubleTap } from './use-double-tap'
 
-function mountTaps(activeKey: string | null = 'a') {
-  return renderHook((active: string | null) => useDoubleTap<string>(active), {
+async function mountTaps(activeKey: string | null = 'a') {
+  return await renderHook((active: string | null = activeKey) => useDoubleTap<string>(active), {
     initialProps: activeKey,
   })
 }
@@ -22,8 +23,8 @@ function atTimes(...times: number[]): void {
 }
 
 describe('useDoubleTap', () => {
-  it('pairs two taps of the same key within the window', () => {
-    const hook = mountTaps()
+  it('pairs two taps of the same key within the window', async () => {
+    const hook = await mountTaps()
     atTimes(1000, 1400)
     act(() => {
       expect(hook.result.current('a')).toBe(false)
@@ -33,8 +34,8 @@ describe('useDoubleTap', () => {
     })
   })
 
-  it('does not pair taps spaced past the window', () => {
-    const hook = mountTaps()
+  it('does not pair taps spaced past the window', async () => {
+    const hook = await mountTaps()
     atTimes(1000, 1500)
     act(() => {
       expect(hook.result.current('a')).toBe(false)
@@ -44,8 +45,8 @@ describe('useDoubleTap', () => {
     })
   })
 
-  it('a tap of another key starts a fresh pairing', () => {
-    const hook = mountTaps()
+  it('a tap of another key starts a fresh pairing', async () => {
+    const hook = await mountTaps()
     atTimes(1000, 1100, 1200)
     act(() => {
       expect(hook.result.current('a')).toBe(false)
@@ -58,37 +59,37 @@ describe('useDoubleTap', () => {
     })
   })
 
-  it('survives the active-key change the first tap itself causes', () => {
+  it('survives the active-key change the first tap itself causes', async () => {
     // The mobile tab bar's case: tapping All from Daily moves the route onto
     // the All root before the second tap — the pending tap must still pair.
-    const hook = mountTaps('a')
+    const hook = await mountTaps('a')
     atTimes(1000, 1100)
     act(() => {
       expect(hook.result.current('b')).toBe(false)
     })
-    hook.rerender('b')
+    await hook.rerender('b')
     act(() => {
       expect(hook.result.current('b')).toBe(true)
     })
   })
 
-  it('expires a pending tap when the active key leaves it', () => {
+  it('expires a pending tap when the active key leaves it', async () => {
     // Something else moved the state off the key between the taps (a deep
     // link, an opened note): the second tap is a return, not a double-tap.
-    const hook = mountTaps('a')
+    const hook = await mountTaps('a')
     atTimes(1000, 1100)
     act(() => {
       expect(hook.result.current('a')).toBe(false)
     })
-    hook.rerender(null)
-    hook.rerender('a')
+    await hook.rerender(null)
+    await hook.rerender('a')
     act(() => {
       expect(hook.result.current('a')).toBe(false)
     })
   })
 
-  it('honors a custom window', () => {
-    const hook = renderHook(() => useDoubleTap<string>('a', 100))
+  it('honors a custom window', async () => {
+    const hook = await renderHook(() => useDoubleTap<string>('a', 100))
     atTimes(1000, 1150)
     act(() => {
       expect(hook.result.current('a')).toBe(false)
