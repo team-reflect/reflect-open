@@ -29,7 +29,7 @@ export interface AssetDescriptionBody {
 /** What {@link gatherAssetDescriptionBodies} could (and could not) read. */
 export interface AssetDescriptionGather {
   /** The readable description bodies, in reference order. */
-  bodies: AssetDescriptionBody[]
+  bodies: readonly AssetDescriptionBody[]
   /**
    * Asset paths whose description file exists but is iCloud-evicted —
    * unreadable without forcing an on-demand download. Consumers that
@@ -37,7 +37,7 @@ export interface AssetDescriptionGather {
    * apply) must skip the write entirely when this is non-empty, or the
    * evicted sidecar's previously indexed chunks are silently dropped.
    */
-  evicted: string[]
+  evicted: readonly string[]
 }
 
 /**
