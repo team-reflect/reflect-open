@@ -245,7 +245,8 @@ pub(crate) fn modified_ms(meta: &fs::Metadata) -> Option<u64> {
 /// (Plan 21: eviction must never read as deletion).
 ///
 /// This stub grammar is the **iOS / legacy** eviction form. Modern macOS
-/// (FileProvider, 12.3+) evicts to a *dataless* file at the real path instead
+/// (FileProvider-based iCloud Drive, macOS 14 Sonoma and later) evicts to a
+/// *dataless* file at the real path instead
 /// — see [`is_dataless`]; both forms must read as "present but not local".
 pub(crate) fn icloud_placeholder_target(file_name: &str) -> Option<&str> {
     let name = file_name.strip_prefix('.')?.strip_suffix(".icloud")?;
@@ -258,6 +259,15 @@ pub(crate) fn icloud_placeholder_target(file_name: &str) -> Option<&str> {
 /// any read blocks while `fileproviderd` re-materializes the bytes — so bulk
 /// passes must check this before reading, or a single pass turns into
 /// thousands of serial on-demand downloads.
+///
+/// Checking `st_flags` for `SF_DATALESS` is Apple's documented detection for
+/// POSIX-level access (TN3150, "Getting ready for dataless files":
+/// <https://developer.apple.com/documentation/technotes/tn3150-getting-ready-for-data-less-files>);
+/// the flag is also documented in `chflags(2)`, which marks it (with
+/// `UF_COMPRESSED`) as kernel-internal: userland can observe but never set
+/// it. The value is public ABI from the macOS SDK's `<sys/stat.h>` (also in
+/// Apple's open-source XNU, `bsd/sys/stat.h`), spelled out here because the
+/// `libc` crate does not bind it yet.
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 const SF_DATALESS: u32 = 0x4000_0000;
 
