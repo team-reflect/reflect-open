@@ -15,7 +15,7 @@ afterEach(() => {
   setBridge(null)
 })
 
-describe('browser mode smoke', () => {
+describe('NoteEditor smoke', () => {
   it('mounts the real editor and serializes typed text', async () => {
     const bridge: IpcBridge = {
       invoke: async () => null,
