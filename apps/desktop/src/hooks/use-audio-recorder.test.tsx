@@ -1,4 +1,5 @@
-import { act, cleanup, renderHook } from '@testing-library/react'
+import { act } from 'react'
+import { cleanup, renderHook } from 'vitest-browser-react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { isRecordingSupported, useAudioRecorder } from './use-audio-recorder'
 
@@ -67,7 +68,7 @@ describe('useAudioRecorder', () => {
   it('records with the first supported container and assembles the result', async () => {
     const track = { stop: vi.fn() }
     getUserMedia.mockResolvedValue(fakeStream([track]))
-    const { result } = renderHook(() => useAudioRecorder())
+    const { result } = await renderHook(() => useAudioRecorder())
 
     await act(async () => {
       await result.current.start()
@@ -95,7 +96,7 @@ describe('useAudioRecorder', () => {
   it('prefers opus-in-webm where the platform supports it', async () => {
     FakeMediaRecorder.supported = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
     getUserMedia.mockResolvedValue(fakeStream([{ stop: vi.fn() }]))
-    const { result } = renderHook(() => useAudioRecorder())
+    const { result } = await renderHook(() => useAudioRecorder())
 
     await act(async () => {
       await result.current.start()
@@ -105,7 +106,7 @@ describe('useAudioRecorder', () => {
 
   it('discards a sub-half-second recording as a misclick', async () => {
     getUserMedia.mockResolvedValue(fakeStream([{ stop: vi.fn() }]))
-    const { result } = renderHook(() => useAudioRecorder())
+    const { result } = await renderHook(() => useAudioRecorder())
 
     await act(async () => {
       await result.current.start()
@@ -121,7 +122,7 @@ describe('useAudioRecorder', () => {
   it('cancel stops the tracks and discards without a result', async () => {
     const track = { stop: vi.fn() }
     getUserMedia.mockResolvedValue(fakeStream([track]))
-    const { result } = renderHook(() => useAudioRecorder())
+    const { result } = await renderHook(() => useAudioRecorder())
 
     await act(async () => {
       await result.current.start()
@@ -138,7 +139,7 @@ describe('useAudioRecorder', () => {
     const track = { stop: vi.fn() }
     getUserMedia.mockResolvedValue(fakeStream([track]))
     FakeMediaRecorder.failConstruction = true
-    const { result } = renderHook(() => useAudioRecorder())
+    const { result } = await renderHook(() => useAudioRecorder())
 
     // Catch inside act: a rejection crossing the act boundary breaks the
     // shared act scope for every later call.
@@ -164,7 +165,7 @@ describe('useAudioRecorder', () => {
 
   it('rethrows a permission denial and returns to idle', async () => {
     getUserMedia.mockRejectedValue(new Error('Permission denied'))
-    const { result } = renderHook(() => useAudioRecorder())
+    const { result } = await renderHook(() => useAudioRecorder())
 
     await expect(
       act(async () => {
@@ -183,7 +184,7 @@ describe('useAudioRecorder', () => {
           release = resolve
         }),
     )
-    const { result } = renderHook(() => useAudioRecorder())
+    const { result } = await renderHook(() => useAudioRecorder())
 
     let firstStart: Promise<void> = Promise.resolve()
     let secondStart: Promise<void> = Promise.resolve()
@@ -210,7 +211,7 @@ describe('useAudioRecorder', () => {
           release = resolve
         }),
     )
-    const { result } = renderHook(() => useAudioRecorder())
+    const { result } = await renderHook(() => useAudioRecorder())
 
     let pending: Promise<void> = Promise.resolve()
     act(() => {
@@ -231,7 +232,7 @@ describe('useAudioRecorder', () => {
 
   it('concurrent stops share one in-flight result and stop the recorder once', async () => {
     getUserMedia.mockResolvedValue(fakeStream([{ stop: vi.fn() }]))
-    const { result } = renderHook(() => useAudioRecorder())
+    const { result } = await renderHook(() => useAudioRecorder())
 
     await act(async () => {
       await result.current.start()
@@ -253,7 +254,7 @@ describe('useAudioRecorder', () => {
 
   it('stop on an already-inactive recorder settles instead of throwing', async () => {
     getUserMedia.mockResolvedValue(fakeStream([{ stop: vi.fn() }]))
-    const { result } = renderHook(() => useAudioRecorder())
+    const { result } = await renderHook(() => useAudioRecorder())
 
     await act(async () => {
       await result.current.start()
@@ -271,7 +272,7 @@ describe('useAudioRecorder', () => {
   it('fires onMaxDuration once when the cap is reached', async () => {
     getUserMedia.mockResolvedValue(fakeStream([{ stop: vi.fn() }]))
     const onMaxDuration = vi.fn()
-    const { result } = renderHook(() =>
+    const { result } = await renderHook(() =>
       useAudioRecorder({ maxDurationMs: 1000, onMaxDuration }),
     )
 
@@ -291,7 +292,7 @@ describe('useAudioRecorder', () => {
   it('stopping before the cap disarms it', async () => {
     getUserMedia.mockResolvedValue(fakeStream([{ stop: vi.fn() }]))
     const onMaxDuration = vi.fn()
-    const { result } = renderHook(() =>
+    const { result } = await renderHook(() =>
       useAudioRecorder({ maxDurationMs: 1000, onMaxDuration }),
     )
 
@@ -310,18 +311,18 @@ describe('useAudioRecorder', () => {
   it('unmount releases the microphone', async () => {
     const track = { stop: vi.fn() }
     getUserMedia.mockResolvedValue(fakeStream([track]))
-    const { result, unmount } = renderHook(() => useAudioRecorder())
+    const { result, unmount } = await renderHook(() => useAudioRecorder())
 
     await act(async () => {
       await result.current.start()
     })
-    unmount()
+    await unmount()
     expect(track.stop).toHaveBeenCalled()
   })
 })
 
 describe('isRecordingSupported', () => {
-  it('requires both MediaRecorder and getUserMedia', () => {
+  it('requires both MediaRecorder and getUserMedia', async () => {
     expect(isRecordingSupported()).toBe(true)
     vi.stubGlobal('navigator', {})
     expect(isRecordingSupported()).toBe(false)
