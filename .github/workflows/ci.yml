@@ -56,10 +56,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
-        shard_total: [3]
+        shard: ["1/3", "2/3", "3/3"]
 
-    name: test-chromium ${{ matrix.shard }}/${{ matrix.shard_total }}
+    name: test-chromium ${{ matrix.shard }}
     runs-on: ubuntu-latest
 
     steps:
@@ -83,16 +82,15 @@ jobs:
         run: pnpm --filter @reflect/desktop exec playwright install --with-deps chromium
 
       - name: Test
-        run: pnpm run test --shard ${{ matrix.shard }}/${{ matrix.shard_total }}
+        run: pnpm run test --shard ${{ matrix.shard }}
 
   webkit:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5]
-        shard_total: [5]
+        shard: ["1/5", "2/5", "3/5", "4/5", "5/5"]
 
-    name: test-webkit ${{ matrix.shard }}/${{ matrix.shard_total }}
+    name: test-webkit ${{ matrix.shard }}
     runs-on: macos-latest
 
     steps:
@@ -116,7 +114,7 @@ jobs:
         run: pnpm --filter @reflect/desktop exec playwright install webkit
 
       - name: Test
-        run: pnpm run test --shard ${{ matrix.shard }}/${{ matrix.shard_total }}
+        run: pnpm run test --shard ${{ matrix.shard }}
         env:
           REFLECT_TEST_BROWSER: webkit
 
