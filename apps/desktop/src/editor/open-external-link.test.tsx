@@ -1,4 +1,5 @@
-import { act, cleanup, renderHook } from '@testing-library/react'
+import { act } from 'react'
+import { cleanup, renderHook } from 'vitest-browser-react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LinkClickHandler } from '@meowdown/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
@@ -27,24 +28,24 @@ function click(href: string, metaKey = false): MouseEvent {
   return event
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks()
   openDeepLinkInNewWindow.mockResolvedValue(true)
-  const { result } = renderHook(() => useOpenExternalLink())
+  const { result } = await renderHook(() => useOpenExternalLink())
   openExternalLink = result.current
 })
 
 afterEach(cleanup)
 
 describe('openExternalLink', () => {
-  it('opens an http(s) link in the OS browser and blocks the frame navigation', () => {
+  it('opens an http(s) link in the OS browser and blocks the frame navigation', async () => {
     const event = click('https://example.com')
 
     expect(openUrl).toHaveBeenCalledWith('https://example.com')
     expect(event.defaultPrevented).toBe(true)
   })
 
-  it('routes a reflect:// link through the in-app deep-link intake, not the URL opener', () => {
+  it('routes a reflect:// link through the in-app deep-link intake, not the URL opener', async () => {
     click('reflect://note/abc123')
 
     expect(dispatchDeepLink).toHaveBeenCalledWith('reflect://note/abc123')
@@ -64,12 +65,10 @@ describe('openExternalLink', () => {
     openDeepLinkInNewWindow.mockResolvedValue(false)
     click('reflect://note/abc123', true)
 
-    await vi.waitFor(() =>
-      expect(dispatchDeepLink).toHaveBeenCalledWith('reflect://note/abc123'),
-    )
+    await vi.waitFor(() => expect(dispatchDeepLink).toHaveBeenCalledWith('reflect://note/abc123'))
   })
 
-  it('opens a custom app scheme in its OS default app', () => {
+  it('opens a custom app scheme in its OS default app', async () => {
     const event = click('x-devonthink-item://40C88434-68B6-4DCB-A258-754679764C3C')
 
     expect(openUrl).toHaveBeenCalledWith('x-devonthink-item://40C88434-68B6-4DCB-A258-754679764C3C')
@@ -90,7 +89,7 @@ describe('openExternalLink', () => {
     expect(event.defaultPrevented).toBe(true)
   })
 
-  it('drops a scheme-less relative href', () => {
+  it('drops a scheme-less relative href', async () => {
     const event = click('notes/foo.md')
 
     expect(openUrl).not.toHaveBeenCalled()

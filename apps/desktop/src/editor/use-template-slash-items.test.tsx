@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react'
+import { renderHook } from 'vitest-browser-react'
 import { describe, expect, it, vi } from 'vitest'
 import type { NoteEditorHandle } from './note-editor'
 
@@ -45,11 +45,15 @@ function fakeEditor(): NoteEditorHandle & { inserted: string[] } {
 describe('useTemplateSlashItems', () => {
   it('maps templates to slash rows whose select inserts through the shared flow', async () => {
     const editor = fakeEditor()
-    const { result } = renderHook(() => useTemplateSlashItems(() => editor))
+    const { result } = await renderHook(() => useTemplateSlashItems(() => editor))
 
     const items = await result.current('jour')
     expect(
-      items.map((item) => ({ id: item.id, label: item.label, keywords: item.keywords })),
+      items.map((item) => ({
+        id: item.id,
+        label: item.label,
+        keywords: item.keywords,
+      })),
     ).toEqual([
       // The shared "template" keyword is the v1 `/template` affordance.
       { id: 'templates/journal.md', label: 'Journal', keywords: ['template'] },
@@ -57,7 +61,7 @@ describe('useTemplateSlashItems', () => {
     ])
 
     items[0]!.onSelect()
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(insertTemplate).toHaveBeenCalledWith('templates/journal.md', editor),
     )
   })
@@ -65,17 +69,17 @@ describe('useTemplateSlashItems', () => {
   it('resolves the editor at select time, not capture time', async () => {
     // The pane unmounted between the menu opening and the select — the shared
     // flow receives null and surfaces the failure, never a stale editor.
-    const { result } = renderHook(() => useTemplateSlashItems(() => null))
+    const { result } = await renderHook(() => useTemplateSlashItems(() => null))
     const items = await result.current('')
     items[0]!.onSelect()
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(insertTemplate).toHaveBeenCalledWith('templates/journal.md', null),
     )
   })
 
   it('returns nothing without a bridge', async () => {
     hasBridge.mockReturnValueOnce(false)
-    const { result } = renderHook(() => useTemplateSlashItems(() => fakeEditor()))
+    const { result } = await renderHook(() => useTemplateSlashItems(() => fakeEditor()))
     await expect(result.current('')).resolves.toEqual([])
   })
 })

@@ -1,4 +1,4 @@
-import { cleanup, renderHook } from '@testing-library/react'
+import { cleanup, renderHook } from 'vitest-browser-react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UIEvent } from 'react'
 import { RESTORE_DEADLINE_MS, useScrollRestore } from './use-scroll-restore'
@@ -88,7 +88,7 @@ interface MountOptions {
   maxScrollTop?: number
 }
 
-function mountRestore(options: MountOptions = {}) {
+async function mountRestore(options: MountOptions = {}) {
   const memory = new Map<string, number>()
   if (options.saved !== undefined) {
     memory.set(KEY, options.saved)
@@ -98,7 +98,9 @@ function mountRestore(options: MountOptions = {}) {
   scrollable.element.appendChild(content)
   const containerRef = { current: scrollable.element }
   const contentRef = { current: content }
-  const hook = renderHook(() => useScrollRestore({ key: KEY, memory, containerRef, contentRef }))
+  const hook = await renderHook(() =>
+    useScrollRestore({ key: KEY, memory, containerRef, contentRef }),
+  )
   return { memory, scrollable, content, hook }
 }
 
@@ -115,8 +117,11 @@ afterEach(() => {
 })
 
 describe('useScrollRestore', () => {
-  it('re-applies the saved offset as content grows until it is reachable', () => {
-    const { memory, scrollable, content, hook } = mountRestore({ saved: 500, maxScrollTop: 100 })
+  it('re-applies the saved offset as content grows until it is reachable', async () => {
+    const { memory, scrollable, content, hook } = await mountRestore({
+      saved: 500,
+      maxScrollTop: 100,
+    })
 
     // The mount-time apply was clamped, so the restore stays armed: watching
     // the content, offset untouched in memory.
@@ -141,8 +146,11 @@ describe('useScrollRestore', () => {
     expect(memory.get(KEY)).toBe(320)
   })
 
-  it('does not let the restore’s clamped scrolls overwrite the saved offset', () => {
-    const { memory, scrollable, hook } = mountRestore({ saved: 500, maxScrollTop: 100 })
+  it('does not let the restore’s clamped scrolls overwrite the saved offset', async () => {
+    const { memory, scrollable, hook } = await mountRestore({
+      saved: 500,
+      maxScrollTop: 100,
+    })
 
     // The browser fires a scroll event for the clamped mount-time apply —
     // recording it would truncate the memory to 100 and the restore would
@@ -151,8 +159,11 @@ describe('useScrollRestore', () => {
     expect(memory.get(KEY)).toBe(500)
   })
 
-  it('gives up at the deadline when the offset never becomes reachable', () => {
-    const { memory, scrollable, hook } = mountRestore({ saved: 500, maxScrollTop: 100 })
+  it('gives up at the deadline when the offset never becomes reachable', async () => {
+    const { memory, scrollable, hook } = await mountRestore({
+      saved: 500,
+      maxScrollTop: 100,
+    })
 
     vi.advanceTimersByTime(RESTORE_DEADLINE_MS)
     expect(observer()?.disconnected).toBe(true)
@@ -168,8 +179,11 @@ describe('useScrollRestore', () => {
     expect(scrollable.element.scrollTop).toBe(40)
   })
 
-  it('hands control to the user on pointerdown', () => {
-    const { memory, scrollable, hook } = mountRestore({ saved: 500, maxScrollTop: 100 })
+  it('hands control to the user on pointerdown', async () => {
+    const { memory, scrollable, hook } = await mountRestore({
+      saved: 500,
+      maxScrollTop: 100,
+    })
 
     scrollable.element.dispatchEvent(new Event('pointerdown'))
     expect(observer()?.disconnected).toBe(true)
@@ -182,8 +196,11 @@ describe('useScrollRestore', () => {
     expect(scrollable.element.scrollTop).toBe(40)
   })
 
-  it('resetToTop cancels an in-flight restore before jumping to the top', () => {
-    const { memory, scrollable, hook } = mountRestore({ saved: 500, maxScrollTop: 100 })
+  it('resetToTop cancels an in-flight restore before jumping to the top', async () => {
+    const { memory, scrollable, hook } = await mountRestore({
+      saved: 500,
+      maxScrollTop: 100,
+    })
 
     hook.result.current.resetToTop()
     expect(scrollable.element.scrollTop).toBe(0)
@@ -200,8 +217,11 @@ describe('useScrollRestore', () => {
     expect(memory.get(KEY)).toBe(10)
   })
 
-  it('cancelRestore ends the chase without touching the scroll or the memory', () => {
-    const { memory, scrollable, hook } = mountRestore({ saved: 500, maxScrollTop: 100 })
+  it('cancelRestore ends the chase without touching the scroll or the memory', async () => {
+    const { memory, scrollable, hook } = await mountRestore({
+      saved: 500,
+      maxScrollTop: 100,
+    })
 
     // An end-of-note focus arrival (the double-tap) pins the container to its
     // end; the chase must die in place — its next content-growth re-apply
@@ -221,15 +241,15 @@ describe('useScrollRestore', () => {
     expect(memory.get(KEY)).toBe(900)
   })
 
-  it('restores a reachable offset synchronously without arming the machinery', () => {
-    const { scrollable } = mountRestore({ saved: 80, maxScrollTop: 100 })
+  it('restores a reachable offset synchronously without arming the machinery', async () => {
+    const { scrollable } = await mountRestore({ saved: 80, maxScrollTop: 100 })
 
     expect(scrollable.element.scrollTop).toBe(80)
     expect(FakeResizeObserver.instances).toHaveLength(0)
   })
 
-  it('does nothing on a fresh mount with no saved offset', () => {
-    const { memory, scrollable, hook } = mountRestore({ maxScrollTop: 100 })
+  it('does nothing on a fresh mount with no saved offset', async () => {
+    const { memory, scrollable, hook } = await mountRestore({ maxScrollTop: 100 })
 
     expect(scrollable.element.scrollTop).toBe(0)
     expect(FakeResizeObserver.instances).toHaveLength(0)
@@ -239,10 +259,13 @@ describe('useScrollRestore', () => {
     expect(memory.get(KEY)).toBe(25)
   })
 
-  it('stops the restore on unmount', () => {
-    const { scrollable, hook } = mountRestore({ saved: 500, maxScrollTop: 100 })
+  it('stops the restore on unmount', async () => {
+    const { scrollable, hook } = await mountRestore({
+      saved: 500,
+      maxScrollTop: 100,
+    })
 
-    hook.unmount()
+    await hook.unmount()
     expect(observer()?.disconnected).toBe(true)
     scrollable.setMaxScrollTop(1000)
     observer()?.resize()

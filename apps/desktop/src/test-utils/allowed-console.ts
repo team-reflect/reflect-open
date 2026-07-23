@@ -3,7 +3,7 @@
 export const ALLOWED_CONSOLE_PATTERNS: RegExp[] = [
   // A benign browser artifact, not app output: the skipped notifications are
   // delivered on the next frame.
-  /^ResizeObserver loop completed with undelivered notifications/,
+  /^(?:Error: )?ResizeObserver loop completed with undelivered notifications/,
   /^window label unavailable; assuming the main window:/,
   /^index: stored projection version /,
   /^failed to save note:/,

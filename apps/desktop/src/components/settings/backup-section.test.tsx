@@ -1,8 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render } from 'vitest-browser-react'
+import { page, userEvent } from 'vitest/browser'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BackupState } from '@/lib/backup-controller'
+import { expectLocatorToHaveCount } from '@/test-utils/expect'
+import '@/test-utils/locator'
 import { BackupSettingsField } from './backup-section'
 
 // The section's GitHub-vs-generic split (Plan 16): a hand-wired remote must
@@ -19,14 +22,14 @@ vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl: vi.fn(async () => {}) }))
 vi.mock('@/providers/sync-provider', () => ({ useSync: () => sync }))
 vi.mock('@/providers/graph-provider', () => ({ useGraph: () => ({ graph: null }) }))
 
-afterEach(() => {
-  cleanup()
+afterEach(async () => {
+  await cleanup()
   vi.clearAllMocks()
 })
 
-function renderSection(backup: BackupState): void {
+async function renderSection(backup: BackupState): Promise<void> {
   sync.backup = backup
-  render(
+  await render(
     <QueryClientProvider client={new QueryClient()}>
       <BackupSettingsField />
     </QueryClientProvider>,
@@ -41,90 +44,94 @@ const AUTH_ERROR = {
 
 describe('BackupSettingsField', () => {
   it('renders a generic remote host-neutrally with the engine’s own auth message', async () => {
-    renderSection({
+    await renderSection({
       phase: 'connected',
       remoteUrl: 'git@gitlab.com:alex/notes.git',
       repo: null,
       status: AUTH_ERROR,
     })
 
-    expect(await screen.findByText('Backup', { selector: 'legend' })).toBeTruthy()
-    expect(screen.queryByText('GitHub sync')).toBeNull()
-    expect(screen.getByText('git@gitlab.com:alex/notes.git')).toBeTruthy()
+    await expect.element(page.locate('legend').getByText('Backup')).toBeVisible()
+    await expect.element(page.getByText('GitHub sync')).not.toBeInTheDocument()
+    await expect.element(page.getByText('git@gitlab.com:alex/notes.git')).toBeVisible()
     // The actionable message, not a GitHub reconnect that can't help.
-    expect(screen.getByText(/ssh-add/)).toBeTruthy()
-    expect(screen.queryByText(/reconnect GitHub/)).toBeNull()
+    await expect.element(page.getByText(/ssh-add/)).toBeVisible()
+    await expect.element(page.getByText(/reconnect GitHub/)).not.toBeInTheDocument()
     // Machine-level GitHub sign-out is noise next to a non-GitHub graph.
-    expect(screen.queryByRole('button', { name: /Sign out of GitHub/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Open GitHub repo' })).toBeNull()
+    await expect
+      .element(page.getByRole('button', { name: /Sign out of GitHub/ }))
+      .not.toBeInTheDocument()
+    await expect
+      .element(page.getByRole('button', { name: 'Open GitHub repo' }))
+      .not.toBeInTheDocument()
   })
 
   it('renders a GitHub remote with the reconnect affordances', async () => {
-    renderSection({
+    await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
       repo: { owner: 'alex', name: 'notes' },
       status: AUTH_ERROR,
     })
 
-    expect(await screen.findByText('GitHub sync')).toBeTruthy()
-    expect(screen.getByText('alex/notes')).toBeTruthy()
-    expect(screen.getByText(/reconnect GitHub/)).toBeTruthy()
-    expect(screen.getByText('GitHub account')).toBeTruthy()
-    expect(screen.getByText(/connected graphs stop backing up/i)).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Open GitHub repo' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /Sign out of GitHub/ })).toBeTruthy()
+    await expect.element(page.getByText('GitHub sync')).toBeVisible()
+    await expect.element(page.getByText('alex/notes')).toBeVisible()
+    await expect.element(page.getByText(/reconnect GitHub/)).toBeVisible()
+    await expect.element(page.getByText('GitHub account')).toBeVisible()
+    await expect.element(page.getByText(/connected graphs stop backing up/i)).toBeVisible()
+    await expect.element(page.getByRole('button', { name: 'Open GitHub repo' })).toBeVisible()
+    await expect.element(page.getByRole('button', { name: /Sign out of GitHub/ })).toBeVisible()
   })
 
   it('opens the connected GitHub repository', async () => {
-    renderSection({
+    await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
       repo: { owner: 'alex', name: 'notes' },
       status: { state: 'idle' },
     })
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Open GitHub repo' }))
+    await userEvent.click(page.getByRole('button', { name: 'Open GitHub repo' }))
 
     expect(openUrl).toHaveBeenCalledWith('https://github.com/alex/notes')
   })
 
   it('keeps unrelated action errors out of the sign-out dialog', async () => {
     vi.mocked(openUrl).mockRejectedValueOnce(new Error('No browser'))
-    renderSection({
+    await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
       repo: { owner: 'alex', name: 'notes' },
       status: { state: 'idle' },
     })
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Open GitHub repo' }))
+    await userEvent.click(page.getByRole('button', { name: 'Open GitHub repo' }))
 
-    expect(await screen.findByText(/Couldn’t open the browser/)).toBeTruthy()
+    await expect.element(page.getByText(/Couldn’t open the browser/)).toBeVisible()
 
-    fireEvent.click(screen.getByRole('button', { name: /Sign out of GitHub/ }))
+    await userEvent.click(page.getByRole('button', { name: /Sign out of GitHub/ }))
 
-    expect(
-      within(screen.getByRole('dialog')).queryByText(/Couldn’t open the browser/),
-    ).toBeNull()
+    await expect
+      .element(page.getByRole('dialog').getByText(/Couldn’t open the browser/))
+      .not.toBeInTheDocument()
   })
 
   it('clears stale open-repo errors before retrying', async () => {
     vi.mocked(openUrl).mockRejectedValueOnce(new Error('No browser'))
-    renderSection({
+    await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
       repo: { owner: 'alex', name: 'notes' },
       status: { state: 'idle' },
     })
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Open GitHub repo' }))
+    await userEvent.click(page.getByRole('button', { name: 'Open GitHub repo' }))
 
-    expect(await screen.findByText(/Couldn’t open the browser/)).toBeTruthy()
+    await expect.element(page.getByText(/Couldn’t open the browser/)).toBeVisible()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open GitHub repo' }))
+    await userEvent.click(page.getByRole('button', { name: 'Open GitHub repo' }))
 
-    await waitFor(() => expect(screen.queryByText(/Couldn’t open the browser/)).toBeNull())
+    await expect.element(page.getByText(/Couldn’t open the browser/)).not.toBeInTheDocument()
   })
 
   it('ignores an older open-repo failure after a newer retry succeeds', async () => {
@@ -137,60 +144,62 @@ describe('BackupSettingsField', () => {
           }),
       )
       .mockResolvedValueOnce()
-    renderSection({
+    await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
       repo: { owner: 'alex', name: 'notes' },
       status: { state: 'idle' },
     })
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Open GitHub repo' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Open GitHub repo' }))
+    await userEvent.click(page.getByRole('button', { name: 'Open GitHub repo' }))
+    await userEvent.click(page.getByRole('button', { name: 'Open GitHub repo' }))
 
-    await waitFor(() => expect(openUrl).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(openUrl).toHaveBeenCalledTimes(2))
 
     rejectFirstOpen(new Error('Old failure'))
 
-    await waitFor(() => expect(screen.queryByText(/Couldn’t open the browser/)).toBeNull())
+    await expect.element(page.getByText(/Couldn’t open the browser/)).not.toBeInTheDocument()
   })
 
   it('confirms before signing out of GitHub', async () => {
-    renderSection({
+    await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
       repo: { owner: 'alex', name: 'notes' },
       status: { state: 'idle' },
     })
 
-    fireEvent.click(await screen.findByRole('button', { name: /Sign out of GitHub/ }))
+    await userEvent.click(page.getByRole('button', { name: /Sign out of GitHub/ }))
 
-    expect(screen.getByRole('heading', { name: 'Sign out of GitHub?' })).toBeTruthy()
-    expect(screen.getByText(/Every GitHub-backed graph will stop backing up/i)).toBeTruthy()
+    await expect.element(page.getByRole('heading', { name: 'Sign out of GitHub?' })).toBeVisible()
+    await expect
+      .element(page.getByText(/Every GitHub-backed graph will stop backing up/i))
+      .toBeVisible()
     expect(sync.signOut).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+    await userEvent.click(page.getByRole('button', { name: 'Sign out' }))
 
-    await waitFor(() => expect(sync.signOut).toHaveBeenCalledTimes(1))
-    await waitFor(() =>
-      expect(screen.queryByRole('heading', { name: 'Sign out of GitHub?' })).toBeNull(),
-    )
+    await vi.waitFor(() => expect(sync.signOut).toHaveBeenCalledTimes(1))
+    await expect
+      .element(page.getByRole('heading', { name: 'Sign out of GitHub?' }))
+      .not.toBeInTheDocument()
   })
 
   it('shows sign-out failures inside the confirmation dialog', async () => {
     sync.signOut.mockRejectedValueOnce(new Error('Keychain denied'))
-    renderSection({
+    await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
       repo: { owner: 'alex', name: 'notes' },
       status: { state: 'idle' },
     })
 
-    fireEvent.click(await screen.findByRole('button', { name: /Sign out of GitHub/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+    await userEvent.click(page.getByRole('button', { name: /Sign out of GitHub/ }))
+    await userEvent.click(page.getByRole('button', { name: 'Sign out' }))
 
-    expect(await screen.findByRole('heading', { name: 'Sign out of GitHub?' })).toBeTruthy()
-    expect(await within(screen.getByRole('dialog')).findByText('Keychain denied')).toBeTruthy()
-    expect(screen.getAllByText('Keychain denied')).toHaveLength(1)
+    await expect.element(page.getByRole('heading', { name: 'Sign out of GitHub?' })).toBeVisible()
+    await expect.element(page.getByRole('dialog').getByText('Keychain denied')).toBeVisible()
+    await expectLocatorToHaveCount(page.getByText('Keychain denied'), 1)
   })
 
   it('does not close the sign-out dialog while sign-out is pending', async () => {
@@ -201,23 +210,23 @@ describe('BackupSettingsField', () => {
           resolveSignOut = resolve
         }),
     )
-    renderSection({
+    await renderSection({
       phase: 'connected',
       remoteUrl: 'https://github.com/alex/notes.git',
       repo: { owner: 'alex', name: 'notes' },
       status: { state: 'idle' },
     })
 
-    fireEvent.click(await screen.findByRole('button', { name: /Sign out of GitHub/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await userEvent.click(page.getByRole('button', { name: /Sign out of GitHub/ }))
+    await userEvent.click(page.getByRole('button', { name: 'Sign out' }))
+    await expect.element(page.getByRole('button', { name: 'Cancel' })).toBeDisabled()
 
-    expect(screen.getByRole('heading', { name: 'Sign out of GitHub?' })).toBeTruthy()
+    await expect.element(page.getByRole('heading', { name: 'Sign out of GitHub?' })).toBeVisible()
 
     resolveSignOut()
 
-    await waitFor(() =>
-      expect(screen.queryByRole('heading', { name: 'Sign out of GitHub?' })).toBeNull(),
-    )
+    await expect
+      .element(page.getByRole('heading', { name: 'Sign out of GitHub?' }))
+      .not.toBeInTheDocument()
   })
 })
