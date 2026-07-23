@@ -352,8 +352,10 @@ pub enum LocalNoteRead {
 /// graph becomes thousands of serial blocking downloads. Runs off the main
 /// thread — even a local read must not stall the UI under a busy provider.
 /// Dataless materialization is switched off for the whole check-and-read
-/// ([`io::NoMaterialize`], per TN3150), so even an eviction racing the stat
-/// reports `Evicted` instead of blocking on a download.
+/// ([`io::NoMaterialize`], per TN3150), so an eviction racing the stat
+/// reports `Evicted` instead of blocking on a download; engaging the policy
+/// is best-effort, and on the rare refusal a narrow stat-then-read race
+/// remains (see the call-site comment).
 #[tauri::command]
 pub async fn note_read_local(
     path: String,
