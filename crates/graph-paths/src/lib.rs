@@ -10,6 +10,10 @@
 
 use std::path::{Component, Path, PathBuf};
 
+mod walk;
+
+pub use walk::{walk_catalog, FileCatalog, FileEntry, REFLECT_IGNORE_FILE};
+
 /// Root trees reserved for Reflect-managed attachments and recordings.
 /// Markdown under either tree is content, not a note.
 pub const RESERVED_NOTE_TREES: [&str; 2] = ["assets", "audio-memos"];
