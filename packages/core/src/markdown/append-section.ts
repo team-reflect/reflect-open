@@ -1,11 +1,5 @@
 import { parseNote } from './extract'
-import { topLevelHeadings } from './heading-blocks'
-import type { Heading } from './model'
-
-function nextSectionStart(headings: readonly Heading[], target: Heading, eof: number): number {
-  const next = headings.find((heading) => heading.from > target.from && heading.level <= target.level)
-  return next ? next.from : eof
-}
+import { sectionEnd, topLevelHeadings } from './heading-blocks'
 
 function documentLineEnding(source: string): '\r\n' | '\n' {
   const newline = source.indexOf('\n')
@@ -17,9 +11,10 @@ function documentLineEnding(source: string): '\r\n' | '\n' {
  * after the existing content (none for an empty note).
  */
 export function appendBlock(source: string, block: string): string {
+  const lineEnding = documentLineEnding(source)
   const base = source.replace(/\s*$/, '')
-  const prefix = base.length > 0 ? `${base}\n\n` : ''
-  return `${prefix}${block.trim()}\n`
+  const prefix = base.length > 0 ? `${base}${lineEnding.repeat(2)}` : ''
+  return `${prefix}${block.trim()}${lineEnding}`
 }
 
 /** Append a new H2 section using the document's existing line ending. */
@@ -47,9 +42,12 @@ export function appendUnderHeading(source: string, heading: string, block: strin
     return appendHeadingSection(source, heading, block)
   }
 
-  const sectionEnd = nextSectionStart(sectionHeadings, target, source.length)
-  const head = source.slice(0, sectionEnd).replace(/\s*$/, '')
-  const tail = source.slice(sectionEnd)
-  const inserted = `${head}\n\n${block}`
-  return tail ? `${inserted}\n\n${tail}` : `${inserted}\n`
+  const lineEnding = documentLineEnding(source)
+  const insertionOffset = sectionEnd(sectionHeadings, target, source.length)
+  const head = source.slice(0, insertionOffset).replace(/\s*$/, '')
+  const tail = source.slice(insertionOffset)
+  const inserted = `${head}${lineEnding.repeat(2)}${block}`
+  return tail
+    ? `${inserted}${lineEnding.repeat(2)}${tail}`
+    : `${inserted}${lineEnding}`
 }

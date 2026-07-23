@@ -60,6 +60,13 @@ describe('appendUnderHeading', () => {
   it('matches the heading case-insensitively', () => {
     expect(appendUnderHeading(doc, 'a', '- new')).toBe('# A\n\nalpha\n\n- new\n\n# B\n\nbeta')
   })
+
+  it('preserves CRLF when extending an existing section', () => {
+    const source = '# A\r\n\r\nalpha\r\n\r\n# B\r\n\r\nbeta\r\n'
+    expect(appendUnderHeading(source, 'A', '- new')).toBe(
+      '# A\r\n\r\nalpha\r\n\r\n- new\r\n\r\n# B\r\n\r\nbeta\r\n',
+    )
+  })
 })
 
 describe('appendListItemUnderHeading', () => {
@@ -187,6 +194,10 @@ describe('appendBlock', () => {
 
   it('trims the block itself', () => {
     expect(appendBlock('alpha', '  new text \n')).toBe('alpha\n\nnew text\n')
+  })
+
+  it('preserves CRLF when appending a block', () => {
+    expect(appendBlock('alpha\r\n', 'new text')).toBe('alpha\r\n\r\nnew text\r\n')
   })
 })
 

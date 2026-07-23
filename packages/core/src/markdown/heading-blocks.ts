@@ -20,3 +20,16 @@ export function topLevelHeadings(
   }
   return headings.filter((heading) => headingOffsets.has(heading.from))
 }
+
+/** End offset for `target` within an ordered set of top-level headings. */
+export function sectionEnd(
+  headings: readonly Heading[],
+  target: Heading,
+  sourceLength: number,
+): number {
+  return (
+    headings.find(
+      (heading) => heading.from > target.from && heading.level <= target.level,
+    )?.from ?? sourceLength
+  )
+}

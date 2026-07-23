@@ -16,7 +16,7 @@ import {
   headingMatchesBacklinkedTitle,
   upgradeSectionHeadingBacklink,
 } from '../markdown/edit'
-import { topLevelHeadings } from '../markdown/heading-blocks'
+import { sectionEnd, topLevelHeadings } from '../markdown/heading-blocks'
 import { parseNote } from '../markdown/extract'
 import { parseFrontmatter, splitFrontmatter } from '../markdown/frontmatter'
 import type { ReconcileStop } from './audio-memo'
@@ -101,10 +101,7 @@ async function findSameDayCapture(
   }
   const ranges = linkSections.map((section) => ({
     from: section.to,
-    to:
-      sectionHeadings.find(
-        (heading) => heading.from > section.from && heading.level <= section.level,
-      )?.from ?? dailySource.length,
+    to: sectionEnd(sectionHeadings, section, dailySource.length),
   }))
   const targets = wikiLinks
     .filter((link) => ranges.some((range) => link.from >= range.from && link.from < range.to))

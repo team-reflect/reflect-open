@@ -9,7 +9,7 @@ import { resolveWikiTarget } from '../indexing/queries'
 import { appendListItemUnderHeading, wikiLinkSafe } from '../markdown/edit'
 import { canonicalEmails } from '../markdown/email-fields'
 import { parseNote } from '../markdown/extract'
-import { topLevelHeadings } from '../markdown/heading-blocks'
+import { sectionEnd, topLevelHeadings } from '../markdown/heading-blocks'
 import { foldKey } from '../markdown/keys'
 import { slugForTitle } from '../markdown/slug'
 import {
@@ -139,13 +139,10 @@ function meetingAlreadyLinked(source: string, title: string): boolean {
   if (!heading) {
     return false
   }
-  const sectionEnd =
-    sectionHeadings.find(
-      (candidate) => candidate.from > heading.from && candidate.level <= heading.level,
-    )?.from ?? source.length
+  const sectionEndOffset = sectionEnd(sectionHeadings, heading, source.length)
   const titleKey = foldKey(title)
   return wikiLinks.some((link) => {
-    if (link.from < heading.to || link.from >= sectionEnd) {
+    if (link.from < heading.to || link.from >= sectionEndOffset) {
       return false
     }
     // The alias counts too: `[[Standup|Daily sync]]` already shows this
