@@ -1,4 +1,6 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act } from 'react'
+import { cleanup, render } from 'vitest-browser-react'
+import { page } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetOperations, startOperation, type OperationHandle } from '@/lib/operations'
 import { publishKeyboardHeight } from '@/mobile/use-keyboard'
@@ -20,8 +22,8 @@ beforeEach(() => {
   resetOperations()
 })
 
-afterEach(() => {
-  cleanup()
+afterEach(async () => {
+  await cleanup()
   publishKeyboardHeight(0)
   vi.useRealTimers()
 })
@@ -36,62 +38,62 @@ function operate(run: () => OperationHandle): OperationHandle {
 }
 
 describe('MobileOperationsPills', () => {
-  it('renders nothing while operations are merely running', () => {
-    render(<MobileOperationsPills />)
+  it('renders nothing while operations are merely running', async () => {
+    await render(<MobileOperationsPills />)
     operate(() => startOperation('Completing task'))
 
-    expect(screen.queryByRole('status')).toBeNull()
-    expect(screen.queryByRole('alert')).toBeNull()
+    expect(page.getByRole('status').query()).toBeNull()
+    expect(page.getByRole('alert').query()).toBeNull()
   })
 
-  it('shows a failed operation with its label and message', () => {
-    render(<MobileOperationsPills />)
+  it('shows a failed operation with its label and message', async () => {
+    await render(<MobileOperationsPills />)
     const handle = operate(() => startOperation('Completing task'))
     act(() => handle.fail('The note is busy.'))
 
-    const pill = screen.getByRole('alert')
-    expect(pill.textContent).toContain('Completing task')
-    expect(pill.textContent).toContain('The note is busy.')
+    const pill = page.getByRole('alert')
+    await expect.element(pill).toHaveTextContent('Completing task')
+    await expect.element(pill).toHaveTextContent('The note is busy.')
   })
 
-  it('shows a warning as a status pill', () => {
-    render(<MobileOperationsPills />)
+  it('shows a warning as a status pill', async () => {
+    await render(<MobileOperationsPills />)
     const handle = operate(() => startOperation('Importing notes'))
     act(() => handle.warn('2 files skipped.'))
 
-    expect(screen.getByRole('status').textContent).toContain('2 files skipped.')
+    await expect.element(page.getByRole('status')).toHaveTextContent('2 files skipped.')
   })
 
-  it('dismisses a pill on tap', () => {
-    render(<MobileOperationsPills />)
+  it('dismisses a pill on tap', async () => {
+    await render(<MobileOperationsPills />)
     const handle = operate(() => startOperation('Completing task'))
     act(() => handle.fail('The note is busy.'))
 
-    fireEvent.click(screen.getByRole('alert'))
+    await page.getByRole('alert').click()
 
-    expect(screen.queryByRole('alert')).toBeNull()
+    await expect.element(page.getByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('expires with the store’s linger window', () => {
-    render(<MobileOperationsPills />)
+  it('expires with the store’s linger window', async () => {
+    await render(<MobileOperationsPills />)
     const handle = operate(() => startOperation('Completing task'))
     act(() => handle.fail('The note is busy.'))
 
     act(() => vi.runAllTimers())
 
-    expect(screen.queryByRole('alert')).toBeNull()
+    expect(page.getByRole('alert').query()).toBeNull()
   })
 })
 
 describe('MobileStatusLayer', () => {
-  it('yields to the software keyboard', () => {
-    render(<MobileStatusLayer />)
+  it('yields to the software keyboard', async () => {
+    await render(<MobileStatusLayer />)
     const handle = operate(() => startOperation('Completing task'))
     act(() => handle.fail('The note is busy.'))
-    expect(screen.getByRole('alert')).toBeTruthy()
+    await expect.element(page.getByRole('alert')).toBeVisible()
 
     act(() => publishKeyboardHeight(300))
 
-    expect(screen.queryByRole('alert')).toBeNull()
+    expect(page.getByRole('alert').query()).toBeNull()
   })
 })
