@@ -207,10 +207,12 @@ impl DiagnosticsState {
     }
 
     #[cfg(any(target_os = "ios", test))]
-    fn web_content_terminated(&self, label: &str, now_ms: u64) {
+    fn web_content_terminated(&self, label: &str, now_ms: u64) -> bool {
         let window = classify_window(label);
         let mut store = self.lock_store();
         prune_terminations(&mut store, now_ms);
+        let recovery_was_already_active =
+            window == DiagnosticWindow::Main && store.safe_mode_reason.is_some();
 
         let recent_count = if window == DiagnosticWindow::Main {
             store.termination_timestamps_ms.push(now_ms);
@@ -240,6 +242,7 @@ impl DiagnosticsState {
             );
         }
         self.persist_best_effort(&store);
+        !recovery_was_already_active
     }
 
     #[cfg(target_os = "ios")]
@@ -480,7 +483,10 @@ pub fn diagnostics_snapshot<R: Runtime>(
 #[cfg(target_os = "ios")]
 pub fn record_web_content_termination<R: Runtime>(webview: &tauri::Webview<R>) {
     let state = webview.app_handle().state::<DiagnosticsState>();
-    state.web_content_terminated(webview.label(), now_ms());
+    let should_reload = state.web_content_terminated(webview.label(), now_ms());
+    if !should_reload {
+        return;
+    }
     let reload = webview.reload();
     state.web_content_reloaded(reload.is_ok(), now_ms());
     if let Err(err) = reload {
@@ -500,11 +506,11 @@ mod tests {
     }
 
     #[test]
-    fn third_recent_main_termination_enters_safe_mode() {
+    fn third_recent_main_termination_enters_safe_mode_and_requests_recovery_reload() {
         let (_dir, state) = state();
-        state.web_content_terminated("main", 1_000);
-        state.web_content_terminated("main", 2_000);
-        state.web_content_terminated("main", 3_000);
+        assert!(state.web_content_terminated("main", 1_000));
+        assert!(state.web_content_terminated("main", 2_000));
+        assert!(state.web_content_terminated("main", 3_000));
 
         let snapshot = state.snapshot("1.2.3", Some("42"), 3_000);
         assert!(snapshot.safe_mode);
@@ -517,6 +523,17 @@ mod tests {
             .events
             .iter()
             .any(|event| matches!(event, DiagnosticEvent::SafeModeEntered { .. })));
+    }
+
+    #[test]
+    fn main_termination_does_not_reload_when_recovery_is_already_active() {
+        let (_dir, state) = state();
+        for now in [1_000, 2_000, 3_000] {
+            assert!(state.web_content_terminated("main", now));
+        }
+
+        assert!(!state.web_content_terminated("main", 4_000));
+        assert!(state.web_content_terminated("note-secondary", 5_000));
     }
 
     #[test]
