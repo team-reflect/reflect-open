@@ -90,14 +90,29 @@ export type TranscriptionConfig = AiProviderConfig & { provider: TranscriptionPr
  */
 export function pickTranscriptionConfig(state: AiProvidersState): TranscriptionConfig | null {
   for (const provider of TRANSCRIPTION_PROVIDERS) {
-    const candidates = state.providers.filter(
-      (candidate): candidate is TranscriptionConfig => candidate.provider === provider,
-    )
-    if (candidates.length > 0) {
-      return (
-        candidates.find((candidate) => candidate.id === state.defaultProviderId) ?? candidates[0]!
-      )
+    const picked = pickProviderTranscriptionConfig(state, provider)
+    if (picked !== null) {
+      return picked
     }
   }
   return null
+}
+
+/**
+ * The configured entry for one *specific* transcription provider (the app
+ * default wins over the first), or `null` when none is configured. The
+ * reconcile pass uses this to route a recording too large for the preferred
+ * provider to a Google entry, whose Files API takes meeting-length audio.
+ */
+export function pickProviderTranscriptionConfig(
+  state: AiProvidersState,
+  provider: TranscriptionProvider,
+): TranscriptionConfig | null {
+  const candidates = state.providers.filter(
+    (candidate): candidate is TranscriptionConfig => candidate.provider === provider,
+  )
+  if (candidates.length === 0) {
+    return null
+  }
+  return candidates.find((candidate) => candidate.id === state.defaultProviderId) ?? candidates[0]!
 }

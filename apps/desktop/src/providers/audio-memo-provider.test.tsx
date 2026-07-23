@@ -1,13 +1,14 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { useState, type ReactElement, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type {
-  AiProvidersState,
-  AudioMemoIdentity,
-  CaptureAudioMemoInput,
-  CaptureAudioMemoOutcome,
-  GraphInfo,
-  Settings,
+import {
+  AUDIO_MEMO_MAX_DURATION_MS,
+  type AiProvidersState,
+  type AudioMemoIdentity,
+  type CaptureAudioMemoInput,
+  type CaptureAudioMemoOutcome,
+  type GraphInfo,
+  type Settings,
 } from '@reflect/core'
 
 const captureAudioMemo = vi.hoisted(() =>
@@ -305,7 +306,7 @@ describe('AudioMemoProvider', () => {
 
   it('arms the recorder cap and saves when it fires', async () => {
     const { result } = renderHook(() => useAudioMemo(), { wrapper })
-    expect(recorderControls.options?.maxDurationMs).toBe(10 * 60_000)
+    expect(recorderControls.options?.maxDurationMs).toBe(AUDIO_MEMO_MAX_DURATION_MS)
 
     await act(async () => {
       result.current.toggle()

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react'
+import { audioMemoCapWarning } from '@reflect/core'
 import { Square, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
+import { formatRecordingElapsed } from '@/lib/recording-time'
 import { useMobileAudioMemo } from '@/mobile/audio-memo-provider'
 import { RecordingLevelWaveform } from '@/mobile/recording-level-waveform'
 import { useRouter } from '@/routing/router'
@@ -79,6 +81,7 @@ function KeySetupControls({ memo }: LiveRecordingControlsProps): ReactElement {
 function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactElement {
   const [discardArmed, setDiscardArmed] = useState(false)
   const discardResetTimer = useRef<number | null>(null)
+  const capWarning = audioMemoCapWarning(memo.elapsedMs)
 
   const clearDiscardReset = (): void => {
     if (discardResetTimer.current !== null) {
@@ -119,7 +122,10 @@ function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactEleme
           <p className="text-sm text-text-muted">Waiting for the microphone…</p>
         )}
       </div>
-      <span className="text-lg font-medium tabular-nums">{formatElapsed(memo.elapsedMs)}</span>
+      <div className="flex flex-col items-center">
+        <span className="text-lg font-medium tabular-nums">{formatRecordingElapsed(memo.elapsedMs)}</span>
+        {capWarning !== null ? <span className="text-xs text-text-muted">{capWarning}</span> : null}
+      </div>
       <div className="flex w-full flex-col items-center gap-3">
         <Button
           variant="destructive"
@@ -144,11 +150,4 @@ function LiveRecordingControls({ memo }: LiveRecordingControlsProps): ReactEleme
       </div>
     </div>
   )
-}
-
-function formatElapsed(elapsedMs: number): string {
-  const totalSeconds = Math.floor(elapsedMs / 1000)
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}:${String(seconds).padStart(2, '0')}`
 }

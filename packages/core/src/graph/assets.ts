@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { echoLocalWrite } from '../indexing/local-write-echo'
 import { call, callBinary } from '../ipc/invoke'
+import { blobChunks } from '../lib/blob'
 
 /** Commands that return `()` from Rust serialize as `null` over IPC. */
 const voidSchema = z.null()
@@ -14,12 +15,6 @@ const CHUNK_BYTES = 4 * 1024 * 1024
 
 /** The header carrying the upload id on raw-body append calls. */
 const UPLOAD_ID_HEADER = 'x-upload-id'
-
-async function* chunksOf(contents: Blob): AsyncGenerator<Uint8Array> {
-  for (let offset = 0; offset < contents.size; offset += CHUNK_BYTES) {
-    yield new Uint8Array(await contents.slice(offset, offset + CHUNK_BYTES).arrayBuffer())
-  }
-}
 
 /**
  * Stream a pasted/dropped file's bytes into the graph's `assets/` folder as
@@ -37,8 +32,13 @@ export async function createAsset(
 ): Promise<string> {
   const id = await call('asset_upload_begin', { generation }, z.string())
   try {
-    for await (const chunk of chunksOf(contents)) {
-      await callBinary('asset_upload_append', chunk, { [UPLOAD_ID_HEADER]: id }, voidSchema)
+    for (const chunk of blobChunks(contents, CHUNK_BYTES)) {
+      await callBinary(
+        'asset_upload_append',
+        new Uint8Array(await chunk.arrayBuffer()),
+        { [UPLOAD_ID_HEADER]: id },
+        voidSchema,
+      )
     }
     const path = await call('asset_upload_commit', { id, desiredName, generation }, z.string())
     echoLocalWrite({ path, kind: 'upsert', modifiedMs: Date.now() })
@@ -46,6 +46,38 @@ export async function createAsset(
   } catch (error) {
     // Best-effort cleanup of the staged temp file; the original error is the
     // one worth surfacing.
+    await call('asset_upload_abort', { id }, voidSchema).catch(() => {})
+    throw error
+  }
+}
+
+/**
+ * Stream a blob's bytes to an **exact graph-relative path** — the audio-memo
+ * intake, where the path is the memo's identity and collision renaming would
+ * corrupt it. Same transport as {@link createAsset}: raw binary IPC bodies in
+ * {@link CHUNK_BYTES} chunks staged under `.reflect/tmp/`, so neither webview
+ * IPC nor the file watcher ever sees the whole file in flight. Requires a
+ * binary-capable bridge (see `hasBinaryIpc`); hosts without one use the
+ * base64 `writeAsset` fallback instead.
+ */
+export async function writeAssetStreamed(
+  path: string,
+  contents: Blob,
+  generation: number,
+): Promise<void> {
+  const id = await call('asset_upload_begin', { generation }, z.string())
+  try {
+    for (const chunk of blobChunks(contents, CHUNK_BYTES)) {
+      await callBinary(
+        'asset_upload_append',
+        new Uint8Array(await chunk.arrayBuffer()),
+        { [UPLOAD_ID_HEADER]: id },
+        voidSchema,
+      )
+    }
+    await call('asset_upload_commit_path', { id, path, generation }, voidSchema)
+    echoLocalWrite({ path, kind: 'upsert', modifiedMs: Date.now() })
+  } catch (error) {
     await call('asset_upload_abort', { id }, voidSchema).catch(() => {})
     throw error
   }

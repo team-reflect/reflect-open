@@ -17,11 +17,21 @@ touches a Reflect server, because there isn't one.
 - **Entry point.** The microphone control in the sidebar, with a global
   shortcut (`mod+\`). Lifecycle lives in
   `apps/desktop/src/providers/audio-memo-provider.tsx`.
-- **Capture is durable first.** The recording (max 10 minutes) is saved
-  immediately into the graph's `audio-memos/` folder. Transcription is a
-  separate, retryable step — a failed or missing transcription never loses
-  the audio.
-- **Transcription.** Runs against the user's own OpenAI or Gemini key
+- **Capture is durable first.** One recording runs up to a meeting-length
+  cap (four hours; the recording UI counts down only when the auto-stop is
+  near) and is saved immediately into the graph's `audio-memos/` folder —
+  streamed over raw binary IPC in chunks, so the webview bridge never carries
+  the whole file as base64 JSON. Transcription is a separate, retryable step
+  — a failed or missing transcription never loses the audio.
+- **Transcription.** The recording is **never split client-side**: it's a
+  compressed container (fMP4/WebM), and a byte-slice from its middle is not
+  decodable audio. Size policy is per provider instead (`transcribe.ts`):
+  OpenAI has a hard 25 MB request ceiling; Gemini takes small recordings
+  inline and meeting-length ones through its Files API (resumable chunked
+  upload under the user's own key, deleted after transcribing). A memo too
+  big for the preferred provider routes to a configured Google entry; with
+  none, it stays pending — never tombstoned — and a surfaced hint says to add
+  a Gemini model. Runs against the user's own OpenAI or Gemini key
   (chosen by `pickTranscriptionConfig` in `@reflect/core`; keys in the OS
   keychain via `apps/desktop/src-tauri/src/secrets.rs`). By default, the fresh
   transcript receives one best-effort small-model pass that adds punctuation,

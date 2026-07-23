@@ -1,7 +1,9 @@
 import { errorMessage, isAppError, toAppError, type AppError } from '../errors'
 import {
+  pickProviderTranscriptionConfig,
   pickTranscriptionConfig,
   type AiProvidersState,
+  type TranscriptionConfig,
 } from '../ai/provider-config'
 import { aiKeySecretName } from '../ai/secrets'
 import {
@@ -10,16 +12,23 @@ import {
   type AudioMemoEnrichmentCredentials,
 } from '../ai/audio-memo-title'
 import { buildAudioMemoTranscript } from '../ai/audio-memo-transcript'
+import { AUDIO_EXTENSION_BY_MIME, baseMimeType } from '../ai/audio-mime'
+import { routeTranscription } from '../ai/transcription-routing'
+import { base64ToBytes, bytesToBase64 } from '../lib/base64'
 import {
-  AUDIO_EXTENSION_BY_MIME,
-  base64ToBytes,
-  baseMimeType,
-  bytesToBase64,
-} from '../ai/transcribe'
-import { listDir, listFiles, readAsset, readNote, writeAsset, writeNote } from '../graph/commands'
+  listDir,
+  listFiles,
+  readAsset,
+  readAssetBinary,
+  readNote,
+  writeAsset,
+  writeNote,
+} from '../graph/commands'
+import { writeAssetStreamed } from '../graph/assets'
 import { AUDIO_MEMOS_DIR, audioMemoPath, dailyPath, notePath } from '../graph/paths'
 import { appendUnderBacklinkedHeading, wikiLinkSafe } from '../markdown/edit'
 import { getSecret } from '../secrets/keychain'
+import { hasBinaryIpc } from '../ipc/bridge'
 import { ensureBacklinkTarget } from './backlink-target'
 
 /**
@@ -42,9 +51,12 @@ import { ensureBacklinkTarget } from './backlink-target'
  *    transcript was dropped. A
  *    failed pass (offline, bad key) leaves the memo pending; the next
  *    trigger retries. Nothing is ever lost to a network error. A recording
- *    the provider *refuses* (oversized, unsupported container) is tombstoned
- *    with a failure note instead — retrying the same bytes can't help, and
- *    stopping would wedge every memo behind it.
+ *    the provider *refuses* (an unsupported or corrupt container) is
+ *    tombstoned with a failure note instead — retrying the same bytes can't
+ *    help, and stopping would wedge every memo behind it. A recording too
+ *    *large* for every configured provider is different: it's skipped, not
+ *    tombstoned, because adding a Google entry (Files API) later makes it
+ *    transcribable.
  *
  * Deleting a transcription note does **not** resurrect it: the daily-note
  * backlink doubles as the tombstone (a memo is only pending while *neither*
@@ -182,13 +194,22 @@ export type CaptureAudioMemoOutcome =
  * Persist one recording into the graph — the durable step, no network. The
  * transcription happens later, in {@link reconcileAudioMemos}.
  */
+async function writeAudioMemoAsset(path: string, audio: Blob, generation: number): Promise<void> {
+  if (hasBinaryIpc()) {
+    await writeAssetStreamed(path, audio, generation)
+    return
+  }
+  // Browser dev's in-memory bridge has no binary transport; recordings there
+  // are short enough for the base64 JSON route.
+  await writeAsset(path, bytesToBase64(new Uint8Array(await audio.arrayBuffer())), generation)
+}
+
 export async function captureAudioMemo(
   input: CaptureAudioMemoInput,
 ): Promise<CaptureAudioMemoOutcome> {
   const memo = audioMemoIdentity(input.recordedAt, input.mimeType)
   try {
-    const encoded = bytesToBase64(new Uint8Array(await input.audio.arrayBuffer()))
-    await writeAsset(memo.audioPath, encoded, input.generation)
+    await writeAudioMemoAsset(memo.audioPath, input.audio, input.generation)
   } catch (cause) {
     return { ok: false, message: errorMessage(cause) }
   }
@@ -216,6 +237,18 @@ function hasBacklink(source: string, memo: AudioMemoIdentity): boolean {
   return source.includes(`[[${memo.base}`)
 }
 
+/** A memo awaiting transcription, with the size its routing decision needs. */
+export interface PendingAudioMemo {
+  /** Everything derivable from the recording's basename. */
+  memo: AudioMemoIdentity
+  /**
+   * Recording size on disk, from the directory listing — provider routing
+   * (see `ai/transcription-routing`) decides on it *before* any bytes are
+   * read, so an unroutable memo costs nothing per pass.
+   */
+  sizeBytes: number
+}
+
 /**
  * Memos awaiting transcription, oldest first: a recording under
  * `audio-memos/` with no same-named transcription note and no daily-note
@@ -223,7 +256,7 @@ function hasBacklink(source: string, memo: AudioMemoIdentity): boolean {
  * is pinned to `generation` — recordings, notes, and daily-note tombstones
  * must come from one graph session, never a mix across a switch.
  */
-export async function listPendingAudioMemos(generation: number): Promise<AudioMemoIdentity[]> {
+export async function listPendingAudioMemos(generation: number): Promise<PendingAudioMemo[]> {
   const [recordings, notes] = await Promise.all([
     listDir(AUDIO_MEMOS_DIR, generation),
     listFiles(generation),
@@ -234,14 +267,14 @@ export async function listPendingAudioMemos(generation: number): Promise<AudioMe
     // aren't local — reading it would abort the pass. It transcribes on a
     // later pass, once downloaded (Plan 21).
     .filter((file) => file.placeholder !== true)
-    .map((file) => audioMemoFromPath(file.path))
-    .filter((memo): memo is AudioMemoIdentity => memo !== null)
-    .filter((memo) => !existingNotes.has(memo.notePath))
-    .sort((first, second) => first.base.localeCompare(second.base))
-  const pending: AudioMemoIdentity[] = []
-  for (const memo of candidates) {
-    if (!hasBacklink(await dailyNoteSource(memo.date, generation), memo)) {
-      pending.push(memo)
+    .map((file) => ({ memo: audioMemoFromPath(file.path), sizeBytes: file.size }))
+    .filter((entry): entry is PendingAudioMemo => entry.memo !== null)
+    .filter(({ memo }) => !existingNotes.has(memo.notePath))
+    .sort((first, second) => first.memo.base.localeCompare(second.memo.base))
+  const pending: PendingAudioMemo[] = []
+  for (const entry of candidates) {
+    if (!hasBacklink(await dailyNoteSource(entry.memo.date, generation), entry.memo)) {
+      pending.push(entry)
     }
   }
   return pending
@@ -282,11 +315,13 @@ async function ensureDailyBacklink(
 /**
  * Why a reconcile pass ended with memos still pending. `config` = no capable
  * provider/key (self-heals when settings change); `stale` = the caller's
- * abort gate fired; anything else is the failing step's error kind
- * (`network` while offline is the expected, silent case).
+ * abort gate fired; `oversize` = a recording exceeds every configured
+ * provider's byte budget (surfaced once — the fix is adding a Google entry,
+ * whose Files API takes meeting-length audio); anything else is the failing
+ * step's error kind (`network` while offline is the expected, silent case).
  */
 export interface ReconcileStop {
-  reason: 'config' | 'stale' | AppError['kind']
+  reason: 'config' | 'stale' | 'oversize' | AppError['kind']
   message: string
 }
 
@@ -295,8 +330,10 @@ export interface ReconcileStop {
  * background controller should swallow rather than surface to the user:
  * `network` (offline — retries on the next trigger), `config` (no provider/key
  * yet — the work waits), or `stale` (a graph switch tore the pass down). Any
- * other reason is an unexpected failure worth surfacing or logging. Shared by
- * every background reconcile loop (capture, transcription, asset descriptions).
+ * other reason is worth surfacing or logging — including `oversize`, which
+ * needs the user to act (add a Google entry) before the memo can transcribe.
+ * Shared by every background reconcile loop (capture, transcription, asset
+ * descriptions).
  */
 export function isSilentStop(stopped: ReconcileStop): boolean {
   return stopped.reason === 'network' || stopped.reason === 'config' || stopped.reason === 'stale'
@@ -324,6 +361,12 @@ export interface ReconcileAudioMemosOutcome {
   transcribed: number
   /** Memos whose recording the provider refused — tombstoned with a failure note. */
   rejected: number
+  /**
+   * Memos left pending because no configured provider's byte budget fits the
+   * recording. Not a tombstone: the memo transcribes on a later pass once a
+   * capable (Google) entry is configured.
+   */
+  skipped: number
   /** Why memos remain pending, or `null` when the pass drained. */
   stopped: ReconcileStop | null
 }
@@ -342,7 +385,7 @@ export interface ReconcileAudioMemosOutcome {
 export async function reconcileAudioMemos(
   input: ReconcileAudioMemosInput,
 ): Promise<ReconcileAudioMemosOutcome> {
-  let pending: AudioMemoIdentity[]
+  let pending: PendingAudioMemo[]
   try {
     pending = await listPendingAudioMemos(input.generation)
   } catch (cause) {
@@ -350,12 +393,13 @@ export async function reconcileAudioMemos(
       pending: 0,
       transcribed: 0,
       rejected: 0,
+      skipped: 0,
       stopped: { reason: toAppError(cause).kind, message: errorMessage(cause) },
     }
   }
   input.onPending?.(pending.length)
   if (pending.length === 0) {
-    return { pending: 0, transcribed: 0, rejected: 0, stopped: null }
+    return { pending: 0, transcribed: 0, rejected: 0, skipped: 0, stopped: null }
   }
 
   // Re-picked on every pass (not once at record time): a pass after the user
@@ -366,6 +410,7 @@ export async function reconcileAudioMemos(
       pending: pending.length,
       transcribed: 0,
       rejected: 0,
+      skipped: 0,
       stopped: { reason: 'config', message: 'No OpenAI or Gemini model is configured.' },
     }
   }
@@ -375,6 +420,7 @@ export async function reconcileAudioMemos(
       pending: pending.length,
       transcribed: 0,
       rejected: 0,
+      skipped: 0,
       stopped: {
         reason: 'config',
         message: `The API key for the configured ${config.provider} model is missing from the keychain.`,
@@ -396,8 +442,39 @@ export async function reconcileAudioMemos(
         ? { config: fallbackEnrichmentConfig, apiKey }
         : null
 
+  // Long-recording routing (`ai/transcription-routing`): a memo the picked
+  // provider can't fit routes to a configured Google entry; with none it's
+  // *skipped* (left pending), never tombstoned — adding a Google key later
+  // transcribes it. Keys are fetched lazily and memoized per entry, so a
+  // pass with no oversized memos never touches the keychain twice.
+  const googleConfig = pickProviderTranscriptionConfig(input.providers, 'google')
+  const apiKeys = new Map<string, string | null>([[config.id, apiKey]])
+  let skippedForMissingGoogleKey = false
+  /** Route a recording of `bytes` with its entry's key; `null` = skip the memo. */
+  const resolveTarget = async (
+    bytes: number,
+  ): Promise<{ config: TranscriptionConfig; apiKey: string } | null> => {
+    const routed = routeTranscription(input.providers, config, bytes)
+    if (routed === null) {
+      return null
+    }
+    if (!apiKeys.has(routed.id)) {
+      apiKeys.set(routed.id, await getSecret(aiKeySecretName(routed.id)).catch(() => null))
+    }
+    const routedKey = apiKeys.get(routed.id) ?? null
+    if (routedKey === null) {
+      // Only a fallback entry can land here (the preferred key is pre-seeded
+      // and non-null) — remember why we skipped, so the surfaced hint names
+      // the missing key rather than blaming the recording's size.
+      skippedForMissingGoogleKey = true
+      return null
+    }
+    return { config: routed, apiKey: routedKey }
+  }
+
   let transcribed = 0
   let rejected = 0
+  let skipped = 0
   let memosNoteTitle: string | null = null
   // The gate is consulted again after every slow await (the asset read, the
   // provider call), not just per memo: a graph switch mid-transcription must
@@ -409,26 +486,44 @@ export async function reconcileAudioMemos(
     pending: pending.length,
     transcribed,
     rejected,
+    skipped,
     stopped: { reason: 'stale', message: 'the graph session ended mid-pass' },
   })
-  for (const memo of pending) {
+  for (const { memo, sizeBytes } of pending) {
     if (stale()) {
       return stalled()
     }
     try {
+      let target = await resolveTarget(sizeBytes)
+      if (target === null) {
+        skipped += 1
+        continue
+      }
+      if (stale()) return stalled()
       memosNoteTitle ??= await ensureBacklinkTarget(MEMOS_NOTE_TITLE, input.generation)
       if (stale()) return stalled()
-      const audio = new Blob([base64ToBytes(await readAsset(memo.audioPath, input.generation))], {
-        type: memo.mimeType,
-      })
+      const bytes = hasBinaryIpc()
+        ? await readAssetBinary(memo.audioPath, input.generation)
+        : base64ToBytes(await readAsset(memo.audioPath, input.generation))
+      const audio = new Blob([bytes], { type: memo.mimeType })
+      if (audio.size > sizeBytes) {
+        // The listing raced a rewrite and undersold the recording. Re-route
+        // on what was actually read: an oversize file must never reach a
+        // provider that will refuse it, because refusal tombstones.
+        target = await resolveTarget(audio.size)
+        if (target === null) {
+          skipped += 1
+          continue
+        }
+      }
       if (stale()) {
         return stalled()
       }
       const note = await buildAudioMemoTranscript({
         audio,
         mimeType: memo.mimeType,
-        config,
-        apiKey,
+        config: target.config,
+        apiKey: target.apiKey,
         enrichmentCredentials,
         formatTranscript: input.formatTranscript,
         fallbackTitle: memo.title,
@@ -446,13 +541,48 @@ export async function reconcileAudioMemos(
         transcribed += 1
       }
     } catch (cause) {
+      // A graph switch mid-flight surfaces as whatever the in-flight call
+      // threw (usually `network`, from the gated send) — but the truth is
+      // the session ended. Classify by the gate, not the symptom.
+      if (stale()) {
+        return stalled()
+      }
       return {
         pending: pending.length,
         transcribed,
         rejected,
+        skipped,
         stopped: { reason: toAppError(cause).kind, message: errorMessage(cause) },
       }
     }
   }
-  return { pending: pending.length, transcribed, rejected, stopped: null }
+  return {
+    pending: pending.length,
+    transcribed,
+    rejected,
+    skipped,
+    stopped:
+      skipped === 0
+        ? null
+        : {
+            reason: 'oversize',
+            message: oversizeStopMessage(googleConfig !== null, skippedForMissingGoogleKey),
+          },
+  }
+}
+
+/**
+ * The surfaced hint when memos were skipped as unroutable — specific about
+ * the actual remedy: add a Google entry, fix its missing key, or (the
+ * practically unreachable case) accept that no provider takes a file this
+ * large.
+ */
+function oversizeStopMessage(hasGoogleEntry: boolean, missingGoogleKey: boolean): string {
+  if (!hasGoogleEntry) {
+    return 'A recording is too long for OpenAI transcription. Add a Google Gemini model in Settings to transcribe long memos.'
+  }
+  if (missingGoogleKey) {
+    return 'A recording needs the configured Google Gemini model to transcribe, but its API key is missing from the keychain.'
+  }
+  return 'A recording is too large for the configured transcription providers.'
 }

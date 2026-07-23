@@ -1,17 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
+  GEMINI_INLINE_MAX_BYTES,
   GOOGLE_TRANSCRIPTION_FALLBACK_MODEL,
   GOOGLE_TRANSCRIPTION_MODEL,
   OPENAI_TRANSCRIPTION_FALLBACK_MODEL,
   OPENAI_TRANSCRIPTION_MODEL,
-  bytesToBase64,
-  isTranscriptionRejected,
   transcribeAudio,
   type TranscriptionRequest,
 } from './transcribe'
+import { isTranscriptionRejected } from './transcribe-http'
 
 interface RecordedCall {
   url: string
+  method: string
   headers: Record<string, string>
   body: RequestInit['body']
 }
@@ -23,6 +24,7 @@ function recordingFetch(
   return async (input, init) => {
     const call: RecordedCall = {
       url: String(input),
+      method: init?.method ?? 'GET',
       headers: (init?.headers ?? {}) as Record<string, string>,
       body: init?.body ?? null,
     }
@@ -90,6 +92,20 @@ describe('transcribeAudio (openai)', () => {
     expect((calls[1]!.body as FormData).get('model')).toBe(OPENAI_TRANSCRIPTION_FALLBACK_MODEL)
   })
 
+  it('rescues a primary-model refusal through whisper-1 — its duration ceiling is higher', async () => {
+    const calls: RecordedCall[] = []
+    const fetchFn = recordingFetch(calls, (call) =>
+      (call.body as FormData).get('model') === OPENAI_TRANSCRIPTION_FALLBACK_MODEL
+        ? jsonResponse(200, { text: 'long meeting transcript' })
+        : jsonResponse(400, { error: { message: 'Audio duration exceeds the limit.', code: null } }),
+    )
+
+    const text = await transcribeAudio(request({ fetchFn }))
+
+    expect(text).toBe('long meeting transcript')
+    expect(calls).toHaveLength(2)
+  })
+
   it('marks a refused recording as a rejection — retrying the same bytes cannot help', async () => {
     const calls: RecordedCall[] = []
     const fetchFn = recordingFetch(calls, () =>
@@ -102,7 +118,19 @@ describe('transcribeAudio (openai)', () => {
 
     expect(isTranscriptionRejected(failure)).toBe(true)
     expect(failure).toMatchObject({ message: expect.stringContaining('Invalid file format.') })
-    expect(calls).toHaveLength(1)
+    // The whisper-1 rescue attempt ran (and was refused) before tombstoning.
+    expect(calls).toHaveLength(2)
+    expect((calls[1]!.body as FormData).get('model')).toBe(OPENAI_TRANSCRIPTION_FALLBACK_MODEL)
+  })
+
+  it('never issues a provider call after the stale gate fires', async () => {
+    const calls: RecordedCall[] = []
+    const fetchFn = recordingFetch(calls, () => jsonResponse(200, { text: 'never' }))
+
+    await expect(
+      transcribeAudio(request({ fetchFn, isStale: () => true })),
+    ).rejects.toMatchObject({ kind: 'network', message: expect.stringContaining('graph session') })
+    expect(calls).toHaveLength(0)
   })
 
   it('an oversized payload is a rejection; a rate limit stays a retryable network error', async () => {
@@ -250,6 +278,109 @@ describe('transcribeAudio (google)', () => {
     expect(isTranscriptionRejected(failure)).toBe(true)
   })
 
+  const UPLOAD_URL = 'https://upload.example/session-1'
+  const FILE_RESOURCE = {
+    name: 'files/memo-1',
+    uri: 'https://generativelanguage.googleapis.com/v1beta/files/memo-1',
+  }
+
+  /** A recording just over the inline budget — uploads as two chunks. */
+  function largeAudio(): Blob {
+    return new Blob([new Uint8Array(GEMINI_INLINE_MAX_BYTES + 1)], { type: 'audio/mp4' })
+  }
+
+  /**
+   * Scripted fetch for the Files API flow, routed by protocol step (session
+   * start → upload chunks → state poll → generateContent → delete) so each
+   * test overrides only the step under test.
+   */
+  function filesApiFetch(
+    calls: RecordedCall[],
+    overrides: {
+      finalizeState?: string
+      chunk?: (call: RecordedCall) => Response | null
+    } = {},
+  ): typeof fetch {
+    return recordingFetch(calls, (call, index) => {
+      if (index === 0) {
+        return new Response('{}', { status: 200, headers: { 'x-goog-upload-url': UPLOAD_URL } })
+      }
+      if (call.url === UPLOAD_URL) {
+        const overridden = overrides.chunk?.(call) ?? null
+        if (overridden !== null) {
+          return overridden
+        }
+        return call.headers['X-Goog-Upload-Command'] === 'upload, finalize'
+          ? jsonResponse(200, {
+              file: { ...FILE_RESOURCE, state: overrides.finalizeState ?? 'PROCESSING' },
+            })
+          : new Response('{}', { status: 200 })
+      }
+      if (call.url.endsWith('/v1beta/files/memo-1') && call.method === 'GET') {
+        return jsonResponse(200, { ...FILE_RESOURCE, state: 'ACTIVE' })
+      }
+      if (call.method === 'DELETE') {
+        return new Response('{}', { status: 200 })
+      }
+      return geminiResponse('meeting transcript')
+    })
+  }
+
+  it('routes a recording over the inline budget through the Files API and deletes the file', async () => {
+    const calls: RecordedCall[] = []
+    const fetchFn = filesApiFetch(calls)
+    const audio = largeAudio()
+
+    const text = await transcribeAudio(request({ provider: 'google', fetchFn, audio }))
+
+    expect(text).toBe('meeting transcript')
+    expect(calls.map((call) => call.method)).toEqual(['POST', 'POST', 'POST', 'GET', 'POST', 'DELETE'])
+    expect(calls[0]!.url).toBe('https://generativelanguage.googleapis.com/upload/v1beta/files')
+    expect(calls[0]!.headers['X-Goog-Upload-Command']).toBe('start')
+    expect(calls[0]!.headers['X-Goog-Upload-Header-Content-Length']).toBe(String(audio.size))
+    expect(calls[1]!.headers['X-Goog-Upload-Offset']).toBe('0')
+    expect(calls[1]!.headers['X-Goog-Upload-Command']).toBe('upload')
+    expect(calls[2]!.headers['X-Goog-Upload-Offset']).toBe(String(8 * 1024 * 1024))
+    expect(calls[2]!.headers['X-Goog-Upload-Command']).toBe('upload, finalize')
+    const generate = JSON.parse(String(calls[4]!.body)) as {
+      contents: { parts: { file_data?: { mime_type: string; file_uri: string } }[] }[]
+    }
+    expect(generate.contents[0]!.parts[1]!.file_data).toEqual({
+      mime_type: 'audio/mp4',
+      file_uri: FILE_RESOURCE.uri,
+    })
+    expect(calls[5]!.url).toBe('https://generativelanguage.googleapis.com/v1beta/files/memo-1')
+  })
+
+  it('tombstones a recording the Files API cannot process — the same bytes would fail again', async () => {
+    const calls: RecordedCall[] = []
+    const fetchFn = filesApiFetch(calls, { finalizeState: 'FAILED' })
+
+    const failure: unknown = await transcribeAudio(
+      request({ provider: 'google', fetchFn, audio: largeAudio() }),
+    ).catch((cause: unknown) => cause)
+
+    expect(isTranscriptionRejected(failure)).toBe(true)
+    // Never generateContent on a dead file.
+    expect(calls.filter((call) => call.url.includes(':generateContent'))).toHaveLength(0)
+  })
+
+  it('a failed upload chunk is a retryable network error, not a rejection', async () => {
+    const calls: RecordedCall[] = []
+    const fetchFn = filesApiFetch(calls, {
+      chunk: () => jsonResponse(500, { error: { message: 'backend unavailable' } }),
+    })
+
+    const failure: unknown = await transcribeAudio(
+      request({ provider: 'google', fetchFn, audio: largeAudio() }),
+    ).catch((cause: unknown) => cause)
+
+    expect(isTranscriptionRejected(failure)).toBe(false)
+    expect(failure).toMatchObject({ kind: 'network' })
+    // The flow stops at the first failed chunk: start + that chunk, no more.
+    expect(calls).toHaveLength(2)
+  })
+
   it('returns an empty transcript when no candidates come back', async () => {
     const fetchFn = recordingFetch([], () => jsonResponse(200, {}))
 
@@ -264,16 +395,5 @@ describe('transcribeAudio (google)', () => {
     await expect(transcribeAudio(request({ provider: 'google', fetchFn }))).rejects.toMatchObject({
       kind: 'auth',
     })
-  })
-})
-
-describe('bytesToBase64', () => {
-  it('matches btoa on small payloads', () => {
-    expect(bytesToBase64(new TextEncoder().encode('abc'))).toBe(btoa('abc'))
-  })
-
-  it('survives payloads beyond one chunk', () => {
-    const bytes = new Uint8Array(0x8000 * 2 + 7).fill(65)
-    expect(bytesToBase64(bytes)).toBe(btoa('A'.repeat(bytes.length)))
   })
 })

@@ -377,6 +377,20 @@ pub fn asset_write(
     Ok(())
 }
 
+/// Read a binary asset's bytes as a **raw IPC response** — no base64, no
+/// JSON. Long audio memos read back for transcription would otherwise cross
+/// the bridge ~1.33× inflated inside one giant JSON string. Pinned to
+/// `generation` for the same reason as [`asset_read`].
+#[tauri::command]
+pub fn asset_read_binary(
+    path: String,
+    generation: u64,
+    state: State<GraphState>,
+) -> AppResult<tauri::ipc::Response> {
+    let root = root_for_generation(&state, generation)?;
+    Ok(tauri::ipc::Response::new(fs::read(resolve(&root, &path)?)?))
+}
+
 /// Read a binary asset's bytes, base64-encoded for the JSON IPC (e.g. audio
 /// memos read back for transcription). Pinned to `generation`, unlike
 /// `note_read`: the caller is a background pass that can span a graph

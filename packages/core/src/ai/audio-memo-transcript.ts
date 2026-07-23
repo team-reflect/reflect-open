@@ -4,7 +4,8 @@ import type { AudioMemoEnrichmentCredentials } from './audio-memo-title'
 import { generateAudioMemoTitle } from './audio-memo-title'
 import { formatAudioMemoTranscript } from './audio-memo-format'
 import { APP_REVIEW_STUB_KEY, stubTranscriptBody } from './audio-memo-review-stub'
-import { isTranscriptionRejected, transcribeAudio } from './transcribe'
+import { isTranscriptionRejected } from './transcribe-http'
+import { transcribeAudio } from './transcribe'
 
 export interface BuildAudioMemoTranscriptInput {
   /** The recording bytes read back from the graph. */
@@ -23,7 +24,10 @@ export interface BuildAudioMemoTranscriptInput {
   readonly fallbackTitle: string
   /** Host transport (the Tauri HTTP plugin's fetch; tests pass a stub). */
   readonly fetchFn?: typeof fetch | undefined
-  /** Abort gate checked between speech-to-text and optional enrichment. */
+  /**
+   * Abort gate, threaded into every transcription provider call (a Files API
+   * flow is multi-request) and checked again before optional enrichment.
+   */
   readonly isStale?: (() => boolean) | undefined
 }
 
@@ -70,6 +74,7 @@ export async function buildAudioMemoTranscript(
       audio: input.audio,
       mimeType: input.mimeType,
       fetchFn: input.fetchFn,
+      isStale: input.isStale,
     })
     if (input.isStale?.() === true) {
       return { status: 'stale' }

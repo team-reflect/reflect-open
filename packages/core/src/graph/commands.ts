@@ -187,6 +187,20 @@ export async function readAsset(path: string, generation: number): Promise<strin
 }
 
 /**
+ * {@link readAsset} without the base64 detour: the bytes come back as a raw
+ * IPC response. For large reads (a meeting-length audio memo read back for
+ * transcription) the base64 route would inflate the payload ~1.33× inside one
+ * giant JSON string. Only on binary-capable bridges (see `hasBinaryIpc`).
+ */
+export async function readAssetBinary(
+  path: string,
+  generation: number,
+): Promise<Uint8Array<ArrayBuffer>> {
+  const buffer = await call('asset_read_binary', { path, generation }, z.instanceof(ArrayBuffer))
+  return new Uint8Array(buffer)
+}
+
+/**
  * Open an asset by graph-relative path in the system default application.
  * `generation` pins the request to the graph whose markdown produced the
  * image, so a delayed click after a graph switch cannot open another graph's

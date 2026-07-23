@@ -47,6 +47,14 @@ const MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
 /** Below this a recording is a misclick, not a memo. */
 const MIN_DURATION_MS = 500
 
+/**
+ * Speech-quality encode target. Left to its defaults, MediaRecorder picks
+ * music-grade bitrates that roughly double a meeting-length memo's size —
+ * which is disk, sync traffic, and (for OpenAI's hard 25 MB request cap)
+ * transcribable duration. Encoders clamp unsupported values, never throw.
+ */
+const AUDIO_BITS_PER_SECOND = 64_000
+
 const ELAPSED_TICK_MS = 200
 
 const FALLBACK_MIME_TYPE = 'audio/mp4'
@@ -139,7 +147,10 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}): UseAudi
     const mimeType = pickMimeType()
     let recorder: MediaRecorder
     try {
-      recorder = new MediaRecorder(input, mimeType ? { mimeType } : undefined)
+      recorder = new MediaRecorder(input, {
+        ...(mimeType ? { mimeType } : {}),
+        audioBitsPerSecond: AUDIO_BITS_PER_SECOND,
+      })
       chunksRef.current = []
       recorder.ondataavailable = (event: BlobEvent) => {
         if (event.data.size > 0) {

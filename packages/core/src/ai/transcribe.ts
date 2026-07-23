@@ -1,22 +1,49 @@
 import { z } from 'zod'
 import { ReflectError } from '../errors'
+import { bytesToBase64 } from '../lib/base64'
 import type { TranscriptionProvider } from './provider-config'
+import { AUDIO_EXTENSION_BY_MIME, baseMimeType } from './audio-mime'
+import {
+  deleteGeminiFile,
+  uploadToGeminiFiles,
+  GEMINI_BASE_URL,
+  GEMINI_FILE_TRANSCRIBE_TIMEOUT_MS,
+  type GeminiUploadedFile,
+} from './gemini-files'
+import {
+  httpError,
+  isRecordingRejection,
+  safeJson,
+  send,
+  TRANSCRIPTION_TRANSFER_TIMEOUT_MS,
+} from './transcribe-http'
 
 /**
- * BYOK audio transcription (audio memos): one short recording in, plain text
- * out. OpenAI is served by its dedicated transcription endpoint, Gemini by a
- * `generateContent` call with inline audio. Both run on fixed transcription
- * models — the configured entry only picks the provider and key (see
+ * BYOK audio transcription (audio memos): one recording in, plain text out.
+ * OpenAI is served by its dedicated transcription endpoint, Gemini by a
+ * `generateContent` call — inline audio for small recordings, the Files API
+ * for meeting-length ones (see {@link GEMINI_INLINE_MAX_BYTES} and
+ * `ai/gemini-files`). Both run on fixed transcription models — the
+ * configured entry only picks the provider and key (see
  * `pickTranscriptionConfig`); chat-model choices don't transfer because chat
  * models can't take this endpoint (OpenAI) or would bill pro-tier rates for
  * speech-to-text (Gemini).
+ *
+ * This module holds only the two provider legs. Which provider a recording
+ * *goes to* — the size-based routing that keeps oversized memos away from
+ * providers that would refuse them — is `ai/transcription-routing`; the
+ * shared HTTP substrate (stale gate, timeouts, error ladder) is
+ * `ai/transcribe-http`.
  */
 
 export const OPENAI_TRANSCRIPTION_MODEL = 'gpt-4o-mini-transcribe'
 
 /**
- * Retried once when the primary model is missing on the key — project-scoped
- * OpenAI keys can expose `whisper-1` but not the 4o transcription models.
+ * Retried when the primary model is missing on the key (project-scoped
+ * OpenAI keys can expose `whisper-1` but not the 4o transcription models) —
+ * and when the primary *refuses the recording*, because the 4o models cap
+ * audio duration well below whisper-1's and a long memo they refuse can
+ * still transcribe.
  */
 export const OPENAI_TRANSCRIPTION_FALLBACK_MODEL = 'whisper-1'
 
@@ -28,6 +55,13 @@ export const GOOGLE_TRANSCRIPTION_MODEL = 'gemini-3.5-flash'
  * release), and a retired transcription model must degrade, not hard-fail.
  */
 export const GOOGLE_TRANSCRIPTION_FALLBACK_MODEL = 'gemini-2.5-flash'
+
+/**
+ * Raw-audio budget for a Gemini *inline* request: the whole JSON body must
+ * stay under Gemini's 20 MB request cap, and inline audio rides it
+ * base64-encoded (~1.33×). Recordings over this go through the Files API.
+ */
+export const GEMINI_INLINE_MAX_BYTES = 12 * 1024 * 1024
 
 export interface TranscriptionRequest {
   provider: TranscriptionProvider
@@ -41,13 +75,21 @@ export interface TranscriptionRequest {
    * (CORS-free); `@reflect/core` itself stays platform-agnostic.
    */
   fetchFn?: typeof fetch | undefined
+  /**
+   * Abort gate consulted before **every** provider call — a Files API
+   * transcription is a multi-request flow, and a graph switch mid-flow must
+   * not bill another call. Firing reads as a retryable `network` error.
+   */
+  isStale?: (() => boolean) | undefined
 }
 
 /**
  * Transcribe one recording, returning the trimmed transcript (empty when the
- * provider heard nothing). Throws {@link ReflectError}: `auth` when the key is
- * rejected, `network` when the call can't complete, `parse` when the response
- * shape is unrecognizable.
+ * provider heard nothing). Throws `ReflectError`: `auth` when the key is
+ * rejected, `network` when the call can't complete, `parse` when the
+ * response shape is unrecognizable — and `TranscriptionRejectedError` (see
+ * `ai/transcribe-http`) when the recording itself was refused and must be
+ * tombstoned rather than retried.
  */
 export async function transcribeAudio(request: TranscriptionRequest): Promise<string> {
   return request.provider === 'openai'
@@ -55,118 +97,8 @@ export async function transcribeAudio(request: TranscriptionRequest): Promise<st
     : transcribeWithGemini(request)
 }
 
-/** `audio/webm;codecs=opus` → `audio/webm` — parameters confuse provider sniffing. */
-export function baseMimeType(mimeType: string): string {
-  return (mimeType.split(';')[0] ?? mimeType).trim().toLowerCase()
-}
-
-/**
- * File extension per audio MIME type — shared by the provider upload filename
- * and the on-disk naming of saved memos (`actions/audio-memo`), which must
- * agree so a stored recording round-trips back into transcription.
- */
-export const AUDIO_EXTENSION_BY_MIME: Record<string, string> = {
-  // An audio-only MP4 *is* an M4A — and whisper-1 sniffs by extension, so a
-  // WKWebView recording named `.mp4` is rejected while `.m4a` is accepted.
-  'audio/mp4': 'm4a',
-  'audio/webm': 'webm',
-  'audio/ogg': 'ogg',
-  'audio/wav': 'wav',
-  'audio/mpeg': 'mp3',
-}
-
 function uploadFilename(mimeType: string): string {
   return `memo.${AUDIO_EXTENSION_BY_MIME[baseMimeType(mimeType)] ?? 'm4a'}`
-}
-
-/** The provider's own error message when the body carries one, else the raw body. */
-function providerErrorMessage(body: string): string {
-  const parsed = z
-    .object({ error: z.object({ message: z.string() }) })
-    .safeParse(safeJson(body))
-  return parsed.success ? parsed.data.error.message : body.slice(0, 200)
-}
-
-function safeJson(body: string): unknown {
-  try {
-    return JSON.parse(body)
-  } catch {
-    return null
-  }
-}
-
-/**
- * The provider refused this specific recording (unsupported container,
- * oversized payload): the same bytes would be refused again, so callers must
- * tombstone the recording rather than retry — treating this as a transient
- * failure would wedge a retry queue forever. Connectivity failures, rate
- * limits, and retired-model 404s stay plain `network` errors; those heal on
- * a later attempt.
- */
-export class TranscriptionRejectedError extends ReflectError {
-  constructor(message: string) {
-    super('parse', message)
-    this.name = 'TranscriptionRejectedError'
-  }
-}
-
-/** Type guard for {@link TranscriptionRejectedError}. */
-export function isTranscriptionRejected(value: unknown): value is TranscriptionRejectedError {
-  return value instanceof TranscriptionRejectedError
-}
-
-/**
- * A 4xx that condemns the recording itself — never auth (401/403), a
- * missing model/endpoint (404), a timeout (408), or a rate limit (429),
- * all of which a later attempt can survive.
- */
-function isRecordingRejection(status: number): boolean {
-  return status >= 400 && status < 500 && ![401, 403, 404, 408, 429].includes(status)
-}
-
-function httpError(provider: TranscriptionProvider, status: number, body: string): ReflectError {
-  if (status === 401 || status === 403) {
-    return new ReflectError('auth', `${provider} rejected the API key (${status})`)
-  }
-  if (isRecordingRejection(status)) {
-    return new TranscriptionRejectedError(
-      `${provider} rejected the recording (${status}): ${providerErrorMessage(body)}`,
-    )
-  }
-  return new ReflectError(
-    'network',
-    `${provider} transcription failed (${status}): ${providerErrorMessage(body)}`,
-  )
-}
-
-/**
- * Bounds a provider connection that accepts and then stalls — the UI must
- * always settle into success or a retryable error, never hang transcribing.
- */
-export const TRANSCRIPTION_TIMEOUT_MS = 120_000
-
-async function send(
-  fetchFn: typeof fetch,
-  input: string,
-  init: RequestInit,
-): Promise<Response> {
-  try {
-    return await fetchFn(input, {
-      ...init,
-      signal: AbortSignal.timeout(TRANSCRIPTION_TIMEOUT_MS),
-    })
-  } catch (cause) {
-    if (
-      cause instanceof DOMException &&
-      (cause.name === 'TimeoutError' || cause.name === 'AbortError')
-    ) {
-      throw new ReflectError(
-        'network',
-        `transcription request timed out after ${TRANSCRIPTION_TIMEOUT_MS / 1000}s`,
-      )
-    }
-    throw new ReflectError('network', cause instanceof Error ? cause.message : String(cause))
-  }
 }
 
 const openAiResponseSchema = z.object({ text: z.string() })
@@ -184,16 +116,25 @@ async function transcribeWithOpenAi(request: TranscriptionRequest): Promise<stri
     const form = new FormData()
     form.append('file', request.audio, uploadFilename(request.mimeType))
     form.append('model', model)
-    return send(fetchFn, 'https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${request.apiKey}` },
-      body: form,
-    })
+    return send(
+      fetchFn,
+      'https://api.openai.com/v1/audio/transcriptions',
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${request.apiKey}` },
+        body: form,
+      },
+      { timeoutMs: TRANSCRIPTION_TRANSFER_TIMEOUT_MS, isStale: request.isStale },
+    )
   }
 
   let response = await attempt(OPENAI_TRANSCRIPTION_MODEL)
   let body = await response.text()
-  if (!response.ok && isModelNotFound(body)) {
+  // Fall back on a missing model (project-scoped keys) — and on a recording
+  // rejection: the 4o transcription models cap audio *duration* well below
+  // whisper-1's, so a long memo the primary refuses can still transcribe.
+  // Costs one duplicate upload only when the recording is already doomed.
+  if (!response.ok && (isModelNotFound(body) || isRecordingRejection(response.status))) {
     response = await attempt(OPENAI_TRANSCRIPTION_FALLBACK_MODEL)
     body = await response.text()
   }
@@ -222,50 +163,64 @@ const geminiResponseSchema = z.object({
     .optional(),
 })
 
-/**
- * Encode in 32 KiB chunks: spreading a whole multi-megabyte recording into
- * one `String.fromCharCode` call overflows the argument limit.
- */
-export function bytesToBase64(bytes: Uint8Array): string {
-  const CHUNK_SIZE = 0x8000
-  let binary = ''
-  for (let offset = 0; offset < bytes.length; offset += CHUNK_SIZE) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + CHUNK_SIZE))
-  }
-  return btoa(binary)
-}
-
-/** Decode {@link bytesToBase64}'s output (a stored recording read back). */
-export function base64ToBytes(base64: string): Uint8Array<ArrayBuffer> {
-  const binary = atob(base64)
-  const bytes = new Uint8Array(binary.length)
-  for (let index = 0; index < binary.length; index++) {
-    bytes[index] = binary.charCodeAt(index)
-  }
-  return bytes
-}
-
 const GEMINI_INSTRUCTION =
   'Transcribe this audio recording verbatim. Return only the transcribed text, with no commentary or formatting.'
 
 async function transcribeWithGemini(request: TranscriptionRequest): Promise<string> {
-  const fetchFn = request.fetchFn ?? fetch
-  const data = bytesToBase64(new Uint8Array(await request.audio.arrayBuffer()))
-  const attempt = (model: string): Promise<Response> =>
-    send(fetchFn, `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: 'POST',
-      headers: { 'x-goog-api-key': request.apiKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: GEMINI_INSTRUCTION },
-              { inline_data: { mime_type: baseMimeType(request.mimeType), data } },
-            ],
+  const audioPart =
+    request.audio.size <= GEMINI_INLINE_MAX_BYTES
+      ? {
+          inline_data: {
+            mime_type: baseMimeType(request.mimeType),
+            data: bytesToBase64(new Uint8Array(await request.audio.arrayBuffer())),
           },
-        ],
-      }),
-    })
+        }
+      : { file: await uploadToGeminiFiles(request) }
+  try {
+    return await geminiGenerateTranscript(request, audioPart)
+  } finally {
+    if ('file' in audioPart) {
+      await deleteGeminiFile(request, audioPart.file.fileName)
+    }
+  }
+}
+
+type GeminiAudioPart =
+  | { inline_data: { mime_type: string; data: string } }
+  | { file: GeminiUploadedFile }
+
+/** `generateContent` over inline audio or an uploaded file, with model fallback. */
+async function geminiGenerateTranscript(
+  request: TranscriptionRequest,
+  audioPart: GeminiAudioPart,
+): Promise<string> {
+  const fetchFn = request.fetchFn ?? fetch
+  const timeoutMs =
+    'file' in audioPart ? GEMINI_FILE_TRANSCRIBE_TIMEOUT_MS : TRANSCRIPTION_TRANSFER_TIMEOUT_MS
+  // The wire shape is the API's snake_case; TypeScript stays camelCase up to
+  // this boundary (see `GeminiUploadedFile`).
+  const wirePart =
+    'file' in audioPart
+      ? {
+          file_data: {
+            mime_type: audioPart.file.mimeType,
+            file_uri: audioPart.file.fileUri,
+          },
+        }
+      : audioPart
+  const attempt = (model: string): Promise<Response> =>
+    send(
+      fetchFn,
+      `${GEMINI_BASE_URL}/v1beta/models/${model}:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'x-goog-api-key': request.apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: GEMINI_INSTRUCTION }, wirePart] }],
+        }),
+      },
+      { timeoutMs, isStale: request.isStale },
+    )
 
   let response = await attempt(GOOGLE_TRANSCRIPTION_MODEL)
   let body = await response.text()

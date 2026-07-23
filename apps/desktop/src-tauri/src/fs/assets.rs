@@ -94,6 +94,7 @@ fn persist_unique(
     assets_dir: &Path,
     desired: &str,
 ) -> AppResult<String> {
+    temp.as_file().sync_all()?;
     let (stem, ext) = split_name(desired);
     for attempt in 1..=MAX_NAME_PROBES {
         let candidate = if attempt == 1 {
@@ -202,9 +203,50 @@ pub fn asset_upload_commit(
         ));
     }
     let assets_dir = assets_dir_for(&state, generation, &desired_name)?;
-    upload.file.as_file().sync_all()?;
     let final_name = persist_unique(upload.file, &assets_dir, &desired_name)?;
     Ok(format!("assets/{final_name}"))
+}
+
+/// Persist a staged upload at an exact target path, creating parent
+/// directories. No-clobber: the temp file only ever *claims* a free path, so
+/// a concurrent writer's file is never overwritten. Like [`persist_unique`],
+/// fsyncs before the rename — durability is the persist helpers' job, never
+/// their callers'.
+fn persist_exact(temp: tempfile::NamedTempFile, target: &Path) -> AppResult<()> {
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    temp.as_file().sync_all()?;
+    temp.persist_noclobber(target)
+        .map_err(|err| AppError::io(err.to_string()))?;
+    Ok(())
+}
+
+/// Finish a streamed upload at an **exact graph-relative path** — the audio
+/// memo intake, where `audio-memos/<base>.<ext>` *is* the memo's identity
+/// (its transcription note and daily-note backlink share the basename), so
+/// the `assets/` collision renaming of [`asset_upload_commit`] would corrupt
+/// it. Memo basenames carry millisecond precision; an existing file at
+/// `path` is a bug and fails loudly rather than being clobbered.
+#[tauri::command]
+pub fn asset_upload_commit_path(
+    id: String,
+    path: String,
+    generation: u64,
+    state: State<GraphState>,
+    uploads: State<AssetUploads>,
+) -> AppResult<()> {
+    let upload = lock_uploads(&uploads)?
+        .remove(&id)
+        .ok_or_else(|| AppError::not_found(format!("unknown upload: {id}")))?;
+    if upload.generation != generation {
+        return Err(AppError::io(
+            "upload was started for a different graph session; dropping it",
+        ));
+    }
+    let root = root_for_generation(&state, generation)?;
+    let target = resolve(&root, &path)?;
+    persist_exact(upload.file, &target)
 }
 
 /// Discard an in-flight upload; dropping the temp file deletes it. Idempotent
@@ -234,7 +276,6 @@ pub fn asset_import(
     let root = root_for_generation(&state, generation)?;
     let mut temp = tempfile::NamedTempFile::new_in(staging_dir(&root)?)?;
     std::io::copy(&mut fs::File::open(source)?, temp.as_file_mut())?;
-    temp.as_file().sync_all()?;
     let assets_dir = assets_dir_for(&state, generation, &desired_name)?;
     let final_name = persist_unique(temp, &assets_dir, &desired_name)?;
     Ok(format!("assets/{final_name}"))
@@ -305,6 +346,30 @@ mod tests {
         fs::write(assets.join("README"), b"first").unwrap();
         let temp = temp_in(graph.path(), b"second");
         assert_eq!(persist_unique(temp, &assets, "README").unwrap(), "README-2");
+    }
+
+    #[test]
+    fn persist_exact_creates_parents_and_writes_the_target() {
+        let graph = tempdir().unwrap();
+        bootstrap(graph.path()).unwrap();
+        let temp = temp_in(graph.path(), b"opus bytes");
+        let target = graph
+            .path()
+            .join("audio-memos/audio-memo-2026-07-19-090000-000.m4a");
+        persist_exact(temp, &target).unwrap();
+        assert_eq!(fs::read(&target).unwrap(), b"opus bytes");
+    }
+
+    #[test]
+    fn persist_exact_never_clobbers_an_existing_file() {
+        let graph = tempdir().unwrap();
+        bootstrap(graph.path()).unwrap();
+        let target = graph.path().join("audio-memos/memo.m4a");
+        fs::create_dir_all(target.parent().unwrap()).unwrap();
+        fs::write(&target, b"first").unwrap();
+        let temp = temp_in(graph.path(), b"second");
+        assert!(persist_exact(temp, &target).is_err());
+        assert_eq!(fs::read(&target).unwrap(), b"first");
     }
 
     #[test]

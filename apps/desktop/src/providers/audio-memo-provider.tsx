@@ -9,7 +9,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import { errorMessage, type GraphInfo } from '@reflect/core'
+import { AUDIO_MEMO_MAX_DURATION_MS, errorMessage, type GraphInfo } from '@reflect/core'
 import { isRecordingSupported, useAudioRecorder } from '@/hooks/use-audio-recorder'
 import { useAudioMemoPipeline } from '@/hooks/use-audio-memo-pipeline'
 import { useSettings } from '@/providers/settings-provider'
@@ -60,9 +60,6 @@ interface AudioMemoContextValue {
 
 const AudioMemoContext = createContext<AudioMemoContextValue | null>(null)
 
-/** Auto-stop cap: bounds the transcription payload (Gemini inlines base64). */
-const MAX_DURATION_MS = 10 * 60_000
-
 const NO_PROVIDER_REASON = 'Add an OpenAI or Gemini model in Settings to record audio memos'
 const UNSUPPORTED_REASON = 'Audio recording is not supported on this platform'
 
@@ -90,7 +87,7 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
 
   const stopAndSaveRef = useRef<() => void>(() => {})
   const recorder = useAudioRecorder({
-    maxDurationMs: MAX_DURATION_MS,
+    maxDurationMs: AUDIO_MEMO_MAX_DURATION_MS,
     onMaxDuration: () => stopAndSaveRef.current(),
   })
   // The hook's functions are stable; the wrapper object is not (elapsed ticks
