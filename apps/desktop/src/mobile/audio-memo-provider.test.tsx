@@ -1,4 +1,5 @@
-import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
+import { act } from 'react'
+import { cleanup, renderHook } from 'vitest-browser-react'
 import { useState, type ReactElement, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
@@ -94,7 +95,11 @@ vi.mock('@/lib/transcription-reconciler', () => ({
 }))
 
 vi.mock('@/lib/operations', () => ({
-  startOperation: () => ({ progress: vi.fn(), done: vi.fn(), fail: failOperation }),
+  startOperation: () => ({
+    progress: vi.fn(),
+    done: vi.fn(),
+    fail: failOperation,
+  }),
 }))
 
 vi.mock('@/mobile/haptics', () => ({
@@ -143,7 +148,14 @@ vi.mock('@/mobile/use-native-audio-recorder', () => ({
 
 const SETTINGS = vi.hoisted(() => ({
   current: {
-    aiProviders: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
+    aiProviders: [
+      {
+        id: 'cfg-openai',
+        provider: 'openai',
+        model: 'gpt-5.1',
+        keyHint: 'wxyz1',
+      },
+    ],
     defaultAiProviderId: 'cfg-openai',
     transcriptionFormat: true,
   },
@@ -187,10 +199,20 @@ beforeEach(() => {
   stagedControls.claimed.clear()
   stagedControls.readStaged.mockResolvedValue(new Blob(['staged'], { type: 'audio/mp4' }))
   stagedControls.deleteStaged.mockResolvedValue(undefined)
-  stagedControls.recordingStatus.mockResolvedValue({ recording: false, elapsedMs: 0 })
+  stagedControls.recordingStatus.mockResolvedValue({
+    recording: false,
+    elapsedMs: 0,
+  })
   stagedControls.stopActive.mockResolvedValue(null)
   SETTINGS.current = {
-    aiProviders: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
+    aiProviders: [
+      {
+        id: 'cfg-openai',
+        provider: 'openai',
+        model: 'gpt-5.1',
+        keyHint: 'wxyz1',
+      },
+    ],
     defaultAiProviderId: 'cfg-openai',
     transcriptionFormat: true,
   }
@@ -205,7 +227,9 @@ afterEach(cleanup)
 
 describe('MobileAudioMemoProvider', () => {
   it('toggle records with the drawer open, then stops, captures, and deletes the staged file', async () => {
-    const { result } = renderHook(() => useMobileAudioMemo(), { wrapper })
+    const { result } = await renderHook(() => useMobileAudioMemo(), {
+      wrapper,
+    })
     expect(result.current.available).toBe(true)
     expect(recorderControls.options?.maxDurationMs).toBe(10 * 60_000)
 
@@ -218,7 +242,7 @@ describe('MobileAudioMemoProvider', () => {
     await act(async () => {
       result.current.toggle()
     })
-    await waitFor(() => expect(result.current.phase).toBe('idle'))
+    await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
     expect(result.current.drawerOpen).toBe(false)
 
     expect(captureAudioMemo).toHaveBeenCalledWith({
@@ -236,7 +260,9 @@ describe('MobileAudioMemoProvider', () => {
 
   it('a capture failure keeps the staged file; discard deletes it', async () => {
     captureAudioMemo.mockResolvedValue({ ok: false, message: 'disk full' })
-    const { result } = renderHook(() => useMobileAudioMemo(), { wrapper })
+    const { result } = await renderHook(() => useMobileAudioMemo(), {
+      wrapper,
+    })
 
     await act(async () => {
       result.current.toggle()
@@ -244,7 +270,7 @@ describe('MobileAudioMemoProvider', () => {
     await act(async () => {
       result.current.toggle()
     })
-    await waitFor(() => expect(result.current.phase).toBe('error'))
+    await vi.waitFor(() => expect(result.current.phase).toBe('error'))
     expect(result.current.canRetry).toBe(true)
     expect(stagedControls.deleteStaged).not.toHaveBeenCalled()
     // The drawer closed on stop — the failure also surfaces as an operation.
@@ -253,7 +279,7 @@ describe('MobileAudioMemoProvider', () => {
     await act(async () => {
       result.current.discard()
     })
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(stagedControls.deleteStaged).toHaveBeenCalledWith(RECORDING.stagedPath),
     )
   })
@@ -262,7 +288,9 @@ describe('MobileAudioMemoProvider', () => {
     captureAudioMemo
       .mockResolvedValueOnce({ ok: false, message: 'disk full' })
       .mockResolvedValueOnce({ ok: true, memo: MEMO })
-    const { result } = renderHook(() => useMobileAudioMemo(), { wrapper })
+    const { result } = await renderHook(() => useMobileAudioMemo(), {
+      wrapper,
+    })
 
     await act(async () => {
       result.current.toggle()
@@ -270,18 +298,20 @@ describe('MobileAudioMemoProvider', () => {
     await act(async () => {
       result.current.toggle()
     })
-    await waitFor(() => expect(result.current.phase).toBe('error'))
+    await vi.waitFor(() => expect(result.current.phase).toBe('error'))
 
     await act(async () => {
       result.current.retry()
     })
-    await waitFor(() => expect(result.current.phase).toBe('idle'))
+    await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
     expect(captureAudioMemo).toHaveBeenCalledTimes(2)
     expect(stagedControls.deleteStaged).toHaveBeenCalledWith(RECORDING.stagedPath)
   })
 
   it('a native stop (interruption, cap) is ingested exactly like a user stop', async () => {
-    const { result } = renderHook(() => useMobileAudioMemo(), { wrapper })
+    const { result } = await renderHook(() => useMobileAudioMemo(), {
+      wrapper,
+    })
 
     await act(async () => {
       result.current.toggle()
@@ -293,7 +323,7 @@ describe('MobileAudioMemoProvider', () => {
     })
 
     expect(result.current.drawerOpen).toBe(false)
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(captureAudioMemo).toHaveBeenCalledWith(
         expect.objectContaining({ audio: RECORDING.blob, generation: 3 }),
       ),
@@ -301,7 +331,9 @@ describe('MobileAudioMemoProvider', () => {
   })
 
   it('a too-short native stop closes the drawer and captures nothing', async () => {
-    const { result } = renderHook(() => useMobileAudioMemo(), { wrapper })
+    const { result } = await renderHook(() => useMobileAudioMemo(), {
+      wrapper,
+    })
 
     await act(async () => {
       result.current.toggle()
@@ -315,7 +347,9 @@ describe('MobileAudioMemoProvider', () => {
   })
 
   it('dismissing the drawer mid-recording stops and saves, never drops', async () => {
-    const { result } = renderHook(() => useMobileAudioMemo(), { wrapper })
+    const { result } = await renderHook(() => useMobileAudioMemo(), {
+      wrapper,
+    })
 
     await act(async () => {
       result.current.toggle()
@@ -324,12 +358,14 @@ describe('MobileAudioMemoProvider', () => {
       result.current.onDrawerOpenChange(false)
     })
 
-    await waitFor(() => expect(captureAudioMemo).toHaveBeenCalled())
+    await vi.waitFor(() => expect(captureAudioMemo).toHaveBeenCalled())
     expect(recorderControls.cancelSpy).not.toHaveBeenCalled()
   })
 
   it('the drawer Cancel discards the live recording without saving', async () => {
-    const { result } = renderHook(() => useMobileAudioMemo(), { wrapper })
+    const { result } = await renderHook(() => useMobileAudioMemo(), {
+      wrapper,
+    })
 
     await act(async () => {
       result.current.toggle()
@@ -345,13 +381,15 @@ describe('MobileAudioMemoProvider', () => {
 
   it('a denied microphone shows the iOS Settings guidance in the drawer', async () => {
     recorderControls.failStart = 'microphone access denied'
-    const { result } = renderHook(() => useMobileAudioMemo(), { wrapper })
+    const { result } = await renderHook(() => useMobileAudioMemo(), {
+      wrapper,
+    })
 
     await act(async () => {
       result.current.toggle()
     })
 
-    await waitFor(() => expect(result.current.phase).toBe('error'))
+    await vi.waitFor(() => expect(result.current.phase).toBe('error'))
     expect(result.current.drawerOpen).toBe(true)
     expect(result.current.error).toMatch(/Settings app/)
     expect(result.current.canRetry).toBe(false)
@@ -359,7 +397,9 @@ describe('MobileAudioMemoProvider', () => {
 
   it('a parked error reopens the drawer from the FAB instead of blocking silently', async () => {
     captureAudioMemo.mockResolvedValue({ ok: false, message: 'disk full' })
-    const { result } = renderHook(() => useMobileAudioMemo(), { wrapper })
+    const { result } = await renderHook(() => useMobileAudioMemo(), {
+      wrapper,
+    })
 
     await act(async () => {
       result.current.toggle()
@@ -367,7 +407,7 @@ describe('MobileAudioMemoProvider', () => {
     await act(async () => {
       result.current.toggle()
     })
-    await waitFor(() => expect(result.current.phase).toBe('error'))
+    await vi.waitFor(() => expect(result.current.phase).toBe('error'))
     expect(result.current.drawerOpen).toBe(false)
 
     await act(async () => {
@@ -382,8 +422,14 @@ describe('MobileAudioMemoProvider', () => {
       if (command === 'plugin:recording|list_staged') {
         return {
           files: [
-            { path: '/staging/recording-old.m4a', modifiedMs: 1_700_000_000_000 },
-            { path: '/staging/recording-claimed.m4a', modifiedMs: 1_700_000_100_000 },
+            {
+              path: '/staging/recording-old.m4a',
+              modifiedMs: 1_700_000_000_000,
+            },
+            {
+              path: '/staging/recording-claimed.m4a',
+              modifiedMs: 1_700_000_100_000,
+            },
           ],
         }
       }
@@ -391,39 +437,38 @@ describe('MobileAudioMemoProvider', () => {
     })
     stagedControls.claimed.add('/staging/recording-claimed.m4a')
 
-    renderHook(() => useMobileAudioMemo(), { wrapper })
+    await renderHook(() => useMobileAudioMemo(), { wrapper })
 
-    await waitFor(() => expect(captureAudioMemo).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(captureAudioMemo).toHaveBeenCalledTimes(1))
     expect(captureAudioMemo).toHaveBeenCalledWith(
       expect.objectContaining({
         recordedAt: new Date(1_700_000_000_000),
         generation: 3,
       }),
     )
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(stagedControls.deleteStaged).toHaveBeenCalledWith('/staging/recording-old.m4a'),
     )
     expect(stagedControls.readStaged).not.toHaveBeenCalledWith('/staging/recording-claimed.m4a')
   })
 
   it('foregrounding re-runs the orphan scan', async () => {
-    renderHook(() => useMobileAudioMemo(), { wrapper })
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('plugin:recording|list_staged'),
-    )
+    await renderHook(() => useMobileAudioMemo(), { wrapper })
+    await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith('plugin:recording|list_staged'))
     invoke.mockClear()
 
     await act(async () => {
       document.dispatchEvent(new Event('visibilitychange'))
     })
 
-    await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith('plugin:recording|list_staged'),
-    )
+    await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith('plugin:recording|list_staged'))
   })
 
   it('a recording that outlived its JS is stopped and saved on mount', async () => {
-    stagedControls.recordingStatus.mockResolvedValue({ recording: true, elapsedMs: 30_000 })
+    stagedControls.recordingStatus.mockResolvedValue({
+      recording: true,
+      elapsedMs: 30_000,
+    })
     const orphaned: NativeRecorderResult = {
       blob: new Blob(['orphan'], { type: 'audio/mp4' }),
       mimeType: 'audio/mp4',
@@ -433,30 +478,32 @@ describe('MobileAudioMemoProvider', () => {
     }
     stagedControls.stopActive.mockResolvedValue(orphaned)
 
-    renderHook(() => useMobileAudioMemo(), { wrapper })
+    await renderHook(() => useMobileAudioMemo(), { wrapper })
 
-    await waitFor(() => expect(stagedControls.stopActive).toHaveBeenCalledTimes(1))
-    await waitFor(() =>
+    await vi.waitFor(() => expect(stagedControls.stopActive).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() =>
       expect(captureAudioMemo).toHaveBeenCalledWith(
         expect.objectContaining({ audio: orphaned.blob, generation: 3 }),
       ),
     )
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(stagedControls.deleteStaged).toHaveBeenCalledWith(orphaned.stagedPath),
     )
   })
 
   it('no live native recording on mount means no stop call', async () => {
-    renderHook(() => useMobileAudioMemo(), { wrapper })
+    await renderHook(() => useMobileAudioMemo(), { wrapper })
 
-    await waitFor(() => expect(stagedControls.recordingStatus).toHaveBeenCalled())
+    await vi.waitFor(() => expect(stagedControls.recordingStatus).toHaveBeenCalled())
     expect(stagedControls.stopActive).not.toHaveBeenCalled()
   })
 
   it('the handshake claims queued actions: recordAudio records, then confirms', async () => {
     vi.useFakeTimers()
     try {
-      const { result } = renderHook(() => useMobileAudioMemo(), { wrapper })
+      const { result } = await renderHook(() => useMobileAudioMemo(), {
+        wrapper,
+      })
       await act(async () => {
         await vi.advanceTimersByTimeAsync(0)
       })
@@ -484,7 +531,7 @@ describe('MobileAudioMemoProvider', () => {
   it('unknown native actions are ignored', async () => {
     vi.useFakeTimers()
     try {
-      renderHook(() => useMobileAudioMemo(), { wrapper })
+      await renderHook(() => useMobileAudioMemo(), { wrapper })
       await act(async () => {
         await vi.advanceTimersByTimeAsync(0)
       })
@@ -504,12 +551,19 @@ describe('MobileAudioMemoProvider', () => {
   it('without an OpenAI or Gemini model, toggle opens the drawer for key setup, never the mic', async () => {
     SETTINGS.current = {
       aiProviders: [
-        { id: 'claude', provider: 'anthropic', model: 'claude-fable-5', keyHint: 'wxyz1' },
+        {
+          id: 'claude',
+          provider: 'anthropic',
+          model: 'claude-fable-5',
+          keyHint: 'wxyz1',
+        },
       ],
       defaultAiProviderId: 'claude',
       transcriptionFormat: true,
     }
-    const { result } = renderHook(() => useMobileAudioMemo(), { wrapper })
+    const { result } = await renderHook(() => useMobileAudioMemo(), {
+      wrapper,
+    })
 
     // The FAB stays visible (available) so the feature is discoverable; only
     // the recording itself waits for a key.
