@@ -83,6 +83,51 @@ describe('dev bridge background task parity', () => {
   })
 })
 
+describe('dev bridge diagnostics parity', () => {
+  it('retains at most the latest 128 lifecycle events', async () => {
+    const bridge = createDevBridge({
+      platform: 'ios',
+      files: createDevFileStore({}),
+      index: await createDevIndexDb(),
+    })
+
+    await bridge.invoke('diagnostics_bootstrap', {})
+    for (let eventIndex = 0; eventIndex < 128; eventIndex += 1) {
+      const checkpoint = eventIndex % 2 === 0 ? 'graphLoading' : 'graphOpening'
+      await bridge.invoke('diagnostics_checkpoint', { checkpoint })
+    }
+
+    const snapshot = (await bridge.invoke('diagnostics_snapshot', {})) as {
+      events: Array<{ kind: string }>
+    }
+    expect(snapshot.events).toHaveLength(128)
+    expect(snapshot.events.every((event) => event.kind === 'checkpoint')).toBe(true)
+  })
+
+  it('coalesces consecutive duplicate lifecycle markers like the native journal', async () => {
+    const bridge = createDevBridge({
+      platform: 'ios',
+      files: createDevFileStore({}),
+      index: await createDevIndexDb(),
+    })
+
+    await bridge.invoke('diagnostics_bootstrap', {})
+    await bridge.invoke('diagnostics_checkpoint', { checkpoint: 'graphLoading' })
+    await bridge.invoke('diagnostics_checkpoint', { checkpoint: 'graphLoading' })
+    await bridge.invoke('diagnostics_frontend_ready', {})
+    await bridge.invoke('diagnostics_frontend_ready', {})
+
+    const snapshot = (await bridge.invoke('diagnostics_snapshot', {})) as {
+      events: Array<{ kind: string }>
+    }
+    expect(snapshot.events.map((event) => event.kind)).toEqual([
+      'appStarted',
+      'checkpoint',
+      'frontendReady',
+    ])
+  })
+})
+
 describe('dev bridge note_create parity', () => {
   it('claims a free path and returns its persisted modified time', async () => {
     const now = vi.spyOn(Date, 'now').mockReturnValue(1_234)

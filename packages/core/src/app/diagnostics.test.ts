@@ -94,6 +94,27 @@ describe('diagnostics IPC', () => {
     ).toBe(false)
   })
 
+  it('rejects checkpoints outside the closed schema', () => {
+    expect(
+      diagnosticsSnapshotSchema.safeParse({
+        schemaVersion: 1,
+        generatedAtMs: 2_000,
+        appVersion: '0.7.0',
+        build: null,
+        safeMode: false,
+        reason: null,
+        recentWebContentTerminations: 0,
+        events: [
+          {
+            kind: 'checkpoint',
+            atMs: 1_000,
+            checkpoint: 'privateNoteContent',
+          },
+        ],
+      }).success,
+    ).toBe(false)
+  })
+
   it('rejects unsafe version metadata from a persisted journal', () => {
     expect(
       diagnosticsSnapshotSchema.safeParse({

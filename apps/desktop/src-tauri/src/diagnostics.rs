@@ -216,6 +216,13 @@ impl DiagnosticsState {
 
         let recent_count = if window == DiagnosticWindow::Main {
             store.termination_timestamps_ms.push(now_ms);
+            let excess = store
+                .termination_timestamps_ms
+                .len()
+                .saturating_sub(MAX_EVENTS);
+            if excess > 0 {
+                store.termination_timestamps_ms.drain(..excess);
+            }
             store.termination_timestamps_ms.len()
         } else {
             0
@@ -579,6 +586,24 @@ mod tests {
             DiagnosticsState::from_path(dir.path().join("diagnostics").join("events.json"));
         let snapshot = reloaded.snapshot("1.2.3", Some("42"), 10_000);
         assert_eq!(snapshot.events.len(), MAX_EVENTS);
+    }
+
+    #[test]
+    fn termination_burst_remains_loadable_and_in_safe_mode() {
+        let (dir, state) = state();
+        for now_ms in 0..(MAX_EVENTS + 20) {
+            state.web_content_terminated("main", now_ms as u64);
+        }
+        drop(state);
+
+        let reloaded =
+            DiagnosticsState::from_path(dir.path().join("diagnostics").join("events.json"));
+        let snapshot = reloaded.snapshot("1.2.3", None, 10_000);
+        assert!(snapshot.safe_mode);
+        assert_eq!(
+            usize::from(snapshot.recent_web_content_terminations),
+            MAX_EVENTS
+        );
     }
 
     #[test]
