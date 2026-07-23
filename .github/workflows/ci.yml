@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   node:
-    name: Lint · typecheck · node tests · build (Node)
+    name: lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -49,17 +49,11 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Test non-desktop packages
-        run: pnpm turbo run test --filter='!@reflect/desktop'
-
-      - name: Test desktop non-browser suites
-        run: pnpm --filter @reflect/desktop exec vitest run --project node
-
       - name: Build
         run: pnpm build
 
   chromium:
-    name: Browser tests (Chromium)
+    name: test-chromium
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -81,11 +75,11 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm --filter @reflect/desktop exec playwright install --with-deps chromium
 
-      - name: Test desktop browser suites
-        run: pnpm --filter @reflect/desktop exec vitest run --project browser
+      - name: Test
+        run: pnpm turbo run test
 
   webkit:
-    name: Browser tests (WebKit)
+    name: test-webkit
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -107,8 +101,8 @@ jobs:
       - name: Install Playwright WebKit
         run: pnpm --filter @reflect/desktop exec playwright install webkit
 
-      - name: Test desktop browser suites
-        run: pnpm --filter @reflect/desktop exec vitest run --project browser
+      - name: Test
+        run: pnpm turbo run test
         env:
           REFLECT_TEST_BROWSER: webkit
 

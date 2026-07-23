@@ -93,8 +93,9 @@ Desktop JS tests are split into Vitest projects (details in
   `REFLECT_TEST_BROWSER=webkit` runs WebKit (the engine of the production
   Tauri webview); `DEBUG=1` opens a headed window. One-time setup:
   `pnpm --filter @reflect/desktop test:install`.
-- `*.test.ts` files are pure logic and run in node (the `node` project); the
-  few that drive the DOM are listed in the config and run in the browser.
+- `*.test.ts` files are pure logic and run in node (the `node` project). A
+  logic test that drives the DOM is named `.test.tsx` so it lands in the
+  browser project.
 - `console.warn` / `console.error` fail tests (`vitest-fail-on-console`).
   Pre-existing noise is allowlisted in
   `apps/desktop/src/test-utils/allowed-console.ts`; PRs may only shrink that

@@ -16,11 +16,11 @@ jsdom. Rust tests are plain `cargo test` (see `AGENTS.md`).
 - **`node`**: `src/**/*.test.ts` plus `scripts/**/*.test.mjs`, executed in a
   plain node environment.
 
-The routing rule: `.test.ts` means "pure logic, node environment",
-`.test.tsx` means "needs a DOM, real browser". Exceptions (`.test.ts` files
-that drive the DOM through `renderHook` or document event listeners) are
-listed explicitly as `DOM_DRIVING_LOGIC_TESTS` in the config and run in the
-browser project. There is no jsdom anywhere.
+The routing rule is the file extension, with no exception list: `.test.ts`
+means "pure logic, node environment", `.test.tsx` means "needs a DOM, real
+browser". A logic test that drives the DOM (through `renderHook` or document
+event listeners) is named `.test.tsx` for that reason alone. There is no
+jsdom anywhere.
 
 ## Browsers
 
