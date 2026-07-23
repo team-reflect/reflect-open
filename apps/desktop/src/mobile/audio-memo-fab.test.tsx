@@ -1,6 +1,5 @@
-import { cleanup, render, type RenderResult } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { render, type RenderResult } from 'vitest-browser-react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const memo = vi.hoisted(() => ({
   phase: 'idle' as 'idle' | 'requesting' | 'recording' | 'transcribing' | 'error',
@@ -25,7 +24,7 @@ vi.mock('@/mobile/audio-memo-provider', () => ({
 
 const { AudioMemoFab } = await import('./audio-memo-fab')
 
-function renderFab(): RenderResult {
+function renderFab(): Promise<RenderResult> {
   return render(<AudioMemoFab />)
 }
 
@@ -36,36 +35,36 @@ beforeEach(() => {
   memo.error = null
 })
 
-afterEach(cleanup)
-
 describe('AudioMemoFab', () => {
   it('idle records on tap', async () => {
-    const view = renderFab()
+    const view = await renderFab()
 
-    await userEvent.click(view.getByRole('button', { name: 'Record audio memo' }))
+    await view.getByRole('button', { name: 'Record audio memo' }).click()
 
     expect(memo.toggle).toHaveBeenCalledTimes(1)
   })
 
-  it('reads as the stop control while recording', () => {
+  it('reads as the stop control while recording', async () => {
     memo.phase = 'recording'
-    const view = renderFab()
+    const view = await renderFab()
 
-    expect(view.getByRole('button', { name: 'Stop recording' })).toBeTruthy()
+    await expect.element(view.getByRole('button', { name: 'Stop recording' })).toBeInTheDocument()
   })
 
-  it('a parked failure reads as the error affordance', () => {
+  it('a parked failure reads as the error affordance', async () => {
     memo.phase = 'error'
     memo.error = 'disk full'
-    const view = renderFab()
+    const view = await renderFab()
 
-    expect(view.getByRole('button', { name: 'Show audio memo error' })).toBeTruthy()
+    await expect
+      .element(view.getByRole('button', { name: 'Show audio memo error' }))
+      .toBeInTheDocument()
   })
 
-  it('hides entirely when the feature cannot run', () => {
+  it('hides entirely when the feature cannot run', async () => {
     memo.available = false
-    const view = renderFab()
+    const view = await renderFab()
 
-    expect(view.queryByRole('button')).toBeNull()
+    expect(view.getByRole('button').query()).toBeNull()
   })
 })

@@ -1,5 +1,5 @@
-import { render, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render } from 'vitest-browser-react'
+import { userEvent } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SnippetTask } from '@reflect/core'
@@ -61,57 +61,57 @@ beforeEach(() => {
 
 describe('BacklinkSnippet task checkboxes', () => {
   it('writes a round-task click through to the source note', async () => {
-    const view = renderSnippet()
+    const view = await renderSnippet()
     const boxes = view.container.querySelectorAll('input[type="checkbox"]')
     expect(boxes).toHaveLength(3)
     await userEvent.click(boxes[0]!)
-    await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
     expect(toggleTask).toHaveBeenCalledWith(
       { notePath: 'notes/meeting.md', markerOffset: 124, raw: '[ ] prep agenda' },
       7,
     )
-    view.unmount()
+    await view.unmount()
   })
 
   it('toggles a checked round task by its own anchor', async () => {
-    const view = renderSnippet()
+    const view = await renderSnippet()
     const boxes = view.container.querySelectorAll('input[type="checkbox"]')
     await userEvent.click(boxes[2]!)
-    await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
     expect(toggleTask).toHaveBeenCalledWith(
       { notePath: 'notes/meeting.md', markerOffset: 164, raw: '[x] send invite' },
       7,
     )
-    view.unmount()
+    await view.unmount()
   })
 
   it('leaves a square GFM checkbox read-only', async () => {
-    const view = renderSnippet()
+    const view = await renderSnippet()
     const boxes = view.container.querySelectorAll('input[type="checkbox"]')
     expect((boxes[1] as HTMLInputElement).checked).toBe(true)
-    await userEvent.click(boxes[1]!)
+    await userEvent.click(boxes[1]!, { force: true })
     expect(toggleTask).not.toHaveBeenCalled()
     expect(operationFail).not.toHaveBeenCalled()
-    view.unmount()
+    await view.unmount()
   })
 
   it('refuses instead of toggling when the anchors disagree with the rendered task', async () => {
     // Simulate anchor drift: the anchor for index 0 claims a different state.
     const drifted = anchors()
     drifted[0] = { ...drifted[0]!, checked: true }
-    const view = renderSnippet(drifted)
+    const view = await renderSnippet(drifted)
     const boxes = view.container.querySelectorAll('input[type="checkbox"]')
     await userEvent.click(boxes[0]!)
     expect(toggleTask).not.toHaveBeenCalled()
-    await waitFor(() => expect(operationFail).toHaveBeenCalled())
-    view.unmount()
+    await vi.waitFor(() => expect(operationFail).toHaveBeenCalled())
+    await view.unmount()
   })
 
-  it('renders a collapsed source item expanded', () => {
+  it('renders a collapsed source item expanded', async () => {
     // The parent is folded in the source note (`+` marker), so its line is
     // sliced into the context verbatim; the snippet must still show the
     // mention underneath instead of folding it away.
-    const view = render(
+    const view = await render(
       <QueryClientProvider
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
       >
@@ -126,14 +126,14 @@ describe('BacklinkSnippet task checkboxes', () => {
     )
     expect(view.container.querySelector('[data-list-collapsed]')).toBeNull()
     expect(view.container.textContent).toContain('mention of')
-    view.unmount()
+    await view.unmount()
   })
 
   it('renders checkboxes inert when the snippet has no round tasks', async () => {
     const squareOnly: SnippetTask[] = [
       { markerOffset: 144, raw: '[x] square box', checked: true, round: false, text: 'square box' },
     ]
-    const view = render(
+    const view = await render(
       <QueryClientProvider
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
       >
@@ -147,8 +147,8 @@ describe('BacklinkSnippet task checkboxes', () => {
       </QueryClientProvider>,
     )
     const box = view.container.querySelector('input[type="checkbox"]')!
-    await userEvent.click(box)
+    await userEvent.click(box, { force: true })
     expect(toggleTask).not.toHaveBeenCalled()
-    view.unmount()
+    await view.unmount()
   })
 })

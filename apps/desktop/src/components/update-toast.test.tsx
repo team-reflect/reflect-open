@@ -1,4 +1,4 @@
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { render } from 'vitest-browser-react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { UpdateState } from '@/lib/update-controller'
 import { UpdateToast } from './update-toast'
@@ -30,7 +30,6 @@ vi.mock('@/providers/update-provider', () => ({
 vi.mock('sonner', () => ({ toast }))
 
 afterEach(() => {
-  cleanup()
   update.state = { phase: 'idle' }
   update.install.mockClear()
   update.restart.mockClear()
@@ -44,9 +43,9 @@ afterEach(() => {
 describe('UpdateToast', () => {
   it('shows an install action when an update is available', async () => {
     update.state = { phase: 'available', version: '1.2.3' }
-    render(<UpdateToast />)
+    await render(<UpdateToast />)
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(toast.message).toHaveBeenCalledWith(
         'Update available',
         expect.objectContaining({
@@ -65,12 +64,12 @@ describe('UpdateToast', () => {
   })
 
   it('updates the same toast while downloading and when ready', async () => {
-    const { rerender } = render(<UpdateToast />)
-    await waitFor(() => expect(toast.dismiss).toHaveBeenCalledWith('reflect-update'))
+    const { rerender } = await render(<UpdateToast />)
+    await vi.waitFor(() => expect(toast.dismiss).toHaveBeenCalledWith('reflect-update'))
 
     update.state = { phase: 'downloading', version: '1.2.3', percent: 42 }
-    rerender(<UpdateToast />)
-    await waitFor(() =>
+    await rerender(<UpdateToast />)
+    await vi.waitFor(() =>
       expect(toast.loading).toHaveBeenCalledWith(
         'Downloading update',
         expect.objectContaining({ id: 'reflect-update', description: '42%' }),
@@ -85,8 +84,8 @@ describe('UpdateToast', () => {
     expect(downloadingOptions?.action).toBeUndefined()
 
     update.state = { phase: 'ready', version: '1.2.3' }
-    rerender(<UpdateToast />)
-    await waitFor(() =>
+    await rerender(<UpdateToast />)
+    await vi.waitFor(() =>
       expect(toast.success).toHaveBeenCalledWith(
         'Update ready',
         expect.objectContaining({
@@ -98,16 +97,16 @@ describe('UpdateToast', () => {
   })
 
   it('surfaces install errors but ignores check-only states', async () => {
-    const { rerender } = render(<UpdateToast />)
+    const { rerender } = await render(<UpdateToast />)
 
     update.state = { phase: 'error', during: 'check', message: 'offline' }
-    rerender(<UpdateToast />)
-    await waitFor(() => expect(toast.dismiss).toHaveBeenCalledWith('reflect-update'))
+    await rerender(<UpdateToast />)
+    await vi.waitFor(() => expect(toast.dismiss).toHaveBeenCalledWith('reflect-update'))
     expect(toast.error).not.toHaveBeenCalled()
 
     update.state = { phase: 'error', during: 'install', message: 'signature failed' }
-    rerender(<UpdateToast />)
-    await waitFor(() =>
+    await rerender(<UpdateToast />)
+    await vi.waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(
         'Update failed',
         expect.objectContaining({

@@ -1,6 +1,6 @@
-import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { useState, type ReactElement, type ReactNode } from 'react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { renderHook } from 'vitest-browser-react'
 import type {
   AiProvidersState,
   AudioMemoIdentity,
@@ -178,11 +178,9 @@ beforeEach(() => {
   createTranscriptionReconciler.mockReturnValue(reconcilerControls.fake)
 })
 
-afterEach(cleanup)
-
 describe('AudioMemoProvider', () => {
   it('toggle records, then stops and hands the recording to the capture action', async () => {
-    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+    const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
     expect(result.current.available).toBe(true)
 
     await act(async () => {
@@ -193,7 +191,7 @@ describe('AudioMemoProvider', () => {
     await act(async () => {
       result.current.toggle()
     })
-    await waitFor(() => expect(result.current.phase).toBe('idle'))
+    await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
 
     expect(captureAudioMemo).toHaveBeenCalledWith({
       audio: RECORDING.blob,
@@ -204,7 +202,7 @@ describe('AudioMemoProvider', () => {
   })
 
   it('mounts one reconciler per graph session and reads formatting lazily', async () => {
-    const { rerender, unmount } = renderHook(() => useAudioMemo(), { wrapper })
+    const { rerender, unmount } = await renderHook(() => useAudioMemo(), { wrapper })
 
     expect(createTranscriptionReconciler).toHaveBeenCalledTimes(1)
     const options = createTranscriptionReconciler.mock.calls[0]?.[0]
@@ -215,18 +213,16 @@ describe('AudioMemoProvider', () => {
     expect(reconcilerControls.fake.start).toHaveBeenCalledTimes(1)
 
     SETTINGS.current = { ...SETTINGS.current, transcriptionFormat: false }
-    await act(async () => {
-      rerender()
-    })
+    await rerender()
     expect(options?.getTranscriptionFormat()).toBe(false)
     expect(createTranscriptionReconciler).toHaveBeenCalledTimes(1)
 
-    unmount()
+    await unmount()
     expect(reconcilerControls.fake.dispose).toHaveBeenCalledTimes(1)
   })
 
   it('a saved capture schedules transcription without waiting on the watcher', async () => {
-    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+    const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
 
     await act(async () => {
       result.current.toggle()
@@ -234,7 +230,7 @@ describe('AudioMemoProvider', () => {
     await act(async () => {
       result.current.toggle()
     })
-    await waitFor(() => expect(result.current.phase).toBe('idle'))
+    await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
 
     expect(reconcilerControls.fake.schedule).toHaveBeenCalled()
   })
@@ -247,7 +243,7 @@ describe('AudioMemoProvider', () => {
       defaultAiProviderId: 'claude',
       transcriptionFormat: true,
     }
-    const { rerender } = renderHook(() => useAudioMemo(), { wrapper })
+    const { rerender } = await renderHook(() => useAudioMemo(), { wrapper })
     expect(reconcilerControls.fake.schedule).not.toHaveBeenCalled()
 
     SETTINGS.current = {
@@ -255,16 +251,14 @@ describe('AudioMemoProvider', () => {
       defaultAiProviderId: 'cfg-openai',
       transcriptionFormat: true,
     }
-    await act(async () => {
-      rerender()
-    })
+    await rerender()
 
     expect(reconcilerControls.fake.schedule).toHaveBeenCalledTimes(1)
   })
 
   it('a too-short recording is discarded without saving', async () => {
     recorderControls.stopResult = null
-    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+    const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
 
     await act(async () => {
       result.current.toggle()
@@ -281,7 +275,7 @@ describe('AudioMemoProvider', () => {
     captureAudioMemo
       .mockResolvedValueOnce({ ok: false, message: 'disk full' })
       .mockResolvedValueOnce({ ok: true, memo: MEMO })
-    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+    const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
 
     await act(async () => {
       result.current.toggle()
@@ -289,14 +283,14 @@ describe('AudioMemoProvider', () => {
     await act(async () => {
       result.current.toggle()
     })
-    await waitFor(() => expect(result.current.phase).toBe('error'))
+    await vi.waitFor(() => expect(result.current.phase).toBe('error'))
     expect(result.current.error).toBe('disk full')
     expect(result.current.canRetry).toBe(true)
 
     await act(async () => {
       result.current.retry()
     })
-    await waitFor(() => expect(result.current.phase).toBe('idle'))
+    await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
     expect(captureAudioMemo).toHaveBeenCalledTimes(2)
     expect(captureAudioMemo).toHaveBeenLastCalledWith(
       expect.objectContaining({ audio: RECORDING.blob }),
@@ -304,7 +298,7 @@ describe('AudioMemoProvider', () => {
   })
 
   it('arms the recorder cap and saves when it fires', async () => {
-    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+    const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
     expect(recorderControls.options?.maxDurationMs).toBe(10 * 60_000)
 
     await act(async () => {
@@ -314,11 +308,11 @@ describe('AudioMemoProvider', () => {
       recorderControls.options?.onMaxDuration?.()
     })
 
-    await waitFor(() => expect(captureAudioMemo).toHaveBeenCalled())
+    await vi.waitFor(() => expect(captureAudioMemo).toHaveBeenCalled())
   })
 
   it('collapsing the sidebar mid-recording stops and saves', async () => {
-    const { result, rerender } = renderHook(() => useAudioMemo(), { wrapper })
+    const { result, act, rerender } = await renderHook(() => useAudioMemo(), { wrapper })
 
     await act(async () => {
       result.current.toggle()
@@ -326,21 +320,19 @@ describe('AudioMemoProvider', () => {
     expect(result.current.phase).toBe('recording')
 
     sidebarState.collapsed = true
-    await act(async () => {
-      rerender()
-    })
+    await rerender()
 
-    await waitFor(() => expect(captureAudioMemo).toHaveBeenCalled())
+    await vi.waitFor(() => expect(captureAudioMemo).toHaveBeenCalled())
   })
 
   it('the stop click commits immediately — no recording-phase gap for Esc to cancel in', async () => {
     recorderControls.holdStop = true
-    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+    const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
 
     await act(async () => {
       result.current.toggle()
     })
-    act(() => {
+    await act(() => {
       void result.current.toggle()
     })
     // The recorder's stop hasn't settled, but the phase already left
@@ -350,18 +342,18 @@ describe('AudioMemoProvider', () => {
     await act(async () => {
       recorderControls.releaseStop()
     })
-    await waitFor(() => expect(result.current.phase).toBe('idle'))
+    await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
     expect(captureAudioMemo).toHaveBeenCalledTimes(1)
   })
 
   it('a mic click landing in the stop gap starts the next memo once the recorder frees', async () => {
     recorderControls.holdStop = true
-    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+    const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
 
     await act(async () => {
       result.current.toggle()
     })
-    act(() => {
+    await act(() => {
       void result.current.toggle()
     })
     expect(result.current.phase).toBe('transcribing')
@@ -377,7 +369,7 @@ describe('AudioMemoProvider', () => {
     await act(async () => {
       recorderControls.releaseStop()
     })
-    await waitFor(() => expect(result.current.phase).toBe('recording'))
+    await vi.waitFor(() => expect(result.current.phase).toBe('recording'))
     expect(recorderControls.startSpy).toHaveBeenCalledTimes(2)
     expect(captureAudioMemo).toHaveBeenCalledTimes(1)
   })
@@ -395,7 +387,7 @@ describe('AudioMemoProvider', () => {
       mimeType: 'audio/mp4',
       durationMs: 2000,
     }
-    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+    const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
 
     await act(async () => {
       result.current.toggle()
@@ -423,7 +415,7 @@ describe('AudioMemoProvider', () => {
     await act(async () => {
       releaseFirst({ ok: true, memo: MEMO })
     })
-    await waitFor(() => expect(result.current.phase).toBe('idle'))
+    await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
     expect(result.current.pendingCount).toBe(0)
     expect(captureAudioMemo).toHaveBeenCalledTimes(2)
     expect(captureAudioMemo).toHaveBeenLastCalledWith(
@@ -444,7 +436,7 @@ describe('AudioMemoProvider', () => {
       mimeType: 'audio/mp4',
       durationMs: 2000,
     }
-    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+    const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
 
     await act(async () => {
       result.current.toggle()
@@ -463,7 +455,7 @@ describe('AudioMemoProvider', () => {
     await act(async () => {
       releaseFirst({ ok: false, message: 'disk full' })
     })
-    await waitFor(() => expect(result.current.phase).toBe('error'))
+    await vi.waitFor(() => expect(result.current.phase).toBe('error'))
     // The second memo holds behind the failure — retrying later must not
     // write the first recording after the second.
     expect(captureAudioMemo).toHaveBeenCalledTimes(1)
@@ -471,7 +463,7 @@ describe('AudioMemoProvider', () => {
     await act(async () => {
       result.current.retry()
     })
-    await waitFor(() => expect(result.current.phase).toBe('idle'))
+    await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
     expect(captureAudioMemo).toHaveBeenCalledTimes(3)
     expect(captureAudioMemo.mock.calls[1]?.[0].audio).toBe(RECORDING.blob)
     expect(captureAudioMemo.mock.calls[2]?.[0].audio).toBe(second.blob)
@@ -490,7 +482,7 @@ describe('AudioMemoProvider', () => {
       mimeType: 'audio/mp4',
       durationMs: 2000,
     }
-    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+    const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
 
     await act(async () => {
       result.current.toggle()
@@ -509,12 +501,12 @@ describe('AudioMemoProvider', () => {
     await act(async () => {
       releaseFirst({ ok: false, message: 'disk full' })
     })
-    await waitFor(() => expect(result.current.phase).toBe('error'))
+    await vi.waitFor(() => expect(result.current.phase).toBe('error'))
 
     await act(async () => {
       result.current.discard()
     })
-    await waitFor(() => expect(result.current.phase).toBe('idle'))
+    await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
     expect(captureAudioMemo).toHaveBeenCalledTimes(2)
     expect(captureAudioMemo).toHaveBeenLastCalledWith(
       expect.objectContaining({ audio: second.blob }),
@@ -523,7 +515,7 @@ describe('AudioMemoProvider', () => {
 
   it('a second toggle during the permission prompt aborts the request', async () => {
     recorderControls.holdStart = true
-    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+    const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
 
     await act(async () => {
       result.current.toggle()
@@ -539,22 +531,27 @@ describe('AudioMemoProvider', () => {
 
   it('a denied microphone maps to platform-appropriate guidance, with no retry', async () => {
     recorderControls.failStart = new DOMException('denied', 'NotAllowedError')
-    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+    const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
 
     await act(async () => {
       result.current.toggle()
     })
 
-    await waitFor(() => expect(result.current.phase).toBe('error'))
+    await vi.waitFor(() => expect(result.current.phase).toBe('error'))
     expect(result.current.canRetry).toBe(false)
-    // jsdom is not a Macintosh user agent — the copy must not name macOS paths.
-    expect(result.current.error).toMatch(/system settings/i)
-    expect(result.current.error).not.toMatch(/Privacy & Security/)
+    // A real browser reports the host OS user agent, so the expected copy
+    // follows the platform the suite runs on.
+    if (navigator.userAgent.includes('Macintosh')) {
+      expect(result.current.error).toMatch(/Privacy & Security/)
+    } else {
+      expect(result.current.error).toMatch(/system settings/i)
+      expect(result.current.error).not.toMatch(/Privacy & Security/)
+    }
   })
 
   it('collapsing the sidebar during the permission prompt abandons the request', async () => {
     recorderControls.holdStart = true
-    const { result, rerender } = renderHook(() => useAudioMemo(), { wrapper })
+    const { result, act, rerender } = await renderHook(() => useAudioMemo(), { wrapper })
 
     await act(async () => {
       result.current.toggle()
@@ -562,9 +559,7 @@ describe('AudioMemoProvider', () => {
     expect(result.current.phase).toBe('requesting')
 
     sidebarState.collapsed = true
-    await act(async () => {
-      rerender()
-    })
+    await rerender()
 
     expect(recorderControls.cancelSpy).toHaveBeenCalled()
     expect(captureAudioMemo).not.toHaveBeenCalled()
@@ -572,22 +567,20 @@ describe('AudioMemoProvider', () => {
 
   it('a capture failure while the sidebar is collapsed surfaces through operations', async () => {
     captureAudioMemo.mockResolvedValue({ ok: false, message: 'disk full' })
-    const { result, rerender } = renderHook(() => useAudioMemo(), { wrapper })
+    const { result, act, rerender } = await renderHook(() => useAudioMemo(), { wrapper })
 
     await act(async () => {
       result.current.toggle()
     })
     sidebarState.collapsed = true
-    await act(async () => {
-      rerender()
-    })
+    await rerender()
 
-    await waitFor(() => expect(failOperation).toHaveBeenCalledWith('disk full'))
+    await vi.waitFor(() => expect(failOperation).toHaveBeenCalledWith('disk full'))
   })
 
   it('a parked error never invisibly blocks recording: toggle surfaces, then clears it', async () => {
     captureAudioMemo.mockResolvedValue({ ok: false, message: 'disk full' })
-    const { result, rerender } = renderHook(() => useAudioMemo(), { wrapper })
+    const { result, act, rerender } = await renderHook(() => useAudioMemo(), { wrapper })
 
     // Fail a capture, then collapse — the error popover unmounts with the mic.
     await act(async () => {
@@ -596,11 +589,9 @@ describe('AudioMemoProvider', () => {
     await act(async () => {
       result.current.toggle()
     })
-    await waitFor(() => expect(result.current.phase).toBe('error'))
+    await vi.waitFor(() => expect(result.current.phase).toBe('error'))
     sidebarState.collapsed = true
-    await act(async () => {
-      rerender()
-    })
+    await rerender()
 
     // Collapsed: toggle re-surfaces the error instead of doing nothing.
     toggleSidebar.mockClear()
@@ -612,9 +603,7 @@ describe('AudioMemoProvider', () => {
 
     // Visible: toggle acknowledges the error; the next one records.
     sidebarState.collapsed = false
-    await act(async () => {
-      rerender()
-    })
+    await rerender()
     await act(async () => {
       result.current.toggle()
     })
@@ -627,7 +616,7 @@ describe('AudioMemoProvider', () => {
 
   it('starting from a collapsed sidebar expands it first', async () => {
     sidebarState.collapsed = true
-    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+    const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
 
     await act(async () => {
       result.current.toggle()
@@ -645,7 +634,7 @@ describe('AudioMemoProvider', () => {
       defaultAiProviderId: 'claude',
       transcriptionFormat: true,
     }
-    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+    const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
 
     expect(result.current.available).toBe(false)
     expect(result.current.unavailableReason).toMatch(/OpenAI or Gemini/)
@@ -661,12 +650,12 @@ describe('AudioMemoProvider', () => {
   })
 
   it('cancel discards the recording without saving', async () => {
-    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+    const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
 
     await act(async () => {
       result.current.toggle()
     })
-    act(() => {
+    await act(() => {
       result.current.cancel()
     })
 
@@ -676,15 +665,15 @@ describe('AudioMemoProvider', () => {
   })
 
   it('shows the transcribing phase while the reconciler reports work', async () => {
-    const { result } = renderHook(() => useAudioMemo(), { wrapper })
+    const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
     expect(result.current.phase).toBe('idle')
 
-    act(() => {
+    await act(() => {
       reconcilerControls.setTranscribing(true)
     })
     expect(result.current.phase).toBe('transcribing')
 
-    act(() => {
+    await act(() => {
       reconcilerControls.setTranscribing(false)
     })
     expect(result.current.phase).toBe('idle')

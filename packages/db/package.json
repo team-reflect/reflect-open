@@ -9,7 +9,7 @@
   "types": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "db:codegen": "node scripts/generate-schema.mjs"
   },
   "dependencies": {
@@ -21,6 +21,6 @@
     "kysely-codegen": "^0.20.0",
     "sqlite-vec": "^0.1.9",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   }
 }

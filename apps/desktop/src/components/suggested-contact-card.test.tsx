@@ -1,8 +1,9 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render } from 'vitest-browser-react'
+import { page, userEvent } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '@reflect/core'
+import { expectLocatorToHaveCount } from '@/test-utils/expect'
 import { SuggestedContactCard } from './suggested-contact-card'
 
 // The card reads the graph (generation for writes) and the contacts opt-in;
@@ -55,9 +56,9 @@ function installFakeBridge(authorization = 'authorized'): void {
   })
 }
 
-function renderCard(): void {
+async function renderCard(): Promise<void> {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(
+  await render(
     <QueryClientProvider client={queryClient}>
       <SuggestedContactCard path="notes/Ada Lovelace.md" />
     </QueryClientProvider>,
@@ -71,66 +72,65 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  cleanup()
   setBridge(null)
 })
 
 describe('SuggestedContactCard', () => {
   it('offers the matched contact with its primary details', async () => {
-    renderCard()
-    expect(await screen.findByText('Ada Lovelace')).toBeTruthy()
-    expect(screen.getByText('ada@example.com · +1 555 0100')).toBeTruthy()
+    await renderCard()
+    await expect.element(page.getByText('Ada Lovelace')).toBeInTheDocument()
+    await expect.element(page.getByText('ada@example.com · +1 555 0100')).toBeInTheDocument()
     expect(lookups).toEqual(['Ada Lovelace'])
   })
 
   it('Add writes the details block in one write, then the content hides the card', async () => {
-    renderCard()
-    await userEvent.click(await screen.findByRole('button', { name: 'Add' }))
+    await renderCard()
+    await userEvent.click(page.getByRole('button', { name: 'Add' }))
 
-    await waitFor(() => expect(written.length).toBe(1))
+    await vi.waitFor(() => expect(written.length).toBe(1))
     expect(written[0]?.contents).toBe(
       '# Ada Lovelace\n\n- Type: #person\n- Email: ada@example.com\n- Phone: +1 555 0100\n',
     )
-    await waitFor(() => expect(screen.queryByText('Ada Lovelace')).toBeNull())
+    await expectLocatorToHaveCount(page.getByText('Ada Lovelace'), 0)
   })
 
   it('Ignore records the contact in ignoredContacts, then hides the card', async () => {
-    renderCard()
-    await userEvent.click(await screen.findByRole('button', { name: 'Ignore' }))
+    await renderCard()
+    await userEvent.click(page.getByRole('button', { name: 'Ignore' }))
 
-    await waitFor(() => expect(written.length).toBe(1))
+    await vi.waitFor(() => expect(written.length).toBe(1))
     expect(written[0]?.contents).toBe(
       '---\nignoredContacts:\n  - Ada Lovelace\n---\n# Ada Lovelace\n',
     )
-    await waitFor(() => expect(screen.queryByText('Ada Lovelace')).toBeNull())
+    await expectLocatorToHaveCount(page.getByText('Ada Lovelace'), 0)
   })
 
   it('renders nothing when the body already carries contact details — no lookup', async () => {
     noteSource = '# Ada Lovelace\n\n- Email: ada@example.com\n'
-    renderCard()
-    await waitFor(() => expect(lookups).toEqual([]))
-    expect(screen.queryByText('Ada Lovelace')).toBeNull()
+    await renderCard()
+    await vi.waitFor(() => expect(lookups).toEqual([]))
+    expect(page.getByText('Ada Lovelace').query()).toBeNull()
   })
 
   it('renders nothing for a contact dismissed on this note', async () => {
     noteSource = '---\nignoredContacts:\n  - ada lovelace\n---\n# Ada Lovelace\n'
-    renderCard()
+    await renderCard()
     // The dismissal check needs the match's name, so the lookup does run.
-    await waitFor(() => expect(lookups).toEqual(['Ada Lovelace']))
-    expect(screen.queryByText('ada@example.com · +1 555 0100')).toBeNull()
+    await vi.waitFor(() => expect(lookups).toEqual(['Ada Lovelace']))
+    expect(page.getByText('ada@example.com · +1 555 0100').query()).toBeNull()
   })
 
   it('renders nothing when the integration is off', async () => {
     contactsEnabled.current = false
-    renderCard()
-    await waitFor(() => expect(lookups).toEqual([]))
-    expect(screen.queryByText('Ada Lovelace')).toBeNull()
+    await renderCard()
+    await vi.waitFor(() => expect(lookups).toEqual([]))
+    expect(page.getByText('Ada Lovelace').query()).toBeNull()
   })
 
   it('renders nothing while contacts access is denied', async () => {
     installFakeBridge('denied')
-    renderCard()
-    await waitFor(() => expect(lookups).toEqual([]))
-    expect(screen.queryByText('Ada Lovelace')).toBeNull()
+    await renderCard()
+    await vi.waitFor(() => expect(lookups).toEqual([]))
+    expect(page.getByText('Ada Lovelace').query()).toBeNull()
   })
 })

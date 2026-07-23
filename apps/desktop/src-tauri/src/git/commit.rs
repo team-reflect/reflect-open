@@ -47,6 +47,10 @@ pub(super) fn commit_all(
 ) -> AppResult<CommitOutcome> {
     let repo = open_existing(root)?;
     ensure_clean_state(&repo)?;
+    // In-memory hard guarantee, independent of any on-disk ignore file: the
+    // runtime directory must never enter a backup commit (Plan 21 — a synced
+    // `.reflect/` is index corruption on every other device).
+    repo.add_ignore_rule("/.reflect/")?;
 
     let mut index = repo.index()?;
     let skipped = add_all_with_size_guard(&mut index, root, max_file_bytes)?;

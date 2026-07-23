@@ -700,6 +700,31 @@ describe('MobileShell', () => {
  * `transitionend` completions by hand.
  */
 describe('MobileStack transitions & back-swipe', () => {
+  // The test browser pins `prefers-reduced-motion: reduce`, which turns the
+  // stack's animations off. These tests are about the animated path, so they
+  // report the animating preference; the reduced-motion test below stubs the
+  // other answer for itself.
+  const animatingMatchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof matchMedia
+  let realMatchMedia: typeof matchMedia
+
+  beforeEach(() => {
+    realMatchMedia = globalThis.matchMedia
+    globalThis.matchMedia = animatingMatchMedia
+  })
+
+  afterEach(() => {
+    globalThis.matchMedia = realMatchMedia
+  })
+
   /** Navigate to the probe note and complete the push animation. */
   async function pushProbeNote(view: ReturnType<typeof render>): Promise<void> {
     const user = userEvent.setup()
@@ -833,12 +858,13 @@ describe('MobileStack transitions & back-swipe', () => {
     firePointer(stack, 'pointermove', { pointerId: 1, clientX: 40, clientY: 304 })
     // The card tracks the finger. (jsdom has no layout, so the gesture falls
     // back to window.innerWidth = 1024px — the pop threshold is ~410px.)
-    expect(card.style.transform).toBe('translate3d(30px, 0, 0)')
+    // The browser normalizes the written value's bare zeros to `0px`.
+    expect(card.style.transform).toBe('translate3d(30px, 0px, 0px)')
 
     firePointer(stack, 'pointermove', { pointerId: 1, clientX: 600, clientY: 310 })
     firePointer(stack, 'pointerup', { pointerId: 1, clientX: 600, clientY: 310 })
     // Released past the threshold: the card settles offscreen...
-    expect(card.style.transform).toBe('translate3d(100%, 0, 0)')
+    expect(card.style.transform).toBe('translate3d(100%, 0px, 0px)')
 
     // ...and only then commits the pop.
     fireEvent.transitionEnd(card)
@@ -904,7 +930,7 @@ describe('MobileStack transitions & back-swipe', () => {
       firePointer(stack, 'pointermove', { pointerId: 1, clientX: 40, clientY: 304 })
       firePointer(stack, 'pointermove', { pointerId: 1, clientX: 120, clientY: 306 })
       firePointer(stack, 'pointerup', { pointerId: 1, clientX: 120, clientY: 306 })
-      expect(card.style.transform).toBe('translate3d(0, 0, 0)')
+      expect(card.style.transform).toBe('translate3d(0px, 0px, 0px)')
 
       fireEvent.transitionEnd(card)
       expect(view.getByRole('heading').textContent).toBe('Edit note')

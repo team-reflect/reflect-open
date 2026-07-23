@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { render } from 'vitest-browser-react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { setIndexProgress } from '@/lib/index-progress'
 import { publishKeyboardHeight } from '@/mobile/use-keyboard'
@@ -17,38 +17,37 @@ beforeEach(() => {
 
 afterEach(() => {
   setIndexProgress(null)
-  cleanup()
 })
 
 describe('IndexProgressPill', () => {
-  it('stays hidden for a skip-everything pass, however large the graph', () => {
+  it('stays hidden for a skip-everything pass, however large the graph', async () => {
     setIndexProgress({ done: 3_500, total: 7_000, worked: 0 })
-    render(<IndexProgressPill />)
-    expect(screen.queryByRole('status')).toBeNull()
+    const view = await render(<IndexProgressPill />)
+    expect(view.getByRole('status').query()).toBeNull()
   })
 
-  it('appears once a pass has actually read enough files (a first index)', () => {
+  it('appears once a pass has actually read enough files (a first index)', async () => {
     setIndexProgress({ done: 160, total: 7_000, worked: 160 })
-    render(<IndexProgressPill />)
-    expect(screen.getByRole('status').textContent).toContain('160 of 7,000')
+    const view = await render(<IndexProgressPill />)
+    await expect.element(view.getByRole('status')).toHaveTextContent('160 of 7,000')
   })
 
-  it('stays hidden below the work threshold — a routine sync of a few notes', () => {
+  it('stays hidden below the work threshold — a routine sync of a few notes', async () => {
     setIndexProgress({ done: 6_900, total: 7_000, worked: 40 })
-    render(<IndexProgressPill />)
-    expect(screen.queryByRole('status')).toBeNull()
+    const view = await render(<IndexProgressPill />)
+    expect(view.getByRole('status').query()).toBeNull()
   })
 
-  it('stays hidden on a small graph even when every file is read', () => {
+  it('stays hidden on a small graph even when every file is read', async () => {
     setIndexProgress({ done: 90, total: 90, worked: 90 })
-    render(<IndexProgressPill />)
-    expect(screen.queryByRole('status')).toBeNull()
+    const view = await render(<IndexProgressPill />)
+    expect(view.getByRole('status').query()).toBeNull()
   })
 
-  it('yields to the keyboard', () => {
+  it('yields to the keyboard', async () => {
     setIndexProgress({ done: 500, total: 7_000, worked: 500 })
     publishKeyboardHeight(300)
-    render(<IndexProgressPill />)
-    expect(screen.queryByRole('status')).toBeNull()
+    const view = await render(<IndexProgressPill />)
+    expect(view.getByRole('status').query()).toBeNull()
   })
 })

@@ -1,6 +1,6 @@
-import { act, cleanup, render, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ReactElement } from 'react'
+import { renderHook } from 'vitest-browser-react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ReactNode } from 'react'
 import type {
   AiProviderConfig,
   ChatConversation,
@@ -95,19 +95,20 @@ function conversation(overrides: Partial<ChatConversation> = {}): ChatConversati
 
 let session: ReturnType<typeof useChatSession> | null = null
 
-function Probe(): ReactElement | null {
-  session = useChatSession()
-  return null
-}
-
 const GRAPH: GraphInfo = { root: '/g', name: 'test-graph', generation: 1 }
 
 function renderProvider() {
   session = null
-  return render(
-    <ChatProvider graph={GRAPH}>
-      <Probe />
-    </ChatProvider>,
+  return renderHook(
+    () => {
+      session = useChatSession()
+      return session
+    },
+    {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <ChatProvider graph={GRAPH}>{children}</ChatProvider>
+      ),
+    },
   )
 }
 
@@ -118,8 +119,6 @@ function scriptTurn(events: ChatStreamEvent[]) {
     })()
   })
 }
-
-afterEach(cleanup)
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -140,9 +139,9 @@ beforeEach(() => {
 describe('ChatProvider persistence', () => {
   it('resumes the latest conversation when it is fresh enough', async () => {
     core.listChatConversations.mockResolvedValue([conversation()])
-    renderProvider()
+    await renderProvider()
 
-    await waitFor(() => expect(session?.turns).toEqual([RESTORED_TURN]))
+    await vi.waitFor(() => expect(session?.turns).toEqual([RESTORED_TURN]))
     expect(session?.activeConversationId).toBe('conv-1')
     expect(core.loadChatMessages).toHaveBeenCalledWith('conv-1')
   })
@@ -151,9 +150,9 @@ describe('ChatProvider persistence', () => {
     core.listChatConversations.mockResolvedValue([
       conversation({ updatedMs: Date.now() - 7 * 60 * 60 * 1000 }),
     ])
-    renderProvider()
+    await renderProvider()
 
-    await waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+    await vi.waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
     expect(core.loadChatMessages).not.toHaveBeenCalled()
     expect(session?.turns).toEqual([])
     expect(session?.activeConversationId).not.toBe('conv-1')
@@ -164,8 +163,8 @@ describe('ChatProvider persistence', () => {
       { type: 'text-delta', text: 'Hi.' },
       { type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] },
     ])
-    renderProvider()
-    await waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+    const { act } = await renderProvider()
+    await vi.waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
 
     await act(() => session?.send('hello there'))
 
@@ -198,8 +197,8 @@ describe('ChatProvider persistence', () => {
       },
       { type: 'complete', messages: [{ role: 'assistant', content: 'noop' }] },
     ])
-    renderProvider()
-    await waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+    const { act } = await renderProvider()
+    await vi.waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
 
     await act(() => session?.send('summarize my notes'))
 
@@ -212,8 +211,8 @@ describe('ChatProvider persistence', () => {
   it('saves later turns into the restored conversation', async () => {
     core.listChatConversations.mockResolvedValue([conversation()])
     scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: 'More.' }] }])
-    renderProvider()
-    await waitFor(() => expect(session?.turns).toHaveLength(1))
+    const { act } = await renderProvider()
+    await vi.waitFor(() => expect(session?.turns).toHaveLength(1))
 
     await act(() => session?.send('and today?'))
 
@@ -226,8 +225,8 @@ describe('ChatProvider persistence', () => {
   it('passes the semantic search setting into chat turns', async () => {
     settingsState.semanticSearchEnabled = true
     scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] }])
-    renderProvider()
-    await waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+    const { act } = await renderProvider()
+    await vi.waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
 
     await act(() => session?.send('hello'))
 
@@ -237,14 +236,10 @@ describe('ChatProvider persistence', () => {
   })
 
   it('passes the latest configured system prompt into the next chat turn', async () => {
-    const view = renderProvider()
-    await waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+    const { act, rerender } = await renderProvider()
+    await vi.waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
     settingsState.chatSystemPrompt = 'Answer like a rigorous research partner.'
-    view.rerender(
-      <ChatProvider graph={GRAPH}>
-        <Probe />
-      </ChatProvider>,
-    )
+    await rerender()
     scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] }])
 
     await act(() => session?.send('hello'))
@@ -261,8 +256,8 @@ describe('ChatProvider persistence', () => {
     setPlatformSurface({ mobileApp: true })
     try {
       scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] }])
-      renderProvider()
-      await waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+      const { act } = await renderProvider()
+      await vi.waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
 
       await act(() => session?.send('hello'))
 
@@ -276,10 +271,10 @@ describe('ChatProvider persistence', () => {
 
   it('holds the composer draft and clears it when a send goes through', async () => {
     scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] }])
-    renderProvider()
-    await waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+    const { act } = await renderProvider()
+    await vi.waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
 
-    act(() => session?.setDraft('half-typed question'))
+    await act(() => session?.setDraft('half-typed question'))
     expect(session?.draft).toBe('half-typed question')
 
     await act(() => session?.send('half-typed question'))
@@ -288,8 +283,8 @@ describe('ChatProvider persistence', () => {
   })
 
   it('opens a past conversation and switches the active id', async () => {
-    renderProvider()
-    await waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+    const { act } = await renderProvider()
+    await vi.waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
 
     await act(() => session?.openConversation('conv-9'))
 
@@ -311,8 +306,8 @@ describe('ChatProvider persistence', () => {
         }),
     )
     scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] }])
-    renderProvider()
-    await waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+    const { act } = await renderProvider()
+    await vi.waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
     const homeConversation = session?.activeConversationId
 
     let openDone: Promise<void> | undefined
@@ -334,8 +329,8 @@ describe('ChatProvider persistence', () => {
 
   it('deleting the active conversation starts a fresh chat', async () => {
     core.listChatConversations.mockResolvedValue([conversation()])
-    renderProvider()
-    await waitFor(() => expect(session?.activeConversationId).toBe('conv-1'))
+    const { act } = await renderProvider()
+    await vi.waitFor(() => expect(session?.activeConversationId).toBe('conv-1'))
 
     await act(() => session?.deleteConversation('conv-1'))
 
@@ -359,8 +354,8 @@ describe('ChatProvider persistence', () => {
         } satisfies ChatStreamEvent
       })()
     })
-    renderProvider()
-    await waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+    const { act } = await renderProvider()
+    await vi.waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
 
     let sendDone: Promise<void> | undefined
     await act(async () => {
@@ -392,8 +387,8 @@ describe('ChatProvider persistence', () => {
         }),
     )
     scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] }])
-    renderProvider()
-    await waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+    const { act } = await renderProvider()
+    await vi.waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
 
     await act(() => session?.send('hello'))
     const sentInto = core.saveChatMessage.mock.calls[0]![0] as { conversation: { id: string } }
@@ -416,18 +411,18 @@ describe('ChatProvider persistence', () => {
 describe('ChatProvider model selection', () => {
   it('starts on the persisted model selection', async () => {
     settingsState.selection = { configId: 'm1', modelId: 'gpt-5.5' }
-    renderProvider()
-    await waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+    await renderProvider()
+    await vi.waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
 
     expect(session?.activeModel).toEqual({ ...MODEL, model: 'gpt-5.5' })
   })
 
   it('persists a picked model and applies it to the session', async () => {
-    renderProvider()
-    await waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+    const { act } = await renderProvider()
+    await vi.waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
     expect(session?.activeModel).toEqual(MODEL)
 
-    act(() => session?.selectModel({ configId: 'm1', modelId: 'gpt-5.5' }))
+    await act(() => session?.selectModel({ configId: 'm1', modelId: 'gpt-5.5' }))
 
     expect(updateSettings).toHaveBeenCalledWith({
       chatModelSelection: { configId: 'm1', modelId: 'gpt-5.5' },
@@ -437,8 +432,8 @@ describe('ChatProvider model selection', () => {
 
   it('falls back to the default model when the persisted selection dangles', async () => {
     settingsState.selection = { configId: 'gone', modelId: 'gpt-5.5' }
-    renderProvider()
-    await waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
+    await renderProvider()
+    await vi.waitFor(() => expect(core.listChatConversations).toHaveBeenCalled())
 
     expect(session?.activeModel).toEqual(MODEL)
   })

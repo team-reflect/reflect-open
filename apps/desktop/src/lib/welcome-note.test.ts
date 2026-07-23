@@ -13,15 +13,19 @@ interface FakeGraph {
 }
 
 function installFakeBridge(options: {
-  existingFiles?: string[]
+  stats?: { notes?: number; attachments?: number; skipped?: number }
   meta?: Record<string, string>
 }): FakeGraph {
   const graph: FakeGraph = { written: [], meta: { ...options.meta } }
   setBridge({
     invoke: async (command, args) => {
       switch (command) {
-        case 'list_files':
-          return (options.existingFiles ?? []).map((path) => ({ path, size: 0, modifiedMs: 0 }))
+        case 'vault_scan_stats':
+          return {
+            notes: options.stats?.notes ?? 0,
+            attachments: options.stats?.attachments ?? 0,
+            skipped: options.stats?.skipped ?? 0,
+          }
         case 'note_write':
           graph.written.push({ path: String(args['path']), contents: String(args['contents']) })
           return null
@@ -66,8 +70,12 @@ describe('ensureWelcomeNote', () => {
     expect(graph.written[0]!.contents).toContain('[[Wiki Links]]')
   })
 
-  it('marks a graph with existing notes without writing into it', async () => {
-    const graph = installFakeBridge({ existingFiles: ['daily/2026-06-12.md'] })
+  it.each([
+    { label: 'notes anywhere in the vault', stats: { notes: 2 } },
+    { label: 'only attachments (a folder of PDFs)', stats: { attachments: 3 } },
+    { label: 'only skipped entries (unreadable content)', stats: { skipped: 1 } },
+  ])('marks a vault with $label without writing into it', async ({ stats }) => {
+    const graph = installFakeBridge({ stats })
     expect(await ensureWelcomeNote(GENERATIONS)).toBe(false)
     expect(graph.written).toHaveLength(0)
     expect(graph.meta[WELCOME_SEEDED_META_KEY]).toBe('true')

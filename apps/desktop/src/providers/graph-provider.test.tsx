@@ -1,5 +1,5 @@
-import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { renderHook } from 'vitest-browser-react'
 import type { ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { open } from '@tauri-apps/plugin-dialog'
@@ -105,6 +105,8 @@ function installFakeBridge(): void {
           return generation
         case 'list_files':
           return storedFiles
+        case 'vault_scan_stats':
+          return { notes: storedFiles.length, attachments: 0, skipped: 0 }
         case 'index_meta_set':
           metaStore[String(args['key'])] = String(args['value'])
           return null
@@ -157,36 +159,36 @@ afterEach(() => {
 
 describe('GraphProvider open sequencing', () => {
   it('starts at the chooser when there are no recents', async () => {
-    const { result } = renderHook(() => useGraph(), { wrapper })
-    await waitFor(() => expect(result.current.status).toBe('choosing'))
+    const { result } = await renderHook(() => useGraph(), { wrapper })
+    await vi.waitFor(() => expect(result.current.status).toBe('choosing'))
     expect(result.current.graph).toBeNull()
   })
 
   it('serializes overlapping opens and commits only the last requested graph', async () => {
-    const { result } = renderHook(() => useGraph(), { wrapper })
-    await waitFor(() => expect(result.current.status).toBe('choosing'))
+    const { result, act } = await renderHook(() => useGraph(), { wrapper })
+    await vi.waitFor(() => expect(result.current.status).toBe('choosing'))
 
     let firstOpen: Promise<boolean>
     let secondOpen: Promise<boolean>
-    act(() => {
+    await act(() => {
       firstOpen = result.current.openRecent('/a')
       secondOpen = result.current.openRecent('/b')
     })
 
     // The second backend open must wait for the first (Rust GraphState is
     // last-write-wins; running in request order keeps it on the last graph).
-    await waitFor(() => expect(invokeLog).toContain('graph_open:/a'))
+    await vi.waitFor(() => expect(invokeLog).toContain('graph_open:/a'))
     expect(invokeLog).not.toContain('graph_open:/b')
 
     await act(async () => {
       resolveOpen('/a')
-      await waitFor(() => expect(invokeLog).toContain('graph_open:/b'))
+      await vi.waitFor(() => expect(invokeLog).toContain('graph_open:/b'))
       resolveOpen('/b')
       await firstOpen
       await secondOpen
     })
 
-    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await vi.waitFor(() => expect(result.current.status).toBe('ready'))
     // The superseded first open must not have committed its graph.
     expect(result.current.graph?.root).toBe('/b')
   })
@@ -195,14 +197,14 @@ describe('GraphProvider open sequencing', () => {
     // Note windows adopted the outgoing session; their close-requested
     // flushes must land against its still-valid generation, so the close
     // command precedes graph_open (bump-first would reject the saves).
-    const { result } = renderHook(() => useGraph(), { wrapper })
-    await waitFor(() => expect(result.current.status).toBe('choosing'))
+    const { result, act } = await renderHook(() => useGraph(), { wrapper })
+    await vi.waitFor(() => expect(result.current.status).toBe('choosing'))
 
     let opened: Promise<boolean>
-    act(() => {
+    await act(() => {
       opened = result.current.openRecent('/a')
     })
-    await waitFor(() => expect(invokeLog).toContain('graph_open:/a'))
+    await vi.waitFor(() => expect(invokeLog).toContain('graph_open:/a'))
     expect(invokeLog.indexOf('close_note_windows')).toBeGreaterThanOrEqual(0)
     expect(invokeLog.indexOf('close_note_windows')).toBeLessThan(
       invokeLog.indexOf('graph_open:/a'),
@@ -214,8 +216,8 @@ describe('GraphProvider open sequencing', () => {
   })
 
   it('surfaces an open failure and returns to the chooser', async () => {
-    const { result } = renderHook(() => useGraph(), { wrapper })
-    await waitFor(() => expect(result.current.status).toBe('choosing'))
+    const { result, act } = await renderHook(() => useGraph(), { wrapper })
+    await vi.waitFor(() => expect(result.current.status).toBe('choosing'))
 
     failOpens = true
     await act(async () => {
@@ -228,13 +230,13 @@ describe('GraphProvider open sequencing', () => {
 
   it('forgets the open graph and returns to the chooser', async () => {
     storedRecents = [{ root: '/known', name: 'known', openedMs: 1 }]
-    const { result } = renderHook(() => useGraph(), { wrapper })
+    const { result, act } = await renderHook(() => useGraph(), { wrapper })
 
     await act(async () => {
-      await waitFor(() => expect(pendingOpens.has('/known')).toBe(true))
+      await vi.waitFor(() => expect(pendingOpens.has('/known')).toBe(true))
       resolveOpen('/known')
     })
-    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await vi.waitFor(() => expect(result.current.status).toBe('ready'))
 
     await act(async () => {
       await result.current.forget('/known')
@@ -248,13 +250,13 @@ describe('GraphProvider open sequencing', () => {
 
   it('drops the cached iCloud listing when the graph is deleted', async () => {
     storedRecents = [{ root: '/known', name: 'known', openedMs: 1 }]
-    const { result } = renderHook(() => useGraph(), { wrapper })
+    const { result, act } = await renderHook(() => useGraph(), { wrapper })
 
     await act(async () => {
-      await waitFor(() => expect(pendingOpens.has('/known')).toBe(true))
+      await vi.waitFor(() => expect(pendingOpens.has('/known')).toBe(true))
       resolveOpen('/known')
     })
-    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await vi.waitFor(() => expect(result.current.status).toBe('ready'))
 
     // The chooser's listing was cached before the delete; without the drop it
     // would keep showing the deleted graph (queries never go stale on their own).
@@ -275,13 +277,13 @@ describe('GraphProvider open sequencing', () => {
 
   it('returns to the graph chooser without opening the folder picker', async () => {
     storedRecents = [{ root: '/known', name: 'known', openedMs: 1 }]
-    const { result } = renderHook(() => useGraph(), { wrapper })
+    const { result, act } = await renderHook(() => useGraph(), { wrapper })
 
     await act(async () => {
-      await waitFor(() => expect(pendingOpens.has('/known')).toBe(true))
+      await vi.waitFor(() => expect(pendingOpens.has('/known')).toBe(true))
       resolveOpen('/known')
     })
-    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await vi.waitFor(() => expect(result.current.status).toBe('ready'))
 
     vi.mocked(open).mockClear()
     await act(async () => {
@@ -299,12 +301,12 @@ describe('GraphProvider open sequencing', () => {
 describe('GraphProvider welcome seeding', () => {
   it('seeds an empty unmarked graph and stamps the welcomeSeeded marker', async () => {
     vi.mocked(open).mockResolvedValue('/fresh')
-    const { result } = renderHook(() => useGraph(), { wrapper })
-    await waitFor(() => expect(result.current.status).toBe('choosing'))
+    const { result, act } = await renderHook(() => useGraph(), { wrapper })
+    await vi.waitFor(() => expect(result.current.status).toBe('choosing'))
 
     await act(async () => {
       const picking = result.current.pickAndOpen()
-      await waitFor(() => expect(pendingOpens.has('/fresh')).toBe(true))
+      await vi.waitFor(() => expect(pendingOpens.has('/fresh')).toBe(true))
       resolveOpen('/fresh')
       await picking
     })
@@ -317,13 +319,13 @@ describe('GraphProvider welcome seeding', () => {
   it('never seeds a marked graph, even when it is empty (deleted notes stay deleted)', async () => {
     storedRecents = [{ root: '/known', name: 'known', openedMs: 1 }]
     metaStore['welcomeSeeded'] = 'true'
-    const { result } = renderHook(() => useGraph(), { wrapper })
+    const { result, act } = await renderHook(() => useGraph(), { wrapper })
 
     await act(async () => {
-      await waitFor(() => expect(pendingOpens.has('/known')).toBe(true))
+      await vi.waitFor(() => expect(pendingOpens.has('/known')).toBe(true))
       resolveOpen('/known')
     })
-    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await vi.waitFor(() => expect(result.current.status).toBe('ready'))
 
     expect(invokeLog).not.toContain('note_write')
   })
@@ -331,13 +333,13 @@ describe('GraphProvider welcome seeding', () => {
   it('marks an unmarked graph with existing notes without writing into it', async () => {
     storedRecents = [{ root: '/existing', name: 'existing', openedMs: 1 }]
     storedFiles = [{ path: 'daily/2026-06-12.md', size: 10, modifiedMs: 0 }]
-    const { result } = renderHook(() => useGraph(), { wrapper })
+    const { result, act } = await renderHook(() => useGraph(), { wrapper })
 
     await act(async () => {
-      await waitFor(() => expect(pendingOpens.has('/existing')).toBe(true))
+      await vi.waitFor(() => expect(pendingOpens.has('/existing')).toBe(true))
       resolveOpen('/existing')
     })
-    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await vi.waitFor(() => expect(result.current.status).toBe('ready'))
 
     expect(invokeLog).not.toContain('note_write')
     // Onboarding was considered: emptying this graph later won't re-seed.
@@ -347,9 +349,9 @@ describe('GraphProvider welcome seeding', () => {
 
 describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
   it('defers opening the fixed roots and shows onboarding on a fresh install', async () => {
-    const { result } = renderHook(() => useGraph(), { wrapper: mobileWrapper })
+    const { result } = await renderHook(() => useGraph(), { wrapper: mobileWrapper })
 
-    await waitFor(() => expect(result.current.needsOnboarding).toBe(true))
+    await vi.waitFor(() => expect(result.current.needsOnboarding).toBe(true))
     expect(result.current.status).toBe('choosing')
     expect(result.current.graph).toBeNull()
     expect(result.current.mobileStorageInfo).toEqual({
@@ -366,39 +368,39 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
   })
 
   it('opens the local root and records flag + kind on completeOnboarding(local)', async () => {
-    const { result } = renderHook(() => useGraph(), { wrapper: mobileWrapper })
-    await waitFor(() => expect(result.current.needsOnboarding).toBe(true))
+    const { result, act } = await renderHook(() => useGraph(), { wrapper: mobileWrapper })
+    await vi.waitFor(() => expect(result.current.needsOnboarding).toBe(true))
 
     await act(async () => {
       const done = result.current.completeOnboarding('local')
-      await waitFor(() => expect(pendingOpens.has(MOBILE_ROOT)).toBe(true))
+      await vi.waitFor(() => expect(pendingOpens.has(MOBILE_ROOT)).toBe(true))
       resolveOpen(MOBILE_ROOT)
       await done
     })
 
-    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await vi.waitFor(() => expect(result.current.status).toBe('ready'))
     expect(result.current.needsOnboarding).toBe(false)
     expect(result.current.graph?.root).toBe(MOBILE_ROOT)
     expect(result.current.mobileStorageKind).toBe('local')
     // The gate is persisted (through the settings provider) so later launches
     // open the root directly — persistence trails the state update, so wait.
-    await waitFor(() => expect(settingsStore['mobileOnboarded']).toBe(true))
+    await vi.waitFor(() => expect(settingsStore['mobileOnboarded']).toBe(true))
     expect(settingsStore['mobileStorage']).toBe('local')
   })
 
   it('defers the first mobile index pass while hidden and replays it on foreground', async () => {
     const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
     try {
-      const { result } = renderHook(() => useGraph(), { wrapper: mobileWrapper })
-      await waitFor(() => expect(result.current.needsOnboarding).toBe(true))
+      const { result, act } = await renderHook(() => useGraph(), { wrapper: mobileWrapper })
+      await vi.waitFor(() => expect(result.current.needsOnboarding).toBe(true))
 
       await act(async () => {
         const done = result.current.completeOnboarding('local')
-        await waitFor(() => expect(pendingOpens.has(MOBILE_ROOT)).toBe(true))
+        await vi.waitFor(() => expect(pendingOpens.has(MOBILE_ROOT)).toBe(true))
         resolveOpen(MOBILE_ROOT)
         await done
       })
-      await waitFor(() => expect(metaStore['welcomeSeeded']).toBe('true'))
+      await vi.waitFor(() => expect(metaStore['welcomeSeeded']).toBe('true'))
       await act(async () => {
         await Promise.resolve()
       })
@@ -407,13 +409,13 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
       expect(invokeLog).not.toContain('index_reconcile_scan')
 
       visibility.mockReturnValue('visible')
-      act(() => {
+      await act(() => {
         document.dispatchEvent(new Event('visibilitychange'))
       })
 
       // Resume performs a full sync, which catches files and local events the
       // intentionally absent live subscription could not observe while hidden.
-      await waitFor(() => expect(invokeLog).toContain('index_clear'))
+      await vi.waitFor(() => expect(invokeLog).toContain('index_clear'))
     } finally {
       visibility.mockRestore()
     }
@@ -422,25 +424,25 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
   it('clears suspension when mobile foregrounds before its index session opens', async () => {
     const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
     try {
-      const { result } = renderHook(() => useGraph(), { wrapper: mobileWrapper })
-      await waitFor(() => expect(result.current.needsOnboarding).toBe(true))
+      const { result, act } = await renderHook(() => useGraph(), { wrapper: mobileWrapper })
+      await vi.waitFor(() => expect(result.current.needsOnboarding).toBe(true))
       expect(result.current.indexGeneration).toBeNull()
 
       // The app foregrounds while onboarding still has no graph/index. This
       // must clear the sticky suspension even though there is nothing to sync.
       visibility.mockReturnValue('visible')
-      act(() => {
+      await act(() => {
         document.dispatchEvent(new Event('visibilitychange'))
       })
 
       await act(async () => {
         const done = result.current.completeOnboarding('local')
-        await waitFor(() => expect(pendingOpens.has(MOBILE_ROOT)).toBe(true))
+        await vi.waitFor(() => expect(pendingOpens.has(MOBILE_ROOT)).toBe(true))
         resolveOpen(MOBILE_ROOT)
         await done
       })
 
-      await waitFor(() => expect(invokeLog).toContain('index_clear'))
+      await vi.waitFor(() => expect(invokeLog).toContain('index_clear'))
       expect(result.current.status).toBe('ready')
     } finally {
       visibility.mockRestore()
@@ -448,21 +450,21 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
   })
 
   it('creates the default container graph and records kind + name on completeOnboarding(icloud)', async () => {
-    const { result } = renderHook(() => useGraph(), { wrapper: mobileWrapper })
-    await waitFor(() => expect(result.current.needsOnboarding).toBe(true))
+    const { result, act } = await renderHook(() => useGraph(), { wrapper: mobileWrapper })
+    await vi.waitFor(() => expect(result.current.needsOnboarding).toBe(true))
 
     await act(async () => {
       const done = result.current.completeOnboarding('icloud')
-      await waitFor(() => expect(pendingOpens.has(ICLOUD_GRAPH)).toBe(true))
+      await vi.waitFor(() => expect(pendingOpens.has(ICLOUD_GRAPH)).toBe(true))
       resolveOpen(ICLOUD_GRAPH)
       await done
     })
 
-    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await vi.waitFor(() => expect(result.current.status).toBe('ready'))
     expect(result.current.graph?.root).toBe(ICLOUD_GRAPH)
     expect(result.current.mobileStorageKind).toBe('icloud')
     expect(invokeLog).toContain(`graph_create:${ICLOUD_GRAPH}`)
-    await waitFor(() => expect(settingsStore['mobileOnboarded']).toBe(true))
+    await vi.waitFor(() => expect(settingsStore['mobileOnboarded']).toBe(true))
     expect(settingsStore['mobileStorage']).toBe('icloud')
     // WHICH graph is remembered by name — never by container path.
     expect(settingsStore['mobileGraphName']).toBe('Notes')
@@ -474,20 +476,20 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
       icloudDocumentsRoot: ICLOUD_ROOT,
       icloudGraphRoots: [`${ICLOUD_ROOT}/Notes`, `${ICLOUD_ROOT}/Work`],
     }
-    const { result } = renderHook(() => useGraph(), { wrapper: mobileWrapper })
-    await waitFor(() => expect(result.current.needsOnboarding).toBe(true))
+    const { result, act } = await renderHook(() => useGraph(), { wrapper: mobileWrapper })
+    await vi.waitFor(() => expect(result.current.needsOnboarding).toBe(true))
 
     await act(async () => {
       const done = result.current.completeOnboarding('icloud', `${ICLOUD_ROOT}/Work`)
-      await waitFor(() => expect(pendingOpens.has(`${ICLOUD_ROOT}/Work`)).toBe(true))
+      await vi.waitFor(() => expect(pendingOpens.has(`${ICLOUD_ROOT}/Work`)).toBe(true))
       resolveOpen(`${ICLOUD_ROOT}/Work`)
       await done
     })
 
-    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await vi.waitFor(() => expect(result.current.status).toBe('ready'))
     expect(result.current.graph?.root).toBe(`${ICLOUD_ROOT}/Work`)
     expect(invokeLog).not.toContain(`graph_create:${ICLOUD_ROOT}/Work`)
-    await waitFor(() => expect(settingsStore['mobileGraphName']).toBe('Work'))
+    await vi.waitFor(() => expect(settingsStore['mobileGraphName']).toBe('Work'))
   })
 
   it('creates an explicitly named iCloud graph when it is not already known', async () => {
@@ -497,45 +499,45 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
       icloudDocumentsRoot: ICLOUD_ROOT,
       icloudGraphRoots: [`${ICLOUD_ROOT}/Notes`],
     }
-    const { result } = renderHook(() => useGraph(), { wrapper: mobileWrapper })
-    await waitFor(() => expect(result.current.needsOnboarding).toBe(true))
+    const { result, act } = await renderHook(() => useGraph(), { wrapper: mobileWrapper })
+    await vi.waitFor(() => expect(result.current.needsOnboarding).toBe(true))
 
     await act(async () => {
       const done = result.current.completeOnboarding('icloud', journalRoot)
-      await waitFor(() => expect(pendingOpens.has(journalRoot)).toBe(true))
+      await vi.waitFor(() => expect(pendingOpens.has(journalRoot)).toBe(true))
       resolveOpen(journalRoot)
       await done
     })
 
-    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await vi.waitFor(() => expect(result.current.status).toBe('ready'))
     expect(invokeLog).toContain(`graph_create:${journalRoot}`)
-    await waitFor(() => expect(settingsStore['mobileGraphName']).toBe('Journal'))
+    await vi.waitFor(() => expect(settingsStore['mobileGraphName']).toBe('Journal'))
   })
 
   it('shows onboarding immediately while the iCloud container is still resolving', async () => {
     storageHangs = true
-    const { result } = renderHook(() => useGraph(), { wrapper: mobileWrapper })
+    const { result, act } = await renderHook(() => useGraph(), { wrapper: mobileWrapper })
 
     // Onboarding must not wait on the container lookup — on a fresh install
     // that call can take a long time, and it used to hold the whole app on a
     // bare "Loading…" screen.
-    await waitFor(() => expect(result.current.needsOnboarding).toBe(true))
+    await vi.waitFor(() => expect(result.current.needsOnboarding).toBe(true))
     expect(result.current.mobileStorageResolving).toBe(true)
     // The sandbox root seeds instantly so the on-device/GitHub paths work.
-    await waitFor(() => expect(result.current.mobileStorageInfo?.localRoot).toBe(MOBILE_ROOT))
+    await vi.waitFor(() => expect(result.current.mobileStorageInfo?.localRoot).toBe(MOBILE_ROOT))
     expect(result.current.mobileStorageInfo?.icloudDocumentsRoot).toBeNull()
 
-    await act(async () => {
+    await act(() => {
       releaseStorage()
     })
-    await waitFor(() => expect(result.current.mobileStorageResolving).toBe(false))
+    await vi.waitFor(() => expect(result.current.mobileStorageResolving).toBe(false))
     expect(result.current.mobileStorageInfo?.icloudDocumentsRoot).toBe(ICLOUD_ROOT)
   })
 
   it('rejects completeOnboarding(icloud) when iCloud is unavailable', async () => {
     storedStorage = { localRoot: MOBILE_ROOT, icloudDocumentsRoot: null, icloudGraphRoots: [] }
-    const { result } = renderHook(() => useGraph(), { wrapper: mobileWrapper })
-    await waitFor(() => expect(result.current.needsOnboarding).toBe(true))
+    const { result, act } = await renderHook(() => useGraph(), { wrapper: mobileWrapper })
+    await vi.waitFor(() => expect(result.current.needsOnboarding).toBe(true))
 
     await act(async () => {
       await expect(result.current.completeOnboarding('icloud')).rejects.toThrow(
@@ -547,8 +549,8 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
   })
 
   it('keeps onboarding up (flag unset) when the open fails, for an in-app retry', async () => {
-    const { result } = renderHook(() => useGraph(), { wrapper: mobileWrapper })
-    await waitFor(() => expect(result.current.needsOnboarding).toBe(true))
+    const { result, act } = await renderHook(() => useGraph(), { wrapper: mobileWrapper })
+    await vi.waitFor(() => expect(result.current.needsOnboarding).toBe(true))
 
     failOpens = true
     await act(async () => {
@@ -565,14 +567,14 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
 
   it('opens the local root directly when onboarded without a storage kind (pre-Plan-21 installs)', async () => {
     settingsStore = { mobileOnboarded: true }
-    const { result } = renderHook(() => useGraph(), { wrapper: mobileWrapper })
+    const { result, act } = await renderHook(() => useGraph(), { wrapper: mobileWrapper })
 
     await act(async () => {
-      await waitFor(() => expect(pendingOpens.has(MOBILE_ROOT)).toBe(true))
+      await vi.waitFor(() => expect(pendingOpens.has(MOBILE_ROOT)).toBe(true))
       resolveOpen(MOBILE_ROOT)
     })
 
-    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await vi.waitFor(() => expect(result.current.status).toBe('ready'))
     expect(result.current.needsOnboarding).toBe(false)
     expect(result.current.graph?.root).toBe(MOBILE_ROOT)
     expect(result.current.mobileStorageKind).toBe('local')
@@ -585,14 +587,14 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
       icloudDocumentsRoot: ICLOUD_ROOT,
       icloudGraphRoots: [ICLOUD_GRAPH],
     }
-    const { result } = renderHook(() => useGraph(), { wrapper: mobileWrapper })
+    const { result, act } = await renderHook(() => useGraph(), { wrapper: mobileWrapper })
 
     await act(async () => {
-      await waitFor(() => expect(pendingOpens.has(ICLOUD_GRAPH)).toBe(true))
+      await vi.waitFor(() => expect(pendingOpens.has(ICLOUD_GRAPH)).toBe(true))
       resolveOpen(ICLOUD_GRAPH)
     })
 
-    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await vi.waitFor(() => expect(result.current.status).toBe('ready'))
     expect(result.current.graph?.root).toBe(ICLOUD_GRAPH)
     expect(result.current.mobileStorageKind).toBe('icloud')
   })
@@ -604,23 +606,23 @@ describe('GraphProvider mobile onboarding (Plans 19/21)', () => {
       icloudDocumentsRoot: ICLOUD_ROOT,
       icloudGraphRoots: [`${ICLOUD_ROOT}/Notes`, `${ICLOUD_ROOT}/Work`],
     }
-    const { result } = renderHook(() => useGraph(), { wrapper: mobileWrapper })
+    const { result, act } = await renderHook(() => useGraph(), { wrapper: mobileWrapper })
 
     await act(async () => {
-      await waitFor(() => expect(pendingOpens.has(`${ICLOUD_ROOT}/Work`)).toBe(true))
+      await vi.waitFor(() => expect(pendingOpens.has(`${ICLOUD_ROOT}/Work`)).toBe(true))
       resolveOpen(`${ICLOUD_ROOT}/Work`)
     })
 
-    await waitFor(() => expect(result.current.status).toBe('ready'))
+    await vi.waitFor(() => expect(result.current.status).toBe('ready'))
     expect(result.current.graph?.root).toBe(`${ICLOUD_ROOT}/Work`)
   })
 
   it('parks on an honest error when the iCloud graph is unreachable (signed out)', async () => {
     settingsStore = { mobileOnboarded: true, mobileStorage: 'icloud' }
     storedStorage = { localRoot: MOBILE_ROOT, icloudDocumentsRoot: null, icloudGraphRoots: [] }
-    const { result } = renderHook(() => useGraph(), { wrapper: mobileWrapper })
+    const { result } = await renderHook(() => useGraph(), { wrapper: mobileWrapper })
 
-    await waitFor(() => expect(result.current.status).toBe('choosing'))
+    await vi.waitFor(() => expect(result.current.status).toBe('choosing'))
     // No silent fallback to the empty local root — that would look like the
     // user's notes vanished. The error names the fix instead.
     expect(result.current.needsOnboarding).toBe(false)

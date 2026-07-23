@@ -63,6 +63,22 @@ export function subscribeFileChanges(
 }
 
 /**
+ * Event name the Rust watcher emits when only a full reconcile can tell what
+ * changed: a visible folder was created, renamed, or removed, and no platform
+ * enumerates its descendants per file. Carries no payload.
+ */
+export const RECONCILE_EVENT = 'index:reconcile'
+
+/**
+ * Subscribe to the watcher's coarse reconcile demands. The handler should
+ * trigger the ordinary full index refresh (re-list, hash-gate, prune) — the
+ * pass is content-hash gated, so over-asking costs a listing, not a re-parse.
+ */
+export function subscribeReconcileRequests(handler: () => void): Promise<Unlisten> {
+  return getBridge().listen(RECONCILE_EVENT, () => handler())
+}
+
+/**
  * Fan a locally produced batch (files a sync merge just wrote, Plan 12) to
  * every subscriber, exactly as if the watcher had reported it. Pull-applied
  * writes must reach open editors and the index even when the Rust watcher

@@ -1,9 +1,9 @@
-import { fireEvent, render, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render } from 'vitest-browser-react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import { RouterProvider, useRouter } from '@/routing/router'
+import { expectLocatorToHaveCount } from '@/test-utils/expect'
 import { BacklinksPanel } from './backlinks-panel'
 
 const { getBacklinksWithContext, getBacklinksPage } = vi.hoisted(() => {
@@ -64,18 +64,17 @@ beforeEach(() => {
 describe('BacklinksPanel', () => {
   it('renders nothing when the note has no inbound links', async () => {
     getBacklinksWithContext.mockResolvedValue([])
-    const view = renderPanel('notes/lonely.md')
-    await waitFor(() => expect(getBacklinksWithContext).toHaveBeenCalled())
-    expect(view.queryByText(/Incoming backlink/)).toBeNull()
-    view.unmount()
+    const view = await renderPanel('notes/lonely.md')
+    await vi.waitFor(() => expect(getBacklinksWithContext).toHaveBeenCalled())
+    expect(view.getByText(/Incoming backlink/).query()).toBeNull()
+    await view.unmount()
   })
 
   it('surfaces a failed query as an alert instead of rendering nothing', async () => {
     getBacklinksWithContext.mockRejectedValue(new Error('index unavailable'))
-    const view = renderPanel('notes/roadmap.md')
-    const alert = await view.findByRole('alert')
-    expect(alert.textContent).toContain('Couldn’t load backlinks.')
-    view.unmount()
+    const view = await renderPanel('notes/roadmap.md')
+    await expect.element(view.getByRole('alert')).toHaveTextContent('Couldn’t load backlinks.')
+    await view.unmount()
   })
 
   it('uses the singular header for one inbound link', async () => {
@@ -88,9 +87,9 @@ describe('BacklinksPanel', () => {
         tasks: [],
       },
     ])
-    const view = renderPanel('notes/roadmap.md')
-    await view.findByText('Incoming backlink (1)')
-    view.unmount()
+    const view = await renderPanel('notes/roadmap.md')
+    await expect.element(view.getByText('Incoming backlink (1)')).toBeInTheDocument()
+    await view.unmount()
   })
 
   it('renders a snippet wiki link as a clickable chip that navigates to its target', async () => {
@@ -107,18 +106,16 @@ describe('BacklinksPanel', () => {
       kind: 'resolved',
       path: 'notes/roadmap.md',
     })
-    const view = renderPanel('notes/source.md')
+    const view = await renderPanel('notes/source.md')
 
     // The [[Roadmap]] source renders as a chip whose label is the bare target,
     // not the raw bracket syntax.
-    const chip = await view.findByTestId('wikilink')
-    expect(chip.textContent).toBe('Roadmap')
+    const chip = view.getByTestId('wikilink')
+    await expect.element(chip).toHaveTextContent(/^Roadmap$/)
 
-    await userEvent.click(chip)
-    await waitFor(() =>
-      expect(view.getByTestId('route').textContent).toContain('notes/roadmap.md'),
-    )
-    view.unmount()
+    await chip.click()
+    await expect.element(view.getByTestId('route')).toHaveTextContent('notes/roadmap.md')
+    await view.unmount()
   })
 
   it('groups references by source note and navigates on title click', async () => {
@@ -145,23 +142,23 @@ describe('BacklinksPanel', () => {
         tasks: [],
       },
     ])
-    const view = renderPanel('notes/roadmap.md')
+    const view = await renderPanel('notes/roadmap.md')
 
-    await view.findByText('Incoming backlinks (3)')
-    expect(view.getAllByText('Meeting Notes')).toHaveLength(1)
+    await expect.element(view.getByText('Incoming backlinks (3)')).toBeInTheDocument()
+    await expectLocatorToHaveCount(view.getByText('Meeting Notes'), 1)
     // Snippets render as rich text: the leading prose survives, the [[…]] source
     // becomes a chip whose label shows the bare target.
-    expect(view.getByText(/discussed/)).toBeDefined()
-    expect(view.getByText(/revisit/)).toBeDefined()
-    expect(view.getByText(/ship the/)).toBeDefined()
-    expect(view.getAllByTestId('wikilink')).toHaveLength(3)
+    await expect.element(view.getByText(/discussed/)).toBeInTheDocument()
+    await expect.element(view.getByText(/revisit/)).toBeInTheDocument()
+    await expect.element(view.getByText(/ship the/)).toBeInTheDocument()
+    await expectLocatorToHaveCount(view.getByTestId('wikilink'), 3)
 
-    await userEvent.click(view.getByText('Meeting Notes'))
-    expect(view.getByTestId('route').textContent).toContain('notes/meeting.md')
+    await view.getByText('Meeting Notes').click()
+    await expect.element(view.getByTestId('route')).toHaveTextContent('notes/meeting.md')
     // A backlink tap must not request focus — on mobile that would raise the
     // keyboard mid-arrival; desktop autofocuses note arrivals on its own.
-    expect(view.getByTestId('route').getAttribute('data-focus')).toBe('false')
-    view.unmount()
+    await expect.element(view.getByTestId('route')).toHaveAttribute('data-focus', 'false')
+    await view.unmount()
   })
 
   it('opens a ⌘-clicked backlink source in a new window', async () => {
@@ -174,18 +171,18 @@ describe('BacklinksPanel', () => {
         tasks: [],
       },
     ])
-    const view = renderPanel('notes/roadmap.md')
+    const view = await renderPanel('notes/roadmap.md')
 
-    fireEvent.click(await view.findByText('Meeting Notes'), { metaKey: true })
+    await view.getByText('Meeting Notes').click({ modifiers: ['Meta'] })
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(openRouteInNewWindow).toHaveBeenCalledWith({
         kind: 'note',
         path: 'notes/meeting.md',
       }),
     )
-    expect(view.getByTestId('route').textContent).toContain('"today"')
-    view.unmount()
+    await expect.element(view.getByTestId('route')).toHaveTextContent('"today"')
+    await view.unmount()
   })
 
   it('collapses snippets but keeps source titles on header toggle, for the session', async () => {
@@ -198,23 +195,23 @@ describe('BacklinksPanel', () => {
         tasks: [],
       },
     ])
-    const view = renderPanel('notes/roadmap.md')
+    const view = await renderPanel('notes/roadmap.md')
 
-    const header = await view.findByRole('button', { name: /Incoming backlink \(1\)/ })
-    expect(header.getAttribute('aria-expanded')).toBe('true')
+    const header = view.getByRole('button', { name: /Incoming backlink \(1\)/ })
+    await expect.element(header).toHaveAttribute('aria-expanded', 'true')
 
-    await userEvent.click(header)
-    expect(header.getAttribute('aria-expanded')).toBe('false')
-    expect(view.getByText('Meeting Notes')).toBeDefined()
-    expect(view.queryByText(/discussed/)).toBeNull()
-    view.unmount()
+    await header.click()
+    await expect.element(header).toHaveAttribute('aria-expanded', 'false')
+    await expect.element(view.getByText('Meeting Notes')).toBeInTheDocument()
+    expect(view.getByText(/discussed/).query()).toBeNull()
+    await view.unmount()
 
-    const reopened = renderPanel('notes/roadmap.md')
-    const persistedHeader = await reopened.findByRole('button', {
+    const reopened = await renderPanel('notes/roadmap.md')
+    const persistedHeader = reopened.getByRole('button', {
       name: /Incoming backlink \(1\)/,
     })
-    expect(persistedHeader.getAttribute('aria-expanded')).toBe('false')
-    reopened.unmount()
+    await expect.element(persistedHeader).toHaveAttribute('aria-expanded', 'false')
+    await reopened.unmount()
   })
 
   it('resets a collapsed group when navigating to another note with the same source', async () => {
@@ -235,17 +232,15 @@ describe('BacklinksPanel', () => {
         </RouterProvider>
       </QueryClientProvider>
     )
-    const view = render(panelFor('notes/a.md'))
+    const view = await render(panelFor('notes/a.md'))
 
-    await view.findByText(/links and/)
-    await userEvent.click(
-      view.getByRole('button', { name: 'Collapse references from Shared Source' }),
-    )
-    expect(view.queryByText(/links and/)).toBeNull()
+    await expect.element(view.getByText(/links/)).toBeInTheDocument()
+    await view.getByRole('button', { name: 'Collapse references from Shared Source' }).click()
+    expect(view.getByText(/links/).query()).toBeNull()
 
-    view.rerender(panelFor('notes/b.md'))
-    await view.findByText(/links and/)
-    view.unmount()
+    await view.rerender(panelFor('notes/b.md'))
+    await expect.element(view.getByText(/links/)).toBeInTheDocument()
+    await view.unmount()
   })
 
   it('keeps simultaneously mounted panels in sync (one per day in the stream)', async () => {
@@ -259,7 +254,7 @@ describe('BacklinksPanel', () => {
       },
     ])
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    const view = render(
+    const view = await render(
       <QueryClientProvider client={client}>
         <RouterProvider>
           <BacklinksPanel path="daily/2026-06-09.md" />
@@ -268,16 +263,14 @@ describe('BacklinksPanel', () => {
       </QueryClientProvider>,
     )
 
-    await waitFor(() =>
-      expect(view.getAllByRole('button', { name: /Incoming backlink \(1\)/ })).toHaveLength(2),
-    )
-    const headers = view.getAllByRole('button', { name: /Incoming backlink \(1\)/ })
+    const headers = view.getByRole('button', { name: /Incoming backlink \(1\)/ })
+    await expectLocatorToHaveCount(headers, 2)
 
-    await userEvent.click(headers[0]!)
-    expect(headers[0]!.getAttribute('aria-expanded')).toBe('false')
-    expect(headers[1]!.getAttribute('aria-expanded')).toBe('false')
-    expect(view.queryByText(/discussed/)).toBeNull()
-    view.unmount()
+    await headers.nth(0).click()
+    await expect.element(headers.nth(0)).toHaveAttribute('aria-expanded', 'false')
+    await expect.element(headers.nth(1)).toHaveAttribute('aria-expanded', 'false')
+    expect(view.getByText(/discussed/).query()).toBeNull()
+    await view.unmount()
   })
 
   it('lets one group be peeked at after the header collapse (old Reflect behavior)', async () => {
@@ -297,22 +290,20 @@ describe('BacklinksPanel', () => {
         tasks: [],
       },
     ])
-    const view = renderPanel('notes/roadmap.md')
+    const view = await renderPanel('notes/roadmap.md')
 
-    const header = await view.findByRole('button', { name: /Incoming backlinks \(2\)/ })
-    await userEvent.click(header)
-    expect(view.queryByText(/discussed/)).toBeNull()
-    expect(view.queryByText(/ship the/)).toBeNull()
+    const header = view.getByRole('button', { name: /Incoming backlinks \(2\)/ })
+    await header.click()
+    expect(view.getByText(/discussed/).query()).toBeNull()
+    expect(view.getByText(/ship the/).query()).toBeNull()
 
-    await userEvent.click(
-      view.getByRole('button', { name: 'Expand references from Meeting Notes' }),
-    )
-    expect(view.getByText(/discussed/)).toBeDefined()
-    expect(view.queryByText(/ship the/)).toBeNull()
+    await view.getByRole('button', { name: 'Expand references from Meeting Notes' }).click()
+    await expect.element(view.getByText(/discussed/)).toBeInTheDocument()
+    expect(view.getByText(/ship the/).query()).toBeNull()
 
-    await userEvent.click(header)
-    expect(view.getByText(/ship the/)).toBeDefined()
-    view.unmount()
+    await header.click()
+    await expect.element(view.getByText(/ship the/)).toBeInTheDocument()
+    await view.unmount()
   })
 
   it('collapses one source group via its own chevron', async () => {
@@ -332,14 +323,12 @@ describe('BacklinksPanel', () => {
         tasks: [],
       },
     ])
-    const view = renderPanel('notes/roadmap.md')
-    await view.findByText('Incoming backlinks (2)')
+    const view = await renderPanel('notes/roadmap.md')
+    await expect.element(view.getByText('Incoming backlinks (2)')).toBeInTheDocument()
 
-    await userEvent.click(
-      view.getByRole('button', { name: 'Collapse references from Meeting Notes' }),
-    )
-    expect(view.queryByText(/discussed/)).toBeNull()
-    expect(view.getByText(/ship the/)).toBeDefined()
-    view.unmount()
+    await view.getByRole('button', { name: 'Collapse references from Meeting Notes' }).click()
+    expect(view.getByText(/discussed/).query()).toBeNull()
+    await expect.element(view.getByText(/ship the/)).toBeInTheDocument()
+    await view.unmount()
   })
 })

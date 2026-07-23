@@ -1,5 +1,5 @@
-import { act, render } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { render } from 'vitest-browser-react'
 import type { FileChange } from '@reflect/core'
 import { useFileChanges } from './use-file-changes'
 
@@ -15,6 +15,10 @@ interface Subscription {
   emit: (changes: FileChange[]) => void
   unlisten: ReturnType<typeof vi.fn>
   resolve: () => Promise<void>
+}
+
+function flushMicrotasks(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0))
 }
 
 /** Capture the watcher callback and hand back a controllable unlisten. */
@@ -33,7 +37,7 @@ function stubSubscription(): Subscription {
     unlisten,
     resolve: async () => {
       resolveSubscribe(unlisten)
-      await act(async () => {})
+      await flushMicrotasks()
     },
   }
 }
@@ -54,19 +58,19 @@ describe('useFileChanges', () => {
   it('delivers watcher events to the handler', async () => {
     const subscription = stubSubscription()
     const handler = vi.fn()
-    const view = render(<Host handler={handler} />)
+    const view = await render(<Host handler={handler} />)
     await subscription.resolve()
     subscription.emit(UPSERT)
     expect(handler).toHaveBeenCalledWith(UPSERT)
-    view.unmount()
+    await view.unmount()
   })
 
   it('drops events that race the teardown', async () => {
     const subscription = stubSubscription()
     const handler = vi.fn()
-    const view = render(<Host handler={handler} />)
+    const view = await render(<Host handler={handler} />)
     await subscription.resolve()
-    view.unmount()
+    await view.unmount()
     subscription.emit(UPSERT)
     expect(handler).not.toHaveBeenCalled()
     expect(subscription.unlisten).toHaveBeenCalledOnce()
@@ -74,39 +78,39 @@ describe('useFileChanges', () => {
 
   it('closes an unlisten that resolves after teardown', async () => {
     const subscription = stubSubscription()
-    const view = render(<Host handler={vi.fn()} />)
-    view.unmount()
+    const view = await render(<Host handler={vi.fn()} />)
+    await view.unmount()
     await subscription.resolve()
     expect(subscription.unlisten).toHaveBeenCalledOnce()
   })
 
   it('resubscribes when the handler identity changes', async () => {
     const first = stubSubscription()
-    const view = render(<Host handler={vi.fn()} />)
+    const view = await render(<Host handler={vi.fn()} />)
     await first.resolve()
     expect(subscribeFileChanges).toHaveBeenCalledTimes(1)
 
     const second = stubSubscription()
     const nextHandler = vi.fn()
-    view.rerender(<Host handler={nextHandler} />)
+    await view.rerender(<Host handler={nextHandler} />)
     await second.resolve()
     expect(subscribeFileChanges).toHaveBeenCalledTimes(2)
     expect(first.unlisten).toHaveBeenCalledOnce()
 
     second.emit(UPSERT)
     expect(nextHandler).toHaveBeenCalledWith(UPSERT)
-    view.unmount()
+    await view.unmount()
   })
 
-  it('does nothing when disabled or without a bridge', () => {
-    const view = render(<Host handler={null} />)
+  it('does nothing when disabled or without a bridge', async () => {
+    const view = await render(<Host handler={null} />)
     expect(subscribeFileChanges).not.toHaveBeenCalled()
-    view.unmount()
+    await view.unmount()
 
     hasBridge.mockReturnValue(false)
-    const bridgeless = render(<Host handler={vi.fn()} />)
+    const bridgeless = await render(<Host handler={vi.fn()} />)
     expect(subscribeFileChanges).not.toHaveBeenCalled()
-    bridgeless.unmount()
+    await bridgeless.unmount()
   })
 
   // The hook doesn't catch handler throws (the contract only covers the
@@ -115,15 +119,15 @@ describe('useFileChanges', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     subscribeFileChanges.mockRejectedValue(new Error('bridge gone'))
     const handler = vi.fn()
-    const view = render(<Host handler={handler} />)
-    await act(async () => {})
+    const view = await render(<Host handler={handler} />)
+    await flushMicrotasks()
 
     expect(consoleError).toHaveBeenCalledWith(
       'file-change subscription failed:',
       expect.any(Error),
     )
     expect(handler).not.toHaveBeenCalled()
-    expect(() => view.unmount()).not.toThrow()
+    await expect(view.unmount()).resolves.toBeUndefined()
     consoleError.mockRestore()
   })
 })

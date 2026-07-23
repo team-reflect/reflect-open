@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
-import { cleanup, render, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { render } from 'vitest-browser-react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GraphInfo } from '@reflect/core'
 import type { DeepLinkIo } from '@/lib/deep-links/handle'
 import { beginLinkNavigationIntent } from '@/lib/windows/link-navigation-intent'
@@ -40,19 +40,17 @@ beforeEach(() => {
   navigation.revision = 0
 })
 
-afterEach(cleanup)
-
 describe('DeepLinkProvider', () => {
-  it('attaches a handler on mount and detaches on unmount', () => {
-    const view = mount()
+  it('attaches a handler on mount and detaches on unmount', async () => {
+    const view = await mount()
     expect(setDeepLinkHandler).toHaveBeenLastCalledWith(expect.any(Function))
 
-    view.unmount()
+    await view.unmount()
     expect(setDeepLinkHandler).toHaveBeenLastCalledWith(null)
   })
 
-  it('routes URLs into handleDeepLink with the session io', () => {
-    mount()
+  it('routes URLs into handleDeepLink with the session io', async () => {
+    await mount()
 
     attachedHandler()('reflect://today')
 
@@ -63,20 +61,20 @@ describe('DeepLinkProvider', () => {
     expect(io.generation).toBe(7)
   })
 
-  it('reports stale when the graph session changes — an in-flight resolve must not navigate', () => {
-    const view = mount()
+  it('reports stale when the graph session changes — an in-flight resolve must not navigate', async () => {
+    const view = await mount()
     attachedHandler()('reflect://note/x')
     const io = handleDeepLink.mock.calls[0]![1]
 
     expect(io.isStale?.()).toBe(false)
-    view.rerender(
+    await view.rerender(
       <DeepLinkProvider graph={{ ...GRAPH, generation: 8 }}>{null}</DeepLinkProvider>,
     )
     expect(io.isStale?.()).toBe(true)
   })
 
-  it('reports stale when navigation changes while a note target resolves', () => {
-    mount()
+  it('reports stale when navigation changes while a note target resolves', async () => {
+    await mount()
     attachedHandler()('reflect://note/x')
     const io = handleDeepLink.mock.calls[0]![1]
 
@@ -85,8 +83,8 @@ describe('DeepLinkProvider', () => {
     expect(io.isStale?.()).toBe(true)
   })
 
-  it('reports stale when a newer note-link intent starts during resolution', () => {
-    mount()
+  it('reports stale when a newer note-link intent starts during resolution', async () => {
+    await mount()
     attachedHandler()('reflect://note/x')
     const io = handleDeepLink.mock.calls[0]![1]
 
@@ -99,8 +97,8 @@ describe('DeepLinkProvider', () => {
     'reflect://append?text=captured',
     'reflect://task?text=captured',
     'reflect://edit-notes?content=invalid',
-  ])('does not stale a pending note resolve for non-navigation URL %s', (url) => {
-    mount()
+  ])('does not stale a pending note resolve for non-navigation URL %s', async (url) => {
+    await mount()
     attachedHandler()('reflect://note/x')
     const pendingNoteIo = handleDeepLink.mock.calls[0]![1]
 
@@ -112,8 +110,8 @@ describe('DeepLinkProvider', () => {
 
   it.each(['reflect://today', 'reflect://note/y'])(
     'stales a pending note resolve for newer navigation URL %s',
-    (url) => {
-      mount()
+    async (url) => {
+      await mount()
       attachedHandler()('reflect://note/x')
       const pendingNoteIo = handleDeepLink.mock.calls[0]![1]
 
@@ -124,12 +122,12 @@ describe('DeepLinkProvider', () => {
     },
   )
 
-  it('a StrictMode probe cycle does not stale a link the probe attach drained', () => {
+  it('a StrictMode probe cycle does not stale a link the probe attach drained', async () => {
     // The note window's initial deep link buffers in the intake and is drained
     // by the FIRST attach — which in dev is StrictMode's probe run. Its async
     // note resolution must survive the probe's detach/reattach (same session),
     // or ⌘-clicked windows open on Today instead of the note.
-    render(
+    await render(
       <StrictMode>
         <DeepLinkProvider graph={GRAPH}>{null}</DeepLinkProvider>
       </StrictMode>,
@@ -142,15 +140,15 @@ describe('DeepLinkProvider', () => {
     expect(io.isStale?.()).toBe(false)
   })
 
-  it('stays fresh after a plain unmount — the keyed remount makes the old router inert', () => {
+  it('stays fresh after a plain unmount — the keyed remount makes the old router inert', async () => {
     // Unmount alone is not a session change: on a graph switch the whole
     // keyed workspace remounts, so a late navigate hits a torn-down router
     // and no-ops. Staleness tracks the generation, nothing else.
-    const view = mount()
+    const view = await mount()
     attachedHandler()('reflect://note/x')
     const io = handleDeepLink.mock.calls[0]![1]
 
-    view.unmount()
+    await view.unmount()
     expect(io.isStale?.()).toBe(false)
   })
 
@@ -158,10 +156,10 @@ describe('DeepLinkProvider', () => {
     handleDeepLink.mockRejectedValueOnce(new Error('spool failed'))
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    mount()
+    await mount()
     attachedHandler()('reflect://append?text=x')
 
-    await waitFor(() => expect(errorSpy).toHaveBeenCalled())
+    await vi.waitFor(() => expect(errorSpy).toHaveBeenCalled())
     errorSpy.mockRestore()
   })
 })

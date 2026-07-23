@@ -1,15 +1,14 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { render } from 'vitest-browser-react'
+import { page } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '@reflect/core'
 import { AgentsSection } from './agents-section'
 
-const platform = vi.hoisted(() => ({ isMacosDesktop: true }))
-vi.mock('@/lib/platform', () => ({
-  get isMacosDesktop() {
-    return platform.isMacosDesktop
-  },
-}))
+// A browser-mode module mock materializes value exports once, so this file
+// keeps the flag statically true; the off-macOS test lives in
+// `agents-section-non-macos.test.tsx`.
+vi.mock('@/lib/platform', () => ({ isMacosDesktop: true }))
 
 const GRAPH = { root: '/graphs/Personal', name: 'Personal', generation: 7 }
 vi.mock('@/providers/graph-provider', () => ({
@@ -57,9 +56,9 @@ function installFakeBridge(): void {
   })
 }
 
-function renderSection(): void {
+async function renderSection(): Promise<void> {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(
+  await render(
     <QueryClientProvider client={queryClient}>
       <AgentsSection />
     </QueryClientProvider>,
@@ -67,49 +66,41 @@ function renderSection(): void {
 }
 
 beforeEach(() => {
-  platform.isMacosDesktop = true
   installState = 'missing'
   installFakeBridge()
 })
 
 afterEach(() => {
-  cleanup()
   setBridge(null)
 })
 
 describe('AgentsSection', () => {
   it('installs the skill with the graph generation pinned', async () => {
-    renderSection()
-    fireEvent.click(await screen.findByRole('button', { name: 'Install skill' }))
+    await renderSection()
+    await page.getByRole('button', { name: 'Install skill' }).click()
 
-    await waitFor(() => expect(screen.getByText('Installed')).toBeTruthy())
+    await expect.element(page.getByText('Installed')).toBeInTheDocument()
     expect(installCalls).toEqual([{ generation: GRAPH.generation }])
-    expect(screen.getByText('/Users/me/.agents/skills/reflect-personal/SKILL.md')).toBeTruthy()
+    await expect
+      .element(page.getByText('/Users/me/.agents/skills/reflect-personal/SKILL.md'))
+      .toBeInTheDocument()
   })
 
   it('offers an update for a stale install and removal for any managed one', async () => {
     installState = 'stale'
-    renderSection()
+    await renderSection()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Remove' }))
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Install skill' })).toBeTruthy(),
-    )
+    await page.getByRole('button', { name: 'Remove' }).click()
+    await expect.element(page.getByRole('button', { name: 'Install skill' })).toBeInTheDocument()
     expect(uninstallCalls).toEqual([{ generation: GRAPH.generation }])
   })
 
   it('refuses to touch an unmanaged file', async () => {
     installState = 'conflict'
-    renderSection()
+    await renderSection()
 
-    await screen.findByText(/Reflect doesn’t manage/)
-    expect(screen.queryByRole('button', { name: 'Install skill' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
-  })
-
-  it('renders nothing off macOS desktop', () => {
-    platform.isMacosDesktop = false
-    renderSection()
-    expect(screen.queryByText('Agent skill')).toBeNull()
+    await expect.element(page.getByText(/Reflect doesn’t manage/)).toBeInTheDocument()
+    expect(page.getByRole('button', { name: 'Install skill' }).query()).toBeNull()
+    expect(page.getByRole('button', { name: 'Remove' }).query()).toBeNull()
   })
 })

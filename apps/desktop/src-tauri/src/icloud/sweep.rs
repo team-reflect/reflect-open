@@ -83,11 +83,16 @@ pub async fn icloud_conflicts_scan(
     state: State<'_, GraphState>,
 ) -> AppResult<SweepOutcome> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    tauri::async_runtime::spawn_blocking(move || {
-        run_sweep(&root, &skip_paths, &ingested_paths, record_baseline)
+    let sweep_root = root.clone();
+    let outcome = tauri::async_runtime::spawn_blocking(move || {
+        run_sweep(&sweep_root, &skip_paths, &ingested_paths, record_baseline)
     })
     .await
-    .map_err(|err| AppError::io(err.to_string()))?
+    .map_err(|err| AppError::io(err.to_string()))?;
+    // The sweep folds conflict siblings into canonical notes; a cached
+    // listing from before those renames would pin the conflict names.
+    crate::fs::invalidate_file_catalog(&state, &root);
+    outcome
 }
 
 /// The sweep body (blocking). Pure fs + ladder logic apart from the
@@ -114,7 +119,7 @@ fn run_sweep(
         advance_base_if_clean(root, rel, &shadow, false);
     }
 
-    let files = crate::fs::note_files(root)?;
+    let files = crate::fs::note_files(root);
 
     if record_baseline {
         for file in &files {

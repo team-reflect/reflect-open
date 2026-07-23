@@ -61,6 +61,8 @@ beforeEach(() => {
         case 'list_files':
         case 'db_query':
           return []
+        case 'vault_scan_stats':
+          return { notes: 0, attachments: 0, skipped: 0 }
         case 'settings_load':
           return storedSettings
         default:
@@ -91,8 +93,10 @@ describe('GraphChooser', () => {
       expect(screen.getByRole('heading', { name: 'iCloud' })).toBeInTheDocument(),
     )
     expect(screen.getByText('Recommended')).toBeInTheDocument()
+    expect(screen.getByText(/Open an existing folder/)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'A folder you choose' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Choose a folder/ })).toBeInTheDocument()
+    expect(screen.getByText(/Reflect keeps its files where they are/)).toBeInTheDocument()
   })
 
   it('creates an iCloud graph from the typed name', async () => {
@@ -105,6 +109,9 @@ describe('GraphChooser', () => {
     render(<GraphChooser />, { wrapper })
 
     const nameInput = await screen.findByRole('textbox', { name: 'Name' })
+    // The input starts disabled until `icloud_status` resolves; typing into it
+    // before then throws on slower engines (WebKit).
+    await waitFor(() => expect(nameInput).toBeEnabled())
     await user.clear(nameInput)
     await user.type(nameInput, 'My Notes')
     await user.click(screen.getByRole('button', { name: 'Create' }))
@@ -185,7 +192,7 @@ describe('GraphChooser', () => {
       expect(screen.getByRole('heading', { name: 'A folder you choose' })).toBeInTheDocument(),
     )
     expect(screen.queryByRole('heading', { name: 'iCloud' })).not.toBeInTheDocument()
-    expect(screen.getByText(/any folder on this computer/)).toBeInTheDocument()
+    expect(screen.getByText(/existing Markdown folder on this computer/)).toBeInTheDocument()
   })
 
   // The provider auto-opens the most recent graph on mount, so the chooser's

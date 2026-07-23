@@ -1,16 +1,19 @@
 # Readable filenames & note identity
 
-Regular notes live at `notes/<slug>.md`, where the slug derives from the
-note's title: a note titled "Meeting Notes" is `notes/meeting-notes.md`, and
-when the title changes, the file follows. The graph reads as plain markdown
-in Finder, on GitHub, in Obsidian — no opaque ULID names (Plan 17).
+Regular notes Reflect creates live at `notes/<slug>.md`, where the slug derives
+from the note's title: a Reflect-created note titled "Meeting Notes" is
+`notes/meeting-notes.md`, and when the title changes, the file follows. An
+opened Markdown vault can also contain adopted notes at the root or in visible
+nested folders. Reflect edits those files in place and never opts them into
+filename or graph-wide retitle automation (Plan 17).
 
 Three rules make the whole system hang together:
 
-1. **The filename is a projection of the title.** The title lives in content
+1. **A managed filename is a projection of the title.** The title lives in content
    (the first H1, or frontmatter `title:`); the slug is derived from it, never
    edited directly. There is no "rename file" UI — retitle the note and the
-   filename follows.
+   filename follows. This applies only to a direct `notes/*.md` file carrying a
+   valid Reflect ULID `id`. Adopted notes save content only and keep their path.
 2. **The frontmatter `id` is the durable identity.** Every note Reflect
    creates carries `id: <lowercase ulid>`. Filenames change; the id never
    does. It's what lets the index recognize a file that moved while Reflect
@@ -68,9 +71,10 @@ to `meeting.md` when it frees up.
 
 ## Rename: filenames follow settled titles
 
-Only settled, in-app title changes move files. Sync pulls, external edits,
-reconciles, and rebuilds never rename a file — that single rule makes move
-loops with external tools impossible.
+Only settled, in-app title changes to Reflect-managed notes move files. Sync
+pulls, external edits, reconciles, rebuilds, and edits to adopted notes never
+rename a file — that rule makes move loops with external tools impossible and
+keeps existing vault layouts intact.
 
 The settled-title tracker (`apps/desktop/src/editor/title-rename.ts`, Plan
 07b) watches saves and fires after 5 seconds of quiet, or immediately on
