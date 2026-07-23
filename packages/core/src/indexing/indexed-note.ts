@@ -71,8 +71,10 @@ import { serializeWikiSuggestionAddress } from './suggest'
  * derived linkable aliases for rich titles and rich frontmatter aliases:
  * existing notes must reproject for both the recovery-semantics convergence
  * and the backfilled alias rows.
+ * 17 - legacy nested `Email` / `Emails` contact fields and canonical email
+ * identities: unchanged V1 person notes need their `note_emails` rows rebuilt.
  */
-export const PROJECTION_VERSION = 16
+export const PROJECTION_VERSION = 17
 
 export const indexedLinkSchema = z.object({
   kind: z.enum(['wiki', 'md']),

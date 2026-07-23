@@ -1,4 +1,5 @@
 import { appendBlock } from '../markdown/edit'
+import { canonicalEmails } from '../markdown/email-fields'
 import { splitFrontmatter } from '../markdown/frontmatter'
 import type { ContactMatch } from './commands'
 
@@ -46,7 +47,7 @@ const TYPE_LINE_PATTERN = /^[ \t]*[-+*][ \t]+type:/im
  * stack a second line.
  */
 export function contactDetailsMarkdown(contact: ContactMatch, existingBody = ''): string {
-  const emails = uniqueValues(contact.emails)
+  const emails = canonicalEmails(contact.emails)
   const phones = uniqueValues(contact.phones)
   if (emails.length === 0 && phones.length === 0) {
     return ''
