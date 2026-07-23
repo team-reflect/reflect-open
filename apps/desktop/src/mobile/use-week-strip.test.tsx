@@ -1,4 +1,5 @@
-import { act, cleanup, renderHook } from '@testing-library/react'
+import { act } from 'react'
+import { cleanup, renderHook } from 'vitest-browser-react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WeekStartDay } from '@reflect/core'
 import { createWeekWindow, weekAtIndex, weekIndexOf, weekStartOf } from './calendar'
@@ -77,31 +78,38 @@ const DATE = '2026-06-12'
 const WEEK_START: WeekStartDay = 'monday'
 const initialWindow = createWeekWindow(DATE, WEEK_START)
 
-function mountStrip(date: string = DATE, weekStart: WeekStartDay = WEEK_START) {
-  return renderHook(
-    ({ date: currentDate, weekStart: currentWeekStart }) =>
+async function mountStrip(date: string = DATE, weekStart: WeekStartDay = WEEK_START) {
+  return await renderHook(
+    (
+      {
+        date: currentDate,
+        weekStart: currentWeekStart,
+      }: { date: string; weekStart: WeekStartDay } = { date, weekStart },
+    ) =>
       useWeekStrip(currentDate, currentWeekStart),
     { initialProps: { date, weekStart } },
   )
 }
 
 describe('useWeekStrip', () => {
-  it('rebuilds the window when a swipe settles near an edge and reinits onto the anchor', () => {
-    const { result } = mountStrip()
+  it('rebuilds the window when a swipe settles near an edge and reinits onto the anchor', async () => {
+    const { result } = await mountStrip()
 
     act(() => embla.settleAt(1))
 
     const browsedWeek = weekAtIndex(initialWindow, 1)
     const rebuilt = createWeekWindow(browsedWeek, WEEK_START)
     expect(result.current.weekWindow).toEqual(rebuilt)
-    expect(embla.api.reInit).toHaveBeenCalledWith({ startIndex: rebuilt.anchorIndex })
+    expect(embla.api.reInit).toHaveBeenCalledWith({
+      startIndex: rebuilt.anchorIndex,
+    })
     // The browsed week became the rebuilt window's anchor — still on screen.
     expect(result.current.displayedWeekStart).toBe(browsedWeek)
     expect(embla.api.scrollTo).not.toHaveBeenCalled()
   })
 
-  it('leaves a mid-window settle alone', () => {
-    const { result } = mountStrip()
+  it('leaves a mid-window settle alone', async () => {
+    const { result } = await mountStrip()
 
     act(() => embla.settleAt(28))
 
@@ -110,8 +118,8 @@ describe('useWeekStrip', () => {
     expect(embla.api.reInit).not.toHaveBeenCalled()
   })
 
-  it('follows an in-window date change without snapping back while browsing', () => {
-    const { result, rerender } = mountStrip()
+  it('follows an in-window date change without snapping back while browsing', async () => {
+    const { result, rerender } = await mountStrip()
 
     // Browse two weeks ahead of the selection: the echo guard must keep the
     // re-render from scrolling the strip back to the (unchanged) date's week.
@@ -119,15 +127,15 @@ describe('useWeekStrip', () => {
     expect(embla.api.scrollTo).not.toHaveBeenCalled()
 
     // A real date change is followed with a plain scroll — no rebuild.
-    rerender({ date: '2026-06-19', weekStart: WEEK_START })
+    await rerender({ date: '2026-06-19', weekStart: WEEK_START })
     expect(embla.api.scrollTo).toHaveBeenCalledWith(27)
     expect(result.current.displayedWeekStart).toBe(weekAtIndex(initialWindow, 27))
     expect(result.current.weekWindow).toEqual(initialWindow)
     expect(embla.api.reInit).not.toHaveBeenCalled()
   })
 
-  it('showWeekOf scrolls to an in-window target', () => {
-    const { result } = mountStrip()
+  it('showWeekOf scrolls to an in-window target', async () => {
+    const { result } = await mountStrip()
 
     act(() => result.current.showWeekOf('2026-06-19'))
 
@@ -136,8 +144,8 @@ describe('useWeekStrip', () => {
     expect(result.current.weekWindow).toEqual(initialWindow)
   })
 
-  it('showWeekOf rebuilds the window around an out-of-window target', () => {
-    const { result } = mountStrip()
+  it('showWeekOf rebuilds the window around an out-of-window target', async () => {
+    const { result } = await mountStrip()
     const target = '2027-06-12'
     expect(weekIndexOf(initialWindow, target, WEEK_START)).toBe(-1)
 
@@ -145,33 +153,39 @@ describe('useWeekStrip', () => {
 
     const rebuilt = createWeekWindow(target, WEEK_START)
     expect(result.current.weekWindow).toEqual(rebuilt)
-    expect(embla.api.reInit).toHaveBeenCalledWith({ startIndex: rebuilt.anchorIndex })
+    expect(embla.api.reInit).toHaveBeenCalledWith({
+      startIndex: rebuilt.anchorIndex,
+    })
     expect(result.current.displayedWeekStart).toBe(weekStartOf(target, WEEK_START))
     expect(embla.api.scrollTo).not.toHaveBeenCalled()
   })
 
-  it('rebuilds around a far date change that falls outside the window', () => {
-    const { result, rerender } = mountStrip()
+  it('rebuilds around a far date change that falls outside the window', async () => {
+    const { result, rerender } = await mountStrip()
 
-    rerender({ date: '2027-06-12', weekStart: WEEK_START })
+    await rerender({ date: '2027-06-12', weekStart: WEEK_START })
 
     const rebuilt = createWeekWindow('2027-06-12', WEEK_START)
     expect(result.current.weekWindow).toEqual(rebuilt)
-    expect(embla.api.reInit).toHaveBeenCalledWith({ startIndex: rebuilt.anchorIndex })
+    expect(embla.api.reInit).toHaveBeenCalledWith({
+      startIndex: rebuilt.anchorIndex,
+    })
     expect(result.current.displayedWeekStart).toBe(weekStartOf('2027-06-12', WEEK_START))
   })
 
-  it('rebuilds when the week-start setting re-aligns the weeks', () => {
-    const { result, rerender } = mountStrip()
+  it('rebuilds when the week-start setting re-aligns the weeks', async () => {
+    const { result, rerender } = await mountStrip()
     // The old window's Monday-aligned weeks no longer contain any
     // Sunday-start week — the misalignment signal a rebuild answers.
     expect(weekIndexOf(initialWindow, DATE, 'sunday')).toBe(-1)
 
-    rerender({ date: DATE, weekStart: 'sunday' })
+    await rerender({ date: DATE, weekStart: 'sunday' })
 
     const rebuilt = createWeekWindow(DATE, 'sunday')
     expect(result.current.weekWindow).toEqual(rebuilt)
-    expect(embla.api.reInit).toHaveBeenCalledWith({ startIndex: rebuilt.anchorIndex })
+    expect(embla.api.reInit).toHaveBeenCalledWith({
+      startIndex: rebuilt.anchorIndex,
+    })
     expect(result.current.displayedWeekStart).toBe(weekStartOf(DATE, 'sunday'))
   })
 })
@@ -180,13 +194,13 @@ describe('shouldRecenterWeeks', () => {
   // 9 week slides around the anchor; margin 2 → indices 0–1 and 7–8 trigger.
   const window = createWeekWindow('2026-06-12', 'monday', 4)
 
-  it('leaves the middle of the window alone', () => {
+  it('leaves the middle of the window alone', async () => {
     expect(shouldRecenterWeeks(window, 4, 2)).toBe(false)
     expect(shouldRecenterWeeks(window, 2, 2)).toBe(false)
     expect(shouldRecenterWeeks(window, 6, 2)).toBe(false)
   })
 
-  it('re-centers within the margin of either edge', () => {
+  it('re-centers within the margin of either edge', async () => {
     expect(shouldRecenterWeeks(window, 1, 2)).toBe(true)
     expect(shouldRecenterWeeks(window, 0, 2)).toBe(true)
     expect(shouldRecenterWeeks(window, 7, 2)).toBe(true)
