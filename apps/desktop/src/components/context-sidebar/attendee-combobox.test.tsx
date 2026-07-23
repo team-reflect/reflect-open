@@ -74,8 +74,13 @@ describe('AttendeeCombobox', () => {
     await expect.element(input).toHaveValue('')
   })
 
-  it('a picked contact carries its invite email for the note pre-fill', async () => {
-    contactLinkSuggestions.mockResolvedValue([contact('Grace Hopper', 'grace@example.com')])
+  it('a picked contact carries all emails for identity resolution', async () => {
+    contactLinkSuggestions.mockResolvedValue([
+      {
+        ...contact('Grace Hopper', 'grace@example.com'),
+        emails: ['grace@example.com', 'grace@work.example'],
+      },
+    ])
     const input = await renderCombobox()
 
     await input.fill('gra')
@@ -83,7 +88,10 @@ describe('AttendeeCombobox', () => {
     await expect.element(page.getByText('grace@example.com')).toBeInTheDocument()
     await userEvent.keyboard('{Enter}')
 
-    expect(onAdd).toHaveBeenCalledWith({ name: 'Grace Hopper', email: 'grace@example.com' })
+    expect(onAdd).toHaveBeenCalledWith({
+      name: 'Grace Hopper',
+      emails: ['grace@example.com', 'grace@work.example'],
+    })
   })
 
   it('Enter with no suggestions adds the typed name verbatim', async () => {
@@ -96,7 +104,21 @@ describe('AttendeeCombobox', () => {
     await expect.element(input).toHaveValue('')
   })
 
-  it('Enter during a pending refetch adds the typed text, not a stale row', async () => {
+  it('blur does not bypass an exact Contact row', async () => {
+    contactLinkSuggestions.mockResolvedValue([
+      contact('Grace Hopper', 'grace@example.com'),
+    ])
+    const input = await renderCombobox()
+
+    await input.fill('Grace Hopper')
+    await expect.element(page.getByText('grace@example.com')).toBeInTheDocument()
+    await userEvent.tab()
+
+    expect(onAdd).not.toHaveBeenCalled()
+    await expect.element(input).toHaveValue('Grace Hopper')
+  })
+
+  it('Enter during a pending refetch does not add stale or identity-less text', async () => {
     suggestWikiTargets.mockResolvedValue([noteSuggestion('Ada Lovelace')])
     const input = await renderCombobox()
 
@@ -110,7 +132,8 @@ describe('AttendeeCombobox', () => {
     await input.fill('Adam Smith')
     await userEvent.keyboard('{Enter}')
 
-    expect(onAdd).toHaveBeenCalledWith({ name: 'Adam Smith' })
+    expect(onAdd).not.toHaveBeenCalled()
+    await expect.element(input).toHaveValue('Adam Smith')
   })
 
   it('offers an Add row for a name that matches nothing exactly', async () => {

@@ -227,7 +227,7 @@ describe('DailyEventsSection', () => {
     await vi.waitFor(() =>
       expect(addMeetingToDaily).toHaveBeenCalledWith(
         expect.objectContaining({
-          attendees: [{ name: 'Ada Lovelace', email: 'ada@example.com' }],
+          attendees: [{ name: 'Ada Lovelace', emails: ['ada@example.com'] }],
           lookupContacts: true,
         }),
       ),
@@ -236,7 +236,7 @@ describe('DailyEventsSection', () => {
 
   it('upgrades a prefilled chip to the note that owns its invite email', async () => {
     resolveMeetingAttendees.mockResolvedValueOnce([
-      { name: 'Ada Lovelace', email: 'ada@example.com' },
+      { name: 'Ada Lovelace', emails: ['ada@example.com'] },
     ])
     events = [
       eventAt(9, {
@@ -262,7 +262,7 @@ describe('DailyEventsSection', () => {
     await vi.waitFor(() =>
       expect(addMeetingToDaily).toHaveBeenCalledWith(
         expect.objectContaining({
-          attendees: [{ name: 'Ada Lovelace', email: 'ada@example.com' }],
+          attendees: [{ name: 'Ada Lovelace', emails: ['ada@example.com'] }],
         }),
       ),
     )

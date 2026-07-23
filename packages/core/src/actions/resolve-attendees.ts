@@ -1,63 +1,128 @@
+import {
+  resolvePerson,
+  type PersonResolution,
+} from '../contacts/person'
 import { resolveAttendeeContact } from '../contacts/resolve'
-import { noteTitleOwningEmail } from '../indexing/queries'
+import { serializeWikiSuggestionAddress } from '../indexing/suggest'
+import { canonicalEmail, canonicalEmails } from '../markdown/email-fields'
 import { wikiLinkSafe } from '../markdown/edit'
-import { foldEmail } from '../markdown/email-fields'
 import type { MeetingAttendee } from './add-meeting'
 
+/** An attendee classified for linked or plain-text meeting serialization. */
+export type ResolvedMeetingAttendee =
+  | {
+      readonly kind: 'existing'
+      readonly attendee: MeetingAttendee
+      readonly insertText: string
+    }
+  | {
+      readonly kind: 'new'
+      readonly attendee: MeetingAttendee
+      readonly insertText: string
+    }
+  | {
+      readonly kind: 'plain'
+      readonly attendee: MeetingAttendee
+    }
+
+function normalizedAttendee(
+  attendee: MeetingAttendee,
+  emails: readonly string[],
+): MeetingAttendee {
+  return emails.length === 0
+    ? { name: attendee.name }
+    : { name: attendee.name, emails }
+}
+
+function targetFromPerson(
+  attendee: MeetingAttendee,
+  resolution: PersonResolution,
+): ResolvedMeetingAttendee {
+  if (resolution.kind === 'existing') {
+    return {
+      kind: 'existing',
+      attendee: {
+        name: resolution.title,
+        emails: resolution.emails,
+      },
+      insertText: resolution.insertText,
+    }
+  }
+  if (resolution.kind === 'blocked') {
+    return {
+      kind: 'plain',
+      attendee: normalizedAttendee(attendee, resolution.emails),
+    }
+  }
+  const name = wikiLinkSafe(attendee.name)
+  const insertText = serializeWikiSuggestionAddress(name, null)
+  if (insertText === null) {
+    return {
+      kind: 'plain',
+      attendee: normalizedAttendee(attendee, resolution.emails),
+    }
+  }
+  return {
+    kind: 'new',
+    attendee:
+      resolution.emails.length === 0
+        ? { name }
+        : { name, emails: resolution.emails },
+    insertText,
+  }
+}
+
+async function resolveMeetingAttendee(
+  attendee: MeetingAttendee,
+  lookupContacts: boolean,
+): Promise<ResolvedMeetingAttendee> {
+  const emails = canonicalEmails(attendee.emails ?? [])
+  let resolution = await resolvePerson(emails)
+  if (resolution.kind !== 'missing') {
+    return targetFromPerson(attendee, resolution)
+  }
+
+  const nameEmail = canonicalEmail(attendee.name)
+  if (lookupContacts && emails[0] !== undefined) {
+    const contact = await resolveAttendeeContact(emails[0])
+    if (contact !== null) {
+      const contactAttendee = {
+        name:
+          emails.includes(nameEmail) && contact.fullName.trim() !== ''
+            ? contact.fullName.trim()
+            : attendee.name,
+        emails: canonicalEmails([...emails, ...contact.emails]),
+      }
+      resolution = await resolvePerson(contactAttendee.emails)
+      return targetFromPerson(contactAttendee, resolution)
+    }
+  }
+  return targetFromPerson(normalizedAttendee(attendee, emails), resolution)
+}
+
 /**
- * Canonicalize meeting attendees against what the graph already knows, so
- * one person keeps one note no matter how the calendar spelled them.
- *
- * Calendars are unreliable about names: EventKit reports many participants
- * by bare address (no display name), and the ones it does name can differ
- * from the note title ("Doe, Jane" vs "Jane Doe"). Matching by name alone
- * therefore mints duplicate person notes. The invite email is the stable
- * identity, so each attendee that carries one resolves in order:
- *
- * 1. **The graph.** A `#person`-tagged note owning the address via a
- *    `- Email:` contact-field bullet (the `note_emails` projection) wins
- *    outright — the attendee is renamed to that note's title, so the
- *    `[[Person]]` link lands on the existing note.
- * 2. **Apple Contacts** (gate on), only when the attendee's name *is* the
- *    address — the calendar knew no better. The contact's full name becomes
- *    the attendee, so the note the flow then creates (pre-filled with the
- *    contact's details, including this email) is born under the person's
- *    real name — and step 1 finds it next time.
- * 3. Otherwise the attendee passes through unchanged, and the flow behaves
- *    as v1 did: title match or a fresh note.
- *
- * Both the add-meeting dialog (prefilling chips) and `addMeetingToDaily`
- * (authoritatively, at write time) run this, so what the user sees is what
- * gets linked — and a quick submit can't skip the resolution.
+ * Resolve attendees for meeting serialization. Every Contact email participates
+ * in ownership; conflicts and unaddressable owners become plain text.
+ */
+export async function resolveMeetingAttendeeTargets(
+  attendees: readonly MeetingAttendee[],
+  lookupContacts: boolean,
+): Promise<ResolvedMeetingAttendee[]> {
+  return Promise.all(
+    attendees.map((attendee) =>
+      resolveMeetingAttendee(attendee, lookupContacts),
+    ),
+  )
+}
+
+/**
+ * Resolve the editable attendee chips. Existing owners use their note title;
+ * blocked identities remain selectable under the original display name.
  */
 export async function resolveMeetingAttendees(
   attendees: readonly MeetingAttendee[],
   lookupContacts: boolean,
 ): Promise<MeetingAttendee[]> {
-  return Promise.all(attendees.map((attendee) => resolveAttendee(attendee, lookupContacts)))
-}
-
-async function resolveAttendee(
-  attendee: MeetingAttendee,
-  lookupContacts: boolean,
-): Promise<MeetingAttendee> {
-  if (attendee.email === undefined || foldEmail(attendee.email) === '') {
-    return attendee
-  }
-  const ownerTitle = await noteTitleOwningEmail(attendee.email)
-  // The rename must be lossless: `[[…]]` has no escaping, so a title that
-  // wikiLinkSafe would alter (brackets, pipes, doubled spaces) can't be
-  // linked verbatim — the sanitized form would miss the owner in the index
-  // and mint the very duplicate this resolution exists to prevent. Such an
-  // owner falls through to the later steps instead.
-  if (ownerTitle !== null && ownerTitle !== '' && wikiLinkSafe(ownerTitle) === ownerTitle) {
-    return { name: ownerTitle, email: attendee.email }
-  }
-  if (lookupContacts && foldEmail(attendee.name) === foldEmail(attendee.email)) {
-    const contact = await resolveAttendeeContact(attendee.email)
-    if (contact !== null && contact.fullName.trim() !== '') {
-      return { name: contact.fullName.trim(), email: attendee.email }
-    }
-  }
-  return attendee
+  const resolved = await resolveMeetingAttendeeTargets(attendees, lookupContacts)
+  return resolved.map(({ attendee }) => attendee)
 }

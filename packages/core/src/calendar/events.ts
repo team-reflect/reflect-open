@@ -78,7 +78,9 @@ export function defaultAttendees(event: CalendarEvent): MeetingAttendee[] {
       continue
     }
     seen.add(key)
-    attendees.push(attendee.email === null ? { name } : { name, email: attendee.email })
+    attendees.push(
+      attendee.email === null ? { name } : { name, emails: [attendee.email] },
+    )
   }
   return attendees
 }

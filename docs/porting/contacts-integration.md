@@ -10,9 +10,10 @@ Settings → System integrations switch with the permission flow, the
 suggested-contact card, contacts in the `[[` link menu, and the
 meeting-attendee half: the
 [calendar flow](./calendar-meetings-integration.md)'s add-meeting action
-resolves each attendee's invite email through `resolveAttendeeContact`
-(gated on the integration being enabled and readable) and pre-fills the
-person notes it creates; on a miss the note is created bare, as v1 did.
+resolves every attendee email against explicit `Email` fields on `#person`
+notes. A unique owner is reused. Conflicting or unaddressable owners stay
+plain text and never create a duplicate. On a miss, Apple Contacts can still
+provide the display name and details for the new person note.
 
 Decisions taken at implementation time:
 
@@ -33,11 +34,16 @@ Decisions taken at implementation time:
   `ignoredContactNames`), so a retitled note stays eligible for its own
   suggestion and the state travels with the note through sync and export.
 - **Contacts join the `[[` link menu, like v1's backlink menu.** Word-prefix
-  matches (min two typed characters, capped, deduped against notes the link
-  would resolve to) appear after note suggestions; selecting one inserts the
-  link and creates the person note prefilled with the same details block Add
-  writes. A contact row for the exact typed name replaces the bare Create
-  row.
+  matches appear after note suggestions. All of a Contact's emails resolve as
+  one identity: a unique `#person` owner supplies the verified wikilink
+  address, a miss creates a prefilled person note, and several owners block
+  the Contact row rather than choosing one. An exact blocked Contact also
+  suppresses its duplicate-creating Create fallback; ordinary note
+  suggestions remain available.
+- **Email ownership is explicit and conservative.** Only `Email` fields on
+  `#person` notes count, including legacy V1 nested `Email` / `Emails` lists.
+  Values are canonicalized for matching, and primary email order does not
+  break conflicts.
 - **No `mailto:`/`tel:` links.** v1's rich editor hid link URLs; v2 notes are
   markdown the user owns, where the syntax would double every value — and the
   editor's link opener is scoped to `https`. Plain values keep the files
@@ -70,10 +76,10 @@ macOS.
    contacts permission prompt; denial shows an inline pointer to System
    Settings.
 2. **Meeting attendees become person notes.** When a meeting is added from
-   the [calendar flow](./calendar-meetings-integration.md), each attendee
-   email is looked up in Apple Contacts. On a match, the created person note
-   is pre-filled (name, email, phone); on a miss, a person note is still
-   created from the attendee email, as in v1.
+   the [calendar flow](./calendar-meetings-integration.md), all known attendee
+   emails first resolve against existing `#person` notes. On a miss, Apple
+   Contacts can pre-fill the created note with name, email, and phone. The
+   invite email is still written when Contacts is unavailable.
 3. **Suggested contact.** On a note whose title matches a contact's name, a
    card offers the contact's details (photo, primary email, phone) with
    **Add** — writes the fields into the note as plain markdown — and

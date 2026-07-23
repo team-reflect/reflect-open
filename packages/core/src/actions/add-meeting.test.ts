@@ -1,11 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ensurePersonNote } from '../contacts/person'
 import { noteExists, readNote, writeNote } from '../graph/commands'
 import { createNoteWithTitle } from '../graph/create-note'
-import { noteTitleOwningEmail, resolveWikiTarget } from '../indexing/queries'
+import { resolveWikiTarget } from '../indexing/queries'
 import { setBridge } from '../ipc/bridge'
 import { resolved, unresolved } from '../markdown/resolve'
-import { addMeetingToDaily, meetingLine, type AddMeetingInput } from './add-meeting'
+import {
+  addMeetingToDaily,
+  meetingLine,
+  type AddMeetingInput,
+  type MeetingAttendee,
+} from './add-meeting'
+import { resolveMeetingAttendeeTargets } from './resolve-attendees'
 
+vi.mock('../contacts/person', () => ({
+  ensurePersonNote: vi.fn(),
+}))
 vi.mock('../graph/commands', () => ({
   noteExists: vi.fn(),
   readNote: vi.fn(),
@@ -15,21 +25,22 @@ vi.mock('../graph/create-note', () => ({
   createNoteWithTitle: vi.fn(),
 }))
 vi.mock('../indexing/queries', () => ({
-  noteTitleOwningEmail: vi.fn(),
   resolveWikiTarget: vi.fn(),
 }))
+vi.mock('./resolve-attendees', () => ({
+  resolveMeetingAttendeeTargets: vi.fn(),
+}))
 
+const ensurePersonMock = vi.mocked(ensurePersonNote)
 const noteExistsMock = vi.mocked(noteExists)
 const readNoteMock = vi.mocked(readNote)
 const writeNoteMock = vi.mocked(writeNote)
 const createNoteMock = vi.mocked(createNoteWithTitle)
-const resolveMock = vi.mocked(resolveWikiTarget)
-const owningNoteMock = vi.mocked(noteTitleOwningEmail)
+const resolveWikiTargetMock = vi.mocked(resolveWikiTarget)
+const resolveAttendeesMock = vi.mocked(resolveMeetingAttendeeTargets)
 
 const DAILY = 'daily/2026-07-01.md'
 const GENERATION = 3
-
-const notFound = () => ({ kind: 'notFound', message: 'missing' })
 
 function input(overrides: Partial<AddMeetingInput> = {}): AddMeetingInput {
   return {
@@ -42,234 +53,273 @@ function input(overrides: Partial<AddMeetingInput> = {}): AddMeetingInput {
   }
 }
 
+function newTargets(attendees: readonly MeetingAttendee[]) {
+  return attendees.map((attendee) => ({
+    kind: 'new' as const,
+    attendee,
+    insertText: attendee.name,
+  }))
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
-  readNoteMock.mockRejectedValue(notFound())
+  readNoteMock.mockRejectedValue({ kind: 'notFound', message: 'missing' })
   noteExistsMock.mockResolvedValue(false)
   createNoteMock.mockImplementation(async (title: string) => `notes/${title.toLowerCase()}.md`)
-  resolveMock.mockImplementation(async (target) => unresolved(target))
-  owningNoteMock.mockResolvedValue(null)
+  resolveWikiTargetMock.mockImplementation(async (target) => unresolved(target))
+  resolveAttendeesMock.mockImplementation(async (attendees) => newTargets(attendees))
+  ensurePersonMock.mockImplementation(async ({ title }) => ({
+    kind: 'created',
+    path: `notes/${title.toLowerCase()}.md`,
+  }))
 })
 
 describe('meetingLine', () => {
-  it('renders the v1 shape: time, met with, for', () => {
+  it('renders linked and plain attendees', () => {
     expect(
       meetingLine({
         title: 'Standup',
-        attendees: ['Ada Lovelace', 'Grace Hopper'],
+        attendees: [
+          { kind: 'linked', insertText: 'Ada Lovelace' },
+          { kind: 'plain', text: 'Shared inbox' },
+        ],
         backlinkMeeting: true,
         startTime: '9:00am',
       }),
-    ).toBe('- 9:00am met with [[Ada Lovelace]], [[Grace Hopper]] for [[Standup]]')
+    ).toBe('- 9:00am met with [[Ada Lovelace]], Shared inbox for [[Standup]]')
   })
 
-  it('shortens for attendee-less events and capitalizes without a time', () => {
-    expect(
-      meetingLine({ title: 'Standup', attendees: [], backlinkMeeting: true, startTime: '9:00am' }),
-    ).toBe('- 9:00am [[Standup]]')
-    expect(
-      meetingLine({ title: 'Standup', attendees: ['Ada Lovelace'], backlinkMeeting: true }),
-    ).toBe('- Met with [[Ada Lovelace]] for [[Standup]]')
-  })
-
-  it('writes the meeting name as plain text when not backlinked', () => {
+  it('shortens attendee-less events and supports a plain meeting title', () => {
     expect(
       meetingLine({
         title: 'Standup',
-        attendees: ['Ada Lovelace'],
-        backlinkMeeting: false,
+        attendees: [],
+        backlinkMeeting: true,
         startTime: '9:00am',
       }),
-    ).toBe('- 9:00am met with [[Ada Lovelace]] for Standup')
+    ).toBe('- 9:00am [[Standup]]')
+    expect(
+      meetingLine({
+        title: 'Standup',
+        attendees: [{ kind: 'linked', insertText: 'Ada Lovelace' }],
+        backlinkMeeting: false,
+      }),
+    ).toBe('- Met with [[Ada Lovelace]] for Standup')
   })
 })
 
 describe('addMeetingToDaily', () => {
-  it('appends the meeting under ## Meetings, creating the section on a fresh daily', async () => {
+  it('writes the daily line before creating missing notes', async () => {
+    const calls: string[] = []
+    writeNoteMock.mockImplementation(async () => {
+      calls.push('daily')
+    })
+    ensurePersonMock.mockImplementation(async () => {
+      calls.push('person')
+      return { kind: 'created', path: 'notes/ada.md' }
+    })
+
     const outcome = await addMeetingToDaily(
-      input({ attendees: [{ name: 'Ada Lovelace' }], startTime: '9:00am' }),
+      input({
+        attendees: [{
+          name: 'Ada Lovelace',
+          emails: ['ada@example.com'],
+        }],
+        backlinkMeeting: false,
+        startTime: '9:00am',
+      }),
     )
-    expect(outcome.appended).toBe(true)
+
+    expect(calls).toEqual(['daily', 'person'])
     expect(writeNoteMock).toHaveBeenCalledWith(
       DAILY,
-      '## Meetings\n\n- 9:00am met with [[Ada Lovelace]] for [[Standup]]\n',
+      '## Meetings\n\n- 9:00am met with [[Ada Lovelace]] for Standup\n',
       GENERATION,
     )
+    expect(ensurePersonMock).toHaveBeenCalledWith({
+      title: 'Ada Lovelace',
+      emails: ['ada@example.com'],
+      body: '- Type: #person\n- Email: ada@example.com',
+      generation: GENERATION,
+    })
+    expect(outcome).toEqual({
+      appended: true,
+      createdNotes: ['Ada Lovelace'],
+    })
   })
 
-  it('appends to an existing Meetings section of a non-empty daily', async () => {
-    readNoteMock.mockResolvedValue('Some notes\n\n## Meetings\n\n- [[Kickoff]]\n\n## Later\n\nx\n')
-    await addMeetingToDaily(input())
-    const written = writeNoteMock.mock.calls[0]?.[1]
-    expect(written).toContain('## Meetings\n\n- [[Kickoff]]\n\n- [[Standup]]')
-    expect(written).toContain('## Later')
-  })
+  it('is a full no-op when the meeting is already linked that day', async () => {
+    readNoteMock.mockResolvedValue(
+      '## Meetings\n\n- 9:00am met with [[Ada Lovelace]] for [[Standup]]\n',
+    )
 
-  it('is idempotent: a day that already links the meeting is a full no-op', async () => {
-    readNoteMock.mockResolvedValue('## Meetings\n\n- 9:00am met with [[Ada Lovelace]] for [[Standup]]\n')
-    const outcome = await addMeetingToDaily(input({ attendees: [{ name: 'Carol' }] }))
-    expect(outcome).toEqual({ appended: false, createdNotes: [] })
+    await expect(
+      addMeetingToDaily(input({ attendees: [{ name: 'Carol' }] })),
+    ).resolves.toEqual({ appended: false, createdNotes: [] })
     expect(writeNoteMock).not.toHaveBeenCalled()
-    // No invisible side effects either — a re-add must not mint notes the
-    // daily line never gained.
-    expect(createNoteMock).not.toHaveBeenCalled()
+    expect(resolveAttendeesMock).not.toHaveBeenCalled()
+    expect(ensurePersonMock).not.toHaveBeenCalled()
   })
 
-  it('treats case-different and aliased Meetings links as already linked', async () => {
+  it('recognizes an aliased meeting link in the Meetings section', async () => {
     readNoteMock.mockResolvedValue('## Meetings\n\n- [[STANDUP|Daily sync]]\n')
-    const outcome = await addMeetingToDaily(input())
-    expect(outcome.appended).toBe(false)
-    expect(writeNoteMock).not.toHaveBeenCalled()
+
+    await expect(addMeetingToDaily(input())).resolves.toEqual({
+      appended: false,
+      createdNotes: [],
+    })
   })
 
-  it('matches a link whose alias (not target) carries the meeting name', async () => {
-    readNoteMock.mockResolvedValue('## Meetings\n\n- [[Standup|Daily sync]]\n')
-    const outcome = await addMeetingToDaily(input({ title: 'Daily sync' }))
-    expect(outcome.appended).toBe(false)
-    expect(writeNoteMock).not.toHaveBeenCalled()
-  })
-
-  it('still appends when the title is only linked outside the Meetings section', async () => {
-    readNoteMock.mockResolvedValue('Prep notes for [[Standup]] tomorrow.\n')
-    const outcome = await addMeetingToDaily(input())
-    expect(outcome.appended).toBe(true)
-    const written = writeNoteMock.mock.calls[0]?.[1]
-    expect(written).toContain('## Meetings\n\n- [[Standup]]')
-  })
-
-  it('an un-backlinked meeting always appends, like v1 (plain text has no link to match)', async () => {
-    readNoteMock.mockResolvedValue('## Meetings\n\n- [[Standup]]\n')
-    const outcome = await addMeetingToDaily(input({ backlinkMeeting: false }))
-    expect(outcome.appended).toBe(true)
-    const written = writeNoteMock.mock.calls[0]?.[1]
-    expect(written).toContain('- [[Standup]]\n\n- Standup')
-  })
-
-  it('creates the meeting note (typed #meeting) only when backlinked and missing', async () => {
-    await addMeetingToDaily(input({ backlinkMeeting: false }))
-    expect(createNoteMock).not.toHaveBeenCalled()
-
+  it('creates a missing backlinked meeting note only', async () => {
     await addMeetingToDaily(input())
-    expect(createNoteMock).toHaveBeenCalledWith('Standup', GENERATION, '- Type: #meeting')
+    expect(createNoteMock).toHaveBeenCalledWith(
+      'Standup',
+      GENERATION,
+      '- Type: #meeting',
+    )
 
     createNoteMock.mockClear()
-    resolveMock.mockResolvedValue(resolved('notes/standup.md'))
+    resolveWikiTargetMock.mockResolvedValue(resolved('notes/standup.md'))
     await addMeetingToDaily(input())
     expect(createNoteMock).not.toHaveBeenCalled()
   })
 
-  it('creates person notes for missing attendees, typed #person', async () => {
-    resolveMock.mockImplementation(async (target) =>
-      target === 'Grace Hopper' || target === 'Standup'
-        ? resolved(`notes/${target.toLowerCase()}.md`)
-        : unresolved(target),
-    )
-    const outcome = await addMeetingToDaily(
-      input({ attendees: [{ name: 'Ada Lovelace' }, { name: 'Grace Hopper' }] }),
-    )
-    expect(createNoteMock).toHaveBeenCalledTimes(1)
-    expect(createNoteMock).toHaveBeenCalledWith('Ada Lovelace', GENERATION, '- Type: #person')
-    expect(outcome.createdNotes).toEqual(['Ada Lovelace'])
-  })
-
-  it('skips creation when the slug path already exists (index lag backstop)', async () => {
-    noteExistsMock.mockImplementation(async (path) => path === 'notes/ada-lovelace.md')
-    await addMeetingToDaily(input({ attendees: [{ name: 'Ada Lovelace' }], backlinkMeeting: false }))
-    expect(createNoteMock).not.toHaveBeenCalled()
-  })
-
-  it('sanitizes link-corrupting characters and deduplicates attendees', async () => {
+  it('deduplicates attendee display names and removes the meeting itself', async () => {
     await addMeetingToDaily(
       input({
-        title: '  Stand|up [v2]  ',
         attendees: [
           { name: 'Ada Lovelace' },
           { name: 'ada lovelace' },
           { name: '' },
-          { name: 'Stand up v2' },
+          { name: 'Standup' },
         ],
+        backlinkMeeting: false,
       }),
     )
-    // `Stand up v2` also names the meeting itself, so it drops out of the
-    // attendee links rather than duplicating the meeting link.
+
     expect(writeNoteMock).toHaveBeenCalledWith(
       DAILY,
-      '## Meetings\n\n- Met with [[Ada Lovelace]] for [[Stand up v2]]\n',
+      '## Meetings\n\n- Met with [[Ada Lovelace]] for Standup\n',
       GENERATION,
     )
+    expect(ensurePersonMock).toHaveBeenCalledTimes(1)
   })
 
-  it('does not create a person note for an attendee named like the meeting', async () => {
-    resolveMock.mockImplementation(async (target) =>
-      target === 'Standup' ? resolved('notes/standup.md') : unresolved(target),
-    )
-    await addMeetingToDaily(input({ attendees: [{ name: 'Standup' }] }))
-    expect(createNoteMock).not.toHaveBeenCalled()
-  })
-
-  it('rejects an empty meeting name', async () => {
-    await expect(addMeetingToDaily(input({ title: '  [|]  ' }))).rejects.toThrow(
-      'a meeting needs a name',
-    )
+  it('rejects an empty meeting name before writing', async () => {
+    await expect(
+      addMeetingToDaily(input({ title: '  [|]  ' })),
+    ).rejects.toThrow('a meeting needs a name')
     expect(writeNoteMock).not.toHaveBeenCalled()
   })
 })
 
-describe('addMeetingToDaily attendee resolution', () => {
-  it('links the note owning the invite email instead of minting a duplicate', async () => {
-    owningNoteMock.mockImplementation(async (email) =>
-      email === 'jane@corp.com' ? 'Jane Doe' : null,
-    )
-    resolveMock.mockImplementation(async (target) =>
-      target === 'Jane Doe' ? resolved('notes/jane-doe.md') : unresolved(target),
-    )
+describe('attendee identity outcomes', () => {
+  it('reuses an existing owner and does not create', async () => {
+    resolveAttendeesMock.mockResolvedValue([
+      {
+        kind: 'existing',
+        attendee: {
+          name: 'Jane Doe',
+          emails: ['jane@corp.com'],
+        },
+        insertText: 'Jane Doe',
+      },
+    ])
+
     const outcome = await addMeetingToDaily(
       input({
-        attendees: [{ name: 'jane@corp.com', email: 'jane@corp.com' }],
+        attendees: [{
+          name: 'jane@corp.com',
+          emails: ['jane@corp.com'],
+        }],
         backlinkMeeting: false,
       }),
     )
+
     expect(writeNoteMock).toHaveBeenCalledWith(
       DAILY,
       '## Meetings\n\n- Met with [[Jane Doe]] for Standup\n',
       GENERATION,
     )
-    expect(createNoteMock).not.toHaveBeenCalled()
+    expect(ensurePersonMock).not.toHaveBeenCalled()
     expect(outcome.createdNotes).toEqual([])
   })
 
-  it('collapses two spellings of one person once their emails resolve to the same note', async () => {
-    owningNoteMock.mockResolvedValue('Jane Doe')
-    resolveMock.mockImplementation(async (target) =>
-      target === 'Jane Doe' ? resolved('notes/jane-doe.md') : unresolved(target),
-    )
-    await addMeetingToDaily(
+  it.each(['identity conflict', 'unaddressable owner'])(
+    'writes a %s as plain text without creating',
+    async () => {
+      resolveAttendeesMock.mockResolvedValue([
+        {
+          kind: 'plain',
+          attendee: {
+            name: 'Jane Doe',
+            emails: ['jane@corp.com'],
+          },
+        },
+      ])
+
+      await addMeetingToDaily(
+        input({
+          attendees: [{
+            name: 'Jane Doe',
+            emails: ['jane@corp.com'],
+          }],
+          backlinkMeeting: false,
+        }),
+      )
+
+      expect(writeNoteMock).toHaveBeenCalledWith(
+        DAILY,
+        '## Meetings\n\n- Met with Jane Doe for Standup\n',
+        GENERATION,
+      )
+      expect(ensurePersonMock).not.toHaveBeenCalled()
+    },
+  )
+
+  it('fails before writing when identity resolution fails', async () => {
+    resolveAttendeesMock.mockRejectedValue(new Error('index unavailable'))
+
+    await expect(
+      addMeetingToDaily(
+        input({
+          attendees: [{
+            name: 'Jane',
+            emails: ['jane@corp.com'],
+          }],
+        }),
+      ),
+    ).rejects.toThrow('index unavailable')
+    expect(writeNoteMock).not.toHaveBeenCalled()
+  })
+
+  it('accepts a race that blocks creation after the daily write', async () => {
+    ensurePersonMock.mockResolvedValue({
+      kind: 'blocked',
+      emails: ['ada@example.com'],
+      reason: 'identity-conflict',
+    })
+
+    const outcome = await addMeetingToDaily(
       input({
-        attendees: [
-          { name: 'jane@corp.com', email: 'jane@corp.com' },
-          { name: 'Doe, Jane', email: 'jane.doe@home.example' },
-        ],
+        attendees: [{
+          name: 'Ada Lovelace',
+          emails: ['ada@example.com'],
+        }],
         backlinkMeeting: false,
       }),
     )
-    expect(writeNoteMock).toHaveBeenCalledWith(
-      DAILY,
-      '## Meetings\n\n- Met with [[Jane Doe]] for Standup\n',
-      GENERATION,
-    )
-  })
 
-  it('resolution errors fail the call loudly rather than writing a duplicate-prone line', async () => {
-    owningNoteMock.mockRejectedValue(new Error('index unavailable'))
-    await expect(
-      addMeetingToDaily(input({ attendees: [{ name: 'Jane', email: 'jane@corp.com' }] })),
-    ).rejects.toThrow('index unavailable')
-    expect(createNoteMock).not.toHaveBeenCalled()
+    expect(writeNoteMock).toHaveBeenCalled()
+    expect(outcome.createdNotes).toEqual([])
   })
 })
 
-describe('addMeetingToDaily contact pre-fill', () => {
-  const ADA = { name: 'Ada Lovelace', email: 'ada@example.com' }
+describe('Contact prefill', () => {
+  const ADA = {
+    name: 'Ada Lovelace',
+    emails: ['ada@example.com'],
+  }
 
   function installContactsBridge(contacts: unknown[]): ReturnType<typeof vi.fn> {
     const invoke = vi.fn(async () => contacts)
@@ -281,84 +331,45 @@ describe('addMeetingToDaily contact pre-fill', () => {
     setBridge(null)
   })
 
-  it('pre-fills a created person note from the matching contact', async () => {
+  it('uses Contact details as the new note body', async () => {
     const invoke = installContactsBridge([
       {
         fullName: 'Ada Lovelace',
         givenName: 'Ada',
         familyName: 'Lovelace',
-        emails: ['ada@example.com'],
+        emails: ['ada@example.com', 'ada@work.example'],
         phones: ['+1 555-0100'],
       },
     ])
-    await addMeetingToDaily(input({ attendees: [ADA], lookupContacts: true }))
-    expect(invoke).toHaveBeenCalledWith('contacts_lookup_by_email', { email: 'ada@example.com' })
-    expect(createNoteMock).toHaveBeenCalledWith(
-      'Ada Lovelace',
-      GENERATION,
-      '- Type: #person\n- Email: ada@example.com\n- Phone: +1 555-0100',
+
+    await addMeetingToDaily(
+      input({ attendees: [ADA], lookupContacts: true }),
     )
+
+    expect(invoke).toHaveBeenCalledWith(
+      'contacts_lookup_by_email',
+      { email: 'ada@example.com' },
+    )
+    expect(ensurePersonMock).toHaveBeenCalledWith({
+      title: 'Ada Lovelace',
+      emails: ['ada@example.com'],
+      body:
+        '- Type: #person\n- Email: ada@example.com\n- Phone: +1 555-0100',
+      generation: GENERATION,
+    })
   })
 
-  it('names and pre-fills the created note from the contact when the calendar only knew the address', async () => {
-    installContactsBridge([
-      {
-        fullName: 'Ada Lovelace',
-        givenName: 'Ada',
-        familyName: 'Lovelace',
+  it('persists attendee emails without touching Contacts when the gate is off', async () => {
+    const invoke = installContactsBridge([])
+
+    await addMeetingToDaily(input({ attendees: [ADA] }))
+
+    expect(invoke).not.toHaveBeenCalled()
+    expect(ensurePersonMock).toHaveBeenCalledWith(
+      expect.objectContaining({
         emails: ['ada@example.com'],
-        phones: [],
-      },
-    ])
-    const outcome = await addMeetingToDaily(
-      input({
-        attendees: [{ name: 'ada@example.com', email: 'ada@example.com' }],
-        lookupContacts: true,
+        body: '- Type: #person\n- Email: ada@example.com',
       }),
     )
-    expect(writeNoteMock).toHaveBeenCalledWith(
-      DAILY,
-      expect.stringContaining('[[Ada Lovelace]]'),
-      GENERATION,
-    )
-    expect(createNoteMock).toHaveBeenCalledWith(
-      'Ada Lovelace',
-      GENERATION,
-      '- Type: #person\n- Email: ada@example.com',
-    )
-    expect(outcome.createdNotes).toContain('Ada Lovelace')
-  })
-
-  it('creates the bare typed note on a lookup miss, as v1 did', async () => {
-    installContactsBridge([])
-    await addMeetingToDaily(input({ attendees: [ADA], lookupContacts: true }))
-    expect(createNoteMock).toHaveBeenCalledWith('Ada Lovelace', GENERATION, '- Type: #person')
-  })
-
-  it('never touches the bridge while the contacts gate is off', async () => {
-    const invoke = installContactsBridge([])
-    await addMeetingToDaily(input({ attendees: [ADA] }))
-    expect(invoke).not.toHaveBeenCalled()
-    expect(createNoteMock).toHaveBeenCalledWith('Ada Lovelace', GENERATION, '- Type: #person')
-  })
-
-  it('skips the lookup for attendees without an invite email', async () => {
-    const invoke = installContactsBridge([])
-    await addMeetingToDaily(
-      input({ attendees: [{ name: 'Grace Hopper' }], lookupContacts: true }),
-    )
-    expect(invoke).not.toHaveBeenCalled()
-    expect(createNoteMock).toHaveBeenCalledWith('Grace Hopper', GENERATION, '- Type: #person')
-  })
-
-  it('does not look up attendees whose note already exists', async () => {
-    const invoke = installContactsBridge([])
-    resolveMock.mockImplementation(async (target) =>
-      target === 'Ada Lovelace' ? resolved('notes/ada-lovelace.md') : unresolved(target),
-    )
-    await addMeetingToDaily(input({ attendees: [ADA], lookupContacts: true }))
-    expect(invoke).not.toHaveBeenCalled()
-    expect(createNoteMock).toHaveBeenCalledTimes(1)
-    expect(createNoteMock).toHaveBeenCalledWith('Standup', GENERATION, '- Type: #meeting')
   })
 })

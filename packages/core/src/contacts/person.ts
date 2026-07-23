@@ -59,7 +59,6 @@ export type PersonContactResolution =
 
 interface PersonOwnerRow {
   readonly path: string
-  readonly title: string
 }
 
 async function personOwners(emails: readonly string[]): Promise<PersonOwnerRow[]> {
@@ -72,7 +71,7 @@ async function personOwners(emails: readonly string[]): Promise<PersonOwnerRow[]
       .where('noteEmails.emailKey', 'in', chunk)
       .where('tags.tagKey', '=', PERSON_TAG_KEY)
       .where('notes.kind', '=', 'note')
-      .select(['notes.path as path', 'notes.title as title'])
+      .select('notes.path as path')
       .distinct()
       .orderBy('notes.path')
       .execute()

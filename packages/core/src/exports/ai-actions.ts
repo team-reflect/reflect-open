@@ -200,9 +200,14 @@ export {
   MEETINGS_HEADING,
   type AddMeetingInput,
   type AddMeetingOutcome,
+  type MeetingLineAttendee,
   type MeetingAttendee,
 } from '../actions/add-meeting'
-export { resolveMeetingAttendees } from '../actions/resolve-attendees'
+export {
+  resolveMeetingAttendees,
+  resolveMeetingAttendeeTargets,
+  type ResolvedMeetingAttendee,
+} from '../actions/resolve-attendees'
 export {
   describePage,
   isDescriptionRejected,

@@ -118,7 +118,7 @@ describe('defaultAttendees', () => {
       }),
     )
     expect(attendees).toEqual([
-      { name: 'Ada Lovelace', email: 'ada@example.com' },
+      { name: 'Ada Lovelace', emails: ['ada@example.com'] },
       { name: 'Grace Hopper' },
     ])
   })

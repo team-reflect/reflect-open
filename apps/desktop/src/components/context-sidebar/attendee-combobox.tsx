@@ -48,10 +48,10 @@ function entryName(entry: AutocompleteEntry): string {
 }
 
 function entryAttendee(entry: AutocompleteEntry): MeetingAttendee {
-  // A contact's invite email rides along so the submit-time contacts lookup
-  // can pre-fill the person note, exactly like calendar-sourced attendees.
+  // Every Contact email rides along so submit-time ownership cannot give the
+  // primary address special treatment.
   return entry.kind === 'contact'
-    ? { name: entry.contact.fullName, email: entry.contact.emails[0] }
+    ? { name: entry.contact.fullName, emails: entry.contact.emails }
     : { name: entryName(entry) }
 }
 
@@ -81,7 +81,7 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
   const deferredQuery = useDeferredValue(query)
   const searchTerm = deferredQuery.trim()
 
-  const { data: fetched, isPlaceholderData } = useQuery({
+  const { data: fetched, isFetching, isPlaceholderData } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'attendee-suggestions', searchTerm, contactsInMenu],
     queryFn: async () => {
       const [suggestions, contacts] = await Promise.all([
@@ -121,9 +121,17 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
   const open = !dismissed && query.trim() !== '' && entries.length > 0
   // The list lags the input twice over (the deferred value, then the fetch —
   // keepPreviousData shows the prior query's rows meanwhile). Enter may only
-  // take the highlighted row when the rows answer exactly what's typed;
-  // anything staler falls back to the typed text, like blur always does.
-  const entriesMatchInput = !isPlaceholderData && searchTerm === query.trim()
+  // take the highlighted row or add typed text only when the rows answer
+  // exactly what is typed. Pending results must not discard Contact emails.
+  const entriesMatchInput =
+    !isFetching && !isPlaceholderData && searchTerm === query.trim()
+  const exactContact = entriesMatchInput
+    ? entries.find(
+        (entry) =>
+          entry.kind === 'contact' &&
+          foldKey(entry.contact.fullName) === foldKey(query),
+      )
+    : undefined
 
   const select = (entry: AutocompleteEntry): void => {
     onAdd(entryAttendee(entry))
@@ -133,7 +141,7 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
 
   const addTyped = (): void => {
     const name = query.trim()
-    if (name === '') {
+    if (name === '' || !entriesMatchInput || exactContact !== undefined) {
       return
     }
     onAdd({ name })
@@ -151,8 +159,9 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
         open && entriesMatchInput
           ? entries.find((candidate) => entryKey(candidate) === highlighted)
           : undefined
-      if (entry !== undefined) {
-        select(entry)
+      const selected = entry ?? exactContact
+      if (selected !== undefined) {
+        select(selected)
       } else {
         addTyped()
       }

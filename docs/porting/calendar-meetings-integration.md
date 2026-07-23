@@ -68,7 +68,10 @@ is added to [docs/privacy.md](../privacy.md)'s inventory.
    [contacts integration](./contacts-integration.md) on, a fresh person note
    is pre-filled from the Apple Contacts entry matching the attendee's
    invite email. After that, they are ordinary notes; nothing about them
-   stays tied to the calendar.
+   stays tied to the calendar. Existing `#person` notes are reused by explicit
+   email ownership even when their title differs from the calendar name.
+   Conflicting or unaddressable owners are written as plain attendee text and
+   do not create another person note.
 
 ### Architecture
 
