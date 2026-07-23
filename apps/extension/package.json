@@ -8,7 +8,7 @@
     "build": "wxt build",
     "zip": "WXT_STORE_BUILD=true wxt zip",
     "typecheck": "wxt prepare && tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "postinstall": "wxt prepare"
   },
   "dependencies": {

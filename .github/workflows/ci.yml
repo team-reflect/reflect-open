@@ -76,7 +76,7 @@ jobs:
         run: pnpm --filter @reflect/desktop exec playwright install --with-deps chromium
 
       - name: Test
-        run: pnpm turbo run test
+        run: pnpm run test
 
   webkit:
     name: test-webkit
@@ -102,7 +102,7 @@ jobs:
         run: pnpm --filter @reflect/desktop exec playwright install webkit
 
       - name: Test
-        run: pnpm turbo run test
+        run: pnpm run test
         env:
           REFLECT_TEST_BROWSER: webkit
 
