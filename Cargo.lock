@@ -3824,6 +3824,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "objc2-link-presentation"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e373111112c275f52dbe3e3e183d4f96afd2307912efa9c89e52ce0ddda07c4"
+dependencies = [
+ "block2",
+ "objc2",
+ "objc2-foundation",
+]
+
+[[package]]
 name = "objc2-osa-kit"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4806,6 +4817,7 @@ dependencies = [
  "objc2-contacts",
  "objc2-event-kit",
  "objc2-foundation",
+ "objc2-link-presentation",
  "objc2-ui-kit",
  "ort",
  "percent-encoding",

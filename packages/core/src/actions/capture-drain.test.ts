@@ -25,10 +25,12 @@ vi.mock('../graph/commands', () => ({
   captureInboxRead: vi.fn(),
   captureInboxReject: vi.fn(),
   captureInboxRemove: vi.fn(),
+  captureLinkPreview: vi.fn(),
   listFiles: vi.fn(),
   promoteCaptureScreenshot: vi.fn(),
   readAsset: vi.fn(),
   readNote: vi.fn(),
+  writeAsset: vi.fn(),
   writeNote: vi.fn(),
 }))
 vi.mock('./meta-scrape', () => ({
