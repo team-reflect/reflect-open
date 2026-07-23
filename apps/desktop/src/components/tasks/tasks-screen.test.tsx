@@ -262,6 +262,7 @@ afterEach(async () => {
   await cleanup()
 })
 
+// Keep native browser navigation out of keyboard-handler tests in this suite.
 describe('TasksScreen', () => {
   it('shows an empty state when there are no open tasks', async () => {
     getOpenTasks.mockResolvedValue([])
@@ -870,8 +871,9 @@ describe('TasksScreen', () => {
 
     await view.findByText('keep')
     await userEvent.keyboard('{Meta>}a{/Meta}') // select both
-    await userEvent.keyboard('{Backspace}')
-    await Promise.resolve()
+    await act(() => {
+      fireEvent.keyDown(view.getByLabelText('Tasks', { exact: true }), { key: 'Backspace' })
+    })
     // V1 refuses a multi-row ⌫ (which row would survive is unclear).
     expect(deleteTask).not.toHaveBeenCalled()
     await view.unmount()
