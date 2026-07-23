@@ -259,10 +259,32 @@ function visibleLayer(view: BrowserView): HTMLElement {
 /**
  * Dispatch a pointer event the gesture hook can read.
  */
-function firePointer(element: Element, type: string, init: Record<string, unknown>): void {
-  const event = new Event(type, { bubbles: true, cancelable: true })
-  Object.assign(event, init)
-  element.dispatchEvent(event)
+async function firePointer(
+  element: Element,
+  type: string,
+  init: PointerEventInit,
+): Promise<void> {
+  await act(() => {
+    element.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, ...init }))
+  })
+}
+
+async function finishAnimation(element: Element): Promise<void> {
+  await act(() => {
+    fireEvent.animationEnd(element)
+  })
+}
+
+async function finishTransition(element: Element): Promise<void> {
+  await act(() => {
+    fireEvent.transitionEnd(element)
+  })
+}
+
+async function fireClick(element: Element): Promise<void> {
+  await act(() => {
+    fireEvent.click(element)
+  })
 }
 
 /** The calendar strip's per-day aria-label (CalendarStrip uses this form). */
@@ -341,20 +363,18 @@ describe('MobileShell', () => {
   })
 
   it('selects a day in another week straight from the pageable strip', async () => {
-    const user = userEvent
     const today = todayIso()
     // Two weeks out: its cell lives on a different week slide of the strip,
     // which the strip renders (and Embla pages) rather than a single week.
     const nextFortnight = addDaysIso(today, 14)
     const view = await mount({ kind: 'today' })
 
-    await user.click(view.getByRole('button', { name: dayCellLabel(nextFortnight) }))
-    expect(
-      view
-        .getByRole('button', { name: dayCellLabel(nextFortnight) })
-        .element()
-        .getAttribute('aria-current'),
-    ).toBe('date')
+    await fireClick(
+      view.getByRole('button', { name: dayCellLabel(nextFortnight) }).element(),
+    )
+    await expect
+      .element(view.getByRole('button', { name: dayCellLabel(nextFortnight) }))
+      .toHaveAttribute('aria-current', 'date')
     expect(shownMonth(view)).toBe(monthLabel(monthOf(nextFortnight)))
     await expect.element(view.getByRole('button', { name: 'Today' })).toBeVisible()
   })
@@ -496,7 +516,7 @@ describe('MobileShell', () => {
     await expect.element(view.getByRole('searchbox', { name: 'Search notes' })).toBeVisible()
     await expect.element(view.getByText('No notes yet')).toHaveTextContent('No notes yet')
 
-    await user.click(view.getByRole('button', { name: 'Daily' }))
+    await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
     expect(
       view
         .getByRole('button', { name: dayCellLabel(other) })
@@ -518,7 +538,7 @@ describe('MobileShell', () => {
     let fakeNow = 1_000
     const now = vi.spyOn(Date, 'now').mockImplementation(() => fakeNow)
 
-    fireEvent.click(view.getByRole('button', { name: 'Daily' }))
+    await fireClick(view.getByRole('button', { name: 'Daily', exact: true }).element())
     expect(
       view
         .getByRole('button', { name: dayCellLabel(other) })
@@ -527,7 +547,7 @@ describe('MobileShell', () => {
     ).toBe('date')
 
     fakeNow = 1_100
-    fireEvent.click(view.getByRole('button', { name: 'Daily' }))
+    await fireClick(view.getByRole('button', { name: 'Daily', exact: true }).element())
     now.mockRestore()
     await waitFor(() => {
       expect(
@@ -555,9 +575,9 @@ describe('MobileShell', () => {
 
     let fakeNow = 1_000
     const now = vi.spyOn(Date, 'now').mockImplementation(() => fakeNow)
-    fireEvent.click(view.getByRole('button', { name: 'Daily' }))
+    await fireClick(view.getByRole('button', { name: 'Daily', exact: true }).element())
     fakeNow = 1_100
-    fireEvent.click(view.getByRole('button', { name: 'Daily' }))
+    await fireClick(view.getByRole('button', { name: 'Daily', exact: true }).element())
     now.mockRestore()
 
     // A date-preserving focus arrival: the caret lands at the end (the
@@ -574,7 +594,7 @@ describe('MobileShell', () => {
     const other = otherDayInWeek(today)
     const view = await mount({ kind: 'daily', date: other })
 
-    await user.click(view.getByRole('button', { name: 'Daily' }))
+    await user.click(view.getByRole('button', { name: 'Daily', exact: true }))
     expect(
       view
         .getByRole('button', { name: dayCellLabel(other) })
@@ -749,7 +769,7 @@ describe('MobileStack transitions & back-swipe', () => {
   async function pushProbeNote(view: BrowserView): Promise<void> {
     const user = userEvent
     await user.click(view.getByRole('button', { name: 'probe-navigate' }))
-    fireEvent.animationEnd(stackLayers(view).at(-1)!)
+    await finishAnimation(stackLayers(view).at(-1)!)
   }
 
   it('pushes a note as a sliding card over its origin, which stays mounted but inert', async () => {
@@ -772,7 +792,7 @@ describe('MobileStack transitions & back-swipe', () => {
     ).toBe(monthLabel(monthOf(todayIso())))
     expect(view.container.querySelector('.mobile-stack-scrim')).toBeTruthy()
 
-    fireEvent.animationEnd(entering!)
+    await finishAnimation(entering!)
     // The animation class clears; the origin stays mounted for the back-swipe.
     expect(entering!.className).not.toContain('mobile-stack-slide-in')
     expect(stackLayers(view)).toHaveLength(2)
@@ -791,7 +811,7 @@ describe('MobileStack transitions & back-swipe', () => {
     expect(exiting.className).toContain('mobile-stack-slide-out')
     expect(exiting.getAttribute('aria-hidden')).toBe('true')
 
-    fireEvent.animationEnd(exiting)
+    await finishAnimation(exiting)
     expect(stackLayers(view)).toHaveLength(1)
   })
 
@@ -822,7 +842,7 @@ describe('MobileStack transitions & back-swipe', () => {
     await waitFor(() => {
       expect(stackLayers(view).at(-1)!.className).toContain('mobile-stack-slide-in')
     })
-    fireEvent.animationEnd(stackLayers(view).at(-1)!)
+    await finishAnimation(stackLayers(view).at(-1)!)
 
     await user.click(view.getByRole('button', { name: 'Back' }))
     // Popping reveals the still-mounted source, re-seats today beneath it,
@@ -833,7 +853,7 @@ describe('MobileStack transitions & back-swipe', () => {
     expect(
       page.elementLocator(visibleLayer(view)).getByRole('heading').element().textContent,
     ).toBe('Edit note')
-    fireEvent.animationEnd(layers.at(-1)!)
+    await finishAnimation(layers.at(-1)!)
     expect(stackLayers(view)).toHaveLength(2)
   })
 
@@ -872,25 +892,25 @@ describe('MobileStack transitions & back-swipe', () => {
 
     const stack = view.container.querySelector('.mobile-stack')!
     const card = stackLayers(view).at(-1)!
-    firePointer(stack, 'pointerdown', {
+    await firePointer(stack, 'pointerdown', {
       pointerId: 1,
       isPrimary: true,
       pointerType: 'touch',
       clientX: 10,
       clientY: 300,
     })
-    firePointer(stack, 'pointermove', { pointerId: 1, clientX: 40, clientY: 304 })
+    await firePointer(stack, 'pointermove', { pointerId: 1, clientX: 40, clientY: 304 })
     // The card tracks the finger in the 375px mobile viewport.
     // The browser normalizes the written value's bare zeros to `0px`.
     expect(card.style.transform).toBe('translate3d(30px, 0px, 0px)')
 
-    firePointer(stack, 'pointermove', { pointerId: 1, clientX: 600, clientY: 310 })
-    firePointer(stack, 'pointerup', { pointerId: 1, clientX: 600, clientY: 310 })
+    await firePointer(stack, 'pointermove', { pointerId: 1, clientX: 600, clientY: 310 })
+    await firePointer(stack, 'pointerup', { pointerId: 1, clientX: 600, clientY: 310 })
     // Released past the threshold: the card settles offscreen...
     expect(card.style.transform).toBe('translate3d(100%, 0px, 0px)')
 
     // ...and only then commits the pop.
-    fireEvent.transitionEnd(card)
+    await finishTransition(card)
     expect(shownMonth(view)).toBe(monthLabel(monthOf(todayIso())))
     expect(stackLayers(view)).toHaveLength(1)
   })
@@ -915,16 +935,16 @@ describe('MobileStack transitions & back-swipe', () => {
 
     const stack = view.container.querySelector('.mobile-stack')!
     const card = stackLayers(view).at(-1)!
-    firePointer(stack, 'pointerdown', {
+    await firePointer(stack, 'pointerdown', {
       pointerId: 1,
       isPrimary: true,
       pointerType: 'touch',
       clientX: 10,
       clientY: 300,
     })
-    firePointer(stack, 'pointermove', { pointerId: 1, clientX: 40, clientY: 304 })
-    firePointer(stack, 'pointermove', { pointerId: 1, clientX: 600, clientY: 310 })
-    firePointer(stack, 'pointerup', { pointerId: 1, clientX: 600, clientY: 310 })
+    await firePointer(stack, 'pointermove', { pointerId: 1, clientX: 40, clientY: 304 })
+    await firePointer(stack, 'pointermove', { pointerId: 1, clientX: 600, clientY: 310 })
+    await firePointer(stack, 'pointerup', { pointerId: 1, clientX: 600, clientY: 310 })
 
     await act(() => {
       card.dispatchEvent(new Event('transitionend', { bubbles: true }))
@@ -947,19 +967,19 @@ describe('MobileStack transitions & back-swipe', () => {
     try {
       const stack = view.container.querySelector('.mobile-stack')!
       const card = stackLayers(view).at(-1)!
-      firePointer(stack, 'pointerdown', {
+      await firePointer(stack, 'pointerdown', {
         pointerId: 1,
         isPrimary: true,
         pointerType: 'touch',
         clientX: 10,
         clientY: 300,
       })
-      firePointer(stack, 'pointermove', { pointerId: 1, clientX: 40, clientY: 304 })
-      firePointer(stack, 'pointermove', { pointerId: 1, clientX: 120, clientY: 306 })
-      firePointer(stack, 'pointerup', { pointerId: 1, clientX: 120, clientY: 306 })
+      await firePointer(stack, 'pointermove', { pointerId: 1, clientX: 40, clientY: 304 })
+      await firePointer(stack, 'pointermove', { pointerId: 1, clientX: 120, clientY: 306 })
+      await firePointer(stack, 'pointerup', { pointerId: 1, clientX: 120, clientY: 306 })
       expect(card.style.transform).toBe('translate3d(0px, 0px, 0px)')
 
-      fireEvent.transitionEnd(card)
+      await finishTransition(card)
       expect(view.getByRole('heading').element().textContent).toBe('Edit note')
       expect(stackLayers(view)).toHaveLength(2)
     } finally {
@@ -976,39 +996,39 @@ describe('MobileStack transitions & back-swipe', () => {
     const card = stackLayers(view).at(-1)!
 
     // Not from the edge.
-    firePointer(stack, 'pointerdown', {
+    await firePointer(stack, 'pointerdown', {
       pointerId: 1,
       isPrimary: true,
       pointerType: 'touch',
       clientX: 200,
       clientY: 300,
     })
-    firePointer(stack, 'pointermove', { pointerId: 1, clientX: 260, clientY: 300 })
+    await firePointer(stack, 'pointermove', { pointerId: 1, clientX: 260, clientY: 300 })
     expect(card.style.transform).toBe('')
-    firePointer(stack, 'pointerup', { pointerId: 1, clientX: 260, clientY: 300 })
+    await firePointer(stack, 'pointerup', { pointerId: 1, clientX: 260, clientY: 300 })
 
     // Not a touch.
-    firePointer(stack, 'pointerdown', {
+    await firePointer(stack, 'pointerdown', {
       pointerId: 2,
       isPrimary: true,
       pointerType: 'mouse',
       clientX: 10,
       clientY: 300,
     })
-    firePointer(stack, 'pointermove', { pointerId: 2, clientX: 80, clientY: 300 })
+    await firePointer(stack, 'pointermove', { pointerId: 2, clientX: 80, clientY: 300 })
     expect(card.style.transform).toBe('')
-    firePointer(stack, 'pointerup', { pointerId: 2, clientX: 80, clientY: 300 })
+    await firePointer(stack, 'pointerup', { pointerId: 2, clientX: 80, clientY: 300 })
 
     // Vertical intent from the edge: the scroll wins and the gesture disarms.
-    firePointer(stack, 'pointerdown', {
+    await firePointer(stack, 'pointerdown', {
       pointerId: 3,
       isPrimary: true,
       pointerType: 'touch',
       clientX: 10,
       clientY: 300,
     })
-    firePointer(stack, 'pointermove', { pointerId: 3, clientX: 14, clientY: 360 })
-    firePointer(stack, 'pointermove', { pointerId: 3, clientX: 80, clientY: 360 })
+    await firePointer(stack, 'pointermove', { pointerId: 3, clientX: 14, clientY: 360 })
+    await firePointer(stack, 'pointermove', { pointerId: 3, clientX: 80, clientY: 360 })
     expect(card.style.transform).toBe('')
   })
 })
