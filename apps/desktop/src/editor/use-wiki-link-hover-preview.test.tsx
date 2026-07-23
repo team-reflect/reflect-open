@@ -1,5 +1,5 @@
-import { render, renderHook, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { render, renderHook } from 'vitest-browser-react'
 import type { ReactNode } from 'react'
 import type { WikilinkHoverHit } from '@meowdown/core'
 import { useWikiLinkHoverPreview } from './use-wiki-link-hover-preview'
@@ -36,10 +36,10 @@ function hoverHit(target: string): WikilinkHoverHit {
   return { target, from: 0, to: 0, element: document.createElement('span') }
 }
 
-function setupRenderer(
+async function setupRenderer(
   overrides: Partial<Parameters<typeof useWikiLinkHoverPreview>[0]> = {},
-): (hit: WikilinkHoverHit) => Promise<ReactNode> {
-  const { result } = renderHook(() =>
+): Promise<(hit: WikilinkHoverHit) => Promise<ReactNode>> {
+  const { result } = await renderHook(() =>
     useWikiLinkHoverPreview({
       generation: 7,
       graphKey: '/graph',
@@ -61,7 +61,7 @@ describe('useWikiLinkHoverPreview', () => {
   })
 
   it('resolves null without touching the graph when no graph session is open', async () => {
-    const renderBody = setupRenderer({ generation: null, graphKey: null })
+    const renderBody = await setupRenderer({ generation: null, graphKey: null })
 
     await expect(renderBody(hoverHit('Alpha'))).resolves.toBeNull()
     expect(mocks.resolveExistingWikiTarget).not.toHaveBeenCalled()
@@ -74,14 +74,14 @@ describe('useWikiLinkHoverPreview', () => {
       { kind: 'unavailable', paths: ['notes/a.md'] },
     ]) {
       mocks.resolveExistingWikiTarget.mockResolvedValueOnce(resolution)
-      const renderBody = setupRenderer()
+      const renderBody = await setupRenderer()
       await expect(renderBody(hoverHit('Target'))).resolves.toBeNull()
     }
     expect(mocks.readExistingNoteSource).not.toHaveBeenCalled()
   })
 
   it('resolves null instead of rejecting when resolution or the read fails', async () => {
-    const renderBody = setupRenderer()
+    const renderBody = await setupRenderer()
 
     mocks.resolveExistingWikiTarget.mockRejectedValueOnce(new Error('index gone'))
     await expect(renderBody(hoverHit('Alpha'))).resolves.toBeNull()
@@ -100,11 +100,11 @@ describe('useWikiLinkHoverPreview', () => {
       path: 'notes/alpha.md',
     })
     mocks.readExistingNoteSource.mockResolvedValue('---\nprivate: true\n---\n# Alpha\n\nBody')
-    const renderBody = setupRenderer()
+    const renderBody = await setupRenderer()
 
-    render(<>{await renderBody(hoverHit('Alpha'))}</>)
+    const screen = await render(<>{await renderBody(hoverHit('Alpha'))}</>)
 
-    expect(screen.getByTestId('markdown-preview').textContent).toBe('# Alpha\n\nBody')
+    expect(screen.getByTestId('markdown-preview').element().textContent).toBe('# Alpha\n\nBody')
     expect(mocks.markdownPreview.mock.calls.at(-1)?.[0]).toMatchObject({
       content: '# Alpha\n\nBody',
       interactive: false,
@@ -119,9 +119,9 @@ describe('useWikiLinkHoverPreview', () => {
       path: 'notes/alpha.md',
     })
     mocks.readExistingNoteSource.mockResolvedValue('# Alpha')
-    const renderBody = setupRenderer()
+    const renderBody = await setupRenderer()
 
-    render(<>{await renderBody(hoverHit('Alpha'))}</>)
+    await render(<>{await renderBody(hoverHit('Alpha'))}</>)
 
     const props = mocks.markdownPreview.mock.calls.at(-1)?.[0] as MarkdownPreviewProps
     expect(props.resolveImageUrl('https://example.com/cat.png')).toBeNull()
@@ -138,12 +138,12 @@ describe('useWikiLinkHoverPreview', () => {
       path: 'daily/2026-06-09.md',
     })
     mocks.readExistingNoteSource.mockResolvedValue('---\nid: day\n---\n\n')
-    const renderBody = setupRenderer()
+    const renderBody = await setupRenderer()
 
-    render(<>{await renderBody(hoverHit('2026-06-09'))}</>)
+    const screen = await render(<>{await renderBody(hoverHit('2026-06-09'))}</>)
 
-    expect(screen.getByText('Tue, June 9th, 2026')).not.toBeNull()
-    expect(screen.getByText('Empty note')).not.toBeNull()
+    expect(screen.getByText('Tue, June 9th, 2026').query()).not.toBeNull()
+    expect(screen.getByText('Empty note').query()).not.toBeNull()
     expect(mocks.markdownPreview).not.toHaveBeenCalled()
   })
 })

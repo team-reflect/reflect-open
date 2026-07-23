@@ -113,6 +113,12 @@ export interface GraphIndexOptions {
    */
   onFileProgress?: (done: number, total: number, worked: number) => void
   /**
+   * Called with iCloud-evicted notes whose content the index lacks (see
+   * `IndexPassOptions.onStalePlaceholders`). The provider requests targeted
+   * downloads for exactly these paths.
+   */
+  onStalePlaceholders?: (paths: readonly string[]) => void
+  /**
    * Dynamic guard for platforms that must not start index work while the app
    * is suspended. Checked at every lifecycle boundary in addition to the
    * explicit {@link GraphIndex.suspend} transition.
@@ -126,7 +132,15 @@ export interface GraphIndexOptions {
  * keeps one instance (e.g. in a ref) across graph switches.
  */
 export function createGraphIndex(options: GraphIndexOptions = {}): GraphIndex {
-  const { onError, onProgress, onApplied, onMoved, onFileProgress, shouldSuspend } = options
+  const {
+    onError,
+    onProgress,
+    onApplied,
+    onMoved,
+    onFileProgress,
+    onStalePlaceholders,
+    shouldSuspend,
+  } = options
   let abort: AbortController | null = null
   let done: Promise<void> = Promise.resolve()
   let suspended = false
@@ -209,6 +223,18 @@ export function createGraphIndex(options: GraphIndexOptions = {}): GraphIndex {
           generation,
           signal: controller.signal,
           ...(onMoved !== undefined ? { onMoved } : {}),
+          // Guarded: `openGraph` swaps the Rust root *before* this pass is
+          // stopped, so a superseded pass could otherwise request its old
+          // paths against the newly opened graph.
+          ...(onStalePlaceholders !== undefined
+            ? {
+                onStalePlaceholders: (paths: readonly string[]) => {
+                  if (!controller.signal.aborted && !isStale() && !isSuspended()) {
+                    onStalePlaceholders(paths)
+                  }
+                },
+              }
+            : {}),
           ...(onFileProgress !== undefined
             ? {
                 onFileProgress: (progressDone: number, total: number, worked: number) => {

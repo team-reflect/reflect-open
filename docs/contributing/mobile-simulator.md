@@ -39,6 +39,23 @@ lines from `spike_mobile.rs`:
 [plan19-spike] PASS: libgit2 init+commit
 ```
 
+## Link preview capture
+
+To verify URL-only share captures:
+
+1. Share a web page from Safari to Reflect without a screenshot.
+2. Open Reflect and wait for capture enrichment to finish.
+3. Open the generated capture note and confirm it contains a `## Screenshot`
+   section whose asset is a JPEG under `assets/`.
+4. Repeat with a page that has no representative image and confirm enrichment
+   still completes without a screenshot.
+5. Mark either the capture note or its daily note `private: true` before
+   enrichment and confirm no preview is attached.
+
+The preview comes from Apple's LinkPresentation framework. It is expected to
+vary by website and OS release, so automated tests cover lifecycle and privacy
+behavior while this simulator check covers the system integration.
+
 ## The software keyboard
 
 The simulator hides the software keyboard whenever "Connect Hardware

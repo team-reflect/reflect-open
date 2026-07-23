@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { expect, test } from 'vitest'
 
 import {
@@ -37,6 +38,7 @@ const baseInput = {
   notesPath: 'release-notes.md',
   productName: 'Reflect',
 }
+const appDir = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 test('pre-release publish uses prepared notes and opts out of GitHub latest heuristics', () => {
   const args = createReleaseArgs({
@@ -347,7 +349,7 @@ test('beta release builds keep the beta flavor overlay', () => {
 })
 
 test('macOS entitlements resolve through platform and flavor overlays', () => {
-  const srcTauri = join(process.cwd(), 'src-tauri')
+  const srcTauri = join(appDir, 'src-tauri')
 
   expect(macosEntitlementsPath('stable')).toBe(join(srcTauri, 'Entitlements.plist'))
   expect(macosEntitlementsPath('beta')).toBe(join(srcTauri, 'Entitlements.plist'))
@@ -355,7 +357,7 @@ test('macOS entitlements resolve through platform and flavor overlays', () => {
 })
 
 test('macOS provisioning profiles resolve per flavor and dev remains unprovisioned', () => {
-  const srcTauri = join(process.cwd(), 'src-tauri')
+  const srcTauri = join(appDir, 'src-tauri')
 
   expect(macosProvisioningProfilePath('stable')).toBe(join(srcTauri, 'Reflect.provisionprofile'))
   expect(macosProvisioningProfilePath('beta')).toBe(join(srcTauri, 'Reflect-beta.provisionprofile'))

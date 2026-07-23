@@ -1,6 +1,6 @@
-import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { setBridge } from '@reflect/core'
+import { renderHook } from 'vitest-browser-react'
+import { setBridge, upsertFrontmatter } from '@reflect/core'
 import { onNoteMoved } from '@/lib/note-moves'
 import { flushOpenDocuments } from './open-documents'
 import type { NoteEditorHandle } from './note-editor'
@@ -22,6 +22,12 @@ setBridge({
 /** The fake on-disk file + a write log, behind the mocked IPC. */
 let disk: string
 let writes: string[]
+
+const MANAGED_ID = '01hv3xq7c2dm8k4t9w5e6r1n98'
+
+function managedNote(content: string): string {
+  return upsertFrontmatter(content, { id: MANAGED_ID })
+}
 
 function fakeEditor(): NoteEditorHandle & { applied: string[] } {
   const applied: string[] = []
@@ -63,8 +69,8 @@ beforeEach(() => {
 })
 
 async function readyHook() {
-  const hook = renderHook(() => useNoteDocument('notes/a.md', 1))
-  await waitFor(() => expect(hook.result.current.status).toBe('ready'))
+  const hook = await renderHook(() => useNoteDocument('notes/a.md', 1))
+  await vi.waitFor(() => expect(hook.result.current.status).toBe('ready'))
   return hook
 }
 
@@ -74,6 +80,27 @@ interface GraphFakeOptions {
   linkSources?: () => Array<{ source_path: string }>
   /** Path returned by title resolution (simulates a title collision). */
   resolveTitleTo?: string
+}
+
+/**
+ * Hold the IPC calls matching `match` until the returned release runs, so a
+ * background chain can be parked mid-flight. The browser-mode `unmount()`
+ * awaits React's act (it flushes microtasks), which would otherwise run a
+ * teardown chain to completion before the test can stage the next step.
+ */
+function gateInvokes(match: (command: string, args: Record<string, unknown>) => boolean) {
+  const ungated = mockInvoke.getMockImplementation()
+  let release = () => {}
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  mockInvoke.mockImplementation(async (command, args) => {
+    if (match(command, args)) {
+      await gate
+    }
+    return ungated?.(command, args)
+  })
+  return release
 }
 
 /** One bridge fake for the rename scenarios: a files map + the index queries. */
@@ -129,15 +156,15 @@ describe('useNoteDocument', () => {
   it('debounces edits into an atomic write and clears dirty', async () => {
     vi.useFakeTimers()
     try {
-      const hook = renderHook(() => useNoteDocument('notes/a.md', 1))
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      const hook = await renderHook(() => useNoteDocument('notes/a.md', 1))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
       expect(hook.result.current.status).toBe('ready')
 
-      act(() => hook.result.current.onEditorChange('# Hello edited\n'))
+      await hook.act(() => hook.result.current.onEditorChange('# Hello edited\n'))
       expect(hook.result.current.dirty).toBe(true)
       expect(writes).toEqual([])
 
-      await act(() => vi.advanceTimersByTimeAsync(1000))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000))
       expect(writes).toEqual(['# Hello edited\n'])
       expect(hook.result.current.dirty).toBe(false)
     } finally {
@@ -148,16 +175,16 @@ describe('useNoteDocument', () => {
   it('flushOpenDocuments persists a pending edit without waiting out the debounce (quit path)', async () => {
     vi.useFakeTimers()
     try {
-      const hook = renderHook(() => useNoteDocument('notes/a.md', 1))
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      const hook = await renderHook(() => useNoteDocument('notes/a.md', 1))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
       expect(hook.result.current.status).toBe('ready')
 
-      act(() => hook.result.current.onEditorChange('# Quitting\n'))
+      await hook.act(() => hook.result.current.onEditorChange('# Quitting\n'))
       expect(writes).toEqual([]) // still inside the 800ms debounce window
 
       // The quit path: the registry flush settles only once the write has
       // landed — no timer advance, the way a ⌘Q teardown would run it.
-      await act(() => flushOpenDocuments())
+      await hook.act(() => flushOpenDocuments())
       expect(writes).toEqual(['# Quitting\n'])
       expect(hook.result.current.dirty).toBe(false)
     } finally {
@@ -174,20 +201,20 @@ describe('useNoteDocument', () => {
     })
     editor.getMarkdown = getMarkdown
 
-    act(() => hook.result.current.bindEditor(editor))
-    act(() => hook.result.current.bindEditor(null))
-    await act(() => flushOpenDocuments())
+    await hook.act(() => hook.result.current.bindEditor(editor))
+    await hook.act(() => hook.result.current.bindEditor(null))
+    await hook.act(() => flushOpenDocuments())
 
     expect(getMarkdown).toHaveBeenCalledOnce()
     expect(writes).toEqual(['# 🧠 Business ideas\n'])
-    hook.unmount()
+    await hook.unmount()
   })
 
   it('unmounting unregisters the buffer from the quit-flush registry', async () => {
     const hook = await readyHook()
-    act(() => hook.result.current.onEditorChange('# Edited\n'))
-    hook.unmount() // unmount itself flushes once (the existing final-flush path)
-    await act(async () => {})
+    await hook.act(() => hook.result.current.onEditorChange('# Edited\n'))
+    await hook.unmount() // unmount itself flushes once (the existing final-flush path)
+    await hook.act(async () => {})
     const writesAfterUnmount = writes.length
 
     await flushOpenDocuments() // the unmounted buffer must no longer be registered
@@ -198,24 +225,24 @@ describe('useNoteDocument', () => {
     vi.useFakeTimers()
     try {
       const files: Record<string, string> = {
-        'notes/a.md': '# Old Title\n',
+        'notes/a.md': managedNote('# Old Title\n'),
         'notes/src.md': 'see [[Old Title]]\n',
       }
       installGraphFake({ files, linkSources: () => [{ source_path: 'notes/src.md' }] })
 
-      const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      const hook = await renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
       expect(hook.result.current.status).toBe('ready')
 
-      act(() => hook.result.current.onEditorChange('# New Title\n'))
-      await act(() => vi.advanceTimersByTimeAsync(1000)) // the rename save lands
+      await hook.act(() => hook.result.current.onEditorChange('# New Title\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000)) // the rename save lands
 
       // Blur is a settle point: the rewrite fires without waiting out the
       // quiet period, then the alias lands through the normal save pipeline.
-      act(() => {
+      await hook.act(() => {
         window.dispatchEvent(new Event('blur'))
       })
-      await act(() => vi.runAllTimersAsync())
+      await hook.act(() => vi.runAllTimersAsync())
 
       expect(files['notes/src.md']).toBe('see [[New Title]]\n')
       // The file followed its title (Plan 17): alias and content move along.
@@ -232,18 +259,18 @@ describe('useNoteDocument', () => {
     vi.useFakeTimers()
     try {
       const files: Record<string, string> = {
-        'notes/a.md': '# Old Title\n',
+        'notes/a.md': managedNote('# Old Title\n'),
         'notes/src.md': 'see [[Old Title]]\n',
       }
       installGraphFake({ files, linkSources: () => [{ source_path: 'notes/src.md' }] })
 
-      const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
-      await act(() => vi.advanceTimersByTimeAsync(0))
-      act(() => hook.result.current.onEditorChange('# New Title\n'))
-      await act(() => vi.advanceTimersByTimeAsync(1000)) // save lands, quiet timer armed
+      const hook = await renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => hook.result.current.onEditorChange('# New Title\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000)) // save lands, quiet timer armed
 
-      hook.unmount() // teardown settles the tracker — the session is disposed
-      await act(() => vi.runAllTimersAsync())
+      await hook.unmount() // teardown settles the tracker — the session is disposed
+      await hook.act(() => vi.runAllTimersAsync())
 
       expect(files['notes/src.md']).toBe('see [[New Title]]\n')
       // The alias can't go through the disposed session — it lands on disk,
@@ -260,27 +287,27 @@ describe('useNoteDocument', () => {
     vi.useFakeTimers()
     try {
       const files: Record<string, string> = {
-        'notes/a.md': '# Old Title\n',
+        'notes/a.md': managedNote('# Old Title\n'),
         'notes/b.md': '# Note B\n',
         'notes/src.md': 'see [[Old Title]]\n',
       }
       installGraphFake({ files, linkSources: () => [{ source_path: 'notes/src.md' }] })
 
       // Note A: edit the title, save lands, rename pending.
-      const paneA = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
-      await act(() => vi.advanceTimersByTimeAsync(0))
-      act(() => paneA.result.current.onEditorChange('# New Title\n'))
-      await act(() => vi.advanceTimersByTimeAsync(1000))
-      paneA.unmount() // teardown settles A's rename asynchronously
+      const paneA = await renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      await paneA.act(() => vi.advanceTimersByTimeAsync(0))
+      await paneA.act(() => paneA.result.current.onEditorChange('# New Title\n'))
+      await paneA.act(() => vi.advanceTimersByTimeAsync(1000))
+      await paneA.unmount() // teardown settles A's rename asynchronously
 
       // Note B mounts immediately — the rename must not be able to see it.
-      const paneB = renderHook(() => useNoteDocument('notes/b.md', 1, { trackRenames: true }))
-      await act(() => vi.runAllTimersAsync())
+      const paneB = await renderHook(() => useNoteDocument('notes/b.md', 1, { trackRenames: true }))
+      await paneB.act(() => vi.runAllTimersAsync())
 
       expect(files['notes/src.md']).toBe('see [[New Title]]\n')
       expect(files['notes/new-title.md']).toContain('aliases:') // alias on A, via disk
       expect(files['notes/b.md']).toBe('# Note B\n') // B untouched
-      paneB.unmount()
+      await paneB.unmount()
     } finally {
       vi.useRealTimers()
     }
@@ -290,7 +317,7 @@ describe('useNoteDocument', () => {
     vi.useFakeTimers()
     try {
       const files: Record<string, string> = {
-        'notes/a.md': '# Old Title\n',
+        'notes/a.md': managedNote('# Old Title\n'),
         'notes/src.md': 'see [[Old Title]]\n',
       }
       installGraphFake({
@@ -299,22 +326,23 @@ describe('useNoteDocument', () => {
         resolveTitleTo: 'notes/other-owner.md', // another note owns "Old Title"
       })
 
-      const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
-      await act(() => vi.advanceTimersByTimeAsync(0))
-      act(() => hook.result.current.onEditorChange('# New Title\n'))
-      await act(() => vi.advanceTimersByTimeAsync(1000))
-      act(() => {
+      const hook = await renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => hook.result.current.onEditorChange('# New Title\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000))
+      await hook.act(() => {
         window.dispatchEvent(new Event('blur'))
       })
-      await act(() => vi.runAllTimersAsync())
+      await hook.act(() => vi.runAllTimersAsync())
 
       // Links keep resolving to their deliberate target; no competing alias.
       // The file still follows the NEW title — the guard is about the old
       // title's links, not the filename.
       expect(files['notes/src.md']).toBe('see [[Old Title]]\n')
-      expect(files['notes/new-title.md']).toBe('# New Title\n')
+      expect(files['notes/new-title.md']).toContain(`id: ${MANAGED_ID}`)
+      expect(files['notes/new-title.md']!.endsWith('# New Title\n')).toBe(true)
       expect(files['notes/a.md']).toBeUndefined()
-      hook.unmount()
+      await hook.unmount()
     } finally {
       vi.useRealTimers()
     }
@@ -325,7 +353,7 @@ describe('useNoteDocument', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {
       const files: Record<string, string> = {
-        'notes/a.md': '# Old Title\n',
+        'notes/a.md': managedNote('# Old Title\n'),
         'notes/src.md': 'see [[Old Title]]\n',
       }
       installGraphFake({
@@ -335,21 +363,21 @@ describe('useNoteDocument', () => {
         },
       })
 
-      const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
-      await act(() => vi.advanceTimersByTimeAsync(0))
-      act(() => hook.result.current.onEditorChange('# New Title\n'))
-      await act(() => vi.advanceTimersByTimeAsync(1000))
-      act(() => {
+      const hook = await renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => hook.result.current.onEditorChange('# New Title\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000))
+      await hook.act(() => {
         window.dispatchEvent(new Event('blur'))
       })
-      await act(() => vi.runAllTimersAsync())
+      await hook.act(() => vi.runAllTimersAsync())
 
       // The rewrite failed, the baseline has advanced — the alias is what
       // keeps [[Old Title]] resolving here, so it must land regardless.
       expect(files['notes/src.md']).toBe('see [[Old Title]]\n')
       expect(files['notes/new-title.md']).toContain('aliases:')
       expect(files['notes/new-title.md']).toContain('Old Title')
-      hook.unmount()
+      await hook.unmount()
     } finally {
       errorSpy.mockRestore()
       vi.useRealTimers()
@@ -371,28 +399,68 @@ describe('useNoteDocument', () => {
         },
       })
 
-      const hook = renderHook(() =>
-        useNoteDocument('notes/01arz3ndekt.md', 1, {
+      const placeholderPath = 'notes/01arz3ndektsv4rrffq69g5fav.md'
+      const hook = await renderHook(() =>
+        useNoteDocument(placeholderPath, 1, {
           createIfMissing: true,
           trackRenames: true,
+          missingSeed: managedNote('#\n'),
         }),
       )
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
       expect(hook.result.current.status).toBe('ready')
 
-      act(() => hook.result.current.onEditorChange('# Brand New Note\n'))
-      await act(() => vi.advanceTimersByTimeAsync(1000))
-      act(() => {
+      await hook.act(() => hook.result.current.onEditorChange('# Brand New Note\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000))
+      await hook.act(() => {
         window.dispatchEvent(new Event('blur'))
       })
-      await act(() => vi.runAllTimersAsync())
+      await hook.act(() => vi.runAllTimersAsync())
 
       // Titling an untitled note is a birth: no rewrite ran, no alias landed —
       // but the file shed its placeholder name for the title's slug (Plan 17).
       expect(linkQueries).toEqual([])
-      expect(files['notes/brand-new-note.md']).toBe('# Brand New Note\n')
-      expect(files['notes/01arz3ndekt.md']).toBeUndefined()
-      hook.unmount()
+      expect(files['notes/brand-new-note.md']).toContain(`id: ${MANAGED_ID}`)
+      expect(files['notes/brand-new-note.md']!.endsWith('# Brand New Note\n')).toBe(true)
+      expect(files[placeholderPath]).toBeUndefined()
+      await hook.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('saves an adopted retitle in place without rewriting, aliasing, or moving', async () => {
+    vi.useFakeTimers()
+    try {
+      const files: Record<string, string> = {
+        'notes/adopted.md': '# Old Title\n',
+        'notes/source.md': 'see [[Old Title]]\n',
+      }
+      const linkQueries: string[] = []
+      installGraphFake({
+        files,
+        linkSources: () => {
+          linkQueries.push('sources-query')
+          return [{ source_path: 'notes/source.md' }]
+        },
+      })
+
+      const hook = await renderHook(() =>
+        useNoteDocument('notes/adopted.md', 1, { trackRenames: true }),
+      )
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => hook.result.current.onEditorChange('# New Title\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000))
+      await hook.act(() => {
+        window.dispatchEvent(new Event('blur'))
+      })
+      await hook.act(() => vi.runAllTimersAsync())
+
+      expect(files['notes/adopted.md']).toBe('# New Title\n')
+      expect(files['notes/new-title.md']).toBeUndefined()
+      expect(files['notes/source.md']).toBe('see [[Old Title]]\n')
+      expect(linkQueries).toEqual([])
+      await hook.unmount()
     } finally {
       vi.useRealTimers()
     }
@@ -403,20 +471,20 @@ describe('useNoteDocument', () => {
     const moves: Array<[string, string]> = []
     const unsubscribe = onNoteMoved((from, to) => moves.push([from, to]))
     try {
-      const files: Record<string, string> = { 'notes/a.md': '# Old Title\n' }
+      const files: Record<string, string> = { 'notes/a.md': managedNote('# Old Title\n') }
       installGraphFake({ files })
 
-      const hook = renderHook(
-        ({ path }: { path: string }) => useNoteDocument(path, 1, { trackRenames: true }),
+      const hook = await renderHook(
+        ({ path }: { path: string } = { path: 'notes/a.md' }) => useNoteDocument(path, 1, { trackRenames: true }),
         { initialProps: { path: 'notes/a.md' } },
       )
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
       expect(hook.result.current.status).toBe('ready')
       const epochBefore = hook.result.current.sessionEpoch
 
-      act(() => hook.result.current.onEditorChange('# New Title\n'))
-      await act(() => vi.advanceTimersByTimeAsync(1000)) // save lands
-      await act(() => vi.runAllTimersAsync()) // quiet period → rename + move
+      await hook.act(() => hook.result.current.onEditorChange('# New Title\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000)) // save lands
+      await hook.act(() => vi.runAllTimersAsync()) // quiet period → rename + move
 
       expect(moves).toEqual([['notes/a.md', 'notes/new-title.md']])
       // Alias frontmatter (the rename's breadcrumb) + content, at the slug path.
@@ -427,17 +495,17 @@ describe('useNoteDocument', () => {
       // The router (subscribed to onNoteMoved) re-renders the pane with the
       // new path; the hook adopts the retargeted session — no reload, no new
       // epoch, so the live editor (and its cursor) survives.
-      hook.rerender({ path: 'notes/new-title.md' })
-      await act(async () => {})
+      await hook.rerender({ path: 'notes/new-title.md' })
+      await hook.act(async () => {})
       expect(hook.result.current.status).toBe('ready')
       expect(hook.result.current.sessionEpoch).toBe(epochBefore)
 
       // Subsequent edits land on the new path only — nothing resurrects a.md.
-      act(() => hook.result.current.onEditorChange('# New Title\n\nmore\n'))
-      await act(() => vi.advanceTimersByTimeAsync(1000))
+      await hook.act(() => hook.result.current.onEditorChange('# New Title\n\nmore\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000))
       expect(files['notes/new-title.md']).toContain('# New Title\n\nmore\n')
       expect(files['notes/a.md']).toBeUndefined()
-      hook.unmount()
+      await hook.unmount()
     } finally {
       unsubscribe()
       vi.useRealTimers()
@@ -447,25 +515,25 @@ describe('useNoteDocument', () => {
   it('watcher upserts at the retargeted path reconcile before React catches up (Plan 17)', async () => {
     vi.useFakeTimers()
     try {
-      const files: Record<string, string> = { 'notes/a.md': '# Old Title\n' }
+      const files: Record<string, string> = { 'notes/a.md': managedNote('# Old Title\n') }
       installGraphFake({ files })
-      const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
-      await act(() => vi.advanceTimersByTimeAsync(0))
-      act(() => hook.result.current.onEditorChange('# New Title\n'))
-      await act(() => vi.advanceTimersByTimeAsync(1000))
-      await act(() => vi.runAllTimersAsync()) // rename + move settle; session retargeted
+      const hook = await renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => hook.result.current.onEditorChange('# New Title\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000))
+      await hook.act(() => vi.runAllTimersAsync()) // rename + move settle; session retargeted
 
       // An external edit lands at the NEW path while the pane still renders
       // the old route path (no rerender yet) — it must reconcile against the
       // session's current path, not the stale prop.
       files['notes/new-title.md'] = '# New Title\n\nedited elsewhere\n'
-      act(() => {
+      await hook.act(() => {
         emitChange?.([{ path: 'notes/new-title.md', kind: 'upsert' }])
       })
-      await act(() => vi.runAllTimersAsync())
+      await hook.act(() => vi.runAllTimersAsync())
 
       expect(hook.result.current.initialContent).toContain('edited elsewhere')
-      hook.unmount()
+      await hook.unmount()
     } finally {
       vi.useRealTimers()
     }
@@ -474,19 +542,19 @@ describe('useNoteDocument', () => {
   it('an unadopted retargeted session still tears down on unmount (no orphan flush)', async () => {
     vi.useFakeTimers()
     try {
-      const files: Record<string, string> = { 'notes/a.md': '# Old Title\n' }
+      const files: Record<string, string> = { 'notes/a.md': managedNote('# Old Title\n') }
       installGraphFake({ files })
 
-      const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
-      await act(() => vi.advanceTimersByTimeAsync(0))
-      act(() => hook.result.current.onEditorChange('# New Title\n'))
-      await act(() => vi.advanceTimersByTimeAsync(1000))
-      await act(() => vi.runAllTimersAsync()) // move lands; session retargeted
+      const hook = await renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => hook.result.current.onEditorChange('# New Title\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000))
+      await hook.act(() => vi.runAllTimersAsync()) // move lands; session retargeted
 
       // Unmount without any rerender (nothing adopted the session): the
       // deferred teardown must still dispose it and flush nothing stale.
-      hook.unmount()
-      await act(async () => {})
+      await hook.unmount()
+      await hook.act(async () => {})
       const after = { ...files }
 
       await flushOpenDocuments() // an orphan would flush here and resurrect a.md
@@ -501,21 +569,23 @@ describe('useNoteDocument', () => {
     vi.useFakeTimers()
     try {
       const files: Record<string, string> = {
-        'notes/a.md': '# Old Title\n',
+        'notes/a.md': managedNote('# Old Title\n'),
         'notes/src.md': 'see [[Old Title]]\n',
       }
       installGraphFake({ files, linkSources: () => [{ source_path: 'notes/src.md' }] })
 
-      const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
-      await act(() => vi.advanceTimersByTimeAsync(0))
-      act(() => hook.result.current.onEditorChange('# New Title\n'))
-      await act(() => vi.advanceTimersByTimeAsync(1000))
+      const hook = await renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => hook.result.current.onEditorChange('# New Title\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000))
 
-      hook.unmount() // teardown settle → the alias lands via the disk path
+      const teardown = hook.unmount() // teardown settle → the alias lands via the disk path
       // An external writer adds an alias before the chain's placement read —
-      // the settle-time snapshot doesn't know about it.
+      // the settle-time snapshot doesn't know about it. The write has to land
+      // before the unmount promise flushes the chain's continuation.
       files['notes/a.md'] = '---\naliases:\n  - Keeper\n---\n# New Title\n'
-      await act(() => vi.runAllTimersAsync())
+      await teardown
+      await hook.act(() => vi.runAllTimersAsync())
 
       expect(files['notes/new-title.md']).toContain('Keeper') // concurrently-gained, kept
       expect(files['notes/new-title.md']).toContain('Old Title') // the rename's alias
@@ -528,23 +598,29 @@ describe('useNoteDocument', () => {
     vi.useFakeTimers()
     try {
       const files: Record<string, string> = {
-        'notes/a.md': '# Old Title\n',
+        'notes/a.md': managedNote('# Old Title\n'),
         'notes/src.md': 'see [[Old Title]]\n',
       }
       installGraphFake({ files, linkSources: () => [{ source_path: 'notes/src.md' }] })
 
-      const paneA = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
-      await act(() => vi.advanceTimersByTimeAsync(0))
-      act(() => paneA.result.current.onEditorChange('# New Title\n'))
-      await act(() => vi.advanceTimersByTimeAsync(1000))
-      paneA.unmount() // settles the rename; its chain runs on
+      const paneA = await renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      await paneA.act(() => vi.advanceTimersByTimeAsync(0))
+      await paneA.act(() => paneA.result.current.onEditorChange('# New Title\n'))
+      await paneA.act(() => vi.advanceTimersByTimeAsync(1000))
+      // Park the chain at its link rewrite so the reopen lands first, the way
+      // it does in the app.
+      const releaseRewrite = gateInvokes(
+        (command, args) => command === 'note_write' && args['path'] === 'notes/src.md',
+      )
+      await paneA.unmount() // settles the rename; its chain runs on
 
       // The same note is reopened immediately and edited before the chain's
       // alias placement runs.
-      const paneA2 = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
-      await act(() => vi.advanceTimersByTimeAsync(0))
-      act(() => paneA2.result.current.onEditorChange('# New Title\n\nfresh edit\n'))
-      await act(() => vi.runAllTimersAsync())
+      const paneA2 = await renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      await paneA2.act(() => vi.advanceTimersByTimeAsync(0))
+      await paneA2.act(() => paneA2.result.current.onEditorChange('# New Title\n\nfresh edit\n'))
+      releaseRewrite()
+      await paneA2.act(() => vi.runAllTimersAsync())
 
       // The alias went through the live session — no conflict from our own
       // background write, and the user's edit and the alias both persist
@@ -553,7 +629,7 @@ describe('useNoteDocument', () => {
       expect(files['notes/new-title.md']).toContain('aliases:')
       expect(files['notes/new-title.md']).toContain('Old Title')
       expect(files['notes/new-title.md']).toContain('fresh edit')
-      paneA2.unmount()
+      await paneA2.unmount()
     } finally {
       vi.useRealTimers()
     }
@@ -563,64 +639,64 @@ describe('useNoteDocument', () => {
     vi.useFakeTimers()
     try {
       const files: Record<string, string> = {
-        'notes/a.md': '# Old Title\n',
+        'notes/a.md': managedNote('# Old Title\n'),
         'notes/src.md': 'see [[Old Title]]\n',
       }
       installGraphFake({ files, linkSources: () => [{ source_path: 'notes/src.md' }] })
 
-      const hook = renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
-      await act(() => vi.advanceTimersByTimeAsync(0))
-      act(() => hook.result.current.onEditorChange('# New Title\n'))
-      await act(() => vi.advanceTimersByTimeAsync(1000)) // save lands, quiet timer armed
+      const hook = await renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => hook.result.current.onEditorChange('# New Title\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000)) // save lands, quiet timer armed
 
       // ⌘Q: the registry flush must settle the rename and await its writes.
-      await act(() => flushOpenDocuments())
+      await hook.act(() => flushOpenDocuments())
 
       expect(files['notes/src.md']).toBe('see [[New Title]]\n')
       expect(files['notes/new-title.md']).toContain('aliases:')
-      hook.unmount()
+      await hook.unmount()
     } finally {
       vi.useRealTimers()
     }
   })
 
   it('ignores the watcher echo of its own save', async () => {
-    const { result } = await readyHook()
+    const { result, act } = await readyHook()
     const editor = fakeEditor()
-    act(() => result.current.bindEditor(editor))
+    await act(() => result.current.bindEditor(editor))
 
     // The watcher reports our own write back; content matches disk state.
-    act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
+    await act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
     await act(async () => {})
     expect(editor.applied).toEqual([])
     expect(result.current.conflict).toBeNull()
   })
 
   it('reloads a clean buffer on a real external change', async () => {
-    const { result } = await readyHook()
+    const { result, act } = await readyHook()
     const editor = fakeEditor()
-    act(() => result.current.bindEditor(editor))
+    await act(() => result.current.bindEditor(editor))
 
     disk = '# Changed outside\n'
-    act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
-    await waitFor(() => expect(editor.applied).toEqual(['# Changed outside\n']))
+    await act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
+    await vi.waitFor(() => expect(editor.applied).toEqual(['# Changed outside\n']))
     expect(result.current.conflict).toBeNull()
     expect(result.current.dirty).toBe(false)
   })
 
   it('parks an external change as a conflict when the buffer is dirty', async () => {
-    const { result } = await readyHook()
+    const { result, act } = await readyHook()
     const editor = fakeEditor()
-    act(() => result.current.bindEditor(editor))
+    await act(() => result.current.bindEditor(editor))
 
-    act(() => result.current.onEditorChange('# My unsaved edit\n'))
+    await act(() => result.current.onEditorChange('# My unsaved edit\n'))
     disk = '# Theirs\n'
-    act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
-    await waitFor(() => expect(result.current.conflict).toBe('# Theirs\n'))
+    await act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
+    await vi.waitFor(() => expect(result.current.conflict).toBe('# Theirs\n'))
     expect(editor.applied).toEqual([]) // never clobbered
 
     // Load theirs: applies the external content and clears the conflict.
-    act(() => result.current.loadTheirs())
+    await act(() => result.current.loadTheirs())
     expect(editor.applied).toEqual(['# Theirs\n'])
     expect(result.current.conflict).toBeNull()
     expect(result.current.dirty).toBe(false)
@@ -632,14 +708,14 @@ describe('useNoteDocument', () => {
       // meowdown's converter mangles git conflict markers, so the guard must catch it.
       disk =
         '# Shared\n\n<<<<<<< this device\nedited on a\n=======\nedited on b\n>>>>>>> other device\n'
-      const hook = renderHook(() => useNoteDocument('notes/tasks.md', 1))
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      const hook = await renderHook(() => useNoteDocument('notes/tasks.md', 1))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
       expect(hook.result.current.status).toBe('ready')
       expect(hook.result.current.protected).toBe(true)
 
       // Even if an edit somehow reaches the pipeline, nothing is written.
-      act(() => hook.result.current.onEditorChange('mangled'))
-      await act(() => vi.advanceTimersByTimeAsync(2000))
+      await hook.act(() => hook.result.current.onEditorChange('mangled'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(2000))
       expect(writes).toEqual([])
     } finally {
       vi.useRealTimers()
@@ -649,8 +725,8 @@ describe('useNoteDocument', () => {
   it('an external reload never dirties the buffer, even when serialization normalizes', async () => {
     vi.useFakeTimers()
     try {
-      const hook = renderHook(() => useNoteDocument('notes/a.md', 1))
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      const hook = await renderHook(() => useNoteDocument('notes/a.md', 1))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
 
       // The editor's change handler fires synchronously inside setMarkdown and
       // reports a *normalized* serialization (extra trailing newline) — as the
@@ -666,23 +742,23 @@ describe('useNoteDocument', () => {
           hook.result.current.onEditorChange(normalizedMarkdown)
         },
       }
-      act(() => hook.result.current.bindEditor(normalizing))
+      await hook.act(() => hook.result.current.bindEditor(normalizing))
 
       disk = '# Changed outside\n'
-      act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
       expect(editor.applied).toEqual(['# Changed outside\n'])
       expect(hook.result.current.dirty).toBe(false)
 
       // No save may fire from the reload alone.
-      await act(() => vi.advanceTimersByTimeAsync(5000))
+      await hook.act(() => vi.advanceTimersByTimeAsync(5000))
       expect(writes).toEqual([])
 
       // A persistence flush and ref teardown both ask Meowdown to reconcile,
       // but its unchanged normalized snapshot is not itself a user edit.
-      await act(() => flushOpenDocuments())
-      act(() => hook.result.current.bindEditor(null))
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => flushOpenDocuments())
+      await hook.act(() => hook.result.current.bindEditor(null))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
       expect(writes).toEqual([])
     } finally {
       vi.useRealTimers()
@@ -692,25 +768,25 @@ describe('useNoteDocument', () => {
   it('pauses saves while a conflict is parked (no clobbering theirs)', async () => {
     vi.useFakeTimers()
     try {
-      const hook = renderHook(() => useNoteDocument('notes/a.md', 1))
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      const hook = await renderHook(() => useNoteDocument('notes/a.md', 1))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
 
       // An edit schedules a save, then an external change parks a conflict
       // before the debounce fires.
-      act(() => hook.result.current.onEditorChange('# Mine\n'))
+      await hook.act(() => hook.result.current.onEditorChange('# Mine\n'))
       disk = '# Theirs\n'
-      act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
       expect(hook.result.current.conflict).toBe('# Theirs\n')
 
       // Neither the pending debounce nor an explicit flush may write now.
-      act(() => hook.result.current.onEditorChange('# Mine v2\n'))
-      await act(() => vi.advanceTimersByTimeAsync(5000))
+      await hook.act(() => hook.result.current.onEditorChange('# Mine v2\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(5000))
       expect(writes).toEqual([])
 
       // Resolution unblocks: keepMine rewrites with the buffer.
-      act(() => hook.result.current.keepMine())
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => hook.result.current.keepMine())
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
       expect(writes).toEqual(['# Mine v2\n'])
     } finally {
       vi.useRealTimers()
@@ -737,23 +813,23 @@ describe('useNoteDocument', () => {
         return null
       })
 
-      const hook = renderHook(() => useNoteDocument('notes/a.md', 1))
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      const hook = await renderHook(() => useNoteDocument('notes/a.md', 1))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
 
-      act(() => hook.result.current.onEditorChange('# Saved\n'))
-      await act(() => vi.advanceTimersByTimeAsync(1000)) // write dispatched, unresolved
+      await hook.act(() => hook.result.current.onEditorChange('# Saved\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000)) // write dispatched, unresolved
       expect(writes).toEqual(['# Saved\n'])
 
       // User keeps typing (dirty again) while the watcher reports our write.
-      act(() => hook.result.current.onEditorChange('# Saved and more\n'))
-      act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => hook.result.current.onEditorChange('# Saved and more\n'))
+      await hook.act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
       expect(hook.result.current.conflict).toBeNull() // echo, not a conflict
 
-      act(() => {
+      await hook.act(() => {
         resolveWrite?.()
       })
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
     } finally {
       vi.useRealTimers()
     }
@@ -783,22 +859,22 @@ describe('useNoteDocument', () => {
         return null
       })
 
-      const hook = renderHook(() => useNoteDocument('notes/a.md', 1))
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      const hook = await renderHook(() => useNoteDocument('notes/a.md', 1))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
 
-      act(() => hook.result.current.onEditorChange('# A\n'))
-      await act(() => vi.advanceTimersByTimeAsync(1000)) // write1(A) dispatched, hanging
+      await hook.act(() => hook.result.current.onEditorChange('# A\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000)) // write1(A) dispatched, hanging
       expect(writes).toEqual(['# A\n'])
 
       // More typing queues a second save; then the user reverts to A before
       // write1 settles. The queued step must NOT persist the stale "# B".
-      act(() => hook.result.current.onEditorChange('# B\n'))
-      await act(() => vi.advanceTimersByTimeAsync(1000))
-      act(() => hook.result.current.onEditorChange('# A\n'))
-      act(() => {
+      await hook.act(() => hook.result.current.onEditorChange('# B\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000))
+      await hook.act(() => hook.result.current.onEditorChange('# A\n'))
+      await hook.act(() => {
         resolveWrite?.()
       })
-      await act(() => vi.advanceTimersByTimeAsync(2000))
+      await hook.act(() => vi.advanceTimersByTimeAsync(2000))
       expect(writes).toEqual(['# A\n']) // no stale second write
       expect(hook.result.current.dirty).toBe(false)
     } finally {
@@ -826,17 +902,17 @@ describe('useNoteDocument', () => {
         return null
       })
 
-      const hook = renderHook(() => useNoteDocument('notes/a.md', 1))
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      const hook = await renderHook(() => useNoteDocument('notes/a.md', 1))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
 
-      act(() => hook.result.current.onEditorChange('# Edited\n'))
-      await act(() => vi.advanceTimersByTimeAsync(1000))
+      await hook.act(() => hook.result.current.onEditorChange('# Edited\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000))
       expect(hook.result.current.error).toMatch(/disk full/)
       expect(hook.result.current.status).toBe('ready') // editing continues
 
       // The next (successful) save clears the surfaced error.
-      act(() => hook.result.current.onEditorChange('# Edited again\n'))
-      await act(() => vi.advanceTimersByTimeAsync(1000))
+      await hook.act(() => hook.result.current.onEditorChange('# Edited again\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000))
       expect(hook.result.current.error).toBeNull()
       expect(writes).toEqual(['# Edited again\n'])
     } finally {
@@ -860,16 +936,16 @@ describe('useNoteDocument', () => {
         return null
       })
 
-      const hook = renderHook(({ path }) => useNoteDocument(path, 1), {
+      const hook = await renderHook(({ path }: { path: string } = { path: 'notes/a.md' }) => useNoteDocument(path, 1), {
         initialProps: { path: 'notes/a.md' },
       })
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
 
       // Dirty edit, then switch notes before the debounce fires: the unmount
       // flush must persist the OLD note's buffer to the OLD path.
-      act(() => hook.result.current.onEditorChange('# Unsaved on A\n'))
-      hook.rerender({ path: 'notes/b.md' })
-      await act(() => vi.advanceTimersByTimeAsync(2000))
+      await hook.act(() => hook.result.current.onEditorChange('# Unsaved on A\n'))
+      await hook.rerender({ path: 'notes/b.md' })
+      await hook.act(() => vi.advanceTimersByTimeAsync(2000))
 
       expect(written).toContainEqual({ path: 'notes/a.md', contents: '# Unsaved on A\n' })
       expect(written.some((write) => write.path === 'notes/b.md')).toBe(false)
@@ -881,11 +957,12 @@ describe('useNoteDocument', () => {
   it('reconciles pending editor input during a same-path session rebind', async () => {
     vi.useFakeTimers()
     try {
-      const hook = renderHook(
-        ({ createIfMissing }) => useNoteDocument('notes/a.md', 1, { createIfMissing }),
+      const hook = await renderHook(
+        ({ createIfMissing }: { createIfMissing: boolean } = { createIfMissing: false }) =>
+          useNoteDocument('notes/a.md', 1, { createIfMissing }),
         { initialProps: { createIfMissing: false } },
       )
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
       expect(hook.result.current.status).toBe('ready')
 
       const editor = fakeEditor()
@@ -897,13 +974,13 @@ describe('useNoteDocument', () => {
         }
         return '# Pending native input\n'
       })
-      act(() => hook.result.current.bindEditor(editor))
+      await hook.act(() => hook.result.current.bindEditor(editor))
 
       // Changing a session option recreates the session without unmounting the
       // editor. The outgoing session must remain discoverable while Meowdown
       // synchronously reports reconciled native input from getMarkdown().
-      hook.rerender({ createIfMissing: true })
-      await act(() => vi.advanceTimersByTimeAsync(2000))
+      await hook.rerender({ createIfMissing: true })
+      await hook.act(() => vi.advanceTimersByTimeAsync(2000))
 
       expect(editor.getMarkdown).toHaveBeenCalled()
       expect(writes).toContain('# Pending native input\n')
@@ -927,17 +1004,17 @@ describe('useNoteDocument', () => {
         return null
       })
 
-      const hook = renderHook(() =>
+      const hook = await renderHook(() =>
         useNoteDocument('daily/2026-06-09.md', 1, { createIfMissing: true }),
       )
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
       expect(hook.result.current.status).toBe('ready')
       expect(hook.result.current.initialContent).toBe('')
       expect(hook.result.current.dirty).toBe(false)
       expect(writes).toEqual([]) // opening alone never creates the file
 
-      act(() => hook.result.current.onEditorChange('first keystroke\n'))
-      await act(() => vi.advanceTimersByTimeAsync(1000))
+      await hook.act(() => hook.result.current.onEditorChange('first keystroke\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000))
       expect(writes).toEqual(['first keystroke\n'])
     } finally {
       vi.useRealTimers()
@@ -951,8 +1028,8 @@ describe('useNoteDocument', () => {
       }
       return null
     })
-    const hook = renderHook(() => useNoteDocument('notes/gone.md', 1))
-    await waitFor(() => expect(hook.result.current.status).toBe('error'))
+    const hook = await renderHook(() => useNoteDocument('notes/gone.md', 1))
+    await vi.waitFor(() => expect(hook.result.current.status).toBe('error'))
   })
 
   it('a same-graph generation bump keeps unsaved edits and saves with the new generation', async () => {
@@ -971,20 +1048,20 @@ describe('useNoteDocument', () => {
         return null
       })
 
-      const hook = renderHook(({ gen }) => useNoteDocument('notes/a.md', gen), {
+      const hook = await renderHook(({ gen }: { gen: number } = { gen: 1 }) => useNoteDocument('notes/a.md', gen), {
         initialProps: { gen: 1 },
       })
-      await act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
 
       // Reopening the same graph bumps the generation without remounting the
       // pane. The dirty buffer must survive (no dispose/reload-from-disk) and
       // the pending save must carry the NEW generation — a stale one would be
       // rejected by Rust and the edit silently lost.
-      act(() => hook.result.current.onEditorChange('# Unsaved\n'))
-      hook.rerender({ gen: 2 })
+      await hook.act(() => hook.result.current.onEditorChange('# Unsaved\n'))
+      await hook.rerender({ gen: 2 })
       expect(hook.result.current.dirty).toBe(true)
 
-      await act(() => vi.advanceTimersByTimeAsync(1000))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000))
       expect(written).toEqual([{ contents: '# Unsaved\n', generation: 2 }])
       expect(hook.result.current.dirty).toBe(false)
     } finally {
@@ -993,14 +1070,14 @@ describe('useNoteDocument', () => {
   })
 
   it('keepMine rewrites the file with the buffer', async () => {
-    const { result } = await readyHook()
-    act(() => result.current.onEditorChange('# My unsaved edit\n'))
+    const { result, act } = await readyHook()
+    await act(() => result.current.onEditorChange('# My unsaved edit\n'))
     disk = '# Theirs\n'
-    act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
-    await waitFor(() => expect(result.current.conflict).toBe('# Theirs\n'))
+    await act(() => emitChange?.([{ path: 'notes/a.md', kind: 'upsert' }]))
+    await vi.waitFor(() => expect(result.current.conflict).toBe('# Theirs\n'))
 
-    act(() => result.current.keepMine())
-    await waitFor(() => expect(writes).toContain('# My unsaved edit\n'))
+    await act(() => result.current.keepMine())
+    await vi.waitFor(() => expect(writes).toContain('# My unsaved edit\n'))
     expect(result.current.conflict).toBeNull()
   })
 })

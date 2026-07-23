@@ -21,6 +21,13 @@
 //! a stub) and never as removes (eviction is not deletion; the item is still
 //! listed). When iCloud finishes a download, the next update round reports
 //! the real upsert.
+//!
+//! Download nudges are **changed-only**: a placeholder is requested when its
+//! content is something this device lacks (a new arrival, or a remote edit
+//! reaching an evicted item), never because the OS evicted content we already
+//! indexed — that would fight Optimize Storage indefinitely. Open-path
+//! catch-up (placeholders the *index* lacks) is the reconcile's targeted
+//! `icloud_request_downloads`, not this watch.
 
 use crate::error::AppResult;
 
@@ -66,7 +73,7 @@ mod platform {
         NSNumber, NSOperationQueue, NSPredicate, NSString,
     };
     use serde::Serialize;
-    use tauri::Emitter;
+    use tauri::{Emitter, Manager};
 
     use crate::error::{AppError, AppResult};
 
@@ -92,21 +99,34 @@ mod platform {
     /// the non-`Send` Objective-C handles sound inside a global.
     static ACTIVE: Mutex<Option<MainThreadBound<Watch>>> = Mutex::new(None);
 
-    /// Last reported state per graph-relative path: `Some(mtime)` when the
-    /// content is local, `None` while it is a placeholder (listed, not
-    /// downloaded). Plain Rust — safe to touch from the delivery queue.
-    static SNAPSHOT: LazyLock<Mutex<HashMap<String, Option<u64>>>> =
+    /// One tracked item's last-known sync state.
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    enum TrackedState {
+        /// Bytes are local, at this content-change mtime (epoch ms).
+        Local(u64),
+        /// Listed but not downloaded (a placeholder, or an eviction). The
+        /// provider's content-change date rides along — it is cloud
+        /// metadata, present without local bytes — so a *remote edit*
+        /// reaching an evicted item is distinguishable from the eviction
+        /// itself.
+        Evicted(Option<u64>),
+    }
+
+    /// Last reported state per graph-relative path. Plain Rust — safe to
+    /// touch from the delivery queue.
+    static SNAPSHOT: LazyLock<Mutex<HashMap<String, TrackedState>>> =
         LazyLock::new(|| Mutex::new(HashMap::new()));
 
-    /// Graph-relative paths whose download this watch already requested.
+    /// Content-change date last download-requested, per graph-relative path.
     /// The OS treats repeat requests as no-ops, but *issuing* them is not
     /// free: during an initial sync every update round used to re-request
     /// every still-pending placeholder — O(N) `NSFileManager` calls per
-    /// round, O(N²) across a large download. Each path is nudged once;
-    /// completion (or removal) clears it so a later eviction can re-nudge.
-    /// A download that silently stalls is retried by the resume-path
+    /// round, O(N²) across a large download. Each (path, date) is requested
+    /// once; completion (or removal from the listing) clears the entry. A
+    /// download that silently stalls is retried by the resume-path
     /// `icloud_download_pending` walk, which requests unconditionally.
-    static NUDGED: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
+    static NUDGED: LazyLock<Mutex<HashMap<String, Option<u64>>>> =
+        LazyLock::new(|| Mutex::new(HashMap::new()));
 
     /// The watcher's change event, matching `watcher::FileChange`.
     #[derive(Debug, Clone, Serialize)]
@@ -316,10 +336,13 @@ mod platform {
     }
 
     impl ItemState {
-        /// The snapshot value for this item: `Some(mtime)` once local,
-        /// `None` while a placeholder.
-        fn snapshot_state(&self) -> Option<u64> {
-            self.downloaded.then(|| self.mtime.unwrap_or(0))
+        /// The snapshot value for this item.
+        fn snapshot_state(&self) -> TrackedState {
+            if self.downloaded {
+                TrackedState::Local(self.mtime.unwrap_or(0))
+            } else {
+                TrackedState::Evicted(self.mtime)
+            }
         }
     }
 
@@ -354,26 +377,55 @@ mod platform {
         conflicts: Vec<String>,
     }
 
-    /// Pure half of the nudge bookkeeping: mark placeholders not yet nudged
-    /// this watch (returning their absolute paths, for the caller to
-    /// request), and clear completed ones so a later eviction re-nudges.
-    fn plan_nudges(nudged: &mut HashSet<String>, items: &[ItemState]) -> Vec<String> {
+    /// Pure half of the nudge bookkeeping: the placeholders this round should
+    /// request downloads for. Only content the device *provably lacks* is
+    /// nudged — an item new to the snapshot (e.g. a note created on another
+    /// device), or one whose content-change date moved to a *known different*
+    /// date (a remote edit reaching an evicted item). Everything ambiguous
+    /// stays silent: an eviction of already-seen content, and any report
+    /// without a usable date on either side — re-downloading whatever the OS
+    /// just evicted turns Optimize Storage into a tug-of-war that keeps
+    /// `fileproviderd` pinned for as long as the app runs, and a genuinely
+    /// missed remote edit is caught by the reconcile's mtime comparison on
+    /// the next pass. Gather rounds never nudge (see
+    /// [`handle_notification`]) — open-path catch-up belongs to the
+    /// reconcile's targeted `icloud_request_downloads`, which consults the
+    /// *index* rather than this watch's session-local snapshot.
+    fn plan_nudges(
+        nudged: &mut HashMap<String, Option<u64>>,
+        snapshot: &HashMap<String, TrackedState>,
+        items: &[ItemState],
+    ) -> Vec<String> {
         let mut request: Vec<String> = Vec::new();
         for item in items {
             if item.downloaded {
                 nudged.remove(&item.rel);
-            } else if nudged.insert(item.rel.clone()) {
-                request.push(item.abs.clone());
+                continue;
             }
+            let missing = match snapshot.get(&item.rel) {
+                None => true, // an arrival: content this device has never had
+                Some(TrackedState::Local(mtime)) => item.mtime.is_some_and(|date| date != *mtime),
+                Some(TrackedState::Evicted(previous)) => item
+                    .mtime
+                    .is_some_and(|date| previous.is_some_and(|prev| date != prev)),
+            };
+            if !missing || nudged.get(&item.rel) == Some(&item.mtime) {
+                continue;
+            }
+            nudged.insert(item.rel.clone(), item.mtime);
+            request.push(item.abs.clone());
         }
         request
     }
 
-    /// Request downloads for the placeholders [`plan_nudges`] marked.
+    /// Request downloads for the placeholders [`plan_nudges`] marked. Must
+    /// run *before* the round's delta folds into [`SNAPSHOT`] — the plan
+    /// compares against the previous states.
     fn nudge_pending(items: &[ItemState]) {
         let request = {
+            let snapshot = SNAPSHOT.lock().expect("snapshot lock");
             let mut nudged = NUDGED.lock().expect("nudge lock");
-            plan_nudges(&mut nudged, items)
+            plan_nudges(&mut nudged, &snapshot, items)
         };
         for abs in request {
             crate::icloud::storage::request_download(std::path::Path::new(&abs));
@@ -412,14 +464,31 @@ mod platform {
         let round = if is_update {
             match update_delta(notification, roots) {
                 Some((upserted, removed)) => update_round(&upserted, &removed),
-                None => full_round(&query, roots),
+                None => full_round(&query, roots, true),
             }
         } else {
-            full_round(&query, roots)
+            // The gather round: this watch just started, with an empty
+            // snapshot — every placeholder would compare as "new". Nudging
+            // here used to re-request every evicted file in the graph on
+            // every app open, an unpaced download storm that pinned
+            // fileproviderd. The reconcile's targeted downloads own
+            // open-path catch-up; this round only seeds the snapshot.
+            full_round(&query, roots, false)
         };
 
-        if emit_file_changes && !round.changes.is_empty() {
-            let _ = app.emit("index:changed", round.changes);
+        if !round.changes.is_empty() {
+            // The listing cache must not outlive a change this round observed
+            // (a download materialized, a Mac-side edit landed). Try every
+            // root variant: invalidation is root-checked, so the one matching
+            // the open graph wins and the others are no-ops.
+            let state = app.state::<crate::fs::GraphState>();
+            for root in roots {
+                let root = std::path::Path::new(root.trim_end_matches('/'));
+                crate::fs::invalidate_file_catalog(&state, root);
+            }
+            if emit_file_changes {
+                let _ = app.emit("index:changed", round.changes);
+            }
         }
         if !round.conflicts.is_empty() {
             let mut conflicts = round.conflicts;
@@ -428,8 +497,9 @@ mod platform {
         }
     }
 
-    /// Apply one update notification's delta: nudge new placeholders, fold
-    /// the delta into the snapshot, and drop nudge marks for removed items.
+    /// Apply one update notification's delta: nudge placeholders whose
+    /// content this device lacks, fold the delta into the snapshot, and drop
+    /// nudge marks for removed items.
     fn update_round(upserted: &[ItemState], removed: &[String]) -> Round {
         nudge_pending(upserted);
         let changes = {
@@ -448,12 +518,14 @@ mod platform {
         }
     }
 
-    /// Snapshot the query's full results listing — the gather round, and the
-    /// fallback for an update notification without a usable delta. Expressed
-    /// through [`apply_update_delta`] (every listed item as an upsert, every
+    /// Snapshot the query's full results listing — the gather round (`nudge:
+    /// false`), and the fallback for an update notification without a usable
+    /// delta (`nudge: true`; the gather already seeded the snapshot, so the
+    /// changed-only comparison works). Expressed through
+    /// [`apply_update_delta`] (every listed item as an upsert, every
     /// snapshot row missing from the listing as a remove) so the full and
     /// incremental paths share one set of diff rules and can never drift.
-    fn full_round(query: &NSMetadataQuery, roots: &[String]) -> Round {
+    fn full_round(query: &NSMetadataQuery, roots: &[String], nudge: bool) -> Round {
         query.disableUpdates();
         let results = query.results();
         let mut items: Vec<ItemState> = Vec::new();
@@ -467,13 +539,15 @@ mod platform {
         }
         query.enableUpdates();
 
-        nudge_pending(&items);
+        if nudge {
+            nudge_pending(&items);
+        }
         let listed: HashSet<&str> = items.iter().map(|item| item.rel.as_str()).collect();
         {
             // Placeholders that vanished from the listing can't complete —
             // drop their nudge marks along with the snapshot rows.
             let mut nudged = NUDGED.lock().expect("nudge lock");
-            nudged.retain(|rel| listed.contains(rel.as_str()));
+            nudged.retain(|rel, _| listed.contains(rel.as_str()));
         }
         let changes = {
             let mut snapshot = SNAPSHOT.lock().expect("snapshot lock");
@@ -541,7 +615,7 @@ mod platform {
     /// is silent in both directions — eviction is not deletion, and its bytes
     /// aren't local to upsert — until iCloud downloads the item again.
     fn apply_update_delta(
-        snapshot: &mut HashMap<String, Option<u64>>,
+        snapshot: &mut HashMap<String, TrackedState>,
         upserted: &[ItemState],
         removed: &[String],
     ) -> Vec<FileChange> {
@@ -549,10 +623,10 @@ mod platform {
         for item in upserted {
             let state = item.snapshot_state();
             let previous = snapshot.insert(item.rel.clone(), state);
-            let Some(mtime) = state else {
+            let TrackedState::Local(mtime) = state else {
                 continue; // placeholder (or eviction): bytes aren't local
             };
-            if previous.flatten() != Some(mtime) {
+            if previous != Some(TrackedState::Local(mtime)) {
                 changes.push(FileChange {
                     path: item.rel.clone(),
                     kind: "upsert".to_string(),
@@ -572,9 +646,10 @@ mod platform {
         changes
     }
 
-    /// The watcher's note-tracking rule, over absolute metadata paths:
-    /// `.md` under `daily/`, `notes/`, or `templates/`, graph-relative. Tries
-    /// every root variant — Spotlight may report either side of the
+    /// The watcher's note-tracking rule, over absolute metadata paths: an
+    /// eligible Markdown note anywhere visible (the shared
+    /// `reflect-graph-paths` policy), graph-relative. Tries every root
+    /// variant — Spotlight may report either side of the
     /// `/var` ↔ `/private/var` symlink. Variants are slash-terminated
     /// ([`root_variants`]), so the strip is a path boundary, not a string
     /// prefix — a sibling `…/Notes-old/` can never masquerade as the graph.
@@ -582,11 +657,7 @@ mod platform {
         let rel = roots
             .iter()
             .find_map(|root| path.strip_prefix(root.as_str()))?;
-        let tracked = (rel.starts_with("daily/")
-            || rel.starts_with("notes/")
-            || rel.starts_with("templates/"))
-            && rel.ends_with(".md");
-        tracked.then(|| rel.to_string())
+        reflect_graph_paths::is_note(rel).then(|| rel.to_string())
     }
 
     /// A metadata attribute as a string; `None` when absent or another type.
@@ -617,14 +688,23 @@ mod platform {
     mod tests {
         use super::{
             apply_update_delta, plan_nudges, root_variants, tracked_note_relpath, ItemState,
+            TrackedState,
         };
-        use std::collections::{HashMap, HashSet};
+        use std::collections::HashMap;
 
-        fn state(entries: &[(&str, Option<u64>)]) -> HashMap<String, Option<u64>> {
+        fn state(entries: &[(&str, TrackedState)]) -> HashMap<String, TrackedState> {
             entries
                 .iter()
-                .map(|(rel, mtime)| (rel.to_string(), *mtime))
+                .map(|(rel, tracked)| (rel.to_string(), *tracked))
                 .collect()
+        }
+
+        fn local(mtime: u64) -> TrackedState {
+            TrackedState::Local(mtime)
+        }
+
+        fn evicted(mtime: Option<u64>) -> TrackedState {
+            TrackedState::Evicted(mtime)
         }
 
         fn item(rel: &str, downloaded: bool, mtime: Option<u64>) -> ItemState {
@@ -650,7 +730,7 @@ mod platform {
         fn upserts_need_local_bytes_and_a_new_mtime() {
             // A full listing applied as a delta (how `full_round` uses it):
             // every listed item upserts, removes come precomputed.
-            let mut snapshot = state(&[("notes/same.md", Some(1))]);
+            let mut snapshot = state(&[("notes/same.md", local(1))]);
             let listing = vec![
                 item("notes/same.md", true, Some(1)),    // unchanged: no event
                 item("notes/changed.md", true, Some(2)), // new content: upsert
@@ -668,8 +748,10 @@ mod platform {
 
         #[test]
         fn eviction_is_not_deletion_but_disappearance_is() {
-            let mut snapshot =
-                state(&[("notes/evicted.md", Some(1)), ("notes/deleted.md", Some(1))]);
+            let mut snapshot = state(&[
+                ("notes/evicted.md", local(1)),
+                ("notes/deleted.md", local(1)),
+            ]);
             // The evicted note stays listed placeholder-state; the deleted one
             // is gone from the listing entirely.
             let listing = vec![item("notes/evicted.md", false, None)];
@@ -681,33 +763,78 @@ mod platform {
         }
 
         #[test]
-        fn plan_nudges_requests_each_placeholder_once() {
-            let mut nudged: HashSet<String> = HashSet::new();
-            let stub = item("notes/a.md", false, None);
+        fn plan_nudges_requests_an_arrival_once() {
+            let mut nudged: HashMap<String, Option<u64>> = HashMap::new();
+            let snapshot = state(&[]);
+            let stub = item("notes/a.md", false, Some(5));
 
-            // First sighting: request it. Every later round: already marked.
+            // First sighting of unknown content: request it. Every later
+            // round with the same content date: already marked.
             assert_eq!(
-                plan_nudges(&mut nudged, std::slice::from_ref(&stub)),
+                plan_nudges(&mut nudged, &snapshot, std::slice::from_ref(&stub)),
                 vec!["/container/Notes/notes/a.md".to_string()]
             );
-            assert!(plan_nudges(&mut nudged, std::slice::from_ref(&stub)).is_empty());
+            assert!(plan_nudges(&mut nudged, &snapshot, std::slice::from_ref(&stub)).is_empty());
 
-            // Completion clears the mark, so a later eviction re-nudges.
+            // Completion clears the mark.
             let downloaded = item("notes/a.md", true, Some(5));
-            assert!(plan_nudges(&mut nudged, std::slice::from_ref(&downloaded)).is_empty());
-            assert!(!nudged.contains("notes/a.md"));
+            assert!(
+                plan_nudges(&mut nudged, &snapshot, std::slice::from_ref(&downloaded)).is_empty()
+            );
+            assert!(!nudged.contains_key("notes/a.md"));
+        }
+
+        #[test]
+        fn plan_nudges_leaves_evictions_alone() {
+            // The OS evicted content we already saw locally: same content
+            // date, bytes offloaded. Re-requesting it would fight Optimize
+            // Storage — the eviction must be silent.
+            let mut nudged: HashMap<String, Option<u64>> = HashMap::new();
+            let snapshot = state(&[("notes/a.md", local(5))]);
+            let evictee = item("notes/a.md", false, Some(5));
+            assert!(plan_nudges(&mut nudged, &snapshot, std::slice::from_ref(&evictee)).is_empty());
+        }
+
+        #[test]
+        fn plan_nudges_stays_silent_when_the_content_date_is_unknown() {
+            let mut nudged: HashMap<String, Option<u64>> = HashMap::new();
+            // An eviction reported without a content-change date must not
+            // read as "missing" — that would re-request what the OS just
+            // offloaded, the exact tug-of-war the policy forbids. A missed
+            // real edit is caught by the reconcile's mtime comparison.
+            let snapshot = state(&[("notes/a.md", local(5)), ("notes/b.md", evicted(None))]);
+            let dateless = item("notes/a.md", false, None);
+            assert!(
+                plan_nudges(&mut nudged, &snapshot, std::slice::from_ref(&dateless)).is_empty()
+            );
+            // A date appearing on an item whose previous date was unknown is
+            // metadata arriving, not a provable remote edit — silent too.
+            let dated = item("notes/b.md", false, Some(7));
+            assert!(plan_nudges(&mut nudged, &snapshot, std::slice::from_ref(&dated)).is_empty());
+        }
+
+        #[test]
+        fn plan_nudges_requests_a_remote_edit_reaching_an_evicted_item() {
+            let mut nudged: HashMap<String, Option<u64>> = HashMap::new();
+            // Already evicted at content date 5; the cloud now reports 7 — a
+            // remote edit whose bytes this device lacks.
+            let snapshot = state(&[("notes/a.md", evicted(Some(5)))]);
+            let edited = item("notes/a.md", false, Some(7));
             assert_eq!(
-                plan_nudges(&mut nudged, std::slice::from_ref(&stub)),
+                plan_nudges(&mut nudged, &snapshot, std::slice::from_ref(&edited)),
                 vec!["/container/Notes/notes/a.md".to_string()]
             );
+            // The same report again: already requested for date 7.
+            let snapshot = state(&[("notes/a.md", evicted(Some(7)))]);
+            assert!(plan_nudges(&mut nudged, &snapshot, std::slice::from_ref(&edited)).is_empty());
         }
 
         #[test]
         fn update_delta_applies_incrementally_with_the_same_rules() {
             let mut snapshot = state(&[
-                ("notes/same.md", Some(1)),
-                ("notes/evictee.md", Some(3)),
-                ("notes/deleted.md", Some(4)),
+                ("notes/same.md", local(1)),
+                ("notes/evictee.md", local(3)),
+                ("notes/deleted.md", local(4)),
             ]);
             let upserted = vec![
                 item("notes/same.md", true, Some(1)), // unchanged mtime: no event
@@ -732,22 +859,23 @@ mod platform {
                 ]
             );
             // The snapshot now carries the delta: the placeholder and the
-            // evictee as `None`, the arrival's mtime, and no deleted row —
-            // exactly what a later full round must diff against.
+            // evictee as evicted (content dates preserved for the changed-only
+            // nudge), the arrival's mtime, and no deleted row — exactly what
+            // a later round must diff against.
             assert_eq!(
                 snapshot,
                 state(&[
-                    ("notes/same.md", Some(1)),
-                    ("notes/changed.md", Some(2)),
-                    ("notes/stub.md", None),
-                    ("notes/evictee.md", None),
+                    ("notes/same.md", local(1)),
+                    ("notes/changed.md", local(2)),
+                    ("notes/stub.md", evicted(Some(9))),
+                    ("notes/evictee.md", evicted(Some(3))),
                 ])
             );
         }
 
         #[test]
         fn a_download_completion_in_an_update_upserts_once() {
-            let mut snapshot = state(&[("notes/a.md", None)]);
+            let mut snapshot = state(&[("notes/a.md", evicted(None))]);
             let changes =
                 apply_update_delta(&mut snapshot, &[item("notes/a.md", true, Some(5))], &[]);
             assert_eq!(

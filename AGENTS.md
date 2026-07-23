@@ -85,6 +85,22 @@ Local unit tests:
 pnpm test --run path/to/test
 ```
 
+Desktop JS tests are split into Vitest projects (details in
+`docs/contributing/testing.md`):
+
+- `*.test.tsx` files run in a real browser via Vitest browser mode +
+  Playwright (the `browser` project). Chromium by default;
+  `REFLECT_TEST_BROWSER=webkit` runs WebKit (the engine of the production
+  Tauri webview); `DEBUG=1` opens a headed window. One-time setup:
+  `pnpm --filter @reflect/desktop test:install`.
+- `*.test.ts` files are pure logic and run in node (the `node` project). A
+  logic test that drives the DOM is named `.test.tsx` so it lands in the
+  browser project.
+- `console.warn` / `console.error` fail tests (`vitest-fail-on-console`).
+  Pre-existing noise is allowlisted in
+  `apps/desktop/src/test-utils/allowed-console.ts`; PRs may only shrink that
+  list, and a new entry needs a stated reason.
+
 Rust tests (the Cargo workspace: desktop shell, `reflect` CLI, index-schema crate):
 
 ```bash

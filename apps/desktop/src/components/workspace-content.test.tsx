@@ -1,4 +1,5 @@
-import { cleanup, render } from '@testing-library/react'
+import { render } from 'vitest-browser-react'
+import { page } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GraphInfo } from '@reflect/core'
 import type { ContextSidebarTarget } from '@/components/context-sidebar/sidebar-route'
@@ -56,39 +57,48 @@ const { WorkspaceContent } = await import('./workspace-content')
 
 const GRAPH: GraphInfo = { root: '/notes', name: 'Notes', generation: 1 }
 
-beforeEach(() => {
+beforeEach(async () => {
   workspaceState.collapsed = false
   workspaceState.target = { kind: 'daily', date: '2026-07-11' }
+  // The context sidebar is `hidden lg:block`, so it only renders on a
+  // desktop-width viewport.
+  await page.viewport(1280, 800)
 })
 
-afterEach(cleanup)
+afterEach(async () => {
+  await page.viewport(900, 600)
+})
 
 describe('WorkspaceContent', () => {
-  it('hides and restores the workspace and daily context sidebars together', () => {
-    const view = render(<WorkspaceContent graph={GRAPH} />)
+  it('hides and restores the workspace and daily context sidebars together', async () => {
+    const view = await render(<WorkspaceContent graph={GRAPH} />)
 
-    expect(view.getByRole('complementary', { name: 'Workspace' })).toBeTruthy()
-    expect(view.getByRole('complementary', { name: 'Context' })).toBeTruthy()
-    expect(view.getByTestId('daily-context').textContent).toBe('2026-07-11')
+    await expect
+      .element(view.getByRole('complementary', { name: 'Workspace' }))
+      .toBeInTheDocument()
+    await expect.element(view.getByRole('complementary', { name: 'Context' })).toBeInTheDocument()
+    expect(view.getByTestId('daily-context').element().textContent).toBe('2026-07-11')
 
     workspaceState.collapsed = true
-    view.rerender(<WorkspaceContent graph={GRAPH} />)
-    expect(view.queryByRole('complementary', { name: 'Workspace' })).toBeNull()
-    expect(view.queryByRole('complementary', { name: 'Context' })).toBeNull()
+    await view.rerender(<WorkspaceContent graph={GRAPH} />)
+    expect(view.getByRole('complementary', { name: 'Workspace' }).query()).toBeNull()
+    expect(view.getByRole('complementary', { name: 'Context' }).query()).toBeNull()
 
     workspaceState.collapsed = false
-    view.rerender(<WorkspaceContent graph={GRAPH} />)
-    expect(view.getByRole('complementary', { name: 'Workspace' })).toBeTruthy()
-    expect(view.getByRole('complementary', { name: 'Context' })).toBeTruthy()
+    await view.rerender(<WorkspaceContent graph={GRAPH} />)
+    await expect
+      .element(view.getByRole('complementary', { name: 'Workspace' }))
+      .toBeInTheDocument()
+    await expect.element(view.getByRole('complementary', { name: 'Context' })).toBeInTheDocument()
   })
 
-  it('applies the same collapsed state to ordinary note context', () => {
+  it('applies the same collapsed state to ordinary note context', async () => {
     workspaceState.target = { kind: 'note', path: 'notes/project.md' }
-    const view = render(<WorkspaceContent graph={GRAPH} />)
-    expect(view.getByTestId('note-context').textContent).toBe('notes/project.md')
+    const view = await render(<WorkspaceContent graph={GRAPH} />)
+    expect(view.getByTestId('note-context').element().textContent).toBe('notes/project.md')
 
     workspaceState.collapsed = true
-    view.rerender(<WorkspaceContent graph={GRAPH} />)
-    expect(view.queryByRole('complementary', { name: 'Context' })).toBeNull()
+    await view.rerender(<WorkspaceContent graph={GRAPH} />)
+    expect(view.getByRole('complementary', { name: 'Context' }).query()).toBeNull()
   })
 })

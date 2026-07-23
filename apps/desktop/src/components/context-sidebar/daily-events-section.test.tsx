@@ -1,28 +1,20 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { render } from 'vitest-browser-react'
+import { page, userEvent } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '@reflect/core'
 import { SettingsProvider } from '@/providers/settings-provider'
+import { expectLocatorToHaveCount } from '@/test-utils/expect'
 import { DailyEventsSection } from './daily-events-section'
 
-// The calendar queries only run in the macOS desktop webview; jsdom is neither.
+// The calendar queries only run in the macOS desktop webview; the test
+// browser is not it either, so the platform check is mocked on.
 vi.mock('@/lib/platform', () => ({ isMacosDesktop: true }))
-
-// jsdom has no ResizeObserver; the dialog's input group observes itself.
-class NoopResizeObserver {
-  observe(): void {}
-  unobserve(): void {}
-  disconnect(): void {}
-}
-window.ResizeObserver ??= NoopResizeObserver as unknown as typeof ResizeObserver
 
 // The add-meeting dialog reads the write generation from the graph provider.
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ graph: { root: '/graph', generation: 3 } }),
 }))
-
-// jsdom can't scroll; cmdk scrolls the highlighted suggestion into view.
-window.HTMLElement.prototype.scrollIntoView = () => {}
 
 // The action itself is covered in @reflect/core; here it is the seam the
 // dialog submits through. The attendee combobox's suggestion sources are
@@ -87,8 +79,8 @@ function installFakeBridge(): void {
 
 let queryClient: QueryClient
 
-function renderSection(): void {
-  render(
+async function renderSection(): Promise<void> {
+  await render(
     <QueryClientProvider client={queryClient}>
       <SettingsProvider>
         <DailyEventsSection date={DATE} />
@@ -110,7 +102,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  cleanup()
   setBridge(null)
   queryClient.clear()
 })
@@ -118,10 +109,10 @@ afterEach(() => {
 describe('DailyEventsSection', () => {
   it('lists the day’s events in start order with their times', async () => {
     events = [eventAt(14), eventAt(9)]
-    renderSection()
+    await renderSection()
 
-    await waitFor(() => expect(screen.getByText('Meeting at 9')).toBeTruthy())
-    const rows = screen.getAllByRole('button', { name: /meeting at/i })
+    await expect.element(page.getByText('Meeting at 9')).toBeInTheDocument()
+    const rows = page.getByRole('button', { name: /meeting at/i }).elements()
     expect(rows.map((row) => row.textContent)).toEqual([
       expect.stringContaining('Meeting at 9'),
       expect.stringContaining('Meeting at 14'),
@@ -140,17 +131,17 @@ describe('DailyEventsSection', () => {
         ],
       }),
     ]
-    renderSection()
+    await renderSection()
 
-    await waitFor(() => expect(screen.getByText('Meeting at 9')).toBeTruthy())
-    expect(screen.queryByText('OOO banner')).toBeNull()
-    expect(screen.queryByText('Declined sync')).toBeNull()
+    await expect.element(page.getByText('Meeting at 9')).toBeInTheDocument()
+    expect(page.getByText('OOO banner').query()).toBeNull()
+    expect(page.getByText('Declined sync').query()).toBeNull()
   })
 
   it('renders nothing while the integration is off', async () => {
     stored = { calendarEnabled: false, calendarIds: ['cal-work'] }
     events = [eventAt(9)]
-    const { container } = render(
+    const { container } = await render(
       <QueryClientProvider client={queryClient}>
         <SettingsProvider>
           <DailyEventsSection date={DATE} />
@@ -158,7 +149,7 @@ describe('DailyEventsSection', () => {
       </QueryClientProvider>,
     )
 
-    await waitFor(() => expect(container.textContent).toBe(''))
+    await vi.waitFor(() => expect(container.textContent).toBe(''))
   })
 
   it('clicking an event opens the dialog prefilled from the event', async () => {
@@ -173,30 +164,30 @@ describe('DailyEventsSection', () => {
         ],
       }),
     ]
-    renderSection()
-    fireEvent.click(await screen.findByRole('button', { name: /standup/i }))
+    await renderSection()
+    await page.getByRole('button', { name: /standup/i }).click()
 
-    const name = await screen.findByLabelText<HTMLInputElement>('Meeting name')
-    expect(name.value).toBe('Standup')
+    const name = page.getByLabelText('Meeting name')
+    await expect.element(name).toHaveValue('Standup')
     // Suggested attendees: people who haven't declined, excluding the user.
-    expect(screen.getByText('Ada Lovelace')).toBeTruthy()
-    expect(screen.queryByText('Room 4')).toBeNull()
+    await expect.element(page.getByText('Ada Lovelace')).toBeInTheDocument()
+    expect(page.getByText('Room 4').query()).toBeNull()
     // Recurring events default the create-backlinked-note choice on (v1).
-    const checkbox = screen.getByRole('checkbox')
-    expect(checkbox.getAttribute('aria-checked')).toBe('true')
+    const checkbox = page.getByRole('checkbox')
+    await expect.element(checkbox).toHaveAttribute('aria-checked', 'true')
   })
 
   it('submitting writes the meeting through addMeetingToDaily and closes', async () => {
     events = [eventAt(9, { title: 'Standup' })]
-    renderSection()
-    fireEvent.click(await screen.findByRole('button', { name: /standup/i }))
+    await renderSection()
+    await page.getByRole('button', { name: /standup/i }).click()
 
-    const attendee = await screen.findByLabelText<HTMLInputElement>('Attendees')
-    fireEvent.change(attendee, { target: { value: 'Grace Hopper' } })
-    fireEvent.keyDown(attendee, { key: 'Enter' })
-    fireEvent.click(screen.getByRole('button', { name: /add to daily note/i }))
+    const attendee = page.getByLabelText('Attendees')
+    await attendee.fill('Grace Hopper')
+    await userEvent.keyboard('{Enter}')
+    await page.getByRole('button', { name: /add to daily note/i }).click()
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(addMeetingToDaily).toHaveBeenCalledWith({
         date: DATE,
         title: 'Standup',
@@ -207,7 +198,7 @@ describe('DailyEventsSection', () => {
         generation: 3,
       }),
     )
-    await waitFor(() => expect(screen.queryByLabelText('Meeting name')).toBeNull())
+    await expectLocatorToHaveCount(page.getByLabelText('Meeting name'), 0)
   })
 
   it('passes invite emails and the contacts gate through to the action', async () => {
@@ -227,13 +218,13 @@ describe('DailyEventsSection', () => {
         ],
       }),
     ]
-    renderSection()
-    fireEvent.click(await screen.findByRole('button', { name: /standup/i }))
+    await renderSection()
+    await page.getByRole('button', { name: /standup/i }).click()
 
-    await screen.findByText('Ada Lovelace')
-    fireEvent.click(screen.getByRole('button', { name: /add to daily note/i }))
+    await expect.element(page.getByText('Ada Lovelace')).toBeInTheDocument()
+    await page.getByRole('button', { name: /add to daily note/i }).click()
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(addMeetingToDaily).toHaveBeenCalledWith(
         expect.objectContaining({
           attendees: [{ name: 'Ada Lovelace', email: 'ada@example.com' }],
@@ -261,14 +252,14 @@ describe('DailyEventsSection', () => {
         ],
       }),
     ]
-    renderSection()
-    fireEvent.click(await screen.findByRole('button', { name: /standup/i }))
+    await renderSection()
+    await page.getByRole('button', { name: /standup/i }).click()
 
-    await screen.findByText('Ada Lovelace')
-    expect(screen.queryByText('ada@example.com')).toBeNull()
+    await expect.element(page.getByText('Ada Lovelace')).toBeInTheDocument()
+    expect(page.getByText('ada@example.com').query()).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: /add to daily note/i }))
-    await waitFor(() =>
+    await page.getByRole('button', { name: /add to daily note/i }).click()
+    await vi.waitFor(() =>
       expect(addMeetingToDaily).toHaveBeenCalledWith(
         expect.objectContaining({
           attendees: [{ name: 'Ada Lovelace', email: 'ada@example.com' }],
@@ -286,13 +277,13 @@ describe('DailyEventsSection', () => {
         ],
       }),
     ]
-    renderSection()
-    fireEvent.click(await screen.findByRole('button', { name: /standup/i }))
+    await renderSection()
+    await page.getByRole('button', { name: /standup/i }).click()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Remove Ada Lovelace' }))
-    fireEvent.click(screen.getByRole('button', { name: /add to daily note/i }))
+    await page.getByRole('button', { name: 'Remove Ada Lovelace' }).click()
+    await page.getByRole('button', { name: /add to daily note/i }).click()
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(addMeetingToDaily).toHaveBeenCalledWith(
         expect.objectContaining({ attendees: [] }),
       ),
@@ -302,12 +293,12 @@ describe('DailyEventsSection', () => {
   it('a failed submit surfaces the error and keeps the dialog open', async () => {
     addMeetingToDaily.mockRejectedValueOnce(new Error('disk full'))
     events = [eventAt(9, { title: 'Standup' })]
-    renderSection()
-    fireEvent.click(await screen.findByRole('button', { name: /standup/i }))
+    await renderSection()
+    await page.getByRole('button', { name: /standup/i }).click()
 
-    fireEvent.click(await screen.findByRole('button', { name: /add to daily note/i }))
+    await page.getByRole('button', { name: /add to daily note/i }).click()
 
-    await waitFor(() => expect(screen.getByText(/disk full/i)).toBeTruthy())
-    expect(screen.getByLabelText('Meeting name')).toBeTruthy()
+    await expect.element(page.getByText(/disk full/i)).toBeInTheDocument()
+    await expect.element(page.getByLabelText('Meeting name')).toBeInTheDocument()
   })
 })

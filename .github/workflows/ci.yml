@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   node:
-    name: Lint · typecheck · non-desktop tests · build (Node)
+    name: lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -49,19 +49,18 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Test non-desktop packages
-        run: pnpm turbo run test --filter='!@reflect/desktop'
-
       - name: Build
         run: pnpm build
 
-  desktop-tests:
-    name: Desktop tests (${{ matrix.shard }}/3)
-    runs-on: ubuntu-latest
+  chromium:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: ["1/3", "2/3", "3/3"]
+
+    name: test-chromium ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -79,8 +78,45 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Test desktop shard
-        run: pnpm --filter @reflect/desktop exec vitest run --shard=${{ matrix.shard }}/3
+      - name: Install Playwright Chromium
+        run: pnpm --filter @reflect/desktop exec playwright install --with-deps chromium
+
+      - name: Test
+        run: pnpm run test --shard ${{ matrix.shard }}
+
+  webkit:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["1/5", "2/5", "3/5", "4/5", "5/5"]
+
+    name: test-webkit ${{ matrix.shard }}
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+
+      - name: Install Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright WebKit
+        run: pnpm --filter @reflect/desktop exec playwright install webkit
+
+      - name: Test
+        run: pnpm run test --shard ${{ matrix.shard }}
+        env:
+          REFLECT_TEST_BROWSER: webkit
 
   rust:
     name: fmt · clippy · test (Rust)
@@ -147,3 +183,25 @@ jobs:
 
       - name: Test
         run: cargo test --workspace
+
+  apple-rust:
+    name: check Apple Rust bindings
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          cache-on-failure: true
+
+      - name: Stage desktop sidecars
+        run: node apps/desktop/scripts/build-sidecar.mjs
+
+      - name: Check desktop library
+        run: cargo check -p reflect-open --lib

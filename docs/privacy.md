@@ -74,8 +74,14 @@ disk at call time), and it is covered by tests.
   held in the browser's local extension storage and retried automatically until it
   spools — it is never sent anywhere else in the meantime.
 - Once a capture lands in your graph, the desktop app's rules above apply unchanged:
-  any BYOK AI enrichment of it honors `private: true`, and no content leaves the device
-  except through the calls listed here.
+  enrichment may request the captured URL directly to read page metadata. On macOS and
+  iOS, Reflect also asks Apple's LinkPresentation framework for one representative
+  image when the capture has no screenshot. These requests go to the captured website
+  and any redirects or subresources selected by the operating system, never through a
+  Reflect server. The app re-reads the capture and daily note before and after each
+  request; `private: true` prevents the request or discards its result. A successful
+  image is downscaled and stored as a local JPEG in the graph. Any BYOK AI enrichment
+  then follows the provider rules above.
 
 ## Apple Contacts (off by default)
 
@@ -142,5 +148,6 @@ API keys and tokens live in the **OS keychain only** — never in markdown, neve
 | Key validation | The provider | No | — (only when adding a key) |
 | Update check | GitHub Releases | No | On in packaged builds |
 | Browser capture | Nowhere (local host on disk) | — (stays on your machine) | — (only when you capture) |
+| Capture metadata and preview | The captured website, via Reflect and Apple LinkPresentation | URL only; private captures are blocked | No (after an explicit capture) |
 | Contacts lookup | Nowhere (on-device OS store) | — (stays on your machine) | Yes (opt-in) |
 | Exception diagnostics | Sentry | No — free-form messages and context are redacted | No (official releases) |

@@ -15,10 +15,12 @@ import {
   errorMessage,
   forgetRecent,
   hasBridge,
+  icloudRequestDownloads,
   isMobilePlatform,
   createGraph,
   openGraph,
   recentGraphs,
+  subscribeReconcileRequests,
   type AppPlatform,
   type GraphInfo,
   type RecentGraph,
@@ -163,6 +165,16 @@ export function GraphProvider({
       // External renames healed by id follow through to sessions and routes,
       // exactly as for an in-app rename (Plan 17).
       onMoved: followHealedMove,
+      // iCloud-evicted notes whose content the index lacks (never indexed
+      // here, or remote-edited while evicted): request exactly those
+      // downloads; the materialized files index via ordinary watcher
+      // upserts. Non-iCloud graphs never list placeholders, so this never
+      // fires for them. Rust resolves against the active root itself.
+      onStalePlaceholders: (paths) => {
+        icloudRequestDownloads(paths).catch((err: unknown) => {
+          console.error('iCloud download request failed:', errorMessage(err))
+        })
+      },
       // `visibilitychange` below performs the active teardown; this dynamic
       // guard also closes the launch race where the first sync is scheduled
       // after iOS has already hidden the webview.
@@ -478,6 +490,27 @@ export function GraphProvider({
     const seq = openSeq.current
     indexRef.current.refresh(indexGeneration, () => seq !== openSeq.current)
   }, [indexGeneration])
+  // A structural vault change (folder created, renamed, or removed) cannot
+  // be expressed as per-file events; the watcher asks for one full reconcile
+  // instead, and `refresh` coalesces bursts into a single queued rerun.
+  useEffect(() => {
+    let unlisten: (() => void) | null = null
+    let disposed = false
+    void subscribeReconcileRequests(() => refreshIndex()).then(
+      (fn) => {
+        if (disposed) {
+          fn()
+        } else {
+          unlisten = fn
+        }
+      },
+      (error: unknown) => console.error('failed to subscribe reconcile requests:', error),
+    )
+    return () => {
+      disposed = true
+      unlisten?.()
+    }
+  }, [refreshIndex])
 
   const value = useMemo<GraphContextValue>(
     () => ({

@@ -173,6 +173,16 @@ export interface IndexPassOptions {
    * "preparing" surface on every open.
    */
   onFileProgress?: (done: number, total: number, worked: number) => void
+  /**
+   * Called (at most once per pass, non-empty) with iCloud-evicted notes whose
+   * content the index lacks: files the pass had to skip unread — a reconcile's
+   * stale/rowless placeholders, or every placeholder a rebuild couldn't
+   * re-index after the wipe. The desktop layer requests targeted downloads
+   * for exactly these; the materialized files then arrive as ordinary watcher
+   * upserts and are indexed live. Without a caller wired, evicted content
+   * simply stays unindexed until it materializes some other way.
+   */
+  onStalePlaceholders?: (paths: readonly string[]) => void
 }
 
 /** One note omitted from a rebuild because its projection could not be written. */
@@ -309,7 +319,7 @@ export function createMtimeTouchBatch(generation: number): MtimeTouchBatch {
  * continuing to hold SQLite locks in the background.
  */
 export async function rebuildIndex(options: IndexPassOptions): Promise<void> {
-  const { generation, onSkippedNote, onFileProgress } = options
+  const { generation, onSkippedNote, onFileProgress, onStalePlaceholders } = options
   if (options.signal?.aborted) {
     return // don't wipe the current index for an already-cancelled pass
   }
@@ -319,6 +329,7 @@ export async function rebuildIndex(options: IndexPassOptions): Promise<void> {
   }
   const files = await listFiles()
   const batch = createIndexApplyBatch(generation, onSkippedNote)
+  const evicted: string[] = []
   let done = 0
   let worked = 0
   for (const file of files) {
@@ -334,7 +345,12 @@ export async function rebuildIndex(options: IndexPassOptions): Promise<void> {
       }
     }
     if (file.placeholder === true) {
-      continue // evicted to iCloud — unreadable until re-download, indexed then
+      // Evicted to iCloud — unreadable until re-download. The wipe above
+      // dropped its row, so after this pass the note is missing from search
+      // entirely: surface it for a targeted download, and index it on the
+      // materialization upsert.
+      evicted.push(file.path)
+      continue
     }
     worked += 1
     const content = await readNote(file.path)
@@ -356,6 +372,9 @@ export async function rebuildIndex(options: IndexPassOptions): Promise<void> {
     return
   }
   onFileProgress?.(files.length, files.length, worked)
+  if (evicted.length > 0) {
+    onStalePlaceholders?.(evicted)
+  }
   // The rows now match the current projection — stamp it so `syncIndex` can
   // reconcile cheaply from here on. A superseded pass stamps into a stale
   // generation, which Rust drops: the next open then rebuilds again, which is
@@ -404,10 +423,17 @@ export async function syncIndex(options: IndexPassOptions): Promise<void> {
  * pass. Changed notes apply in shared `index_apply_batch` transactions.
  */
 export async function reconcileIndex(options: IndexPassOptions): Promise<void> {
-  const { generation, signal, onMoved, onSkippedNote, onFileProgress } = options
+  const { generation, signal, onMoved, onSkippedNote, onFileProgress, onStalePlaceholders } =
+    options
   const scan = await reconcileScan(generation)
   if (signal?.aborted) {
     return
+  }
+  if (scan.stalePlaceholders.length > 0) {
+    // Evicted notes whose content the index lacks: request their downloads
+    // now so they materialize (and index, via watcher upserts) while the
+    // pass works through the readable candidates.
+    onStalePlaceholders?.(scan.stalePlaceholders)
   }
   /** Stored facts per candidate path; healed moves graft the orphan's in. */
   const facts = new Map<string, { mtime: number; fileHash: string }>()

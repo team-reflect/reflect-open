@@ -10,13 +10,13 @@
   "types": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.96",
     "@ai-sdk/google": "^3.0.84",
     "@ai-sdk/openai": "^3.0.84",
-    "@meowdown/markdown": "^0.56.0",
+    "@meowdown/markdown": "^0.58.0",
     "@reflect/db": "workspace:*",
     "@reflect/utils": "workspace:*",
     "ai": "^6.0.211",
@@ -30,6 +30,6 @@
     "jsdom": "^29.1.1",
     "sqlite-vec": "^0.1.9",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   }
 }

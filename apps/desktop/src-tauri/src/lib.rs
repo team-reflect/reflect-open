@@ -11,6 +11,7 @@
 //! [`skill`] (per-graph agent-skill install under `~/.agents/skills/`),
 //! [`calendar`] (read-only Apple Calendar access),
 //! [`contacts`] (live Apple Contacts lookups),
+//! [`menu`] (the macOS app menu, incl. Paste and Match Style),
 //! [`error`] (the shared error contract).
 
 mod background_task;
@@ -25,6 +26,8 @@ mod fs;
 mod git;
 mod graph_gitignore;
 mod icloud;
+mod link_preview;
+mod menu;
 mod quit;
 mod recents;
 mod secrets;
@@ -243,6 +246,7 @@ pub fn run() {
             icloud::storage::mobile_storage_local,
             icloud::storage::icloud_download_pending,
             icloud::storage::icloud_pending_count,
+            icloud::storage::icloud_request_downloads,
             icloud::storage::icloud_status,
             icloud::storage::icloud_adopt_graph,
             icloud::sweep::icloud_conflicts_scan,
@@ -254,6 +258,7 @@ pub fn run() {
             fs::graph_import_reflect_v1_zip,
             fs::graph_import_cancel,
             fs::note_read,
+            fs::note_read_local,
             fs::note_create,
             fs::note_write,
             fs::asset_write,
@@ -268,6 +273,8 @@ pub fn run() {
             fs::note_exists,
             fs::note_delete,
             fs::list_files,
+            fs::list_attachments,
+            fs::vault_scan_stats,
             recents::recent_graphs,
             recents::forget_recent,
             settings::settings_load,
@@ -298,6 +305,7 @@ pub fn run() {
             embed::embed_texts,
             watcher::watch_start,
             watcher::watch_stop,
+            menu::menu_install_paste_and_match_style,
             calendar::calendar_authorization_status,
             calendar::calendar_request_access,
             calendar::calendar_list_calendars,
@@ -314,6 +322,7 @@ pub fn run() {
             capture::capture_inbox_reject,
             capture::capture_shared_inbox_relay,
             capture::capture_screenshot_promote,
+            capture::capture_link_preview,
             capture::capture_meta_fetch,
             git::git_status,
             git::git_setup,

@@ -1,4 +1,5 @@
-import { renderHook, act, cleanup } from '@testing-library/react'
+import { act } from 'react'
+import { renderHook, cleanup } from 'vitest-browser-react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '@reflect/core'
 import { useICloudRefresh } from './use-icloud-refresh'
@@ -79,7 +80,7 @@ describe('useICloudRefresh', () => {
       mobileStorageKind: 'local',
       refreshIndex,
     }
-    renderHook(() => useICloudRefresh())
+    await renderHook(() => useICloudRefresh())
     await flush()
 
     expect(downloadCalls).toEqual([])
@@ -87,7 +88,7 @@ describe('useICloudRefresh', () => {
   })
 
   it('nudges note downloads on mount without repeating the open-time reconcile', async () => {
-    renderHook(() => useICloudRefresh())
+    await renderHook(() => useICloudRefresh())
     await flush()
 
     expect(downloadCalls).toEqual(['/iCloud/Documents'])
@@ -100,7 +101,7 @@ describe('useICloudRefresh', () => {
 
   it('polls the note count while pending and reconciles + starts assets when they land', async () => {
     pendingCount = 3
-    renderHook(() => useICloudRefresh())
+    await renderHook(() => useICloudRefresh())
     await flush()
     expect(downloadCalls).toHaveLength(1)
     expect(refreshIndex).not.toHaveBeenCalled()
@@ -138,7 +139,7 @@ describe('useICloudRefresh', () => {
 
   it('gives up polling at the limit with one final reconcile', async () => {
     pendingCount = 3
-    renderHook(() => useICloudRefresh())
+    await renderHook(() => useICloudRefresh())
     await flush()
     expect(refreshIndex).not.toHaveBeenCalled()
 
@@ -172,7 +173,7 @@ describe('useICloudRefresh', () => {
     })
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {
-      renderHook(() => useICloudRefresh())
+      await renderHook(() => useICloudRefresh())
       await flush()
 
       expect(allScopeDownloadCalls).toHaveLength(0)
@@ -183,7 +184,7 @@ describe('useICloudRefresh', () => {
   })
 
   it('collapses the resume event burst into one refresh — which reconciles', async () => {
-    renderHook(() => useICloudRefresh())
+    await renderHook(() => useICloudRefresh())
     await flush()
     expect(downloadCalls).toHaveLength(1)
 
@@ -206,9 +207,9 @@ describe('useICloudRefresh', () => {
   })
 
   it('stops listening after unmount', async () => {
-    const { unmount } = renderHook(() => useICloudRefresh())
+    const { unmount } = await renderHook(() => useICloudRefresh())
     await flush()
-    unmount()
+    await unmount()
 
     await act(async () => {
       vi.advanceTimersByTime(5000)

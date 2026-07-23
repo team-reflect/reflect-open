@@ -1,7 +1,9 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render } from 'vitest-browser-react'
+import { page, type Locator } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import type { ApiKeyValidation } from '@reflect/core'
+import { fireEvent } from '@/test-utils/fire-event'
 
 /**
  * The mobile add-provider sheet over the shared submit flow: a verified key
@@ -20,21 +22,19 @@ vi.mock('@reflect/core', async (importOriginal) => ({
 vi.mock('@/lib/provider-fetch', () => ({ providerFetch: vi.fn() }))
 vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl: vi.fn(() => Promise.resolve()) }))
 
-// vaul needs browser APIs jsdom doesn't provide; passthrough so the sheet
-// content renders inline.
+// Keep the sheet content inline so this suite exercises its state flow
+// without depending on vaul's drag and animation behavior.
 vi.mock('@/components/ui/drawer', () => ({
   Drawer: ({ children }: { children?: ReactNode }) => <>{children}</>,
   DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
 }))
 
-// jsdom doesn't implement this; Radix Select scrolls the selected option into
-// view when the listbox opens.
-Element.prototype.scrollIntoView ??= () => {}
-
 const { AddAiProviderDrawer } = await import('./add-ai-provider-drawer')
 
-afterEach(cleanup)
+afterEach(async () => {
+  await cleanup()
+})
 
 const onAdd = vi.fn<(draft: unknown) => Promise<void>>()
 const onOpenChange = vi.fn<(open: boolean) => void>()
@@ -45,32 +45,35 @@ beforeEach(() => {
   onOpenChange.mockReset()
 })
 
-function renderSheet() {
-  render(<AddAiProviderDrawer open onOpenChange={onOpenChange} onAdd={onAdd} />)
+async function renderSheet(): Promise<void> {
+  await render(<AddAiProviderDrawer open onOpenChange={onOpenChange} onAdd={onAdd} />)
 }
 
-function consentCheckbox() {
-  return screen.getByRole('checkbox', { name: /I understand this data will be sent/ })
+function consentCheckbox(): Locator {
+  return page.getByRole('checkbox', { name: /I understand this data will be sent/ })
 }
 
 async function typeKeyAndSubmit(key: string, submitLabel = 'Add provider') {
-  fireEvent.change(screen.getByLabelText('API key'), { target: { value: key } })
-  fireEvent.click(consentCheckbox())
-  fireEvent.click(screen.getByRole('button', { name: submitLabel }))
+  fireEvent.change(page.getByLabelText('API key'), { target: { value: key } })
+  await consentCheckbox().click()
+  await page.getByRole('button', { name: submitLabel }).click()
+}
+
+async function selectAnthropic(): Promise<void> {
+  await page.getByRole('combobox', { name: 'Provider' }).click()
+  await page.getByRole('option', { name: 'Anthropic' }).click()
 }
 
 describe('AddAiProviderDrawer', () => {
   it('verifies the key, hands the draft to onAdd, and closes', async () => {
     validateApiKey.mockResolvedValue('valid')
-    renderSheet()
+    await renderSheet()
 
-    // Keyboard-driven (the pointer path needs capture APIs jsdom lacks);
-    // options render in a portal, so they're queried from screen.
-    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Provider' }), { key: 'ArrowDown' })
-    fireEvent.keyDown(await screen.findByRole('option', { name: 'Anthropic' }), { key: 'Enter' })
+    // Options render in a portal, so query them from the page.
+    await selectAnthropic()
     await typeKeyAndSubmit('sk-ant-key')
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(onAdd).toHaveBeenCalledWith(
         expect.objectContaining({ provider: 'anthropic', apiKey: 'sk-ant-key' }),
       ),
@@ -80,61 +83,61 @@ describe('AddAiProviderDrawer', () => {
 
   it('shows a rejected key inline and stores nothing', async () => {
     validateApiKey.mockResolvedValue('invalid')
-    renderSheet()
+    await renderSheet()
 
     await typeKeyAndSubmit('sk-bad')
 
-    await waitFor(() => expect(screen.getByText(/rejected this API key/)).toBeDefined())
+    await expect.element(page.getByText(/rejected this API key/)).toBeVisible()
     expect(onAdd).not.toHaveBeenCalled()
     expect(onOpenChange).not.toHaveBeenCalled()
   })
 
   it('downgrades to save-anyway when the provider is unreachable', async () => {
     validateApiKey.mockResolvedValue('unreachable')
-    renderSheet()
+    await renderSheet()
 
     await typeKeyAndSubmit('sk-offline')
-    await waitFor(() => expect(screen.getByText(/Couldn’t reach/)).toBeDefined())
+    await expect.element(page.getByText(/Couldn’t reach/)).toBeVisible()
     expect(onAdd).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save anyway' }))
-    await waitFor(() =>
+    await page.getByRole('button', { name: 'Save anyway' }).click()
+    await vi.waitFor(() =>
       expect(onAdd).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'sk-offline' })),
     )
     // The unverified key was saved once, without a second validation probe.
     expect(validateApiKey).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps the submit disabled until the data-sharing consent is checked', () => {
-    renderSheet()
+  it('keeps the submit disabled until the data-sharing consent is checked', async () => {
+    await renderSheet()
 
-    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'sk-key' } })
-    expect(screen.getByRole('button', { name: 'Add provider' })).toHaveProperty('disabled', true)
+    fireEvent.change(page.getByLabelText('API key'), { target: { value: 'sk-key' } })
+    await expect.element(page.getByRole('button', { name: 'Add provider' })).toBeDisabled()
 
-    fireEvent.click(consentCheckbox())
-    expect(screen.getByRole('button', { name: 'Add provider' })).toHaveProperty('disabled', false)
+    await consentCheckbox().click()
+    await expect.element(page.getByRole('button', { name: 'Add provider' })).toBeEnabled()
   })
 
   it('resets consent when the provider changes', async () => {
-    renderSheet()
+    await renderSheet()
 
-    fireEvent.click(consentCheckbox())
-    expect(consentCheckbox()).toHaveProperty('checked', true)
+    await consentCheckbox().click()
+    await expect.element(consentCheckbox()).toBeChecked()
 
-    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Provider' }), { key: 'ArrowDown' })
-    fireEvent.keyDown(await screen.findByRole('option', { name: 'Anthropic' }), { key: 'Enter' })
+    await selectAnthropic()
 
-    expect(consentCheckbox()).toHaveProperty('checked', false)
+    await expect.element(consentCheckbox()).not.toBeChecked()
   })
 
   it('mentions audio only for transcription-capable providers', async () => {
-    renderSheet()
+    await renderSheet()
 
-    expect(screen.getByText(/audio memos send the recording/)).toBeDefined()
+    await expect.element(page.getByText(/audio memos send the recording/)).toBeVisible()
 
-    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Provider' }), { key: 'ArrowDown' })
-    fireEvent.keyDown(await screen.findByRole('option', { name: 'Anthropic' }), { key: 'Enter' })
+    await selectAnthropic()
 
-    expect(screen.queryByText(/audio memos send the recording/)).toBeNull()
+    await expect
+      .element(page.getByText(/audio memos send the recording/))
+      .not.toBeInTheDocument()
   })
 })

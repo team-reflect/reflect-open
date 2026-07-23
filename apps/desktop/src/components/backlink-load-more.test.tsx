@@ -1,5 +1,5 @@
-import { act, cleanup, render } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render } from 'vitest-browser-react'
+import { userEvent } from 'vitest/browser'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BacklinkLoadMore } from './backlink-load-more'
 
@@ -71,16 +71,15 @@ function activeObserver(): TestIntersectionObserver {
 }
 
 afterEach(() => {
-  cleanup()
   observerInstances.length = 0
   vi.unstubAllGlobals()
 })
 
 describe('BacklinkLoadMore', () => {
-  it('defers loading until its 600px preload area and requests only once', () => {
+  it('defers loading until its 600px preload area and requests only once', async () => {
     installIntersectionObserver()
     const loadMore = vi.fn()
-    render(
+    await render(
       <BacklinkLoadMore
         hasNextPage
         isFetchingNextPage={false}
@@ -92,17 +91,17 @@ describe('BacklinkLoadMore', () => {
     expect(loadMore).not.toHaveBeenCalled()
     expect(activeObserver().rootMargin).toBe('600px 0px')
 
-    act(() => activeObserver().notify(false))
+    activeObserver().notify(false)
     expect(loadMore).not.toHaveBeenCalled()
 
-    act(() => activeObserver().notify(true, 2))
+    activeObserver().notify(true, 2)
     expect(loadMore).toHaveBeenCalledTimes(1)
   })
 
   it('keeps loaded content on a page error and retries only on demand', async () => {
     installIntersectionObserver()
     const loadMore = vi.fn()
-    const view = render(
+    const view = await render(
       <>
         <p>Already loaded reference</p>
         <BacklinkLoadMore
@@ -114,19 +113,19 @@ describe('BacklinkLoadMore', () => {
       </>,
     )
 
-    expect(view.getByText('Already loaded reference')).toBeDefined()
-    expect(view.getByRole('alert').textContent).toContain('Couldn’t load more backlinks.')
+    await expect.element(view.getByText('Already loaded reference')).toBeInTheDocument()
+    expect(view.getByRole('alert').element().textContent).toContain('Couldn’t load more backlinks.')
     expect(observerInstances).toHaveLength(0)
 
     await userEvent.click(view.getByRole('button', { name: 'Retry loading backlinks' }))
     expect(loadMore).toHaveBeenCalledTimes(1)
-    expect(view.getByText('Already loaded reference')).toBeDefined()
+    await expect.element(view.getByText('Already loaded reference')).toBeInTheDocument()
   })
 
   it('does not observe or request another page while a fetch is active', async () => {
     installIntersectionObserver()
     const loadMore = vi.fn()
-    const view = render(
+    const view = await render(
       <BacklinkLoadMore
         hasNextPage
         isFetchingNextPage
@@ -136,17 +135,17 @@ describe('BacklinkLoadMore', () => {
     )
 
     const button = view.getByRole('button', { name: 'Loading more backlinks…' })
-    expect(button.hasAttribute('disabled')).toBe(true)
+    await expect.element(button).toBeDisabled()
     expect(observerInstances).toHaveLength(0)
 
-    await userEvent.click(button)
+    await userEvent.click(button, { force: true })
     expect(loadMore).not.toHaveBeenCalled()
   })
 
   it('keeps a manual load button when viewport observation is unavailable', async () => {
     vi.stubGlobal('IntersectionObserver', undefined)
     const loadMore = vi.fn()
-    const view = render(
+    const view = await render(
       <BacklinkLoadMore
         hasNextPage
         isFetchingNextPage={false}

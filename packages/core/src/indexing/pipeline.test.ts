@@ -39,6 +39,7 @@ beforeEach(() => {
           total: 1,
           candidates: [{ path: 'notes/a.md', modifiedMs: 5, storedMtime: null, storedHash: null }],
           orphans: [],
+          stalePlaceholders: [],
         }
       case 'index_apply':
       case 'index_apply_batch':
@@ -504,6 +505,7 @@ describe('reconcileIndex move healing (Plan 17)', () => {
           total: 1,
           candidates: [{ path: NEW, modifiedMs: 9, storedMtime: null, storedHash: null }],
           orphans: [{ path: OLD, storedMtime: 1, storedHash: options.storedHash }],
+          stalePlaceholders: [],
         }
       }
       if (command === 'note_read') {
@@ -584,7 +586,7 @@ describe('reconcileIndex over the native scan delta', () => {
     // visible progress.
     mockInvoke.mockImplementation(async (command) => {
       if (command === 'index_reconcile_scan') {
-        return { total: 7_000, candidates: [], orphans: [] }
+        return { total: 7_000, candidates: [], orphans: [], stalePlaceholders: [] }
       }
       if (command === 'note_read') {
         throw new Error('must not read without a candidate')
@@ -617,6 +619,7 @@ describe('reconcileIndex over the native scan delta', () => {
           total: 1,
           candidates: [{ path: 'notes/a.md', modifiedMs: 2_000, storedMtime: 1_000, storedHash }],
           orphans: [],
+          stalePlaceholders: [],
         }
       }
       if (command === 'note_read') {
@@ -659,6 +662,7 @@ describe('reconcileIndex over the native scan delta', () => {
             { path: 'notes/changed.md', modifiedMs: 2_000, storedMtime: 1_000, storedHash: 'old' },
           ],
           orphans: [{ path: 'notes/gone.md', storedMtime: 1_000, storedHash: 'gone' }],
+          stalePlaceholders: [],
         }
       }
       if (command === 'note_read') {
@@ -689,6 +693,7 @@ describe('reconcileIndex over the native scan delta', () => {
             { path: 'notes/ghost.md', modifiedMs: 2_000, storedMtime: 1_000, storedHash: 'h' },
           ],
           orphans: [],
+          stalePlaceholders: [],
         }
       }
       if (command === 'note_read') {
@@ -729,10 +734,40 @@ describe('iCloud eviction placeholders (Plan 21)', () => {
       return null
     })
 
-    await rebuildIndex({ generation: 6 })
+    const stale: string[][] = []
+    await rebuildIndex({ generation: 6, onStalePlaceholders: (paths) => stale.push([...paths]) })
 
     const batch = mockInvoke.mock.calls.find(([cmd]) => cmd === 'index_apply_batch')
     const notes = (batch![1] as { notes: { path: string }[] }).notes
     expect(notes.map((note) => note.path)).toEqual(['notes/real.md'])
+    // The wipe dropped the evicted note's row and the rebuild couldn't read
+    // it — it must be surfaced for a targeted download, or it silently
+    // disappears from search until something else materializes it.
+    expect(stale).toEqual([['notes/evicted.md']])
+  })
+
+  it('reconcile surfaces stale placeholders for targeted downloads', async () => {
+    mockInvoke.mockImplementation(async (command) => {
+      if (command === 'index_reconcile_scan') {
+        return {
+          total: 3,
+          candidates: [],
+          orphans: [],
+          stalePlaceholders: ['notes/remote-edit.md', 'notes/never-local.md'],
+        }
+      }
+      if (command === 'db_query') {
+        return []
+      }
+      return null
+    })
+
+    const stale: string[][] = []
+    await reconcileIndex({ generation: 4, onStalePlaceholders: (paths) => stale.push([...paths]) })
+
+    expect(stale).toEqual([['notes/remote-edit.md', 'notes/never-local.md']])
+    // Placeholders are never read — that would force the very downloads the
+    // callback exists to make targeted and non-blocking.
+    expect(mockInvoke.mock.calls.map(([cmd]) => cmd)).not.toContain('note_read')
   })
 })

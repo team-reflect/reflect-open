@@ -616,6 +616,7 @@ fn reconcile_scan_classifies_candidates_orphans_and_skips() {
     indexed("notes/moved.md", 1_000, "moved-hash");
     indexed("notes/fresh.md", (now - 1_000) as i64, "fresh-hash");
     indexed("notes/evicted.md", 1_000, "evicted-hash");
+    indexed("notes/evicted-current.md", 9_000, "current-hash");
     indexed("notes/gone.md", 1_000, "gone-hash");
 
     let meta = |path: &str, modified_ms: u64, placeholder: bool| crate::fs::FileMeta {
@@ -629,12 +630,14 @@ fn reconcile_scan_classifies_candidates_orphans_and_skips() {
         meta("notes/moved.md", 2_000, false),   // mtime moved → candidate with facts
         meta("notes/fresh.md", now - 1_000, false), // matches but too fresh to trust → candidate
         meta("notes/new.md", 3_000, false),     // no row → arrival candidate
-        meta("notes/evicted.md", 9_000, true),  // placeholder → never a candidate, never orphaned
+        meta("notes/evicted.md", 9_000, true),  // placeholder, stale row → download request
+        meta("notes/evicted-current.md", 9_000, true), // placeholder, row current → left evicted
+        meta("notes/evicted-new.md", 4_000, true), // placeholder, no row → download request
     ];
 
     let scan = scan_reconcile(&conn, &files, now).unwrap();
 
-    assert_eq!(scan.total, 5);
+    assert_eq!(scan.total, 7);
     let paths: Vec<&str> = scan
         .candidates
         .iter()
@@ -658,6 +661,13 @@ fn reconcile_scan_classifies_candidates_orphans_and_skips() {
     assert_eq!(orphan_paths, ["notes/gone.md"]);
     assert_eq!(scan.orphans[0].stored_hash, "gone-hash");
     assert_eq!(scan.orphans[0].stored_mtime, 1_000);
+
+    // Placeholders whose content the index lacks (stale or missing rows) are
+    // reported for a targeted download; a current row stays evicted in peace.
+    assert_eq!(
+        scan.stale_placeholders,
+        ["notes/evicted.md", "notes/evicted-new.md"]
+    );
 }
 
 #[test]

@@ -24,7 +24,7 @@ use tauri_plugin_opener::OpenerExt;
 use crate::error::{AppError, AppResult};
 
 use self::io::{
-    atomic_create, atomic_write, bootstrap, collect_files, AtomicCreateOutcome, NOTE_DIRS,
+    atomic_create, atomic_write, bootstrap, collect_files, initialize_runtime, AtomicCreateOutcome,
 };
 use self::resolve::resolve;
 
@@ -37,19 +37,10 @@ pub use self::import::ImportCancel;
 /// the same crash-safe, sync-clean path.
 pub(crate) use self::io::atomic_write_bytes;
 
-/// iCloud eviction-placeholder name mapping, shared with the watcher (which
-/// must treat an evicted note as present, not deleted — Plan 21). Desktop-only
-/// like the watcher itself; mobile's change source is the Plan 21 Phase 2
-/// metadata query, which maps placeholders on its own side.
-#[cfg(desktop)]
-pub(crate) use self::io::eviction_placeholder;
 /// "Occupied" probe (real file OR eviction placeholder), shared with the
 /// iCloud sweep's collision folding — an evicted canonical note must not be
 /// treated as a free slot (Plan 21).
 pub(crate) use self::io::file_occupied;
-/// The one home of the `.{name}.icloud` placeholder grammar, shared with the
-/// desktop watcher and the iCloud container discovery (`icloud::storage`).
-pub(crate) use self::io::icloud_placeholder_target;
 /// Sync-exclusion marking, shared with `git::repo` (a freshly initialized
 /// backup repo must never ride a file-sync provider — Plan 21).
 pub(crate) use self::io::mark_dir_local_only;
@@ -60,6 +51,18 @@ pub(crate) use self::resolve::ensure_relative;
 /// The full traversal guard, shared with sibling modules that address graph
 /// files (capture promotes screenshots into `assets/`).
 pub(crate) use self::resolve::resolve as resolve_in_graph;
+/// iCloud eviction-placeholder path construction, shared with note deletion
+/// and the desktop watcher (which treats an evicted note as present, not
+/// deleted — Plan 21). The grammar now lives in `reflect-graph-paths`.
+pub(crate) use reflect_graph_paths::eviction_placeholder;
+/// iCloud eviction-placeholder name mapping, shared with the iCloud
+/// container discovery (`icloud::storage`) — Apple-only, like its callers.
+#[cfg(any(target_os = "ios", target_os = "macos"))]
+pub(crate) use reflect_graph_paths::icloud_placeholder_target;
+/// Dataless-file probe (modern macOS eviction: bytes remote, real path
+/// intact), shared with the desktop watcher and the iCloud pending walk —
+/// every place that must not mistake an evicted note for a readable one.
+pub(crate) use reflect_graph_paths::is_dataless;
 
 /// The open graph root plus a monotonic generation, kept **under one lock** so
 /// they swap atomically (the same pattern as the index's `IndexState`, Plan 04b).
@@ -70,6 +73,13 @@ pub(crate) use self::resolve::resolve as resolve_in_graph;
 pub struct GraphInner {
     pub generation: u64,
     pub root: Option<PathBuf>,
+    /// Cached vault catalog for the current root, dropped on every write path
+    /// and watcher/iCloud change so listings never pin deleted files.
+    catalog: Option<io::FileCatalog>,
+    /// Monotonic invalidation epoch. A scan runs without the graph lock; it
+    /// may publish into the cache only if no invalidation happened since it
+    /// began — otherwise its result is returned to its caller but not pinned.
+    catalog_revision: u64,
 }
 
 /// Tauri-managed state holding the currently open graph (root + generation).
@@ -89,7 +99,7 @@ pub struct GraphInfo {
 }
 
 /// Metadata for a file inside the graph.
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileMeta {
     /// Graph-relative path, forward-slashed.
@@ -97,10 +107,12 @@ pub struct FileMeta {
     pub size: u64,
     /// Last-modified time in epoch milliseconds.
     pub modified_ms: u64,
-    /// True when the file is an iCloud eviction placeholder: the note exists
-    /// but its content is not on disk until re-downloaded. Consumers must not
-    /// read it — and must not treat it as deleted (Plan 21). `size` and
-    /// `modified_ms` describe the placeholder stub, not the real file.
+    /// True when the file is iCloud-evicted: the note exists but its content
+    /// is not on disk until re-downloaded. Consumers must not read it — a
+    /// read blocks on an on-demand download — and must not treat it as
+    /// deleted (Plan 21). Covers both eviction forms: for a legacy `.icloud`
+    /// stub, `size` and `modified_ms` describe the stub; for a modern
+    /// dataless file they are the real (preserved) values.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub placeholder: bool,
 }
@@ -140,6 +152,8 @@ fn activate(state: &State<GraphState>, root: &Path) -> AppResult<GraphInfo> {
         let mut inner = lock_graph(state)?;
         inner.generation += 1;
         inner.root = Some(root.to_path_buf());
+        inner.catalog = None;
+        inner.catalog_revision = inner.catalog_revision.wrapping_add(1);
         inner.generation
     };
     let info = graph_info(root, generation);
@@ -152,9 +166,7 @@ fn activate(state: &State<GraphState>, root: &Path) -> AppResult<GraphInfo> {
     Ok(info)
 }
 
-fn lock_graph<'a>(
-    state: &'a State<GraphState>,
-) -> AppResult<std::sync::MutexGuard<'a, GraphInner>> {
+fn lock_graph(state: &GraphState) -> AppResult<std::sync::MutexGuard<'_, GraphInner>> {
     state.0.lock().map_err(|err| {
         // A poisoned lock means a command panicked while holding it — the panic
         // itself is the bug; this context points at the blast radius.
@@ -277,13 +289,15 @@ pub async fn graph_import_reflect_v1_zip(
     // Writing is fast and local; throttle the events to ~100 per import so a
     // large graph doesn't flood the webview.
     let mut last_emitted = 0usize;
-    import::finalize_import(&root, prepared, downloads, |done, total| {
+    let summary = import::finalize_import(&root, prepared, downloads, |done, total| {
         let step = (total / 100).max(1);
         if done == total || done >= last_emitted + step {
             last_emitted = done;
             emit_import_progress(&app, "writing", done, total);
         }
-    })
+    })?;
+    invalidate_file_catalog(&state, &root);
+    Ok(summary)
 }
 
 /// Cancel the running Reflect V1 import (a no-op when none is running). The
@@ -300,14 +314,15 @@ fn emit_import_progress(app: &tauri::AppHandle, stage: &'static str, done: usize
     );
 }
 
-/// Open an existing graph at `path`, ensuring the standard layout exists.
+/// Open an existing Markdown vault in place, adding only `.reflect/` runtime
+/// state. Reflect's authoring directories remain lazy for adopted vaults.
 #[tauri::command]
 pub fn graph_open(path: String, state: State<GraphState>) -> AppResult<GraphInfo> {
     let root = PathBuf::from(&path);
     if !root.is_dir() {
         return Err(AppError::not_found(format!("not a directory: {path}")));
     }
-    bootstrap(&root)?;
+    initialize_runtime(&root)?;
     activate(&state, &root)
 }
 
@@ -320,7 +335,71 @@ pub fn note_read(
     state: State<GraphState>,
 ) -> AppResult<String> {
     let root = root_for(&state, generation)?;
-    Ok(fs::read_to_string(resolve(&root, &path)?)?)
+    let abs = resolve(&root, &path)?;
+    Ok(io::read_note_no_follow(&root, &abs)?)
+}
+
+/// How a [`note_read_local`] request found the note on disk.
+#[derive(Debug, Serialize)]
+#[serde(
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    tag = "kind"
+)]
+pub enum LocalNoteRead {
+    /// The bytes are local; here they are.
+    Content { content: String },
+    /// The note is iCloud-evicted (a dataless file, or an `.icloud` stub in
+    /// the logical path's place). Reading it would block on an on-demand
+    /// download — this command refuses instead.
+    Evicted,
+}
+
+/// Read a note's markdown **only when its bytes are local**. Bulk background
+/// passes (the embedding backfill, asset-description gathering) must use this
+/// instead of [`note_read`]: reading an evicted note makes `fileproviderd`
+/// materialize it on demand, and a whole-graph pass over an evicted iCloud
+/// graph becomes thousands of serial blocking downloads. Runs off the main
+/// thread — even a local read must not stall the UI under a busy provider.
+/// Dataless materialization is switched off for the whole check-and-read
+/// ([`io::NoMaterialize`], per TN3150), so an eviction racing the stat
+/// reports `Evicted` instead of blocking on a download; engaging the policy
+/// is best-effort, and on the rare refusal a narrow stat-then-read race
+/// remains (see the call-site comment).
+#[tauri::command]
+pub async fn note_read_local(
+    path: String,
+    generation: Option<u64>,
+    state: State<'_, GraphState>,
+) -> AppResult<LocalNoteRead> {
+    let root = root_for(&state, generation)?;
+    let abs = resolve(&root, &path)?;
+    let read_root = root;
+    tauri::async_runtime::spawn_blocking(move || {
+        // Best-effort: when the guard refuses to engage, the read keeps a
+        // slim stat-then-read race (an eviction landing between the two
+        // materializes that one file).
+        let _no_materialize = io::NoMaterialize::engage();
+        match fs::metadata(&abs) {
+            Ok(meta) if is_dataless(&meta) => return Ok(LocalNoteRead::Evicted),
+            Err(err)
+                if err.kind() == std::io::ErrorKind::NotFound
+                    && eviction_placeholder(&abs).is_some_and(|stub| stub.exists()) =>
+            {
+                return Ok(LocalNoteRead::Evicted);
+            }
+            _ => {}
+        }
+        match io::read_note_no_follow(&read_root, &abs) {
+            Ok(content) => Ok(LocalNoteRead::Content { content }),
+            // The engaged policy answers a dataless read with EDEADLK
+            // instead of downloading: the eviction raced the stat.
+            Err(err) if err.kind() == std::io::ErrorKind::Deadlock => Ok(LocalNoteRead::Evicted),
+            Err(err) => Err(err.into()),
+        }
+    })
+    .await
+    .map_err(|err| AppError::io(err.to_string()))?
 }
 
 /// Atomically write a note's markdown by graph-relative path. `generation` pins
@@ -337,7 +416,9 @@ pub fn note_write(
     state: State<GraphState>,
 ) -> AppResult<Option<u64>> {
     let root = root_for_generation(&state, generation)?;
-    atomic_write(&root, &resolve(&root, &path)?, &contents)
+    let modified_ms = atomic_write(&root, &resolve(&root, &path)?, &contents)?;
+    invalidate_file_catalog(&state, &root);
+    Ok(modified_ms)
 }
 
 /// Atomically create a note only when `path` is still free. Unlike
@@ -353,7 +434,10 @@ pub fn note_create(
     let root = root_for_generation(&state, generation)?;
     let target = resolve(&root, &path)?;
     match atomic_create(&root, &target, &contents)? {
-        AtomicCreateOutcome::Created(modified_ms) => Ok(NoteCreateOutcome::Created { modified_ms }),
+        AtomicCreateOutcome::Created(modified_ms) => {
+            invalidate_file_catalog(&state, &root);
+            Ok(NoteCreateOutcome::Created { modified_ms })
+        }
         AtomicCreateOutcome::Collision => Ok(NoteCreateOutcome::Collision),
     }
 }
@@ -374,6 +458,7 @@ pub fn asset_write(
         .decode(contents_base64.as_bytes())
         .map_err(|err| AppError::io(format!("invalid base64 asset payload: {err}")))?;
     atomic_write_bytes(&root, &resolve(&root, &path)?, &bytes)?;
+    invalidate_file_catalog(&state, &root);
     Ok(())
 }
 
@@ -505,7 +590,7 @@ pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> A
     let target = if abs.exists() {
         abs
     } else {
-        io::eviction_placeholder(&abs)
+        eviction_placeholder(&abs)
             .filter(|stub| stub.exists())
             .unwrap_or(abs)
     };
@@ -515,6 +600,7 @@ pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> A
     move_to_graph_trash(&root, &target)?;
     // A deleted note's sync ancestor is meaningless — drop it (Plan 21).
     crate::conflict::shadow::ShadowStore::new(&root).forget(&path);
+    invalidate_file_catalog(&state, &root);
     Ok(())
 }
 
@@ -544,6 +630,8 @@ pub fn graph_delete(generation: u64, state: State<GraphState>) -> AppResult<()> 
             }
             let root = inner.root.take().ok_or_else(AppError::no_graph)?;
             inner.generation += 1;
+            inner.catalog = None;
+            inner.catalog_revision = inner.catalog_revision.wrapping_add(1);
             root
         };
         os_trash_delete(&root)?;
@@ -624,22 +712,204 @@ fn move_to_graph_trash(root: &Path, abs: &Path) -> AppResult<()> {
     Ok(())
 }
 
-/// List markdown notes under `daily/` and `notes/`. `generation`, when given,
-/// pins the listing to the issuing graph session (see [`root_for`]).
+/// List eligible Markdown notes anywhere in the vault. `generation`, when
+/// given, pins the listing to the issuing graph session (see [`root_for`]).
 #[tauri::command]
 pub fn list_files(generation: Option<u64>, state: State<GraphState>) -> AppResult<Vec<FileMeta>> {
-    let root = root_for(&state, generation)?;
-    note_files(&root)
+    Ok(file_catalog(&state, generation)?.notes)
 }
 
-/// The same note listing as [`list_files`], callable with a plain root —
-/// the iCloud conflict sweep walks the graph outside any Tauri state.
-pub(crate) fn note_files(root: &Path) -> AppResult<Vec<FileMeta>> {
-    let mut out = Vec::new();
-    for dir in NOTE_DIRS {
-        collect_files(root, dir, Some("md"), &mut out)?;
+/// List supported local attachments from the same cached catalog as
+/// [`list_files`].
+#[tauri::command]
+pub fn list_attachments(
+    generation: Option<u64>,
+    state: State<GraphState>,
+) -> AppResult<Vec<FileMeta>> {
+    Ok(file_catalog(&state, generation)?.attachments)
+}
+
+/// Counts from the vault catalog. `skipped` is what the walk refused or
+/// failed to list (unreadable directories, symlinks, default-pruned trees) —
+/// the number that keeps "why isn't my file showing up" diagnosable.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultScanStats {
+    pub notes: u32,
+    pub attachments: u32,
+    pub skipped: u32,
+}
+
+#[tauri::command]
+pub fn vault_scan_stats(
+    generation: Option<u64>,
+    state: State<GraphState>,
+) -> AppResult<VaultScanStats> {
+    let catalog = file_catalog(&state, generation)?;
+    Ok(VaultScanStats {
+        notes: catalog.notes.len() as u32,
+        attachments: catalog.attachments.len() as u32,
+        skipped: catalog.skipped,
+    })
+}
+
+/// The same note listing as [`list_files`], callable with a plain root — the
+/// iCloud conflict sweep and the index reconcile walk the disk fresh, outside
+/// the cache: reconcile's whole job is to re-verify what is actually there.
+pub(crate) fn note_files(root: &Path) -> Vec<FileMeta> {
+    io::collect_note_files(root)
+}
+
+/// Cached catalog for the current graph. The scan runs without the graph
+/// lock; the result is always returned to the caller (fresh as of its own
+/// start), and is published into the cache only when generation, root, and
+/// invalidation epoch are unchanged — a snapshot that predates a concurrent
+/// write may serve its own caller but must never be pinned. No retry loop:
+/// under sustained writes every caller simply keeps paying for its own scan.
+fn file_catalog(state: &GraphState, generation: Option<u64>) -> AppResult<io::FileCatalog> {
+    file_catalog_with(state, generation, io::collect_file_catalog)
+}
+
+fn file_catalog_with<F>(
+    state: &GraphState,
+    generation: Option<u64>,
+    scan: F,
+) -> AppResult<io::FileCatalog>
+where
+    F: FnOnce(&Path) -> io::FileCatalog,
+{
+    let (root, expected_generation, expected_revision) = {
+        let inner = lock_graph(state)?;
+        if generation.is_some_and(|generation| generation != inner.generation) {
+            return Err(AppError::io(
+                "the graph changed since this command was issued; dropping it",
+            ));
+        }
+        if let Some(catalog) = &inner.catalog {
+            return Ok(catalog.clone());
+        }
+        (
+            inner.root.clone().ok_or_else(AppError::no_graph)?,
+            inner.generation,
+            inner.catalog_revision,
+        )
+    };
+
+    let catalog = scan(&root);
+    let mut inner = lock_graph(state)?;
+    if inner.generation == expected_generation
+        && inner.root.as_deref() == Some(root.as_path())
+        && inner.catalog.is_none()
+        && inner.catalog_revision == expected_revision
+    {
+        inner.catalog = Some(catalog.clone());
     }
-    Ok(out)
+    Ok(catalog)
+}
+
+/// Invalidate the catalog only if `root` is still the active generation's
+/// root. A late watcher/iCloud callback for a previous graph is harmless.
+pub(crate) fn invalidate_file_catalog(state: &GraphState, root: &Path) {
+    match state.0.lock() {
+        Ok(mut inner) if inner.root.as_deref() == Some(root) => {
+            inner.catalog = None;
+            inner.catalog_revision = inner.catalog_revision.wrapping_add(1);
+        }
+        Ok(_) => {}
+        Err(error) => tracing::error!(
+            ?error,
+            "graph state lock poisoned while invalidating catalog"
+        ),
+    }
+}
+
+#[cfg(test)]
+mod file_catalog_tests {
+    use super::{file_catalog, file_catalog_with, invalidate_file_catalog, GraphInner, GraphState};
+    use std::fs;
+    use std::sync::Mutex;
+
+    fn graph_at(root: &std::path::Path, generation: u64) -> GraphState {
+        GraphState(Mutex::new(GraphInner {
+            generation,
+            root: Some(root.to_path_buf()),
+            catalog: None,
+            catalog_revision: 0,
+        }))
+    }
+
+    #[test]
+    fn catalog_is_cached_until_invalidated_and_pinned_to_the_generation() {
+        let vault = tempfile::tempdir().expect("vault");
+        fs::write(vault.path().join("README.md"), "# Root\n").expect("write root note");
+        fs::create_dir_all(vault.path().join("Media")).expect("create media");
+        fs::write(vault.path().join("Media/diagram.png"), b"png").expect("write attachment");
+        let graph = graph_at(vault.path(), 7);
+
+        let first = file_catalog(&graph, Some(7)).expect("first catalog");
+        assert_eq!(first.notes[0].path, "README.md");
+        assert_eq!(first.attachments[0].path, "Media/diagram.png");
+
+        fs::create_dir_all(vault.path().join("Projects")).expect("create projects");
+        fs::write(vault.path().join("Projects/plan.md"), "# Plan\n").expect("write nested note");
+        let cached = file_catalog(&graph, Some(7)).expect("cached catalog");
+        assert_eq!(cached.notes.len(), 1);
+
+        invalidate_file_catalog(&graph, vault.path());
+        let refreshed = file_catalog(&graph, Some(7)).expect("refreshed catalog");
+        assert_eq!(
+            refreshed
+                .notes
+                .iter()
+                .map(|file| file.path.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Projects/plan.md", "README.md"]
+        );
+
+        assert!(file_catalog(&graph, Some(6)).is_err());
+    }
+
+    #[test]
+    fn invalidation_from_an_old_root_cannot_clear_the_active_catalog() {
+        let vault = tempfile::tempdir().expect("vault");
+        let old_vault = tempfile::tempdir().expect("old vault");
+        fs::write(vault.path().join("README.md"), "# Root\n").expect("write root note");
+        let graph = graph_at(vault.path(), 3);
+        file_catalog(&graph, Some(3)).expect("catalog");
+
+        invalidate_file_catalog(&graph, old_vault.path());
+
+        assert!(graph.0.lock().expect("graph lock").catalog.is_some());
+    }
+
+    #[test]
+    fn a_scan_racing_an_invalidation_serves_its_caller_but_is_never_pinned() {
+        let vault = tempfile::tempdir().expect("vault");
+        fs::write(vault.path().join("README.md"), "# Root\n").expect("write root note");
+        let graph = graph_at(vault.path(), 5);
+
+        let stale = file_catalog_with(&graph, Some(5), |root| {
+            let scanned = super::io::collect_file_catalog(root);
+            // A write lands while the scan is in flight: the scan's snapshot
+            // may serve its own caller, but must not become the cache.
+            fs::write(root.join("arrived.md"), "# Arrived\n").expect("write racing note");
+            invalidate_file_catalog(&graph, root);
+            scanned
+        })
+        .expect("racing catalog");
+        assert_eq!(stale.notes.len(), 1);
+        assert!(graph.0.lock().expect("graph lock").catalog.is_none());
+
+        let fresh = file_catalog(&graph, Some(5)).expect("fresh catalog");
+        assert_eq!(
+            fresh
+                .notes
+                .iter()
+                .map(|file| file.path.as_str())
+                .collect::<Vec<_>>(),
+            vec!["README.md", "arrived.md"]
+        );
+    }
 }
 
 #[cfg(test)]

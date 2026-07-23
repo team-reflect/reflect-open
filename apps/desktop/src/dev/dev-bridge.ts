@@ -90,6 +90,7 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
       case 'mobile_storage_local':
         return DEV_GRAPH_ROOT
       case 'icloud_download_pending':
+      case 'icloud_request_downloads':
         return 0
       case 'graph_open':
       case 'graph_create':
@@ -117,6 +118,15 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
           throw new ReflectError('notFound', `no such note: ${path}`)
         }
         return contents
+      }
+      case 'note_read_local': {
+        // The in-memory store has no iCloud, so a note is never evicted.
+        const { path } = pathArgsSchema.parse(args)
+        const contents = files.read(path)
+        if (contents === null) {
+          throw new ReflectError('notFound', `no such note: ${path}`)
+        }
+        return { kind: 'content', content: contents }
       }
       case 'note_write': {
         const { path, contents } = writeArgsSchema.parse(args)
@@ -316,5 +326,5 @@ function reconcileScan(files: DevFileStore, index: DevIndexDb) {
     .filter(([path]) => !onDisk.has(path))
     .map(([path, facts]) => ({ path, storedMtime: facts.mtime, storedHash: facts.hash }))
     .sort((first, second) => first.path.localeCompare(second.path))
-  return { total: listing.length, candidates, orphans }
+  return { total: listing.length, candidates, orphans, stalePlaceholders: [] }
 }

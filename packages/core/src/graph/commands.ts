@@ -126,6 +126,27 @@ export async function readNote(path: string, generation?: number): Promise<strin
   return call('note_read', { path, generation }, z.string())
 }
 
+const localNoteReadSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('content'), content: z.string() }),
+  z.object({ kind: z.literal('evicted') }),
+])
+
+/** How a {@link readNoteLocal} request found the note on disk. */
+export type LocalNoteRead = z.infer<typeof localNoteReadSchema>
+
+/**
+ * Read a note's markdown **only when its bytes are local**, reporting an
+ * iCloud-evicted note as `{ kind: 'evicted' }` instead of reading it. Bulk
+ * background passes (the embedding backfill, asset-description gathering)
+ * must use this instead of {@link readNote}: reading an evicted note blocks
+ * while the OS materializes it on demand, and a whole-graph pass over an
+ * evicted iCloud graph becomes thousands of serial blocking downloads.
+ * Missing files still reject with `notFound`, exactly like {@link readNote}.
+ */
+export async function readNoteLocal(path: string, generation?: number): Promise<LocalNoteRead> {
+  return call('note_read_local', { path, generation }, localNoteReadSchema)
+}
+
 /**
  * Atomically write a note's markdown by graph-relative path. `generation` (from
  * `GraphInfo`) pins the write to the graph it was issued for — Rust rejects it
@@ -220,11 +241,36 @@ export async function deleteNote(path: string, generation: number): Promise<void
 }
 
 /**
- * List markdown notes under `daily/` and `notes/`. `generation` pins the
- * listing like {@link readNote}'s.
+ * List eligible Markdown notes at the graph root and in visible nested
+ * folders. `generation` pins the listing like {@link readNote}'s.
  */
 export async function listFiles(generation?: number): Promise<FileMeta[]> {
   return call('list_files', { generation }, z.array(fileMetaSchema))
+}
+
+/**
+ * List supported local attachments anywhere in the vault, from the same
+ * cached catalog as {@link listFiles}.
+ */
+export async function listAttachments(generation?: number): Promise<FileMeta[]> {
+  return call('list_attachments', { generation }, z.array(fileMetaSchema))
+}
+
+const vaultScanStatsSchema = z.object({
+  notes: z.number(),
+  attachments: z.number(),
+  skipped: z.number(),
+})
+
+export type VaultScanStats = z.infer<typeof vaultScanStatsSchema>
+
+/**
+ * Counts from the vault catalog. `skipped` is what the walk refused or failed
+ * to list (unreadable directories, symlinks, default-pruned trees) — surfaced
+ * so "why isn't my file showing up" stays diagnosable.
+ */
+export async function vaultScanStats(generation?: number): Promise<VaultScanStats> {
+  return call('vault_scan_stats', { generation }, vaultScanStatsSchema)
 }
 
 /**
@@ -299,6 +345,14 @@ export async function promoteCaptureScreenshot(
   generation: number,
 ): Promise<void> {
   await call('capture_screenshot_promote', { spoolName, assetPath, maxDim, generation }, voidSchema)
+}
+
+/**
+ * Ask the native platform for one representative image for a captured URL.
+ * Returns a base64-encoded normalized JPEG, or `null` when unavailable.
+ */
+export async function captureLinkPreview(url: string): Promise<string | null> {
+  return call('capture_link_preview', { url }, z.string().nullable())
 }
 
 /**

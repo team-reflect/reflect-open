@@ -1,6 +1,6 @@
-import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { renderHook } from 'vitest-browser-react'
 import type { ReactNode } from 'react'
 import type { RetrievalHit } from '@reflect/core'
 import { useSimilarNotes } from './use-similar-notes'
@@ -43,25 +43,25 @@ beforeEach(() => {
 describe('useSimilarNotes', () => {
   it('returns a reference-stable array across re-renders when the data is unchanged', async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    const { result, rerender } = renderHook(() => useSimilarNotes('notes/x.md'), {
+    const { result, rerender } = await renderHook(() => useSimilarNotes('notes/x.md'), {
       wrapper: wrapper(client),
     })
 
-    await waitFor(() => expect(result.current.length).toBe(2))
+    await vi.waitFor(() => expect(result.current.length).toBe(2))
     const first = result.current
 
     // A re-render with no query change must not mint a fresh array — a new
     // reference each render would defeat memoization in every consumer.
-    rerender()
+    await rerender()
     expect(result.current).toBe(first)
-    rerender()
+    await rerender()
     expect(result.current).toBe(first)
   })
 
   it('returns an empty array (and never queries) while semantic search is off', async () => {
     semanticSetting.enabled = false
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    const { result, rerender } = renderHook(() => useSimilarNotes('notes/x.md'), {
+    const { result, rerender } = await renderHook(() => useSimilarNotes('notes/x.md'), {
       wrapper: wrapper(client),
     })
 
@@ -70,18 +70,18 @@ describe('useSimilarNotes', () => {
     const first = result.current
     expect(first).toEqual([])
     // The disabled path is stable too.
-    rerender()
+    await rerender()
     expect(result.current).toBe(first)
   })
 
   it('returns an empty array and never queries related notes for an empty daily note', async () => {
     readNote.mockResolvedValue('- \n')
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    const { result } = renderHook(() => useSimilarNotes('daily/2026-06-09.md'), {
+    const { result } = await renderHook(() => useSimilarNotes('daily/2026-06-09.md'), {
       wrapper: wrapper(client),
     })
 
-    await waitFor(() => expect(readNote).toHaveBeenCalledWith('daily/2026-06-09.md'))
+    await vi.waitFor(() => expect(readNote).toHaveBeenCalledWith('daily/2026-06-09.md'))
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(relatedNotes).not.toHaveBeenCalled()
     expect(result.current).toEqual([])
@@ -90,11 +90,11 @@ describe('useSimilarNotes', () => {
   it('queries related notes for a daily note once it has authored content', async () => {
     readNote.mockResolvedValue('- real entry\n')
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    const { result } = renderHook(() => useSimilarNotes('daily/2026-06-09.md'), {
+    const { result } = await renderHook(() => useSimilarNotes('daily/2026-06-09.md'), {
       wrapper: wrapper(client),
     })
 
-    await waitFor(() => expect(result.current.length).toBe(2))
+    await vi.waitFor(() => expect(result.current.length).toBe(2))
     expect(readNote).toHaveBeenCalledWith('daily/2026-06-09.md')
     expect(relatedNotes).toHaveBeenCalledWith('daily/2026-06-09.md', 6)
   })

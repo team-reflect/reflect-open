@@ -1,4 +1,5 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render } from 'vitest-browser-react'
+import { page } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '@reflect/core'
@@ -101,7 +102,7 @@ afterEach(() => {
 
 describe('MobileNote with a conflicted note', () => {
   it('opens protected with raw markers and conflict resolution actions', async () => {
-    render(
+    await render(
       <QueryClientProvider client={queryClient}>
         <RouterProvider initialRoute={{ kind: 'note', path: 'notes/standup.md' }}>
           <MobileNote path="notes/standup.md" />
@@ -109,12 +110,16 @@ describe('MobileNote with a conflicted note', () => {
       </QueryClientProvider>,
     )
 
-    expect(await screen.findByText(/choose what to keep/i)).toBeTruthy()
+    await expect.element(page.getByText(/choose what to keep/i)).toBeVisible()
     // Protected: raw file shown verbatim, no live editor mounted.
-    expect(screen.getByText(/desktop line/)).toBeTruthy()
-    expect(screen.queryByTestId('fake-editor')).toBeNull()
-    expect(screen.getByRole('button', { name: /keep this device’s version/i })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /keep the other device’s/i })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /keep both/i })).toBeTruthy()
+    await expect.element(page.getByText(/desktop line/)).toBeVisible()
+    await expect.element(page.getByTestId('fake-editor')).not.toBeInTheDocument()
+    await expect
+      .element(page.getByRole('button', { name: /keep this device’s version/i }))
+      .toBeVisible()
+    await expect
+      .element(page.getByRole('button', { name: /keep the other device’s/i }))
+      .toBeVisible()
+    await expect.element(page.getByRole('button', { name: /keep both/i })).toBeVisible()
   })
 })

@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import userEvent from '@testing-library/user-event'
+import { cleanup, render } from 'vitest-browser-react'
+import { page, userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GraphInfo } from '@reflect/core'
 import { MobileGraphs } from './graphs'
@@ -13,8 +13,7 @@ import { MobileGraphs } from './graphs'
  * and graph creation in its own sheet instead of an inline form.
  */
 
-// vaul needs browser APIs jsdom doesn't provide; passthrough so the sheet
-// content always renders (the drawer itself is verified on-device).
+// Keep the sheet content inline so this suite focuses on graph switching.
 vi.mock('@/components/ui/drawer', () => ({
   Drawer: ({
     children,
@@ -75,14 +74,14 @@ beforeEach(() => {
   completeOnboarding.mockImplementation(async () => {})
 })
 
-afterEach(() => {
-  cleanup()
+afterEach(async () => {
+  await cleanup()
   queryClient.clear()
   vi.clearAllMocks()
 })
 
-function mount(): void {
-  render(
+async function mount(): Promise<void> {
+  await render(
     <QueryClientProvider client={queryClient}>
       <MobileGraphs />
     </QueryClientProvider>,
@@ -91,66 +90,64 @@ function mount(): void {
 
 describe('MobileGraphs', () => {
   it('checkmarks the open graph and switches on tapping another', async () => {
-    const user = userEvent.setup()
-    mount()
+    await mount()
 
-    const current = await screen.findByRole('button', { name: 'Notes' })
-    expect(current.getAttribute('aria-current')).toBe('true')
+    await expect
+      .element(page.getByRole('button', { name: 'Notes' }))
+      .toHaveAttribute('aria-current', 'true')
 
-    await user.click(screen.getByRole('button', { name: 'Work' }))
-    await waitFor(() =>
+    await userEvent.click(page.getByRole('button', { name: 'Work' }))
+    await vi.waitFor(() =>
       expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Work'),
     )
   })
 
   it('ignores a tap on the graph that is already open', async () => {
-    const user = userEvent.setup()
-    mount()
+    await mount()
 
-    await user.click(await screen.findByRole('button', { name: 'Notes' }))
+    await userEvent.click(page.getByRole('button', { name: 'Notes' }))
     expect(completeOnboarding).not.toHaveBeenCalled()
   })
 
   it('switches to the on-device root', async () => {
-    const user = userEvent.setup()
-    mount()
+    await mount()
 
-    await user.click(await screen.findByRole('button', { name: 'This device' }))
-    await waitFor(() => expect(completeOnboarding).toHaveBeenCalledWith('local', '/Documents'))
+    await userEvent.click(page.getByRole('button', { name: 'This device' }))
+    await vi.waitFor(() =>
+      expect(completeOnboarding).toHaveBeenCalledWith('local', '/Documents'),
+    )
   })
 
   it('creates a graph through the sheet, not an inline form', async () => {
-    const user = userEvent.setup()
-    mount()
+    await mount()
 
-    await user.click(await screen.findByRole('button', { name: 'New graph' }))
-    await user.type(screen.getByLabelText('Name'), 'Journal')
-    await user.click(screen.getByRole('button', { name: 'Create' }))
+    await userEvent.click(page.getByRole('button', { name: 'New graph' }))
+    await userEvent.fill(page.getByLabelText('Name'), 'Journal')
+    await userEvent.click(page.getByRole('button', { name: 'Create' }))
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(completeOnboarding).toHaveBeenCalledWith('icloud', '/iCloud/Documents/Journal'),
     )
   })
 
   it('rejects a colliding name before it ever reaches the backend', async () => {
-    const user = userEvent.setup()
-    mount()
+    await mount()
 
-    await user.click(await screen.findByRole('button', { name: 'New graph' }))
-    await user.type(screen.getByLabelText('Name'), 'Work')
+    await userEvent.click(page.getByRole('button', { name: 'New graph' }))
+    await userEvent.fill(page.getByLabelText('Name'), 'Work')
 
-    expect(await screen.findByText(/already exists in iCloud Drive/)).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: 'Create' }))
+    await expect.element(page.getByText(/already exists in iCloud Drive/)).toBeVisible()
+    // The collision disables Create, so the name can never reach the backend.
+    await expect.element(page.getByRole('button', { name: 'Create' })).toBeDisabled()
     expect(completeOnboarding).not.toHaveBeenCalled()
   })
 
   it('surfaces a failed switch and stays on the list', async () => {
     completeOnboarding.mockRejectedValueOnce(new Error('clone failed'))
-    const user = userEvent.setup()
-    mount()
+    await mount()
 
-    await user.click(await screen.findByRole('button', { name: 'Work' }))
-    expect(await screen.findByText('clone failed')).toBeTruthy()
+    await userEvent.click(page.getByRole('button', { name: 'Work' }))
+    await expect.element(page.getByText('clone failed')).toBeVisible()
   })
 
   it('says so when iCloud Drive is unavailable', async () => {
@@ -159,9 +156,11 @@ describe('MobileGraphs', () => {
       icloudDocumentsRoot: null,
       icloudGraphRoots: [],
     }
-    mount()
+    await mount()
 
-    expect(await screen.findByText(/iCloud Drive isn’t available/)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'New graph' })).toBeNull()
+    await expect.element(page.getByText(/iCloud Drive isn’t available/)).toBeVisible()
+    await expect
+      .element(page.getByRole('button', { name: 'New graph' }))
+      .not.toBeInTheDocument()
   })
 })

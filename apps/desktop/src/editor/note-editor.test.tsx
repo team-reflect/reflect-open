@@ -1,44 +1,14 @@
-import { type ReactNode } from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import '@testing-library/jest-dom/vitest'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createRef } from 'react'
 import { openUrl } from '@tauri-apps/plugin-opener'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { page, userEvent } from 'vitest/browser'
+import { render } from 'vitest-browser-react'
 import { dispatchDeepLink } from '@/lib/deep-links/intake'
-import { NoteEditor } from './note-editor'
 import { setPlatformSurface } from '@/lib/platform-surface'
-
-/** Props the mocked `<MeowdownEditor>` captures so the test can drive its callbacks. */
-interface CapturedEditorProps {
-  mode?: 'hide' | 'focus' | 'show' | 'source'
-  editorClassName?: string
-  spellCheck?: boolean
-  caretGlide?: boolean
-  blockHandle?: boolean
-  timeFormat?: '12' | '24'
-  children?: ReactNode
-  resolveImageUrl?: (src: string) => string | undefined
-  onImageClick?: (payload: { src: string; alt: string; event: MouseEvent | TouchEvent }) => void
-  onLinkClick?: (payload: { href: string; event: MouseEvent }) => void
-  onTagClick?: (payload: { tag: string; event: MouseEvent }) => void
-  onFilePaste?: (file: File) => Promise<string | undefined>
-  resolveFileLink?: (payload: { href: string; label: string; title: string }) => boolean
-  resolveFileInfo?: (
-    href: string,
-  ) => { size: number } | undefined | Promise<{ size: number } | undefined>
-  onFileClick?: (payload: { href: string; name: string; event: MouseEvent | KeyboardEvent }) => void
-}
-
-const captured = vi.hoisted(() => ({
-  props: null as CapturedEditorProps | null,
-  hoverRenderer: null as unknown,
-}))
-
-/** The stub editor `useEditor` hands `EditorInputTraits` (see the mock below). */
-const editorStub = vi.hoisted(() => ({
-  mounted: true,
-  view: { dom: document.createElement('div') },
-}))
+import { expectLocatorToHaveCount } from '@/test-utils/expect'
+import { pasteFiles } from '@/test-utils/file-events'
+import '@/test-utils/locator'
+import { NoteEditor, type NoteEditorHandle } from './note-editor'
 
 vi.mock('@tauri-apps/plugin-opener', () => ({
   openUrl: vi.fn(async () => {}),
@@ -54,508 +24,473 @@ vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
   openDeepLinkInNewWindow,
 }))
 
-// Stub the editor: capture its props and render the image-preview DOM shape
-// meowdown produces, so the source element lookup in `onImageClick` resolves.
-// `useEditor` backs `EditorInputTraits` (mounted inside the editor).
-vi.mock('@meowdown/react', () => ({
-  useEditor: () => editorStub,
-  WikilinkHoverCard: ({ children }: { children: unknown }) => {
-    captured.hoverRenderer = children
-    return <div data-testid="wikilink-hover-card" />
-  },
-  MeowdownEditor: (props: CapturedEditorProps) => {
-    captured.props = props
-    return (
-      <div className={props.editorClassName}>
-        <span className="md-image-view-preview">
-          <img
-            src={props.resolveImageUrl?.('assets/cat.png') ?? ''}
-            alt="Cat"
-            data-testid="inline-image"
-          />
-        </span>
-        {props.children}
-      </div>
-    )
-  },
-}))
+const pmRoot = page.locate('.ProseMirror')
+
+const IMAGE_NOTE = 'A photo\n\n![Cat](assets/cat.png)'
 
 function renderEditor(
   openAsset: (path: string) => Promise<void> | void = vi.fn(async () => {}),
 ): ReturnType<typeof render> {
   return render(
     <NoteEditor
-      initialContent={'A photo\n\n![Cat](assets/cat.png)'}
+      initialContent={IMAGE_NOTE}
       resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : null)}
-      resolveAssetOpenPath={(src) =>
-        src === 'assets/cat.png' ? 'assets/cat.png' : null
-      }
+      resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
       openAsset={openAsset}
     />,
   )
 }
 
-/** A click payload as meowdown's `onImageClick` would deliver it. */
-function imageClick(src: string, alt: string): { src: string; alt: string; event: MouseEvent } {
-  const image = screen.getByTestId('inline-image')
-  const event = new MouseEvent('click', { bubbles: true })
-  Object.defineProperty(event, 'target', { value: image, configurable: true })
-  return { src, alt, event }
+function firePointer(element: Element, type: string, init: PointerEventInit): void {
+  element.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, ...init }))
 }
-
-function installViewTransitionMock(): ReturnType<typeof vi.fn> {
-  const startViewTransition = vi.fn((callback?: () => unknown): ViewTransition => {
-    const update = callback?.()
-    return {
-      finished: Promise.resolve(),
-      ready: Promise.resolve(),
-      updateCallbackDone: Promise.resolve(update).then(() => undefined),
-      skipTransition: vi.fn(),
-      types: new Set<string>() as unknown as ViewTransitionTypeSet,
-    }
-  })
-  Object.defineProperty(document, 'startViewTransition', {
-    configurable: true,
-    writable: true,
-    value: startViewTransition,
-  })
-  return startViewTransition
-}
-
-function firePointer(element: Element, type: string, init: Record<string, unknown>): void {
-  const event = new Event(type, { bubbles: true, cancelable: true })
-  Object.assign(event, init)
-  act(() => {
-    element.dispatchEvent(event)
-  })
-}
-
-beforeEach(() => {
-  captured.props = null
-  captured.hoverRenderer = null
-  Object.defineProperty(window, 'matchMedia', {
-    configurable: true,
-    writable: true,
-    value: vi.fn((query: string): MediaQueryList => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })),
-  })
-  Element.prototype.getAnimations = vi.fn(() => [])
-  Object.defineProperty(document, 'startViewTransition', {
-    configurable: true,
-    writable: true,
-    value: undefined,
-  })
-})
 
 afterEach(() => {
-  cleanup()
   setPlatformSurface({ touchEditor: false, mobileApp: false })
   vi.clearAllMocks()
 })
 
 describe('NoteEditor markdown syntax mode', () => {
-  it('passes hide to meowdown by default', () => {
-    renderEditor()
-    expect(captured.props?.mode).toBe('hide')
+  it('hides markdown syntax by default', async () => {
+    await render(<NoteEditor initialContent="Hello" />)
+    await expect.element(pmRoot).toHaveAttribute('data-mark-mode', 'hide')
   })
 
-  it('passes an explicit markdown syntax mode to meowdown', () => {
-    render(<NoteEditor initialContent="" markMode="show" />)
-    expect(captured.props?.mode).toBe('show')
+  it('applies an explicit markdown syntax mode', async () => {
+    await render(<NoteEditor initialContent="Hello" markMode="show" />)
+    await expect.element(pmRoot).toHaveAttribute('data-mark-mode', 'show')
   })
 })
 
 describe('NoteEditor wiki-link hover card', () => {
-  it('does not mount the optional card without a host renderer', () => {
-    render(<NoteEditor initialContent="" />)
-    expect(screen.queryByTestId('wikilink-hover-card')).toBeNull()
+  it('does not mount the optional card without a host renderer', async () => {
+    await render(<NoteEditor initialContent="see [[Note]] here" />)
+    await pmRoot.getByTestId('wikilink').hover()
+    await expect.element(pmRoot.getByTestId('wikilink')).toBeVisible()
+    await expectLocatorToHaveCount(page.getByTestId('wikilink-hover-card'), 0)
   })
 
-  it('mounts the card with the host renderer as its body resolver', () => {
-    const renderer = async (): Promise<ReactNode> => null
-    render(<NoteEditor initialContent="" renderWikilinkHoverCard={renderer} />)
-
-    expect(screen.getByTestId('wikilink-hover-card')).toBeInTheDocument()
-    expect(captured.hoverRenderer).toBe(renderer)
+  it('shows the host-rendered card body when a wiki link is hovered', async () => {
+    await render(
+      <NoteEditor
+        initialContent="see [[Note]] here"
+        renderWikilinkHoverCard={() => <div data-testid="reflect-hover-body">Preview</div>}
+      />,
+    )
+    await pmRoot.getByTestId('wikilink').hover()
+    await expect.element(page.getByTestId('reflect-hover-body'), { timeout: 5_000 }).toBeVisible()
   })
 })
 
 describe('NoteEditor time format', () => {
-  it('passes the 12-hour clock to meowdown by default', () => {
-    renderEditor()
-    expect(captured.props?.timeFormat).toBe('12')
+  it('inserts a 12-hour time through /now by default', async () => {
+    const handleRef = createRef<NoteEditorHandle>()
+    await render(<NoteEditor initialContent="" handleRef={handleRef} />)
+
+    await pmRoot.click()
+    await userEvent.keyboard('/now')
+    await expect.element(page.getByRole('option', { name: /now/i })).toBeVisible()
+    await userEvent.keyboard('{Enter}')
+
+    await vi.waitFor(() => {
+      expect(handleRef.current?.getMarkdown()).toMatch(/^\d{1,2}:\d{2}(am|pm)\n$/)
+    })
   })
 
-  it("maps the 24h setting to meowdown's 24-hour clock", () => {
-    render(<NoteEditor initialContent="" timeFormat="24h" />)
-    expect(captured.props?.timeFormat).toBe('24')
+  it("maps the 24h setting to meowdown's 24-hour clock", async () => {
+    const handleRef = createRef<NoteEditorHandle>()
+    await render(<NoteEditor initialContent="" timeFormat="24h" handleRef={handleRef} />)
+
+    await pmRoot.click()
+    await userEvent.keyboard('/now')
+    await expect.element(page.getByRole('option', { name: /now/i })).toBeVisible()
+    await userEvent.keyboard('{Enter}')
+
+    await vi.waitFor(() => {
+      expect(handleRef.current?.getMarkdown()).toMatch(/^\d{2}:\d{2}\n$/)
+    })
   })
 })
 
 describe('NoteEditor smooth caret animation', () => {
-  it('enables caret glide by default', () => {
-    renderEditor()
-    expect(captured.props?.caretGlide).toBe(true)
+  it('enables the caret glide by default', async () => {
+    await render(<NoteEditor initialContent="Hello" />)
+    await pmRoot.click()
+    const caret = page.getByTestId('virtual-caret')
+    await expect.element(caret).toBeVisible()
+    expect(getComputedStyle(caret.element()).getPropertyValue('--meowdown-caret-glide')).toBe(
+      '80ms',
+    )
   })
 
-  it('disables caret glide when smooth caret animation is off', () => {
-    render(<NoteEditor initialContent="" smoothCaretAnimation={false} />)
-    expect(captured.props?.caretGlide).toBe(false)
+  it('disables the caret glide when smooth caret animation is off', async () => {
+    await render(<NoteEditor initialContent="Hello" smoothCaretAnimation={false} />)
+    await pmRoot.click()
+    const caret = page.getByTestId('virtual-caret')
+    await expect.element(caret).toBeVisible()
+    expect(getComputedStyle(caret.element()).getPropertyValue('--meowdown-caret-glide')).toBe(
+      '0ms',
+    )
   })
 })
 
 describe('NoteEditor touch-surface input hygiene', () => {
-  afterEach(() => {
-    setPlatformSurface({ touchEditor: false })
-    editorStub.mounted = true
-    editorStub.view.dom = document.createElement('div')
+  it('passes the spellcheck setting through on desktop', async () => {
+    await render(<NoteEditor initialContent="Hello" spellCheck={true} />)
+    await expect.element(pmRoot).toBeVisible()
+    const editable = pmRoot.element()
+    expect(editable).toBeInstanceOf(HTMLElement)
+    await expect.poll(() => (editable as HTMLElement).spellcheck).toBe(true)
   })
 
-  it('passes the spellcheck setting through on desktop', () => {
-    render(<NoteEditor initialContent="" spellCheck={true} />)
-    expect(captured.props?.spellCheck).toBe(true)
-  })
-
-  it('pins spellcheck off on the touch surface (iOS smart-punctuation gate)', () => {
+  it('pins spellcheck off on the touch surface (iOS smart-punctuation gate)', async () => {
     setPlatformSurface({ touchEditor: true })
-    render(<NoteEditor initialContent="" spellCheck={true} />)
-    expect(captured.props?.spellCheck).toBe(false)
+    await render(<NoteEditor initialContent="Hello" spellCheck={true} />)
+    await expect.element(pmRoot).toBeVisible()
+    const editable = pmRoot.element()
+    expect(editable).toBeInstanceOf(HTMLElement)
+
+    // meowdown's spell-check extension applies its value on the first input,
+    // not on mount, so type one character before reading the pinned state.
+    await pmRoot.click()
+    await userEvent.keyboard('x')
+    await expect.poll(() => (editable as HTMLElement).spellcheck).toBe(false)
   })
 
-  it('passes the block handle through on desktop', () => {
-    render(<NoteEditor initialContent="" blockHandle={true} />)
-    expect(captured.props?.blockHandle).toBe(true)
+  it('shows the block handle on hover on desktop', async () => {
+    await render(<NoteEditor initialContent="Hello" blockHandle={true} />)
+    await pmRoot.getByText('Hello').hover()
+    await expect.element(page.getByTestId('block-handle')).toBeVisible()
   })
 
-  it('pins the block handle off on the touch surface', () => {
+  it('pins the block handle off on the touch surface', async () => {
     setPlatformSurface({ touchEditor: true })
-    render(<NoteEditor initialContent="" blockHandle={true} />)
-    expect(captured.props?.blockHandle).toBe(false)
+    await render(<NoteEditor initialContent="Hello" blockHandle={true} />)
+    await pmRoot.getByText('Hello').hover()
+    await expect.element(pmRoot.getByText('Hello')).toBeVisible()
+    await expectLocatorToHaveCount(page.getByTestId('block-handle'), 0)
   })
 
-  it('sets explicit input traits on the contenteditable on the touch surface', () => {
+  it('sets explicit input traits on the contenteditable on the touch surface', async () => {
     setPlatformSurface({ touchEditor: true })
-    render(<NoteEditor initialContent="" />)
-    expect(editorStub.view.dom.getAttribute('autocapitalize')).toBe('sentences')
-    expect(editorStub.view.dom.getAttribute('autocorrect')).toBe('on')
+    await render(<NoteEditor initialContent="Hello" />)
+    await expect.element(pmRoot).toHaveAttribute('autocapitalize', 'sentences')
+    await expect.element(pmRoot).toHaveAttribute('autocorrect', 'on')
   })
 
-  it('retries until the editor view mounts (traits are never silently skipped)', async () => {
-    setPlatformSurface({ touchEditor: true })
-    editorStub.mounted = false
-    render(<NoteEditor initialContent="" />)
-    expect(editorStub.view.dom.hasAttribute('autocapitalize')).toBe(false)
-
-    editorStub.mounted = true
-    await waitFor(() => {
-      expect(editorStub.view.dom.getAttribute('autocapitalize')).toBe('sentences')
-    })
-  })
-
-  it('leaves the contenteditable untouched on desktop', () => {
-    render(<NoteEditor initialContent="" />)
-    expect(editorStub.view.dom.hasAttribute('autocapitalize')).toBe(false)
-    expect(editorStub.view.dom.hasAttribute('autocorrect')).toBe(false)
+  it('leaves the contenteditable untouched on desktop', async () => {
+    await render(<NoteEditor initialContent="Hello" />)
+    await expect.element(pmRoot).toBeVisible()
+    await expect.element(pmRoot).not.toHaveAttribute('autocapitalize')
+    await expect.element(pmRoot).not.toHaveAttribute('autocorrect')
   })
 })
 
 describe('NoteEditor tag click', () => {
-  it('forwards a clicked tag name, without the leading #', () => {
+  it('forwards a clicked tag name, without the leading #', async () => {
     const onTagClick = vi.fn()
-    render(<NoteEditor initialContent="" onTagClick={onTagClick} />)
-    expect(captured.props?.onTagClick).toBeTypeOf('function')
+    await render(<NoteEditor initialContent="see #book here" onTagClick={onTagClick} />)
 
-    const event = new MouseEvent('click', { bubbles: true })
-    act(() => captured.props?.onTagClick?.({ tag: 'book', event }))
-    expect(onTagClick).toHaveBeenCalledWith('book')
+    await pmRoot.getByText('#book').click()
+    await vi.waitFor(() => {
+      expect(onTagClick).toHaveBeenCalledWith('book')
+    })
   })
 })
 
 describe('NoteEditor image lightbox', () => {
   it('opens a lightbox from an inline image and closes on Escape', async () => {
-    renderEditor()
-    expect(captured.props?.onImageClick).toBeTypeOf('function')
+    await renderEditor()
 
-    act(() => captured.props?.onImageClick?.(imageClick('assets/cat.png', 'Cat')))
-
-    const dialog = await screen.findByRole('dialog', { name: 'Image preview' })
-    const preview = dialog.querySelector('img')
-    expect(preview).toBeInstanceOf(HTMLImageElement)
-    expect(preview?.src).toBe('asset://cat.png')
+    await pmRoot.getByAltText('Cat').click()
+    const dialog = page.getByRole('dialog', { name: 'Image preview' })
+    await expect.element(dialog).toBeVisible()
+    const preview = dialog.locate('img')
+    expect(preview.element()).toHaveProperty('src', 'asset://cat.png')
 
     await userEvent.keyboard('{Escape}')
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-  })
-
-  it('uses the native View Transition API when available', async () => {
-    const startViewTransition = installViewTransitionMock()
-    renderEditor()
-
-    act(() => captured.props?.onImageClick?.(imageClick('assets/cat.png', 'Cat')))
-
-    expect(startViewTransition).toHaveBeenCalledTimes(1)
-    expect(await screen.findByRole('dialog', { name: 'Image preview' })).toBeInTheDocument()
+    await expectLocatorToHaveCount(page.getByRole('dialog'), 0)
   })
 
   it('opens a local image through the graph asset opener', async () => {
     const openImage = vi.fn(async () => {})
-    renderEditor(openImage)
+    await renderEditor(openImage)
 
-    act(() => captured.props?.onImageClick?.(imageClick('assets/cat.png', 'Cat')))
-
-    await userEvent.click(await screen.findByRole('button', { name: 'Open' }))
-    expect(openImage).toHaveBeenCalledWith('assets/cat.png')
+    await pmRoot.getByAltText('Cat').click()
+    await page.getByRole('button', { name: 'Open' }).click()
+    await vi.waitFor(() => {
+      expect(openImage).toHaveBeenCalledWith('assets/cat.png')
+    })
   })
 
   it('keeps the image opener inside iOS safe-area bounds', async () => {
-    renderEditor()
+    await renderEditor()
 
-    act(() => captured.props?.onImageClick?.(imageClick('assets/cat.png', 'Cat')))
-
-    const opener = await screen.findByRole('button', { name: 'Open' })
-    expect(opener.parentElement?.className).toContain(
+    await pmRoot.getByAltText('Cat').click()
+    const opener = page.getByRole('button', { name: 'Open' })
+    await expect.element(opener).toBeVisible()
+    expect(opener.element().parentElement?.className).toContain(
       'top-[max(env(safe-area-inset-top),1rem)]',
     )
-    expect(opener.parentElement?.className).toContain(
+    expect(opener.element().parentElement?.className).toContain(
       'right-[max(env(safe-area-inset-right),1rem)]',
     )
   })
 
   it('shows mobile close chrome inside iOS safe-area bounds', async () => {
     setPlatformSurface({ mobileApp: true })
-    renderEditor()
+    await renderEditor()
 
-    act(() => captured.props?.onImageClick?.(imageClick('assets/cat.png', 'Cat')))
-
-    const close = await screen.findByRole('button', { name: 'Close' })
-    expect(close.parentElement?.className).toContain(
+    await pmRoot.getByAltText('Cat').click()
+    const close = page.getByRole('button', { name: 'Close', exact: true })
+    await expect.element(close).toBeVisible()
+    expect(close.element().parentElement?.className).toContain(
       'top-[max(env(safe-area-inset-top),1rem)]',
     )
-    expect(close.parentElement?.className).toContain(
+    expect(close.element().parentElement?.className).toContain(
       'left-[max(env(safe-area-inset-left),1rem)]',
     )
-    const dialog = screen.getByRole('dialog', { name: 'Image preview' })
-    expect(dialog.querySelector('.bg-black')).not.toBeNull()
+    await expect.element(page.getByRole('dialog', { name: 'Image preview' }).locate('.bg-black')).toBeInTheDocument()
   })
 
   it('dismisses the mobile image lightbox with a downward drag', async () => {
     setPlatformSurface({ mobileApp: true })
-    renderEditor()
+    await renderEditor()
 
-    act(() => captured.props?.onImageClick?.(imageClick('assets/cat.png', 'Cat')))
-
-    const preview = await screen.findByRole('button', { name: 'Close image preview' })
-    const image = preview.querySelector('img')
+    await pmRoot.getByAltText('Cat').click()
+    const preview = page.getByRole('button', { name: 'Close image preview' })
+    await expect.element(preview).toBeVisible()
+    const image = preview.locate('img').element()
     expect(image).toBeInstanceOf(HTMLImageElement)
 
-    firePointer(preview, 'pointerdown', {
+    firePointer(preview.element(), 'pointerdown', {
       pointerId: 1,
       isPrimary: true,
       pointerType: 'touch',
       clientX: 180,
       clientY: 120,
     })
-    firePointer(preview, 'pointermove', {
-      pointerId: 1,
-      clientX: 182,
-      clientY: 180,
-    })
-    expect(image?.style.transform).toContain('translate3d(0px, 0px, 0)')
-
-    firePointer(preview, 'pointermove', {
-      pointerId: 1,
-      clientX: 184,
-      clientY: 360,
-    })
-    firePointer(preview, 'pointerup', {
-      pointerId: 1,
-      clientX: 184,
-      clientY: 360,
+    firePointer(preview.element(), 'pointermove', { pointerId: 1, clientX: 182, clientY: 190 })
+    firePointer(preview.element(), 'pointermove', { pointerId: 1, clientX: 183, clientY: 260 })
+    await vi.waitFor(() => {
+      expect(preview.locate('img').element()).toHaveProperty(
+        'style.transform',
+        expect.stringContaining(', 70px,'),
+      )
     })
 
-    expect(image?.style.transform).toContain(`, ${window.innerHeight}px, 0)`)
-    fireEvent.transitionEnd(image!)
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    firePointer(preview.element(), 'pointermove', { pointerId: 1, clientX: 184, clientY: 520 })
+    firePointer(preview.element(), 'pointerup', { pointerId: 1, clientX: 184, clientY: 520 })
+
+    await expectLocatorToHaveCount(page.getByRole('dialog'), 0, { timeout: 5_000 })
   })
 
   it('uses the opener captured when the lightbox opens', async () => {
     const firstOpenImage = vi.fn(async () => {})
     const secondOpenImage = vi.fn(async () => {})
-    const view = renderEditor(firstOpenImage)
+    const screen = await renderEditor(firstOpenImage)
 
-    act(() => captured.props?.onImageClick?.(imageClick('assets/cat.png', 'Cat')))
-    await screen.findByRole('dialog', { name: 'Image preview' })
+    await pmRoot.getByAltText('Cat').click()
+    await expect.element(page.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
 
-    view.rerender(
+    await screen.rerender(
       <NoteEditor
-        initialContent={'A photo\n\n![Cat](assets/cat.png)'}
+        initialContent={IMAGE_NOTE}
         resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : null)}
         resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
         openAsset={secondOpenImage}
       />,
     )
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Open' }))
-    expect(firstOpenImage).toHaveBeenCalledWith('assets/cat.png')
+    await page.getByRole('button', { name: 'Open' }).click()
+    await vi.waitFor(() => {
+      expect(firstOpenImage).toHaveBeenCalledWith('assets/cat.png')
+    })
     expect(secondOpenImage).not.toHaveBeenCalled()
   })
 
   it('hides the Open button when no opener is provided', async () => {
-    render(
+    await render(
       <NoteEditor
-        initialContent={'A photo\n\n![Cat](assets/cat.png)'}
+        initialContent={IMAGE_NOTE}
         resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : null)}
         resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
       />,
     )
 
-    act(() => captured.props?.onImageClick?.(imageClick('assets/cat.png', 'Cat')))
-
-    expect(await screen.findByRole('dialog', { name: 'Image preview' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Open' })).toBeNull()
+    await pmRoot.getByAltText('Cat').click()
+    await expect.element(page.getByRole('dialog', { name: 'Image preview' })).toBeVisible()
+    await expectLocatorToHaveCount(page.getByRole('button', { name: 'Open' }), 0)
   })
 
-  it('does not open a lightbox when the source cannot be resolved', () => {
-    renderEditor()
+  it('skips rendering an image whose source cannot be resolved', async () => {
+    await render(
+      <NoteEditor
+        initialContent={'![Cat](assets/cat.png)\n\n![X](https://blocked.example/x.png)'}
+        resolveImageUrl={(src) => (src === 'assets/cat.png' ? 'asset://cat.png' : null)}
+      />,
+    )
 
-    act(() => captured.props?.onImageClick?.(imageClick('https://blocked.example/x.png', 'X')))
-
-    expect(screen.queryByRole('dialog')).toBeNull()
+    await expect.element(pmRoot.getByAltText('Cat')).toBeInTheDocument()
+    await expectLocatorToHaveCount(pmRoot.locate('img'), 1)
   })
 })
 
 describe('NoteEditor link opening', () => {
-  it('opens external links via onLinkClick', () => {
-    renderEditor()
-    expect(captured.props?.onLinkClick).toBeTypeOf('function')
+  it('opens external links through the OS opener', async () => {
+    await render(<NoteEditor initialContent="see [Docs](https://example.com) here" />)
 
-    const event = new MouseEvent('click')
-    act(() => captured.props?.onLinkClick?.({ href: 'https://example.com', event }))
-
-    expect(openUrl).toHaveBeenCalledWith('https://example.com')
+    await pmRoot.getByRole('link').click()
+    await vi.waitFor(() => {
+      expect(openUrl).toHaveBeenCalledWith('https://example.com')
+    })
   })
 
-  it('opens a custom app scheme link via the URL opener', () => {
-    renderEditor()
-
-    const event = new MouseEvent('click')
-    act(() =>
-      captured.props?.onLinkClick?.({ href: 'x-devonthink-item://40C88434-68B6-4DCB', event }),
+  it('opens a custom app scheme link via the URL opener', async () => {
+    await render(
+      <NoteEditor initialContent="[note](x-devonthink-item://40C88434-68B6-4DCB) here" />,
     )
 
-    expect(openUrl).toHaveBeenCalledWith('x-devonthink-item://40C88434-68B6-4DCB')
+    await pmRoot.getByRole('link').click()
+    await vi.waitFor(() => {
+      expect(openUrl).toHaveBeenCalledWith('x-devonthink-item://40C88434-68B6-4DCB')
+    })
   })
 
-  it('drops an unsafe scheme link without opening anything', () => {
-    renderEditor()
+  it('drops an unsafe scheme link without opening anything', async () => {
+    await render(<NoteEditor initialContent="[secret](file:///etc/passwd) here" />)
 
-    const event = new MouseEvent('click')
-    act(() => captured.props?.onLinkClick?.({ href: 'file:///etc/passwd', event }))
-
+    await pmRoot.getByRole('link').click()
+    await expect.element(pmRoot.getByRole('link')).toBeVisible()
     expect(openUrl).not.toHaveBeenCalled()
     expect(dispatchDeepLink).not.toHaveBeenCalled()
   })
 
-  it('opens an assets/ link through the graph asset opener, not the URL opener', () => {
-    const openImage = vi.fn(async () => {})
-    renderEditor(openImage)
+  it('opens an assets/ link through the graph asset opener, not the URL opener', async () => {
+    const openAsset = vi.fn(async () => {})
+    await render(
+      <NoteEditor
+        initialContent="[cat](assets/cat.png) here"
+        resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
+        openAsset={openAsset}
+      />,
+    )
 
-    const event = new MouseEvent('click')
-    act(() => captured.props?.onLinkClick?.({ href: 'assets/cat.png', event }))
-
-    expect(openImage).toHaveBeenCalledWith('assets/cat.png')
+    await pmRoot.getByRole('link').click()
+    await vi.waitFor(() => {
+      expect(openAsset).toHaveBeenCalledWith('assets/cat.png')
+    })
     expect(openUrl).not.toHaveBeenCalled()
   })
 
-  it('routes a reflect:// link through the in-app deep-link intake, not the URL opener', () => {
-    renderEditor()
+  it('routes a reflect:// link through the in-app deep-link intake, not the URL opener', async () => {
+    await render(<NoteEditor initialContent="[note](reflect://note/abc123) here" />)
 
-    const event = new MouseEvent('click')
-    act(() => captured.props?.onLinkClick?.({ href: 'reflect://note/abc123', event }))
-
-    expect(dispatchDeepLink).toHaveBeenCalledWith('reflect://note/abc123')
+    await pmRoot.getByRole('link').click()
+    await vi.waitFor(() => {
+      expect(dispatchDeepLink).toHaveBeenCalledWith('reflect://note/abc123')
+    })
     expect(openUrl).not.toHaveBeenCalled()
   })
 
   it('⌘-click sends a reflect:// link to a new window instead of dispatching', async () => {
     openDeepLinkInNewWindow.mockResolvedValue(true)
-    renderEditor()
+    await render(<NoteEditor initialContent="[note](reflect://note/abc123) here" />)
 
-    const event = new MouseEvent('click', { metaKey: true })
-    act(() => captured.props?.onLinkClick?.({ href: 'reflect://note/abc123', event }))
-
-    await waitFor(() =>
-      expect(openDeepLinkInNewWindow).toHaveBeenCalledWith('reflect://note/abc123'),
-    )
+    await pmRoot.getByRole('link').click({ modifiers: ['Meta'] })
+    await vi.waitFor(() => {
+      expect(openDeepLinkInNewWindow).toHaveBeenCalledWith('reflect://note/abc123')
+    })
     expect(dispatchDeepLink).not.toHaveBeenCalled()
   })
 
   it('a declined ⌘-click open degrades to the normal deep-link dispatch', async () => {
     openDeepLinkInNewWindow.mockResolvedValue(false)
-    renderEditor()
+    await render(<NoteEditor initialContent="[append](reflect://append?text=hi) here" />)
 
-    const event = new MouseEvent('click', { metaKey: true })
-    act(() => captured.props?.onLinkClick?.({ href: 'reflect://append?text=hi', event }))
-
-    await waitFor(() => expect(dispatchDeepLink).toHaveBeenCalledWith('reflect://append?text=hi'))
+    await pmRoot.getByRole('link').click({ modifiers: ['Meta'] })
+    await vi.waitFor(() => {
+      expect(dispatchDeepLink).toHaveBeenCalledWith('reflect://append?text=hi')
+    })
   })
 })
 
 describe('NoteEditor file pills', () => {
-  it('passes the file-link resolver through unchanged (meowdown reads it once)', () => {
-    const resolveFileLink = vi.fn(() => true)
-    render(<NoteEditor initialContent="" resolveFileLink={resolveFileLink} />)
-    expect(captured.props?.resolveFileLink).toBe(resolveFileLink)
+  const claimAssets = ({ href }: { href: string }) => href.startsWith('assets/')
+
+  it('renders a claimed link as a pill with its resolved size', async () => {
+    await render(
+      <NoteEditor
+        initialContent="[report.pdf](assets/report.pdf)"
+        resolveFileLink={claimAssets}
+        resolveFileInfo={() => Promise.resolve({ size: 1_400_000 })}
+      />,
+    )
+
+    const pill = pmRoot.getByTestId('file-pill')
+    await expect.element(pill).toHaveTextContent('report.pdf')
+    await expect.element(pmRoot.getByTestId('file-pill-size')).toHaveTextContent('1.4 MB')
   })
 
-  it('omits the resolver when the host claims no file links', () => {
-    render(<NoteEditor initialContent="" />)
-    expect('resolveFileLink' in (captured.props ?? {})).toBe(false)
+  it('leaves links as links when the host claims no file links', async () => {
+    await render(<NoteEditor initialContent="[report.pdf](assets/report.pdf)" />)
+
+    await expect.element(pmRoot.getByRole('link')).toBeInTheDocument()
+    await expectLocatorToHaveCount(pmRoot.getByTestId('file-pill'), 0)
   })
 
-  it('opens a clicked assets/ pill through the graph asset opener, not the URL opener', () => {
+  it('opens a clicked assets/ pill through the graph asset opener, not the URL opener', async () => {
     const openAsset = vi.fn(async () => {})
-    renderEditor(openAsset)
+    await render(
+      <NoteEditor
+        initialContent="[cat.png](assets/cat.png)"
+        resolveFileLink={claimAssets}
+        resolveAssetOpenPath={(src) => (src === 'assets/cat.png' ? 'assets/cat.png' : null)}
+        openAsset={openAsset}
+      />,
+    )
 
-    const event = new MouseEvent('click')
-    act(() => captured.props?.onFileClick?.({ href: 'assets/cat.png', name: 'cat.png', event }))
-
-    expect(openAsset).toHaveBeenCalledWith('assets/cat.png')
-    expect(openUrl).not.toHaveBeenCalled()
-  })
-
-  it('forwards pill size lookups to resolveFileInfo', async () => {
-    const resolveFileInfo = vi.fn(async () => ({ size: 42 }))
-    render(<NoteEditor initialContent="" resolveFileInfo={resolveFileInfo} />)
-
-    await expect(captured.props?.resolveFileInfo?.('assets/q3.pdf')).resolves.toEqual({
-      size: 42,
+    await pmRoot.getByTestId('file-pill').click()
+    await vi.waitFor(() => {
+      expect(openAsset).toHaveBeenCalledWith('assets/cat.png')
     })
-    expect(resolveFileInfo).toHaveBeenCalledExactlyOnceWith('assets/q3.pdf')
+    expect(openUrl).not.toHaveBeenCalled()
   })
 })
 
 describe('NoteEditor file paste', () => {
-  it('forwards meowdown paste to saveFile and returns its destination', async () => {
+  it('persists a pasted file through saveFile and inserts its destination', async () => {
+    const handleRef = createRef<NoteEditorHandle>()
     const saveFile = vi.fn(async () => 'assets/report.pdf')
-    render(<NoteEditor initialContent="" saveFile={saveFile} />)
+    await render(
+      <NoteEditor
+        initialContent=""
+        handleRef={handleRef}
+        saveFile={saveFile}
+        resolveFileLink={({ href }) => href.startsWith('assets/')}
+      />,
+    )
+    await expect.element(pmRoot).toBeInTheDocument()
 
     const pasted = new File([new Uint8Array(4)], 'q3.pdf', { type: 'application/pdf' })
-    await expect(captured.props?.onFilePaste?.(pasted)).resolves.toBe('assets/report.pdf')
+    pasteFiles(pmRoot.element(), [pasted])
+
+    await expect.element(pmRoot.getByTestId('file-pill')).toHaveTextContent('q3.pdf')
     expect(saveFile).toHaveBeenCalledExactlyOnceWith(pasted)
+    expect(handleRef.current?.getMarkdown()).toBe('[q3.pdf](assets/report.pdf)\n')
   })
 
-  it('declines the paste (undefined) when saveFile returns null', async () => {
-    render(<NoteEditor initialContent="" saveFile={async () => null} />)
-    const pasted = new File([], 'q3.pdf', { type: 'application/pdf' })
-    await expect(captured.props?.onFilePaste?.(pasted)).resolves.toBeUndefined()
+  it('declines the paste when saveFile returns null', async () => {
+    const handleRef = createRef<NoteEditorHandle>()
+    const saveFile = vi.fn(async () => null)
+    await render(<NoteEditor initialContent="" handleRef={handleRef} saveFile={saveFile} />)
+    await expect.element(pmRoot).toBeInTheDocument()
+
+    pasteFiles(pmRoot.element(), [new File([], 'q3.pdf', { type: 'application/pdf' })])
+
+    await vi.waitFor(() => {
+      expect(saveFile).toHaveBeenCalled()
+    })
+    expect(handleRef.current?.getMarkdown()).toBe('\n')
   })
 })

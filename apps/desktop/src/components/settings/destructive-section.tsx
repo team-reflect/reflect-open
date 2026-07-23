@@ -84,7 +84,7 @@ export function DestructiveSection(): ReactElement {
         </SettingsField>
         <SettingsField
           legend="Delete graph"
-          description="Move this graph and all of its notes to the trash."
+          description="Move the entire selected folder and everything inside it to Trash."
         >
           <div className="mt-3 flex justify-start">
             <Button
@@ -128,9 +128,9 @@ export function DestructiveSection(): ReactElement {
         <DialogContent>
           <DialogTitle>Delete graph?</DialogTitle>
           <DialogDescription className="min-w-0">
-            Move{' '}
+            Move the entire selected folder{' '}
             <span className="font-mono text-text [overflow-wrap:anywhere]">{graphId}</span> and
-            all of its notes to the trash. Type{' '}
+            everything inside it to Trash. Type{' '}
             <span className="font-mono text-text">{graphName}</span> to confirm.
           </DialogDescription>
           <Input

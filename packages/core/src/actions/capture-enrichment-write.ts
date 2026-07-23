@@ -38,6 +38,7 @@ interface PersistCaptureEnrichmentInput {
   toTitle: string
   status: Exclude<CaptureStatus, 'skipped'>
   provider: AiProviderConfig | null
+  screenshot?: string | undefined
   generation: number
 }
 
@@ -184,6 +185,7 @@ export async function persistCaptureEnrichment(
       captureHash,
       captureProvider: input.provider?.provider,
       captureModel: input.provider?.model,
+      ...(input.screenshot === undefined ? {} : { captureScreenshot: input.screenshot }),
       captureDailyFromTitle: titleChanged ? input.fromTitle : undefined,
       captureFinalizeStatus: titleChanged ? input.status : undefined,
     }),

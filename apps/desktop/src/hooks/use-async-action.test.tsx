@@ -1,21 +1,17 @@
-import { act, cleanup, renderHook } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
+import { renderHook } from 'vitest-browser-react'
 import { useAsyncAction } from './use-async-action'
-
-afterEach(() => {
-  cleanup()
-})
 
 describe('useAsyncAction', () => {
   it('flips pending for the duration of the action', async () => {
-    const { result } = renderHook(() => useAsyncAction())
+    const { result, act } = await renderHook(() => useAsyncAction())
     let release: () => void = () => {}
     const gate = new Promise<void>((resolve) => {
       release = resolve
     })
 
     let running: Promise<void> = Promise.resolve()
-    act(() => {
+    await act(() => {
       running = result.current.run(() => gate)
     })
     expect(result.current.pending).toBe(true)
@@ -29,7 +25,7 @@ describe('useAsyncAction', () => {
   })
 
   it('captures a failure as a message and clears it on the next run', async () => {
-    const { result } = renderHook(() => useAsyncAction())
+    const { result, act } = await renderHook(() => useAsyncAction())
 
     await act(async () => {
       await result.current.run(async () => {
@@ -45,9 +41,9 @@ describe('useAsyncAction', () => {
     expect(result.current.error).toBeNull()
   })
 
-  it('setError surfaces a validation message without running anything', () => {
-    const { result } = renderHook(() => useAsyncAction())
-    act(() => {
+  it('setError surfaces a validation message without running anything', async () => {
+    const { result, act } = await renderHook(() => useAsyncAction())
+    await act(() => {
       result.current.setError('Name the new repository.')
     })
     expect(result.current.error).toBe('Name the new repository.')
