@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react'
+import { renderHook } from 'vitest-browser-react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WindowBootstrap } from '@reflect/core'
 
@@ -35,10 +35,10 @@ const BOOT: WindowBootstrap = {
   initialDeepLink: 'reflect://note/notes%2Ffoo.md',
 }
 
-function mount() {
+async function mount() {
   const onAdopted = vi.fn()
   const onFailed = vi.fn()
-  const view = renderHook(() =>
+  const view = await renderHook(() =>
     useNoteWindowBoot({ platform: 'desktop', onAdopted, onFailed }),
   )
   return { onAdopted, onFailed, view }
@@ -55,11 +55,14 @@ beforeEach(() => {
 
 describe('useNoteWindowBoot', () => {
   it('adopts the open sessions and seeds the router from a path-shaped link', async () => {
-    const { onAdopted, onFailed } = mount()
-    await waitFor(() => expect(onAdopted).toHaveBeenCalledWith(BOOT))
+    const { onAdopted, onFailed } = await mount()
+    await vi.waitFor(() => expect(onAdopted).toHaveBeenCalledWith(BOOT))
     // ⌘-click links resolve synchronously — the route slot is seeded and the
     // intake is bypassed, so the window never flashes today's daily note.
-    expect(getInitialWindowRoute()).toEqual({ kind: 'note', path: 'notes/foo.md' })
+    expect(getInitialWindowRoute()).toEqual({
+      kind: 'note',
+      path: 'notes/foo.md',
+    })
     expect(dispatchDeepLink).not.toHaveBeenCalled()
     expect(onFailed).not.toHaveBeenCalled()
     // The adopted window refetches on committed index writes — never its own
@@ -70,31 +73,34 @@ describe('useNoteWindowBoot', () => {
   })
 
   it('falls back to the intake for a target only the index can answer', async () => {
-    windowBootstrap.mockResolvedValue({ ...BOOT, initialDeepLink: 'reflect://note/Meeting%20Notes' })
-    const { onAdopted } = mount()
-    await waitFor(() => expect(onAdopted).toHaveBeenCalled())
+    windowBootstrap.mockResolvedValue({
+      ...BOOT,
+      initialDeepLink: 'reflect://note/Meeting%20Notes',
+    })
+    const { onAdopted } = await mount()
+    await vi.waitFor(() => expect(onAdopted).toHaveBeenCalled())
     expect(getInitialWindowRoute()).toBeNull()
     expect(dispatchDeepLink).toHaveBeenCalledWith('reflect://note/Meeting%20Notes')
   })
 
   it('skips the deep-link dispatch when none is pending (a reload)', async () => {
     windowBootstrap.mockResolvedValue({ ...BOOT, initialDeepLink: null })
-    const { onAdopted } = mount()
-    await waitFor(() => expect(onAdopted).toHaveBeenCalled())
+    const { onAdopted } = await mount()
+    await vi.waitFor(() => expect(onAdopted).toHaveBeenCalled())
     expect(dispatchDeepLink).not.toHaveBeenCalled()
   })
 
   it('parks the window on a failed bootstrap', async () => {
     windowBootstrap.mockRejectedValue(new Error('no graph is open'))
-    const { onAdopted, onFailed } = mount()
-    await waitFor(() => expect(onFailed).toHaveBeenCalled())
+    const { onAdopted, onFailed } = await mount()
+    await vi.waitFor(() => expect(onFailed).toHaveBeenCalled())
     expect(String(onFailed.mock.calls[0]![0])).toContain('no graph is open')
     expect(onAdopted).not.toHaveBeenCalled()
   })
 
   it('does nothing in the main window', async () => {
     isMainWindow.mockReturnValue(true)
-    const { onAdopted, onFailed } = mount()
+    const { onAdopted, onFailed } = await mount()
     await Promise.resolve()
     expect(windowBootstrap).not.toHaveBeenCalled()
     expect(onAdopted).not.toHaveBeenCalled()
@@ -106,9 +112,9 @@ describe('useNoteWindowBoot', () => {
     const unlistenNavigate = vi.fn()
     subscribeIndexWritten.mockResolvedValue(unlistenWritten)
     subscribeWindowNavigate.mockResolvedValue(unlistenNavigate)
-    const { onAdopted, view } = mount()
-    await waitFor(() => expect(onAdopted).toHaveBeenCalled())
-    view.unmount()
+    const { onAdopted, view } = await mount()
+    await vi.waitFor(() => expect(onAdopted).toHaveBeenCalled())
+    await view.unmount()
     expect(unlistenWritten).toHaveBeenCalled()
     expect(unlistenNavigate).toHaveBeenCalled()
   })
