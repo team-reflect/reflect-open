@@ -7,8 +7,8 @@ import { dispatchDeepLink } from '@/lib/deep-links/intake'
 import { setPlatformSurface } from '@/lib/platform-surface'
 import { expectLocatorToHaveCount } from '@/test-utils/expect'
 import { pasteFiles } from '@/test-utils/file-events'
-import { NoteEditor, type NoteEditorHandle } from './note-editor'
 import '@/test-utils/locator'
+import { NoteEditor, type NoteEditorHandle } from './note-editor'
 
 vi.mock('@tauri-apps/plugin-opener', () => ({
   openUrl: vi.fn(async () => {}),
