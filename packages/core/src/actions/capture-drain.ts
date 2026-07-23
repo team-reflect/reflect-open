@@ -45,8 +45,11 @@ import {
 /** The category note every captured-link section backlinks. */
 const LINKS_NOTE_TITLE = 'Links'
 
-/** Long-edge cap for promoted screenshots (the Rust side re-encodes JPEG). */
-const SCREENSHOT_MAX_DIM = 1600
+/**
+ * Long-edge cap for capture screenshots (the Rust side re-encodes JPEG) —
+ * shared by the drain's spool promotion and enrichment's preview-image fetch.
+ */
+export const SCREENSHOT_MAX_DIM = 1600
 
 /** Spool `.jpg`s with no sibling `.json` older than this are host-crash debris. */
 const ORPHAN_SPOOL_MAX_AGE_MS = 60 * 60 * 1000

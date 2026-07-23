@@ -445,6 +445,25 @@ fn downscale_jpeg(bytes: &[u8], max_dim: u32) -> AppResult<Vec<u8>> {
     Ok(out)
 }
 
+/// Write asset bytes into the graph atomically: a same-directory temp file
+/// first, then a rename — readers never see a half-written asset.
+fn persist_asset(root: &std::path::Path, asset_path: &str, bytes: &[u8]) -> AppResult<()> {
+    let target = crate::fs::resolve_in_graph(root, asset_path)?;
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut tmp = tempfile::NamedTempFile::new_in(
+        target
+            .parent()
+            .ok_or_else(|| AppError::io("asset path has no parent"))?,
+    )?;
+    tmp.write_all(bytes)?;
+    tmp.flush()?;
+    tmp.persist(&target)
+        .map_err(|err| AppError::io(err.to_string()))?;
+    Ok(())
+}
+
 /// Copy a spooled screenshot into the graph as a downscaled JPEG asset. Copy,
 /// not move — the drain removes spool files only after the note is written,
 /// so a crash mid-drain re-runs cleanly.
@@ -459,20 +478,7 @@ pub fn capture_screenshot_promote(
     let root = root_for_generation(&state, generation)?;
     let bytes = fs::read(inbox_file(&root, &spool_name)?)?;
     let jpeg = downscale_jpeg(&bytes, max_dim)?;
-    let target = crate::fs::resolve_in_graph(&root, &asset_path)?;
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let mut tmp = tempfile::NamedTempFile::new_in(
-        target
-            .parent()
-            .ok_or_else(|| AppError::io("asset path has no parent"))?,
-    )?;
-    tmp.write_all(&jpeg)?;
-    tmp.flush()?;
-    tmp.persist(&target)
-        .map_err(|err| AppError::io(err.to_string()))?;
-    Ok(())
+    persist_asset(&root, &asset_path, &jpeg)
 }
 
 // ---- meta fetch -----------------------------------------------------------------
@@ -518,13 +524,30 @@ fn classify_fetch_status(url: &str, status: reqwest::StatusCode) -> Option<AppEr
     Some(AppError::io(message))
 }
 
+/// What the meta fetch hands back: the capped HTML plus the URL that
+/// actually served it — redirects are followed, so relative references in
+/// the HTML (an `og:image` path) must resolve against `final_url`, not the
+/// URL the capture started from.
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetaFetchResponse {
+    pub html: String,
+    pub final_url: String,
+}
+
 /// Fetch a captured page's HTML for meta-tag scraping, hard-capped (timeout,
 /// byte cap, redirect limit, http(s) only). Lives here rather than widening
 /// the webview's HTTP-plugin capability to every URL — the only thing that
 /// can reach arbitrary hosts is this bounded, HTML-only primitive, and the
 /// privacy gate in `@reflect/core` runs before it is ever called.
+///
+/// Deliberately *not* host-vetted the way `capture_image_fetch` is: the
+/// capture URL is one the user chose to share (user intent, possibly a
+/// private-network page they legitimately want captured), whereas the image
+/// URL comes from page content. The response is only ever parsed for text
+/// metadata. Revisit if scrape targets ever become content-controlled.
 #[tauri::command]
-pub async fn capture_meta_fetch(url: String) -> AppResult<String> {
+pub async fn capture_meta_fetch(url: String) -> AppResult<MetaFetchResponse> {
     if !url.starts_with("https://") && !url.starts_with("http://") {
         return Err(AppError::parse(format!("not an http(s) url: {url}")));
     }
@@ -567,6 +590,7 @@ pub async fn capture_meta_fetch(url: String) -> AppResult<String> {
         )));
     }
 
+    let final_url = response.url().to_string();
     let mut body: Vec<u8> = Vec::new();
     let mut response = response;
     while let Some(chunk) = response.chunk().await.map_err(classify_fetch_error)? {
@@ -576,12 +600,481 @@ pub async fn capture_meta_fetch(url: String) -> AppResult<String> {
             break;
         }
     }
-    Ok(String::from_utf8_lossy(&body).into_owned())
+    Ok(MetaFetchResponse {
+        html: String::from_utf8_lossy(&body).into_owned(),
+        final_url,
+    })
+}
+
+/// Cap on a fetched preview image's raw bytes. Unlike the HTML fetch, a
+/// truncated image is useless, so an oversized answer fails instead of
+/// being cut off; the downscale pass below bounds what lands in the graph.
+const IMAGE_FETCH_MAX_BYTES: usize = 8 * 1024 * 1024;
+
+/// Is this Content-Type an image? Parameters (`; charset=…`) don't matter;
+/// case doesn't either (the caller lowercases).
+fn image_content_type(content_type: &str) -> bool {
+    content_type.trim_start().starts_with("image/")
+}
+
+/// Is this an address the preview-image fetch may connect to? The image URL
+/// comes from page *content* — attacker-controlled, unlike the user-shared
+/// capture URL — so the fetch must never become a bridge onto localhost, the
+/// user's LAN, carrier-grade NAT space, or link-local metadata endpoints.
+fn public_address(addr: &std::net::IpAddr) -> bool {
+    match addr {
+        std::net::IpAddr::V4(v4) => {
+            let octets = v4.octets();
+            let cgnat = octets[0] == 100 && (octets[1] & 0xc0) == 64; // 100.64/10
+            !(v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                || v4.is_broadcast()
+                || v4.is_multicast()
+                || v4.is_unspecified()
+                || cgnat)
+        }
+        std::net::IpAddr::V6(v6) => {
+            if let Some(mapped) = v6.to_ipv4_mapped() {
+                return public_address(&std::net::IpAddr::V4(mapped));
+            }
+            let segments = v6.segments();
+            let unique_local = (segments[0] & 0xfe00) == 0xfc00; // fc00::/7
+            let link_local = (segments[0] & 0xffc0) == 0xfe80; // fe80::/10
+            !(v6.is_loopback()
+                || v6.is_unspecified()
+                || v6.is_multicast()
+                || unique_local
+                || link_local)
+        }
+    }
+}
+
+/// Which hosts the preview-image fetch may connect to. Production always
+/// runs [`HostPolicy::PublicOnly`]; the test-only variant lets integration
+/// tests point the fetch at a loopback server to exercise the redirect,
+/// content-type, and byte-cap mechanics.
+#[derive(Clone, Copy)]
+enum HostPolicy {
+    /// Every hop's host must resolve exclusively to public addresses.
+    PublicOnly,
+    /// Skip the public-address check (local test servers only).
+    #[cfg(test)]
+    AllowLocal,
+}
+
+/// Resolve one redirect hop's host and refuse it unless every address is
+/// public ([`public_address`]); returns the full vetted address list so the
+/// caller can pin the connection to it — all of it, keeping the resolver's
+/// v4/v6 fallback — because resolving again at connect time would reopen
+/// the DNS-rebinding window this check closes.
+async fn vetted_image_addrs(
+    target: &reqwest::Url,
+    hosts: HostPolicy,
+) -> AppResult<Vec<std::net::SocketAddr>> {
+    let host = target
+        .host_str()
+        .ok_or_else(|| AppError::parse(format!("{target} has no host")))?;
+    let port = target
+        .port_or_known_default()
+        .ok_or_else(|| AppError::parse(format!("{target} has no port")))?;
+    let addrs: Vec<std::net::SocketAddr> = tokio::net::lookup_host((host, port))
+        .await
+        .map_err(|err| AppError::Network {
+            message: format!("{host} did not resolve: {err}"),
+        })?
+        .collect();
+    if addrs.is_empty() {
+        return Err(AppError::Network {
+            message: format!("{host} did not resolve"),
+        });
+    }
+    match hosts {
+        #[cfg(test)]
+        HostPolicy::AllowLocal => return Ok(addrs),
+        HostPolicy::PublicOnly => {}
+    }
+    for addr in &addrs {
+        if !public_address(&addr.ip()) {
+            return Err(AppError::parse(format!(
+                "{host} resolves to a non-public address"
+            )));
+        }
+    }
+    Ok(addrs)
+}
+
+/// The network half of the preview-image fetch: follow redirects manually
+/// (host-vetted per hop, connection pinned to the vetted addresses), require
+/// image content, cap the raw bytes, and downscale/re-encode to JPEG.
+/// Stateless so the integration tests can exercise it against a local
+/// server; the command below owns graph-root resolution and the write.
+async fn fetch_preview_image(url: &str, max_dim: u32, hosts: HostPolicy) -> AppResult<Vec<u8>> {
+    let mut target =
+        reqwest::Url::parse(url).map_err(|err| AppError::parse(format!("{url}: {err}")))?;
+    let mut response: Option<reqwest::Response> = None;
+    for _hop in 0..=5 {
+        if target.scheme() != "https" && target.scheme() != "http" {
+            return Err(AppError::parse(format!("not an http(s) url: {target}")));
+        }
+        let addrs = vetted_image_addrs(&target, hosts).await?;
+        let host = target.host_str().unwrap_or_default().to_owned();
+        // Redirects are followed manually (with the host re-vetted each hop)
+        // and the connection pinned to the vetted addresses.
+        let client = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .resolve_to_addrs(&host, &addrs)
+            .timeout(META_FETCH_TIMEOUT)
+            .user_agent(META_FETCH_USER_AGENT)
+            .build()
+            .map_err(|err| AppError::io(err.to_string()))?;
+        let hop_response = client
+            .get(target.clone())
+            // What a browser sends when a page loads a cross-site image.
+            .header(
+                "Accept",
+                "image/avif,image/webp,image/png,image/*;q=0.8,*/*;q=0.5",
+            )
+            .header("Accept-Language", "en-US,en;q=0.9")
+            .header("Sec-Fetch-Dest", "image")
+            .header("Sec-Fetch-Mode", "no-cors")
+            .header("Sec-Fetch-Site", "cross-site")
+            .send()
+            .await
+            .map_err(classify_fetch_error)?;
+        if hop_response.status().is_redirection() {
+            let location = hop_response
+                .headers()
+                .get(reqwest::header::LOCATION)
+                .and_then(|value| value.to_str().ok())
+                .ok_or_else(|| AppError::io(format!("{target} redirected without a location")))?;
+            target = target
+                .join(location)
+                .map_err(|err| AppError::parse(format!("{target} redirected badly: {err}")))?;
+            continue;
+        }
+        response = Some(hop_response);
+        break;
+    }
+    let response =
+        response.ok_or_else(|| AppError::io(format!("{url} redirected too many times")))?;
+
+    if let Some(err) = classify_fetch_status(url, response.status()) {
+        return Err(err);
+    }
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if !image_content_type(&content_type) {
+        return Err(AppError::parse(format!(
+            "{url} is not an image ({content_type})"
+        )));
+    }
+
+    let mut bytes: Vec<u8> = Vec::new();
+    let mut response = response;
+    while let Some(chunk) = response.chunk().await.map_err(classify_fetch_error)? {
+        if bytes.len() + chunk.len() > IMAGE_FETCH_MAX_BYTES {
+            return Err(AppError::io(format!("{url} exceeds the preview image cap")));
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    downscale_jpeg(&bytes, max_dim)
+}
+
+/// Fetch a captured page's own preview image (its `og:image`) and store it
+/// as the capture's screenshot asset. Same bounded shape as the meta fetch —
+/// http(s) only, timeout, redirect limit, byte cap, browser presentation —
+/// plus image-only content, public-address-only hosts (checked per redirect
+/// hop, connections pinned to the vetted address), and the screenshot
+/// downscale/re-encode, so a hostile URL can neither widen the webview's
+/// HTTP capability, reach into the local network, nor land oversized or
+/// non-image bytes in the graph. The privacy gate in `@reflect/core` runs
+/// before it is ever called.
+#[tauri::command]
+pub async fn capture_image_fetch(
+    url: String,
+    asset_path: String,
+    max_dim: u32,
+    generation: u64,
+    state: State<'_, GraphState>,
+) -> AppResult<()> {
+    // Fail fast before any network work; the root is re-derived after it.
+    root_for_generation(&state, generation)?;
+    let jpeg = fetch_preview_image(&url, max_dim, HostPolicy::PublicOnly).await?;
+    // Re-pin the graph: a 15s fetch is long enough for a graph switch, and
+    // persisting into a stale root would resurrect files under it.
+    let root = root_for_generation(&state, generation)?;
+    persist_asset(&root, &asset_path, &jpeg)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::sync::Arc;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    /// Serve canned HTTP/1.1 responses on 127.0.0.1: each connection's
+    /// request path is matched against `routes` and the canned bytes written
+    /// back verbatim. Returns the server's base URL.
+    async fn serve(routes: Vec<(&'static str, Vec<u8>)>) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
+        let routes = Arc::new(routes);
+        tokio::spawn(async move {
+            loop {
+                let Ok((mut stream, _)) = listener.accept().await else {
+                    break;
+                };
+                let routes = routes.clone();
+                tokio::spawn(async move {
+                    let mut buf = [0u8; 4096];
+                    let Ok(read) = stream.read(&mut buf).await else {
+                        return;
+                    };
+                    let head = String::from_utf8_lossy(&buf[..read]).into_owned();
+                    let path = head.split_whitespace().nth(1).unwrap_or("/").to_owned();
+                    let not_found = response("404 Not Found", &[], b"");
+                    let body = routes
+                        .iter()
+                        .find(|(route, _)| *route == path)
+                        .map(|(_, bytes)| bytes.as_slice())
+                        .unwrap_or(&not_found);
+                    let _ = stream.write_all(body).await;
+                    let _ = stream.shutdown().await;
+                });
+            }
+        });
+        base
+    }
+
+    /// One canned HTTP/1.1 response with correct framing.
+    fn response(status: &str, headers: &[(&str, &str)], body: &[u8]) -> Vec<u8> {
+        let mut head = format!("HTTP/1.1 {status}\r\n");
+        for (name, value) in headers {
+            head.push_str(&format!("{name}: {value}\r\n"));
+        }
+        head.push_str(&format!(
+            "Content-Length: {}\r\nConnection: close\r\n\r\n",
+            body.len()
+        ));
+        let mut bytes = head.into_bytes();
+        bytes.extend_from_slice(body);
+        bytes
+    }
+
+    /// A tiny valid PNG for the happy-path fetch.
+    fn png_bytes() -> Vec<u8> {
+        let mut out = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::new_rgb8(4, 4)
+            .write_to(&mut out, image::ImageFormat::Png)
+            .unwrap();
+        out.into_inner()
+    }
+
+    fn error_message(result: AppResult<Vec<u8>>) -> String {
+        match result.unwrap_err() {
+            AppError::Io { message }
+            | AppError::Parse { message }
+            | AppError::Network { message } => message,
+            other => panic!("unexpected error kind: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn preview_fetch_follows_relative_redirects_to_the_image() {
+        let base = serve(vec![
+            (
+                "/start",
+                response("302 Found", &[("Location", "/hop/")], b""),
+            ),
+            // A relative Location must resolve against the current hop.
+            (
+                "/hop/",
+                response("302 Found", &[("Location", "cover.png")], b""),
+            ),
+            (
+                "/hop/cover.png",
+                response("200 OK", &[("Content-Type", "image/png")], &png_bytes()),
+            ),
+        ])
+        .await;
+
+        let jpeg = fetch_preview_image(&format!("{base}/start"), 64, HostPolicy::AllowLocal)
+            .await
+            .unwrap();
+
+        // Decoded and re-encoded: the stored asset is JPEG regardless of source.
+        assert_eq!(&jpeg[..2], &[0xff, 0xd8]);
+    }
+
+    #[tokio::test]
+    async fn preview_fetch_gives_up_after_five_redirects() {
+        let base = serve(vec![(
+            "/loop",
+            response("302 Found", &[("Location", "/loop")], b""),
+        )])
+        .await;
+
+        let message = error_message(
+            fetch_preview_image(&format!("{base}/loop"), 64, HostPolicy::AllowLocal).await,
+        );
+
+        assert!(message.contains("redirected too many times"), "{message}");
+    }
+
+    #[tokio::test]
+    async fn preview_fetch_fails_on_a_redirect_without_a_location() {
+        let base = serve(vec![("/lost", response("302 Found", &[], b""))]).await;
+
+        let message = error_message(
+            fetch_preview_image(&format!("{base}/lost"), 64, HostPolicy::AllowLocal).await,
+        );
+
+        assert!(
+            message.contains("redirected without a location"),
+            "{message}"
+        );
+    }
+
+    #[tokio::test]
+    async fn preview_fetch_refuses_non_image_content() {
+        let base = serve(vec![(
+            "/page",
+            response("200 OK", &[("Content-Type", "text/html")], b"<html></html>"),
+        )])
+        .await;
+
+        let message = error_message(
+            fetch_preview_image(&format!("{base}/page"), 64, HostPolicy::AllowLocal).await,
+        );
+
+        assert!(message.contains("is not an image"), "{message}");
+    }
+
+    #[tokio::test]
+    async fn preview_fetch_refuses_oversized_images() {
+        let oversized = vec![0u8; IMAGE_FETCH_MAX_BYTES + 1];
+        let base = serve(vec![(
+            "/huge.png",
+            response("200 OK", &[("Content-Type", "image/png")], &oversized),
+        )])
+        .await;
+
+        let message = error_message(
+            fetch_preview_image(&format!("{base}/huge.png"), 64, HostPolicy::AllowLocal).await,
+        );
+
+        assert!(
+            message.contains("exceeds the preview image cap"),
+            "{message}"
+        );
+    }
+
+    #[tokio::test]
+    async fn preview_fetch_refuses_local_hosts_in_production_policy() {
+        // The SSRF regression test: under the production policy the fetch
+        // must refuse loopback before a single byte is sent.
+        let base = serve(vec![(
+            "/cover.png",
+            response("200 OK", &[("Content-Type", "image/png")], &png_bytes()),
+        )])
+        .await;
+
+        let message = error_message(
+            fetch_preview_image(&format!("{base}/cover.png"), 64, HostPolicy::PublicOnly).await,
+        );
+
+        assert!(message.contains("non-public address"), "{message}");
+    }
+
+    #[tokio::test]
+    async fn meta_fetch_truncates_at_the_byte_cap() {
+        let mut html = String::from("<html><head><title>Big page</title></head><body>");
+        html.push_str(&"x".repeat(600 * 1024));
+        let base = serve(vec![(
+            "/page",
+            response("200 OK", &[("Content-Type", "text/html")], html.as_bytes()),
+        )])
+        .await;
+
+        let fetched = capture_meta_fetch(format!("{base}/page")).await.unwrap();
+
+        assert_eq!(fetched.html.len(), META_FETCH_MAX_BYTES);
+        assert!(fetched.html.contains("<title>Big page</title>"));
+        assert_eq!(fetched.final_url, format!("{base}/page"));
+    }
+
+    #[tokio::test]
+    async fn meta_fetch_reports_the_redirected_final_url() {
+        let base = serve(vec![
+            (
+                "/moved",
+                response("301 Moved Permanently", &[("Location", "/final/page")], b""),
+            ),
+            (
+                "/final/page",
+                response(
+                    "200 OK",
+                    &[("Content-Type", "text/html")],
+                    b"<html><head><title>Landed</title></head></html>",
+                ),
+            ),
+        ])
+        .await;
+
+        let fetched = capture_meta_fetch(format!("{base}/moved")).await.unwrap();
+
+        // Relative references in the HTML must resolve against this URL.
+        assert_eq!(fetched.final_url, format!("{base}/final/page"));
+        assert!(fetched.html.contains("Landed"));
+    }
+
+    #[tokio::test]
+    async fn meta_fetch_refuses_non_html_content() {
+        let base = serve(vec![(
+            "/cover.png",
+            response("200 OK", &[("Content-Type", "image/png")], &png_bytes()),
+        )])
+        .await;
+
+        let result = capture_meta_fetch(format!("{base}/cover.png")).await;
+
+        assert!(matches!(result, Err(AppError::Parse { .. })), "{result:?}");
+    }
+
+    #[test]
+    fn public_addresses_exclude_every_local_network_family() {
+        use std::net::IpAddr;
+        let public = |candidate: &str| public_address(&candidate.parse::<IpAddr>().unwrap());
+        assert!(public("93.184.216.34"));
+        assert!(public("2606:2800:220:1:248:1893:25c8:1946"));
+        assert!(!public("127.0.0.1")); // loopback
+        assert!(!public("10.0.0.8")); // private
+        assert!(!public("172.16.4.1")); // private
+        assert!(!public("192.168.1.1")); // private
+        assert!(!public("169.254.169.254")); // link-local (cloud metadata)
+        assert!(!public("100.64.0.1")); // carrier-grade NAT
+        assert!(!public("0.0.0.0")); // unspecified
+        assert!(!public("::1")); // v6 loopback
+        assert!(!public("fd12:3456:789a::1")); // v6 unique-local
+        assert!(!public("fe80::1")); // v6 link-local
+        assert!(!public("::ffff:192.168.1.1")); // v4-mapped private
+    }
+
+    #[test]
+    fn image_content_types_gate_on_the_image_family() {
+        assert!(image_content_type("image/jpeg"));
+        assert!(image_content_type("image/webp; charset=binary"));
+        assert!(!image_content_type("text/html"));
+        assert!(!image_content_type("application/octet-stream"));
+        assert!(!image_content_type(""));
+    }
 
     #[test]
     fn meta_fetch_statuses_classify_rate_limits_as_retryable() {

@@ -203,6 +203,16 @@ export function withTitle(body: string, title: string): string {
 }
 
 /**
+ * Append the screenshot section for a fetched preview image — the exact
+ * shape the drain writes for spooled screenshots, so {@link withTitle} keeps
+ * the alt text in sync on later retitles. The caller has verified the
+ * capture carries no screenshot yet.
+ */
+export function withScreenshot(body: string, title: string, assetPath: string): string {
+  return `${body.trimEnd()}\n\n## Screenshot\n\n![${title}](${assetPath})\n`
+}
+
+/**
  * Rewrite a daily entry's wiki-link display text after its capture note was
  * retitled. Both writers (the drain's dedup refresh and the enrichment
  * retitle) keep the invariant "daily link text mirrors the note's H1", so the

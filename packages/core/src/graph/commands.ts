@@ -322,13 +322,40 @@ export async function promoteCaptureScreenshot(
   await call('capture_screenshot_promote', { spoolName, assetPath, maxDim, generation }, voidSchema)
 }
 
+const metaFetchResponseSchema = z.object({
+  html: z.string(),
+  /**
+   * The URL that actually served the HTML after redirects — relative
+   * references in the page (an `og:image` path) resolve against this, not
+   * the URL the capture started from.
+   */
+  finalUrl: z.string(),
+})
+
+export type MetaFetchResponse = z.infer<typeof metaFetchResponseSchema>
+
 /**
  * Fetch a captured page's HTML for meta-tag scraping — the Rust side caps
  * scheme/timeout/size/redirects, so arbitrary capture URLs never widen the
  * webview's own HTTP capability. The privacy gate runs before any call here.
  */
-export async function captureMetaFetch(url: string): Promise<string> {
-  return call('capture_meta_fetch', { url }, z.string())
+export async function captureMetaFetch(url: string): Promise<MetaFetchResponse> {
+  return call('capture_meta_fetch', { url }, metaFetchResponseSchema)
+}
+
+/**
+ * Fetch a captured page's own preview image (its `og:image`) into the graph
+ * as the capture's screenshot asset. Same bounded fetch rules as
+ * {@link captureMetaFetch} — image content only, downscaled and re-encoded on
+ * the Rust side before it touches the graph.
+ */
+export async function captureImageFetch(
+  url: string,
+  assetPath: string,
+  maxDim: number,
+  generation: number,
+): Promise<void> {
+  await call('capture_image_fetch', { url, assetPath, maxDim, generation }, voidSchema)
 }
 
 /** The recently-opened graphs, newest first. */

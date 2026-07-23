@@ -11,6 +11,7 @@ import {
   files,
   getSecretMock,
   IDENTITY,
+  imageFetchMock,
   NO_PROVIDERS,
   readAssetMock,
   reconcile,
@@ -24,6 +25,7 @@ import type { CaptureEnvelope } from './capture-envelope'
 const ensureBacklinkTargetMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../graph/commands', () => ({
+  captureImageFetch: vi.fn(),
   captureInboxList: vi.fn(),
   captureInboxRead: vi.fn(),
   captureInboxReject: vi.fn(),
@@ -79,6 +81,7 @@ describe('reconcileCaptureEnrichment', () => {
       title: 'An article',
       description: 'A scraped description.',
       siteName: 'Example',
+      image: null,
     })
 
     const outcome = await reconcile()
@@ -125,6 +128,7 @@ describe('reconcileCaptureEnrichment', () => {
       title: 'An article',
       description: 'A shorter scraped description.',
       siteName: null,
+      image: null,
     })
 
     const outcome = await reconcile({ providers: NO_PROVIDERS })
@@ -142,6 +146,7 @@ describe('reconcileCaptureEnrichment', () => {
       title: 'An article',
       description: 'A scraped description.',
       siteName: null,
+      image: null,
     })
 
     const outcome = await reconcile({ providers: NO_PROVIDERS })
@@ -166,6 +171,7 @@ describe('reconcileCaptureEnrichment', () => {
       title: 'An article from its metadata',
       description: 'A scraped description.',
       siteName: 'Example',
+      image: null,
     })
 
     const outcome = await reconcile({ providers: NO_PROVIDERS })
@@ -192,6 +198,7 @@ describe('reconcileCaptureEnrichment', () => {
       title: `${'lengthy '.repeat(20)}tail`,
       description: 'A scraped description.',
       siteName: 'Instagram',
+      image: null,
     })
 
     const outcome = await reconcile({ providers: NO_PROVIDERS })
@@ -205,12 +212,97 @@ describe('reconcileCaptureEnrichment', () => {
     expect(files.get(DAILY)).toContain(`|${heading!.slice('# '.length)}]]`)
   })
 
+  it('fetches the page preview image as the capture screenshot', async () => {
+    addSpool(envelope({ source: 'ios-share', title: '' }), { screenshot: false })
+    expect((await drain()).stopped).toBeNull()
+    writeNoteMock.mockClear()
+    scrapeMock.mockResolvedValue({
+      title: 'An article from its metadata',
+      description: 'A scraped description.',
+      siteName: null,
+      image: 'https://cdn.example.com/cover.jpg',
+    })
+
+    const outcome = await reconcile({ providers: NO_PROVIDERS })
+
+    expect(outcome).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
+    expect(imageFetchMock).toHaveBeenCalledWith(
+      'https://cdn.example.com/cover.jpg',
+      IDENTITY.assetPath,
+      1600,
+      3,
+    )
+    const note = files.get(IDENTITY.notePath) ?? ''
+    expect(note).toContain(`captureScreenshot: ${IDENTITY.assetPath}`)
+    expect(note).toContain(`## Screenshot\n\n![An article from its metadata](${IDENTITY.assetPath})`)
+    expect(note).toContain('captureStatus: done')
+  })
+
+  it('feeds the fetched preview image to the AI call', async () => {
+    addSpool(envelope({ source: 'ios-share', title: '' }), { screenshot: false })
+    expect((await drain()).stopped).toBeNull()
+    writeNoteMock.mockClear()
+    scrapeMock.mockResolvedValue({
+      title: 'An article from its metadata',
+      description: 'A scraped description.',
+      siteName: null,
+      image: 'https://cdn.example.com/cover.jpg',
+    })
+
+    const outcome = await reconcile()
+
+    expect(outcome.enriched).toBe(1)
+    expect(describeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ screenshotBase64: btoa('jpeg-bytes') }),
+    )
+    expect(readAssetMock).toHaveBeenCalledWith(IDENTITY.assetPath, 3)
+  })
+
+  it('a preview image failure never blocks enrichment', async () => {
+    addSpool(envelope({ source: 'ios-share', title: '' }), { screenshot: false })
+    expect((await drain()).stopped).toBeNull()
+    writeNoteMock.mockClear()
+    scrapeMock.mockResolvedValue({
+      title: 'An article from its metadata',
+      description: 'A scraped description.',
+      siteName: null,
+      image: 'https://cdn.example.com/cover.jpg',
+    })
+    imageFetchMock.mockRejectedValue(new ReflectError('io', 'cover.jpg answered 404 Not Found'))
+
+    const outcome = await reconcile({ providers: NO_PROVIDERS })
+
+    expect(outcome).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
+    const note = files.get(IDENTITY.notePath) ?? ''
+    expect(note).not.toContain('## Screenshot')
+    expect(note).not.toContain('captureScreenshot')
+    expect(note).toContain('- Description: A scraped description.')
+    expect(note).toContain('captureStatus: done')
+  })
+
+  it('never fetches a preview image over an extension screenshot', async () => {
+    await drainOne()
+    scrapeMock.mockResolvedValue({
+      title: 'An article',
+      description: 'A scraped description.',
+      siteName: null,
+      image: 'https://cdn.example.com/cover.jpg',
+    })
+
+    const outcome = await reconcile()
+
+    expect(outcome.enriched).toBe(1)
+    expect(imageFetchMock).not.toHaveBeenCalled()
+    expect(files.get(IDENTITY.notePath)).toContain(`captureScreenshot: ${IDENTITY.assetPath}`)
+  })
+
   it('keeps a supplied capture title when scraped metadata differs', async () => {
     await drainOne({ source: 'ios-share', title: 'The title supplied by the app' })
     scrapeMock.mockResolvedValue({
       title: 'A different metadata title',
       description: 'A scraped description.',
       siteName: 'Example',
+      image: null,
     })
 
     const outcome = await reconcile({ providers: NO_PROVIDERS })
@@ -227,6 +319,7 @@ describe('reconcileCaptureEnrichment', () => {
       title: 'A title available immediately',
       description: 'A description available immediately.',
       siteName: null,
+      image: null,
     })
     let finishProvider: (() => void) | undefined
     describeMock.mockImplementation(
@@ -276,6 +369,7 @@ describe('reconcileCaptureEnrichment', () => {
       title: 'First Chair on Instagram',
       description: 'An Instagram reel about furniture and decor.',
       siteName: 'Instagram',
+      image: null,
     })
     getSecretMock.mockResolvedValue(null)
 
@@ -328,6 +422,7 @@ describe('reconcileCaptureEnrichment', () => {
       title: 'A title available without the keychain',
       description: 'A description available without the keychain.',
       siteName: null,
+      image: null,
     })
     getSecretMock.mockRejectedValue(new ReflectError('io', 'keychain is unavailable'))
 
@@ -391,6 +486,7 @@ describe('reconcileCaptureEnrichment', () => {
         title: 'A scraped title',
         description: 'A scraped description.',
         siteName: null,
+        image: null,
       }
     })
 
@@ -405,13 +501,16 @@ describe('reconcileCaptureEnrichment', () => {
   })
 
   it('does not send capture content to AI when the day becomes private during metadata fetch', async () => {
-    await drainOne()
+    addSpool(envelope({ source: 'ios-share', title: '' }), { screenshot: false })
+    expect((await drain()).stopped).toBeNull()
+    writeNoteMock.mockClear()
     scrapeMock.mockImplementation(async () => {
       files.set(DAILY, `---\nprivate: true\n---\n\n${files.get(DAILY) ?? ''}`)
       return {
         title: 'An article',
         description: 'A scraped description.',
         siteName: null,
+        image: 'https://cdn.example.com/cover.jpg',
       }
     })
 
@@ -421,6 +520,8 @@ describe('reconcileCaptureEnrichment', () => {
     expect(files.get(IDENTITY.notePath)).toContain('captureStatus: skipped')
     expect(describeMock).not.toHaveBeenCalled()
     expect(readAssetMock).not.toHaveBeenCalled()
+    // Even the preview-image fetch stays behind the privacy gate.
+    expect(imageFetchMock).not.toHaveBeenCalled()
   })
 
   it('does not send capture content to AI when the day becomes private while loading its screenshot', async () => {
@@ -446,6 +547,7 @@ describe('reconcileCaptureEnrichment', () => {
         title: 'An article',
         description: 'A scraped description.',
         siteName: null,
+        image: null,
       }
     })
 
@@ -486,7 +588,7 @@ describe('reconcileCaptureEnrichment', () => {
       if (url.includes('instagram')) {
         throw new ReflectError('network', 'https://www.instagram.com answered 429')
       }
-      return { title: 'An article', description: 'A scraped description.', siteName: null }
+      return { title: 'An article', description: 'A scraped description.', siteName: null, image: null }
     })
 
     const outcome = await reconcile({ providers: NO_PROVIDERS })
@@ -505,6 +607,7 @@ describe('reconcileCaptureEnrichment', () => {
       title: 'First Chair on Instagram',
       description: 'An Instagram reel about furniture and decor.',
       siteName: 'Instagram',
+      image: null,
     })
     const retry = await reconcile({ providers: NO_PROVIDERS })
 
@@ -529,7 +632,7 @@ describe('reconcileCaptureEnrichment', () => {
       if (url.includes('instagram')) {
         throw new ReflectError('network', 'https://www.instagram.com answered 429')
       }
-      return { title: 'An article', description: 'A scraped description.', siteName: null }
+      return { title: 'An article', description: 'A scraped description.', siteName: null, image: null }
     })
     getSecretMock.mockRejectedValue(new ReflectError('io', 'keychain is unavailable'))
 
@@ -603,6 +706,7 @@ describe('reconcileCaptureEnrichment', () => {
       title: 'A title from metadata',
       description: 'A scraped description.',
       siteName: null,
+      image: null,
     })
     describeMock.mockRejectedValue(new DescriptionRejectedError('image too large'))
 
@@ -619,7 +723,7 @@ describe('reconcileCaptureEnrichment', () => {
 
   it('a provider refusal without scraped description does not stamp AI provenance', async () => {
     await drainOne()
-    scrapeMock.mockResolvedValue({ title: 'An article', description: null, siteName: null })
+    scrapeMock.mockResolvedValue({ title: 'An article', description: null, siteName: null, image: null })
     describeMock.mockRejectedValue(new DescriptionRejectedError('image too large'))
 
     const outcome = await reconcile()
@@ -634,7 +738,7 @@ describe('reconcileCaptureEnrichment', () => {
 
   it('omits the description bullet when no description source exists', async () => {
     await drainOne()
-    scrapeMock.mockResolvedValue({ title: 'An article', description: null, siteName: null })
+    scrapeMock.mockResolvedValue({ title: 'An article', description: null, siteName: null, image: null })
 
     const outcome = await reconcile({ providers: NO_PROVIDERS })
 
@@ -650,6 +754,7 @@ describe('reconcileCaptureEnrichment', () => {
       title: 'A title available without AI',
       description: 'A description available without AI.',
       siteName: null,
+      image: null,
     })
     describeMock.mockRejectedValue(new ReflectError('auth', 'key rejected'))
 
@@ -747,6 +852,7 @@ describe('reconcileCaptureEnrichment', () => {
       title: 'A title from metadata',
       description: 'A scraped description.',
       siteName: null,
+      image: null,
     })
     writeNoteMock
       .mockImplementationOnce(async (path, contents) => {
@@ -767,6 +873,7 @@ describe('reconcileCaptureEnrichment', () => {
       title: 'A different title on retry',
       description: 'A different description on retry.',
       siteName: null,
+      image: null,
     })
 
     const retry = await reconcile({ providers: NO_PROVIDERS })
@@ -787,6 +894,7 @@ describe('reconcileCaptureEnrichment', () => {
       title: 'A title from metadata',
       description: 'A scraped description.',
       siteName: null,
+      image: null,
     })
     writeNoteMock
       .mockImplementationOnce(async (path, contents) => {
@@ -846,6 +954,7 @@ describe('reconcileCaptureEnrichment', () => {
       title: 'A title from metadata',
       description: 'A scraped description.',
       siteName: null,
+      image: null,
     })
     writeNoteMock
       .mockImplementationOnce(async (path, contents) => {
@@ -875,6 +984,7 @@ describe('reconcileCaptureEnrichment', () => {
       title: 'A scraped title',
       description: 'A scraped description.',
       siteName: null,
+      image: null,
     })
     describeMock.mockImplementation(async () => {
       const staged = files.get(IDENTITY.notePath) ?? ''
@@ -913,6 +1023,7 @@ describe('reconcileCaptureEnrichment', () => {
       title: 'An article',
       description: 'A scraped description.',
       siteName: null,
+      image: null,
     })
     describeMock.mockResolvedValue({ title: 'A Cleaned Up Article', description: '' })
 
