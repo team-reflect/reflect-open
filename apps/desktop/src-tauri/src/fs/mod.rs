@@ -334,7 +334,8 @@ pub fn note_read(
     state: State<GraphState>,
 ) -> AppResult<String> {
     let root = root_for(&state, generation)?;
-    Ok(fs::read_to_string(resolve(&root, &path)?)?)
+    let abs = resolve(&root, &path)?;
+    Ok(io::read_note_no_follow(&root, &abs)?)
 }
 
 /// How a [`note_read_local`] request found the note on disk.
@@ -372,6 +373,7 @@ pub async fn note_read_local(
 ) -> AppResult<LocalNoteRead> {
     let root = root_for(&state, generation)?;
     let abs = resolve(&root, &path)?;
+    let read_root = root;
     tauri::async_runtime::spawn_blocking(move || {
         // Best-effort: when the guard refuses to engage, the read keeps a
         // slim stat-then-read race (an eviction landing between the two
@@ -387,7 +389,7 @@ pub async fn note_read_local(
             }
             _ => {}
         }
-        match fs::read_to_string(&abs) {
+        match io::read_note_no_follow(&read_root, &abs) {
             Ok(content) => Ok(LocalNoteRead::Content { content }),
             // The engaged policy answers a dataless read with EDEADLK
             // instead of downloading: the eviction raced the stat.

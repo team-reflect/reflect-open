@@ -207,6 +207,22 @@ mod tests {
         assert_eq!(as_graph_path("assets/caption.md", &root), None);
     }
 
+    #[test]
+    fn normalizes_dot_and_doubled_separators_in_explicit_arguments() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(dir.path().join("notes")).expect("mkdir");
+        std::fs::write(dir.path().join("notes/idea.md"), "# Idea\n").expect("write");
+        assert_eq!(
+            as_graph_path("./notes/idea.md", dir.path()).as_deref(),
+            Some("notes/idea.md")
+        );
+        assert_eq!(
+            as_graph_path("notes//idea.md", dir.path()).as_deref(),
+            Some("notes/idea.md")
+        );
+    }
+
+
     #[cfg(unix)]
     #[test]
     fn explicit_paths_refuse_symlinks() {

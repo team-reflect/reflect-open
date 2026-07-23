@@ -137,6 +137,45 @@ fn create_runtime_file(path: &Path, contents: &str) -> AppResult<()> {
     }
 }
 
+/// `O_NOFOLLOW_ANY` from the macOS SDK's `<sys/fcntl.h>` (also in Apple's
+/// open-source XNU): refuse to open when **any** path component is a
+/// symlink, atomically — no check-then-use window. Spelled out here because
+/// the `libc` crate does not bind it yet.
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const O_NOFOLLOW_ANY: i32 = 0x2000_0000;
+
+/// Read a note's markdown with symlink traversal refused at open time on
+/// Apple platforms. Symlinks are outside the graph-content contract:
+/// discovery never lists them and the watcher reports them as removals; this
+/// closes the remaining door — a direct read through a stale route or index
+/// row. The root is canonicalized first (a vault may legitimately live
+/// *behind* a symlink — `/var`, a linked `~/Dropbox`); `O_NOFOLLOW_ANY` then
+/// polices only the components below it. Off Apple targets it falls back to
+/// a plain read (the lexical resolve guard still applies).
+pub(super) fn read_note_no_follow(root: &Path, abs: &Path) -> std::io::Result<String> {
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    {
+        use std::io::Read;
+        use std::os::unix::fs::OpenOptionsExt;
+        let path = match abs.strip_prefix(root) {
+            Ok(rel) => root.canonicalize()?.join(rel),
+            Err(_) => abs.to_path_buf(),
+        };
+        let mut file = fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(O_NOFOLLOW_ANY)
+            .open(path)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+        Ok(contents)
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    {
+        let _ = root;
+        fs::read_to_string(abs)
+    }
+}
+
 /// Drop leftover staging files (`.reflect/tmp/`: asset uploads, `fs::assets`,
 /// and atomic-write temps) — a crash mid-write strands its temp file, and
 /// nothing else ever reclaims it. Opening the graph is the natural sweep
@@ -505,6 +544,32 @@ fn file_meta_from(entry: reflect_graph_paths::FileEntry) -> FileMeta {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn note_reads_refuse_every_symlinked_component() {
+        use std::os::unix::fs::symlink;
+        let dir = tempdir().unwrap();
+        let outside = tempdir().unwrap();
+        fs::create_dir_all(dir.path().join("notes")).unwrap();
+        fs::create_dir_all(outside.path().join("real")).unwrap();
+        fs::write(outside.path().join("real/secret.md"), "# outside").unwrap();
+        symlink(
+            outside.path().join("real/secret.md"),
+            dir.path().join("notes/leaf.md"),
+        )
+        .unwrap();
+        symlink(outside.path().join("real"), dir.path().join("linked")).unwrap();
+        fs::write(dir.path().join("notes/plain.md"), "# plain").unwrap();
+
+        let root = dir.path();
+        assert!(read_note_no_follow(root, &root.join("notes/leaf.md")).is_err());
+        assert!(read_note_no_follow(root, &root.join("linked/secret.md")).is_err());
+        assert_eq!(
+            read_note_no_follow(root, &root.join("notes/plain.md")).unwrap(),
+            "# plain"
+        );
+    }
 
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     #[test]
