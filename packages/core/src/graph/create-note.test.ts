@@ -452,6 +452,21 @@ describe('resolveOrCreateNoteWithTitle', () => {
     })
     expect(invoke.mock.calls.filter(([command]) => command === 'note_create')).toHaveLength(1)
   })
+
+  it('uses the optional body only when creating a missing note', async () => {
+    const invoke = bindBridge()
+
+    await expect(
+      resolveOrCreateNoteWithTitle('Ada Lovelace', 7, '- Type: #person'),
+    ).resolves.toMatchObject({
+      kind: 'created',
+      path: 'notes/ada-lovelace.md',
+    })
+    const write = invoke.mock.calls.find(([command]) => command === 'note_create')
+    expect(write?.[1]?.['contents']).toMatch(
+      /^---\nid: [0-9a-z]{26}\n---\n# Ada Lovelace\n\n- Type: #person\n$/,
+    )
+  })
 })
 
 describe('untitledNoteSeed', () => {

@@ -8,6 +8,7 @@ import {
   getNoteIdsByPath,
   getOpenTasks,
   getPinnedNotes,
+  getWikiAddressForPath,
   listDailyNotes,
   noteTitleOwningEmail,
   resolveWikiTarget,
@@ -77,6 +78,74 @@ describe('noteTitleOwningEmail', () => {
   it('short-circuits a blank address before touching the bridge', async () => {
     await expect(noteTitleOwningEmail('   ')).resolves.toBeNull()
     expect(mockInvoke).not.toHaveBeenCalled()
+  })
+})
+
+describe('getWikiAddressForPath', () => {
+  it('uses the note_keys winner for the canonical title address', async () => {
+    mockInvoke
+      .mockResolvedValueOnce([
+        {
+          path: 'notes/ada.md',
+          title: 'Ada Lovelace',
+          title_key: 'ada lovelace',
+          daily_date: null,
+          mtime: 1,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          key: 'ada lovelace',
+          note_path: 'notes/ada.md',
+          daily_date: null,
+          claim_count: 1,
+        },
+      ])
+
+    await expect(getWikiAddressForPath('notes/ada.md')).resolves.toMatchObject({
+      path: 'notes/ada.md',
+      title: 'Ada Lovelace',
+      insertText: 'Ada Lovelace',
+    })
+  })
+
+  it('rescues an ambiguous title with a unique alias', async () => {
+    mockInvoke
+      .mockResolvedValueOnce([
+        {
+          path: 'notes/ada.md',
+          title: 'Ada Lovelace',
+          title_key: 'ada lovelace',
+          daily_date: null,
+          mtime: 1,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          key: 'ada lovelace',
+          note_path: 'notes/ada.md',
+          daily_date: null,
+          claim_count: 2,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          note_path: 'notes/ada.md',
+          alias: 'Augusta Ada King',
+          claim_count: 1,
+        },
+      ])
+
+    await expect(getWikiAddressForPath('notes/ada.md')).resolves.toMatchObject({
+      path: 'notes/ada.md',
+      alias: 'Augusta Ada King',
+      insertText: 'Augusta Ada King',
+    })
+  })
+
+  it('returns null when the path is absent', async () => {
+    mockInvoke.mockResolvedValue([])
+    await expect(getWikiAddressForPath('notes/missing.md')).resolves.toBeNull()
   })
 })
 

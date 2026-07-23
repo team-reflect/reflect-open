@@ -20,6 +20,7 @@ export {
 } from './queries-backlinks'
 export { getCompletedTasks, getOpenTasks, type OpenTask } from './queries-tasks'
 export {
+  getWikiAddressForPath,
   suggestTags,
   suggestWikiLinkTargets,
   suggestWikiTargets,

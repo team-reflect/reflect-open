@@ -140,11 +140,13 @@ async function claimNotePathForSlug(
  * fallback, and the final index race check have one implementation. Only a
  * genuine `missing` result reaches the atomic no-clobber claim. If that claim
  * loses to a concurrent sync checkout or creator, the winner is resolved
- * before any suffix is tried.
+ * before any suffix is tried. `body` seeds only a genuinely new note; an
+ * existing title or alias is left untouched.
  */
 export async function resolveOrCreateNoteWithTitle(
   title: string,
   generation: number,
+  body?: string,
 ): Promise<ResolveOrCreateNoteResult> {
   const existing = await resolveExistingWikiTarget(title, generation)
   if (existing.kind !== 'missing') {
@@ -153,7 +155,7 @@ export async function resolveOrCreateNoteWithTitle(
 
   // On a lost claim, re-resolve both projections before considering a
   // suffix: the winner may be the note this link meant.
-  return claimNotePathForSlug(slugForTitle(title), newNoteSource(title), generation, async () => {
+  return claimNotePathForSlug(slugForTitle(title), newNoteSource(title, body), generation, async () => {
     const collisionResolution = await resolveExistingWikiTarget(title, generation)
     return collisionResolution.kind === 'missing' ? null : collisionResolution
   })

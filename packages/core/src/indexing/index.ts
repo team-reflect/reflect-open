@@ -75,6 +75,7 @@ export {
   getOpenTasks,
   getCompletedTasks,
   getPinnedNotes,
+  getWikiAddressForPath,
   suggestWikiTargets,
   suggestWikiLinkTargets,
   suggestTags,

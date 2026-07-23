@@ -100,6 +100,37 @@ export async function suggestWikiLinkTargets(
   )
 }
 
+/**
+ * Return a verified wiki-link suggestion for one indexed note path. This is
+ * the path-first counterpart to text search: it uses the same canonical title,
+ * `note_keys` winner checks, rich-title address, and alias rescue.
+ */
+export async function getWikiAddressForPath(
+  path: string,
+): Promise<WikiLinkSuggestion | null> {
+  const note = await db
+    .selectFrom('notes')
+    .where('path', '=', path)
+    .where('kind', '!=', 'template')
+    .select(['path', 'title', 'titleKey', 'dailyDate', 'mtime'])
+    .executeTakeFirst()
+  if (note === undefined) {
+    return null
+  }
+  const candidate = rankWikiSuggestions('', [note], [], 1)[0]
+  if (candidate === undefined) {
+    return null
+  }
+  const result = await verifyWikiSuggestionAddresses(
+    [candidate],
+    [note.titleKey],
+    1,
+    '',
+    false,
+  )
+  return result.suggestions[0] ?? null
+}
+
 async function queryWikiTargetCandidates(
   query: string,
   dateGen?: DateSuggestionContext,

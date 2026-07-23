@@ -245,3 +245,13 @@ export {
   noteHasContactDetails,
 } from '../contacts/markdown'
 export { pickContactForEmail, resolveAttendeeContact } from '../contacts/resolve'
+export {
+  ensurePersonNote,
+  resolvePerson,
+  type BlockedPersonResolution,
+  type EnsurePersonNoteInput,
+  type EnsurePersonNoteResult,
+  type ExistingPersonResolution,
+  type MissingPersonResolution,
+  type PersonResolution,
+} from '../contacts/person'
