@@ -11,7 +11,7 @@ import { reactWithCompiler } from './react-compiler-plugin'
 const browserName = process.env.REFLECT_TEST_BROWSER === 'webkit' ? 'webkit' : 'chromium'
 
 if (process.env.CI) {
-  console.log("Running in CI mode with browser:", browserName);
+  console.log('Running in CI mode with browser:', browserName)
 }
 
 function desktopProject(project: {
