@@ -1,4 +1,4 @@
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { render } from 'vitest-browser-react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GraphInfo } from '@reflect/core'
 import {
@@ -41,7 +41,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  cleanup()
   resetDeepLinkIntakeForTests()
 })
 
@@ -53,17 +52,17 @@ describe('DeepLinkProvider navigation intent integration', () => {
         finishResolution = resolve
       }),
     )
-    render(<DeepLinkProvider graph={GRAPH}>{null}</DeepLinkProvider>)
+    await render(<DeepLinkProvider graph={GRAPH}>{null}</DeepLinkProvider>)
 
     dispatchDeepLink('reflect://note/Project%20X')
     expect(resolveNoteTarget).toHaveBeenCalledWith('Project X')
 
     dispatchDeepLink('reflect://append?text=captured%20while%20resolving')
-    await waitFor(() => expect(captureInboxSpool).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(captureInboxSpool).toHaveBeenCalledTimes(1))
 
     finishResolution('notes/project-x.md')
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(navigate).toHaveBeenCalledWith({ kind: 'note', path: 'notes/project-x.md' }),
     )
   })

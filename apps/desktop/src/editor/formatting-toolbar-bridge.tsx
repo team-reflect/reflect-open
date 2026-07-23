@@ -95,13 +95,13 @@ export function FormattingToolbarBridge(): null {
       // state (the ingest runs on a deferred flush, up to ~20ms later), so an
       // immediate `canExec` read computes capabilities for the previous caret
       // position. Coalesce each burst and publish after the ingest window.
-      let publishTimer: ReturnType<typeof setTimeout> | null = null
+      let publishTimer: ReturnType<typeof setTimeout> | undefined
       function publishAfterSelectionSync(): void {
-        if (publishTimer !== null) {
+        if (publishTimer !== undefined) {
           clearTimeout(publishTimer)
         }
         publishTimer = setTimeout(() => {
-          publishTimer = null
+          publishTimer = undefined
           if (editor.focused) {
             publish()
           }
@@ -132,7 +132,7 @@ export function FormattingToolbarBridge(): null {
         dom.removeEventListener('focusin', handleFocusIn)
         dom.removeEventListener('focusout', handleFocusOut)
         document.removeEventListener('selectionchange', handleSelectionChange)
-        if (publishTimer !== null) {
+        if (publishTimer !== undefined) {
           clearTimeout(publishTimer)
         }
         clearFormattingToolbar(owner)

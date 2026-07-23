@@ -1,6 +1,6 @@
-import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { renderHook } from 'vitest-browser-react'
 import type { ReactNode } from 'react'
 import { setBridge, type AiProviderConfig } from '@reflect/core'
 import { resetOperations, useOperations } from '@/lib/operations'
@@ -70,7 +70,7 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 
 /** Resolves once the initial settings_load has populated the query cache. */
 async function loadSettled(): Promise<void> {
-  await waitFor(() => expect(queryClient.getQueryData(SETTINGS_QUERY_KEY)).toBeDefined())
+  await vi.waitFor(() => expect(queryClient.getQueryData(SETTINGS_QUERY_KEY)).toBeDefined())
 }
 
 beforeEach(() => {
@@ -82,7 +82,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  cleanup() // `globals: false` disables testing-library's automatic cleanup
   setBridge(null)
   queryClient.clear()
   resetOperations() // failed-save entries linger on a timer otherwise
@@ -91,29 +90,31 @@ afterEach(() => {
 describe('SettingsProvider', () => {
   it('serves defaults immediately, then the persisted document', async () => {
     stored = { editorMarkdownSyntax: 'show' }
-    const { result } = renderHook(() => useSettings(), { wrapper })
+    gateLoad = true
+    const { result } = await renderHook(() => useSettings(), { wrapper })
     // Defaults are usable before the IPC load settles — no loading gate.
     expect(result.current.settings.editorMarkdownSyntax).toBe('hide')
-    await waitFor(() => expect(result.current.settings.editorMarkdownSyntax).toBe('show'))
+    releaseLoad()
+    await vi.waitFor(() => expect(result.current.settings.editorMarkdownSyntax).toBe('show'))
     // Hydration alone must not write the store back.
     expect(saved).toEqual([])
   })
 
   it('normalizes an invalid persisted value to its default', async () => {
     stored = { editorMarkdownSyntax: 'sideways' }
-    const { result } = renderHook(() => useSettings(), { wrapper })
+    const { result } = await renderHook(() => useSettings(), { wrapper })
     await loadSettled()
     expect(result.current.settings.editorMarkdownSyntax).toBe('hide')
   })
 
   it('an equal-but-rebuilt array value does not trigger a save', async () => {
     stored = { allNotesFilterTags: ['book', 'person'] }
-    const { result } = renderHook(() => useSettings(), { wrapper })
+    const { result, act } = await renderHook(() => useSettings(), { wrapper })
     await loadSettled()
 
     // Same value, new instance — a consumer writing back what it read must
     // not count as a change (reference equality would).
-    act(() => {
+    await act(() => {
       result.current.updateSettings({ allNotesFilterTags: ['book', 'person'] })
     })
     await act(async () => {
@@ -122,10 +123,10 @@ describe('SettingsProvider', () => {
     expect(saved).toEqual([])
 
     // A genuinely changed array still persists.
-    act(() => {
+    await act(() => {
       result.current.updateSettings({ allNotesFilterTags: ['book'] })
     })
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(saved).toEqual([
         {
           editorMarkdownSyntax: 'hide',
@@ -164,12 +165,12 @@ describe('SettingsProvider', () => {
 
   it('an equal-but-rebuilt record value does not trigger a save', async () => {
     stored = { graphColors: { '/graphs/work': 'teal' } }
-    const { result } = renderHook(() => useSettings(), { wrapper })
+    const { result, act } = await renderHook(() => useSettings(), { wrapper })
     await loadSettled()
 
     // Same entries, new instance — re-choosing the current color rebuilds the
     // record without changing it; that must not count as a change.
-    act(() => {
+    await act(() => {
       result.current.updateSettings({ graphColors: { '/graphs/work': 'teal' } })
     })
     await act(async () => {
@@ -178,26 +179,26 @@ describe('SettingsProvider', () => {
     expect(saved).toEqual([])
 
     // A genuinely changed record still persists.
-    act(() => {
+    await act(() => {
       result.current.updateSettings({ graphColors: { '/graphs/work': 'pink' } })
     })
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(saved).toMatchObject([{ graphColors: { '/graphs/work': 'pink' } }]),
     )
   })
 
   it('applies an update instantly and persists the full document', async () => {
     stored = { editorMarkdownSyntax: 'hide', futureKey: true }
-    const { result } = renderHook(() => useSettings(), { wrapper })
+    const { result, act } = await renderHook(() => useSettings(), { wrapper })
     await loadSettled()
 
-    act(() => {
+    await act(() => {
       result.current.updateSettings({ editorMarkdownSyntax: 'show' })
     })
     // Applied synchronously — plain React state, no IO in the way.
     expect(result.current.settings.editorMarkdownSyntax).toBe('show')
     // The persisted document keeps unknown keys (newer-version settings survive).
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(saved).toEqual([
         {
           editorMarkdownSyntax: 'show',
@@ -238,10 +239,10 @@ describe('SettingsProvider', () => {
   it('an update racing the initial load wins and keeps passthrough keys', async () => {
     stored = { editorMarkdownSyntax: 'hide', futureKey: true }
     gateLoad = true
-    const { result } = renderHook(() => useSettings(), { wrapper })
+    const { result, act } = await renderHook(() => useSettings(), { wrapper })
 
     // Update while settings_load is still in flight…
-    act(() => {
+    await act(() => {
       result.current.updateSettings({ editorMarkdownSyntax: 'show' })
     })
     expect(result.current.settings.editorMarkdownSyntax).toBe('show')
@@ -249,12 +250,12 @@ describe('SettingsProvider', () => {
     // built from defaults would drop `futureKey` permanently.
     expect(saved).toEqual([])
 
-    act(() => {
+    await act(() => {
       releaseLoad()
     })
     // The load result must not clobber the update, and the deferred flush
     // persists the update merged over the *loaded* document.
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(saved).toEqual([
         {
           editorMarkdownSyntax: 'show',
@@ -296,16 +297,16 @@ describe('SettingsProvider', () => {
   it('compounding updates racing the initial load flush as one document', async () => {
     stored = { editorMarkdownSyntax: 'show' }
     gateLoad = true
-    const { result } = renderHook(() => useSettings(), { wrapper })
+    const { result, act } = await renderHook(() => useSettings(), { wrapper })
 
-    act(() => {
+    await act(() => {
       result.current.updateSettings({ editorMarkdownSyntax: 'show' })
       result.current.updateSettings({ editorMarkdownSyntax: 'hide' })
     })
-    act(() => {
+    await act(() => {
       releaseLoad()
     })
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(saved).toEqual([
         {
           editorMarkdownSyntax: 'hide',
@@ -350,13 +351,13 @@ describe('SettingsProvider', () => {
         { id: 'b', provider: 'openai', model: 'gpt-5', keyHint: '22222' },
       ],
     }
-    const { result } = renderHook(() => useSettings(), { wrapper })
+    const { result, act } = await renderHook(() => useSettings(), { wrapper })
     await loadSettled()
 
     // Both updaters are dispatched from the same render — equally "stale"
     // closures. Sequential application means the second still sees the
     // first's result; a snapshot-based merge would resurrect entry 'a'.
-    act(() => {
+    await act(() => {
       result.current.updateSettingsWith((current) => ({
         aiProviders: current.aiProviders.filter((model) => model.id !== 'a'),
       }))
@@ -382,9 +383,9 @@ describe('SettingsProvider', () => {
     }
     stored = { aiProviders: [persisted] }
     gateLoad = true
-    const { result } = renderHook(() => useSettings(), { wrapper })
+    const { result, act } = await renderHook(() => useSettings(), { wrapper })
 
-    act(() => {
+    await act(() => {
       result.current.updateSettingsWith((current) => ({
         aiProviders: [...current.aiProviders, added],
       }))
@@ -394,11 +395,13 @@ describe('SettingsProvider', () => {
     expect(result.current.settings.aiProviders).toEqual([])
     expect(saved).toEqual([])
 
-    act(() => {
+    await act(() => {
       releaseLoad()
     })
-    await waitFor(() => expect(result.current.settings.aiProviders).toEqual([persisted, added]))
-    await waitFor(() =>
+    await vi.waitFor(() =>
+      expect(result.current.settings.aiProviders).toEqual([persisted, added]),
+    )
+    await vi.waitFor(() =>
       expect(saved).toEqual([expect.objectContaining({ aiProviders: [persisted, added] })]),
     )
   })
@@ -411,16 +414,16 @@ describe('SettingsProvider', () => {
       keyHint: '22222',
     }
     failLoad = true
-    const { result } = renderHook(() => useSettings(), { wrapper })
+    const { result, act } = await renderHook(() => useSettings(), { wrapper })
 
-    act(() => {
+    await act(() => {
       result.current.updateSettingsWith((current) => ({
         aiProviders: [...current.aiProviders, added],
       }))
     })
     // The failed load drains the queue over defaults — the edit must not
     // vanish — but nothing is written over a store that couldn't be read.
-    await waitFor(() => expect(result.current.settings.aiProviders).toEqual([added]))
+    await vi.waitFor(() => expect(result.current.settings.aiProviders).toEqual([added]))
     await act(async () => {
       await flushSettings()
     })
@@ -429,14 +432,14 @@ describe('SettingsProvider', () => {
 
   it('with no bridge (browser dev) the load settles as failed instead of hanging', async () => {
     setBridge(null)
-    const { result } = renderHook(() => useSettings(), { wrapper })
+    const { result, act } = await renderHook(() => useSettings(), { wrapper })
 
     // Waiters must not hang on a query that will never run.
     await expect(result.current.whenSettingsLoaded()).resolves.toBe('failed')
 
     // Read-modify-write updates drain immediately (session-only) rather than
     // queueing forever, and nothing is ever persisted.
-    act(() => {
+    await act(() => {
       result.current.updateSettingsWith(() => ({ editorMarkdownSyntax: 'show' }))
     })
     expect(result.current.settings.editorMarkdownSyntax).toBe('show')
@@ -444,17 +447,17 @@ describe('SettingsProvider', () => {
   })
 
   it('keeps the applied value and surfaces a failed save as an operation', async () => {
-    const { result } = renderHook(
+    const { result, act } = await renderHook(
       () => ({ ...useSettings(), operations: useOperations() }),
       { wrapper },
     )
     await loadSettled()
 
     failSaves = true
-    act(() => {
+    await act(() => {
       result.current.updateSettings({ editorMarkdownSyntax: 'show' })
     })
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(result.current.operations).toMatchObject([
         { label: 'Saving settings', status: 'failed', message: 'disk full' },
       ]),
@@ -463,26 +466,26 @@ describe('SettingsProvider', () => {
   })
 
   it('retries an unconfirmed save on the next update, even to the same value', async () => {
-    const { result } = renderHook(
+    const { result, act } = await renderHook(
       () => ({ ...useSettings(), operations: useOperations() }),
       { wrapper },
     )
     await loadSettled()
 
     failSaves = true
-    act(() => {
+    await act(() => {
       result.current.updateSettings({ editorMarkdownSyntax: 'show' })
     })
-    await waitFor(() => expect(result.current.operations).toHaveLength(1))
+    await vi.waitFor(() => expect(result.current.operations).toHaveLength(1))
     expect(saved).toEqual([])
 
     // Disk recovered; re-applying the same value must re-attempt the write —
     // `lastPersisted` only advances on a *confirmed* save.
     failSaves = false
-    act(() => {
+    await act(() => {
       result.current.updateSettings({ editorMarkdownSyntax: 'show' })
     })
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(saved).toEqual([
         {
           editorMarkdownSyntax: 'show',
@@ -520,17 +523,17 @@ describe('SettingsProvider', () => {
   })
 
   it('the quit flush persists changes a failed save left unconfirmed', async () => {
-    const { result } = renderHook(
+    const { result, act } = await renderHook(
       () => ({ ...useSettings(), operations: useOperations() }),
       { wrapper },
     )
     await loadSettled()
 
     failSaves = true
-    act(() => {
+    await act(() => {
       result.current.updateSettings({ editorMarkdownSyntax: 'show' })
     })
-    await waitFor(() => expect(result.current.operations).toHaveLength(1))
+    await vi.waitFor(() => expect(result.current.operations).toHaveLength(1))
     expect(saved).toEqual([])
 
     failSaves = false
@@ -574,11 +577,11 @@ describe('SettingsProvider', () => {
 
   it('surfaces a failed load and keeps changes session-only', async () => {
     failLoad = true
-    const { result } = renderHook(
+    const { result, act } = await renderHook(
       () => ({ ...useSettings(), operations: useOperations() }),
       { wrapper },
     )
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(result.current.operations).toMatchObject([
         { label: 'Loading settings', status: 'failed', message: 'corrupt store' },
       ]),
@@ -586,7 +589,7 @@ describe('SettingsProvider', () => {
 
     // Changes still apply for the session, but nothing may be written over a
     // store that couldn't be read — a defaults-built save could wipe it.
-    act(() => {
+    await act(() => {
       result.current.updateSettings({ editorMarkdownSyntax: 'show' })
     })
     expect(result.current.settings.editorMarkdownSyntax).toBe('show')

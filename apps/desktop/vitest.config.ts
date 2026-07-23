@@ -11,6 +11,13 @@ import { reactWithCompiler } from './react-compiler-plugin'
 // migration finishes. See docs/contributing/testing.md.
 const browserName = process.env.REFLECT_TEST_BROWSER === 'webkit' ? 'webkit' : 'chromium'
 
+// Directories whose `.test.tsx` files have been migrated to the browser
+// project; the rest stay in jsdom-legacy until their batch lands.
+const BROWSER_MIGRATED_TESTS = [
+  'src/routing/**/*.test.tsx',
+  'src/providers/**/*.test.tsx',
+]
+
 // `.test.ts` files that still depend on a DOM (renderHook, document event
 // listeners); they stay in jsdom until their subject moves off DOM APIs or
 // the test moves to the browser project.
@@ -82,7 +89,7 @@ export default defineConfig({
         plugins: [tailwindcss()],
         test: {
           name: 'browser',
-          include: ['src/**/*.browser.test.tsx'],
+          include: ['src/**/*.browser.test.tsx', ...BROWSER_MIGRATED_TESTS],
           setupFiles: ['./src/test-utils/setup-console.ts', './src/test-utils/setup-browser.ts'],
           // Real keyboard focus is a per-page global; parallel test files
           // would steal it from each other.
@@ -116,7 +123,11 @@ export default defineConfig({
           name: 'jsdom-legacy',
           environment: 'jsdom',
           include: ['src/**/*.test.tsx', ...JSDOM_ONLY_TESTS],
-          exclude: [...configDefaults.exclude, 'src/**/*.browser.test.tsx'],
+          exclude: [
+            ...configDefaults.exclude,
+            'src/**/*.browser.test.tsx',
+            ...BROWSER_MIGRATED_TESTS,
+          ],
         },
       }),
     ],
