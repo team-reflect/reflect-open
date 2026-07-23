@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.7.0-beta.15](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.14...v0.7.0-beta.15) (2026-07-23)
+
+
+### Features
+
+* adopt existing Markdown vaults in place ([#920](https://github.com/team-reflect/reflect-open/issues/920)) ([50962f3](https://github.com/team-reflect/reflect-open/commit/50962f3598b29a184ec2077ae1149a9e875704d1))
+* show daily note markers in iOS calendar ([#928](https://github.com/team-reflect/reflect-open/issues/928)) ([16ce9a3](https://github.com/team-reflect/reflect-open/commit/16ce9a3dbae539f93ae731f0a046c6b70f215379))
+
+
+### Bug Fixes
+
+* add Paste and Match Style (Cmd+Shift+V) to the macOS Edit menu ([#905](https://github.com/team-reflect/reflect-open/issues/905)) ([8be94e0](https://github.com/team-reflect/reflect-open/commit/8be94e0d332482419738c2203a70796cb4d8cc0e))
+* handle iCloud dataless files ([#896](https://github.com/team-reflect/reflect-open/issues/896)) ([695ed24](https://github.com/team-reflect/reflect-open/commit/695ed24d144170b146823ec5f84b56fa86826ffc))
+* keep long AI prompts within the dialog ([#930](https://github.com/team-reflect/reflect-open/issues/930)) ([645d0e2](https://github.com/team-reflect/reflect-open/commit/645d0e20b5fe67c958066d099d010d052ea2ce62))
+* update meowdown to ^0.57.0 ([#907](https://github.com/team-reflect/reflect-open/issues/907)) ([cedba83](https://github.com/team-reflect/reflect-open/commit/cedba83c5dbc5ce89134f4b39967430a170878ad))
+* update meowdown to ^0.57.1 ([#921](https://github.com/team-reflect/reflect-open/issues/921)) ([5d8323f](https://github.com/team-reflect/reflect-open/commit/5d8323fda418724803de01f1c7e64559e584588a))
+* update meowdown to ^0.57.2 ([#925](https://github.com/team-reflect/reflect-open/issues/925)) ([7c5bed8](https://github.com/team-reflect/reflect-open/commit/7c5bed8aa3189bae849147975ad65ad3f0d9dbdd))
+
 ## [0.7.0-beta.14](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.13...v0.7.0-beta.14) (2026-07-21)
 
 
