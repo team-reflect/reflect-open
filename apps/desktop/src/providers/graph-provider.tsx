@@ -20,6 +20,7 @@ import {
   createGraph,
   openGraph,
   recentGraphs,
+  subscribeReconcileRequests,
   type AppPlatform,
   type GraphInfo,
   type RecentGraph,
@@ -489,6 +490,30 @@ export function GraphProvider({
     const seq = openSeq.current
     indexRef.current.refresh(indexGeneration, () => seq !== openSeq.current)
   }, [indexGeneration])
+  const refreshIndexRef = useRef(refreshIndex)
+  refreshIndexRef.current = refreshIndex
+
+  // A structural vault change (folder created, renamed, or removed) cannot
+  // be expressed as per-file events; the watcher asks for one full reconcile
+  // instead, and `refresh` coalesces bursts into a single queued rerun.
+  useEffect(() => {
+    let unlisten: (() => void) | null = null
+    let disposed = false
+    void subscribeReconcileRequests(() => refreshIndexRef.current()).then(
+      (fn) => {
+        if (disposed) {
+          fn()
+        } else {
+          unlisten = fn
+        }
+      },
+      (error: unknown) => console.error('failed to subscribe reconcile requests:', error),
+    )
+    return () => {
+      disposed = true
+      unlisten?.()
+    }
+  }, [])
 
   const value = useMemo<GraphContextValue>(
     () => ({
