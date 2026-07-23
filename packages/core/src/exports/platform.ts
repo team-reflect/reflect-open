@@ -157,6 +157,7 @@ export {
   untitledNotePath,
   isUntitledNotePath,
   createNoteWithTitle,
+  materializeDailyNote,
   resolveOrCreateNoteWithTitle,
   type ResolveOrCreateNoteResult,
 } from '../graph/create-note'
