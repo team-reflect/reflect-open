@@ -1,5 +1,7 @@
 # Reflect
 
+[English](README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
+
 Plain-file notes for Mac and iPhone: daily notes, wiki links, local search,
 and optional AI over your own Markdown.
 
