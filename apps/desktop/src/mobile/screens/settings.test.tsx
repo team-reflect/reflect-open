@@ -274,7 +274,7 @@ describe('MobileSettings', () => {
     await expect.element(page.getByText('alex/notes')).toBeVisible()
     await expect.element(page.getByRole('button', { name: 'Disconnect GitHub' })).toBeVisible()
     await expect
-      .element(page.getByRole('button', { name: 'Connect GitHub' }))
+      .element(page.getByRole('button', { name: 'Connect GitHub', exact: true }))
       .not.toBeInTheDocument()
   })
 
