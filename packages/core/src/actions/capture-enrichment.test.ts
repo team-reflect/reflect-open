@@ -17,6 +17,7 @@ import {
   reconcile,
   scrapeMock,
   wireCaptureMocks,
+  writeAssetMock,
   writeNoteMock,
 } from './capture-harness'
 import { captureIdentity } from './capture'
@@ -34,6 +35,7 @@ vi.mock('../graph/commands', () => ({
   promoteCaptureScreenshot: vi.fn(),
   readAsset: vi.fn(),
   readNote: vi.fn(),
+  writeAsset: vi.fn(),
   writeNote: vi.fn(),
 }))
 vi.mock('./meta-scrape', () => ({
@@ -67,7 +69,7 @@ describe('reconcileCaptureEnrichment', () => {
     addSpool(envelope({ source: 'ios-share', title: '' }), { screenshot: false })
     expect((await drain()).stopped).toBeNull()
     writeNoteMock.mockClear()
-    linkPreviewMock.mockResolvedValue(true)
+    linkPreviewMock.mockResolvedValue(btoa('preview-jpeg'))
     scrapeMock.mockResolvedValue({
       title: 'An article from metadata',
       description: 'A scraped description.',
@@ -77,7 +79,12 @@ describe('reconcileCaptureEnrichment', () => {
     const outcome = await reconcile({ providers: NO_PROVIDERS })
 
     expect(outcome).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
-    expect(linkPreviewMock).toHaveBeenCalledWith(CAPTURE_URL, IDENTITY.assetPath, 3)
+    expect(linkPreviewMock).toHaveBeenCalledWith(CAPTURE_URL)
+    expect(writeAssetMock).toHaveBeenCalledWith(
+      IDENTITY.assetPath,
+      btoa('preview-jpeg'),
+      3,
+    )
     const note = files.get(IDENTITY.notePath) ?? ''
     expect(note).toContain(`captureScreenshot: ${IDENTITY.assetPath}`)
     expect(note).toContain(`![An article from metadata](${IDENTITY.assetPath})`)
@@ -88,7 +95,7 @@ describe('reconcileCaptureEnrichment', () => {
     addSpool(envelope({ source: 'ios-share' }), { screenshot: false })
     expect((await drain()).stopped).toBeNull()
     writeNoteMock.mockClear()
-    linkPreviewMock.mockResolvedValue(true)
+    linkPreviewMock.mockResolvedValue(btoa('preview-jpeg'))
 
     const outcome = await reconcile()
 
@@ -105,6 +112,28 @@ describe('reconcileCaptureEnrichment', () => {
     await reconcile()
 
     expect(linkPreviewMock).not.toHaveBeenCalled()
+  })
+
+  it('treats an empty screenshot stamp as missing', async () => {
+    addSpool(envelope({ source: 'ios-share' }), { screenshot: false })
+    expect((await drain()).stopped).toBeNull()
+    const source = files.get(IDENTITY.notePath) ?? ''
+    files.set(
+      IDENTITY.notePath,
+      source.replace('captureStatus: pending\n', "captureStatus: pending\ncaptureScreenshot: ''\n"),
+    )
+    writeNoteMock.mockClear()
+    linkPreviewMock.mockResolvedValue(btoa('preview-jpeg'))
+
+    const outcome = await reconcile({ providers: NO_PROVIDERS })
+
+    expect(outcome.enriched).toBe(1)
+    expect(linkPreviewMock).toHaveBeenCalledWith(CAPTURE_URL)
+    expect(writeAssetMock).toHaveBeenCalledWith(
+      IDENTITY.assetPath,
+      btoa('preview-jpeg'),
+      3,
+    )
   })
 
   it('continues metadata enrichment when the link preview request fails', async () => {
@@ -126,7 +155,7 @@ describe('reconcileCaptureEnrichment', () => {
     addSpool(envelope({ source: 'ios-share' }), { screenshot: false })
     expect((await drain()).stopped).toBeNull()
     writeNoteMock.mockClear()
-    linkPreviewMock.mockResolvedValue(true)
+    linkPreviewMock.mockResolvedValue(btoa('preview-jpeg'))
     getSecretMock.mockResolvedValue(null)
 
     const waiting = await reconcile()
@@ -148,13 +177,14 @@ describe('reconcileCaptureEnrichment', () => {
     writeNoteMock.mockClear()
     linkPreviewMock.mockImplementation(async () => {
       files.set(DAILY, `---\nprivate: true\n---\n\n${files.get(DAILY) ?? ''}`)
-      return true
+      return btoa('preview-jpeg')
     })
 
     const outcome = await reconcile()
 
     expect(outcome).toEqual({ pending: 1, enriched: 0, skipped: 1, stopped: null })
     expect(files.get(IDENTITY.notePath)).toContain('captureStatus: skipped')
+    expect(writeAssetMock).not.toHaveBeenCalled()
     expect(describeMock).not.toHaveBeenCalled()
   })
 

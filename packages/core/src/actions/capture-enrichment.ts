@@ -7,7 +7,14 @@ import {
 import { defaultAiProvider, type AiProvidersState } from '../ai/provider-config'
 import { aiKeySecretName } from '../ai/secrets'
 import { errorMessage, isAppError, toAppError } from '../errors'
-import { captureLinkPreview, listFiles, readAsset, readNote, writeNote } from '../graph/commands'
+import {
+  captureLinkPreview,
+  listFiles,
+  readAsset,
+  readNote,
+  writeAsset,
+  writeNote,
+} from '../graph/commands'
 import { dailyPath } from '../graph/paths'
 import { hashContent } from '../indexing/hash'
 import { parseFrontmatter, splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter'
@@ -149,18 +156,12 @@ async function readCaptureScreenshot(
   }
 }
 
-async function fetchLinkPreviewScreenshot(
-  meta: CaptureNoteMeta,
-  identity: CaptureIdentity,
-  generation: number,
-): Promise<string | null> {
-  if (meta.captureScreenshot !== undefined) {
+async function fetchLinkPreviewImage(meta: CaptureNoteMeta): Promise<string | null> {
+  if (meta.captureScreenshot) {
     return null
   }
   try {
-    return (await captureLinkPreview(meta.captureUrl, identity.assetPath, generation))
-      ? identity.assetPath
-      : null
+    return await captureLinkPreview(meta.captureUrl)
   } catch {
     return null
   }
@@ -341,9 +342,26 @@ export async function reconcileCaptureEnrichment(
       if (snapshot === null) {
         continue
       }
-      const previewScreenshot = metadataComplete
+      const previewImage = metadataComplete
         ? null
-        : await fetchLinkPreviewScreenshot(snapshot.meta, identity, input.generation)
+        : await fetchLinkPreviewImage(snapshot.meta)
+      if (stale()) {
+        return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
+      }
+      snapshot = await currentCapture(identity)
+      if (snapshot === null) {
+        continue
+      }
+      let previewScreenshot: string | null = null
+      if (previewImage !== null) {
+        try {
+          await writeAsset(identity.assetPath, previewImage, input.generation)
+          previewScreenshot = identity.assetPath
+        } catch {
+          // A preview is optional; metadata enrichment still completes when
+          // the local asset cannot be persisted.
+        }
+      }
       if (stale()) {
         return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
       }

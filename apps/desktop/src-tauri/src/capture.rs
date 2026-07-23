@@ -438,7 +438,7 @@ const CAPTURE_IMAGE_LONG_EDGE: u32 = 1600;
 fn downscale_jpeg(bytes: &[u8], max_dim: u32) -> AppResult<Vec<u8>> {
     let mut reader = image::ImageReader::new(Cursor::new(bytes))
         .with_guessed_format()
-        .map_err(|err| AppError::parse(format!("screenshot format is invalid: {err}")))?;
+        .map_err(|err| AppError::parse(format!("image format is invalid: {err}")))?;
     let mut limits = image::Limits::default();
     limits.max_image_width = Some(CAPTURE_IMAGE_MAX_DIMENSION);
     limits.max_image_height = Some(CAPTURE_IMAGE_MAX_DIMENSION);
@@ -446,7 +446,7 @@ fn downscale_jpeg(bytes: &[u8], max_dim: u32) -> AppResult<Vec<u8>> {
     reader.limits(limits);
     let decoded = reader
         .decode()
-        .map_err(|err| AppError::parse(format!("screenshot does not decode: {err}")))?;
+        .map_err(|err| AppError::parse(format!("image does not decode: {err}")))?;
     let resized = if decoded.width() > max_dim || decoded.height() > max_dim {
         decoded.resize(max_dim, max_dim, image::imageops::FilterType::CatmullRom)
     } else {
@@ -455,9 +455,9 @@ fn downscale_jpeg(bytes: &[u8], max_dim: u32) -> AppResult<Vec<u8>> {
     let mut out = Vec::new();
     let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 80);
     resized
-        .into_rgb8() // JPEG carries no alpha; screenshots are opaque
+        .into_rgb8() // JPEG carries no alpha
         .write_with_encoder(encoder)
-        .map_err(|err| AppError::io(format!("screenshot re-encode failed: {err}")))?;
+        .map_err(|err| AppError::io(format!("image re-encode failed: {err}")))?;
     Ok(out)
 }
 
@@ -493,26 +493,21 @@ pub fn capture_screenshot_promote(
 }
 
 /// Ask the platform link-preview service for one representative image and
-/// persist it as the capture's normalized JPEG asset.
+/// return a normalized JPEG for the policy layer to persist after its
+/// post-request privacy check.
 #[tauri::command]
-pub async fn capture_link_preview(
-    app: tauri::AppHandle,
-    url: String,
-    asset_path: String,
-    generation: u64,
-    state: State<'_, GraphState>,
-) -> AppResult<bool> {
+pub async fn capture_link_preview(app: tauri::AppHandle, url: String) -> AppResult<Option<String>> {
+    use base64::Engine;
+
     let Some(bytes) = crate::link_preview::fetch(&app, &url).await? else {
-        return Ok(false);
+        return Ok(None);
     };
     let jpeg = tauri::async_runtime::spawn_blocking(move || {
         downscale_jpeg(&bytes, CAPTURE_IMAGE_LONG_EDGE)
     })
     .await
     .map_err(|err| AppError::io(format!("link preview task failed: {err}")))??;
-    let root = root_for_generation(&state, generation)?;
-    persist_asset(&root, &asset_path, &jpeg)?;
-    Ok(true)
+    Ok(Some(base64::engine::general_purpose::STANDARD.encode(jpeg)))
 }
 
 // ---- meta fetch -----------------------------------------------------------------

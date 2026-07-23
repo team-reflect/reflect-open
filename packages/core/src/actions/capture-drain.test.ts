@@ -30,6 +30,7 @@ vi.mock('../graph/commands', () => ({
   promoteCaptureScreenshot: vi.fn(),
   readAsset: vi.fn(),
   readNote: vi.fn(),
+  writeAsset: vi.fn(),
   writeNote: vi.fn(),
 }))
 vi.mock('./meta-scrape', () => ({

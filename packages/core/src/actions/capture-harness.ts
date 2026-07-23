@@ -11,6 +11,7 @@ import {
   promoteCaptureScreenshot,
   readAsset,
   readNote,
+  writeAsset,
   writeNote,
 } from '../graph/commands'
 import { getSecret } from '../secrets/keychain'
@@ -45,6 +46,7 @@ export const listFilesMock = vi.mocked(listFiles)
 export const promoteMock = vi.mocked(promoteCaptureScreenshot)
 export const readAssetMock = vi.mocked(readAsset)
 export const readNoteMock = vi.mocked(readNote)
+export const writeAssetMock = vi.mocked(writeAsset)
 export const writeNoteMock = vi.mocked(writeNote)
 export const scrapeMock = vi.mocked(scrapePageMeta)
 export const describeMock = vi.mocked(describePage)
@@ -153,7 +155,10 @@ export function wireCaptureMocks(): void {
     [...files.keys()].map((path) => ({ path, size: 1, modifiedMs: 0 })),
   )
   readAssetMock.mockResolvedValue(btoa('jpeg-bytes'))
-  linkPreviewMock.mockResolvedValue(false)
+  writeAssetMock.mockImplementation(async (path, contentsBase64) => {
+    files.set(path, contentsBase64)
+  })
+  linkPreviewMock.mockResolvedValue(null)
   getSecretMock.mockResolvedValue('sk-live-key')
   scrapeMock.mockResolvedValue({ title: 'An article', description: null, siteName: null })
   describeMock.mockResolvedValue({ title: null, description: 'An AI description of the page.' })

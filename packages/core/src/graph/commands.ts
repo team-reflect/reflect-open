@@ -349,14 +349,10 @@ export async function promoteCaptureScreenshot(
 
 /**
  * Ask the native platform for one representative image for a captured URL.
- * Returns `false` when the platform or page has no preview image.
+ * Returns a base64-encoded normalized JPEG, or `null` when unavailable.
  */
-export async function captureLinkPreview(
-  url: string,
-  assetPath: string,
-  generation: number,
-): Promise<boolean> {
-  return call('capture_link_preview', { url, assetPath, generation }, z.boolean())
+export async function captureLinkPreview(url: string): Promise<string | null> {
+  return call('capture_link_preview', { url }, z.string().nullable())
 }
 
 /**
