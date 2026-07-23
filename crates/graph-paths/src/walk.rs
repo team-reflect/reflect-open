@@ -163,7 +163,9 @@ pub fn walk_catalog(root: &Path) -> FileCatalog {
             GraphPathKind::Attachment => catalog.attachments.push(file),
         }
     }
-    catalog.notes.sort_by(|left, right| left.path.cmp(&right.path));
+    catalog
+        .notes
+        .sort_by(|left, right| left.path.cmp(&right.path));
     catalog
         .attachments
         .sort_by(|left, right| left.path.cmp(&right.path));
@@ -243,9 +245,16 @@ mod tests {
                 "templates/journal.md",
             ]
         );
-        let attachments: Vec<&str> = catalog.attachments.iter().map(|f| f.path.as_str()).collect();
+        let attachments: Vec<&str> = catalog
+            .attachments
+            .iter()
+            .map(|f| f.path.as_str())
+            .collect();
         assert_eq!(attachments, vec!["Media/clip.MP4", "assets/photo.png"]);
-        assert!(catalog.notes.iter().all(|f| !f.placeholder && f.modified_ms > 0));
+        assert!(catalog
+            .notes
+            .iter()
+            .all(|f| !f.placeholder && f.modified_ms > 0));
     }
 
     #[cfg(unix)]
@@ -301,7 +310,10 @@ mod tests {
         fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
         let notes: Vec<&str> = catalog.notes.iter().map(|f| f.path.as_str()).collect();
         assert_eq!(notes, vec!["notes/a.md"]);
-        assert!(catalog.skipped >= 1, "the unreadable directory must be counted");
+        assert!(
+            catalog.skipped >= 1,
+            "the unreadable directory must be counted"
+        );
     }
 
     #[test]
@@ -338,6 +350,9 @@ mod tests {
             notes,
             vec!["Target Practice/notes.md", "notes/a.md", "vendor/notes.md"]
         );
-        assert!(catalog.skipped >= 2, "node_modules and target must be counted");
+        assert!(
+            catalog.skipped >= 2,
+            "node_modules and target must be counted"
+        );
     }
 }

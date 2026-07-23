@@ -41,6 +41,16 @@ pub(crate) use self::io::atomic_write_bytes;
 /// iCloud sweep's collision folding — an evicted canonical note must not be
 /// treated as a free slot (Plan 21).
 pub(crate) use self::io::file_occupied;
+/// Sync-exclusion marking, shared with `git::repo` (a freshly initialized
+/// backup repo must never ride a file-sync provider — Plan 21).
+pub(crate) use self::io::mark_dir_local_only;
+pub(crate) use self::io::modified_ms;
+/// The lexical traversal guard, shared with the conflict stores that mirror
+/// note paths under `.reflect/` (shadow bases, conflict archive).
+pub(crate) use self::resolve::ensure_relative;
+/// The full traversal guard, shared with sibling modules that address graph
+/// files (capture promotes screenshots into `assets/`).
+pub(crate) use self::resolve::resolve as resolve_in_graph;
 /// iCloud eviction-placeholder path construction, shared with note deletion
 /// and the desktop watcher (which treats an evicted note as present, not
 /// deleted — Plan 21). The grammar now lives in `reflect-graph-paths`.
@@ -52,16 +62,6 @@ pub(crate) use reflect_graph_paths::icloud_placeholder_target;
 /// intact), shared with the desktop watcher and the iCloud pending walk —
 /// every place that must not mistake an evicted note for a readable one.
 pub(crate) use reflect_graph_paths::is_dataless;
-/// Sync-exclusion marking, shared with `git::repo` (a freshly initialized
-/// backup repo must never ride a file-sync provider — Plan 21).
-pub(crate) use self::io::mark_dir_local_only;
-pub(crate) use self::io::modified_ms;
-/// The lexical traversal guard, shared with the conflict stores that mirror
-/// note paths under `.reflect/` (shadow bases, conflict archive).
-pub(crate) use self::resolve::ensure_relative;
-/// The full traversal guard, shared with sibling modules that address graph
-/// files (capture promotes screenshots into `assets/`).
-pub(crate) use self::resolve::resolve as resolve_in_graph;
 
 /// The open graph root plus a monotonic generation, kept **under one lock** so
 /// they swap atomically (the same pattern as the index's `IndexState`, Plan 04b).

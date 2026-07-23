@@ -222,7 +222,6 @@ mod tests {
         );
     }
 
-
     #[cfg(unix)]
     #[test]
     fn explicit_paths_refuse_symlinks() {

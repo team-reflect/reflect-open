@@ -502,7 +502,11 @@ mod tests {
         let root = dir.path();
         std::fs::create_dir_all(root.join("notes")).unwrap();
         std::fs::write(outside.path().join("decoy"), b"stub").unwrap();
-        symlink(outside.path().join("decoy"), root.join("notes/.a.md.icloud")).unwrap();
+        symlink(
+            outside.path().join("decoy"),
+            root.join("notes/.a.md.icloud"),
+        )
+        .unwrap();
 
         let effects = collect_changes(&[root.join("notes/a.md")], root);
         assert_eq!(effects.changes.len(), 1);

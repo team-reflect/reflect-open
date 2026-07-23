@@ -250,7 +250,9 @@ mod tests {
             wire_path(Path::new("Projects/./plan.md")).as_deref(),
             Some("Projects/plan.md")
         );
-        assert!(is_safe_visible(&wire_path(Path::new("Projects//plan.md")).unwrap()));
+        assert!(is_safe_visible(
+            &wire_path(Path::new("Projects//plan.md")).unwrap()
+        ));
         assert_eq!(wire_path(Path::new("")), None);
         assert_eq!(wire_path(Path::new("/absolute.md")), None);
         assert_eq!(wire_path(Path::new("../outside.md")), None);

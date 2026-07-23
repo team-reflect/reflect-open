@@ -414,7 +414,6 @@ mod tests {
         }
 
         let paths: Vec<String> = walk_notes(root.path())
-            
             .into_iter()
             .map(|note| note.rel_path)
             .collect();

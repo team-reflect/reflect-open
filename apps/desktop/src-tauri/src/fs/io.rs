@@ -526,7 +526,11 @@ pub(super) fn collect_file_catalog(root: &Path) -> FileCatalog {
     let catalog = reflect_graph_paths::walk_catalog(root);
     FileCatalog {
         notes: catalog.notes.into_iter().map(file_meta_from).collect(),
-        attachments: catalog.attachments.into_iter().map(file_meta_from).collect(),
+        attachments: catalog
+            .attachments
+            .into_iter()
+            .map(file_meta_from)
+            .collect(),
         skipped: catalog.skipped,
     }
 }
@@ -925,7 +929,11 @@ mod tests {
 
         let catalog = collect_file_catalog(dir.path());
         let notes: Vec<&str> = catalog.notes.iter().map(|f| f.path.as_str()).collect();
-        let attachments: Vec<&str> = catalog.attachments.iter().map(|f| f.path.as_str()).collect();
+        let attachments: Vec<&str> = catalog
+            .attachments
+            .iter()
+            .map(|f| f.path.as_str())
+            .collect();
         assert_eq!(notes, vec!["notes/a.md"]);
         assert_eq!(attachments, vec!["Media/clip.MP4", "assets/photo.png"]);
     }
