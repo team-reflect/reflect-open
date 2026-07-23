@@ -72,6 +72,13 @@ pub(crate) use self::resolve::resolve as resolve_in_graph;
 pub struct GraphInner {
     pub generation: u64,
     pub root: Option<PathBuf>,
+    /// Cached vault catalog for the current root, dropped on every write path
+    /// and watcher/iCloud change so listings never pin deleted files.
+    catalog: Option<io::FileCatalog>,
+    /// Monotonic invalidation epoch. A scan runs without the graph lock; it
+    /// may publish into the cache only if no invalidation happened since it
+    /// began — otherwise its result is returned to its caller but not pinned.
+    catalog_revision: u64,
 }
 
 /// Tauri-managed state holding the currently open graph (root + generation).
@@ -144,6 +151,8 @@ fn activate(state: &State<GraphState>, root: &Path) -> AppResult<GraphInfo> {
         let mut inner = lock_graph(state)?;
         inner.generation += 1;
         inner.root = Some(root.to_path_buf());
+        inner.catalog = None;
+        inner.catalog_revision = inner.catalog_revision.wrapping_add(1);
         inner.generation
     };
     let info = graph_info(root, generation);
@@ -156,9 +165,7 @@ fn activate(state: &State<GraphState>, root: &Path) -> AppResult<GraphInfo> {
     Ok(info)
 }
 
-fn lock_graph<'a>(
-    state: &'a State<GraphState>,
-) -> AppResult<std::sync::MutexGuard<'a, GraphInner>> {
+fn lock_graph(state: &GraphState) -> AppResult<std::sync::MutexGuard<'_, GraphInner>> {
     state.0.lock().map_err(|err| {
         // A poisoned lock means a command panicked while holding it — the panic
         // itself is the bug; this context points at the blast radius.
@@ -281,13 +288,15 @@ pub async fn graph_import_reflect_v1_zip(
     // Writing is fast and local; throttle the events to ~100 per import so a
     // large graph doesn't flood the webview.
     let mut last_emitted = 0usize;
-    import::finalize_import(&root, prepared, downloads, |done, total| {
+    let summary = import::finalize_import(&root, prepared, downloads, |done, total| {
         let step = (total / 100).max(1);
         if done == total || done >= last_emitted + step {
             last_emitted = done;
             emit_import_progress(&app, "writing", done, total);
         }
-    })
+    })?;
+    invalidate_file_catalog(&state, &root);
+    Ok(summary)
 }
 
 /// Cancel the running Reflect V1 import (a no-op when none is running). The
@@ -404,7 +413,9 @@ pub fn note_write(
     state: State<GraphState>,
 ) -> AppResult<Option<u64>> {
     let root = root_for_generation(&state, generation)?;
-    atomic_write(&root, &resolve(&root, &path)?, &contents)
+    let modified_ms = atomic_write(&root, &resolve(&root, &path)?, &contents)?;
+    invalidate_file_catalog(&state, &root);
+    Ok(modified_ms)
 }
 
 /// Atomically create a note only when `path` is still free. Unlike
@@ -420,7 +431,10 @@ pub fn note_create(
     let root = root_for_generation(&state, generation)?;
     let target = resolve(&root, &path)?;
     match atomic_create(&root, &target, &contents)? {
-        AtomicCreateOutcome::Created(modified_ms) => Ok(NoteCreateOutcome::Created { modified_ms }),
+        AtomicCreateOutcome::Created(modified_ms) => {
+            invalidate_file_catalog(&state, &root);
+            Ok(NoteCreateOutcome::Created { modified_ms })
+        }
         AtomicCreateOutcome::Collision => Ok(NoteCreateOutcome::Collision),
     }
 }
@@ -441,6 +455,7 @@ pub fn asset_write(
         .decode(contents_base64.as_bytes())
         .map_err(|err| AppError::io(format!("invalid base64 asset payload: {err}")))?;
     atomic_write_bytes(&root, &resolve(&root, &path)?, &bytes)?;
+    invalidate_file_catalog(&state, &root);
     Ok(())
 }
 
@@ -582,6 +597,7 @@ pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> A
     move_to_graph_trash(&root, &target)?;
     // A deleted note's sync ancestor is meaningless — drop it (Plan 21).
     crate::conflict::shadow::ShadowStore::new(&root).forget(&path);
+    invalidate_file_catalog(&state, &root);
     Ok(())
 }
 
@@ -611,6 +627,8 @@ pub fn graph_delete(generation: u64, state: State<GraphState>) -> AppResult<()> 
             }
             let root = inner.root.take().ok_or_else(AppError::no_graph)?;
             inner.generation += 1;
+            inner.catalog = None;
+            inner.catalog_revision = inner.catalog_revision.wrapping_add(1);
             root
         };
         os_trash_delete(&root)?;
@@ -695,14 +713,200 @@ fn move_to_graph_trash(root: &Path, abs: &Path) -> AppResult<()> {
 /// given, pins the listing to the issuing graph session (see [`root_for`]).
 #[tauri::command]
 pub fn list_files(generation: Option<u64>, state: State<GraphState>) -> AppResult<Vec<FileMeta>> {
-    let root = root_for(&state, generation)?;
-    Ok(note_files(&root))
+    Ok(file_catalog(&state, generation)?.notes)
 }
 
-/// The same note listing as [`list_files`], callable with a plain root —
-/// the iCloud conflict sweep walks the graph outside any Tauri state.
+/// List supported local attachments from the same cached catalog as
+/// [`list_files`].
+#[tauri::command]
+pub fn list_attachments(
+    generation: Option<u64>,
+    state: State<GraphState>,
+) -> AppResult<Vec<FileMeta>> {
+    Ok(file_catalog(&state, generation)?.attachments)
+}
+
+/// Counts from the vault catalog. `skipped` is what the walk refused or
+/// failed to list (unreadable directories, symlinks, default-pruned trees) —
+/// the number that keeps "why isn't my file showing up" diagnosable.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultScanStats {
+    pub notes: u32,
+    pub attachments: u32,
+    pub skipped: u32,
+}
+
+#[tauri::command]
+pub fn vault_scan_stats(
+    generation: Option<u64>,
+    state: State<GraphState>,
+) -> AppResult<VaultScanStats> {
+    let catalog = file_catalog(&state, generation)?;
+    Ok(VaultScanStats {
+        notes: catalog.notes.len() as u32,
+        attachments: catalog.attachments.len() as u32,
+        skipped: catalog.skipped,
+    })
+}
+
+/// The same note listing as [`list_files`], callable with a plain root — the
+/// iCloud conflict sweep and the index reconcile walk the disk fresh, outside
+/// the cache: reconcile's whole job is to re-verify what is actually there.
 pub(crate) fn note_files(root: &Path) -> Vec<FileMeta> {
     io::collect_note_files(root)
+}
+
+/// Cached catalog for the current graph. The scan runs without the graph
+/// lock; the result is always returned to the caller (fresh as of its own
+/// start), and is published into the cache only when generation, root, and
+/// invalidation epoch are unchanged — a snapshot that predates a concurrent
+/// write may serve its own caller but must never be pinned. No retry loop:
+/// under sustained writes every caller simply keeps paying for its own scan.
+fn file_catalog(state: &GraphState, generation: Option<u64>) -> AppResult<io::FileCatalog> {
+    file_catalog_with(state, generation, io::collect_file_catalog)
+}
+
+fn file_catalog_with<F>(
+    state: &GraphState,
+    generation: Option<u64>,
+    scan: F,
+) -> AppResult<io::FileCatalog>
+where
+    F: FnOnce(&Path) -> io::FileCatalog,
+{
+    let (root, expected_generation, expected_revision) = {
+        let inner = lock_graph(state)?;
+        if generation.is_some_and(|generation| generation != inner.generation) {
+            return Err(AppError::io(
+                "the graph changed since this command was issued; dropping it",
+            ));
+        }
+        if let Some(catalog) = &inner.catalog {
+            return Ok(catalog.clone());
+        }
+        (
+            inner.root.clone().ok_or_else(AppError::no_graph)?,
+            inner.generation,
+            inner.catalog_revision,
+        )
+    };
+
+    let catalog = scan(&root);
+    let mut inner = lock_graph(state)?;
+    if inner.generation == expected_generation
+        && inner.root.as_deref() == Some(root.as_path())
+        && inner.catalog.is_none()
+        && inner.catalog_revision == expected_revision
+    {
+        inner.catalog = Some(catalog.clone());
+    }
+    Ok(catalog)
+}
+
+/// Invalidate the catalog only if `root` is still the active generation's
+/// root. A late watcher/iCloud callback for a previous graph is harmless.
+pub(crate) fn invalidate_file_catalog(state: &GraphState, root: &Path) {
+    match state.0.lock() {
+        Ok(mut inner) if inner.root.as_deref() == Some(root) => {
+            inner.catalog = None;
+            inner.catalog_revision = inner.catalog_revision.wrapping_add(1);
+        }
+        Ok(_) => {}
+        Err(error) => tracing::error!(
+            ?error,
+            "graph state lock poisoned while invalidating catalog"
+        ),
+    }
+}
+
+#[cfg(test)]
+mod file_catalog_tests {
+    use super::{file_catalog, file_catalog_with, invalidate_file_catalog, GraphInner, GraphState};
+    use std::fs;
+    use std::sync::Mutex;
+
+    fn graph_at(root: &std::path::Path, generation: u64) -> GraphState {
+        GraphState(Mutex::new(GraphInner {
+            generation,
+            root: Some(root.to_path_buf()),
+            catalog: None,
+            catalog_revision: 0,
+        }))
+    }
+
+    #[test]
+    fn catalog_is_cached_until_invalidated_and_pinned_to_the_generation() {
+        let vault = tempfile::tempdir().expect("vault");
+        fs::write(vault.path().join("README.md"), "# Root\n").expect("write root note");
+        fs::create_dir_all(vault.path().join("Media")).expect("create media");
+        fs::write(vault.path().join("Media/diagram.png"), b"png").expect("write attachment");
+        let graph = graph_at(vault.path(), 7);
+
+        let first = file_catalog(&graph, Some(7)).expect("first catalog");
+        assert_eq!(first.notes[0].path, "README.md");
+        assert_eq!(first.attachments[0].path, "Media/diagram.png");
+
+        fs::create_dir_all(vault.path().join("Projects")).expect("create projects");
+        fs::write(vault.path().join("Projects/plan.md"), "# Plan\n").expect("write nested note");
+        let cached = file_catalog(&graph, Some(7)).expect("cached catalog");
+        assert_eq!(cached.notes.len(), 1);
+
+        invalidate_file_catalog(&graph, vault.path());
+        let refreshed = file_catalog(&graph, Some(7)).expect("refreshed catalog");
+        assert_eq!(
+            refreshed
+                .notes
+                .iter()
+                .map(|file| file.path.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Projects/plan.md", "README.md"]
+        );
+
+        assert!(file_catalog(&graph, Some(6)).is_err());
+    }
+
+    #[test]
+    fn invalidation_from_an_old_root_cannot_clear_the_active_catalog() {
+        let vault = tempfile::tempdir().expect("vault");
+        let old_vault = tempfile::tempdir().expect("old vault");
+        fs::write(vault.path().join("README.md"), "# Root\n").expect("write root note");
+        let graph = graph_at(vault.path(), 3);
+        file_catalog(&graph, Some(3)).expect("catalog");
+
+        invalidate_file_catalog(&graph, old_vault.path());
+
+        assert!(graph.0.lock().expect("graph lock").catalog.is_some());
+    }
+
+    #[test]
+    fn a_scan_racing_an_invalidation_serves_its_caller_but_is_never_pinned() {
+        let vault = tempfile::tempdir().expect("vault");
+        fs::write(vault.path().join("README.md"), "# Root\n").expect("write root note");
+        let graph = graph_at(vault.path(), 5);
+
+        let stale = file_catalog_with(&graph, Some(5), |root| {
+            let scanned = super::io::collect_file_catalog(root);
+            // A write lands while the scan is in flight: the scan's snapshot
+            // may serve its own caller, but must not become the cache.
+            fs::write(root.join("arrived.md"), "# Arrived\n").expect("write racing note");
+            invalidate_file_catalog(&graph, root);
+            scanned
+        })
+        .expect("racing catalog");
+        assert_eq!(stale.notes.len(), 1);
+        assert!(graph.0.lock().expect("graph lock").catalog.is_none());
+
+        let fresh = file_catalog(&graph, Some(5)).expect("fresh catalog");
+        assert_eq!(
+            fresh
+                .notes
+                .iter()
+                .map(|file| file.path.as_str())
+                .collect::<Vec<_>>(),
+            vec!["README.md", "arrived.md"]
+        );
+    }
 }
 
 #[cfg(test)]

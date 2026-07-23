@@ -249,6 +249,31 @@ export async function listFiles(generation?: number): Promise<FileMeta[]> {
 }
 
 /**
+ * List supported local attachments anywhere in the vault, from the same
+ * cached catalog as {@link listFiles}.
+ */
+export async function listAttachments(generation?: number): Promise<FileMeta[]> {
+  return call('list_attachments', { generation }, z.array(fileMetaSchema))
+}
+
+const vaultScanStatsSchema = z.object({
+  notes: z.number(),
+  attachments: z.number(),
+  skipped: z.number(),
+})
+
+export type VaultScanStats = z.infer<typeof vaultScanStatsSchema>
+
+/**
+ * Counts from the vault catalog. `skipped` is what the walk refused or failed
+ * to list (unreadable directories, symlinks, default-pruned trees) — surfaced
+ * so "why isn't my file showing up" stays diagnosable.
+ */
+export async function vaultScanStats(generation?: number): Promise<VaultScanStats> {
+  return call('vault_scan_stats', { generation }, vaultScanStatsSchema)
+}
+
+/**
  * Point the capture host at the active graph (pointer file + inbox dir) and
  * rewrite native-messaging manifests for detected browsers. Called after
  * every graph open — rewriting self-heals app moves (Plan 11).

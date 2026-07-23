@@ -272,6 +272,7 @@ pub fn note_move_indexed<R: tauri::Runtime>(
             return Err(err);
         }
     }
+    crate::fs::invalidate_file_catalog(&graph, &root);
     emit_index_written(&app);
     emit_note_moved(&app, &from, &to);
     Ok(())
