@@ -19,10 +19,11 @@ describe('NoteRowList', () => {
       snippet: [],
     }
 
-    const view = await render(<NoteRowList rows={[row]} onOpen={() => {}} />)
+    const view = await render(<NoteRowList rows={[row]} onOpen={() => { }} />)
     const match = view.getByText('Tim Mac')
 
-    expect(match.element().tagName).toBe('MARK')
+    await expect.element(match).toBeInTheDocument()
+    await vi.waitFor(() =>  expect(match.element().tagName).toBe('MARK'))
     await expect.element(match).toHaveClass('bg-primary/15')
     await expect.element(view.getByRole('button')).toHaveTextContent('Tim MacCaw')
   })
