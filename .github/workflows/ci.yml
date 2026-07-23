@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   node:
-    name: Lint · typecheck · non-desktop tests · build (Node)
+    name: Lint · typecheck · node tests · build (Node)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -52,16 +52,15 @@ jobs:
       - name: Test non-desktop packages
         run: pnpm turbo run test --filter='!@reflect/desktop'
 
+      - name: Test desktop non-browser suites
+        run: pnpm --filter @reflect/desktop exec vitest run --project jsdom-legacy
+
       - name: Build
         run: pnpm build
 
-  desktop-tests:
-    name: Desktop tests (${{ matrix.shard }}/3)
+  chromium:
+    name: Desktop browser tests (Chromium)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -79,8 +78,39 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Test desktop shard
-        run: pnpm --filter @reflect/desktop exec vitest run --shard=${{ matrix.shard }}/3
+      - name: Install Playwright Chromium
+        run: pnpm --filter @reflect/desktop exec playwright install --with-deps chromium
+
+      - name: Test desktop browser suites
+        run: pnpm --filter @reflect/desktop exec vitest run --project browser
+
+  webkit:
+    name: Desktop browser tests (WebKit)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+
+      - name: Install Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright WebKit
+        run: pnpm --filter @reflect/desktop exec playwright install webkit
+
+      - name: Test desktop browser suites
+        run: pnpm --filter @reflect/desktop exec vitest run --project browser
+        env:
+          REFLECT_TEST_BROWSER: webkit
 
   rust:
     name: fmt · clippy · test (Rust)
