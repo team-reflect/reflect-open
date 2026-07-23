@@ -1,5 +1,6 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { cleanup, render } from 'vitest-browser-react'
+import { page } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getConflictedNotes, type GraphInfo } from '@reflect/core'
 import type { BackupState } from '@/lib/backup-controller'
@@ -44,15 +45,15 @@ beforeEach(() => {
   vi.mocked(getConflictedNotes).mockResolvedValue([])
 })
 
-afterEach(() => {
-  cleanup()
+afterEach(async () => {
+  await cleanup()
   queryClient.clear()
   publishKeyboardHeight(0)
   vi.clearAllMocks()
 })
 
-function mount(): void {
-  render(
+async function mount(): Promise<void> {
+  await render(
     <QueryClientProvider client={queryClient}>
       <SyncStatusPill />
     </QueryClientProvider>,
@@ -61,17 +62,17 @@ function mount(): void {
 
 describe('SyncStatusPill', () => {
   it('hides in the quiet Backed up state', async () => {
-    mount()
+    await mount()
 
     await Promise.resolve()
-    expect(screen.queryByRole('status')).toBeNull()
+    await expect.element(page.getByRole('status')).not.toBeInTheDocument()
   })
 
   it('shows Syncing while a cycle runs', async () => {
     sync.backup = connected({ state: 'syncing' })
-    mount()
+    await mount()
 
-    expect((await screen.findByRole('status')).textContent).toBe('Syncing')
+    await expect.element(page.getByRole('status')).toHaveTextContent('Syncing')
   })
 
   it('claims nothing until the conflict count is known', async () => {
@@ -79,10 +80,10 @@ describe('SyncStatusPill', () => {
     // (reads as Backed up) to Needs review.
     sync.backup = connected({ state: 'offline', message: 'Offline' })
     vi.mocked(getConflictedNotes).mockReturnValue(new Promise(() => {}))
-    mount()
+    await mount()
 
     await Promise.resolve()
-    expect(screen.queryByRole('status')).toBeNull()
+    await expect.element(page.getByRole('status')).not.toBeInTheDocument()
   })
 
   it('still shows engine states when the conflict count fails to load', async () => {
@@ -90,26 +91,24 @@ describe('SyncStatusPill', () => {
     // engine truth and would otherwise blank forever.
     sync.backup = connected({ state: 'offline', message: 'Offline' })
     vi.mocked(getConflictedNotes).mockRejectedValue(new Error('index unavailable'))
-    mount()
+    await mount()
 
-    expect((await screen.findByRole('status')).textContent).toBe('Offline')
+    await expect.element(page.getByRole('status')).toHaveTextContent('Offline')
   })
 
   it('shows Needs review while conflicted notes exist', async () => {
     vi.mocked(getConflictedNotes).mockResolvedValue([{ path: 'notes/a.md', title: 'A' }])
-    mount()
+    await mount()
 
-    await waitFor(() => {
-      expect(screen.getByRole('status').textContent).toBe('Needs review')
-    })
+    await expect.element(page.getByRole('status')).toHaveTextContent('Needs review')
   })
 
   it('yields to the software keyboard', async () => {
     sync.backup = connected({ state: 'syncing' })
     publishKeyboardHeight(300)
-    mount()
+    await mount()
 
     await Promise.resolve()
-    expect(screen.queryByRole('status')).toBeNull()
+    await expect.element(page.getByRole('status')).not.toBeInTheDocument()
   })
 })
