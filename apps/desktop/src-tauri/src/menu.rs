@@ -6,12 +6,12 @@
 //! nil target, so macOS delivers it to the focused view. WKWebView handles
 //! this selector; Safari's own "Paste and Match Style" item sends the same
 //! one:
-//! <https://github.com/WebKit/WebKit/blob/85b404d9be36a777d5765440185ace8e2fd7a600/Source/WebKit/UIProcess/API/mac/WKWebViewMac.mm#L346>
+//! https://github.com/WebKit/WebKit/blob/85b404d9be36a777d5765440185ace8e2fd7a600/Source/WebKit/UIProcess/API/mac/WKWebViewMac.mm#L346
 //!
 //! WebKit then reads the clipboard itself and fires a normal DOM `paste`
 //! event in the page. That event carries only `text/plain`; the HTML flavor
 //! is dropped:
-//! <https://github.com/WebKit/WebKit/blob/85b404d9be36a777d5765440185ace8e2fd7a600/Source/WebCore/editing/Editor.cpp#L471-L478>
+//! https://github.com/WebKit/WebKit/blob/85b404d9be36a777d5765440185ace8e2fd7a600/Source/WebCore/editing/Editor.cpp#L471-L478
 //!
 //! The editor handles it like any other paste and inserts plain text. This
 //! module never reads the clipboard and never sends text over IPC.
@@ -25,24 +25,24 @@
 //!
 //! - custom items always get muda's own `fireMenuItemAction:` selector,
 //!   which routes the click back to app code:
-//!   <https://github.com/tauri-apps/muda/blob/muda-v0.19.3/src/platform_impl/macos/mod.rs#L834>
-//!   (its handler: <https://github.com/tauri-apps/muda/blob/muda-v0.19.3/src/platform_impl/macos/mod.rs#L1034>)
+//!   https://github.com/tauri-apps/muda/blob/muda-v0.19.3/src/platform_impl/macos/mod.rs#L834
+//!   (its handler: https://github.com/tauri-apps/muda/blob/muda-v0.19.3/src/platform_impl/macos/mod.rs#L1034)
 //! - predefined items map to a fixed selector list (`paste:`, `copy:`, ...)
 //!   that has no paste-as-plain-text entry:
-//!   <https://github.com/tauri-apps/muda/blob/muda-v0.19.3/src/platform_impl/macos/mod.rs#L983>
+//!   https://github.com/tauri-apps/muda/blob/muda-v0.19.3/src/platform_impl/macos/mod.rs#L983
 //!
 //! Open upstream requests for more native items:
-//! <https://github.com/tauri-apps/muda/issues/83> and
-//! <https://github.com/tauri-apps/tauri/issues/2802>.
+//! https://github.com/tauri-apps/muda/issues/83 and
+//! https://github.com/tauri-apps/tauri/issues/2802.
 //!
 //! # Why the webview triggers this, and only after the menu is installed
 //!
 //! The frontend replaces the whole app menu at startup: `installNativeMenu`
 //! (`apps/desktop/src/lib/native-menu/menu.ts`) builds its own menu and
 //! calls `Menu.setAsAppMenu` from `@tauri-apps/api/menu`
-//! (<https://github.com/tauri-apps/tauri/blob/@tauri-apps/api-v2.11.1/packages/api/src/menu/menu.ts#L237>),
+//! (https://github.com/tauri-apps/tauri/blob/@tauri-apps/api-v2.11.1/packages/api/src/menu/menu.ts#L237),
 //! which installs it as the new `NSApp.mainMenu` on the Rust side
-//! (<https://github.com/tauri-apps/tauri/blob/tauri-v2.11.3/crates/tauri/src/app.rs#L961>).
+//! (https://github.com/tauri-apps/tauri/blob/tauri-v2.11.3/crates/tauri/src/app.rs#L961).
 //! Any item added to the menu before that point is thrown away together with
 //! the old menu. So `installNativeMenu` invokes this command as its last
 //! step, and the item lands in the menu that is actually on screen, the same
