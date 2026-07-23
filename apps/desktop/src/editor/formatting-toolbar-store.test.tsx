@@ -1,4 +1,5 @@
-import { act, renderHook } from '@testing-library/react'
+import { act } from 'react'
+import { renderHook } from 'vitest-browser-react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   clearFormattingToolbar,
@@ -7,7 +8,9 @@ import {
   type FormattingToolbar,
 } from './formatting-toolbar-store'
 
-function makeToolbar(overrides: Partial<FormattingToolbar['capabilities']> = {}): FormattingToolbar {
+function makeToolbar(
+  overrides: Partial<FormattingToolbar['capabilities']> = {},
+): FormattingToolbar {
   return {
     capabilities: {
       canIndent: false,
@@ -45,8 +48,8 @@ afterEach(() => {
 })
 
 describe('formatting toolbar store', () => {
-  it('publishes and clears the active toolbar', () => {
-    const view = renderHook(() => useFormattingToolbar())
+  it('publishes and clears the active toolbar', async () => {
+    const view = await renderHook(() => useFormattingToolbar())
     expect(view.result.current).toBeNull()
 
     const owner = makeOwner()
@@ -58,8 +61,8 @@ describe('formatting toolbar store', () => {
     expect(view.result.current).toBeNull()
   })
 
-  it('drops a refresh with equal capabilities and the same commands', () => {
-    const view = renderHook(() => useFormattingToolbar())
+  it('drops a refresh with equal capabilities and the same commands', async () => {
+    const view = await renderHook(() => useFormattingToolbar())
     const owner = makeOwner()
     const toolbar = makeToolbar()
     act(() => publishFormattingToolbar(owner, toolbar))
@@ -84,8 +87,8 @@ describe('formatting toolbar store', () => {
     expect(view.result.current?.capabilities.canIndent).toBe(true)
   })
 
-  it('ignores a stale clear after another editor took over', () => {
-    const view = renderHook(() => useFormattingToolbar())
+  it('ignores a stale clear after another editor took over', async () => {
+    const view = await renderHook(() => useFormattingToolbar())
     const first = makeOwner()
     const second = makeOwner()
     act(() => publishFormattingToolbar(first, makeToolbar()))

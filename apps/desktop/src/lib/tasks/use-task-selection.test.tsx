@@ -1,4 +1,5 @@
-import { act, renderHook } from '@testing-library/react'
+import { act } from 'react'
+import { renderHook } from 'vitest-browser-react'
 import { describe, expect, it } from 'vitest'
 import { useTaskSelection } from './use-task-selection'
 
@@ -6,8 +7,8 @@ const KEYS = ['a', 'b', 'c', 'd']
 const noMods = { metaKey: false, ctrlKey: false, shiftKey: false }
 
 describe('useTaskSelection', () => {
-  it('selects exclusively, toggles with ⌘, and ranges with shift', () => {
-    const { result } = renderHook(() => useTaskSelection(KEYS))
+  it('selects exclusively, toggles with ⌘, and ranges with shift', async () => {
+    const { result } = await renderHook(() => useTaskSelection(KEYS))
 
     act(() => result.current.clickSelect('b', noMods))
     expect([...result.current.selected]).toEqual(['b'])
@@ -24,8 +25,8 @@ describe('useTaskSelection', () => {
     expect([...result.current.selected]).toEqual(['a', 'b', 'c'])
   })
 
-  it('moves a single selection and extends a range with the arrows', () => {
-    const { result } = renderHook(() => useTaskSelection(KEYS))
+  it('moves a single selection and extends a range with the arrows', async () => {
+    const { result } = await renderHook(() => useTaskSelection(KEYS))
 
     act(() => result.current.clickSelect('b', noMods))
     act(() => result.current.move(1))
@@ -43,8 +44,8 @@ describe('useTaskSelection', () => {
     expect([...result.current.selected]).toEqual(['b', 'c'])
   })
 
-  it('clamps movement at the ends and selects all / clears', () => {
-    const { result } = renderHook(() => useTaskSelection(KEYS))
+  it('clamps movement at the ends and selects all / clears', async () => {
+    const { result } = await renderHook(() => useTaskSelection(KEYS))
 
     act(() => result.current.clickSelect('a', noMods))
     act(() => result.current.move(-1)) // already at the top
@@ -61,10 +62,11 @@ describe('useTaskSelection', () => {
     expect([...result.current.selected]).toEqual(['a'])
   })
 
-  it('tracks the active pivot (cursor, else anchor) for Return-to-add', () => {
-    const { result, rerender } = renderHook(({ keys }) => useTaskSelection(keys), {
-      initialProps: { keys: KEYS },
-    })
+  it('tracks the active pivot (cursor, else anchor) for Return-to-add', async () => {
+    const { result, rerender } = await renderHook(
+      ({ keys }: { keys: string[] } = { keys: KEYS }) => useTaskSelection(keys),
+      { initialProps: { keys: KEYS } },
+    )
     expect(result.current.activeKey()).toBeNull()
 
     act(() => result.current.clickSelect('b', noMods))
@@ -82,24 +84,25 @@ describe('useTaskSelection', () => {
 
     // A pruned pivot (its row left the order) falls back to null.
     act(() => result.current.clickSelect('d', noMods))
-    rerender({ keys: ['a', 'b'] })
+    await rerender({ keys: ['a', 'b'] })
     expect(result.current.activeKey()).toBeNull()
   })
 
-  it('prunes keys that leave the visible order', () => {
-    const { result, rerender } = renderHook(({ keys }) => useTaskSelection(keys), {
-      initialProps: { keys: KEYS },
-    })
+  it('prunes keys that leave the visible order', async () => {
+    const { result, rerender } = await renderHook(
+      ({ keys }: { keys: string[] } = { keys: KEYS }) => useTaskSelection(keys),
+      { initialProps: { keys: KEYS } },
+    )
 
     act(() => result.current.selectAll())
     expect(result.current.selectedCount).toBe(4)
 
     // 'b' and 'd' completed / filtered away — the selection drops them.
-    rerender({ keys: ['a', 'c'] })
+    await rerender({ keys: ['a', 'c'] })
     expect([...result.current.selected]).toEqual(['a', 'c'])
     expect(result.current.isSoleSelected('a')).toBe(false)
 
-    rerender({ keys: ['a'] })
+    await rerender({ keys: ['a'] })
     expect(result.current.isSoleSelected('a')).toBe(true)
   })
 })

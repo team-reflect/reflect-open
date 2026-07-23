@@ -1,4 +1,5 @@
-import { act, cleanup, renderHook } from '@testing-library/react'
+import { act } from 'react'
+import { cleanup, renderHook } from 'vitest-browser-react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { useSwipeTarget } from './use-swipe-target'
 
@@ -13,10 +14,14 @@ import { useSwipeTarget } from './use-swipe-target'
 const ARRIVAL = '0:1:2026-07-06'
 const NEXT_ARRIVAL = '0:2:2026-07-06'
 
-function mountSwipeTarget(navigationKey: string) {
-  return renderHook((props: { navigationKey: string }) => useSwipeTarget(props.navigationKey), {
-    initialProps: { navigationKey },
-  })
+async function mountSwipeTarget(navigationKey: string) {
+  return await renderHook(
+    (props: { navigationKey: string } = { navigationKey }) =>
+      useSwipeTarget(props.navigationKey),
+    {
+      initialProps: { navigationKey },
+    },
+  )
 }
 
 afterEach(() => {
@@ -24,30 +29,30 @@ afterEach(() => {
 })
 
 describe('useSwipeTarget', () => {
-  it('starts with no target', () => {
-    const hook = mountSwipeTarget(ARRIVAL)
+  it('starts with no target', async () => {
+    const hook = await mountSwipeTarget(ARRIVAL)
     expect(hook.result.current.targetDate).toBeNull()
   })
 
-  it('follows a target announced by the current arrival', () => {
-    const hook = mountSwipeTarget(ARRIVAL)
+  it('follows a target announced by the current arrival', async () => {
+    const hook = await mountSwipeTarget(ARRIVAL)
     act(() => hook.result.current.followSwipeTarget('2026-07-07', ARRIVAL))
     expect(hook.result.current.targetDate).toBe('2026-07-07')
   })
 
-  it('clears the target on any new arrival', () => {
-    const hook = mountSwipeTarget(ARRIVAL)
+  it('clears the target on any new arrival', async () => {
+    const hook = await mountSwipeTarget(ARRIVAL)
     act(() => hook.result.current.followSwipeTarget('2026-07-07', ARRIVAL))
 
     // A date-preserving Today tap: only the arrival identity moves.
-    hook.rerender({ navigationKey: NEXT_ARRIVAL })
+    await hook.rerender({ navigationKey: NEXT_ARRIVAL })
 
     expect(hook.result.current.targetDate).toBeNull()
   })
 
-  it('rejects a target from a superseded arrival', () => {
-    const hook = mountSwipeTarget(ARRIVAL)
-    hook.rerender({ navigationKey: NEXT_ARRIVAL })
+  it('rejects a target from a superseded arrival', async () => {
+    const hook = await mountSwipeTarget(ARRIVAL)
+    await hook.rerender({ navigationKey: NEXT_ARRIVAL })
 
     // The old swipe's deferred pointer-up work lands after Today has won.
     act(() => hook.result.current.followSwipeTarget('2026-07-07', ARRIVAL))
@@ -55,10 +60,10 @@ describe('useSwipeTarget', () => {
     expect(hook.result.current.targetDate).toBeNull()
   })
 
-  it('keeps following the arrival that owns the gesture', () => {
-    const hook = mountSwipeTarget(ARRIVAL)
+  it('keeps following the arrival that owns the gesture', async () => {
+    const hook = await mountSwipeTarget(ARRIVAL)
     act(() => hook.result.current.followSwipeTarget('2026-07-07', ARRIVAL))
-    hook.rerender({ navigationKey: NEXT_ARRIVAL })
+    await hook.rerender({ navigationKey: NEXT_ARRIVAL })
 
     // A fresh swipe under the new arrival is followed again.
     act(() => hook.result.current.followSwipeTarget('2026-07-05', NEXT_ARRIVAL))

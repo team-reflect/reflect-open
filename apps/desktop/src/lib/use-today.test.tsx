@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
+import { act } from 'react'
+import { renderHook } from 'vitest-browser-react'
 import { useToday } from './use-today'
 
 beforeEach(() => {
@@ -10,9 +11,9 @@ afterEach(() => {
 })
 
 describe('useToday', () => {
-  it('rolls over when local midnight passes, then keeps rolling', () => {
+  it('rolls over when local midnight passes, then keeps rolling', async () => {
     vi.setSystemTime(new Date(2026, 5, 9, 23, 59, 0)) // June 9, 23:59 local
-    const { result } = renderHook(() => useToday())
+    const { result } = await renderHook(() => useToday())
     expect(result.current).toBe('2026-06-09')
 
     act(() => {
@@ -26,10 +27,10 @@ describe('useToday', () => {
     expect(result.current).toBe('2026-06-11')
   })
 
-  it('cleans its timer up on unmount', () => {
+  it('cleans its timer up on unmount', async () => {
     vi.setSystemTime(new Date(2026, 5, 9, 12, 0, 0))
-    const { unmount } = renderHook(() => useToday())
-    unmount()
+    const { unmount } = await renderHook(() => useToday())
+    await unmount()
     expect(vi.getTimerCount()).toBe(0)
   })
 })

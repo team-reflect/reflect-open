@@ -1,4 +1,5 @@
-import { act, renderHook, waitFor } from '@testing-library/react'
+import { act } from 'react'
+import { renderHook } from 'vitest-browser-react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const invoke = vi.hoisted(() => vi.fn<(command: string, args?: unknown) => Promise<unknown>>())
@@ -13,15 +14,16 @@ const pluginEvents = vi.hoisted(() => ({
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke,
-  addPluginListener: vi.fn(async (_plugin: string, event: string, handler: (p: unknown) => void) => {
-    pluginEvents.handlers.set(event, handler)
-    return { unregister: vi.fn() }
-  }),
+  addPluginListener: vi.fn(
+    async (_plugin: string, event: string, handler: (p: unknown) => void) => {
+      pluginEvents.handlers.set(event, handler)
+      return { unregister: vi.fn() }
+    },
+  ),
 }))
 
-const { isStagedPathClaimed, releaseStagedPath, useNativeAudioRecorder } = await import(
-  './use-native-audio-recorder'
-)
+const { isStagedPathClaimed, releaseStagedPath, useNativeAudioRecorder } =
+  await import('./use-native-audio-recorder')
 
 function base64Of(text: string): string {
   return btoa(text)
@@ -29,10 +31,8 @@ function base64Of(text: string): string {
 
 const onNativeStop = vi.fn()
 
-function renderRecorder() {
-  return renderHook(() =>
-    useNativeAudioRecorder({ maxDurationMs: 600_000, onNativeStop }),
-  )
+async function renderRecorder() {
+  return await renderHook(() => useNativeAudioRecorder({ maxDurationMs: 600_000, onNativeStop }))
 }
 
 beforeEach(() => {
@@ -43,7 +43,7 @@ beforeEach(() => {
 
 describe('useNativeAudioRecorder', () => {
   it('start invokes the plugin with the cap and flips to recording', async () => {
-    const { result } = renderRecorder()
+    const { result } = await renderRecorder()
     expect(result.current.status).toBe('idle')
 
     await act(async () => {
@@ -58,7 +58,7 @@ describe('useNativeAudioRecorder', () => {
 
   it('a rejected start resets to idle and rethrows for the caller', async () => {
     invoke.mockRejectedValueOnce('microphone access denied')
-    const { result } = renderRecorder()
+    const { result } = await renderRecorder()
 
     await expect(
       act(async () => {
@@ -82,7 +82,7 @@ describe('useNativeAudioRecorder', () => {
       }
       throw new Error(`unexpected invoke: ${command}`)
     })
-    const { result } = renderRecorder()
+    const { result } = await renderRecorder()
 
     await act(async () => {
       await result.current.start()
@@ -113,7 +113,7 @@ describe('useNativeAudioRecorder', () => {
       }
       return undefined
     })
-    const { result } = renderRecorder()
+    const { result } = await renderRecorder()
 
     await act(async () => {
       await result.current.start()
@@ -131,8 +131,8 @@ describe('useNativeAudioRecorder', () => {
   })
 
   it('level events feed the waveform only while recording', async () => {
-    const { result } = renderRecorder()
-    await waitFor(() => expect(pluginEvents.handlers.has('recordingLevel')).toBe(true))
+    const { result } = await renderRecorder()
+    await vi.waitFor(() => expect(pluginEvents.handlers.has('recordingLevel')).toBe(true))
 
     act(() => {
       pluginEvents.emit('recordingLevel', { level: 0.5, elapsedMs: 1200 })
@@ -157,8 +157,8 @@ describe('useNativeAudioRecorder', () => {
       }
       return undefined
     })
-    const { result } = renderRecorder()
-    await waitFor(() => expect(pluginEvents.handlers.has('recordingStopped')).toBe(true))
+    const { result } = await renderRecorder()
+    await vi.waitFor(() => expect(pluginEvents.handlers.has('recordingStopped')).toBe(true))
     await act(async () => {
       await result.current.start()
     })
@@ -173,7 +173,7 @@ describe('useNativeAudioRecorder', () => {
     })
 
     expect(result.current.status).toBe('idle')
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(onNativeStop).toHaveBeenCalledWith(
         expect.objectContaining({
           stagedPath: path,
@@ -188,8 +188,8 @@ describe('useNativeAudioRecorder', () => {
 
   it('a too-short native stop deletes the file and reports null', async () => {
     const path = '/staging/native-short.m4a'
-    renderRecorder()
-    await waitFor(() => expect(pluginEvents.handlers.has('recordingStopped')).toBe(true))
+    await renderRecorder()
+    await vi.waitFor(() => expect(pluginEvents.handlers.has('recordingStopped')).toBe(true))
 
     await act(async () => {
       pluginEvents.emit('recordingStopped', {
@@ -200,7 +200,7 @@ describe('useNativeAudioRecorder', () => {
       })
     })
 
-    await waitFor(() => expect(onNativeStop).toHaveBeenCalledWith(null))
+    await vi.waitFor(() => expect(onNativeStop).toHaveBeenCalledWith(null))
     expect(invoke).toHaveBeenCalledWith('plugin:recording|delete_staged', {
       request: { path },
     })
@@ -215,8 +215,8 @@ describe('useNativeAudioRecorder', () => {
       }
       return undefined
     })
-    renderRecorder()
-    await waitFor(() => expect(pluginEvents.handlers.has('recordingStopped')).toBe(true))
+    await renderRecorder()
+    await vi.waitFor(() => expect(pluginEvents.handlers.has('recordingStopped')).toBe(true))
 
     await act(async () => {
       pluginEvents.emit('recordingStopped', {
@@ -229,7 +229,7 @@ describe('useNativeAudioRecorder', () => {
 
     // The file is left staged (released) for the orphan scan, but the host is
     // still notified so the recording UI closes rather than stranding.
-    await waitFor(() => expect(isStagedPathClaimed(path)).toBe(false))
+    await vi.waitFor(() => expect(isStagedPathClaimed(path)).toBe(false))
     expect(onNativeStop).toHaveBeenCalledWith(null)
   })
 
@@ -245,8 +245,8 @@ describe('useNativeAudioRecorder', () => {
       }
       return undefined
     })
-    const { result } = renderRecorder()
-    await waitFor(() => expect(pluginEvents.handlers.has('recordingStopped')).toBe(true))
+    const { result } = await renderRecorder()
+    await vi.waitFor(() => expect(pluginEvents.handlers.has('recordingStopped')).toBe(true))
 
     let startPromise: Promise<void> = Promise.resolve()
     await act(async () => {

@@ -1,12 +1,14 @@
-import { act, fireEvent, render, waitFor } from '@testing-library/react'
+import { render } from 'vitest-browser-react'
+import { page } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { useEffect } from 'react'
+import { act, useEffect } from 'react'
 import { todayIso } from '@/lib/dates'
 import { createDayWindow, neighborDate } from '@/lib/day-window'
 import { RouterProvider, useRouter, type NavigateOptions } from '@/routing/router'
 import type { Route } from '@/routing/route'
-import { installVirtuaTestEnv } from '@/test-utils/virtua-jsdom'
-import { DailyStream, ESTIMATED_DAY_HEIGHT } from './daily-stream'
+import { fireEvent } from '@/test-utils/fire-event'
+import '@/test-utils/locator'
+import { DailyStream } from './daily-stream'
 
 /**
  * The stream's arrival-focus contract: every fresh arrival autofocuses the
@@ -88,26 +90,7 @@ vi.mock('@/providers/settings-provider', () => ({
   }),
 }))
 
-installVirtuaTestEnv((element) =>
-  element.dataset['testid'] === 'daily-stream' ? 800 : ESTIMATED_DAY_HEIGHT,
-)
-Element.prototype.scrollTo ??= () => {}
-
-// virtua anchors by assigning `scrollTop`, which jsdom ignores by default —
-// retain the value so scroll events report the anchored offset back.
-let scrollTop = 0
-Object.defineProperty(HTMLElement.prototype, 'scrollTop', {
-  configurable: true,
-  get() {
-    return scrollTop
-  },
-  set(value: number) {
-    scrollTop = Number(value)
-  },
-})
-
 beforeEach(() => {
-  scrollTop = 0
   focusLog.calls.length = 0
 })
 
@@ -121,34 +104,28 @@ function NavigateProbe({ onReady }: { onReady: (navigate: Navigate) => void }): 
   return null
 }
 
-function renderStream() {
+async function renderStream() {
   let navigate: Navigate = () => {
     throw new Error('navigate not ready')
   }
-  const view = render(
-    <RouterProvider initialRoute={{ kind: 'today' }}>
-      <DailyStream target={{ kind: 'today' }} />
-      <NavigateProbe
-        onReady={(run) => {
-          navigate = run
-        }}
-      />
-    </RouterProvider>,
+  const view = await render(
+    <div style={{ height: 800 }}>
+      <RouterProvider initialRoute={{ kind: 'today' }}>
+        <DailyStream target={{ kind: 'today' }} />
+        <NavigateProbe
+          onReady={(run) => {
+            navigate = run
+          }}
+        />
+      </RouterProvider>
+    </div>,
   )
   const paneFor = (date: string) =>
-    view.container.querySelector(`[data-testid="pane-probe"][data-date="${date}"]`)
+    page.locate(`[data-testid="pane-probe"][data-date="${date}"]`)
   return {
     view,
     navigate: (route: Route, options?: NavigateOptions) => navigate(route, options),
-    // jsdom fires no scroll events, so virtua never learns about the offset
-    // the arrival assigned — nudge it until the target day's row renders.
-    anchored: (date: string) =>
-      waitFor(() => {
-        const stream = view.container.querySelector('[data-testid="daily-stream"]')
-        expect(stream).not.toBeNull()
-        fireEvent.scroll(stream!)
-        expect(paneFor(date)).not.toBeNull()
-      }),
+    anchored: (date: string) => expect.element(paneFor(date)).toBeInTheDocument(),
     paneFor,
   }
 }
@@ -156,27 +133,27 @@ function renderStream() {
 describe('DailyStream arrival focus', () => {
   it('a capture arrival (focusEditor) focuses today with the caret at the end', async () => {
     const today = todayIso()
-    const { view, navigate, anchored, paneFor } = renderStream()
+    const { view, navigate, anchored, paneFor } = await renderStream()
 
-    act(() => navigate({ kind: 'today' }, { focusEditor: true }))
+    await act(() => navigate({ kind: 'today' }, { focusEditor: true }))
     await anchored(today)
 
     const pane = paneFor(today)
-    expect(pane?.getAttribute('data-autofocus')).toBe('true')
-    expect(pane?.getAttribute('data-selection')).toBe('end')
-    view.unmount()
+    await expect.element(pane).toHaveAttribute('data-autofocus', 'true')
+    await expect.element(pane).toHaveAttribute('data-selection', 'end')
+    await view.unmount()
   })
 
   it('clicking a day’s date heading focuses that day’s note at its start', async () => {
     const today = todayIso()
     const yesterday = neighborDate(createDayWindow(today), today, -1)
     expect(yesterday).not.toBeNull()
-    const { view, anchored, paneFor } = renderStream()
+    const { view, anchored, paneFor } = await renderStream()
     await anchored(today)
-    await waitFor(() => expect(paneFor(yesterday!)).not.toBeNull())
+    await expect.element(paneFor(yesterday!)).toBeInTheDocument()
     focusLog.calls.length = 0
 
-    const heading = paneFor(yesterday!)?.closest('section')?.querySelector('h2')
+    const heading = paneFor(yesterday!).element().closest('section')?.querySelector('h2')
     expect(heading).not.toBeNull()
     fireEvent.click(heading!)
 
@@ -184,7 +161,7 @@ describe('DailyStream arrival focus', () => {
       `focus:${yesterday}`,
       `setSelection:${yesterday}:start`,
     ])
-    view.unmount()
+    await view.unmount()
   })
 
   it('a heading click focuses even while a selection stands elsewhere', async () => {
@@ -192,11 +169,11 @@ describe('DailyStream arrival focus', () => {
     // on it leaves an editor selection uncollapsed — the click must still
     // focus rather than treating the stale selection as a copy gesture.
     const today = todayIso()
-    const { view, anchored, paneFor } = renderStream()
+    const { view, anchored, paneFor } = await renderStream()
     await anchored(today)
     focusLog.calls.length = 0
 
-    const heading = paneFor(today)?.closest('section')?.querySelector('h2')
+    const heading = paneFor(today).element().closest('section')?.querySelector('h2')
     expect(heading).not.toBeNull()
     const range = document.createRange()
     range.selectNodeContents(heading!)
@@ -207,22 +184,22 @@ describe('DailyStream arrival focus', () => {
 
     expect(focusLog.calls).toEqual([`focus:${today}`, `setSelection:${today}:start`])
     selection?.removeAllRanges()
-    view.unmount()
+    await view.unmount()
   })
 
   it('an ordinary arrival keeps the default start-of-note focus', async () => {
     const today = todayIso()
-    const { view, navigate, anchored, paneFor } = renderStream()
+    const { view, navigate, anchored, paneFor } = await renderStream()
 
     // A capture arrival first, so the follow-up proves the append intent is
     // one-shot rather than sticky.
-    act(() => navigate({ kind: 'today' }, { focusEditor: true }))
-    act(() => navigate({ kind: 'today' }))
+    await act(() => navigate({ kind: 'today' }, { focusEditor: true }))
+    await act(() => navigate({ kind: 'today' }))
     await anchored(today)
 
     const pane = paneFor(today)
-    expect(pane?.getAttribute('data-autofocus')).toBe('true')
-    expect(pane?.getAttribute('data-selection')).toBe('start')
-    view.unmount()
+    await expect.element(pane).toHaveAttribute('data-autofocus', 'true')
+    await expect.element(pane).toHaveAttribute('data-selection', 'start')
+    await view.unmount()
   })
 })

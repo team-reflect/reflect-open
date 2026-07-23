@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
+import { act } from 'react'
+import { renderHook } from 'vitest-browser-react'
 import { resetOperations, startOperation, useOperations } from './operations'
 
 beforeEach(() => {
@@ -12,8 +13,8 @@ afterEach(() => {
 })
 
 describe('operations store', () => {
-  it('tracks start → progress → done through the hook', () => {
-    const { result } = renderHook(() => useOperations())
+  it('tracks start → progress → done through the hook', async () => {
+    const { result } = await renderHook(() => useOperations())
     expect(result.current).toEqual([])
 
     let handle!: ReturnType<typeof startOperation>
@@ -35,8 +36,8 @@ describe('operations store', () => {
     expect(result.current).toEqual([])
   })
 
-  it('a failed operation lingers with its error, then clears', () => {
-    const { result } = renderHook(() => useOperations())
+  it('a failed operation lingers with its error, then clears', async () => {
+    const { result } = await renderHook(() => useOperations())
     let handle!: ReturnType<typeof startOperation>
     act(() => {
       handle = startOperation('Renaming "A" → "B"')
@@ -49,8 +50,8 @@ describe('operations store', () => {
     expect(result.current).toEqual([])
   })
 
-  it('a warning operation lingers without being marked failed', () => {
-    const { result } = renderHook(() => useOperations())
+  it('a warning operation lingers without being marked failed', async () => {
+    const { result } = await renderHook(() => useOperations())
     let handle!: ReturnType<typeof startOperation>
     act(() => {
       handle = startOperation('Rebuilding search index')
@@ -63,8 +64,8 @@ describe('operations store', () => {
     expect(result.current).toEqual([])
   })
 
-  it('handles are scoped: finishing one operation leaves others running', () => {
-    const { result } = renderHook(() => useOperations())
+  it('handles are scoped: finishing one operation leaves others running', async () => {
+    const { result } = await renderHook(() => useOperations())
     let first!: ReturnType<typeof startOperation>
     act(() => {
       first = startOperation('first')
@@ -75,8 +76,8 @@ describe('operations store', () => {
     expect(result.current.map((operation) => operation.label)).toEqual(['second'])
   })
 
-  it('stores optional toast metadata and can dismiss immediately', () => {
-    const { result } = renderHook(() => useOperations())
+  it('stores optional toast metadata and can dismiss immediately', async () => {
+    const { result } = await renderHook(() => useOperations())
     const run = vi.fn()
     let handle!: ReturnType<typeof startOperation>
 
@@ -102,8 +103,8 @@ describe('operations store', () => {
     expect(result.current).toEqual([])
   })
 
-  it('keeps persistent failures visible until dismissed', () => {
-    const { result } = renderHook(() => useOperations())
+  it('keeps persistent failures visible until dismissed', async () => {
+    const { result } = await renderHook(() => useOperations())
     let handle!: ReturnType<typeof startOperation>
 
     act(() => {
