@@ -51,7 +51,7 @@ describe('BackupSettingsField', () => {
       status: AUTH_ERROR,
     })
 
-    await expect.element(page.getByText('Backup', { selector: 'legend' })).toBeVisible()
+    await expect.element(page.locate('legend').getByText('Backup')).toBeVisible()
     await expect.element(page.getByText('GitHub sync')).not.toBeInTheDocument()
     await expect.element(page.getByText('git@gitlab.com:alex/notes.git')).toBeVisible()
     // The actionable message, not a GitHub reconnect that can't help.
