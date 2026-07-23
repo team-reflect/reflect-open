@@ -53,8 +53,14 @@ jobs:
         run: pnpm build
 
   chromium:
-    name: test-chromium
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["1/3", "2/3", "3/3"]
+
+    name: test-chromium ${{ matrix.shard }}
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -76,11 +82,17 @@ jobs:
         run: pnpm --filter @reflect/desktop exec playwright install --with-deps chromium
 
       - name: Test
-        run: pnpm run test
+        run: pnpm run test --shard ${{ matrix.shard }}
 
   webkit:
-    name: test-webkit
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["1/5", "2/5", "3/5", "4/5", "5/5"]
+
+    name: test-webkit ${{ matrix.shard }}
     runs-on: macos-latest
+
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -102,7 +114,7 @@ jobs:
         run: pnpm --filter @reflect/desktop exec playwright install webkit
 
       - name: Test
-        run: pnpm run test
+        run: pnpm run test --shard ${{ matrix.shard }}
         env:
           REFLECT_TEST_BROWSER: webkit
 
