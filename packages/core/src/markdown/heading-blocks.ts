@@ -2,7 +2,10 @@ import { splitFrontmatter } from './frontmatter'
 import { parseBody } from './grammar'
 import type { Heading } from './model'
 
-/** Return only headings represented by top-level Markdown blocks. */
+/**
+ * Return only headings represented by direct top-level Markdown blocks,
+ * preserving their source offsets, including offsets after frontmatter.
+ */
 export function topLevelHeadings(
   source: string,
   headings: readonly Heading[],
