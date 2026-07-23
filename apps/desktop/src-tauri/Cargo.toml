@@ -128,6 +128,12 @@ dispatch2 = "0.3.1"
 objc2 = "0.6.4"
 objc2-foundation = "0.3.2"
 objc2-contacts = "0.3.2"
+objc2-link-presentation = { version = "0.3.2", default-features = false, features = [
+  "std",
+  "LPLinkMetadata",
+  "LPMetadataProvider",
+  "block2",
+] }
 block2 = "0.6.2"
 
 # Finite-length execution assertions around iOS persistence. UIKit's begin/end

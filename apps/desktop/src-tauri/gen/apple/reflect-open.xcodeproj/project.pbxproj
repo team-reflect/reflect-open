@@ -20,6 +20,7 @@
 		93F2A1181D6BC7832338EE9C /* ShareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93EF89A222208D739ABC00B8 /* ShareView.swift */; };
 		9611839F9E9EC688FCDFCC91 /* RecordingWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A26DB86321DA75DFE1CD4B41 /* RecordingWidgetBundle.swift */; };
 		961AA49623F0DDC7AB09B777 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 39269153EFAD0C2FEFBE6696 /* UIKit.framework */; };
+		99EC4B1E2F71936A7C4EFCE4 /* LinkPresentation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4A941ADD800B6F9E26D1C47C /* LinkPresentation.framework */; };
 		9C05940F9725363AAB9131D3 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C94374B175075AF3AA7DE586 /* Security.framework */; };
 		9D7F5A94048CECBFC3D89BBA /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F28F8A628D32337E04C0CBC0 /* libapp.a */; };
 		A2E5A9558E714E679520EA9E /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E66BC7105426B91F03659B53 /* MetalKit.framework */; };
@@ -100,6 +101,7 @@
 		44C3B8C21F2D38187423AB2F /* libiconv.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libiconv.tbd; path = usr/lib/libiconv.tbd; sourceTree = SDKROOT; };
 		48F8214D2C537DF115410CC0 /* resolve.rs */ = {isa = PBXFileReference; path = resolve.rs; sourceTree = "<group>"; };
 		491E4F680A58FFBD620237F9 /* commit.rs */ = {isa = PBXFileReference; path = commit.rs; sourceTree = "<group>"; };
+		4A941ADD800B6F9E26D1C47C /* LinkPresentation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = LinkPresentation.framework; path = System/Library/Frameworks/LinkPresentation.framework; sourceTree = SDKROOT; };
 		4B8413C8F746CEEC50B61694 /* import_assets.rs */ = {isa = PBXFileReference; path = import_assets.rs; sourceTree = "<group>"; };
 		4EE64B671C831953394179E2 /* watcher.rs */ = {isa = PBXFileReference; path = watcher.rs; sourceTree = "<group>"; };
 		51006DE1482D28D9562253A1 /* ShareExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -155,6 +157,7 @@
 		E1940DEB1B975598A69CA93F /* frontmatter.rs */ = {isa = PBXFileReference; path = frontmatter.rs; sourceTree = "<group>"; };
 		E66BC7105426B91F03659B53 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 		E8031FEC080EBAF422BEE44C /* markers.rs */ = {isa = PBXFileReference; path = markers.rs; sourceTree = "<group>"; };
+		E833A01F2799F6788CDCE53F /* link_preview.rs */ = {isa = PBXFileReference; path = link_preview.rs; sourceTree = "<group>"; };
 		EC45808CD3D13DD431212EAE /* watch.rs */ = {isa = PBXFileReference; path = watch.rs; sourceTree = "<group>"; };
 		F28F8A628D32337E04C0CBC0 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
 		F3173A0D7E498896FAC5A43E /* watcher_mobile.rs */ = {isa = PBXFileReference; path = watcher_mobile.rs; sourceTree = "<group>"; };
@@ -170,6 +173,7 @@
 				319EDF8F46AB05DFBA9D674F /* libz.tbd in Frameworks */,
 				E9E7B6C59015E7301EE63308 /* libiconv.tbd in Frameworks */,
 				C4FAE42D7B978D8330E5D6DC /* Contacts.framework in Frameworks */,
+				99EC4B1E2F71936A7C4EFCE4 /* LinkPresentation.framework in Frameworks */,
 				74275EAEFEA922B7D8A2C78F /* CoreGraphics.framework in Frameworks */,
 				266B3807E809464C8FC14146 /* Metal.framework in Frameworks */,
 				A2E5A9558E714E679520EA9E /* MetalKit.framework in Frameworks */,
@@ -291,6 +295,7 @@
 				08B3817A23175E584BA6FD8D /* error.rs */,
 				152767D3A95549268E140D0F /* graph_gitignore.rs */,
 				560C7C23BE58D7EA845F1170 /* lib.rs */,
+				E833A01F2799F6788CDCE53F /* link_preview.rs */,
 				37EF719F509C3A532C0E0114 /* main.rs */,
 				B667667E9C6C141128493B00 /* quit.rs */,
 				8C04E40F02C9B4AE9A24A9A4 /* recents.rs */,
@@ -375,6 +380,7 @@
 				F28F8A628D32337E04C0CBC0 /* libapp.a */,
 				44C3B8C21F2D38187423AB2F /* libiconv.tbd */,
 				80E05926405BFDA2A3BC70BC /* libz.tbd */,
+				4A941ADD800B6F9E26D1C47C /* LinkPresentation.framework */,
 				FDC9BB81FAB5AF8D65160799 /* Metal.framework */,
 				E66BC7105426B91F03659B53 /* MetalKit.framework */,
 				68D1FDE7F099CA5F909105EB /* QuartzCore.framework */,

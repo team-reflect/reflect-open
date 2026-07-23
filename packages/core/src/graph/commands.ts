@@ -348,6 +348,18 @@ export async function promoteCaptureScreenshot(
 }
 
 /**
+ * Ask the native platform for one representative image for a captured URL.
+ * Returns `false` when the platform or page has no preview image.
+ */
+export async function captureLinkPreview(
+  url: string,
+  assetPath: string,
+  generation: number,
+): Promise<boolean> {
+  return call('capture_link_preview', { url, assetPath, generation }, z.boolean())
+}
+
+/**
  * Fetch a captured page's HTML for meta-tag scraping — the Rust side caps
  * scheme/timeout/size/redirects, so arbitrary capture URLs never widen the
  * webview's own HTTP capability. The privacy gate runs before any call here.

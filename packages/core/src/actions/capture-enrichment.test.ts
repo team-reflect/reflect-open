@@ -11,6 +11,7 @@ import {
   files,
   getSecretMock,
   IDENTITY,
+  linkPreviewMock,
   NO_PROVIDERS,
   readAssetMock,
   reconcile,
@@ -28,6 +29,7 @@ vi.mock('../graph/commands', () => ({
   captureInboxRead: vi.fn(),
   captureInboxReject: vi.fn(),
   captureInboxRemove: vi.fn(),
+  captureLinkPreview: vi.fn(),
   listFiles: vi.fn(),
   promoteCaptureScreenshot: vi.fn(),
   readAsset: vi.fn(),
@@ -60,6 +62,101 @@ describe('reconcileCaptureEnrichment', () => {
     expect(outcome.stopped).toBeNull()
     writeNoteMock.mockClear()
   }
+
+  it('attaches an Apple link preview to a URL-only capture', async () => {
+    addSpool(envelope({ source: 'ios-share', title: '' }), { screenshot: false })
+    expect((await drain()).stopped).toBeNull()
+    writeNoteMock.mockClear()
+    linkPreviewMock.mockResolvedValue(true)
+    scrapeMock.mockResolvedValue({
+      title: 'An article from metadata',
+      description: 'A scraped description.',
+      siteName: null,
+    })
+
+    const outcome = await reconcile({ providers: NO_PROVIDERS })
+
+    expect(outcome).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
+    expect(linkPreviewMock).toHaveBeenCalledWith(CAPTURE_URL, IDENTITY.assetPath, 3)
+    const note = files.get(IDENTITY.notePath) ?? ''
+    expect(note).toContain(`captureScreenshot: ${IDENTITY.assetPath}`)
+    expect(note).toContain(`![An article from metadata](${IDENTITY.assetPath})`)
+    expect(note).toContain('captureStatus: done')
+  })
+
+  it('sends a newly attached link preview to the configured AI provider', async () => {
+    addSpool(envelope({ source: 'ios-share' }), { screenshot: false })
+    expect((await drain()).stopped).toBeNull()
+    writeNoteMock.mockClear()
+    linkPreviewMock.mockResolvedValue(true)
+
+    const outcome = await reconcile()
+
+    expect(outcome.enriched).toBe(1)
+    expect(readAssetMock).toHaveBeenCalledWith(IDENTITY.assetPath, 3)
+    expect(describeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ screenshotBase64: btoa('jpeg-bytes') }),
+    )
+  })
+
+  it('does not request a link preview when the capture already has a screenshot', async () => {
+    await drainOne()
+
+    await reconcile()
+
+    expect(linkPreviewMock).not.toHaveBeenCalled()
+  })
+
+  it('continues metadata enrichment when the link preview request fails', async () => {
+    addSpool(envelope({ source: 'ios-share' }), { screenshot: false })
+    expect((await drain()).stopped).toBeNull()
+    writeNoteMock.mockClear()
+    linkPreviewMock.mockRejectedValue(new ReflectError('network', 'preview unavailable'))
+
+    const outcome = await reconcile({ providers: NO_PROVIDERS })
+
+    expect(outcome.enriched).toBe(1)
+    const note = files.get(IDENTITY.notePath) ?? ''
+    expect(note).toContain('captureStatus: done')
+    expect(note).not.toContain('captureScreenshot')
+    expect(note).not.toContain('## Screenshot')
+  })
+
+  it('does not retry a link preview after the metadata checkpoint', async () => {
+    addSpool(envelope({ source: 'ios-share' }), { screenshot: false })
+    expect((await drain()).stopped).toBeNull()
+    writeNoteMock.mockClear()
+    linkPreviewMock.mockResolvedValue(true)
+    getSecretMock.mockResolvedValue(null)
+
+    const waiting = await reconcile()
+
+    expect(waiting.stopped?.reason).toBe('config')
+    expect(files.get(IDENTITY.notePath)).toContain('captureMetadataStatus: done')
+    expect(linkPreviewMock).toHaveBeenCalledTimes(1)
+
+    getSecretMock.mockResolvedValue('sk-live-key')
+    const retry = await reconcile()
+
+    expect(retry.enriched).toBe(1)
+    expect(linkPreviewMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('skips a capture made private while its link preview is loading', async () => {
+    addSpool(envelope({ source: 'ios-share' }), { screenshot: false })
+    expect((await drain()).stopped).toBeNull()
+    writeNoteMock.mockClear()
+    linkPreviewMock.mockImplementation(async () => {
+      files.set(DAILY, `---\nprivate: true\n---\n\n${files.get(DAILY) ?? ''}`)
+      return true
+    })
+
+    const outcome = await reconcile()
+
+    expect(outcome).toEqual({ pending: 1, enriched: 0, skipped: 1, stopped: null })
+    expect(files.get(IDENTITY.notePath)).toContain('captureStatus: skipped')
+    expect(describeMock).not.toHaveBeenCalled()
+  })
 
   it('patches the AI description into the metadata bullets with provenance', async () => {
     const contentText = [

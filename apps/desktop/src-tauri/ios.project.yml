@@ -177,6 +177,7 @@ targets:
       - sdk: libiconv.tbd
       # objc2-contacts' link directive doesn't reach xcodebuild either.
       - sdk: Contacts.framework
+      - sdk: LinkPresentation.framework
       - sdk: CoreGraphics.framework
       - sdk: Metal.framework
       - sdk: MetalKit.framework

@@ -7,7 +7,7 @@ import {
 import { defaultAiProvider, type AiProvidersState } from '../ai/provider-config'
 import { aiKeySecretName } from '../ai/secrets'
 import { errorMessage, isAppError, toAppError } from '../errors'
-import { listFiles, readAsset, readNote, writeNote } from '../graph/commands'
+import { captureLinkPreview, listFiles, readAsset, readNote, writeNote } from '../graph/commands'
 import { dailyPath } from '../graph/paths'
 import { hashContent } from '../indexing/hash'
 import { parseFrontmatter, splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter'
@@ -32,6 +32,7 @@ import {
   notePrivate,
   noteSource,
   withDescription,
+  withScreenshot,
   withTitle,
   type CaptureNoteMeta,
 } from './capture-note'
@@ -145,6 +146,23 @@ async function readCaptureScreenshot(
       throw cause
     }
     return undefined
+  }
+}
+
+async function fetchLinkPreviewScreenshot(
+  meta: CaptureNoteMeta,
+  identity: CaptureIdentity,
+  generation: number,
+): Promise<string | null> {
+  if (meta.captureScreenshot !== undefined) {
+    return null
+  }
+  try {
+    return (await captureLinkPreview(meta.captureUrl, identity.assetPath, generation))
+      ? identity.assetPath
+      : null
+  } catch {
+    return null
   }
 }
 
@@ -323,6 +341,16 @@ export async function reconcileCaptureEnrichment(
       if (snapshot === null) {
         continue
       }
+      const previewScreenshot = metadataComplete
+        ? null
+        : await fetchLinkPreviewScreenshot(snapshot.meta, identity, input.generation)
+      if (stale()) {
+        return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
+      }
+      snapshot = await currentCapture(identity)
+      if (snapshot === null) {
+        continue
+      }
       const placeholderTitle = displayTitle({ title: '', url: snapshot.meta.captureUrl })
       const metadataTitle =
         snapshot.title === placeholderTitle && pageMeta?.title
@@ -339,6 +367,9 @@ export async function reconcileCaptureEnrichment(
       if (metadataTitle !== null) {
         metadataBody = withTitle(metadataBody, metadataTitle)
       }
+      if (previewScreenshot !== null) {
+        metadataBody = withScreenshot(metadataBody, metadataDisplayTitle, previewScreenshot)
+      }
 
       if (config === null) {
         const titleChanged = metadataDisplayTitle !== snapshot.title
@@ -354,6 +385,7 @@ export async function reconcileCaptureEnrichment(
           toTitle: metadataDisplayTitle,
           status: titleChanged ? 'pending' : 'done',
           provider: null,
+          screenshot: previewScreenshot ?? undefined,
           generation: input.generation,
         })
         if (captureHash === null) {
@@ -390,6 +422,7 @@ export async function reconcileCaptureEnrichment(
           toTitle: metadataDisplayTitle,
           status: 'pending',
           provider: null,
+          screenshot: previewScreenshot ?? undefined,
           generation: input.generation,
         })
         if (persistedHash === null) {

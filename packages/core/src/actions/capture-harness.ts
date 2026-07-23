@@ -6,6 +6,7 @@ import {
   captureInboxRead,
   captureInboxReject,
   captureInboxRemove,
+  captureLinkPreview,
   listFiles,
   promoteCaptureScreenshot,
   readAsset,
@@ -39,6 +40,7 @@ export const inboxListMock = vi.mocked(captureInboxList)
 export const inboxReadMock = vi.mocked(captureInboxRead)
 export const inboxRejectMock = vi.mocked(captureInboxReject)
 export const inboxRemoveMock = vi.mocked(captureInboxRemove)
+export const linkPreviewMock = vi.mocked(captureLinkPreview)
 export const listFilesMock = vi.mocked(listFiles)
 export const promoteMock = vi.mocked(promoteCaptureScreenshot)
 export const readAssetMock = vi.mocked(readAsset)
@@ -151,6 +153,7 @@ export function wireCaptureMocks(): void {
     [...files.keys()].map((path) => ({ path, size: 1, modifiedMs: 0 })),
   )
   readAssetMock.mockResolvedValue(btoa('jpeg-bytes'))
+  linkPreviewMock.mockResolvedValue(false)
   getSecretMock.mockResolvedValue('sk-live-key')
   scrapeMock.mockResolvedValue({ title: 'An article', description: null, siteName: null })
   describeMock.mockResolvedValue({ title: null, description: 'An AI description of the page.' })

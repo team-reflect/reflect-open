@@ -26,6 +26,7 @@ mod fs;
 mod git;
 mod graph_gitignore;
 mod icloud;
+mod link_preview;
 mod menu;
 mod quit;
 mod recents;
@@ -321,6 +322,7 @@ pub fn run() {
             capture::capture_inbox_reject,
             capture::capture_shared_inbox_relay,
             capture::capture_screenshot_promote,
+            capture::capture_link_preview,
             capture::capture_meta_fetch,
             git::git_status,
             git::git_setup,

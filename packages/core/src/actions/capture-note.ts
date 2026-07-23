@@ -202,6 +202,12 @@ export function withTitle(body: string, title: string): string {
   )
 }
 
+/** Append a screenshot section backed by a graph-relative asset. */
+export function withScreenshot(body: string, title: string, assetPath: string): string {
+  const separator = body.endsWith('\n') ? '\n' : '\n\n'
+  return `${body}${separator}## Screenshot\n\n![${title}](${assetPath})\n`
+}
+
 /**
  * Rewrite a daily entry's wiki-link display text after its capture note was
  * retitled. Both writers (the drain's dedup refresh and the enrichment

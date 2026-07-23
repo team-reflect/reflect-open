@@ -25,6 +25,7 @@ vi.mock('../graph/commands', () => ({
   captureInboxRead: vi.fn(),
   captureInboxReject: vi.fn(),
   captureInboxRemove: vi.fn(),
+  captureLinkPreview: vi.fn(),
   listFiles: vi.fn(),
   promoteCaptureScreenshot: vi.fn(),
   readAsset: vi.fn(),

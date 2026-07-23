@@ -7,7 +7,7 @@
 //! this module only moves bytes.
 
 use std::fs;
-use std::io::Write;
+use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -426,10 +426,23 @@ pub fn capture_shared_inbox_relay(generation: u64, state: State<GraphState>) -> 
 
 // ---- screenshot promote ---------------------------------------------------------
 
+const CAPTURE_IMAGE_MAX_DIMENSION: u32 = 8192;
+const CAPTURE_IMAGE_MAX_ALLOC: u64 = 128 * 1024 * 1024;
+const CAPTURE_IMAGE_LONG_EDGE: u32 = 1600;
+
 /// Decode, downscale to `max_dim` on the long edge, re-encode as JPEG. Pure —
 /// the unit tests exercise this without Tauri state.
 fn downscale_jpeg(bytes: &[u8], max_dim: u32) -> AppResult<Vec<u8>> {
-    let decoded = image::load_from_memory(bytes)
+    let mut reader = image::ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|err| AppError::parse(format!("screenshot format is invalid: {err}")))?;
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(CAPTURE_IMAGE_MAX_DIMENSION);
+    limits.max_image_height = Some(CAPTURE_IMAGE_MAX_DIMENSION);
+    limits.max_alloc = Some(CAPTURE_IMAGE_MAX_ALLOC);
+    reader.limits(limits);
+    let decoded = reader
+        .decode()
         .map_err(|err| AppError::parse(format!("screenshot does not decode: {err}")))?;
     let resized = if decoded.width() > max_dim || decoded.height() > max_dim {
         decoded.resize(max_dim, max_dim, image::imageops::FilterType::CatmullRom)
@@ -443,6 +456,20 @@ fn downscale_jpeg(bytes: &[u8], max_dim: u32) -> AppResult<Vec<u8>> {
         .write_with_encoder(encoder)
         .map_err(|err| AppError::io(format!("screenshot re-encode failed: {err}")))?;
     Ok(out)
+}
+
+fn persist_asset(root: &Path, asset_path: &str, bytes: &[u8]) -> AppResult<()> {
+    let target = crate::fs::resolve_in_graph(root, asset_path)?;
+    let parent = target
+        .parent()
+        .ok_or_else(|| AppError::io("asset path has no parent"))?;
+    fs::create_dir_all(parent)?;
+    let mut tmp = tempfile::NamedTempFile::new_in(parent)?;
+    tmp.write_all(bytes)?;
+    tmp.flush()?;
+    tmp.persist(&target)
+        .map_err(|err| AppError::io(err.to_string()))?;
+    Ok(())
 }
 
 /// Copy a spooled screenshot into the graph as a downscaled JPEG asset. Copy,
@@ -459,20 +486,30 @@ pub fn capture_screenshot_promote(
     let root = root_for_generation(&state, generation)?;
     let bytes = fs::read(inbox_file(&root, &spool_name)?)?;
     let jpeg = downscale_jpeg(&bytes, max_dim)?;
-    let target = crate::fs::resolve_in_graph(&root, &asset_path)?;
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let mut tmp = tempfile::NamedTempFile::new_in(
-        target
-            .parent()
-            .ok_or_else(|| AppError::io("asset path has no parent"))?,
-    )?;
-    tmp.write_all(&jpeg)?;
-    tmp.flush()?;
-    tmp.persist(&target)
-        .map_err(|err| AppError::io(err.to_string()))?;
-    Ok(())
+    persist_asset(&root, &asset_path, &jpeg)
+}
+
+/// Ask the platform link-preview service for one representative image and
+/// persist it as the capture's normalized JPEG asset.
+#[tauri::command]
+pub async fn capture_link_preview(
+    app: tauri::AppHandle,
+    url: String,
+    asset_path: String,
+    generation: u64,
+    state: State<'_, GraphState>,
+) -> AppResult<bool> {
+    let Some(bytes) = crate::link_preview::fetch(&app, &url).await? else {
+        return Ok(false);
+    };
+    let jpeg = tauri::async_runtime::spawn_blocking(move || {
+        downscale_jpeg(&bytes, CAPTURE_IMAGE_LONG_EDGE)
+    })
+    .await
+    .map_err(|err| AppError::io(format!("link preview task failed: {err}")))??;
+    let root = root_for_generation(&state, generation)?;
+    persist_asset(&root, &asset_path, &jpeg)?;
+    Ok(true)
 }
 
 // ---- meta fetch -----------------------------------------------------------------
@@ -833,6 +870,21 @@ mod tests {
     fn downscale_rejects_non_images() {
         assert!(matches!(
             downscale_jpeg(b"not an image", 1600),
+            Err(AppError::Parse { .. })
+        ));
+    }
+
+    #[test]
+    fn downscale_rejects_images_over_the_dimension_limit() {
+        let too_wide =
+            image::DynamicImage::new_rgb8(CAPTURE_IMAGE_MAX_DIMENSION.saturating_add(1), 1);
+        let mut png = Vec::new();
+        too_wide
+            .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+            .unwrap();
+
+        assert!(matches!(
+            downscale_jpeg(&png, CAPTURE_IMAGE_LONG_EDGE),
             Err(AppError::Parse { .. })
         ));
     }
