@@ -107,6 +107,28 @@ describe('BacklinkSnippet task checkboxes', () => {
     view.unmount()
   })
 
+  it('renders a collapsed source item expanded', () => {
+    // The parent is folded in the source note (`+` marker), so its line is
+    // sliced into the context verbatim; the snippet must still show the
+    // mention underneath instead of folding it away.
+    const view = render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <BacklinkSnippet
+          text={'+ parent line\n  - mention of [[Roadmap]]'}
+          notePath="notes/meeting.md"
+          tasks={[]}
+          onWikilinkClick={() => {}}
+          resolveImageUrl={() => undefined}
+        />
+      </QueryClientProvider>,
+    )
+    expect(view.container.querySelector('[data-list-collapsed]')).toBeNull()
+    expect(view.container.textContent).toContain('mention of')
+    view.unmount()
+  })
+
   it('renders checkboxes inert when the snippet has no round tasks', async () => {
     const squareOnly: SnippetTask[] = [
       { markerOffset: 144, raw: '[x] square box', checked: true, round: false, text: 'square box' },

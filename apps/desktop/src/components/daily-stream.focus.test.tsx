@@ -2,6 +2,7 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useEffect } from 'react'
 import { todayIso } from '@/lib/dates'
+import { createDayWindow, neighborDate } from '@/lib/day-window'
 import { RouterProvider, useRouter, type NavigateOptions } from '@/routing/router'
 import type { Route } from '@/routing/route'
 import { installVirtuaTestEnv } from '@/test-utils/virtua-jsdom'
@@ -21,23 +22,63 @@ import { DailyStream, ESTIMATED_DAY_HEIGHT } from './daily-stream'
  * focus assignment as it mounts).
  */
 
+/**
+ * Focus/selection calls the probe's registered handles receive, as
+ * `"<method>:<date>[:<arg>]"` — hoisted so the NotePane mock factory can
+ * reach it.
+ */
+const focusLog = vi.hoisted(() => ({ calls: [] as string[] }))
+
 vi.mock('@/components/note-pane', () => ({
   NotePane: ({
     dailyDate,
     autoFocus = false,
     autoFocusSelection = 'start',
+    registerHandle,
   }: {
     dailyDate?: string
     autoFocus?: boolean
     autoFocusSelection?: 'start' | 'end'
-  }) => (
-    <div
-      data-testid="pane-probe"
-      data-date={dailyDate}
-      data-autofocus={String(autoFocus)}
-      data-selection={autoFocusSelection}
-    />
-  ),
+    registerHandle?: (
+      date: string,
+      handle: import('@/editor/note-editor').NoteEditorHandle | null,
+    ) => void
+  }) => {
+    // Register a recording handle like the real pane's mounted editor would,
+    // so the stream's imperative focus paths (heading click, cross-day arrow
+    // navigation) are observable.
+    useEffect(() => {
+      if (dailyDate === undefined || registerHandle === undefined) {
+        return
+      }
+      registerHandle(dailyDate, {
+        getMarkdown: () => '',
+        setMarkdown: () => {},
+        insertMarkdown: () => {},
+        focus: () => {
+          focusLog.calls.push(`focus:${dailyDate}`)
+        },
+        setSelection: (position: 'start' | 'end') => {
+          focusLog.calls.push(`setSelection:${dailyDate}:${position}`)
+        },
+        getSelectedText: () => '',
+        openSelectionMenu: () => {},
+        startPendingReplacement: () => false,
+        appendPendingReplacementText: () => {},
+        acceptPendingReplacement: () => {},
+        discardPendingReplacement: () => {},
+      })
+      return () => registerHandle(dailyDate, null)
+    }, [dailyDate, registerHandle])
+    return (
+      <div
+        data-testid="pane-probe"
+        data-date={dailyDate}
+        data-autofocus={String(autoFocus)}
+        data-selection={autoFocusSelection}
+      />
+    )
+  },
 }))
 vi.mock('@/providers/settings-provider', () => ({
   useSettings: () => ({
@@ -67,6 +108,7 @@ Object.defineProperty(HTMLElement.prototype, 'scrollTop', {
 
 beforeEach(() => {
   scrollTop = 0
+  focusLog.calls.length = 0
 })
 
 type Navigate = (route: Route, options?: NavigateOptions) => void
@@ -122,6 +164,49 @@ describe('DailyStream arrival focus', () => {
     const pane = paneFor(today)
     expect(pane?.getAttribute('data-autofocus')).toBe('true')
     expect(pane?.getAttribute('data-selection')).toBe('end')
+    view.unmount()
+  })
+
+  it('clicking a day’s date heading focuses that day’s note at its start', async () => {
+    const today = todayIso()
+    const yesterday = neighborDate(createDayWindow(today), today, -1)
+    expect(yesterday).not.toBeNull()
+    const { view, anchored, paneFor } = renderStream()
+    await anchored(today)
+    await waitFor(() => expect(paneFor(yesterday!)).not.toBeNull())
+    focusLog.calls.length = 0
+
+    const heading = paneFor(yesterday!)?.closest('section')?.querySelector('h2')
+    expect(heading).not.toBeNull()
+    fireEvent.click(heading!)
+
+    expect(focusLog.calls).toEqual([
+      `focus:${yesterday}`,
+      `setSelection:${yesterday}:start`,
+    ])
+    view.unmount()
+  })
+
+  it('a heading click focuses even while a selection stands elsewhere', async () => {
+    // The heading is unselectable chrome (`user-select: none`), so mousedown
+    // on it leaves an editor selection uncollapsed — the click must still
+    // focus rather than treating the stale selection as a copy gesture.
+    const today = todayIso()
+    const { view, anchored, paneFor } = renderStream()
+    await anchored(today)
+    focusLog.calls.length = 0
+
+    const heading = paneFor(today)?.closest('section')?.querySelector('h2')
+    expect(heading).not.toBeNull()
+    const range = document.createRange()
+    range.selectNodeContents(heading!)
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+    fireEvent.click(heading!)
+
+    expect(focusLog.calls).toEqual([`focus:${today}`, `setSelection:${today}:start`])
+    selection?.removeAllRanges()
     view.unmount()
   })
 

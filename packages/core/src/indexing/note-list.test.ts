@@ -94,7 +94,7 @@ describe('listNotes', () => {
     expect(tagArgs['params']).toEqual(['note'])
   })
 
-  it('narrows both queries to one tag via tag-first joins on the stored folded tag_key', async () => {
+  it('narrows both queries to one tag and includes tagged daily notes', async () => {
     mockInvoke
       .mockResolvedValueOnce([
         {
@@ -105,10 +105,21 @@ describe('listNotes', () => {
           is_pinned: 0,
           pinned_order: null,
         },
+        {
+          path: 'daily/2026-06-09.md',
+          title: 'June 9, 2026',
+          mtime: 1500,
+          preview: 'Read a book.',
+          is_pinned: 0,
+          pinned_order: null,
+        },
       ])
-      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ note_path: 'daily/2026-06-09.md', tag: 'Book' }])
 
-    await listNotes({ tag: 'Book' })
+    const entries = await listNotes({ tag: 'Book' })
+
+    expect(entries.map((entry) => entry.path)).toEqual(['notes/health.md', 'daily/2026-06-09.md'])
+    expect(entries[1]?.tags).toEqual(['Book'])
 
     expect(mockInvoke).toHaveBeenCalledTimes(2)
     const [, listArgs] = mockInvoke.mock.calls[0]!
@@ -118,7 +129,7 @@ describe('listNotes', () => {
     expect(listSql).toContain('"tags"."tag_key"')
     expect(listSql).not.toContain('exists')
     expect(listSql).not.toContain('lower(')
-    expect(listArgs['params']).toEqual(['book', 'note'])
+    expect(listArgs['params']).toEqual(['book', 'note', 'daily'])
 
     const [, tagArgs] = mockInvoke.mock.calls[1]!
     const tagSql = String(tagArgs['sql'])
@@ -126,7 +137,7 @@ describe('listNotes', () => {
     expect(tagSql).toContain('"filter_tags"."tag_key"')
     expect(tagSql).not.toContain('exists')
     expect(tagSql).not.toContain('lower(')
-    expect(tagArgs['params']).toEqual(['book', 'note'])
+    expect(tagArgs['params']).toEqual(['book', 'note', 'daily'])
   })
 
   it('skips the tag fetch entirely when no notes match', async () => {

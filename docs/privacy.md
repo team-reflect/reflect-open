@@ -97,12 +97,14 @@ disk at call time), and it is covered by tests.
 
 - **Where:** Sentry, for errors raised in the React/WebView layer. Native process crashes
   remain covered by the operating system's crash reporting.
-- **What:** an allow-listed diagnostic containing the exception class, redacted exception
-  text, sanitized JavaScript stack locations, the app version, and whether React handled
-  the error. Stack filenames are reduced to bundle basenames. Request data, note content,
-  note titles, graph paths, local filesystem paths, breadcrumbs, console output, session
-  replay, tracing, and user identifiers are not collected. Sentry is also configured not
-  to store the transport IP address with events.
+- **What:** an allow-listed diagnostic containing the exception class, sanitized
+  JavaScript stack locations, the app version, and whether the exception was marked
+  handled. A small set of vetted structural error messages that cannot contain document
+  data is kept; all other exception text is redacted. Stack filenames are reduced to
+  bundle basenames. Request
+  data, note content, note titles, graph paths, local filesystem paths, breadcrumbs,
+  console output, session replay, tracing, and user identifiers are not collected. Sentry
+  is also configured not to store the transport IP address with events.
 - **When:** only when an official desktop or iOS release raises an uncaught JavaScript
   error, an unhandled promise rejection, or a caught/recoverable React error. Development
   and self-built apps without the release DSN do not initialize Sentry.
@@ -141,4 +143,4 @@ API keys and tokens live in the **OS keychain only** — never in markdown, neve
 | Update check | GitHub Releases | No | On in packaged builds |
 | Browser capture | Nowhere (local host on disk) | — (stays on your machine) | — (only when you capture) |
 | Contacts lookup | Nowhere (on-device OS store) | — (stays on your machine) | Yes (opt-in) |
-| Exception diagnostics | Sentry | No — messages and context are redacted | No (official releases) |
+| Exception diagnostics | Sentry | No — free-form messages and context are redacted | No (official releases) |

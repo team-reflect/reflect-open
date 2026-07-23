@@ -60,7 +60,9 @@ git2 = { version = "0.21.0", default-features = false, features = [
   "vendored-libgit2",
   "vendored-openssl",
 ] }
-tauri-plugin-http = "2.5.9"
+# unsafe-headers lets provider-fetch.ts pass an explicit empty Origin, which
+# the plugin treats as "send no Origin header" (see providerFetch's doc).
+tauri-plugin-http = { version = "2.5.9", features = ["unsafe-headers"] }
 # Link capture (Plan 11): screenshot downscale + the bounded meta-scrape fetch.
 # reqwest 0.12 rides the exact version tauri-plugin-http already compiles.
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }
@@ -72,8 +74,9 @@ zip = { version = "4.6.1", default-features = false, features = ["deflate-flate2
 [target.'cfg(target_os = "macos")'.dependencies]
 xattr = "1.6.1"
 # Apple Calendar read-only bridge (`src/calendar.rs`): EventKit through the
-# objc2 bindings, trimmed to the classes the module touches. objc2-app-kit is
-# only here for EKCalendar's NSColor → hex conversion.
+# objc2 bindings, trimmed to the classes the modules touch. objc2-app-kit
+# backs EKCalendar's NSColor → hex conversion and the Edit menu's Paste and
+# Match Style item (`src/menu.rs`).
 objc2 = "0.6.4"
 block2 = "0.6.2"
 objc2-foundation = { version = "0.3.2", default-features = false, features = [
@@ -103,8 +106,12 @@ objc2-event-kit = { version = "0.3.2", default-features = false, features = [
 ] }
 objc2-app-kit = { version = "0.3.2", default-features = false, features = [
   "std",
+  "NSApplication",
   "NSColor",
   "NSColorSpace",
+  "NSEvent",
+  "NSMenu",
+  "NSMenuItem",
 ] }
 
 # Apple Contacts integration (`contacts.rs`): live CNContactStore lookups on
