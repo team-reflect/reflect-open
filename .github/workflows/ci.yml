@@ -53,7 +53,7 @@ jobs:
         run: pnpm turbo run test --filter='!@reflect/desktop'
 
       - name: Test desktop non-browser suites
-        run: pnpm --filter @reflect/desktop exec vitest run --project jsdom-legacy
+        run: pnpm --filter @reflect/desktop exec vitest run --project node --project jsdom-legacy
 
       - name: Build
         run: pnpm build

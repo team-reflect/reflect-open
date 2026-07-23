@@ -14,14 +14,16 @@ jsdom. Rust tests are plain `cargo test` (see `AGENTS.md`).
   Chromium by default; WebKit on demand (see below). Test files run
   sequentially (`fileParallelism: false`) because real keyboard focus is a
   per-page global.
-- **`jsdom-legacy`**: every other `src/**/*.test.{ts,tsx}` plus
-  `scripts/**/*.test.mjs`, executed under jsdom. This project shrinks as the
-  browser-mode migration proceeds and will eventually be replaced by a plain
-  `node` project for pure-logic tests.
+- **`node`**: `src/**/*.test.ts` plus `scripts/**/*.test.mjs`, executed in a
+  plain node environment.
+- **`jsdom-legacy`**: `src/**/*.test.tsx` plus the `.test.ts` exceptions in
+  `JSDOM_ONLY_TESTS`, executed under jsdom. This project shrinks as the
+  browser-mode migration proceeds.
 
-The target routing rule: `.test.ts` means "pure logic, node environment",
-`.test.tsx` means "needs a DOM, real browser". Exceptions are listed
-explicitly in the config.
+The routing rule: `.test.ts` means "pure logic, node environment",
+`.test.tsx` means "needs a DOM, real browser". Exceptions (`.test.ts` files
+that still touch the DOM through `renderHook` or document event listeners)
+are listed explicitly as `JSDOM_ONLY_TESTS` in the config.
 
 ## Browsers
 
