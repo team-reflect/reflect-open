@@ -1,6 +1,6 @@
-import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import userEvent from '@testing-library/user-event'
+import { act, cleanup, render } from 'vitest-browser-react'
+import { page, userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { format } from 'date-fns'
 import { StrictMode, type ReactElement } from 'react'
@@ -13,39 +13,20 @@ import { RouterProvider, useRouter } from '@/routing/router'
 import type { Route } from '@/routing/route'
 import { addDaysIso, formatDayLabel, parseIsoDate, todayIso } from '@/lib/dates'
 import { monthLabel, monthOf } from '@/lib/month-grid'
+import { fireEvent } from '@/test-utils/fire-event'
+import '@/test-utils/locator'
 import { weekOf } from './calendar'
 import { MobileShell } from './mobile-shell'
 import { publishKeyboardHeight } from './use-keyboard'
 
-// jsdom implements none of these; Embla (the day carousel) needs them to init.
-class ObserverStub {
-  observe(): void {}
-  unobserve(): void {}
-  disconnect(): void {}
-  takeRecords(): [] {
-    return []
-  }
-}
-globalThis.ResizeObserver ??= ObserverStub as unknown as typeof ResizeObserver
-globalThis.IntersectionObserver ??= ObserverStub as unknown as typeof IntersectionObserver
-globalThis.matchMedia ??= ((query: string) => ({
-  matches: false,
-  media: query,
-  onchange: null,
-  addEventListener: () => {},
-  removeEventListener: () => {},
-  addListener: () => {},
-  removeListener: () => {},
-  dispatchEvent: () => false,
-})) as unknown as typeof matchMedia
+const waitFor = vi.waitFor
 
 /**
  * The tabbed mobile shell (Plan 19, V1 parity): the daily spine pages
  * between days, the All tab lists and searches, a note screen pops back to
  * where it came from, and a cold note entry lands on today. Drives the real
  * router → MobileShell → screens → NotePane stack over a fake IPC bridge;
- * only the ProseMirror view is stubbed (jsdom can't host contenteditable),
- * mirroring `route-content.test.tsx`.
+ * only the ProseMirror view is stubbed, mirroring `route-content.test.tsx`.
  */
 
 const editorProbe = vi.hoisted(() => ({
@@ -118,8 +99,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   hasBridge: () => true,
   getBacklinksWithContext: indexFns.getBacklinksWithContext,
 }))
-// vaul needs browser APIs jsdom doesn't provide (matchMedia, pointer
-// capture); its drag/animation is verified on-device. This passthrough
+// Vaul's drag/animation is verified on-device. This passthrough
 // honours `open`, so the month-picker sheet renders only once the title
 // opens it.
 vi.mock('@/components/ui/drawer', () => ({
@@ -181,12 +161,13 @@ setBridge({
   listen: async () => () => {},
 })
 
-afterEach(() => {
-  cleanup()
+afterEach(async () => {
+  await cleanup()
   publishKeyboardHeight(0)
 })
 
-beforeEach(() => {
+beforeEach(async () => {
+  await page.viewport(375, 700)
   files = {}
   editorProbe.focusCalls = 0
   editorProbe.selectionCalls = []
@@ -234,7 +215,7 @@ function mount(
   initialRoute: Route,
   probeRoute?: Route,
   options?: { strict?: boolean },
-): ReturnType<typeof render> {
+) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const tree = (
     <QueryClientProvider client={queryClient}>
@@ -260,12 +241,14 @@ function NavProbe({ to }: { to: Route }): ReactElement {
 }
 
 /** Every mounted stack layer, in DOM order (below → current → exiting). */
-function stackLayers(view: ReturnType<typeof render>): HTMLElement[] {
+type BrowserView = Awaited<ReturnType<typeof render>>
+
+function stackLayers(view: BrowserView): HTMLElement[] {
   return Array.from(view.container.querySelectorAll<HTMLElement>('.mobile-stack-layer'))
 }
 
 /** The screen the user sees — the one stack layer not hidden as a11y-inert. */
-function visibleLayer(view: ReturnType<typeof render>): HTMLElement {
+function visibleLayer(view: BrowserView): HTMLElement {
   const visible = stackLayers(view).find((layer) => layer.getAttribute('aria-hidden') !== 'true')
   if (!visible) {
     throw new Error('no visible mobile-stack layer')
@@ -274,16 +257,12 @@ function visibleLayer(view: ReturnType<typeof render>): HTMLElement {
 }
 
 /**
- * Dispatch a pointer event the gesture hook can read. jsdom's PointerEvent
- * support is spotty, but React reads `pointerType`/`clientX`/… straight off
- * the native event object, so a plain Event with the fields assigned works.
+ * Dispatch a pointer event the gesture hook can read.
  */
 function firePointer(element: Element, type: string, init: Record<string, unknown>): void {
   const event = new Event(type, { bubbles: true, cancelable: true })
   Object.assign(event, init)
-  act(() => {
-    element.dispatchEvent(event)
-  })
+  element.dispatchEvent(event)
 }
 
 /** The calendar strip's per-day aria-label (CalendarStrip uses this form). */
@@ -295,10 +274,11 @@ function dayCellLabel(date: string): string {
  * The strip header's settled month label — a month change rolls the old
  * label out, so the heading's whole textContent briefly holds both.
  */
-function shownMonth(view: ReturnType<typeof render>): string | null {
+function shownMonth(view: BrowserView): string | null {
   return (
     view
       .getByRole('heading', { level: 1 })
+      .element()
       .querySelector('[data-slot="month-title"]')?.textContent ?? null
   )
 }
@@ -313,67 +293,76 @@ describe('MobileShell', () => {
   it('renders today as the daily spine with its note content', async () => {
     const today = todayIso()
     files[`daily/${today}.md`] = 'captured on the go'
-    const view = mount({ kind: 'today' })
+    const view = await mount({ kind: 'today' })
 
     // The header is the month; the carousel mounts today's slide (±1
     // neighbours), each carrying its formatted date as the note's subject.
     expect(shownMonth(view)).toBe(monthLabel(monthOf(today)))
-    expect(view.getByText(formatDayLabel(today, 'mdy'))).toBeTruthy()
+    await expect.element(view.getByText(formatDayLabel(today, 'mdy'))).toBeVisible()
     await waitFor(() => {
-      const editors = view.getAllByTestId('fake-editor')
+      const editors = view.getByTestId('fake-editor').elements()
       expect(editors.some((editor) => editor.textContent?.includes('captured on the go'))).toBe(true)
     })
   })
 
   it('selects a day from the calendar strip and jumps back to today', async () => {
-    const user = userEvent.setup()
+    const user = userEvent
     const today = todayIso()
     const other = otherDayInWeek(today)
-    const view = mount({ kind: 'today' })
+    const view = await mount({ kind: 'today' })
 
-    expect(view.queryByRole('button', { name: 'Today' })).toBeNull()
+    expect(view.getByRole('button', { name: 'Today' }).query()).toBeNull()
     const todayButton = view.getByText('Today')
-    expect(todayButton.classList.contains('opacity-0')).toBe(true)
-    expect(todayButton.hasAttribute('inert')).toBe(true)
+    expect(todayButton.element().classList.contains('opacity-0')).toBe(true)
+    expect(todayButton.element().hasAttribute('inert')).toBe(true)
 
     await user.click(view.getByRole('button', { name: dayCellLabel(other) }))
-    expect(view.getByRole('button', { name: dayCellLabel(other) }).getAttribute('aria-current')).toBe(
-      'date',
-    )
     expect(
-      view.getByRole('button', { name: 'Today' }).classList.contains('opacity-100'),
+      view
+        .getByRole('button', { name: dayCellLabel(other) })
+        .element()
+        .getAttribute('aria-current'),
+    ).toBe('date')
+    expect(
+      view.getByRole('button', { name: 'Today' }).element().classList.contains('opacity-100'),
     ).toBe(true)
-    expect(todayButton.hasAttribute('inert')).toBe(false)
+    expect(todayButton.element().hasAttribute('inert')).toBe(false)
 
     await user.click(view.getByRole('button', { name: 'Today' }))
-    expect(view.queryByRole('button', { name: 'Today' })).toBeNull()
-    expect(todayButton.classList.contains('opacity-0')).toBe(true)
-    expect(todayButton.hasAttribute('inert')).toBe(true)
-    expect(view.getByRole('button', { name: dayCellLabel(today) }).getAttribute('aria-current')).toBe(
-      'date',
-    )
+    expect(view.getByRole('button', { name: 'Today' }).query()).toBeNull()
+    expect(todayButton.element().classList.contains('opacity-0')).toBe(true)
+    expect(todayButton.element().hasAttribute('inert')).toBe(true)
+    expect(
+      view
+        .getByRole('button', { name: dayCellLabel(today) })
+        .element()
+        .getAttribute('aria-current'),
+    ).toBe('date')
   })
 
   it('selects a day in another week straight from the pageable strip', async () => {
-    const user = userEvent.setup()
+    const user = userEvent
     const today = todayIso()
     // Two weeks out: its cell lives on a different week slide of the strip,
     // which the strip renders (and Embla pages) rather than a single week.
     const nextFortnight = addDaysIso(today, 14)
-    const view = mount({ kind: 'today' })
+    const view = await mount({ kind: 'today' })
 
     await user.click(view.getByRole('button', { name: dayCellLabel(nextFortnight) }))
     expect(
-      view.getByRole('button', { name: dayCellLabel(nextFortnight) }).getAttribute('aria-current'),
+      view
+        .getByRole('button', { name: dayCellLabel(nextFortnight) })
+        .element()
+        .getAttribute('aria-current'),
     ).toBe('date')
     expect(shownMonth(view)).toBe(monthLabel(monthOf(nextFortnight)))
-    expect(view.getByRole('button', { name: 'Today' })).toBeTruthy()
+    await expect.element(view.getByRole('button', { name: 'Today' })).toBeVisible()
   })
 
   it('jumps to a picked month from the month title’s picker sheet', async () => {
-    const user = userEvent.setup()
+    const user = userEvent
     const today = todayIso()
-    const view = mount({ kind: 'today' })
+    const view = await mount({ kind: 'today' })
 
     await user.click(view.getByRole('button', { name: 'Change month' }))
     await user.click(view.getByRole('button', { name: 'Next year' }))
@@ -382,35 +371,41 @@ describe('MobileShell', () => {
     const pickedMonth = `${Number(monthOf(today).slice(0, 4)) + 1}-01`
     await user.click(view.getByRole('button', { name: monthLabel(pickedMonth) }))
 
-    expect(view.queryByTestId('drawer')).toBeNull()
+    expect(view.getByTestId('drawer').query()).toBeNull()
     expect(shownMonth(view)).toBe(monthLabel(pickedMonth))
     const firstDay = `${pickedMonth}-01`
     expect(
-      view.getByRole('button', { name: dayCellLabel(firstDay) }).getAttribute('aria-current'),
+      view
+        .getByRole('button', { name: dayCellLabel(firstDay) })
+        .element()
+        .getAttribute('aria-current'),
     ).toBe('date')
-    expect(view.getByRole('button', { name: 'Today' })).toBeTruthy()
+    await expect.element(view.getByRole('button', { name: 'Today' })).toBeVisible()
   })
 
   it('keeps the selection when its own month is picked from the sheet', async () => {
-    const user = userEvent.setup()
+    const user = userEvent
     const today = todayIso()
-    const view = mount({ kind: 'today' })
+    const view = await mount({ kind: 'today' })
 
     await user.click(view.getByRole('button', { name: 'Change month' }))
     await user.click(view.getByRole('button', { name: monthLabel(monthOf(today)) }))
 
-    expect(view.queryByTestId('drawer')).toBeNull()
-    expect(view.getByRole('button', { name: dayCellLabel(today) }).getAttribute('aria-current')).toBe(
-      'date',
-    )
-    expect(view.queryByRole('button', { name: 'Today' })).toBeNull()
+    expect(view.getByTestId('drawer').query()).toBeNull()
+    expect(
+      view
+        .getByRole('button', { name: dayCellLabel(today) })
+        .element()
+        .getAttribute('aria-current'),
+    ).toBe('date')
+    expect(view.getByRole('button', { name: 'Today' }).query()).toBeNull()
   })
 
   it('fires haptics from the Daily header Today and Settings buttons', async () => {
-    const user = userEvent.setup()
+    const user = userEvent
     const today = todayIso()
     const other = otherDayInWeek(today)
-    const view = mount({ kind: 'today' })
+    const view = await mount({ kind: 'today' })
 
     await user.click(view.getByRole('button', { name: dayCellLabel(other) }))
     hapticImpactLight.mockClear()
@@ -420,49 +415,49 @@ describe('MobileShell', () => {
 
     await user.click(view.getByRole('button', { name: 'Settings' }))
     expect(hapticImpactLight).toHaveBeenCalledTimes(2)
-    expect(view.getByRole('heading', { name: 'Settings' })).toBeTruthy()
+    await expect.element(view.getByRole('heading', { name: 'Settings' })).toBeVisible()
   })
 
   it('re-anchors the carousel when a date link lands outside its window', async () => {
-    const user = userEvent.setup()
+    const user = userEvent
     // Beyond the ±366-day window — only reachable as a date-link navigation,
     // which forces the carousel to rebuild its window around the day.
     const farDay = addDaysIso(todayIso(), 400)
     files[`daily/${farDay}.md`] = 'far future plans'
-    const view = mount({ kind: 'today' }, { kind: 'daily', date: farDay })
+    const view = await mount({ kind: 'today' }, { kind: 'daily', date: farDay })
 
     await user.click(view.getByRole('button', { name: 'probe-navigate' }))
     expect(shownMonth(view)).toBe(monthLabel(monthOf(farDay)))
     await waitFor(() => {
-      const editors = view.getAllByTestId('fake-editor')
+      const editors = view.getByTestId('fake-editor').elements()
       expect(editors.some((editor) => editor.textContent?.includes('far future plans'))).toBe(true)
     })
   })
 
   it('opens a note from in-screen navigation and pops back through history', async () => {
-    const user = userEvent.setup()
+    const user = userEvent
     files['notes/meeting-notes.md'] = 'agenda'
-    const view = mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
 
     await user.click(view.getByRole('button', { name: 'probe-navigate' }))
-    expect(view.getByRole('heading').textContent).toBe('Edit note')
+    expect(view.getByRole('heading').element().textContent).toBe('Edit note')
 
     await user.click(view.getByRole('button', { name: 'Back' }))
     expect(shownMonth(view)).toBe(monthLabel(monthOf(todayIso())))
   })
 
   it('never focuses the destination editor on navigation (keyboard stays down)', async () => {
-    const user = userEvent.setup()
+    const user = userEvent
     files['notes/source.md'] = 'see [[Target Note]]'
-    const view = mount({ kind: 'note', path: 'notes/source.md' })
+    const view = await mount({ kind: 'note', path: 'notes/source.md' })
 
     // A plain arrival (cold entry, All list, back-nav) must not focus — on
     // touch that would raise the keyboard while browsing. (The stack keeps
     // today's spine mounted beneath the note, so scope to the visible layer.)
     await waitFor(() => {
-      expect(within(visibleLayer(view)).getByTestId('fake-editor').textContent).toContain(
-        'see [[Target Note]]',
-      )
+      expect(
+        page.elementLocator(visibleLayer(view)).getByTestId('fake-editor').element().textContent,
+      ).toContain('see [[Target Note]]')
     })
     expect(editorProbe.focusCalls).toBe(0)
 
@@ -472,60 +467,74 @@ describe('MobileShell', () => {
     // real router, NotePane, and document pipeline.
     await user.click(view.getByRole('button', { name: 'fake-wikilink' }))
     await waitFor(() => {
-      expect(view.getByRole('heading').textContent).not.toContain('source')
+      expect(view.getByRole('heading').element().textContent).not.toContain('source')
     })
     await waitFor(() => {
-      expect(within(visibleLayer(view)).getByTestId('fake-editor')).toBeTruthy()
+      expect(
+        page.elementLocator(visibleLayer(view)).getByTestId('fake-editor').query(),
+      ).not.toBeNull()
     })
     expect(editorProbe.focusCalls).toBe(0)
     expect(editorProbe.selectionCalls).toEqual([])
   })
 
   it('switches tabs: All shows the searchable list, Daily returns to the last-open day', async () => {
-    const user = userEvent.setup()
+    const user = userEvent
     const today = todayIso()
     const other = otherDayInWeek(today)
-    const view = mount({ kind: 'today' })
+    const view = await mount({ kind: 'today' })
 
     await user.click(view.getByRole('button', { name: dayCellLabel(other) }))
-    expect(view.getByRole('button', { name: dayCellLabel(other) }).getAttribute('aria-current')).toBe(
-      'date',
-    )
+    expect(
+      view
+        .getByRole('button', { name: dayCellLabel(other) })
+        .element()
+        .getAttribute('aria-current'),
+    ).toBe('date')
 
     await user.click(view.getByRole('button', { name: 'All' }))
-    expect(view.getByRole('searchbox', { name: 'Search notes' })).toBeTruthy()
-    expect((await view.findByText('No notes yet')).textContent).toBe('No notes yet')
+    await expect.element(view.getByRole('searchbox', { name: 'Search notes' })).toBeVisible()
+    await expect.element(view.getByText('No notes yet')).toHaveTextContent('No notes yet')
 
     await user.click(view.getByRole('button', { name: 'Daily' }))
-    expect(view.getByRole('button', { name: dayCellLabel(other) }).getAttribute('aria-current')).toBe(
-      'date',
-    )
+    expect(
+      view
+        .getByRole('button', { name: dayCellLabel(other) })
+        .element()
+        .getAttribute('aria-current'),
+    ).toBe('date')
   })
 
   it('double-tapping Daily opens today and focuses the daily editor at its end', async () => {
-    const user = userEvent.setup()
+    const user = userEvent
     const today = todayIso()
     const other = otherDayInWeek(today)
-    const view = mount({ kind: 'today' })
+    const view = await mount({ kind: 'today' })
 
     await user.click(view.getByRole('button', { name: dayCellLabel(other) }))
     await user.click(view.getByRole('button', { name: 'All' }))
-    await view.findByRole('searchbox', { name: 'Search notes' })
+    await expect.element(view.getByRole('searchbox', { name: 'Search notes' })).toBeVisible()
 
     let fakeNow = 1_000
     const now = vi.spyOn(Date, 'now').mockImplementation(() => fakeNow)
 
     fireEvent.click(view.getByRole('button', { name: 'Daily' }))
-    expect(view.getByRole('button', { name: dayCellLabel(other) }).getAttribute('aria-current')).toBe(
-      'date',
-    )
+    expect(
+      view
+        .getByRole('button', { name: dayCellLabel(other) })
+        .element()
+        .getAttribute('aria-current'),
+    ).toBe('date')
 
     fakeNow = 1_100
     fireEvent.click(view.getByRole('button', { name: 'Daily' }))
     now.mockRestore()
     await waitFor(() => {
       expect(
-        view.getByRole('button', { name: dayCellLabel(today) }).getAttribute('aria-current'),
+        view
+          .getByRole('button', { name: dayCellLabel(today) })
+          .element()
+          .getAttribute('aria-current'),
       ).toBe('date')
     })
     // The capture gesture: focus with the caret at the end of today's content.
@@ -538,9 +547,9 @@ describe('MobileShell', () => {
   it('double-tapping Daily while already on today focuses the editor at its end', async () => {
     const today = todayIso()
     files[`daily/${today}.md`] = 'first thought'
-    const view = mount({ kind: 'today' })
+    const view = await mount({ kind: 'today' })
     await waitFor(() => {
-      const editors = view.getAllByTestId('fake-editor')
+      const editors = view.getByTestId('fake-editor').elements()
       expect(editors.some((editor) => editor.textContent?.includes('first thought'))).toBe(true)
     })
 
@@ -560,41 +569,49 @@ describe('MobileShell', () => {
   })
 
   it('does not jump to today on a single tap of the active Daily tab', async () => {
-    const user = userEvent.setup()
+    const user = userEvent
     const today = todayIso()
     const other = otherDayInWeek(today)
-    const view = mount({ kind: 'daily', date: other })
+    const view = await mount({ kind: 'daily', date: other })
 
     await user.click(view.getByRole('button', { name: 'Daily' }))
-    expect(view.getByRole('button', { name: dayCellLabel(other) }).getAttribute('aria-current')).toBe(
-      'date',
-    )
-    expect(view.getByRole('button', { name: dayCellLabel(today) }).getAttribute('aria-current')).not.toBe(
-      'date',
-    )
+    expect(
+      view
+        .getByRole('button', { name: dayCellLabel(other) })
+        .element()
+        .getAttribute('aria-current'),
+    ).toBe('date')
+    expect(
+      view
+        .getByRole('button', { name: dayCellLabel(today) })
+        .element()
+        .getAttribute('aria-current'),
+    ).not.toBe('date')
     expect(editorProbe.focusCalls).toBe(0)
   })
 
   it('switches to the Tasks tab, which renders the grouped task list', async () => {
-    const user = userEvent.setup()
-    const view = mount({ kind: 'today' })
+    const user = userEvent
+    const view = await mount({ kind: 'today' })
 
     await user.click(view.getByRole('button', { name: 'Tasks' }))
-    expect(view.getByRole('searchbox', { name: 'Search tasks' })).toBeTruthy()
+    await expect.element(view.getByRole('searchbox', { name: 'Search tasks' })).toBeVisible()
     // The fake bridge's index is empty, so the tab lands on its empty state.
-    expect((await view.findByText('No tasks to show')).textContent).toBe('No tasks to show')
+    await expect.element(view.getByText('No tasks to show')).toHaveTextContent('No tasks to show')
   })
 
   it('double-tapping Tasks selects the task search filter', async () => {
-    const user = userEvent.setup()
+    const user = userEvent
     let fakeNow = 1_000
     const now = vi.spyOn(Date, 'now').mockImplementation(() => fakeNow)
-    const view = mount({ kind: 'today' })
+    const view = await mount({ kind: 'today' })
     let box: HTMLInputElement | null = null
 
     try {
       fireEvent.click(view.getByRole('button', { name: 'Tasks' }))
-      box = (await view.findByRole('searchbox', { name: 'Search tasks' })) as HTMLInputElement
+      const boxLocator = view.getByRole('searchbox', { name: 'Search tasks' })
+      await expect.element(boxLocator).toBeVisible()
+      box = boxLocator.element() as HTMLInputElement
       await user.type(box, 'milk')
 
       fakeNow = 2_000
@@ -613,27 +630,27 @@ describe('MobileShell', () => {
     expect(box.selectionEnd).toBe(box.value.length)
   })
 
-  it('hides the tab bar while the software keyboard is up (V1: the keyboard covered it)', () => {
-    const view = mount({ kind: 'today' })
-    expect(view.getByRole('navigation', { name: 'Sections' })).toBeTruthy()
+  it('hides the tab bar while the software keyboard is up (V1: the keyboard covered it)', async () => {
+    const view = await mount({ kind: 'today' })
+    await expect.element(view.getByRole('navigation', { name: 'Sections' })).toBeVisible()
 
-    act(() => publishKeyboardHeight(316))
-    expect(view.queryByRole('navigation', { name: 'Sections' })).toBeNull()
+    await act(() => publishKeyboardHeight(316))
+    expect(view.getByRole('navigation', { name: 'Sections' }).query()).toBeNull()
 
-    act(() => publishKeyboardHeight(0))
-    expect(view.getByRole('navigation', { name: 'Sections' })).toBeTruthy()
+    await act(() => publishKeyboardHeight(0))
+    await expect.element(view.getByRole('navigation', { name: 'Sections' })).toBeVisible()
   })
 
-  it('gives the tab bar slot to the formatting toolbar only while an editor is focused', () => {
-    const view = mount({ kind: 'today' })
+  it('gives the tab bar slot to the formatting toolbar only while an editor is focused', async () => {
+    const view = await mount({ kind: 'today' })
     const owner = Symbol('shell-test')
 
     // Keyboard up with no focused editor (the All-tab search field): neither
     // the tab bar nor a dead-button toolbar.
-    act(() => publishKeyboardHeight(316))
-    expect(view.queryByRole('toolbar', { name: 'Formatting' })).toBeNull()
+    await act(() => publishKeyboardHeight(316))
+    expect(view.getByRole('toolbar', { name: 'Formatting' }).query()).toBeNull()
 
-    act(() =>
+    await act(() =>
       publishFormattingToolbar(owner, {
         capabilities: { canIndent: true, canDedent: false, canMoveUp: true, canMoveDown: true },
         commands: {
@@ -649,41 +666,45 @@ describe('MobileShell', () => {
         },
       }),
     )
-    expect(view.getByRole('toolbar', { name: 'Formatting' })).toBeTruthy()
-    expect(view.queryByRole('navigation', { name: 'Sections' })).toBeNull()
+    await expect.element(view.getByRole('toolbar', { name: 'Formatting' })).toBeVisible()
+    expect(view.getByRole('navigation', { name: 'Sections' }).query()).toBeNull()
 
-    act(() => {
+    await act(() => {
       clearFormattingToolbar(owner)
       publishKeyboardHeight(0)
     })
-    expect(view.queryByRole('toolbar', { name: 'Formatting' })).toBeNull()
-    expect(view.getByRole('navigation', { name: 'Sections' })).toBeTruthy()
+    expect(view.getByRole('toolbar', { name: 'Formatting' }).query()).toBeNull()
+    await expect.element(view.getByRole('navigation', { name: 'Sections' })).toBeVisible()
   })
 
   it('renders a search entry as the All tab with the query seeded', async () => {
-    const user = userEvent.setup()
-    const view = mount({ kind: 'search', query: 'meeting' })
+    const user = userEvent
+    const view = await mount({ kind: 'search', query: 'meeting' })
 
     const box = view.getByRole('searchbox', { name: 'Search notes' })
     await waitFor(() => {
-      expect((box as HTMLInputElement).value).toBe('meeting')
+      expect((box.element() as HTMLInputElement).value).toBe('meeting')
     })
-    expect(view.getByRole('button', { name: 'All' }).getAttribute('aria-current')).toBe('page')
+    expect(
+      view.getByRole('button', { name: 'All' }).element().getAttribute('aria-current'),
+    ).toBe('page')
 
     await user.click(view.getByRole('button', { name: 'Clear search' }))
 
-    expect((box as HTMLInputElement).value).toBe('')
-    expect(view.queryByRole('button', { name: 'Clear search' })).toBeNull()
+    expect((box.element() as HTMLInputElement).value).toBe('')
+    expect(view.getByRole('button', { name: 'Clear search' }).query()).toBeNull()
   })
 
   it('back from a cold note entry lands on today', async () => {
-    const user = userEvent.setup()
+    const user = userEvent
     files['notes/meeting-notes.md'] = 'agenda'
-    const view = mount({ kind: 'note', path: 'notes/meeting-notes.md' })
+    const view = await mount({ kind: 'note', path: 'notes/meeting-notes.md' })
 
-    expect(view.getByRole('heading').textContent).toBe('Edit note')
+    expect(view.getByRole('heading').element().textContent).toBe('Edit note')
     await waitFor(() => {
-      expect(within(visibleLayer(view)).getByTestId('fake-editor').textContent).toContain('agenda')
+      expect(
+        page.elementLocator(visibleLayer(view)).getByTestId('fake-editor').element().textContent,
+      ).toContain('agenda')
     })
 
     await user.click(view.getByRole('button', { name: 'Back' }))
@@ -696,8 +717,7 @@ describe('MobileShell', () => {
  * its origin (which stays mounted, hidden, and inert beneath it), popping
  * slides it out, tab switches stay instant, and an edge back-swipe drags the
  * card with the finger — popping past the threshold, snapping back short of
- * it. jsdom runs no animations, so tests drive the `animationend` /
- * `transitionend` completions by hand.
+ * it. Tests drive the `animationend` / `transitionend` completions by hand.
  */
 describe('MobileStack transitions & back-swipe', () => {
   // The test browser pins `prefers-reduced-motion: reduce`, which turns the
@@ -726,16 +746,16 @@ describe('MobileStack transitions & back-swipe', () => {
   })
 
   /** Navigate to the probe note and complete the push animation. */
-  async function pushProbeNote(view: ReturnType<typeof render>): Promise<void> {
-    const user = userEvent.setup()
+  async function pushProbeNote(view: BrowserView): Promise<void> {
+    const user = userEvent
     await user.click(view.getByRole('button', { name: 'probe-navigate' }))
     fireEvent.animationEnd(stackLayers(view).at(-1)!)
   }
 
   it('pushes a note as a sliding card over its origin, which stays mounted but inert', async () => {
-    const user = userEvent.setup()
+    const user = userEvent
     files['notes/meeting-notes.md'] = 'agenda'
-    const view = mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
 
     await user.click(view.getByRole('button', { name: 'probe-navigate' }))
     const layers = stackLayers(view)
@@ -744,8 +764,10 @@ describe('MobileStack transitions & back-swipe', () => {
     expect(entering!.className).toContain('mobile-stack-slide-in')
     expect(origin!.getAttribute('aria-hidden')).toBe('true')
     expect(
-      within(origin!)
+      page
+        .elementLocator(origin!)
         .getByRole('heading', { level: 1, hidden: true })
+        .element()
         .querySelector('[data-slot="month-title"]')?.textContent,
     ).toBe(monthLabel(monthOf(todayIso())))
     expect(view.container.querySelector('.mobile-stack-scrim')).toBeTruthy()
@@ -757,9 +779,9 @@ describe('MobileStack transitions & back-swipe', () => {
   })
 
   it('pops the note with a slide-out and unmounts it when the animation ends', async () => {
-    const user = userEvent.setup()
+    const user = userEvent
     files['notes/meeting-notes.md'] = 'agenda'
-    const view = mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
     await pushProbeNote(view)
 
     await user.click(view.getByRole('button', { name: 'Back' }))
@@ -774,8 +796,8 @@ describe('MobileStack transitions & back-swipe', () => {
   })
 
   it('keeps tab switches instant: one layer, no slide (V1 cross-fade at most)', async () => {
-    const user = userEvent.setup()
-    const view = mount({ kind: 'today' })
+    const user = userEvent
+    const view = await mount({ kind: 'today' })
     expect(stackLayers(view)).toHaveLength(1)
 
     await user.click(view.getByRole('button', { name: 'All' }))
@@ -786,13 +808,13 @@ describe('MobileStack transitions & back-swipe', () => {
   })
 
   it('follows history direction within a note chain: wiki-link pushes, back pops', async () => {
-    const user = userEvent.setup()
+    const user = userEvent
     files['notes/source.md'] = 'see [[Target Note]]'
-    const view = mount({ kind: 'note', path: 'notes/source.md' })
+    const view = await mount({ kind: 'note', path: 'notes/source.md' })
     await waitFor(() => {
-      expect(within(visibleLayer(view)).getByTestId('fake-editor').textContent).toContain(
-        'Target Note',
-      )
+      expect(
+        page.elementLocator(visibleLayer(view)).getByTestId('fake-editor').element().textContent,
+      ).toContain('Target Note')
     })
 
     await user.click(view.getByRole('button', { name: 'fake-wikilink' }))
@@ -808,7 +830,9 @@ describe('MobileStack transitions & back-swipe', () => {
     const layers = stackLayers(view)
     expect(layers).toHaveLength(3)
     expect(layers.at(-1)!.className).toContain('mobile-stack-slide-out')
-    expect(within(visibleLayer(view)).getByRole('heading').textContent).toBe('Edit note')
+    expect(
+      page.elementLocator(visibleLayer(view)).getByRole('heading').element().textContent,
+    ).toBe('Edit note')
     fireEvent.animationEnd(layers.at(-1)!)
     expect(stackLayers(view)).toHaveLength(2)
   })
@@ -826,9 +850,9 @@ describe('MobileStack transitions & back-swipe', () => {
       dispatchEvent: () => false,
     })) as unknown as typeof matchMedia
     try {
-      const user = userEvent.setup()
+      const user = userEvent
       files['notes/meeting-notes.md'] = 'agenda'
-      const view = mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+      const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
 
       await user.click(view.getByRole('button', { name: 'probe-navigate' }))
       expect(stackLayers(view).at(-1)!.className).not.toContain('mobile-stack-slide-in')
@@ -843,7 +867,7 @@ describe('MobileStack transitions & back-swipe', () => {
 
   it('pops the note when an edge swipe crosses the release threshold', async () => {
     files['notes/meeting-notes.md'] = 'agenda'
-    const view = mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
     await pushProbeNote(view)
 
     const stack = view.container.querySelector('.mobile-stack')!
@@ -856,8 +880,7 @@ describe('MobileStack transitions & back-swipe', () => {
       clientY: 300,
     })
     firePointer(stack, 'pointermove', { pointerId: 1, clientX: 40, clientY: 304 })
-    // The card tracks the finger. (jsdom has no layout, so the gesture falls
-    // back to window.innerWidth = 1024px — the pop threshold is ~410px.)
+    // The card tracks the finger in the 375px mobile viewport.
     // The browser normalizes the written value's bare zeros to `0px`.
     expect(card.style.transform).toBe('translate3d(30px, 0px, 0px)')
 
@@ -878,11 +901,15 @@ describe('MobileStack transitions & back-swipe', () => {
     // StrictMode's dev double-invocation (which caught an impure updater
     // once), and the card's transform + the scrim's opacity settling in the
     // same frame, so `transitionend` arrives twice before React re-renders.
-    const user = userEvent.setup()
+    const user = userEvent
     files['notes/meeting-notes.md'] = 'agenda'
-    const view = mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' }, {
-      strict: true,
-    })
+    const view = await mount(
+      { kind: 'today' },
+      { kind: 'note', path: 'notes/meeting-notes.md' },
+      {
+        strict: true,
+      },
+    )
     await user.click(view.getByRole('button', { name: 'All' }))
     await pushProbeNote(view)
 
@@ -899,16 +926,16 @@ describe('MobileStack transitions & back-swipe', () => {
     firePointer(stack, 'pointermove', { pointerId: 1, clientX: 600, clientY: 310 })
     firePointer(stack, 'pointerup', { pointerId: 1, clientX: 600, clientY: 310 })
 
-    act(() => {
+    await act(() => {
       card.dispatchEvent(new Event('transitionend', { bubbles: true }))
       card.dispatchEvent(new Event('transitionend', { bubbles: true }))
     })
-    expect(view.getByRole('searchbox', { name: 'Search notes' })).toBeTruthy()
+    await expect.element(view.getByRole('searchbox', { name: 'Search notes' })).toBeVisible()
   })
 
   it('snaps back when the swipe releases short of the threshold', async () => {
     files['notes/meeting-notes.md'] = 'agenda'
-    const view = mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
     await pushProbeNote(view)
 
     // A slow machine can stretch the gap between synthetic moves past the
@@ -933,7 +960,7 @@ describe('MobileStack transitions & back-swipe', () => {
       expect(card.style.transform).toBe('translate3d(0px, 0px, 0px)')
 
       fireEvent.transitionEnd(card)
-      expect(view.getByRole('heading').textContent).toBe('Edit note')
+      expect(view.getByRole('heading').element().textContent).toBe('Edit note')
       expect(stackLayers(view)).toHaveLength(2)
     } finally {
       nowSpy.mockRestore()
@@ -942,7 +969,7 @@ describe('MobileStack transitions & back-swipe', () => {
 
   it('ignores mid-screen touches, mouse pointers, and vertical scrolls', async () => {
     files['notes/meeting-notes.md'] = 'agenda'
-    const view = mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
+    const view = await mount({ kind: 'today' }, { kind: 'note', path: 'notes/meeting-notes.md' })
     await pushProbeNote(view)
 
     const stack = view.container.querySelector('.mobile-stack')!
