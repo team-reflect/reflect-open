@@ -1,9 +1,10 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import userEvent from '@testing-library/user-event'
+import { cleanup, render } from 'vitest-browser-react'
+import { page, userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_SETTINGS, getConflictedNotes, type GraphInfo, type Settings } from '@reflect/core'
 import type { BackupState } from '@/lib/backup-controller'
+import '@/test-utils/locator'
 import { MobileSettings } from './settings'
 
 /**
@@ -58,8 +59,7 @@ vi.mock('@/providers/sync-provider', () => ({
   useSyncContext: () => sync.value,
 }))
 
-// vaul's gestures need browser APIs jsdom does not provide. The prompt
-// editor's state and save wiring still render through this open-state shell.
+// The prompt editor's state and save wiring render through this open-state shell.
 vi.mock('@/components/ui/drawer', () => ({
   Drawer: ({ open, children }: { open?: boolean; children?: import('react').ReactNode }) =>
     open ? <div data-testid="drawer">{children}</div> : null,
@@ -85,7 +85,8 @@ function connected(status: Extract<BackupState, { phase: 'connected' }>['status'
 
 let queryClient: QueryClient
 
-beforeEach(() => {
+beforeEach(async () => {
+  await page.viewport(375, 700)
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   settingsState.current = { ...DEFAULT_SETTINGS }
   graphState.mobileStorageKind = 'icloud'
@@ -97,13 +98,13 @@ beforeEach(() => {
   vi.mocked(getConflictedNotes).mockResolvedValue([])
 })
 
-afterEach(() => {
-  cleanup()
+afterEach(async () => {
+  await cleanup()
   queryClient.clear()
   vi.clearAllMocks()
 })
 
-function mount(): ReturnType<typeof render> {
+function mount() {
   return render(
     <QueryClientProvider client={queryClient}>
       <MobileSettings />
@@ -113,56 +114,56 @@ function mount(): ReturnType<typeof render> {
 
 describe('MobileSettings', () => {
   it('discloses the graph row into the Graphs screen', async () => {
-    const user = userEvent.setup()
-    mount()
+    const user = userEvent
+    await mount()
 
-    const graphRow = screen.getByRole('button', { name: /Field Notes/ })
-    expect(graphRow.textContent).toContain('iCloud Drive')
+    const graphRow = page.getByRole('button', { name: /Field Notes/ })
+    await expect.element(graphRow).toHaveTextContent('iCloud Drive')
     await user.click(graphRow)
 
     expect(navigate).toHaveBeenCalledWith({ kind: 'graphs' })
   })
 
   it('opens the privacy policy from the About group', async () => {
-    const user = userEvent.setup()
-    mount()
+    const user = userEvent
+    await mount()
 
-    await user.click(screen.getByRole('button', { name: 'Privacy Policy' }))
+    await user.click(page.getByRole('button', { name: 'Privacy Policy' }))
 
     expect(openUrl).toHaveBeenCalledWith('https://reflect.app/privacy')
   })
 
   it('writes appearance choices to the settings document', async () => {
-    const user = userEvent.setup()
-    mount()
+    const user = userEvent
+    await mount()
 
-    await user.click(screen.getByRole('radio', { name: 'Dark' }))
+    await user.click(page.getByRole('radio', { name: 'Dark' }))
     expect(updateSettings).toHaveBeenCalledWith({ theme: 'dark' })
 
-    await user.click(screen.getByRole('radio', { name: 'Large' }))
+    await user.click(page.getByRole('radio', { name: 'Large' }))
     expect(updateSettings).toHaveBeenCalledWith({ editorTextSize: 'large' })
   })
 
   it('toggles the editor switches', async () => {
-    const user = userEvent.setup()
-    mount()
+    const user = userEvent
+    await mount()
 
-    await user.click(screen.getByRole('switch', { name: 'Smooth caret animation' }))
+    await user.click(page.getByRole('switch', { name: 'Smooth caret animation' }))
     expect(updateSettings).toHaveBeenCalledWith({ editorSmoothCaretAnimation: false })
 
-    await user.click(screen.getByRole('switch', { name: 'Start with a bullet' }))
+    await user.click(page.getByRole('switch', { name: 'Start with a bullet' }))
     expect(updateSettings).toHaveBeenCalledWith({ editorDefaultBullet: false })
 
-    await user.click(screen.getByRole('switch', { name: 'Bullet after a heading' }))
+    await user.click(page.getByRole('switch', { name: 'Bullet after a heading' }))
     expect(updateSettings).toHaveBeenCalledWith({ editorBulletAfterHeading: false })
   })
 
   it('toggles audio transcription formatting', async () => {
-    const user = userEvent.setup()
-    mount()
+    const user = userEvent
+    await mount()
 
-    const toggle = screen.getByRole('switch', { name: 'Transcription auto-format' })
-    const descriptionId = toggle.getAttribute('aria-describedby')
+    const toggle = page.getByRole('switch', { name: 'Transcription auto-format' })
+    const descriptionId = toggle.element().getAttribute('aria-describedby')
     expect(descriptionId).not.toBeNull()
     expect(document.getElementById(descriptionId ?? '')?.textContent).toContain(
       'Uses AI to add punctuation, paragraphs, and light Markdown',
@@ -174,13 +175,13 @@ describe('MobileSettings', () => {
   })
 
   it('edits the AI chat system prompt', async () => {
-    const user = userEvent.setup()
-    mount()
+    const user = userEvent
+    await mount()
 
-    await user.click(screen.getByRole('button', { name: /System prompt.*Default/ }))
-    const textarea = screen.getByRole('textbox', { name: 'System prompt instructions' })
+    await user.click(page.getByRole('button', { name: /System prompt.*Default/ }))
+    const textarea = page.getByRole('textbox', { name: 'System prompt instructions' })
     await user.type(textarea, 'Challenge my assumptions.')
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await user.click(page.getByRole('button', { name: 'Save' }))
 
     expect(updateSettings).toHaveBeenCalledWith({
       chatSystemPrompt: 'Challenge my assumptions.',
@@ -188,122 +189,134 @@ describe('MobileSettings', () => {
   })
 
   it('tracks a prompt that hydrates while its editor is open', async () => {
-    const user = userEvent.setup()
-    const view = mount()
-    await user.click(screen.getByRole('button', { name: /System prompt.*Default/ }))
+    const user = userEvent
+    const view = await mount()
+    await user.click(page.getByRole('button', { name: /System prompt.*Default/ }))
 
     settingsState.current = {
       ...settingsState.current,
       chatSystemPrompt: 'Persisted instructions loaded from disk.',
     }
-    view.rerender(
+    await view.rerender(
       <QueryClientProvider client={queryClient}>
         <MobileSettings />
       </QueryClientProvider>,
     )
 
-    const textarea = screen.getByRole('textbox', { name: 'System prompt instructions' })
-    expect((textarea as HTMLTextAreaElement).value).toBe('Persisted instructions loaded from disk.')
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    const textarea = page.getByRole('textbox', { name: 'System prompt instructions' })
+    await expect.element(textarea).toHaveValue('Persisted instructions loaded from disk.')
+    await user.click(page.getByRole('button', { name: 'Save' }))
     expect(updateSettings).toHaveBeenCalledWith({
       chatSystemPrompt: 'Persisted instructions loaded from disk.',
     })
   })
 
   it('restores the default prompt immediately from the mobile editor', async () => {
-    const user = userEvent.setup()
+    const user = userEvent
     settingsState.current = {
       ...settingsState.current,
       chatSystemPrompt: 'Always answer in haiku.',
     }
-    mount()
+    await mount()
 
-    await user.click(screen.getByRole('button', { name: /System prompt.*Custom/ }))
-    await user.click(screen.getByRole('button', { name: 'Use default' }))
+    await user.click(page.getByRole('button', { name: /System prompt.*Custom/ }))
+    await user.click(page.getByRole('button', { name: 'Use default' }))
 
     expect(updateSettings).toHaveBeenCalledWith({ chatSystemPrompt: '' })
-    expect(screen.queryByRole('textbox', { name: 'System prompt instructions' })).toBeNull()
+    await expect
+      .element(page.getByRole('textbox', { name: 'System prompt instructions' }))
+      .not.toBeInTheDocument()
   })
 
   it('shows the connected repo and the live plain-language status', async () => {
-    mount()
+    await mount()
 
-    expect(await screen.findByText('alex/notes')).toBeTruthy()
-    expect(await screen.findByText('Backed up')).toBeTruthy()
+    await expect.element(page.getByText('alex/notes')).toBeVisible()
+    await expect.element(page.getByText('Backed up')).toBeVisible()
     // Never git terms.
-    expect(screen.queryByText(/commit|branch|merge|push|pull/i)).toBeNull()
+    await expect.element(page.getByText(/commit|branch|merge|push|pull/i)).not.toBeInTheDocument()
   })
 
   it('routes Disconnect through the backup controller and signs out', async () => {
-    const user = userEvent.setup()
-    mount()
+    const user = userEvent
+    await mount()
 
-    await user.click(await screen.findByRole('button', { name: 'Disconnect GitHub' }))
+    await user.click(page.getByRole('button', { name: 'Disconnect GitHub' }))
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(sync.value?.disconnectGraph).toHaveBeenCalledTimes(1)
       expect(sync.value?.signOut).toHaveBeenCalledTimes(1)
     })
   })
 
   it('offers Connect GitHub for a disconnected local graph and opens the sheet', async () => {
-    const user = userEvent.setup()
+    const user = userEvent
     graphState.mobileStorageKind = 'local'
     sync.value = {
       backup: { phase: 'disconnected' },
       disconnectGraph: vi.fn(async () => {}),
       signOut: vi.fn(async () => {}),
     }
-    mount()
+    await mount()
 
-    expect(screen.getByText('Sync notes with Reflect on your other devices.')).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: 'Connect GitHub' }))
+    await expect
+      .element(page.getByText('Sync notes with Reflect on your other devices.'))
+      .toBeVisible()
+    await user.click(page.getByRole('button', { name: 'Connect GitHub' }))
 
-    expect(await screen.findByText('connect-github-sheet')).toBeTruthy()
+    await expect.element(page.getByText('connect-github-sheet')).toBeVisible()
   })
 
   it('hides the connect row once the local graph is connected', async () => {
     graphState.mobileStorageKind = 'local'
-    mount()
+    await mount()
 
-    expect(await screen.findByText('alex/notes')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Disconnect GitHub' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Connect GitHub' })).toBeNull()
+    await expect.element(page.getByText('alex/notes')).toBeVisible()
+    await expect.element(page.getByRole('button', { name: 'Disconnect GitHub' })).toBeVisible()
+    await expect
+      .element(page.getByRole('button', { name: 'Connect GitHub' }))
+      .not.toBeInTheDocument()
   })
 
-  it('never offers connect for iCloud graphs — they sync through the container', () => {
+  it('never offers connect for iCloud graphs — they sync through the container', async () => {
     sync.value = {
       backup: { phase: 'disconnected' },
       disconnectGraph: vi.fn(async () => {}),
       signOut: vi.fn(async () => {}),
     }
-    mount()
+    await mount()
 
-    expect(screen.queryByRole('button', { name: 'Connect GitHub' })).toBeNull()
-    expect(screen.queryByText('Backup')).toBeNull()
+    await expect
+      .element(page.getByRole('button', { name: 'Connect GitHub' }))
+      .not.toBeInTheDocument()
+    await expect.element(page.getByText('Backup')).not.toBeInTheDocument()
   })
 
-  it('waits out the loading phase — no connect row that could flash', () => {
+  it('waits out the loading phase — no connect row that could flash', async () => {
     graphState.mobileStorageKind = 'local'
     sync.value = {
       backup: { phase: 'loading' },
       disconnectGraph: vi.fn(async () => {}),
       signOut: vi.fn(async () => {}),
     }
-    mount()
+    await mount()
 
-    expect(screen.queryByRole('button', { name: 'Connect GitHub' })).toBeNull()
-    expect(screen.queryByText('Backup')).toBeNull()
+    await expect
+      .element(page.getByRole('button', { name: 'Connect GitHub' }))
+      .not.toBeInTheDocument()
+    await expect.element(page.getByText('Backup')).not.toBeInTheDocument()
   })
 
   it('degrades to the local groups where no sync lifecycle is mounted', async () => {
     sync.value = null
-    mount()
+    await mount()
 
-    expect(await screen.findByText('Field Notes')).toBeTruthy()
-    expect(screen.getByText('1.2.3')).toBeTruthy()
-    expect(await screen.findByText('2')).toBeTruthy() // the note count
-    expect(screen.queryByText('Backed up')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Disconnect GitHub' })).toBeNull()
+    await expect.element(page.getByText('Field Notes')).toBeVisible()
+    await expect.element(page.getByText('1.2.3')).toBeVisible()
+    await expect.element(page.getByText('2')).toBeVisible() // the note count
+    await expect.element(page.getByText('Backed up')).not.toBeInTheDocument()
+    await expect
+      .element(page.getByRole('button', { name: 'Disconnect GitHub' }))
+      .not.toBeInTheDocument()
   })
 })
