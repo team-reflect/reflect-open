@@ -194,6 +194,7 @@ describe('SettingsScreen', () => {
 
     const dialog = screen.getByRole('dialog', { name: /delete graph/i })
     expect(within(dialog).getByText('/graphs/work')).toBeTruthy()
+    expect(within(dialog).getByText(/everything inside it to Trash/)).toBeTruthy()
     const confirm = within(dialog).getByRole('button', { name: /delete graph/i })
     expect(confirm.hasAttribute('disabled')).toBe(true)
 

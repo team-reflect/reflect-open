@@ -1,6 +1,7 @@
 import {
   errorMessage,
   getLinkSources,
+  isReflectManagedNote,
   readNote,
   resolveWikiTarget,
   rewriteLinksForTitleChange,
@@ -16,9 +17,9 @@ import { createTitleRenameTracker } from './title-rename'
 import type { TitleRename } from './title-rename'
 
 /**
- * Owns one note's auto-rename lifecycle: the settled-title tracker, the
- * serialized rewrite chain, where the old-title alias lands — and the **file
- * move** that keeps the filename a projection of the title
+ * Owns one Reflect-managed note's auto-rename lifecycle: the settled-title
+ * tracker, the serialized rewrite chain, where the old-title alias lands —
+ * and the **file move** that keeps the filename a projection of the title
  * (`docs/readable-filenames.md`).
  *
  * A settled rename runs three phases, each failing independently with an
@@ -188,7 +189,14 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
   return {
     content(content: string, origin: NoteContentOrigin): void {
       if (origin === 'saved') {
-        tracker.saved(content)
+        // Only direct `notes/*.md` files carrying a valid Reflect ULID opt in
+        // to graph-wide automation. Adopted vault files save their content in
+        // place; a retitle never moves them, rewrites links, or adds aliases.
+        if (isReflectManagedNote(currentPath, content)) {
+          tracker.saved(content)
+        } else {
+          tracker.baseline(content)
+        }
       } else {
         tracker.baseline(content) // load/external: new ground truth, no rewrite
       }

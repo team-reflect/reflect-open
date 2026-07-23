@@ -1,4 +1,4 @@
-import type { FileMeta, NoteCreateOutcome } from '@reflect/core'
+import { isNotePath, type FileMeta, type NoteCreateOutcome } from '@reflect/core'
 
 /** One in-memory markdown file: contents plus a last-modified stamp. */
 interface DevFile {
@@ -13,7 +13,7 @@ interface DevFile {
  * hash-reconcile behave like real files.
  */
 export interface DevFileStore {
-  /** Every markdown note under `daily/` and `notes/` (the `list_files` view). */
+  /** Every eligible Markdown note anywhere in the graph (`list_files`). */
   list: () => FileMeta[]
   /** Files under a graph-relative directory prefix (the `dir_list` view). */
   listDir: (dir: string) => FileMeta[]
@@ -59,10 +59,7 @@ export function createDevFileStore(seed: Record<string, string>): DevFileStore {
   return {
     list: () =>
       [...files.entries()]
-        .filter(
-          ([path]) =>
-            (path.startsWith('daily/') || path.startsWith('notes/')) && path.endsWith('.md'),
-        )
+        .filter(([path]) => isNotePath(path))
         .map(toMeta),
     listDir: (dir) => {
       const prefix = dir.endsWith('/') ? dir : `${dir}/`

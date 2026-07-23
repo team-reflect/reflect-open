@@ -241,8 +241,8 @@ export async function deleteNote(path: string, generation: number): Promise<void
 }
 
 /**
- * List markdown notes under `daily/` and `notes/`. `generation` pins the
- * listing like {@link readNote}'s.
+ * List eligible Markdown notes at the graph root and in visible nested
+ * folders. `generation` pins the listing like {@link readNote}'s.
  */
 export async function listFiles(generation?: number): Promise<FileMeta[]> {
   return call('list_files', { generation }, z.array(fileMetaSchema))
