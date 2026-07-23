@@ -1,4 +1,5 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render } from 'vitest-browser-react'
+import { page } from 'vitest/browser'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useEffect, useRef, type ReactElement } from 'react'
 import { untitledNotePath } from '@reflect/core'
@@ -61,50 +62,50 @@ function Arrival({
   return route.kind === 'note' ? <MobileNote key={route.path} path={route.path} /> : null
 }
 
-function renderArrival(path: string, options?: NavigateOptions): ReturnType<typeof render> {
-  return render(
+async function renderArrival(path: string, options?: NavigateOptions): Promise<void> {
+  await render(
     <RouterProvider>
       <Arrival path={path} options={options} />
     </RouterProvider>,
   )
 }
 
-afterEach(() => {
-  cleanup()
+afterEach(async () => {
+  await cleanup()
   paneProps.autoFocus = null
   paneProps.className = null
   paneProps.gutterClassName = null
 })
 
 describe('MobileNote focus contract', () => {
-  it('labels an existing note screen as edit note', () => {
-    renderArrival('notes/target.md')
-    expect(screen.getByRole('heading', { name: 'Edit note' })).toBeTruthy()
+  it('labels an existing note screen as edit note', async () => {
+    await renderArrival('notes/target.md')
+    await expect.element(page.getByRole('heading', { name: 'Edit note' })).toBeVisible()
   })
 
-  it('does not autofocus a plain arrival (no keyboard on browse)', () => {
-    renderArrival('notes/target.md')
+  it('does not autofocus a plain arrival (no keyboard on browse)', async () => {
+    await renderArrival('notes/target.md')
     expect(paneProps.autoFocus).toBe(false)
   })
 
-  it('uses the mobile note-body gutter for the editor surface', () => {
-    renderArrival('notes/target.md')
+  it('uses the mobile note-body gutter for the editor surface', async () => {
+    await renderArrival('notes/target.md')
     expect(paneProps.gutterClassName).toBe('reflect-mobile-content-gutter')
   })
 
-  it('gives the pane a top inset (no date header above a plain note)', () => {
-    renderArrival('notes/target.md')
+  it('gives the pane a top inset (no date header above a plain note)', async () => {
+    await renderArrival('notes/target.md')
     expect(paneProps.className).toContain('pt-4')
   })
 
-  it('autofocuses a fresh untitled note (the + flow)', () => {
-    renderArrival(untitledNotePath())
-    expect(screen.getByRole('heading', { name: 'New note' })).toBeTruthy()
+  it('autofocuses a fresh untitled note (the + flow)', async () => {
+    await renderArrival(untitledNotePath())
+    await expect.element(page.getByRole('heading', { name: 'New note' })).toBeVisible()
     expect(paneProps.autoFocus).toBe(true)
   })
 
-  it('ignores a focusEditor arrival intent (navigation never raises the keyboard)', () => {
-    renderArrival('notes/target.md', { focusEditor: true })
+  it('ignores a focusEditor arrival intent (navigation never raises the keyboard)', async () => {
+    await renderArrival('notes/target.md', { focusEditor: true })
     expect(paneProps.autoFocus).toBe(false)
   })
 })

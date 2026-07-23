@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { cleanup, render } from 'vitest-browser-react'
+import { page } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement, ReactNode } from 'react'
 import type {
@@ -11,6 +12,7 @@ import type {
 } from '@reflect/core'
 import { ChatProvider } from '@/providers/chat-provider'
 import { RouterProvider, useRouter } from '@/routing/router'
+import { fireEvent } from '@/test-utils/fire-event'
 
 /**
  * The Chat tab over a faked engine (the desktop chat-screen harness, mobile
@@ -53,8 +55,7 @@ vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({ indexGeneration: null, graph: null }),
 }))
 
-// jsdom can't host the ProseMirror contenteditable; settled markdown renders
-// as plain text here.
+// Keep settled markdown as plain text so this suite isolates the chat state.
 vi.mock('@/editor/markdown-preview', () => ({
   MarkdownPreview: ({ content }: { content: string }) => (
     <div data-testid="markdown-preview">{content}</div>
@@ -62,21 +63,18 @@ vi.mock('@/editor/markdown-preview', () => ({
 }))
 vi.mock('@/lib/provider-fetch', () => ({ providerFetch: vi.fn() }))
 
-// vaul needs browser APIs jsdom doesn't provide; passthrough so sheet content
-// renders inline.
+// Keep sheet content inline so this suite isolates the chat flow.
 vi.mock('@/components/ui/drawer', () => ({
   Drawer: ({ children }: { children?: ReactNode }) => <>{children}</>,
   DrawerContent: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DrawerTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
 }))
 
-// shadcn's MessageScroller drives the viewport with scrollTo; jsdom has no
-// layout engine.
-Element.prototype.scrollTo ??= () => {}
-
 const { MobileChat } = await import('./chat')
 
-afterEach(cleanup)
+afterEach(async () => {
+  await cleanup()
+})
 
 const MODEL: AiProviderConfig = { id: 'm1', provider: 'openai', model: 'gpt-5.1', keyHint: '12345' }
 
@@ -133,10 +131,10 @@ function Harness({ showScreen }: { showScreen: boolean }): ReactElement {
 }
 
 describe('MobileChat', () => {
-  it('with no provider, the call-to-action navigates to Settings', () => {
-    render(<Harness showScreen />)
+  it('with no provider, the call-to-action navigates to Settings', async () => {
+    await render(<Harness showScreen />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add an AI provider' }))
+    await page.getByRole('button', { name: 'Add an AI provider' }).click()
 
     expect(probedRoute).toEqual({ kind: 'settings' })
   })
@@ -147,16 +145,16 @@ describe('MobileChat', () => {
       { type: 'text-delta', text: 'Grounded answer.' },
       { type: 'complete', messages: [{ role: 'assistant', content: 'Grounded answer.' }] },
     ])
-    render(<Harness showScreen />)
+    await render(<Harness showScreen />)
 
-    const composer = screen.getByLabelText('Chat message')
+    const composer = page.getByLabelText('Chat message')
     fireEvent.change(composer, { target: { value: 'what did I write?' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await page.getByRole('button', { name: 'Send' }).click()
 
-    await waitFor(() => expect(screen.getByText('Grounded answer.')).toBeDefined())
-    expect(screen.getByText('what did I write?')).toBeDefined()
+    await expect.element(page.getByText('Grounded answer.')).toBeVisible()
+    await expect.element(page.getByText('what did I write?')).toBeVisible()
     // A send that goes through clears the provider-held draft.
-    expect((composer as HTMLTextAreaElement).value).toBe('')
+    await expect.element(composer).toHaveValue('')
   })
 
   it('keeps the draft and the conversation across a screen unmount (tab switch)', async () => {
@@ -165,35 +163,33 @@ describe('MobileChat', () => {
       { type: 'text-delta', text: 'Kept.' },
       { type: 'complete', messages: [{ role: 'assistant', content: 'Kept.' }] },
     ])
-    const { rerender } = render(<Harness showScreen />)
+    const { rerender } = await render(<Harness showScreen />)
 
-    fireEvent.change(screen.getByLabelText('Chat message'), {
+    fireEvent.change(page.getByLabelText('Chat message'), {
       target: { value: 'sent question' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
-    await waitFor(() => expect(screen.getByText('Kept.')).toBeDefined())
+    await page.getByRole('button', { name: 'Send' }).click()
+    await expect.element(page.getByText('Kept.')).toBeVisible()
 
-    fireEvent.change(screen.getByLabelText('Chat message'), {
+    fireEvent.change(page.getByLabelText('Chat message'), {
       target: { value: 'half-typed follow-up' },
     })
 
-    rerender(<Harness showScreen={false} />)
-    expect(screen.queryByLabelText('Chat message')).toBeNull()
-    rerender(<Harness showScreen />)
+    await rerender(<Harness showScreen={false} />)
+    await expect.element(page.getByLabelText('Chat message')).not.toBeInTheDocument()
+    await rerender(<Harness showScreen />)
 
-    expect((screen.getByLabelText('Chat message') as HTMLTextAreaElement).value).toBe(
-      'half-typed follow-up',
-    )
-    expect(screen.getByText('sent question')).toBeDefined()
+    await expect.element(page.getByLabelText('Chat message')).toHaveValue('half-typed follow-up')
+    await expect.element(page.getByText('sent question')).toBeVisible()
   })
 
   it('focuses the composer when a chat tab capture arrival requests it', async () => {
     configureModel()
-    render(<Harness showScreen />)
+    await render(<Harness showScreen />)
 
-    const composer = screen.getByLabelText('Chat message')
-    fireEvent.click(screen.getByRole('button', { name: 'focus chat input' }))
+    const composer = page.getByLabelText('Chat message')
+    await page.getByRole('button', { name: 'focus chat input' }).click()
 
-    await waitFor(() => expect(document.activeElement).toBe(composer))
+    await vi.waitFor(() => expect(document.activeElement).toBe(composer.element()))
   })
 })

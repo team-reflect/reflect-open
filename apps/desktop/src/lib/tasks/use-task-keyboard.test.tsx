@@ -1,4 +1,5 @@
-import { act, cleanup, renderHook } from '@testing-library/react'
+import { act } from 'react'
+import { cleanup, renderHook } from 'vitest-browser-react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type OpenTask } from '@reflect/core'
 import { makeOpenTask as task } from './open-task-fixture'
@@ -55,7 +56,7 @@ afterEach(() => {
   root.remove()
 })
 
-function mount(options: {
+async function mount(options: {
   selection?: TaskSelection
   actions?: TaskActions
   tasksByKey?: ReadonlyMap<string, OpenTask>
@@ -70,7 +71,7 @@ function mount(options: {
   const onToggleFilters = vi.fn()
   const onToggleSchedule = vi.fn()
   const onConvertToBullet = vi.fn()
-  renderHook(() =>
+  await renderHook(() =>
     useTaskKeyboard({
       selection,
       actions,
@@ -86,7 +87,15 @@ function mount(options: {
       onConvertToBullet,
     }),
   )
-  return { selection, actions, setQuery, scrollToKey, onToggleFilters, onToggleSchedule, onConvertToBullet }
+  return {
+    selection,
+    actions,
+    setQuery,
+    scrollToKey,
+    onToggleFilters,
+    onToggleSchedule,
+    onConvertToBullet,
+  }
 }
 
 /** Let the `void insert(...).then(...)` microtask settle before asserting. */
@@ -101,7 +110,12 @@ function press(
   key: string,
   mods: { metaKey?: boolean; shiftKey?: boolean } = {},
 ): KeyboardEvent {
-  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...mods })
+  const event = new KeyboardEvent('keydown', {
+    key,
+    bubbles: true,
+    cancelable: true,
+    ...mods,
+  })
   act(() => {
     target.dispatchEvent(event)
   })
@@ -109,8 +123,8 @@ function press(
 }
 
 describe('useTaskKeyboard', () => {
-  it('selects all on ⌘A and moves / extends with the arrows', () => {
-    const { selection } = mount({})
+  it('selects all on ⌘A and moves / extends with the arrows', async () => {
+    const { selection } = await mount({})
     const a = press(root, 'a', { metaKey: true })
     expect(selection.selectAll).toHaveBeenCalled()
     expect(a.defaultPrevented).toBe(true)
@@ -123,16 +137,19 @@ describe('useTaskKeyboard', () => {
     expect(selection.extend).toHaveBeenCalledWith(1)
   })
 
-  it('works when nothing is focused (the body is on-surface)', () => {
-    const { selection } = mount({})
+  it('works when nothing is focused (the body is on-surface)', async () => {
+    const { selection } = await mount({})
     press(document.body, 'a', { metaKey: true })
     expect(selection.selectAll).toHaveBeenCalled()
   })
 
-  it('toggles the resolved selection on ⌘↵ and deletes it on ⌘⌫', () => {
+  it('toggles the resolved selection on ⌘↵ and deletes it on ⌘⌫', async () => {
     const t = task({ notePath: 'notes/a.md', markerOffset: 2 })
-    const selection = makeSelection({ selected: new Set(['k']), selectedCount: 1 })
-    const { actions } = mount({ selection, tasksByKey: new Map([['k', t]]) })
+    const selection = makeSelection({
+      selected: new Set(['k']),
+      selectedCount: 1,
+    })
+    const { actions } = await mount({ selection, tasksByKey: new Map([['k', t]]) })
 
     press(root, 'Enter', { metaKey: true })
     expect(actions.toggle).toHaveBeenCalledWith([t]) // complete, or reopen if checked
@@ -142,17 +159,17 @@ describe('useTaskKeyboard', () => {
     expect(selection.clear).toHaveBeenCalled()
   })
 
-  it('archives on ⌘⇧↵ instead of toggling', () => {
-    const { actions } = mount({})
+  it('archives on ⌘⇧↵ instead of toggling', async () => {
+    const { actions } = await mount({})
     press(root, 'Enter', { metaKey: true, shiftKey: true })
     expect(actions.archive).toHaveBeenCalled()
     expect(actions.toggle).not.toHaveBeenCalled()
   })
 
-  it('toggles the filters menu on ⌘⇧E, even from the search box', () => {
+  it('toggles the filters menu on ⌘⇧E, even from the search box', async () => {
     const input = document.createElement('input')
     root.appendChild(input)
-    const { onToggleFilters } = mount({})
+    const { onToggleFilters } = await mount({})
     press(root, 'e', { metaKey: true, shiftKey: true })
     expect(onToggleFilters).toHaveBeenCalledTimes(1)
     // Fires regardless of focus (it's a screen-level chord).
@@ -160,36 +177,42 @@ describe('useTaskKeyboard', () => {
     expect(onToggleFilters).toHaveBeenCalledTimes(2)
   })
 
-  it('opens the schedule calendar on ⌘⇧S only when something is selected', () => {
-    const withNone = mount({ selection: makeSelection({ selectedCount: 0 }) })
+  it('opens the schedule calendar on ⌘⇧S only when something is selected', async () => {
+    const withNone = await mount({ selection: makeSelection({ selectedCount: 0 }) })
     const noneEvent = press(root, 's', { metaKey: true, shiftKey: true })
     expect(withNone.onToggleSchedule).not.toHaveBeenCalled()
     expect(noneEvent.defaultPrevented).toBe(false)
 
-    const withSel = mount({ selection: makeSelection({ selectedCount: 2 }) })
+    const withSel = await mount({ selection: makeSelection({ selectedCount: 2 }) })
     const selEvent = press(root, 's', { metaKey: true, shiftKey: true })
     expect(withSel.onToggleSchedule).toHaveBeenCalledTimes(1)
     expect(selEvent.defaultPrevented).toBe(true)
   })
 
-  it('converts the selection to bullets on ⌘⇧K only when something is selected', () => {
-    const withNone = mount({ selection: makeSelection({ selectedCount: 0 }) })
+  it('converts the selection to bullets on ⌘⇧K only when something is selected', async () => {
+    const withNone = await mount({ selection: makeSelection({ selectedCount: 0 }) })
     const noneEvent = press(root, 'k', { metaKey: true, shiftKey: true })
     expect(withNone.onConvertToBullet).not.toHaveBeenCalled()
     expect(noneEvent.defaultPrevented).toBe(false)
 
-    const withSel = mount({ selection: makeSelection({ selectedCount: 2 }) })
+    const withSel = await mount({ selection: makeSelection({ selectedCount: 2 }) })
     const selEvent = press(root, 'k', { metaKey: true, shiftKey: true })
     expect(withSel.onConvertToBullet).toHaveBeenCalledTimes(1)
     expect(selEvent.defaultPrevented).toBe(true)
   })
 
-  it('backs off ⌘⇧K while the inline editor is focused (it handles convert itself)', () => {
+  it('backs off ⌘⇧K while the inline editor is focused (it handles convert itself)', async () => {
     const editor = document.createElement('div')
     editor.setAttribute('data-task-editor', '')
     root.appendChild(editor)
-    const selection = makeSelection({ selected: new Set(['k']), selectedCount: 1 })
-    const { onConvertToBullet } = mount({ selection, tasksByKey: new Map([['k', task()]]) })
+    const selection = makeSelection({
+      selected: new Set(['k']),
+      selectedCount: 1,
+    })
+    const { onConvertToBullet } = await mount({
+      selection,
+      tasksByKey: new Map([['k', task()]]),
+    })
 
     press(editor, 'k', { metaKey: true, shiftKey: true })
     // The editor's own keymap flushes the draft then converts — the screen handler
@@ -197,7 +220,7 @@ describe('useTaskKeyboard', () => {
     expect(onConvertToBullet).not.toHaveBeenCalled()
   })
 
-  it('plain ⌫ removes a single empty row and selects the previous (V1)', () => {
+  it('plain ⌫ removes a single empty row and selects the previous (V1)', async () => {
     const a = task({ notePath: 'notes/a.md', markerOffset: 2, text: 'first' })
     const empty = task({ notePath: 'notes/b.md', markerOffset: 2, text: '' })
     const selection = makeSelection({
@@ -206,7 +229,7 @@ describe('useTaskKeyboard', () => {
       activeKey: () => 'b',
     })
     const ordered = [a, empty]
-    const { actions } = mount({
+    const { actions } = await mount({
       selection,
       orderedTasks: ordered,
       tasksByKey: new Map([
@@ -225,11 +248,18 @@ describe('useTaskKeyboard', () => {
     })
   })
 
-  it('plain ⌫ leaves a multi-selection untouched (ambiguous, V1)', () => {
+  it('plain ⌫ leaves a multi-selection untouched (ambiguous, V1)', async () => {
     const empty = task({ notePath: 'notes/a.md', markerOffset: 2, text: '' })
-    const full = task({ notePath: 'notes/b.md', markerOffset: 2, text: 'keep' })
-    const selection = makeSelection({ selected: new Set(['e', 'f']), selectedCount: 2 })
-    const { actions } = mount({
+    const full = task({
+      notePath: 'notes/b.md',
+      markerOffset: 2,
+      text: 'keep',
+    })
+    const selection = makeSelection({
+      selected: new Set(['e', 'f']),
+      selectedCount: 2,
+    })
+    const { actions } = await mount({
       selection,
       tasksByKey: new Map([
         ['e', empty],
@@ -241,8 +271,8 @@ describe('useTaskKeyboard', () => {
     expect(actions.remove).not.toHaveBeenCalled()
   })
 
-  it('Escape clears the selection and the search query together (V1)', () => {
-    const { selection, setQuery } = mount({
+  it('Escape clears the selection and the search query together (V1)', async () => {
+    const { selection, setQuery } = await mount({
       selection: makeSelection({ selectedCount: 1 }),
       query: 'milk',
     })
@@ -251,16 +281,24 @@ describe('useTaskKeyboard', () => {
     expect(setQuery).toHaveBeenCalledWith('')
   })
 
-  it('leaves Escape for other handlers when nothing is selected and the query is empty', () => {
-    const { selection } = mount({ selection: makeSelection({ selectedCount: 0 }), query: '' })
+  it('leaves Escape for other handlers when nothing is selected and the query is empty', async () => {
+    const { selection } = await mount({
+      selection: makeSelection({ selectedCount: 0 }),
+      query: '',
+    })
     const event = press(root, 'Escape')
     expect(event.defaultPrevented).toBe(false)
     expect(selection.clear).not.toHaveBeenCalled()
   })
 
-  it('ignores keys a focused widget already handled (defaultPrevented)', () => {
-    const { selection } = mount({})
-    const event = new KeyboardEvent('keydown', { key: 'a', metaKey: true, bubbles: true, cancelable: true })
+  it('ignores keys a focused widget already handled (defaultPrevented)', async () => {
+    const { selection } = await mount({})
+    const event = new KeyboardEvent('keydown', {
+      key: 'a',
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
     event.preventDefault() // a portaled menu handled it first
     act(() => {
       root.dispatchEvent(event)
@@ -268,8 +306,8 @@ describe('useTaskKeyboard', () => {
     expect(selection.selectAll).not.toHaveBeenCalled()
   })
 
-  it('ignores keys from a portaled overlay (the filters menu)', () => {
-    const { selection } = mount({})
+  it('ignores keys from a portaled overlay (the filters menu)', async () => {
+    const { selection } = await mount({})
     const menu = document.createElement('div')
     menu.setAttribute('role', 'menu')
     const item = document.createElement('div')
@@ -280,8 +318,8 @@ describe('useTaskKeyboard', () => {
     menu.remove()
   })
 
-  it('backs off when focus is outside the Tasks surface (the workspace sidebar)', () => {
-    const { selection } = mount({})
+  it('backs off when focus is outside the Tasks surface (the workspace sidebar)', async () => {
+    const { selection } = await mount({})
     // A focused control in another panel keeps its own keys — the shortcuts must
     // not reach across to the task list. (The surface is focused on mount, so the
     // shortcuts still work the moment you're on Tasks; see the body test above.)
@@ -293,9 +331,16 @@ describe('useTaskKeyboard', () => {
   })
 
   it('Return adds a task to today’s daily when nothing is selected', async () => {
-    const created = task({ notePath: 'daily/2026-06-15.md', markerOffset: 0, text: '' })
+    const created = task({
+      notePath: 'daily/2026-06-15.md',
+      markerOffset: 0,
+      text: '',
+    })
     const insert = vi.fn().mockResolvedValue(created)
-    const { selection } = mount({ actions: makeActions({ insert }), today: '2026-06-15' })
+    const { selection } = await mount({
+      actions: makeActions({ insert }),
+      today: '2026-06-15',
+    })
 
     const event = press(root, 'Enter')
     expect(event.defaultPrevented).toBe(true)
@@ -314,7 +359,7 @@ describe('useTaskKeyboard', () => {
     })
   })
 
-  it('Return adds to the active selected row’s note, not whichever renders last', () => {
+  it('Return adds to the active selected row’s note, not whichever renders last', async () => {
     const pinned = task({
       notePath: 'notes/a.md',
       noteTitle: 'A',
@@ -331,7 +376,7 @@ describe('useTaskKeyboard', () => {
       selectedCount: 2,
       activeKey: () => 'a',
     })
-    mount({
+    await mount({
       selection,
       actions: makeActions({ insert }),
       tasksByKey: new Map([
@@ -350,7 +395,7 @@ describe('useTaskKeyboard', () => {
     })
   })
 
-  it('Return continues a grouped Current row inside its task context', () => {
+  it('Return continues a grouped Current row inside its task context', async () => {
     const grouped = task({
       notePath: 'notes/a.md',
       noteTitle: 'A',
@@ -364,7 +409,7 @@ describe('useTaskKeyboard', () => {
       selectedCount: 1,
       activeKey: () => 'grouped',
     })
-    mount({
+    await mount({
       selection,
       actions: makeActions({ insert, insertAfter }),
       tasksByKey: new Map([['grouped', grouped]]),
@@ -381,7 +426,7 @@ describe('useTaskKeyboard', () => {
     expect(insert).not.toHaveBeenCalled()
   })
 
-  it('Return falls to today’s daily when the pivot is no longer selected', () => {
+  it('Return falls to today’s daily when the pivot is no longer selected', async () => {
     const deselected = task({ notePath: 'notes/a.md', noteTitle: 'A' })
     const insert = vi.fn().mockResolvedValue(null)
     // The pivot still points at 'k' (last touched), but a ⌘-click deselected it —
@@ -391,7 +436,7 @@ describe('useTaskKeyboard', () => {
       selectedCount: 0,
       activeKey: () => 'k',
     })
-    mount({
+    await mount({
       selection,
       actions: makeActions({ insert }),
       today: '2026-06-15',
@@ -408,12 +453,18 @@ describe('useTaskKeyboard', () => {
     })
   })
 
-  it('backs off entirely while the inline editor is focused', () => {
+  it('backs off entirely while the inline editor is focused', async () => {
     const editor = document.createElement('div')
     editor.setAttribute('data-task-editor', '')
     root.appendChild(editor)
-    const selection = makeSelection({ selected: new Set(['k']), selectedCount: 1 })
-    const { actions } = mount({ selection, tasksByKey: new Map([['k', task()]]) })
+    const selection = makeSelection({
+      selected: new Set(['k']),
+      selectedCount: 1,
+    })
+    const { actions } = await mount({
+      selection,
+      tasksByKey: new Map([['k', task()]]),
+    })
 
     press(editor, 'Backspace', { metaKey: true })
     press(editor, 'a', { metaKey: true })
@@ -421,10 +472,12 @@ describe('useTaskKeyboard', () => {
     expect(selection.selectAll).not.toHaveBeenCalled()
   })
 
-  it('in the search box, only Escape acts', () => {
+  it('in the search box, only Escape acts', async () => {
     const input = document.createElement('input')
     root.appendChild(input)
-    const { selection, setQuery } = mount({ selection: makeSelection({ selectedCount: 1 }) })
+    const { selection, setQuery } = await mount({
+      selection: makeSelection({ selectedCount: 1 }),
+    })
 
     press(input, 'a', { metaKey: true })
     expect(selection.selectAll).not.toHaveBeenCalled()

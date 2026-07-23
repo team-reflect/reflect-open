@@ -16,7 +16,7 @@ and MIT-licensed, so there is no copyleft constraint.
 - **Editor:** meowdown (`@meowdown/react`, `@meowdown/core`) on ProseKit (`@prosekit/*`) +
   `@lezer/markdown`.
 - **Forms:** `react-hook-form`.
-- **Test:** `vitest`, `@testing-library/react`, `jsdom`.
+- **Test:** `vitest`, `vitest-browser-react`, `@vitest/browser-playwright`, Playwright.
 
 ## TypeScript libraries (additions by plan)
 
