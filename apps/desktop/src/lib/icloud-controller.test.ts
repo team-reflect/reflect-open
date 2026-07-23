@@ -38,8 +38,8 @@ let releaseScan: (() => void) | null
 let listeners: Map<string, (payload: unknown) => void>
 
 beforeEach(() => {
-  // Fake only what the controller schedules — leaving setImmediate real
-  // gives settleScan a way to yield genuine event-loop turns, which the
+  // Fake only what the controller schedules — leaving the message channel
+  // real gives settleScan a way to yield genuine event-loop turns, which the
   // reindex chain needs (crypto.subtle resolves off the thread pool).
   vi.useFakeTimers({
     toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'],
@@ -113,14 +113,26 @@ const INGEST_SETTLE_MS = 31_000
 /** Fire the debounce and let the async scan settle. Signal-triggered scans
  * fire on the 1s window (the default); arrival-driven ingest scans need
  * {@link INGEST_SETTLE_MS}. */
+/** One macrotask turn that the faked timers do not control. */
+function realEventLoopTurn(): Promise<void> {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel()
+    channel.port1.onmessage = () => {
+      channel.port1.close()
+      resolve()
+    }
+    channel.port2.postMessage(undefined)
+  })
+}
+
 async function settleScan(advanceMs = 1_100): Promise<void> {
   await vi.advanceTimersByTimeAsync(advanceMs)
   // The post-scan fan-out (emit → reindex → invalidate) continues past the
   // last timer, and hashing awaits `crypto.subtle` — a *real* async source
-  // fake timers can't flush. setImmediate stays un-faked (see beforeEach) so
-  // each round yields a genuine event-loop turn.
+  // fake timers can't flush. A message channel stays un-faked (see beforeEach)
+  // so each round yields a genuine event-loop turn.
   for (let round = 0; round < 20; round += 1) {
-    await new Promise((resolve) => setImmediate(resolve))
+    await realEventLoopTurn()
   }
 }
 

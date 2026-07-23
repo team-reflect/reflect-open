@@ -88,13 +88,13 @@ pnpm test --run path/to/test
 Desktop JS tests are split into Vitest projects (details in
 `docs/contributing/testing.md`):
 
-- `*.browser.test.tsx` files run in a real browser via Vitest browser mode +
+- `*.test.tsx` files run in a real browser via Vitest browser mode +
   Playwright (the `browser` project). Chromium by default;
   `REFLECT_TEST_BROWSER=webkit` runs WebKit (the engine of the production
   Tauri webview); `DEBUG=1` opens a headed window. One-time setup:
   `pnpm --filter @reflect/desktop test:install`.
-- Everything else currently runs under jsdom (the `jsdom-legacy` project)
-  while the browser-mode migration is in progress.
+- `*.test.ts` files are pure logic and run in node (the `node` project); the
+  few that drive the DOM are listed in the config and run in the browser.
 - `console.warn` / `console.error` fail tests (`vitest-fail-on-console`).
   Pre-existing noise is allowlisted in
   `apps/desktop/src/test-utils/allowed-console.ts`; PRs may only shrink that

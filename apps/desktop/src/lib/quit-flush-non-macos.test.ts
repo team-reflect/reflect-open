@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+// A browser-mode module mock materializes value exports once, so
+// `isMacosDesktop` cannot flip per test. The non-macOS behavior lives here
+// with the flag statically false; quit-flush.test.ts covers macOS.
+
 interface CloseRequestedEventForTest {
   preventDefault: () => void
 }
@@ -11,7 +15,6 @@ const windowMock = vi.hoisted(() => ({
   hide: vi.fn(async () => {}),
   unlisten: vi.fn(),
 }))
-const windowRole = vi.hoisted(() => ({ isMainWindow: true }))
 const core = vi.hoisted(() => ({
   confirmQuit: vi.fn(async () => {}),
   quitRequested: null as (() => void) | null,
@@ -43,15 +46,14 @@ vi.mock('@reflect/core', () => ({
 vi.mock('@/editor/open-documents', () => ({ flushOpenDocuments }))
 vi.mock('@/lib/backup-flush', () => ({ flushBackup }))
 vi.mock('@/lib/settings-flush', () => ({ flushSettings }))
-vi.mock('@/lib/platform', () => ({ isMacosDesktop: true }))
+vi.mock('@/lib/platform', () => ({ isMacosDesktop: false }))
 vi.mock('@/lib/windows/window-role', () => ({
-  isMainWindow: () => windowRole.isMainWindow,
+  isMainWindow: () => true,
 }))
 
 const { installQuitFlush } = await import('./quit-flush')
 
 beforeEach(() => {
-  windowRole.isMainWindow = true
   windowMock.closeRequested = null
   core.quitRequested = null
 })
@@ -60,47 +62,18 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-interface CloseRequestForTest {
-  completed: Promise<void>
-  preventDefault: ReturnType<typeof vi.fn>
-}
-
-function closeCurrentWindow(): CloseRequestForTest {
-  const preventDefault = vi.fn()
-  const closeRequested = windowMock.closeRequested
-  expect(closeRequested).not.toBeNull()
-  const completed = closeRequested?.({ preventDefault }) ?? Promise.resolve()
-  return { completed, preventDefault }
-}
-
-describe('installQuitFlush', () => {
-  it('flushes and hides the macOS main window even when one flush rejects', async () => {
-    flushSettings.mockRejectedValueOnce(new Error('settings flush failed'))
+describe('installQuitFlush outside macOS', () => {
+  it('allows the main window to close normally', async () => {
     const dispose = installQuitFlush()
-    const closeRequest = closeCurrentWindow()
+    const preventDefault = vi.fn()
+    const closeRequested = windowMock.closeRequested
+    expect(closeRequested).not.toBeNull()
+    const completed = closeRequested?.({ preventDefault }) ?? Promise.resolve()
 
-    expect(closeRequest.preventDefault).toHaveBeenCalledOnce()
-    await closeRequest.completed
-    expect(flushOpenDocuments).toHaveBeenCalledOnce()
-    expect(flushSettings).toHaveBeenCalledOnce()
-    expect(flushBackup).toHaveBeenCalledOnce()
-    expect(windowMock.hide).toHaveBeenCalledOnce()
-
-    dispose()
-  })
-
-  it('allows secondary windows to close normally', async () => {
-    windowRole.isMainWindow = false
-    const dispose = installQuitFlush()
-    const closeRequest = closeCurrentWindow()
-
-    expect(closeRequest.preventDefault).not.toHaveBeenCalled()
-    await closeRequest.completed
-    expect(flushOpenDocuments).toHaveBeenCalledOnce()
-    expect(flushBackup).toHaveBeenCalledOnce()
+    expect(preventDefault).not.toHaveBeenCalled()
+    await completed
     expect(windowMock.hide).not.toHaveBeenCalled()
 
     dispose()
   })
-
 })

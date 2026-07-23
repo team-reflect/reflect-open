@@ -10,20 +10,17 @@ jsdom. Rust tests are plain `cargo test` (see `AGENTS.md`).
 
 `apps/desktop/vitest.config.ts` defines the Vitest projects:
 
-- **`browser`**: `src/**/*.browser.test.tsx`, executed in a real browser.
-  Chromium by default; WebKit on demand (see below). Test files run
-  sequentially (`fileParallelism: false`) because real keyboard focus is a
-  per-page global.
+- **`browser`**: `src/**/*.test.tsx`, executed in a real browser. Chromium by
+  default; WebKit on demand (see below). Test files run sequentially
+  (`fileParallelism: false`) because real keyboard focus is a per-page global.
 - **`node`**: `src/**/*.test.ts` plus `scripts/**/*.test.mjs`, executed in a
   plain node environment.
-- **`jsdom-legacy`**: `src/**/*.test.tsx` plus the `.test.ts` exceptions in
-  `JSDOM_ONLY_TESTS`, executed under jsdom. This project shrinks as the
-  browser-mode migration proceeds.
 
 The routing rule: `.test.ts` means "pure logic, node environment",
 `.test.tsx` means "needs a DOM, real browser". Exceptions (`.test.ts` files
-that still touch the DOM through `renderHook` or document event listeners)
-are listed explicitly as `JSDOM_ONLY_TESTS` in the config.
+that drive the DOM through `renderHook` or document event listeners) are
+listed explicitly as `DOM_DRIVING_LOGIC_TESTS` in the config and run in the
+browser project. There is no jsdom anywhere.
 
 ## Browsers
 

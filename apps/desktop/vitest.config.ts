@@ -4,29 +4,15 @@ import { playwright } from '@vitest/browser-playwright'
 import { configDefaults, defineConfig, type ViteUserConfig } from 'vitest/config'
 import { reactWithCompiler } from './react-compiler-plugin'
 
-
-// Test routing: `*.browser.test.tsx` runs in a real browser (chromium by
-// default; REFLECT_TEST_BROWSER=webkit switches to WebKit, DEBUG=1 opens a
-// headed window). Everything else stays in jsdom until the browser-mode
-// migration finishes. See docs/contributing/testing.md.
+// Test routing: `.test.tsx` needs a DOM and runs in a real browser (chromium
+// by default; REFLECT_TEST_BROWSER=webkit switches to WebKit, DEBUG=1 opens a
+// headed window); `.test.ts` is pure logic and runs in node. The exceptions
+// below are `.test.ts` files that still drive the DOM. See
+// docs/contributing/testing.md.
 const browserName = process.env.REFLECT_TEST_BROWSER === 'webkit' ? 'webkit' : 'chromium'
 
-// Directories whose `.test.tsx` files have been migrated to the browser
-// project; the rest stay in jsdom-legacy until their batch lands.
-const BROWSER_MIGRATED_TESTS = [
-  'src/routing/**/*.test.tsx',
-  'src/providers/**/*.test.tsx',
-  'src/hooks/**/*.test.tsx',
-  'src/lib/**/*.test.tsx',
-  'src/editor/**/*.test.tsx',
-  'src/components/**/*.test.tsx',
-  'src/mobile/**/*.test.tsx',
-]
-
-// `.test.ts` files that still depend on a DOM (renderHook, document event
-// listeners); they stay in jsdom until their subject moves off DOM APIs or
-// the test moves to the browser project.
-const JSDOM_ONLY_TESTS: string[] = [
+/** `.test.ts` files that drive the DOM, so they run in the browser project. */
+const DOM_DRIVING_LOGIC_TESTS = [
   'src/editor/formatting-toolbar-store.test.ts',
   'src/editor/open-external-link.test.ts',
   'src/editor/use-template-slash-items.test.ts',
@@ -94,7 +80,7 @@ export default defineConfig({
         plugins: [tailwindcss()],
         test: {
           name: 'browser',
-          include: ['src/**/*.browser.test.tsx', ...BROWSER_MIGRATED_TESTS],
+          include: ['src/**/*.test.tsx', ...DOM_DRIVING_LOGIC_TESTS],
           setupFiles: ['./src/test-utils/setup-console.ts', './src/test-utils/setup-browser.ts'],
           // Real keyboard focus is a per-page global; parallel test files
           // would steal it from each other.
@@ -120,19 +106,7 @@ export default defineConfig({
           name: 'node',
           environment: 'node',
           include: ['src/**/*.test.ts', 'scripts/**/*.test.mjs'],
-          exclude: [...configDefaults.exclude, ...JSDOM_ONLY_TESTS],
-        },
-      }),
-      desktopProject({
-        test: {
-          name: 'jsdom-legacy',
-          environment: 'jsdom',
-          include: ['src/**/*.test.tsx', ...JSDOM_ONLY_TESTS],
-          exclude: [
-            ...configDefaults.exclude,
-            'src/**/*.browser.test.tsx',
-            ...BROWSER_MIGRATED_TESTS,
-          ],
+          exclude: [...configDefaults.exclude, ...DOM_DRIVING_LOGIC_TESTS],
         },
       }),
     ],
