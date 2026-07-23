@@ -351,8 +351,9 @@ pub enum LocalNoteRead {
 /// materialize it on demand, and a whole-graph pass over an evicted iCloud
 /// graph becomes thousands of serial blocking downloads. Runs off the main
 /// thread — even a local read must not stall the UI under a busy provider.
-/// The check is stat-then-read, so a racing eviction can still materialize
-/// one file; the pass-level storm is what this prevents.
+/// Dataless materialization is switched off for the whole check-and-read
+/// ([`io::NoMaterialize`], per TN3150), so even an eviction racing the stat
+/// reports `Evicted` instead of blocking on a download.
 #[tauri::command]
 pub async fn note_read_local(
     path: String,
@@ -362,6 +363,10 @@ pub async fn note_read_local(
     let root = root_for(&state, generation)?;
     let abs = resolve(&root, &path)?;
     tauri::async_runtime::spawn_blocking(move || {
+        // Best-effort: when the guard refuses to engage, the read keeps a
+        // slim stat-then-read race (an eviction landing between the two
+        // materializes that one file).
+        let _no_materialize = io::NoMaterialize::engage();
         match fs::metadata(&abs) {
             Ok(meta) if io::is_dataless(&meta) => return Ok(LocalNoteRead::Evicted),
             Err(err)
@@ -372,9 +377,13 @@ pub async fn note_read_local(
             }
             _ => {}
         }
-        Ok(LocalNoteRead::Content {
-            content: fs::read_to_string(&abs)?,
-        })
+        match fs::read_to_string(&abs) {
+            Ok(content) => Ok(LocalNoteRead::Content { content }),
+            // The engaged policy answers a dataless read with EDEADLK
+            // instead of downloading: the eviction raced the stat.
+            Err(err) if err.kind() == std::io::ErrorKind::Deadlock => Ok(LocalNoteRead::Evicted),
+            Err(err) => Err(err.into()),
+        }
     })
     .await
     .map_err(|err| AppError::io(err.to_string()))?

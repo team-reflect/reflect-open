@@ -8,6 +8,8 @@
 
 use std::fs;
 use std::io::Write;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+use std::os::raw::c_int;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
@@ -304,6 +306,89 @@ pub(crate) fn is_dataless(_meta: &fs::Metadata) -> bool {
     false
 }
 
+/// The thread/process I/O policy interface from `<sys/resource.h>`
+/// (`getiopolicy_np(3)`, available since macOS 10.5 / iOS 2.0), not bound by
+/// the `libc` crate yet. Policy type 3 governs whether file access
+/// materializes dataless files (TN3150).
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES: c_int = 3;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const IOPOL_SCOPE_THREAD: c_int = 1;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const IOPOL_MATERIALIZE_DATALESS_FILES_OFF: c_int = 1;
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+extern "C" {
+    fn getiopolicy_np(iotype: c_int, scope: c_int) -> c_int;
+    fn setiopolicy_np(iotype: c_int, scope: c_int, policy: c_int) -> c_int;
+}
+
+/// Dataless-file materialization switched **off** for the current thread,
+/// RAII (TN3150's second option:
+/// <https://developer.apple.com/documentation/technotes/tn3150-getting-ready-for-data-less-files>).
+/// While engaged, reading a dataless file fails with `EDEADLK`
+/// (`std::io::ErrorKind::Deadlock`) instead of blocking while
+/// `fileproviderd` fetches the bytes; `note_read_local` uses this to close
+/// its stat-then-read race, reporting an eviction that lands between the
+/// check and the read as `Evicted` rather than downloading it. Restoring
+/// the previous policy on drop matters: the async runtime's blocking pool
+/// reuses threads, and a leaked `OFF` would make every later command on the
+/// thread refuse materialization.
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+pub(crate) struct NoMaterialize {
+    previous: c_int,
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+impl NoMaterialize {
+    /// Engage the thread-scoped policy; `None` (and no policy change) when
+    /// the kernel refuses. Callers proceed unguarded then: the stat check
+    /// still catches settled evictions, only the race window reopens.
+    pub(crate) fn engage() -> Option<Self> {
+        let previous = unsafe {
+            getiopolicy_np(
+                IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES,
+                IOPOL_SCOPE_THREAD,
+            )
+        };
+        if previous < 0 {
+            return None;
+        }
+        let set = unsafe {
+            setiopolicy_np(
+                IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES,
+                IOPOL_SCOPE_THREAD,
+                IOPOL_MATERIALIZE_DATALESS_FILES_OFF,
+            )
+        };
+        (set == 0).then_some(Self { previous })
+    }
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+impl Drop for NoMaterialize {
+    fn drop(&mut self) {
+        unsafe {
+            setiopolicy_np(
+                IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES,
+                IOPOL_SCOPE_THREAD,
+                self.previous,
+            );
+        }
+    }
+}
+
+/// No dataless files off Apple platforms; the guard is a no-op.
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+pub(crate) struct NoMaterialize;
+
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+impl NoMaterialize {
+    pub(crate) fn engage() -> Option<Self> {
+        Some(Self)
+    }
+}
+
 /// The placeholder path iCloud leaves behind when it evicts `logical`
 /// (`notes/a.md` → `notes/.a.md.icloud`).
 pub(crate) fn eviction_placeholder(logical: &Path) -> Option<PathBuf> {
@@ -419,6 +504,33 @@ mod tests {
         let path = dir.path().join("note.md");
         fs::write(&path, b"hello").unwrap();
         assert!(!is_dataless(&fs::metadata(&path).unwrap()));
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    #[test]
+    fn no_materialize_engages_and_restores_the_thread_policy() {
+        let current = || unsafe {
+            getiopolicy_np(
+                IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES,
+                IOPOL_SCOPE_THREAD,
+            )
+        };
+        let before = current();
+        let guard = NoMaterialize::engage().expect("thread policy should engage");
+        assert_eq!(current(), IOPOL_MATERIALIZE_DATALESS_FILES_OFF);
+        // Restore-on-drop is what keeps the guard safe on the async
+        // runtime's reused blocking threads.
+        drop(guard);
+        assert_eq!(current(), before);
+    }
+
+    #[test]
+    fn a_local_read_succeeds_under_the_no_materialize_guard() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("note.md");
+        fs::write(&path, b"hello").unwrap();
+        let _no_materialize = NoMaterialize::engage();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "hello");
     }
 
     #[test]
