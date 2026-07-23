@@ -133,7 +133,7 @@ describe('GraphChooser', () => {
       .element(page.getByText('Open an existing graph from iCloud Drive.'))
       .toBeVisible()
     await expect.element(page.getByText('or create new graph')).toBeVisible()
-    await userEvent.click(page.getByRole('button', { name: 'Work' }))
+    await userEvent.click(page.getByRole('button', { name: 'Work', exact: true }))
 
     await vi.waitFor(() =>
       expect(invokeLog).toContainEqual(['graph_open', { path: '/icloud/Documents/Work' }]),
@@ -203,10 +203,10 @@ describe('GraphChooser', () => {
   it('lists recent graphs and reopens one on click', async () => {
     await render(<GraphChooser />, { wrapper })
 
-    await expect.element(page.getByText('personal')).toBeVisible()
+    await expect.element(page.getByText('personal', { exact: true })).toBeVisible()
     await expect.element(page.getByText('/graphs/personal')).toBeVisible()
 
-    await userEvent.click(page.getByText('personal'))
+    await userEvent.click(page.getByText('personal', { exact: true }))
     await vi.waitFor(() =>
       expect(invokeLog).toContainEqual(['graph_open', { path: '/graphs/personal' }]),
     )
@@ -215,10 +215,12 @@ describe('GraphChooser', () => {
   it('forgets a recent graph and refreshes the list', async () => {
     await render(<GraphChooser />, { wrapper })
 
-    await expect.element(page.getByText('personal')).toBeVisible()
+    await expect.element(page.getByText('personal', { exact: true })).toBeVisible()
     await userEvent.click(page.getByRole('button', { name: 'Forget personal' }))
 
-    await expect.element(page.getByText('personal')).not.toBeInTheDocument()
+    await expect
+      .element(page.getByText('personal', { exact: true }))
+      .not.toBeInTheDocument()
     expect(invokeLog).toContainEqual(['forget_recent', { root: '/graphs/personal' }])
   })
 
@@ -226,11 +228,15 @@ describe('GraphChooser', () => {
     storedSettings = { graphColors: { '/graphs/personal': 'teal' } }
     await render(<GraphChooser />, { wrapper })
 
-    await expect.element(page.getByText('personal')).toBeVisible()
-    const personalIcon = page.getByRole('button', { name: /personal/ }).locate('svg')
+    await expect.element(page.getByText('personal', { exact: true })).toBeVisible()
+    const personalIcon = page
+      .getByRole('button', { name: 'personal /graphs/personal', exact: true })
+      .locate('svg')
     await expect.element(personalIcon).toHaveStyle({ color: '#14b8a6' })
 
-    const workIcon = page.getByRole('button', { name: /work/ }).locate('svg')
+    const workIcon = page
+      .getByRole('button', { name: 'work /graphs/work', exact: true })
+      .locate('svg')
     await expect.element(workIcon).toHaveClass('text-text-muted')
   })
 })
