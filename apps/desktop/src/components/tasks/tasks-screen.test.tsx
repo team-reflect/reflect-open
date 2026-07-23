@@ -1,6 +1,6 @@
-import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { cleanup, render } from 'vitest-browser-react'
+import { userEvent, type Locator } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OpenTask } from '@reflect/core'
 import { useEffect, useState, type MutableRefObject, type ReactNode } from 'react'
@@ -8,11 +8,9 @@ import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { makeOpenTask as task } from '@/lib/tasks/open-task-fixture'
 import { resetRecentlyCompleted } from '@/lib/tasks/recently-completed'
 import { RouterProvider, useRouter } from '@/routing/router'
+import { fireEvent } from '@/test-utils/fire-event'
+import '@/test-utils/locator'
 import { TasksScreen } from './tasks-screen'
-
-// jsdom doesn't implement scrollIntoView; the Tasks view scrolls the focused row.
-const scrollIntoView = vi.fn()
-Element.prototype.scrollIntoView = scrollIntoView
 
 const getOpenTasks = vi.hoisted(() => vi.fn())
 const getCompletedTasks = vi.hoisted(() => vi.fn())
@@ -71,8 +69,7 @@ vi.mock('@/lib/note-task', () => ({
   convertTaskToBullet,
 }))
 
-// The real inline editor mounts ProseKit, which jsdom can't render (no
-// getClientRects/getAnimations). Stub it with the callback surface the row
+// Stub the real inline editor with the callback surface the row
 // wires up, so selection + edit/delete/cancel routing is testable here; the
 // editor's own commit/cancel decision is unit-tested via resolveTaskEdit.
 vi.mock('./task-editor', () => ({
@@ -201,8 +198,27 @@ function renderScreen(
         <RouteProbe />
       </RouterProvider>
     </QueryClientProvider>,
-  )
+  ).then((view) => {
+    const find = async (locator: Locator): Promise<Element> => {
+      await expect.element(locator).toBeInTheDocument()
+      return locator.element()
+    }
+    return Object.assign(view, {
+      findByRole: (...args: Parameters<typeof view.getByRole>) => find(view.getByRole(...args)),
+      findByTestId: (...args: Parameters<typeof view.getByTestId>) =>
+        find(view.getByTestId(...args)),
+      findByText: (...args: Parameters<typeof view.getByText>) => find(view.getByText(...args)),
+      getAllByRole: (...args: Parameters<typeof view.getByRole>) => view.getByRole(...args).elements(),
+      getAllByText: (...args: Parameters<typeof view.getByText>) => view.getByText(...args).elements(),
+      queryByRole: (...args: Parameters<typeof view.getByRole>) => view.getByRole(...args).query(),
+      queryByTestId: (...args: Parameters<typeof view.getByTestId>) =>
+        view.getByTestId(...args).query(),
+      queryByText: (...args: Parameters<typeof view.getByText>) => view.getByText(...args).query(),
+    })
+  })
 }
+
+const waitFor = vi.waitFor
 
 beforeEach(() => {
   window.sessionStorage.clear()
@@ -225,19 +241,18 @@ beforeEach(() => {
   startOperation.mockClear()
   fail.mockReset()
   resetRecentlyCompleted()
-  scrollIntoView.mockClear()
 })
 
-afterEach(() => {
-  cleanup()
+afterEach(async () => {
+  await cleanup()
 })
 
 describe('TasksScreen', () => {
   it('shows an empty state when there are no open tasks', async () => {
     getOpenTasks.mockResolvedValue([])
-    const view = renderScreen()
+    const view = await renderScreen()
     await view.findByText('No tasks to show.')
-    view.unmount()
+    await view.unmount()
   })
 
   it('does not flash an empty state while archived tasks are still loading', async () => {
@@ -249,7 +264,7 @@ describe('TasksScreen', () => {
         resolveCompleted = resolve
       }),
     )
-    const view = renderScreen()
+    const view = await renderScreen()
 
     // Open resolved to []; completed still loading → no false "empty" yet.
     await waitFor(() => expect(getOpenTasks).toHaveBeenCalled())
@@ -261,25 +276,25 @@ describe('TasksScreen', () => {
     ])
     await view.findByText('archived task')
     expect(view.queryByText('No tasks to show.')).toBeNull()
-    view.unmount()
+    await view.unmount()
   })
 
   it('surfaces a failed query as an alert', async () => {
     getOpenTasks.mockRejectedValue(new Error('index unavailable'))
-    const view = renderScreen()
+    const view = await renderScreen()
     const alert = await view.findByRole('alert')
     expect(alert.textContent).toContain('Couldn’t load tasks.')
-    view.unmount()
+    await view.unmount()
   })
 
   it('surfaces a failed archived query as an alert, not a blank list', async () => {
     window.sessionStorage.setItem('reflect.tasks.filter.archived', 'true')
     getOpenTasks.mockResolvedValue([])
     getCompletedTasks.mockRejectedValue(new Error('index unavailable'))
-    const view = renderScreen()
+    const view = await renderScreen()
     const alert = await view.findByRole('alert')
     expect(alert.textContent).toContain('Couldn’t load tasks.')
-    view.unmount()
+    await view.unmount()
   })
 
   it('clears the archived error when "show archived" is turned off', async () => {
@@ -288,7 +303,7 @@ describe('TasksScreen', () => {
       task({ notePath: 'notes/p.md', text: 'open task', noteTitle: 'P' }),
     ])
     getCompletedTasks.mockRejectedValue(new Error('index unavailable'))
-    const view = renderScreen()
+    const view = await renderScreen()
     await view.findByRole('alert') // archived read failed → alert
 
     await userEvent.click(view.getByRole('button', { name: 'Task filters' }))
@@ -297,7 +312,7 @@ describe('TasksScreen', () => {
     // The retained archived error no longer counts → open tasks render, no alert.
     await view.findByText('open task')
     expect(view.queryByRole('alert')).toBeNull()
-    view.unmount()
+    await view.unmount()
   })
 
   it('groups tasks by date bucket then note, in display order', async () => {
@@ -308,14 +323,14 @@ describe('TasksScreen', () => {
       task({ notePath: 'notes/d.md', dueDate: '2026-06-10', text: 'overdue task', noteTitle: 'D' }),
       task({ notePath: 'notes/p.md', text: 'project task', noteTitle: 'Project' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await view.findByText('today task')
     const headers = view.getAllByRole('heading', { level: 2 }).map((node) => node.textContent)
     expect(headers).toEqual(['Current', 'Overdue', 'Project'])
     expect(view.getByText('overdue task')).toBeDefined()
     expect(view.getByText('project task')).toBeDefined()
-    view.unmount()
+    await view.unmount()
   })
 
   it('renders one breadcrumb per consecutive task context and selects that context', async () => {
@@ -342,7 +357,7 @@ describe('TasksScreen', () => {
         breadcrumbs: ['StartupToolbox', 'Later'],
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     const context = await view.findByRole('button', {
       name: 'StartupToolbox → Reflections',
@@ -352,7 +367,7 @@ describe('TasksScreen', () => {
 
     await userEvent.click(context)
     expect(view.getByRole('button', { name: 'Convert to bullet 2' })).toBeDefined()
-    view.unmount()
+    await view.unmount()
   })
 
   it('hides a lone generic task breadcrumb', async () => {
@@ -365,11 +380,11 @@ describe('TasksScreen', () => {
         breadcrumbs: ['Tasks:'],
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await view.findByText('project task')
     expect(view.queryByText('Tasks:')).toBeNull()
-    view.unmount()
+    await view.unmount()
   })
 
   it('opens a task’s source note from its title without an arrow', async () => {
@@ -382,13 +397,13 @@ describe('TasksScreen', () => {
         noteTitle: 'Project',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     const sourceLink = await view.findByRole('button', { name: 'Project' })
     expect(sourceLink.querySelector('svg')).toBeNull()
     await userEvent.click(sourceLink)
-    expect(view.getByTestId('route').textContent).toContain('notes/p.md')
-    view.unmount()
+    expect(view.getByTestId('route').element().textContent).toContain('notes/p.md')
+    await view.unmount()
   })
 
   it('opens a modifier-clicked task source in a new window without selecting the row', async () => {
@@ -401,7 +416,7 @@ describe('TasksScreen', () => {
         noteTitle: 'Project',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     fireEvent.click(await view.findByRole('button', { name: 'Project' }), { metaKey: true })
 
@@ -411,16 +426,16 @@ describe('TasksScreen', () => {
         path: 'notes/p.md',
       }),
     )
-    expect(view.getByTestId('route').textContent).toBe('{"kind":"today"}')
+    expect(view.getByTestId('route').element().textContent).toBe('{"kind":"today"}')
     expect(view.queryByTestId('task-editor')).toBeNull()
-    view.unmount()
+    await view.unmount()
   })
 
   it('opens a modifier-clicked note-group title in a new window', async () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/p.md', text: 'project task', noteTitle: 'Project' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     fireEvent.click(await view.findByRole('button', { name: 'Project' }), { metaKey: true })
 
@@ -430,8 +445,8 @@ describe('TasksScreen', () => {
         path: 'notes/p.md',
       }),
     )
-    expect(view.getByTestId('route').textContent).toBe('{"kind":"today"}')
-    view.unmount()
+    expect(view.getByTestId('route').element().textContent).toBe('{"kind":"today"}')
+    await view.unmount()
   })
 
   it('opens a task’s source note from its date without editing the task', async () => {
@@ -443,17 +458,17 @@ describe('TasksScreen', () => {
         noteTitle: '2026-06-09',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(
       await view.findByRole('button', { name: 'Tue, June 9th, 2026' }),
     )
 
-    expect(view.getByTestId('route').textContent).toBe(
+    expect(view.getByTestId('route').element().textContent).toBe(
       '{"kind":"daily","date":"2026-06-09"}',
     )
     expect(view.queryByTestId('task-editor')).toBeNull()
-    view.unmount()
+    await view.unmount()
   })
 
   it('renders unfocused task content through the markdown preview', async () => {
@@ -465,27 +480,27 @@ describe('TasksScreen', () => {
         noteTitle: 'Project',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     const row = await view.findByRole('button', { name: 'ship bold text' })
     expect(row.querySelector('strong')?.textContent).toBe('bold')
     expect(row.textContent).not.toContain('**bold**')
-    view.unmount()
+    await view.unmount()
   })
 
   it('selects a task when clicking the row outside the text control', async () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/p.md', markerOffset: 2, text: 'full row', noteTitle: 'Project' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await view.findByRole('button', { name: 'full row' })
     const row = view.container.querySelector('[data-task-key="notes/p.md:2"]')
     expect(row).toBeInstanceOf(HTMLElement)
     await userEvent.click(row as HTMLElement)
 
-    expect(view.getByTestId('task-editor').textContent).toContain('full row')
-    view.unmount()
+    expect(view.getByTestId('task-editor').element().textContent).toContain('full row')
+    await view.unmount()
   })
 
   it('opens the inline editor on a sole selection, and Escape exits it', async () => {
@@ -493,21 +508,25 @@ describe('TasksScreen', () => {
       task({ notePath: 'notes/p.md', markerOffset: 2, text: 'first', noteTitle: 'Project' }),
       task({ notePath: 'notes/p.md', markerOffset: 3, text: 'second', noteTitle: 'Project' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     // A single click selects exclusively → that row swaps to the inline editor.
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
-    expect(view.getByTestId('task-editor').textContent).toContain('first')
-    expect(view.getByRole('button', { name: 'second' }).getAttribute('aria-pressed')).toBe('false')
+    expect(view.getByTestId('task-editor').element().textContent).toContain('first')
+    expect(
+      view.getByRole('button', { name: 'second' }).element().getAttribute('aria-pressed'),
+    ).toBe('false')
 
     // Clicking another row moves the sole selection (and the editor) to it.
     await userEvent.click(view.getByRole('button', { name: 'second' }))
-    expect(view.getByTestId('task-editor').textContent).toContain('second')
+    expect(view.getByTestId('task-editor').element().textContent).toContain('second')
 
     await userEvent.keyboard('{Escape}')
     expect(view.queryByTestId('task-editor')).toBeNull()
-    expect(view.getByRole('button', { name: 'first' }).getAttribute('aria-pressed')).toBe('false')
-    view.unmount()
+    expect(
+      view.getByRole('button', { name: 'first' }).element().getAttribute('aria-pressed'),
+    ).toBe('false')
+    await view.unmount()
   })
 
   it('scrolls the focused task row into view after selection renders', async () => {
@@ -515,16 +534,17 @@ describe('TasksScreen', () => {
       task({ notePath: 'notes/p.md', markerOffset: 2, text: 'first', noteTitle: 'Project' }),
       task({ notePath: 'notes/p.md', markerOffset: 3, text: 'second', noteTitle: 'Project' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'second' }))
-    const row = view.container.querySelector('[data-task-key="notes/p.md:3"]')
+    const row = view.container.querySelector('[data-task-key="notes/p.md:3"]') as HTMLElement
 
     await waitFor(() => {
-      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
-      expect(scrollIntoView.mock.contexts).toContain(row)
+      const rect = row.getBoundingClientRect()
+      expect(rect.top).toBeGreaterThanOrEqual(0)
+      expect(rect.bottom).toBeLessThanOrEqual(window.innerHeight)
     })
-    view.unmount()
+    await view.unmount()
   })
 
   it('commits, deletes, or cancels an inline edit through the editor', async () => {
@@ -534,7 +554,7 @@ describe('TasksScreen', () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/p.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'P' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     // Commit → editTask with the new content, and edit mode exits.
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
@@ -557,7 +577,7 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'edited content' }))
     await userEvent.click(view.getByText('delete-edit'))
     await waitFor(() => expect(deleteTask).toHaveBeenCalled())
-    view.unmount()
+    await view.unmount()
   })
 
   it('flush persists an edit without exiting edit mode (selection unchanged)', async () => {
@@ -565,7 +585,7 @@ describe('TasksScreen', () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/p.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'P' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     await userEvent.click(view.getByText('flush-edit'))
@@ -578,7 +598,7 @@ describe('TasksScreen', () => {
     )
     // The selection (and so the inline editor) is left intact — flush never clears.
     expect(view.getByTestId('task-editor')).toBeDefined()
-    view.unmount()
+    await view.unmount()
   })
 
   it('completes from the editor: edit+complete sequences the two writes', async () => {
@@ -587,7 +607,7 @@ describe('TasksScreen', () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/p.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'P' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     // ⌘↵ with an edit → save the content, then toggle the rewritten line.
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
@@ -605,7 +625,7 @@ describe('TasksScreen', () => {
         1,
       ),
     )
-    view.unmount()
+    await view.unmount()
   })
 
   it('editing an already-completed task with ⌘↵ saves the text, never reopens it', async () => {
@@ -623,14 +643,14 @@ describe('TasksScreen', () => {
         noteTitle: 'P',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'done task' }))
     await userEvent.click(view.getByText('complete-edited'))
     await waitFor(() => expect(editTask).toHaveBeenCalled())
     // The marker stays `[x]` — no toggle back to open.
     expect(toggleTask).not.toHaveBeenCalled()
-    view.unmount()
+    await view.unmount()
   })
 
   it('completes from the editor: an unchanged task just toggles, no edit', async () => {
@@ -638,13 +658,13 @@ describe('TasksScreen', () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/p.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'P' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     await userEvent.click(view.getByText('complete-unchanged'))
     await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
     expect(editTask).not.toHaveBeenCalled()
-    view.unmount()
+    await view.unmount()
   })
 
   it('toggles rows with ⌘-click and selects a range with shift-click', async () => {
@@ -653,9 +673,9 @@ describe('TasksScreen', () => {
       task({ notePath: 'notes/p.md', markerOffset: 3, text: 'second', noteTitle: 'Project' }),
       task({ notePath: 'notes/p.md', markerOffset: 4, text: 'third', noteTitle: 'Project' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
     const pressed = (name: string) =>
-      view.getByRole('button', { name }).getAttribute('aria-pressed') === 'true'
+      view.getByRole('button', { name }).element().getAttribute('aria-pressed') === 'true'
 
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     // ⌘-click adds the row without clearing the rest (modifier set explicitly —
@@ -667,7 +687,7 @@ describe('TasksScreen', () => {
     // Shift-click from the anchor (third) back to first selects the whole range.
     fireEvent.click(view.getByRole('button', { name: 'first' }), { shiftKey: true })
     expect([pressed('first'), pressed('second'), pressed('third')]).toEqual([true, true, true])
-    view.unmount()
+    await view.unmount()
   })
 
   it('selects all with ⌘A and moves a single selection with the arrow keys', async () => {
@@ -675,9 +695,9 @@ describe('TasksScreen', () => {
       task({ notePath: 'notes/a.md', markerOffset: 2, text: 'first', noteTitle: 'A' }),
       task({ notePath: 'notes/b.md', markerOffset: 2, text: 'second', noteTitle: 'B' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
     const pressed = (name: string) =>
-      view.getByRole('button', { name }).getAttribute('aria-pressed') === 'true'
+      view.getByRole('button', { name }).element().getAttribute('aria-pressed') === 'true'
 
     await view.findByRole('button', { name: 'first' })
     await userEvent.keyboard('{Meta>}a{/Meta}')
@@ -686,10 +706,10 @@ describe('TasksScreen', () => {
 
     // ↓ collapses to a single moving selection → that row opens the editor.
     await userEvent.keyboard('{ArrowDown}')
-    expect(view.getByTestId('task-editor').textContent).toContain('second')
+    expect(view.getByTestId('task-editor').element().textContent).toContain('second')
     await userEvent.keyboard('{ArrowUp}')
-    expect(view.getByTestId('task-editor').textContent).toContain('first')
-    view.unmount()
+    expect(view.getByTestId('task-editor').element().textContent).toContain('first')
+    await view.unmount()
   })
 
   it('completes the selection with ⌘↵', async () => {
@@ -698,7 +718,7 @@ describe('TasksScreen', () => {
       task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
       task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] second', text: 'second', noteTitle: 'B' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await view.findByRole('button', { name: 'first' })
     await userEvent.keyboard('{Meta>}a{/Meta}') // select all
@@ -707,7 +727,7 @@ describe('TasksScreen', () => {
     // Completing keeps both showing struck (the middle state), not dropped.
     await waitFor(() => expect(view.getAllByRole('button', { name: /^Reopen:/ })).toHaveLength(2))
     expect(view.getByText('first')).toBeDefined()
-    view.unmount()
+    await view.unmount()
   })
 
   it('deletes a multi-selection with ⌘⌫', async () => {
@@ -716,7 +736,7 @@ describe('TasksScreen', () => {
       task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
       task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] second', text: 'second', noteTitle: 'B' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     // ⌘⌫ deletes only outside the inline editor (a multi-selection mounts none);
     // while editing a sole task it's a text edit, so it can't race the commit.
@@ -725,7 +745,7 @@ describe('TasksScreen', () => {
     await userEvent.keyboard('{Meta>}{Backspace}{/Meta}')
     await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(view.queryByText('first')).toBeNull())
-    view.unmount()
+    await view.unmount()
   })
 
   it('a note group’s "+ Add" button inserts into that note and opens the editor', async () => {
@@ -733,14 +753,14 @@ describe('TasksScreen', () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/proj.md', markerOffset: 2, raw: '[ ] a', text: 'a', noteTitle: 'Project' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await view.findByText('a')
     await userEvent.click(await view.findByRole('button', { name: 'Add a task to Project' }))
     await waitFor(() => expect(insertTask).toHaveBeenCalledWith('notes/proj.md', 1))
     // The new row's editor opens, ready to type.
     await view.findByTestId('task-editor')
-    view.unmount()
+    await view.unmount()
   })
 
   it('Overdue tasks show no "+ Add" button (V1 can’t add to an aggregate bucket)', async () => {
@@ -754,18 +774,18 @@ describe('TasksScreen', () => {
         dueDate: '2026-06-01',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await view.findByText('late')
     expect(view.queryByRole('button', { name: /Add a task/ })).toBeNull()
-    view.unmount()
+    await view.unmount()
   })
 
   it('Return adds a task to today’s daily and opens its inline editor', async () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await view.findByRole('button', { name: 'first' })
     await userEvent.keyboard('{Enter}')
@@ -773,7 +793,7 @@ describe('TasksScreen', () => {
     await waitFor(() => expect(insertTask).toHaveBeenCalledWith('daily/2026-06-14.md', 1))
     // The optimistic empty row mounts its inline editor, ready to type into.
     await view.findByTestId('task-editor')
-    view.unmount()
+    await view.unmount()
   })
 
   it('dismissing the inserted row deletes the right note line (V1 empty cleanup)', async () => {
@@ -781,7 +801,7 @@ describe('TasksScreen', () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await view.findByRole('button', { name: 'first' })
     await userEvent.keyboard('{Enter}')
@@ -797,7 +817,7 @@ describe('TasksScreen', () => {
         1,
       ),
     )
-    view.unmount()
+    await view.unmount()
   })
 
   it('Backspace deletes a row and lands the editor on the previous one (V1)', async () => {
@@ -806,7 +826,7 @@ describe('TasksScreen', () => {
       task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
       task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] second', text: 'second', noteTitle: 'B' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     // Select the second row (its editor opens), then ⌫-delete it.
     await userEvent.click(await view.findByRole('button', { name: 'second' }))
@@ -818,7 +838,7 @@ describe('TasksScreen', () => {
     )
     // Lands on the previous row, whose editor now opens.
     await view.findByText('editing: first')
-    view.unmount()
+    await view.unmount()
   })
 
   it('plain ⌫ leaves a multi-selection untouched (ambiguous, V1)', async () => {
@@ -827,7 +847,7 @@ describe('TasksScreen', () => {
       task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ]', text: '', noteTitle: 'A' }),
       task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] keep', text: 'keep', noteTitle: 'B' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await view.findByText('keep')
     await userEvent.keyboard('{Meta>}a{/Meta}') // select both
@@ -835,7 +855,7 @@ describe('TasksScreen', () => {
     await Promise.resolve()
     // V1 refuses a multi-row ⌫ (which row would survive is unclear).
     expect(deleteTask).not.toHaveBeenCalled()
-    view.unmount()
+    await view.unmount()
   })
 
   it('Enter in the editor saves the row and opens the next task (continuous entry)', async () => {
@@ -844,7 +864,7 @@ describe('TasksScreen', () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     await view.findByTestId('task-editor')
@@ -853,7 +873,7 @@ describe('TasksScreen', () => {
     // Persists this row's edit, then appends the next task in the same note.
     await waitFor(() => expect(editTask).toHaveBeenCalled())
     await waitFor(() => expect(insertTask).toHaveBeenCalledWith('notes/a.md', 1))
-    view.unmount()
+    await view.unmount()
   })
 
   it('Enter in a grouped task keeps the new row in that breadcrumb context', async () => {
@@ -885,7 +905,7 @@ describe('TasksScreen', () => {
         breadcrumbs: ['StartupToolbox', 'Later'],
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     await userEvent.click(view.getByRole('button', { name: 'continue-edit' }))
@@ -908,7 +928,7 @@ describe('TasksScreen', () => {
       view.getByRole('button', { name: 'StartupToolbox → Reflections' }),
     )
     expect(view.getByRole('button', { name: 'Convert to bullet 2' })).toBeDefined()
-    view.unmount()
+    await view.unmount()
   })
 
   it('preserves a grouped task draft when contextual insertion is refused', async () => {
@@ -924,7 +944,7 @@ describe('TasksScreen', () => {
         breadcrumbs: ['Project'],
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     await userEvent.click(view.getByRole('button', { name: 'continue-edit' }))
@@ -939,7 +959,7 @@ describe('TasksScreen', () => {
     expect(insertTask).not.toHaveBeenCalled()
     expect(await view.findByRole('button', { name: 'edited content' })).toBeDefined()
     expect(fail).toHaveBeenCalledWith('This note is open.')
-    view.unmount()
+    await view.unmount()
   })
 
   it('Enter continues a scheduled grouped task despite its aggregate date bucket', async () => {
@@ -954,7 +974,7 @@ describe('TasksScreen', () => {
         dueDate: '2026-07-01',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'scheduled' }))
     await userEvent.click(view.getByRole('button', { name: 'continue-unchanged' }))
@@ -966,7 +986,7 @@ describe('TasksScreen', () => {
         1,
       ),
     )
-    view.unmount()
+    await view.unmount()
   })
 
   it('Enter on a cleared row deletes it instead of leaving a bare task (no ghost)', async () => {
@@ -975,7 +995,7 @@ describe('TasksScreen', () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     await view.findByTestId('task-editor')
@@ -985,7 +1005,7 @@ describe('TasksScreen', () => {
       expect(deleteTask).toHaveBeenCalledWith(expect.objectContaining({ notePath: 'notes/a.md' }), 1),
     )
     expect(editTask).not.toHaveBeenCalled()
-    view.unmount()
+    await view.unmount()
   })
 
   it('↑/↓ in the editor move the selection between rows (V1)', async () => {
@@ -993,14 +1013,14 @@ describe('TasksScreen', () => {
       task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
       task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] second', text: 'second', noteTitle: 'B' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     await view.findByText('editing: first')
     await userEvent.click(view.getByRole('button', { name: 'nav-down' }))
     // The editor follows the selection to the next row.
     await view.findByText('editing: second')
-    view.unmount()
+    await view.unmount()
   })
 
   it('does not reopen an already-completed task when ⌘↵ hits the selection', async () => {
@@ -1019,7 +1039,7 @@ describe('TasksScreen', () => {
         noteTitle: 'B',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await view.findByRole('button', { name: 'open' })
     await userEvent.keyboard('{Meta>}a{/Meta}') // selects the open and the completed row
@@ -1027,7 +1047,7 @@ describe('TasksScreen', () => {
     // Only the open row toggles; the completed one is left untouched.
     await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
     expect(toggleTask).toHaveBeenCalledWith(expect.objectContaining({ notePath: 'notes/a.md' }), 1)
-    view.unmount()
+    await view.unmount()
   })
 
   it('scheduling the selection writes a due-date link to each task (V1)', async () => {
@@ -1036,7 +1056,7 @@ describe('TasksScreen', () => {
       task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] plan', text: 'plan', noteTitle: 'A' }),
       task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] ship', text: 'ship', noteTitle: 'B' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await view.findByText('plan')
     await userEvent.keyboard('{Meta>}a{/Meta}') // select both (no editor)
@@ -1050,7 +1070,7 @@ describe('TasksScreen', () => {
       'plan [[2026-06-20]]',
       1,
     )
-    view.unmount()
+    await view.unmount()
   })
 
   it('converts a multi-selection to bullets via the toolbar button (no editor, bulk)', async () => {
@@ -1058,7 +1078,7 @@ describe('TasksScreen', () => {
       task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] plan', text: 'plan', noteTitle: 'A' }),
       task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] ship', text: 'ship', noteTitle: 'B' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await view.findByText('plan')
     await userEvent.keyboard('{Meta>}a{/Meta}') // select both (no editor mounts)
@@ -1070,7 +1090,7 @@ describe('TasksScreen', () => {
     // The converted rows are no longer checkboxes, so they leave the view.
     await waitFor(() => expect(view.queryByText('plan')).toBeNull())
     expect(view.queryByText('ship')).toBeNull()
-    view.unmount()
+    await view.unmount()
   })
 
   it('converts a multi-selection to bullets with ⌘⇧K', async () => {
@@ -1078,14 +1098,14 @@ describe('TasksScreen', () => {
       task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] plan', text: 'plan', noteTitle: 'A' }),
       task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] ship', text: 'ship', noteTitle: 'B' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await view.findByText('plan')
     await userEvent.keyboard('{Meta>}a{/Meta}') // select both (no editor mounts)
     await userEvent.keyboard('{Meta>}{Shift>}k{/Shift}{/Meta}')
     await waitFor(() => expect(convertTaskToBullet).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(view.queryByText('plan')).toBeNull())
-    view.unmount()
+    await view.unmount()
   })
 
   it('converts a sole-edited row through its editor — saving the draft before converting', async () => {
@@ -1096,7 +1116,7 @@ describe('TasksScreen', () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] plan', text: 'plan', noteTitle: 'A' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'plan' })) // sole → editor mounts
     await userEvent.click(view.getByRole('button', { name: /Convert to bullet 1/ }))
@@ -1116,7 +1136,7 @@ describe('TasksScreen', () => {
       ),
     )
     await waitFor(() => expect(view.queryByText('plan')).toBeNull())
-    view.unmount()
+    await view.unmount()
   })
 
   it('converts an edited row from the editor’s own ⌘⇧K (save then convert)', async () => {
@@ -1124,13 +1144,13 @@ describe('TasksScreen', () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] plan', text: 'plan', noteTitle: 'A' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'plan' }))
     await userEvent.click(view.getByRole('button', { name: 'convert-edited' }))
     await waitFor(() => expect(editTask).toHaveBeenCalledWith(expect.anything(), 'edited content', 1))
     await waitFor(() => expect(convertTaskToBullet).toHaveBeenCalled())
-    view.unmount()
+    await view.unmount()
   })
 
   it('⌘↵ reopens a selection that is already all checked (toggle both ways, V1)', async () => {
@@ -1139,7 +1159,7 @@ describe('TasksScreen', () => {
       task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] one', text: 'one', noteTitle: 'A' }),
       task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] two', text: 'two', noteTitle: 'B' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await view.findByText('one')
     await userEvent.keyboard('{Meta>}a{/Meta}') // select both (no editor)
@@ -1149,7 +1169,7 @@ describe('TasksScreen', () => {
     // The struck rows stay selected; ⌘↵ again reopens them (two more toggles).
     await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
     await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(4))
-    view.unmount()
+    await view.unmount()
   })
 
   it('ignores task shortcuts coming from a portaled overlay (the filters menu)', async () => {
@@ -1157,7 +1177,7 @@ describe('TasksScreen', () => {
       task({ notePath: 'notes/a.md', markerOffset: 2, text: 'first', noteTitle: 'A' }),
       task({ notePath: 'notes/b.md', markerOffset: 2, text: 'second', noteTitle: 'B' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
     await view.findByRole('button', { name: 'first' })
 
     // The filters menu portals a role="menu" outside the list and owns its own
@@ -1170,9 +1190,11 @@ describe('TasksScreen', () => {
     fireEvent.keyDown(item, { key: 'ArrowDown' })
 
     expect(view.queryByTestId('task-editor')).toBeNull()
-    expect(view.getByRole('button', { name: 'first' }).getAttribute('aria-pressed')).toBe('false')
+    expect(
+      view.getByRole('button', { name: 'first' }).element().getAttribute('aria-pressed'),
+    ).toBe('false')
     menu.remove()
-    view.unmount()
+    await view.unmount()
   })
 
   it('completes a task when its checkbox is clicked', async () => {
@@ -1186,7 +1208,7 @@ describe('TasksScreen', () => {
         noteTitle: 'Project',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
     await waitFor(() =>
@@ -1198,7 +1220,7 @@ describe('TasksScreen', () => {
     // V1's middle state: the row stays visible, struck, until archived.
     await view.findByRole('button', { name: 'Reopen: project task' })
     expect(view.getByText('project task')).toBeDefined()
-    view.unmount()
+    await view.unmount()
   })
 
   it('yields the struck row to the index when the task is reopened at its source note', async () => {
@@ -1214,7 +1236,7 @@ describe('TasksScreen', () => {
       }),
     ])
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    const view = renderScreen(client)
+    const view = await renderScreen(client)
 
     await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
     await view.findByRole('button', { name: 'Reopen: project task' })
@@ -1237,7 +1259,7 @@ describe('TasksScreen', () => {
 
     await view.findByRole('button', { name: 'Complete: project task' })
     expect(view.queryByRole('button', { name: 'Reopen: project task' })).toBeNull()
-    view.unmount()
+    await view.unmount()
   })
 
   it('keeps the struck row when a refetch races the completion’s reindex', async () => {
@@ -1252,7 +1274,7 @@ describe('TasksScreen', () => {
     })
     getOpenTasks.mockResolvedValue([staleRow])
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-    const view = renderScreen(client)
+    const view = await renderScreen(client)
 
     await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
     await view.findByRole('button', { name: 'Reopen: project task' })
@@ -1264,7 +1286,7 @@ describe('TasksScreen', () => {
 
     await view.findByRole('button', { name: 'Reopen: project task' })
     expect(view.queryByRole('button', { name: 'Complete: project task' })).toBeNull()
-    view.unmount()
+    await view.unmount()
   })
 
   it('completes a selected task when its checkbox is clicked', async () => {
@@ -1278,7 +1300,7 @@ describe('TasksScreen', () => {
         noteTitle: 'Project',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'project task' }))
     expect(view.getByTestId('task-editor')).toBeDefined()
@@ -1290,7 +1312,7 @@ describe('TasksScreen', () => {
         1,
       ),
     )
-    view.unmount()
+    await view.unmount()
   })
 
   it('completes every selected open task when a selected checkbox is clicked', async () => {
@@ -1311,7 +1333,7 @@ describe('TasksScreen', () => {
         noteTitle: 'B',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await view.findByRole('button', { name: 'first task' })
     await userEvent.keyboard('{Meta>}a{/Meta}')
@@ -1330,7 +1352,7 @@ describe('TasksScreen', () => {
     )
     await view.findByRole('button', { name: 'Reopen: first task' })
     await view.findByRole('button', { name: 'Reopen: second task' })
-    view.unmount()
+    await view.unmount()
   })
 
   it('reopens selected checked tasks when a checked selected checkbox is clicked', async () => {
@@ -1355,7 +1377,7 @@ describe('TasksScreen', () => {
         noteTitle: 'B',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await view.findByRole('button', { name: 'open task' })
     await view.findByRole('button', { name: 'done task' })
@@ -1369,7 +1391,7 @@ describe('TasksScreen', () => {
     )
     await view.findByRole('button', { name: 'Complete: open task' })
     await view.findByRole('button', { name: 'Complete: done task' })
-    view.unmount()
+    await view.unmount()
   })
 
   it('saves an edited selected task before completing it from the checkbox', async () => {
@@ -1384,7 +1406,7 @@ describe('TasksScreen', () => {
         noteTitle: 'Project',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'project task' }))
     await userEvent.click(view.getByRole('button', { name: 'stage-checkbox-edit' }))
@@ -1403,7 +1425,7 @@ describe('TasksScreen', () => {
         1,
       ),
     )
-    view.unmount()
+    await view.unmount()
   })
 
   it('disables row checkboxes while an edit-and-toggle write is pending', async () => {
@@ -1426,7 +1448,7 @@ describe('TasksScreen', () => {
         noteTitle: 'Project',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'project task' }))
     await userEvent.click(view.getByRole('button', { name: 'stage-checkbox-edit' }))
@@ -1440,7 +1462,7 @@ describe('TasksScreen', () => {
 
     resolveEdit()
     await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
-    view.unmount()
+    await view.unmount()
   })
 
   it('reopens a completed task when its checkbox is clicked', async () => {
@@ -1454,7 +1476,7 @@ describe('TasksScreen', () => {
         noteTitle: 'Project',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
     await userEvent.click(await view.findByRole('button', { name: 'Reopen: project task' }))
@@ -1466,7 +1488,7 @@ describe('TasksScreen', () => {
       ),
     )
     await view.findByRole('button', { name: 'Complete: project task' })
-    view.unmount()
+    await view.unmount()
   })
 
   it('reopens an archived completed task when its checkbox is clicked', async () => {
@@ -1483,7 +1505,7 @@ describe('TasksScreen', () => {
         noteTitle: 'Project',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'Reopen: project task' }))
 
@@ -1494,7 +1516,7 @@ describe('TasksScreen', () => {
       ),
     )
     await view.findByRole('button', { name: 'Complete: project task' })
-    view.unmount()
+    await view.unmount()
   })
 
   it('shows an open checkbox while a reopen write is pending', async () => {
@@ -1519,7 +1541,7 @@ describe('TasksScreen', () => {
         noteTitle: 'Project',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'Reopen: project task' }))
     const complete = await view.findByRole('button', { name: 'Complete: project task' })
@@ -1529,7 +1551,7 @@ describe('TasksScreen', () => {
 
     resolveToggle()
     await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
-    view.unmount()
+    await view.unmount()
   })
 
   it('restores a struck task when an unchanged editor checkbox reopen fails', async () => {
@@ -1543,7 +1565,7 @@ describe('TasksScreen', () => {
         noteTitle: 'Project',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
     await view.findByRole('button', { name: 'Reopen: project task' })
@@ -1556,7 +1578,7 @@ describe('TasksScreen', () => {
     await waitFor(() => expect(fail).toHaveBeenCalledWith('stale index'))
     expect(startOperation).toHaveBeenCalledWith('Reopening task')
     await view.findByRole('button', { name: 'Reopen: project task' })
-    view.unmount()
+    await view.unmount()
   })
 
   it('reopens a selected completed task when its checkbox is clicked', async () => {
@@ -1573,7 +1595,7 @@ describe('TasksScreen', () => {
         noteTitle: 'Project',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'project task' }))
     expect(view.getByTestId('task-editor')).toBeDefined()
@@ -1585,7 +1607,7 @@ describe('TasksScreen', () => {
         1,
       ),
     )
-    view.unmount()
+    await view.unmount()
   })
 
   it('saves an edited selected completed task before reopening it from the checkbox', async () => {
@@ -1603,7 +1625,7 @@ describe('TasksScreen', () => {
         noteTitle: 'Project',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'project task' }))
     await userEvent.click(view.getByRole('button', { name: 'stage-checkbox-edit' }))
@@ -1622,7 +1644,7 @@ describe('TasksScreen', () => {
         1,
       ),
     )
-    view.unmount()
+    await view.unmount()
   })
 
   it('restores persisted text when an edited struck task fails before reopening', async () => {
@@ -1637,7 +1659,7 @@ describe('TasksScreen', () => {
         noteTitle: 'Project',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
     await view.findByRole('button', { name: 'Reopen: project task' })
@@ -1651,7 +1673,7 @@ describe('TasksScreen', () => {
     expect(startOperation).toHaveBeenCalledWith('Reopening task')
     await view.findByRole('button', { name: 'Reopen: project task' })
     expect(view.queryByText('edited content')).toBeNull()
-    view.unmount()
+    await view.unmount()
   })
 
   it('keeps a completed task visible (struck) when archived tasks are shown', async () => {
@@ -1669,13 +1691,13 @@ describe('TasksScreen', () => {
         noteTitle: 'Project',
       }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
     // Flipped to completed in place — still on screen, now marked done.
     await view.findByRole('button', { name: 'Reopen: project task' })
     expect(view.getByText('project task')).toBeDefined()
-    view.unmount()
+    await view.unmount()
   })
 
   it('shows the Archive button after completing, and Archive hides the row', async () => {
@@ -1683,7 +1705,7 @@ describe('TasksScreen', () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/p.md', markerOffset: 5, raw: '[ ] project task', text: 'project task', noteTitle: 'P' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
     // The row lingers struck and an Archive 1 action appears.
@@ -1694,7 +1716,7 @@ describe('TasksScreen', () => {
     // Archiving hides this session's completed rows (still `[x]` on disk).
     await waitFor(() => expect(view.queryByText('project task')).toBeNull())
     expect(view.queryByRole('button', { name: /Archive/ })).toBeNull()
-    view.unmount()
+    await view.unmount()
   })
 
   it('archives the session’s completed tasks with ⌘⇧↵', async () => {
@@ -1702,13 +1724,13 @@ describe('TasksScreen', () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/p.md', markerOffset: 5, raw: '[ ] project task', text: 'project task', noteTitle: 'P' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
     await view.findByRole('button', { name: 'Reopen: project task' })
     await userEvent.keyboard('{Meta>}{Shift>}{Enter}{/Shift}{/Meta}')
     await waitFor(() => expect(view.queryByText('project task')).toBeNull())
-    view.unmount()
+    await view.unmount()
   })
 
   it('a failed delete restores a struck task instead of dropping it (V1 middle state)', async () => {
@@ -1717,7 +1739,7 @@ describe('TasksScreen', () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] one', text: 'one', noteTitle: 'A' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     // Complete it → struck (kept showing via the session set), then try to delete.
     await userEvent.click(await view.findByRole('button', { name: 'Complete: one' }))
@@ -1729,7 +1751,7 @@ describe('TasksScreen', () => {
     await waitFor(() => expect(deleteTask).toHaveBeenCalled())
     // The write failed, so the struck row is restored, not lost.
     await view.findByRole('button', { name: 'Reopen: one' })
-    view.unmount()
+    await view.unmount()
   })
 
   it('rolls the row back and surfaces a failed completion via the operations toast', async () => {
@@ -1737,14 +1759,14 @@ describe('TasksScreen', () => {
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/p.md', text: 'project task', noteTitle: 'Project' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
     await waitFor(() => expect(fail).toHaveBeenCalledWith('stale index'))
     expect(startOperation).toHaveBeenCalledWith('Completing task')
     // Rolled back: the row returns after the failed write.
     await view.findByText('project task')
-    view.unmount()
+    await view.unmount()
   })
 
   it('refetches (does not restore a stale snapshot) when a bulk complete fails', async () => {
@@ -1753,7 +1775,7 @@ describe('TasksScreen', () => {
       task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
       task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] second', text: 'second', noteTitle: 'B' }),
     ])
-    const view = renderScreen()
+    const view = await renderScreen()
 
     await view.findByRole('button', { name: 'first' })
     await userEvent.keyboard('{Meta>}a{/Meta}')
@@ -1762,6 +1784,6 @@ describe('TasksScreen', () => {
     // A batch failure reconciles by refetching the index, not by restoring the
     // pre-batch snapshot (which would un-do any write that already landed).
     await waitFor(() => expect(getOpenTasks.mock.calls.length).toBeGreaterThan(1))
-    view.unmount()
+    await view.unmount()
   })
 })
