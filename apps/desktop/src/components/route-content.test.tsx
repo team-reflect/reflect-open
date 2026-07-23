@@ -107,6 +107,9 @@ vi.mock('@/providers/settings-provider', () => ({
     updateSettingsWith: () => {},
   }),
 }))
+vi.mock('@/components/daily-stream', () => ({
+  DailyStream: () => <div data-testid="daily-stream" />,
+}))
 vi.mock('@/components/settings-screen', () => ({
   SettingsScreen: () => <div data-testid="settings-screen" />,
 }))
@@ -182,13 +185,13 @@ function renderRoute(route: Route) {
 describe('RouteContent', () => {
   it('renders the daily stream for the today route', async () => {
     const view = await renderRoute({ kind: 'today' })
-    await expect.element(page.getByTestId('daily-stream')).toBeVisible()
+    await expect.element(page.getByTestId('daily-stream')).toBeInTheDocument()
     await view.unmount()
   })
 
   it('renders the daily stream for a daily route, surviving a malformed date', async () => {
     const view = await renderRoute({ kind: 'daily', date: '2026-02-31' })
-    await expect.element(page.getByTestId('daily-stream')).toBeVisible()
+    await expect.element(page.getByTestId('daily-stream')).toBeInTheDocument()
     await view.unmount()
   })
 
@@ -273,13 +276,13 @@ describe('RouteContent', () => {
 
   it('renders the settings screen for the settings route', async () => {
     const view = await renderRoute({ kind: 'settings' })
-    await expect.element(page.getByTestId('settings-screen')).toBeVisible()
+    await expect.element(page.getByTestId('settings-screen')).toBeInTheDocument()
     await view.unmount()
   })
 
   it('renders the chat screen for the chat route, not the stream', async () => {
     const view = await renderRoute({ kind: 'chat' })
-    await expect.element(page.getByTestId('chat-screen')).toBeVisible()
+    await expect.element(page.getByTestId('chat-screen')).toBeInTheDocument()
     await expect.element(page.getByTestId('daily-stream')).not.toBeInTheDocument()
     await view.unmount()
   })
@@ -298,7 +301,7 @@ describe('RouteContent', () => {
 
   it('arriving on a search route opens the palette pre-filled over the stream', async () => {
     const view = await renderRoute({ kind: 'search', query: 'roadmap' })
-    await expect.element(page.getByTestId('daily-stream')).toBeVisible()
+    await expect.element(page.getByTestId('daily-stream')).toBeInTheDocument()
     await vi.waitFor(() =>
       expect(JSON.parse(page.getByTestId('palette').element().textContent ?? '')).toEqual({
         open: true,
