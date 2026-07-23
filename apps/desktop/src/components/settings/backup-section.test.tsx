@@ -219,7 +219,7 @@ describe('BackupSettingsField', () => {
 
     await userEvent.click(page.getByRole('button', { name: /Sign out of GitHub/ }))
     await userEvent.click(page.getByRole('button', { name: 'Sign out' }))
-    await userEvent.click(page.getByRole('button', { name: 'Cancel' }))
+    await expect.element(page.getByRole('button', { name: 'Cancel' })).toBeDisabled()
 
     await expect.element(page.getByRole('heading', { name: 'Sign out of GitHub?' })).toBeVisible()
 
