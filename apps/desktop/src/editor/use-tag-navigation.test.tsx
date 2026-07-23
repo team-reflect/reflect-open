@@ -1,5 +1,5 @@
-import { act, render } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { render } from 'vitest-browser-react'
 import type { ReactNode } from 'react'
 import { RouterProvider, useRouter } from '@/routing/router'
 import { useTagNavigation } from './use-tag-navigation'
@@ -25,15 +25,17 @@ function renderHost() {
   )
 }
 
-function currentRoute(view: ReturnType<typeof renderHost>): string {
-  return view.getByTestId('route').textContent ?? ''
+function currentRoute(view: Awaited<ReturnType<typeof renderHost>>): string {
+  return view.getByTestId('route').element().textContent ?? ''
 }
 
 describe('useTagNavigation', () => {
-  it('opens All Notes filtered by the clicked tag', () => {
-    const view = renderHost()
-    act(() => lastHandler?.('book'))
-    expect(JSON.parse(currentRoute(view))).toEqual({ kind: 'allNotes', tag: 'book' })
-    view.unmount()
+  it('opens All Notes filtered by the clicked tag', async () => {
+    const view = await renderHost()
+    lastHandler?.('book')
+    await vi.waitFor(() => {
+      expect(JSON.parse(currentRoute(view))).toEqual({ kind: 'allNotes', tag: 'book' })
+    })
+    await view.unmount()
   })
 })

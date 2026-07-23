@@ -189,7 +189,7 @@ describe('BackupSettingsField', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
 
     expect(await screen.findByRole('heading', { name: 'Sign out of GitHub?' })).toBeTruthy()
-    expect(within(screen.getByRole('dialog')).getByText('Keychain denied')).toBeTruthy()
+    expect(await within(screen.getByRole('dialog')).findByText('Keychain denied')).toBeTruthy()
     expect(screen.getAllByText('Keychain denied')).toHaveLength(1)
   })
 

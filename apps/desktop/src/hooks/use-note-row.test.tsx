@@ -1,6 +1,6 @@
-import { act, renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { renderHook } from 'vitest-browser-react'
 import type { ReactNode } from 'react'
 import type { NoteRow } from '@reflect/core'
 import { getNoteRowOverlay, resetNoteRowOverlays, setNoteRowOverlay } from './note-row-overlay'
@@ -49,26 +49,28 @@ afterEach(() => {
 describe('useNoteRow', () => {
   it('returns the index row', async () => {
     getNote.mockResolvedValue(noteRow({ gistUrl: 'from-index' }))
-    const { result } = renderHook(() => useNoteRow('notes/a.md'), { wrapper: makeWrapper() })
-    await waitFor(() => expect(result.current?.gistUrl).toBe('from-index'))
+    const { result } = await renderHook(() => useNoteRow('notes/a.md'), { wrapper: makeWrapper() })
+    await vi.waitFor(() => expect(result.current?.gistUrl).toBe('from-index'))
   })
 
   it('overlays a freshly-written value over a lagging index row', async () => {
     getNote.mockResolvedValue(noteRow({ gistUrl: null })) // index hasn't seen the publish yet
-    const { result } = renderHook(() => useNoteRow('notes/a.md'), { wrapper: makeWrapper() })
-    await waitFor(() => expect(result.current).not.toBeNull())
+    const { result, act } = await renderHook(() => useNoteRow('notes/a.md'), {
+      wrapper: makeWrapper(),
+    })
+    await vi.waitFor(() => expect(result.current).not.toBeNull())
     expect(result.current?.gistUrl).toBeNull()
 
-    act(() => setNoteRowOverlay('notes/a.md', GENERATION, { gistUrl: 'pending' }))
-    await waitFor(() => expect(result.current?.gistUrl).toBe('pending'))
+    await act(() => setNoteRowOverlay('notes/a.md', GENERATION, { gistUrl: 'pending' }))
+    await vi.waitFor(() => expect(result.current?.gistUrl).toBe('pending'))
   })
 
   it('retires the overlay once the index row catches up to it', async () => {
     setNoteRowOverlay('notes/a.md', GENERATION, { gistUrl: 'u' })
     getNote.mockResolvedValue(noteRow({ gistUrl: 'u' })) // index already agrees
-    const { result } = renderHook(() => useNoteRow('notes/a.md'), { wrapper: makeWrapper() })
+    const { result } = await renderHook(() => useNoteRow('notes/a.md'), { wrapper: makeWrapper() })
 
-    await waitFor(() => expect(result.current?.gistUrl).toBe('u'))
-    await waitFor(() => expect(getNoteRowOverlay('notes/a.md', GENERATION)).toBeNull())
+    await vi.waitFor(() => expect(result.current?.gistUrl).toBe('u'))
+    await vi.waitFor(() => expect(getNoteRowOverlay('notes/a.md', GENERATION)).toBeNull())
   })
 })

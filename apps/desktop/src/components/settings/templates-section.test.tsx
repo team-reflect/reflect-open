@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { render } from 'vitest-browser-react'
+import { page, userEvent } from 'vitest/browser'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { RouterProvider, useRouter } from '@/routing/router'
 import { TemplatesSection } from './templates-section'
@@ -44,14 +44,6 @@ function renderSection() {
   )
 }
 
-function templateLink(): HTMLButtonElement {
-  const button = screen.getByText('templates/weekly-review.md').closest('button')
-  if (!(button instanceof HTMLButtonElement)) {
-    throw new Error('expected the template path inside its link button')
-  }
-  return button
-}
-
 beforeEach(() => {
   listTemplates.mockReset().mockResolvedValue([
     { path: 'templates/weekly-review.md', title: 'Weekly review', mtime: 1 },
@@ -59,32 +51,29 @@ beforeEach(() => {
   openRouteInNewWindow.mockReset().mockResolvedValue(true)
 })
 
-afterEach(cleanup)
-
 describe('TemplatesSection note links', () => {
   it('opens a template in the current window on a plain click', async () => {
-    renderSection()
+    await renderSection()
 
-    await userEvent.click(await screen.findByText('templates/weekly-review.md'))
+    await userEvent.click(page.getByText('templates/weekly-review.md'))
 
-    expect(screen.getByTestId('route').textContent).toBe(
-      'note:templates/weekly-review.md',
-    )
+    await expect
+      .element(page.getByTestId('route'))
+      .toHaveTextContent('note:templates/weekly-review.md')
     expect(openRouteInNewWindow).not.toHaveBeenCalled()
   })
 
   it('opens a ⌘-clicked template in a new window with its explicit note route', async () => {
-    renderSection()
-    await screen.findByText('templates/weekly-review.md')
+    await renderSection()
 
-    fireEvent.click(templateLink(), { metaKey: true })
+    await page.getByText('templates/weekly-review.md').click({ modifiers: ['Meta'] })
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(openRouteInNewWindow).toHaveBeenCalledWith({
         kind: 'note',
         path: 'templates/weekly-review.md',
       }),
     )
-    expect(screen.getByTestId('route').textContent).toBe('settings')
+    expect(page.getByTestId('route').element().textContent).toBe('settings')
   })
 })

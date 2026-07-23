@@ -1,7 +1,7 @@
-import { cleanup, render, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render } from 'vitest-browser-react'
+import { userEvent } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { RouterProvider, useRouter } from '@/routing/router'
@@ -47,14 +47,12 @@ beforeEach(() => {
   relatedNotes.mockReset().mockResolvedValue([])
 })
 
-afterEach(cleanup)
-
 describe('NoteContextSidebar', () => {
   it('queries the note path for similar notes and shows no section without results', async () => {
-    const view = renderSidebar('notes/rust.md')
-    await waitFor(() => expect(relatedNotes).toHaveBeenCalledWith('notes/rust.md', 6))
-    expect(view.queryByText('Similar notes')).toBeNull()
-    view.unmount()
+    const view = await renderSidebar('notes/rust.md')
+    await vi.waitFor(() => expect(relatedNotes).toHaveBeenCalledWith('notes/rust.md', 6))
+    expect(view.getByText('Similar notes').query()).toBeNull()
+    await view.unmount()
   })
 
   it('lists similar notes under their own section and navigates on click', async () => {
@@ -68,11 +66,11 @@ describe('NoteContextSidebar', () => {
         isPrivate: false,
       },
     ])
-    const view = renderSidebar('notes/rust.md')
-    await view.findByText('Similar notes')
+    const view = await renderSidebar('notes/rust.md')
+    await expect.element(view.getByText('Similar notes')).toBeInTheDocument()
     await userEvent.click(view.getByText('Zig'))
-    expect(view.getByTestId('route').textContent).toContain('"kind":"note"')
-    expect(view.getByTestId('route').textContent).toContain('notes/zig.md')
-    view.unmount()
+    await expect.element(view.getByTestId('route')).toHaveTextContent('"kind":"note"')
+    await expect.element(view.getByTestId('route')).toHaveTextContent('notes/zig.md')
+    await view.unmount()
   })
 })

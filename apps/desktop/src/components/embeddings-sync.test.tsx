@@ -1,5 +1,5 @@
-import { cleanup, render, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { render } from 'vitest-browser-react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { IndexAppliedListener } from '@reflect/core'
 import { EmbeddingsSync } from './embeddings-sync'
 
@@ -55,8 +55,6 @@ beforeEach(() => {
   })
 })
 
-afterEach(cleanup)
-
 /** One macrotask — long enough for a would-be queue item to have started. */
 function flushQueue(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))
@@ -64,12 +62,12 @@ function flushQueue(): Promise<void> {
 
 describe('EmbeddingsSync', () => {
   it('backfills and follows applied index batches while enabled and ready', async () => {
-    render(<EmbeddingsSync />)
-    await waitFor(() => expect(semantic.backfillEmbeddingsVisibly).toHaveBeenCalled())
-    await waitFor(() => expect(onApplied).not.toBeNull())
+    await render(<EmbeddingsSync />)
+    await vi.waitFor(() => expect(semantic.backfillEmbeddingsVisibly).toHaveBeenCalled())
+    await vi.waitFor(() => expect(onApplied).not.toBeNull())
 
     onApplied?.([{ kind: 'upsert', path: 'notes/a.md' }], 7)
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(core.embedNote).toHaveBeenCalledWith({
         path: 'notes/a.md',
         generation: 7,
@@ -79,8 +77,8 @@ describe('EmbeddingsSync', () => {
   })
 
   it('ignores a delayed emit from a superseded index session', async () => {
-    render(<EmbeddingsSync />)
-    await waitFor(() => expect(onApplied).not.toBeNull())
+    await render(<EmbeddingsSync />)
+    await vi.waitFor(() => expect(onApplied).not.toBeNull())
 
     onApplied?.([{ kind: 'upsert', path: 'notes/a.md' }], 6)
     await flushQueue()
@@ -88,8 +86,8 @@ describe('EmbeddingsSync', () => {
   })
 
   it('never embeds asset-file changes riding the same batches', async () => {
-    render(<EmbeddingsSync />)
-    await waitFor(() => expect(onApplied).not.toBeNull())
+    await render(<EmbeddingsSync />)
+    await vi.waitFor(() => expect(onApplied).not.toBeNull())
 
     onApplied?.(
       [
@@ -105,19 +103,19 @@ describe('EmbeddingsSync', () => {
 
   it('starts no embedding work while semantic search is disabled', async () => {
     semanticSetting.enabled = false
-    render(<EmbeddingsSync />)
+    await render(<EmbeddingsSync />)
     await flushQueue()
     expect(semantic.backfillEmbeddingsVisibly).not.toHaveBeenCalled()
     expect(core.subscribeIndexApplied).not.toHaveBeenCalled()
   })
 
   it('pauses follow-up work the moment semantic search is disabled', async () => {
-    const view = render(<EmbeddingsSync />)
-    await waitFor(() => expect(onApplied).not.toBeNull())
+    const view = await render(<EmbeddingsSync />)
+    await vi.waitFor(() => expect(onApplied).not.toBeNull())
 
     semanticSetting.enabled = false
-    view.rerender(<EmbeddingsSync />)
-    await waitFor(() => expect(unlisten).toHaveBeenCalled())
+    await view.rerender(<EmbeddingsSync />)
+    await vi.waitFor(() => expect(unlisten).toHaveBeenCalled())
 
     // A batch still in flight when the teardown ran must be dropped, not
     // embedded behind the user's back.

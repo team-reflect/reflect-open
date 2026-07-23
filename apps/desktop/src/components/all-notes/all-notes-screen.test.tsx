@@ -1,12 +1,13 @@
-import { fireEvent, render, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { page, userEvent } from 'vitest/browser'
+import { render } from 'vitest-browser-react'
 import type { ReactElement } from 'react'
 import { setBridge } from '@reflect/core'
 import { resetOperations, useOperations } from '@/lib/operations'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { RouterProvider, useRouter } from '@/routing/router'
-import { installVirtuaTestEnv } from '@/test-utils/virtua-jsdom'
+import { expectLocatorToHaveCount } from '@/test-utils/expect'
 import { AllNotesScreen } from './all-notes-screen'
 
 /**
@@ -42,14 +43,6 @@ vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/windows/open-in-new-window')>()),
   openRouteInNewWindow,
 }))
-
-// jsdom computes no layout, so virtua can't measure its viewport or rows.
-// installVirtuaTestEnv supplies those: the scroll container reports a tall
-// viewport and each row (an <li>) the estimated row height, so even a 1000-row
-// list windows down to a handful of mounted rows.
-installVirtuaTestEnv((element) => (element.tagName === 'LI' ? 48 : 768))
-Element.prototype.scrollTo ??= () => {}
-Element.prototype.scrollIntoView ??= () => {} // cmdk scrolls the selected item
 
 // Deterministic regardless of the test run's clock: both timestamps are far in
 // the past, so the Updated column always renders the short-date form.
@@ -89,6 +82,26 @@ const facetRows = [
 const mockInvoke = vi.fn<(command: string, args: Record<string, unknown>) => Promise<unknown>>()
 
 setBridge({ invoke: mockInvoke, listen: async () => () => {} })
+
+const manyNoteRows = Array.from({ length: 1000 }, (_, index) => ({
+  path: `notes/n${index}.md`,
+  title: `Note ${index}`,
+  mtime: 1_000_000 - index,
+  preview: '',
+}))
+
+function mockManyNotes(): void {
+  mockInvoke.mockImplementation(async (command, args) => {
+    if (command !== 'db_query') {
+      return null
+    }
+    const sql = String(args['sql'])
+    if (sql.includes('"preview"')) {
+      return manyNoteRows
+    }
+    return []
+  })
+}
 
 beforeEach(() => {
   resetOperations()
@@ -157,7 +170,11 @@ function renderScreen(
   return render(
     <QueryClientProvider client={client}>
       <RouterProvider initialRoute={{ kind: 'allNotes', tag: null }}>
-        <RoutedScreen />
+        {/* The screen fills its container (`h-full`); hand it the viewport
+            height so the scroll container gets a real, bounded size. */}
+        <div style={{ height: '100vh' }}>
+          <RoutedScreen />
+        </div>
         <RouteProbe />
         <OperationsProbe />
         <ReArrive />
@@ -166,33 +183,33 @@ function renderScreen(
   )
 }
 
-function probedRoute(view: ReturnType<typeof renderScreen>): unknown {
-  return JSON.parse(view.getByTestId('route').textContent ?? 'null')
+function probedRoute(view: Awaited<ReturnType<typeof renderScreen>>): unknown {
+  return JSON.parse(view.getByTestId('route').element().textContent ?? 'null')
 }
 
 describe('AllNotesScreen', () => {
   it('lists non-daily notes with subject, snippet, tags, and updated columns', async () => {
-    const view = renderScreen()
+    const view = await renderScreen()
 
-    await view.findByText('Health Stacked')
-    expect(view.getByText('Shop your health goals.')).toBeDefined()
-    expect(view.getByText('Tokyo Gâteau')).toBeDefined()
-    expect(view.getAllByText('#link')).toHaveLength(2)
-    expect(view.getByText('1/15/2020')).toBeDefined()
-    expect(view.getByText('1/10/2020')).toBeDefined()
-    view.unmount()
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
+    await expect.element(view.getByText('Shop your health goals.')).toBeInTheDocument()
+    await expect.element(view.getByText('Tokyo Gâteau')).toBeInTheDocument()
+    await expectLocatorToHaveCount(view.getByText('#link'), 2)
+    await expect.element(view.getByText('1/15/2020')).toBeInTheDocument()
+    await expect.element(view.getByText('1/10/2020')).toBeInTheDocument()
+    await view.unmount()
   })
 
   it('keeps ISO updated dates on one line', async () => {
     settingsState.dateFormat = 'iso'
-    const view = renderScreen()
+    const view = await renderScreen()
 
-    const updated = await view.findByText('2020-01-15')
-    expect(updated.className).toContain('whitespace-nowrap')
-    expect(updated.parentElement?.className ?? '').toContain(
+    const updated = view.getByText('2020-01-15')
+    await expect.element(updated).toHaveClass('whitespace-nowrap')
+    expect(updated.element().parentElement?.className ?? '').toContain(
       'grid-cols-[minmax(0,15rem)_minmax(0,1fr)_minmax(0,8rem)_6rem]',
     )
-    view.unmount()
+    await view.unmount()
   })
 
   it('renders a dash, not an epoch date, for a row missing its mtime', async () => {
@@ -209,51 +226,45 @@ describe('AllNotesScreen', () => {
       }
       return []
     })
-    const view = renderScreen()
+    const view = await renderScreen()
 
-    await view.findByText('Legacy Note')
-    expect(view.getByText('—')).toBeDefined()
-    view.unmount()
+    await expect.element(view.getByText('Legacy Note')).toBeInTheDocument()
+    await expect.element(view.getByText('—')).toBeInTheDocument()
+    await view.unmount()
   })
 
   it('opens a note when its row is clicked', async () => {
-    const view = renderScreen()
+    const view = await renderScreen()
 
-    fireEvent.click(await view.findByRole('button', { name: /Health Stacked/ }))
+    await view.getByRole('button', { name: /Health Stacked/ }).click()
 
     expect(probedRoute(view)).toEqual({ kind: 'note', path: 'notes/health.md' })
-    view.unmount()
+    await view.unmount()
   })
 
   it('opens a modifier-clicked note subject in a new window without selecting its row', async () => {
-    const view = renderScreen()
+    const view = await renderScreen()
 
-    fireEvent.click(await view.findByRole('button', { name: 'Health Stacked' }), {
-      metaKey: true,
-    })
+    await view.getByRole('button', { name: 'Health Stacked' }).click({ modifiers: ['Meta'] })
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(openRouteInNewWindow).toHaveBeenCalledWith({
         kind: 'note',
         path: 'notes/health.md',
       }),
     )
     expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: null })
-    expect(view.queryByRole('button', { name: /Trash \(/ })).toBeNull()
-    view.unmount()
+    expect(view.getByRole('button', { name: /Trash \(/ }).query()).toBeNull()
+    await view.unmount()
   })
 
   it('keeps a modifier-double-click from navigating the current window', async () => {
-    const view = renderScreen()
-    const subject = await view.findByRole('button', { name: 'Health Stacked' })
+    const view = await renderScreen()
+    const subject = view.getByRole('button', { name: 'Health Stacked' })
 
-    // The browser sequence is click, click, dblclick (fireEvent.doubleClick by
-    // itself emits only the last leg and would miss duplicate window opens).
-    fireEvent.click(subject, { metaKey: true, detail: 1 })
-    fireEvent.click(subject, { metaKey: true, detail: 2 })
-    fireEvent.doubleClick(subject, { metaKey: true, detail: 2 })
+    await subject.dblClick({ modifiers: ['Meta'] })
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(openRouteInNewWindow).toHaveBeenCalledWith({
         kind: 'note',
         path: 'notes/health.md',
@@ -261,36 +272,37 @@ describe('AllNotesScreen', () => {
     )
     expect(openRouteInNewWindow).toHaveBeenCalledTimes(1)
     expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: null })
-    view.unmount()
+    await view.unmount()
   })
 
   it('renders pinned tags from settings as tabs and filters through the route', async () => {
-    const view = renderScreen()
-    await view.findByText('Health Stacked')
+    const view = await renderScreen()
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
-    expect(view.getByRole('button', { name: '#person' })).toBeDefined()
-    fireEvent.click(view.getByRole('button', { name: '#book' }))
+    await expect.element(view.getByRole('button', { name: '#person' })).toBeInTheDocument()
+    await view.getByRole('button', { name: '#book' }).click()
 
     expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: 'book' })
-    await view.findByText('No notes tagged #book.')
-    expect(view.queryByText('Health Stacked')).toBeNull()
-    view.unmount()
+    await expect.element(view.getByText('No notes tagged #book.')).toBeInTheDocument()
+    expect(view.getByText('Health Stacked').query()).toBeNull()
+    await view.unmount()
   })
 
   it('re-anchors to the top when re-arriving on the same route', async () => {
-    const view = renderScreen()
-    await view.findByText('Health Stacked')
+    mockManyNotes()
+    const view = await renderScreen()
+    await expect.element(view.getByText('Note 0', { exact: true })).toBeInTheDocument()
 
-    const scroller = view.getByTestId('all-notes-scroll')
-    fireEvent.scroll(scroller, { target: { scrollTop: 400 } })
+    const scroller = view.getByTestId('all-notes-scroll').element()
+    scroller.scrollTop = 400
     expect(scroller.scrollTop).toBe(400)
 
     // Same-route navigation pushes no entry, but the router clears the saved
     // offset and bumps arrivalSeq — the list must re-anchor, not stay put.
-    fireEvent.click(view.getByTestId('re-arrive'))
+    await view.getByTestId('re-arrive').click()
 
-    await waitFor(() => expect(scroller.scrollTop).toBe(0))
-    view.unmount()
+    await vi.waitFor(() => expect(scroller.scrollTop).toBe(0))
+    await view.unmount()
   })
 
   it('renders rows from a warm cache without a refetch', async () => {
@@ -323,123 +335,110 @@ describe('AllNotesScreen', () => {
     )
     client.setQueryData([INDEX_QUERY_SCOPE, '/g', 'all-notes-tags'], facetRows)
 
-    const view = renderScreen(client)
+    const view = await renderScreen(client)
 
-    expect(await view.findByText('Health Stacked')).toBeDefined()
-    expect(view.getByText('Tokyo Gâteau')).toBeDefined()
-    view.unmount()
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
+    await expect.element(view.getByText('Tokyo Gâteau')).toBeInTheDocument()
+    await view.unmount()
   })
 
   it('virtualizes long lists instead of rendering every row', async () => {
-    const many = Array.from({ length: 1000 }, (_, index) => ({
-      path: `notes/n${index}.md`,
-      title: `Note ${index}`,
-      mtime: 1_000_000 - index,
-      preview: '',
-    }))
-    mockInvoke.mockImplementation(async (command, args) => {
-      if (command !== 'db_query') {
-        return null
-      }
-      const sql = String(args['sql'])
-      if (sql.includes('"preview"')) {
-        return many
-      }
-      return []
-    })
+    mockManyNotes()
 
-    const view = renderScreen()
+    const view = await renderScreen()
 
-    await view.findByText('Note 0')
-    const rendered = view.getByTestId('all-notes-scroll').querySelectorAll('li')
+    await expect.element(view.getByText('Note 0', { exact: true })).toBeInTheDocument()
+    const rendered = view.getByTestId('all-notes-scroll').element().querySelectorAll('li')
     expect(rendered.length).toBeGreaterThan(0)
     // The list is uncapped, but only the scroll window (plus buffer) mounts.
     expect(rendered.length).toBeLessThan(100)
-    view.unmount()
+    await view.unmount()
   })
 
   it('offers unpinned tags in the Custom combobox and shows the chosen one', async () => {
-    const view = renderScreen()
+    const view = await renderScreen()
 
     // `book` is pinned, so the combobox offers only `travel` (with its count).
-    fireEvent.click(await view.findByRole('button', { name: 'Custom' }))
-    const listbox = await view.findByRole('listbox')
-    expect(listbox.textContent).toContain('#travel')
-    expect(listbox.textContent).toContain('2')
-    expect(listbox.textContent).not.toContain('#book')
+    await view.getByRole('button', { name: 'Custom' }).click()
+    const listbox = page.getByRole('listbox')
+    await expect.element(listbox).toHaveTextContent('#travel')
+    await expect.element(listbox).toHaveTextContent('2')
+    expect(listbox.element().textContent).not.toContain('#book')
 
-    fireEvent.click(view.getByRole('option', { name: /#travel/ }))
+    await page.getByRole('option', { name: /#travel/ }).click()
 
     expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: 'travel' })
-    await view.findByText('June 9, 2026')
-    expect(view.getByText('Daily travel notes.')).toBeDefined()
-    expect(view.queryByText('Health Stacked')).toBeNull()
+    await expect.element(view.getByText('June 9, 2026')).toBeInTheDocument()
+    await expect.element(view.getByText('Daily travel notes.')).toBeInTheDocument()
+    expect(view.getByText('Health Stacked').query()).toBeNull()
     // The trigger adopts the active custom tag.
-    await waitFor(() =>
-      expect(view.getByRole('button', { name: /#travel/, expanded: false })).toBeDefined(),
-    )
-    fireEvent.click(view.getByRole('button', { name: 'June 9, 2026' }))
+    await expect
+      .element(view.getByRole('button', { name: /#travel/, expanded: false }))
+      .toBeInTheDocument()
+    await view.getByRole('button', { name: 'June 9, 2026' }).click()
     expect(probedRoute(view)).toEqual({ kind: 'daily', date: '2026-06-09' })
-    view.unmount()
+    await view.unmount()
   })
 
   it('filters by an arbitrary typed tag from the Custom combobox', async () => {
-    const view = renderScreen()
-    await view.findByText('Health Stacked')
+    const view = await renderScreen()
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
-    fireEvent.click(view.getByRole('button', { name: 'Custom' }))
-    const input = await view.findByPlaceholderText('Filter by any tag…')
+    await view.getByRole('button', { name: 'Custom' }).click()
+    const input = page.getByPlaceholder('Filter by any tag…')
 
     // An exact existing tag isn't duplicated as a "Filter by" item.
-    fireEvent.change(input, { target: { value: 'travel' } })
-    expect(view.queryByRole('option', { name: /Filter by/ })).toBeNull()
+    await input.fill('travel')
+    expect(page.getByRole('option', { name: /Filter by/ }).query()).toBeNull()
 
     // A leading `#` is accepted, and the tag need not exist in the index.
-    fireEvent.change(input, { target: { value: '#zettel' } })
-    fireEvent.click(await view.findByRole('option', { name: 'Filter by #zettel' }))
+    await input.fill('#zettel')
+    await page.getByRole('option', { name: 'Filter by #zettel' }).click()
 
     expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: 'zettel' })
-    await view.findByText('No notes tagged #zettel.')
-    view.unmount()
+    await expect.element(view.getByText('No notes tagged #zettel.')).toBeInTheDocument()
+    await view.unmount()
   })
 
   it('matches facets case-insensitively in the Custom combobox', async () => {
-    const view = renderScreen()
-    await view.findByText('Health Stacked')
+    const view = await renderScreen()
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
-    fireEvent.click(view.getByRole('button', { name: 'Custom' }))
-    const input = await view.findByPlaceholderText('Filter by any tag…')
-    fireEvent.change(input, { target: { value: 'TRAVEL' } })
+    await view.getByRole('button', { name: 'Custom' }).click()
+    const input = page.getByPlaceholder('Filter by any tag…')
+    await input.fill('TRAVEL')
 
     // cmdk's default filter (command-score) folds case like `foldTag` does,
     // so a differently-cased query keeps the existing facet reachable instead
     // of dead-ending with a hidden list and a suppressed "Filter by" offer.
-    expect(await view.findByRole('option', { name: /#travel/ })).toBeDefined()
-    expect(view.queryByRole('option', { name: /Filter by/ })).toBeNull()
+    await expect.element(page.getByRole('option', { name: /#travel/ })).toBeInTheDocument()
+    expect(page.getByRole('option', { name: /Filter by/ }).query()).toBeNull()
 
-    fireEvent.click(view.getByRole('option', { name: /#travel/ }))
+    await page.getByRole('option', { name: /#travel/ }).click()
     expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: 'travel' })
-    view.unmount()
+    await view.unmount()
   })
 })
 
 describe('AllNotesScreen — selection and bulk trash', () => {
   it('selects a row on click and reveals the bulk Trash action', async () => {
-    const view = renderScreen()
-    await view.findByText('Health Stacked')
+    const view = await renderScreen()
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
     // Clicking the row body (the snippet, not a button) selects without opening.
-    fireEvent.click(view.getByText('Shop your health goals.'))
+    await view.getByText('Shop your health goals.').click()
     expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: null })
     const trashButton = view.getByRole('button', { name: /Trash \(1\)/ })
-    expect(trashButton).toBeDefined()
-    expect(view.getByRole('group', { name: 'Filter by tag' }).previousElementSibling).toBe(trashButton)
+    await expect.element(trashButton).toBeInTheDocument()
+    expect(view.getByRole('group', { name: 'Filter by tag' }).element().previousElementSibling).toBe(
+      trashButton.element(),
+    )
 
     // ⌘-click a second row extends the selection.
-    fireEvent.click(view.getByText('Dandelion chocolate.'), { metaKey: true })
-    expect(view.getByRole('button', { name: /Trash \(2\)/ })).toBeDefined()
+    await view.getByText('Dandelion chocolate.').click({ modifiers: ['Meta'] })
+    await expect.element(view.getByRole('button', { name: /Trash \(2\)/ })).toBeInTheDocument()
     expect(openRouteInNewWindow).not.toHaveBeenCalled()
-    view.unmount()
+    await view.unmount()
   })
 
   it('range-selects rows with Shift-click', async () => {
@@ -461,67 +460,65 @@ describe('AllNotesScreen — selection and bulk trash', () => {
       }
       return []
     })
-    const view = renderScreen()
-    await view.findByText('Note A')
+    const view = await renderScreen()
+    await expect.element(view.getByText('Note A')).toBeInTheDocument()
 
     // Click the first row's body (the snippet), then Shift-click the third →
     // the whole range is selected (the row passes the modifier through).
-    fireEvent.click(view.getByText('alpha'))
-    fireEvent.click(view.getByText('charlie'), { shiftKey: true })
+    await view.getByText('alpha').click()
+    await view.getByText('charlie').click({ modifiers: ['Shift'] })
 
-    expect(view.getByRole('button', { name: /Trash \(3\)/ })).toBeDefined()
-    view.unmount()
+    await expect.element(view.getByRole('button', { name: /Trash \(3\)/ })).toBeInTheDocument()
+    await view.unmount()
   })
 
   it('opens a note on double-click', async () => {
-    const view = renderScreen()
-    await view.findByText('Health Stacked')
+    const view = await renderScreen()
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
-    fireEvent.doubleClick(view.getByText('Shop your health goals.'))
+    await view.getByText('Shop your health goals.').dblClick()
     expect(probedRoute(view)).toEqual({ kind: 'note', path: 'notes/health.md' })
-    view.unmount()
+    await view.unmount()
   })
 
   it('drives selection from the keyboard and opens with Return', async () => {
-    const view = renderScreen()
-    await view.findByText('Health Stacked')
-    const surface = view.getByLabelText('All notes')
+    const view = await renderScreen()
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
-    fireEvent.keyDown(surface, { key: 'ArrowDown' }) // selects the first row
-    expect(view.getByRole('button', { name: /Trash \(1\)/ })).toBeDefined()
+    await userEvent.keyboard('{ArrowDown}') // selects the first row
+    await expect.element(view.getByRole('button', { name: /Trash \(1\)/ })).toBeInTheDocument()
 
-    fireEvent.keyDown(surface, { key: 'Enter' })
+    await userEvent.keyboard('{Enter}')
     expect(probedRoute(view)).toEqual({ kind: 'note', path: 'notes/health.md' })
     expect(openRouteInNewWindow).not.toHaveBeenCalled()
-    view.unmount()
+    await view.unmount()
   })
 
   it('clears the selection on Escape', async () => {
-    const view = renderScreen()
-    await view.findByText('Health Stacked')
-    const surface = view.getByLabelText('All notes')
+    const view = await renderScreen()
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
-    fireEvent.click(view.getByText('Shop your health goals.'))
-    expect(view.queryByRole('button', { name: /Trash \(1\)/ })).not.toBeNull()
+    await view.getByText('Shop your health goals.').click()
+    await expect.element(view.getByRole('button', { name: /Trash \(1\)/ })).toBeInTheDocument()
 
-    fireEvent.keyDown(surface, { key: 'Escape' })
-    expect(view.queryByRole('button', { name: /Trash \(/ })).toBeNull()
-    view.unmount()
+    await userEvent.keyboard('{Escape}')
+    expect(view.getByRole('button', { name: /Trash \(/ }).query()).toBeNull()
+    await view.unmount()
   })
 
   it('bulk-trashes the selection to the OS trash and drops the rows', async () => {
-    const view = renderScreen()
-    await view.findByText('Health Stacked')
+    const view = await renderScreen()
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
-    fireEvent.click(view.getByText('Shop your health goals.'))
-    fireEvent.click(view.getByText('Dandelion chocolate.'), { metaKey: true })
-    fireEvent.click(view.getByRole('button', { name: /Trash \(2\)/ }))
+    await view.getByText('Shop your health goals.').click()
+    await view.getByText('Dandelion chocolate.').click({ modifiers: ['Meta'] })
+    await view.getByRole('button', { name: /Trash \(2\)/ }).click()
 
     // Confirm, then the two notes go to the trash via `note_delete`.
-    await view.findByText('Trash 2 notes?')
-    fireEvent.click(view.getByRole('button', { name: 'Trash' }))
+    await expect.element(page.getByText('Trash 2 notes?')).toBeInTheDocument()
+    await page.getByRole('button', { name: 'Trash', exact: true }).click()
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith('note_delete', {
         path: 'notes/health.md',
         generation: 1,
@@ -533,51 +530,53 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     })
     // Optimistic removal: the rows leave at once — the test harness has no file
     // watcher to drive the reindex that would otherwise refresh the list.
-    await waitFor(() => expect(view.queryByText('Health Stacked')).toBeNull())
-    expect(view.queryByText('Tokyo Gâteau')).toBeNull()
-    view.unmount()
+    await expectLocatorToHaveCount(view.getByText('Health Stacked'), 0)
+    expect(view.getByText('Tokyo Gâteau').query()).toBeNull()
+    await view.unmount()
   })
 
   it('opens the confirm dialog from the ⌘⌫ shortcut', async () => {
-    const view = renderScreen()
-    await view.findByText('Health Stacked')
-    const surface = view.getByLabelText('All notes')
+    const view = await renderScreen()
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
-    fireEvent.click(view.getByText('Shop your health goals.'))
-    fireEvent.keyDown(surface, { key: 'Backspace', metaKey: true })
+    await view.getByText('Shop your health goals.').click()
+    await userEvent.keyboard('{Meta>}{Backspace}{/Meta}')
 
-    expect(await view.findByText('Trash 1 note?')).toBeDefined()
-    view.unmount()
+    await expect.element(page.getByText('Trash 1 note?')).toBeInTheDocument()
+    await view.unmount()
   })
 
   it('does not offer bulk trash for a tagged daily note', async () => {
-    const view = renderScreen()
-    await view.findByText('Health Stacked')
+    const view = await renderScreen()
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
-    fireEvent.click(view.getByRole('button', { name: /Custom/ }))
-    fireEvent.click(await view.findByRole('option', { name: /#travel/ }))
-    await view.findByText('June 9, 2026')
+    await view.getByRole('button', { name: /Custom/ }).click()
+    await page.getByRole('option', { name: /#travel/ }).click()
+    await expect.element(view.getByText('June 9, 2026')).toBeInTheDocument()
 
-    fireEvent.click(view.getByText('Daily travel notes.'))
-    expect(view.queryByRole('button', { name: /Trash \(/ })).toBeNull()
+    await view.getByText('Daily travel notes.').click()
+    expect(view.getByRole('button', { name: /Trash \(/ }).query()).toBeNull()
 
-    fireEvent.keyDown(view.getByLabelText('All notes'), { key: 'Backspace', metaKey: true })
-    expect(view.queryByText('Trash 1 note?')).toBeNull()
+    await userEvent.keyboard('{Meta>}{Backspace}{/Meta}')
+    expect(page.getByText('Trash 1 note?').query()).toBeNull()
     expect(mockInvoke.mock.calls.some(([command]) => command === 'note_delete')).toBe(false)
-    view.unmount()
+    await view.unmount()
   })
 
   it('does not open a note when Return activates a focused header button', async () => {
-    const view = renderScreen()
-    await view.findByText('Health Stacked')
+    const view = await renderScreen()
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
     // Select a note, then send Return to the New note button: a focused control
     // owns Return, so the document-level shortcut must back off and not open.
-    fireEvent.click(view.getByText('Shop your health goals.'))
-    fireEvent.keyDown(view.getByRole('button', { name: /New note/ }), { key: 'Enter' })
+    await view.getByText('Shop your health goals.').click()
+    view
+      .getByRole('button', { name: /New note/ })
+      .element()
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
 
     expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: null })
-    view.unmount()
+    await view.unmount()
   })
 
   it('closes the confirm and reports the failure via the operations toast', async () => {
@@ -600,24 +599,22 @@ describe('AllNotesScreen — selection and bulk trash', () => {
       }
       return []
     })
-    const view = renderScreen()
-    await view.findByText('Health Stacked')
+    const view = await renderScreen()
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
-    fireEvent.click(view.getByText('Shop your health goals.'))
-    fireEvent.click(view.getByRole('button', { name: /Trash \(1\)/ }))
-    await view.findByText('Trash 1 note?')
-    fireEvent.click(view.getByRole('button', { name: 'Trash' }))
+    await view.getByText('Shop your health goals.').click()
+    await view.getByRole('button', { name: /Trash \(1\)/ }).click()
+    await expect.element(page.getByText('Trash 1 note?')).toBeInTheDocument()
+    await page.getByRole('button', { name: 'Trash', exact: true }).click()
 
     // The confirm closes either way; the reason lands in the operations toast.
-    await waitFor(() => expect(view.queryByText('Trash 1 note?')).toBeNull())
-    await waitFor(() =>
-      expect(view.getByTestId('operations').textContent).toContain('failed:disk on fire'),
-    )
+    await expectLocatorToHaveCount(page.getByText('Trash 1 note?'), 0)
+    await expect.element(view.getByTestId('operations')).toHaveTextContent('failed:disk on fire')
     // The note that failed to trash is left in the list and stays selected, so
     // the bulk action is still available for an immediate retry (no re-select).
-    expect(view.getByText('Health Stacked')).toBeDefined()
-    expect(view.getByRole('button', { name: /Trash \(1\)/ })).toBeDefined()
-    view.unmount()
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
+    await expect.element(view.getByRole('button', { name: /Trash \(1\)/ })).toBeInTheDocument()
+    await view.unmount()
   })
 
   it('keeps trashed rows gone on a partial failure (no index resurrection)', async () => {
@@ -645,39 +642,39 @@ describe('AllNotesScreen — selection and bulk trash', () => {
       }
       return []
     })
-    const view = renderScreen()
-    await view.findByText('Health Stacked')
+    const view = await renderScreen()
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
-    fireEvent.click(view.getByText('Shop your health goals.'))
-    fireEvent.click(view.getByText('Dandelion chocolate.'), { metaKey: true })
-    fireEvent.click(view.getByRole('button', { name: /Trash \(2\)/ }))
-    await view.findByText('Trash 2 notes?')
-    fireEvent.click(view.getByRole('button', { name: 'Trash' }))
+    await view.getByText('Shop your health goals.').click()
+    await view.getByText('Dandelion chocolate.').click({ modifiers: ['Meta'] })
+    await view.getByRole('button', { name: /Trash \(2\)/ }).click()
+    await expect.element(page.getByText('Trash 2 notes?')).toBeInTheDocument()
+    await page.getByRole('button', { name: 'Trash', exact: true }).click()
 
     // The successfully-trashed note stays gone; the failed one stays selected.
-    await waitFor(() => expect(view.queryByText('Health Stacked')).toBeNull())
-    expect(view.getByText('Tokyo Gâteau')).toBeDefined()
-    expect(view.getByRole('button', { name: /Trash \(1\)/ })).toBeDefined()
-    view.unmount()
+    await expectLocatorToHaveCount(view.getByText('Health Stacked'), 0)
+    await expect.element(view.getByText('Tokyo Gâteau')).toBeInTheDocument()
+    await expect.element(view.getByRole('button', { name: /Trash \(1\)/ })).toBeInTheDocument()
+    await view.unmount()
   })
 
   it('ignores a second confirm click while a trash is in flight', async () => {
-    const view = renderScreen()
-    await view.findByText('Health Stacked')
+    const view = await renderScreen()
+    await expect.element(view.getByText('Health Stacked')).toBeInTheDocument()
 
-    fireEvent.click(view.getByText('Shop your health goals.'))
-    fireEvent.click(view.getByRole('button', { name: /Trash \(1\)/ }))
-    await view.findByText('Trash 1 note?')
+    await view.getByText('Shop your health goals.').click()
+    await view.getByRole('button', { name: /Trash \(1\)/ }).click()
+    await expect.element(page.getByText('Trash 1 note?')).toBeInTheDocument()
 
-    const confirm = view.getByRole('button', { name: 'Trash' })
-    fireEvent.click(confirm)
-    fireEvent.click(confirm) // a rapid second click must not double-delete
+    const confirm = page.getByRole('button', { name: 'Trash', exact: true }).element() as HTMLElement
+    confirm.click()
+    confirm.click() // a rapid second click must not double-delete
 
-    await waitFor(() => expect(view.queryByText('Trash 1 note?')).toBeNull())
+    await expectLocatorToHaveCount(page.getByText('Trash 1 note?'), 0)
     const healthDeletes = mockInvoke.mock.calls.filter(
       ([command, args]) => command === 'note_delete' && args['path'] === 'notes/health.md',
     )
     expect(healthDeletes).toHaveLength(1)
-    view.unmount()
+    await view.unmount()
   })
 })

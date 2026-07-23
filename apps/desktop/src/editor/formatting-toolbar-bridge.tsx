@@ -90,15 +90,33 @@ export function FormattingToolbarBridge(): null {
         },
       }
 
+      // `selectionchange` (and the focus that a caret-placing tap raises)
+      // fires before ProseMirror ingests the new DOM selection into its
+      // state (the ingest runs on a deferred flush, up to ~20ms later), so an
+      // immediate `canExec` read computes capabilities for the previous caret
+      // position. Coalesce each burst and publish after the ingest window.
+      let publishTimer: ReturnType<typeof setTimeout> | undefined
+      function publishAfterSelectionSync(): void {
+        if (publishTimer !== undefined) {
+          clearTimeout(publishTimer)
+        }
+        publishTimer = setTimeout(() => {
+          publishTimer = undefined
+          if (editor.focused) {
+            publish()
+          }
+        }, 32)
+      }
+
       function handleFocusIn(): void {
-        publish()
+        publishAfterSelectionSync()
       }
       function handleFocusOut(): void {
         clearFormattingToolbar(owner)
       }
       function handleSelectionChange(): void {
         if (editor.focused) {
-          publish()
+          publishAfterSelectionSync()
         }
       }
 
@@ -114,6 +132,9 @@ export function FormattingToolbarBridge(): null {
         dom.removeEventListener('focusin', handleFocusIn)
         dom.removeEventListener('focusout', handleFocusOut)
         document.removeEventListener('selectionchange', handleSelectionChange)
+        if (publishTimer !== undefined) {
+          clearTimeout(publishTimer)
+        }
         clearFormattingToolbar(owner)
       }
     }

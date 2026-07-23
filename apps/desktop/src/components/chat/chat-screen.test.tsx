@@ -1,7 +1,7 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { page, userEvent } from 'vitest/browser'
+import { render } from 'vitest-browser-react'
 import type { ReactElement } from 'react'
 import {
   cloudSafeGraphContext,
@@ -18,6 +18,7 @@ import {
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ChatProvider, useChatSession } from '@/providers/chat-provider'
 import { RouterProvider, useRouter } from '@/routing/router'
+import { ChatScreen } from './chat-screen'
 
 /**
  * The chat view over a faked engine: the provider stack and screen are real,
@@ -118,17 +119,6 @@ vi.mock('@/editor/markdown-preview', () => ({
 }))
 vi.mock('@/lib/provider-fetch', () => ({ providerFetch: vi.fn() }))
 
-// jsdom doesn't implement this; Radix Select scrolls the selected option into
-// view when the listbox opens.
-Element.prototype.scrollIntoView ??= () => {}
-// shadcn's MessageScroller drives the viewport with scrollTo; jsdom has no
-// layout engine, so the browser API is stubbed for interaction tests.
-Element.prototype.scrollTo ??= () => {}
-
-const { ChatScreen } = await import('./chat-screen')
-
-afterEach(cleanup)
-
 const GRAPH: GraphInfo = { root: '/graphs/test', name: 'test-graph', generation: 1 }
 
 const GRAPH_CONTEXT = cloudSafeGraphContext({
@@ -175,6 +165,17 @@ function pngFile(name: string): File {
   return new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], name, { type: 'image/png' })
 }
 
+/** Dispatches a real drop with the files loaded into a real `DataTransfer`. */
+function dropFiles(target: Element, files: File[]): boolean {
+  const dataTransfer = new DataTransfer()
+  for (const file of files) {
+    dataTransfer.items.add(file)
+  }
+  return target.dispatchEvent(
+    new DragEvent('drop', { dataTransfer, bubbles: true, cancelable: true }),
+  )
+}
+
 let probedSend: ((text: string) => Promise<void>) | null = null
 let probedNewChat: (() => void) | null = null
 let probedRoute: unknown = null
@@ -211,10 +212,12 @@ function renderChat() {
 }
 
 describe('ChatScreen', () => {
-  it('shows the add-a-provider call to action when nothing is configured', () => {
-    const view = renderChat()
-    expect(view.getByRole('button', { name: /add an ai provider/i })).toBeDefined()
-    expect(view.queryByLabelText('Chat message')).toBeNull()
+  it('shows the add-a-provider call to action when nothing is configured', async () => {
+    const view = await renderChat()
+    await expect
+      .element(view.getByRole('button', { name: /add an ai provider/i }))
+      .toBeInTheDocument()
+    expect(view.getByLabelText('Chat message').query()).toBeNull()
   })
 
   it('runs a grounded turn: user bubble, search chip, cited answer', async () => {
@@ -233,17 +236,15 @@ describe('ChatScreen', () => {
       { type: 'text-delta', text: 'It ships in June. [[Atlas]]' },
       { type: 'complete', messages: [{ role: 'assistant', content: 'It ships in June. [[Atlas]]' }] },
     ])
-    const view = renderChat()
+    const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'when does atlas ship?{Enter}')
 
-    expect(view.getByText('when does atlas ship?')).toBeDefined()
-    await view.findByText(/Searched “atlas” · 1 note/)
+    await expect.element(view.getByText('when does atlas ship?')).toBeInTheDocument()
+    await expect.element(view.getByText(/Searched “atlas” · 1 note/)).toBeInTheDocument()
     // The turn settled, so the answer renders as markdown (not plain text).
-    await waitFor(() =>
-      expect(view.getByTestId('markdown-preview').textContent).toContain('It ships in June.'),
-    )
-    await userEvent.click(view.getByRole('button', { name: 'Atlas' }))
+    await expect.element(view.getByTestId('markdown-preview')).toHaveTextContent('It ships in June.')
+    await view.getByRole('button', { name: 'Atlas', exact: true }).click()
     expect(probedRoute).toEqual({ kind: 'note', path: 'notes/atlas.md' })
 
     // The turn went out with the keychain key and the full derived history.
@@ -280,13 +281,13 @@ describe('ChatScreen', () => {
       },
       { type: 'complete', messages: [{ role: 'assistant', content: 'Done.' }] },
     ])
-    const view = renderChat()
+    const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'open the source notes{Enter}')
-    fireEvent.click(await view.findByRole('button', { name: 'Atlas' }), { metaKey: true })
-    fireEvent.click(await view.findByRole('button', { name: 'Brief' }), { metaKey: true })
+    await view.getByRole('button', { name: 'Atlas', exact: true }).click({ modifiers: ['Meta'] })
+    await view.getByRole('button', { name: 'Brief', exact: true }).click({ modifiers: ['Meta'] })
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(openRouteInNewWindow.mock.calls).toEqual([
         [{ kind: 'note', path: 'notes/atlas.md' }],
         [{ kind: 'note', path: 'notes/brief.md' }],
@@ -304,12 +305,12 @@ describe('ChatScreen', () => {
         messages: [{ role: 'assistant', content: 'See [[Atlas]] and #book.' }],
       },
     ])
-    const view = renderChat()
+    const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'what should I open?{Enter}')
-    await userEvent.click(await view.findByRole('button', { name: 'Open Atlas' }))
+    await view.getByRole('button', { name: 'Open Atlas' }).click()
 
-    await waitFor(() => expect(probedRoute).toEqual({ kind: 'note', path: 'notes/atlas.md' }))
+    await vi.waitFor(() => expect(probedRoute).toEqual({ kind: 'note', path: 'notes/atlas.md' }))
   })
 
   it('opens ⌘-clicked cited wiki links in a new window', async () => {
@@ -321,12 +322,12 @@ describe('ChatScreen', () => {
         messages: [{ role: 'assistant', content: 'See [[Atlas]].' }],
       },
     ])
-    const view = renderChat()
+    const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'what should I open?{Enter}')
-    fireEvent.click(await view.findByRole('button', { name: 'Open Atlas' }), { metaKey: true })
+    await view.getByRole('button', { name: 'Open Atlas' }).click({ modifiers: ['Meta'] })
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(openRouteInNewWindow).toHaveBeenCalledWith({
         kind: 'note',
         path: 'notes/atlas.md',
@@ -337,14 +338,16 @@ describe('ChatScreen', () => {
 
   it('offers the provider catalog in the picker, keeping a custom model selectable', async () => {
     configureModel()
-    const view = renderChat()
+    const view = await renderChat()
 
-    // Keyboard-driven (the pointer path needs capture APIs jsdom lacks);
-    // options render in a portal, so they're queried from screen.
-    fireEvent.keyDown(view.getByRole('combobox', { name: 'Model' }), { key: 'ArrowDown' })
+    // Options render in a portal, so they're queried from the page.
+    await view.getByRole('combobox', { name: 'Model' }).click()
 
-    expect(await screen.findByText('OpenAI')).toBeDefined()
-    const labels = screen.getAllByRole('option').map((option) => option.textContent)
+    await expect.element(page.getByText('OpenAI')).toBeInTheDocument()
+    const labels = page
+      .getByRole('option')
+      .elements()
+      .map((option) => option.textContent)
     // The full curated catalog plus the entry's custom configured model.
     expect(labels).toEqual([
       'GPT-5.6 Sol',
@@ -364,14 +367,14 @@ describe('ChatScreen', () => {
       { type: 'text-delta', text: 'Hi.' },
       { type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] },
     ])
-    const view = renderChat()
+    const view = await renderChat()
 
-    fireEvent.keyDown(view.getByRole('combobox', { name: 'Model' }), { key: 'ArrowDown' })
-    fireEvent.keyDown(await screen.findByRole('option', { name: 'GPT-5.6 Terra' }), { key: 'Enter' })
+    await view.getByRole('combobox', { name: 'Model' }).click()
+    await page.getByRole('option', { name: 'GPT-5.6 Terra' }).click()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'hi{Enter}')
 
-    await waitFor(() => expect(streamChat).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(streamChat).toHaveBeenCalledTimes(1))
     // Same entry (id → keychain key), with the picked model applied.
     expect(streamChat.mock.lastCall?.[0].config).toEqual({ ...MODEL, model: 'gpt-5.6-terra' })
   })
@@ -379,12 +382,12 @@ describe('ChatScreen', () => {
   it('starts the picker on the model persisted from the last session', async () => {
     configureModel()
     settingsState.selection = { configId: 'm1', modelId: 'gpt-5.6-luna' }
-    const view = renderChat()
+    const view = await renderChat()
 
-    fireEvent.keyDown(view.getByRole('combobox', { name: 'Model' }), { key: 'ArrowDown' })
+    await view.getByRole('combobox', { name: 'Model' }).click()
 
-    const picked = await screen.findByRole('option', { name: 'GPT-5.6 Luna' })
-    expect(picked.getAttribute('aria-selected')).toBe('true')
+    const picked = page.getByRole('option', { name: 'GPT-5.6 Luna' })
+    await expect.element(picked).toHaveAttribute('aria-selected', 'true')
   })
 
   it('sends the graph overview context with each turn', async () => {
@@ -393,11 +396,11 @@ describe('ChatScreen', () => {
       { type: 'text-delta', text: 'Hi.' },
       { type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] },
     ])
-    const view = renderChat()
+    const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'hi{Enter}')
 
-    await waitFor(() => expect(streamChat).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(streamChat).toHaveBeenCalledTimes(1))
     expect(loadChatGraphContext).toHaveBeenCalledWith('test-graph')
     expect(streamChat.mock.lastCall?.[0].context).toEqual(GRAPH_CONTEXT)
   })
@@ -409,13 +412,13 @@ describe('ChatScreen', () => {
       { type: 'text-delta', text: 'Hi.' },
       { type: 'complete', messages: [{ role: 'assistant', content: 'Hi.' }] },
     ])
-    const view = renderChat()
+    const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'hi{Enter}')
 
-    await waitFor(() => expect(streamChat).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(streamChat).toHaveBeenCalledTimes(1))
     expect(streamChat.mock.lastCall?.[0].context).toBeNull()
-    expect(await view.findByText('Hi.')).toBeDefined()
+    await expect.element(view.getByText('Hi.')).toBeInTheDocument()
   })
 
   it('renders listing chips: recent notes by tag and a daily range', async () => {
@@ -462,18 +465,20 @@ describe('ChatScreen', () => {
       },
       { type: 'complete', messages: [{ role: 'assistant', content: 'Done.' }] },
     ])
-    const view = renderChat()
+    const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'what have I been reading?{Enter}')
 
-    await userEvent.click(await view.findByRole('button', { name: '#book' }))
+    await view.getByRole('button', { name: '#book' }).click()
     expect(probedRoute).toEqual({ kind: 'allNotes', tag: 'book' })
-    await userEvent.click(view.getByRole('button', { name: 'Atlas' }))
+    await view.getByRole('button', { name: 'Atlas', exact: true }).click()
     expect(probedRoute).toEqual({ kind: 'note', path: 'notes/atlas.md' })
     // A refused listing shows the refusal, not a misleading count.
-    await view.findByText(/Listed #\* notes — Not a tag/)
-    await view.findByText(/Listed daily notes 2026-06-01 – 2026-06-11 · 2 days/)
-    await userEvent.click(view.getByRole('button', { name: '2026-06-10' }))
+    await expect.element(view.getByText(/Listed #\* notes — Not a tag/)).toBeInTheDocument()
+    await expect
+      .element(view.getByText(/Listed daily notes 2026-06-01 – 2026-06-11 · 2 days/))
+      .toBeInTheDocument()
+    await view.getByRole('button', { name: '2026-06-10' }).click()
     expect(probedRoute).toEqual({ kind: 'daily', date: '2026-06-10' })
   })
 
@@ -501,13 +506,15 @@ describe('ChatScreen', () => {
       },
       { type: 'complete', messages: [{ role: 'assistant', content: 'Done.' }] },
     ])
-    const view = renderChat()
+    const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'what does the chart show?{Enter}')
 
     // Entries are labeled by filename; a refused asset keeps its refusal inline.
-    await view.findByText('chart.png')
-    await view.findByText(/scan\.pdf — This asset cannot be read by AI\./)
+    await expect.element(view.getByText('chart.png')).toBeInTheDocument()
+    await expect
+      .element(view.getByText(/scan\.pdf — This asset cannot be read by AI\./))
+      .toBeInTheDocument()
   })
 
   it('renders streaming text as plain text until the turn settles', async () => {
@@ -518,13 +525,13 @@ describe('ChatScreen', () => {
         await new Promise<never>(() => {})
       })(),
     )
-    const view = renderChat()
+    const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'hi{Enter}')
 
     // Visible immediately as plain text — never re-parsed per delta.
-    await view.findByText('Streaming **markdown**')
-    expect(view.queryByTestId('markdown-preview')).toBeNull()
+    await expect.element(view.getByText('Streaming **markdown**')).toBeInTheDocument()
+    expect(view.getByTestId('markdown-preview').query()).toBeNull()
   })
 
   it('rejects a second send fired before the first one has rendered', async () => {
@@ -533,7 +540,7 @@ describe('ChatScreen', () => {
       { type: 'text-delta', text: 'One.' },
       { type: 'complete', messages: [{ role: 'assistant', content: 'One.' }] },
     ])
-    const view = renderChat()
+    const view = await renderChat()
     if (!probedSend) {
       expect.unreachable('probe did not capture send')
     }
@@ -541,22 +548,21 @@ describe('ChatScreen', () => {
 
     // Two sends in one tick — rendered state (and refs synced to it) still
     // says idle for both, so the guard must be synchronous.
-    await act(async () => {
-      await Promise.all([send('one'), send('two')])
-    })
+    await Promise.all([send('one'), send('two')])
 
     expect(streamChat).toHaveBeenCalledTimes(1)
-    expect(view.getByText('one')).toBeDefined()
-    expect(view.queryByText('two')).toBeNull()
+    // Exact match: the assistant's reply ("One.") also contains this text.
+    await expect.element(view.getByText('one', { exact: true })).toBeInTheDocument()
+    expect(view.getByText('two', { exact: true }).query()).toBeNull()
   })
 
   it('surfaces a missing keychain entry as an in-transcript error', async () => {
     configureModel()
     getSecret.mockResolvedValueOnce(null)
-    const view = renderChat()
+    const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'hi{Enter}')
-    await view.findByText(/No API key found for this provider/)
+    await expect.element(view.getByText(/No API key found for this provider/)).toBeInTheDocument()
     expect(streamChat).not.toHaveBeenCalled()
   })
 
@@ -571,15 +577,15 @@ describe('ChatScreen', () => {
         await new Promise<never>(() => {})
       })()
     })
-    const view = renderChat()
+    const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'hey{Enter}')
-    await waitFor(() => expect(signal).toBeDefined())
+    await vi.waitFor(() => expect(signal).toBeDefined())
     expect(signal?.aborted).toBe(false)
 
     // Switching graphs remounts the workspace tree: the dead conversation
     // must not keep reading whichever graph is open now.
-    view.unmount()
+    await view.unmount()
     expect(signal?.aborted).toBe(true)
   })
 
@@ -589,17 +595,15 @@ describe('ChatScreen', () => {
       { type: 'text-delta', text: 'A cat.' },
       { type: 'complete', messages: [{ role: 'assistant', content: 'A cat.' }] },
     ])
-    const view = renderChat()
+    const view = await renderChat()
 
     // Dropped on the textarea, handled by the screen-level drop target.
-    fireEvent.drop(view.getByLabelText('Chat message'), {
-      dataTransfer: { files: [pngFile('cat.png')], types: ['Files'] },
-    })
-    await view.findByRole('button', { name: 'Remove cat.png' })
+    dropFiles(view.getByLabelText('Chat message').element(), [pngFile('cat.png')])
+    await expect.element(view.getByRole('button', { name: 'Remove cat.png' })).toBeInTheDocument()
 
     await userEvent.type(view.getByLabelText('Chat message'), '{Enter}')
 
-    await waitFor(() => expect(streamChat).toHaveBeenCalled())
+    await vi.waitFor(() => expect(streamChat).toHaveBeenCalled())
     expect(streamChat.mock.lastCall?.[0]?.messages.at(-1)).toEqual({
       role: 'user',
       content: [
@@ -607,13 +611,13 @@ describe('ChatScreen', () => {
       ],
     })
     // The queue cleared; the photo now lives in the transcript bubble.
-    expect(view.queryByRole('button', { name: 'Remove cat.png' })).toBeNull()
-    expect(view.getByAltText('cat.png')).toBeDefined()
+    expect(view.getByRole('button', { name: 'Remove cat.png' }).query()).toBeNull()
+    await expect.element(view.getByAltText('cat.png')).toBeInTheDocument()
   })
 
   it('a drop still reading when New chat clears the session never lands', async () => {
     configureModel()
-    const view = renderChat()
+    const view = await renderChat()
 
     // A file whose read only settles when the test says so.
     let releaseRead: (buffer: ArrayBuffer) => void = () => {}
@@ -624,45 +628,35 @@ describe('ChatScreen', () => {
           releaseRead = resolve
         }),
     })
-    fireEvent.drop(view.getByLabelText('Chat message'), {
-      dataTransfer: { files: [file], types: ['Files'] },
-    })
+    dropFiles(view.getByLabelText('Chat message').element(), [file])
 
-    await act(async () => {
-      probedNewChat?.()
-    })
-    await act(async () => {
-      releaseRead(new Uint8Array([0x89]).buffer)
-    })
+    probedNewChat?.()
+    releaseRead(new Uint8Array([0x89]).buffer)
+    await new Promise((resolve) => setTimeout(resolve, 100))
 
-    expect(view.queryByAltText('cat.png')).toBeNull()
+    expect(view.getByAltText('cat.png').query()).toBeNull()
   })
 
-  it('claims non-image file drops so the webview never navigates to them', () => {
+  it('claims non-image file drops so the webview never navigates to them', async () => {
     configureModel()
-    const view = renderChat()
+    const view = await renderChat()
 
-    const notCancelled = fireEvent.drop(view.getByLabelText('Chat message'), {
-      dataTransfer: {
-        files: [new File(['hi'], 'notes.txt', { type: 'text/plain' })],
-        types: ['Files'],
-      },
-    })
+    const notCancelled = dropFiles(view.getByLabelText('Chat message').element(), [
+      new File(['hi'], 'notes.txt', { type: 'text/plain' }),
+    ])
 
-    // fireEvent returns false when a handler called preventDefault.
+    // dispatchEvent returns false when a handler called preventDefault.
     expect(notCancelled).toBe(false)
-    expect(view.queryByAltText('notes.txt')).toBeNull()
+    expect(view.getByAltText('notes.txt').query()).toBeNull()
   })
 
   it('a removed attachment never sends', async () => {
     configureModel()
-    const view = renderChat()
+    const view = await renderChat()
 
-    fireEvent.drop(view.getByLabelText('Chat message'), {
-      dataTransfer: { files: [pngFile('cat.png')], types: ['Files'] },
-    })
-    await userEvent.click(await view.findByRole('button', { name: 'Remove cat.png' }))
-    expect(view.queryByAltText('cat.png')).toBeNull()
+    dropFiles(view.getByLabelText('Chat message').element(), [pngFile('cat.png')])
+    await view.getByRole('button', { name: 'Remove cat.png' }).click()
+    expect(view.getByAltText('cat.png').query()).toBeNull()
 
     // Nothing left to send: Enter on the empty composer is a no-op again.
     await userEvent.type(view.getByLabelText('Chat message'), '{Enter}')
@@ -675,15 +669,13 @@ describe('ChatScreen', () => {
       { type: 'text-delta', text: 'Hello!' },
       { type: 'complete', messages: [{ role: 'assistant', content: 'Hello!' }] },
     ])
-    const view = renderChat()
+    const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'hey{Enter}')
-    await waitFor(() =>
-      expect(view.getByTestId('markdown-preview').textContent).toContain('Hello!'),
-    )
+    await expect.element(view.getByTestId('markdown-preview')).toHaveTextContent('Hello!')
 
-    await userEvent.click(view.getByRole('button', { name: /new chat/i }))
-    expect(view.queryByTestId('markdown-preview')).toBeNull()
-    expect(view.queryByText('hey')).toBeNull()
+    await view.getByRole('button', { name: /new chat/i }).click()
+    expect(view.getByTestId('markdown-preview').query()).toBeNull()
+    expect(view.getByText('hey').query()).toBeNull()
   })
 })
