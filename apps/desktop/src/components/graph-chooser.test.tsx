@@ -61,6 +61,8 @@ beforeEach(() => {
         case 'list_files':
         case 'db_query':
           return []
+        case 'vault_scan_stats':
+          return { notes: 0, attachments: 0, skipped: 0 }
         case 'settings_load':
           return storedSettings
         default:
