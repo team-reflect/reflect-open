@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { IndexedNote } from '@reflect/core'
+import { diagnosticsSnapshotSchema, type IndexedNote } from '@reflect/core'
 import { createDevBridge } from '@/dev/dev-bridge'
 import { createDevFileStore } from '@/dev/dev-file-store'
 import { createDevIndexDb } from '@/dev/dev-index-db'
@@ -97,9 +97,9 @@ describe('dev bridge diagnostics parity', () => {
       await bridge.invoke('diagnostics_checkpoint', { checkpoint })
     }
 
-    const snapshot = (await bridge.invoke('diagnostics_snapshot', {})) as {
-      events: Array<{ kind: string }>
-    }
+    const snapshot = diagnosticsSnapshotSchema.parse(
+      await bridge.invoke('diagnostics_snapshot', {}),
+    )
     expect(snapshot.events).toHaveLength(128)
     expect(snapshot.events.every((event) => event.kind === 'checkpoint')).toBe(true)
   })
@@ -117,9 +117,9 @@ describe('dev bridge diagnostics parity', () => {
     await bridge.invoke('diagnostics_frontend_ready', {})
     await bridge.invoke('diagnostics_frontend_ready', {})
 
-    const snapshot = (await bridge.invoke('diagnostics_snapshot', {})) as {
-      events: Array<{ kind: string }>
-    }
+    const snapshot = diagnosticsSnapshotSchema.parse(
+      await bridge.invoke('diagnostics_snapshot', {}),
+    )
     expect(snapshot.events.map((event) => event.kind)).toEqual([
       'appStarted',
       'checkpoint',

@@ -28,18 +28,29 @@ const TERMINATION_WINDOW_MS: u64 = 5 * 60 * 1_000;
 #[cfg(any(target_os = "ios", test))]
 const SAFE_MODE_TERMINATION_COUNT: usize = 3;
 
+/// Closed lifecycle markers accepted by the privacy-safe diagnostics journal.
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum DiagnosticCheckpoint {
+    /// The frontend resolved its native runtime platform.
     PlatformResolved,
+    /// The mobile application root mounted.
     MobileRootMounted,
+    /// Graph discovery or creation began.
     GraphLoading,
+    /// A selected graph began opening.
     GraphOpening,
+    /// The graph became available to the application.
     GraphReady,
+    /// No graph could be opened.
     GraphUnavailable,
+    /// Filesystem-to-index reconciliation began.
     IndexReconcileStarted,
+    /// The live index became ready.
     IndexLive,
+    /// The application entered the background.
     Backgrounded,
+    /// The application returned to the foreground.
     Foregrounded,
 }
 
@@ -51,9 +62,11 @@ enum DiagnosticWindow {
     Other,
 }
 
+/// Closed reasons for entering sticky diagnostics recovery mode.
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum SafeModeReason {
+    /// The main WebContent process terminated at least three times in five minutes.
     RepeatedWebContentTerminations,
 }
 
@@ -114,6 +127,7 @@ impl Default for DiagnosticStore {
     }
 }
 
+/// Current sticky recovery state returned during application bootstrap.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiagnosticsStatus {
@@ -122,6 +136,7 @@ pub struct DiagnosticsStatus {
     recent_web_content_terminations: u8,
 }
 
+/// Sanitized, bounded lifecycle history that a user can explicitly share.
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiagnosticsSnapshot {
@@ -135,6 +150,10 @@ pub struct DiagnosticsSnapshot {
     events: Vec<DiagnosticEvent>,
 }
 
+/// Tauri-managed state for the local, closed-schema diagnostics journal.
+///
+/// The journal is bounded, excludes free-form text, and fails open when stored
+/// data is malformed so untrusted local contents never reach a shared snapshot.
 pub struct DiagnosticsState {
     path: Option<PathBuf>,
     #[cfg(any(target_os = "ios", test))]
@@ -451,11 +470,13 @@ fn app_build_number() -> Option<String> {
     None
 }
 
+/// Records an application start and returns the current sticky recovery status.
 #[tauri::command]
 pub fn diagnostics_bootstrap(state: State<'_, DiagnosticsState>) -> DiagnosticsStatus {
     state.bootstrap(now_ms())
 }
 
+/// Appends one closed lifecycle checkpoint to the bounded local journal.
 #[tauri::command]
 pub fn diagnostics_checkpoint(
     checkpoint: DiagnosticCheckpoint,
@@ -464,16 +485,19 @@ pub fn diagnostics_checkpoint(
     state.checkpoint(checkpoint, now_ms());
 }
 
+/// Records that the frontend completed startup, coalescing consecutive duplicates.
 #[tauri::command]
 pub fn diagnostics_frontend_ready(state: State<'_, DiagnosticsState>) {
     state.frontend_ready(now_ms());
 }
 
+/// Clears sticky recovery state before the user retries normal startup.
 #[tauri::command]
 pub fn diagnostics_retry_normal(state: State<'_, DiagnosticsState>) {
     state.retry_normal(now_ms());
 }
 
+/// Returns a sanitized snapshot of the bounded journal for explicit user sharing.
 #[tauri::command]
 pub fn diagnostics_snapshot<R: Runtime>(
     app: AppHandle<R>,
@@ -487,6 +511,7 @@ pub fn diagnostics_snapshot<R: Runtime>(
     )
 }
 
+/// Handles an iOS WebContent-process death, reloading unless recovery was already active.
 #[cfg(target_os = "ios")]
 pub fn record_web_content_termination<R: Runtime>(webview: &tauri::Webview<R>) {
     let state = webview.app_handle().state::<DiagnosticsState>();
