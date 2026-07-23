@@ -15,7 +15,7 @@ import { addDaysIso, formatDayLabel, parseIsoDate, todayIso } from '@/lib/dates'
 import { monthLabel, monthOf } from '@/lib/month-grid'
 import { fireEvent } from '@/test-utils/fire-event'
 import '@/test-utils/locator'
-import { weekOf } from './calendar'
+import { createWeekWindow, weekOf } from './calendar'
 import { MobileShell } from './mobile-shell'
 import { publishKeyboardHeight } from './use-keyboard'
 
@@ -88,6 +88,7 @@ vi.mock('@/mobile/haptics', () => ({
 }))
 
 const indexFns = vi.hoisted(() => ({
+  dailyDatesInRange: vi.fn(async () => [] as string[]),
   getBacklinksWithContext: vi.fn(async () => ({
     contexts: [],
     nextCursor: null,
@@ -97,6 +98,7 @@ const indexFns = vi.hoisted(() => ({
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
+  dailyDatesInRange: indexFns.dailyDatesInRange,
   getBacklinksWithContext: indexFns.getBacklinksWithContext,
 }))
 // Vaul's drag/animation is verified on-device. This passthrough
@@ -173,6 +175,7 @@ beforeEach(async () => {
   editorProbe.selectionCalls = []
   mockInvoke.mockReset()
   hapticImpactLight.mockClear()
+  indexFns.dailyDatesInRange.mockReset().mockResolvedValue([])
   mockInvoke.mockImplementation(async (command, args) => {
     if (command === 'note_read') {
       const content = files[(args as { path: string }).path]
@@ -360,6 +363,32 @@ describe('MobileShell', () => {
         .element()
         .getAttribute('aria-current'),
     ).toBe('date')
+  })
+
+  it('marks dates backed by daily notes across the pageable strip window', async () => {
+    const today = todayIso()
+    const week = weekOf(today, 'monday')
+    const notedDay = week.find((day) => day !== today) ?? week[0]!
+    const emptyDay = week.find((day) => day !== today && day !== notedDay) ?? week[1]!
+    indexFns.dailyDatesInRange.mockResolvedValue([notedDay])
+
+    const view = await mount({ kind: 'today' })
+
+    await expect.element(view.getByTestId(`note-dot-${notedDay}`)).toBeVisible()
+    await expect.element(view.getByTestId(`note-dot-${emptyDay}`)).not.toBeInTheDocument()
+    await expect
+      .element(
+        view.getByRole('button', {
+          name: `${dayCellLabel(notedDay)}, has daily note`,
+        }),
+      )
+      .toBeVisible()
+
+    const weekWindow = createWeekWindow(today, 'monday')
+    expect(indexFns.dailyDatesInRange).toHaveBeenCalledWith(
+      weekWindow.start,
+      addDaysIso(weekWindow.start, weekWindow.count * 7 - 1),
+    )
   })
 
   it('selects a day in another week straight from the pageable strip', async () => {

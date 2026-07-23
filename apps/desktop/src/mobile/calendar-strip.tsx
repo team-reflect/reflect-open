@@ -8,6 +8,7 @@ import { monthPickTarget, weekAtIndex, weekStartOf } from '@/mobile/calendar'
 import { hapticImpactLight } from '@/mobile/haptics'
 import { MonthPickerDrawer } from '@/mobile/month-picker-drawer'
 import { MonthTitle } from '@/mobile/month-title'
+import { useDailyNoteDates } from '@/mobile/use-daily-note-dates'
 import { useWeekStrip } from '@/mobile/use-week-strip'
 import { WeekRow } from '@/mobile/week-row'
 import { useSettings } from '@/providers/settings-provider'
@@ -50,6 +51,10 @@ export function CalendarStrip({ date, today, resetSeq, onSelect }: CalendarStrip
   const { emblaRef, weekWindow, displayedWeekStart, showWeekOf } = useWeekStrip(
     date,
     settings.weekStartDay,
+  )
+  const dailyNoteDates = useDailyNoteDates(
+    weekWindow.start,
+    addDaysIso(weekAtIndex(weekWindow, weekWindow.count - 1), 6),
   )
 
   // Header month: the selection's own month while its week is on screen;
@@ -157,6 +162,7 @@ export function CalendarStrip({ date, today, resetSeq, onSelect }: CalendarStrip
                 weekStart={weekStart}
                 selectedDay={contains(date) ? date : null}
                 todayDay={contains(today) ? today : null}
+                dailyNoteDates={dailyNoteDates}
                 onSelect={onSelect}
               />
             )
