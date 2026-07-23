@@ -129,6 +129,13 @@ describe('installNativeMenu', () => {
     expect(menuNew).toHaveBeenCalledTimes(1)
     expect(setAsAppMenu).toHaveBeenCalledTimes(1)
     expect(invoke).toHaveBeenCalledExactlyOnceWith('menu_install_paste_and_match_style')
+    // The item lands in the installed menu, so the command must run after
+    // setAsAppMenu and the NSApp role assignments (menu.ts explains why).
+    const firstCall = (mocked: { mock: { invocationCallOrder: number[] } }) =>
+      mocked.mock.invocationCallOrder[0] ?? Infinity
+    expect(firstCall(invoke)).toBeGreaterThan(firstCall(setAsAppMenu))
+    expect(firstCall(invoke)).toBeGreaterThan(firstCall(setAsWindowsMenuForNSApp))
+    expect(firstCall(invoke)).toBeGreaterThan(firstCall(setAsHelpMenuForNSApp))
     expect(isNativeMenuInstalled()).toBe(true)
   })
 
