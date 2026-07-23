@@ -70,7 +70,10 @@ export function AiPromptDialog({ prompt, onSave, onClose }: AiPromptDialogProps)
         if (!isOpen) onClose()
       }}
     >
-      <DialogContent showCloseButton={false} className="max-w-md">
+      <DialogContent
+        showCloseButton={false}
+        className="max-h-[calc(100dvh-2rem)] max-w-md overflow-y-auto"
+      >
         <DialogHeader>
           <DialogTitle>{prompt === null ? 'Add prompt' : 'Edit prompt'}</DialogTitle>
           <DialogDescription>
@@ -99,6 +102,7 @@ export function AiPromptDialog({ prompt, onSave, onClose }: AiPromptDialogProps)
             <Textarea
               {...register('body', { required: true })}
               aria-invalid={formState.errors.body !== undefined || undefined}
+              className="field-sizing-fixed h-40 max-h-[50dvh] resize-y overflow-y-auto"
               rows={5}
               placeholder={'Translate the following text to French.\n\n{{selectedText}}'}
             />

@@ -1052,6 +1052,22 @@ describe('SettingsScreen', () => {
     await vi.waitFor(() => expect(saved.at(-1)).toMatchObject({ chatSystemPrompt: '' }))
   })
 
+  it('keeps long AI prompts scrollable within the viewport', async () => {
+    await renderScreen()
+    const section = page.getByRole('region', { name: 'AI prompts' })
+
+    await section.getByRole('button', { name: /add prompt/i }).click()
+    const dialog = page.getByRole('dialog', { name: /add prompt/i })
+    const promptBody = dialog.getByPlaceholder(/Translate the following/)
+
+    expect(dialog.element().className).toContain('max-h-[calc(100dvh-2rem)]')
+    expect(dialog.element().className).toContain('overflow-y-auto')
+    expect(promptBody.element().className).toContain('field-sizing-fixed')
+    expect(promptBody.element().className).toContain('max-h-[50dvh]')
+    expect(promptBody.element().className).toContain('resize-y')
+    expect(promptBody.element().className).toContain('overflow-y-auto')
+  })
+
   it('adding an AI prompt persists the full document', async () => {
     await renderScreen()
     const section = page.getByRole('region', { name: 'AI prompts' })
