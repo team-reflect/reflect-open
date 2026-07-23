@@ -10,6 +10,10 @@ import { reactWithCompiler } from './react-compiler-plugin'
 // docs/contributing/testing.md.
 const browserName = process.env.REFLECT_TEST_BROWSER === 'webkit' ? 'webkit' : 'chromium'
 
+if (process.env.CI) {
+  console.log("Running in CI mode with browser:", browserName);
+}
+
 function desktopProject(project: {
   plugins?: ViteUserConfig['plugins']
   test: NonNullable<ViteUserConfig['test']>
