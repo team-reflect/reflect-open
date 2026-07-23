@@ -55,8 +55,9 @@ pub(crate) use self::resolve::resolve as resolve_in_graph;
 /// and the desktop watcher (which treats an evicted note as present, not
 /// deleted — Plan 21). The grammar now lives in `reflect-graph-paths`.
 pub(crate) use reflect_graph_paths::eviction_placeholder;
-/// iCloud eviction-placeholder name mapping, shared with the desktop watcher
-/// and the iCloud container discovery (`icloud::storage`).
+/// iCloud eviction-placeholder name mapping, shared with the iCloud
+/// container discovery (`icloud::storage`) — Apple-only, like its callers.
+#[cfg(any(target_os = "ios", target_os = "macos"))]
 pub(crate) use reflect_graph_paths::icloud_placeholder_target;
 /// Dataless-file probe (modern macOS eviction: bytes remote, real path
 /// intact), shared with the desktop watcher and the iCloud pending walk —
