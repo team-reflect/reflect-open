@@ -1,4 +1,5 @@
-import { act, renderHook } from '@testing-library/react'
+import { act } from 'react'
+import { renderHook } from 'vitest-browser-react'
 import { describe, expect, it } from 'vitest'
 import { useListSelection } from './use-list-selection'
 
@@ -6,8 +7,8 @@ const KEYS = ['a', 'b', 'c', 'd']
 const noMods = { metaKey: false, ctrlKey: false, shiftKey: false }
 
 describe('useListSelection', () => {
-  it('selects exclusively, toggles with ⌘, and ranges with shift', () => {
-    const { result } = renderHook(() => useListSelection(KEYS))
+  it('selects exclusively, toggles with ⌘, and ranges with shift', async () => {
+    const { result } = await renderHook(() => useListSelection(KEYS))
 
     act(() => result.current.clickSelect('b', noMods))
     expect([...result.current.selected]).toEqual(['b'])
@@ -23,8 +24,8 @@ describe('useListSelection', () => {
     expect([...result.current.selected]).toEqual(['a', 'b', 'c'])
   })
 
-  it('moves and extends with the arrows, clamping at the ends', () => {
-    const { result } = renderHook(() => useListSelection(KEYS))
+  it('moves and extends with the arrows, clamping at the ends', async () => {
+    const { result } = await renderHook(() => useListSelection(KEYS))
 
     act(() => result.current.clickSelect('b', noMods))
     act(() => result.current.move(1))
@@ -36,8 +37,8 @@ describe('useListSelection', () => {
     expect([...result.current.selected]).toEqual(['c', 'd'])
   })
 
-  it('selects all, clears, and tracks the active pivot', () => {
-    const { result } = renderHook(() => useListSelection(KEYS))
+  it('selects all, clears, and tracks the active pivot', async () => {
+    const { result } = await renderHook(() => useListSelection(KEYS))
 
     act(() => result.current.selectAll())
     expect(result.current.selectedCount).toBe(4)
@@ -50,8 +51,8 @@ describe('useListSelection', () => {
     expect(result.current.activeKey()).toBe('c')
   })
 
-  it('programmatically selects visible keys in render order', () => {
-    const { result } = renderHook(() => useListSelection(KEYS))
+  it('programmatically selects visible keys in render order', async () => {
+    const { result } = await renderHook(() => useListSelection(KEYS))
 
     act(() => result.current.select(['d', 'missing', 'b']))
     expect([...result.current.selected]).toEqual(['b', 'd'])
@@ -62,16 +63,17 @@ describe('useListSelection', () => {
     expect(result.current.activeKey()).toBeNull()
   })
 
-  it('prunes keys that leave the visible order', () => {
-    const { result, rerender } = renderHook(({ keys }) => useListSelection(keys), {
-      initialProps: { keys: KEYS },
-    })
+  it('prunes keys that leave the visible order', async () => {
+    const { result, rerender } = await renderHook(
+      ({ keys }: { keys: string[] } = { keys: KEYS }) => useListSelection(keys),
+      { initialProps: { keys: KEYS } },
+    )
 
     act(() => result.current.selectAll())
-    rerender({ keys: ['a', 'c'] })
+    await rerender({ keys: ['a', 'c'] })
     expect([...result.current.selected]).toEqual(['a', 'c'])
 
-    rerender({ keys: ['a'] })
+    await rerender({ keys: ['a'] })
     expect(result.current.isSoleSelected('a')).toBe(true)
   })
 })
