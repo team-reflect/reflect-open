@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react'
+import { renderHook } from 'vitest-browser-react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const setWindowTitle = vi.hoisted(() => vi.fn())
@@ -11,18 +11,22 @@ beforeEach(() => {
 })
 
 describe('useNoteWindowTitle', () => {
-  it('sets the title and follows changes (a rename)', () => {
-    const view = renderHook(({ title }: { title: string | null }) => useNoteWindowTitle(title), {
-      initialProps: { title: 'Meeting Notes' },
-    })
+  it('sets the title and follows changes (a rename)', async () => {
+    const view = await renderHook(
+      ({ title }: { title: string | null } = { title: 'Meeting Notes' }) =>
+        useNoteWindowTitle(title),
+      {
+        initialProps: { title: 'Meeting Notes' },
+      },
+    )
     expect(setWindowTitle).toHaveBeenLastCalledWith('Meeting Notes')
 
-    view.rerender({ title: 'Renamed Notes' })
+    await view.rerender({ title: 'Renamed Notes' })
     expect(setWindowTitle).toHaveBeenLastCalledWith('Renamed Notes')
   })
 
-  it('falls back to the app name while the title is unknown', () => {
-    renderHook(() => useNoteWindowTitle(null))
+  it('falls back to the app name while the title is unknown', async () => {
+    await renderHook(() => useNoteWindowTitle(null))
     expect(setWindowTitle).toHaveBeenLastCalledWith('Reflect')
   })
 })
