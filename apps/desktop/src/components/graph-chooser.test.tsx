@@ -109,6 +109,9 @@ describe('GraphChooser', () => {
     render(<GraphChooser />, { wrapper })
 
     const nameInput = await screen.findByRole('textbox', { name: 'Name' })
+    // The input starts disabled until `icloud_status` resolves; typing into it
+    // before then throws on slower engines (WebKit).
+    await waitFor(() => expect(nameInput).toBeEnabled())
     await user.clear(nameInput)
     await user.type(nameInput, 'My Notes')
     await user.click(screen.getByRole('button', { name: 'Create' }))
