@@ -449,7 +449,7 @@ describe('MobileTasks', () => {
     const input = view.getByRole('textbox', { name: 'Task text' })
     await user.clear(input)
     await user.type(input, 'buy oat milk')
-    await user.click(view.getByRole('button', { name: 'Complete' }))
+    await user.click(view.getByRole('button', { name: 'Complete', exact: true }))
 
     await waitFor(() => expect(editTask).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
@@ -467,7 +467,7 @@ describe('MobileTasks', () => {
     // First visit ends through an action button (Complete), which skips the
     // dismissal commit. The sheet stays mounted for the same task afterwards.
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
-    await user.click(view.getByRole('button', { name: 'Complete' }))
+    await user.click(view.getByRole('button', { name: 'Complete', exact: true }))
     await waitFor(() => expect(toggleTask).toHaveBeenCalledTimes(1))
 
     // Second visit (the struck row): its edits must still commit on dismiss.
@@ -501,7 +501,7 @@ describe('MobileTasks', () => {
 
     await user.click(await view.findByRole('button', { name: 'Edit: buy milk' }))
     await user.clear(view.getByRole('textbox', { name: 'Task text' }))
-    await user.click(view.getByRole('button', { name: 'Complete' }))
+    await user.click(view.getByRole('button', { name: 'Complete', exact: true }))
 
     await waitFor(() => expect(deleteTask).toHaveBeenCalledTimes(1))
     expect(toggleTask).not.toHaveBeenCalled()
