@@ -81,9 +81,19 @@ export {
   DESCRIPTION_SUFFIX,
   isDaily,
   isNotePath,
+  isAttachmentPath,
+  isSafeVisibleGraphPath,
+  classifyGraphPath,
+  mayContainNotes,
   isTemplatePath,
   dateFromDailyPath,
+  type GraphPathKind,
 } from '../graph/paths'
+export {
+  isValidReflectNoteId,
+  isReflectManagedNotePath,
+  isReflectManagedNote,
+} from '../graph/note-management'
 export {
   graphInfoSchema,
   recentGraphSchema,
@@ -122,6 +132,9 @@ export {
   noteExists,
   deleteNote,
   listFiles,
+  listAttachments,
+  vaultScanStats,
+  type VaultScanStats,
   recentGraphs,
   forgetRecent,
   deleteGraph,

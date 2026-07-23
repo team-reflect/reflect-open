@@ -54,7 +54,7 @@ export function untitledNotePath(): string {
 }
 
 /** `notes/<26-char Crockford-base32 ULID>.md` — {@link untitledNotePath}'s shape. */
-const ULID_NOTE_PATH_RE = /^notes\/[0-9a-hjkmnp-tv-z]{26}\.md$/
+const ULID_NOTE_PATH_RE = /^notes\/[0-7][0-9a-hjkmnp-tv-z]{25}\.md$/
 
 /**
  * Is `path` a ULID placeholder name — a note born untitled that has not yet

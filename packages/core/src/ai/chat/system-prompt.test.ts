@@ -27,6 +27,8 @@ describe('chatSystemPrompt', () => {
       customSystemPrompt: '',
     })
     expect(prompt).toContain('Today’s date is 2026-06-12.')
+    expect(prompt).toContain('Reflect-created regular notes live under notes/')
+    expect(prompt).toContain('Adopted notes may live at any eligible visible path')
     expect(prompt).toContain('Grounding rules:')
     expect(prompt).not.toContain('Graph overview')
   })

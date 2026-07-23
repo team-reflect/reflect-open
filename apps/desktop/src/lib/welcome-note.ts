@@ -1,11 +1,11 @@
 import {
   getIndexMeta,
-  listFiles,
   newNoteId,
   notePath,
   setIndexMeta,
   slugForTitle,
   upsertFrontmatter,
+  vaultScanStats,
   writeNote,
 } from '@reflect/core'
 
@@ -53,9 +53,11 @@ export interface EnsureWelcomeNoteOptions {
 
 /**
  * Consider onboarding for this graph **exactly once** (find-or-create): when
- * the `welcomeSeeded` marker is absent, an **empty** graph (no markdown under
- * `daily/` or `notes/`) gets the welcome note, a graph with any note at all is
- * someone's existing data and only gets marked. Either way the marker lands,
+ * the `welcomeSeeded` marker is absent, an **empty** graph gets the welcome
+ * note, while any existing content means this is someone's data and only gets
+ * marked. Empty means the scan found nothing at all — no notes, no
+ * attachments, and nothing it had to skip: a folder of PDFs, or one whose
+ * files were unreadable, must not be seeded into. Either way the marker lands,
  * so deleting the note — or emptying the graph entirely — never re-onboards.
  * The marker is stamped after the write: a failed seed retries on the next
  * open, and a retry that finds the note already on disk converges to marking.
@@ -65,8 +67,8 @@ export async function ensureWelcomeNote(options: EnsureWelcomeNoteOptions): Prom
   if ((await getIndexMeta(WELCOME_SEEDED_META_KEY)) !== null) {
     return false
   }
-  const files = await listFiles(options.fileGeneration)
-  const seeded = files.length === 0
+  const stats = await vaultScanStats(options.fileGeneration)
+  const seeded = stats.notes === 0 && stats.attachments === 0 && stats.skipped === 0
   if (seeded) {
     const source = upsertFrontmatter(WELCOME_BODY, { id: newNoteId(), pinned: true })
     await writeNote(WELCOME_NOTE_PATH, source, options.fileGeneration)

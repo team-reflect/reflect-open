@@ -471,6 +471,8 @@ describe('isUntitledNotePath', () => {
   it('rejects slug-named, daily, and near-miss paths', () => {
     expect(isUntitledNotePath('notes/meeting-notes.md')).toBe(false)
     expect(isUntitledNotePath('daily/2026-06-12.md')).toBe(false)
+    // A 128-bit ULID cannot start above `7` (the textual form has two spare bits).
+    expect(isUntitledNotePath('notes/81arz3ndektsv4rrffq69g5fav.md')).toBe(false)
     // Right length, but `u` is outside the Crockford base32 alphabet.
     expect(isUntitledNotePath('notes/uuuuuuuuuuuuuuuuuuuuuuuuuu.md')).toBe(false)
     // A ULID-shaped name outside notes/ is not a placeholder.

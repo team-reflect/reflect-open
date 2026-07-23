@@ -187,7 +187,9 @@ Recommended default:
 
 - One note per markdown file.
 - Daily notes stored in `daily/YYYY-MM-DD.md`.
-- Regular notes stored in `notes/`.
+- Regular notes Reflect creates are stored in `notes/`; an opened Markdown vault may
+  already contain notes at its root or in visible nested folders, and those paths stay
+  intact.
 - Attachments stored in `assets/` and referenced with relative markdown links.
 - File names should be stable and human-readable where possible.
 - Stable note IDs should live in frontmatter.

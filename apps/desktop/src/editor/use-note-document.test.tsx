@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
-import { setBridge } from '@reflect/core'
+import { setBridge, upsertFrontmatter } from '@reflect/core'
 import { onNoteMoved } from '@/lib/note-moves'
 import { flushOpenDocuments } from './open-documents'
 import type { NoteEditorHandle } from './note-editor'
@@ -22,6 +22,12 @@ setBridge({
 /** The fake on-disk file + a write log, behind the mocked IPC. */
 let disk: string
 let writes: string[]
+
+const MANAGED_ID = '01hv3xq7c2dm8k4t9w5e6r1n98'
+
+function managedNote(content: string): string {
+  return upsertFrontmatter(content, { id: MANAGED_ID })
+}
 
 function fakeEditor(): NoteEditorHandle & { applied: string[] } {
   const applied: string[] = []
@@ -219,7 +225,7 @@ describe('useNoteDocument', () => {
     vi.useFakeTimers()
     try {
       const files: Record<string, string> = {
-        'notes/a.md': '# Old Title\n',
+        'notes/a.md': managedNote('# Old Title\n'),
         'notes/src.md': 'see [[Old Title]]\n',
       }
       installGraphFake({ files, linkSources: () => [{ source_path: 'notes/src.md' }] })
@@ -253,7 +259,7 @@ describe('useNoteDocument', () => {
     vi.useFakeTimers()
     try {
       const files: Record<string, string> = {
-        'notes/a.md': '# Old Title\n',
+        'notes/a.md': managedNote('# Old Title\n'),
         'notes/src.md': 'see [[Old Title]]\n',
       }
       installGraphFake({ files, linkSources: () => [{ source_path: 'notes/src.md' }] })
@@ -281,7 +287,7 @@ describe('useNoteDocument', () => {
     vi.useFakeTimers()
     try {
       const files: Record<string, string> = {
-        'notes/a.md': '# Old Title\n',
+        'notes/a.md': managedNote('# Old Title\n'),
         'notes/b.md': '# Note B\n',
         'notes/src.md': 'see [[Old Title]]\n',
       }
@@ -311,7 +317,7 @@ describe('useNoteDocument', () => {
     vi.useFakeTimers()
     try {
       const files: Record<string, string> = {
-        'notes/a.md': '# Old Title\n',
+        'notes/a.md': managedNote('# Old Title\n'),
         'notes/src.md': 'see [[Old Title]]\n',
       }
       installGraphFake({
@@ -333,7 +339,8 @@ describe('useNoteDocument', () => {
       // The file still follows the NEW title — the guard is about the old
       // title's links, not the filename.
       expect(files['notes/src.md']).toBe('see [[Old Title]]\n')
-      expect(files['notes/new-title.md']).toBe('# New Title\n')
+      expect(files['notes/new-title.md']).toContain(`id: ${MANAGED_ID}`)
+      expect(files['notes/new-title.md']!.endsWith('# New Title\n')).toBe(true)
       expect(files['notes/a.md']).toBeUndefined()
       await hook.unmount()
     } finally {
@@ -346,7 +353,7 @@ describe('useNoteDocument', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {
       const files: Record<string, string> = {
-        'notes/a.md': '# Old Title\n',
+        'notes/a.md': managedNote('# Old Title\n'),
         'notes/src.md': 'see [[Old Title]]\n',
       }
       installGraphFake({
@@ -392,10 +399,12 @@ describe('useNoteDocument', () => {
         },
       })
 
+      const placeholderPath = 'notes/01arz3ndektsv4rrffq69g5fav.md'
       const hook = await renderHook(() =>
-        useNoteDocument('notes/01arz3ndekt.md', 1, {
+        useNoteDocument(placeholderPath, 1, {
           createIfMissing: true,
           trackRenames: true,
+          missingSeed: managedNote('#\n'),
         }),
       )
       await hook.act(() => vi.advanceTimersByTimeAsync(0))
@@ -411,8 +420,46 @@ describe('useNoteDocument', () => {
       // Titling an untitled note is a birth: no rewrite ran, no alias landed —
       // but the file shed its placeholder name for the title's slug (Plan 17).
       expect(linkQueries).toEqual([])
-      expect(files['notes/brand-new-note.md']).toBe('# Brand New Note\n')
-      expect(files['notes/01arz3ndekt.md']).toBeUndefined()
+      expect(files['notes/brand-new-note.md']).toContain(`id: ${MANAGED_ID}`)
+      expect(files['notes/brand-new-note.md']!.endsWith('# Brand New Note\n')).toBe(true)
+      expect(files[placeholderPath]).toBeUndefined()
+      await hook.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('saves an adopted retitle in place without rewriting, aliasing, or moving', async () => {
+    vi.useFakeTimers()
+    try {
+      const files: Record<string, string> = {
+        'notes/adopted.md': '# Old Title\n',
+        'notes/source.md': 'see [[Old Title]]\n',
+      }
+      const linkQueries: string[] = []
+      installGraphFake({
+        files,
+        linkSources: () => {
+          linkQueries.push('sources-query')
+          return [{ source_path: 'notes/source.md' }]
+        },
+      })
+
+      const hook = await renderHook(() =>
+        useNoteDocument('notes/adopted.md', 1, { trackRenames: true }),
+      )
+      await hook.act(() => vi.advanceTimersByTimeAsync(0))
+      await hook.act(() => hook.result.current.onEditorChange('# New Title\n'))
+      await hook.act(() => vi.advanceTimersByTimeAsync(1000))
+      await hook.act(() => {
+        window.dispatchEvent(new Event('blur'))
+      })
+      await hook.act(() => vi.runAllTimersAsync())
+
+      expect(files['notes/adopted.md']).toBe('# New Title\n')
+      expect(files['notes/new-title.md']).toBeUndefined()
+      expect(files['notes/source.md']).toBe('see [[Old Title]]\n')
+      expect(linkQueries).toEqual([])
       await hook.unmount()
     } finally {
       vi.useRealTimers()
@@ -424,7 +471,7 @@ describe('useNoteDocument', () => {
     const moves: Array<[string, string]> = []
     const unsubscribe = onNoteMoved((from, to) => moves.push([from, to]))
     try {
-      const files: Record<string, string> = { 'notes/a.md': '# Old Title\n' }
+      const files: Record<string, string> = { 'notes/a.md': managedNote('# Old Title\n') }
       installGraphFake({ files })
 
       const hook = await renderHook(
@@ -468,7 +515,7 @@ describe('useNoteDocument', () => {
   it('watcher upserts at the retargeted path reconcile before React catches up (Plan 17)', async () => {
     vi.useFakeTimers()
     try {
-      const files: Record<string, string> = { 'notes/a.md': '# Old Title\n' }
+      const files: Record<string, string> = { 'notes/a.md': managedNote('# Old Title\n') }
       installGraphFake({ files })
       const hook = await renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
       await hook.act(() => vi.advanceTimersByTimeAsync(0))
@@ -495,7 +542,7 @@ describe('useNoteDocument', () => {
   it('an unadopted retargeted session still tears down on unmount (no orphan flush)', async () => {
     vi.useFakeTimers()
     try {
-      const files: Record<string, string> = { 'notes/a.md': '# Old Title\n' }
+      const files: Record<string, string> = { 'notes/a.md': managedNote('# Old Title\n') }
       installGraphFake({ files })
 
       const hook = await renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
@@ -522,7 +569,7 @@ describe('useNoteDocument', () => {
     vi.useFakeTimers()
     try {
       const files: Record<string, string> = {
-        'notes/a.md': '# Old Title\n',
+        'notes/a.md': managedNote('# Old Title\n'),
         'notes/src.md': 'see [[Old Title]]\n',
       }
       installGraphFake({ files, linkSources: () => [{ source_path: 'notes/src.md' }] })
@@ -551,7 +598,7 @@ describe('useNoteDocument', () => {
     vi.useFakeTimers()
     try {
       const files: Record<string, string> = {
-        'notes/a.md': '# Old Title\n',
+        'notes/a.md': managedNote('# Old Title\n'),
         'notes/src.md': 'see [[Old Title]]\n',
       }
       installGraphFake({ files, linkSources: () => [{ source_path: 'notes/src.md' }] })
@@ -592,7 +639,7 @@ describe('useNoteDocument', () => {
     vi.useFakeTimers()
     try {
       const files: Record<string, string> = {
-        'notes/a.md': '# Old Title\n',
+        'notes/a.md': managedNote('# Old Title\n'),
         'notes/src.md': 'see [[Old Title]]\n',
       }
       installGraphFake({ files, linkSources: () => [{ source_path: 'notes/src.md' }] })

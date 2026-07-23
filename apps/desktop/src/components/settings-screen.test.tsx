@@ -199,6 +199,9 @@ describe('SettingsScreen', () => {
 
     const dialog = page.getByRole('dialog', { name: /delete graph/i })
     await expect.element(dialog.getByText('/graphs/work')).toBeInTheDocument()
+    // Deleting an adopted vault trashes the user's own folder — the dialog
+    // must say so in as many words.
+    await expect.element(dialog.getByText(/everything inside it to Trash/)).toBeInTheDocument()
     const confirm = dialog.getByRole('button', { name: /delete graph/i })
     await expect.element(confirm).toBeDisabled()
 

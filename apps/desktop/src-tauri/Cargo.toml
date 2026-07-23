@@ -37,6 +37,7 @@ serde_json = { workspace = true }
 # down to pure reads (deny ATTACH/DETACH/PRAGMA); see `db/query.rs`.
 rusqlite = { workspace = true, features = ["hooks"] }
 reflect-index-schema = { path = "../../../crates/index-schema" }
+reflect-graph-paths = { workspace = true }
 tempfile = { workspace = true }
 sha2 = { workspace = true }
 dirs = "6.0.0"

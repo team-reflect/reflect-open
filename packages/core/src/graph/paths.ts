@@ -12,6 +12,45 @@ export const ASSETS_DIR = 'assets'
 /** Audio-memo recordings live apart from pasted/dropped `assets/` files. */
 export const AUDIO_MEMOS_DIR = 'audio-memos'
 
+/** Root trees whose Markdown files are attachment metadata, never notes. */
+const RESERVED_NOTE_TREES = new Set([ASSETS_DIR, AUDIO_MEMOS_DIR])
+
+/** Obsidian-compatible local attachment formats Reflect can render or open. */
+const ATTACHMENT_EXTENSIONS = new Set([
+  '3gp',
+  'avif',
+  'bmp',
+  'flac',
+  'gif',
+  'jpeg',
+  'jpg',
+  'm4a',
+  'mkv',
+  'mov',
+  'mp3',
+  'mp4',
+  'ogg',
+  'ogv',
+  'pdf',
+  'png',
+  'svg',
+  'wav',
+  'webm',
+  'webp',
+])
+
+/** A supported content kind at a safe, visible graph-relative path. */
+export type GraphPathKind = 'note' | 'attachment'
+
+/**
+ * ASCII-only lowering, byte-for-byte the Rust side's `eq_ignore_ascii_case`.
+ * Full-Unicode `toLowerCase` folds characters Rust does not (KELVIN SIGN → k),
+ * and the two classifiers must never disagree on the same wire path.
+ */
+function asciiLowerCase(value: string): string {
+  return value.replace(/[A-Z]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) + 32))
+}
+
 /** Matches a daily-note path and captures its ISO date. */
 const DAILY_PATH_RE = /^daily\/(\d{4}-\d{2}-\d{2})\.md$/
 /** A bare ISO date (`YYYY-MM-DD`). */
@@ -84,25 +123,78 @@ export function isDaily(path: string): boolean {
 }
 
 /**
- * Is this graph-relative path an indexable markdown note (`.md` under
- * `daily/`, `notes/`, or `templates/`)? The file-change stream carries more
- * than notes — the watcher also reports `audio-memos/` recordings — so
- * consumers that read or index note *content* gate on this. Templates count:
- * they are indexed and editable like notes, just excluded from note surfaces
- * (gate on {@link isTemplatePath} where that matters, e.g. embeddings).
+ * Whether every component is a visible, normal graph-relative component.
+ * Filesystem walkers must additionally reject symlinks because a lexical path
+ * cannot reveal what an entry points at.
+ */
+export function isSafeVisibleGraphPath(path: string): boolean {
+  if (path === '' || path.startsWith('/') || path.includes('\\') || /^[A-Za-z]:/.test(path)) {
+    return false
+  }
+  const components = path.split('/')
+  return components.every((component) => component !== '' && !component.startsWith('.'))
+}
+
+/**
+ * Classify a graph-relative wire path using the cross-platform discovery
+ * policy (mirrored by `crates/graph-paths` and pinned by the shared fixture
+ * corpus). Notes require an exactly lowercase `.md` suffix. Attachments match
+ * their extension case-insensitively. Hidden, absolute, and traversal paths
+ * fail closed, while Markdown may otherwise live at the root or any depth.
+ */
+export function classifyGraphPath(path: string): GraphPathKind | null {
+  if (!isSafeVisibleGraphPath(path)) {
+    return null
+  }
+  const components = path.split('/')
+  const first = components[0]
+  const filename = components.at(-1)
+  if (first === undefined || filename === undefined) {
+    return null
+  }
+  const extensionSeparator = filename.lastIndexOf('.')
+  if (extensionSeparator < 0 || extensionSeparator === filename.length - 1) {
+    return null
+  }
+  const extension = filename.slice(extensionSeparator + 1)
+  if (extension === 'md' && !RESERVED_NOTE_TREES.has(asciiLowerCase(first))) {
+    return 'note'
+  }
+  return ATTACHMENT_EXTENSIONS.has(asciiLowerCase(extension)) ? 'attachment' : null
+}
+
+/**
+ * Is this graph-relative path an indexable markdown note? The file-change
+ * stream carries more than notes — the watcher also reports `audio-memos/`
+ * recordings — so consumers that read or index note *content* gate on this.
+ * Templates count: they are indexed and editable like notes, just excluded
+ * from note surfaces (gate on {@link isTemplatePath} where that matters,
+ * e.g. embeddings).
  */
 export function isNotePath(path: string): boolean {
-  return (
-    (path.startsWith(`${DAILY_DIR}/`) ||
-      path.startsWith(`${NOTES_DIR}/`) ||
-      path.startsWith(`${TEMPLATES_DIR}/`)) &&
-    path.endsWith('.md')
-  )
+  return classifyGraphPath(path) === 'note'
+}
+
+/** Is this graph-relative path a supported local attachment? */
+export function isAttachmentPath(path: string): boolean {
+  return classifyGraphPath(path) === 'attachment'
+}
+
+/**
+ * Can an eligible note exist below this graph-relative directory? Walkers use
+ * this to prune hidden and reserved root trees before descending.
+ */
+export function mayContainNotes(path: string): boolean {
+  if (!isSafeVisibleGraphPath(path)) {
+    return false
+  }
+  const first = path.split('/')[0]
+  return first !== undefined && !RESERVED_NOTE_TREES.has(asciiLowerCase(first))
 }
 
 /** Is this graph-relative path a note template (`.md` under `templates/`)? */
 export function isTemplatePath(path: string): boolean {
-  return path.startsWith(`${TEMPLATES_DIR}/`) && path.endsWith('.md')
+  return path.startsWith(`${TEMPLATES_DIR}/`) && isNotePath(path)
 }
 
 /** Extract the ISO date from a daily-note path, or `null` if it isn't one. */

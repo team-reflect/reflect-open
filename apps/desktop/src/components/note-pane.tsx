@@ -1,6 +1,13 @@
 import { memo, useCallback, useMemo, useRef, useState, type ReactElement } from 'react'
 import type { ExitBoundaryHandler } from '@meowdown/core'
-import { detectConflictMarkers, isDaily, isTemplatePath, untitledNoteSeed } from '@reflect/core'
+import {
+  detectConflictMarkers,
+  isDaily,
+  isReflectManagedNotePath,
+  isTemplatePath,
+  isUntitledNotePath,
+  untitledNoteSeed,
+} from '@reflect/core'
 import { BacklinksPanel } from '@/components/backlinks-panel'
 import { ConflictNoteView } from '@/components/conflict-note-view'
 import { InlineAlert } from '@/components/inline-alert'
@@ -32,7 +39,10 @@ import { useSettings } from '@/providers/settings-provider'
 interface NotePaneProps {
   /** Graph-relative path of the note to edit. */
   path: string
-  /** Treat a missing file as empty (created on first keystroke) — Plan 06. */
+  /**
+   * Request lazy creation. The pane permits it only for daily notes and the
+   * explicit new-note ULID route; arbitrary missing paths fail closed.
+   */
   lazy?: boolean
   /** Focus the editor when it mounts (the navigated-to day/note). */
   autoFocus?: boolean
@@ -123,6 +133,7 @@ export function NotePaneComponent({
   const { settings } = useSettings()
   const generation = graph?.generation ?? null
   const dailyNote = isDaily(path)
+  const lazyCreate = lazy && (dailyNote || isUntitledNotePath(path))
   // Templates rename via file operations only (settings, or outside the app):
   // the rename pipeline's slug targets live under `notes/`, so tracking a
   // template's title would move it out of `templates/`. The untitled `id:`
@@ -133,17 +144,17 @@ export function NotePaneComponent({
   // Re-mint during render when the path changes — only the committed render's
   // seed reaches the session, so the transient stale render is harmless, and
   // this avoids writing a ref during render.
-  const needsSeed = lazy && !dailyNote && !template
+  const needsSeed = lazyCreate && !dailyNote && !template
   const [seed, setSeed] = useState(() => ({ path, seed: untitledNoteSeed() }))
   if (needsSeed && seed.path !== path) {
     setSeed({ path, seed: untitledNoteSeed() })
   }
   const document = useNoteDocument(path, generation, {
-    createIfMissing: lazy,
-    // Daily notes are excluded from rename tracking: their date labels are
-    // stream chrome, not content (decided 2026-06-09). Templates too — see
-    // the `template` note above.
-    trackRenames: !dailyNote && !template,
+    createIfMissing: lazyCreate,
+    // Only direct `notes/*.md` paths can be Reflect-managed. The coordinator
+    // verifies valid ULID frontmatter before any automation; adopted notes,
+    // templates, dailies, and arbitrary vault paths save content in place.
+    trackRenames: isReflectManagedNotePath(path),
     // A missing ordinary note opens as a name-me template (old Reflect's
     // new-note flow): the seed — `id:` frontmatter plus an empty H1 the
     // caret lands in, ghosted "Untitled" by the title placeholder — only
