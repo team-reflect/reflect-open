@@ -1,6 +1,9 @@
 // Console noise that predates fail-on-console, silenced so the check could
 // land. PRs may only shrink this list; a new entry needs a stated reason.
 export const ALLOWED_CONSOLE_PATTERNS: RegExp[] = [
+  // A benign browser artifact, not app output: the skipped notifications are
+  // delivered on the next frame.
+  /^ResizeObserver loop completed with undelivered notifications/,
   /^window label unavailable; assuming the main window:/,
   /^index: stored projection version /,
   /^failed to save note:/,

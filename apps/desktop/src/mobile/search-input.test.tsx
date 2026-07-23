@@ -1,38 +1,35 @@
 import { useState, type ReactElement } from 'react'
-import { cleanup, fireEvent, render } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { render } from 'vitest-browser-react'
+import { userEvent } from 'vitest/browser'
+import { describe, expect, it, vi } from 'vitest'
+import { expectLocatorToHaveCount } from '@/test-utils/expect'
 import { SearchInput } from './search-input'
 
-afterEach(() => {
-  cleanup()
-})
-
 describe('SearchInput', () => {
-  it('blurs the field on the return key (dismissing the iOS keyboard)', () => {
-    const { getByLabelText } = render(
+  it('blurs the field on the return key (dismissing the iOS keyboard)', async () => {
+    const view = await render(
       <SearchInput aria-label="Search" value="" onValueChange={vi.fn()} />,
     )
-    const input = getByLabelText('Search') as HTMLInputElement
+    const input = view.getByLabelText('Search').element() as HTMLInputElement
     input.focus()
     expect(document.activeElement).toBe(input)
-    fireEvent.keyDown(input, { key: 'Enter' })
+    await userEvent.keyboard('{Enter}')
     expect(document.activeElement).not.toBe(input)
   })
 
-  it('leaves the field focused for other keys', () => {
-    const { getByLabelText } = render(
+  it('leaves the field focused for other keys', async () => {
+    const view = await render(
       <SearchInput aria-label="Search" value="" onValueChange={vi.fn()} />,
     )
-    const input = getByLabelText('Search') as HTMLInputElement
+    const input = view.getByLabelText('Search').element() as HTMLInputElement
     input.focus()
-    fireEvent.keyDown(input, { key: 'a' })
+    await userEvent.keyboard('a')
     expect(document.activeElement).toBe(input)
   })
 
-  it('runs a caller-supplied onKeyDown after dismissing', () => {
+  it('runs a caller-supplied onKeyDown after dismissing', async () => {
     const onKeyDown = vi.fn()
-    const { getByLabelText } = render(
+    const view = await render(
       <SearchInput
         aria-label="Search"
         value=""
@@ -40,38 +37,37 @@ describe('SearchInput', () => {
         onKeyDown={onKeyDown}
       />,
     )
-    const input = getByLabelText('Search')
-    fireEvent.keyDown(input, { key: 'Enter' })
+    const input = view.getByLabelText('Search').element() as HTMLInputElement
+    input.focus()
+    await userEvent.keyboard('{Enter}')
     expect(onKeyDown).toHaveBeenCalledTimes(1)
   })
 
-  it('is a search-typed input', () => {
-    const { getByLabelText } = render(
+  it('is a search-typed input', async () => {
+    const view = await render(
       <SearchInput aria-label="Search" value="" onValueChange={vi.fn()} />,
     )
-    expect(getByLabelText('Search').getAttribute('type')).toBe('search')
+    await expect.element(view.getByLabelText('Search')).toHaveAttribute('type', 'search')
   })
 
   it('shows the clear action only while the search has text', async () => {
-    const user = userEvent.setup()
-    const { getByRole, queryByRole } = render(<SearchInputHarness />)
+    const view = await render(<SearchInputHarness />)
 
-    expect(queryByRole('button', { name: 'Clear search' })).toBeNull()
-    await user.type(getByRole('searchbox', { name: 'Search' }), 'notes')
-    expect(getByRole('button', { name: 'Clear search' })).toBeTruthy()
+    expect(view.getByRole('button', { name: 'Clear search' }).query()).toBeNull()
+    await view.getByRole('searchbox', { name: 'Search' }).fill('notes')
+    await expect.element(view.getByRole('button', { name: 'Clear search' })).toBeInTheDocument()
 
-    await user.click(getByRole('button', { name: 'Clear search' }))
-    expect((getByRole('searchbox', { name: 'Search' }) as HTMLInputElement).value).toBe('')
-    expect(queryByRole('button', { name: 'Clear search' })).toBeNull()
+    await view.getByRole('button', { name: 'Clear search' }).click()
+    await expect.element(view.getByRole('searchbox', { name: 'Search' })).toHaveValue('')
+    await expectLocatorToHaveCount(view.getByRole('button', { name: 'Clear search' }), 0)
   })
 
   it('keeps the search field focused when the clear action is tapped', async () => {
-    const user = userEvent.setup()
-    const { getByRole } = render(<SearchInputHarness initialValue="notes" />)
-    const input = getByRole('searchbox', { name: 'Search' })
+    const view = await render(<SearchInputHarness initialValue="notes" />)
+    const input = view.getByRole('searchbox', { name: 'Search' }).element() as HTMLInputElement
     input.focus()
 
-    await user.click(getByRole('button', { name: 'Clear search' }))
+    await view.getByRole('button', { name: 'Clear search' }).click()
 
     expect(document.activeElement).toBe(input)
   })

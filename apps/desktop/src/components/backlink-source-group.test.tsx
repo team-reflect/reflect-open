@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { render } from 'vitest-browser-react'
+import { page } from 'vitest/browser'
+import { describe, expect, it, vi } from 'vitest'
 import type { BacklinkSource } from '@/lib/group-backlinks'
 import { BacklinkSourceGroup } from './backlink-source-group'
 
@@ -22,14 +23,12 @@ function mount(onOpen: (path: string, event?: { metaKey: boolean }) => void) {
   )
 }
 
-afterEach(cleanup)
-
 describe('BacklinkSourceGroup', () => {
-  it('forwards the click event so ⌘-click can open a new window', () => {
+  it('forwards the click event so ⌘-click can open a new window', async () => {
     const onOpen = vi.fn()
-    mount(onOpen)
+    await mount(onOpen)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Source Note' }), { metaKey: true })
+    await page.getByRole('button', { name: 'Source Note' }).click({ modifiers: ['Meta'] })
 
     expect(onOpen).toHaveBeenCalledTimes(1)
     const [path, event] = onOpen.mock.calls[0]!
@@ -37,11 +36,11 @@ describe('BacklinkSourceGroup', () => {
     expect(event?.metaKey).toBe(true)
   })
 
-  it('plain clicks arrive without the modifier', () => {
+  it('plain clicks arrive without the modifier', async () => {
     const onOpen = vi.fn()
-    mount(onOpen)
+    await mount(onOpen)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Source Note' }))
+    await page.getByRole('button', { name: 'Source Note' }).click()
 
     const [, event] = onOpen.mock.calls[0]!
     expect(event?.metaKey).toBe(false)

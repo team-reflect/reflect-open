@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { render } from 'vitest-browser-react'
+import { page, type Locator } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '@reflect/core'
@@ -53,8 +54,8 @@ function installFakeBridge(): { invoked: string[] } {
 
 let queryClient: QueryClient
 
-function renderSection(): void {
-  render(
+async function renderSection(): Promise<void> {
+  await render(
     <QueryClientProvider client={queryClient}>
       <SettingsProvider>
         <CalendarIntegrationField />
@@ -63,8 +64,8 @@ function renderSection(): void {
   )
 }
 
-function calendarSwitch(): HTMLElement {
-  return screen.getByRole('switch', { name: /calendar events/i })
+function calendarSwitch(): Locator {
+  return page.getByRole('switch', { name: /calendar events/i })
 }
 
 beforeEach(() => {
@@ -79,91 +80,91 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  cleanup()
   setBridge(null)
   queryClient.clear()
 })
 
 describe('CalendarIntegrationField', () => {
   it('starts switched off with no calendar detail', async () => {
-    renderSection()
-    await waitFor(() => expect(calendarSwitch().getAttribute('aria-checked')).toBe('false'))
-    expect(screen.queryByText(/calendars/i)).toBeNull()
+    await renderSection()
+    await expect.element(calendarSwitch()).toHaveAttribute('aria-checked', 'false')
+    expect(page.getByText(/calendars/i).query()).toBeNull()
   })
 
   it('enabling requests access, persists the setting, and opens the calendar chooser dialog', async () => {
-    renderSection()
-    await waitFor(() => expect(calendarSwitch().getAttribute('aria-checked')).toBe('false'))
+    await renderSection()
+    await expect.element(calendarSwitch()).toHaveAttribute('aria-checked', 'false')
 
-    fireEvent.click(calendarSwitch())
+    await calendarSwitch().click()
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(saved.at(-1)).toMatchObject({ calendarEnabled: true, calendarIds: [] }),
     )
-    await waitFor(() => expect(screen.getByText('0/2 calendars selected')).toBeTruthy())
-    expect(screen.queryByText('Google')).toBeNull()
-    expect(screen.queryByText('iCloud')).toBeNull()
+    await expect.element(page.getByText('0/2 calendars selected')).toBeInTheDocument()
+    expect(page.getByText('Google').query()).toBeNull()
+    expect(page.getByText('iCloud').query()).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: /choose calendars/i }))
+    await page.getByRole('button', { name: /choose calendars/i }).click()
 
-    expect(await screen.findByRole('dialog', { name: 'Choose calendars' })).toBeTruthy()
-    expect(screen.getByText('Google')).toBeTruthy()
-    expect(screen.getByText('iCloud')).toBeTruthy()
-    expect(screen.getByRole('checkbox', { name: 'Work' })).toBeTruthy()
-    expect(screen.getByRole('checkbox', { name: 'Home' })).toBeTruthy()
+    await expect
+      .element(page.getByRole('dialog', { name: 'Choose calendars' }))
+      .toBeInTheDocument()
+    await expect.element(page.getByText('Google')).toBeInTheDocument()
+    await expect.element(page.getByText('iCloud')).toBeInTheDocument()
+    await expect.element(page.getByRole('checkbox', { name: 'Work' })).toBeInTheDocument()
+    await expect.element(page.getByRole('checkbox', { name: 'Home' })).toBeInTheDocument()
   })
 
   it('shows nothing (not "No calendars found") while the list is still loading', async () => {
     stored = { calendarEnabled: true }
     authStatus = 'fullAccess'
     calendarsResponse = () => new Promise(() => {}) // never settles
-    renderSection()
+    await renderSection()
 
-    await waitFor(() => expect(calendarSwitch().getAttribute('aria-checked')).toBe('true'))
-    expect(screen.queryByText(/no calendars found/i)).toBeNull()
+    await expect.element(calendarSwitch()).toHaveAttribute('aria-checked', 'true')
+    expect(page.getByText(/no calendars found/i).query()).toBeNull()
   })
 
   it('shows the empty state once an empty list has actually loaded', async () => {
     stored = { calendarEnabled: true }
     authStatus = 'fullAccess'
     calendarsResponse = async () => []
-    renderSection()
+    await renderSection()
 
-    await waitFor(() => expect(screen.getByText(/no calendars found/i)).toBeTruthy())
+    await expect.element(page.getByText(/no calendars found/i)).toBeInTheDocument()
   })
 
   it('toggling a calendar persists its id and updates the count', async () => {
     stored = { calendarEnabled: true }
     authStatus = 'fullAccess'
-    renderSection()
-    await screen.findByText('0/2 calendars selected')
-    fireEvent.click(screen.getByRole('button', { name: /choose calendars/i }))
-    const work = await screen.findByRole('checkbox', { name: 'Work' })
+    await renderSection()
+    await expect.element(page.getByText('0/2 calendars selected')).toBeInTheDocument()
+    await page.getByRole('button', { name: /choose calendars/i }).click()
 
-    fireEvent.click(work)
+    await page.getByRole('checkbox', { name: 'Work' }).click()
 
-    await waitFor(() => expect(saved.at(-1)).toMatchObject({ calendarIds: ['cal-work'] }))
-    await waitFor(() => expect(screen.getByText('1/2 calendars selected')).toBeTruthy())
+    await vi.waitFor(() => expect(saved.at(-1)).toMatchObject({ calendarIds: ['cal-work'] }))
+    await expect.element(page.getByText('1/2 calendars selected')).toBeInTheDocument()
   })
 
   it('counts only ids the Mac still knows, ignoring stale ones', async () => {
     stored = { calendarEnabled: true, calendarIds: ['cal-work', 'cal-gone-1', 'cal-gone-2'] }
     authStatus = 'fullAccess'
-    renderSection()
+    await renderSection()
 
-    await waitFor(() => expect(screen.getByText('1/2 calendars selected')).toBeTruthy())
+    await expect.element(page.getByText('1/2 calendars selected')).toBeInTheDocument()
   })
 
   it('denied access shows the explanation and deep-links to System Settings', async () => {
     stored = { calendarEnabled: true }
     authStatus = 'denied'
-    renderSection()
+    await renderSection()
 
-    const open = await screen.findByRole('button', { name: /open system settings/i })
-    expect(screen.getByText(/can’t read your calendars/i)).toBeTruthy()
+    const open = page.getByRole('button', { name: /open system settings/i })
+    await expect.element(page.getByText(/can’t read your calendars/i)).toBeInTheDocument()
 
-    fireEvent.click(open)
-    await waitFor(() =>
+    await open.click()
+    await vi.waitFor(() =>
       expect(openUrl).toHaveBeenCalledWith(
         'x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars',
       ),
@@ -174,14 +175,13 @@ describe('CalendarIntegrationField', () => {
     stored = { calendarEnabled: true }
     authStatus = 'notDetermined'
     const { invoked } = installFakeBridge()
-    renderSection()
+    await renderSection()
 
-    const grant = await screen.findByRole('button', { name: /grant access/i })
-    fireEvent.click(grant)
+    await page.getByRole('button', { name: /grant access/i }).click()
 
-    await waitFor(() => expect(invoked).toContain('calendar_request_access'))
+    await vi.waitFor(() => expect(invoked).toContain('calendar_request_access'))
     // The grant resolved and the invalidated auth query re-ran: the calendar
     // list replaces the permission explanation.
-    await waitFor(() => expect(screen.getByText('0/2 calendars selected')).toBeTruthy())
+    await expect.element(page.getByText('0/2 calendars selected')).toBeInTheDocument()
   })
 })

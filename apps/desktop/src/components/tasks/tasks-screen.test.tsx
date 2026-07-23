@@ -1549,7 +1549,7 @@ describe('TasksScreen', () => {
     await view.findByRole('button', { name: 'Reopen: project task' })
     getOpenTasks.mockResolvedValue([])
 
-    await userEvent.click(view.getByText('project task'))
+    await userEvent.click(view.getByRole('button', { name: 'project task' }))
     await view.findByTestId('task-editor')
     await userEvent.click(view.getByRole('button', { name: 'Reopen: project task' }))
 
@@ -1643,7 +1643,7 @@ describe('TasksScreen', () => {
     await view.findByRole('button', { name: 'Reopen: project task' })
     getOpenTasks.mockResolvedValue([])
 
-    await userEvent.click(view.getByText('project task'))
+    await userEvent.click(view.getByRole('button', { name: 'project task' }))
     await userEvent.click(view.getByRole('button', { name: 'stage-checkbox-edit' }))
     await userEvent.click(view.getByRole('button', { name: 'Reopen: project task' }))
 
@@ -1722,7 +1722,7 @@ describe('TasksScreen', () => {
     // Complete it → struck (kept showing via the session set), then try to delete.
     await userEvent.click(await view.findByRole('button', { name: 'Complete: one' }))
     await view.findByRole('button', { name: 'Reopen: one' })
-    await userEvent.click(view.getByText('one')) // select the struck row → editor opens
+    await userEvent.click(view.getByRole('button', { name: 'one' })) // select the struck row → editor opens
     await view.findByTestId('task-editor')
     await userEvent.click(view.getByRole('button', { name: 'delete-edit' }))
 

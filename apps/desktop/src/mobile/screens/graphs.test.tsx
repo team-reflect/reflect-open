@@ -140,7 +140,8 @@ describe('MobileGraphs', () => {
     await user.type(screen.getByLabelText('Name'), 'Work')
 
     expect(await screen.findByText(/already exists in iCloud Drive/)).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: 'Create' }))
+    // The collision disables Create, so the name can never reach the backend.
+    expect(screen.getByRole('button', { name: 'Create' }).hasAttribute('disabled')).toBe(true)
     expect(completeOnboarding).not.toHaveBeenCalled()
   })
 

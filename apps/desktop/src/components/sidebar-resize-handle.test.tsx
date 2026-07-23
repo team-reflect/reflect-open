@@ -1,5 +1,6 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, render } from 'vitest-browser-react'
+import { page } from 'vitest/browser'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { activeSidebarWidthDrags } from '@/hooks/use-sidebar-resize'
 import { SidebarResizeHandle } from './sidebar-resize-handle'
 
@@ -16,17 +17,30 @@ function rootVariable(name: string): string {
   return document.documentElement.style.getPropertyValue(name)
 }
 
-function firePointer(element: Element, type: string, init: Record<string, unknown>): void {
-  const event = new Event(type, { bubbles: true, cancelable: true })
-  Object.assign(event, init)
-  act(() => {
-    element.dispatchEvent(event)
-  })
+function firePointer(element: Element, type: string, init: PointerEventInit): void {
+  element.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, ...init }))
 }
 
-function renderHandle(panel: 'workspace' | 'context'): HTMLElement {
-  render(<SidebarResizeHandle panel={panel} />)
-  return screen.getByRole('separator')
+function fireKey(element: Element, key: string): void {
+  element.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }))
+}
+
+/**
+ * Renders the handle inside a rail sized like the app's `<aside>`: the drag
+ * rebases on the rail's rendered width, so the wrapper has to carry the
+ * persisted setting.
+ */
+async function renderHandle(panel: 'workspace' | 'context'): Promise<HTMLElement> {
+  const width =
+    panel === 'workspace'
+      ? settingsState.settings.sidebarWidth
+      : settingsState.settings.contextSidebarWidth
+  await render(
+    <div style={{ position: 'relative', width: `${width}px` }}>
+      <SidebarResizeHandle panel={panel} />
+    </div>,
+  )
+  return page.getByRole('separator').element() as HTMLElement
 }
 
 /** Mocks the handle's aside as rendered at the given width. */
@@ -38,17 +52,14 @@ function mockRenderedRail(handle: HTMLElement, width: number): void {
   vi.spyOn(aside, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, width, 800))
 }
 
-function setViewport(width: number): void {
-  Object.defineProperty(window, 'innerWidth', {
-    value: width,
-    configurable: true,
-    writable: true,
-  })
-}
+// The drag math budgets against the real viewport width, so every test runs on
+// the desktop-sized window these assertions are written for.
+beforeEach(async () => {
+  await page.viewport(1024, 800)
+})
 
-afterEach(() => {
-  cleanup()
-  setViewport(1024)
+afterEach(async () => {
+  await page.viewport(900, 600)
   const style = document.documentElement.style
   for (const property of [
     '--sidebar-width',
@@ -65,14 +76,16 @@ afterEach(() => {
 })
 
 describe('SidebarResizeHandle', () => {
-  it('drags the workspace sidebar wider and commits once on release', () => {
-    const handle = renderHandle('workspace')
+  it('drags the workspace sidebar wider and commits once on release', async () => {
+    const handle = await renderHandle('workspace')
 
     firePointer(handle, 'pointerdown', { pointerId: 7, button: 0, clientX: 300 })
     firePointer(handle, 'pointermove', { pointerId: 7, clientX: 380 })
     expect(rootVariable('cursor')).toBe('col-resize')
     expect(rootVariable('--sidebar-width')).toBe('340px')
-    expect(handle.getAttribute('aria-valuenow')).toBe('340')
+    // The width variable is written imperatively; the attribute follows the
+    // re-render.
+    await expect.poll(() => handle.getAttribute('aria-valuenow')).toBe('340')
     expect(settingsState.updateSettings).not.toHaveBeenCalled()
 
     firePointer(handle, 'pointerup', { pointerId: 7, clientX: 380 })
@@ -82,8 +95,8 @@ describe('SidebarResizeHandle', () => {
     expect(rootVariable('cursor')).toBe('')
   })
 
-  it('clamps a drag past the range to its bounds', () => {
-    const handle = renderHandle('workspace')
+  it('clamps a drag past the range to its bounds', async () => {
+    const handle = await renderHandle('workspace')
 
     firePointer(handle, 'pointerdown', { pointerId: 7, button: 0, clientX: 300 })
     firePointer(handle, 'pointermove', { pointerId: 7, clientX: 1200 })
@@ -94,8 +107,8 @@ describe('SidebarResizeHandle', () => {
     expect(settingsState.updateSettings).toHaveBeenCalledWith({ sidebarWidth: 200 })
   })
 
-  it('widens the context panel when dragged leftward', () => {
-    const handle = renderHandle('context')
+  it('widens the context panel when dragged leftward', async () => {
+    const handle = await renderHandle('context')
 
     firePointer(handle, 'pointerdown', { pointerId: 3, button: 0, clientX: 700 })
     firePointer(handle, 'pointermove', { pointerId: 3, clientX: 640 })
@@ -105,8 +118,8 @@ describe('SidebarResizeHandle', () => {
     expect(settingsState.updateSettings).toHaveBeenCalledWith({ contextSidebarWidth: 380 })
   })
 
-  it('ignores secondary-button presses and foreign pointer ids', () => {
-    const handle = renderHandle('workspace')
+  it('ignores secondary-button presses and foreign pointer ids', async () => {
+    const handle = await renderHandle('workspace')
 
     firePointer(handle, 'pointerdown', { pointerId: 7, button: 2, clientX: 300 })
     firePointer(handle, 'pointermove', { pointerId: 7, clientX: 380 })
@@ -117,8 +130,8 @@ describe('SidebarResizeHandle', () => {
     expect(rootVariable('--sidebar-width')).toBe('')
   })
 
-  it('rebases the drag on the rendered width when the rail is capped narrower', () => {
-    const handle = renderHandle('workspace')
+  it('rebases the drag on the rendered width when the rail is capped narrower', async () => {
+    const handle = await renderHandle('workspace')
     settingsState.settings.sidebarWidth = 480
     // A narrow window: the viewport renders the 480px setting at 400px.
     mockRenderedRail(handle, 400)
@@ -131,12 +144,12 @@ describe('SidebarResizeHandle', () => {
     expect(settingsState.updateSettings).toHaveBeenCalledWith({ sidebarWidth: 420 })
   })
 
-  it('never clamps the first move below the rendered width', () => {
+  it('never clamps the first move below the rendered width', async () => {
     // A 700px viewport budgets only 340px for the rail, but proportional
     // flooring can render it at 400px: the cap must stop growth, not yank the
     // rail to 340px on the first activated move.
-    setViewport(700)
-    const handle = renderHandle('workspace')
+    await page.viewport(700, 800)
+    const handle = await renderHandle('workspace')
     mockRenderedRail(handle, 400)
 
     firePointer(handle, 'pointerdown', { pointerId: 7, button: 0, clientX: 400 })
@@ -148,21 +161,18 @@ describe('SidebarResizeHandle', () => {
     expect(settingsState.updateSettings).toHaveBeenCalledWith({ sidebarWidth: 340 })
   })
 
-  it('keeps aria-valuenow in step with viewport scaling', () => {
+  it('keeps aria-valuenow in step with viewport scaling', async () => {
     settingsState.settings = { sidebarWidth: 480, contextSidebarWidth: 480 }
-    const handle = renderHandle('workspace')
+    const handle = await renderHandle('workspace')
     // At 1024px the 480px preferences scale to 332px each.
     expect(handle.getAttribute('aria-valuenow')).toBe('332')
 
-    act(() => {
-      setViewport(1600)
-      window.dispatchEvent(new Event('resize'))
-    })
-    expect(handle.getAttribute('aria-valuenow')).toBe('480')
+    await page.viewport(1600, 800)
+    await expect.poll(() => handle.getAttribute('aria-valuenow')).toBe('480')
   })
 
-  it('a bare click commits nothing and never suppresses the width effect', () => {
-    const handle = renderHandle('workspace')
+  it('a bare click commits nothing and never suppresses the width effect', async () => {
+    const handle = await renderHandle('workspace')
     settingsState.settings.sidebarWidth = 480
     mockRenderedRail(handle, 400)
 
@@ -179,8 +189,8 @@ describe('SidebarResizeHandle', () => {
     expect(rootVariable('--sidebar-width')).toBe('')
   })
 
-  it('a drag that returns to its starting width commits nothing', () => {
-    const handle = renderHandle('workspace')
+  it('a drag that returns to its starting width commits nothing', async () => {
+    const handle = await renderHandle('workspace')
 
     firePointer(handle, 'pointerdown', { pointerId: 7, button: 0, clientX: 300 })
     firePointer(handle, 'pointermove', { pointerId: 7, clientX: 380 })
@@ -194,32 +204,32 @@ describe('SidebarResizeHandle', () => {
     expect(rootVariable('cursor')).toBe('')
   })
 
-  it('steps the keyboard resize from the rendered width on a capped rail', () => {
-    const handle = renderHandle('workspace')
+  it('steps the keyboard resize from the rendered width on a capped rail', async () => {
+    const handle = await renderHandle('workspace')
     settingsState.settings.sidebarWidth = 480
     mockRenderedRail(handle, 400)
 
-    fireEvent.keyDown(handle, { key: 'ArrowRight' })
+    fireKey(handle, 'ArrowRight')
     expect(settingsState.updateSettings).toHaveBeenLastCalledWith({ sidebarWidth: 416 })
   })
 
-  it('a keystroke into a wall commits nothing', () => {
+  it('a keystroke into a wall commits nothing', async () => {
     settingsState.settings.sidebarWidth = 480
-    const handle = renderHandle('workspace')
+    const handle = await renderHandle('workspace')
 
     // Already at the range maximum: nothing moves, so nothing persists.
-    fireEvent.keyDown(handle, { key: 'ArrowRight' })
+    fireKey(handle, 'ArrowRight')
     expect(settingsState.updateSettings).not.toHaveBeenCalled()
   })
 
-  it('keeps the drag chrome while another rail still drags', () => {
-    render(
+  it('keeps the drag chrome while another rail still drags', async () => {
+    await render(
       <>
         <SidebarResizeHandle panel="workspace" />
         <SidebarResizeHandle panel="context" />
       </>,
     )
-    const [workspace, context] = screen.getAllByRole('separator')
+    const [workspace, context] = page.getByRole('separator').elements()
     if (!workspace || !context) {
       throw new Error('handles missing')
     }
@@ -236,72 +246,72 @@ describe('SidebarResizeHandle', () => {
     expect(rootVariable('cursor')).toBe('')
   })
 
-  it('reverts an unmount-interrupted drag to the persisted width', () => {
-    const handle = renderHandle('workspace')
+  it('reverts an unmount-interrupted drag to the persisted width', async () => {
+    const handle = await renderHandle('workspace')
 
     firePointer(handle, 'pointerdown', { pointerId: 7, button: 0, clientX: 300 })
     firePointer(handle, 'pointermove', { pointerId: 7, clientX: 380 })
     expect(rootVariable('--sidebar-width')).toBe('340px')
 
-    cleanup()
+    await cleanup()
 
     expect(settingsState.updateSettings).not.toHaveBeenCalled()
     expect(rootVariable('--sidebar-width')).toBe('260px')
     expect(rootVariable('cursor')).toBe('')
   })
 
-  it('resets to the default width on double-click', () => {
+  it('resets to the default width on double-click', async () => {
     settingsState.settings.sidebarWidth = 333
-    const handle = renderHandle('workspace')
+    const handle = await renderHandle('workspace')
 
-    fireEvent.doubleClick(handle)
+    handle.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }))
 
     expect(settingsState.updateSettings).toHaveBeenCalledWith({ sidebarWidth: 260 })
     expect(rootVariable('--sidebar-width')).toBe('260px')
   })
 
-  it('moves the divider with arrow keys, following separator semantics', () => {
-    const workspaceHandle = renderHandle('workspace')
+  it('moves the divider with arrow keys, following separator semantics', async () => {
+    const workspaceHandle = await renderHandle('workspace')
 
-    fireEvent.keyDown(workspaceHandle, { key: 'ArrowRight' })
+    fireKey(workspaceHandle, 'ArrowRight')
     expect(settingsState.updateSettings).toHaveBeenCalledWith({ sidebarWidth: 276 })
 
     // The mocked provider never re-renders, so each keystroke steps from the
     // same 260px base.
-    fireEvent.keyDown(workspaceHandle, { key: 'ArrowLeft' })
+    fireKey(workspaceHandle, 'ArrowLeft')
     expect(settingsState.updateSettings).toHaveBeenLastCalledWith({ sidebarWidth: 244 })
 
-    cleanup()
-    const contextHandle = renderHandle('context')
+    await cleanup()
+    const contextHandle = await renderHandle('context')
 
     // For the right panel, moving the divider left widens it.
-    fireEvent.keyDown(contextHandle, { key: 'ArrowLeft' })
+    fireKey(contextHandle, 'ArrowLeft')
     expect(settingsState.updateSettings).toHaveBeenLastCalledWith({ contextSidebarWidth: 336 })
   })
 
-  it('jumps to the rail minimum and maximum with Home and End', () => {
-    const workspaceHandle = renderHandle('workspace')
+  it('jumps to the rail minimum and maximum with Home and End', async () => {
+    const workspaceHandle = await renderHandle('workspace')
 
-    fireEvent.keyDown(workspaceHandle, { key: 'Home' })
+    fireKey(workspaceHandle, 'Home')
     expect(settingsState.updateSettings).toHaveBeenLastCalledWith({ sidebarWidth: 200 })
 
-    fireEvent.keyDown(workspaceHandle, { key: 'End' })
+    fireKey(workspaceHandle, 'End')
     expect(settingsState.updateSettings).toHaveBeenLastCalledWith({ sidebarWidth: 480 })
 
-    cleanup()
-    const contextHandle = renderHandle('context')
+    await cleanup()
+    const contextHandle = await renderHandle('context')
 
     // Home is the rail's minimum on both sides — value semantics, per the
     // WAI window-splitter pattern, not divider-position semantics.
-    fireEvent.keyDown(contextHandle, { key: 'Home' })
+    fireKey(contextHandle, 'Home')
     expect(settingsState.updateSettings).toHaveBeenLastCalledWith({ contextSidebarWidth: 240 })
 
-    fireEvent.keyDown(contextHandle, { key: 'End' })
+    fireKey(contextHandle, 'End')
     expect(settingsState.updateSettings).toHaveBeenLastCalledWith({ contextSidebarWidth: 480 })
   })
 
-  it('exposes the clamp range and controlled panel through the separator attributes', () => {
-    const handle = renderHandle('workspace')
+  it('exposes the clamp range and controlled panel through the separator attributes', async () => {
+    const handle = await renderHandle('workspace')
 
     expect(handle.getAttribute('aria-orientation')).toBe('vertical')
     expect(handle.getAttribute('aria-controls')).toBe('workspace-sidebar')

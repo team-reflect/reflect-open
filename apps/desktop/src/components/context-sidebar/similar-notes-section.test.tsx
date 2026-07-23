@@ -1,5 +1,5 @@
-import { fireEvent, render, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render } from 'vitest-browser-react'
+import { userEvent } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
@@ -57,10 +57,10 @@ beforeEach(() => {
 
 describe('SimilarNotesSection', () => {
   it('renders nothing at all when the note has no semantic neighbors', async () => {
-    const view = renderSimilar('daily/2026-06-09.md', false)
-    await waitFor(() => expect(relatedNotes).toHaveBeenCalledWith('daily/2026-06-09.md', 6))
+    const view = await renderSimilar('daily/2026-06-09.md', false)
+    await vi.waitFor(() => expect(relatedNotes).toHaveBeenCalledWith('daily/2026-06-09.md', 6))
     expect(view.container.firstChild).toBeNull()
-    view.unmount()
+    await view.unmount()
   })
 
   it('neither queries nor renders while semantic search is disabled', async () => {
@@ -75,12 +75,12 @@ describe('SimilarNotesSection', () => {
         isPrivate: false,
       },
     ])
-    const view = renderSimilar('notes/languages.md', false)
+    const view = await renderSimilar('notes/languages.md', false)
     // Give a would-be fetch a tick to fire before asserting it never did.
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(relatedNotes).not.toHaveBeenCalled()
     expect(view.container.firstChild).toBeNull()
-    view.unmount()
+    await view.unmount()
   })
 
   it('renders the Similar notes section with one title-only row per neighbor', async () => {
@@ -102,17 +102,17 @@ describe('SimilarNotesSection', () => {
         isPrivate: false,
       },
     ])
-    const view = renderSimilar('notes/languages.md')
-    await view.findByText('Rust')
-    expect(view.getByText('Similar notes')).toBeDefined()
-    expect(view.getByText('Zig')).toBeDefined()
-    const rustRow = view.getByRole('button', { name: 'Rust' })
+    const view = await renderSimilar('notes/languages.md')
+    await expect.element(view.getByText('Rust')).toBeInTheDocument()
+    await expect.element(view.getByText('Similar notes')).toBeInTheDocument()
+    await expect.element(view.getByText('Zig')).toBeInTheDocument()
+    const rustRow = view.getByRole('button', { name: 'Rust' }).element()
     expect(rustRow.className).toContain('px-3')
     expect(rustRow.parentElement?.className ?? '').not.toContain('-mx-1')
     // V1 rows are bare titles — snippets never render here.
-    expect(view.queryByText('borrow checker notes')).toBeNull()
-    expect(view.queryByText('comptime experiments')).toBeNull()
-    view.unmount()
+    expect(view.getByText('borrow checker notes').query()).toBeNull()
+    expect(view.getByText('comptime experiments').query()).toBeNull()
+    await view.unmount()
   })
 
   it('shows no more than six neighbors', async () => {
@@ -126,11 +126,11 @@ describe('SimilarNotesSection', () => {
         isPrivate: false,
       })),
     )
-    const view = renderSimilar('notes/languages.md', false)
-    await view.findByText('Note 6')
-    expect(view.queryByText('Note 7')).toBeNull()
+    const view = await renderSimilar('notes/languages.md', false)
+    await expect.element(view.getByText('Note 6')).toBeInTheDocument()
+    expect(view.getByText('Note 7').query()).toBeNull()
     expect(relatedNotes).toHaveBeenCalledWith('notes/languages.md', 6)
-    view.unmount()
+    await view.unmount()
   })
 
   it('navigates to the clicked neighbor', async () => {
@@ -144,11 +144,11 @@ describe('SimilarNotesSection', () => {
         isPrivate: false,
       },
     ])
-    const view = renderSimilar('daily/2026-06-09.md')
-    await userEvent.click(await view.findByText('Gardening'))
-    expect(view.getByTestId('route').textContent).toContain('"kind":"note"')
-    expect(view.getByTestId('route').textContent).toContain('notes/gardening.md')
-    view.unmount()
+    const view = await renderSimilar('daily/2026-06-09.md')
+    await userEvent.click(view.getByText('Gardening'))
+    await expect.element(view.getByTestId('route')).toHaveTextContent('"kind":"note"')
+    await expect.element(view.getByTestId('route')).toHaveTextContent('notes/gardening.md')
+    await view.unmount()
   })
 
   it('opens a ⌘-clicked neighbor in a new window', async () => {
@@ -162,19 +162,17 @@ describe('SimilarNotesSection', () => {
         isPrivate: false,
       },
     ])
-    const view = renderSimilar('daily/2026-06-09.md')
+    const view = await renderSimilar('daily/2026-06-09.md')
 
-    fireEvent.click(await view.findByRole('button', { name: 'Gardening' }), {
-      metaKey: true,
-    })
+    await view.getByRole('button', { name: 'Gardening' }).click({ modifiers: ['Meta'] })
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(openRouteInNewWindow).toHaveBeenCalledWith({
         kind: 'note',
         path: 'notes/gardening.md',
       }),
     )
-    expect(view.getByTestId('route').textContent).toContain('"kind":"today"')
-    view.unmount()
+    await expect.element(view.getByTestId('route')).toHaveTextContent('"kind":"today"')
+    await view.unmount()
   })
 })

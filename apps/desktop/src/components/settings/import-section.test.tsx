@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { render } from 'vitest-browser-react'
+import { page, type Locator } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { V1ImportState } from '@/providers/v1-import-provider'
 
@@ -26,25 +27,20 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  cleanup()
   vi.clearAllMocks()
 })
 
-function importButton(): HTMLButtonElement {
-  const element = screen.getByRole('button', { name: /import/i })
-  if (!(element instanceof HTMLButtonElement)) {
-    throw new Error('expected button')
-  }
-  return element
+function importButton(): Locator {
+  return page.getByRole('button', { name: /import/i })
 }
 
 describe('ImportSection', () => {
   it('hands the picked Reflect V1 zip to the import controller', async () => {
-    render(<ImportSection />)
+    await render(<ImportSection />)
 
-    fireEvent.click(importButton())
+    await importButton().click()
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(open).toHaveBeenCalledWith({
         multiple: false,
         directory: false,
@@ -52,26 +48,26 @@ describe('ImportSection', () => {
         filters: [{ name: 'Zip archives', extensions: ['zip'] }],
       }),
     )
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(startImport).toHaveBeenCalledWith('/Users/alex/Downloads/reflect-v1.zip'),
     )
   })
 
   it('does nothing when the picker is cancelled', async () => {
     open.mockResolvedValueOnce(null)
-    render(<ImportSection />)
+    await render(<ImportSection />)
 
-    fireEvent.click(importButton())
+    await importButton().click()
 
-    await waitFor(() => expect(open).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(open).toHaveBeenCalledTimes(1))
     expect(startImport).not.toHaveBeenCalled()
   })
 
-  it('is disabled while an import runs', () => {
+  it('is disabled while an import runs', async () => {
     importState.state = { phase: 'running', progress: null, cancelling: false }
-    render(<ImportSection />)
+    await render(<ImportSection />)
 
-    expect(importButton().hasAttribute('disabled')).toBe(true)
-    expect(importButton().textContent).toContain('Importing')
+    await expect.element(importButton()).toBeDisabled()
+    expect(importButton().element().textContent).toContain('Importing')
   })
 })

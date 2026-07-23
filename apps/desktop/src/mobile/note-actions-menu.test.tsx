@@ -1,8 +1,8 @@
 import { type ReactNode } from 'react'
-import { cleanup, render, waitFor, within } from '@testing-library/react'
+import { render } from 'vitest-browser-react'
+import { page } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '@reflect/core'
 import { NoteActionsMenu } from './note-actions-menu'
 
@@ -49,11 +49,12 @@ beforeEach(() => {
   })
 })
 
-afterEach(cleanup)
-
-function mount(onDeleted = vi.fn()): { view: ReturnType<typeof render>; onDeleted: typeof onDeleted } {
+async function mount(onDeleted = vi.fn()): Promise<{
+  view: Awaited<ReturnType<typeof render>>
+  onDeleted: typeof onDeleted
+}> {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  const view = render(
+  const view = await render(
     <QueryClientProvider client={queryClient}>
       <NoteActionsMenu path="notes/meeting.md" onDeleted={onDeleted} />
     </QueryClientProvider>,
@@ -63,27 +64,25 @@ function mount(onDeleted = vi.fn()): { view: ReturnType<typeof render>; onDelete
 
 describe('NoteActionsMenu', () => {
   it('pins the note by writing the frontmatter flag', async () => {
-    const user = userEvent.setup()
-    const { view } = mount()
+    const { view } = await mount()
 
-    await user.click(view.getByRole('button', { name: 'Pin' }))
+    await view.getByRole('button', { name: 'Pin' }).click()
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       const write = calls.find((call) => call.command === 'note_write')
       expect(write?.args['contents']).toContain('pinned: true')
     })
   })
 
   it('deletes after confirmation and notifies the screen', async () => {
-    const user = userEvent.setup()
-    const { view, onDeleted } = mount()
+    const { view, onDeleted } = await mount()
 
-    await user.click(view.getByRole('button', { name: 'Delete' }))
+    await view.getByRole('button', { name: 'Delete' }).click()
     // A second "Delete" appears in the confirm dialog; scope to it.
-    const dialog = await view.findByRole('dialog')
-    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+    const dialog = page.getByRole('dialog')
+    await dialog.getByRole('button', { name: 'Delete' }).click()
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(calls.some((call) => call.command === 'note_delete')).toBe(true)
     })
     expect(onDeleted).toHaveBeenCalledOnce()

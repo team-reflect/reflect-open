@@ -19,6 +19,8 @@ const BROWSER_MIGRATED_TESTS = [
   'src/hooks/**/*.test.tsx',
   'src/lib/**/*.test.tsx',
   'src/editor/**/*.test.tsx',
+  'src/components/**/*.test.tsx',
+  'src/mobile/**/*.test.tsx',
 ]
 
 // `.test.ts` files that still depend on a DOM (renderHook, document event
