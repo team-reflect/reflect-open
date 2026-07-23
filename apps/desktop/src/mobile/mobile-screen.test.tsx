@@ -1,9 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, cleanup, render } from 'vitest-browser-react'
+import { cleanup, render } from 'vitest-browser-react'
 import { page, userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { format } from 'date-fns'
-import { StrictMode, type ReactElement } from 'react'
+import { act, StrictMode, type ReactElement } from 'react'
 import { setBridge } from '@reflect/core'
 import {
   clearFormattingToolbar,
