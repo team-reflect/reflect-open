@@ -174,10 +174,30 @@ pub fn walk_catalog(root: &Path) -> FileCatalog {
 }
 
 fn is_pruned_dir(name: &str, path: &Path) -> bool {
+    is_pruned_dir_name(name) || has_cachedir_tag(path)
+}
+
+fn is_pruned_dir_name(name: &str) -> bool {
     PRUNED_DIR_NAMES
         .iter()
         .any(|pruned| name.eq_ignore_ascii_case(pruned))
-        || has_cachedir_tag(path)
+}
+
+/// Whether any directory component of a wire path is on the default prune
+/// list. The lexical half of the walk's exclusion rules, shared with the
+/// watcher so a live event can never index a file the listing refuses
+/// (`CACHEDIR.TAG` and ignore-file exclusions need disk state and stay
+/// walk-only; a structural reconcile prunes their residue).
+pub fn has_pruned_component(path: &str) -> bool {
+    let mut components = path.split('/').peekable();
+    while let Some(component) = components.next() {
+        // Only directory components count: a *file* named `Pods` (no
+        // trailing components) is not a pruned tree.
+        if components.peek().is_some() && is_pruned_dir_name(component) {
+            return true;
+        }
+    }
+    false
 }
 
 fn has_cachedir_tag(dir: &Path) -> bool {
@@ -327,6 +347,18 @@ mod tests {
         write(root, "notes/a.md", "a");
 
         assert_eq!(note_paths(root), vec!["notes/a.md"]);
+    }
+
+    #[test]
+    fn pruned_components_are_shared_with_live_event_filtering() {
+        use super::has_pruned_component;
+        assert!(has_pruned_component("node_modules/pkg/README.md"));
+        assert!(has_pruned_component("vendor/Pods/readme.md"));
+        assert!(has_pruned_component("NODE_MODULES/x.md"));
+        // Only directory components count; similar file names are fine.
+        assert!(!has_pruned_component("Pods"));
+        assert!(!has_pruned_component("notes/node_modules.md"));
+        assert!(!has_pruned_component("Projects/deep/plan.md"));
     }
 
     #[test]

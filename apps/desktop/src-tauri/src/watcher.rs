@@ -24,7 +24,8 @@ use std::time::Duration;
 use notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_full::{new_debouncer, DebounceEventResult, Debouncer, RecommendedCache};
 use reflect_graph_paths::{
-    classify, evicted_logical_path, eviction_placeholder, wire_path, GraphPathKind,
+    classify, evicted_logical_path, eviction_placeholder, has_pruned_component, wire_path,
+    GraphPathKind,
 };
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -88,6 +89,12 @@ fn tracked_relpath(path: &Path, root: &Path) -> Option<String> {
     let logical = evicted_logical_path(rel);
     let rel = logical.as_deref().unwrap_or(rel);
     let wire = wire_path(rel)?;
+    // The walk's lexical exclusions apply to live events too: a write under
+    // `node_modules/` must not reach the index through the watcher when the
+    // listing will never contain it.
+    if has_pruned_component(&wire) {
+        return None;
+    }
     let kind = classify(&wire);
     let tracked = kind == Some(GraphPathKind::Note)
         || kind == Some(GraphPathKind::Attachment)
@@ -160,8 +167,9 @@ fn collect_changes(paths: &[PathBuf], root: &Path) -> BatchEffects {
             };
             seen.insert(rel, change);
         } else if let Ok(rel) = path.strip_prefix(root) {
-            if wire_path(rel).is_none() {
-                continue; // hidden or unrepresentable — the blackout
+            let visible = wire_path(rel).is_some_and(|wire| !has_pruned_component(&wire));
+            if !visible {
+                continue; // hidden, pruned, or unrepresentable — the blackout
             }
             match std::fs::symlink_metadata(path) {
                 Ok(meta) if meta.is_dir() => reconcile = true,
@@ -420,6 +428,31 @@ mod tests {
         // platform never enumerates the descendants either way.
         let removed = collect_changes(&[root.join("Archive")], root);
         assert!(removed.reconcile);
+    }
+
+    #[test]
+    fn pruned_dependency_trees_are_invisible_to_live_events() {
+        // `npm install` inside an adopted vault: thousands of markdown files
+        // land under `node_modules/`, none of which the listing will ever
+        // contain. The watcher must neither upsert them nor reconcile for
+        // them — the same lexical rule the walk prunes by.
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("node_modules/pkg")).unwrap();
+        std::fs::write(root.join("node_modules/pkg/README.md"), "# dep").unwrap();
+
+        assert_eq!(
+            tracked_relpath(&root.join("node_modules/pkg/README.md"), root),
+            None
+        );
+        let effects = collect_changes(
+            &[
+                root.join("node_modules/pkg/README.md"),
+                root.join("node_modules/pkg"),
+            ],
+            root,
+        );
+        assert_eq!(effects, BatchEffects::default());
     }
 
     #[test]
