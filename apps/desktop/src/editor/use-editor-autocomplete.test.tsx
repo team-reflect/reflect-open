@@ -1,5 +1,5 @@
-import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { renderHook } from 'vitest-browser-react'
 import { useEditorAutocomplete } from './use-editor-autocomplete'
 
 const resolveOrCreateNoteWithTitle = vi.hoisted(() => vi.fn())
@@ -51,7 +51,7 @@ describe('useEditorAutocomplete', () => {
       claimedTargetKeys: ['roadmap'],
       queryReadsAsDate: false,
     })
-    const { result } = renderHook(() => useEditorAutocomplete())
+    const { result } = await renderHook(() => useEditorAutocomplete())
 
     await expect(result.current.onWikilinkSearch('Roadmap')).resolves.toEqual([])
   })
@@ -61,14 +61,14 @@ describe('useEditorAutocomplete', () => {
       kind: 'ambiguous',
       paths: ['notes/business-ideas.md', 'notes/business-ideas-2.md'],
     })
-    const { result } = renderHook(() => useEditorAutocomplete())
+    const { result, act } = await renderHook(() => useEditorAutocomplete())
     const items = await result.current.onWikilinkSearch('Business ideas')
 
-    act(() => {
+    await act(() => {
       items[0]!.onSelect?.()
     })
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Business ideas', 7),
     )
     expect(startOperation).toHaveBeenCalledWith('Creating note')
@@ -82,14 +82,14 @@ describe('useEditorAutocomplete', () => {
       kind: 'unavailable',
       paths: ['notes/business-ideas.md'],
     })
-    const { result } = renderHook(() => useEditorAutocomplete())
+    const { result, act } = await renderHook(() => useEditorAutocomplete())
     const items = await result.current.onWikilinkSearch('Business ideas')
 
-    act(() => {
+    await act(() => {
       items[0]!.onSelect?.()
     })
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Business ideas', 7),
     )
     expect(startOperation).toHaveBeenCalledWith('Creating note')
@@ -101,14 +101,14 @@ describe('useEditorAutocomplete', () => {
   it('surfaces a failed background create instead of silently doing nothing', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     resolveOrCreateNoteWithTitle.mockRejectedValue(new Error('graph changed'))
-    const { result } = renderHook(() => useEditorAutocomplete())
+    const { result, act } = await renderHook(() => useEditorAutocomplete())
     const items = await result.current.onWikilinkSearch('Business ideas')
 
-    act(() => {
+    await act(() => {
       items[0]!.onSelect?.()
     })
 
-    await waitFor(() => expect(operationFail).toHaveBeenCalledWith('graph changed'))
+    await vi.waitFor(() => expect(operationFail).toHaveBeenCalledWith('graph changed'))
     expect(startOperation).toHaveBeenCalledWith('Creating note')
     consoleError.mockRestore()
   })
@@ -118,14 +118,14 @@ describe('useEditorAutocomplete', () => {
       kind: 'created',
       path: 'notes/business-ideas.md',
     })
-    const { result } = renderHook(() => useEditorAutocomplete())
+    const { result, act } = await renderHook(() => useEditorAutocomplete())
     const items = await result.current.onWikilinkSearch('Business ideas')
 
-    act(() => {
+    await act(() => {
       items[0]!.onSelect?.()
     })
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Business ideas', 7),
     )
     expect(startOperation).not.toHaveBeenCalled()

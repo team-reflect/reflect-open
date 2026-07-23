@@ -1,6 +1,5 @@
-import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ReactNode } from 'react'
+import { renderHook } from 'vitest-browser-react'
 import { setBridge } from '@reflect/core'
 
 // jsdom has no Tauri runtime; mirror the macOS/iOS URL shape the injected
@@ -20,20 +19,25 @@ import {
 let persistence: AssetPersistence | null = null
 let operations: Operation[] = []
 
-function OperationsProbe(): ReactNode {
-  operations = useOperations()
-  return null
-}
-
-function Host({
+function renderPersistence({
   generation,
   path = 'notes/a.md',
 }: {
   generation: number | null
   path?: string
-}): ReactNode {
-  persistence = useAssetPersistence(generation, path)
-  return null
+}) {
+  return renderHook(
+    (
+      { generation, path }: { generation: number | null; path: string } = {
+        generation: null,
+        path: 'notes/a.md',
+      },
+    ) => {
+      persistence = useAssetPersistence(generation, path)
+      operations = useOperations()
+    },
+    { initialProps: { generation, path } },
+  )
 }
 
 /** A bridge whose upload commands succeed, echoing the committed name back. */
@@ -56,7 +60,6 @@ function fileOf(name: string, type: string, size = 16): File {
 }
 
 afterEach(() => {
-  cleanup()
   setBridge(null)
   persistence = null
   resetOperations()
@@ -66,7 +69,7 @@ afterEach(() => {
 describe('useAssetPersistence saveFile', () => {
   it('names a pasted image pasted-<timestamp>.<ext>, leaving collisions to Rust', async () => {
     installUploadBridge()
-    render(<Host generation={3} />)
+    const { act } = await renderPersistence({ generation: 3 })
 
     let saved: string | null = null
     await act(async () => {
@@ -78,7 +81,7 @@ describe('useAssetPersistence saveFile', () => {
 
   it('keeps an attachment under its sanitized original name', async () => {
     installUploadBridge()
-    render(<Host generation={3} />)
+    const { act } = await renderPersistence({ generation: 3 })
 
     let saved: string | null = null
     await act(async () => {
@@ -90,7 +93,7 @@ describe('useAssetPersistence saveFile', () => {
 
   it('treats an image MIME without a known extension as a named attachment', async () => {
     installUploadBridge()
-    render(<Host generation={3} />)
+    const { act } = await renderPersistence({ generation: 3 })
 
     let saved: string | null = null
     await act(async () => {
@@ -102,12 +105,7 @@ describe('useAssetPersistence saveFile', () => {
 
   it('saves a large file without asking, with a status-line warning after', async () => {
     installUploadBridge()
-    render(
-      <>
-        <Host generation={3} />
-        <OperationsProbe />
-      </>,
-    )
+    const { act } = await renderPersistence({ generation: 3 })
 
     let saved: string | null = null
     await act(async () => {
@@ -130,7 +128,7 @@ describe('useAssetPersistence saveFile', () => {
 
   it('declines without a graph session', async () => {
     const invoke = installUploadBridge()
-    render(<Host generation={null} />)
+    const { act } = await renderPersistence({ generation: null })
 
     let saved: string | null = 'sentinel'
     await act(async () => {
@@ -142,32 +140,32 @@ describe('useAssetPersistence saveFile', () => {
 })
 
 describe('useAssetPersistence resolveImageUrl', () => {
-  it('passes remote URLs through untouched', () => {
+  it('passes remote URLs through untouched', async () => {
     installUploadBridge()
-    render(<Host generation={3} />)
+    await renderPersistence({ generation: 3 })
 
     expect(persistence!.resolveImageUrl('https://example.com/cat.png')).toBe(
       'https://example.com/cat.png',
     )
   })
 
-  it('maps a safe assets/ path onto the generation-pinned reflect-asset URL', () => {
+  it('maps a safe assets/ path onto the generation-pinned reflect-asset URL', async () => {
     installUploadBridge()
-    render(<Host generation={3} />)
+    await renderPersistence({ generation: 3 })
 
     expect(persistence!.resolveImageUrl('assets/cat.png')).toBe(
       `reflect-asset://localhost/${encodeURIComponent('3/assets/cat.png')}`,
     )
   })
 
-  it('declines unsafe paths and missing sessions', () => {
+  it('declines unsafe paths and missing sessions', async () => {
     installUploadBridge()
-    render(<Host generation={3} />)
+    await renderPersistence({ generation: 3 })
 
     expect(persistence!.resolveImageUrl('assets/../secrets.env')).toBeNull()
     expect(persistence!.resolveImageUrl('notes/other.md')).toBeNull()
 
-    render(<Host generation={null} />)
+    await renderPersistence({ generation: null })
     expect(persistence!.resolveImageUrl('assets/cat.png')).toBeNull()
   })
 })
@@ -212,7 +210,7 @@ describe('useAssetPersistence resolveFileInfo', () => {
       { path: 'assets/q3-report.pdf', size: 1234 },
       { path: 'assets/archive.zip', size: 5678 },
     ])
-    render(<Host generation={3} />)
+    await renderPersistence({ generation: 3 })
 
     const [report, archive] = await Promise.all([
       persistence!.resolveFileInfo('assets/q3-report.pdf'),
@@ -226,7 +224,7 @@ describe('useAssetPersistence resolveFileInfo', () => {
 
   it('serves a just-saved file from the save itself, without a listing', async () => {
     const invoke = installListingBridge([])
-    render(<Host generation={3} />)
+    const { act } = await renderPersistence({ generation: 3 })
 
     await act(async () => {
       await persistence!.saveFile(fileOf('Q3 Report.PDF', 'application/pdf', 1234))
@@ -240,7 +238,7 @@ describe('useAssetPersistence resolveFileInfo', () => {
 
   it('declines remote or unsafe hrefs without touching the bridge', async () => {
     const invoke = installListingBridge([])
-    render(<Host generation={3} />)
+    await renderPersistence({ generation: 3 })
 
     await expect(persistence!.resolveFileInfo('https://example.com/q3.pdf')).resolves.toBeUndefined()
     await expect(persistence!.resolveFileInfo('assets/../secrets.env')).resolves.toBeUndefined()
@@ -249,14 +247,14 @@ describe('useAssetPersistence resolveFileInfo', () => {
 
   it('returns undefined for an asset missing from the listing', async () => {
     installListingBridge([{ path: 'assets/other.pdf', size: 9 }])
-    render(<Host generation={3} />)
+    await renderPersistence({ generation: 3 })
 
     await expect(persistence!.resolveFileInfo('assets/gone.pdf')).resolves.toBeUndefined()
   })
 
   it('declines without a graph session', async () => {
     const invoke = installListingBridge([{ path: 'assets/q3.pdf', size: 9 }])
-    render(<Host generation={null} />)
+    await renderPersistence({ generation: null })
 
     await expect(persistence!.resolveFileInfo('assets/q3.pdf')).resolves.toBeUndefined()
     expect(invoke).not.toHaveBeenCalled()
@@ -270,7 +268,7 @@ describe('useAssetPersistence resolveFileInfo', () => {
       invokeBinary: async () => null,
       listen: async () => () => {},
     })
-    render(<Host generation={3} />)
+    await renderPersistence({ generation: 3 })
 
     await expect(persistence!.resolveFileInfo('assets/q3.pdf')).resolves.toBeUndefined()
   })
@@ -287,21 +285,21 @@ describe('useAssetPersistence resolveFileInfo', () => {
       invokeBinary: async () => null,
       listen: async () => () => {},
     })
-    const view = render(<Host generation={3} />)
+    const view = await renderPersistence({ generation: 3 })
 
     const staleLookup = persistence!.resolveFileInfo('assets/q3.pdf')
-    await waitFor(() => expect(resolveListing).not.toBeNull())
+    await vi.waitFor(() => expect(resolveListing).not.toBeNull())
     const resolveStale = resolveListing!
     resolveListing = null
 
     // The user switches graphs; the old graph's listing then lands.
-    view.rerender(<Host generation={4} />)
+    await view.rerender({ generation: 4, path: 'notes/a.md' })
     resolveStale([{ path: 'assets/q3.pdf', size: 999, modifiedMs: 0 }])
     await staleLookup
 
     // The new session lists afresh instead of serving the stale size.
     const freshLookup = persistence!.resolveFileInfo('assets/q3.pdf')
-    await waitFor(() => expect(resolveListing).not.toBeNull())
+    await vi.waitFor(() => expect(resolveListing).not.toBeNull())
     resolveListing!([{ path: 'assets/q3.pdf', size: 111, modifiedMs: 0 }])
     await expect(freshLookup).resolves.toEqual({ size: 111 })
   })
@@ -337,7 +335,7 @@ function installFailingBridge(): { heal: () => void } {
 describe('useAssetPersistence errors', () => {
   it('owns save failures — never throws — keyed by how the file was named', async () => {
     const bridge = installFailingBridge()
-    render(<Host generation={3} />)
+    const { act } = await renderPersistence({ generation: 3 })
 
     // A pasted image fails as an image…
     await act(async () => {
@@ -373,17 +371,17 @@ describe('useAssetPersistence errors', () => {
         }),
       listen: async () => () => {},
     })
-    const view = render(<Host generation={3} path="notes/a.md" />)
+    const view = await renderPersistence({ generation: 3, path: 'notes/a.md' })
 
     let savePromise: Promise<string | null> | null = null
-    act(() => {
+    await view.act(() => {
       savePromise = persistence!.saveFile(fileOf('slow.pdf', 'application/pdf'))
     })
-    await waitFor(() => expect(failLateAppend).not.toBeNull())
+    await vi.waitFor(() => expect(failLateAppend).not.toBeNull())
 
     // The user moves on; the stream then fails for the note they left.
-    view.rerender(<Host generation={3} path="notes/b.md" />)
-    await act(async () => {
+    await view.rerender({ generation: 3, path: 'notes/b.md' })
+    await view.act(async () => {
       failLateAppend!()
       await savePromise
     })
