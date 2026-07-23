@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0-beta.16](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.15...v0.7.0-beta.16) (2026-07-23)
+
+
+### Features
+
+* attach Apple link previews to URL-only captures ([#929](https://github.com/team-reflect/reflect-open/issues/929)) ([3eb6113](https://github.com/team-reflect/reflect-open/commit/3eb6113b615948e506120fa2b6abbd69d11674d4))
+
 ## [0.7.0-beta.15](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.14...v0.7.0-beta.15) (2026-07-23)
 
 
