@@ -426,8 +426,11 @@ pub fn capture_shared_inbox_relay(generation: u64, state: State<GraphState>) -> 
 
 // ---- screenshot promote ---------------------------------------------------------
 
+// Maximum decoded image width or height, in pixels.
 const CAPTURE_IMAGE_MAX_DIMENSION: u32 = 8192;
+// Maximum memory the image decoder may allocate, in bytes.
 const CAPTURE_IMAGE_MAX_ALLOC: u64 = 128 * 1024 * 1024;
+// Long-edge target for persisted capture JPEGs, in pixels.
 const CAPTURE_IMAGE_LONG_EDGE: u32 = 1600;
 
 /// Decode, downscale to `max_dim` on the long edge, re-encode as JPEG. Pure —
