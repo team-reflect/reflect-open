@@ -766,7 +766,7 @@ describe('MobileStack transitions & back-swipe', () => {
     expect(
       page
         .elementLocator(origin!)
-        .getByRole('heading', { level: 1, hidden: true })
+        .locate('h1')
         .element()
         .querySelector('[data-slot="month-title"]')?.textContent,
     ).toBe(monthLabel(monthOf(todayIso())))
