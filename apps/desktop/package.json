@@ -11,7 +11,7 @@
     "release:ios": "node scripts/release-ios.mjs",
     "release:macos": "node scripts/release-macos.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --config ../../vitest.config.ts --project browser --project node",
     "test:install": "playwright install chromium webkit",
     "lint:react": "eslint .",
     "tauri": "tauri",

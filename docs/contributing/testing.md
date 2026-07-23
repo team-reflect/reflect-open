@@ -6,15 +6,18 @@ JS tests run on [Vitest](https://vitest.dev). The desktop app
 provider, so editor and component tests run in a real browser instead of
 jsdom. Rust tests are plain `cargo test` (see `AGENTS.md`).
 
-## Desktop test projects
+## Test projects
 
-`apps/desktop/vitest.config.ts` defines the Vitest projects:
+The root `vitest.config.ts` collects every app and package into one Vitest
+workspace. The desktop app has two project configs:
 
-- **`browser`**: `src/**/*.test.tsx`, executed in a real browser. Chromium by
+- **`apps/desktop/vitest.browser.config.ts` (`browser`)**:
+  `src/**/*.test.tsx`, executed in a real browser. Chromium by
   default; WebKit on demand (see below). Test files run sequentially
   (`fileParallelism: false`) because real keyboard focus is a per-page global.
-- **`node`**: `src/**/*.test.ts` plus `scripts/**/*.test.mjs`, executed in a
-  plain node environment.
+- **`apps/desktop/vitest.node.config.ts` (`node`)**:
+  `src/**/*.test.ts` plus `scripts/**/*.test.mjs`, executed in a plain node
+  environment.
 
 The routing rule is the file extension, with no exception list: `.test.ts`
 means "pure logic, node environment", `.test.tsx` means "needs a DOM, real
@@ -33,13 +36,13 @@ Firefox is intentionally not part of the matrix.
 pnpm --filter @reflect/desktop test:install
 
 # run the browser project on Chromium
-pnpm --filter @reflect/desktop exec vitest run --project browser
+pnpm exec vitest run --project browser
 
 # same, on WebKit
-REFLECT_TEST_BROWSER=webkit pnpm --filter @reflect/desktop exec vitest run --project browser
+REFLECT_TEST_BROWSER=webkit pnpm exec vitest run --project browser
 
 # watch a headed browser window while debugging
-DEBUG=1 pnpm --filter @reflect/desktop exec vitest --project browser path/to/test
+DEBUG=1 pnpm exec vitest --project browser path/to/test
 ```
 
 ## Console output fails tests

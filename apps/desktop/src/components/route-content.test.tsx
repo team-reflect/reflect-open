@@ -115,13 +115,13 @@ vi.mock('@/components/chat/chat-screen', () => ({
   ChatScreen: () => <div data-testid="chat-screen" />,
 }))
 
-// jsdom implements neither — the daily stream's virtualizer needs both.
+// These tests do not exercise layout, but the daily stream's virtualizer needs
+// these browser APIs to exist.
 class ResizeObserverStub {
   observe(): void {}
   unobserve(): void {}
   disconnect(): void {}
 }
-globalThis.ResizeObserver ??= ResizeObserverStub as unknown as typeof ResizeObserver
 Element.prototype.scrollTo ??= () => {}
 
 /** The fake graph: files behind the IPC bridge + a write log. */
@@ -136,6 +136,7 @@ setBridge({
 })
 
 beforeEach(() => {
+  vi.stubGlobal('ResizeObserver', ResizeObserverStub)
   files = {}
   writes = []
   editorProbe.onChange = null
@@ -164,6 +165,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.unstubAllGlobals()
   setPlatformSurface({ touchEditor: false, mobileApp: false })
 })
 
