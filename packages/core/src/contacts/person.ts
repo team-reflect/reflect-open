@@ -2,7 +2,9 @@ import { resolveOrCreateNoteWithTitle, type ResolveOrCreateNoteResult } from '..
 import { db } from '../indexing/db'
 import { getWikiAddressForPath } from '../indexing/queries-suggestions'
 import { inClauseChunks } from '../indexing/query-utils'
+import { serializeWikiSuggestionAddress } from '../indexing/suggest'
 import { canonicalEmails } from '../markdown/email-fields'
+import type { ContactMatch } from './commands'
 
 const PERSON_TAG_KEY = 'person'
 
@@ -30,6 +32,30 @@ export type PersonResolution =
   | MissingPersonResolution
   | ExistingPersonResolution
   | BlockedPersonResolution
+
+export interface NewPersonContactResolution {
+  readonly kind: 'new'
+  readonly contact: ContactMatch
+  readonly insertText: string
+}
+
+export interface ExistingPersonContactResolution extends ExistingPersonResolution {
+  readonly contact: ContactMatch
+}
+
+export interface BlockedPersonContactResolution {
+  readonly kind: 'blocked'
+  readonly contact: ContactMatch
+  readonly reason:
+    | BlockedPersonResolution['reason']
+    | 'unaddressable-contact'
+}
+
+/** A Contact row ready for a wikilink surface, or a reason to hide it. */
+export type PersonContactResolution =
+  | NewPersonContactResolution
+  | ExistingPersonContactResolution
+  | BlockedPersonContactResolution
 
 interface PersonOwnerRow {
   readonly path: string
@@ -91,6 +117,28 @@ export async function resolvePerson(
     title: address.title,
     insertText: address.insertText,
   }
+}
+
+/**
+ * Resolve one Apple Contact into a selectable new/existing wikilink target.
+ * Unsafe new names and unsafe or conflicting owners remain blocked identities,
+ * so callers cannot fall through to duplicate creation.
+ */
+export async function resolvePersonContact(
+  contact: ContactMatch,
+): Promise<PersonContactResolution> {
+  const resolution = await resolvePerson(contact.emails)
+  if (resolution.kind === 'existing') {
+    return { ...resolution, contact }
+  }
+  if (resolution.kind === 'blocked') {
+    return { kind: 'blocked', contact, reason: resolution.reason }
+  }
+  const insertText = serializeWikiSuggestionAddress(contact.fullName, null)
+  if (insertText === null) {
+    return { kind: 'blocked', contact, reason: 'unaddressable-contact' }
+  }
+  return { kind: 'new', contact, insertText }
 }
 
 export interface EnsurePersonNoteInput {

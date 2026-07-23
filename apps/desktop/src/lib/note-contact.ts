@@ -2,13 +2,9 @@ import {
   appendContactDetails,
   contactDetailsMarkdown,
   contactNamesEqual,
-  createNoteWithTitle,
   matchContactForTitle,
-  noteExists,
   noteHasContactDetails,
-  notePath,
   parseNote,
-  slugForTitle,
   splitFrontmatter,
   writeNote,
   type ContactMatch,
@@ -81,24 +77,6 @@ export async function addContactToNote(
   // Reuse the validated snapshot — with no session, `source` came from disk.
   // A second read here would reopen the window between the check and the write.
   await writeNote(path, appendContactDetails(source, contact), generation)
-}
-
-/**
- * Create a person note from a `[[` link-menu contact row (v1's backlink-menu
- * behavior): titled with the contact's name and prefilled with the same
- * details block Add writes. The row only appears when no suggestion resolves
- * to the name, so the note shouldn't exist — the direct existence check
- * backstops index lag, ensuring a race never mints an `ada-lovelace-2.md`
- * beside the real person note.
- */
-export async function createPersonNoteFromContact(
-  contact: ContactMatch,
-  generation: number,
-): Promise<void> {
-  if (await noteExists(notePath(slugForTitle(contact.fullName)))) {
-    return
-  }
-  await createNoteWithTitle(contact.fullName, generation, contactDetailsMarkdown(contact))
 }
 
 /**

@@ -7,11 +7,14 @@ import {
 } from '@meowdown/react'
 import {
   contactLinkSuggestions,
+  contactDetailsMarkdown,
   displayNoteTitle,
+  ensurePersonNote,
   errorMessage,
   hasBridge,
   isContactsReadable,
   resolveOrCreateNoteWithTitle,
+  resolvePersonContact,
   suggestTags,
   suggestWikiLinkTargets,
 } from '@reflect/core'
@@ -19,7 +22,6 @@ import { reportAmbiguousNoteTitle } from '@/editor/ambiguous-note-feedback'
 import { buildAutocompleteEntries } from '@/editor/wiki-autocomplete-entries'
 import { useContactsAuthorization } from '@/hooks/use-contacts-authorization'
 import { formatDayLabel, todayIso } from '@/lib/dates'
-import { createPersonNoteFromContact } from '@/lib/note-contact'
 import { startOperation } from '@/lib/operations'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
@@ -83,20 +85,37 @@ export function useEditorAutocomplete(): EditorAutocomplete {
         dateFormat: settings.dateFormat,
         weekStartDay: settings.weekStartDay,
       }
-      const [wikiLinks, contacts] = await Promise.all([
+      const [wikiLinks, contactResolutions] = await Promise.all([
         suggestWikiLinkTargets(query, 8, dateContext),
         // A contacts hiccup (permission revoked mid-session, store error)
         // must cost only its own rows, never the note suggestions.
         contactsInMenu
-          ? contactLinkSuggestions(query).catch((error: unknown) => {
-              console.error('contact link suggestions failed:', error)
-              return []
-            })
+          ? contactLinkSuggestions(query)
+              .then((contacts) =>
+                Promise.all(contacts.map((contact) => resolvePersonContact(contact))),
+              )
+              .catch((error: unknown) => {
+                console.error('contact link suggestions failed:', error)
+                return []
+              })
           : Promise.resolve([]),
       ])
+      const contacts = contactResolutions.flatMap((resolution) =>
+        resolution.kind === 'blocked'
+          ? []
+          : [{
+              contact: resolution.contact,
+              target: resolution.insertText,
+              ownerPath: resolution.kind === 'existing' ? resolution.path : null,
+            }],
+      )
+      const blockedContactNames = contactResolutions.flatMap((resolution) =>
+        resolution.kind === 'blocked' ? [resolution.contact.fullName] : [],
+      )
       return buildAutocompleteEntries(query, wikiLinks.suggestions, {
         offerCreate: true,
         contacts,
+        blockedContactNames,
         requireSerializableWikiText: true,
         queryReadsAsDate: wikiLinks.queryReadsAsDate,
         claimedTargetKeys: wikiLinks.claimedTargetKeys,
@@ -118,18 +137,30 @@ export function useEditorAutocomplete(): EditorAutocomplete {
         if (entry.kind === 'contact') {
           const { contact } = entry
           return {
-            target: contact.fullName,
+            target: entry.target,
             label: contact.fullName,
             detail: contact.emails[0] ?? contact.phones[0] ?? 'Contact',
-            // Like the create row: the menu inserts the link text; the person
-            // note is born in the background, prefilled from the contact.
             onSelect: () => {
               if (generation !== null) {
-                void createPersonNoteFromContact(contact, generation).catch(
-                  (error: unknown) => {
+                void ensurePersonNote({
+                  title: contact.fullName,
+                  emails: contact.emails,
+                  body: contactDetailsMarkdown(contact),
+                  generation,
+                })
+                  .then((outcome) => {
+                    if (outcome.kind === 'ambiguous') {
+                      reportAmbiguousNoteTitle('Creating note', contact.fullName)
+                    } else if (outcome.kind === 'unavailable') {
+                      startOperation('Creating note').fail(
+                        `Couldn’t create “${contact.fullName}” while a potentially matching note is unavailable. Try again when it is available on this device.`,
+                      )
+                    }
+                  })
+                  .catch((error: unknown) => {
                     console.error('create-person-note failed:', error)
-                  },
-                )
+                    startOperation('Creating note').fail(errorMessage(error))
+                  })
               }
             },
           }

@@ -17,8 +17,21 @@ import {
 
 export type AutocompleteEntry<Suggestion extends WikiSuggestion = WikiSuggestion> =
   | { kind: 'suggestion'; suggestion: Suggestion }
-  | { kind: 'contact'; contact: ContactMatch }
+  | {
+      kind: 'contact'
+      contact: ContactMatch
+      target: string
+      ownerPath: string | null
+    }
   | { kind: 'create'; title: string }
+
+export interface ContactEntryCandidate {
+  readonly contact: ContactMatch
+  /** Validated text inserted by a wikilink consumer, or the attendee name. */
+  readonly target: string
+  /** Existing owner path, or null for a Contact that would create a note. */
+  readonly ownerPath: string | null
+}
 
 export interface EntryOptions {
   /**
@@ -32,7 +45,9 @@ export interface EntryOptions {
    * A contact whose name would resolve to an existing suggestion is dropped —
    * the note row already covers it, exactly v1's dedup.
    */
-  contacts?: readonly ContactMatch[]
+  contacts?: readonly ContactEntryCandidate[]
+  /** Exact Contact names whose identity is blocked and must not offer Create. */
+  blockedContactNames?: readonly string[]
   /**
    * Drop raw Create/contact text that cannot be embedded in `[[…]]` without
    * changing what Markdown parses. False for non-markdown consumers such as
@@ -73,10 +88,14 @@ export function buildAutocompleteEntries<Suggestion extends WikiSuggestion>(
   // ambiguous or unsafe still collides with the writable resolver's fallback
   // matching, so it must keep suppressing Create and contact rows.
   const resolvable = new Set<string>()
+  const suggestionPaths = new Set<string>()
   const fallbackResolvable = new Set(
     [...claimedTargetKeys].map(foldFallbackTitleKey),
   )
   for (const suggestion of suggestions) {
+    if (suggestion.path !== null) {
+      suggestionPaths.add(suggestion.path)
+    }
     resolvable.add(foldKey(suggestion.target))
     fallbackResolvable.add(foldFallbackTitleKey(suggestion.target))
     if (suggestion.alias !== null) {
@@ -84,7 +103,11 @@ export function buildAutocompleteEntries<Suggestion extends WikiSuggestion>(
       fallbackResolvable.add(foldFallbackTitleKey(suggestion.alias))
     }
   }
-  const contacts = (options.contacts ?? []).filter((contact) => {
+  const contacts = (options.contacts ?? []).filter((candidate) => {
+    const { contact } = candidate
+    if (candidate.ownerPath !== null) {
+      return !suggestionPaths.has(candidate.ownerPath)
+    }
     if (
       claimedTargetKeys.has(foldKey(contact.fullName)) ||
       resolvable.has(foldKey(contact.fullName)) ||
@@ -94,10 +117,15 @@ export function buildAutocompleteEntries<Suggestion extends WikiSuggestion>(
     }
     return (
       !options.requireSerializableWikiText ||
-      serializeWikiSuggestionAddress(contact.fullName, null) !== null
+      serializeWikiSuggestionAddress(candidate.target, null) !== null
     )
   })
-  entries.push(...contacts.map((contact) => ({ kind: 'contact' as const, contact })))
+  entries.push(
+    ...contacts.map((candidate) => ({
+      kind: 'contact' as const,
+      ...candidate,
+    })),
+  )
 
   if (title === '' || !options.offerCreate) {
     return entries
@@ -114,7 +142,9 @@ export function buildAutocompleteEntries<Suggestion extends WikiSuggestion>(
     suggestions.some((suggestion) => suggestion.generated !== undefined)
   // A contact row for the exact typed name IS the create action (prefilled) —
   // a bare Create row beside it would just be the worse duplicate.
-  const contactCoversQuery = contacts.some((contact) => foldKey(contact.fullName) === key)
+  const contactCoversQuery =
+    contacts.some(({ contact }) => foldKey(contact.fullName) === key) ||
+    (options.blockedContactNames ?? []).some((name) => foldKey(name) === key)
   const canSerializeCreate =
     !options.requireSerializableWikiText ||
     serializeWikiSuggestionAddress(title, null) !== null

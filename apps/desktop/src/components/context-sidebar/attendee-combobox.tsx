@@ -98,7 +98,14 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
       return buildAutocompleteEntries(
         searchTerm,
         suggestions.filter((suggestion) => suggestion.date === null),
-        { offerCreate: true, contacts },
+        {
+          offerCreate: true,
+          contacts: contacts.map((contact) => ({
+            contact,
+            target: contact.fullName,
+            ownerPath: null,
+          })),
+        },
       )
     },
     enabled: hasBridge() && graph !== null && searchTerm !== '',

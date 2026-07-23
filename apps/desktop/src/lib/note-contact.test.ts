@@ -4,22 +4,16 @@ import type { NoteSession } from '@/editor/note-session'
 
 const readNote = vi.hoisted(() => vi.fn<(path: string) => Promise<string>>())
 const writeNote = vi.hoisted(() => vi.fn(async () => {}))
-const noteExists = vi.hoisted(() => vi.fn(async () => false))
 const openSession = vi.hoisted(() => vi.fn<(path: string) => NoteSession | null>(() => null))
-const createNoteWithTitle = vi.hoisted(() => vi.fn(async () => 'notes/created.md'))
 
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   readNote,
   writeNote,
-  noteExists,
-  createNoteWithTitle,
 }))
 vi.mock('@/editor/open-documents', () => ({ openSession }))
 
-const { addContactToNote, createPersonNoteFromContact, ignoreContactSuggestion } = await import(
-  './note-contact'
-)
+const { addContactToNote, ignoreContactSuggestion } = await import('./note-contact')
 
 const ADA: ContactMatch = {
   fullName: 'Ada Lovelace',
@@ -34,9 +28,6 @@ const ADA_BLOCK = '- Type: #person\n- Email: ada@example.com\n- Phone: +1 555 01
 beforeEach(() => {
   readNote.mockReset()
   writeNote.mockClear()
-  noteExists.mockReset()
-  noteExists.mockResolvedValue(false)
-  createNoteWithTitle.mockClear()
   openSession.mockReset()
   openSession.mockReturnValue(null)
 })
@@ -140,23 +131,6 @@ describe('addContactToNote', () => {
     await addContactToNote('notes/Ada Lovelace.md', bare, 3)
 
     expect(writeNote).not.toHaveBeenCalled()
-  })
-})
-
-describe('createPersonNoteFromContact', () => {
-  it('creates the person note prefilled with the details block', async () => {
-    await createPersonNoteFromContact(ADA, 3)
-
-    expect(createNoteWithTitle).toHaveBeenCalledWith('Ada Lovelace', 3, ADA_BLOCK)
-  })
-
-  it('skips creation when the slug path already exists (index-lag backstop)', async () => {
-    noteExists.mockResolvedValue(true)
-
-    await createPersonNoteFromContact(ADA, 3)
-
-    expect(noteExists).toHaveBeenCalledWith('notes/ada-lovelace.md')
-    expect(createNoteWithTitle).not.toHaveBeenCalled()
   })
 })
 

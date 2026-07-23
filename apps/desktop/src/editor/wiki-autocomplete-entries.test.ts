@@ -27,6 +27,11 @@ function contact(overrides: Partial<ContactMatch>): ContactMatch {
   }
 }
 
+function contactCandidate(overrides: Partial<ContactMatch> = {}) {
+  const value = contact(overrides)
+  return { contact: value, target: value.fullName, ownerPath: null }
+}
+
 describe('buildAutocompleteEntries', () => {
   it('offers create when nothing matches the typed text exactly', () => {
     const entries = buildAutocompleteEntries('New Idea', [
@@ -96,7 +101,7 @@ describe('buildAutocompleteEntries', () => {
       expect(
         buildAutocompleteEntries(unsafeName, [], {
           offerCreate: true,
-          contacts: [contact({ fullName: unsafeName })],
+          contacts: [contactCandidate({ fullName: unsafeName })],
           requireSerializableWikiText: true,
         }),
       ).toEqual([])
@@ -141,7 +146,7 @@ describe('buildAutocompleteEntries', () => {
     expect(
       buildAutocompleteEntries('Ada Lovelace', [], {
         offerCreate: true,
-        contacts: [contact({})],
+        contacts: [contactCandidate()],
         claimedTargetKeys: ['ada lovelace'],
       }),
     ).toEqual([])
@@ -153,7 +158,7 @@ describe('buildAutocompleteEntries', () => {
     // bare `Ideas` would be refused by the writable resolver's fallback guard.
     const entries = buildAutocompleteEntries('Ideas', [], {
       offerCreate: true,
-      contacts: [contact({ fullName: 'Ideas' })],
+      contacts: [contactCandidate({ fullName: 'Ideas' })],
       claimedTargetKeys: ['🧠 ideas'],
     })
     expect(entries).toEqual([])
@@ -162,7 +167,7 @@ describe('buildAutocompleteEntries', () => {
   it('drops a claimed contact found by a partial query', () => {
     const entries = buildAutocompleteEntries('Road', [], {
       offerCreate: true,
-      contacts: [contact({ fullName: 'Roadmap' })],
+      contacts: [contactCandidate({ fullName: 'Roadmap' })],
       claimedTargetKeys: ['roadmap'],
     })
     expect(entries).toEqual([{ kind: 'create', title: 'Road' }])
@@ -172,10 +177,17 @@ describe('buildAutocompleteEntries', () => {
     const ada = contact({})
     const entries = buildAutocompleteEntries('Ada Lovelace', [], {
       offerCreate: true,
-      contacts: [ada],
+      contacts: [{ contact: ada, target: ada.fullName, ownerPath: null }],
       claimedTargetKeys: ['roadmap'],
     })
-    expect(entries).toEqual([{ kind: 'contact', contact: ada }])
+    expect(entries).toEqual([
+      {
+        kind: 'contact',
+        contact: ada,
+        target: 'Ada Lovelace',
+        ownerPath: null,
+      },
+    ])
   })
 
   it('never offers create from unsettled (in-flight) suggestions', () => {
@@ -200,17 +212,72 @@ describe('buildAutocompleteEntries', () => {
     const entries = buildAutocompleteEntries(
       'Ada L',
       [suggestion({ target: 'Ada Lovelace Notes', title: 'Ada Lovelace Notes' })],
-      { offerCreate: true, contacts: [ada] },
+      {
+        offerCreate: true,
+        contacts: [{ contact: ada, target: ada.fullName, ownerPath: null }],
+      },
     )
     expect(entries.map((entry) => entry.kind)).toEqual(['suggestion', 'contact', 'create'])
-    expect(entries[1]).toEqual({ kind: 'contact', contact: ada })
+    expect(entries[1]).toEqual({
+      kind: 'contact',
+      contact: ada,
+      target: 'Ada Lovelace',
+      ownerPath: null,
+    })
   })
 
   it('drops a contact whose name already resolves to a suggestion', () => {
     const entries = buildAutocompleteEntries(
       'ada',
       [suggestion({ target: 'Ada Lovelace', title: 'Ada Lovelace' })],
-      { offerCreate: true, contacts: [contact({})] },
+      { offerCreate: true, contacts: [contactCandidate()] },
+    )
+    expect(entries.filter((entry) => entry.kind === 'contact')).toEqual([])
+  })
+
+  it('keeps an email-owned Contact when its name resolves to another note', () => {
+    const ada = contact({})
+    const entries = buildAutocompleteEntries(
+      'ada',
+      [suggestion({ target: 'Ada Lovelace', title: 'Ada Lovelace' })],
+      {
+        offerCreate: true,
+        contacts: [{
+          contact: ada,
+          target: 'Augusta Ada King',
+          ownerPath: 'notes/augusta.md',
+        }],
+      },
+    )
+    expect(entries.filter((entry) => entry.kind === 'contact')).toEqual([
+      {
+        kind: 'contact',
+        contact: ada,
+        target: 'Augusta Ada King',
+        ownerPath: 'notes/augusta.md',
+      },
+    ])
+  })
+
+  it('drops an email-owned Contact when its owner already has a note row', () => {
+    const ada = contact({})
+    const entries = buildAutocompleteEntries(
+      'ada',
+      [
+        suggestion({
+          target: 'Augusta Ada King',
+          title: 'Augusta Ada King',
+          path: 'notes/augusta.md',
+        }),
+      ],
+      {
+        offerCreate: true,
+        contacts: [{
+          contact: ada,
+          target: 'Augusta Ada King',
+          ownerPath: 'notes/augusta.md',
+        }],
+      },
     )
     expect(entries.filter((entry) => entry.kind === 'contact')).toEqual([])
   })
@@ -219,7 +286,7 @@ describe('buildAutocompleteEntries', () => {
     const entries = buildAutocompleteEntries(
       'ada',
       [suggestion({ target: 'People/Ada', title: 'People/Ada', alias: 'Ada Lovelace' })],
-      { offerCreate: true, contacts: [contact({})] },
+      { offerCreate: true, contacts: [contactCandidate()] },
     )
     expect(entries.filter((entry) => entry.kind === 'contact')).toEqual([])
   })
@@ -228,7 +295,7 @@ describe('buildAutocompleteEntries', () => {
     const entries = buildAutocompleteEntries(
       'Ada Lovelace',
       [suggestion({ target: '🧠 Ada Lovelace', title: '🧠 Ada Lovelace' })],
-      { offerCreate: true, contacts: [contact({})] },
+      { offerCreate: true, contacts: [contactCandidate()] },
     )
     expect(entries.map((entry) => entry.kind)).toEqual(['suggestion'])
   })
@@ -238,9 +305,18 @@ describe('buildAutocompleteEntries', () => {
     // beside it would just be the worse duplicate.
     const entries = buildAutocompleteEntries('ada lovelace', [], {
       offerCreate: true,
-      contacts: [contact({})],
+      contacts: [contactCandidate()],
     })
     expect(entries.map((entry) => entry.kind)).toEqual(['contact'])
+  })
+
+  it('suppresses Create for an exact blocked Contact without hiding note rows', () => {
+    const note = suggestion({ target: 'Ada Notes', title: 'Ada Notes' })
+    const entries = buildAutocompleteEntries('Ada Lovelace', [note], {
+      offerCreate: true,
+      blockedContactNames: ['Ada Lovelace'],
+    })
+    expect(entries).toEqual([{ kind: 'suggestion', suggestion: note }])
   })
 })
 

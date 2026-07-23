@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resolveOrCreateNoteWithTitle } from '../graph/create-note'
 import { setBridge } from '../ipc/bridge'
 import { getWikiAddressForPath } from '../indexing/queries-suggestions'
-import { ensurePersonNote, resolvePerson } from './person'
+import type { ContactMatch } from './commands'
+import {
+  ensurePersonNote,
+  resolvePerson,
+  resolvePersonContact,
+} from './person'
 
 vi.mock('../graph/create-note', () => ({
   resolveOrCreateNoteWithTitle: vi.fn(),
@@ -23,6 +28,17 @@ function address(path = 'notes/ada.md') {
     alias: null,
     date: null,
     insertText: 'Ada Lovelace',
+  }
+}
+
+function contact(overrides: Partial<ContactMatch> = {}): ContactMatch {
+  return {
+    fullName: 'Ada Lovelace',
+    givenName: 'Ada',
+    familyName: 'Lovelace',
+    emails: ['ada@example.com'],
+    phones: [],
+    ...overrides,
   }
 }
 
@@ -176,5 +192,51 @@ describe('ensurePersonNote', () => {
       7,
       '- Type: #person\n- Email: ada@example.com',
     )
+  })
+})
+
+describe('resolvePersonContact', () => {
+  it('uses an existing email owner target even when its title differs', async () => {
+    mockInvoke.mockResolvedValue([
+      { path: 'notes/augusta.md', title: 'Augusta Ada King' },
+    ])
+    getAddressMock.mockResolvedValue({
+      ...address('notes/augusta.md'),
+      target: 'Augusta Ada King',
+      title: 'Augusta Ada King',
+      insertText: 'Augusta Ada King',
+    })
+    const ada = contact()
+
+    await expect(resolvePersonContact(ada)).resolves.toEqual({
+      kind: 'existing',
+      contact: ada,
+      emails: ['ada@example.com'],
+      path: 'notes/augusta.md',
+      title: 'Augusta Ada King',
+      insertText: 'Augusta Ada King',
+    })
+  })
+
+  it('returns a serializable new target for an unowned contact', async () => {
+    mockInvoke.mockResolvedValue([])
+    const ada = contact()
+
+    await expect(resolvePersonContact(ada)).resolves.toEqual({
+      kind: 'new',
+      contact: ada,
+      insertText: 'Ada Lovelace',
+    })
+  })
+
+  it('blocks an unsafe new contact name', async () => {
+    mockInvoke.mockResolvedValue([])
+    const ada = contact({ fullName: 'Ada | Augusta' })
+
+    await expect(resolvePersonContact(ada)).resolves.toEqual({
+      kind: 'blocked',
+      contact: ada,
+      reason: 'unaddressable-contact',
+    })
   })
 })

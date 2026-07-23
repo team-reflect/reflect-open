@@ -248,10 +248,15 @@ export { pickContactForEmail, resolveAttendeeContact } from '../contacts/resolve
 export {
   ensurePersonNote,
   resolvePerson,
+  resolvePersonContact,
   type BlockedPersonResolution,
+  type BlockedPersonContactResolution,
   type EnsurePersonNoteInput,
   type EnsurePersonNoteResult,
   type ExistingPersonResolution,
+  type ExistingPersonContactResolution,
   type MissingPersonResolution,
+  type NewPersonContactResolution,
+  type PersonContactResolution,
   type PersonResolution,
 } from '../contacts/person'
