@@ -177,7 +177,7 @@ vi.mock('@/components/ui/drawer', () => ({
 }))
 
 /** Narrow a queried element to the editor stub's textarea so `.value` typechecks. */
-function asTextArea(element: HTMLElement): HTMLTextAreaElement {
+function asTextArea(element: Element): HTMLTextAreaElement {
   if (!(element instanceof HTMLTextAreaElement)) {
     throw new Error('expected a textarea')
   }
