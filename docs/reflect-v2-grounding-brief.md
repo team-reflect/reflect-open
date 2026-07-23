@@ -1042,7 +1042,9 @@ The docs make data portability part of Reflect's values. V2 should satisfy that 
 
 Minimum viable V2 portability:
 
-- Notes are plain markdown files under `daily/` and `notes/`.
+- Notes are plain Markdown files. Reflect-created daily notes live under `daily/` and
+  regular notes under `notes/`; opened Markdown vaults may keep adopted notes at the
+  root or in visible nested folders.
 - Attachments live as normal files under `assets/` and use relative markdown links.
 - Backlinks, tags, tasks, and daily-note dates remain readable in markdown.
 - `.reflect/` stays out of the durable portability contract except for deliberately documented durable local tables such as `chat_*`.

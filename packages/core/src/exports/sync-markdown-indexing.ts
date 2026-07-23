@@ -132,6 +132,7 @@ export {
   subscribeIndexWritten,
   subscribeNoteMoved,
   subscribeFileChanges,
+  subscribeReconcileRequests,
   emitFileChanges,
   setLocalWriteEcho,
   subscribeOwnWrites,

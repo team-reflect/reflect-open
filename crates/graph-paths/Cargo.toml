@@ -1,0 +1,15 @@
+[package]
+name = "reflect-graph-paths"
+version = "0.1.0"
+description = "Shared graph-relative path classification for Reflect"
+edition = "2021"
+
+[dependencies]
+# ripgrep's directory walker: per-entry errors, no symlink following, and
+# `.gitignore`-style pruning — the properties the vault walk is built on.
+ignore = "0.4"
+
+[dev-dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+tempfile = { workspace = true }

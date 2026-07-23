@@ -36,7 +36,7 @@ impl Fixture {
     /// title/aliases/private, content hash, file mtime, FTS row.
     fn build_index(&self) {
         let conn = reflect_index_schema::open_index_at(self.root()).unwrap();
-        for note in reflect_cli::note_file::walk_notes(self.root()).unwrap() {
+        for note in reflect_cli::note_file::walk_notes(self.root()) {
             let content = fs::read_to_string(self.root().join(&note.rel_path)).unwrap();
             let meta = parse_note_meta(&note.rel_path, &content);
             let daily_date = reflect_cli::paths::date_from_daily_path(&note.rel_path);
@@ -424,6 +424,45 @@ fn search_warns_when_the_index_is_stale_but_still_returns_rows() {
 
     let value = json(&reflect(&fixture, &["search", "alpha", "--json"]));
     assert_eq!(value["stale"], true);
+}
+
+#[test]
+fn search_fails_closed_when_an_indexed_note_is_unavailable() {
+    let fixture = graph();
+    let note = fixture.write_note("Projects/plan.md", "# Plan\nsecret searchable text\n");
+    fixture.build_index();
+    fs::remove_file(note).unwrap();
+    fs::write(
+        fixture.root().join("Projects/.plan.md.icloud"),
+        b"placeholder",
+    )
+    .unwrap();
+
+    let output = reflect(&fixture, &["search", "searchable"]);
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    assert_eq!(stdout(&output), "");
+}
+
+#[cfg(unix)]
+#[test]
+fn stale_index_never_follows_a_note_replaced_by_a_symlink() {
+    use std::os::unix::fs::symlink;
+
+    let fixture = graph();
+    let note = fixture.write_note("Projects/plan.md", "# Plan\nindexed text\n");
+    fixture.build_index();
+    let outside = tempfile::NamedTempFile::new().unwrap();
+    fs::write(outside.path(), "outside secret\n").unwrap();
+    fs::remove_file(note).unwrap();
+    symlink(outside.path(), fixture.root().join("Projects/plan.md")).unwrap();
+
+    let show = reflect(&fixture, &["show", "Plan"]);
+    assert!(!show.status.success());
+    assert!(!stdout(&show).contains("outside secret"));
+
+    let search = reflect(&fixture, &["search", "indexed"]);
+    assert!(search.status.success(), "stderr: {}", stderr(&search));
+    assert_eq!(stdout(&search), "");
 }
 
 #[test]

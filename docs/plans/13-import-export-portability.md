@@ -2,8 +2,9 @@
 
 > **Status (2026-06-14):** Closed by product decision. We are **not** building a
 > dedicated import/export portability surface. Reflect's portability contract is the
-> graph itself: ordinary markdown files in `daily/`, `notes/`, and `assets/`, plus a
-> rebuildable `.reflect/` index that can be deleted at any time.
+> graph itself: ordinary Markdown and attachment files wherever they already live,
+> plus a rebuildable `.reflect/` index that can be deleted at any time. Reflect-created
+> regular notes, daily notes, and pasted files use `notes/`, `daily/`, and `assets/`.
 
 ## Decision
 
@@ -17,12 +18,20 @@ tool.
 
 Reflect V1 exports are now emitted in Reflect V2's graph-compatible markdown shape, so
 there is no dedicated Reflect V1 import path. Users migrate by opening or copying the
-exported graph folder directly.
+exported graph folder directly. Opening an existing Markdown folder adopts it in place;
+it is not an import and does not rearrange its files.
 
 ## Portability Contract
 
 - The graph folder is the export. Copy or zip the folder directly.
-- `daily/`, `notes/`, and `assets/` contain the user-owned durable data.
+- Eligible Markdown can live at the graph root or in visible nested folders. Reflect
+  keeps adopted paths intact. Hidden trees, `assets/`/`audio-memos/`, well-known
+  dependency directories (`node_modules` and friends, plus anything stamped with a
+  `CACHEDIR.TAG`), and paths matched by the vault's own `.gitignore` or a
+  `.reflectignore` file are excluded from discovery; the scan reports a skipped
+  count so an excluded file is always explainable.
+- Reflect-created regular notes live in `notes/`, daily notes in `daily/`, and pasted
+  files in `assets/`; those defaults do not constrain files created by other tools.
 - `.reflect/` is excluded from the portability contract. It is a rebuildable local
   projection, except for explicitly documented durable local tables such as `chat_*`.
 - Markdown frontmatter carries minimal metadata such as stable IDs, aliases, `private`,
@@ -35,7 +44,7 @@ exported graph folder directly.
 - No Markdown ZIP export button.
 - No JSON export.
 - No HTML export.
-- No Obsidian/folder import workflow.
+- No Obsidian/folder import workflow. Existing Markdown vaults open directly instead.
 - No generalized importer framework for Evernote, Roam, Notion, Readwise, Kindle, or
   other apps.
 - No export-to-import round-trip test suite beyond the normal markdown parser, writer,

@@ -73,7 +73,7 @@ mod platform {
         NSNumber, NSOperationQueue, NSPredicate, NSString,
     };
     use serde::Serialize;
-    use tauri::Emitter;
+    use tauri::{Emitter, Manager};
 
     use crate::error::{AppError, AppResult};
 
@@ -476,8 +476,19 @@ mod platform {
             full_round(&query, roots, false)
         };
 
-        if emit_file_changes && !round.changes.is_empty() {
-            let _ = app.emit("index:changed", round.changes);
+        if !round.changes.is_empty() {
+            // The listing cache must not outlive a change this round observed
+            // (a download materialized, a Mac-side edit landed). Try every
+            // root variant: invalidation is root-checked, so the one matching
+            // the open graph wins and the others are no-ops.
+            let state = app.state::<crate::fs::GraphState>();
+            for root in roots {
+                let root = std::path::Path::new(root.trim_end_matches('/'));
+                crate::fs::invalidate_file_catalog(&state, root);
+            }
+            if emit_file_changes {
+                let _ = app.emit("index:changed", round.changes);
+            }
         }
         if !round.conflicts.is_empty() {
             let mut conflicts = round.conflicts;
@@ -635,9 +646,10 @@ mod platform {
         changes
     }
 
-    /// The watcher's note-tracking rule, over absolute metadata paths:
-    /// `.md` under `daily/`, `notes/`, or `templates/`, graph-relative. Tries
-    /// every root variant — Spotlight may report either side of the
+    /// The watcher's note-tracking rule, over absolute metadata paths: an
+    /// eligible Markdown note anywhere visible (the shared
+    /// `reflect-graph-paths` policy), graph-relative. Tries every root
+    /// variant — Spotlight may report either side of the
     /// `/var` ↔ `/private/var` symlink. Variants are slash-terminated
     /// ([`root_variants`]), so the strip is a path boundary, not a string
     /// prefix — a sibling `…/Notes-old/` can never masquerade as the graph.
@@ -645,11 +657,7 @@ mod platform {
         let rel = roots
             .iter()
             .find_map(|root| path.strip_prefix(root.as_str()))?;
-        let tracked = (rel.starts_with("daily/")
-            || rel.starts_with("notes/")
-            || rel.starts_with("templates/"))
-            && rel.ends_with(".md");
-        tracked.then(|| rel.to_string())
+        reflect_graph_paths::is_note(rel).then(|| rel.to_string())
     }
 
     /// A metadata attribute as a string; `None` when absent or another type.

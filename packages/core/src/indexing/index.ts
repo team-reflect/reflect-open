@@ -15,7 +15,9 @@ export {
 } from './commands'
 export {
   FILE_CHANGES_EVENT,
+  RECONCILE_EVENT,
   subscribeFileChanges,
+  subscribeReconcileRequests,
   emitFileChanges,
   type FileChange,
 } from './file-changes'

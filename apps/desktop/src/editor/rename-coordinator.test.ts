@@ -61,6 +61,11 @@ vi.mock('@/lib/operations', () => ({
 const { createRenameCoordinator } = await import('./rename-coordinator')
 
 const PATH = 'notes/subject.md'
+const MANAGED_ID = '01hv3xq7c2dm8k4t9w5e6r1n98'
+
+function managed(content: string): string {
+  return upsertFrontmatter(content, { id: MANAGED_ID })
+}
 
 function makeCoordinator(overrides?: {
   generation?: () => number | null
@@ -79,8 +84,8 @@ async function renameOnce(
   from: string,
   to: string,
 ): Promise<void> {
-  coordinator.content(`# ${from}\n`, 'load')
-  coordinator.content(`# ${to}\n`, 'saved')
+  coordinator.content(managed(`# ${from}\n`), 'load')
+  coordinator.content(managed(`# ${to}\n`), 'saved')
   coordinator.settle()
   await coordinator.settled()
 }
@@ -140,11 +145,11 @@ afterEach(() => {
 
 describe('rename coordinator', () => {
   it('rewrites links with the generation read at run time, then writes the alias to disk', async () => {
-    const content = '# New Title\n'
+    const content = managed('# New Title\n')
     io.readNote.mockResolvedValue(content)
     let generation = 3
     const coordinator = makeCoordinator({ generation: () => generation })
-    coordinator.content('# Old Title\n', 'load')
+    coordinator.content(managed('# Old Title\n'), 'load')
     coordinator.content(content, 'saved')
     generation = 4 // bumps between save and settle — the rewrite must see 4
     coordinator.settle()
@@ -283,9 +288,9 @@ describe('rename coordinator', () => {
   it('a blocked settle keeps the rename pending; the next settle fires it', async () => {
     let armed = false
     const coordinator = makeCoordinator({ canFire: () => armed })
-    io.readNote.mockResolvedValue('# New Title\n')
-    coordinator.content('# Old Title\n', 'load')
-    coordinator.content('# New Title\n', 'saved')
+    io.readNote.mockResolvedValue(managed('# New Title\n'))
+    coordinator.content(managed('# Old Title\n'), 'load')
+    coordinator.content(managed('# New Title\n'), 'saved')
     coordinator.settle() // conflict parked: must not fire
     await coordinator.settled()
     expect(io.rewriteLinksForTitleChange).not.toHaveBeenCalled()
@@ -298,8 +303,8 @@ describe('rename coordinator', () => {
 
   it('external content re-baselines: no rewrite for titles the user did not author', async () => {
     const coordinator = makeCoordinator()
-    coordinator.content('# Old Title\n', 'load')
-    coordinator.content('# Synced Title\n', 'external') // another device renamed it
+    coordinator.content(managed('# Old Title\n'), 'load')
+    coordinator.content(managed('# Synced Title\n'), 'external') // another device renamed it
     coordinator.settle()
     await coordinator.settled()
     expect(io.rewriteLinksForTitleChange).not.toHaveBeenCalled()
@@ -334,7 +339,7 @@ describe('rename coordinator', () => {
     io.slugPathForTitle.mockResolvedValue('notes/fresh-note.md')
     const coordinator = makeCoordinator()
     coordinator.content('', 'load') // untitled lazy note
-    coordinator.content('# Fresh Note\n', 'saved')
+    coordinator.content(managed('# Fresh Note\n'), 'saved')
     coordinator.settle()
     await coordinator.settled()
 
@@ -388,7 +393,7 @@ describe('rename coordinator', () => {
 
     io.readNote.mockResolvedValue('# C\n')
     io.slugPathForTitle.mockResolvedValueOnce('notes/c.md')
-    coordinator.content('# C\n', 'saved')
+    coordinator.content(managed('# C\n'), 'saved')
     coordinator.settle()
     await coordinator.settled()
 
@@ -407,7 +412,7 @@ describe('rename coordinator', () => {
 
     // Second leg: the note on disk now carries A as the auto-added alias.
     io.readNote.mockResolvedValue(upsertFrontmatter('# C\n', { aliases: ['A'] }))
-    coordinator.content('# C\n', 'saved')
+    coordinator.content(managed('# C\n'), 'saved')
     coordinator.settle()
     await coordinator.settled()
 
@@ -419,5 +424,35 @@ describe('rename coordinator', () => {
     expect(secondAliasWrite?.[1]).toBe(
       upsertFrontmatter(upsertFrontmatter('# C\n', { aliases: ['A'] }), { aliases: ['B'] }),
     )
+  })
+
+  it('keeps an adopted direct note content-only when its title changes', async () => {
+    const coordinator = makeCoordinator()
+    coordinator.content('# Old Title\n', 'load')
+    coordinator.content('# New Title\n', 'saved')
+    coordinator.settle()
+    await coordinator.settled()
+
+    expect(io.rewriteLinksForTitleChange).not.toHaveBeenCalled()
+    expect(io.slugPathForTitle).not.toHaveBeenCalled()
+    expect(io.moveNoteIndexed).not.toHaveBeenCalled()
+    expect(io.writeNote).not.toHaveBeenCalled()
+    expect(operationLog.records).toEqual([])
+  })
+
+  it('keeps a valid-id note outside direct notes/ content-only', async () => {
+    const coordinator = createRenameCoordinator({
+      path: 'Projects/subject.md',
+      generation: () => 7,
+      canFire: () => true,
+    })
+    coordinator.content(managed('# Old Title\n'), 'load')
+    coordinator.content(managed('# New Title\n'), 'saved')
+    coordinator.settle()
+    await coordinator.settled()
+
+    expect(io.rewriteLinksForTitleChange).not.toHaveBeenCalled()
+    expect(io.moveNoteIndexed).not.toHaveBeenCalled()
+    expect(operationLog.records).toEqual([])
   })
 })

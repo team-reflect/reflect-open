@@ -40,7 +40,8 @@ export function GraphChooser(): ReactElement {
       <div className="space-y-1.5 text-center">
         <h1 className="text-2xl font-semibold tracking-tight text-text">Welcome to Reflect</h1>
         <p className="text-sm text-text-secondary">
-          Your notes are plain markdown files. Choose where to keep them.
+          Your notes are plain Markdown files. Open an existing folder or choose where new notes
+          live.
         </p>
       </div>
 
@@ -58,7 +59,8 @@ export function GraphChooser(): ReactElement {
             icon={<Folder aria-hidden className="size-4" strokeWidth={1.75} />}
             title="A folder you choose"
           >
-            Keep notes in any folder on this {icloudCapable ? 'Mac' : 'computer'}.
+            Open an existing Markdown folder on this {icloudCapable ? 'Mac' : 'computer'}.
+            Reflect keeps its files where they are.
           </CardHeader>
           <Button
             type="button"

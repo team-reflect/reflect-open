@@ -105,6 +105,8 @@ function installFakeBridge(): void {
           return generation
         case 'list_files':
           return storedFiles
+        case 'vault_scan_stats':
+          return { notes: storedFiles.length, attachments: 0, skipped: 0 }
         case 'index_meta_set':
           metaStore[String(args['key'])] = String(args['value'])
           return null

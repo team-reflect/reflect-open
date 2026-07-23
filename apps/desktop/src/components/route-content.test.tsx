@@ -128,6 +128,7 @@ Element.prototype.scrollTo ??= () => {}
 let files: Record<string, string>
 let writes: Array<{ path: string; contents: string }>
 const mockInvoke = vi.fn<(command: string, args: Record<string, unknown>) => Promise<unknown>>()
+const NEW_NOTE_PATH = 'notes/01arz3ndektsv4rrffq69g5fav.md'
 
 setBridge({
   invoke: mockInvoke,
@@ -223,9 +224,9 @@ describe('RouteContent', () => {
   })
 
   it('opens a missing note seeded with an empty focused title, writing nothing', async () => {
-    const view = renderRoute({ kind: 'note', path: 'notes/new.md' })
+    const view = renderRoute({ kind: 'note', path: NEW_NOTE_PATH })
 
-    await view.findByLabelText('Editing notes/new.md')
+    await view.findByLabelText(`Editing ${NEW_NOTE_PATH}`)
     // The seed is an empty H1: the caret lands in it (plain focus, no text
     // to select) and the title placeholder ghosts "Untitled" over the line.
     expect(view.getByTestId('fake-editor').textContent).toBe('#\n')
@@ -234,20 +235,31 @@ describe('RouteContent', () => {
     // Opening never litters the graph — even a forced flush writes nothing.
     await act(() => flushOpenDocuments())
     expect(writes).toEqual([])
-    expect(files['notes/new.md']).toBeUndefined()
+    expect(files[NEW_NOTE_PATH]).toBeUndefined()
     view.unmount()
   })
 
   it('creates the file once the user actually edits the seeded note', async () => {
-    const view = renderRoute({ kind: 'note', path: 'notes/new.md' })
-    await view.findByLabelText('Editing notes/new.md')
+    const view = renderRoute({ kind: 'note', path: NEW_NOTE_PATH })
+    await view.findByLabelText(`Editing ${NEW_NOTE_PATH}`)
 
     act(() => editorProbe.onChange?.('# Manifesto\n'))
     await act(() => flushOpenDocuments())
 
     // The seed's header rides along: the file is born with its identity
     // (`id:` frontmatter, Plan 17) plus exactly what the user typed.
-    expect(files['notes/new.md']).toMatch(/^---\nid: [0-9a-z]{26}\n---\n# Manifesto\n$/)
+    expect(files[NEW_NOTE_PATH]).toMatch(/^---\nid: [0-9a-z]{26}\n---\n# Manifesto\n$/)
+    view.unmount()
+  })
+
+  it('never recreates an arbitrary missing vault path', async () => {
+    const view = renderRoute({ kind: 'note', path: 'Projects/missing.md' })
+
+    await view.findByText(/Couldn’t open Projects\/missing\.md: missing/)
+    expect(view.queryByTestId('fake-editor')).toBeNull()
+    await act(() => flushOpenDocuments())
+    expect(writes).toEqual([])
+    expect(files['Projects/missing.md']).toBeUndefined()
     view.unmount()
   })
 
