@@ -10,7 +10,9 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+#[cfg(any(target_os = "ios", test))]
+use std::time::Instant;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 #[cfg(target_os = "ios")]
@@ -23,6 +25,7 @@ use crate::error::{AppError, AppResult};
 const SCHEMA_VERSION: u8 = 1;
 const MAX_EVENTS: usize = 128;
 const TERMINATION_WINDOW_MS: u64 = 5 * 60 * 1_000;
+#[cfg(any(target_os = "ios", test))]
 const SAFE_MODE_TERMINATION_COUNT: usize = 3;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -134,6 +137,7 @@ pub struct DiagnosticsSnapshot {
 
 pub struct DiagnosticsState {
     path: Option<PathBuf>,
+    #[cfg(any(target_os = "ios", test))]
     started_at: Instant,
     store: Mutex<DiagnosticStore>,
 }
@@ -153,6 +157,7 @@ impl Default for DiagnosticsState {
             .unwrap_or_default();
         Self {
             path,
+            #[cfg(any(target_os = "ios", test))]
             started_at: Instant::now(),
             store: Mutex::new(store),
         }
@@ -201,6 +206,7 @@ impl DiagnosticsState {
         self.persist_best_effort(&store);
     }
 
+    #[cfg(any(target_os = "ios", test))]
     fn web_content_terminated(&self, label: &str, now_ms: u64) {
         let window = classify_window(label);
         let mut store = self.lock_store();
@@ -374,6 +380,7 @@ fn status_from(store: &DiagnosticStore) -> DiagnosticsStatus {
     }
 }
 
+#[cfg(any(target_os = "ios", test))]
 fn classify_window(label: &str) -> DiagnosticWindow {
     if label == crate::windows::MAIN_WINDOW_LABEL {
         DiagnosticWindow::Main

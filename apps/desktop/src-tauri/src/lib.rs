@@ -29,6 +29,7 @@ mod graph_gitignore;
 mod icloud;
 mod link_preview;
 mod menu;
+#[cfg(any(target_os = "ios", test))]
 mod native_diagnostics;
 mod quit;
 mod recents;
