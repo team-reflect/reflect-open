@@ -1,10 +1,13 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act } from 'react'
+import { cleanup, render } from 'vitest-browser-react'
+import { page } from 'vitest/browser'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   clearFormattingToolbar,
   publishFormattingToolbar,
   type FormattingToolbar,
 } from '@/editor/formatting-toolbar-store'
+import { fireEvent } from '@/test-utils/fire-event'
 import { MobileFormattingToolbar } from './formatting-toolbar'
 
 vi.mock('@/mobile/haptics', () => ({ hapticImpactLight: vi.fn() }))
@@ -43,17 +46,17 @@ afterEach(() => {
 })
 
 describe('MobileFormattingToolbar', () => {
-  it('renders nothing while no editor is focused (the search keyboard case)', () => {
-    const view = render(<MobileFormattingToolbar />)
+  it('renders nothing while no editor is focused (the search keyboard case)', async () => {
+    const view = await render(<MobileFormattingToolbar />)
     expect(view.container.firstChild).toBeNull()
   })
 
-  it('renders V1 item order plus the dismiss button, with canExec-driven enablement', () => {
+  it('renders V1 item order plus the dismiss button, with canExec-driven enablement', async () => {
     const toolbar = makeToolbar({ canDedent: false, canMoveUp: false })
-    render(<MobileFormattingToolbar />)
-    act(() => publishFormattingToolbar(owner, toolbar))
+    await render(<MobileFormattingToolbar />)
+    await act(() => publishFormattingToolbar(owner, toolbar))
 
-    const buttons = screen.getAllByRole('button')
+    const buttons = page.getByRole('button').elements()
     expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual([
       'Slash command',
       'Bullet list',
@@ -66,49 +69,43 @@ describe('MobileFormattingToolbar', () => {
       'Move down',
       'Hide keyboard',
     ])
-    expect((screen.getByRole('button', { name: 'Outdent' }) as HTMLButtonElement).disabled).toBe(
-      true,
-    )
-    expect((screen.getByRole('button', { name: 'Move up' }) as HTMLButtonElement).disabled).toBe(
-      true,
-    )
-    expect((screen.getByRole('button', { name: 'Indent' }) as HTMLButtonElement).disabled).toBe(
-      false,
-    )
+    await expect.element(page.getByRole('button', { name: 'Outdent' })).toBeDisabled()
+    await expect.element(page.getByRole('button', { name: 'Move up' })).toBeDisabled()
+    await expect.element(page.getByRole('button', { name: 'Indent' })).toBeEnabled()
   })
 
-  it('never lets a tap move focus out of the editor', () => {
-    render(<MobileFormattingToolbar />)
-    act(() => publishFormattingToolbar(owner, makeToolbar()))
+  it('never lets a tap move focus out of the editor', async () => {
+    await render(<MobileFormattingToolbar />)
+    await act(() => publishFormattingToolbar(owner, makeToolbar()))
 
-    const bullet = screen.getByRole('button', { name: 'Bullet list' })
+    const bullet = page.getByRole('button', { name: 'Bullet list' })
     // fireEvent returns false when a handler called preventDefault — the
     // contract that keeps the editor focused (and the keyboard up) mid-tap.
     expect(fireEvent.pointerDown(bullet)).toBe(false)
     expect(fireEvent.mouseDown(bullet)).toBe(false)
   })
 
-  it('routes taps to the published commands', () => {
+  it('routes taps to the published commands', async () => {
     const toolbar = makeToolbar()
-    render(<MobileFormattingToolbar />)
-    act(() => publishFormattingToolbar(owner, toolbar))
+    await render(<MobileFormattingToolbar />)
+    await act(() => publishFormattingToolbar(owner, toolbar))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Bullet list' }))
+    fireEvent.click(page.getByRole('button', { name: 'Bullet list' }))
     expect(toolbar.commands.toggleBulletList).toHaveBeenCalledOnce()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cycle checklist and task' }))
+    fireEvent.click(page.getByRole('button', { name: 'Cycle checklist and task' }))
     expect(toolbar.commands.cycleCheckableList).toHaveBeenCalledOnce()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Link note' }))
+    fireEvent.click(page.getByRole('button', { name: 'Link note' }))
     expect(toolbar.commands.insertTrigger).toHaveBeenCalledWith('[[')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Tag' }))
+    fireEvent.click(page.getByRole('button', { name: 'Tag' }))
     expect(toolbar.commands.insertTrigger).toHaveBeenCalledWith('#')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Slash command' }))
+    fireEvent.click(page.getByRole('button', { name: 'Slash command' }))
     expect(toolbar.commands.insertTrigger).toHaveBeenCalledWith('/')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Hide keyboard' }))
+    fireEvent.click(page.getByRole('button', { name: 'Hide keyboard' }))
     expect(toolbar.commands.dismissKeyboard).toHaveBeenCalledOnce()
   })
 })
