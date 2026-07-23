@@ -12,10 +12,11 @@ import { dailyPath, notePath } from '../graph/paths'
 import { hashContent } from '../indexing/hash'
 import {
   appendBlock,
-  appendUnderBacklinkedHeading,
+  appendListItemUnderBacklinkedHeading,
   headingMatchesBacklinkedTitle,
   upgradeSectionHeadingBacklink,
 } from '../markdown/edit'
+import { topLevelHeadings } from '../markdown/heading-blocks'
 import { parseNote } from '../markdown/extract'
 import { parseFrontmatter, splitFrontmatter } from '../markdown/frontmatter'
 import type { ReconcileStop } from './audio-memo'
@@ -87,7 +88,8 @@ async function findSameDayCapture(
   generation: number,
 ): Promise<SameDayCapture | null> {
   const { headings, wikiLinks } = parseNote({ path: '', source: dailySource })
-  const linkSections = headings.filter(
+  const sectionHeadings = topLevelHeadings(dailySource, headings)
+  const linkSections = sectionHeadings.filter(
     (heading) =>
       heading.level === 2 &&
       sectionTitles.some((title) =>
@@ -100,7 +102,7 @@ async function findSameDayCapture(
   const ranges = linkSections.map((section) => ({
     from: section.to,
     to:
-      headings.find(
+      sectionHeadings.find(
         (heading) => heading.from > section.from && heading.level <= section.level,
       )?.from ?? dailySource.length,
   }))
@@ -238,7 +240,7 @@ export async function drainCaptureInbox(
       }
       updatedDaily = upgradeSectionHeadingBacklink(updatedDaily, linksNoteTitle, [LINKS_NOTE_TITLE])
       if (!updatedDaily.includes(`[[${identity.base}`)) {
-        updatedDaily = appendUnderBacklinkedHeading(
+        updatedDaily = appendListItemUnderBacklinkedHeading(
           updatedDaily,
           linksNoteTitle,
           `- [[${identity.base}|${freshTitle}]]`,

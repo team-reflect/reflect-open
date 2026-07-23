@@ -6,9 +6,10 @@ import { noteExists, readNote, writeNote } from '../graph/commands'
 import { createNoteWithTitle } from '../graph/create-note'
 import { dailyPath, notePath } from '../graph/paths'
 import { resolveWikiTarget } from '../indexing/queries'
-import { appendUnderHeading, wikiLinkSafe } from '../markdown/edit'
+import { appendListItemUnderHeading, wikiLinkSafe } from '../markdown/edit'
 import { canonicalEmails } from '../markdown/email-fields'
 import { parseNote } from '../markdown/extract'
+import { topLevelHeadings } from '../markdown/heading-blocks'
 import { foldKey } from '../markdown/keys'
 import { slugForTitle } from '../markdown/slug'
 import {
@@ -43,7 +44,7 @@ import {
  * lazy-daily contract), so writing one would just be normalized away.
  */
 
-/** Where the daily-note entry lands (`appendUnderHeading` creates it). */
+/** Where the daily-note entry lands (`appendListItemUnderHeading` creates it). */
 export const MEETINGS_HEADING = 'Meetings'
 
 /** Created notes are typed like v1 tagged them (`- Type: #link` in capture is
@@ -131,14 +132,15 @@ async function titleHasNote(title: string): Promise<boolean> {
  */
 function meetingAlreadyLinked(source: string, title: string): boolean {
   const { headings, wikiLinks } = parseNote({ path: '', source })
-  const heading = headings.find(
+  const sectionHeadings = topLevelHeadings(source, headings)
+  const heading = sectionHeadings.find(
     (candidate) => candidate.text.toLowerCase() === MEETINGS_HEADING.toLowerCase(),
   )
   if (!heading) {
     return false
   }
   const sectionEnd =
-    headings.find(
+    sectionHeadings.find(
       (candidate) => candidate.from > heading.from && candidate.level <= heading.level,
     )?.from ?? source.length
   const titleKey = foldKey(title)
@@ -279,7 +281,11 @@ export async function addMeetingToDaily(input: AddMeetingInput): Promise<AddMeet
     backlinkMeeting: input.backlinkMeeting,
     startTime: input.startTime,
   })
-  await writeNote(daily, appendUnderHeading(source, MEETINGS_HEADING, line), input.generation)
+  await writeNote(
+    daily,
+    appendListItemUnderHeading(source, MEETINGS_HEADING, line),
+    input.generation,
+  )
 
   const createdNotes: string[] = []
   if (input.backlinkMeeting && !(await titleHasNote(title))) {
