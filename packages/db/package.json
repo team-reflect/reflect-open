@@ -21,6 +21,6 @@
     "kysely-codegen": "^0.20.0",
     "sqlite-vec": "^0.1.9",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   }
 }

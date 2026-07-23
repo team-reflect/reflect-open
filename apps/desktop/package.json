@@ -12,6 +12,7 @@
     "release:macos": "node scripts/release-macos.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:install": "playwright install chromium webkit",
     "lint:react": "eslint .",
     "tauri": "tauri",
     "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
@@ -68,15 +69,19 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
+    "@vitest/browser-playwright": "^4.1.10",
     "babel-plugin-react-compiler": "^1.0.0",
     "eslint": "^10.5.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "jsdom": "^29.1.1",
+    "playwright": "^1.61.1",
     "shadcn": "^4.11.0",
     "tailwindcss": "^4.3.1",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.62.0",
     "vite": "^8.1.0",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10",
+    "vitest-browser-react": "^2.2.0",
+    "vitest-fail-on-console": "^0.10.1"
   }
 }

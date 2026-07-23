@@ -1,18 +1,72 @@
 import { fileURLToPath } from 'node:url'
-import { defineConfig } from 'vitest/config'
+import tailwindcss from '@tailwindcss/vite'
+import { playwright } from '@vitest/browser-playwright'
+import { configDefaults, defineConfig, type ViteUserConfig } from 'vitest/config'
 import { reactWithCompiler } from './react-compiler-plugin'
 
-// Editor (ProseMirror/contenteditable) tests will move to browser-mode vitest
-// later (Plan 01 step 9); jsdom covers pure logic + light component tests.
-export default defineConfig({
-  plugins: [reactWithCompiler()],
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+// Test routing: `*.browser.test.tsx` runs in a real browser (chromium by
+// default; REFLECT_TEST_BROWSER=webkit switches to WebKit, DEBUG=1 opens a
+// headed window). Everything else stays in jsdom until the browser-mode
+// migration finishes. See docs/contributing/testing.md.
+const browserName = process.env.REFLECT_TEST_BROWSER === 'webkit' ? 'webkit' : 'chromium'
+
+function desktopProject(project: {
+  plugins?: ViteUserConfig['plugins']
+  test: NonNullable<ViteUserConfig['test']>
+}): ViteUserConfig {
+  return {
+    plugins: [reactWithCompiler(), ...(project.plugins ?? [])],
+    resolve: {
+      alias: {
+        '@': fileURLToPath(new URL('./src', import.meta.url)),
+      },
     },
-  },
+    test: {
+      globals: false,
+      retry: process.env.CI ? 3 : 0,
+      setupFiles: ['./src/test-utils/setup-console.ts'],
+      ...project.test,
+    },
+  }
+}
+
+export default defineConfig({
   test: {
-    environment: 'jsdom',
-    globals: false,
+    slowTestThreshold: 10_000,
+    projects: [
+      desktopProject({
+        plugins: [tailwindcss()],
+        test: {
+          name: 'browser',
+          include: ['src/**/*.browser.test.tsx'],
+          setupFiles: ['./src/test-utils/setup-console.ts', './src/test-utils/setup-browser.ts'],
+          // Real keyboard focus is a per-page global; parallel test files
+          // would steal it from each other.
+          fileParallelism: false,
+          browser: {
+            enabled: true,
+            viewport: { width: 900, height: 600 },
+            provider: playwright({
+              contextOptions: {
+                reducedMotion: 'reduce',
+                hasTouch: true,
+                permissions:
+                  browserName === 'chromium' ? ['clipboard-read', 'clipboard-write'] : undefined,
+              },
+            }),
+            headless: !process.env.DEBUG,
+            instances: [{ browser: browserName }],
+          },
+        },
+      }),
+      desktopProject({
+        test: {
+          name: 'jsdom-legacy',
+          environment: 'jsdom',
+          include: ['src/**/*.test.{ts,tsx}', 'scripts/**/*.test.mjs'],
+          exclude: [...configDefaults.exclude, 'src/**/*.browser.test.tsx'],
+        },
+      }),
+    ],
   },
 })
