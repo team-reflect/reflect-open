@@ -3,7 +3,7 @@ import { cleanup, render } from 'vitest-browser-react'
 import { userEvent, type Locator } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OpenTask } from '@reflect/core'
-import { useEffect, useState, type MutableRefObject, type ReactNode } from 'react'
+import { act, useEffect, useState, type MutableRefObject, type ReactNode } from 'react'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { makeOpenTask as task } from '@/lib/tasks/open-task-fixture'
 import { resetRecentlyCompleted } from '@/lib/tasks/recently-completed'
@@ -203,17 +203,32 @@ function renderScreen(
       await expect.element(locator).toBeInTheDocument()
       return locator.element()
     }
+    const locateByRole = view.getByRole.bind(view)
+    const getByRole = (...args: Parameters<typeof view.getByRole>): Locator => {
+      const [role, options] = args
+      return locateByRole(
+        role,
+        typeof options?.name === 'string' ? { ...options, exact: true } : options,
+      )
+    }
+    const locateByText = view.getByText.bind(view)
+    const getByText = (...args: Parameters<typeof view.getByText>): Locator => {
+      const [text, options] = args
+      return locateByText(text, typeof text === 'string' ? { ...options, exact: true } : options)
+    }
     return Object.assign(view, {
-      findByRole: (...args: Parameters<typeof view.getByRole>) => find(view.getByRole(...args)),
+      getByRole,
+      getByText,
+      findByRole: (...args: Parameters<typeof view.getByRole>) => find(getByRole(...args)),
       findByTestId: (...args: Parameters<typeof view.getByTestId>) =>
         find(view.getByTestId(...args)),
-      findByText: (...args: Parameters<typeof view.getByText>) => find(view.getByText(...args)),
-      getAllByRole: (...args: Parameters<typeof view.getByRole>) => view.getByRole(...args).elements(),
-      getAllByText: (...args: Parameters<typeof view.getByText>) => view.getByText(...args).elements(),
-      queryByRole: (...args: Parameters<typeof view.getByRole>) => view.getByRole(...args).query(),
+      findByText: (...args: Parameters<typeof view.getByText>) => find(getByText(...args)),
+      getAllByRole: (...args: Parameters<typeof view.getByRole>) => getByRole(...args).elements(),
+      getAllByText: (...args: Parameters<typeof view.getByText>) => getByText(...args).elements(),
+      queryByRole: (...args: Parameters<typeof view.getByRole>) => getByRole(...args).query(),
       queryByTestId: (...args: Parameters<typeof view.getByTestId>) =>
         view.getByTestId(...args).query(),
-      queryByText: (...args: Parameters<typeof view.getByText>) => view.getByText(...args).query(),
+      queryByText: (...args: Parameters<typeof view.getByText>) => getByText(...args).query(),
     })
   })
 }
@@ -680,12 +695,16 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'first' }))
     // ⌘-click adds the row without clearing the rest (modifier set explicitly —
     // userEvent's held modifiers don't reach its synthetic click).
-    fireEvent.click(view.getByRole('button', { name: 'third' }), { metaKey: true })
+    await act(() => {
+      fireEvent.click(view.getByRole('button', { name: 'third' }), { metaKey: true })
+    })
     expect([pressed('first'), pressed('second'), pressed('third')]).toEqual([true, false, true])
     expect(openRouteInNewWindow).not.toHaveBeenCalled()
 
     // Shift-click from the anchor (third) back to first selects the whole range.
-    fireEvent.click(view.getByRole('button', { name: 'first' }), { shiftKey: true })
+    await act(() => {
+      fireEvent.click(view.getByRole('button', { name: 'first' }), { shiftKey: true })
+    })
     expect([pressed('first'), pressed('second'), pressed('third')]).toEqual([true, true, true])
     await view.unmount()
   })
@@ -1457,7 +1476,7 @@ describe('TasksScreen', () => {
     await waitFor(() => expect(editTask).toHaveBeenCalledTimes(1))
     const reopen = await view.findByRole('button', { name: 'Reopen: edited content' })
     await waitFor(() => expect((reopen as HTMLButtonElement).disabled).toBe(true))
-    await userEvent.click(reopen)
+    fireEvent.click(reopen)
     expect(toggleTask).not.toHaveBeenCalled()
 
     resolveEdit()
