@@ -1,14 +1,10 @@
-import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { render } from 'vitest-browser-react'
+import { describe, expect, it, vi } from 'vitest'
 import { MobileScreenHeader } from './screen-header'
 
-afterEach(() => {
-  cleanup()
-})
-
 describe('MobileScreenHeader', () => {
-  it('centers the title between balanced header action slots', () => {
-    const view = render(
+  it('centers the title between balanced header action slots', async () => {
+    const view = await render(
       <MobileScreenHeader
         title="Roadmap"
         onBack={vi.fn()}
@@ -27,11 +23,11 @@ describe('MobileScreenHeader', () => {
     )
     expect(Array.from(header.classList)).toContain('items-center')
 
-    expect(Array.from(screen.getByRole('button', { name: 'Back' }).classList)).toContain(
-      'justify-self-center',
-    )
-    expect(Array.from(screen.getByRole('heading', { name: 'Roadmap' }).classList)).toContain(
-      'text-center',
-    )
+    expect(
+      Array.from(view.getByRole('button', { name: 'Back' }).element().classList),
+    ).toContain('justify-self-center')
+    expect(
+      Array.from(view.getByRole('heading', { name: 'Roadmap' }).element().classList),
+    ).toContain('text-center')
   })
 })

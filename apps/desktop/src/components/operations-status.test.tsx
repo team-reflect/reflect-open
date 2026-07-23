@@ -1,4 +1,4 @@
-import { act, cleanup, render, waitFor } from '@testing-library/react'
+import { render } from 'vitest-browser-react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetOperations, startOperation } from '@/lib/operations'
 import { OperationsStatus } from './operations-status'
@@ -21,29 +21,25 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  cleanup()
   resetOperations()
 })
 
 describe('OperationsStatus', () => {
   it('creates and updates a Sonner toast with a stable operation id', async () => {
-    render(<OperationsStatus />)
+    await render(<OperationsStatus />)
 
-    let handle!: ReturnType<typeof startOperation>
-    act(() => {
-      handle = startOperation('Rebuilding search index')
-    })
+    const handle = startOperation('Rebuilding search index')
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(toast.message).toHaveBeenLastCalledWith(
         'Rebuilding search index',
         expect.objectContaining({ id: 'operation-1' }),
       ),
     )
 
-    act(() => handle.progress(3, 12))
+    handle.progress(3, 12)
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(toast.message).toHaveBeenLastCalledWith(
         'Rebuilding search index',
         expect.objectContaining({ id: 'operation-1', description: '3/12' }),
@@ -53,35 +49,31 @@ describe('OperationsStatus', () => {
 
   it('surfaces failures and dismisses the Sonner toast when the operation clears', async () => {
     vi.useFakeTimers()
-    render(<OperationsStatus />)
+    await render(<OperationsStatus />)
 
-    let handle!: ReturnType<typeof startOperation>
-    act(() => {
-      handle = startOperation('Saving settings')
-    })
-    act(() => handle.fail('disk full'))
+    const handle = startOperation('Saving settings')
+    handle.fail('disk full')
 
-    await act(async () => {})
-    expect(toast.error).toHaveBeenLastCalledWith(
-      'Saving settings',
-      expect.objectContaining({ id: 'operation-1', description: 'disk full' }),
+    await vi.waitFor(() =>
+      expect(toast.error).toHaveBeenLastCalledWith(
+        'Saving settings',
+        expect.objectContaining({ id: 'operation-1', description: 'disk full' }),
+      ),
     )
 
-    act(() => vi.advanceTimersByTime(9_200))
-
-    expect(toast.dismiss).toHaveBeenCalledWith('operation-1')
+    vi.advanceTimersByTime(9_200)
     vi.useRealTimers()
+
+    await vi.waitFor(() => expect(toast.dismiss).toHaveBeenCalledWith('operation-1'))
   })
 
   it('passes optional action metadata to Sonner', async () => {
-    render(<OperationsStatus />)
+    await render(<OperationsStatus />)
     const run = vi.fn()
 
-    act(() => {
-      startOperation('Update available', { action: { label: 'Install', run }, persistent: true })
-    })
+    startOperation('Update available', { action: { label: 'Install', run }, persistent: true })
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(toast.message).toHaveBeenLastCalledWith(
         'Update available',
         expect.objectContaining({
@@ -99,23 +91,20 @@ describe('OperationsStatus', () => {
   })
 
   it('does not remove the operation when a toast is dismissed', async () => {
-    render(<OperationsStatus />)
+    await render(<OperationsStatus />)
 
-    let handle!: ReturnType<typeof startOperation>
-    act(() => {
-      handle = startOperation('Saving settings')
-    })
+    const handle = startOperation('Saving settings')
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(toast.message).toHaveBeenLastCalledWith(
         'Saving settings',
         expect.not.objectContaining({ onDismiss: expect.any(Function) }),
       ),
     )
 
-    act(() => handle.fail('disk full'))
+    handle.fail('disk full')
 
-    await waitFor(() =>
+    await vi.waitFor(() =>
       expect(toast.error).toHaveBeenLastCalledWith(
         'Saving settings',
         expect.objectContaining({ id: 'operation-1', description: 'disk full' }),
@@ -129,16 +118,14 @@ describe('OperationsStatus', () => {
       throw error
     })
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
-    render(<OperationsStatus />)
+    await render(<OperationsStatus />)
 
-    act(() => {
-      startOperation('Update available', { action: { label: 'Install', run } })
-    })
+    startOperation('Update available', { action: { label: 'Install', run } })
 
-    await waitFor(() => expect(toast.message).toHaveBeenCalled())
+    await vi.waitFor(() => expect(toast.message).toHaveBeenCalled())
     const options = toast.message.mock.lastCall?.[1]
     options?.action?.onClick()
-    await waitFor(() => expect(consoleError).toHaveBeenCalledWith('operation action failed:', error))
+    await vi.waitFor(() => expect(consoleError).toHaveBeenCalledWith('operation action failed:', error))
 
     consoleError.mockRestore()
   })

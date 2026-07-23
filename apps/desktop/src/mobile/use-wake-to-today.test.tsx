@@ -1,4 +1,4 @@
-import { act, cleanup, render } from '@testing-library/react'
+import { render } from 'vitest-browser-react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
 import { RouterProvider, useRouter } from '@/routing/router'
@@ -15,9 +15,7 @@ let visibility: DocumentVisibilityState = 'visible'
 
 function setVisibility(state: DocumentVisibilityState): void {
   visibility = state
-  act(() => {
-    document.dispatchEvent(new Event('visibilitychange'))
-  })
+  document.dispatchEvent(new Event('visibilitychange'))
 }
 
 function Probe(): ReactElement {
@@ -27,7 +25,7 @@ function Probe(): ReactElement {
 }
 
 beforeEach(() => {
-  vi.useFakeTimers()
+  vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(2026, 5, 12, 22, 0, 0)) // 2026-06-12, late evening
   Object.defineProperty(document, 'visibilityState', {
     configurable: true,
@@ -37,7 +35,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  cleanup()
   vi.useRealTimers()
 })
 
@@ -50,24 +47,25 @@ function mountOn(date: string): ReturnType<typeof render> {
 }
 
 describe('useWakeToToday', () => {
-  it('navigates to today when the app foregrounds on a new date', () => {
-    const view = mountOn('2026-06-10')
-    expect(view.getByRole('status').textContent).toBe('daily:2026-06-10')
+  it('navigates to today when the app foregrounds on a new date', async () => {
+    const view = await mountOn('2026-06-10')
+    await expect.element(view.getByRole('status')).toHaveTextContent('daily:2026-06-10')
 
     setVisibility('hidden')
     vi.setSystemTime(new Date(2026, 5, 13, 8, 0, 0)) // overnight in the background
     setVisibility('visible')
 
-    expect(view.getByRole('status').textContent).toBe('today')
+    await expect.element(view.getByRole('status')).toHaveTextContent('today')
   })
 
-  it('stays put when the app foregrounds on the same date', () => {
-    const view = mountOn('2026-06-10')
+  it('stays put when the app foregrounds on the same date', async () => {
+    const view = await mountOn('2026-06-10')
 
     setVisibility('hidden')
     vi.setSystemTime(new Date(2026, 5, 12, 23, 30, 0)) // later the same evening
     setVisibility('visible')
 
-    expect(view.getByRole('status').textContent).toBe('daily:2026-06-10')
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    await expect.element(view.getByRole('status')).toHaveTextContent('daily:2026-06-10')
   })
 })

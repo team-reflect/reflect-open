@@ -1,6 +1,6 @@
-import { act, renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { renderHook } from 'vitest-browser-react'
 import type { ReactNode } from 'react'
 import type { BacklinkContext, BacklinkContextPage } from '@reflect/core'
 import { useBacklinkSources } from './use-backlink-sources'
@@ -57,11 +57,11 @@ describe('useBacklinkSources', () => {
           : nextPage,
     )
 
-    const { result } = renderHook(() => useBacklinkSources('notes/target.md'), {
+    const { result, act } = await renderHook(() => useBacklinkSources('notes/target.md'), {
       wrapper: makeWrapper(),
     })
 
-    await waitFor(() => expect(result.current.groups).toHaveLength(1))
+    await vi.waitFor(() => expect(result.current.groups).toHaveLength(1))
     expect(getBacklinksWithContext).toHaveBeenNthCalledWith(1, 'notes/target.md', {
       cursor: null,
       limit: 10,
@@ -69,11 +69,11 @@ describe('useBacklinkSources', () => {
     expect(result.current.count).toBe(12)
     expect(result.current.hasNextPage).toBe(true)
 
-    act(() => {
+    await act(() => {
       result.current.loadMore()
       result.current.loadMore()
     })
-    await waitFor(() => expect(result.current.isFetchingNextPage).toBe(true))
+    await vi.waitFor(() => expect(result.current.isFetchingNextPage).toBe(true))
     expect(getBacklinksWithContext).toHaveBeenCalledTimes(2)
     expect(getBacklinksWithContext).toHaveBeenNthCalledWith(2, 'notes/target.md', {
       cursor: nextCursor,
@@ -92,7 +92,7 @@ describe('useBacklinkSources', () => {
       await nextPage
     })
 
-    await waitFor(() => expect(result.current.isFetchingNextPage).toBe(false))
+    await vi.waitFor(() => expect(result.current.isFetchingNextPage).toBe(false))
     expect(result.current.groups).toEqual([
       {
         path: 'notes/a.md',
@@ -122,13 +122,13 @@ describe('useBacklinkSources', () => {
       })
       .mockRejectedValueOnce(new Error('next page failed'))
 
-    const { result } = renderHook(() => useBacklinkSources('notes/target.md'), {
+    const { result, act } = await renderHook(() => useBacklinkSources('notes/target.md'), {
       wrapper: makeWrapper(),
     })
-    await waitFor(() => expect(result.current.groups).toHaveLength(1))
+    await vi.waitFor(() => expect(result.current.groups).toHaveLength(1))
 
-    act(() => result.current.loadMore())
-    await waitFor(() => expect(result.current.isFetchNextPageError).toBe(true))
+    await act(() => result.current.loadMore())
+    await vi.waitFor(() => expect(result.current.isFetchNextPageError).toBe(true))
 
     expect(result.current.isError).toBe(false)
     expect(result.current.groups).toHaveLength(1)
@@ -138,10 +138,10 @@ describe('useBacklinkSources', () => {
   it('reports an initial-page failure as the panel error', async () => {
     getBacklinksWithContext.mockRejectedValue(new Error('initial page failed'))
 
-    const { result } = renderHook(() => useBacklinkSources('notes/target.md'), {
+    const { result } = await renderHook(() => useBacklinkSources('notes/target.md'), {
       wrapper: makeWrapper(),
     })
-    await waitFor(() => expect(result.current.isError).toBe(true))
+    await vi.waitFor(() => expect(result.current.isError).toBe(true))
 
     expect(result.current.isFetchNextPageError).toBe(false)
     expect(result.current.groups).toEqual([])

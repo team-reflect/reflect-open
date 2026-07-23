@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { render } from 'vitest-browser-react'
+import { page } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getNote, readNote, type GraphInfo } from '@reflect/core'
@@ -47,14 +48,13 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  cleanup()
   queryClient.clear()
   setPlatformSurface({ mobileApp: false })
   vi.clearAllMocks()
 })
 
-function renderNotice(): void {
-  render(
+async function renderNotice(): Promise<void> {
+  await render(
     <QueryClientProvider client={queryClient}>
       <SyncConflictNotice path="notes/clash.md" />
     </QueryClientProvider>,
@@ -64,36 +64,36 @@ function renderNotice(): void {
 describe('SyncConflictNotice', () => {
   it('renders nothing for a note without conflict markers', async () => {
     vi.mocked(getNote).mockResolvedValue({ ...NOTE, hasConflict: false })
-    renderNotice()
+    await renderNotice()
 
-    await Promise.resolve() // let the query settle
-    expect(screen.queryByText(/edited on two devices/i)).toBeNull()
+    await vi.waitFor(() => expect(getNote).toHaveBeenCalled()) // let the query settle
+    expect(page.getByText(/edited on two devices/i).query()).toBeNull()
   })
 
   it('offers mine/theirs/both resolutions for a conflicted note', async () => {
     vi.mocked(getNote).mockResolvedValue(NOTE)
-    renderNotice()
+    await renderNotice()
 
-    expect(await screen.findByText(/edited on two devices/i)).toBeTruthy()
+    await expect.element(page.getByText(/edited on two devices/i)).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /keep this device’s version/i }))
+    await page.getByRole('button', { name: /keep this device’s version/i }).click()
     expect(resolution.resolve).toHaveBeenCalledWith('ours')
 
-    fireEvent.click(screen.getByRole('button', { name: /keep the other device’s/i }))
+    await page.getByRole('button', { name: /keep the other device’s/i }).click()
     expect(resolution.resolve).toHaveBeenCalledWith('theirs')
 
-    fireEvent.click(screen.getByRole('button', { name: /keep both/i }))
+    await page.getByRole('button', { name: /keep both/i }).click()
     expect(resolution.resolve).toHaveBeenCalledWith('both')
   })
 
   it('offers the same resolution actions on mobile', async () => {
     setPlatformSurface({ mobileApp: true })
     vi.mocked(getNote).mockResolvedValue(NOTE)
-    renderNotice()
+    await renderNotice()
 
-    expect(await screen.findByText(/choose what to keep/i)).toBeTruthy()
+    await expect.element(page.getByText(/choose what to keep/i)).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /keep this device’s version/i }))
+    await page.getByRole('button', { name: /keep this device’s version/i }).click()
     expect(resolution.resolve).toHaveBeenCalledWith('ours')
   })
 
@@ -102,12 +102,14 @@ describe('SyncConflictNotice', () => {
     vi.mocked(readNote).mockResolvedValue(
       '<<<<<<< Mac\nmac\n=======\nphone\n>>>>>>> iPhone\n<<<<<<< Mac\n=======\nipad\n>>>>>>> iPad\n',
     )
-    renderNotice()
+    await renderNotice()
 
     // `theirs` splices in every non-first side — naming one device would lie.
-    expect(await screen.findByRole('button', { name: 'Keep the other versions' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Keep all' })).toBeTruthy()
+    await expect
+      .element(page.getByRole('button', { name: 'Keep the other versions' }))
+      .toBeInTheDocument()
+    await expect.element(page.getByRole('button', { name: 'Keep all' })).toBeInTheDocument()
     // The first side is still a single device, so it stays named.
-    expect(screen.getByRole('button', { name: 'Keep “Mac”' })).toBeTruthy()
+    await expect.element(page.getByRole('button', { name: 'Keep “Mac”' })).toBeInTheDocument()
   })
 })

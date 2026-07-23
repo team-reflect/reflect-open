@@ -1,10 +1,9 @@
-import { act, cleanup, renderHook } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
+import { renderHook } from 'vitest-browser-react'
 import { PaletteProvider, usePalette } from '@/components/command-palette/palette-provider'
 import { listRegisteredBindings } from '@/editor/keymap'
 import { registerAppCommands } from '@/lib/commands/app-commands'
-import { dispatchMenuCommand } from '@/lib/native-menu/dispatch'
 import { NoteTemplatesProvider } from '@/providers/note-templates-provider'
 import { ShortcutsProvider, useShortcuts } from '@/providers/shortcuts-provider'
 import { SidebarProvider, useSidebar } from '@/providers/sidebar-provider'
@@ -14,18 +13,15 @@ import { RouterProvider, useRouter } from './router'
 const newChat = vi.hoisted(() => vi.fn())
 const openRecent = vi.hoisted(() => vi.fn())
 const openRouteInNewWindow = vi.hoisted(() => vi.fn(async () => true))
-const platform = vi.hoisted(() => ({ isMacosDesktop: false }))
-const nativeMenu = vi.hoisted(() => ({ installed: false }))
 
 vi.mock('@/lib/windows/open-in-new-window', () => ({ openRouteInNewWindow }))
 vi.mock('@/lib/native-menu/menu', () => ({
-  isNativeMenuInstalled: () => nativeMenu.installed,
+  isNativeMenuInstalled: () => false,
 }))
-vi.mock('@/lib/platform', () => ({
-  get isMacosDesktop() {
-    return platform.isMacosDesktop
-  },
-}))
+// macOS-only shortcut behavior lives in app-shortcuts-macos.test.tsx: a
+// browser-mode module mock materializes value exports once, so the flag
+// cannot flip per test.
+vi.mock('@/lib/platform', () => ({ isMacosDesktop: false }))
 
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({
@@ -57,12 +53,6 @@ vi.mock('@/providers/chat-provider', () => ({
 registerAppCommands() // production does this in main.tsx
 
 beforeEach(() => {
-  platform.isMacosDesktop = false
-  nativeMenu.installed = false
-})
-
-afterEach(() => {
-  cleanup()
   openRecent.mockClear()
   openRouteInNewWindow.mockClear()
 })
@@ -133,52 +123,52 @@ describe('app shortcuts', () => {
     }
   })
 
-  it('⌘N opens a fresh note route; ⌘D returns to today; ⌘[ ⌘] traverse', () => {
-    const { result } = shortcutsHook()
+  it('⌘N opens a fresh note route; ⌘D returns to today; ⌘[ ⌘] traverse', async () => {
+    const { result, act } = await shortcutsHook()
 
-    act(() => press('n'))
+    await act(() => press('n'))
     expect(result.current.router.route.kind).toBe('note')
     const opened = result.current.router.route as { kind: 'note'; path: string }
     expect(opened.path).toMatch(/^notes\/[0-9a-z]+\.md$/)
 
-    act(() => press('d'))
+    await act(() => press('d'))
     expect(result.current.router.route).toEqual({ kind: 'today' })
 
-    act(() => press('['))
+    await act(() => press('['))
     expect(result.current.router.route.kind).toBe('note')
 
-    act(() => press(']'))
+    await act(() => press(']'))
     expect(result.current.router.route).toEqual({ kind: 'today' })
   })
 
-  it('⌘N from today makes back re-anchor Daily instead of restoring stale scroll', () => {
-    const { result } = shortcutsHook()
-    act(() => result.current.router.saveScrollState(735))
+  it('⌘N from today makes back re-anchor Daily instead of restoring stale scroll', async () => {
+    const { result, act } = await shortcutsHook()
+    await act(() => result.current.router.saveScrollState(735))
     expect(result.current.router.savedScroll()).toBe(735)
 
-    act(() => press('n'))
+    await act(() => press('n'))
     expect(result.current.router.route.kind).toBe('note')
 
-    act(() => press('['))
+    await act(() => press('['))
     expect(result.current.router.route).toEqual({ kind: 'today' })
     expect(result.current.router.savedScroll()).toBeNull()
   })
 
-  it('⌘⇧O opens the current note in a new window', () => {
-    const { result } = shortcutsHook()
-    act(() => press('n'))
+  it('⌘⇧O opens the current note in a new window', async () => {
+    const { result, act } = await shortcutsHook()
+    await act(() => press('n'))
     const opened = result.current.router.route
 
-    act(() => press('o', { shiftKey: true }))
+    await act(() => press('o', { shiftKey: true }))
 
     expect(openRouteInNewWindow).toHaveBeenCalledWith(opened)
     expect(result.current.router.route).toEqual(opened)
   })
 
-  it('⌘[ and ⌘] still traverse when the focused editor consumes the keydown', () => {
-    const { result } = shortcutsHook()
-    act(() => press('n'))
-    act(() => press('d'))
+  it('⌘[ and ⌘] still traverse when the focused editor consumes the keydown', async () => {
+    const { result, act } = await shortcutsHook()
+    await act(() => press('n'))
+    await act(() => press('d'))
     expect(result.current.router.route).toEqual({ kind: 'today' })
 
     const editor = document.createElement('div')
@@ -186,95 +176,59 @@ describe('app shortcuts', () => {
     editor.addEventListener('keydown', (event) => event.preventDefault())
 
     try {
-      act(() => pressFrom(editor, 'Unidentified', { code: 'BracketLeft' }))
+      await act(() => pressFrom(editor, 'Unidentified', { code: 'BracketLeft' }))
       expect(result.current.router.route.kind).toBe('note')
 
-      act(() => pressFrom(editor, 'Unidentified', { code: 'BracketRight' }))
+      await act(() => pressFrom(editor, 'Unidentified', { code: 'BracketRight' }))
       expect(result.current.router.route).toEqual({ kind: 'today' })
     } finally {
       editor.remove()
     }
   })
 
-  it('matches bracket history shortcuts by produced key on non-US layouts', () => {
-    const { result } = shortcutsHook()
-    act(() => press('n'))
+  it('matches bracket history shortcuts by produced key on non-US layouts', async () => {
+    const { result, act } = await shortcutsHook()
+    await act(() => press('n'))
     const opened = result.current.router.route
-    act(() => press('d'))
+    await act(() => press('d'))
     expect(result.current.router.route).toEqual({ kind: 'today' })
 
     // On JIS keyboards the key labeled `[` can report a physical BracketRight
     // code. The user-facing shortcut is character-based, so event.key wins.
-    act(() => press('[', { code: 'BracketRight' }))
+    await act(() => press('[', { code: 'BracketRight' }))
     expect(result.current.router.route).toEqual(opened)
 
-    act(() => press(']', { code: 'BracketLeft' }))
+    await act(() => press(']', { code: 'BracketLeft' }))
     expect(result.current.router.route).toEqual({ kind: 'today' })
     expect(result.current.router.canForward).toBe(false)
   })
 
-  it('⌘K opens the palette', () => {
-    const { result } = shortcutsHook()
+  it('⌘K opens the palette', async () => {
+    const { result, act } = await shortcutsHook()
     expect(result.current.palette.open).toBe(false)
-    act(() => press('k'))
+    await act(() => press('k'))
     expect(result.current.palette.open).toBe(true)
   })
 
-  it('⌘\\ toggles the sidebar in both directions', () => {
-    const { result } = shortcutsHook()
+  it('⌘\\ toggles the sidebar in both directions', async () => {
+    const { result, act } = await shortcutsHook()
     expect(result.current.sidebar.collapsed).toBe(false)
 
-    act(() => press('\\'))
+    await act(() => press('\\'))
     expect(result.current.sidebar.collapsed).toBe(true)
 
-    act(() => press('\\'))
+    await act(() => press('\\'))
     expect(result.current.sidebar.collapsed).toBe(false)
   })
 
-  it('keeps the macOS webview fallback until the native menu is installed', () => {
-    platform.isMacosDesktop = true
-    const { result } = shortcutsHook()
-    const event = new KeyboardEvent('keydown', {
-      key: '\\',
-      metaKey: true,
-      cancelable: true,
-    })
-
-    act(() => {
-      window.dispatchEvent(event)
-    })
-    expect(event.defaultPrevented).toBe(true)
-    expect(result.current.sidebar.collapsed).toBe(true)
-  })
-
-  it('leaves ⌘\\ to the native macOS menu accelerator', () => {
-    platform.isMacosDesktop = true
-    nativeMenu.installed = true
-    const { result } = shortcutsHook()
-    const event = new KeyboardEvent('keydown', {
-      key: '\\',
-      metaKey: true,
-      cancelable: true,
-    })
-
-    act(() => {
-      window.dispatchEvent(event)
-    })
-    expect(event.defaultPrevented).toBe(false)
-    expect(result.current.sidebar.collapsed).toBe(false)
-
-    act(() => dispatchMenuCommand('sidebar.toggle'))
-    expect(result.current.sidebar.collapsed).toBe(true)
-  })
-
-  it('defers ⌘K to a focused editor that already handled it', () => {
-    const { result } = shortcutsHook()
+  it('defers ⌘K to a focused editor that already handled it', async () => {
+    const { result, act } = await shortcutsHook()
     // The editor (meowdown's Mod-k) sits below window: it consumes the keydown
     // before it bubbles up, so the palette must stay closed.
     const editor = document.createElement('div')
     document.body.append(editor)
     editor.addEventListener('keydown', (event) => event.preventDefault())
-    act(() => {
+    await act(() => {
       editor.dispatchEvent(
         new KeyboardEvent('keydown', { key: 'k', metaKey: true, cancelable: true, bubbles: true }),
       )
@@ -283,87 +237,87 @@ describe('app shortcuts', () => {
     editor.remove()
   })
 
-  it('⌘⇧A opens All notes', () => {
-    const { result } = shortcutsHook()
+  it('⌘⇧A opens All notes', async () => {
+    const { result, act } = await shortcutsHook()
 
-    act(() => press('a', { shiftKey: true }))
+    await act(() => press('a', { shiftKey: true }))
     expect(result.current.router.route).toEqual({ kind: 'allNotes', tag: null })
   })
 
-  it('⌘⇧N starts a fresh chat when the chat route is active', () => {
+  it('⌘⇧N starts a fresh chat when the chat route is active', async () => {
     newChat.mockClear()
-    const { result } = shortcutsHook()
+    const { result, act } = await shortcutsHook()
 
-    act(() => press('j'))
+    await act(() => press('j'))
     expect(result.current.router.route).toEqual({ kind: 'chat' })
 
-    act(() => press('n', { shiftKey: true }))
+    await act(() => press('n', { shiftKey: true }))
     expect(newChat).toHaveBeenCalledTimes(1)
   })
 
-  it('⌘⇧N is inert outside the chat route', () => {
+  it('⌘⇧N is inert outside the chat route', async () => {
     newChat.mockClear()
-    const { result } = shortcutsHook()
+    const { result, act } = await shortcutsHook()
 
-    act(() => press('n', { shiftKey: true }))
+    await act(() => press('n', { shiftKey: true }))
     expect(result.current.router.route).toEqual({ kind: 'today' })
     expect(newChat).not.toHaveBeenCalled()
   })
 
-  it('⌘number switches to the matching recent graph', () => {
-    shortcutsHook()
+  it('⌘number switches to the matching recent graph', async () => {
+    const { act } = await shortcutsHook()
 
-    act(() => press('1'))
+    await act(() => press('1'))
     expect(openRecent).not.toHaveBeenCalled() // first row is already open
 
-    act(() => press('2'))
+    await act(() => press('2'))
     expect(openRecent).toHaveBeenCalledWith('/work')
 
-    act(() => press('9'))
+    await act(() => press('9'))
     expect(openRecent).toHaveBeenCalledTimes(1)
   })
 
-  it('matches graph number shortcuts by physical digit key on symbol-producing layouts', () => {
-    shortcutsHook()
+  it('matches graph number shortcuts by physical digit key on symbol-producing layouts', async () => {
+    const { act } = await shortcutsHook()
 
-    act(() => press('@', { code: 'Digit2' }))
-
-    expect(openRecent).toHaveBeenCalledWith('/work')
-  })
-
-  it('strips Shift from physical digit fallback on layouts where digits require Shift', () => {
-    shortcutsHook()
-
-    act(() => press('2', { code: 'Digit2', shiftKey: true }))
+    await act(() => press('@', { code: 'Digit2' }))
 
     expect(openRecent).toHaveBeenCalledWith('/work')
   })
 
-  it('does not turn produced symbols with Shift into graph number shortcuts', () => {
-    shortcutsHook()
+  it('strips Shift from physical digit fallback on layouts where digits require Shift', async () => {
+    const { act } = await shortcutsHook()
 
-    act(() => press('@', { code: 'Digit2', shiftKey: true }))
+    await act(() => press('2', { code: 'Digit2', shiftKey: true }))
+
+    expect(openRecent).toHaveBeenCalledWith('/work')
+  })
+
+  it('does not turn produced symbols with Shift into graph number shortcuts', async () => {
+    const { act } = await shortcutsHook()
+
+    await act(() => press('@', { code: 'Digit2', shiftKey: true }))
 
     expect(openRecent).not.toHaveBeenCalled()
   })
 
-  it('keeps graph switching on the Meta key, not Ctrl-number', () => {
-    shortcutsHook()
+  it('keeps graph switching on the Meta key, not Ctrl-number', async () => {
+    const { act } = await shortcutsHook()
 
-    act(() => press('2', { metaKey: false, ctrlKey: true }))
+    await act(() => press('2', { metaKey: false, ctrlKey: true }))
 
     expect(openRecent).not.toHaveBeenCalled()
   })
 
-  it('matches uppercase keys (caps lock) and ignores auto-repeat', () => {
-    const { result } = shortcutsHook()
-    act(() => {
+  it('matches uppercase keys (caps lock) and ignores auto-repeat', async () => {
+    const { result, act } = await shortcutsHook()
+    await act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'N', metaKey: true }))
     })
     expect(result.current.router.route.kind).toBe('note') // caps lock still triggers
 
     const opened = result.current.router.route
-    act(() => {
+    await act(() => {
       window.dispatchEvent(
         new KeyboardEvent('keydown', { key: 'n', metaKey: true, repeat: true }),
       )
@@ -371,34 +325,34 @@ describe('app shortcuts', () => {
     expect(result.current.router.route).toEqual(opened) // held key doesn't spam notes
   })
 
-  it('is inert while the palette is open (modal owns the keyboard)', () => {
-    const { result } = shortcutsHook()
-    act(() => result.current.palette.openPalette())
-    act(() => press('n'))
+  it('is inert while the palette is open (modal owns the keyboard)', async () => {
+    const { result, act } = await shortcutsHook()
+    await act(() => result.current.palette.openPalette())
+    await act(() => press('n'))
     expect(result.current.router.route).toEqual({ kind: 'today' }) // nothing behind the overlay
-    act(() => result.current.palette.closePalette())
-    act(() => press('n'))
+    await act(() => result.current.palette.closePalette())
+    await act(() => press('n'))
     expect(result.current.router.route.kind).toBe('note') // resumes after close
   })
 
-  it('⌘/ opens the cheat-sheet, closes it again, and mutes other shortcuts meanwhile', () => {
-    const { result } = shortcutsHook()
-    act(() => press('/'))
+  it('⌘/ opens the cheat-sheet, closes it again, and mutes other shortcuts meanwhile', async () => {
+    const { result, act } = await shortcutsHook()
+    await act(() => press('/'))
     expect(result.current.shortcuts.open).toBe(true)
 
-    act(() => press('n'))
+    await act(() => press('n'))
     expect(result.current.router.route).toEqual({ kind: 'today' }) // modal mutes navigation
 
-    act(() => press('/'))
+    await act(() => press('/'))
     expect(result.current.shortcuts.open).toBe(false)
 
-    act(() => press('n'))
+    await act(() => press('n'))
     expect(result.current.router.route.kind).toBe('note') // resumes after close
   })
 
-  it('ignores chords with extra modifiers', () => {
-    const { result } = shortcutsHook()
-    act(() => {
+  it('ignores chords with extra modifiers', async () => {
+    const { result, act } = await shortcutsHook()
+    await act(() => {
       window.dispatchEvent(
         new KeyboardEvent('keydown', { key: 'n', metaKey: true, altKey: true }),
       )

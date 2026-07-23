@@ -1,5 +1,5 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { render } from 'vitest-browser-react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AiChatSection } from './ai-chat-section'
 
 const settings = vi.hoisted(() => ({
@@ -16,17 +16,15 @@ beforeEach(() => {
   settings.update.mockClear()
 })
 
-afterEach(cleanup)
-
 describe('AiChatSection', () => {
-  it('persists a dirty prompt when keyboard navigation unmounts Settings before blur', () => {
-    const view = render(<AiChatSection />)
-    const textarea = screen.getByRole('textbox', { name: 'System prompt' })
+  it('persists a dirty prompt when keyboard navigation unmounts Settings before blur', async () => {
+    const view = await render(<AiChatSection />)
+    const textarea = view.getByRole('textbox', { name: 'System prompt' })
 
-    fireEvent.change(textarea, { target: { value: '  Keep answers short.  ' } })
+    await textarea.fill('  Keep answers short.  ')
     expect(settings.update).not.toHaveBeenCalled()
 
-    view.unmount()
+    await view.unmount()
 
     expect(settings.update).toHaveBeenCalledOnce()
     expect(settings.update).toHaveBeenCalledWith({ chatSystemPrompt: 'Keep answers short.' })

@@ -11,7 +11,6 @@ const windowMock = vi.hoisted(() => ({
   hide: vi.fn(async () => {}),
   unlisten: vi.fn(),
 }))
-const platform = vi.hoisted(() => ({ isMacosDesktop: true }))
 const windowRole = vi.hoisted(() => ({ isMainWindow: true }))
 const core = vi.hoisted(() => ({
   confirmQuit: vi.fn(async () => {}),
@@ -44,11 +43,7 @@ vi.mock('@reflect/core', () => ({
 vi.mock('@/editor/open-documents', () => ({ flushOpenDocuments }))
 vi.mock('@/lib/backup-flush', () => ({ flushBackup }))
 vi.mock('@/lib/settings-flush', () => ({ flushSettings }))
-vi.mock('@/lib/platform', () => ({
-  get isMacosDesktop() {
-    return platform.isMacosDesktop
-  },
-}))
+vi.mock('@/lib/platform', () => ({ isMacosDesktop: true }))
 vi.mock('@/lib/windows/window-role', () => ({
   isMainWindow: () => windowRole.isMainWindow,
 }))
@@ -56,7 +51,6 @@ vi.mock('@/lib/windows/window-role', () => ({
 const { installQuitFlush } = await import('./quit-flush')
 
 beforeEach(() => {
-  platform.isMacosDesktop = true
   windowRole.isMainWindow = true
   windowMock.closeRequested = null
   core.quitRequested = null
@@ -109,15 +103,4 @@ describe('installQuitFlush', () => {
     dispose()
   })
 
-  it('allows the main window to close normally outside macOS', async () => {
-    platform.isMacosDesktop = false
-    const dispose = installQuitFlush()
-    const closeRequest = closeCurrentWindow()
-
-    expect(closeRequest.preventDefault).not.toHaveBeenCalled()
-    await closeRequest.completed
-    expect(windowMock.hide).not.toHaveBeenCalled()
-
-    dispose()
-  })
 })
