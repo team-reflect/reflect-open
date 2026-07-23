@@ -1,5 +1,9 @@
-import { type ReactElement } from 'react'
-import { setLocalWriteEcho, type AppPlatform } from '@reflect/core'
+import { useEffect, type ReactElement } from 'react'
+import {
+  recordDiagnosticCheckpoint,
+  setLocalWriteEcho,
+  type AppPlatform,
+} from '@reflect/core'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { setPlatformSurface } from '@/lib/platform-surface'
 import { MobileApp } from '@/mobile/mobile-app'
@@ -22,10 +26,16 @@ setPlatformSurface({ touchEditor: true, mobileApp: true })
  * shell. Desktop-only providers (auto-update, drag region) never load here.
  */
 export function MobileRoot({ platform }: { platform: AppPlatform }): ReactElement {
+  useEffect(() => {
+    if (platform === 'ios') {
+      void recordDiagnosticCheckpoint('mobileRootMounted').catch(() => {})
+    }
+  }, [platform])
+
   return (
     <GraphProvider platform={platform}>
       <TooltipProvider>
-        <MobileApp />
+        <MobileApp diagnosticsEnabled={platform === 'ios'} />
       </TooltipProvider>
     </GraphProvider>
   )

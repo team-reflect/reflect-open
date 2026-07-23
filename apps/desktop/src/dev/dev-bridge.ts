@@ -1,4 +1,5 @@
 import {
+  diagnosticCheckpointSchema,
   indexedNoteSchema,
   ReflectError,
   type AppPlatform,
@@ -71,6 +72,7 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
   // In-memory keychain stand-in so the AI-provider settings flow (and chat,
   // against a CORS-permissive provider) works end-to-end in the harness.
   const secrets = new Map<string, string>()
+  const diagnosticEvents: Record<string, unknown>[] = []
 
   async function invoke(command: string, args: Record<string, unknown>): Promise<unknown> {
     switch (command) {
@@ -78,6 +80,36 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         return '0.0.0-dev'
       case 'app_platform':
         return platform
+      case 'diagnostics_bootstrap':
+        diagnosticEvents.push({
+          kind: 'appStarted',
+          atMs: Date.now(),
+        })
+        return { safeMode: false, reason: null, recentWebContentTerminations: 0 }
+      case 'diagnostics_checkpoint':
+        diagnosticEvents.push({
+          kind: 'checkpoint',
+          atMs: Date.now(),
+          checkpoint: diagnosticCheckpointSchema.parse(args['checkpoint']),
+        })
+        diagnosticEvents.splice(0, Math.max(0, diagnosticEvents.length - 128))
+        return null
+      case 'diagnostics_frontend_ready':
+        diagnosticEvents.push({ kind: 'frontendReady', atMs: Date.now() })
+        return null
+      case 'diagnostics_retry_normal':
+        return null
+      case 'diagnostics_snapshot':
+        return {
+          schemaVersion: 1,
+          generatedAtMs: Date.now(),
+          appVersion: '0.0.0-dev',
+          build: null,
+          safeMode: false,
+          reason: null,
+          recentWebContentTerminations: 0,
+          events: diagnosticEvents.slice(-128),
+        }
       case 'background_task_begin':
         // Browser previews are never suspended like an iOS process, so the
         // native finite-length assertion is honestly unavailable.

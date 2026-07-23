@@ -31,6 +31,18 @@ export {
 export { WINDOW_NAVIGATE_EVENT, subscribeWindowNavigate } from '../app/window-events'
 export { toggleDevtools } from '../app/devtools'
 export {
+  bootstrapDiagnostics,
+  recordDiagnosticCheckpoint,
+  markDiagnosticsFrontendReady,
+  retryNormalDiagnosticsStartup,
+  getDiagnosticsSnapshot,
+  diagnosticCheckpointSchema,
+  diagnosticsSnapshotSchema,
+  type DiagnosticCheckpoint,
+  type DiagnosticsSnapshot,
+  type DiagnosticsStatus,
+} from '../app/diagnostics'
+export {
   agentSkillStatus,
   agentSkillInstall,
   agentSkillUninstall,

@@ -20,6 +20,7 @@ import { AiProviderActionsDrawer } from '@/mobile/ai-provider-actions-drawer'
 import { PRIVACY_POLICY_URL } from '@/mobile/ai-provider-consent'
 import { ChatSystemPromptDrawer } from '@/mobile/chat-system-prompt-drawer'
 import { ConnectGithubDrawer } from '@/mobile/connect-github-drawer'
+import { useDiagnosticsShare } from '@/mobile/diagnostics-share'
 import { MobileScreenHeader } from '@/mobile/screen-header'
 import {
   SettingsActionRow,
@@ -67,6 +68,8 @@ export function MobileSettings(): ReactElement {
   // until the conflict count is known, so the row never claims `Backed up`
   // over conflict markers already on disk and then flips.
   const status = useMobileSyncStatus()
+  const diagnosticsEnabled = import.meta.env.TAURI_ENV_PLATFORM === 'ios'
+  const diagnostics = useDiagnosticsShare(diagnosticsEnabled)
   const [disconnecting, setDisconnecting] = useState(false)
   const [connectOpen, setConnectOpen] = useState(false)
   const {
@@ -249,7 +252,12 @@ export function MobileSettings(): ReactElement {
             </SettingsGroup>
           ) : null}
 
-          <SettingsGroup header="About">
+          <SettingsGroup
+            header="About"
+            footer={
+              diagnostics.error === null ? null : `Diagnostics: ${diagnostics.error}`
+            }
+          >
             <SettingsValueRow
               label="Notes"
               value={notes === undefined ? '…' : String(notes.length)}
@@ -258,6 +266,19 @@ export function MobileSettings(): ReactElement {
               label="Version"
               value={version === null ? '…' : marketingVersion(version)}
             />
+            {diagnosticsEnabled ? (
+              <SettingsActionRow
+                label={diagnostics.ready ? 'Share diagnostics' : 'Retry diagnostics'}
+                pending={diagnostics.loading || diagnostics.sharing}
+                onPress={() => {
+                  if (diagnostics.ready) {
+                    diagnostics.share()
+                  } else {
+                    diagnostics.prepare()
+                  }
+                }}
+              />
+            ) : null}
             <SettingsActionRow
               label="Privacy Policy"
               onPress={() => {

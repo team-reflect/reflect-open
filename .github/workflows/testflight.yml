@@ -102,9 +102,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Resolve build number
+        id: build_number
         run: |
           build_number="$(date -u +%Y%m%d%H%M)"
           echo "BUILD_NUMBER=$build_number" >> "$GITHUB_ENV"
+          echo "value=$build_number" >> "$GITHUB_OUTPUT"
           echo "Using TestFlight CFBundleVersion $build_number"
 
       - name: Build and upload to TestFlight
@@ -117,6 +119,10 @@ jobs:
           VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           WAIT_FLAG: ${{ inputs.wait_for_processing && '--wait' || '' }}
         run: |
+          if [ -z "$SENTRY_AUTH_TOKEN" ] || [ -z "$VITE_SENTRY_DSN" ]; then
+            echo "::error::TestFlight requires both SENTRY_AUTH_TOKEN and SENTRY_DSN"
+            exit 1
+          fi
           pnpm release:ios preflight --build-number="$BUILD_NUMBER"
           args=(testflight --build-number="$BUILD_NUMBER" --export-method="$EXPORT_METHOD")
           if [ -n "$WAIT_FLAG" ]; then
@@ -124,12 +130,51 @@ jobs:
           fi
           pnpm release:ios "${args[@]}"
 
+      - name: Package and verify native symbols
+        if: always()
+        run: |
+          archive="apps/desktop/src-tauri/gen/apple/build/reflect-open_iOS.xcarchive"
+          archive_zip="$RUNNER_TEMP/reflect-ios-xcarchive-$BUILD_NUMBER.zip"
+          if [ ! -d "$archive" ]; then
+            echo "::warning::No Xcode archive was produced; skipping symbol packaging"
+            exit 0
+          fi
+
+          # Package first so the exact archive remains available for diagnosis
+          # even when the symbol verification below finds a release blocker.
+          ditto -c -k --sequesterRsrc --keepParent "$archive" "$archive_zip"
+
+          app_binary="$archive/Products/Applications/Reflect.app/Reflect"
+          dsym_binary="$archive/dSYMs/Reflect.app.dSYM/Contents/Resources/DWARF/Reflect"
+          test -f "$app_binary"
+          test -f "$dsym_binary"
+
+          app_uuids="$(xcrun dwarfdump --uuid "$app_binary" | awk '{ print $2 }' | sort)"
+          dsym_uuids="$(xcrun dwarfdump --uuid "$dsym_binary" | awk '{ print $2 }' | sort)"
+          if [ "$app_uuids" != "$dsym_uuids" ]; then
+            echo "::error::Reflect executable and dSYM UUIDs do not match"
+            exit 1
+          fi
+
       # The exported IPA, kept for post-hoc signing/entitlements inspection —
       # TestFlight builds cannot be downloaded back from App Store Connect.
       - name: Upload IPA artifact
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: reflect-ios-ipa
+          name: reflect-ios-ipa-${{ steps.build_number.outputs.value }}
           path: apps/desktop/src-tauri/gen/apple/build/arm64/*.ipa
           if-no-files-found: ignore
+          retention-days: 90
+
+      # The exact archive contains the app/extension dSYMs and matching
+      # binaries needed for Apple .ips reports that arrive after release.
+      - name: Upload Xcode archive artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: reflect-ios-xcarchive-${{ steps.build_number.outputs.value }}
+          path: ${{ runner.temp }}/reflect-ios-xcarchive-${{ steps.build_number.outputs.value }}.zip
+          if-no-files-found: ignore
+          retention-days: 90
+          compression-level: 0

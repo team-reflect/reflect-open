@@ -3,6 +3,10 @@ options:
   bundleIdPrefix: app.reflect
   deploymentTarget:
     iOS: 14.0
+packages:
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa
+    exactVersion: 8.58.4
 fileGroups: [../../src]
 configs:
   debug: debug
@@ -49,6 +53,7 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+      - path: ../../ios/NativeDiagnostics.swift
       - path: Assets.xcassets
       # Build artifacts (libapp.a) land here; without an explicit `none`,
       # regenerating after a build sweeps them into Copy Bundle Resources,
@@ -168,6 +173,8 @@ targets:
       # + the recording Live Activity; embedded and signed with the app.
       - target: RecordingWidget
         embed: true
+      - package: Sentry
+        product: Sentry
       - framework: libapp.a
         embed: false
       # libgit2 (vendored into libapp.a) needs zlib and iconv at the final
