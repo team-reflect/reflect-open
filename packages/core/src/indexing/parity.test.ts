@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { isNotePath, mayContainNotes } from '../graph/paths'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -53,23 +54,25 @@ interface ScalarInputs {
   ftsMatch: string[]
 }
 
-/** Graph-relative paths of every fixture `.md`, mirroring the CLI's walk. */
+/** Graph-relative paths of every eligible fixture note, mirroring the CLI's
+ * full-vault walk: any depth, gated by the shared classifier. */
 function walkCorpusNotes(): string[] {
   const paths: string[] = []
-  for (const dir of ['daily', 'notes']) {
-    const stack = [join(corpusDir, dir)]
-    while (stack.length > 0) {
-      const current = stack.pop()
-      if (current === undefined) {
-        break
-      }
-      for (const entry of readdirSync(current)) {
-        const full = join(current, entry)
-        if (statSync(full).isDirectory()) {
+  const stack = [corpusDir]
+  while (stack.length > 0) {
+    const current = stack.pop()
+    if (current === undefined) {
+      break
+    }
+    for (const entry of readdirSync(current)) {
+      const full = join(current, entry)
+      const rel = full.slice(corpusDir.length + 1).replaceAll('\\', '/')
+      if (statSync(full).isDirectory()) {
+        if (mayContainNotes(rel)) {
           stack.push(full)
-        } else if (entry.endsWith('.md')) {
-          paths.push(full.slice(corpusDir.length + 1).replaceAll('\\', '/'))
         }
+      } else if (isNotePath(rel)) {
+        paths.push(rel)
       }
     }
   }
