@@ -8,7 +8,7 @@ import { buildIndexedNote } from './indexed-note'
 import { buildFtsMatch } from './search-query'
 
 /**
- * The TS side of the TS↔Rust parity contract (see `fixtures/parity/README.md`).
+ * The TS side of the TS↔Rust parity contract (see `fixtures/parity/README.txt`).
  *
  * The `reflect` CLI (`apps/cli`) re-implements this package's read-side
  * contract in Rust. This test derives `fixtures/parity/expected.json` from the

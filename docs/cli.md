@@ -174,7 +174,7 @@ app can refresh its own installs without ever overwriting a hand-edited one
   `@reflect/core` (path conventions, fold keys, frontmatter coercions, title
   derivation, SHA-256 hashing, FTS match syntax). Each Rust module names its
   TS counterpart, and the contract is pinned by the shared parity corpus in
-  [`fixtures/parity/`](../fixtures/parity/README.md): TS generates
+  [`fixtures/parity/`](../fixtures/parity/README.txt): TS generates
   `expected.json` from the real core pipeline, the Rust tests assert against
   it, so neither side can change without the other following in the same PR.
   Don't grow the surface.

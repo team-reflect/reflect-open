@@ -4756,6 +4756,7 @@ dependencies = [
  "clap",
  "jiff",
  "pulldown-cmark",
+ "reflect-graph-paths",
  "reflect-index-schema",
  "rusqlite",
  "saphyr",

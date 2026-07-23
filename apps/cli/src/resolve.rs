@@ -4,14 +4,14 @@
 //! graph path → title fold-key → alias fold-key. Index-backed when the index
 //! is open; otherwise a file scan derives the same titles/aliases.
 
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
 use rusqlite::{params, Connection};
 
 use crate::error::CliError;
 use crate::keys::fold_key;
-use crate::note_file::{parse_note_meta, walk_notes};
-use crate::paths::{daily_path, parse_calendar_date, NOTE_DIRS};
+use crate::note_file::{checked_note_path, parse_note_meta, walk_notes};
+use crate::paths::{daily_path, parse_calendar_date};
 
 /// What a `<note>` argument resolved to.
 pub enum ResolvedNote {
@@ -30,25 +30,50 @@ impl ResolvedNote {
 }
 
 /// Interpret `arg` as an explicit note path (graph-relative, or absolute
-/// inside the graph). Only existing `.md` files under `daily/`/`notes/`
-/// qualify; anything else falls through to title/alias matching.
+/// inside the graph). Only existing eligible Markdown files qualify; anything
+/// else falls through to title/alias matching. Symlinked path components are
+/// refused even when their target happens to remain inside the graph.
 fn as_graph_path(arg: &str, root: &Path) -> Option<String> {
     let candidate = Path::new(arg);
-    let absolute = if candidate.is_absolute() {
-        candidate.to_path_buf()
+    let canonical_root = root.canonicalize().ok()?;
+    let relative = if candidate.is_absolute() {
+        absolute_graph_relative(candidate, &canonical_root)?
     } else {
-        root.join(candidate)
+        candidate.to_path_buf()
     };
-    let canonical = absolute.canonicalize().ok()?;
-    if !canonical.is_file() {
+    let rel_path = relative.to_str()?.replace(std::path::MAIN_SEPARATOR, "/");
+    // User-typed arguments deserve shell-style tolerance (`./notes/a.md`,
+    // `notes//a.md`); the wire form stays strict, so normalize before the
+    // classifier sees it.
+    let rel_path = rel_path
+        .split('/')
+        .filter(|component| !component.is_empty() && *component != ".")
+        .collect::<Vec<_>>()
+        .join("/");
+    let current = checked_note_path(&canonical_root, &rel_path).ok()?;
+    if !current.is_file() || !current.canonicalize().ok()?.starts_with(&canonical_root) {
         return None;
     }
-    let rel = canonical.strip_prefix(root).ok()?;
-    let rel_path = rel.to_string_lossy().replace('\\', "/");
-    let under_note_dir = NOTE_DIRS
-        .iter()
-        .any(|dir| rel_path.starts_with(&format!("{dir}/")));
-    (under_note_dir && rel_path.ends_with(".md")).then_some(rel_path)
+    Some(rel_path)
+}
+
+/// Find the lexical graph boundary for an absolute path by canonicalizing its
+/// ancestors. This accepts aliases of the graph root (for example macOS's
+/// `/var` → `/private/var`) without canonicalizing away symlinks below it;
+/// [`checked_note_path`] still inspects every component of the returned suffix.
+fn absolute_graph_relative(candidate: &Path, canonical_root: &Path) -> Option<PathBuf> {
+    if candidate
+        .components()
+        .any(|component| matches!(component, Component::ParentDir))
+    {
+        return None;
+    }
+    candidate.ancestors().find_map(|ancestor| {
+        if ancestor.canonicalize().ok()?.as_path() != canonical_root {
+            return None;
+        }
+        candidate.strip_prefix(ancestor).ok().map(Path::to_path_buf)
+    })
 }
 
 /// Title matches first, alias matches only when no title matched — the
@@ -90,7 +115,7 @@ fn collect_paths(conn: &Connection, sql: &str, key: &str) -> Result<Vec<String>,
 fn scan_lookup(root: &Path, key: &str) -> Result<Vec<String>, CliError> {
     let mut by_title = Vec::new();
     let mut by_alias = Vec::new();
-    for note in walk_notes(root)? {
+    for note in walk_notes(root) {
         if note.rel_path.starts_with("templates/") {
             continue; // templates never resolve by title/alias
         }
@@ -152,5 +177,102 @@ pub fn resolve_note(
                 rel_path: first.clone(),
             })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::as_graph_path;
+
+    #[test]
+    fn explicit_paths_accept_root_and_nested_notes_only() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(temp.path().join("README.md"), "root").expect("write");
+        std::fs::create_dir_all(temp.path().join("Projects/.hidden")).expect("mkdir");
+        std::fs::write(temp.path().join("Projects/plan.md"), "plan").expect("write");
+        std::fs::write(temp.path().join("Projects/.hidden/secret.md"), "secret").expect("write");
+        std::fs::create_dir_all(temp.path().join("assets")).expect("mkdir");
+        std::fs::write(temp.path().join("assets/caption.md"), "caption").expect("write");
+        let root = temp.path().canonicalize().expect("canonical root");
+
+        assert_eq!(
+            as_graph_path("README.md", &root).as_deref(),
+            Some("README.md")
+        );
+        assert_eq!(
+            as_graph_path("Projects/plan.md", &root).as_deref(),
+            Some("Projects/plan.md")
+        );
+        assert_eq!(as_graph_path("Projects/.hidden/secret.md", &root), None);
+        assert_eq!(as_graph_path("assets/caption.md", &root), None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn explicit_paths_refuse_symlinks() {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempfile::tempdir().expect("tempdir");
+        std::fs::write(temp.path().join("real.md"), "real").expect("write");
+        symlink(temp.path().join("real.md"), temp.path().join("linked.md")).expect("symlink");
+        let root = temp.path().canonicalize().expect("canonical root");
+
+        assert_eq!(as_graph_path("linked.md", &root), None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn absolute_paths_accept_different_aliases_of_the_graph_root() {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempfile::tempdir().expect("tempdir");
+        let real_root = temp.path().join("real-vault");
+        let alias_root = temp.path().join("vault-alias");
+        std::fs::create_dir(&real_root).expect("mkdir");
+        std::fs::write(real_root.join("README.md"), "root").expect("write");
+        symlink(&real_root, &alias_root).expect("symlink");
+
+        assert_eq!(
+            as_graph_path(
+                real_root.join("README.md").to_str().expect("UTF-8 path"),
+                &alias_root,
+            )
+            .as_deref(),
+            Some("README.md")
+        );
+        assert_eq!(
+            as_graph_path(
+                alias_root.join("README.md").to_str().expect("UTF-8 path"),
+                &real_root,
+            )
+            .as_deref(),
+            Some("README.md")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn absolute_paths_still_refuse_symlinks_below_the_graph_root() {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir(temp.path().join("Projects")).expect("mkdir");
+        std::fs::write(temp.path().join("Projects/plan.md"), "plan").expect("write");
+        symlink(
+            temp.path().join("Projects"),
+            temp.path().join("linked-projects"),
+        )
+        .expect("symlink");
+
+        assert_eq!(
+            as_graph_path(
+                temp.path()
+                    .join("linked-projects/plan.md")
+                    .to_str()
+                    .expect("UTF-8 path"),
+                temp.path(),
+            ),
+            None
+        );
     }
 }
