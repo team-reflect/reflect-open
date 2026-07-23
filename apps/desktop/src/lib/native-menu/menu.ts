@@ -1,4 +1,4 @@
-import { isTauri } from '@tauri-apps/api/core'
+import { invoke, isTauri } from '@tauri-apps/api/core'
 import {
   Menu,
   Submenu,
@@ -217,5 +217,17 @@ export async function installNativeMenu(): Promise<void> {
     } else if (layout.nsAppRole === 'help') {
       await submenu.setAsHelpMenuForNSApp()
     }
+  }
+  // Must run after setAsAppMenu, like the role assignment above: it adds the
+  // Edit > "Paste and Match Style" (⌘⇧V) item to the menu that was just
+  // installed. The menu API cannot create that item (it needs a native macOS
+  // action selector), so a Rust command does it with direct AppKit calls;
+  // see `src-tauri/src/menu.rs` for the full explanation with source links.
+  // Best-effort: the menu works without the item, so a failed invoke must
+  // not make the whole install look failed.
+  try {
+    await invoke('menu_install_paste_and_match_style')
+  } catch (error) {
+    console.warn('failed to add the Paste and Match Style menu item:', error)
   }
 }

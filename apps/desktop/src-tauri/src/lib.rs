@@ -11,6 +11,7 @@
 //! [`skill`] (per-graph agent-skill install under `~/.agents/skills/`),
 //! [`calendar`] (read-only Apple Calendar access),
 //! [`contacts`] (live Apple Contacts lookups),
+//! [`menu`] (the macOS app menu, incl. Paste and Match Style),
 //! [`error`] (the shared error contract).
 
 mod background_task;
@@ -25,6 +26,7 @@ mod fs;
 mod git;
 mod graph_gitignore;
 mod icloud;
+mod menu;
 mod quit;
 mod recents;
 mod secrets;
@@ -298,6 +300,7 @@ pub fn run() {
             embed::embed_texts,
             watcher::watch_start,
             watcher::watch_stop,
+            menu::menu_install_paste_and_match_style,
             calendar::calendar_authorization_status,
             calendar::calendar_request_access,
             calendar::calendar_list_calendars,
