@@ -8,6 +8,8 @@
 
 use std::fs;
 use std::io::Write;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+use std::os::raw::c_int;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
@@ -243,9 +245,148 @@ pub(crate) fn modified_ms(meta: &fs::Metadata) -> Option<u64> {
 /// Storage replaces a not-downloaded file with such a stub; to the rest of the
 /// app the file still exists — it just isn't readable until re-downloaded
 /// (Plan 21: eviction must never read as deletion).
+///
+/// This stub grammar is the **iOS / legacy** eviction form. Modern macOS
+/// (FileProvider-based iCloud Drive, macOS 14 Sonoma and later) evicts to a
+/// *dataless* file at the real path instead
+/// — see [`is_dataless`]; both forms must read as "present but not local".
 pub(crate) fn icloud_placeholder_target(file_name: &str) -> Option<&str> {
     let name = file_name.strip_prefix('.')?.strip_suffix(".icloud")?;
     (!name.is_empty()).then_some(name)
+}
+
+/// The kernel's dataless-file flag (`SF_DATALESS` in `<sys/stat.h>`): set on
+/// files whose bytes have been evicted to a file provider (modern macOS
+/// iCloud Drive). The file keeps its real path, logical size, and mtime, but
+/// any read blocks while `fileproviderd` re-materializes the bytes — so bulk
+/// passes must check this before reading, or a single pass turns into
+/// thousands of serial on-demand downloads.
+///
+/// Checking `st_flags` for `SF_DATALESS` is Apple's documented detection for
+/// POSIX-level access (TN3150, "Getting ready for dataless files":
+/// <https://developer.apple.com/documentation/technotes/tn3150-getting-ready-for-data-less-files>);
+/// the flag is also documented in `chflags(2)`, which marks it (with
+/// `UF_COMPRESSED`) as kernel-internal: userland can observe but never set
+/// it. The value is public ABI from the macOS SDK's `<sys/stat.h>` (also in
+/// Apple's open-source XNU, `bsd/sys/stat.h`), spelled out here because the
+/// `libc` crate does not bind it yet.
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const SF_DATALESS: u32 = 0x4000_0000;
+
+/// Pure half of [`is_dataless`], split out because userland cannot *set*
+/// `SF_DATALESS` (it is kernel-owned), so only the flag decode is unit
+/// testable. Deliberately not `st_blocks == 0`: transparently-compressed
+/// (decmpfs) files also allocate zero data blocks, and misreading one as
+/// evicted would silently drop it from indexing forever.
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+fn dataless_flags(flags: u32) -> bool {
+    flags & SF_DATALESS != 0
+}
+
+/// True when `meta` describes an evicted dataless file (bytes remote, path
+/// and stat intact). Always `false` off Apple platforms.
+#[cfg(target_os = "macos")]
+pub(crate) fn is_dataless(meta: &fs::Metadata) -> bool {
+    use std::os::macos::fs::MetadataExt;
+    dataless_flags(meta.st_flags())
+}
+
+/// True when `meta` describes an evicted dataless file (bytes remote, path
+/// and stat intact). Always `false` off Apple platforms.
+#[cfg(target_os = "ios")]
+pub(crate) fn is_dataless(meta: &fs::Metadata) -> bool {
+    use std::os::ios::fs::MetadataExt;
+    dataless_flags(meta.st_flags())
+}
+
+/// True when `meta` describes an evicted dataless file (bytes remote, path
+/// and stat intact). Always `false` off Apple platforms.
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+pub(crate) fn is_dataless(_meta: &fs::Metadata) -> bool {
+    false
+}
+
+/// The thread/process I/O policy interface from `<sys/resource.h>`
+/// (`getiopolicy_np(3)`, available since macOS 10.5 / iOS 2.0), not bound by
+/// the `libc` crate yet. Policy type 3 governs whether file access
+/// materializes dataless files (TN3150).
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES: c_int = 3;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const IOPOL_SCOPE_THREAD: c_int = 1;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const IOPOL_MATERIALIZE_DATALESS_FILES_OFF: c_int = 1;
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+extern "C" {
+    fn getiopolicy_np(iotype: c_int, scope: c_int) -> c_int;
+    fn setiopolicy_np(iotype: c_int, scope: c_int, policy: c_int) -> c_int;
+}
+
+/// Dataless-file materialization switched **off** for the current thread,
+/// RAII (TN3150's second option:
+/// <https://developer.apple.com/documentation/technotes/tn3150-getting-ready-for-data-less-files>).
+/// While engaged, reading a dataless file fails with `EDEADLK`
+/// (`std::io::ErrorKind::Deadlock`) instead of blocking while
+/// `fileproviderd` fetches the bytes; `note_read_local` uses this to close
+/// its stat-then-read race, reporting an eviction that lands between the
+/// check and the read as `Evicted` rather than downloading it. Restoring
+/// the previous policy on drop matters: the async runtime's blocking pool
+/// reuses threads, and a leaked `OFF` would make every later command on the
+/// thread refuse materialization.
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+pub(crate) struct NoMaterialize {
+    previous: c_int,
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+impl NoMaterialize {
+    /// Engage the thread-scoped policy; `None` (and no policy change) when
+    /// the kernel refuses. Callers proceed unguarded then: the stat check
+    /// still catches settled evictions, only the race window reopens.
+    pub(crate) fn engage() -> Option<Self> {
+        let previous = unsafe {
+            getiopolicy_np(
+                IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES,
+                IOPOL_SCOPE_THREAD,
+            )
+        };
+        if previous < 0 {
+            return None;
+        }
+        let set = unsafe {
+            setiopolicy_np(
+                IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES,
+                IOPOL_SCOPE_THREAD,
+                IOPOL_MATERIALIZE_DATALESS_FILES_OFF,
+            )
+        };
+        (set == 0).then_some(Self { previous })
+    }
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+impl Drop for NoMaterialize {
+    fn drop(&mut self) {
+        unsafe {
+            setiopolicy_np(
+                IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES,
+                IOPOL_SCOPE_THREAD,
+                self.previous,
+            );
+        }
+    }
+}
+
+/// No dataless files off Apple platforms; the guard is a no-op.
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+pub(crate) struct NoMaterialize;
+
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+impl NoMaterialize {
+    pub(crate) fn engage() -> Option<Self> {
+        Some(Self)
+    }
 }
 
 /// The placeholder path iCloud leaves behind when it evicts `logical`
@@ -324,7 +465,10 @@ pub(super) fn collect_files(
                 path: rel.to_string_lossy().replace('\\', "/"),
                 size: meta.len(),
                 modified_ms: modified_ms(&meta).unwrap_or(0),
-                placeholder,
+                // Two eviction forms fold into one flag: the legacy `.icloud`
+                // stub (detected by name above) and the modern dataless file
+                // (kernel flag on the real path).
+                placeholder: placeholder || is_dataless(&meta),
             });
         }
     }
@@ -343,6 +487,51 @@ fn evicted_logical_path(path: &Path) -> Option<PathBuf> {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    #[test]
+    fn dataless_decodes_only_the_kernel_flag() {
+        assert!(dataless_flags(SF_DATALESS));
+        assert!(dataless_flags(SF_DATALESS | 0x1));
+        assert!(!dataless_flags(0));
+        // Other BSD flags (UF_HIDDEN, UF_COMPRESSED, …) are not eviction.
+        assert!(!dataless_flags(0x8000 | 0x20));
+    }
+
+    #[test]
+    fn a_regular_file_is_not_dataless() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("note.md");
+        fs::write(&path, b"hello").unwrap();
+        assert!(!is_dataless(&fs::metadata(&path).unwrap()));
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    #[test]
+    fn no_materialize_engages_and_restores_the_thread_policy() {
+        let current = || unsafe {
+            getiopolicy_np(
+                IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES,
+                IOPOL_SCOPE_THREAD,
+            )
+        };
+        let before = current();
+        let guard = NoMaterialize::engage().expect("thread policy should engage");
+        assert_eq!(current(), IOPOL_MATERIALIZE_DATALESS_FILES_OFF);
+        // Restore-on-drop is what keeps the guard safe on the async
+        // runtime's reused blocking threads.
+        drop(guard);
+        assert_eq!(current(), before);
+    }
+
+    #[test]
+    fn a_local_read_succeeds_under_the_no_materialize_guard() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("note.md");
+        fs::write(&path, b"hello").unwrap();
+        let _no_materialize = NoMaterialize::engage();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "hello");
+    }
 
     #[test]
     fn bootstrap_creates_layout() {

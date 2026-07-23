@@ -126,6 +126,27 @@ export async function readNote(path: string, generation?: number): Promise<strin
   return call('note_read', { path, generation }, z.string())
 }
 
+const localNoteReadSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('content'), content: z.string() }),
+  z.object({ kind: z.literal('evicted') }),
+])
+
+/** How a {@link readNoteLocal} request found the note on disk. */
+export type LocalNoteRead = z.infer<typeof localNoteReadSchema>
+
+/**
+ * Read a note's markdown **only when its bytes are local**, reporting an
+ * iCloud-evicted note as `{ kind: 'evicted' }` instead of reading it. Bulk
+ * background passes (the embedding backfill, asset-description gathering)
+ * must use this instead of {@link readNote}: reading an evicted note blocks
+ * while the OS materializes it on demand, and a whole-graph pass over an
+ * evicted iCloud graph becomes thousands of serial blocking downloads.
+ * Missing files still reject with `notFound`, exactly like {@link readNote}.
+ */
+export async function readNoteLocal(path: string, generation?: number): Promise<LocalNoteRead> {
+  return call('note_read_local', { path, generation }, localNoteReadSchema)
+}
+
 /**
  * Atomically write a note's markdown by graph-relative path. `generation` (from
  * `GraphInfo`) pins the write to the graph it was issued for — Rust rejects it

@@ -1,4 +1,4 @@
-import { readNote } from '../graph/commands'
+import { readNoteLocal } from '../graph/commands'
 import { isTemplatePath } from '../graph/paths'
 import { gatherAssetDescriptionBodies } from '../indexing/asset-description-text'
 import { db } from '../indexing/db'
@@ -38,18 +38,37 @@ export async function embedNote(options: EmbedNoteOptions): Promise<number> {
   }
   let content = options.content
   if (content === undefined) {
+    let read: Awaited<ReturnType<typeof readNoteLocal>>
     try {
-      content = await readNote(path)
+      read = await readNoteLocal(path)
     } catch {
       return 0 // deleted between event and read; the remove path handles it
     }
+    if (read.kind === 'evicted') {
+      // iCloud-evicted: reading would force an on-demand download, and the
+      // backfill sweeping a whole evicted graph would turn into thousands of
+      // serial blocking downloads. The pre-eviction vectors stay valid (rows
+      // survive eviction); if the note re-materializes with new content, the
+      // index-applied follow-up re-embeds it then.
+      return 0
+    }
+    content = read.content
   }
 
   const parsed = parseNote({ path, source: content })
-  const assetBodies = await gatherAssetDescriptionBodies(parsed.assets.map((asset) => asset.path))
+  const gathered = await gatherAssetDescriptionBodies(parsed.assets.map((asset) => asset.path))
+  if (gathered.evicted.length > 0) {
+    // A referenced sidecar is iCloud-evicted. `embedApply` replaces the
+    // note's *entire* chunk set, so applying without that sidecar's body
+    // would silently drop its previously embedded chunks — and sidecars are
+    // untracked by the watcher, so nothing would ever restore them. Skip the
+    // whole note this pass; the stored vectors stay valid until the sidecar
+    // is local again.
+    return 0
+  }
   const chunks = [
     ...(await chunkNote(path, content, parsed)),
-    ...(await chunkAssetDescriptions(assetBodies, content.length + 1)),
+    ...(await chunkAssetDescriptions(gathered.bodies, content.length + 1)),
   ]
   if (chunks.length === 0) {
     await embedRemove(path, generation)

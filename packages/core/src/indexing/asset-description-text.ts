@@ -1,5 +1,5 @@
 import { isAppError } from '../errors'
-import { readNote } from '../graph/commands'
+import { readNoteLocal } from '../graph/commands'
 import { descriptionPathFor } from '../graph/paths'
 import { splitFrontmatter } from '../markdown/frontmatter'
 
@@ -26,41 +26,61 @@ export interface AssetDescriptionBody {
   body: string
 }
 
+/** What {@link gatherAssetDescriptionBodies} could (and could not) read. */
+export interface AssetDescriptionGather {
+  /** The readable description bodies, in reference order. */
+  bodies: readonly AssetDescriptionBody[]
+  /**
+   * Asset paths whose description file exists but is iCloud-evicted —
+   * unreadable without forcing an on-demand download. Consumers that
+   * *replace* stored derivations (the embedding pipeline's full chunk-set
+   * apply) must skip the write entirely when this is non-empty, or the
+   * evicted sidecar's previously indexed chunks are silently dropped.
+   */
+  evicted: readonly string[]
+}
+
 /**
  * The per-asset description bodies for a note's referenced assets. Reads any
  * `<asset>.reflect.md` that exists (managed or user-authored — it is the
  * user's content about the asset) and strips frontmatter. Missing files and
- * empty bodies are skipped; a repeated asset contributes once. Accumulation
- * stops once the combined length reaches {@link MAX_ASSET_TEXT_CHARS} (the
- * body that crosses the cap is kept whole — consumers apply their own final
- * cap). Reads are unpinned, matching the indexer's own note reads (the
- * *write* is generation-pinned, so a graph switch drops the stale row
- * regardless).
+ * empty bodies are skipped; an iCloud-evicted sidecar is reported in
+ * `evicted` instead of being read (a read would block on an on-demand
+ * download mid-pass); a repeated asset contributes once. Accumulation stops
+ * once the combined length reaches {@link MAX_ASSET_TEXT_CHARS} (the body
+ * that crosses the cap is kept whole — consumers apply their own final cap).
+ * Reads are unpinned, matching the indexer's own note reads (the *write* is
+ * generation-pinned, so a graph switch drops the stale row regardless).
  */
 export async function gatherAssetDescriptionBodies(
   assetPaths: readonly string[],
-): Promise<AssetDescriptionBody[]> {
+): Promise<AssetDescriptionGather> {
+  const bodies: AssetDescriptionBody[] = []
+  const evicted: string[] = []
   if (assetPaths.length === 0) {
-    return []
+    return { bodies, evicted }
   }
   const seen = new Set<string>()
-  const bodies: AssetDescriptionBody[] = []
   let total = 0
   for (const assetPath of assetPaths) {
     if (seen.has(assetPath)) {
       continue // an asset referenced twice in one note contributes once
     }
     seen.add(assetPath)
-    let source: string
+    let read: Awaited<ReturnType<typeof readNoteLocal>>
     try {
-      source = await readNote(descriptionPathFor(assetPath))
+      read = await readNoteLocal(descriptionPathFor(assetPath))
     } catch (cause) {
       if (isAppError(cause) && cause.kind === 'notFound') {
         continue // no description for this asset (not generated yet, or none)
       }
       throw cause
     }
-    const body = splitFrontmatter(source).body.trim()
+    if (read.kind === 'evicted') {
+      evicted.push(assetPath)
+      continue
+    }
+    const body = splitFrontmatter(read.content).body.trim()
     if (body === '') {
       continue
     }
@@ -70,16 +90,19 @@ export async function gatherAssetDescriptionBodies(
       break
     }
   }
-  return bodies
+  return { bodies, evicted }
 }
 
 /**
  * The combined body text of a note's assets' description files, for folding
  * into its search index — {@link gatherAssetDescriptionBodies} joined and
- * capped at {@link MAX_ASSET_TEXT_CHARS}.
+ * capped at {@link MAX_ASSET_TEXT_CHARS}. An evicted sidecar's body is simply
+ * absent here: the FTS document is rebuilt from the note file whenever the
+ * note changes, so the fold catches up once the sidecar is local again —
+ * unlike the embedding pipeline, nothing previously stored is destroyed.
  */
 export async function gatherAssetDescriptionText(assetPaths: readonly string[]): Promise<string> {
-  const bodies = await gatherAssetDescriptionBodies(assetPaths)
+  const { bodies } = await gatherAssetDescriptionBodies(assetPaths)
   return bodies
     .map((entry) => entry.body)
     .join('\n\n')

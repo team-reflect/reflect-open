@@ -24,21 +24,31 @@ function fakePipelineBridge(options: {
   content: string
   storedRows: Array<{ content_hash: string; model_id: string }>
   descriptions?: Record<string, string>
+  /** Report the note itself as iCloud-evicted (bytes not local). */
+  evicted?: boolean
+  /** Sidecar paths (`<asset>.reflect.md`) to report as iCloud-evicted. */
+  evictedSidecars?: string[]
 }) {
   const embedded: string[][] = []
   const applied: { path: string; chunks: AppliedChunk[] }[] = []
   setBridge({
     invoke: async (command, args) => {
-      if (command === 'note_read') {
+      if (command === 'note_read_local') {
         const path = (args as { path: string }).path
         if (path.endsWith('.reflect.md')) {
+          if (options.evictedSidecars?.includes(path) === true) {
+            return { kind: 'evicted' }
+          }
           const description = options.descriptions?.[path]
           if (description === undefined) {
             throw { kind: 'notFound', message: `no description at ${path}` }
           }
-          return description
+          return { kind: 'content', content: description }
         }
-        return options.content
+        if (options.evicted === true) {
+          return { kind: 'evicted' }
+        }
+        return { kind: 'content', content: options.content }
       }
       if (command === 'db_query') {
         return options.storedRows
@@ -76,6 +86,21 @@ describe('embedNote', () => {
     expect(count).toBe(0)
     expect(embedded).toHaveLength(0)
     expect(applied).toHaveLength(0)
+  })
+
+  it('skips an iCloud-evicted note without touching its stored vectors', async () => {
+    // Reading an evicted note would force a blocking on-demand download —
+    // the backfill must skip it, and must not embed_remove: the
+    // pre-eviction vectors stay valid until new content materializes.
+    const { embedded, applied } = fakePipelineBridge({
+      content: '# One\n\nAlpha text.\n',
+      storedRows: [],
+      evicted: true,
+    })
+    const count = await embedNote({ path: 'notes/a.md', generation: 1, modelId: MODEL })
+    expect(count).toBe(0)
+    expect(embedded).toHaveLength(0)
+    expect(applied).toHaveLength(0) // neither embed_apply nor embed_remove
   })
 
   it('embeds everything for a brand-new note', async () => {
@@ -172,6 +197,21 @@ describe('embedNote', () => {
     // Synthetic positions live past the note source, so asset chunks order last.
     expect(assetChunk.posFrom).toBeGreaterThan(IMAGE_NOTE.length)
     expect(chunks.slice(0, -1).every((chunk) => chunk.posFrom < IMAGE_NOTE.length)).toBe(true)
+  })
+
+  it('skips the whole note while a referenced sidecar is evicted — chunks survive', async () => {
+    // embed_apply replaces the note's entire chunk set; applying without the
+    // evicted sidecar's body would silently drop its previously embedded
+    // chunks, and sidecars are untracked so nothing would restore them.
+    const { embedded, applied } = fakePipelineBridge({
+      content: IMAGE_NOTE,
+      storedRows: [{ content_hash: 'previously-stored', model_id: MODEL }],
+      evictedSidecars: ['assets/pic.png.reflect.md'],
+    })
+    const count = await embedNote({ path: 'notes/a.md', generation: 1, modelId: MODEL })
+    expect(count).toBe(0)
+    expect(embedded).toHaveLength(0)
+    expect(applied).toHaveLength(0) // neither embed_apply nor embed_remove
   })
 
   it('a note without a description for its asset embeds only its own text', async () => {

@@ -57,6 +57,19 @@ pub struct ReconcileScan {
     pub total: u64,
     pub candidates: Vec<ScanCandidate>,
     pub orphans: Vec<ScanOrphan>,
+    /// Evicted files whose **content the index lacks**: no stored row (never
+    /// indexed on this device), or a listed mtime differing from the stored
+    /// row (a remote edit that synced while the file was evicted). The
+    /// reconcile cannot read these — placeholders are never candidates — so
+    /// it surfaces them for a *targeted* download request
+    /// (`icloud_request_downloads`); the materialized file then arrives as an
+    /// ordinary watcher upsert. Evicted files whose row is current are
+    /// deliberately absent: re-downloading content we already indexed would
+    /// fight the OS's eviction choice (Optimize Mac Storage). For legacy
+    /// `.icloud` stubs the listed mtime is the stub's own, so an
+    /// evicted-after-indexing note re-requests on each reconcile — matching
+    /// mobile's existing download-all-pending-notes behavior on open/resume.
+    pub stale_placeholders: Vec<String>,
 }
 
 impl ReconcileScan {
@@ -66,6 +79,7 @@ impl ReconcileScan {
             total: 0,
             candidates: Vec::new(),
             orphans: Vec::new(),
+            stale_placeholders: Vec::new(),
         }
     }
 }
@@ -95,11 +109,22 @@ pub(super) fn scan_reconcile(
     }
 
     let mut candidates = Vec::new();
+    let mut stale_placeholders = Vec::new();
     let mut on_disk: HashSet<&str> = HashSet::with_capacity(files.len());
     for file in files {
         on_disk.insert(file.path.as_str());
         if file.placeholder {
-            continue; // evicted to iCloud — unreadable until re-download
+            // Evicted to iCloud — unreadable until re-download, so never a
+            // candidate. But when the index has no current row for it, the
+            // content is *missing*, not merely offloaded: report it so the
+            // caller can request exactly that download.
+            let current = stored
+                .get(&file.path)
+                .is_some_and(|(mtime, _)| *mtime == file.modified_ms as i64);
+            if !current {
+                stale_placeholders.push(file.path.clone());
+            }
+            continue;
         }
         let facts = stored.get(&file.path);
         let settled = now_ms.saturating_sub(file.modified_ms) >= MTIME_TRUST_AGE_MS;
@@ -131,5 +156,6 @@ pub(super) fn scan_reconcile(
         total: files.len() as u64,
         candidates,
         orphans,
+        stale_placeholders,
     })
 }

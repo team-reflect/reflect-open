@@ -106,6 +106,21 @@ export async function icloudPendingCount(
 }
 
 /**
+ * Requests iCloud downloads for specific graph-relative paths in the active
+ * graph — the reconcile's targeted follow-up for evicted notes whose index
+ * rows are missing or stale. Unlike {@link icloudDownloadPending} this
+ * fetches exactly the content the index lacks, so an OS-evicted graph is
+ * never re-downloaded wholesale. Returns how many requests were issued; a
+ * no-op for an empty list.
+ */
+export async function icloudRequestDownloads(paths: readonly string[]): Promise<number> {
+  if (paths.length === 0) {
+    return 0
+  }
+  return call('icloud_request_downloads', { paths }, icloudDownloadPendingSchema)
+}
+
+/**
  * The app-sandbox `Documents/` root alone — the cheap half of
  * {@link mobileStorage}, available before the iCloud container resolves (the
  * first container lookup can take a long time on a fresh install). Mobile
