@@ -313,7 +313,7 @@ describe('MobileSettings', () => {
 
     await expect.element(page.getByText('Field Notes')).toBeVisible()
     await expect.element(page.getByText('1.2.3')).toBeVisible()
-    await expect.element(page.getByText('2')).toBeVisible() // the note count
+    await expect.element(page.getByText('2', { exact: true })).toBeVisible() // the note count
     await expect.element(page.getByText('Backed up')).not.toBeInTheDocument()
     await expect
       .element(page.getByRole('button', { name: 'Disconnect GitHub' }))
