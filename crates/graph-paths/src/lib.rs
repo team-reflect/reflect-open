@@ -128,6 +128,57 @@ pub fn eviction_placeholder(path: &Path) -> Option<PathBuf> {
     Some(path.with_file_name(format!(".{name}.icloud")))
 }
 
+/// The kernel's dataless-file flag (`SF_DATALESS` in `<sys/stat.h>`): set on
+/// files whose bytes have been evicted to a file provider (modern macOS
+/// iCloud Drive). The file keeps its real path, logical size, and mtime, but
+/// any read blocks while `fileproviderd` re-materializes the bytes — so bulk
+/// passes must check this before reading, or a single pass turns into
+/// thousands of serial on-demand downloads.
+///
+/// Checking `st_flags` for `SF_DATALESS` is Apple's documented detection for
+/// POSIX-level access (TN3150, "Getting ready for dataless files":
+/// <https://developer.apple.com/documentation/technotes/tn3150-getting-ready-for-data-less-files>);
+/// the flag is also documented in `chflags(2)`, which marks it (with
+/// `UF_COMPRESSED`) as kernel-internal: userland can observe but never set
+/// it. The value is public ABI from the macOS SDK's `<sys/stat.h>` (also in
+/// Apple's open-source XNU, `bsd/sys/stat.h`), spelled out here because the
+/// `libc` crate does not bind it yet.
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const SF_DATALESS: u32 = 0x4000_0000;
+
+/// Pure half of [`is_dataless`], split out because userland cannot *set*
+/// `SF_DATALESS` (it is kernel-owned), so only the flag decode is unit
+/// testable. Deliberately not `st_blocks == 0`: transparently-compressed
+/// (decmpfs) files also allocate zero data blocks, and misreading one as
+/// evicted would silently drop it from indexing forever.
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+fn dataless_flags(flags: u32) -> bool {
+    flags & SF_DATALESS != 0
+}
+
+/// True when `meta` describes an evicted dataless file (bytes remote, path
+/// and stat intact). Always `false` off Apple platforms.
+#[cfg(target_os = "macos")]
+pub fn is_dataless(meta: &std::fs::Metadata) -> bool {
+    use std::os::macos::fs::MetadataExt;
+    dataless_flags(meta.st_flags())
+}
+
+/// True when `meta` describes an evicted dataless file (bytes remote, path
+/// and stat intact). Always `false` off Apple platforms.
+#[cfg(target_os = "ios")]
+pub fn is_dataless(meta: &std::fs::Metadata) -> bool {
+    use std::os::ios::fs::MetadataExt;
+    dataless_flags(meta.st_flags())
+}
+
+/// True when `meta` describes an evicted dataless file (bytes remote, path
+/// and stat intact). Always `false` off Apple platforms.
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+pub fn is_dataless(_meta: &std::fs::Metadata) -> bool {
+    false
+}
+
 fn is_reserved_note_tree(component: &str) -> bool {
     RESERVED_NOTE_TREES
         .iter()
@@ -223,5 +274,35 @@ mod tests {
         assert_eq!(eviction_placeholder(logical).as_deref(), Some(placeholder));
         assert_eq!(evicted_logical_path(placeholder).as_deref(), Some(logical));
         assert_eq!(evicted_logical_path(logical), None);
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    #[test]
+    fn dataless_decodes_only_the_kernel_flag() {
+        use super::{dataless_flags, SF_DATALESS};
+        assert!(dataless_flags(SF_DATALESS));
+        assert!(dataless_flags(SF_DATALESS | 0x1));
+        assert!(!dataless_flags(0));
+        // Other BSD flags (UF_HIDDEN, UF_COMPRESSED, …) are not eviction.
+        assert!(!dataless_flags(0x8000 | 0x20));
+    }
+
+    #[test]
+    fn a_regular_file_is_not_dataless() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("note.md");
+        std::fs::write(&path, b"hello").unwrap();
+        assert!(!super::is_dataless(&std::fs::metadata(&path).unwrap()));
+    }
+
+    #[test]
+    fn placeholder_names_parse_only_the_icloud_shape() {
+        use super::icloud_placeholder_target;
+        assert_eq!(icloud_placeholder_target(".a.md.icloud"), Some("a.md"));
+        assert_eq!(icloud_placeholder_target(".noext.icloud"), Some("noext"));
+        // Not placeholders: no leading dot, no suffix, or nothing in between.
+        assert_eq!(icloud_placeholder_target("a.md.icloud"), None);
+        assert_eq!(icloud_placeholder_target(".a.md"), None);
+        assert_eq!(icloud_placeholder_target(".icloud"), None);
     }
 }

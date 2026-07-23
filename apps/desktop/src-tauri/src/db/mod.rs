@@ -331,7 +331,7 @@ pub fn index_reconcile_scan(
     index: State<IndexState>,
 ) -> AppResult<scan::ReconcileScan> {
     let root = crate::fs::current_root(&graph)?;
-    let files = crate::fs::note_files(&root)?;
+    let files = crate::fs::note_files(&root);
     let state = lock_state(&index)?;
     if state.generation != generation {
         return Ok(scan::ReconcileScan::empty());

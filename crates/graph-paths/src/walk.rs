@@ -16,7 +16,10 @@ use std::time::UNIX_EPOCH;
 
 use ignore::WalkBuilder;
 
-use crate::{classify, evicted_logical_path, icloud_placeholder_target, wire_path, GraphPathKind};
+use crate::{
+    classify, evicted_logical_path, icloud_placeholder_target, is_dataless, wire_path,
+    GraphPathKind,
+};
 
 /// Per-directory ignore file for user-configured exclusions, same syntax and
 /// precedence as `.gitignore`.
@@ -150,7 +153,10 @@ pub fn walk_catalog(root: &Path) -> FileCatalog {
                 .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
                 .map(|duration| duration.as_millis() as u64)
                 .unwrap_or(0),
-            placeholder,
+            // Two eviction forms fold into one flag: the legacy `.icloud`
+            // stub (detected by name above) and the modern dataless file
+            // (kernel flag on the real path).
+            placeholder: placeholder || is_dataless(&meta),
         };
         match kind {
             GraphPathKind::Note => catalog.notes.push(file),

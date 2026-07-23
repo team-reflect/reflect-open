@@ -114,7 +114,7 @@ fn run_sweep(
         advance_base_if_clean(root, rel, &shadow, false);
     }
 
-    let files = crate::fs::note_files(root)?;
+    let files = crate::fs::note_files(root);
 
     if record_baseline {
         for file in &files {

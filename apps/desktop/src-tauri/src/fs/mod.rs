@@ -24,7 +24,7 @@ use tauri_plugin_opener::OpenerExt;
 use crate::error::{AppError, AppResult};
 
 use self::io::{
-    atomic_create, atomic_write, bootstrap, collect_files, AtomicCreateOutcome, NOTE_DIRS,
+    atomic_create, atomic_write, bootstrap, collect_files, initialize_runtime, AtomicCreateOutcome,
 };
 use self::resolve::resolve;
 
@@ -37,23 +37,21 @@ pub use self::import::ImportCancel;
 /// the same crash-safe, sync-clean path.
 pub(crate) use self::io::atomic_write_bytes;
 
-/// iCloud eviction-placeholder name mapping, shared with the watcher (which
-/// must treat an evicted note as present, not deleted — Plan 21). Desktop-only
-/// like the watcher itself; mobile's change source is the Plan 21 Phase 2
-/// metadata query, which maps placeholders on its own side.
-#[cfg(desktop)]
-pub(crate) use self::io::eviction_placeholder;
 /// "Occupied" probe (real file OR eviction placeholder), shared with the
 /// iCloud sweep's collision folding — an evicted canonical note must not be
 /// treated as a free slot (Plan 21).
 pub(crate) use self::io::file_occupied;
-/// The one home of the `.{name}.icloud` placeholder grammar, shared with the
-/// desktop watcher and the iCloud container discovery (`icloud::storage`).
-pub(crate) use self::io::icloud_placeholder_target;
+/// iCloud eviction-placeholder path construction, shared with note deletion
+/// and the desktop watcher (which treats an evicted note as present, not
+/// deleted — Plan 21). The grammar now lives in `reflect-graph-paths`.
+pub(crate) use reflect_graph_paths::eviction_placeholder;
+/// iCloud eviction-placeholder name mapping, shared with the desktop watcher
+/// and the iCloud container discovery (`icloud::storage`).
+pub(crate) use reflect_graph_paths::icloud_placeholder_target;
 /// Dataless-file probe (modern macOS eviction: bytes remote, real path
 /// intact), shared with the desktop watcher and the iCloud pending walk —
 /// every place that must not mistake an evicted note for a readable one.
-pub(crate) use self::io::is_dataless;
+pub(crate) use reflect_graph_paths::is_dataless;
 /// Sync-exclusion marking, shared with `git::repo` (a freshly initialized
 /// backup repo must never ride a file-sync provider — Plan 21).
 pub(crate) use self::io::mark_dir_local_only;
@@ -93,7 +91,7 @@ pub struct GraphInfo {
 }
 
 /// Metadata for a file inside the graph.
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileMeta {
     /// Graph-relative path, forward-slashed.
@@ -306,14 +304,15 @@ fn emit_import_progress(app: &tauri::AppHandle, stage: &'static str, done: usize
     );
 }
 
-/// Open an existing graph at `path`, ensuring the standard layout exists.
+/// Open an existing Markdown vault in place, adding only `.reflect/` runtime
+/// state. Reflect's authoring directories remain lazy for adopted vaults.
 #[tauri::command]
 pub fn graph_open(path: String, state: State<GraphState>) -> AppResult<GraphInfo> {
     let root = PathBuf::from(&path);
     if !root.is_dir() {
         return Err(AppError::not_found(format!("not a directory: {path}")));
     }
-    bootstrap(&root)?;
+    initialize_runtime(&root)?;
     activate(&state, &root)
 }
 
@@ -370,10 +369,10 @@ pub async fn note_read_local(
         // materializes that one file).
         let _no_materialize = io::NoMaterialize::engage();
         match fs::metadata(&abs) {
-            Ok(meta) if io::is_dataless(&meta) => return Ok(LocalNoteRead::Evicted),
+            Ok(meta) if is_dataless(&meta) => return Ok(LocalNoteRead::Evicted),
             Err(err)
                 if err.kind() == std::io::ErrorKind::NotFound
-                    && io::eviction_placeholder(&abs).is_some_and(|stub| stub.exists()) =>
+                    && eviction_placeholder(&abs).is_some_and(|stub| stub.exists()) =>
             {
                 return Ok(LocalNoteRead::Evicted);
             }
@@ -573,7 +572,7 @@ pub fn note_delete(path: String, generation: u64, state: State<GraphState>) -> A
     let target = if abs.exists() {
         abs
     } else {
-        io::eviction_placeholder(&abs)
+        eviction_placeholder(&abs)
             .filter(|stub| stub.exists())
             .unwrap_or(abs)
     };
@@ -692,22 +691,18 @@ fn move_to_graph_trash(root: &Path, abs: &Path) -> AppResult<()> {
     Ok(())
 }
 
-/// List markdown notes under `daily/` and `notes/`. `generation`, when given,
-/// pins the listing to the issuing graph session (see [`root_for`]).
+/// List eligible Markdown notes anywhere in the vault. `generation`, when
+/// given, pins the listing to the issuing graph session (see [`root_for`]).
 #[tauri::command]
 pub fn list_files(generation: Option<u64>, state: State<GraphState>) -> AppResult<Vec<FileMeta>> {
     let root = root_for(&state, generation)?;
-    note_files(&root)
+    Ok(note_files(&root))
 }
 
 /// The same note listing as [`list_files`], callable with a plain root —
 /// the iCloud conflict sweep walks the graph outside any Tauri state.
-pub(crate) fn note_files(root: &Path) -> AppResult<Vec<FileMeta>> {
-    let mut out = Vec::new();
-    for dir in NOTE_DIRS {
-        collect_files(root, dir, Some("md"), &mut out)?;
-    }
-    Ok(out)
+pub(crate) fn note_files(root: &Path) -> Vec<FileMeta> {
+    io::collect_note_files(root)
 }
 
 #[cfg(test)]

@@ -4808,6 +4808,7 @@ dependencies = [
  "objc2-ui-kit",
  "ort",
  "percent-encoding",
+ "reflect-graph-paths",
  "reflect-index-schema",
  "reqwest 0.12.28",
  "rusqlite",
