@@ -188,7 +188,9 @@ describe('DailyStream', () => {
       return el as HTMLElement
     })
     const date = dateAtIndex(dayWindow, Number(row.getAttribute('data-index')))
-    fireEvent.focusIn(row)
+    await act(() => {
+      fireEvent.focusIn(row)
+    })
 
     expect(focused).toBe(date)
     await view.unmount()
