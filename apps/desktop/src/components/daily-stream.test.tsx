@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, cleanup, render } from 'vitest-browser-react'
+import { cleanup, render } from 'vitest-browser-react'
 import { page } from 'vitest/browser'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { useEffect, useState, type ReactElement, type ReactNode } from 'react'
+import { act, useEffect, useState, type ReactElement, type ReactNode } from 'react'
 import { setBridge } from '@reflect/core'
 import {
   FocusedDailyProvider,
