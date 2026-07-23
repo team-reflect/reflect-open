@@ -1,5 +1,5 @@
-import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { renderHook } from 'vitest-browser-react'
 import {
   emitFileChanges,
   indexNote,
@@ -42,13 +42,12 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  cleanup()
   vi.clearAllMocks()
 })
 
 describe('useConflictResolution', () => {
   it('writes the spliced side, reindexes, and notifies open views', async () => {
-    const { result } = renderHook(() => useConflictResolution('notes/clash.md'))
+    const { result, act } = await renderHook(() => useConflictResolution('notes/clash.md'))
 
     await act(async () => {
       await result.current.resolve('ours')
@@ -70,7 +69,7 @@ describe('useConflictResolution', () => {
 
   it('a failed write surfaces the error and notifies nothing', async () => {
     vi.mocked(writeNote).mockRejectedValueOnce({ kind: 'io', message: 'disk full' })
-    const { result } = renderHook(() => useConflictResolution('notes/clash.md'))
+    const { result, act } = await renderHook(() => useConflictResolution('notes/clash.md'))
 
     await act(async () => {
       await result.current.resolve('theirs')
@@ -83,7 +82,7 @@ describe('useConflictResolution', () => {
 
   it('a failed reindex still notifies — the file on disk did change', async () => {
     vi.mocked(indexNote).mockRejectedValueOnce({ kind: 'io', message: 'index closed' })
-    const { result } = renderHook(() => useConflictResolution('notes/clash.md'))
+    const { result, act } = await renderHook(() => useConflictResolution('notes/clash.md'))
 
     await act(async () => {
       await result.current.resolve('both')
@@ -96,7 +95,7 @@ describe('useConflictResolution', () => {
 
   it('does nothing without an open graph', async () => {
     graphState.graph = null
-    const { result } = renderHook(() => useConflictResolution('notes/clash.md'))
+    const { result, act } = await renderHook(() => useConflictResolution('notes/clash.md'))
 
     await act(async () => {
       await result.current.resolve('ours')

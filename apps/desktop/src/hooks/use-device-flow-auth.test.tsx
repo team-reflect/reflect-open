@@ -1,5 +1,5 @@
-import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { renderHook } from 'vitest-browser-react'
 import { runDeviceFlow, ReflectError, type GithubAuth } from '@reflect/core'
 import { useDeviceFlowAuth } from './use-device-flow-auth'
 
@@ -12,7 +12,6 @@ const mockFlow = vi.mocked(runDeviceFlow)
 const AUTH: GithubAuth = { kind: 'pat', token: 'ghp_abc' }
 
 afterEach(() => {
-  cleanup()
   mockFlow.mockReset()
 })
 
@@ -24,7 +23,7 @@ describe('useDeviceFlowAuth', () => {
       options.onCode({ userCode: 'ABCD-1234', verificationUri: 'https://github.com/login/device' })
       return AUTH
     })
-    const { result } = renderHook(() => useDeviceFlowAuth())
+    const { result, act } = await renderHook(() => useDeviceFlowAuth())
 
     let authed = false
     await act(async () => {
@@ -46,7 +45,7 @@ describe('useDeviceFlowAuth', () => {
       options.onCode({ userCode: 'ABCD-1234', verificationUri: 'https://github.com/login/device' })
       throw new ReflectError('auth', 'GitHub sign-in was denied.')
     })
-    const { result } = renderHook(() => useDeviceFlowAuth())
+    const { result, act } = await renderHook(() => useDeviceFlowAuth())
 
     let authed = true
     await act(async () => {
@@ -60,7 +59,7 @@ describe('useDeviceFlowAuth', () => {
 
   it('resolves false without an error when the flow is aborted (dialog closed)', async () => {
     mockFlow.mockResolvedValue(null)
-    const { result } = renderHook(() => useDeviceFlowAuth())
+    const { result, act } = await renderHook(() => useDeviceFlowAuth())
 
     let authed = true
     await act(async () => {
@@ -77,14 +76,14 @@ describe('useDeviceFlowAuth', () => {
       signal = options.signal
       return null
     })
-    const { result, unmount } = renderHook(() => useDeviceFlowAuth())
+    const { result, act, unmount } = await renderHook(() => useDeviceFlowAuth())
 
     await act(async () => {
       await result.current.signIn()
     })
     expect(signal?.aborted).toBe(false)
 
-    unmount()
+    await unmount()
     expect(signal?.aborted).toBe(true)
   })
 })

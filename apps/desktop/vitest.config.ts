@@ -16,6 +16,8 @@ const browserName = process.env.REFLECT_TEST_BROWSER === 'webkit' ? 'webkit' : '
 const BROWSER_MIGRATED_TESTS = [
   'src/routing/**/*.test.tsx',
   'src/providers/**/*.test.tsx',
+  'src/hooks/**/*.test.tsx',
+  'src/lib/**/*.test.tsx',
 ]
 
 // `.test.ts` files that still depend on a DOM (renderHook, document event
