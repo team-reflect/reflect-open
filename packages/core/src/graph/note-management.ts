@@ -18,7 +18,7 @@ export function isValidReflectNoteId(value: unknown): value is string {
 }
 
 /**
- * Whether a path is eligible for Reflect's filename and link automation.
+ * Whether a path is eligible for Reflect's title-derived filename automation.
  * Managed notes live directly in `notes/`; nested and adopted vault paths do
  * not become managed merely because their names resemble Reflect files.
  */
@@ -28,8 +28,9 @@ export function isReflectManagedNotePath(path: string): boolean {
 
 /**
  * Whether an on-disk note is Reflect-managed. Both the direct `notes/` path
- * and a valid frontmatter ULID are required. Adopted notes remain content-only
- * saves: retitling them never moves files, rewrites links, or adds aliases.
+ * and a valid frontmatter ULID are required. This is filename ownership, not
+ * title tracking: adopted and stable-path notes still maintain known links
+ * when retitled, but never move files.
  */
 export function isReflectManagedNote(path: string, source: string): boolean {
   if (!isReflectManagedNotePath(path)) {

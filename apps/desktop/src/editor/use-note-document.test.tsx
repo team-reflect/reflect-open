@@ -429,7 +429,7 @@ describe('useNoteDocument', () => {
     }
   })
 
-  it('saves an adopted retitle in place without rewriting, aliasing, or moving', async () => {
+  it('maintains links for an adopted retitle without moving its file', async () => {
     vi.useFakeTimers()
     try {
       const files: Record<string, string> = {
@@ -456,10 +456,12 @@ describe('useNoteDocument', () => {
       })
       await hook.act(() => vi.runAllTimersAsync())
 
-      expect(files['notes/adopted.md']).toBe('# New Title\n')
+      expect(files['notes/adopted.md']).toBe(
+        upsertFrontmatter('# New Title\n', { aliases: ['Old Title'] }),
+      )
       expect(files['notes/new-title.md']).toBeUndefined()
-      expect(files['notes/source.md']).toBe('see [[Old Title]]\n')
-      expect(linkQueries).toEqual([])
+      expect(files['notes/source.md']).toBe('see [[New Title]]\n')
+      expect(linkQueries).toEqual(['sources-query'])
       await hook.unmount()
     } finally {
       vi.useRealTimers()

@@ -157,6 +157,7 @@ export {
 export {
   rewriteLinksForTitleChange,
   nextAliases,
+  type RenameBacklink,
   type RenameIo,
   type TitleRenameRewriteOptions,
   type TitleRenameRewriteResult,

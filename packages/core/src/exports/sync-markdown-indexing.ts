@@ -229,6 +229,7 @@ export {
   type SearchFilters,
   type FilteredSearchHit,
   type FilteredSearchOptions,
+  type RenameBacklink,
   type RenameIo,
   type TitleRenameRewriteOptions,
   type TitleRenameRewriteResult,

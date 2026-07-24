@@ -1,6 +1,7 @@
-import { renameWikiLink } from '../markdown/edit'
+import { wikiLinkSafe } from '../markdown/edit'
+import { parseNote } from '../markdown/extract'
 import { foldKey } from '../markdown/keys'
-import { wikiLinkTargetForTitle } from '../markdown/note-title'
+import { displayNoteTitle, wikiLinkTargetForTitle } from '../markdown/note-title'
 import type { Resolution } from '../markdown/resolve'
 import { serializeWikiSuggestionAddress } from './suggest'
 
@@ -16,10 +17,19 @@ import { serializeWikiSuggestionAddress } from './suggest'
 export interface RenameIo {
   /** Distinct source paths of links whose folded target key matches. */
   sources: (targetKey: string) => Promise<string[]>
+  /** Links that currently resolve to the renamed note's subject path. */
+  backlinks: (path: string) => Promise<RenameBacklink[]>
   read: (path: string) => Promise<string>
   /** Write with the graph generation pre-bound (stale → loud rejection). */
   write: (path: string, content: string) => Promise<void>
   resolve: (target: string) => Promise<Resolution>
+}
+
+/** Indexed fields needed to find title-mirroring displays for one subject. */
+export interface RenameBacklink {
+  sourcePath: string | null
+  targetRaw: string | null
+  alias: string | null
 }
 
 export interface TitleRenameRewriteOptions {
@@ -32,7 +42,7 @@ export interface TitleRenameRewriteOptions {
 }
 
 export interface TitleRenameRewriteResult {
-  /** Sources whose links were rewritten. */
+  /** Sources whose targets or title-mirroring displays were rewritten. */
   rewritten: string[]
   /** Sources that failed to read/write — skipped; the alias keeps them resolving. */
   failed: string[]
@@ -51,11 +61,89 @@ export interface TitleRenameRewriteResult {
   destinationBlocked: boolean
 }
 
+interface Splice {
+  from: number
+  to: number
+  text: string
+}
+
+function applySplices(source: string, splices: Splice[]): string {
+  let result = source
+  for (const splice of [...splices].sort((first, second) => second.from - first.from)) {
+    result = result.slice(0, splice.from) + splice.text + result.slice(splice.to)
+  }
+  return result
+}
+
+async function rewriteSourceLinks(options: {
+  content: string
+  path: string
+  fromTarget: string
+  toTarget: string
+  fromDisplay: string
+  toDisplay: string
+  rewriteTargets: boolean
+  oldTargetBelongsToSubject: boolean
+  backlinkTargetKeys: ReadonlySet<string>
+  resolve: (target: string) => Promise<Resolution>
+}): Promise<string> {
+  const {
+    content,
+    path,
+    fromTarget,
+    toTarget,
+    fromDisplay,
+    toDisplay,
+    rewriteTargets,
+    oldTargetBelongsToSubject,
+    backlinkTargetKeys,
+    resolve,
+  } = options
+  const fromTargetKey = fromTarget.trim().toLowerCase()
+  const displayAddressable =
+    toDisplay !== '' && serializeWikiSuggestionAddress('subject', toDisplay) !== null
+  const splices: Splice[] = []
+  const subjectResolution = new Map<string, Promise<boolean>>()
+
+  for (const link of parseNote({ path: '', source: content }).wikiLinks) {
+    const oldTarget = link.target.toLowerCase() === fromTargetKey
+    let targetsSubject = oldTarget && oldTargetBelongsToSubject
+    const targetKey = foldKey(link.target)
+    if (!targetsSubject && backlinkTargetKeys.has(targetKey)) {
+      let resolvesToSubject = subjectResolution.get(targetKey)
+      if (resolvesToSubject === undefined) {
+        resolvesToSubject = resolve(link.target).then(
+          (resolution) => resolution.kind === 'resolved' && resolution.ref === path,
+        )
+        subjectResolution.set(targetKey, resolvesToSubject)
+      }
+      targetsSubject = await resolvesToSubject
+    }
+
+    const target = oldTarget && rewriteTargets ? toTarget : link.target
+    const alias =
+      targetsSubject && displayAddressable && link.alias === fromDisplay
+        ? toDisplay
+        : (link.alias ?? null)
+    if (target === link.target && alias === (link.alias ?? null)) {
+      continue
+    }
+    splices.push({
+      from: link.from,
+      to: link.to,
+      text: alias === null ? `[[${target}]]` : `[[${target}|${alias}]]`,
+    })
+  }
+
+  return applySplices(content, splices)
+}
+
 /**
  * Rewrite `[[from]]` → `[[to]]` across every source that links to the renamed
- * note's old title. Serialized (ordering stays deterministic and progress
- * means something); a failing source is skipped, not fatal — the old-title
- * alias keeps its links resolving.
+ * note's old title, and update pipe displays that still mirror the old title
+ * on any link resolving to the same subject. Serialized (ordering stays
+ * deterministic and progress means something); a failing source is skipped,
+ * not fatal. The old-title alias keeps its links resolving.
  */
 export async function rewriteLinksForTitleChange(
   options: TitleRenameRewriteOptions,
@@ -66,6 +154,8 @@ export async function rewriteLinksForTitleChange(
   // ever appears inside `[[…]]`. Rewrite in that space.
   const fromTarget = wikiLinkTargetForTitle(from)
   const toTarget = wikiLinkTargetForTitle(to)
+  const fromDisplay = wikiLinkSafe(displayNoteTitle(from))
+  const toDisplay = wikiLinkSafe(displayNoteTitle(to))
 
   // Collision guard: if the old title now resolves to a *different* note (a
   // second note owns it as title or alias), the existing links still point
@@ -76,9 +166,7 @@ export async function rewriteLinksForTitleChange(
   // resolution stays deterministic and the alias still lands, so nothing
   // breaks; the late-created note simply wins future resolutions.
   const resolution = await io.resolve(fromTarget)
-  if (resolution.kind === 'resolved' && resolution.ref !== path) {
-    return { rewritten: [], failed: [], collision: true, destinationBlocked: false }
-  }
+  const collision = resolution.kind === 'resolved' && resolution.ref !== path
 
   // Destination guard: never write an address this note has not been proven
   // to own. An unserializable target (`[[C:\notes Ada]]`) parses back to
@@ -87,22 +175,54 @@ export async function rewriteLinksForTitleChange(
   // outranks this note's derived alias, so the collision is permanent, not a
   // race. A still-missing destination is fine: the watcher may not have
   // projected the renamed note's own derived alias yet.
-  if (serializeWikiSuggestionAddress(toTarget, null) === null) {
-    return { rewritten: [], failed: [], collision: false, destinationBlocked: true }
-  }
-  const destination = await io.resolve(toTarget)
-  if (destination.kind === 'resolved' && destination.ref !== path) {
-    return { rewritten: [], failed: [], collision: false, destinationBlocked: true }
+  let destinationBlocked = false
+  if (!collision) {
+    if (serializeWikiSuggestionAddress(toTarget, null) === null) {
+      destinationBlocked = true
+    } else {
+      const destination = await io.resolve(toTarget)
+      destinationBlocked = destination.kind === 'resolved' && destination.ref !== path
+    }
   }
 
-  const sources = (await io.sources(foldKey(fromTarget))).filter((source) => source !== path)
+  const [titleSources, backlinks] = await Promise.all([
+    collision ? Promise.resolve([]) : io.sources(foldKey(fromTarget)),
+    io.backlinks(path),
+  ])
+  const backlinkTargets = new Map<string, Set<string>>()
+  for (const backlink of backlinks) {
+    if (
+      backlink.sourcePath === null ||
+      backlink.targetRaw === null ||
+      backlink.alias !== fromDisplay
+    ) {
+      continue
+    }
+    const targets = backlinkTargets.get(backlink.sourcePath) ?? new Set<string>()
+    targets.add(foldKey(backlink.targetRaw))
+    backlinkTargets.set(backlink.sourcePath, targets)
+  }
+  const sources = [...new Set([...titleSources, ...backlinkTargets.keys()])]
+    .filter((source) => source !== path)
+    .sort()
   const rewritten: string[] = []
   const failed: string[] = []
   let done = 0
   for (const source of sources) {
     try {
       const content = await io.read(source)
-      const next = renameWikiLink(content, fromTarget, toTarget)
+      const next = await rewriteSourceLinks({
+        content,
+        path,
+        fromTarget,
+        toTarget,
+        fromDisplay,
+        toDisplay,
+        rewriteTargets: !collision && !destinationBlocked,
+        oldTargetBelongsToSubject: !collision,
+        backlinkTargetKeys: backlinkTargets.get(source) ?? new Set<string>(),
+        resolve: io.resolve,
+      })
       if (next !== content) {
         await io.write(source, next)
         rewritten.push(source)
@@ -113,7 +233,7 @@ export async function rewriteLinksForTitleChange(
     done += 1
     onProgress?.(done, sources.length)
   }
-  return { rewritten, failed, collision: false, destinationBlocked: false }
+  return { rewritten, failed, collision, destinationBlocked }
 }
 
 /**
