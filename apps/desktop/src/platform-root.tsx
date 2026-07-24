@@ -1,5 +1,11 @@
 import { lazy, Suspense, useEffect, useState, type ReactElement } from 'react'
-import { getAppPlatform, hasBridge, isMobilePlatform, type AppPlatform } from '@reflect/core'
+import {
+  getAppPlatform,
+  hasBridge,
+  isMobilePlatform,
+  recordDiagnosticCheckpoint,
+  type AppPlatform,
+} from '@reflect/core'
 import { warmMobileStorage } from '@/lib/mobile-boot-warm'
 
 const DesktopRoot = lazy(() =>
@@ -39,6 +45,9 @@ export function warmPlatformRoot(): void {
   }
   void resolveAppPlatform().then((platform) => {
     if (isMobilePlatform(platform)) {
+      if (platform === 'ios') {
+        void recordDiagnosticCheckpoint('platformResolved').catch(() => {})
+      }
       warmMobileStorage()
       void import('@/mobile/mobile-root')
     } else {

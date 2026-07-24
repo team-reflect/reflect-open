@@ -7,13 +7,17 @@ import {
   createAltoolUploadArgs,
   createAltoolValidateArgs,
   createApiKeyAltoolArgs,
+  createSentryDebugFilesUploadArgs,
   createTimestampBuildNumber,
   createTauriIosBuildEnv,
   createTauriIosBuildArgs,
   findIpaAppexPaths,
   findIpaInfoPlistPath,
+  inspectNativeSentryConfiguration,
   isFalsePlistValue,
+  isProductionSentryDsn,
   normalizeApiKeyContent,
+  parseDwarfdumpUuids,
   resolveBuildNumber,
 } from './release-ios.mjs'
 
@@ -93,8 +97,71 @@ test('iOS release builds expose the staged API key path to Tauri signing', () =>
     APPLE_API_ISSUER: 'issuer-uuid',
     APPLE_API_KEY: 'ABC123DEFG',
     APPLE_API_KEY_PATH: '/tmp/AuthKey_ABC123DEFG.p8',
+    CARGO_PROFILE_RELEASE_DEBUG: 'line-tables-only',
     CI: 'true',
   })
+})
+
+test('native debug upload targets dSYMs without uploading source bundles', () => {
+  expect(createSentryDebugFilesUploadArgs('/tmp/ios-build')).toEqual([
+    'debug-files',
+    'upload',
+    '--org',
+    'reflect-64',
+    '--project',
+    'reflect-open',
+    '--type',
+    'dsym',
+    '--no-sources',
+    '--wait-for',
+    '60',
+    '/tmp/ios-build',
+  ])
+})
+
+test('native diagnostics accept only the production Reflect Sentry DSN', () => {
+  expect(
+    isProductionSentryDsn(
+      'https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/4511705649971200',
+    ),
+  ).toBe(true)
+  expect(
+    isProductionSentryDsn(
+      'https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/1',
+    ),
+  ).toBe(false)
+  expect(isProductionSentryDsn('https://public@example.test/4511705649971200')).toBe(false)
+})
+
+test('native symbol upload rejects partial Sentry configuration', () => {
+  expect(inspectNativeSentryConfiguration({})).toEqual({
+    enabled: false,
+    error: null,
+  })
+  expect(
+    inspectNativeSentryConfiguration({
+      VITE_SENTRY_DSN:
+        'https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/4511705649971200',
+    }),
+  ).toEqual({
+    enabled: false,
+    error:
+      'native Sentry configuration is incomplete; set both SENTRY_AUTH_TOKEN and VITE_SENTRY_DSN',
+  })
+})
+
+test('Mach-O UUID parsing normalizes every archive architecture', () => {
+  expect(
+    parseDwarfdumpUuids(
+      [
+        'UUID: abcdefab-cdef-abcd-efab-cdefabcdefab (arm64) /tmp/Reflect',
+        'UUID: 01234567-89AB-CDEF-0123-456789ABCDEF (arm64e) /tmp/Reflect',
+      ].join('\n'),
+    ),
+  ).toEqual([
+    '01234567-89AB-CDEF-0123-456789ABCDEF',
+    'ABCDEFAB-CDEF-ABCD-EFAB-CDEFABCDEFAB',
+  ])
 })
 
 test('altool upload uses package upload with API key auth and optional processing wait', () => {

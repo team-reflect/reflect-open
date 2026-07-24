@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { IndexedNote } from '@reflect/core'
+import { diagnosticsSnapshotSchema, type IndexedNote } from '@reflect/core'
 import { createDevBridge } from '@/dev/dev-bridge'
 import { createDevFileStore } from '@/dev/dev-file-store'
 import { createDevIndexDb } from '@/dev/dev-index-db'
@@ -80,6 +80,51 @@ describe('dev bridge background task parity', () => {
     await expect(
       bridge.invoke('background_task_end', { token: 'already-expired' }),
     ).resolves.toBeNull()
+  })
+})
+
+describe('dev bridge diagnostics parity', () => {
+  it('retains at most the latest 128 lifecycle events', async () => {
+    const bridge = createDevBridge({
+      platform: 'ios',
+      files: createDevFileStore({}),
+      index: await createDevIndexDb(),
+    })
+
+    await bridge.invoke('diagnostics_bootstrap', {})
+    for (let eventIndex = 0; eventIndex < 128; eventIndex += 1) {
+      const checkpoint = eventIndex % 2 === 0 ? 'graphLoading' : 'graphOpening'
+      await bridge.invoke('diagnostics_checkpoint', { checkpoint })
+    }
+
+    const snapshot = diagnosticsSnapshotSchema.parse(
+      await bridge.invoke('diagnostics_snapshot', {}),
+    )
+    expect(snapshot.events).toHaveLength(128)
+    expect(snapshot.events.every((event) => event.kind === 'checkpoint')).toBe(true)
+  })
+
+  it('coalesces consecutive duplicate lifecycle markers like the native journal', async () => {
+    const bridge = createDevBridge({
+      platform: 'ios',
+      files: createDevFileStore({}),
+      index: await createDevIndexDb(),
+    })
+
+    await bridge.invoke('diagnostics_bootstrap', {})
+    await bridge.invoke('diagnostics_checkpoint', { checkpoint: 'graphLoading' })
+    await bridge.invoke('diagnostics_checkpoint', { checkpoint: 'graphLoading' })
+    await bridge.invoke('diagnostics_frontend_ready', {})
+    await bridge.invoke('diagnostics_frontend_ready', {})
+
+    const snapshot = diagnosticsSnapshotSchema.parse(
+      await bridge.invoke('diagnostics_snapshot', {}),
+    )
+    expect(snapshot.events.map((event) => event.kind)).toEqual([
+      'appStarted',
+      'checkpoint',
+      'frontendReady',
+    ])
   })
 })
 

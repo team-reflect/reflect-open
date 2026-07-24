@@ -1,4 +1,5 @@
 import {
+  diagnosticCheckpointSchema,
   indexedNoteSchema,
   ReflectError,
   type AppPlatform,
@@ -71,6 +72,22 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
   // In-memory keychain stand-in so the AI-provider settings flow (and chat,
   // against a CORS-permissive provider) works end-to-end in the harness.
   const secrets = new Map<string, string>()
+  const diagnosticEvents: Record<string, unknown>[] = []
+
+  function appendDiagnosticEvent(event: Record<string, unknown>): void {
+    const previousEvent = diagnosticEvents.at(-1)
+    const isDuplicateFrontendReady =
+      event['kind'] === 'frontendReady' && previousEvent?.['kind'] === 'frontendReady'
+    const isDuplicateCheckpoint =
+      event['kind'] === 'checkpoint' &&
+      previousEvent?.['kind'] === 'checkpoint' &&
+      event['checkpoint'] === previousEvent['checkpoint']
+    if (isDuplicateFrontendReady || isDuplicateCheckpoint) {
+      return
+    }
+    diagnosticEvents.push(event)
+    diagnosticEvents.splice(0, Math.max(0, diagnosticEvents.length - 128))
+  }
 
   async function invoke(command: string, args: Record<string, unknown>): Promise<unknown> {
     switch (command) {
@@ -78,6 +95,35 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
         return '0.0.0-dev'
       case 'app_platform':
         return platform
+      case 'diagnostics_bootstrap':
+        appendDiagnosticEvent({
+          kind: 'appStarted',
+          atMs: Date.now(),
+        })
+        return { safeMode: false, reason: null, recentWebContentTerminations: 0 }
+      case 'diagnostics_checkpoint':
+        appendDiagnosticEvent({
+          kind: 'checkpoint',
+          atMs: Date.now(),
+          checkpoint: diagnosticCheckpointSchema.parse(args['checkpoint']),
+        })
+        return null
+      case 'diagnostics_frontend_ready':
+        appendDiagnosticEvent({ kind: 'frontendReady', atMs: Date.now() })
+        return null
+      case 'diagnostics_retry_normal':
+        return null
+      case 'diagnostics_snapshot':
+        return {
+          schemaVersion: 1,
+          generatedAtMs: Date.now(),
+          appVersion: '0.0.0-dev',
+          build: null,
+          safeMode: false,
+          reason: null,
+          recentWebContentTerminations: 0,
+          events: diagnosticEvents.slice(),
+        }
       case 'background_task_begin':
         // Browser previews are never suspended like an iOS process, so the
         // native finite-length assertion is honestly unavailable.

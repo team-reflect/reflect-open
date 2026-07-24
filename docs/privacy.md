@@ -3,8 +3,8 @@
 Reflect is local-first: your notes are markdown files in a folder you chose, the search
 index is SQLite in `.reflect/` beside them, and **no Reflect-hosted server exists in any
 path** — there is no product analytics and no account. Official release builds send
-scrubbed JavaScript exception diagnostics to Sentry. Every network call the app can make
-is listed here, with what it carries.
+scrubbed WebView and native crash/hang diagnostics to Sentry. Every network call the app
+can make is listed here, with what it carries.
 
 The one hard rule sits above all of it: **a note with `private: true` frontmatter never
 has its content sent to any external service.** This is enforced in code at every AI
@@ -101,24 +101,50 @@ disk at call time), and it is covered by tests.
 
 ## Exception diagnostics (on in official release builds)
 
-- **Where:** Sentry, for errors raised in the React/WebView layer. Native process crashes
-  remain covered by the operating system's crash reporting.
-- **What:** an allow-listed diagnostic containing the exception class, sanitized
-  JavaScript stack locations, the app version, and whether the exception was marked
-  handled. A small set of vetted structural error messages that cannot contain document
-  data is kept; all other exception text is redacted. Stack filenames are reduced to
-  bundle basenames. Request
-  data, note content, note titles, graph paths, local filesystem paths, breadcrumbs,
-  console output, session replay, tracing, and user identifiers are not collected. Sentry
-  is also configured not to store the transport IP address with events.
-- **When:** only when an official desktop or iOS release raises an uncaught JavaScript
-  error, an unhandled promise rejection, or a caught/recoverable React error. Development
-  and self-built apps without the release DSN do not initialize Sentry.
+- **Where:** Sentry. The React/WebView SDK handles JavaScript exceptions; the iOS native
+  SDK handles host-process crashes, main-thread hangs, watchdog terminations, and
+  converted Apple MetricKit diagnostics.
+- **What:** an allow-listed diagnostic containing the JavaScript exception category (or
+  a fixed native failure category), sanitized stack locations, the app/build version,
+  and whether the exception was marked handled. Native
+  reports can also include non-identifying OS/device model, architecture, memory,
+  storage, battery, and thermal facts needed to distinguish resource terminations. A
+  small set of vetted JavaScript structural error messages that cannot contain document
+  data is kept; every native exception value and all other exception text is redacted.
+  JavaScript filenames and native loaded-image names are reduced to basenames; native
+  source paths, frame variables, context lines, and thread names are removed. Raw
+  MetricKit payloads are not attached.
+- **Never collected:** request data, note content, note titles, graph paths, local
+  filesystem paths, breadcrumbs, console or Rust tracing output, session replay,
+  performance traces/profiles, screenshots, view hierarchy, and user identifiers.
+  Sentry is also configured not to store the transport IP address with events.
+- **When:** when an official desktop or iOS release raises an uncaught JavaScript error,
+  an unhandled promise rejection, or a caught/recoverable React error; on iOS, also for
+  the native failure categories above. Development and self-built apps without the
+  release DSN do not initialize Sentry.
 - **Operational safeguards:** Sentry's server-side and default scrubbers are enabled, IP
   address storage and server-side JavaScript source scraping are disabled, and explicit
   sensitive-field rules cover notes, graph paths, requests, and user identifiers. Private
-  source maps are uploaded during official builds for readable stacks, then deleted from
-  the app bundle.
+  JavaScript source maps and native dSYMs are uploaded during official builds for readable
+  stacks; sources are not included with native symbol uploads, and neither kind of symbol
+  file is shipped as readable source in the app bundle.
+
+## Local iOS diagnostic journal
+
+- Reflect keeps the newest **128** closed, timestamped lifecycle markers in its local
+  app-support directory: startup stages, frontend-ready, background/foreground,
+  WebContent-process termination/reload outcome, and recovery-mode changes. A shared
+  report adds the current app/build version. This is a separate typed journal, not a copy
+  of console or Rust logs, so it cannot accept note data, filenames, paths, URLs,
+  settings, or arbitrary error text. The directory is excluded from iCloud and device
+  backups.
+- The journal is not uploaded automatically. **Settings → About → Share diagnostics**
+  creates the JSON only when you ask and opens the iOS share sheet. The repeated-crash
+  recovery screen offers the same action before opening settings, iCloud storage, or the
+  note graph.
+- Three main-WebView terminations within five minutes enable sticky recovery mode. “Try
+  opening notes” explicitly clears the termination burst and reloads the app; a corrupt
+  or unreadable journal always fails open to normal startup.
 
 ## Housekeeping calls
 
@@ -151,3 +177,4 @@ API keys and tokens live in the **OS keychain only** — never in markdown, neve
 | Capture metadata and preview | The captured website, via Reflect and Apple LinkPresentation | URL only; private captures are blocked | No (after an explicit capture) |
 | Contacts lookup | Nowhere (on-device OS store) | — (stays on your machine) | Yes (opt-in) |
 | Exception diagnostics | Sentry | No — free-form messages and context are redacted | No (official releases) |
+| Local iOS diagnostic journal | Nowhere unless you explicitly share it | No — closed lifecycle markers only | No (stored locally) |

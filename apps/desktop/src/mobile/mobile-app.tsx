@@ -1,4 +1,9 @@
-import { useEffect, type ReactElement } from 'react'
+import { useEffect, useRef, type ReactElement } from 'react'
+import {
+  markDiagnosticsFrontendReady,
+  recordDiagnosticCheckpoint,
+  type DiagnosticCheckpoint,
+} from '@reflect/core'
 import { installBackgroundFlush } from '@/lib/background-flush'
 import { MobileAudioMemoProvider } from '@/mobile/audio-memo-provider'
 import { MobileErrorBoundary } from '@/mobile/mobile-error-boundary'
@@ -27,14 +32,74 @@ import { RouterProvider } from '@/routing/router'
  * screen inherits `--keyboard-height`; the caret reveal and the
  * checkbox-haptic listener mount here so they cover every screen's editors.
  */
-export function MobileApp(): ReactElement {
-  const { status, graph, error, needsOnboarding } = useGraph()
+interface MobileAppProps {
+  readonly diagnosticsEnabled: boolean
+}
+
+export function MobileApp({ diagnosticsEnabled }: MobileAppProps): ReactElement {
+  const { status, graph, error, needsOnboarding, indexing } = useGraph()
+  const lastGraphCheckpoint = useRef<DiagnosticCheckpoint | null>(null)
+  const lastIndexing = useRef<boolean | null>(null)
+  const markedReady = useRef(false)
   useKeyboardHeightVar()
   useKeyboardCaretReveal()
   useTaskCheckboxHaptics()
   // iCloud graphs have an out-of-process writer (the OS syncing files in):
   // nudge downloads + re-reconcile on resume. Inert for local/git graphs.
   useICloudRefresh()
+
+  useEffect(() => {
+    if (!diagnosticsEnabled) {
+      return
+    }
+    const checkpoint: DiagnosticCheckpoint =
+      status === 'loading'
+        ? 'graphLoading'
+        : status === 'opening'
+          ? 'graphOpening'
+          : status === 'ready'
+            ? 'graphReady'
+            : 'graphUnavailable'
+    if (lastGraphCheckpoint.current !== checkpoint) {
+      lastGraphCheckpoint.current = checkpoint
+      void recordDiagnosticCheckpoint(checkpoint).catch(() => {})
+    }
+    if (status === 'ready' && graph !== null && !markedReady.current) {
+      markedReady.current = true
+      void markDiagnosticsFrontendReady().catch(() => {})
+    }
+  }, [diagnosticsEnabled, graph, status])
+
+  useEffect(() => {
+    if (!diagnosticsEnabled || status !== 'ready') {
+      return
+    }
+    if (lastIndexing.current === null) {
+      lastIndexing.current = indexing
+      if (!indexing) {
+        return
+      }
+    } else if (lastIndexing.current === indexing) {
+      return
+    }
+    lastIndexing.current = indexing
+    void recordDiagnosticCheckpoint(indexing ? 'indexReconcileStarted' : 'indexLive').catch(
+      () => {},
+    )
+  }, [diagnosticsEnabled, indexing, status])
+
+  useEffect(() => {
+    if (!diagnosticsEnabled) {
+      return
+    }
+    const onVisibilityChange = (): void => {
+      void recordDiagnosticCheckpoint(
+        document.visibilityState === 'hidden' ? 'backgrounded' : 'foregrounded',
+      ).catch(() => {})
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [diagnosticsEnabled])
 
   // Flush-on-background (Plan 19, decision 6): iOS may suspend or kill the
   // process soon after backgrounding, so every hide lands dirty note buffers

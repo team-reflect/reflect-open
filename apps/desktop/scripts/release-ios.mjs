@@ -30,6 +30,10 @@ const here = dirname(fileURLToPath(import.meta.url))
 const appDir = join(here, '..')
 const repoRoot = join(here, '..', '..', '..')
 const iosBuildDir = join(appDir, 'src-tauri', 'gen', 'apple', 'build')
+const iosArchive = join(iosBuildDir, 'reflect-open_iOS.xcarchive')
+const iosAppBinary = join(iosArchive, 'Products', 'Applications', 'Reflect.app', 'Reflect')
+const iosDsymBundle = join(iosArchive, 'dSYMs', 'Reflect.app.dSYM')
+const iosDsymBinary = join(iosDsymBundle, 'Contents', 'Resources', 'DWARF', 'Reflect')
 
 function log(message) {
   console.log(`release-ios: ${message}`)
@@ -70,7 +74,15 @@ export function createTauriIosBuildArgs({
 
 /** Build the environment Tauri's iOS signing layer needs for API-key auth. */
 export function createTauriIosBuildEnv({ apiKeyCredentials = null, baseEnv = process.env } = {}) {
-  return { ...baseEnv, CI: 'true', ...(apiKeyCredentials?.env ?? {}) }
+  return {
+    ...baseEnv,
+    // Rust release builds otherwise omit the line tables Xcode needs when it
+    // creates the app dSYM, leaving native crash addresses unsymbolicated.
+    CARGO_PROFILE_RELEASE_DEBUG:
+      baseEnv.CARGO_PROFILE_RELEASE_DEBUG || 'line-tables-only',
+    CI: 'true',
+    ...(apiKeyCredentials?.env ?? {}),
+  }
 }
 
 /** Build the altool command that uploads an IPA to App Store Connect/TestFlight. */
@@ -88,6 +100,62 @@ export function createAltoolValidateArgs({ authArgs, ipa }) {
 /** Build the altool command that checks for an App Store Connect app record. */
 export function createAltoolListAppsArgs({ authArgs, bundleIdentifier }) {
   return ['altool', '--list-apps', '--filter-bundle-id', bundleIdentifier, ...authArgs, '--output-format', 'json']
+}
+
+/** Build the Sentry CLI args for native dSYMs only, without source bundles. */
+export function createSentryDebugFilesUploadArgs(path) {
+  return [
+    'debug-files',
+    'upload',
+    '--org',
+    'reflect-64',
+    '--project',
+    'reflect-open',
+    '--type',
+    'dsym',
+    '--no-sources',
+    '--wait-for',
+    '60',
+    path,
+  ]
+}
+
+/** Accept only the production Reflect Sentry project configured in the clients. */
+export function isProductionSentryDsn(value) {
+  return /^https:\/\/[0-9a-f]{32}@o463484\.ingest\.us\.sentry\.io\/4511705649971200$/.test(
+    value ?? '',
+  )
+}
+
+/** Inspect native symbol-upload credentials without exposing their values. */
+export function inspectNativeSentryConfiguration(env = process.env) {
+  const hasAuthToken = Boolean(env.SENTRY_AUTH_TOKEN)
+  const hasDsn = Boolean(env.VITE_SENTRY_DSN)
+  if (!hasAuthToken && !hasDsn) {
+    return { enabled: false, error: null }
+  }
+  if (!hasAuthToken || !hasDsn) {
+    return {
+      enabled: false,
+      error: 'native Sentry configuration is incomplete; set both SENTRY_AUTH_TOKEN and VITE_SENTRY_DSN',
+    }
+  }
+  if (!isProductionSentryDsn(env.VITE_SENTRY_DSN)) {
+    return {
+      enabled: false,
+      error: 'VITE_SENTRY_DSN does not identify the production Reflect Sentry project',
+    }
+  }
+  return { enabled: true, error: null }
+}
+
+/** Parse every Mach-O UUID from `dwarfdump --uuid` output. */
+export function parseDwarfdumpUuids(output) {
+  return output
+    .split(/\r?\n/)
+    .map((line) => line.match(/^UUID: ([0-9a-f-]{36}) \(/i)?.[1]?.toUpperCase())
+    .filter((uuid) => uuid !== undefined)
+    .sort()
 }
 
 /** Return the standard App Store Connect API key lookup locations for altool. */
@@ -403,6 +471,56 @@ function assertIpaAppStoreMetadata(ipa) {
   assertIpaAppexEntitlements(ipa)
 }
 
+function assertCurrentArchiveSymbols() {
+  if (!existsSync(iosArchive)) {
+    fail(`tauri build succeeded, but the current Xcode archive is missing: ${iosArchive}`)
+  }
+  if (!existsSync(iosAppBinary)) {
+    fail(`current Xcode archive is missing its main executable: ${iosAppBinary}`)
+  }
+  if (!existsSync(iosDsymBinary)) {
+    fail(`current Xcode archive is missing its main dSYM: ${iosDsymBinary}`)
+  }
+
+  const appUuids = parseDwarfdumpUuids(capture('xcrun', ['dwarfdump', '--uuid', iosAppBinary]))
+  const dsymUuids = parseDwarfdumpUuids(capture('xcrun', ['dwarfdump', '--uuid', iosDsymBinary]))
+  if (
+    appUuids.length === 0 ||
+    dsymUuids.length === 0 ||
+    appUuids.join('\n') !== dsymUuids.join('\n')
+  ) {
+    fail(
+      'current Reflect executable and dSYM UUIDs do not match; refusing to publish a build that cannot be symbolicated',
+    )
+  }
+  log(`archive executable and dSYM UUIDs match: ${appUuids.join(', ')}`)
+}
+
+function uploadNativeDebugFiles() {
+  const configuration = inspectNativeSentryConfiguration()
+  if (configuration.error !== null) {
+    fail(configuration.error)
+  }
+  if (!configuration.enabled) {
+    log('native Sentry upload skipped (SENTRY_AUTH_TOKEN and VITE_SENTRY_DSN are not set)')
+    return
+  }
+
+  log('uploading native dSYM bundles from the current Xcode archive to Sentry…')
+  const result = spawnSync(
+    'pnpm',
+    ['exec', 'sentry-cli', ...createSentryDebugFilesUploadArgs(iosArchive)],
+    {
+      cwd: appDir,
+      stdio: 'inherit',
+      env: process.env,
+    },
+  )
+  if (result.status !== 0) {
+    fail('native Sentry dSYM upload failed; refusing to publish an unsymbolicated build')
+  }
+}
+
 function ensureReleaseTools() {
   ensureMacos()
   ensureTool('xcodebuild', ['-version'], 'Install Xcode and select it with `xcode-select`.')
@@ -410,6 +528,10 @@ function ensureReleaseTools() {
 }
 
 function runTauriIosBuild({ apiKeyCredentials, buildNumber, exportMethod, verbose }) {
+  const sentryConfiguration = inspectNativeSentryConfiguration()
+  if (sentryConfiguration.error !== null) {
+    fail(sentryConfiguration.error)
+  }
   ensureReleaseTools()
   const args = createTauriIosBuildArgs({
     buildNumber,
@@ -439,6 +561,8 @@ function runTauriIosBuild({ apiKeyCredentials, buildNumber, exportMethod, verbos
   const ipa = newestIpa()
   if (!ipa) fail(`tauri build succeeded, but no .ipa was found under ${iosBuildDir}`)
   assertIpaAppStoreMetadata(ipa)
+  assertCurrentArchiveSymbols()
+  uploadNativeDebugFiles()
   log(`IPA: ${ipa} (${(statSync(ipa).size / (1024 * 1024)).toFixed(1)} MB)`)
   return ipa
 }
@@ -557,6 +681,10 @@ function testflight({ buildNumberFlag, exportMethod, wait, verbose }) {
 }
 
 function preflight({ buildNumberFlag }) {
+  const sentryConfiguration = inspectNativeSentryConfiguration()
+  if (sentryConfiguration.error !== null) {
+    fail(sentryConfiguration.error)
+  }
   ensureReleaseTools()
   resolveBuildNumber(buildNumberFlag, { required: true })
   const apiKeyCredentials = resolveApiKeyCredentials({ requirePrivateKey: false })
@@ -569,6 +697,7 @@ function preflight({ buildNumberFlag }) {
       }`,
     )
     log(`altool upload auth: ${uploadCredentials.source}`)
+    log(`native Sentry: ${sentryConfiguration.enabled ? 'configured' : 'disabled'}`)
     log(`xcodebuild: ${capture('xcodebuild', ['-version']).trim().replace(/\n/g, ' / ')}`)
     verifyAppStoreConnectAppRecord(uploadCredentials)
     log('preflight passed')

@@ -63,8 +63,10 @@ for `pnpm release:ios testflight`.
 4. **Sentry exception telemetry credentials.** Set the public `VITE_SENTRY_DSN` and the
    private, build-only `SENTRY_AUTH_TOKEN` for local TestFlight builds. Configure them in
    GitHub as the repository secrets `SENTRY_DSN` and `SENTRY_AUTH_TOKEN`; the TestFlight
-   workflow requires both before building. The token needs release/source-map upload
-   scope only and must never use the `VITE_` prefix or enter the app bundle.
+   workflow requires both before building. The DSN initializes both the WebView and iOS
+   native SDKs. The token must be allowed to upload JavaScript source maps and native
+   debug files to the `reflect-open` project; it must never use the `VITE_` prefix or
+   enter the app bundle.
 
 5. **A monotonically increasing build number.** TestFlight rejects duplicate
    `CFBundleVersion` values for the same marketing version. The GitHub Action
@@ -75,7 +77,7 @@ for `pnpm release:ios testflight`.
    builds: a lower `CFBundleVersion` can upload successfully while TestFlight
    still appears to show the previous timestamp build as the latest.
 
-5. **Xcode on macOS.** The workflow and local script use `xcodebuild`, Tauri's
+6. **Xcode on macOS.** The workflow and local script use `xcodebuild`, Tauri's
    iOS build command, and `xcrun altool`.
 
 ## Commands
@@ -96,7 +98,12 @@ Runs `pnpm tauri ios build --export-method app-store-connect --ci`, using the
 signed-in Xcode account locally or the App Store Connect API key environment
 when the key is configured. The build number is merged into the Tauri config as
 `bundle.iOS.bundleVersion`. The IPA lands under
-`apps/desktop/src-tauri/gen/apple/build/`.
+`apps/desktop/src-tauri/gen/apple/build/`. Release builds retain Rust line
+tables so Xcode can produce a useful dSYM. When the Sentry credentials are set,
+the helper requires the current archive's main dSYM, verifies its UUID against
+the archived executable, and uploads only that archive's native symbols without
+source bundles before returning. Supplying only one of the DSN or token is a
+release error.
 
 ```bash
 pnpm release:ios testflight --wait
@@ -125,7 +132,13 @@ the upload flow.
 
 Use **Actions -> TestFlight -> Run workflow**. The workflow builds on
 `macos-26`, uploads the IPA to App Store Connect, and serializes runs so two
-uploads do not race each other.
+uploads do not race each other. It keeps both the exported IPA and a metadata-
+preserving ZIP of the exact `.xcarchive` for 90 days. The archive contains the
+matching app/extension binaries and dSYMs needed to symbolicate a later Apple
+`.ips` report. The release helper verifies the main executable and dSYM UUIDs
+match before publication. The workflow packages the archive before repeating
+that check, so the exact evidence is still retained if verification finds a
+release blocker.
 
 Configure these repository secrets:
 
@@ -134,6 +147,8 @@ Configure these repository secrets:
 | `APPLE_API_KEY` | App Store Connect API key ID |
 | `APPLE_API_ISSUER` | App Store Connect issuer UUID |
 | `APPLE_API_KEY_CONTENT` | Contents of `AuthKey_<KEY>.p8` |
+| `SENTRY_DSN` | Public DSN for the production Reflect Sentry project |
+| `SENTRY_AUTH_TOKEN` | Build-only token allowed to upload releases, source maps, and debug files |
 
 The workflow does not accept a build-number input. Each run resolves one UTC
 timestamp build number, logs it, and passes the same value to both `preflight`
@@ -184,3 +199,18 @@ workflow.
 - **Export-compliance prompt appears again**: rebuild from an Xcode project that
   includes `ITSAppUsesNonExemptEncryption=false` in the iOS Info.plist. The
   release helper refuses to upload IPAs that are missing this key.
+- **A TestFlight feedback ZIP has no stack**: this is expected for many
+  `WKWebView` content-process deaths, jetsam/resource kills, and watchdog
+  terminations. TestFlight feedback is not a substitute for an Apple `.ips`
+  report. Check Sentry's native hang/watchdog/MetricKit events and ask the
+  tester to use **Settings → About → Share diagnostics** (the recovery screen
+  also has this action). The local journal identifies the startup stage and
+  reload loop but deliberately contains no general logs.
+- **An Apple `.ips` report is unsymbolicated**: download the
+  `reflect-ios-xcarchive-<build>` artifact for the exact TestFlight build,
+  confirm its executable UUID appears in the report, and symbolicate with the
+  archive's matching dSYM. An IPA alone does not contain the required dSYM.
+- **Sentry reports “missing debug information”**: inspect the release helper's
+  `sentry-cli debug-files upload` output. TestFlight publication fails when
+  native Sentry is configured but no dSYM exists or the upload is rejected;
+  JavaScript source-map upload does not cover Rust or Swift frames.

@@ -21,6 +21,7 @@ mod conflict;
 mod contacts;
 mod db;
 mod devtools;
+mod diagnostics;
 mod error;
 mod fs;
 mod git;
@@ -28,6 +29,8 @@ mod graph_gitignore;
 mod icloud;
 mod link_preview;
 mod menu;
+#[cfg(any(target_os = "ios", test))]
+mod native_diagnostics;
 mod quit;
 mod recents;
 mod secrets;
@@ -210,12 +213,18 @@ pub fn run() {
     // line with the spike, but keep the window show.)
     #[cfg(mobile)]
     let builder = builder.setup(|app| {
+        #[cfg(target_os = "ios")]
+        native_diagnostics::start(&app.package_info().version.to_string());
         if let Some(window) = app.get_webview_window(windows::MAIN_WINDOW_LABEL) {
             window.show()?;
         }
         spike_mobile::run_self_check(app.handle());
         Ok(())
     });
+
+    #[cfg(target_os = "ios")]
+    let builder =
+        builder.on_web_content_process_terminate(diagnostics::record_web_content_termination);
 
     builder
         // Serves note images (`assets/…`) to the webview. Registered as an
@@ -237,9 +246,15 @@ pub fn run() {
         .manage(quit::QuitState::default())
         .manage(windows::WindowInit::default())
         .manage(embed::EmbedState::default())
+        .manage(diagnostics::DiagnosticsState::default())
         .invoke_handler(tauri::generate_handler![
             app_version,
             app_platform,
+            diagnostics::diagnostics_bootstrap,
+            diagnostics::diagnostics_checkpoint,
+            diagnostics::diagnostics_frontend_ready,
+            diagnostics::diagnostics_retry_normal,
+            diagnostics::diagnostics_snapshot,
             background_task::background_task_begin,
             background_task::background_task_end,
             icloud::storage::mobile_storage,
