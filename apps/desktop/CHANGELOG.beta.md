@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.7.0-beta.17](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.16...v0.7.0-beta.17) (2026-07-24)
+
+
+### Features
+
+* allow GitHub sign-out with no connected graph ([#945](https://github.com/team-reflect/reflect-open/issues/945)) ([d0638e9](https://github.com/team-reflect/reflect-open/commit/d0638e9fa7fdeed350730e2a2d995d9edd9174c3))
+
+
+### Bug Fixes
+
+* reuse person notes by contact email ([#931](https://github.com/team-reflect/reflect-open/issues/931)) ([75c26ee](https://github.com/team-reflect/reflect-open/commit/75c26ee56bbbddbe1c814916445ea0a695ea260b))
+* soften iOS calendar note markers ([#941](https://github.com/team-reflect/reflect-open/issues/941)) ([ed2e6c4](https://github.com/team-reflect/reflect-open/commit/ed2e6c46c64127f68a3ca78083a6602bede8cf8b))
+* update meowdown to ^0.58.0 ([#934](https://github.com/team-reflect/reflect-open/issues/934)) ([a23f257](https://github.com/team-reflect/reflect-open/commit/a23f2572a75449c866620ab776e83234f50ad001))
+* update meowdown to ^0.58.1 ([#935](https://github.com/team-reflect/reflect-open/issues/935)) ([fdf422e](https://github.com/team-reflect/reflect-open/commit/fdf422ec2079552473d4d71d8010d4d7938de9d4))
+
 ## [0.7.0-beta.16](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.15...v0.7.0-beta.16) (2026-07-23)
 
 
