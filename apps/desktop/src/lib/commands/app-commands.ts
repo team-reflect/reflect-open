@@ -6,6 +6,7 @@ import {
   randomNotePath,
   toggleDevtools,
   untitledNotePath,
+  type RecentGraph,
 } from '@reflect/core'
 import { attachFilesToNote } from '@/lib/attach-files'
 import { runCopyDeepLink } from '@/lib/note-deep-link'
@@ -47,6 +48,22 @@ function openNewNote(context: CommandContext): void {
     context.clearScrollState()
   }
   context.navigate(newNoteRoute())
+}
+
+/**
+ * Order the numbered graph slots (Cmd+1..9) alphabetically by graph name so a
+ * given number maps to a predictable graph instead of following the persisted
+ * recents list, which reshuffles by most-recently-used. Case-insensitive, with
+ * the root path as a stable tiebreak.
+ */
+export function sortGraphsByName(recents: readonly RecentGraph[]): string[] {
+  return [...recents]
+    .sort(
+      (a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) ||
+        a.root.localeCompare(b.root),
+    )
+    .map((recent) => recent.root)
 }
 
 const GRAPH_SWITCH_COMMANDS: AppCommand[] = Array.from({ length: 9 }, (_, index) => {

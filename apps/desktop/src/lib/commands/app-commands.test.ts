@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { EmbedStatus, NoteRow, PinnedNote } from '@reflect/core'
+import type { EmbedStatus, NoteRow, PinnedNote, RecentGraph } from '@reflect/core'
 import { notePathForRoute, type Route } from '@/routing/route'
 import type { NavigateOptions } from '@/routing/router'
 import { resetOperations } from '@/lib/operations'
@@ -49,7 +49,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
 }))
 
 // Importing registers the commands (module side effect, like production).
-const { APP_COMMANDS, keybindingFor } = await import('./app-commands')
+const { APP_COMMANDS, keybindingFor, sortGraphsByName } = await import('./app-commands')
 
 function command(id: string) {
   const found = APP_COMMANDS.find((entry) => entry.id === id)
@@ -102,6 +102,26 @@ function noteRow(isPrivate: boolean): NoteRow {
     gistStale: false,
   }
 }
+
+function recentGraph(root: string, openedMs: number, name: string = root): RecentGraph {
+  return { root, name, openedMs }
+}
+
+describe('sortGraphsByName', () => {
+  it('orders graphs alphabetically by name, ignoring the recents (most-recently-used) order', () => {
+    const banana = recentGraph('/graphs/2', 2, 'Banana')
+    const apple = recentGraph('/graphs/1', 1, 'Apple')
+
+    expect(sortGraphsByName([banana, apple])).toEqual(['/graphs/1', '/graphs/2'])
+  })
+
+  it('sorts case-insensitively and breaks ties by root path', () => {
+    const lower = recentGraph('/graphs/z', 1, 'alpha')
+    const upper = recentGraph('/graphs/a', 2, 'Alpha')
+
+    expect(sortGraphsByName([lower, upper])).toEqual(['/graphs/a', '/graphs/z'])
+  })
+})
 
 describe('keybindingFor', () => {
   it('returns the binding UI hints derive from', () => {
