@@ -11,7 +11,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard, Once};
 
 use serde::Serialize;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
@@ -78,8 +78,38 @@ pub(crate) fn restorable_window_state_flags() -> tauri_plugin_window_state::Stat
         | StateFlags::FULLSCREEN
 }
 
+/// Resolve the OS-preferred theme background for `window`. Values mirror
+/// `--surface-app` in `design-system/tokens/colors.css` (`:root` and `.dark`
+/// scopes) so the native layer matches the first webview paint.
+fn theme_background_color<R: tauri::Runtime>(
+    window: &tauri::WebviewWindow<R>,
+) -> tauri::webview::Color {
+    use tauri::webview::Color;
+    use tauri::Theme;
+
+    match window.theme() {
+        Ok(Theme::Dark) => Color(10, 15, 30, 255),
+        _ => Color(248, 250, 250, 255),
+    }
+}
+
+/// Paint the native window in the OS-preferred theme color before its first
+/// reveal. Without this, the webview layer paints white for the frames between
+/// `show()` and the frontend applying the design-system's `.dark` scope, so a
+/// dark-mode user sees a white-to-dark flash. macOS's webview layer ignores
+/// `set_background_color` — the paired theme script
+/// (`apps/desktop/public/theme-init.js`, loaded from `index.html`) handles
+/// that side.
+#[cfg(desktop)]
+fn apply_theme_background<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>) {
+    if let Err(err) = window.set_background_color(Some(theme_background_color(window))) {
+        tracing::warn!(error = %err, label = window.label(), "failed to set window background color");
+    }
+}
+
 #[cfg(desktop)]
 fn surface_window<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>) {
+    apply_theme_background(window);
     if let Err(err) = window.unminimize() {
         tracing::warn!(error = %err, label = window.label(), "failed to unminimize window");
     }
@@ -312,6 +342,36 @@ pub async fn open_note_window(
     let mut builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::default())
         .title("Reflect")
         .inner_size(1000.0, 650.0)
+        // Paint the OS-preferred theme color at build time so the note window
+        // doesn't briefly flash white before its webview loads the frontend
+        // (mirrors the main window's `apply_theme_background`).
+        .background_color(theme_background_color(&window))
+        // Build hidden and reveal on `PageLoadEvent::Finished` so the user
+        // never sees WKWebView's default white backing while HTML/CSS/JS are
+        // still loading. The main window gets the same effect for free: its
+        // `visible: false` config only flips to visible on `RunEvent::Ready`,
+        // and Tauri's plugin + geometry-restore setup between builder and
+        // Ready gives the webview time to reach the same state. `Once` gates
+        // the reveal to the first Finished only: reloads (Cmd+R, dev HMR,
+        // webview crash recovery) otherwise re-run `set_focus`, stealing
+        // focus back to a note window the user has moved away from.
+        .visible(false)
+        .on_page_load({
+            let revealed = Once::new();
+            move |window, payload| {
+                if !matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                    return;
+                }
+                revealed.call_once(|| {
+                    if let Err(err) = window.show() {
+                        tracing::warn!(error = %err, label = window.label(), "failed to show note window after page load");
+                    }
+                    if let Err(err) = window.set_focus() {
+                        tracing::warn!(error = %err, label = window.label(), "failed to focus note window after page load");
+                    }
+                });
+            }
+        })
         // Match the main window: HTML5 drops must reach the webview (chat and
         // editor file drops), so the native drag-drop handler stays off.
         .disable_drag_drop_handler();
