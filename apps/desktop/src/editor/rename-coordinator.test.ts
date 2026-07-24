@@ -128,7 +128,12 @@ function fakeSession(content: string): NoteSession & {
 
 beforeEach(() => {
   io.rewriteLinksForTitleChange.mockReset()
-  io.rewriteLinksForTitleChange.mockResolvedValue({ rewritten: 1, failed: 0, collision: false })
+  io.rewriteLinksForTitleChange.mockResolvedValue({
+    rewritten: ['notes/source.md'],
+    failed: [],
+    collision: false,
+    destinationBlocked: false,
+  })
   io.getBacklinks.mockReset()
   io.getBacklinks.mockResolvedValue([])
   io.readNote.mockReset()
@@ -212,7 +217,12 @@ describe('rename coordinator', () => {
   })
 
   it('a collision rewrites nothing onto the note: no alias write, operation done', async () => {
-    io.rewriteLinksForTitleChange.mockResolvedValue({ rewritten: 0, failed: 0, collision: true })
+    io.rewriteLinksForTitleChange.mockResolvedValue({
+      rewritten: [],
+      failed: [],
+      collision: true,
+      destinationBlocked: false,
+    })
     const coordinator = makeCoordinator()
     await renameOnce(coordinator, 'Old Title', 'New Title')
 
@@ -379,7 +389,12 @@ describe('rename coordinator', () => {
   })
 
   it('the rewrite collision guard does not block the move (filename follows the NEW title)', async () => {
-    io.rewriteLinksForTitleChange.mockResolvedValue({ rewritten: 0, failed: 0, collision: true })
+    io.rewriteLinksForTitleChange.mockResolvedValue({
+      rewritten: [],
+      failed: [],
+      collision: true,
+      destinationBlocked: false,
+    })
     io.slugPathForTitle.mockResolvedValue('notes/new-title.md')
     const coordinator = makeCoordinator()
     await renameOnce(coordinator, 'Old Title', 'New Title')

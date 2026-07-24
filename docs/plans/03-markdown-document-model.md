@@ -69,7 +69,7 @@ Markdown is the source of truth, so the parser is load-bearing. Two hard require
    These outputs are the contract the indexer (Plan 04) consumes.
 
 4. **Serialization.** Provide `serialize(ast)` and targeted edit helpers:
-   `renameWikiLink(ast, from, to)`, `upsertFrontmatter(ast, patch)`,
+   `retitleWikiLinks(ast, options)`, `upsertFrontmatter(ast, patch)`,
    `appendUnderHeading(ast, heading, block)` (used by capture in Plan 11). Edits must be
    **minimal-diff** — touch only affected nodes, preserve surrounding whitespace/style.
 
