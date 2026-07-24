@@ -3,7 +3,6 @@ import type { ExitBoundaryHandler } from '@meowdown/core'
 import {
   detectConflictMarkers,
   isDaily,
-  isReflectManagedNotePath,
   isTemplatePath,
   isUntitledNotePath,
   untitledNoteSeed,
@@ -151,10 +150,10 @@ export function NotePaneComponent({
   }
   const document = useNoteDocument(path, generation, {
     createIfMissing: lazyCreate,
-    // Only direct `notes/*.md` paths can be Reflect-managed. The coordinator
-    // verifies valid ULID frontmatter before any automation; adopted notes,
-    // templates, dailies, and arbitrary vault paths save content in place.
-    trackRenames: isReflectManagedNotePath(path),
+    // Every editable regular note maintains title-addressed links and
+    // title-mirroring backlink displays. The coordinator separately limits
+    // title-derived file moves to Reflect-managed notes.
+    trackRenames: !dailyNote && !template,
     // A missing ordinary note opens as a name-me template (old Reflect's
     // new-note flow): the seed — `id:` frontmatter plus an empty H1 the
     // caret lands in, ghosted "Untitled" by the title placeholder — only
