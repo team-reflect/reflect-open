@@ -366,6 +366,38 @@ describe('rewriteLinksForTitleChange stable-target displays', () => {
     expect(writes[sourcePath]).toBe('[[Old Title|New Title]]\n')
   })
 
+  it('confirms each stable target once, not once per source', async () => {
+    const files = {
+      'daily/a.md': '[[capture-base|Old Title]]\n',
+      'daily/b.md': '[[capture-base|Old Title]]\n',
+      'daily/c.md': '[[capture-base|Old Title]]\n',
+    }
+    const { io } = fakeIo(files, {
+      sources: [],
+      resolveByTarget: { 'capture-base': 'notes/capture.md' },
+      backlinks: Object.keys(files).map((sourcePath) => ({
+        sourcePath,
+        targetRaw: 'capture-base',
+        alias: 'Old Title',
+      })),
+    })
+    const resolveCalls: string[] = []
+    const resolve = io.resolve
+    io.resolve = async (target) => {
+      resolveCalls.push(target)
+      return resolve(target)
+    }
+
+    await rewriteLinksForTitleChange({
+      path: 'notes/capture.md',
+      from: 'Old Title',
+      to: 'New Title',
+      io,
+    })
+
+    expect(resolveCalls.filter((target) => target === 'capture-base')).toHaveLength(1)
+  })
+
   it('splices by file offset in a source that carries frontmatter', async () => {
     const sourcePath = 'notes/source.md'
     const source = '---\nid: 01hv3xq7c2dm8k4t9w5e6r1n98\ntags: [a]\n---\n\nSee [[Old Title]].\n'
