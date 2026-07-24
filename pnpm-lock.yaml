@@ -37,10 +37,10 @@ importers:
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.8)
       '@meowdown/core':
-        specifier: ^0.58.1
+        specifier: ^0.58.2
         version: 0.58.2(@lezer/common@1.5.2)(@shikijs/types@4.3.1)(@types/hast@3.0.5)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)
       '@meowdown/react':
-        specifier: ^0.58.1
+        specifier: ^0.58.2
         version: 0.58.2(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@shikijs/types@4.3.1)(@types/hast@3.0.5)(@types/react@19.2.17)(date-fns@4.4.0)(prosemirror-model@1.25.11)(prosemirror-state@1.4.4)(prosemirror-transform@1.12.0)(prosemirror-view@1.42.2)(react-dom@19.2.8)(react@19.2.8)
       '@reflect/core':
         specifier: workspace:*
@@ -257,7 +257,7 @@ importers:
         specifier: ^3.0.84
         version: 3.0.87(zod@4.4.3)
       '@meowdown/markdown':
-        specifier: ^0.58.1
+        specifier: ^0.58.2
         version: 0.58.2
       '@reflect/db':
         specifier: workspace:*
