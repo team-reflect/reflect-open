@@ -8,11 +8,13 @@ function fakeIo(
     resolveTo?: string
     resolveByTarget?: Record<string, string>
     backlinks?: Array<{ sourcePath: string; targetRaw: string; alias: string | null }>
+    /** Sources of raw old-title targets. Defaults to every file. */
+    sources?: string[]
   },
 ) {
   const writes: Record<string, string> = {}
   const io = {
-    sources: async () => Object.keys(files).sort(),
+    sources: async () => options?.sources ?? Object.keys(files).sort(),
     backlinks: async () => options?.backlinks ?? [],
     read: async (path) => {
       const content = files[path]
@@ -301,6 +303,84 @@ describe('rewriteLinksForTitleChange stable-target displays', () => {
     })
 
     expect(writes).toEqual({})
+  })
+
+  it('syncs a stable display even when the old title belongs to another note now', async () => {
+    const sourcePath = 'daily/2026-07-23.md'
+    const { io, writes } = fakeIo(
+      { [sourcePath]: '- [[capture-base|Old Title]]\n' },
+      {
+        resolveByTarget: {
+          'Old Title': 'notes/other-owner.md',
+          'capture-base': 'notes/capture.md',
+        },
+        backlinks: [{ sourcePath, targetRaw: 'capture-base', alias: 'Old Title' }],
+      },
+    )
+
+    const result = await rewriteLinksForTitleChange({
+      path: 'notes/capture.md',
+      from: 'Old Title',
+      to: 'New Title',
+      io,
+    })
+
+    expect(result.collision).toBe(true)
+    expect(result.rewritten).toEqual([sourcePath])
+    expect(writes[sourcePath]).toBe('- [[capture-base|New Title]]\n')
+  })
+
+  it('leaves an old-title link entirely alone on collision', async () => {
+    const sourcePath = 'notes/source.md'
+    const { io, writes } = fakeIo(
+      { [sourcePath]: '[[Old Title]] and [[Old Title|Old Title]]\n' },
+      { resolveTo: 'notes/other-owner.md' },
+    )
+
+    const result = await rewriteLinksForTitleChange({
+      path: 'notes/subject.md',
+      from: 'Old Title',
+      to: 'New Title',
+      io,
+    })
+
+    expect(result.collision).toBe(true)
+    expect(writes).toEqual({})
+  })
+
+  it('keeps the old target but refreshes its display when the destination is blocked', async () => {
+    const sourcePath = 'notes/source.md'
+    const { io, writes } = fakeIo(
+      { [sourcePath]: '[[Old Title|Old Title]]\n' },
+      { resolveByTarget: { 'New Title': 'notes/other.md' } },
+    )
+
+    const result = await rewriteLinksForTitleChange({
+      path: 'notes/subject.md',
+      from: 'Old Title',
+      to: 'New Title',
+      io,
+    })
+
+    expect(result.destinationBlocked).toBe(true)
+    expect(writes[sourcePath]).toBe('[[Old Title|New Title]]\n')
+  })
+
+  it('splices by file offset in a source that carries frontmatter', async () => {
+    const sourcePath = 'notes/source.md'
+    const source = '---\nid: 01hv3xq7c2dm8k4t9w5e6r1n98\ntags: [a]\n---\n\nSee [[Old Title]].\n'
+    const { io, writes } = fakeIo({ [sourcePath]: source })
+
+    await rewriteLinksForTitleChange({
+      path: 'notes/subject.md',
+      from: 'Old Title',
+      to: 'New Title',
+      io,
+    })
+
+    expect(writes[sourcePath]).toBe(
+      '---\nid: 01hv3xq7c2dm8k4t9w5e6r1n98\ntags: [a]\n---\n\nSee [[New Title]].\n',
+    )
   })
 })
 
