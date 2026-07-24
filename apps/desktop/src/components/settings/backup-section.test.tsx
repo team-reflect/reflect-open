@@ -18,13 +18,16 @@ const sync = vi.hoisted(() => ({
   signOut: vi.fn(async () => {}),
   backUpNow: vi.fn(async () => {}),
 }))
+const github = vi.hoisted(() => ({ connected: false }))
 vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl: vi.fn(async () => {}) }))
 vi.mock('@/providers/sync-provider', () => ({ useSync: () => sync }))
 vi.mock('@/providers/graph-provider', () => ({ useGraph: () => ({ graph: null }) }))
+vi.mock('@/hooks/use-github-connected', () => ({ useGithubConnected: () => github.connected }))
 
 afterEach(async () => {
   await cleanup()
   vi.clearAllMocks()
+  github.connected = false
 })
 
 async function renderSection(backup: BackupState): Promise<void> {
@@ -228,5 +231,37 @@ describe('BackupSettingsField', () => {
     await expect
       .element(page.getByRole('heading', { name: 'Sign out of GitHub?' }))
       .not.toBeInTheDocument()
+  })
+
+  it('offers sign-out with no connected graph when signed in to GitHub', async () => {
+    github.connected = true
+    await renderSection({ phase: 'disconnected' })
+
+    await expect.element(page.getByRole('button', { name: /Connect GitHub/ })).toBeVisible()
+    await expect.element(page.getByText('GitHub account')).toBeVisible()
+    await expect.element(page.getByText(/Sign out to connect a different account/i)).toBeVisible()
+    await expect.element(page.getByRole('button', { name: /Sign out of GitHub/ })).toBeVisible()
+  })
+
+  it('hides sign-out with no connected graph when not signed in to GitHub', async () => {
+    github.connected = false
+    await renderSection({ phase: 'disconnected' })
+
+    await expect.element(page.getByRole('button', { name: /Connect GitHub/ })).toBeVisible()
+    await expect
+      .element(page.getByRole('button', { name: /Sign out of GitHub/ }))
+      .not.toBeInTheDocument()
+  })
+
+  it('signs out of GitHub from the disconnected state', async () => {
+    github.connected = true
+    await renderSection({ phase: 'disconnected' })
+
+    await userEvent.click(page.getByRole('button', { name: /Sign out of GitHub/ }))
+    await expect.element(page.getByRole('heading', { name: 'Sign out of GitHub?' })).toBeVisible()
+
+    await userEvent.click(page.getByRole('button', { name: 'Sign out' }))
+
+    await vi.waitFor(() => expect(sync.signOut).toHaveBeenCalledTimes(1))
   })
 })

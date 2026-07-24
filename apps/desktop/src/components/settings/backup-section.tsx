@@ -6,19 +6,11 @@ import { ExternalLink } from 'lucide-react'
 import { ConnectGithubDialog } from '@/components/settings/connect-github-dialog'
 import { ConflictedNoteLinks } from '@/components/settings/conflicted-note-links'
 import { SettingsField } from '@/components/settings/field'
+import { GithubSignOutRow } from '@/components/settings/github-sign-out-row'
 import { SyncForkNotice } from '@/components/settings/sync-fork-notice'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
 import { useAsyncAction } from '@/hooks/use-async-action'
+import { useGithubConnected } from '@/hooks/use-github-connected'
 import { suggestRepoName } from '@/lib/github-repos'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
@@ -55,11 +47,10 @@ function githubRepoBrowserUrl(repo: NonNullable<Extract<BackupState, { phase: 'c
 export function BackupSettingsField(): ReactElement {
   const { backup, disconnectGraph, signOut, backUpNow } = useSync()
   const { graph } = useGraph()
+  const githubConnected = useGithubConnected()
   const [connectOpen, setConnectOpen] = useState(false)
-  const [signOutOpen, setSignOutOpen] = useState(false)
   const openRepoAttempt = useRef(0)
   const action = useAsyncAction()
-  const signOutAction = useAsyncAction()
 
   const conflicted = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, 'conflicted-notes', graph?.root],
@@ -107,20 +98,6 @@ export function BackupSettingsField(): ReactElement {
       })
   }
 
-  function setSignOutDialogOpen(open: boolean): void {
-    if (!open && signOutAction.pending) {
-      return
-    }
-    setSignOutOpen(open)
-  }
-
-  async function confirmSignOut(): Promise<void> {
-    await signOutAction.run(async () => {
-      await signOut()
-      setSignOutOpen(false)
-    })
-  }
-
   return (
     <>
       <SettingsField
@@ -137,11 +114,19 @@ export function BackupSettingsField(): ReactElement {
           ) : null}
 
           {backup.phase === 'disconnected' ? (
-            <div>
-              <Button size="sm" onClick={() => setConnectOpen(true)}>
-                Connect GitHub…
-              </Button>
-            </div>
+            <>
+              <div>
+                <Button size="sm" onClick={() => setConnectOpen(true)}>
+                  Connect GitHub…
+                </Button>
+              </div>
+              {githubConnected ? (
+                <GithubSignOutRow
+                  signOut={signOut}
+                  description="Signed in to GitHub. Sign out to connect a different account."
+                />
+              ) : null}
+            </>
           ) : null}
 
           {backup.phase === 'connected' ? (
@@ -187,54 +172,10 @@ export function BackupSettingsField(): ReactElement {
                 ) : null}
               </div>
               {backup.repo !== null ? (
-                <div className="mt-2 flex flex-col gap-2 border-t border-border/70 pt-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-text">GitHub account</p>
-                    <p className="text-xs text-text-muted">
-                      Sign out on this machine; connected graphs stop backing up.
-                    </p>
-                  </div>
-                  <Dialog open={signOutOpen} onOpenChange={setSignOutDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        title="Removes the GitHub token from this machine"
-                        disabled={signOutAction.pending}
-                      >
-                        Sign out of GitHub…
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent showCloseButton={!signOutAction.pending}>
-                      <DialogHeader>
-                        <DialogTitle>Sign out of GitHub?</DialogTitle>
-                        <DialogDescription>
-                          This removes the GitHub token from this machine. Every
-                          GitHub-backed graph will stop backing up until you sign in again.
-                        </DialogDescription>
-                      </DialogHeader>
-                      {signOutAction.error !== null ? (
-                        <p className="text-xs text-red-700 dark:text-red-300">
-                          {signOutAction.error}
-                        </p>
-                      ) : null}
-                      <DialogFooter>
-                        <DialogClose asChild>
-                          <Button variant="outline" disabled={signOutAction.pending}>
-                            Cancel
-                          </Button>
-                        </DialogClose>
-                        <Button
-                          variant="destructive"
-                          disabled={signOutAction.pending}
-                          onClick={() => void confirmSignOut()}
-                        >
-                          Sign out
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </div>
+                <GithubSignOutRow
+                  signOut={signOut}
+                  description="Sign out on this machine; connected graphs stop backing up."
+                />
               ) : null}
             </>
           ) : null}
