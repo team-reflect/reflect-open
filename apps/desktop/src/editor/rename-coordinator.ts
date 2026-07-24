@@ -96,8 +96,8 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
   // Rewrite inbound links across the graph, record the old title as an alias,
   // then move only a Reflect-managed file onto the new title's slug. Every
   // write carries the generation read at run time (stale → loud rejection in
-  // Rust — a rename pending across a graph switch is dropped, never
-  // cross-written).
+  // Rust). A rename pending across a graph switch is dropped, never
+  // cross-written.
   const runRename = (rename: TitleRename): void => {
     chain = chain.then(async () => {
       const gen = generation()

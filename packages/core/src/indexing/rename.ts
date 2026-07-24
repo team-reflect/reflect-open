@@ -143,7 +143,7 @@ async function rewriteSourceLinks(options: {
  * note's old title, and update pipe displays that still mirror the old title
  * on any link resolving to the same subject. Serialized (ordering stays
  * deterministic and progress means something); a failing source is skipped,
- * not fatal — the old-title alias keeps its links resolving.
+ * not fatal. The old-title alias keeps its links resolving.
  */
 export async function rewriteLinksForTitleChange(
   options: TitleRenameRewriteOptions,
