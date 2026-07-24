@@ -366,6 +366,29 @@ describe('rewriteLinksForTitleChange stable-target displays', () => {
     expect(writes[sourcePath]).toBe('[[Old Title|New Title]]\n')
   })
 
+  it('syncs a display the index still records under an earlier title', async () => {
+    // The first retitle (A → B) rewrote this Daily entry; the watcher has not
+    // reprojected it yet, so the index still shows its display as "A".
+    const sourcePath = 'daily/2026-07-23.md'
+    const { io, writes } = fakeIo(
+      { [sourcePath]: '- [[capture-base|B]]\n' },
+      {
+        sources: [], // `[[B]]` is nobody's raw target
+        resolveByTarget: { 'capture-base': 'notes/capture.md' },
+        backlinks: [{ sourcePath, targetRaw: 'capture-base', alias: 'A' }],
+      },
+    )
+
+    await rewriteLinksForTitleChange({
+      path: 'notes/capture.md',
+      from: 'B',
+      to: 'C',
+      io,
+    })
+
+    expect(writes[sourcePath]).toBe('- [[capture-base|C]]\n')
+  })
+
   it('confirms each stable target once, not once per source', async () => {
     const files = {
       'daily/a.md': '[[capture-base|Old Title]]\n',
