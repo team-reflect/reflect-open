@@ -274,44 +274,6 @@ export function clearTaskDueDate(content: string): string {
   return removed.replace(/[ \t]{2,}/g, ' ').trim()
 }
 
-interface Splice {
-  from: number
-  to: number
-  text: string
-}
-
-/** Apply non-overlapping splices, right-to-left so earlier offsets stay valid. */
-function applySplices(source: string, splices: Splice[]): string {
-  let result = source
-  for (const splice of [...splices].sort((a, b) => b.from - a.from)) {
-    result = result.slice(0, splice.from) + splice.text + result.slice(splice.to)
-  }
-  return result
-}
-
-/**
- * Rewrite the target of every `[[from]]` / `[[from|alias]]` to `to`
- * (case-insensitive match on the trimmed target), preserving each alias and all
- * surrounding text. Used by the rename-rewrite flow.
- */
-export function renameWikiLink(source: string, from: string, to: string): string {
-  // `[[…]]` has no escaping, so a target can't contain the bracket/pipe/newline
-  // characters that delimit the syntax — writing one would corrupt the link.
-  if (/[[\]|\r\n]/.test(to)) {
-    throw new Error(`invalid wiki-link target (cannot contain [ ] | or a newline): ${to}`)
-  }
-  const fromKey = from.trim().toLowerCase()
-  const { wikiLinks } = parseNote({ path: '', source })
-  const splices = wikiLinks
-    .filter((link) => link.target.toLowerCase() === fromKey)
-    .map<Splice>((link) => ({
-      from: link.from,
-      to: link.to,
-      text: link.alias ? `[[${to}|${link.alias}]]` : `[[${to}]]`,
-    }))
-  return applySplices(source, splices)
-}
-
 function nextSectionStart(headings: Heading[], target: Heading, eof: number): number {
   const next = headings.find((heading) => heading.from > target.from && heading.level <= target.level)
   return next ? next.from : eof
