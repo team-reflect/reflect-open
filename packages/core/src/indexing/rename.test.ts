@@ -258,6 +258,50 @@ describe('rewriteLinksForTitleChange stable-target displays', () => {
 
     expect(writes[sourcePath]).toBe('[[stable-address|Meeting with Grace]]\n')
   })
+
+  it('rechecks that an indexed stable target still resolves to the subject', async () => {
+    const sourcePath = 'notes/source.md'
+    const { io, writes } = fakeIo(
+      {
+        [sourcePath]: '[[stable-address|Old Title]]\n',
+      },
+      {
+        resolveByTarget: { 'stable-address': 'notes/new-owner.md' },
+        backlinks: [{ sourcePath, targetRaw: 'stable-address', alias: 'Old Title' }],
+      },
+    )
+
+    await rewriteLinksForTitleChange({
+      path: 'notes/subject.md',
+      from: 'Old Title',
+      to: 'New Title',
+      io,
+    })
+
+    expect(writes).toEqual({})
+  })
+
+  it('uses the latest parsed alias instead of stale backlink positions', async () => {
+    const sourcePath = 'notes/source.md'
+    const { io, writes } = fakeIo(
+      {
+        [sourcePath]: 'A newly inserted prefix [[stable-address|Custom label]]\n',
+      },
+      {
+        resolveByTarget: { 'stable-address': 'notes/subject.md' },
+        backlinks: [{ sourcePath, targetRaw: 'stable-address', alias: 'Old Title' }],
+      },
+    )
+
+    await rewriteLinksForTitleChange({
+      path: 'notes/subject.md',
+      from: 'Old Title',
+      to: 'New Title',
+      io,
+    })
+
+    expect(writes).toEqual({})
+  })
 })
 
 describe('rewriteLinksForTitleChange write failures', () => {
