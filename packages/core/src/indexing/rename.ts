@@ -47,16 +47,20 @@ export interface TitleRenameRewriteResult {
   /** Sources that failed to read/write — skipped; the alias keeps them resolving. */
   failed: string[]
   /**
-   * True when `from` now belongs to a different note — links were left alone,
-   * and the old title must NOT be claimed as an alias (it is theirs).
+   * True when `from` now belongs to a different note — its links stay pointed
+   * where they are, and the old title must NOT be claimed as an alias (it is
+   * theirs). Links that address this note through a *stable* target are not
+   * part of that dispute, so their title-mirroring displays still sync and
+   * `rewritten` can be non-empty.
    */
   collision: boolean
   /**
    * True when the NEW title's linkable target is not a safe address for this
    * note — unserializable as wiki-link text, or already resolving to a
-   * different note — so links were left alone. Unlike a `collision`, the
-   * old-title alias MUST still be placed: the untouched links keep resolving
-   * to this note only through it.
+   * different note — so no target is repointed. Displays still sync: a pipe
+   * display is label text, not an address. Unlike a `collision`, the old-title
+   * alias MUST still be placed: the un-repointed links keep resolving to this
+   * note only through it.
    */
   destinationBlocked: boolean
 }
