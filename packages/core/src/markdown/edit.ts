@@ -1,12 +1,20 @@
 import type { SyntaxNode } from '@meowdown/markdown'
+import {
+  appendListItemAtHeading,
+  normalizeListItem,
+} from './append-list-item'
+import { appendHeadingSection } from './append-section'
 import { parseNote } from './extract'
 import { splitFrontmatter } from './frontmatter'
 import { parseBody } from './grammar'
+import { topLevelHeadings } from './heading-blocks'
 import { foldKey } from './keys'
+import type { Heading, TaskMarker, WikiLink } from './model'
 import { normalizeWikiTarget } from './resolve'
 import { scanInlineWikiLinks } from './scan'
 import { parseTaskMarker } from './task-marker'
-import type { Heading, TaskMarker, WikiLink } from './model'
+
+export { appendBlock, appendUnderHeading } from './append-section'
 
 /**
  * Source-level edit helpers (Plan 03). These splice the original string by node
@@ -312,11 +320,6 @@ export function renameWikiLink(source: string, from: string, to: string): string
   return applySplices(source, splices)
 }
 
-function nextSectionStart(headings: Heading[], target: Heading, eof: number): number {
-  const next = headings.find((heading) => heading.from > target.from && heading.level <= target.level)
-  return next ? next.from : eof
-}
-
 /**
  * `[[…]]` has no escaping — strip the characters that would corrupt a link
  * before embedding untrusted text (a page title, a meeting name) in one.
@@ -326,52 +329,20 @@ export function wikiLinkSafe(text: string): string {
 }
 
 /**
- * Append `block` as its own paragraph at the end of the note, one blank line
- * after the existing content (none for an empty note). The flat variant of
- * {@link appendUnderHeading}, for content that stands on its own rather than
- * landing under a section heading.
+ * Insert an unordered-list item into the leading list beneath the first
+ * matching heading. If the heading is missing, append a new H2 section.
  */
-export function appendBlock(source: string, block: string): string {
-  const base = source.replace(/\s*$/, '')
-  const prefix = base.length > 0 ? `${base}\n\n` : ''
-  return `${prefix}${block.trim()}\n`
-}
-
-/**
- * Insert `block` at the end of the section under the first heading whose text
- * matches `heading` (case-insensitive). If no such heading exists, append a new
- * `## heading` section at end of file. Used by capture (Plan 11) and the
- * add-meeting action.
- */
-export function appendUnderHeading(source: string, heading: string, block: string): string {
+export function appendListItemUnderHeading(source: string, heading: string, item: string): string {
   const headingKey = heading.trim().toLowerCase()
   const { headings } = parseNote({ path: '', source })
-  const target = headings.find((candidate) => candidate.text.toLowerCase() === headingKey)
+  const target = topLevelHeadings(source, headings).find(
+    (candidate) => candidate.text.toLowerCase() === headingKey,
+  )
 
-  if (!target) {
-    return appendHeadingSection(source, heading, block)
+  if (target === undefined) {
+    return appendHeadingSection(source, heading, normalizeListItem(item))
   }
-
-  return appendAtHeading(source, headings, target, block)
-}
-
-function appendHeadingSection(source: string, heading: string, block: string): string {
-  const base = source.replace(/\s*$/, '')
-  const prefix = base.length > 0 ? `${base}\n\n` : ''
-  return `${prefix}## ${heading.trim()}\n\n${block}\n`
-}
-
-function appendAtHeading(
-  source: string,
-  headings: Heading[],
-  target: Heading,
-  block: string,
-): string {
-  const sectionEnd = nextSectionStart(headings, target, source.length)
-  const head = source.slice(0, sectionEnd).replace(/\s*$/, '')
-  const tail = source.slice(sectionEnd)
-  const inserted = `${head}\n\n${block}`
-  return tail ? `${inserted}\n\n${tail}` : `${inserted}\n`
+  return appendListItemAtHeading(source, target, item)
 }
 
 /** The target when a heading consists entirely of one parsed wiki link. */
@@ -420,9 +391,10 @@ function matchingBacklinkedHeading(
   wikiLinks: readonly WikiLink[],
   titles: readonly string[],
 ): Heading | undefined {
-  const matches = headings.filter((heading) =>
-    heading.level === 2 &&
-    titles.some((title) => headingMatchesBacklinkedTitle(source, heading, wikiLinks, title)),
+  const matches = topLevelHeadings(source, headings).filter(
+    (heading) =>
+      heading.level === 2 &&
+      titles.some((title) => headingMatchesBacklinkedTitle(source, heading, wikiLinks, title)),
   )
   return (
     matches.find((heading) => linkedHeadingTarget(source, heading, wikiLinks) !== null) ?? matches[0]
@@ -447,24 +419,24 @@ export function upgradeSectionHeadingBacklink(
   if (target === undefined || linkedHeadingTarget(source, target, wikiLinks) !== null) {
     return source
   }
+  const trailingCarriageReturn =
+    source[target.to - 1] === '\r' && source[target.to] === '\n' ? '\r' : ''
   return (
     source.slice(0, target.from) +
-    `${'#'.repeat(target.level)} [[${safeTitle}]]` +
+    `${'#'.repeat(target.level)} [[${safeTitle}]]${trailingCarriageReturn}` +
     source.slice(target.to)
   )
 }
 
 /**
- * Append `block` under a section whose heading is itself a wiki link. New
- * sections are emitted as `## [[Title]]`; an existing linked heading is reused,
- * including an aliased display spelling. The old app-generated `## Title` form
- * is upgraded in place so the next automatic append adds the missing backlink
- * without splitting one category across duplicate sections.
+ * Insert one unordered-list item into the leading list beneath a backlinked H2.
+ * Existing legacy plain headings are upgraded in place; a missing section is
+ * appended as `## [[Title]]`.
  */
-export function appendUnderBacklinkedHeading(
+export function appendListItemUnderBacklinkedHeading(
   source: string,
   title: string,
-  block: string,
+  item: string,
   matchingTitles: readonly string[] = [],
 ): string {
   const safeTitle = wikiLinkSafe(title)
@@ -482,7 +454,7 @@ export function appendUnderBacklinkedHeading(
   )
 
   if (target === undefined) {
-    return appendHeadingSection(upgraded, linkedHeading, block)
+    return appendHeadingSection(upgraded, linkedHeading, normalizeListItem(item))
   }
-  return appendAtHeading(upgraded, headings, target, block)
+  return appendListItemAtHeading(upgraded, target, item)
 }
