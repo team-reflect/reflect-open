@@ -14,7 +14,9 @@ Three rules make the whole system hang together:
    (the first H1, or frontmatter `title:`); the slug is derived from it, never
    edited directly. There is no "rename file" UI — retitle the note and the
    filename follows. This applies only to a direct `notes/*.md` file carrying a
-   valid Reflect ULID `id`. Adopted notes save content only and keep their path.
+   valid Reflect ULID `id`. Adopted notes keep their path: a retitle maintains
+   their known wiki links and records the old title as an alias, but never moves
+   the file.
 2. **The frontmatter `id` is the durable identity.** Every note Reflect
    creates carries `id: <lowercase ulid>`. Filenames change; the id never
    does. It's what lets the index recognize a file that moved while Reflect
