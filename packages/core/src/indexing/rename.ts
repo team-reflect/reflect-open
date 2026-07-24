@@ -29,6 +29,7 @@ export interface RenameIo {
 export interface RenameBacklink {
   sourcePath: string | null
   targetRaw: string | null
+  /** Only the *presence* of a pipe display is read; its text may lag the file. */
   alias: string | null
 }
 
@@ -121,13 +122,20 @@ export async function rewriteLinksForTitleChange(
     collision ? Promise.resolve([]) : io.sources(foldKey(fromTarget)),
     io.backlinks(path),
   ])
+  // Only *whether* a link carries a pipe display is read from the index, never
+  // its text. Reflect rewrites display text itself, so a second retitle can
+  // arrive before the watcher reprojects the source the first one just wrote,
+  // and an alias-equality filter would silently drop exactly those sources. A
+  // pipe's presence is safe to trust: Reflect never adds one to, or removes one
+  // from, a link that did not already have one. Whether a display still mirrors
+  // the old title is decided on the re-read file, in `retitleWikiLinks`.
   const backlinkSources = new Set<string>()
   const candidateTargets = new Map<string, string>()
   for (const backlink of backlinks) {
     if (
       backlink.sourcePath === null ||
       backlink.targetRaw === null ||
-      backlink.alias !== fromDisplay
+      backlink.alias === null
     ) {
       continue
     }
