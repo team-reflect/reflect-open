@@ -100,7 +100,7 @@ So **standardize on `@lezer/markdown` for everything** — editor, indexer, and 
 edits — and write the wiki-link inline extension exactly once. A single
 `packages/core/src/markdown/` module owns: the GFM + wiki-link Lezer config, extraction
 (walk the tree → links/headings/tags/assets/text), and splice-based edit helpers
-(`renameWikiLink`, `upsertFrontmatter`, `appendUnderHeading`) that edit the source string
+(`retitleWikiLinks`, `upsertFrontmatter`, `appendUnderHeading`) that edit the source string
 by node position rather than re-serializing. The editor's `docToMarkdown` and these edits
 operate on the same syntax, so a round-trip test covers both.
 
