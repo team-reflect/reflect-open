@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0-beta.18](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.17...v0.7.0-beta.18) (2026-07-24)
+
+
+### Bug Fixes
+
+* sync stable backlink labels when notes are retitled ([#943](https://github.com/team-reflect/reflect-open/issues/943)) ([4e04603](https://github.com/team-reflect/reflect-open/commit/4e04603a645bfba1d8a4f96e087aaad79667b684))
+
 ## [0.7.0-beta.17](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.16...v0.7.0-beta.17) (2026-07-24)
 
 
