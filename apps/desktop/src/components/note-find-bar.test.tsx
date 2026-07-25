@@ -107,7 +107,7 @@ describe('NoteFindBar', () => {
     await expect.element(queryInput).toHaveFocus()
 
     await userEvent.fill(queryInput, 'alpha')
-    await expect.element(matchCount).toHaveTextContent('1 / 3')
+    await expect.element(matchCount).toHaveTextContent('1/3')
 
     await page.getByRole('button', { name: 'Next match' }).click()
     expect(handle.findNext).toHaveBeenCalledTimes(1)
