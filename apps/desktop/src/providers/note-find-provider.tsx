@@ -122,8 +122,8 @@ export function NoteFindProvider({ children }: { children: ReactNode }): ReactEl
   const previous = useCallback((): void => move(-1), [move])
 
   const report = useCallback(
-    (path: string, next: SearchStatus): void => {
-      if (path === target) setStatus(next)
+    (path: string, nextStatus: SearchStatus): void => {
+      if (path === target) setStatus(nextStatus)
     },
     [target],
   )
