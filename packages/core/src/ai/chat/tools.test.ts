@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ToolCallOptions } from 'ai'
+import type { ToolExecutionOptions } from 'ai'
 import type { RetrievalHit, RetrieveOptions } from '../../embeddings/retrieve'
 import type { DailyNoteRow, DailyNotesRange } from '../../indexing/queries'
 import type { RecentNoteRow, RecentNotesOptions } from '../../indexing/note-list'
@@ -26,7 +26,11 @@ import {
   type SearchNotesOutput,
 } from './tools'
 
-const CALL: ToolCallOptions = { toolCallId: 'call-1', messages: [] }
+const CALL: ToolExecutionOptions<Record<string, unknown>> = {
+  toolCallId: 'call-1',
+  messages: [],
+  context: {},
+}
 
 // Sentinels that cannot collide with prompt copy or fixture prose, so the
 // not-in-payload assertions below can never pass vacuously.
