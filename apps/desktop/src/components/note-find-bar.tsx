@@ -1,9 +1,10 @@
 import { useLayoutEffect, useRef, type KeyboardEvent, type ReactElement } from 'react'
-import { ChevronDownIcon, ChevronUpIcon, SearchIcon, XIcon } from 'lucide-react'
+import { ChevronDownIcon, ChevronUpIcon, XIcon } from 'lucide-react'
+import { SearchIcon } from '@/components/icons/search-icon'
 import { useNoteFind } from '@/providers/note-find-provider'
 
 const FIND_BUTTON_CLASS =
-  'flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-hover hover:text-text disabled:pointer-events-none disabled:opacity-40'
+  'flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-[5px] text-text-muted transition-colors hover:bg-surface-hover hover:text-text disabled:pointer-events-none disabled:opacity-40'
 
 function statusText(active: number, total: number): string {
   if (total === 0) {
@@ -77,18 +78,18 @@ export function NoteFindBar(): ReactElement | null {
     <div
       role="search"
       aria-label="Find in note"
-      // A pill, not a form field: the bar is transient chrome floating over the
-      // note and is always focused while open, so an input focus ring would
-      // only draw a second box inside this one.
-      className="absolute top-2 right-3 z-40 flex max-w-[calc(100%_-_1.5rem)] items-center gap-1 rounded-full border border-border bg-surface py-1 pr-1 pl-2.5 shadow-pop"
+      // Same frame as the sidebar's search field, so the two read as one
+      // family. The bar is its own focus treatment: it exists only while its
+      // input is focused, so a focus ring would draw a second box inside it.
+      className="absolute top-2 right-3 z-40 flex max-w-[calc(100%_-_1.5rem)] items-center gap-1 rounded-[7px] border border-border-strong bg-input-bg py-1 pr-1 pl-1.5 shadow-app-input"
       onKeyDown={handleSearchKeyDown}
     >
-      <SearchIcon aria-hidden className="size-3.5 shrink-0 text-text-muted" strokeWidth={2} />
+      <SearchIcon className="size-[18px] shrink-0 text-text-muted" />
       <input
         ref={inputRef}
         aria-label="Find in note"
         autoComplete="off"
-        className="reflect-find-input w-40 min-w-0 bg-transparent text-sm text-text placeholder:text-text-muted"
+        className="reflect-find-input w-40 min-w-0 bg-transparent text-xs text-text placeholder:text-text-muted"
         placeholder="Find in note…"
         spellCheck={false}
         value={find.query}
@@ -115,7 +116,7 @@ export function NoteFindBar(): ReactElement | null {
         disabled={!canNavigate}
         onClick={find.previous}
       >
-        <ChevronUpIcon className="size-4" strokeWidth={2} />
+        <ChevronUpIcon className="size-3.5" strokeWidth={2} />
       </button>
       <button
         type="button"
@@ -124,7 +125,7 @@ export function NoteFindBar(): ReactElement | null {
         disabled={!canNavigate}
         onClick={find.next}
       >
-        <ChevronDownIcon className="size-4" strokeWidth={2} />
+        <ChevronDownIcon className="size-3.5" strokeWidth={2} />
       </button>
       <button
         type="button"
@@ -132,7 +133,7 @@ export function NoteFindBar(): ReactElement | null {
         className={FIND_BUTTON_CLASS}
         onClick={() => find.close(true)}
       >
-        <XIcon className="size-4" strokeWidth={2} />
+        <XIcon className="size-3.5" strokeWidth={2} />
       </button>
     </div>
   )
