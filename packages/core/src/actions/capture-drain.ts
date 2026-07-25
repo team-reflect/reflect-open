@@ -16,8 +16,8 @@ import {
   headingMatchesBacklinkedTitle,
   upgradeSectionHeadingBacklink,
 } from '../markdown/edit'
-import { sectionEnd, topLevelHeadings } from '../markdown/heading-blocks'
 import { parseNote } from '../markdown/extract'
+import { sectionEnd, topLevelHeadings } from '../markdown/heading-blocks'
 import { parseFrontmatter, splitFrontmatter } from '../markdown/frontmatter'
 import type { ReconcileStop } from './audio-memo'
 import { ensureBacklinkTarget } from './backlink-target'
@@ -80,6 +80,13 @@ interface SameDayCapture {
   title: string
 }
 
+/**
+ * The capture note this day's Links sections already hold for `url`, or `null`.
+ * The scan spans each whole section, deliberately wider than where a new entry
+ * would land (the section's first bullet list), so a link an older build
+ * appended below the user's own prose is still recognized instead of captured
+ * a second time.
+ */
 async function findSameDayCapture(
   dailySource: string,
   sectionTitles: readonly string[],
@@ -88,7 +95,7 @@ async function findSameDayCapture(
   generation: number,
 ): Promise<SameDayCapture | null> {
   const { headings, wikiLinks } = parseNote({ path: '', source: dailySource })
-  const sectionHeadings = topLevelHeadings(dailySource, headings)
+  const sectionHeadings = topLevelHeadings(headings)
   const linkSections = sectionHeadings.filter(
     (heading) =>
       heading.level === 2 &&
@@ -240,7 +247,7 @@ export async function drainCaptureInbox(
         updatedDaily = appendListItemUnderBacklinkedHeading(
           updatedDaily,
           linksNoteTitle,
-          `- [[${identity.base}|${freshTitle}]]`,
+          `[[${identity.base}|${freshTitle}]]`,
           [LINKS_NOTE_TITLE],
         )
       }

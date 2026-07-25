@@ -129,10 +129,15 @@ async function titleHasNote(title: string): Promise<boolean> {
  * (`foldKey`), and alias forms (`[[Standup|Daily sync]]`) count. Links
  * elsewhere in the note deliberately don't — mentioning a meeting in prose
  * must not swallow the calendar entry.
+ *
+ * The scan spans the whole section, deliberately wider than where a new entry
+ * would land (the section's first bullet list). "Already on the day's agenda"
+ * is the question worth answering: an entry a user moved down past their own
+ * notes still counts, and re-adding it would read as a duplicate.
  */
 function meetingAlreadyLinked(source: string, title: string): boolean {
   const { headings, wikiLinks } = parseNote({ path: '', source })
-  const sectionHeadings = topLevelHeadings(source, headings)
+  const sectionHeadings = topLevelHeadings(headings)
   const heading = sectionHeadings.find(
     (candidate) => candidate.text.toLowerCase() === MEETINGS_HEADING.toLowerCase(),
   )
@@ -203,10 +208,12 @@ export type MeetingLineAttendee =
   | { readonly kind: 'plain'; readonly text: string }
 
 /**
- * The daily-note bullet, in v1's `generateMeetingListItem` shape:
- * `- 9:00am met with [[Ada]], [[Bob]] for [[Standup]]`. Attendee-less events
- * shorten to `- 9:00am [[Standup]]`; without a start time the phrasing
+ * The daily-note bullet's text, in v1's `generateMeetingListItem` shape:
+ * `9:00am met with [[Ada]], [[Bob]] for [[Standup]]`. Attendee-less events
+ * shorten to `9:00am [[Standup]]`; without a start time the phrasing
  * capitalizes to `Met with`; an un-backlinked meeting name is plain text.
+ * The bullet marker itself belongs to the list this lands in, so it is added
+ * by {@link appendListItemUnderHeading} rather than written here.
  */
 export function meetingLine(input: {
   title: string
@@ -232,7 +239,7 @@ export function meetingLine(input: {
     parts.push(' for ')
   }
   parts.push(input.backlinkMeeting ? `[[${input.title}]]` : input.title)
-  return `- ${parts.join('')}`
+  return parts.join('')
 }
 
 /**

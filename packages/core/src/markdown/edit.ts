@@ -1,20 +1,18 @@
 import type { SyntaxNode } from '@meowdown/markdown'
-import {
-  appendListItemAtHeading,
-  normalizeListItem,
-} from './append-list-item'
+import { appendListItemAtHeading, listItemBlock } from './append-list-item'
 import { appendHeadingSection } from './append-section'
 import { parseNote } from './extract'
 import { splitFrontmatter } from './frontmatter'
 import { parseBody } from './grammar'
 import { topLevelHeadings } from './heading-blocks'
 import { foldKey } from './keys'
+import { lineEndingAt, offsetBeforeLineEnding } from './line-endings'
 import type { Heading, TaskMarker, WikiLink } from './model'
 import { normalizeWikiTarget } from './resolve'
 import { scanInlineWikiLinks } from './scan'
 import { parseTaskMarker } from './task-marker'
 
-export { appendBlock, appendUnderHeading } from './append-section'
+export { appendBlock } from './append-section'
 
 /**
  * Source-level edit helpers (Plan 03). These splice the original string by node
@@ -164,17 +162,6 @@ function nearestParentListItem(taskNode: SyntaxNode): SyntaxNode | null {
   return null
 }
 
-function insertionLineEnding(source: string, insertionOffset: number): '\r\n' | '\n' {
-  if (source.startsWith('\r\n', insertionOffset)) {
-    return '\r\n'
-  }
-  if (source[insertionOffset] === '\n') {
-    return '\n'
-  }
-  const previousNewline = source.lastIndexOf('\n', insertionOffset - 1)
-  return previousNewline > 0 && source[previousNewline - 1] === '\r' ? '\r\n' : '\n'
-}
-
 /**
  * Add an empty task to the end of `task`'s nearest parent-list context. The new
  * line reuses the task's exact indentation and round-list prefix, so parsing it
@@ -199,14 +186,12 @@ export function appendTaskToContext(
     throw new TaskStaleError('task no longer has a parent list context')
   }
 
-  const contextEnd = bodyOffset + contextItem.to
   // Lezer's CRLF ranges end between `\r` and `\n`; splice before the pair so
   // the inserted line cannot inherit a lone LF at either boundary.
-  const insertionOffset =
-    source[contextEnd - 1] === '\r' && source[contextEnd] === '\n' ? contextEnd - 1 : contextEnd
+  const insertionOffset = offsetBeforeLineEnding(source, bodyOffset + contextItem.to)
   const lineStart = source.lastIndexOf('\n', locatedOffset - 1) + 1
   const linePrefix = source.slice(lineStart, locatedOffset)
-  const lineEnding = insertionLineEnding(source, insertionOffset)
+  const lineEnding = lineEndingAt(source, insertionOffset)
   const trailingLineEnding = insertionOffset === source.length ? lineEnding : ''
   const inserted = `${lineEnding}${linePrefix}[ ] ${trailingLineEnding}`
   return {
@@ -291,20 +276,25 @@ export function wikiLinkSafe(text: string): string {
 }
 
 /**
- * Insert an unordered-list item into the leading list beneath the first
- * matching heading. If the heading is missing, append a new H2 section.
+ * Insert an unordered-list item into the list beneath the first matching
+ * top-level heading. If the heading is missing, append a new H2 section.
+ * `content` carries no bullet marker; see {@link appendListItemAtHeading}.
  */
-export function appendListItemUnderHeading(source: string, heading: string, item: string): string {
+export function appendListItemUnderHeading(
+  source: string,
+  heading: string,
+  content: string,
+): string {
   const headingKey = heading.trim().toLowerCase()
   const { headings } = parseNote({ path: '', source })
-  const target = topLevelHeadings(source, headings).find(
+  const target = topLevelHeadings(headings).find(
     (candidate) => candidate.text.toLowerCase() === headingKey,
   )
 
   if (target === undefined) {
-    return appendHeadingSection(source, heading, normalizeListItem(item))
+    return appendHeadingSection(source, heading, listItemBlock(content))
   }
-  return appendListItemAtHeading(source, target, item)
+  return appendListItemAtHeading(source, target, content)
 }
 
 /** The target when a heading consists entirely of one parsed wiki link. */
@@ -353,7 +343,7 @@ function matchingBacklinkedHeading(
   wikiLinks: readonly WikiLink[],
   titles: readonly string[],
 ): Heading | undefined {
-  const matches = topLevelHeadings(source, headings).filter(
+  const matches = topLevelHeadings(headings).filter(
     (heading) =>
       heading.level === 2 &&
       titles.some((title) => headingMatchesBacklinkedTitle(source, heading, wikiLinks, title)),
@@ -381,24 +371,26 @@ export function upgradeSectionHeadingBacklink(
   if (target === undefined || linkedHeadingTarget(source, target, wikiLinks) !== null) {
     return source
   }
-  const trailingCarriageReturn =
-    source[target.to - 1] === '\r' && source[target.to] === '\n' ? '\r' : ''
+  // Lezer ends a CRLF heading between the `\r` and the `\n`, so rewriting up to
+  // `target.to` would drop the `\r` and leave that one line LF-terminated.
+  const headingEnd = offsetBeforeLineEnding(source, target.to)
   return (
     source.slice(0, target.from) +
-    `${'#'.repeat(target.level)} [[${safeTitle}]]${trailingCarriageReturn}` +
-    source.slice(target.to)
+    `${'#'.repeat(target.level)} [[${safeTitle}]]` +
+    source.slice(headingEnd)
   )
 }
 
 /**
- * Insert one unordered-list item into the leading list beneath a backlinked H2.
+ * Insert one unordered-list item into the list beneath a backlinked H2.
  * Existing legacy plain headings are upgraded in place; a missing section is
- * appended as `## [[Title]]`.
+ * appended as `## [[Title]]`. `content` carries no bullet marker; see
+ * {@link appendListItemAtHeading}.
  */
 export function appendListItemUnderBacklinkedHeading(
   source: string,
   title: string,
-  item: string,
+  content: string,
   matchingTitles: readonly string[] = [],
 ): string {
   const safeTitle = wikiLinkSafe(title)
@@ -416,7 +408,7 @@ export function appendListItemUnderBacklinkedHeading(
   )
 
   if (target === undefined) {
-    return appendHeadingSection(upgraded, linkedHeading, normalizeListItem(item))
+    return appendHeadingSection(upgraded, linkedHeading, listItemBlock(content))
   }
-  return appendListItemAtHeading(upgraded, target, item)
+  return appendListItemAtHeading(upgraded, target, content)
 }

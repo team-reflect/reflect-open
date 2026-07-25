@@ -150,6 +150,13 @@ export interface Heading extends Span {
   text: string
   /** GitHub-style slug for anchors + section chunking (Plan 09). */
   slug: string
+  /**
+   * Whether the heading is a direct block of the document rather than one
+   * nested inside a blockquote or list item. Only a top-level heading opens a
+   * section: `> ## Meetings` is quoted prose, and automatic daily-note writes
+   * must neither target it nor let it bound a real section.
+   */
+  topLevel: boolean
 }
 
 /** A relative reference into the graph's `assets/` directory. */

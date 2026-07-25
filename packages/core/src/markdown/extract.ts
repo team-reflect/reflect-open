@@ -4,6 +4,7 @@ import { parseFrontmatter, splitFrontmatter } from './frontmatter'
 import { parseBody } from './grammar'
 import { foldTag } from './keys'
 import { parseInlineLink } from './link-syntax'
+import { headingLevelOf } from './node-types'
 import { buildPlainText, plainTextOfRange, unescapeMarkdownText } from './plain-text'
 import { normalizeWikiTarget } from './resolve'
 import { taskBreadcrumbs } from './task-breadcrumbs'
@@ -63,11 +64,6 @@ function isTagExcludedNode(name: string): boolean {
 
 function isLiteralPlainTextNode(name: string): boolean {
   return name === 'InlineCode' || name === 'FencedCode' || name === 'CodeBlock'
-}
-
-function headingLevelOf(name: string): number | null {
-  const match = /^(?:ATXHeading|SetextHeading)([1-6])$/.exec(name)
-  return match ? Number(match[1]) : null
 }
 
 function cleanHeadingText(raw: string): string {
@@ -349,10 +345,13 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
         return false
       }
 
-      const headingLevel = headingLevelOf(name)
-      if (headingLevel) {
+      const headingLevel = headingLevelOf(node)
+      if (headingLevel !== null) {
         const text = cleanHeadingText(body.slice(from, to))
-        headings.push({ level: headingLevel, text, slug: slugify(text), from: from + bodyOffset, to: to + bodyOffset })
+        // `isTop` is the `Document` node: a heading anywhere else is nested in a
+        // blockquote or list item, so it never opens or ends a real section.
+        const topLevel = node.node.parent?.type.isTop === true
+        headings.push({ level: headingLevel, text, slug: slugify(text), topLevel, from: from + bodyOffset, to: to + bodyOffset })
         return true
       }
 

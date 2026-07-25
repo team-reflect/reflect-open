@@ -75,6 +75,8 @@ beforeEach(() => {
 })
 
 describe('meetingLine', () => {
+  // The bullet marker belongs to the list the entry lands in, so it is not
+  // part of the rendered text here.
   it('renders linked and plain attendees', () => {
     expect(
       meetingLine({
@@ -86,7 +88,7 @@ describe('meetingLine', () => {
         backlinkMeeting: true,
         startTime: '9:00am',
       }),
-    ).toBe('- 9:00am met with [[Ada Lovelace]], Shared inbox for [[Standup]]')
+    ).toBe('9:00am met with [[Ada Lovelace]], Shared inbox for [[Standup]]')
   })
 
   it('shortens attendee-less events and supports a plain meeting title', () => {
@@ -97,14 +99,14 @@ describe('meetingLine', () => {
         backlinkMeeting: true,
         startTime: '9:00am',
       }),
-    ).toBe('- 9:00am [[Standup]]')
+    ).toBe('9:00am [[Standup]]')
     expect(
       meetingLine({
         title: 'Standup',
         attendees: [{ kind: 'linked', insertText: 'Ada Lovelace' }],
         backlinkMeeting: false,
       }),
-    ).toBe('- Met with [[Ada Lovelace]] for Standup')
+    ).toBe('Met with [[Ada Lovelace]] for Standup')
   })
 })
 

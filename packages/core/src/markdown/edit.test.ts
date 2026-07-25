@@ -6,7 +6,6 @@ import {
   appendListItemUnderHeading,
   appendTaskLine,
   appendTaskToContext,
-  appendUnderHeading,
   clearTaskDueDate,
   editTaskLine,
   removeTaskLine,
@@ -16,55 +15,46 @@ import {
   toggleTaskMarker,
 } from './edit'
 
-describe('appendUnderHeading', () => {
-  const doc = '# A\n\nalpha\n\n# B\n\nbeta'
-
-  it('inserts at the end of a heading section, before the next sibling heading', () => {
-    expect(appendUnderHeading(doc, 'A', '- new')).toBe('# A\n\nalpha\n\n- new\n\n# B\n\nbeta')
-  })
-
-  it('appends at end of file for the last section', () => {
-    expect(appendUnderHeading(doc, 'B', '- new')).toBe('# A\n\nalpha\n\n# B\n\nbeta\n\n- new\n')
-  })
-
-  it('creates a new section when the heading is missing', () => {
-    expect(appendUnderHeading(doc, 'Inbox', '- new')).toBe(
-      '# A\n\nalpha\n\n# B\n\nbeta\n\n## Inbox\n\n- new\n',
-    )
-  })
-
-  it('matches the heading case-insensitively', () => {
-    expect(appendUnderHeading(doc, 'a', '- new')).toBe('# A\n\nalpha\n\n- new\n\n# B\n\nbeta')
-  })
-
-  it('preserves CRLF when extending an existing section', () => {
-    const source = '# A\r\n\r\nalpha\r\n\r\n# B\r\n\r\nbeta\r\n'
-    expect(appendUnderHeading(source, 'A', '- new')).toBe(
-      '# A\r\n\r\nalpha\r\n\r\n- new\r\n\r\n# B\r\n\r\nbeta\r\n',
-    )
-  })
-})
-
 describe('appendListItemUnderHeading', () => {
-  it('extends only the leading bullet list and stays before later prose and lists', () => {
+  it("extends the section's bullet list and stays before later prose and lists", () => {
     const source =
       '## Meetings\n\n- [[Kickoff]]\n- [[Planning]]\n\nNotes for next time.\n\n- Personal reminder\n'
-    expect(appendListItemUnderHeading(source, 'Meetings', '- [[Standup]]')).toBe(
+    expect(appendListItemUnderHeading(source, 'Meetings', '[[Standup]]')).toBe(
       '## Meetings\n\n- [[Kickoff]]\n- [[Planning]]\n- [[Standup]]\n\nNotes for next time.\n\n- Personal reminder\n',
     )
   })
 
   it('starts a bullet list directly beneath the heading when prose comes first', () => {
     const source = '## Meetings\n\nNotes for next time.\n'
-    expect(appendListItemUnderHeading(source, 'Meetings', '- [[Standup]]')).toBe(
+    expect(appendListItemUnderHeading(source, 'Meetings', '[[Standup]]')).toBe(
       '## Meetings\n\n- [[Standup]]\n\nNotes for next time.\n',
     )
   })
 
-  it('reuses the leading list marker', () => {
+  it('reuses the list marker already in use', () => {
     const source = '## Meetings\n\n* [[Kickoff]]\n\nNotes for next time.\n'
-    expect(appendListItemUnderHeading(source, 'Meetings', '- [[Standup]]')).toBe(
+    expect(appendListItemUnderHeading(source, 'Meetings', '[[Standup]]')).toBe(
       '## Meetings\n\n* [[Kickoff]]\n* [[Standup]]\n\nNotes for next time.\n',
+    )
+  })
+  it('joins the list the section already has, even when prose comes first', () => {
+    const source = '## Meetings\n\nAgenda I typed this morning:\n\n- [[Kickoff]]\n'
+    expect(appendListItemUnderHeading(source, 'Meetings', '[[Standup]]')).toBe(
+      '## Meetings\n\nAgenda I typed this morning:\n\n- [[Kickoff]]\n- [[Standup]]\n',
+    )
+  })
+
+  it('starts its own list rather than joining one under a subheading', () => {
+    const source = '## Meetings\n\nAgenda:\n\n### Follow-ups\n\n- [[Chase invoice]]\n'
+    expect(appendListItemUnderHeading(source, 'Meetings', '[[Standup]]')).toBe(
+      '## Meetings\n\n- [[Standup]]\n\nAgenda:\n\n### Follow-ups\n\n- [[Chase invoice]]\n',
+    )
+  })
+
+  it('ignores an ordered list and starts an unordered one', () => {
+    const source = '## Meetings\n\n1. Standup\n'
+    expect(appendListItemUnderHeading(source, 'Meetings', '[[Standup]]')).toBe(
+      '## Meetings\n\n- [[Standup]]\n\n1. Standup\n',
     )
   })
 })
@@ -72,77 +62,84 @@ describe('appendListItemUnderHeading', () => {
 describe('appendListItemUnderBacklinkedHeading', () => {
   it('creates a linked H2 section when the category is missing', () => {
     expect(
-      appendListItemUnderBacklinkedHeading('morning notes\n', 'Links', '- [[Article]]'),
+      appendListItemUnderBacklinkedHeading('morning notes\n', 'Links', '[[Article]]'),
     ).toBe('morning notes\n\n## [[Links]]\n\n- [[Article]]\n')
   })
 
   it('matches a linked target case-insensitively and preserves its alias', () => {
     const source = '## [[LINKS|Saved links]]\n\n- [[Old]]\n'
-    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '- [[New]]')).toBe(
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
       '## [[LINKS|Saved links]]\n\n- [[Old]]\n- [[New]]\n',
     )
   })
 
   it('does not mistake escaped literal brackets for a linked heading', () => {
     const source = '## \\[[Links]]\n\nliteral brackets\n'
-    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '- [[New]]')).toBe(
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
       '## \\[[Links]]\n\nliteral brackets\n\n## [[Links]]\n\n- [[New]]\n',
     )
   })
 
   it('preserves a user-authored plain heading at another level', () => {
     const source = '# Links\n\ntitle-like content\n'
-    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '- [[New]]')).toBe(
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
       '# Links\n\ntitle-like content\n\n## [[Links]]\n\n- [[New]]\n',
     )
   })
 
-  it('extends the leading list without crossing later prose or a subheading', () => {
+  it('extends the list without crossing later prose or a subheading', () => {
     const source =
       '## [[Links]]\n\n- [[Old]]\n  - context\n- [[Older]]\n\nScratchpad.\n\n### Follow-up\n\ntext\n'
-    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '- [[New]]')).toBe(
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
       '## [[Links]]\n\n- [[Old]]\n  - context\n- [[Older]]\n- [[New]]\n\nScratchpad.\n\n### Follow-up\n\ntext\n',
     )
   })
 
   it('starts the list directly beneath the linked heading when prose comes first', () => {
     const source = '## [[Links]]\n\nScratchpad.\n'
-    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '- [[New]]')).toBe(
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
       '## [[Links]]\n\n- [[New]]\n\nScratchpad.\n',
     )
   })
 
   it('handles frontmatter offsets and upgrades a legacy heading in place', () => {
     const source = '---\nprivate: true\n---\n\n## Links\n\n- [[Old]]\n\nScratchpad.\n'
-    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '- [[New]]')).toBe(
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
       '---\nprivate: true\n---\n\n## [[Links]]\n\n- [[Old]]\n- [[New]]\n\nScratchpad.\n',
     )
   })
 
   it('preserves CRLF while inserting before prose', () => {
     const source = '## Links\r\n\r\n- [[Old]]\r\n\r\nScratchpad.\r\n'
-    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '- [[New]]')).toBe(
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
       '## [[Links]]\r\n\r\n- [[Old]]\r\n- [[New]]\r\n\r\nScratchpad.\r\n',
     )
   })
 
   it('preserves a nested matching heading and creates a top-level section', () => {
     const source = '> ## [[Links]]\n> - [[Quoted]]\n\nOutside the quote.\n'
-    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '- [[New]]')).toBe(
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
       '> ## [[Links]]\n> - [[Quoted]]\n\nOutside the quote.\n\n## [[Links]]\n\n- [[New]]\n',
     )
   })
 
   it('preserves a matching heading nested in a list item', () => {
     const source = '- ## [[Links]]\n  - [[Nested]]\n\nOutside the list.\n'
-    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '- [[New]]')).toBe(
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
       '- ## [[Links]]\n  - [[Nested]]\n\nOutside the list.\n\n## [[Links]]\n\n- [[New]]\n',
+    )
+  })
+
+  it("joins a linked section's existing list from below its prose", () => {
+    const source = '## [[Links]]\n\nReading list for today:\n\n- [[Old]]\n'
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
+      '## [[Links]]\n\nReading list for today:\n\n- [[Old]]\n- [[New]]\n',
     )
   })
 
   it('uses CRLF when creating a missing section', () => {
     const source = 'Morning notes.\r\n'
-    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '- [[New]]')).toBe(
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
       'Morning notes.\r\n\r\n## [[Links]]\r\n\r\n- [[New]]\r\n',
     )
   })

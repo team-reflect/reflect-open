@@ -56,7 +56,6 @@ export {
   PARSED_NOTE_VERSION,
   parseNote,
   appendBlock,
-  appendUnderHeading,
   appendTaskLine,
   appendTaskToContext,
   wikiLinkSafe,

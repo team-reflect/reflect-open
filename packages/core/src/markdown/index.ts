@@ -38,7 +38,6 @@ export {
 } from './scan'
 export {
   appendBlock,
-  appendUnderHeading,
   appendTaskLine,
   appendTaskToContext,
   wikiLinkSafe,

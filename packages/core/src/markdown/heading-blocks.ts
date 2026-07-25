@@ -1,27 +1,13 @@
-import { splitFrontmatter } from './frontmatter'
-import { parseBody } from './grammar'
 import type { Heading } from './model'
 
 /**
- * Return only headings represented by direct top-level Markdown blocks,
- * preserving their source offsets, including offsets after frontmatter.
+ * The headings that open a section: those `parseNote` saw as direct blocks of
+ * the document. A `## Meetings` nested in a blockquote or a list item is quoted
+ * prose, so it must neither receive an automatic entry nor cut a real section
+ * short.
  */
-export function topLevelHeadings(
-  source: string,
-  headings: readonly Heading[],
-): readonly Heading[] {
-  const { body, bodyOffset } = splitFrontmatter(source)
-  const headingOffsets = new Set<number>()
-  for (
-    let block = parseBody(body).topNode.firstChild;
-    block !== null;
-    block = block.nextSibling
-  ) {
-    if (/^(?:ATX|Setext)Heading[1-6]$/.test(block.name)) {
-      headingOffsets.add(bodyOffset + block.from)
-    }
-  }
-  return headings.filter((heading) => headingOffsets.has(heading.from))
+export function topLevelHeadings(headings: readonly Heading[]): readonly Heading[] {
+  return headings.filter((heading) => heading.topLevel)
 }
 
 /** End offset for `target` within an ordered set of top-level headings. */

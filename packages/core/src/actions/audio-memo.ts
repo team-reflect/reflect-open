@@ -274,8 +274,8 @@ async function ensureDailyBacklink(
     return
   }
   const displayTitle = wikiLinkSafe(title) || memo.title
-  const link = `- [[${memo.base}|${displayTitle}]]`
-  const updated = appendListItemUnderBacklinkedHeading(source, memosNoteTitle, link, [
+  const entry = `[[${memo.base}|${displayTitle}]]`
+  const updated = appendListItemUnderBacklinkedHeading(source, memosNoteTitle, entry, [
     MEMOS_NOTE_TITLE,
   ])
   await writeNote(dailyPath(memo.date), updated, generation)
