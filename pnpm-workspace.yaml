@@ -25,7 +25,7 @@ minimumReleaseAgeExclude:
 # (https://github.com/prosekit/meowdown/pull/377). Drop this block, and the
 # `blockExoticSubdeps` line with it, once that lands in a published release.
 overrides:
-  '@meowdown/core': https://pkg.pr.new/prosekit/meowdown/@meowdown/core@6930b2f
-  '@meowdown/markdown': https://pkg.pr.new/prosekit/meowdown/@meowdown/markdown@6930b2f
-  '@meowdown/react': https://pkg.pr.new/prosekit/meowdown/@meowdown/react@6930b2f
+  '@meowdown/core': https://pkg.pr.new/prosekit/meowdown/@meowdown/core@f8fd641
+  '@meowdown/markdown': https://pkg.pr.new/prosekit/meowdown/@meowdown/markdown@f8fd641
+  '@meowdown/react': https://pkg.pr.new/prosekit/meowdown/@meowdown/react@f8fd641
 blockExoticSubdeps: false
