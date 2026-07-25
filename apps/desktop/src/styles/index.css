@@ -656,6 +656,14 @@ html:root {
   outline: none;
 }
 
+/* ---- Find in note ------------------------------------------------------
+   The pill is the focus treatment: it exists only while its input is focused,
+   so the global outline above would draw a second box inside it. Unlayered,
+   like the shadcn opt-out above, because a Tailwind utility cannot beat it. */
+.reflect-find-input:focus-visible {
+  outline: none;
+}
+
 /* ---- ⌘K palette (Plan 08) ---------------------------------------------- */
 .reflect-palette {
   overflow: hidden;
