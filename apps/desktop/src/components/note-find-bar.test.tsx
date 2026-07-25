@@ -136,8 +136,12 @@ describe('NoteFindBar', () => {
     await page.getByRole('button', { name: 'Open find' }).click()
     await expect.element(queryInput).toHaveFocus()
 
+    // WebKit follows the macOS convention of not focusing a button on click, so
+    // move focus explicitly to model the user having gone somewhere else.
     const outside = page.getByRole('button', { name: 'Elsewhere' })
-    await outside.click()
+    outside.element().focus()
+    await expect.element(outside).toHaveFocus()
+
     await userEvent.keyboard('{Escape}')
 
     await expect.element(findBar).not.toBeInTheDocument()
