@@ -296,7 +296,7 @@ describe('streamChatTurn', () => {
   })
 
   it('keeps every completed step when cut short after multiple tool rounds', async () => {
-    // Pins the SDK semantic the engine relies on: each onStepFinish's
+    // Pins the SDK semantic the engine relies on: each onStepEnd's
     // `response.messages` holds *only that step's* messages, so appending
     // (not assigning) yields the full paired history. If an `ai` upgrade ever
     // makes it cumulative again, this starts failing instead of silently

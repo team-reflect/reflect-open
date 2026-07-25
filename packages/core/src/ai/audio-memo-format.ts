@@ -99,7 +99,7 @@ export async function formatAudioMemoTranscript(
         request.fetchFn ?? fetch,
       ),
       output: Output.object({ schema: formattedAudioMemoSchema }),
-      system: FORMAT_SYSTEM_PROMPT,
+      instructions: FORMAT_SYSTEM_PROMPT,
       prompt: `Transcript JSON string:\n${JSON.stringify(request.transcript)}`,
       abortSignal: AbortSignal.timeout(FORMAT_TIMEOUT_MS),
       maxRetries: 0,

@@ -85,12 +85,12 @@ export async function* streamTransformTurn(
   try {
     const result = streamText({
       model,
-      system: TRANSFORM_SYSTEM_PROMPT,
+      instructions: TRANSFORM_SYSTEM_PROMPT,
       prompt: options.prompt,
       ...(options.signal !== undefined ? { abortSignal: options.signal } : {}),
     })
 
-    for await (const part of result.fullStream) {
+    for await (const part of result.stream) {
       switch (part.type) {
         case 'text-delta':
           text += part.text

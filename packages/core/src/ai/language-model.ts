@@ -1,5 +1,5 @@
 import { createAnthropic } from '@ai-sdk/anthropic'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import { createGoogle } from '@ai-sdk/google'
 import { createOpenAI } from '@ai-sdk/openai'
 import type { LanguageModel } from 'ai'
 import type { AiProviderConfig } from '../settings/schema'
@@ -27,7 +27,7 @@ export function languageModel(
         headers: anthropicDirectBrowserAccessHeaders(),
       })(config.model)
     case 'google':
-      return createGoogleGenerativeAI({ apiKey, fetch: fetchFn })(config.model)
+      return createGoogle({ apiKey, fetch: fetchFn })(config.model)
     case 'openrouter':
       return createOpenAI({
         apiKey,
