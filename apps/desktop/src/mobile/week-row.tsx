@@ -94,7 +94,7 @@ function WeekRowComponent({
               className={cn(
                 'size-1 rounded-full',
                 hasDailyNote
-                  ? 'bg-text-muted'
+                  ? 'bg-text-muted opacity-50'
                   : !selected && isToday
                     ? 'bg-primary'
                     : 'bg-transparent',
