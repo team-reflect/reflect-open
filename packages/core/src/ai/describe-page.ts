@@ -155,8 +155,8 @@ export async function describePage(request: DescribePageRequest): Promise<PageEn
   const content: UserContent = [{ type: 'text', text: describePrompt(request) }]
   if (request.screenshotBase64) {
     content.push({
-      type: 'image',
-      image: request.screenshotBase64,
+      type: 'file',
+      data: request.screenshotBase64,
       mediaType: 'image/jpeg',
     })
   }

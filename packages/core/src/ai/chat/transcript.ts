@@ -135,7 +135,7 @@ function settleTools(
 
 /**
  * The model-facing user message for one turn: plain text when nothing is
- * attached, otherwise image parts (the data URL is the payload) followed by
+ * attached, otherwise image file parts (the data URL is the payload) followed by
  * the text — which may be absent entirely for a photo-only message.
  */
 export function userMessage(
@@ -149,8 +149,8 @@ export function userMessage(
     role: 'user',
     content: [
       ...attachments.map((attachment) => ({
-        type: 'image' as const,
-        image: attachment.dataUrl,
+        type: 'file' as const,
+        data: attachment.dataUrl,
         mediaType: attachment.mediaType,
       })),
       ...(text === '' ? [] : [{ type: 'text' as const, text }]),

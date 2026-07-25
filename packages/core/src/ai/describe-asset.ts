@@ -26,7 +26,7 @@ export interface DescribeAssetRequest {
   apiKey: string
   /** Host transport (the Tauri HTTP plugin's fetch; tests pass a stub). */
   fetchFn?: typeof fetch | undefined
-  /** How `data` is carried: image input, file input, or SVG source text. */
+  /** How `data` is carried: image or PDF file input, or SVG source text. */
   kind: AssetKind
   /** IANA media type (e.g. `image/png`, `application/pdf`, `image/svg+xml`). */
   mediaType: string
@@ -108,7 +108,7 @@ function describePrompt(kind: AssetKind, filename: string): string {
 export async function describeAsset(request: DescribeAssetRequest): Promise<string> {
   const content: UserContent = [{ type: 'text', text: describePrompt(request.kind, request.filename) }]
   if (request.kind === 'image') {
-    content.push({ type: 'image', image: request.data, mediaType: request.mediaType })
+    content.push({ type: 'file', data: request.data, mediaType: request.mediaType })
   } else if (request.kind === 'pdf') {
     content.push({
       type: 'file',

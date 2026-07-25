@@ -50,7 +50,7 @@ describe('estimateTokens', () => {
     const photo: ModelMessage = {
       role: 'user',
       content: [
-        { type: 'image', image: `data:image/png;base64,${'a'.repeat(400_000)}`, mediaType: 'image/png' },
+        { type: 'file', data: `data:image/png;base64,${'a'.repeat(400_000)}`, mediaType: 'image/png' },
       ],
     }
     expect(estimateTokens(photo)).toBe(1_604)
