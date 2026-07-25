@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { effectiveDailyDate, notePathForRoute, routeForPath, routesEqual } from './route'
+import {
+  effectiveDailyDate,
+  focusedNotePathForRoute,
+  notePathForRoute,
+  routeForPath,
+  routesEqual,
+} from './route'
 
 describe('routeForPath', () => {
   it('routes real daily paths to the daily view', () => {
@@ -75,5 +81,22 @@ describe('effectiveDailyDate', () => {
     expect(effectiveDailyDate({ kind: 'note', path: 'notes/a.md' }, TODAY, '2026-06-01')).toBeNull()
     expect(effectiveDailyDate({ kind: 'search', query: 'x' }, TODAY, '2026-06-01')).toBeNull()
     expect(effectiveDailyDate({ kind: 'settings' }, TODAY, '2026-06-01')).toBeNull()
+  })
+})
+
+describe('focusedNotePathForRoute', () => {
+  const TODAY = '2026-06-10'
+
+  it('targets the focused day inside the daily stream', () => {
+    expect(focusedNotePathForRoute({ kind: 'today' }, TODAY, '2026-06-01')).toBe(
+      'daily/2026-06-01.md',
+    )
+  })
+
+  it('keeps ordinary note and non-note routes unchanged', () => {
+    expect(
+      focusedNotePathForRoute({ kind: 'note', path: 'notes/a.md' }, TODAY, '2026-06-01'),
+    ).toBe('notes/a.md')
+    expect(focusedNotePathForRoute({ kind: 'settings' }, TODAY, '2026-06-01')).toBeNull()
   })
 })

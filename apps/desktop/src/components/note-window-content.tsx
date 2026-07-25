@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react'
 import { dailyPath } from '@reflect/core'
+import { NoteFindBar } from '@/components/note-find-bar'
 import { RouteContent } from '@/components/route-content'
 import { SingleNoteView } from '@/components/single-note-view'
 import { useNoteRow } from '@/hooks/use-note-row'
@@ -37,7 +38,7 @@ export function NoteWindowContent(): ReactElement {
   )
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-surface text-text">
+    <div className="relative h-screen w-screen overflow-hidden bg-surface text-text">
       {dailyDate !== null ? (
         <SingleNoteView
           path={dailyPath(dailyDate)}
@@ -53,6 +54,7 @@ export function NoteWindowContent(): ReactElement {
       ) : (
         <RouteContent />
       )}
+      <NoteFindBar />
     </div>
   )
 }

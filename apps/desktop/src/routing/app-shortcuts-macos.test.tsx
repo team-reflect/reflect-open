@@ -15,7 +15,19 @@ import { RouterProvider } from './router'
 // The macOS-only behaviors live in this file with the flag statically true.
 const nativeMenu = vi.hoisted(() => ({ installed: false }))
 
+const openNoteFindForPath = vi.hoisted(() => vi.fn(() => true))
+const findNextInNote = vi.hoisted(() => vi.fn())
+const findPreviousInNote = vi.hoisted(() => vi.fn())
+
 vi.mock('@/lib/platform', () => ({ isMacosDesktop: true }))
+vi.mock('@/providers/note-find-provider', () => ({
+  useNoteFindActions: () => ({
+    openForPath: openNoteFindForPath,
+    next: findNextInNote,
+    previous: findPreviousInNote,
+  }),
+}))
+
 vi.mock('@/lib/native-menu/menu', () => ({
   isNativeMenuInstalled: () => nativeMenu.installed,
 }))

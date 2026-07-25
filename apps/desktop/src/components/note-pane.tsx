@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo, useRef, useState, type ReactElement } from 'react'
-import type { ExitBoundaryHandler } from '@meowdown/core'
+import type { ExitBoundaryHandler, SearchStatus } from '@meowdown/core'
 import {
   detectConflictMarkers,
   isDaily,
@@ -33,6 +33,7 @@ import { useWikiLinkHoverPreview } from '@/editor/use-wiki-link-hover-preview'
 import { isTouchEditorSurface } from '@/lib/platform-surface'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
+import { useNoteSearchQuery, useNoteSearchReport } from '@/providers/note-find-provider'
 import { useSettings } from '@/providers/settings-provider'
 
 interface NotePaneProps {
@@ -182,6 +183,14 @@ export function NotePaneComponent({
 
   const bindEditor = document.bindEditor
   const aiEditorRef = useRef<NoteEditorHandle | null>(null)
+  // Find is one session per window: only the targeted note gets a query, and
+  // only its status reaches the Find bar.
+  const searchQuery = useNoteSearchQuery(path)
+  const reportSearchStatus = useNoteSearchReport()
+  const handleSearchChange = useCallback(
+    (status: SearchStatus) => reportSearchStatus(path, status),
+    [path, reportSearchStatus],
+  )
   // The registry entry this pane made, so unmount removes exactly it (a
   // remount of the same path may already have re-registered).
   const registeredHandle = useRef<{ path: string; handle: NoteEditorHandle } | null>(null)
@@ -345,6 +354,8 @@ export function NotePaneComponent({
         onChange={document.onEditorChange}
         markMode={markModeFromSyntax(settings.editorMarkdownSyntax)}
         spellCheck={settings.editorSpellCheck}
+        searchQuery={searchQuery}
+        onSearchChange={handleSearchChange}
         smoothCaretAnimation={settings.editorSmoothCaretAnimation}
         timeFormat={settings.timeFormat}
         bulletAfterHeading={settings.editorBulletAfterHeading}

@@ -21,7 +21,11 @@ minimumReleaseAgeExclude:
   - prosemirror-flat-list
   - prosemirror-view
 
-# overrides:
-#   '@meowdown/core': https://pkg.pr.new/prosekit/meowdown/@meowdown/core@623bc43
-#   '@meowdown/react': https://pkg.pr.new/prosekit/meowdown/@meowdown/react@623bc43
-# blockExoticSubdeps: false
+# Unreleased meowdown build carrying the find API this branch consumes
+# (https://github.com/prosekit/meowdown/pull/377). Drop this block, and the
+# `blockExoticSubdeps` line with it, once that lands in a published release.
+overrides:
+  '@meowdown/core': https://pkg.pr.new/prosekit/meowdown/@meowdown/core@6930b2f
+  '@meowdown/markdown': https://pkg.pr.new/prosekit/meowdown/@meowdown/markdown@6930b2f
+  '@meowdown/react': https://pkg.pr.new/prosekit/meowdown/@meowdown/react@6930b2f
+blockExoticSubdeps: false

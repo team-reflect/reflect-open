@@ -16,6 +16,7 @@ import {
   type FileInfoResolver,
   type FileLinkResolver,
   type MarkMode,
+  type SearchStatus,
   type StartPendingReplacementOptions,
   type WikilinkHoverHit,
 } from '@meowdown/core'
@@ -97,6 +98,10 @@ export interface NoteEditorHandle {
   acceptPendingReplacement(options?: AcceptPendingReplacementOptions): void
   /** Clear the staged replacement without touching the document. */
   discardPendingReplacement(): void
+  /** Select the next find match, wrapping at the document end. */
+  findNext(): void
+  /** Select the previous find match, wrapping at the document start. */
+  findPrevious(): void
 }
 
 interface NoteEditorProps {
@@ -195,6 +200,14 @@ interface NoteEditorProps {
    * click-to-focus (the daily stream uses this for per-day sizing).
    */
   className?: string
+  /**
+   * Text to find in this note. Every match is highlighted and the first one at
+   * or after the caret is selected; an empty string (the default) clears the
+   * highlights and leaves the caret alone.
+   */
+  searchQuery?: string
+  /** Called when this note's match count or selected match changes. */
+  onSearchChange?: (status: SearchStatus) => void
   /** Imperative handle (React 19 ref-as-prop). */
   handleRef?: Ref<NoteEditorHandle>
   /**
@@ -233,6 +246,8 @@ export function NoteEditor({
   children,
   titlePlaceholder,
   className,
+  searchQuery,
+  onSearchChange,
   handleRef,
 }: NoteEditorProps): ReactElement {
   const innerRef = useRef<EditorHandle>(null)
@@ -286,6 +301,8 @@ export function NoteEditor({
         innerRef.current?.appendPendingReplacementText(text),
       acceptPendingReplacement: (options) => innerRef.current?.acceptPendingReplacement(options),
       discardPendingReplacement: () => innerRef.current?.discardPendingReplacement(),
+      findNext: () => innerRef.current?.findNext(),
+      findPrevious: () => innerRef.current?.findPrevious(),
     }),
     [],
   )
@@ -406,6 +423,8 @@ export function NoteEditor({
         // syntax ([[ wiki links, code spans, --- fences) — Plan 19 gate.
         // Autocorrect is independent and stays on (EditorInputTraits).
         spellCheck={isTouchEditorSurface() ? false : spellCheck}
+        searchQuery={searchQuery ?? ''}
+        {...(onSearchChange !== undefined ? { onSearchChange } : {})}
         // Reflect's implementation-neutral `12h`/`24h` maps to meowdown's
         // `12`/`24` here at the boundary, like `markModeFromSyntax`.
         timeFormat={timeFormat === '24h' ? '24' : '12'}
