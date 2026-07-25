@@ -17,6 +17,7 @@ import { openSession, registerOpenDocument, retargetOpenDocument } from './open-
 
 const io = vi.hoisted(() => ({
   rewriteLinksForTitleChange: vi.fn(),
+  getBacklinks: vi.fn(),
   getLinkSources: vi.fn(),
   readNote: vi.fn(),
   writeNote: vi.fn(),
@@ -27,6 +28,7 @@ const io = vi.hoisted(() => ({
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   rewriteLinksForTitleChange: io.rewriteLinksForTitleChange,
+  getBacklinks: io.getBacklinks,
   getLinkSources: io.getLinkSources,
   readNote: io.readNote,
   writeNote: io.writeNote,
@@ -126,7 +128,14 @@ function fakeSession(content: string): NoteSession & {
 
 beforeEach(() => {
   io.rewriteLinksForTitleChange.mockReset()
-  io.rewriteLinksForTitleChange.mockResolvedValue({ rewritten: 1, failed: 0, collision: false })
+  io.rewriteLinksForTitleChange.mockResolvedValue({
+    rewritten: ['notes/source.md'],
+    failed: [],
+    collision: false,
+    destinationBlocked: false,
+  })
+  io.getBacklinks.mockReset()
+  io.getBacklinks.mockResolvedValue([])
   io.readNote.mockReset()
   io.writeNote.mockReset()
   io.writeNote.mockResolvedValue(undefined)
@@ -208,7 +217,12 @@ describe('rename coordinator', () => {
   })
 
   it('a collision rewrites nothing onto the note: no alias write, operation done', async () => {
-    io.rewriteLinksForTitleChange.mockResolvedValue({ rewritten: 0, failed: 0, collision: true })
+    io.rewriteLinksForTitleChange.mockResolvedValue({
+      rewritten: [],
+      failed: [],
+      collision: true,
+      destinationBlocked: false,
+    })
     const coordinator = makeCoordinator()
     await renameOnce(coordinator, 'Old Title', 'New Title')
 
@@ -375,7 +389,12 @@ describe('rename coordinator', () => {
   })
 
   it('the rewrite collision guard does not block the move (filename follows the NEW title)', async () => {
-    io.rewriteLinksForTitleChange.mockResolvedValue({ rewritten: 0, failed: 0, collision: true })
+    io.rewriteLinksForTitleChange.mockResolvedValue({
+      rewritten: [],
+      failed: [],
+      collision: true,
+      destinationBlocked: false,
+    })
     io.slugPathForTitle.mockResolvedValue('notes/new-title.md')
     const coordinator = makeCoordinator()
     await renameOnce(coordinator, 'Old Title', 'New Title')
@@ -426,21 +445,36 @@ describe('rename coordinator', () => {
     )
   })
 
-  it('keeps an adopted direct note content-only when its title changes', async () => {
+  it('maintains links and aliases for an adopted direct note without moving it', async () => {
+    io.readNote.mockResolvedValue('# New Title\n')
     const coordinator = makeCoordinator()
     coordinator.content('# Old Title\n', 'load')
     coordinator.content('# New Title\n', 'saved')
     coordinator.settle()
     await coordinator.settled()
 
-    expect(io.rewriteLinksForTitleChange).not.toHaveBeenCalled()
+    expect(io.rewriteLinksForTitleChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: PATH,
+        from: 'Old Title',
+        to: 'New Title',
+        io: expect.objectContaining({ backlinks: io.getBacklinks }),
+      }),
+    )
     expect(io.slugPathForTitle).not.toHaveBeenCalled()
     expect(io.moveNoteIndexed).not.toHaveBeenCalled()
-    expect(io.writeNote).not.toHaveBeenCalled()
-    expect(operationLog.records).toEqual([])
+    expect(io.writeNote).toHaveBeenCalledWith(
+      PATH,
+      upsertFrontmatter('# New Title\n', { aliases: ['Old Title'] }),
+      7,
+    )
+    expect(operationLog.records).toEqual([
+      { label: 'Renaming "Old Title" → "New Title"', outcome: 'done', message: null },
+    ])
   })
 
-  it('keeps a valid-id note outside direct notes/ content-only', async () => {
+  it('maintains links for a valid-id note outside direct notes/ without moving it', async () => {
+    io.readNote.mockResolvedValue(managed('# New Title\n'))
     const coordinator = createRenameCoordinator({
       path: 'Projects/subject.md',
       generation: () => 7,
@@ -451,7 +485,57 @@ describe('rename coordinator', () => {
     coordinator.settle()
     await coordinator.settled()
 
+    expect(io.rewriteLinksForTitleChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: 'Projects/subject.md',
+        from: 'Old Title',
+        to: 'New Title',
+      }),
+    )
+    expect(io.slugPathForTitle).not.toHaveBeenCalled()
+    expect(io.moveNoteIndexed).not.toHaveBeenCalled()
+  })
+
+  it('preserves a capture stable alias and path while maintaining its title links', async () => {
+    const base = 'capture-2026-07-23-154848-811-c2b0'
+    const oldSource = upsertFrontmatter('# Old Title\n', { aliases: [base] })
+    const newSource = upsertFrontmatter('# New Title\n', { aliases: [base] })
+    io.readNote.mockResolvedValue(newSource)
+    const coordinator = createRenameCoordinator({
+      path: `notes/${base}.md`,
+      generation: () => 7,
+      canFire: () => true,
+    })
+    coordinator.content(oldSource, 'load')
+    coordinator.content(newSource, 'saved')
+    coordinator.settle()
+    await coordinator.settled()
+
+    expect(io.rewriteLinksForTitleChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: `notes/${base}.md`,
+        from: 'Old Title',
+        to: 'New Title',
+      }),
+    )
+    expect(io.writeNote).toHaveBeenCalledWith(
+      `notes/${base}.md`,
+      upsertFrontmatter(newSource, { aliases: [base, 'Old Title'] }),
+      7,
+    )
+    expect(io.slugPathForTitle).not.toHaveBeenCalled()
+    expect(io.moveNoteIndexed).not.toHaveBeenCalled()
+  })
+
+  it('treats a first title on an adopted note as a no-op birth', async () => {
+    const coordinator = makeCoordinator()
+    coordinator.content('', 'load')
+    coordinator.content('# Fresh Note\n', 'saved')
+    coordinator.settle()
+    await coordinator.settled()
+
     expect(io.rewriteLinksForTitleChange).not.toHaveBeenCalled()
+    expect(io.slugPathForTitle).not.toHaveBeenCalled()
     expect(io.moveNoteIndexed).not.toHaveBeenCalled()
     expect(operationLog.records).toEqual([])
   })

@@ -4,11 +4,18 @@ import { nextAliases, rewriteLinksForTitleChange, type RenameIo } from './rename
 
 function fakeIo(
   files: Record<string, string>,
-  options?: { resolveTo?: string; resolveByTarget?: Record<string, string> },
+  options?: {
+    resolveTo?: string
+    resolveByTarget?: Record<string, string>
+    backlinks?: Array<{ sourcePath: string; targetRaw: string; alias: string | null }>
+    /** Sources of raw old-title targets. Defaults to every file. */
+    sources?: string[]
+  },
 ) {
   const writes: Record<string, string> = {}
-  const io: RenameIo = {
-    sources: async () => Object.keys(files).sort(),
+  const io = {
+    sources: async () => options?.sources ?? Object.keys(files).sort(),
+    backlinks: async () => options?.backlinks ?? [],
     read: async (path) => {
       const content = files[path]
       if (content === undefined) {
@@ -26,6 +33,8 @@ function fakeIo(
       }
       return options?.resolveTo !== undefined ? resolved(options.resolveTo) : unresolved('x')
     },
+  } satisfies RenameIo & {
+    backlinks: () => Promise<Array<{ sourcePath: string; targetRaw: string; alias: string | null }>>
   }
   return { io, writes }
 }
@@ -128,6 +137,305 @@ describe('rewriteLinksForTitleChange', () => {
       [1, 2],
       [2, 2],
     ])
+  })
+})
+
+describe('rewriteLinksForTitleChange stable-target displays', () => {
+  it('updates a title-mirroring display while keeping the stable target', async () => {
+    const sourcePath = 'daily/2026-07-23.md'
+    const stableTarget = 'capture-2026-07-23-154848-811-c2b0'
+    const { io, writes } = fakeIo(
+      {
+        [sourcePath]:
+          `- [[${stableTarget}|Old Title]]\n` + `- [[${stableTarget}|Custom label]]\n`,
+      },
+      {
+        resolveByTarget: { [stableTarget]: 'notes/capture.md' },
+        backlinks: [
+          { sourcePath, targetRaw: stableTarget, alias: 'Old Title' },
+          { sourcePath, targetRaw: stableTarget, alias: 'Custom label' },
+        ],
+      },
+    )
+
+    const result = await rewriteLinksForTitleChange({
+      path: 'notes/capture.md',
+      from: 'Old Title',
+      to: 'New Title',
+      io,
+    })
+
+    expect(result.rewritten).toEqual([sourcePath])
+    expect(writes[sourcePath]).toBe(
+      `- [[${stableTarget}|New Title]]\n` + `- [[${stableTarget}|Custom label]]\n`,
+    )
+  })
+
+  it('handles audio memo and user-defined stable aliases without note-type branches', async () => {
+    const files = {
+      'daily/2026-07-23.md': '[[audio-memo-2026-07-23-154848|Old Title]]\n',
+      'notes/source.md': '[[stable-address|Old Title]]\n',
+    }
+    const { io, writes } = fakeIo(files, {
+      resolveByTarget: {
+        'audio-memo-2026-07-23-154848': 'notes/subject.md',
+        'stable-address': 'notes/subject.md',
+      },
+      backlinks: [
+        {
+          sourcePath: 'daily/2026-07-23.md',
+          targetRaw: 'audio-memo-2026-07-23-154848',
+          alias: 'Old Title',
+        },
+        {
+          sourcePath: 'notes/source.md',
+          targetRaw: 'stable-address',
+          alias: 'Old Title',
+        },
+      ],
+    })
+
+    await rewriteLinksForTitleChange({
+      path: 'notes/subject.md',
+      from: 'Old Title',
+      to: 'New Title',
+      io,
+    })
+
+    expect(writes).toEqual({
+      'daily/2026-07-23.md': '[[audio-memo-2026-07-23-154848|New Title]]\n',
+      'notes/source.md': '[[stable-address|New Title]]\n',
+    })
+  })
+
+  it('rewrites title targets and stable displays in one source write', async () => {
+    const sourcePath = 'notes/source.md'
+    const { io, writes } = fakeIo(
+      {
+        [sourcePath]: '[[Old Title]] and [[stable-address|Old Title]]\n',
+      },
+      {
+        resolveByTarget: { 'stable-address': 'notes/subject.md' },
+        backlinks: [{ sourcePath, targetRaw: 'stable-address', alias: 'Old Title' }],
+      },
+    )
+    const write = io.write
+    let writeCount = 0
+    io.write = async (path, content) => {
+      writeCount += 1
+      await write(path, content)
+    }
+
+    await rewriteLinksForTitleChange({
+      path: 'notes/subject.md',
+      from: 'Old Title',
+      to: 'New Title',
+      io,
+    })
+
+    expect(writeCount).toBe(1)
+    expect(writes[sourcePath]).toBe('[[New Title]] and [[stable-address|New Title]]\n')
+  })
+
+  it('uses the rendered rich title for display comparison', async () => {
+    const sourcePath = 'notes/source.md'
+    const { io, writes } = fakeIo(
+      {
+        [sourcePath]: '[[stable-address|Meeting with Ada]]\n',
+      },
+      {
+        resolveByTarget: { 'stable-address': 'notes/meeting.md' },
+        backlinks: [
+          { sourcePath, targetRaw: 'stable-address', alias: 'Meeting with Ada' },
+        ],
+      },
+    )
+
+    await rewriteLinksForTitleChange({
+      path: 'notes/meeting.md',
+      from: 'Meeting with [[Ada Lovelace|Ada]]',
+      to: 'Meeting with [[Grace Hopper|Grace]]',
+      io,
+    })
+
+    expect(writes[sourcePath]).toBe('[[stable-address|Meeting with Grace]]\n')
+  })
+
+  it('rechecks that an indexed stable target still resolves to the subject', async () => {
+    const sourcePath = 'notes/source.md'
+    const { io, writes } = fakeIo(
+      {
+        [sourcePath]: '[[stable-address|Old Title]]\n',
+      },
+      {
+        resolveByTarget: { 'stable-address': 'notes/new-owner.md' },
+        backlinks: [{ sourcePath, targetRaw: 'stable-address', alias: 'Old Title' }],
+      },
+    )
+
+    await rewriteLinksForTitleChange({
+      path: 'notes/subject.md',
+      from: 'Old Title',
+      to: 'New Title',
+      io,
+    })
+
+    expect(writes).toEqual({})
+  })
+
+  it('uses the latest parsed alias instead of stale backlink positions', async () => {
+    const sourcePath = 'notes/source.md'
+    const { io, writes } = fakeIo(
+      {
+        [sourcePath]: 'A newly inserted prefix [[stable-address|Custom label]]\n',
+      },
+      {
+        resolveByTarget: { 'stable-address': 'notes/subject.md' },
+        backlinks: [{ sourcePath, targetRaw: 'stable-address', alias: 'Old Title' }],
+      },
+    )
+
+    await rewriteLinksForTitleChange({
+      path: 'notes/subject.md',
+      from: 'Old Title',
+      to: 'New Title',
+      io,
+    })
+
+    expect(writes).toEqual({})
+  })
+
+  it('syncs a stable display even when the old title belongs to another note now', async () => {
+    const sourcePath = 'daily/2026-07-23.md'
+    const { io, writes } = fakeIo(
+      { [sourcePath]: '- [[capture-base|Old Title]]\n' },
+      {
+        resolveByTarget: {
+          'Old Title': 'notes/other-owner.md',
+          'capture-base': 'notes/capture.md',
+        },
+        backlinks: [{ sourcePath, targetRaw: 'capture-base', alias: 'Old Title' }],
+      },
+    )
+
+    const result = await rewriteLinksForTitleChange({
+      path: 'notes/capture.md',
+      from: 'Old Title',
+      to: 'New Title',
+      io,
+    })
+
+    expect(result.collision).toBe(true)
+    expect(result.rewritten).toEqual([sourcePath])
+    expect(writes[sourcePath]).toBe('- [[capture-base|New Title]]\n')
+  })
+
+  it('leaves an old-title link entirely alone on collision', async () => {
+    const sourcePath = 'notes/source.md'
+    const { io, writes } = fakeIo(
+      { [sourcePath]: '[[Old Title]] and [[Old Title|Old Title]]\n' },
+      { resolveTo: 'notes/other-owner.md' },
+    )
+
+    const result = await rewriteLinksForTitleChange({
+      path: 'notes/subject.md',
+      from: 'Old Title',
+      to: 'New Title',
+      io,
+    })
+
+    expect(result.collision).toBe(true)
+    expect(writes).toEqual({})
+  })
+
+  it('keeps the old target but refreshes its display when the destination is blocked', async () => {
+    const sourcePath = 'notes/source.md'
+    const { io, writes } = fakeIo(
+      { [sourcePath]: '[[Old Title|Old Title]]\n' },
+      { resolveByTarget: { 'New Title': 'notes/other.md' } },
+    )
+
+    const result = await rewriteLinksForTitleChange({
+      path: 'notes/subject.md',
+      from: 'Old Title',
+      to: 'New Title',
+      io,
+    })
+
+    expect(result.destinationBlocked).toBe(true)
+    expect(writes[sourcePath]).toBe('[[Old Title|New Title]]\n')
+  })
+
+  it('syncs a display the index still records under an earlier title', async () => {
+    // The first retitle (A → B) rewrote this Daily entry; the watcher has not
+    // reprojected it yet, so the index still shows its display as "A".
+    const sourcePath = 'daily/2026-07-23.md'
+    const { io, writes } = fakeIo(
+      { [sourcePath]: '- [[capture-base|B]]\n' },
+      {
+        sources: [], // `[[B]]` is nobody's raw target
+        resolveByTarget: { 'capture-base': 'notes/capture.md' },
+        backlinks: [{ sourcePath, targetRaw: 'capture-base', alias: 'A' }],
+      },
+    )
+
+    await rewriteLinksForTitleChange({
+      path: 'notes/capture.md',
+      from: 'B',
+      to: 'C',
+      io,
+    })
+
+    expect(writes[sourcePath]).toBe('- [[capture-base|C]]\n')
+  })
+
+  it('confirms each stable target once, not once per source', async () => {
+    const files = {
+      'daily/a.md': '[[capture-base|Old Title]]\n',
+      'daily/b.md': '[[capture-base|Old Title]]\n',
+      'daily/c.md': '[[capture-base|Old Title]]\n',
+    }
+    const { io } = fakeIo(files, {
+      sources: [],
+      resolveByTarget: { 'capture-base': 'notes/capture.md' },
+      backlinks: Object.keys(files).map((sourcePath) => ({
+        sourcePath,
+        targetRaw: 'capture-base',
+        alias: 'Old Title',
+      })),
+    })
+    const resolveCalls: string[] = []
+    const resolve = io.resolve
+    io.resolve = async (target) => {
+      resolveCalls.push(target)
+      return resolve(target)
+    }
+
+    await rewriteLinksForTitleChange({
+      path: 'notes/capture.md',
+      from: 'Old Title',
+      to: 'New Title',
+      io,
+    })
+
+    expect(resolveCalls.filter((target) => target === 'capture-base')).toHaveLength(1)
+  })
+
+  it('splices by file offset in a source that carries frontmatter', async () => {
+    const sourcePath = 'notes/source.md'
+    const source = '---\nid: 01hv3xq7c2dm8k4t9w5e6r1n98\ntags: [a]\n---\n\nSee [[Old Title]].\n'
+    const { io, writes } = fakeIo({ [sourcePath]: source })
+
+    await rewriteLinksForTitleChange({
+      path: 'notes/subject.md',
+      from: 'Old Title',
+      to: 'New Title',
+      io,
+    })
+
+    expect(writes[sourcePath]).toBe(
+      '---\nid: 01hv3xq7c2dm8k4t9w5e6r1n98\ntags: [a]\n---\n\nSee [[New Title]].\n',
+    )
   })
 })
 

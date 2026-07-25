@@ -10,12 +10,56 @@ import {
 } from './flow-test-harness'
 import {
   getBacklinks,
+  getLinkSources,
   resolveWikiTarget,
   suggestWikiLinkTargets,
   suggestWikiTargets,
 } from './queries'
+import { rewriteLinksForTitleChange } from './rename'
 
 describe('v1 subject alias flow', () => {
+  it('retitles a display reached through a stable subject alias', async () => {
+    const database = openMigratedIndex()
+    const subjectPath = 'notes/capture.md'
+    const sourcePath = 'daily/2026-07-23.md'
+    const source = '[[capture-2026-07-23-154848|Old Title]]\n'
+    applyProjection(
+      database,
+      project(
+        subjectPath,
+        '---\naliases:\n  - capture-2026-07-23-154848\n---\n# Old Title\n',
+        20,
+      ),
+    )
+    applyProjection(database, project(sourcePath, source, 10))
+    connectIndex(database)
+
+    try {
+      const writes: Record<string, string> = {}
+      await rewriteLinksForTitleChange({
+        path: subjectPath,
+        from: 'Old Title',
+        to: 'New Title',
+        io: {
+          sources: getLinkSources,
+          backlinks: getBacklinks,
+          read: async () => source,
+          write: async (path, content) => {
+            writes[path] = content
+          },
+          resolve: resolveWikiTarget,
+        },
+      })
+
+      expect(writes).toEqual({
+        [sourcePath]: '[[capture-2026-07-23-154848|New Title]]\n',
+      })
+    } finally {
+      setBridge(null)
+      database.close()
+    }
+  })
+
   it('projects, resolves, backlinks, and autocompletes Dad through the real schema', async () => {
     const database = openMigratedIndex()
     const person = project('notes/tim-maccaw-dad.md', '# Tim MacCaw // Dad\n', 20)

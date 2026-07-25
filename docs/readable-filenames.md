@@ -4,8 +4,9 @@ Regular notes Reflect creates live at `notes/<slug>.md`, where the slug derives
 from the note's title: a Reflect-created note titled "Meeting Notes" is
 `notes/meeting-notes.md`, and when the title changes, the file follows. An
 opened Markdown vault can also contain adopted notes at the root or in visible
-nested folders. Reflect edits those files in place and never opts them into
-filename or graph-wide retitle automation (Plan 17).
+nested folders. Reflect edits those files in place: in-app title changes keep
+known wiki links and title-mirroring displays current, but never move the file
+or opt its filename into title projection (Plan 17).
 
 Three rules make the whole system hang together:
 
@@ -13,7 +14,9 @@ Three rules make the whole system hang together:
    (the first H1, or frontmatter `title:`); the slug is derived from it, never
    edited directly. There is no "rename file" UI — retitle the note and the
    filename follows. This applies only to a direct `notes/*.md` file carrying a
-   valid Reflect ULID `id`. Adopted notes save content only and keep their path.
+   valid Reflect ULID `id`. Adopted notes keep their path: a retitle maintains
+   their known wiki links and records the old title as an alias, but never moves
+   the file.
 2. **The frontmatter `id` is the durable identity.** Every note Reflect
    creates carries `id: <lowercase ulid>`. Filenames change; the id never
    does. It's what lets the index recognize a file that moved while Reflect
@@ -74,7 +77,9 @@ to `meeting.md` when it frees up.
 Only settled, in-app title changes to Reflect-managed notes move files. Sync
 pulls, external edits, reconciles, rebuilds, and edits to adopted notes never
 rename a file — that rule makes move loops with external tools impossible and
-keeps existing vault layouts intact.
+keeps existing vault layouts intact. Settled in-app retitles of any editable
+regular note still maintain known wiki links and preserve the old title as an
+alias; link consistency does not imply filename ownership.
 
 The settled-title tracker (`apps/desktop/src/editor/title-rename.ts`, Plan
 07b) watches saves and fires after 5 seconds of quiet, or immediately on
@@ -82,10 +87,12 @@ blur/pane teardown/quit. The rename coordinator
 (`apps/desktop/src/editor/rename-coordinator.ts`) then runs three phases, each
 failing independently with an honest report (`rename-failure.ts`):
 
-1. **Rewrite** inbound `[[old title]]` links across the graph.
+1. **Rewrite** inbound `[[old title]]` targets and pipe displays that still
+   mirror the old title on links resolving to this note.
 2. **Alias** the old title onto the note (`alias-placement.ts`), so anything
    the rewrite missed still resolves.
-3. **Move** the file onto the new title's slug (`move-note.ts`).
+3. **Move** the file onto the new title's slug (`move-note.ts`), only when the
+   note is Reflect-managed. Adopted and stable-path notes stop after phase 2.
 
 The move itself (`moveNoteCarryingSession`) is ordering-as-mechanism: flush
 the session, retarget it to the new path (so any later save writes the new

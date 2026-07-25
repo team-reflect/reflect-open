@@ -1,7 +1,7 @@
 {
   "name": "@reflect/desktop",
   "private": true,
-  "version": "0.7.0-beta.16",
+  "version": "0.7.0-beta.18",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -24,8 +24,8 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
-    "@meowdown/core": "^0.58.0",
-    "@meowdown/react": "^0.58.0",
+    "@meowdown/core": "^0.58.3",
+    "@meowdown/react": "^0.58.3",
     "@reflect/core": "workspace:*",
     "@reflect/db": "workspace:*",
     "@reflect/design-system": "workspace:*",

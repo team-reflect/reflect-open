@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { parseNote } from '../markdown'
 import { foldKey } from '../markdown/keys'
 import {
+  isWikiLinkSafeText,
   mergeDateSuggestions,
   rankWikiSuggestions,
   serializeWikiSuggestionAddress,
@@ -80,6 +81,19 @@ describe('rankWikiSuggestions', () => {
   it('honours the limit after merging', () => {
     const titles = Array.from({ length: 10 }, (_, i) => note(`Note ${i}`, i))
     expect(rankWikiSuggestions('note', titles, [], 3)).toHaveLength(3)
+  })
+})
+
+describe('isWikiLinkSafeText', () => {
+  it('accepts ordinary title text', () => {
+    expect(isWikiLinkSafeText('Meeting with Ada')).toBe(true)
+    expect(isWikiLinkSafeText('')).toBe(true)
+  })
+
+  it('rejects every character that would corrupt a link, backslash included', () => {
+    for (const text of ['a[b', 'a]b', 'a|b', 'a\\b', 'a\rb', 'a\nb']) {
+      expect(isWikiLinkSafeText(text)).toBe(false)
+    }
   })
 })
 

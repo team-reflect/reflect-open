@@ -44,13 +44,13 @@ export {
   wikiLinkSafe,
   editTaskLine,
   removeTaskLine,
-  renameWikiLink,
   setTaskDueDate,
   clearTaskDueDate,
   taskLineToBullet,
   toggleTaskMarker,
   TaskStaleError,
 } from './edit'
+export { retitleWikiLinks, type WikiLinkRetitleOptions } from './retitle'
 export { displayNoteTitle, wikiLinkTargetForTitle } from './note-title'
 export { parseTaskMarker } from './task-marker'
 export {

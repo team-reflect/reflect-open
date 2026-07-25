@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { renameWikiLink } from './edit'
+import { retitleWikiLinks } from './retitle'
 import { parseNote } from './extract'
 
 /**
@@ -42,15 +42,19 @@ describe('markdown corpus', () => {
   })
 })
 
+function retitle(fromKey: string, to: string) {
+  return { repoint: { fromKey, to }, display: null, subjectTargetKeys: new Set<string>() }
+}
+
 describe('edits are non-destructive', () => {
   it('renaming a non-existent target is byte-identical across the whole corpus', () => {
     for (const source of Object.values(CORPUS)) {
-      expect(renameWikiLink(source, 'Nonexistent', 'Whatever')).toBe(source)
+      expect(retitleWikiLinks(source, retitle('nonexistent', 'Whatever'))).toBe(source)
     }
   })
 
   it('preserves CRLF line endings outside the edited span', () => {
-    const renamed = renameWikiLink(CORPUS.crlf, 'Wiki', 'Renamed')
+    const renamed = retitleWikiLinks(CORPUS.crlf, retitle('wiki', 'Renamed'))
     expect(renamed).toBe('# Title\r\n\r\nA [[Renamed]] link.\r\n')
   })
 })
