@@ -41,7 +41,11 @@ interface FakeOptions {
   failIndexApply?: boolean
   /** Hold the listen promise until `release()` (the teardown-race window). */
   gateListen?: boolean
+  /** Make the watcher subscription throw (the unusable-watcher path). */
+  failListen?: boolean
   failStatus?: boolean
+  /** Make the keychain read throw (locked keychain, stale ACL after re-signing). */
+  failSecretGet?: boolean
   /** Scripted `git_merge_remote` outcome (defaults to up-to-date). */
   mergeOutcome?: unknown
   /** Per-call merge outcomes for retry/convergence tests. */
@@ -90,6 +94,9 @@ function fakeBridge(options: FakeOptions = {}) {
           status.remoteUrl = typeof args['remoteUrl'] === 'string' ? args['remoteUrl'] : null
           return status
         case 'secret_get':
+          if (options.failSecretGet === true) {
+            throw { kind: 'io', message: 'keychain unavailable' }
+          }
           return auth
         case 'secret_delete':
           auth = null
@@ -131,6 +138,9 @@ function fakeBridge(options: FakeOptions = {}) {
       }
     },
     listen: async () => {
+      if (options.failListen === true) {
+        throw { kind: 'io', message: 'watcher unavailable' }
+      }
       if (options.gateListen === true) {
         await new Promise<void>((resolve) => {
           releaseListen = resolve
@@ -146,6 +156,10 @@ function fakeBridge(options: FakeOptions = {}) {
     releaseListen: () => releaseListen?.(),
     releaseIndexApply: () => releaseIndexApply?.(),
   }
+}
+
+function commitCount(calls: string[]): number {
+  return calls.filter((command) => command === 'git_commit_all').length
 }
 
 function trackStates(controller: ReturnType<typeof createBackupController>): BackupState[] {
@@ -176,8 +190,6 @@ describe('createBackupController', () => {
   })
 
   it('keeps committing on edits after the GitHub credential is gone', async () => {
-    const commitCount = (calls: string[]): number =>
-      calls.filter((command) => command === 'git_commit_all').length
     const { calls } = fakeBridge({ auth: null })
     const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
     await controller.start()
@@ -256,15 +268,55 @@ describe('createBackupController', () => {
       expect(state.status.message).toContain('git remote set-url')
     }
 
-    // No *sync* engine: local history still commits, but focus events buy no
-    // network work — the remote stays unadopted until the user fixes the URL.
+    // No *sync* engine: the launch snapshot is local history's only commit,
+    // and focus buys nothing further, because the resume triggers belong to
+    // the sync engine that never started. The remote stays unadopted, and
+    // nothing on this path may touch the network.
+    await vi.waitFor(() => {
+      expect(commitCount(calls)).toBe(1)
+    })
     window.dispatchEvent(new Event('focus'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(commitCount(calls)).toBe(1)
+    expect(calls).not.toContain('git_fetch')
+    expect(calls).not.toContain('git_push')
+    controller.dispose()
+  })
+
+  it('keeps the SSH suggestion when local history cannot start', async () => {
+    // Local history is best effort: a watcher that won't come up must not cost
+    // the user the one instruction they have for fixing the remote.
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    fakeBridge({ remoteUrl: 'https://gitlab.com/alex/notes.git', failListen: true })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+
+    expect(controller.getState()).toMatchObject({
+      phase: 'connected',
+      repo: null,
+      status: { state: 'error', errorKind: 'rejected' },
+    })
+    controller.dispose()
+    errorSpy.mockRestore()
+  })
+
+  it('keeps local history when the keychain itself cannot be read', async () => {
+    // A keychain read that throws is the same user-visible situation as a
+    // missing credential, so it must not fail the whole start into the
+    // engine-less catch and take the graph's history with it.
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { calls } = fakeBridge({ failSecretGet: true })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+
+    expect(controller.getState()).toEqual({ phase: 'disconnected' })
     await vi.waitFor(() => {
       expect(calls).toContain('git_commit_all')
     })
     expect(calls).not.toContain('git_fetch')
     expect(calls).not.toContain('git_push')
     controller.dispose()
+    errorSpy.mockRestore()
   })
 
   it('runs the launch pull when fully connected — and skips the idle push', async () => {
@@ -317,8 +369,6 @@ describe('createBackupController', () => {
 
   it('local history keeps committing on edits — still with no network', async () => {
     // A repo without a remote (e.g. after disconnectGraph) needs no git_setup.
-    const commitCount = (calls: string[]): number =>
-      calls.filter((command) => command === 'git_commit_all').length
     const { calls } = fakeBridge({ auth: null, remoteUrl: null })
     const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
     await controller.start()
@@ -573,9 +623,6 @@ describe('createBackupController', () => {
   })
 
   it('an edit backs up after 30s idle on desktop, 10s on mobile', async () => {
-    const commitCount = (calls: string[]): number =>
-      calls.filter((command) => command === 'git_commit_all').length
-
     async function debouncedCommitDelay(mobile: boolean): Promise<number> {
       setPlatformSurface({ mobileApp: mobile })
       const { calls } = fakeBridge()

@@ -243,35 +243,52 @@ export function createBackupController(options: BackupControllerOptions): Backup
    * Git history and stays revertable — nothing is ever fetched or pushed.
    * Connecting a backup later adopts this repository, history included.
    *
-   * This covers *every* desktop path that ends without a syncing engine, not
+   * This runs on the desktop paths that end without a syncing engine, not
    * just "no remote": a graph whose `origin` is a GitHub repo the machine is
    * no longer signed in to, and one whose remote we refuse to adopt, both
    * keep committing locally. Otherwise a signed-out remote silently downgrades
    * the graph to no history at all — worse than never having connected one.
+   * The one no-engine path it deliberately skips is a failed `gitStatus`,
+   * which leaves the repo state unknown: `gitSetup` there could initialize a
+   * repository on a broken graph. A failed *credential* read is not that case,
+   * so `start()` degrades it to the signed-out path above instead.
+   *
+   * Starting it is best effort. It must never take down the state the caller
+   * just published: the SSH-only `rejected` message is the user's only
+   * instruction for fixing that remote, and losing it to a watcher that
+   * happened not to come up would be the worse trade.
    */
   async function startLocalHistory(initialized: boolean): Promise<void> {
     if (isMobileSurface()) {
       return
     }
-    if (!initialized) {
-      await gitSetup(null, null, generation)
+    try {
+      if (!initialized) {
+        await gitSetup(null, null, generation)
+      }
+      const next = createSyncEngine({
+        generation,
+        localOnly: true,
+        getToken: async () => null,
+        onStatus: (engineStatus) => {
+          // No UI surfaces local history, so a failing commit loop (disk full,
+          // corrupted repo) must at least leave a trace for diagnosis.
+          if (engineStatus.state === 'error') {
+            console.error('local history commit failed:', engineStatus.message)
+          }
+        },
+      })
+      if (!(await adoptEngine(next))) {
+        return
+      }
+      void next.syncNow() // first snapshot: commit whatever is already pending
+    } catch (error) {
+      // `adoptEngine` assigns the engine before its first await, so a
+      // half-built lifecycle takes the same teardown as every other failure.
+      // No zombie engine keeps timers alive behind the caller's state.
+      teardown()
+      console.error('local history failed to start:', errorMessage(error))
     }
-    const next = createSyncEngine({
-      generation,
-      localOnly: true,
-      getToken: async () => null,
-      onStatus: (engineStatus) => {
-        // No UI surfaces local history, so a failing commit loop (disk full,
-        // corrupted repo) must at least leave a trace for diagnosis.
-        if (engineStatus.state === 'error') {
-          console.error('local history commit failed:', engineStatus.message)
-        }
-      },
-    })
-    if (!(await adoptEngine(next))) {
-      return
-    }
-    void next.syncNow() // first snapshot: commit whatever is already pending
   }
 
   async function start(): Promise<void> {
@@ -281,7 +298,17 @@ export function createBackupController(options: BackupControllerOptions): Backup
     }
     setState({ phase: 'loading' })
     try {
-      const [status, auth] = await Promise.all([gitStatus(generation), loadGithubAuth()])
+      const [status, auth] = await Promise.all([
+        gitStatus(generation),
+        // A keychain the app can't read is indistinguishable from a signed-out
+        // one as far as backup is concerned, and must not cost the graph its
+        // history: degrade to the signed-out path below rather than failing
+        // the whole start into the engine-less catch.
+        loadGithubAuth().catch((error: unknown) => {
+          console.error('reading the GitHub credential failed:', errorMessage(error))
+          return null
+        }),
+      ])
       if (disposed) {
         return
       }
