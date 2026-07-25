@@ -164,8 +164,10 @@ export async function* streamChatTurn(
       prepareStep: ({ stepNumber }) =>
         stepNumber >= MAX_STEPS - 1 ? { toolChoice: 'none' } : {},
       ...(options.signal !== undefined ? { abortSignal: options.signal } : {}),
+      // `step.response.messages` holds only the messages that step created,
+      // so the running history is accumulated here rather than assigned.
       onStepFinish: (step) => {
-        stepMessages = [...step.response.messages]
+        stepMessages = [...stepMessages, ...step.response.messages]
       },
     })
 
@@ -208,8 +210,7 @@ export async function* streamChatTurn(
       }
     }
 
-    const response = await result.response
-    yield { type: 'complete', messages: response.messages }
+    yield { type: 'complete', messages: await result.responseMessages }
   } catch (cause) {
     // Belt and braces: most failures surface as `error` parts above, but a
     // synchronous throw (bad config, aborted before first byte) lands here.
