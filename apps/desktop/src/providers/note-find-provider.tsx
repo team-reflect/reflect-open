@@ -3,8 +3,8 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type ReactElement,
   type ReactNode,
@@ -58,28 +58,34 @@ const NoteFindReportContext = createContext<(path: string, status: SearchStatus)
 
 /** One note-local Find session for the current webview window. */
 export function NoteFindProvider({ children }: { children: ReactNode }): ReactElement {
-  const { route } = useRouter()
+  const { route, arrivalSeq } = useRouter()
   const today = useToday()
   const focusedDailyDate = useFocusedDailyDate()
   const notePath = focusedNotePathForRoute(route, today, focusedDailyDate)
 
-  const [target, setTarget] = useState<string | null>(null)
+  const [session, setSession] = useState<{ path: string; arrival: number } | null>(null)
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<SearchStatus>(NO_MATCHES)
   const [focusRequest, setFocusRequest] = useState(0)
-  const [pendingStep, setPendingStep] = useState(0)
+  // Set by ⌘G on a closed bar, consumed once the pane has applied the query.
+  const pendingStepRef = useRef(0)
 
-  // Navigating away ends the session before paint, so no stale count shows.
-  useLayoutEffect(() => {
-    setTarget((current) => (current === notePath ? current : null))
-  }, [notePath])
+  // The session belongs to one note reached by one navigation, so leaving that
+  // note (or arriving at it again) ends it with no teardown of its own.
+  const target =
+    session !== null && session.path === notePath && session.arrival === arrivalSeq
+      ? session.path
+      : null
 
-  const openForPath = useCallback((path: string | null): boolean => {
-    if (path === null) return false
-    setTarget(path)
-    setFocusRequest((request) => request + 1)
-    return true
-  }, [])
+  const openForPath = useCallback(
+    (path: string | null): boolean => {
+      if (path === null) return false
+      setSession({ path, arrival: arrivalSeq })
+      setFocusRequest((request) => request + 1)
+      return true
+    },
+    [arrivalSeq],
+  )
 
   const stepIn = useCallback((path: string, step: 1 | -1): void => {
     const handle = noteEditorHandleFor(path)
@@ -95,23 +101,24 @@ export function NoteFindProvider({ children }: { children: ReactNode }): ReactEl
       }
       // ⌘G with the bar closed resumes the last query, then advances once the
       // pane has pushed it into the editor.
-      if (query.length > 0 && openForPath(notePath)) setPendingStep(step)
+      if (query.length > 0 && openForPath(notePath)) pendingStepRef.current = step
     },
     [notePath, openForPath, query, stepIn, target],
   )
 
-  // The pane's own effect runs first (child effects precede the parent's), so
-  // the resumed query is already in the editor by the time this runs.
+  // Runs when a session opens. The pane's own effect went first (child effects
+  // precede the parent's), so a resumed query is already in the editor here.
   useEffect(() => {
-    if (pendingStep === 0 || target === null) return
-    setPendingStep(0)
-    stepIn(target, pendingStep > 0 ? 1 : -1)
-  }, [pendingStep, stepIn, target])
+    const step = pendingStepRef.current
+    if (step === 0 || target === null) return
+    pendingStepRef.current = 0
+    stepIn(target, step > 0 ? 1 : -1)
+  }, [stepIn, target])
 
   const close = useCallback(
     (restoreFocus: boolean): void => {
       const handle = target === null ? null : noteEditorHandleFor(target)
-      setTarget(null)
+      setSession(null)
       setStatus(NO_MATCHES)
       if (restoreFocus) handle?.focus()
     },

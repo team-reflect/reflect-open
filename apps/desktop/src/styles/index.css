@@ -267,9 +267,6 @@ html:root {
   --meowdown-node-outline: var(--accent);
   --meowdown-node-selection: var(--accent-soft, rgb(99 102 241 / 12%));
   --meowdown-selection: var(--accent-soft, rgb(99 102 241 / 12%));
-  /* Find highlights: every match, and the one the caret sits on. */
-  --meowdown-find-match: color-mix(in srgb, var(--accent) 16%, transparent);
-  --meowdown-find-match-active: var(--accent-soft);
   /* Floating menus (top layer): background is Reflect's surface; the highlighted
      row uses accent-soft, matching the ⌘K palette's selected item. */
   --meowdown-popover-bg: var(--surface);
