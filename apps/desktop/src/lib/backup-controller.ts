@@ -238,11 +238,16 @@ export function createBackupController(options: BackupControllerOptions): Backup
   }
 
   /**
-   * Local history (desktop only): a graph with no remote still gets a
-   * repository and the debounced commit loop, so every edit lands in Git
-   * history and stays revertable — nothing is ever fetched or pushed, and
-   * the UI stays `disconnected`. Connecting a backup later adopts this
-   * repository, history included.
+   * Local history (desktop only): a graph the sync engine can't run for still
+   * gets a repository and the debounced commit loop, so every edit lands in
+   * Git history and stays revertable — nothing is ever fetched or pushed.
+   * Connecting a backup later adopts this repository, history included.
+   *
+   * This covers *every* desktop path that ends without a syncing engine, not
+   * just "no remote": a graph whose `origin` is a GitHub repo the machine is
+   * no longer signed in to, and one whose remote we refuse to adopt, both
+   * keep committing locally. Otherwise a signed-out remote silently downgrades
+   * the graph to no history at all — worse than never having connected one.
    */
   async function startLocalHistory(initialized: boolean): Promise<void> {
     if (isMobileSurface()) {
@@ -292,6 +297,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
         // Generic remotes adopt without it — their credentials live with the
         // user's own git tooling (ssh agent), not in our keychain.
         setState({ phase: 'disconnected' })
+        await startLocalHistory(status.initialized)
         return
       }
       if (repo === null && /^https?:\/\//i.test(remoteUrl)) {
@@ -311,6 +317,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
               'HTTPS isn’t supported for this host yet — switch the remote to its SSH form: git remote set-url origin git@<host>:<owner>/<repo>.git',
           },
         })
+        await startLocalHistory(status.initialized)
         return
       }
       const next = createSyncEngine({

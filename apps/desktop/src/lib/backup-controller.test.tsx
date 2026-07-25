@@ -155,13 +155,45 @@ function trackStates(controller: ReturnType<typeof createBackupController>): Bac
 }
 
 describe('createBackupController', () => {
-  it('reports disconnected when no credential is stored', async () => {
+  it('reports disconnected when no credential is stored — but keeps local history', async () => {
+    // Signing out of GitHub (or a lapsed credential) stops the *backup*, not
+    // the note history: the graph already has a repo, so the commit-only loop
+    // takes over. Losing history here is a silent downgrade the user never
+    // asked for.
     const { calls } = fakeBridge({ auth: null })
     const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
     await controller.start()
 
     expect(controller.getState()).toEqual({ phase: 'disconnected' })
-    expect(calls).not.toContain('git_commit_all')
+    await vi.waitFor(() => {
+      expect(calls).toContain('git_commit_all')
+    })
+    // The repo is already initialized, and nothing may touch the network.
+    expect(calls).not.toContain('git_setup')
+    expect(calls).not.toContain('git_fetch')
+    expect(calls).not.toContain('git_push')
+    controller.dispose()
+  })
+
+  it('keeps committing on edits after the GitHub credential is gone', async () => {
+    const commitCount = (calls: string[]): number =>
+      calls.filter((command) => command === 'git_commit_all').length
+    const { calls } = fakeBridge({ auth: null })
+    const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
+    await controller.start()
+    await vi.waitFor(() => {
+      expect(commitCount(calls)).toBe(1)
+    })
+
+    vi.useFakeTimers()
+    try {
+      emitFileChanges([{ path: 'notes/edited.md', kind: 'upsert', modifiedMs: 1 }])
+      await vi.advanceTimersByTimeAsync(30_000)
+    } finally {
+      vi.useRealTimers()
+    }
+    expect(commitCount(calls)).toBe(2)
+    expect(calls).not.toContain('git_push')
     controller.dispose()
   })
 
@@ -224,11 +256,14 @@ describe('createBackupController', () => {
       expect(state.status.message).toContain('git remote set-url')
     }
 
-    // No engine: no git work now, and focus events stay inert.
+    // No *sync* engine: local history still commits, but focus events buy no
+    // network work — the remote stays unadopted until the user fixes the URL.
     window.dispatchEvent(new Event('focus'))
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(calls).not.toContain('git_commit_all')
+    await vi.waitFor(() => {
+      expect(calls).toContain('git_commit_all')
+    })
     expect(calls).not.toContain('git_fetch')
+    expect(calls).not.toContain('git_push')
     controller.dispose()
   })
 
