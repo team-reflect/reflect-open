@@ -607,7 +607,7 @@ describe('ChatScreen', () => {
     expect(streamChat.mock.lastCall?.[0]?.messages.at(-1)).toEqual({
       role: 'user',
       content: [
-        { type: 'image', image: 'data:image/png;base64,iVBORw==', mediaType: 'image/png' },
+        { type: 'file', data: 'data:image/png;base64,iVBORw==', mediaType: 'image/png' },
       ],
     })
     // The queue cleared; the photo now lives in the transcript bubble.
