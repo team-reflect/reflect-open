@@ -56,24 +56,48 @@ const DAILY_PATH_RE = /^daily\/(\d{4}-\d{2}-\d{2})\.md$/
 /** A bare ISO date (`YYYY-MM-DD`). */
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
+/**
+ * Is this a real calendar date, not merely a `YYYY-MM-DD`-shaped string?
+ * `daily/2026-02-31.md` is a legal filename and an ordinary note; it must
+ * never claim a date that no calendar has. Rejects well-formatted but invalid
+ * dates (e.g. 2026-13-99) by round-tripping through UTC and comparing the
+ * components.
+ */
+export function isCalendarDate(date: string): boolean {
+  if (!ISO_DATE_RE.test(date)) {
+    return false
+  }
+  // The regex guarantees three numeric parts, so the destructure can't yield
+  // undefined.
+  const [year, month, day] = date.split('-').map(Number) as [number, number, number]
+  const utc = new Date(Date.UTC(year, month - 1, day))
+  return (
+    utc.getUTCFullYear() === year && utc.getUTCMonth() === month - 1 && utc.getUTCDate() === day
+  )
+}
+
 /** Graph-relative path to a daily note for an ISO `YYYY-MM-DD` date. */
 export function dailyPath(date: string): string {
   if (!ISO_DATE_RE.test(date)) {
     throw new Error(`dailyPath expects an ISO YYYY-MM-DD date, got: ${date}`)
   }
-  // Reject well-formatted but invalid dates (e.g. 2026-13-99, 2026-02-31) by
-  // round-tripping through UTC and comparing the components. The regex above
-  // guarantees three numeric parts, so the destructure can't yield undefined.
-  const [year, month, day] = date.split('-').map(Number) as [number, number, number]
-  const utc = new Date(Date.UTC(year, month - 1, day))
-  if (
-    utc.getUTCFullYear() !== year ||
-    utc.getUTCMonth() !== month - 1 ||
-    utc.getUTCDate() !== day
-  ) {
+  if (!isCalendarDate(date)) {
     throw new Error(`dailyPath expects a valid calendar date, got: ${date}`)
   }
   return `${DAILY_DIR}/${date}.md`
+}
+
+/**
+ * Fold a graph-relative path for case-insensitive comparison. NFC first
+ * (macOS hands back NFD for some filenames), then the same ASCII-only
+ * lowering {@link classifyGraphPath} uses.
+ *
+ * Deliberately not `foldKey`: a path key is compared against values the Rust
+ * side folds with `eq_ignore_ascii_case`, so folding characters Rust leaves
+ * alone (KELVIN SIGN to k) would split one file into two keys.
+ */
+export function foldGraphPath(path: string): string {
+  return asciiLowerCase(path.normalize('NFC'))
 }
 
 /** Graph-relative path to a regular note for a filename slug (without `.md`). */

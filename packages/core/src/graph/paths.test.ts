@@ -7,7 +7,9 @@ import {
   classifyGraphPath,
   dailyPath,
   dateFromDailyPath,
+  foldGraphPath,
   isAttachmentPath,
+  isCalendarDate,
   isDaily,
   isNotePath,
   isSafeVisibleGraphPath,
@@ -120,5 +122,28 @@ describe('graph paths', () => {
   it('extracts the date from a daily path, else null', () => {
     expect(dateFromDailyPath('daily/2026-06-09.md')).toBe('2026-06-09')
     expect(dateFromDailyPath('notes/foo.md')).toBeNull()
+  })
+})
+
+describe('isCalendarDate', () => {
+  it('accepts a real date and rejects an impossible one', () => {
+    expect(isCalendarDate('2026-07-26')).toBe(true)
+    expect(isCalendarDate('2026-02-29')).toBe(false)
+    expect(isCalendarDate('2026-02-31')).toBe(false)
+    expect(isCalendarDate('2026-13-01')).toBe(false)
+    expect(isCalendarDate('not-a-date')).toBe(false)
+  })
+})
+
+describe('foldGraphPath', () => {
+  it('lowers ASCII only, matching the Rust byte fold', () => {
+    expect(foldGraphPath('Projects/Plan.MD')).toBe('projects/plan.md')
+    // KELVIN SIGN survives: Rust's eq_ignore_ascii_case leaves it alone, so
+    // folding it here would split one file into two keys.
+    expect(foldGraphPath('\u212a.md')).toBe('\u212a.md')
+  })
+
+  it('normalizes NFD to NFC before folding', () => {
+    expect(foldGraphPath('Cafe\u0301.md')).toBe('caf\u00e9.md')
   })
 })
