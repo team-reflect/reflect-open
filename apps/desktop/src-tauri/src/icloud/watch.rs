@@ -51,6 +51,19 @@ pub fn icloud_watch_stop(app: tauri::AppHandle) -> AppResult<()> {
     platform::stop(app)
 }
 
+/// The paths the live metadata query currently flags as carrying unresolved
+/// conflict versions — the scoped conflict sweep's candidate set. `None`
+/// whenever the query cannot answer completely (no watch installed, or the
+/// gather round hasn't seeded the view yet); callers must treat `None` as
+/// "check everything". The set may run momentarily stale in the harmless
+/// direction only: a just-resolved path lingers until its update round lands
+/// (an extra no-op check), while a new conflict is always in the set before
+/// the `icloud:conflicts` signal that triggers a sweep, because both come
+/// from the same notification round.
+pub(crate) fn conflicted_paths() -> Option<std::collections::HashSet<String>> {
+    platform::conflicted_paths()
+}
+
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 mod platform {
     use std::collections::{HashMap, HashSet};
@@ -117,6 +130,20 @@ mod platform {
     static SNAPSHOT: LazyLock<Mutex<HashMap<String, TrackedState>>> =
         LazyLock::new(|| Mutex::new(HashMap::new()));
 
+    /// Paths the provider currently flags as carrying unresolved conflict
+    /// versions — maintained by the same rounds that emit `icloud:conflicts`,
+    /// and consumed by the scoped conflict sweep so it checks `NSFileVersion`
+    /// only where the provider says a conflict exists instead of once per
+    /// note. Valid only once [`GATHERED`] is set: before the gather round the
+    /// set is empty for the wrong reason.
+    static CONFLICTED: LazyLock<Mutex<HashSet<String>>> =
+        LazyLock::new(|| Mutex::new(HashSet::new()));
+
+    /// True once the current watch's gather round has seeded a complete
+    /// view. Cleared on install and teardown — a stopped or restarted watch
+    /// must answer "unknown", never "no conflicts".
+    static GATHERED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
     /// Content-change date last download-requested, per graph-relative path.
     /// The OS treats repeat requests as no-ops, but *issuing* them is not
     /// free: during an initial sync every update round used to re-request
@@ -172,6 +199,9 @@ mod platform {
     /// caller is a main-thread closure, which is what serializes teardown
     /// against installs.
     fn teardown_active(mtm: MainThreadMarker) {
+        // A stopped watch must answer "unknown", never "no conflicts".
+        GATHERED.store(false, std::sync::atomic::Ordering::SeqCst);
+        CONFLICTED.lock().expect("conflict lock").clear();
         let Some(bound) = ACTIVE.lock().expect("watch lock").take() else {
             return;
         };
@@ -217,6 +247,8 @@ mod platform {
         }
         SNAPSHOT.lock().expect("snapshot lock").clear();
         NUDGED.lock().expect("nudge lock").clear();
+        CONFLICTED.lock().expect("conflict lock").clear();
+        GATHERED.store(false, Ordering::SeqCst);
         let query = NSMetadataQuery::new();
         query.setNotificationBatchingInterval(UPDATE_BATCHING_INTERVAL_S);
 
@@ -441,6 +473,35 @@ mod platform {
             .collect()
     }
 
+    /// Fold one round's items into the conflicted-path set: a reported item
+    /// enters or leaves by its flag, a removed item leaves. Pure, so the set
+    /// semantics are unit-testable next to [`apply_update_delta`]'s.
+    fn apply_conflict_delta(
+        conflicted: &mut HashSet<String>,
+        upserted: &[ItemState],
+        removed: &[String],
+    ) {
+        for item in upserted {
+            if item.conflict {
+                conflicted.insert(item.rel.clone());
+            } else {
+                conflicted.remove(&item.rel);
+            }
+        }
+        for rel in removed {
+            conflicted.remove(rel);
+        }
+    }
+
+    /// The scoped sweep's candidate set — see the outer
+    /// [`super::conflicted_paths`] for the contract.
+    pub(crate) fn conflicted_paths() -> Option<HashSet<String>> {
+        if !GATHERED.load(std::sync::atomic::Ordering::SeqCst) {
+            return None;
+        }
+        Some(CONFLICTED.lock().expect("conflict lock").clone())
+    }
+
     /// One gathering/update round. Updates apply the notification's own
     /// added/changed/removed delta — O(changed items); a full results
     /// enumeration here would be O(all items) per round, O(n²) across an
@@ -526,6 +587,10 @@ mod platform {
                 nudged.remove(rel);
             }
         }
+        {
+            let mut conflicted = CONFLICTED.lock().expect("conflict lock");
+            apply_conflict_delta(&mut conflicted, upserted, removed);
+        }
         Round {
             changes,
             conflicts: conflicted_rels(upserted),
@@ -572,6 +637,14 @@ mod platform {
                 .collect();
             apply_update_delta(&mut snapshot, &items, &removed)
         };
+        {
+            // A full listing is authoritative — rebuild the set wholesale,
+            // and only a full listing may declare the view complete.
+            let mut conflicted = CONFLICTED.lock().expect("conflict lock");
+            conflicted.clear();
+            apply_conflict_delta(&mut conflicted, &items, &[]);
+        }
+        GATHERED.store(true, std::sync::atomic::Ordering::SeqCst);
         Round {
             changes,
             conflicts: conflicted_rels(&items),
@@ -701,10 +774,10 @@ mod platform {
     #[cfg(test)]
     mod tests {
         use super::{
-            apply_update_delta, plan_nudges, root_variants, tracked_note_relpath, ItemState,
-            TrackedState,
+            apply_conflict_delta, apply_update_delta, plan_nudges, root_variants,
+            tracked_note_relpath, ItemState, TrackedState,
         };
-        use std::collections::HashMap;
+        use std::collections::{HashMap, HashSet};
 
         fn state(entries: &[(&str, TrackedState)]) -> HashMap<String, TrackedState> {
             entries
@@ -738,6 +811,32 @@ mod platform {
                 .collect();
             shapes.sort();
             shapes
+        }
+
+        #[test]
+        fn conflict_set_tracks_flags_across_rounds() {
+            let mut conflicted: HashSet<String> = HashSet::new();
+            let mut flagged = item("notes/a.md", true, Some(1));
+            flagged.conflict = true;
+
+            // A flagged report enters the set and stays across later rounds
+            // that don't mention the path.
+            apply_conflict_delta(&mut conflicted, std::slice::from_ref(&flagged), &[]);
+            apply_conflict_delta(
+                &mut conflicted,
+                &[item("notes/other.md", true, Some(2))],
+                &[],
+            );
+            assert!(conflicted.contains("notes/a.md"));
+
+            // Resolution (the flag dropping) leaves the set…
+            apply_conflict_delta(&mut conflicted, &[item("notes/a.md", true, Some(3))], &[]);
+            assert!(!conflicted.contains("notes/a.md"));
+
+            // …and so does the file disappearing from the listing.
+            apply_conflict_delta(&mut conflicted, std::slice::from_ref(&flagged), &[]);
+            apply_conflict_delta(&mut conflicted, &[], &["notes/a.md".to_string()]);
+            assert!(conflicted.is_empty());
         }
 
         #[test]
@@ -963,5 +1062,10 @@ mod platform {
 
     pub fn stop(_app: tauri::AppHandle) -> AppResult<()> {
         Ok(())
+    }
+
+    /// No query, no view — "unknown", so scoped sweeps fall back to full.
+    pub(crate) fn conflicted_paths() -> Option<std::collections::HashSet<String>> {
+        None
     }
 }

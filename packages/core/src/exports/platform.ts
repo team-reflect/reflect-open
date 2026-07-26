@@ -17,6 +17,7 @@ export {
   type AppPlatform,
   type IcloudDownloadScope,
   type IcloudScanOptions,
+  type IcloudSweepScope,
   type IcloudStatus,
   type IcloudSweepOutcome,
   type MobileStorageInfo,

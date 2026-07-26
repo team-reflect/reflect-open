@@ -11,6 +11,7 @@ import {
   subscribeOwnWrites,
   type FileChange,
   type GraphInfo,
+  type IcloudSweepScope,
 } from '@reflect/core'
 import { dirtyOpenPaths } from '@/editor/open-documents'
 import { throttledInvalidateIndexQueries } from '@/lib/query-client'
@@ -116,14 +117,29 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
    */
   let queuedScan: 'prompt' | 'ingest' | null = null
   let lastScanEndedAt = 0
+  /**
+   * Version-check coverage for the next sweep. `'full'` is sticky until a
+   * sweep consumes it — a resume request must not be narrowed by a later
+   * conflict signal — and the initial baseline sweep starts full. After each
+   * sweep the scope relaxes to `'candidates'` (the watch's conflicted set;
+   * Rust degrades it to full whenever the watch can't answer), and a failed
+   * sweep re-arms `'full'` so the retry is thorough.
+   */
+  let nextScanScope: IcloudSweepScope = 'full'
 
   function scanSuspended(): boolean {
     return emitFileChangesFromWatch && document.visibilityState === 'hidden'
   }
 
-  function scheduleScan(delayMs: number = SCAN_DEBOUNCE_MS): void {
+  function scheduleScan(
+    delayMs: number = SCAN_DEBOUNCE_MS,
+    scope: IcloudSweepScope = 'full',
+  ): void {
     if (disposed || scanSuspended()) {
       return
+    }
+    if (scope === 'full') {
+      nextScanScope = 'full' // sticky until a sweep consumes it
     }
     if (scanRunning) {
       const requested = delayMs <= SCAN_DEBOUNCE_MS ? 'prompt' : 'ingest'
@@ -145,10 +161,16 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
   }
 
   /** Arrival-triggered sweeps: the wide debounce, stretched further to keep
-   * {@link INGEST_SCAN_MIN_SPACING_MS} from the previous sweep's end. */
+   * {@link INGEST_SCAN_MIN_SPACING_MS} from the previous sweep's end. Scoped
+   * to the watch's conflict candidates — during a bulk sync these fire every
+   * spacing window, and a full per-note version check each time was the
+   * sweep's dominant cost on a large graph. */
   function scheduleIngestScan(): void {
     const sinceLastScan = Date.now() - lastScanEndedAt
-    scheduleScan(Math.max(INGEST_SCAN_DEBOUNCE_MS, INGEST_SCAN_MIN_SPACING_MS - sinceLastScan))
+    scheduleScan(
+      Math.max(INGEST_SCAN_DEBOUNCE_MS, INGEST_SCAN_MIN_SPACING_MS - sinceLastScan),
+      'candidates',
+    )
   }
 
   async function runScan(): Promise<void> {
@@ -166,12 +188,15 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
     pendingIngest = new Set()
     const recordBaseline = baselinePending
     baselinePending = false
+    const scope = recordBaseline ? 'full' : nextScanScope
+    nextScanScope = 'candidates' // consumed; the next full trigger re-arms it
     try {
       const outcome = await icloudConflictsScan({
         generation: graph.generation,
         skipPaths: dirtyOpenPaths(),
         ingestedPaths: ingested,
         recordBaseline,
+        scope,
       })
       if (!disposed && outcome.changed.length > 0) {
         applySweepChanges(outcome.changed)
@@ -185,6 +210,7 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
       if (recordBaseline) {
         baselinePending = true // the adoption baseline must survive a failed first sweep
       }
+      nextScanScope = 'full' // whatever failed, retry thoroughly
     } finally {
       lastScanEndedAt = Date.now()
       scanRunning = false
@@ -294,7 +320,10 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
       disposers.push(
         await subscribeIcloudConflicts(() => {
           if (!disposed) {
-            scheduleScan()
+            // The signal and the candidate set come from the same
+            // notification round, so the flagged paths are already in the
+            // watch's view — the prompt sweep needn't re-check every note.
+            scheduleScan(SCAN_DEBOUNCE_MS, 'candidates')
           }
         }),
       )

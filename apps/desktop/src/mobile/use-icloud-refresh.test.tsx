@@ -24,9 +24,16 @@ let allScopeDownloadCalls: string[]
 /** What the fake pending commands report — note placeholders remaining. */
 let pendingCount: number
 let refreshIndex: ReturnType<typeof vi.fn<() => void>>
+/** Simulated `document.visibilityState` (the use-wake-to-today pattern). */
+let visibility: DocumentVisibilityState = 'visible'
 
 beforeEach(() => {
   vi.useFakeTimers()
+  Object.defineProperty(document, 'visibilityState', {
+    configurable: true,
+    get: () => visibility,
+  })
+  visibility = 'visible'
   downloadCalls = []
   countCalls = []
   allScopeDownloadCalls = []
@@ -135,6 +142,80 @@ describe('useICloudRefresh', () => {
     })
     await flush()
     expect(countCalls).toHaveLength(2)
+  })
+
+  it('backs the poll off geometrically while notes stay pending', async () => {
+    pendingCount = 3
+    await renderHook(() => useICloudRefresh())
+    await flush()
+
+    // First wait: the 1s floor.
+    await act(async () => {
+      vi.advanceTimersByTime(999)
+    })
+    await flush()
+    expect(countCalls).toHaveLength(0)
+    await act(async () => {
+      vi.advanceTimersByTime(1)
+    })
+    await flush()
+    expect(countCalls).toHaveLength(1)
+
+    // Second wait doubles to 2s...
+    await act(async () => {
+      vi.advanceTimersByTime(1999)
+    })
+    await flush()
+    expect(countCalls).toHaveLength(1)
+    await act(async () => {
+      vi.advanceTimersByTime(1)
+    })
+    await flush()
+    expect(countCalls).toHaveLength(2)
+
+    // ...then 4s, the ceiling.
+    await act(async () => {
+      vi.advanceTimersByTime(3999)
+    })
+    await flush()
+    expect(countCalls).toHaveLength(2)
+    await act(async () => {
+      vi.advanceTimersByTime(1)
+    })
+    await flush()
+    expect(countCalls).toHaveLength(3)
+  })
+
+  it('stops polling when the app hides, and the next foreground restarts the drain', async () => {
+    pendingCount = 3
+    await renderHook(() => useICloudRefresh())
+    await flush()
+    expect(downloadCalls).toHaveLength(1)
+
+    visibility = 'hidden'
+    await act(async () => {
+      vi.advanceTimersByTime(1000)
+    })
+    await flush()
+    expect(countCalls).toHaveLength(0) // the armed tick bailed hidden
+
+    await act(async () => {
+      vi.advanceTimersByTime(60_000)
+    })
+    await flush()
+    expect(countCalls).toHaveLength(0) // and nothing re-armed behind the webview
+
+    visibility = 'visible'
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await flush()
+    expect(downloadCalls).toHaveLength(2) // the resume renudges...
+    await act(async () => {
+      vi.advanceTimersByTime(1000)
+    })
+    await flush()
+    expect(countCalls).toHaveLength(1) // ...and the poll starts over
   })
 
   it('gives up polling at the limit with one final reconcile', async () => {

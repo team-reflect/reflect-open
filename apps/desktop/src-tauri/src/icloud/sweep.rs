@@ -16,11 +16,11 @@
 //! and `record_baseline` snapshots a graph on iCloud adoption — never on
 //! local saves (see [`crate::conflict::shadow`]).
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::fs;
 use std::path::Path;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use crate::conflict::ladder::{self, ConflictInput};
@@ -67,26 +67,55 @@ pub struct SweepOutcome {
     pub auto_resolved: u32,
 }
 
+/// How much of the graph a sweep checks for unresolved versions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SweepScope {
+    /// Check every note, and run the store-housekeeping passes. The backstop
+    /// — resume, adoption baseline, and any sweep without a live watch.
+    Full,
+    /// Restrict the per-note `NSFileVersion` checks to the paths the live
+    /// metadata query flags as conflicted
+    /// ([`crate::icloud::watch::conflicted_paths`]) — each check is a
+    /// synchronous file-coordination round-trip to `fileproviderd`, and a
+    /// bulk-sync arrival sweep over a large graph paid one per note for a
+    /// listing the query already has. Degrades to `Full` whenever the watch
+    /// cannot answer completely (not installed, or pre-gather).
+    Candidates,
+}
+
 /// Command: run a conflict sweep over the generation-pinned graph.
 ///
 /// `skip_paths` — notes with dirty open sessions (the session's own conflict
 /// parking covers them until flushed). `ingested_paths` — external changes
 /// the frontend just applied cleanly; their content becomes the new shadow
 /// base. `record_baseline` — snapshot every conflict-free note as its own
-/// base (iCloud adoption).
+/// base (iCloud adoption). `scope` — how much of the graph the version
+/// checks cover ([`SweepScope`]).
 #[tauri::command]
 pub async fn icloud_conflicts_scan(
     generation: u64,
     skip_paths: Vec<String>,
     ingested_paths: Vec<String>,
     record_baseline: bool,
+    scope: SweepScope,
     state: State<'_, GraphState>,
 ) -> AppResult<SweepOutcome> {
     let started = std::time::Instant::now();
     let root = crate::fs::root_for_generation(&state, generation)?;
     let sweep_root = root.clone();
     let outcome = crate::blocking::run_blocking(move || {
-        run_sweep(&sweep_root, &skip_paths, &ingested_paths, record_baseline)
+        let candidates = match scope {
+            SweepScope::Full => None,
+            SweepScope::Candidates => crate::icloud::watch::conflicted_paths(),
+        };
+        run_sweep(
+            &sweep_root,
+            &skip_paths,
+            &ingested_paths,
+            record_baseline,
+            candidates,
+        )
     })
     .await;
     if let Ok(outcome) = &outcome {
@@ -108,11 +137,20 @@ pub async fn icloud_conflicts_scan(
 
 /// The sweep body (blocking). Pure fs + ladder logic apart from the
 /// `NSFileVersion` calls, which no-op off Apple platforms.
+///
+/// `conflict_candidates` — when `Some`, the per-note version checks cover
+/// only these paths (the metadata query's conflicted set); `None` checks
+/// everything. **Only** the version checks scope down: ingest base advances,
+/// collision folding, and the baseline all still see the full listing — and
+/// the store-housekeeping passes (orphan pruning, archive pruning) run only
+/// on unscoped sweeps, because pruning against anything less than the full
+/// live set would drop bases for merely-unlisted notes.
 fn run_sweep(
     root: &Path,
     skip_paths: &[String],
     ingested_paths: &[String],
     record_baseline: bool,
+    conflict_candidates: Option<HashSet<String>>,
 ) -> AppResult<SweepOutcome> {
     let shadow = ShadowStore::new(root);
     let skip: BTreeSet<&str> = skip_paths.iter().map(String::as_str).collect();
@@ -152,6 +190,11 @@ fn run_sweep(
     for file in &files {
         if file.placeholder {
             continue;
+        }
+        if let Some(candidates) = &conflict_candidates {
+            if !candidates.contains(&file.path) {
+                continue; // the provider says no conflict lives here
+            }
         }
         let abs = root.join(&file.path);
         let scan = unresolved_versions(&abs);
@@ -211,9 +254,15 @@ fn run_sweep(
             live.remove(change.path.as_str());
         }
     }
-    shadow.prune_orphans(&live);
-
-    archive::prune(root);
+    // Housekeeping only on unscoped sweeps: `live` is correct either way
+    // (built from the full listing above), but pruning is pure maintenance
+    // — external deletions' orphaned bases and aged archive entries can
+    // wait for the next resume's full sweep instead of running on every
+    // 30-second arrival sweep of a bulk sync.
+    if conflict_candidates.is_none() {
+        shadow.prune_orphans(&live);
+        archive::prune(root);
+    }
     Ok(outcome)
 }
 
@@ -757,7 +806,7 @@ mod tests {
             .record("daily/2026-07-04 2.md", "# Day\n\n- from phone\n")
             .unwrap();
 
-        let outcome = run_sweep(root.path(), &[], &[], false).unwrap();
+        let outcome = run_sweep(root.path(), &[], &[], false, None).unwrap();
 
         assert_eq!(outcome.auto_resolved, 1);
         assert!(outcome.needs_review.is_empty());
@@ -803,7 +852,7 @@ mod tests {
             .record("daily/2026-07-04.md", "- old lineage\n")
             .unwrap();
 
-        let outcome = run_sweep(root.path(), &[], &[], false).unwrap();
+        let outcome = run_sweep(root.path(), &[], &[], false, None).unwrap();
 
         assert!(root.path().join("daily/2026-07-04.md").exists());
         assert!(!root.path().join("daily/2026-07-04 2.md").exists());
@@ -825,7 +874,7 @@ mod tests {
         write(root.path(), "daily/.2026-07-04.md.icloud", "stub");
         write(root.path(), "daily/2026-07-04 2.md", "- phone only\n");
 
-        let outcome = run_sweep(root.path(), &[], &[], false).unwrap();
+        let outcome = run_sweep(root.path(), &[], &[], false, None).unwrap();
 
         assert!(!root.path().join("daily/2026-07-04.md").exists());
         assert!(root.path().join("daily/2026-07-04 2.md").exists());
@@ -850,7 +899,7 @@ mod tests {
             "- shared\n- phone wording\n- common tail\n",
         );
 
-        let outcome = run_sweep(root.path(), &[], &[], false).unwrap();
+        let outcome = run_sweep(root.path(), &[], &[], false, None).unwrap();
 
         assert_eq!(
             outcome.needs_review,
@@ -869,7 +918,7 @@ mod tests {
         write(root.path(), "notes/chapter.md", "# Chapter\n");
         write(root.path(), "notes/chapter 2.md", "# Chapter 2\n");
 
-        let outcome = run_sweep(root.path(), &[], &[], false).unwrap();
+        let outcome = run_sweep(root.path(), &[], &[], false, None).unwrap();
 
         assert!(outcome.changed.is_empty());
         assert_eq!(
@@ -889,11 +938,45 @@ mod tests {
             &["daily/2026-07-04.md".to_string()],
             &[],
             false,
+            None,
         )
         .unwrap();
 
         assert_eq!(outcome.deferred, vec!["daily/2026-07-04 2.md".to_string()]);
         assert!(root.path().join("daily/2026-07-04 2.md").exists());
+    }
+
+    #[test]
+    fn scoped_sweeps_defer_housekeeping_to_the_next_full_sweep() {
+        let root = graph();
+        write(root.path(), "notes/a.md", "# a\n");
+        // Record a base, then delete the note externally — an orphaned base.
+        run_sweep(root.path(), &[], &["notes/a.md".to_string()], false, None).unwrap();
+        assert!(ShadowStore::new(root.path()).base("notes/a.md").is_some());
+        fs::remove_file(root.path().join("notes/a.md")).unwrap();
+
+        // A candidate-scoped sweep leaves the orphan alone (pruning against
+        // its narrower view would be wrong; deferring it is safe)…
+        run_sweep(root.path(), &[], &[], false, Some(HashSet::new())).unwrap();
+        assert!(ShadowStore::new(root.path()).base("notes/a.md").is_some());
+
+        // …and the next full sweep prunes it.
+        run_sweep(root.path(), &[], &[], false, None).unwrap();
+        assert!(ShadowStore::new(root.path()).base("notes/a.md").is_none());
+    }
+
+    #[test]
+    fn scoped_sweeps_still_fold_collision_duplicates() {
+        // The scope narrows only the NSFileVersion checks — collision
+        // folding works from the listing and must not be skipped, or a
+        // bulk-sync's "2026-07-04 2.md" would sit unfolded until resume.
+        let root = graph();
+        write(root.path(), "daily/2026-07-04.md", "- a\n");
+        write(root.path(), "daily/2026-07-04 2.md", "- b\n");
+
+        run_sweep(root.path(), &[], &[], false, Some(HashSet::new())).unwrap();
+
+        assert!(!root.path().join("daily/2026-07-04 2.md").exists());
     }
 
     #[test]
@@ -909,6 +992,7 @@ mod tests {
             &["notes/open.md".to_string()],
             &["notes/open.md".to_string()],
             true, // even an adoption baseline must respect the dirty skip
+            None,
         )
         .unwrap();
 
@@ -927,6 +1011,7 @@ mod tests {
             &[],
             &["../evil.md".to_string(), "/etc/hosts".to_string()],
             false,
+            None,
         )
         .unwrap();
 
@@ -946,7 +1031,7 @@ mod tests {
             "<<<<<<< Mac\nmine\n=======\ntheirs\n>>>>>>> iPhone\n",
         );
 
-        run_sweep(root.path(), &[], &["notes/a.md".to_string()], true).unwrap();
+        run_sweep(root.path(), &[], &["notes/a.md".to_string()], true, None).unwrap();
 
         assert_eq!(ShadowStore::new(root.path()).base("notes/a.md"), None);
     }
@@ -957,12 +1042,12 @@ mod tests {
         write(root.path(), "notes/a.md", "# A\n");
         write(root.path(), "notes/b.md", "# B\n");
 
-        run_sweep(root.path(), &[], &[], true).unwrap();
+        run_sweep(root.path(), &[], &[], true, None).unwrap();
         let shadow = ShadowStore::new(root.path());
         assert_eq!(shadow.base("notes/a.md"), Some("# A\n".to_string()));
 
         write(root.path(), "notes/b.md", "# B updated externally\n");
-        run_sweep(root.path(), &[], &["notes/b.md".to_string()], false).unwrap();
+        run_sweep(root.path(), &[], &["notes/b.md".to_string()], false, None).unwrap();
         assert_eq!(
             shadow.base("notes/b.md"),
             Some("# B updated externally\n".to_string())

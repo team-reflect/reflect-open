@@ -181,6 +181,15 @@ const icloudSweepOutcomeSchema = z.object({
  */
 export type IcloudSweepOutcome = z.infer<typeof icloudSweepOutcomeSchema>
 
+/**
+ * How much of the graph a sweep checks for unresolved versions. `'full'`
+ * checks every note and runs store housekeeping — the backstop (resume,
+ * adoption baseline). `'candidates'` restricts the per-note version checks
+ * to the paths the live metadata watch flags as conflicted; Rust degrades it
+ * to a full check whenever the watch cannot answer completely.
+ */
+export type IcloudSweepScope = 'full' | 'candidates'
+
 /** Options for {@link icloudConflictsScan}. */
 export interface IcloudScanOptions {
   /** The open graph's generation — the scan is pinned to it. */
@@ -197,6 +206,8 @@ export interface IcloudScanOptions {
    * their current content. Safe to repeat — existing bases never move here.
    */
   recordBaseline?: boolean
+  /** Version-check coverage; defaults to `'full'` (the safe backstop). */
+  scope?: IcloudSweepScope
 }
 
 /** Run an iCloud conflict sweep over the open graph (Plan 21 Phase 2). */
@@ -208,6 +219,7 @@ export async function icloudConflictsScan(options: IcloudScanOptions): Promise<I
       skipPaths: options.skipPaths ?? [],
       ingestedPaths: options.ingestedPaths ?? [],
       recordBaseline: options.recordBaseline ?? false,
+      scope: options.scope ?? 'full',
     },
     icloudSweepOutcomeSchema,
   )

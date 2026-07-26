@@ -274,6 +274,13 @@ mod platform {
     /// the count and the requests to markdown under the note directories
     /// ([`super::placeholder_in_note_scope`]). Individual failures are logged
     /// and skipped — one undownloadable file must not stop the rest.
+    ///
+    /// The walk runs on every foreground resume and then once per poll tick
+    /// while downloads drain, so its per-entry cost matters: the type check
+    /// rides the `readdir` record (never a second stat), and sync-excluded
+    /// directories ([`super::local_only_name`] — notably a backup repo's
+    /// `.git/`, thousands of loose objects) are never entered, since iCloud
+    /// can hold no placeholder under them.
     pub fn pending_walk(root: &Path, nudge: bool, notes_only: bool) -> u32 {
         let manager = NSFileManager::defaultManager();
         let mut pending = 0;
@@ -283,22 +290,22 @@ mod platform {
                 continue;
             };
             for entry in entries.flatten() {
-                let path = entry.path();
                 // Never follow links (they can loop, or point out of the
                 // graph) — same rule as the adopt-copy walks below.
-                if entry
-                    .file_type()
-                    .map(|kind| kind.is_symlink())
-                    .unwrap_or(true)
-                {
+                let Ok(kind) = entry.file_type() else {
                     continue;
-                }
-                if path.is_dir() {
-                    stack.push(path);
+                };
+                if kind.is_symlink() {
                     continue;
                 }
                 let name = entry.file_name();
                 let name = name.to_string_lossy();
+                if kind.is_dir() {
+                    if !super::local_only_name(&name) {
+                        stack.push(entry.path());
+                    }
+                    continue;
+                }
                 let target = match crate::fs::icloud_placeholder_target(&name) {
                     Some(target) => target.to_string(),
                     None => {
@@ -322,7 +329,7 @@ mod platform {
                     }
                 }
                 pending += 1;
-                if nudge && !start_download(&manager, &path) {
+                if nudge && !start_download(&manager, &entry.path()) {
                     // Some iOS releases want the logical URL, not the stub
                     // (a no-op retry for the dataless form, where the two
                     // paths coincide).
@@ -475,9 +482,13 @@ fn copy_and_verify(root: &Path, target: &Path) -> AppResult<()> {
     Ok(())
 }
 
-/// What stays behind on a move-in: the rebuildable local state, the backup
-/// repo, and OS litter.
-fn adopt_skips(name: &str) -> bool {
+/// Names that never ride a file-sync provider: the rebuildable local state,
+/// the backup repo, and OS litter. A move-in leaves them behind
+/// ([`copy_graph_tree`]), and the pending-download walk never descends into
+/// them — `.reflect/` and `.git/` are marked sync-excluded at bootstrap
+/// (`fs::io::mark_dir_local_only`), so iCloud can never hold a placeholder
+/// under either.
+fn local_only_name(name: &str) -> bool {
     matches!(name, ".reflect" | ".git" | ".DS_Store")
 }
 
@@ -491,7 +502,7 @@ fn copy_graph_tree(source: &Path, target: &Path) -> AppResult<(u64, u64)> {
         for entry in std::fs::read_dir(&from_dir)? {
             let entry = entry?;
             let name = entry.file_name();
-            if adopt_skips(&name.to_string_lossy()) {
+            if local_only_name(&name.to_string_lossy()) {
                 continue;
             }
             let file_type = entry.file_type()?;
@@ -520,7 +531,7 @@ fn count_graph_tree(root: &Path) -> AppResult<(u64, u64)> {
     while let Some(dir) = stack.pop() {
         for entry in std::fs::read_dir(&dir)? {
             let entry = entry?;
-            if adopt_skips(&entry.file_name().to_string_lossy()) {
+            if local_only_name(&entry.file_name().to_string_lossy()) {
                 continue;
             }
             let file_type = entry.file_type()?;
@@ -598,6 +609,27 @@ mod tests {
         assert!(!target.join(".reflect").exists());
         assert!(!target.join(".git").exists());
         assert!(!target.join(".DS_Store").exists());
+    }
+
+    /// The pending walk must count placeholders anywhere in the graph but
+    /// never descend into the sync-excluded directories: `.git/` and
+    /// `.reflect/` are marked local-only at bootstrap, so a placeholder can
+    /// never exist under them, and a backup repo's object store would
+    /// otherwise dominate the walk's stat count on every poll tick.
+    #[cfg(any(target_os = "ios", target_os = "macos"))]
+    #[test]
+    fn pending_walk_skips_sync_excluded_directories() {
+        let root = tempfile::tempdir().expect("tempdir");
+        std::fs::create_dir_all(root.path().join("notes")).expect("mkdir");
+        std::fs::create_dir_all(root.path().join(".git/objects")).expect("mkdir");
+        std::fs::create_dir_all(root.path().join(".reflect/tmp")).expect("mkdir");
+        std::fs::write(root.path().join("notes/.a.md.icloud"), b"stub").expect("write");
+        std::fs::write(root.path().join("notes/b.md"), b"# B").expect("write");
+        // Placeholder-shaped names under excluded dirs must not be reached.
+        std::fs::write(root.path().join(".git/objects/.x.md.icloud"), b"stub").expect("write");
+        std::fs::write(root.path().join(".reflect/tmp/.y.md.icloud"), b"stub").expect("write");
+
+        assert_eq!(platform::pending_walk(root.path(), false, false), 1);
     }
 
     #[cfg(unix)]

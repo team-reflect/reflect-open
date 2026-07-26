@@ -10,11 +10,17 @@ import { useGraph } from '@/providers/graph-provider'
 const RESUME_REFRESH_DEDUPE_MS = 1500
 
 /**
- * While placeholders are still pending, poll the count at this interval and
- * reconcile the moment it reaches zero — note files are small, so downloads
- * usually land within a poll or two and the Mac edit appears in seconds.
+ * While placeholders are still pending, poll the count and reconcile the
+ * moment it reaches zero — note files are small, so downloads usually land
+ * within a poll or two and the Mac edit appears in seconds. Each poll is a
+ * full-graph walk in Rust, so the wait doubles from this floor up to
+ * {@link PENDING_POLL_MAX_MS}: the fast early ticks stay, and a slow link
+ * stops paying a walk every second for the whole drain.
  */
 const PENDING_POLL_MS = 1000
+
+/** The backoff ceiling between pending-count polls. */
+const PENDING_POLL_MAX_MS = 4000
 
 /** Give up polling after this long; the metadata watch and the next resume
  * still cover stragglers (a large asset on a slow link, say). */
@@ -69,13 +75,20 @@ export function useICloudRefresh(): void {
       })
     }
 
-    const pollPending = (startedAt: number): void => {
+    const pollPending = (startedAt: number, attempt: number): void => {
       if (retryTimer !== null) {
         return
       }
+      const delayMs = Math.min(PENDING_POLL_MS * 2 ** attempt, PENDING_POLL_MAX_MS)
       retryTimer = setTimeout(() => {
         retryTimer = null
         if (disposed) {
+          return
+        }
+        if (document.visibilityState === 'hidden') {
+          // Backgrounded mid-drain: stop rather than keep walking the graph
+          // behind a hidden webview (every sibling controller suspends on
+          // hidden). The next resume restarts the whole sequence.
           return
         }
         void icloudPendingCount(root, 'notes').then(
@@ -97,7 +110,7 @@ export function useICloudRefresh(): void {
               refreshIndex()
               return
             }
-            pollPending(startedAt)
+            pollPending(startedAt, attempt + 1)
           },
           (err) => {
             console.error('iCloud pending poll failed:', errorMessage(err))
@@ -106,7 +119,7 @@ export function useICloudRefresh(): void {
             }
           },
         )
-      }, PENDING_POLL_MS)
+      }, delayMs)
     }
 
     const refresh = async (options: { reconcile: boolean }): Promise<void> => {
@@ -126,7 +139,7 @@ export function useICloudRefresh(): void {
         refreshIndex()
       }
       if (pending > 0) {
-        pollPending(Date.now())
+        pollPending(Date.now(), 0)
       } else if (nudged) {
         // A confirmed-empty note count — never a failed nudge, which would
         // start the bulk while notes may still be pending. The next resume
