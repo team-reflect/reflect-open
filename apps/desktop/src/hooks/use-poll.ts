@@ -48,7 +48,13 @@ export function usePoll(
 
     function runTick(): void {
       inFlight = true
-      void tickRef.current().then(settle, () => settle('continue'))
+      try {
+        void tickRef.current().then(settle, () => settle('continue'))
+      } catch {
+        // A synchronous throw must not strand `inFlight` — that would block
+        // the visibility resume forever. Same rule as a rejection.
+        settle('continue')
+      }
     }
 
     function schedule(): void {
@@ -57,6 +63,9 @@ export function usePoll(
       }
       timer = setTimeout(() => {
         timer = null
+        if (document.visibilityState === 'hidden') {
+          return // went hidden in the firing gap; the listener resumes us
+        }
         runTick()
       }, intervalMs)
     }

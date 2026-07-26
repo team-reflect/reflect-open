@@ -75,6 +75,21 @@ describe('usePoll', () => {
     expect(tick).toHaveBeenCalledTimes(1)
   })
 
+  it('a synchronously throwing tick keeps the loop alive', async () => {
+    let calls = 0
+    const tick = (): Promise<'continue' | 'stop'> => {
+      calls += 1
+      if (calls === 1) {
+        throw new Error('sync boom')
+      }
+      return Promise.resolve('continue')
+    }
+    await render(<Harness enabled intervalMs={20} tick={tick} />)
+    await vi.waitFor(() => {
+      expect(calls).toBeGreaterThanOrEqual(2)
+    })
+  })
+
   it("a tick's 'stop' ends the loop for good, across hide and show", async () => {
     const tick = vi.fn(async () => 'stop' as const)
     await render(<Harness enabled intervalMs={20} tick={tick} />)

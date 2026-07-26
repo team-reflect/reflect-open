@@ -12,7 +12,11 @@ import { useBackSwipe } from './use-back-swipe'
  * settle transition to wait out).
  */
 
-function Harness({ enabled = true }: { enabled?: boolean }): ReactElement {
+interface HarnessProps {
+  readonly enabled?: boolean
+}
+
+function Harness({ enabled = true }: HarnessProps): ReactElement {
   const containerRef = useRef<HTMLDivElement>(null)
   const swipe = useBackSwipe({
     enabled,
@@ -54,15 +58,22 @@ function touchMove(node: Element): TouchEvent {
   return event
 }
 
-async function setup(enabled = true): Promise<{
-  node: HTMLElement
-  edgeX: number
-  edgeY: number
-  added: ReturnType<typeof vi.spyOn>
-  removed: ReturnType<typeof vi.spyOn>
-}> {
+/** A listener spy, structurally — `vi.spyOn`'s overloads defeat ReturnType. */
+interface ListenerSpy {
+  readonly mock: { readonly calls: readonly unknown[][] }
+}
+
+interface SwipeSetup {
+  readonly node: Element
+  readonly edgeX: number
+  readonly edgeY: number
+  readonly added: ListenerSpy
+  readonly removed: ListenerSpy
+}
+
+async function setup(enabled = true): Promise<SwipeSetup> {
   const screen = await render(<Harness enabled={enabled} />)
-  const node = screen.getByTestId('stack').element() as HTMLElement
+  const node = screen.getByTestId('stack').element()
   const rect = node.getBoundingClientRect()
   return {
     node,
@@ -73,8 +84,9 @@ async function setup(enabled = true): Promise<{
   }
 }
 
-const touchmoveCalls = (spy: { mock: { calls: unknown[][] } }): number =>
-  spy.mock.calls.filter((call) => call[0] === 'touchmove').length
+function touchmoveCalls(spy: ListenerSpy): number {
+  return spy.mock.calls.filter((listenerCall) => listenerCall[0] === 'touchmove').length
+}
 
 describe('useBackSwipe scroll blocker', () => {
   it('is not attached at idle, and idle touchmoves stay cancelable', async () => {

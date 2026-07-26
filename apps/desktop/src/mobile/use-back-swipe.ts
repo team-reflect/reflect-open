@@ -50,6 +50,12 @@ export type BackSwipeState =
 
 const IDLE: BackSwipeState = { phase: 'idle' }
 
+/** The gesture-scoped scroll blocker: one native listener on one node. */
+interface ScrollBlocker {
+  readonly node: HTMLElement
+  readonly block: (event: TouchEvent) => void
+}
+
 export interface BackSwipeOptions {
   /** Arm the gesture only on stacked screens with no transition running. */
   enabled: boolean
@@ -103,7 +109,7 @@ export function useBackSwipe({ enabled, reducedMotion, onPop, containerRef }: Ba
   // (the `armed` transition), so the listener exists before the sequence's
   // first `touchmove` — where WebKit fixes its cancelability — and an effect
   // could be a frame too late.
-  const blockerRef = useRef<{ node: HTMLElement; block: (event: TouchEvent) => void } | null>(null)
+  const blockerRef = useRef<ScrollBlocker | null>(null)
 
   const detachBlocker = useCallback((): void => {
     const blocker = blockerRef.current

@@ -6,23 +6,35 @@ import { whenEditorMounted } from './when-editor-mounted'
  * queue the test drains one frame at a time, so the retry budget is exact
  * rather than timing-dependent.
  */
-function fakeFrames(): { step: () => boolean; canceled: () => number } {
-  const queue: FrameRequestCallback[] = []
+interface FakeFrames {
+  /** Run the oldest queued frame; `false` when nothing is scheduled. */
+  step: () => boolean
+  canceled: () => number
+}
+
+function fakeFrames(): FakeFrames {
+  const queue = new Map<number, FrameRequestCallback>()
   let nextHandle = 1
   let canceled = 0
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback): number => {
-    queue.push(callback)
-    return nextHandle++
+    const handle = nextHandle
+    nextHandle += 1
+    queue.set(handle, callback)
+    return handle
   })
-  vi.stubGlobal('cancelAnimationFrame', (): void => {
-    canceled += 1
+  vi.stubGlobal('cancelAnimationFrame', (handle: number): void => {
+    if (queue.delete(handle)) {
+      canceled += 1
+    }
   })
   return {
     step: () => {
-      const frame = queue.shift()
-      if (frame === undefined) {
+      const next = queue.entries().next()
+      if (next.done === true) {
         return false
       }
+      const [handle, frame] = next.value
+      queue.delete(handle)
       frame(0)
       return true
     },
@@ -83,6 +95,9 @@ describe('whenEditorMounted', () => {
     const cancel = whenEditorMounted({ mounted: false }, run)
     cancel()
     expect(frames.canceled()).toBe(1)
+    // The canceled frame is genuinely gone — nothing left to run.
+    expect(frames.step()).toBe(false)
+    expect(run).not.toHaveBeenCalled()
     // Canceling again (or after settling) stays a no-op.
     cancel()
     expect(frames.canceled()).toBe(1)
