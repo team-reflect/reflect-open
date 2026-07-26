@@ -88,7 +88,10 @@ export function useICloudRefresh(): void {
         if (document.visibilityState === 'hidden') {
           // Backgrounded mid-drain: stop rather than keep walking the graph
           // behind a hidden webview (every sibling controller suspends on
-          // hidden). The next resume restarts the whole sequence.
+          // hidden). The next resume restarts the whole sequence — clear the
+          // dedupe stamp so even a resume inside the dedupe window counts
+          // (otherwise a quick hide → show would leave nothing scheduled).
+          lastRefreshAt = 0
           return
         }
         void icloudPendingCount(root, 'notes').then(

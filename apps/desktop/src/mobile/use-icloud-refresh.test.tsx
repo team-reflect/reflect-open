@@ -218,6 +218,36 @@ describe('useICloudRefresh', () => {
     expect(countCalls).toHaveLength(1) // ...and the poll starts over
   })
 
+  it('a quick hide → show inside the dedupe window still restarts the drain', async () => {
+    pendingCount = 3
+    await renderHook(() => useICloudRefresh())
+    await flush()
+    expect(downloadCalls).toHaveLength(1)
+
+    // Hide and let the armed tick bail — the poll is now abandoned…
+    visibility = 'hidden'
+    await act(async () => {
+      vi.advanceTimersByTime(1000)
+    })
+    await flush()
+    expect(countCalls).toHaveLength(0)
+
+    // …and a return to visible only 200ms later (inside the 1.5s resume
+    // dedupe) must not be swallowed, or nothing would be scheduled at all.
+    visibility = 'visible'
+    await act(async () => {
+      vi.advanceTimersByTime(200)
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await flush()
+    expect(downloadCalls).toHaveLength(2)
+    await act(async () => {
+      vi.advanceTimersByTime(1000)
+    })
+    await flush()
+    expect(countCalls).toHaveLength(1)
+  })
+
   it('gives up polling at the limit with one final reconcile', async () => {
     pendingCount = 3
     await renderHook(() => useICloudRefresh())
