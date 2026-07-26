@@ -243,13 +243,22 @@ pub fn index_remove<R: tauri::Runtime>(
 /// together on graph open, and the projection is rebuildable in the worst case.
 ///
 /// The rename pipeline end-to-end: `docs/readable-filenames.md`.
-#[tauri::command]
-pub fn note_move_indexed<R: tauri::Runtime>(
+/// One user-initiated move, with the folded addressing for both directions:
+/// the destination's for the forward row move, the source's for the
+/// compensating reverse move when the disk refuses.
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteMoveRequest {
     from: String,
     to: String,
-    generation: u64,
     to_address: write::MovedNoteAddress,
     from_address: write::MovedNoteAddress,
+}
+
+#[tauri::command]
+pub fn note_move_indexed<R: tauri::Runtime>(
+    request: NoteMoveRequest,
+    generation: u64,
     app: tauri::AppHandle<R>,
     graph: State<GraphState>,
     index: State<IndexState>,
@@ -260,12 +269,12 @@ pub fn note_move_indexed<R: tauri::Runtime>(
     {
         let mut state = lock_state(&index)?;
         let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
-        move_rows(conn, &from, &to, &to_address)?;
-        if let Err(err) = crate::fs::move_note_file(&root, &from, &to) {
+        move_rows(conn, &request.from, &request.to, &request.to_address)?;
+        if let Err(err) = crate::fs::move_note_file(&root, &request.from, &request.to) {
             // Compensate: the disk refused, so the rows go back. Best-effort —
             // a failed compensation must surface the *original* error, and the
             // reconcile heals any residue by id.
-            if let Err(comp) = move_rows(conn, &to, &from, &from_address) {
+            if let Err(comp) = move_rows(conn, &request.to, &request.from, &request.from_address) {
                 tracing::error!(
                     ?comp,
                     "rename compensation failed; reconcile will heal by id"
@@ -276,7 +285,7 @@ pub fn note_move_indexed<R: tauri::Runtime>(
     }
     crate::fs::invalidate_file_catalog(&graph, &root);
     emit_index_written(&app);
-    emit_note_moved(&app, &from, &to);
+    emit_note_moved(&app, &request.from, &request.to);
     Ok(())
 }
 

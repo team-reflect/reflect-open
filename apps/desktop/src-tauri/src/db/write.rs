@@ -182,9 +182,8 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
         }
     }
     {
-        let mut stmt = conn.prepare_cached(
-            "INSERT INTO note_claims(note_path, key, tier) VALUES(?1, ?2, ?3)",
-        )?;
+        let mut stmt = conn
+            .prepare_cached("INSERT INTO note_claims(note_path, key, tier) VALUES(?1, ?2, ?3)")?;
         for claim in &note.claims {
             stmt.execute(params![note.path, claim.key, claim.tier])?;
         }

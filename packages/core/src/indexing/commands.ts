@@ -85,11 +85,13 @@ export async function moveNoteIndexed(
   await call(
     'note_move_indexed',
     {
-      from,
-      to,
+      request: {
+        from,
+        to,
+        toAddress: movedNoteAddress(to),
+        fromAddress: movedNoteAddress(from),
+      },
       generation,
-      toAddress: movedNoteAddress(to),
-      fromAddress: movedNoteAddress(from),
     },
     voidSchema,
   )
