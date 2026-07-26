@@ -2,6 +2,7 @@ import { ulid } from 'ulidx'
 import { upsertFrontmatter } from '../markdown/frontmatter'
 import { slugForTitle } from '../markdown/slug'
 import { createNoteIfAbsent } from './commands'
+import { wikiNoteReference } from './note-reference'
 import { notePath } from './paths'
 import {
   resolveExistingWikiTarget,
@@ -151,6 +152,18 @@ export async function resolveOrCreateNoteWithTitle(
   const existing = await resolveExistingWikiTarget(title, generation)
   if (existing.kind !== 'missing') {
     return existing
+  }
+
+  // Only a bare name may invent a titled note under `notes/`. A path target
+  // names one exact missing file and a `#heading` or unsafe target names
+  // none; creating a note *titled* with those spellings would be worse than
+  // refusing.
+  const reference = wikiNoteReference(title)
+  if (reference?.kind !== 'key') {
+    return {
+      kind: 'unavailable',
+      paths: reference?.kind === 'path' ? [reference.path] : [],
+    }
   }
 
   // On a lost claim, re-resolve both projections before considering a

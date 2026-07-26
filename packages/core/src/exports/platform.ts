@@ -169,6 +169,7 @@ export {
   type ResolveOrCreateNoteResult,
 } from '../graph/create-note'
 export {
+  resolveExistingMarkdownTarget,
   resolveExistingWikiTarget,
   type ExistingWikiTargetResolution,
 } from '../graph/resolve-existing-wiki-target'

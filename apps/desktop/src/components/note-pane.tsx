@@ -28,6 +28,7 @@ import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete'
 import { useNoteDocument } from '@/editor/use-note-document'
 import { useTagNavigation } from '@/editor/use-tag-navigation'
 import { useTemplateSlashItems } from '@/editor/use-template-slash-items'
+import { useMarkdownLinkNavigation } from '@/editor/use-markdown-link-navigation'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
 import { useWikiLinkHoverPreview } from '@/editor/use-wiki-link-hover-preview'
 import { isTouchEditorSurface } from '@/lib/platform-surface'
@@ -178,6 +179,7 @@ export function NotePaneComponent({
     resolveAssetOpenPath,
   })
   const onWikiLinkClick = useWikiLinkNavigation(generation)
+  const onNoteLinkClick = useMarkdownLinkNavigation(generation, path)
   const onTagClick = useTagNavigation()
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
 
@@ -371,6 +373,7 @@ export function NotePaneComponent({
         resolveFileLink={resolveAssetFileLink}
         resolveFileInfo={resolveFileInfo}
         onWikiLinkClick={onWikiLinkClick}
+        onNoteLinkClick={onNoteLinkClick}
         {...(generation !== null && !isTouchEditorSurface()
           ? { renderWikilinkHoverCard }
           : {})}

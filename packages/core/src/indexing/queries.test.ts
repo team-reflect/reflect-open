@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '../ipc/bridge'
 import {
   dailyDatesInRange,
-  findExactWikiTargetMatches,
+  findNotesByPathKey,
+  findWikiTargetMatch,
   getBacklinksWithContext,
   getDuplicateNoteIds,
   getNoteIdsByPath,
@@ -153,64 +154,52 @@ describe('resolveWikiTarget', () => {
   })
 })
 
-describe('findExactWikiTargetMatches', () => {
-  it('returns every exact title in path order without querying aliases', async () => {
+describe('findWikiTargetMatch', () => {
+  it('returns the winning tier in one indexed read, preserving ambiguity', async () => {
     mockInvoke.mockResolvedValue([
-      { path: 'notes/business-ideas-2.md' },
-      { path: 'notes/business-ideas.md' },
+      { note_path: 'notes/business-ideas-2.md', tier: 2 },
+      { note_path: 'notes/business-ideas.md', tier: 2 },
+      { note_path: 'archive/business-ideas.md', tier: 4 },
     ])
 
-    await expect(findExactWikiTargetMatches('Business ideas')).resolves.toEqual({
-      kind: 'title',
+    await expect(findWikiTargetMatch('business ideas')).resolves.toEqual({
+      tier: 2,
       paths: ['notes/business-ideas-2.md', 'notes/business-ideas.md'],
     })
 
     expect(mockInvoke).toHaveBeenCalledTimes(1)
     const [, args] = mockInvoke.mock.calls[0]!
     const sql = String(args['sql'])
-    expect(sql).toContain('title_key')
-    expect(sql).toContain('distinct')
-    expect(sql).toContain('order by "path"')
-    expect(sql).toContain('"kind" != ?')
-    expect(args['params']).toEqual(['business ideas', 'template'])
+    expect(sql).toContain('note_claims')
+    expect(sql).toContain('order by "tier"')
+    expect(args['params']).toEqual(['business ideas'])
   })
 
-  it('queries exact aliases only after titles miss', async () => {
-    mockInvoke
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        { note_path: 'notes/alias-a.md' },
-        { note_path: 'notes/alias-b.md' },
-      ])
-
-    await expect(findExactWikiTargetMatches('Business ideas')).resolves.toEqual({
-      kind: 'alias',
-      paths: ['notes/alias-a.md', 'notes/alias-b.md'],
-    })
-
-    expect(mockInvoke).toHaveBeenCalledTimes(2)
-    const [, args] = mockInvoke.mock.calls[1]!
-    const sql = String(args['sql'])
-    expect(sql).toContain('from "aliases"')
-    expect(sql).toContain('inner join "notes"')
-    expect(sql).toContain('distinct')
-    expect(sql).toContain('order by "note_path"')
-    expect(sql).toContain('"notes"."kind" != ?')
-    expect(args['params']).toEqual(['business ideas', 'template'])
+  it('reports an unclaimed key as tier 0 and never queries when the key is blank', async () => {
+    mockInvoke.mockResolvedValue([])
+    await expect(findWikiTargetMatch('missing')).resolves.toEqual({ tier: 0, paths: [] })
+    await expect(findWikiTargetMatch('')).resolves.toEqual({ tier: 0, paths: [] })
+    expect(mockInvoke).toHaveBeenCalledTimes(1)
   })
 
-  it('preserves daily-date precedence before titles and aliases', async () => {
-    mockInvoke.mockResolvedValue([{ path: 'daily/2026-06-09.md' }])
+  it('reads a daily-date claim from the same table as every other tier', async () => {
+    mockInvoke.mockResolvedValue([{ note_path: 'daily/2026-06-09.md', tier: 1 }])
 
-    await expect(findExactWikiTargetMatches('2026-06-09')).resolves.toEqual({
-      kind: 'date',
+    await expect(findWikiTargetMatch('2026-06-09')).resolves.toEqual({
+      tier: 1,
       paths: ['daily/2026-06-09.md'],
     })
+  })
+})
 
-    expect(mockInvoke).toHaveBeenCalledTimes(1)
+describe('findNotesByPathKey', () => {
+  it('selects by the folded path and never queries a blank key', async () => {
+    mockInvoke.mockResolvedValue([{ path: 'Projects/Plan.md' }])
+    await expect(findNotesByPathKey('projects/plan.md')).resolves.toEqual(['Projects/Plan.md'])
     const [, args] = mockInvoke.mock.calls[0]!
-    expect(String(args['sql'])).toContain('daily_date')
-    expect(args['params']).toEqual(['2026-06-09', 'template'])
+    expect(String(args['sql'])).toContain('path_key')
+    await expect(findNotesByPathKey('')).resolves.toEqual([])
+    expect(mockInvoke).toHaveBeenCalledTimes(1)
   })
 })
 

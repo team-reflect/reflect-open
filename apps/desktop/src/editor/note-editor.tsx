@@ -164,6 +164,12 @@ interface NoteEditorProps {
    */
   onWikiLinkClick?: (target: string, event?: MouseEvent | KeyboardEvent) => void
   /**
+   * Click on a rendered Markdown link whose href is graph-local (scheme-less
+   * and not an asset): a note link like `[Plan](./Plan.md)`. Receives the
+   * authored href; the handler owns source-relative resolution.
+   */
+  onNoteLinkClick?: (href: string, event: MouseEvent | KeyboardEvent) => void
+  /**
    * Resolve the passive body of Meowdown's editor-scoped wiki-link hover
    * card. Resolving `null` (missing, ambiguous, or unavailable targets)
    * renders no card. Must be a stable function: a new identity re-runs the
@@ -234,6 +240,7 @@ export function NoteEditor({
   resolveFileLink,
   resolveFileInfo,
   onWikiLinkClick,
+  onNoteLinkClick,
   renderWikilinkHoverCard,
   onTagClick,
   onWikilinkSearch,
@@ -258,6 +265,7 @@ export function NoteEditor({
   // TODO: This violates "Rule of hooks". Refactor this later.
   const onChangeRef = useRef(onChange)
   const onWikiLinkClickRef = useRef(onWikiLinkClick)
+  const onNoteLinkClickRef = useRef(onNoteLinkClick)
   const onTagClickRef = useRef(onTagClick)
   const resolveImageUrlRef = useRef(resolveImageUrl)
   const resolveAssetOpenPathRef = useRef(resolveAssetOpenPath)
@@ -268,6 +276,7 @@ export function NoteEditor({
   useLayoutEffect(() => {
     onChangeRef.current = onChange
     onWikiLinkClickRef.current = onWikiLinkClick
+    onNoteLinkClickRef.current = onNoteLinkClick
     onTagClickRef.current = onTagClick
     resolveImageUrlRef.current = resolveImageUrl
     resolveAssetOpenPathRef.current = resolveAssetOpenPath
@@ -357,6 +366,9 @@ export function NoteEditor({
         return
       }
       if (!isOpenableExternalUrl(href)) {
+        // A scheme-less local href is a note link; the host resolves it
+        // against this note's own directory.
+        onNoteLinkClickRef.current?.(href, event)
         return
       }
       void openUrl(href).catch((cause) => {

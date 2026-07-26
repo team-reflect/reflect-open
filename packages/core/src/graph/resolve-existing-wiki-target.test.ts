@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '../ipc/bridge'
-import { resolveExistingWikiTarget } from './resolve-existing-wiki-target'
+import {
+  resolveExistingMarkdownTarget,
+  resolveExistingWikiTarget,
+} from './resolve-existing-wiki-target'
 
 interface BridgeBehavior {
   readonly files?: Record<string, string>
@@ -84,10 +87,10 @@ describe('resolveExistingWikiTarget', () => {
   it('preserves ambiguity in the winning indexed tier', async () => {
     const invoke = bindBridge({
       query: (sql) =>
-        sql.includes('from "aliases"')
+        sql.includes('note_claims')
           ? [
-              { note_path: 'notes/second.md' },
-              { note_path: 'notes/first.md' },
+              { note_path: 'notes/first.md', tier: 3 },
+              { note_path: 'notes/second.md', tier: 3 },
             ]
           : [],
     })
@@ -102,7 +105,7 @@ describe('resolveExistingWikiTarget', () => {
   it('resolves one indexed title without probing disk', async () => {
     const invoke = bindBridge({
       query: (sql) =>
-        sql.includes('"title_key" = ?') ? [{ path: 'notes/project.md' }] : [],
+        sql.includes('note_claims') ? [{ note_path: 'notes/project.md', tier: 2 }] : [],
     })
 
     await expect(resolveExistingWikiTarget('Project', 7)).resolves.toEqual({
@@ -117,7 +120,7 @@ describe('resolveExistingWikiTarget', () => {
   it('resolves one indexed alias after the title tier misses', async () => {
     const invoke = bindBridge({
       query: (sql) =>
-        sql.includes('from "aliases"') ? [{ note_path: 'notes/project.md' }] : [],
+        sql.includes('note_claims') ? [{ note_path: 'notes/project.md', tier: 3 }] : [],
     })
 
     await expect(resolveExistingWikiTarget('Initiative', 7)).resolves.toEqual({
@@ -132,7 +135,7 @@ describe('resolveExistingWikiTarget', () => {
   it('accepts an indexed daily before probing disk or lower index tiers', async () => {
     const invoke = bindBridge({
       query: (sql) =>
-        sql.includes('"daily_date" = ?') ? [{ path: 'daily/2026-06-09.md' }] : [],
+        sql.includes('note_claims') ? [{ note_path: 'daily/2026-06-09.md', tier: 1 }] : [],
     })
 
     await expect(resolveExistingWikiTarget('2026-06-09', 7)).resolves.toEqual({
@@ -148,7 +151,7 @@ describe('resolveExistingWikiTarget', () => {
     const invoke = bindBridge({
       files: { 'daily/2026-06-09.md': 'Daily contents\n' },
       query: (sql) =>
-        sql.includes('"title_key" = ?') ? [{ path: 'notes/date-title.md' }] : [],
+        sql.includes('note_claims') ? [{ note_path: 'notes/date-title.md', tier: 2 }] : [],
     })
 
     await expect(resolveExistingWikiTarget('2026-06-09', 17)).resolves.toEqual({
@@ -165,7 +168,7 @@ describe('resolveExistingWikiTarget', () => {
   it('accepts an indexed regular date title only after the daily path is missing', async () => {
     const invoke = bindBridge({
       query: (sql) =>
-        sql.includes('"title_key" = ?') ? [{ path: 'notes/date-title.md' }] : [],
+        sql.includes('note_claims') ? [{ note_path: 'notes/date-title.md', tier: 2 }] : [],
     })
 
     await expect(resolveExistingWikiTarget('2026-06-09', 7)).resolves.toEqual({
@@ -182,7 +185,7 @@ describe('resolveExistingWikiTarget', () => {
   it('reports an unreadable daily file as unavailable instead of accepting a lower tier', async () => {
     const invoke = bindBridge({
       query: (sql) =>
-        sql.includes('"title_key" = ?') ? [{ path: 'notes/date-title.md' }] : [],
+        sql.includes('note_claims') ? [{ note_path: 'notes/date-title.md', tier: 2 }] : [],
       read: async () => {
         throw { kind: 'io', message: 'evicted' }
       },
@@ -199,7 +202,7 @@ describe('resolveExistingWikiTarget', () => {
     const invoke = bindBridge({
       placeholders: ['daily/2026-06-09.md'],
       query: (sql) =>
-        sql.includes('"title_key" = ?') ? [{ path: 'notes/date-title.md' }] : [],
+        sql.includes('note_claims') ? [{ note_path: 'notes/date-title.md', tier: 2 }] : [],
     })
 
     await expect(resolveExistingWikiTarget('2026-06-09', 7)).resolves.toEqual({
@@ -286,11 +289,11 @@ describe('resolveExistingWikiTarget', () => {
     let titleLookups = 0
     const invoke = bindBridge({
       query: (sql) => {
-        if (!sql.includes('"title_key" = ?')) {
+        if (!sql.includes('note_claims')) {
           return []
         }
         titleLookups += 1
-        return titleLookups === 2 ? [{ path: 'notes/newly-indexed.md' }] : []
+        return titleLookups === 2 ? [{ note_path: 'notes/newly-indexed.md', tier: 2 }] : []
       },
     })
 
@@ -364,5 +367,122 @@ describe('resolveExistingWikiTarget — rich titles on disk', () => {
       kind: 'missing',
     })
     expectNoWrites(invoke)
+  })
+})
+
+describe('resolveExistingWikiTarget — path and stem dimensions', () => {
+  it('resolves a path-qualified wiki target from the index', async () => {
+    const invoke = bindBridge({
+      query: (sql) => (sql.includes('path_key') ? [{ path: 'Projects/Plan.md' }] : []),
+    })
+
+    await expect(resolveExistingWikiTarget('Projects/Plan', 7)).resolves.toEqual({
+      kind: 'resolved',
+      path: 'Projects/Plan.md',
+    })
+    expect(invoke.mock.calls.some(([command]) => command === 'note_read')).toBe(false)
+    expectNoWrites(invoke)
+  })
+
+  it('resolves a path-qualified target from disk when the index has not caught up', async () => {
+    const invoke = bindBridge({ files: { 'Projects/Plan.md': '# Weekly Planning' } })
+
+    await expect(resolveExistingWikiTarget('Projects/Plan', 7)).resolves.toEqual({
+      kind: 'resolved',
+      path: 'Projects/Plan.md',
+    })
+    expectNoWrites(invoke)
+  })
+
+  it('never falls back to a same-named file elsewhere when a path link misses', async () => {
+    const invoke = bindBridge({ files: { 'Plan.md': '# Plan' } })
+
+    await expect(resolveExistingWikiTarget('Archive/Plan', 7)).resolves.toEqual({
+      kind: 'missing',
+    })
+    expectNoWrites(invoke)
+  })
+
+  it('resolves a bare target by filename stem when no title or alias claims it', async () => {
+    const invoke = bindBridge({
+      query: (sql) =>
+        sql.includes('note_claims') ? [{ note_path: 'Projects/Plan.md', tier: 4 }] : [],
+    })
+
+    await expect(resolveExistingWikiTarget('Plan', 7)).resolves.toEqual({
+      kind: 'resolved',
+      path: 'Projects/Plan.md',
+    })
+    expectNoWrites(invoke)
+  })
+
+  it('drops a fragment before looking the target up', async () => {
+    const invoke = bindBridge({
+      query: (sql) => (sql.includes('path_key') ? [{ path: 'Projects/Plan.md' }] : []),
+    })
+
+    await expect(resolveExistingWikiTarget('Projects/Plan#Next', 7)).resolves.toEqual({
+      kind: 'resolved',
+      path: 'Projects/Plan.md',
+    })
+    expectNoWrites(invoke)
+  })
+
+  it('resolves a fragment-only target to its source note', async () => {
+    const invoke = bindBridge()
+
+    await expect(
+      resolveExistingWikiTarget('#Next', 7, 'Projects/Plan.md'),
+    ).resolves.toEqual({ kind: 'resolved', path: 'Projects/Plan.md' })
+    expect(invoke).not.toHaveBeenCalled()
+  })
+
+  it('treats a percent sign in a bare target as literal text', async () => {
+    const invoke = bindBridge({
+      query: (sql) =>
+        sql.includes('note_claims') ? [{ note_path: 'notes/100.md', tier: 2 }] : [],
+    })
+
+    await expect(resolveExistingWikiTarget('100%', 7)).resolves.toEqual({
+      kind: 'resolved',
+      path: 'notes/100.md',
+    })
+    expectNoWrites(invoke)
+  })
+
+  // The #806 regression point: an already-read candidate that does not match
+  // must never veto the missing verdict that permits creation.
+  it('reports missing when the vault has an unindexed note that does not match', async () => {
+    const invoke = bindBridge({ files: { 'Projects/Plan.md': '# Plan' } })
+
+    await expect(resolveExistingWikiTarget('Brand New Topic', 7)).resolves.toEqual({
+      kind: 'missing',
+    })
+    expectNoWrites(invoke)
+  })
+})
+
+describe('resolveExistingMarkdownTarget', () => {
+  it('resolves a source-relative Markdown href', async () => {
+    const invoke = bindBridge({
+      query: (sql) => (sql.includes('path_key') ? [{ path: 'Projects/Plan.md' }] : []),
+    })
+
+    await expect(
+      resolveExistingMarkdownTarget('./Plan.md', 'Projects/Journal.md', 7),
+    ).resolves.toEqual({ kind: 'resolved', path: 'Projects/Plan.md' })
+    expectNoWrites(invoke)
+  })
+
+  it('reports missing for an external or unsafe href without touching the graph', async () => {
+    const invoke = bindBridge()
+
+    await expect(
+      resolveExistingMarkdownTarget('https://example.com/x.md', 'Note.md', 7),
+    ).resolves.toEqual({ kind: 'missing' })
+    await expect(
+      resolveExistingMarkdownTarget('../../outside.md', 'Note.md', 7),
+    ).resolves.toEqual({ kind: 'missing' })
+    expect(invoke).not.toHaveBeenCalled()
   })
 })
