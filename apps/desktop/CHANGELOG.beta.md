@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.7.0-beta.19](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.18...v0.7.0-beta.19) (2026-07-26)
+
+
+### Features
+
+* find text within notes ([#955](https://github.com/team-reflect/reflect-open/issues/955)) ([22fda1b](https://github.com/team-reflect/reflect-open/commit/22fda1bf5b85d045bc286de55f45a1f883a7a0cd))
+
+
+### Bug Fixes
+
+* keep automatic daily entries in their lists ([#940](https://github.com/team-reflect/reflect-open/issues/940)) ([48ba8c2](https://github.com/team-reflect/reflect-open/commit/48ba8c2ae7a9d15bbb7d83d7929dddb4a351edfb))
+* keep note history when a graph's GitHub backup is signed out ([#950](https://github.com/team-reflect/reflect-open/issues/950)) ([8f1e475](https://github.com/team-reflect/reflect-open/commit/8f1e4758b72cf18268697a217ec18f12b8d10d7a))
+* reduce mobile week-row note dot to 50% opacity ([#951](https://github.com/team-reflect/reflect-open/issues/951)) ([4c359b6](https://github.com/team-reflect/reflect-open/commit/4c359b6f405590e9347d581e66031b2da2a18e88))
+* update meowdown to ^0.58.3 ([#948](https://github.com/team-reflect/reflect-open/issues/948)) ([97c50d6](https://github.com/team-reflect/reflect-open/commit/97c50d6f4a84c9871fd2442667a13eefa8d52dfe))
+
 ## [0.7.0-beta.18](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.17...v0.7.0-beta.18) (2026-07-24)
 
 
