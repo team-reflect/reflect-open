@@ -130,7 +130,7 @@ describe('rich title flow', () => {
     }
   })
 
-  it('a degenerate rich title is unaddressable but stays navigable', async () => {
+  it('a degenerate rich title falls back to a path address and stays navigable', async () => {
     const database = openMigratedIndex()
     const degenerate = project('notes/degenerate.md', '# [[ [ ]]\n', 10)
     expect(degenerate.aliases).toEqual([]) // derived form falls back to the raw title
@@ -138,11 +138,62 @@ describe('rich title flow', () => {
     connectIndex(database)
     try {
       const result = await suggestWikiLinkTargets('[[ [')
-      expect(result.suggestions).toEqual([])
+      // No name survives serialization, so the row falls back to its path
+      // address instead of vanishing from the menu.
+      expect(result.suggestions).toMatchObject([
+        { path: 'notes/degenerate.md', insertText: 'notes/degenerate' },
+      ])
+      await Promise.all(result.suggestions.map(expectSuggestionOpensItsPath))
       const navigation = await suggestWikiTargets('[[ [')
       expect(navigation.map((suggestion) => suggestion.path)).toEqual([
         'notes/degenerate.md',
       ])
+    } finally {
+      setBridge(null)
+      database.close()
+    }
+  })
+})
+
+describe('path-address fallback flow', () => {
+  it('offers each duplicate-titled note its own path address', async () => {
+    const database = openMigratedIndex()
+    applyProjection(database, project('a/Plan.md', '# Plan\n', 20))
+    applyProjection(database, project('b/Plan.md', '# Plan\n', 10))
+    connectIndex(database)
+    try {
+      const { suggestions } = await suggestWikiLinkTargets('plan')
+      expect(suggestions.map((row) => row.insertText).sort()).toEqual(['a/Plan', 'b/Plan'])
+      await Promise.all(suggestions.map(expectSuggestionOpensItsPath))
+    } finally {
+      setBridge(null)
+      database.close()
+    }
+  })
+
+  it('keeps the plain title when it is unambiguous', async () => {
+    const database = openMigratedIndex()
+    applyProjection(database, project('notes/unique.md', '# Unique\n', 20))
+    connectIndex(database)
+    try {
+      const { suggestions } = await suggestWikiLinkTargets('unique')
+      expect(suggestions.map((row) => row.insertText)).toEqual(['Unique'])
+    } finally {
+      setBridge(null)
+      database.close()
+    }
+  })
+
+  it('drops a row whose path has no wiki spelling', async () => {
+    const database = openMigratedIndex()
+    applyProjection(database, project('notes/c#-notes.md', '# Plan\n', 20))
+    applyProjection(database, project('notes/plan.md', '# Plan\n', 10))
+    connectIndex(database)
+    try {
+      const { suggestions } = await suggestWikiLinkTargets('plan')
+      // `#` reads as a fragment separator in every wiki consumer, so the
+      // hash-named duplicate cannot be inserted; its sibling still can.
+      expect(suggestions.map((row) => row.insertText)).toEqual(['notes/plan'])
     } finally {
       setBridge(null)
       database.close()

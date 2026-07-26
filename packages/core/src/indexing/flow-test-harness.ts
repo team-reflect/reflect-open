@@ -68,15 +68,16 @@ export function applyProjection(database: DatabaseSync, indexed: IndexedNote): v
   database
     .prepare(
       `INSERT INTO notes(
-        path, id, title, title_key, kind, daily_date, is_private, is_pinned,
+        path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned,
         pinned_order, mtime, file_hash, preview, has_conflict, gist_url, gist_stale
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       indexed.path,
       indexed.id,
       indexed.title,
       indexed.titleKey,
+      indexed.pathKey,
       indexed.kind,
       indexed.dailyDate,
       Number(indexed.isPrivate),
@@ -97,10 +98,17 @@ export function applyProjection(database: DatabaseSync, indexed: IndexedNote): v
     insertAlias.run(indexed.path, alias.alias, alias.aliasKey)
   }
 
+  const insertClaim = database.prepare(
+    'INSERT INTO note_claims(note_path, key, tier) VALUES (?, ?, ?)',
+  )
+  for (const claim of indexed.claims) {
+    insertClaim.run(indexed.path, claim.key, claim.tier)
+  }
+
   const insertLink = database.prepare(
     `INSERT INTO links(
-      source_path, kind, target_raw, target_key, alias, pos_from, pos_to
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      source_path, kind, target_raw, target_key, target_path_key, alias, pos_from, pos_to
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   )
   for (const link of indexed.links) {
     insertLink.run(
@@ -108,6 +116,7 @@ export function applyProjection(database: DatabaseSync, indexed: IndexedNote): v
       link.kind,
       link.targetRaw,
       link.targetKey,
+      link.targetPathKey,
       link.alias,
       link.posFrom,
       link.posTo,

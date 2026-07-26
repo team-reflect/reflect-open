@@ -313,6 +313,25 @@ async function winningAliasesByPath(
   return winning
 }
 
+/**
+ * Last resort for a note whose every name is ambiguous or unserializable:
+ * address it by its own path. `[[notes/plan-2]]` names exactly one file, so
+ * the row stays selectable instead of vanishing, and the link the user writes
+ * never needs disambiguating later. A root-level file gains a `/` so the
+ * target reads as a path rather than a name. A path containing `#` has no
+ * wiki spelling (every consumer, Obsidian included, reads `#` as a fragment
+ * separator), so such a note stays reachable through search and Markdown
+ * hrefs but cannot be inserted from the `[[` menu.
+ */
+function pathQualifiedInsert(path: string): string | null {
+  const target = path.replace(/\.md$/, '')
+  const qualified = target.includes('/') ? target : `/${target}`
+  if (qualified.includes('#') || qualified !== qualified.trim()) {
+    return null
+  }
+  return serializeWikiSuggestionAddress(qualified, null)
+}
+
 async function verifyWikiSuggestionAddresses(
   candidates: readonly WikiSuggestion[],
   candidateTargetKeys: readonly string[],
@@ -394,11 +413,19 @@ async function verifyWikiSuggestionAddresses(
       if (ranked !== null) {
         verified.push(ranked)
       } else {
+        let rescued = false
         for (const alias of rescueAliases.get(candidate.path) ?? []) {
           const insertText = serializeWikiSuggestionAddress(alias, null)
           if (insertText !== null) {
             verified.push({ ...candidate, alias, insertText })
+            rescued = true
             break
+          }
+        }
+        if (!rescued) {
+          const pathInsert = pathQualifiedInsert(candidate.path)
+          if (pathInsert !== null) {
+            verified.push({ ...candidate, insertText: pathInsert })
           }
         }
       }
