@@ -136,11 +136,14 @@ describe('isCalendarDate', () => {
 })
 
 describe('foldGraphPath', () => {
-  it('lowers ASCII only, matching the Rust byte fold', () => {
+  it('lowers ASCII only, never the full Unicode fold', () => {
     expect(foldGraphPath('Projects/Plan.MD')).toBe('projects/plan.md')
-    // KELVIN SIGN survives: Rust's eq_ignore_ascii_case leaves it alone, so
-    // folding it here would split one file into two keys.
-    expect(foldGraphPath('\u212a.md')).toBe('\u212a.md')
+    // NFC's singleton mappings apply (KELVIN SIGN decomposes to K, then the
+    // ASCII fold lowers it) — safe because every comparand passes through
+    // this same fold. What must NOT happen is toLowerCase-style folding of
+    // characters NFC leaves alone.
+    expect(foldGraphPath('\u212a.md')).toBe('k.md')
+    expect(foldGraphPath('\u0130.md')).toBe('\u0130.md')
   })
 
   it('normalizes NFD to NFC before folding', () => {

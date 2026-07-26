@@ -92,9 +92,11 @@ export function dailyPath(date: string): string {
  * (macOS hands back NFD for some filenames), then the same ASCII-only
  * lowering {@link classifyGraphPath} uses.
  *
- * Deliberately not `foldKey`: a path key is compared against values the Rust
- * side folds with `eq_ignore_ascii_case`, so folding characters Rust leaves
- * alone (KELVIN SIGN to k) would split one file into two keys.
+ * Deliberately not `foldKey`: every comparand of a path key passes through
+ * this one fold, and keeping the lowering ASCII-only means it can never
+ * disagree about case with the Rust walker's `eq_ignore_ascii_case` view of
+ * the same filenames. (NFC's own singleton mappings, e.g. KELVIN SIGN to K,
+ * are fine: they apply to both sides of every comparison.)
  */
 export function foldGraphPath(path: string): string {
   return asciiLowerCase(path.normalize('NFC'))
