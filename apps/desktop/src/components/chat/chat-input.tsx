@@ -22,6 +22,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { imageFilesFrom } from '@/lib/chat-attachments'
 import { groupModelOptions } from '@/lib/chat-model-groups'
 import { keybindingFor } from '@/lib/commands/app-commands'
+import { useImeCompositionGuard } from '@/hooks/use-ime-composition-guard'
 import { useChatSession } from '@/providers/chat-provider'
 import { ChatHistoryMenu } from './chat-history-menu'
 
@@ -37,6 +38,7 @@ const NEW_CHAT_BINDING = keybindingFor('chat.new')
  * conversations; "New chat" appears once there's a conversation to leave.
  */
 export function ChatInput(): ReactElement {
+  const ime = useImeCompositionGuard<HTMLTextAreaElement>()
   const {
     turns,
     status,
@@ -108,8 +110,10 @@ export function ChatInput(): ReactElement {
         <textarea
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
+          onCompositionStart={ime.onCompositionStart}
+          onCompositionEnd={ime.onCompositionEnd}
           onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
+            if (event.key === 'Enter' && !event.shiftKey && !ime.isImeKeyEvent(event)) {
               event.preventDefault()
               submit()
             }
@@ -118,6 +122,7 @@ export function ChatInput(): ReactElement {
               stop()
             }
           }}
+          onKeyUp={ime.onKeyUp}
           onPaste={(event) => {
             const files = imageFilesFrom(event.clipboardData)
             if (files.length === 0) {

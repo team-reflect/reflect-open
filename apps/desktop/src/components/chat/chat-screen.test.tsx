@@ -254,6 +254,27 @@ describe('ChatScreen', () => {
     expect(options?.messages.at(-1)).toEqual({ role: 'user', content: 'when does atlas ship?' })
   })
 
+  it('does not send when Enter confirms an IME conversion', async () => {
+    configureModel()
+    scriptTurn([{ type: 'complete', messages: [{ role: 'assistant', content: '了解' }] }])
+    const view = await renderChat()
+    const input = view.getByLabelText('Chat message').element()
+
+    await userEvent.type(input, '日本語')
+    input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
+    input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }))
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+
+    expect(streamChat).not.toHaveBeenCalled()
+    expect(input).toHaveValue('日本語')
+
+    input.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }))
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+
+    await expect.element(view.getByText('日本語')).toBeInTheDocument()
+    expect(streamChat).toHaveBeenCalledTimes(1)
+  })
+
   it('opens ⌘-clicked tool-result and read-note links in new windows', async () => {
     configureModel()
     scriptTurn([
