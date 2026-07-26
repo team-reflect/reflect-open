@@ -1,8 +1,9 @@
+import { foldGraphPath } from '../graph/paths'
 import { wikiLinkSafe } from '../markdown/edit'
 import { foldKey } from '../markdown/keys'
 import { displayNoteTitle, wikiLinkTargetForTitle } from '../markdown/note-title'
 import type { Resolution } from '../markdown/resolve'
-import { retitleWikiLinks } from '../markdown/retitle'
+import { repointPathWikiLinks, retitleWikiLinks } from '../markdown/retitle'
 import { isWikiLinkSafeText, serializeWikiSuggestionAddress } from './suggest'
 
 /**
@@ -219,4 +220,63 @@ export function nextAliases(
   const unchanged =
     next.length === current.length && next.every((alias, i) => alias === current[i])
   return unchanged ? null : next
+}
+
+/** Data access for {@link rewritePathLinksForMove}, injected like {@link RenameIo}. */
+export interface PathLinkRewriteIo {
+  /** Distinct source paths of links whose folded target path key matches. */
+  pathLinkSources: (targetPathKey: string) => Promise<string[]>
+  read: (path: string) => Promise<string>
+  /** Write with the graph generation pre-bound (stale → loud rejection). */
+  write: (path: string, content: string) => Promise<void>
+}
+
+/** What {@link rewritePathLinksForMove} touched, mirroring the title result. */
+export interface PathLinkRewriteResult {
+  rewritten: string[]
+  /** Sources that failed to read/write — skipped; those links dangle until edited. */
+  failed: string[]
+}
+
+/**
+ * Retarget every inbound `[[vault/path]]` link when a managed file moves.
+ * Unlike a title rewrite there is no ambiguity to arbitrate and no alias
+ * safety net: a path names exactly one file, and after the move nothing else
+ * answers to the old spelling — the autocomplete's path-address fallback
+ * writes exactly these links, so the rename automation must keep them alive.
+ * A source that cannot be read or written is skipped; its link shows as
+ * missing until the user touches it, the same failure Obsidian leaves behind
+ * when its own rewrite is off.
+ */
+export async function rewritePathLinksForMove(
+  fromPath: string,
+  toPath: string,
+  io: PathLinkRewriteIo,
+): Promise<PathLinkRewriteResult> {
+  const to = toPath.replace(/\.md$/, '')
+  // The destination is a `slugForTitle` product today (lowercase word
+  // characters and hyphens); a caller handing over an arbitrary path must
+  // fail loudly rather than splice an unparseable target into user files.
+  if (/[[\]|\r\n#]/.test(to) || !to.includes('/')) {
+    throw new Error(`move destination has no wiki spelling: ${toPath}`)
+  }
+  const fromPathKey = foldGraphPath(fromPath)
+  const sources = (await io.pathLinkSources(fromPathKey))
+    .filter((source) => source !== fromPath)
+    .sort()
+  const rewritten: string[] = []
+  const failed: string[] = []
+  for (const source of sources) {
+    try {
+      const content = await io.read(source)
+      const next = repointPathWikiLinks(content, { fromPathKey, to })
+      if (next !== content) {
+        await io.write(source, next)
+        rewritten.push(source)
+      }
+    } catch {
+      failed.push(source)
+    }
+  }
+  return { rewritten, failed }
 }

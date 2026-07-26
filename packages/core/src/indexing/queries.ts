@@ -34,6 +34,18 @@ export {
  */
 
 /** Distinct source paths of links whose folded target key is `targetKey`. */
+/** Distinct source paths of links that name a file by folded vault path. */
+export async function getPathLinkSources(targetPathKey: string): Promise<string[]> {
+  const rows = await db
+    .selectFrom('links')
+    .where('targetPathKey', '=', targetPathKey)
+    .select('sourcePath')
+    .distinct()
+    .orderBy('sourcePath')
+    .execute()
+  return rows.map((row) => row.sourcePath)
+}
+
 export async function getLinkSources(targetKey: string): Promise<string[]> {
   const rows = await db
     .selectFrom('links')

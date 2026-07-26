@@ -2,10 +2,12 @@ import {
   errorMessage,
   getBacklinks,
   getLinkSources,
+  getPathLinkSources,
   isReflectManagedNote,
   readNote,
   resolveWikiTarget,
   rewriteLinksForTitleChange,
+  rewritePathLinksForMove,
   slugPathForTitle,
   writeNote,
 } from '@reflect/core'
@@ -88,6 +90,21 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
     const target = await slugPathForTitle(currentPath, title)
     if (target === currentPath) {
       return
+    }
+    // Retarget inbound `[[notes/…]]` path links before the file moves: they
+    // point at a briefly-missing destination the move satisfies a moment
+    // later, whereas the reverse order would leave permanent dangling links
+    // whenever the rewrite failed. A failed rewrite must not block the move —
+    // those links dangle either way, and the filename projection is the
+    // user-visible half.
+    try {
+      await rewritePathLinksForMove(currentPath, target, {
+        pathLinkSources: getPathLinkSources,
+        read: readNote,
+        write: (forPath, contents) => writeNote(forPath, contents, gen),
+      })
+    } catch (cause) {
+      console.error('path link rewrite failed:', cause)
     }
     await moveNoteCarryingSession(currentPath, target, gen)
     currentPath = target

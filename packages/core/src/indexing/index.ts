@@ -70,6 +70,7 @@ export {
   getDuplicateNoteIds,
   getIndexMeta,
   getLinkSources,
+  getPathLinkSources,
   getNote,
   getNotesByTag,
   getOpenTasks,
@@ -156,6 +157,7 @@ export {
 } from './filtered-search'
 export {
   rewriteLinksForTitleChange,
+  rewritePathLinksForMove,
   nextAliases,
   type RenameBacklink,
   type RenameIo,

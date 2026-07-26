@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { resolved, unresolved } from '../markdown'
-import { nextAliases, rewriteLinksForTitleChange, type RenameIo } from './rename'
+import {
+  nextAliases,
+  rewriteLinksForTitleChange,
+  rewritePathLinksForMove,
+  type RenameIo,
+} from './rename'
 
 function fakeIo(
   files: Record<string, string>,
@@ -613,5 +618,58 @@ describe('rewriteLinksForTitleChange — destination guard', () => {
       destinationBlocked: false,
     })
     expect(writes).toEqual({})
+  })
+})
+
+describe('rewritePathLinksForMove', () => {
+  function pathIo(files: Record<string, string>, sources: string[]) {
+    const writes: Record<string, string> = {}
+    return {
+      writes,
+      io: {
+        pathLinkSources: async () => sources,
+        read: async (path: string) => {
+          const content = files[path]
+          if (content === undefined) {
+            throw new Error(`unreadable: ${path}`)
+          }
+          return content
+        },
+        write: async (path: string, content: string) => {
+          writes[path] = content
+        },
+      },
+    }
+  }
+
+  it('retargets inbound path links and skips unreadable sources', async () => {
+    const { io, writes } = pathIo(
+      {
+        'Journal.md': 'See [[notes/plan-2|The Plan]] and [[archive/plan-2]].',
+      },
+      ['Journal.md', 'Broken.md'],
+    )
+    const result = await rewritePathLinksForMove('notes/plan-2.md', 'notes/roadmap.md', io)
+    expect(result).toEqual({ rewritten: ['Journal.md'], failed: ['Broken.md'] })
+    expect(writes['Journal.md']).toBe(
+      'See [[notes/roadmap|The Plan]] and [[archive/plan-2]].',
+    )
+  })
+
+  it('never rewrites the moved note itself and skips no-op sources', async () => {
+    const { io, writes } = pathIo(
+      { 'Other.md': 'No path links here.' },
+      ['notes/plan-2.md', 'Other.md'],
+    )
+    const result = await rewritePathLinksForMove('notes/plan-2.md', 'notes/roadmap.md', io)
+    expect(result).toEqual({ rewritten: [], failed: [] })
+    expect(writes).toEqual({})
+  })
+
+  it('rejects a destination that has no wiki spelling', async () => {
+    const { io } = pathIo({}, [])
+    await expect(
+      rewritePathLinksForMove('notes/a.md', 'notes/c#-notes.md', io),
+    ).rejects.toThrowError(/no wiki spelling/)
   })
 })

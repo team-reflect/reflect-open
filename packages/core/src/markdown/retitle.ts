@@ -1,3 +1,5 @@
+import { wikiNoteReference } from '../graph/note-reference'
+import { foldGraphPath } from '../graph/paths'
 import { parseNote } from './extract'
 import { foldKey } from './keys'
 
@@ -83,6 +85,58 @@ export function retitleWikiLinks(source: string, options: WikiLinkRetitleOptions
       from: link.from,
       to: link.to,
       text: nextDisplay === null ? `[[${nextTarget}]]` : `[[${nextTarget}|${nextDisplay}]]`,
+    })
+  }
+  return applySplices(source, splices)
+}
+
+/** How one source's path links move with a renamed file. */
+export interface PathWikiLinkRepointOptions {
+  /** Folded vault path the moved file answered to (`foldGraphPath`). */
+  fromPathKey: string
+  /** The new target text, the destination path without `.md`. */
+  to: string
+}
+
+/**
+ * Repoint every wiki link that names the moved file by vault path
+ * (`[[notes/plan-2]]`), keeping pipe displays and `#fragments` byte-for-byte.
+ * Which link addresses the file is decided with the same reduction the index
+ * projection uses ({@link wikiNoteReference}), so a same-stem link in another
+ * folder is never touched. Markdown hrefs stay as written: Reflect never
+ * emits them, and rewriting other tools' files is not this pipeline's job.
+ */
+export function repointPathWikiLinks(
+  source: string,
+  options: PathWikiLinkRepointOptions,
+): string {
+  const { fromPathKey, to } = options
+  // `#` would re-open fragment syntax inside the rewritten target; the
+  // bracket/pipe/newline characters would corrupt the link itself.
+  if (/[[\]|\r\n#]/.test(to)) {
+    throw new Error(`invalid wiki-link path target: ${to}`)
+  }
+  const splices: Splice[] = []
+  for (const link of parseNote({ path: '', source }).wikiLinks) {
+    const inner = source.slice(link.from + 2, link.to - 2)
+    const pipe = inner.indexOf('|')
+    const targetRaw = pipe === -1 ? inner : inner.slice(0, pipe)
+    const displayRaw = pipe === -1 ? null : inner.slice(pipe + 1)
+
+    const reference = wikiNoteReference(targetRaw)
+    if (reference?.kind !== 'path' || foldGraphPath(reference.path) !== fromPathKey) {
+      continue
+    }
+    const hash = targetRaw.indexOf('#')
+    const fragment = hash === -1 ? '' : targetRaw.slice(hash)
+    const nextTarget = `${to}${fragment}`
+    if (nextTarget === targetRaw) {
+      continue
+    }
+    splices.push({
+      from: link.from,
+      to: link.to,
+      text: displayRaw === null ? `[[${nextTarget}]]` : `[[${nextTarget}|${displayRaw}]]`,
     })
   }
   return applySplices(source, splices)
