@@ -33,8 +33,6 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 /// a large video on a slow connection still finishes.
 const READ_TIMEOUT: Duration = Duration::from_secs(60);
 const CONCURRENT_DOWNLOADS: usize = 6;
-/// Collision probes before giving up, mirroring `persist_unique`'s cap.
-const MAX_NAME_PROBES: u32 = 1000;
 
 /// One remote-asset URL occurrence inside a markdown file.
 pub(super) struct RemoteSpan {
@@ -519,16 +517,8 @@ pub(super) fn plan_asset_name(
     staged: &Path,
     taken: &std::collections::HashSet<String>,
 ) -> AppResult<PlannedAssetName> {
-    let (stem, extension) = match desired.rfind('.') {
-        Some(index) if index > 0 => desired.split_at(index),
-        _ => (desired, ""),
-    };
-    for attempt in 1..=MAX_NAME_PROBES {
-        let candidate = if attempt == 1 {
-            desired.to_string()
-        } else {
-            format!("{stem}-{attempt}{extension}")
-        };
+    let mut candidates = super::assets::NameCandidates::new(desired, staged.to_path_buf());
+    while let Some(candidate) = candidates.next()? {
         if taken.contains(&candidate) {
             continue;
         }
@@ -547,7 +537,8 @@ pub(super) fn plan_asset_name(
         }
     }
     Err(AppError::io(format!(
-        "no free asset name after {MAX_NAME_PROBES} probes for {desired}"
+        "no free asset name after {} probes for {desired}",
+        super::assets::MAX_NAME_PROBES
     )))
 }
 
@@ -756,5 +747,46 @@ mod tests {
             plan_asset_name(&assets, "photo.webp", &dir.path().join("other"), &taken).unwrap();
         assert_eq!(planned.name, "photo-3.webp");
         assert!(!planned.reuse);
+    }
+
+    /// A years-long V1 graph can hold thousands of pastes all named
+    /// `image.png`; once the sequential suffixes are dense the plan must jump
+    /// to digest names instead of exhausting the probe cap.
+    #[test]
+    fn plan_switches_to_digest_names_when_sequential_probes_exhaust() {
+        let dir = tempdir().unwrap();
+        let assets = dir.path().join("assets");
+        fs::create_dir_all(&assets).unwrap();
+        let staged = dir.path().join("staged");
+        fs::write(&staged, b"screenshot bytes").unwrap();
+
+        let mut taken = HashSet::from(["image.png".to_string()]);
+        for suffix in 2..=crate::fs::assets::SEQUENTIAL_NAME_PROBES {
+            taken.insert(format!("image-{suffix}.png"));
+        }
+
+        let planned = plan_asset_name(&assets, "image.png", &staged, &taken).unwrap();
+        let digest = planned
+            .name
+            .strip_prefix("image-")
+            .and_then(|rest| rest.strip_suffix(".png"))
+            .unwrap();
+        assert_eq!(digest.len(), 8);
+        assert!(digest.chars().all(|ch| ch.is_ascii_hexdigit()));
+        assert!(!planned.reuse);
+
+        // Re-importing the same bytes re-derives the same digest name and
+        // reuses the file already on disk.
+        fs::write(assets.join(&planned.name), b"screenshot bytes").unwrap();
+        let again = plan_asset_name(&assets, "image.png", &staged, &taken).unwrap();
+        assert_eq!(again.name, planned.name);
+        assert!(again.reuse);
+
+        // A different file lands beside it under its own digest.
+        let other = dir.path().join("other");
+        fs::write(&other, b"a different screenshot").unwrap();
+        let planned_other = plan_asset_name(&assets, "image.png", &other, &taken).unwrap();
+        assert_ne!(planned_other.name, planned.name);
+        assert!(!planned_other.reuse);
     }
 }
