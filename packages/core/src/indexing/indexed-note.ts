@@ -357,7 +357,9 @@ export function buildIndexedNote(
     aliases,
     claims: projectNoteClaims(parsed, aliases),
     emails: extractEmailFields(body).map((email) => ({ email, emailKey: foldEmail(email) })),
-    assets: parsed.assets.map((asset) => asset.path),
+    // One reference can contribute several candidate spellings; the
+    // projection stores each path once.
+    assets: [...new Set(parsed.assets.map((asset) => asset.path))],
     tasks: parsed.tasks.map((task) => ({
       markerOffset: task.markerOffset,
       text: task.text,

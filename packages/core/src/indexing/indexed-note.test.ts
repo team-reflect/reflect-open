@@ -43,7 +43,7 @@ describe('buildIndexedNote', () => {
     expect(indexed.links.some((link) => link.kind === 'md' && link.targetRaw === 'https://x.com')).toBe(
       true,
     )
-    expect(indexed.assets).toEqual(['assets/p.png'])
+    expect(indexed.assets).toEqual(['notes/assets/p.png', 'assets/p.png'])
   })
 
   it('derives v1 subject aliases from a `//` title, after frontmatter aliases', () => {

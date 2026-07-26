@@ -1,6 +1,6 @@
 import { isAppError } from '../errors'
 import { readNote } from '../graph/commands'
-import { assetReferencingNotePaths } from '../indexing/asset-refs'
+import { assetReferenceMatches, assetReferencingNotePaths } from '../indexing/asset-refs'
 import { parseNote } from '../markdown/extract'
 
 /**
@@ -56,7 +56,7 @@ export async function classifyAssetFromNotes(
       return 'skip-private'
     }
     const parsed = parseNote({ path: notePath, source })
-    if (!parsed.assets.some((ref) => ref.path === assetPath)) {
+    if (!parsed.assets.some((ref) => assetReferenceMatches(ref.path, assetPath))) {
       continue
     }
     if (parsed.frontmatter.private) {
