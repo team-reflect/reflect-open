@@ -220,15 +220,18 @@ fn root_for(state: &State<GraphState>, generation: Option<u64>) -> AppResult<Pat
     }
 }
 
-fn ensure_asset_path(path: &str) -> AppResult<()> {
-    if path
-        .strip_prefix("assets/")
-        .is_some_and(|rest| !rest.is_empty())
-    {
+/// Reads and OS opens accept any supported attachment anywhere in the vault:
+/// an adopted vault keeps its images beside its notes. Classification is the
+/// shared `graph-paths` policy, so neither surface can serve a note, a hidden
+/// file, or a traversal path. Writes are deliberately untouched — Reflect
+/// only ever creates files under `assets/` and `audio-memos/`, and widening
+/// reads must not widen what Reflect will write.
+fn ensure_readable_attachment_path(path: &str) -> AppResult<()> {
+    if reflect_graph_paths::is_attachment(path) {
         return Ok(());
     }
     Err(AppError::traversal(format!(
-        "asset path must be under assets/: {path}"
+        "not a supported attachment path: {path}"
     )))
 }
 
@@ -470,6 +473,7 @@ pub fn asset_write(
 #[tauri::command]
 pub fn asset_read(path: String, generation: u64, state: State<GraphState>) -> AppResult<String> {
     use base64::Engine;
+    ensure_readable_attachment_path(&path)?;
     let root = root_for_generation(&state, generation)?;
     let bytes = fs::read(resolve(&root, &path)?)?;
     Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
@@ -485,7 +489,7 @@ pub fn asset_open(
     app: tauri::AppHandle,
     state: State<GraphState>,
 ) -> AppResult<()> {
-    ensure_asset_path(&path)?;
+    ensure_readable_attachment_path(&path)?;
     let root = root_for_generation(&state, generation)?;
     let abs = resolve(&root, &path)?;
     if !abs.is_file() {
@@ -935,7 +939,7 @@ mod note_create_tests {
 
 #[cfg(test)]
 mod move_tests {
-    use super::{asset_file_url, ensure_asset_path, move_note_file};
+    use super::{asset_file_url, ensure_readable_attachment_path, move_note_file};
     use std::fs;
 
     fn graph() -> tempfile::TempDir {
@@ -987,11 +991,16 @@ mod move_tests {
     }
 
     #[test]
-    fn asset_open_paths_must_stay_under_assets() {
-        assert!(ensure_asset_path("assets/cat.png").is_ok());
-        assert!(ensure_asset_path("notes/cat.png").is_err());
-        assert!(ensure_asset_path("assets/").is_err());
-        assert!(ensure_asset_path("assets").is_err());
+    fn asset_open_accepts_supported_attachments_anywhere_and_nothing_else() {
+        assert!(ensure_readable_attachment_path("assets/cat.png").is_ok());
+        assert!(ensure_readable_attachment_path("Projects/Media/cat.png").is_ok());
+        assert!(ensure_readable_attachment_path("audio-memos/memo.m4a").is_ok());
+        // Notes, hidden components, traversal, and extensionless paths refuse.
+        assert!(ensure_readable_attachment_path("notes/secret.md").is_err());
+        assert!(ensure_readable_attachment_path(".obsidian/cat.png").is_err());
+        assert!(ensure_readable_attachment_path("../cat.png").is_err());
+        assert!(ensure_readable_attachment_path("assets/").is_err());
+        assert!(ensure_readable_attachment_path("assets").is_err());
     }
 
     #[test]

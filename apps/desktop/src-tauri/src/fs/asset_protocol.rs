@@ -122,15 +122,16 @@ fn serve<R: Runtime>(
     Ok((mime, bytes))
 }
 
-/// Split `<generation>/<graph-relative path>` and vet the path shape. The
-/// `assets/` restriction mirrors `asset_open`: images in note markdown are
-/// the only consumer, and they never reference anything else.
+/// Split `<generation>/<graph-relative path>` and vet the path shape. Any
+/// supported attachment anywhere in the vault qualifies, mirroring
+/// `asset_open`: an adopted vault keeps its images beside its notes. Notes,
+/// hidden components, and traversal shapes stay forbidden.
 fn parse_request_path(request_path: &str) -> Result<(u64, &str), StatusCode> {
     let (generation, rel) = request_path
         .split_once('/')
         .ok_or(StatusCode::BAD_REQUEST)?;
     let generation: u64 = generation.parse().map_err(|_| StatusCode::BAD_REQUEST)?;
-    super::ensure_asset_path(rel).map_err(|_| StatusCode::FORBIDDEN)?;
+    super::ensure_readable_attachment_path(rel).map_err(|_| StatusCode::FORBIDDEN)?;
     Ok((generation, rel))
 }
 
@@ -147,6 +148,10 @@ mod tests {
         assert_eq!(
             parse_request_path("12/assets/sub dir/photo 1.jpeg").unwrap(),
             (12, "assets/sub dir/photo 1.jpeg"),
+        );
+        assert_eq!(
+            parse_request_path("3/Projects/Media/cat.png").unwrap(),
+            (3, "Projects/Media/cat.png"),
         );
     }
 
@@ -167,9 +172,17 @@ mod tests {
     }
 
     #[test]
-    fn rejects_paths_outside_assets() {
+    fn rejects_notes_hidden_and_traversal_paths() {
         assert_eq!(
             parse_request_path("3/notes/secret.md").unwrap_err(),
+            StatusCode::FORBIDDEN,
+        );
+        assert_eq!(
+            parse_request_path("3/.obsidian/cat.png").unwrap_err(),
+            StatusCode::FORBIDDEN,
+        );
+        assert_eq!(
+            parse_request_path("3/../cat.png").unwrap_err(),
             StatusCode::FORBIDDEN,
         );
         assert_eq!(
