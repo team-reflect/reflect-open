@@ -69,6 +69,38 @@ impl Fixture {
                 )
                 .unwrap();
             }
+            // The spellings this note answers to, mirroring the desktop's
+            // `projectNoteClaims`: date, title, aliases, filename stem, first
+            // claim of a key wins.
+            let stem = {
+                let filename = note.rel_path.rsplit('/').next().unwrap_or(&note.rel_path);
+                filename.strip_suffix(".md").unwrap_or(filename)
+            };
+            let mut claims: Vec<(String, i64)> = Vec::new();
+            let mut claim = |claims: &mut Vec<(String, i64)>, key: String, tier: i64| {
+                if !key.is_empty() && !claims.iter().any(|(existing, _)| *existing == key) {
+                    claims.push((key, tier));
+                }
+            };
+            if let Some(date) = daily_date {
+                // Calendar-valid only: an impossible `daily/2026-02-31.md` is
+                // an ordinary note and must never claim a date.
+                if reflect_cli::paths::parse_calendar_date(date).is_some() {
+                    claim(&mut claims, date.to_string(), 1);
+                }
+            }
+            claim(&mut claims, fold_key(&meta.title), 2);
+            for alias in &meta.aliases {
+                claim(&mut claims, fold_key(alias), 3);
+            }
+            claim(&mut claims, fold_key(stem), 4);
+            for (key, tier) in &claims {
+                conn.execute(
+                    "INSERT INTO note_claims(note_path, key, tier) VALUES(?1, ?2, ?3)",
+                    params![note.rel_path, key, tier],
+                )
+                .unwrap();
+            }
             conn.execute(
                 "INSERT INTO search_fts(path, title, body) VALUES(?1, ?2, ?3)",
                 params![note.rel_path, meta.title, content],
@@ -702,4 +734,66 @@ fn open_json_shape() {
     assert_eq!(daily["date"], "2026-01-02");
     assert_eq!(daily["path"], "daily/2026-01-02.md");
     assert_eq!(daily["url"], "reflect://daily/2026-01-02");
+}
+
+#[test]
+fn show_resolves_a_note_by_its_filename_stem() {
+    // The H1 differs from the filename: Obsidian's convention. Both spellings
+    // must resolve, with or without an index.
+    let fixture = graph();
+    fixture.write_note("Projects/Plan.md", "# Weekly Planning\nstem body\n");
+
+    let by_stem = reflect(&fixture, &["show", "Plan"]);
+    assert!(by_stem.status.success(), "{}", stderr(&by_stem));
+    assert!(stdout(&by_stem).contains("stem body"));
+
+    fixture.build_index();
+    let indexed = reflect(&fixture, &["show", "Plan"]);
+    assert!(indexed.status.success(), "{}", stderr(&indexed));
+    assert!(stdout(&indexed).contains("stem body"));
+}
+
+#[test]
+fn show_prefers_a_title_over_a_filename_stem() {
+    let fixture = graph();
+    fixture.write_note("Archive/old.md", "# Plan\ntitled body\n");
+    fixture.write_note("Projects/Plan.md", "# Weekly Planning\nstem body\n");
+
+    let scanned = reflect(&fixture, &["show", "Plan"]);
+    assert!(scanned.status.success(), "{}", stderr(&scanned));
+    assert!(stdout(&scanned).contains("titled body"));
+
+    fixture.build_index();
+    let indexed = reflect(&fixture, &["show", "Plan"]);
+    assert!(indexed.status.success(), "{}", stderr(&indexed));
+    assert!(stdout(&indexed).contains("titled body"));
+}
+
+#[test]
+fn show_resolves_a_nested_vault_path_argument() {
+    let fixture = graph();
+    fixture.write_note("Projects/deep/Plan.md", "# Anything\nnested body\n");
+
+    let output = reflect(&fixture, &["show", "Projects/deep/Plan.md"]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(stdout(&output).contains("nested body"));
+}
+
+#[test]
+fn scan_resolution_agrees_with_the_index_on_stems() {
+    // The same vault answers the same way whether or not `.reflect` has an
+    // index — the parity commit 4 exists to keep.
+    let fixture = graph();
+    fixture.write_note("a/Plan.md", "# One Thing\nfirst body\n");
+    fixture.write_note("b/Plan.md", "# Another Thing\nsecond body\n");
+
+    let scanned = reflect(&fixture, &["path", "Plan"]);
+    assert!(scanned.status.success(), "{}", stderr(&scanned));
+    let scanned_path = stdout(&scanned);
+
+    fixture.build_index();
+    let indexed = reflect(&fixture, &["path", "Plan"]);
+    assert!(indexed.status.success(), "{}", stderr(&indexed));
+    assert_eq!(stdout(&indexed), scanned_path);
+    assert!(scanned_path.contains("a/Plan.md"));
 }
