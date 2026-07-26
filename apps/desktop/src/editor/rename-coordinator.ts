@@ -86,7 +86,11 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
    * the filename drifting (cosmetic — resolution never reads filenames) until
    * the next settled rename re-derives it.
    */
-  const runMove = async (title: string, gen: number): Promise<void> => {
+  const runMove = async (
+    title: string,
+    gen: number,
+    options?: { rewriteInboundPathLinks?: boolean },
+  ): Promise<void> => {
     const target = await slugPathForTitle(currentPath, title)
     if (target === currentPath) {
       return
@@ -96,15 +100,18 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
     // later, whereas the reverse order would leave permanent dangling links
     // whenever the rewrite failed. A failed rewrite must not block the move —
     // those links dangle either way, and the filename projection is the
-    // user-visible half.
-    try {
-      await rewritePathLinksForMove(currentPath, target, {
-        pathLinkSources: getPathLinkSources,
-        read: readNote,
-        write: (forPath, contents) => writeNote(forPath, contents, gen),
-      })
-    } catch (cause) {
-      console.error('path link rewrite failed:', cause)
+    // user-visible half. Births skip this: nothing can hold a path link to a
+    // placeholder path that existed only inside this session.
+    if (options?.rewriteInboundPathLinks === true) {
+      try {
+        await rewritePathLinksForMove(currentPath, target, {
+          pathLinkSources: getPathLinkSources,
+          read: readNote,
+          write: (forPath, contents) => writeNote(forPath, contents, gen),
+        })
+      } catch (cause) {
+        console.error('path link rewrite failed:', cause)
+      }
     }
     await moveNoteCarryingSession(currentPath, target, gen)
     currentPath = target
@@ -189,7 +196,7 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
         // is a separate capability: stable-path and adopted notes stay put.
         if (isReflectManagedNote(currentPath, latestSource)) {
           try {
-            await runMove(rename.to, gen)
+            await runMove(rename.to, gen, { rewriteInboundPathLinks: true })
           } catch (cause) {
             failures.move = errorMessage(cause)
             console.error('note file move failed:', cause)
