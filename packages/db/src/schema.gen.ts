@@ -71,7 +71,14 @@ export interface Links {
   posTo: number;
   sourcePath: string;
   targetKey: string;
+  targetPathKey: string | null;
   targetRaw: string;
+}
+
+export interface NoteClaims {
+  key: string;
+  notePath: string;
+  tier: number;
 }
 
 export interface NoteEmails {
@@ -98,6 +105,7 @@ export interface Notes {
   kind: Generated<string>;
   mtime: Generated<number>;
   path: string;
+  pathKey: Generated<string>;
   pinnedOrder: number | null;
   preview: Generated<string>;
   title: string;
@@ -142,6 +150,7 @@ export interface DB {
   indexMeta: IndexMeta;
   links: Links;
   noteEmails: NoteEmails;
+  noteClaims: NoteClaims;
   noteKeys: NoteKeys;
   notes: Notes;
   noteText: NoteText;

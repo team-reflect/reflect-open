@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { noteBasenameKey } from '../graph/note-reference'
+import { dateFromDailyPath, foldGraphPath, isCalendarDate } from '../graph/paths'
 import { call } from '../ipc/invoke'
 import type { IndexedNote } from './indexed-note'
 
@@ -50,7 +52,21 @@ export async function moveIndexedRows(
   to: string,
   generation: number,
 ): Promise<void> {
-  await call('index_move', { from, to, generation }, voidSchema)
+  await call('index_move', { from, to, generation, toAddress: movedNoteAddress(to) }, voidSchema)
+}
+
+/**
+ * The path-derived addressing a row move must re-state: the folded destination
+ * path plus the tier-1/tier-4 claims that derive from it. Folded here because
+ * Rust never folds; mirrors `projectNoteClaims`'s path-derived tiers.
+ */
+function movedNoteAddress(path: string) {
+  const date = dateFromDailyPath(path)
+  return {
+    pathKey: foldGraphPath(path),
+    basenameKey: noteBasenameKey(path),
+    dailyDate: date !== null && isCalendarDate(date) ? date : null,
+  }
 }
 
 /**
@@ -66,7 +82,17 @@ export async function moveNoteIndexed(
   to: string,
   generation: number,
 ): Promise<void> {
-  await call('note_move_indexed', { from, to, generation }, voidSchema)
+  await call(
+    'note_move_indexed',
+    {
+      from,
+      to,
+      generation,
+      toAddress: movedNoteAddress(to),
+      fromAddress: movedNoteAddress(from),
+    },
+    voidSchema,
+  )
 }
 
 const scanCandidateSchema = z.object({

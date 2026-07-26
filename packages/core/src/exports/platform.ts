@@ -87,8 +87,16 @@ export {
   mayContainNotes,
   isTemplatePath,
   dateFromDailyPath,
+  foldGraphPath,
+  isCalendarDate,
   type GraphPathKind,
 } from '../graph/paths'
+export {
+  wikiNoteReference,
+  markdownNoteReference,
+  noteBasenameKey,
+  type NoteReference,
+} from '../graph/note-reference'
 export {
   isValidReflectNoteId,
   isReflectManagedNotePath,

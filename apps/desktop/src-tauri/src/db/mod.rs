@@ -248,6 +248,8 @@ pub fn note_move_indexed<R: tauri::Runtime>(
     from: String,
     to: String,
     generation: u64,
+    to_address: write::MovedNoteAddress,
+    from_address: write::MovedNoteAddress,
     app: tauri::AppHandle<R>,
     graph: State<GraphState>,
     index: State<IndexState>,
@@ -258,12 +260,12 @@ pub fn note_move_indexed<R: tauri::Runtime>(
     {
         let mut state = lock_state(&index)?;
         let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
-        move_rows(conn, &from, &to)?;
+        move_rows(conn, &from, &to, &to_address)?;
         if let Err(err) = crate::fs::move_note_file(&root, &from, &to) {
             // Compensate: the disk refused, so the rows go back. Best-effort —
             // a failed compensation must surface the *original* error, and the
             // reconcile heals any residue by id.
-            if let Err(comp) = move_rows(conn, &to, &from) {
+            if let Err(comp) = move_rows(conn, &to, &from, &from_address) {
                 tracing::error!(
                     ?comp,
                     "rename compensation failed; reconcile will heal by id"
@@ -279,12 +281,17 @@ pub fn note_move_indexed<R: tauri::Runtime>(
 }
 
 /// One committed row-move transaction (the rename pipeline's halves).
-fn move_rows(conn: &mut Connection, from: &str, to: &str) -> AppResult<()> {
+fn move_rows(
+    conn: &mut Connection,
+    from: &str,
+    to: &str,
+    address: &write::MovedNoteAddress,
+) -> AppResult<()> {
     let tx = conn.transaction()?;
     // Child tables FK `notes(path)`; deferring lets the parent key move first
     // and the constraint re-check at commit, when the children have followed.
     tx.execute_batch("PRAGMA defer_foreign_keys = ON;")?;
-    write::move_note(&tx, from, to)?;
+    write::move_note(&tx, from, to, address)?;
     tx.commit()?;
     Ok(())
 }
@@ -301,6 +308,7 @@ pub fn index_move<R: tauri::Runtime>(
     from: String,
     to: String,
     generation: u64,
+    to_address: write::MovedNoteAddress,
     app: tauri::AppHandle<R>,
     index: State<IndexState>,
     background_tasks: State<BackgroundTaskState>,
@@ -312,7 +320,7 @@ pub fn index_move<R: tauri::Runtime>(
             return Ok(());
         }
         let conn = state.conn.as_mut().ok_or_else(AppError::no_graph)?;
-        move_rows(conn, &from, &to)?;
+        move_rows(conn, &from, &to, &to_address)?;
     }
     emit_index_written(&app);
     emit_note_moved(&app, &from, &to);

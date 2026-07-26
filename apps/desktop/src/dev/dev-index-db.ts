@@ -1,5 +1,13 @@
 import sqlite3InitModule, { type Database, type SqlValue } from '@sqlite.org/sqlite-wasm'
-import { encodeTaskBreadcrumbs, ReflectError, type IndexedNote } from '@reflect/core'
+import {
+  dateFromDailyPath,
+  encodeTaskBreadcrumbs,
+  foldGraphPath,
+  isCalendarDate,
+  noteBasenameKey,
+  ReflectError,
+  type IndexedNote,
+} from '@reflect/core'
 
 /**
  * The dev bridge's SQLite index: the real `crates/index-schema` migrations
@@ -111,13 +119,14 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
       removeNote(db, note.path)
       run(
         db,
-        `INSERT INTO notes(path, id, title, title_key, kind, daily_date, is_private, is_pinned, pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at, preview)
-         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO notes(path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned, pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at, preview)
+         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           note.path,
           note.id,
           note.title,
           note.titleKey,
+          note.pathKey,
           note.kind,
           note.dailyDate,
           note.isPrivate,
@@ -136,9 +145,18 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
       for (const link of note.links) {
         run(
           db,
-          `INSERT INTO links(source_path, kind, target_raw, target_key, alias, pos_from, pos_to)
-           VALUES(?, ?, ?, ?, ?, ?, ?)`,
-          [note.path, link.kind, link.targetRaw, link.targetKey, link.alias, link.posFrom, link.posTo],
+          `INSERT INTO links(source_path, kind, target_raw, target_key, target_path_key, alias, pos_from, pos_to)
+           VALUES(?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            note.path,
+            link.kind,
+            link.targetRaw,
+            link.targetKey,
+            link.targetPathKey,
+            link.alias,
+            link.posFrom,
+            link.posTo,
+          ],
         )
       }
       for (const tag of note.tags) {
@@ -153,6 +171,13 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
           note.path,
           alias.alias,
           alias.aliasKey,
+        ])
+      }
+      for (const claim of note.claims) {
+        run(db, 'INSERT INTO note_claims(note_path, key, tier) VALUES(?, ?, ?)', [
+          note.path,
+          claim.key,
+          claim.tier,
         ])
       }
       for (const email of note.emails) {
@@ -201,7 +226,33 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
       db.exec('BEGIN')
       try {
         db.exec('PRAGMA defer_foreign_keys = ON')
-        run(db, 'UPDATE notes SET path = ? WHERE path = ?', [to, from])
+        run(db, 'UPDATE notes SET path = ?, path_key = ? WHERE path = ?', [
+          to,
+          foldGraphPath(to),
+          from,
+        ])
+        const movedRows = db.changes()
+        // Mirrors `write.rs`: carried claims follow the row; the path-derived
+        // tiers are re-stated for the destination. A missing source row moves
+        // nothing and must not mint claims for a note that does not exist.
+        run(db, 'UPDATE note_claims SET note_path = ? WHERE note_path = ?', [to, from])
+        if (movedRows > 0) {
+          run(db, 'DELETE FROM note_claims WHERE note_path = ? AND tier IN (1, 4)', [to])
+          const date = dateFromDailyPath(to)
+          const restated = [
+            ...(date !== null && isCalendarDate(date) ? [{ key: date, tier: 1 }] : []),
+            { key: noteBasenameKey(to), tier: 4 },
+          ]
+          for (const claim of restated) {
+            run(
+              db,
+              `INSERT INTO note_claims(note_path, key, tier)
+               SELECT ?, ?, ?
+               WHERE NOT EXISTS (SELECT 1 FROM note_claims WHERE note_path = ? AND key = ?)`,
+              [to, claim.key, claim.tier, to, claim.key],
+            )
+          }
+        }
         run(db, 'UPDATE note_text SET note_path = ? WHERE note_path = ?', [to, from])
         run(db, 'UPDATE links SET source_path = ? WHERE source_path = ?', [to, from])
         run(db, 'UPDATE tags SET note_path = ? WHERE note_path = ?', [to, from])

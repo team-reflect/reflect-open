@@ -21,6 +21,8 @@ pub struct IndexedNote {
     pub(super) id: Option<String>,
     pub(super) title: String,
     pub(super) title_key: String,
+    /// ASCII-folded graph path: what a path-qualified link joins against.
+    pub(super) path_key: String,
     /// 'daily' | 'note' | 'template' — templates are excluded from note surfaces.
     pub(super) kind: String,
     pub(super) daily_date: Option<String>,
@@ -44,6 +46,8 @@ pub struct IndexedNote {
     pub(super) links: Vec<IndexedLink>,
     pub(super) tags: Vec<IndexedTag>,
     pub(super) aliases: Vec<IndexedAlias>,
+    /// Every folded spelling this note answers to (see `note_claims`).
+    pub(super) claims: Vec<IndexedClaim>,
     /// Emails the note owns via `- Email:` contact-field bullets.
     pub(super) emails: Vec<IndexedEmail>,
     pub(super) assets: Vec<String>,
@@ -56,6 +60,8 @@ pub(super) struct IndexedLink {
     pub(super) kind: String,
     pub(super) target_raw: String,
     pub(super) target_key: String,
+    /// Folded vault path when the link names a file; None when it names a note.
+    pub(super) target_path_key: Option<String>,
     pub(super) alias: Option<String>,
     pub(super) pos_from: i64,
     pub(super) pos_to: i64,
@@ -73,6 +79,15 @@ pub(super) struct IndexedTag {
 pub(super) struct IndexedAlias {
     pub(super) alias: String,
     pub(super) alias_key: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct IndexedClaim {
+    /// Folded spelling this note answers to.
+    pub(super) key: String,
+    /// 1 calendar-valid daily date, 2 authored title, 3 alias, 4 filename stem.
+    pub(super) tier: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -110,14 +125,15 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
     remove_note(conn, &note.path)?;
 
     conn.prepare_cached(
-        "INSERT INTO notes(path, id, title, title_key, kind, daily_date, is_private, is_pinned, pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at, preview)
-         VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?14, ?15)",
+        "INSERT INTO notes(path, id, title, title_key, path_key, kind, daily_date, is_private, is_pinned, pinned_order, has_conflict, gist_url, gist_stale, file_hash, mtime, updated_at, preview)
+         VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15, ?16)",
     )?
     .execute(params![
         note.path,
         note.id,
         note.title,
         note.title_key,
+        note.path_key,
         note.kind,
         note.daily_date,
         i64::from(note.is_private),
@@ -134,8 +150,8 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
         .execute(params![note.path, note.text])?;
     {
         let mut stmt = conn.prepare_cached(
-            "INSERT INTO links(source_path, kind, target_raw, target_key, alias, pos_from, pos_to)
-             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO links(source_path, kind, target_raw, target_key, target_path_key, alias, pos_from, pos_to)
+             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         )?;
         for link in &note.links {
             stmt.execute(params![
@@ -143,6 +159,7 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
                 link.kind,
                 link.target_raw,
                 link.target_key,
+                link.target_path_key,
                 link.alias,
                 link.pos_from,
                 link.pos_to
@@ -162,6 +179,14 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
         )?;
         for alias in &note.aliases {
             stmt.execute(params![note.path, alias.alias, alias.alias_key])?;
+        }
+    }
+    {
+        let mut stmt = conn.prepare_cached(
+            "INSERT INTO note_claims(note_path, key, tier) VALUES(?1, ?2, ?3)",
+        )?;
+        for claim in &note.claims {
+            stmt.execute(params![note.path, claim.key, claim.tier])?;
         }
     }
     {
@@ -212,6 +237,17 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
     Ok(())
 }
 
+/// Path-derived addressing for a moved row: the folded destination path plus
+/// the claims that derive from it. Folded in TypeScript — Rust never folds.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MovedNoteAddress {
+    pub(super) path_key: String,
+    pub(super) basename_key: String,
+    /// Set only for a calendar-valid `daily/YYYY-MM-DD.md` destination.
+    pub(super) daily_date: Option<String>,
+}
+
 /// Move every row keyed by `from` to `to` — the projection half of a file
 /// rename (Plan 17). The row *moves* rather than being re-created so nothing
 /// derived is lost: pinned state, conflict flags, and (critically) embedding
@@ -228,7 +264,12 @@ pub(super) fn apply_note(conn: &Connection, note: &IndexedNote) -> AppResult<()>
 /// drifts until the next settled rename retries. One rule, no adoption
 /// heuristics. A missing `from` row is fine: an unindexed file can still be
 /// renamed, and the watcher indexes it at the new path.
-pub(super) fn move_note(conn: &Connection, from: &str, to: &str) -> AppResult<()> {
+pub(super) fn move_note(
+    conn: &Connection,
+    from: &str,
+    to: &str,
+    address: &MovedNoteAddress,
+) -> AppResult<()> {
     let occupied: bool = conn
         .prepare_cached("SELECT 1 FROM notes WHERE path = ?1")?
         .exists(params![to])?;
@@ -237,8 +278,34 @@ pub(super) fn move_note(conn: &Connection, from: &str, to: &str) -> AppResult<()
             "cannot move note: {to} is already indexed"
         )));
     }
-    conn.prepare_cached("UPDATE notes SET path = ?2 WHERE path = ?1")?
+    let moved = conn
+        .prepare_cached("UPDATE notes SET path = ?2, path_key = ?3 WHERE path = ?1")?
+        .execute(params![from, to, address.path_key])?;
+    conn.prepare_cached("UPDATE note_claims SET note_path = ?2 WHERE note_path = ?1")?
         .execute(params![from, to])?;
+    if moved > 0 {
+        // Title and alias claims live in the content and ride along; the
+        // path-derived tiers are re-stated for the destination. The NOT EXISTS
+        // guard mirrors `projectNoteClaims`'s seen-set: a key a carried claim
+        // already holds is not claimed again. (A move that changes which tier
+        // should own a key converges on the next reprojection.)
+        conn.prepare_cached("DELETE FROM note_claims WHERE note_path = ?1 AND tier IN (1, 4)")?
+            .execute(params![to])?;
+        if let Some(daily_date) = &address.daily_date {
+            conn.prepare_cached(
+                "INSERT INTO note_claims(note_path, key, tier)
+                 SELECT ?1, ?2, 1
+                 WHERE NOT EXISTS (SELECT 1 FROM note_claims WHERE note_path = ?1 AND key = ?2)",
+            )?
+            .execute(params![to, daily_date])?;
+        }
+        conn.prepare_cached(
+            "INSERT INTO note_claims(note_path, key, tier)
+             SELECT ?1, ?2, 4
+             WHERE NOT EXISTS (SELECT 1 FROM note_claims WHERE note_path = ?1 AND key = ?2)",
+        )?
+        .execute(params![to, address.basename_key])?;
+    }
     conn.prepare_cached("UPDATE note_text SET note_path = ?2 WHERE note_path = ?1")?
         .execute(params![from, to])?;
     conn.prepare_cached("UPDATE links SET source_path = ?2 WHERE source_path = ?1")?

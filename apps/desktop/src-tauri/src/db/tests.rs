@@ -12,8 +12,8 @@ use super::migrations::{migrate, migrate_to, open_in_memory, open_index_at, vali
 use super::query::run_query;
 use super::scan::scan_reconcile;
 use super::write::{
-    apply_note, clear_index, move_note, touch_note, IndexedAlias, IndexedEmail, IndexedLink,
-    IndexedNote, IndexedTag, IndexedTask,
+    apply_note, clear_index, move_note, touch_note, IndexedAlias, IndexedClaim, IndexedEmail,
+    IndexedLink, IndexedNote, IndexedTag, IndexedTask, MovedNoteAddress,
 };
 
 fn migrated() -> Connection {
@@ -25,12 +25,32 @@ fn migrated() -> Connection {
     conn
 }
 
+/// The filename-stem key the TS projection derives (`noteBasenameKey`).
+fn stem_key(path: &str) -> String {
+    let filename = path.rsplit('/').next().unwrap_or(path);
+    filename.trim_end_matches(".md").to_lowercase()
+}
+
+/// Mirrors `projectNoteClaims`'s seen-set: first claim of a key wins.
+fn push_claim(claims: &mut Vec<IndexedClaim>, key: &str, tier: i64) {
+    if !key.is_empty() && !claims.iter().any(|claim| claim.key == key) {
+        claims.push(IndexedClaim {
+            key: key.to_string(),
+            tier,
+        });
+    }
+}
+
 fn note(path: &str, title: &str, links: Vec<IndexedLink>) -> IndexedNote {
+    let mut claims = Vec::new();
+    push_claim(&mut claims, &title.to_lowercase(), 2);
+    push_claim(&mut claims, &stem_key(path), 4);
     IndexedNote {
         path: path.to_string(),
         id: None,
         title: title.to_string(),
         title_key: title.to_lowercase(),
+        path_key: path.to_lowercase(),
         kind: "note".to_string(),
         daily_date: None,
         is_private: false,
@@ -47,6 +67,7 @@ fn note(path: &str, title: &str, links: Vec<IndexedLink>) -> IndexedNote {
         links,
         tags: vec![],
         aliases: vec![],
+        claims,
         emails: vec![],
         assets: vec![],
         tasks: vec![],
@@ -58,6 +79,20 @@ fn wiki(target: &str) -> IndexedLink {
         kind: "wiki".to_string(),
         target_raw: target.to_string(),
         target_key: target.to_lowercase(),
+        target_path_key: None,
+        alias: None,
+        pos_from: 0,
+        pos_to: 0,
+    }
+}
+
+/// A link that names an exact file (`[[Projects/Plan]]` or `[x](./plan.md)`).
+fn path_link(kind: &str, target_raw: &str, target_path_key: &str) -> IndexedLink {
+    IndexedLink {
+        kind: kind.to_string(),
+        target_raw: target_raw.to_string(),
+        target_key: target_raw.to_lowercase(),
+        target_path_key: Some(target_path_key.to_string()),
         alias: None,
         pos_from: 0,
         pos_to: 0,
@@ -70,6 +105,11 @@ fn aliased_note(path: &str, title: &str, alias: &str) -> IndexedNote {
         alias: alias.to_string(),
         alias_key: alias.to_lowercase(),
     }];
+    let mut claims = Vec::new();
+    push_claim(&mut claims, &title.to_lowercase(), 2);
+    push_claim(&mut claims, &alias.to_lowercase(), 3);
+    push_claim(&mut claims, &stem_key(path), 4);
+    indexed.claims = claims;
     indexed
 }
 
@@ -77,7 +117,21 @@ fn daily_note(path: &str, date: &str) -> IndexedNote {
     let mut indexed = note(path, date, vec![]);
     indexed.kind = "daily".to_string();
     indexed.daily_date = Some(date.to_string());
+    let mut claims = Vec::new();
+    push_claim(&mut claims, date, 1);
+    push_claim(&mut claims, &date.to_lowercase(), 2);
+    push_claim(&mut claims, &stem_key(path), 4);
+    indexed.claims = claims;
     indexed
+}
+
+/// What the TS `movedNoteAddress` computes for a test path (never a daily).
+fn moved_address(to: &str) -> MovedNoteAddress {
+    MovedNoteAddress {
+        path_key: to.to_lowercase(),
+        basename_key: stem_key(to),
+        daily_date: None,
+    }
 }
 
 fn task(marker_offset: i64, text: &str, checked: bool) -> IndexedTask {
@@ -201,7 +255,13 @@ fn note_emails_apply_move_and_cascade() {
     // transaction the command layer would open).
     conn.execute_batch("BEGIN; PRAGMA defer_foreign_keys = ON;")
         .unwrap();
-    move_note(&conn, "notes/jane-doe.md", "notes/jane.md").unwrap();
+    move_note(
+        &conn,
+        "notes/jane-doe.md",
+        "notes/jane.md",
+        &moved_address("notes/jane.md"),
+    )
+    .unwrap();
     conn.execute_batch("COMMIT;").unwrap();
     let moved = run_query(&conn, "SELECT note_path FROM note_emails", &[]).unwrap();
     assert_eq!(moved[0]["note_path"], Value::from("notes/jane.md"));
@@ -418,6 +478,7 @@ fn templates_are_invisible_to_backlink_resolution() {
     let conn = migrated();
     let mut template = note("templates/journal.md", "Journal", vec![wiki("Target")]);
     template.kind = "template".to_string();
+    template.claims = vec![];
     apply_note(&conn, &template).unwrap();
     apply_note(&conn, &note("notes/target.md", "Target", vec![])).unwrap();
     apply_note(&conn, &note("notes/a.md", "A", vec![wiki("Journal")])).unwrap();
@@ -1554,7 +1615,7 @@ fn apply_chunks_for_an_unindexed_path_is_a_cleaning_no_op() {
 fn move_in_txn(conn: &mut Connection, from: &str, to: &str) -> crate::error::AppResult<()> {
     let tx = conn.transaction()?;
     tx.execute_batch("PRAGMA defer_foreign_keys = ON;")?;
-    move_note(&tx, from, to)?;
+    move_note(&tx, from, to, &moved_address(to))?;
     tx.commit()?;
     Ok(())
 }
@@ -1864,4 +1925,182 @@ fn clear_index_preserves_chat_history() {
     assert_eq!(notes[0]["n"], Value::from(0));
     let messages = run_query(&conn, "SELECT count(*) AS n FROM chat_messages", &[]).unwrap();
     assert_eq!(messages[0]["n"], Value::from(1));
+}
+
+// ---- note_claims addressing (0019) ------------------------------------------
+
+#[test]
+fn a_filename_stem_resolves_a_note_whose_authored_title_differs() {
+    let conn = migrated();
+    apply_note(&conn, &note("Projects/Plan.md", "Weekly Planning", vec![])).unwrap();
+    let keys = run_query(
+        &conn,
+        "SELECT note_path FROM note_keys WHERE key = 'plan'",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(keys.len(), 1);
+    assert_eq!(keys[0]["note_path"], Value::from("Projects/Plan.md"));
+}
+
+#[test]
+fn a_title_outranks_a_filename_stem_claiming_the_same_key() {
+    let conn = migrated();
+    apply_note(&conn, &note("Archive/old.md", "Plan", vec![])).unwrap();
+    apply_note(&conn, &note("Projects/Plan.md", "Weekly", vec![])).unwrap();
+    let keys = run_query(
+        &conn,
+        "SELECT note_path, claim_count FROM note_keys WHERE key = 'plan'",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(keys.len(), 1);
+    assert_eq!(keys[0]["note_path"], Value::from("Archive/old.md"));
+    // The weaker claimant does not inflate the winning tier's count.
+    assert_eq!(keys[0]["claim_count"], Value::from(1));
+}
+
+#[test]
+fn an_alias_outranks_a_filename_stem_but_loses_to_a_title() {
+    let conn = migrated();
+    apply_note(&conn, &aliased_note("notes/a.md", "Alpha", "Plan")).unwrap();
+    apply_note(&conn, &note("archive/Plan.md", "Beta", vec![])).unwrap();
+    let via_alias = run_query(
+        &conn,
+        "SELECT note_path FROM note_keys WHERE key = 'plan'",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(via_alias[0]["note_path"], Value::from("notes/a.md"));
+
+    apply_note(&conn, &note("notes/c.md", "Plan", vec![])).unwrap();
+    let via_title = run_query(
+        &conn,
+        "SELECT note_path FROM note_keys WHERE key = 'plan'",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(via_title[0]["note_path"], Value::from("notes/c.md"));
+}
+
+#[test]
+fn two_files_with_one_stem_report_the_ambiguity_without_fanning_out() {
+    let conn = migrated();
+    apply_note(&conn, &note("b/Plan.md", "One Thing", vec![])).unwrap();
+    apply_note(&conn, &note("a/Plan.md", "Another Thing", vec![])).unwrap();
+    apply_note(&conn, &note("notes/src.md", "Src", vec![wiki("Plan")])).unwrap();
+    let keys = run_query(
+        &conn,
+        "SELECT note_path, claim_count FROM note_keys WHERE key = 'plan'",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(keys.len(), 1);
+    assert_eq!(keys[0]["note_path"], Value::from("a/Plan.md"));
+    assert_eq!(keys[0]["claim_count"], Value::from(2));
+    // Exactly one backlink row: the deterministic winner, never both.
+    let backlinks = run_query(
+        &conn,
+        "SELECT target_path FROM backlinks WHERE source_path = 'notes/src.md'",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(backlinks.len(), 1);
+    assert_eq!(backlinks[0]["target_path"], Value::from("a/Plan.md"));
+}
+
+#[test]
+fn a_path_link_backlinks_to_exactly_that_file() {
+    let conn = migrated();
+    apply_note(&conn, &note("Projects/Plan.md", "Weekly", vec![])).unwrap();
+    apply_note(&conn, &note("notes/Plan.md", "Other", vec![])).unwrap();
+    apply_note(
+        &conn,
+        &note(
+            "Journal.md",
+            "Journal",
+            vec![path_link("wiki", "Projects/Plan", "projects/plan.md")],
+        ),
+    )
+    .unwrap();
+    let rows = run_query(
+        &conn,
+        "SELECT target_path FROM backlinks WHERE source_path = 'Journal.md'",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["target_path"], Value::from("Projects/Plan.md"));
+}
+
+#[test]
+fn a_markdown_link_backlinks_through_its_path_key() {
+    let conn = migrated();
+    apply_note(&conn, &note("Projects/Plan.md", "Weekly", vec![])).unwrap();
+    apply_note(
+        &conn,
+        &note(
+            "Projects/Journal.md",
+            "Journal",
+            vec![path_link("md", "./Plan.md", "projects/plan.md")],
+        ),
+    )
+    .unwrap();
+    let rows = run_query(
+        &conn,
+        "SELECT target_path, kind FROM backlinks WHERE source_path = 'Projects/Journal.md'",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["target_path"], Value::from("Projects/Plan.md"));
+    assert_eq!(rows[0]["kind"], Value::from("md"));
+}
+
+#[test]
+fn a_path_link_to_a_missing_file_produces_no_backlink() {
+    let conn = migrated();
+    apply_note(
+        &conn,
+        &note(
+            "Journal.md",
+            "Journal",
+            vec![path_link("wiki", "Gone/Plan", "gone/plan.md")],
+        ),
+    )
+    .unwrap();
+    let rows = run_query(
+        &conn,
+        "SELECT target_path FROM backlinks WHERE source_path = 'Journal.md'",
+        &[],
+    )
+    .unwrap();
+    assert!(rows.is_empty());
+}
+
+#[test]
+fn a_move_restates_the_path_derived_claims() {
+    let mut conn = migrated();
+    apply_note(&conn, &note("notes/old-name.md", "Kept Title", vec![])).unwrap();
+    move_in_txn(&mut conn, "notes/old-name.md", "notes/new-name.md").unwrap();
+
+    let claims = run_query(
+        &conn,
+        "SELECT key, tier FROM note_claims WHERE note_path = 'notes/new-name.md' ORDER BY tier",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(claims.len(), 2);
+    assert_eq!(claims[0]["key"], Value::from("kept title"));
+    assert_eq!(claims[0]["tier"], Value::from(2));
+    assert_eq!(claims[1]["key"], Value::from("new-name"));
+    assert_eq!(claims[1]["tier"], Value::from(4));
+
+    let path_key = run_query(
+        &conn,
+        "SELECT path_key FROM notes WHERE path = 'notes/new-name.md'",
+        &[],
+    )
+    .unwrap();
+    assert_eq!(path_key[0]["path_key"], Value::from("notes/new-name.md"));
 }

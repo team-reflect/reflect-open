@@ -24,6 +24,7 @@ function sampleNote(overrides: Partial<IndexedNote> = {}): IndexedNote {
     id: '01hv3xq7c2dm8k4t9w5e6r1n99',
     title: 'Sample Note',
     titleKey: 'sample note',
+    pathKey: 'notes/sample.md',
     kind: 'note',
     dailyDate: null,
     isPrivate: false,
@@ -42,6 +43,7 @@ function sampleNote(overrides: Partial<IndexedNote> = {}): IndexedNote {
         kind: 'wiki',
         targetRaw: 'Other Note',
         targetKey: 'other note',
+        targetPathKey: null,
         alias: null,
         posFrom: 3,
         posTo: 16,
@@ -49,6 +51,10 @@ function sampleNote(overrides: Partial<IndexedNote> = {}): IndexedNote {
     ],
     tags: [{ tag: 'book', tagKey: 'book' }],
     aliases: [],
+    claims: [
+      { key: 'sample note', tier: 2 },
+      { key: 'sample', tier: 4 },
+    ],
     emails: [{ email: 'Sample@Example.com', emailKey: 'sample@example.com' }],
     assets: [],
     tasks: [

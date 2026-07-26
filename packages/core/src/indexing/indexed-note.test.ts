@@ -3,8 +3,8 @@ import { gistBodyHash, parseNote } from '../markdown'
 import { buildIndexedNote, indexedNoteSchema, PROJECTION_VERSION } from './indexed-note'
 
 describe('buildIndexedNote', () => {
-  it('carries the projection version that backfills legacy contact emails', () => {
-    expect(PROJECTION_VERSION).toBe(17)
+  it('carries the projection version that backfills path keys and claims', () => {
+    expect(PROJECTION_VERSION).toBe(18)
   })
 
   it('flattens a parsed note into the index payload', () => {
@@ -341,5 +341,83 @@ describe('projectNoteAliases — derived linkable rich-title aliases', () => {
 
   it('skips a derived form the wiki-link syntax cannot address', () => {
     expect(aliasesOf('# C:\\notes [[Ada Lovelace|Ada]]\n')).toEqual([])
+  })
+})
+
+describe('projectNoteClaims (via buildIndexedNote)', () => {
+  const meta = { fileHash: 'h', mtime: 1, source: '' }
+
+  it('claims the filename stem only when the authored title differs', () => {
+    const titled = buildIndexedNote(
+      parseNote({ path: 'Projects/Plan.md', source: '# Weekly Planning' }),
+      { ...meta, source: '# Weekly Planning' },
+    )
+    expect(titled.claims).toEqual([
+      { key: 'weekly planning', tier: 2 },
+      { key: 'plan', tier: 4 },
+    ])
+
+    // An untitled note already carries its filename as its title.
+    const untitled = buildIndexedNote(
+      parseNote({ path: 'Projects/Plan.md', source: 'no heading here' }),
+      { ...meta, source: 'no heading here' },
+    )
+    expect(untitled.claims).toEqual([{ key: 'plan', tier: 2 }])
+  })
+
+  it('claims a calendar-valid daily date but not an impossible one', () => {
+    expect(
+      buildIndexedNote(parseNote({ path: 'daily/2026-07-26.md', source: '' }), meta).claims,
+    ).toContainEqual({ key: '2026-07-26', tier: 1 })
+    expect(
+      buildIndexedNote(parseNote({ path: 'daily/2026-02-31.md', source: '' }), meta).claims,
+    ).not.toContainEqual({ key: '2026-02-31', tier: 1 })
+  })
+
+  it('claims aliases between the title and the stem', () => {
+    const source = '---\naliases: [Roadmap]\n---\n# Weekly Planning'
+    const indexed = buildIndexedNote(parseNote({ path: 'Projects/Plan.md', source }), {
+      ...meta,
+      source,
+    })
+    expect(indexed.claims).toEqual([
+      { key: 'weekly planning', tier: 2 },
+      { key: 'roadmap', tier: 3 },
+      { key: 'plan', tier: 4 },
+    ])
+  })
+
+  it('claims nothing for a template', () => {
+    expect(
+      buildIndexedNote(
+        parseNote({ path: 'templates/meeting.md', source: '# Meeting' }),
+        { ...meta, source: '# Meeting' },
+      ).claims,
+    ).toEqual([])
+  })
+})
+
+describe('path addressing (via buildIndexedNote)', () => {
+  const meta = { fileHash: 'h', mtime: 1, source: '' }
+
+  it('folds the note path into pathKey', () => {
+    expect(
+      buildIndexedNote(parseNote({ path: 'Projects/Plan.md', source: '' }), meta).pathKey,
+    ).toBe('projects/plan.md')
+  })
+
+  it('stamps targetPathKey for path-form links and null for name-form links', () => {
+    const source = 'See [[Projects/Plan]] and [[Plan]] and [rel](./Sibling.md).'
+    const indexed = buildIndexedNote(parseNote({ path: 'Journal/Today.md', source }), {
+      ...meta,
+      source,
+    })
+    expect(
+      indexed.links.map((link) => ({ raw: link.targetRaw, pathKey: link.targetPathKey })),
+    ).toEqual([
+      { raw: 'Projects/Plan', pathKey: 'projects/plan.md' },
+      { raw: 'Plan', pathKey: null },
+      { raw: './Sibling.md', pathKey: 'journal/sibling.md' },
+    ])
   })
 })
