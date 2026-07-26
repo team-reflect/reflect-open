@@ -38,8 +38,8 @@ use super::{root_for_generation, GraphState};
 /// requests have no JSON args, so the id travels out-of-band.
 const UPLOAD_ID_HEADER: &str = "x-upload-id";
 /// Sequential `-2`-style probes before candidates switch to content-digest
-/// names. Small on purpose: everyday collisions stay readable, while a stem
-/// the graph is dense with jumps to digests instead of marching toward the
+/// names. Small on purpose: everyday collisions stay readable, while a
+/// densely collided stem jumps to digests instead of marching toward the
 /// probe cap — a V1 import can carry thousands of pastes all named
 /// `image.png`.
 pub(super) const SEQUENTIAL_NAME_PROBES: u32 = 8;
