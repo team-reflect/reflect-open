@@ -38,6 +38,18 @@ describe('wikiNoteReference', () => {
     })
   })
 
+  it('keeps a loose slash inside a name, like a v1 subject alias', () => {
+    // `[[Tim MacCaw // Dad]]` is a name with a `//` separator, not a path:
+    // path segments are never empty or wrapped in spaces.
+    expect(wikiNoteReference('Tim MacCaw // Dad')).toEqual({
+      kind: 'key',
+      key: 'tim maccaw // dad',
+    })
+    expect(wikiNoteReference('a / b')).toEqual({ kind: 'key', key: 'a / b' })
+    // An explicit leading slash is always a path, even for a root-level file.
+    expect(wikiNoteReference('/Plan')).toEqual({ kind: 'path', path: 'Plan.md' })
+  })
+
   it('treats a percent sign as a literal character', () => {
     expect(wikiNoteReference('100%')).toEqual({ kind: 'key', key: '100%' })
     expect(wikiNoteReference('50% off')).toEqual({ kind: 'key', key: '50% off' })

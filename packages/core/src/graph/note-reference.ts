@@ -86,24 +86,34 @@ function parentSegments(sourcePath: string): readonly string[] {
 }
 
 /**
- * Reduce `[[target]]`. A target containing `/` is vault-root relative, which
- * is Obsidian's rule and the reason a wiki path never inherits the source
- * note's folder the way a Markdown href does.
+ * Reduce `[[target]]`. A path-shaped target is vault-root relative, which is
+ * Obsidian's rule and the reason a wiki path never inherits the source note's
+ * folder the way a Markdown href does.
+ *
+ * Path-shaped means every slash segment is non-empty and trim-stable (plus an
+ * optional explicit leading `/`). A slash inside loose text stays a name:
+ * Reflect's own v1 subject aliases (`[[Tim MacCaw // Dad]]`) are names with a
+ * `//` separator, and no filesystem path has components wrapped in spaces.
  */
 export function wikiNoteReference(target: string): NoteReference | null {
   const path = wikiTargetPath(target.trim())
   if (path === '') {
     return target.includes('#') ? { kind: 'self' } : null
   }
-  if (URI_SCHEME_RE.test(path)) {
+  if (URI_SCHEME_RE.test(path) || path.includes('\\') || path.includes('\0')) {
     return null
   }
-  if (!path.includes('/')) {
-    const key = foldKey(path.replace(MARKDOWN_EXTENSION_RE, ''))
-    return key === '' ? null : { kind: 'key', key }
+  const rooted = path.startsWith('/')
+  const body = rooted ? path.slice(1) : path
+  const pathShaped =
+    body.includes('/') &&
+    body.split('/').every((segment) => segment !== '' && segment === segment.trim())
+  if (rooted || pathShaped) {
+    const resolved = body === '' ? null : notePathFrom([], body)
+    return resolved === null ? null : { kind: 'path', path: resolved }
   }
-  const resolved = notePathFrom([], path.replace(/^\//, ''))
-  return resolved === null ? null : { kind: 'path', path: resolved }
+  const key = foldKey(path.replace(MARKDOWN_EXTENSION_RE, ''))
+  return key === '' ? null : { kind: 'key', key }
 }
 
 /**
