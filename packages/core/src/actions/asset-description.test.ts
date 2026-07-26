@@ -24,7 +24,8 @@ vi.mock('../graph/commands', () => ({
   readNote: vi.fn(),
   writeNote: vi.fn(),
 }))
-vi.mock('../indexing/asset-refs', () => ({
+vi.mock('../indexing/asset-refs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../indexing/asset-refs')>()),
   assetReferencingNotePaths: vi.fn(),
 }))
 vi.mock('../secrets/keychain', () => ({

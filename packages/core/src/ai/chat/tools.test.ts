@@ -367,7 +367,7 @@ describe('read_assets', () => {
       {
         [SIDECAR]: `---\nreflectAsset: true\n---\n${DESCRIPTION_BODY}\n`,
         [spacedSidecar]: `---\nreflectAsset: true\n---\n${DESCRIPTION_BODY}\n`,
-        'notes/deck.md': '# Deck\n\n![a](./assets/chart.png)\n\n![b](assets/chart%20one.png)\n',
+        'notes/deck.md': '# Deck\n\n![a](assets/chart.png)\n\n![b](assets/chart%20one.png)\n',
       },
       ['notes/deck.md'],
     )

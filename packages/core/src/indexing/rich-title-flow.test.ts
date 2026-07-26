@@ -69,11 +69,13 @@ describe('rich title flow', () => {
     connectIndex(database)
     try {
       const result = await suggestWikiLinkTargets('meeting with ada')
-      // The title tier outranks the rich note's derived alias, so only the
-      // plainly titled note is selectable; the claimed key still reaches the
-      // editor so it suppresses the Create row.
+      // The title tier outranks the rich note's derived alias, so the plainly
+      // titled note keeps the name address and the rich note falls back to
+      // its path; the claimed key still reaches the editor so it suppresses
+      // the Create row.
       expect(result.suggestions).toMatchObject([
         { path: 'notes/plain.md', insertText: 'Meeting with Ada' },
+        { path: 'notes/meeting-with-ada.md', insertText: 'notes/meeting-with-ada' },
       ])
       expect(result.claimedTargetKeys).toContain('meeting with ada')
       await expect(resolveWikiTarget('Meeting with Ada')).resolves.toEqual({

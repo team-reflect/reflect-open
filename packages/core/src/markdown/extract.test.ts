@@ -96,7 +96,10 @@ describe('parseNote — links, assets, tags, text', () => {
     expect(note.links).toEqual([
       expect.objectContaining({ href: 'https://example.com/x', text: 'site', domain: 'example.com' }),
     ])
-    expect(note.assets).toEqual([expect.objectContaining({ path: 'assets/photo.png' })])
+    expect(note.assets).toEqual([
+      expect.objectContaining({ path: 'notes/assets/photo.png' }),
+      expect.objectContaining({ path: 'assets/photo.png' }),
+    ])
   })
 
   it('keeps both spellings of an unqualified reference', () => {

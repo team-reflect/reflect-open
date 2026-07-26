@@ -223,8 +223,13 @@ describe('v1 subject alias flow', () => {
       }
       const { suggestions: dateSuggestions } =
         await suggestWikiLinkTargets('2026-07-10')
-      expect(dateSuggestions.map((suggestion) => suggestion.path)).toEqual([
-        'daily/2026-07-10.md',
+      // The daily owns the date key; the date-titled note stays selectable
+      // through its path address instead of vanishing.
+      expect(
+        dateSuggestions.map(({ path, insertText }) => ({ path, insertText })),
+      ).toEqual([
+        { path: 'daily/2026-07-10.md', insertText: '2026-07-10' },
+        { path: 'notes/date-title.md', insertText: 'notes/date-title' },
       ])
       const { suggestions: fuzzyDateSuggestions } =
         await suggestWikiLinkTargets('today', 8, dateContext)
@@ -250,38 +255,49 @@ describe('v1 subject alias flow', () => {
       ])
 
       const duplicateResult = await suggestWikiLinkTargets('Roadmap')
-      expect(duplicateResult).toEqual({
-        suggestions: [],
-        claimedTargetKeys: ['roadmap'],
-        queryReadsAsDate: false,
-      })
-      await expect(suggestWikiLinkTargets('Road')).resolves.toEqual({
-        suggestions: [],
-        claimedTargetKeys: ['roadmap'],
-        queryReadsAsDate: false,
-      })
+      // Neither twin owns the bare name, so each falls back to its own path
+      // address instead of vanishing from the menu.
+      expect(duplicateResult.claimedTargetKeys).toEqual(['roadmap'])
+      expect(duplicateResult.queryReadsAsDate).toBe(false)
+      expect(
+        duplicateResult.suggestions.map(({ path, insertText }) => ({ path, insertText })),
+      ).toEqual([
+        { path: 'notes/z-roadmap.md', insertText: 'notes/z-roadmap' },
+        { path: 'notes/a-roadmap.md', insertText: 'notes/a-roadmap' },
+      ])
+      const prefixResult = await suggestWikiLinkTargets('Road')
+      expect(prefixResult.claimedTargetKeys).toEqual(['roadmap'])
+      expect(prefixResult.suggestions.map((suggestion) => suggestion.insertText)).toEqual([
+        'notes/z-roadmap',
+        'notes/a-roadmap',
+      ])
       const navigationSuggestions = await suggestWikiTargets('Roadmap')
       expect(navigationSuggestions.map((suggestion) => suggestion.path)).toEqual([
         'notes/z-roadmap.md',
         'notes/a-roadmap.md',
       ])
 
-      // Both `🧠 Ideas` twins are filtered, but their claimed key still
-      // reaches the editor so its fallback folding can suppress a Create row
-      // that the writable resolver would refuse as ambiguous.
-      await expect(suggestWikiLinkTargets('Ideas')).resolves.toEqual({
-        suggestions: [],
-        claimedTargetKeys: ['🧠 ideas'],
-        queryReadsAsDate: false,
-      })
+      // Neither `🧠 Ideas` twin owns the name, so both surface by path; the
+      // claimed key still reaches the editor so its fallback folding can
+      // suppress a Create row that the writable resolver would refuse as
+      // ambiguous.
+      const ideasResult = await suggestWikiLinkTargets('Ideas')
+      // The twins claim `ideas` through their filename stems too.
+      expect(ideasResult.claimedTargetKeys).toEqual(['ideas', '🧠 ideas'])
+      expect(ideasResult.suggestions.map((suggestion) => suggestion.insertText)).toEqual([
+        'notes/ideas-2',
+        'notes/ideas',
+      ])
 
-      // A duplicate date-shaped title would open an ambiguity error, not the
-      // suggested note, so it is omitted like any other duplicate title.
-      await expect(suggestWikiLinkTargets('2026-07-12')).resolves.toEqual({
-        suggestions: [],
-        claimedTargetKeys: ['2026-07-12'],
-        queryReadsAsDate: false,
-      })
+      // A duplicate date-shaped title cannot be addressed by name (that would
+      // open an ambiguity error, not the selected note), so each twin gets
+      // its own path address.
+      const dateTwinResult = await suggestWikiLinkTargets('2026-07-12')
+      expect(dateTwinResult.claimedTargetKeys).toEqual(['2026-07-12'])
+      expect(dateTwinResult.suggestions.map((suggestion) => suggestion.insertText)).toEqual([
+        'notes/z-date-twin',
+        'notes/a-date-twin',
+      ])
       // A uniquely claimed date-shaped title stays addressable.
       const { suggestions: dateTitleSuggestions } =
         await suggestWikiLinkTargets('2026-07-11')
@@ -291,13 +307,14 @@ describe('v1 subject alias flow', () => {
 
       const { suggestions: aliasSuggestions } =
         await suggestWikiLinkTargets('Second Shared')
-      expect(aliasSuggestions).toHaveLength(1)
-      expect(aliasSuggestions[0]).toMatchObject({
-        path: 'notes/z-shared.md',
-        target: 'Shared',
-        alias: 'Second Shared',
-        insertText: 'Second Shared',
-      })
+      expect(aliasSuggestions).toMatchObject([
+        {
+          path: 'notes/z-shared.md',
+          target: 'Shared',
+          alias: 'Second Shared',
+          insertText: 'Second Shared',
+        },
+      ])
 
       // Matching the duplicate *title* must not hide a uniquely addressable
       // note: its ambiguous ranked spelling is rescued through its unique alias.
@@ -314,6 +331,7 @@ describe('v1 subject alias flow', () => {
           alias: 'Second Shared',
           insertText: 'Second Shared',
         },
+        { path: 'notes/a-shared.md', insertText: 'notes/a-shared' },
       ])
 
       const adaResult = await suggestWikiLinkTargets('Ada')
@@ -350,11 +368,12 @@ describe('v1 subject alias flow', () => {
       ])
       await Promise.all(unsafeAliasSuggestions.map(expectSuggestionOpensItsPath))
 
+      // Unserializable names fall back to path addresses instead of hiding.
       await expect(suggestWikiLinkTargets('Unsafe | Title')).resolves.toMatchObject({
-        suggestions: [],
+        suggestions: [{ path: 'notes/unsafe.md', insertText: 'notes/unsafe' }],
       })
       await expect(suggestWikiLinkTargets('Escape \\. Title')).resolves.toMatchObject({
-        suggestions: [],
+        suggestions: [{ path: 'notes/escaped.md', insertText: 'notes/escaped' }],
       })
     } finally {
       setBridge(null)

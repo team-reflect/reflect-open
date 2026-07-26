@@ -368,20 +368,28 @@ fn backlink_resolution_uses_daily_then_title_then_alias_precedence() {
 }
 
 #[test]
-fn note_key_precedence_migration_preserves_existing_projection_rows() {
+fn note_addressing_migrations_preserve_rows_and_reproject_resolution() {
     let mut conn = open_in_memory().expect("open");
     conn.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
     migrate_to(&mut conn, 17).expect("stage v17");
 
-    apply_note(
-        &conn,
-        &aliased_note("notes/tim-maccaw-dad.md", "Tim MacCaw // Dad", "Dad"),
+    // Rows as a v17 writer shaped them: no `path_key`, no `note_claims`.
+    for (path, title) in [("notes/dad.md", "Dad"), ("notes/source.md", "Source")] {
+        conn.execute(
+            "INSERT INTO notes(path, title, title_key, kind, file_hash, mtime, updated_at)
+             VALUES(?1, ?2, ?3, 'note', 'h', 0, 0)",
+            rusqlite::params![path, title, title.to_lowercase()],
+        )
+        .unwrap();
+    }
+    conn.execute(
+        "INSERT INTO links(source_path, kind, target_raw, target_key, pos_from, pos_to)
+         VALUES('notes/source.md', 'wiki', 'Dad', 'dad', 0, 0)",
+        [],
     )
     .unwrap();
-    apply_note(&conn, &note("notes/dad.md", "Dad", vec![])).unwrap();
-    apply_note(&conn, &note("notes/source.md", "Source", vec![wiki("Dad")])).unwrap();
 
-    let counts_before: Vec<i64> = ["notes", "links", "aliases"]
+    let counts_before: Vec<i64> = ["notes", "links"]
         .iter()
         .map(|table| {
             conn.query_row(&format!("SELECT count(*) FROM {table}"), [], |row| {
@@ -391,9 +399,10 @@ fn note_key_precedence_migration_preserves_existing_projection_rows() {
         })
         .collect();
 
-    migrate(&mut conn).expect("migrate to v18");
+    migrate(&mut conn).expect("migrate to latest");
 
-    let counts_after: Vec<i64> = ["notes", "links", "aliases"]
+    // Neither 0018 nor 0019 wipes projection rows...
+    let counts_after: Vec<i64> = ["notes", "links"]
         .iter()
         .map(|table| {
             conn.query_row(&format!("SELECT count(*) FROM {table}"), [], |row| {
@@ -404,6 +413,20 @@ fn note_key_precedence_migration_preserves_existing_projection_rows() {
         .collect();
     assert_eq!(counts_after, counts_before);
 
+    // ...but name resolution now reads `note_claims`, which pre-0019 rows do
+    // not have: links stay unresolved until the projection-version bump
+    // rebuilds them on the next open.
+    let stale = run_query(
+        &conn,
+        "SELECT target_path FROM backlinks WHERE source_path = 'notes/source.md'",
+        &[],
+    )
+    .unwrap();
+    assert!(stale.is_empty());
+
+    // The reprojection restores resolution through the claims table.
+    apply_note(&conn, &note("notes/dad.md", "Dad", vec![])).unwrap();
+    apply_note(&conn, &note("notes/source.md", "Source", vec![wiki("Dad")])).unwrap();
     let rows = run_query(
         &conn,
         "SELECT target_path FROM backlinks WHERE source_path = 'notes/source.md'",

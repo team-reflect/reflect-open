@@ -149,8 +149,8 @@ export interface DB {
   embeddingChunks: EmbeddingChunks;
   indexMeta: IndexMeta;
   links: Links;
-  noteEmails: NoteEmails;
   noteClaims: NoteClaims;
+  noteEmails: NoteEmails;
   noteKeys: NoteKeys;
   notes: Notes;
   noteText: NoteText;

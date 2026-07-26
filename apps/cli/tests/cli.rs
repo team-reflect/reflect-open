@@ -77,7 +77,7 @@ impl Fixture {
                 filename.strip_suffix(".md").unwrap_or(filename)
             };
             let mut claims: Vec<(String, i64)> = Vec::new();
-            let mut claim = |claims: &mut Vec<(String, i64)>, key: String, tier: i64| {
+            let claim = |claims: &mut Vec<(String, i64)>, key: String, tier: i64| {
                 if !key.is_empty() && !claims.iter().any(|(existing, _)| *existing == key) {
                     claims.push((key, tier));
                 }

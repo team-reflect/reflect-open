@@ -533,7 +533,12 @@ describe('reconcileIndex move healing (Plan 17)', () => {
     const commands = calls.map(([command]) => command)
     expect(commands).toContain('index_move')
     const move = calls.find(([command]) => command === 'index_move')
-    expect(move?.[1]).toEqual({ from: OLD, to: NEW, generation: 4 })
+    expect(move?.[1]).toEqual({
+      from: OLD,
+      to: NEW,
+      generation: 4,
+      toAddress: { pathKey: NEW.toLowerCase(), basenameKey: 'meeting-notes', dailyDate: null },
+    })
     // The moved row carried its hash: identical content means no re-apply —
     // and crucially no remove, so embeddings survived.
     expect(commands).not.toContain('index_apply')
