@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useEditor } from '@meowdown/react'
 import { isTouchEditorSurface } from '@/lib/platform-surface'
+import { whenEditorMounted } from './when-editor-mounted'
 
 /**
  * iOS text-input hygiene on the editing surface (Plan 19, decision 7 — a gate
@@ -27,26 +28,11 @@ export function EditorInputTraits(): null {
     if (!isTouchEditorSurface()) {
       return
     }
-    // ProseKit attaches the view via ref before effects run, so this applies
-    // immediately in practice — but the mount timing is ProseKit's, not ours,
-    // so a not-yet-mounted editor is retried per frame instead of skipped.
-    let frame: number | null = null
-    const apply = (): void => {
-      if (!editor.mounted) {
-        frame = requestAnimationFrame(apply)
-        return
-      }
-      frame = null
+    return whenEditorMounted(editor, () => {
       const dom = editor.view.dom
       dom.setAttribute('autocapitalize', 'sentences')
       dom.setAttribute('autocorrect', 'on')
-    }
-    apply()
-    return () => {
-      if (frame !== null) {
-        cancelAnimationFrame(frame)
-      }
-    }
+    })
   }, [editor])
 
   return null

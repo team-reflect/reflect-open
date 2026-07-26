@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useEditor } from '@meowdown/react'
 import type { EditorExtension } from '@meowdown/core'
 import { isTouchEditorSurface } from '@/lib/platform-surface'
+import { whenEditorMounted } from './when-editor-mounted'
 import {
   clearFormattingToolbar,
   publishFormattingToolbar,
@@ -37,18 +38,11 @@ export function FormattingToolbarBridge(): null {
       return
     }
     const owner = Symbol('formatting-toolbar')
-    let frame: number | null = null
     let teardown: (() => void) | null = null
 
-    // Same mount dance as EditorInputTraits: ProseKit attaches the view via
-    // ref before effects run, so this attaches immediately in practice — but
-    // the timing is ProseKit's, so a not-yet-mounted editor retries per frame.
-    const attach = (): void => {
-      if (!editor.mounted) {
-        frame = requestAnimationFrame(attach)
-        return
-      }
-      frame = null
+    // Same mount dance as EditorInputTraits — see `whenEditorMounted` for
+    // why the wait is bounded.
+    const cancel = whenEditorMounted(editor, () => {
       const dom = editor.view.dom
 
       function readCapabilities(): FormattingToolbarCapabilities {
@@ -137,12 +131,9 @@ export function FormattingToolbarBridge(): null {
         }
         clearFormattingToolbar(owner)
       }
-    }
-    attach()
+    })
     return () => {
-      if (frame !== null) {
-        cancelAnimationFrame(frame)
-      }
+      cancel()
       teardown?.()
     }
   }, [editor])

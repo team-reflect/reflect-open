@@ -7,6 +7,12 @@ import { useEffect, useRef } from 'react'
  * that throws keeps the loop alive: the network checks this exists for fail
  * transiently. Return 'stop' to end the loop. Disabling or unmounting
  * cancels future ticks but not one already in flight.
+ *
+ * Polling pauses while the document is hidden — a hidden poll can't show its
+ * result, and this hook's consumers exist for flows where the user leaves
+ * the app to do something (create a repo, grant access) — and resumes with
+ * an *immediate* tick on return to visible: the moment the user comes back
+ * is exactly when the polled condition is likeliest to have just become true.
  */
 export function usePoll(
   enabled: boolean,
@@ -24,29 +30,60 @@ export function usePoll(
       return
     }
     let cancelled = false
-    let timer: ReturnType<typeof setTimeout> | undefined
+    let stopped = false
+    let inFlight = false
+    let timer: ReturnType<typeof setTimeout> | null = null
+
+    function settle(result: 'continue' | 'stop'): void {
+      inFlight = false
+      if (cancelled) {
+        return
+      }
+      if (result === 'stop') {
+        stopped = true
+        return
+      }
+      schedule()
+    }
+
+    function runTick(): void {
+      inFlight = true
+      void tickRef.current().then(settle, () => settle('continue'))
+    }
 
     function schedule(): void {
+      if (document.visibilityState === 'hidden') {
+        return // paused — the visibility listener resumes with an immediate tick
+      }
       timer = setTimeout(() => {
-        void tickRef.current().then(
-          (result) => {
-            if (!cancelled && result === 'continue') {
-              schedule()
-            }
-          },
-          () => {
-            if (!cancelled) {
-              schedule()
-            }
-          },
-        )
+        timer = null
+        runTick()
       }, intervalMs)
     }
 
+    function onVisibilityChange(): void {
+      if (document.visibilityState === 'hidden') {
+        if (timer !== null) {
+          clearTimeout(timer)
+          timer = null
+        }
+        return
+      }
+      // An in-flight tick reschedules itself when it settles, and a pending
+      // timer means the loop never paused — only a paused loop resumes here.
+      if (!stopped && !inFlight && timer === null) {
+        runTick()
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
     schedule()
     return () => {
       cancelled = true
-      clearTimeout(timer)
+      if (timer !== null) {
+        clearTimeout(timer)
+      }
+      document.removeEventListener('visibilitychange', onVisibilityChange)
     }
   }, [enabled, intervalMs])
 }

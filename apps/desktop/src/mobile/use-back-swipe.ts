@@ -57,7 +57,8 @@ export interface BackSwipeOptions {
   reducedMotion: boolean
   /** Commit the pop once the screen has settled offscreen. */
   onPop: () => void
-  /** The stack container — gets a non-passive scroll blocker while dragging. */
+  /** The stack container — gets a non-passive scroll blocker while a touch
+   *  owns the gesture (armed through dragging), never between gestures. */
   containerRef: RefObject<HTMLElement | null>
 }
 
@@ -93,10 +94,54 @@ export function useBackSwipe({ enabled, reducedMotion, onPop, containerRef }: Ba
   const stateRef = useRef<BackSwipeState>(IDLE)
   const [state, setState] = useState<BackSwipeState>(IDLE)
 
-  const commit = useCallback((next: BackSwipeState): void => {
-    stateRef.current = next
-    setState(next)
+  // The scroll blocker lives only while a touch owns the gesture. React
+  // registers touch listeners passively, so blocking the page's own vertical
+  // scroll mid-drag needs a native non-passive listener — but a permanently
+  // attached one forces WebKit to consult the main thread for every
+  // `touchmove` in the stack (i.e. every scroll in the app) just in case.
+  // Attach happens synchronously in `commit` inside the pointerdown dispatch
+  // (the `armed` transition), so the listener exists before the sequence's
+  // first `touchmove` — where WebKit fixes its cancelability — and an effect
+  // could be a frame too late.
+  const blockerRef = useRef<{ node: HTMLElement; block: (event: TouchEvent) => void } | null>(null)
+
+  const detachBlocker = useCallback((): void => {
+    const blocker = blockerRef.current
+    if (blocker !== null) {
+      blocker.node.removeEventListener('touchmove', blocker.block)
+      blockerRef.current = null
+    }
   }, [])
+
+  const attachBlocker = useCallback((): void => {
+    if (blockerRef.current !== null) {
+      return
+    }
+    const node = containerRef.current
+    if (!node) {
+      return
+    }
+    const block = (event: TouchEvent): void => {
+      if (stateRef.current.phase === 'dragging') {
+        event.preventDefault()
+      }
+    }
+    node.addEventListener('touchmove', block, { passive: false })
+    blockerRef.current = { node, block }
+  }, [containerRef])
+
+  const commit = useCallback(
+    (next: BackSwipeState): void => {
+      stateRef.current = next
+      if (next.phase === 'armed' || next.phase === 'dragging') {
+        attachBlocker()
+      } else {
+        detachBlocker()
+      }
+      setState(next)
+    },
+    [attachBlocker, detachBlocker],
+  )
 
   // Navigation elsewhere (or a transition starting) invalidates the gesture.
   // Adjusted during render — the derive-state pattern — so a disabled stack
@@ -248,21 +293,18 @@ export function useBackSwipe({ enabled, reducedMotion, onPop, containerRef }: Ba
     return () => clearTimeout(timer)
   }, [state, finishSettle])
 
-  // React registers touch listeners passively, so blocking the page's own
-  // vertical scroll while a drag owns the screen needs a native listener.
+  // The render-path reset above bypasses `commit`, so it cannot detach the
+  // blocker itself; idle never needs one. No cleanup here — this effect
+  // re-runs on every mid-drag commit, and a cleanup would strip the blocker
+  // out from under the live gesture.
   useEffect(() => {
-    const node = containerRef.current
-    if (!node) {
-      return
+    if (state.phase === 'idle') {
+      detachBlocker()
     }
-    const blockScroll = (event: TouchEvent): void => {
-      if (stateRef.current.phase === 'dragging') {
-        event.preventDefault()
-      }
-    }
-    node.addEventListener('touchmove', blockScroll, { passive: false })
-    return () => node.removeEventListener('touchmove', blockScroll)
-  }, [containerRef])
+  }, [state, detachBlocker])
+
+  // Unmount backstop: `detachBlocker` is stable, so this cleanup runs once.
+  useEffect(() => detachBlocker, [detachBlocker])
 
   return {
     state,
