@@ -1,21 +1,21 @@
-let isComposing = false
-let timer : ReturnType<typeof setTimeout> | undefined
+const COMPOSITION_TAIL_MS = 40
 
-// Workaround for a bug in WebKit where the isComposing property is reset to false event when the IME is still composing.
+let lastCompositionEndedAt = -Infinity
+
+if (typeof window !== 'undefined') {
+  window.addEventListener(
+    'compositionend',
+    (event) => {
+      lastCompositionEndedAt = event.timeStamp
+    },
+    true,
+  )
+}
+
+// Workaround for WebKit firing compositionend before the keydown that commits an
+// IME composition, which makes that keydown report `isComposing` as false.
+// https://bugs.webkit.org/show_bug.cgi?id=165004
 // https://bugs.webkit.org/show_bug.cgi?id=311717
 export function isKeyboardEventComposing(event: KeyboardEvent): boolean {
-  if (event.isComposing) {
-    if (timer) {
-      clearTimeout(timer)
-      timer = undefined
-    }
-    isComposing = true
-  } else if (isComposing && !timer) {
-    timer = setTimeout(() => {
-      isComposing = false
-      timer = undefined
-    }, 40)
-  }
-
-  return isComposing
+  return event.isComposing || event.timeStamp - lastCompositionEndedAt < COMPOSITION_TAIL_MS
 }
