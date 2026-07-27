@@ -4,8 +4,8 @@ import { createDayWindow, dateAtIndex, indexWithin, type DayWindow } from '@/lib
 import { getKeyboardHeight } from '@/mobile/use-keyboard'
 
 /**
- * Days either side of the carousel anchor. A generous fixed **symmetric**
- * window (~1 year each way) lets Embla page between days without runtime
+ * Days either side of the carousel anchor. A fixed **symmetric** window
+ * (three months each way) lets Embla page between days without runtime
  * re-anchoring in ordinary use; only the slides near the selection mount an
  * editor, so the empty ones are cheap spacers. Swiping within
  * {@link RECENTER_MARGIN} of an edge (or a date-link beyond the window)
@@ -14,8 +14,16 @@ import { getKeyboardHeight } from '@/mobile/use-keyboard'
  * ({@link createDayWindow}) with a wider, asymmetric reach — but it truly
  * virtualizes its rows, where the carousel renders every slide spacer and
  * only mounts the editors near the selection.
+ *
+ * The spacers are cheap but not free: every slide is a React child
+ * reconciled on each selection change and a DOM node under Embla's
+ * `ResizeObserver`, and a re-anchor re-measures them all — the home
+ * screen's swipe cost scales linearly with this number (the iOS battery
+ * audit's finding at the old ~1-year radius). 90 keeps 60 swipes of
+ * headroom from center before a re-anchor at {@link RECENTER_MARGIN},
+ * far beyond a realistic swipe burst, at a quarter of the belt.
  */
-export const CAROUSEL_RADIUS = 366
+export const CAROUSEL_RADIUS = 90
 
 /**
  * How close (in slides) a settled swipe may get to a window edge before the
@@ -168,6 +176,12 @@ export function useDayCarousel(
     align: 'center',
     skipSnaps: false,
     watchDrag: dragAllowedWithKeyboardClosed,
+    // The container's direct children change only on a re-anchor, and the
+    // follow effect below already reInits synchronously (layout effect —
+    // before Embla's MutationObserver microtask would fire). Watching
+    // slides would just re-measure the whole belt a second time per
+    // re-anchor. `watchResize` stays on: it owns rotation/split-view.
+    watchSlides: false,
   }))
   const [emblaRef, emblaApi] = useEmblaCarousel(emblaOptions)
   const routeIndex = indexWithin(dayWindow, date)
