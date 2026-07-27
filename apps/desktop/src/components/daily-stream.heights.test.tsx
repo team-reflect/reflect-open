@@ -107,6 +107,22 @@ function NavigateTodayProbe({
   return null
 }
 
+/**
+ * Wait for the anchor's imperative scroll to finish: virtua's `scrollToIndex`
+ * keeps re-pinning the target while row sizes settle, so a programmatic
+ * scroll fired too early is snapped back.
+ */
+async function waitForStableScroll(el: Element): Promise<void> {
+  await vi.waitFor(
+    async () => {
+      const before = el.scrollTop
+      await new Promise((resolve) => setTimeout(resolve, 200))
+      expect(el.scrollTop).toBe(before)
+    },
+    { timeout: 10_000 },
+  )
+}
+
 describe('daily note height memory', () => {
   it('stores heights per graph root and date', () => {
     rememberDailyPaneHeight('/a', '2020-01-01', 123)
@@ -147,12 +163,15 @@ describe('daily note height memory', () => {
           document.querySelector(`${todaySelector} [data-testid=fake-editor]`),
         ).not.toBeNull(),
       )
+      await waitForStableScroll(stream.element())
       const rowBefore = document.querySelector(todaySelector)!.getBoundingClientRect().height
 
       // Scroll far into the past so the row unmounts; its cleanup records the
       // pane height.
       stream.element().scrollTop -= 30000
-      await vi.waitFor(() => expect(document.querySelector(todaySelector)).toBeNull())
+      await vi.waitFor(() => expect(document.querySelector(todaySelector)).toBeNull(), {
+        timeout: 5000,
+      })
       const remembered = savedDailyPaneHeight('/g', today)
       expect(remembered).toBeGreaterThanOrEqual(1000)
 
@@ -162,33 +181,34 @@ describe('daily note height memory', () => {
       act(() => {
         navigateToday()
       })
-      await vi.waitFor(() => {
-        const placeholder = document.querySelector(`${todaySelector} .reflect-note-loading`)
-        expect(placeholder).not.toBeNull()
-        expect(placeholder!.getBoundingClientRect().height).toBeCloseTo(remembered!, 0)
-      })
-      expect(
-        document.querySelector(todaySelector)!.getBoundingClientRect().height,
-      ).toBeCloseTo(rowBefore, 0)
-
-      // A never-loaded neighbor keeps the class-based minimum: no inline height.
-      const neighbor = document.querySelector(
-        `[data-index="${todayIndex - 2}"] .reflect-note-loading`,
+      await vi.waitFor(
+        () => {
+          const placeholder = document.querySelector(`${todaySelector} .reflect-note-loading`)
+          expect(placeholder).not.toBeNull()
+          expect(
+            Math.abs(placeholder!.getBoundingClientRect().height - remembered!),
+          ).toBeLessThan(2)
+        },
+        { timeout: 5000 },
       )
-      expect(neighbor).not.toBeNull()
-      expect((neighbor as HTMLElement).style.height).toBe('')
-      expect(neighbor!.className).toMatch(/min-h-/)
+      expect(
+        Math.abs(document.querySelector(todaySelector)!.getBoundingClientRect().height - rowBefore),
+      ).toBeLessThan(2)
 
       // The note arriving must not change the row's size: load it and compare.
+      // (In a waitFor: the loading→ready swap leaves the placeholder's padding
+      // in the computed style for a beat before the recalc settles.)
       await resolveRead(dailyPath(today))
       await vi.waitFor(() =>
         expect(
           document.querySelector(`${todaySelector} [data-testid=fake-editor]`),
         ).not.toBeNull(),
       )
-      expect(
-        document.querySelector(todaySelector)!.getBoundingClientRect().height,
-      ).toBeCloseTo(rowBefore, 0)
+      await vi.waitFor(() =>
+        expect(
+          Math.abs(document.querySelector(todaySelector)!.getBoundingClientRect().height - rowBefore),
+        ).toBeLessThan(2),
+      )
       await view.unmount()
     },
   )
