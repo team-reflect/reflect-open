@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0-beta.20](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.19...v0.7.0-beta.20) (2026-07-27)
+
+
+### Features
+
+* resolve vault links and attachments ([#956](https://github.com/team-reflect/reflect-open/issues/956)) ([37978c5](https://github.com/team-reflect/reflect-open/commit/37978c597057c7c4448d0db86890a6f850bd3156))
+
+
+### Bug Fixes
+
+* prevent Enter from sending during IME composition ([#965](https://github.com/team-reflect/reflect-open/issues/965)) ([0e4658b](https://github.com/team-reflect/reflect-open/commit/0e4658b87c9f3d7b957441973ebb1b3083f73afb))
+
 ## [0.7.0-beta.19](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.18...v0.7.0-beta.19) (2026-07-26)
 
 
