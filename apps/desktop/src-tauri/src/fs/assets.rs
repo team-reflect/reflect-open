@@ -217,6 +217,15 @@ pub fn asset_upload_commit(
 /// fsyncs before the rename — durability is the persist helpers' job, never
 /// their callers'.
 fn persist_exact(temp: tempfile::NamedTempFile, target: &Path) -> AppResult<()> {
+    // An iCloud-evicted file occupies its path through its `.icloud` stub
+    // alone — `persist_noclobber` would happily claim the logical name and
+    // collide with the re-download (Plan 21).
+    if super::file_occupied(target) {
+        return Err(AppError::io(format!(
+            "target already exists: {}",
+            target.display()
+        )));
+    }
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -250,7 +259,9 @@ pub fn asset_upload_commit_path(
     }
     let root = root_for_generation(&state, generation)?;
     let target = resolve(&root, &path)?;
-    persist_exact(upload.file, &target)
+    persist_exact(upload.file, &target)?;
+    super::invalidate_file_catalog(&state, &root);
+    Ok(())
 }
 
 /// Discard an in-flight upload; dropping the temp file deletes it. Idempotent

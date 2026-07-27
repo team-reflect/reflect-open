@@ -125,6 +125,19 @@ describe('transcribeAudio (openai)', () => {
     expect(transient).toMatchObject({ kind: 'network' })
   })
 
+  it('settles a non-STOP finish as a rejection — retrying replays the same finish', async () => {
+    const fetchFn = recordingFetch([], () =>
+      jsonResponse(200, {
+        candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [{ text: 'partial' }] } }],
+      }),
+    )
+
+    const outcome = transcribeAudio(request({ provider: 'google', fetchFn }))
+
+    await expect(outcome).rejects.toSatisfy((error) => isTranscriptionRejected(error))
+    await expect(outcome).rejects.toThrow(/stopped early \(MAX_TOKENS\)/)
+  })
+
   it('reports a rejected key as an auth error', async () => {
     const fetchFn = recordingFetch([], () => jsonResponse(401, { error: { message: 'bad key' } }))
 

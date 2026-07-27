@@ -44,8 +44,8 @@ describe('httpError', () => {
     expect(isTranscriptionRejected(error)).toBe(false)
   })
 
-  it('keeps 404, 408, 429, and 5xx retryable', () => {
-    for (const status of [404, 408, 429, 500, 503]) {
+  it('keeps 402, 404, 408, 429, and 5xx retryable', () => {
+    for (const status of [402, 404, 408, 429, 500, 503]) {
       const error = httpError('openai', status, '')
       expect(error.kind).toBe('network')
       expect(isTranscriptionRejected(error)).toBe(false)

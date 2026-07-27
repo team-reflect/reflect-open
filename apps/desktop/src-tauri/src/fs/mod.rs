@@ -478,7 +478,18 @@ pub fn audio_memo_delete(path: String, generation: u64, state: State<GraphState>
         )));
     }
     let root = root_for_generation(&state, generation)?;
-    match fs::remove_file(resolve(&root, &path)?) {
+    let abs = resolve(&root, &path)?;
+    // An iCloud-evicted segment exists only as its `.name.icloud` stub —
+    // mirror `note_delete` so a cancelled session's evicted parts still
+    // delete (Plan 21).
+    let target = if abs.exists() {
+        abs
+    } else {
+        eviction_placeholder(&abs)
+            .filter(|stub| stub.exists())
+            .unwrap_or(abs)
+    };
+    match fs::remove_file(target) {
         Ok(()) => Ok(()),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(err) => Err(err.into()),

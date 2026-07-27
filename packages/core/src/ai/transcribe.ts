@@ -6,6 +6,7 @@ import {
   httpError,
   safeJson,
   send,
+  TranscriptionRejectedError,
   TRANSCRIPTION_TRANSFER_TIMEOUT_MS,
 } from './transcribe-http'
 
@@ -198,11 +199,11 @@ async function transcribeWithGemini(request: TranscriptionRequest): Promise<stri
   const candidate = parsed.data.candidates?.[0]
   const finishReason = candidate?.finishReason
   if (finishReason !== undefined && finishReason !== 'STOP') {
-    // A non-STOP finish means the transcript is incomplete (MAX_TOKENS,
-    // safety). Failing loudly keeps the memo pending; writing the partial
-    // text would tombstone it as if it were complete.
-    throw new ReflectError(
-      'parse',
+    // A non-STOP finish (MAX_TOKENS, SAFETY) is deterministic for these
+    // bytes — retrying replays the same finish and re-bills the segment on
+    // every pass. Settle it as this segment's failure line; the audio stays
+    // on disk and the rest of the session is unaffected.
+    throw new TranscriptionRejectedError(
       `gemini stopped early (${finishReason}): the transcript would be incomplete`,
     )
   }

@@ -122,13 +122,13 @@ export function isTranscriptionOversize(value: unknown): value is TranscriptionO
 }
 
 /**
- * A 4xx that condemns the recording itself — never auth (401/403), a
- * missing model/endpoint (404), a timeout (408), an oversized payload
- * (413, handled separately), or a rate limit (429), all of which a later
- * attempt can survive.
+ * A 4xx that condemns the recording itself — never auth (401/403), an
+ * exhausted account (402), a missing model/endpoint (404), a timeout (408),
+ * an oversized payload (413, handled separately), or a rate limit (429),
+ * all of which a later attempt can survive.
  */
 function isRecordingRejection(status: number): boolean {
-  return status >= 400 && status < 500 && ![401, 403, 404, 408, 413, 429].includes(status)
+  return status >= 400 && status < 500 && ![401, 402, 403, 404, 408, 413, 429].includes(status)
 }
 
 const errorBodySchema = z.object({
