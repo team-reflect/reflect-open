@@ -24,12 +24,12 @@ export function whenEditorMounted(editor: { readonly mounted: boolean }, run: ()
       run()
       return
     }
-    attempts += 1
-    if (attempts > MOUNT_RETRY_FRAMES) {
+    if (attempts === MOUNT_RETRY_FRAMES) {
       frame = null
-      console.error(`editor view never mounted; gave up after ${attempts} frames`)
+      console.error(`editor view never mounted; gave up after ${MOUNT_RETRY_FRAMES} frames`)
       return
     }
+    attempts += 1
     frame = requestAnimationFrame(check)
   }
   check()
