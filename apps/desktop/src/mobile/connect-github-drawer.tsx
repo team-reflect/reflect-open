@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { Input } from '@/components/ui/input'
 import { useConnectGithubWizard, type ConnectWizardStep } from '@/hooks/use-connect-github-wizard'
+import { isKeyboardEventComposing } from '@/lib/keyboard'
 
 interface ConnectGithubDrawerProps {
   open: boolean
@@ -99,6 +100,9 @@ function ConnectWizardSheet({
                   enterKeyHint="go"
                   onChange={(event) => wizard.setRepoName(event.target.value)}
                   onKeyDown={(event) => {
+                    if (isKeyboardEventComposing(event.nativeEvent)) {
+                      return
+                    }
                     if (event.key === 'Enter') {
                       wizard.continueFromRepo()
                     }
@@ -129,6 +133,9 @@ function ConnectWizardSheet({
                   enterKeyHint="go"
                   onChange={(event) => wizard.setExistingRepo(event.target.value)}
                   onKeyDown={(event) => {
+                    if (isKeyboardEventComposing(event.nativeEvent)) {
+                      return
+                    }
                     if (event.key === 'Enter') {
                       wizard.continueFromRepo()
                     }

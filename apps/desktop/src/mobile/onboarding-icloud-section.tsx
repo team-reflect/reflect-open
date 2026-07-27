@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { cleanGraphName, graphNameFromRoot, graphRootForName, isGraphNameTaken } from '@/lib/graph-names'
+import { isKeyboardEventComposing } from '@/lib/keyboard'
 import { OnboardingIcloudHeader } from '@/mobile/onboarding-icloud-header'
 
 const DEFAULT_ICLOUD_NOTES_NAME = 'Notes'
@@ -103,6 +104,9 @@ export function OnboardingIcloudSection(props: OnboardingIcloudSectionProps): Re
                 enterKeyHint="go"
                 onChange={(event) => setTypedName(event.target.value)}
                 onKeyDown={(event) => {
+                  if (isKeyboardEventComposing(event.nativeEvent)) {
+                    return
+                  }
                   if (event.key === 'Enter') {
                     create()
                   }

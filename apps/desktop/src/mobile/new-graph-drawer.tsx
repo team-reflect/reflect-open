@@ -5,6 +5,7 @@ import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { cleanGraphName, graphRootForName, isGraphNameTaken } from '@/lib/graph-names'
+import { isKeyboardEventComposing } from '@/lib/keyboard'
 
 interface NewGraphDrawerProps {
   open: boolean
@@ -84,6 +85,9 @@ export function NewGraphDrawer({
               enterKeyHint="go"
               onChange={(event) => setTypedName(event.target.value)}
               onKeyDown={(event) => {
+                if (isKeyboardEventComposing(event.nativeEvent)) {
+                  return
+                }
                 if (event.key === 'Enter') {
                   create()
                 }

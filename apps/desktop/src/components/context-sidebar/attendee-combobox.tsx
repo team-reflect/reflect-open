@@ -17,6 +17,7 @@ import {
   type AutocompleteEntry,
 } from '@/editor/wiki-autocomplete-entries'
 import { useContactsAuthorization } from '@/hooks/use-contacts-authorization'
+import { isKeyboardEventComposing } from '@/lib/keyboard'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
@@ -150,6 +151,14 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
   }
 
   const onKeyDown = (keyEvent: KeyboardEvent<HTMLInputElement>): void => {
+    if (isKeyboardEventComposing(keyEvent.nativeEvent)) {
+      // preventDefault keeps cmdk's root handler from selecting the highlighted
+      // entry on the Enter that commits the composition.
+      if (keyEvent.key === 'Enter') {
+        keyEvent.preventDefault()
+      }
+      return
+    }
     if (keyEvent.key === 'Enter') {
       // Ours alone: preventDefault stops the dialog form submitting,
       // stopPropagation keeps cmdk's root handler from double-selecting.

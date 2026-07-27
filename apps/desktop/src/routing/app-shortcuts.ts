@@ -4,6 +4,7 @@ import { registerKeymap } from '@/editor/keymap'
 import { APP_COMMANDS } from '@/lib/commands/app-commands'
 import { runCommand } from '@/lib/commands/registry'
 import { todayIso } from '@/lib/dates'
+import { isKeyboardEventComposing } from '@/lib/keyboard'
 import { setMenuCommandDispatch } from '@/lib/native-menu/dispatch'
 import { isNativeMenuInstalled } from '@/lib/native-menu/menu'
 import { isMacosDesktop } from '@/lib/platform'
@@ -302,6 +303,9 @@ export function useAppShortcuts(): CommandContext {
     }
 
     function onHistoryKeyDownCapture(event: KeyboardEvent) {
+      if (isKeyboardEventComposing(event)) {
+        return
+      }
       const id = idForKeyDown(event)
       if (id === null || isNativeMacosMenuCommand(id) || !HISTORY_COMMAND_IDS.has(id)) {
         return
@@ -314,6 +318,9 @@ export function useAppShortcuts(): CommandContext {
     }
 
     function onKeyDown(event: KeyboardEvent) {
+      if (isKeyboardEventComposing(event)) {
+        return
+      }
       if (event.defaultPrevented) {
         // The focused editor gets first refusal. meowdown's `Mod-k` consumes the
         // keydown (preventDefault) only when it turns a selection or the link at

@@ -3,6 +3,7 @@ import { Circle, CircleCheck } from 'lucide-react'
 import type { OpenTask } from '@reflect/core'
 import { TaskText } from '@/components/tasks/task-text'
 import { formatShortDate } from '@/lib/dates'
+import { isKeyboardEventComposing } from '@/lib/keyboard'
 import { taskKey } from '@/lib/tasks/task-identity'
 import { useTaskCheckboxToggle } from '@/lib/tasks/use-task-checkbox-toggle'
 import { cn } from '@/lib/utils'
@@ -65,6 +66,9 @@ export function MobileTaskRow({ task, showSource, onEdit }: MobileTaskRowProps):
         aria-label={`Edit: ${label}`}
         onClick={edit}
         onKeyDown={(event) => {
+          if (isKeyboardEventComposing(event.nativeEvent)) {
+            return
+          }
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault()
             edit()

@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { isKeyboardEventComposing } from '@/lib/keyboard'
 import { useGraph } from '@/providers/graph-provider'
 import { SettingsField } from './field'
 import { SettingsSection } from './section'
@@ -142,6 +143,9 @@ export function DestructiveSection(): ReactElement {
             disabled={deleting}
             onChange={(event) => setDeleteName(event.target.value)}
             onKeyDown={(event) => {
+              if (isKeyboardEventComposing(event.nativeEvent)) {
+                return
+              }
               if (event.key === 'Enter') {
                 event.preventDefault()
                 void deleteGraphToTrash()
