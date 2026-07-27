@@ -16,7 +16,7 @@ function projection(path: string, mtime: number, fileHash: string): IndexedNote 
     id: null,
     title: path,
     titleKey: path,
-    pathKey: path.toLowerCase(),
+    pathKey: foldGraphPath(path),
     kind: 'note',
     dailyDate: null,
     isPrivate: false,
