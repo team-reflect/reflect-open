@@ -135,6 +135,7 @@ export {
   type AudioMemoIdentity,
   type CaptureAudioMemoInput,
   type CaptureAudioMemoOutcome,
+  type CaptureAudioMemoPartInput,
   type ReconcileAudioMemosInput,
   type ReconcileAudioMemosOutcome,
   type ReconcileStop,

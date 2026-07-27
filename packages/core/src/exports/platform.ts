@@ -139,6 +139,7 @@ export {
   listDir,
   noteExists,
   deleteNote,
+  deleteAudioMemo,
   listFiles,
   listAttachments,
   vaultScanStats,

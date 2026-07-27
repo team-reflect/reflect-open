@@ -8,7 +8,7 @@ import {
   type TranscriptionRequest,
 } from './transcribe'
 import { bytesToBase64 } from '../lib/base64'
-import { isTranscriptionRejected } from './transcribe-http'
+import { isTranscriptionOversize, isTranscriptionRejected } from './transcribe-http'
 
 interface RecordedCall {
   url: string
@@ -105,14 +105,15 @@ describe('transcribeAudio (openai)', () => {
     expect(calls).toHaveLength(1)
   })
 
-  it('an oversized payload is a rejection; a rate limit stays a retryable network error', async () => {
+  it('an oversized payload is an oversize skip; a rate limit stays a retryable network error', async () => {
     const tooLarge = recordingFetch([], () =>
       jsonResponse(413, { error: { message: 'Maximum content size exceeded.' } }),
     )
     const rejection: unknown = await transcribeAudio(request({ fetchFn: tooLarge })).catch(
       (cause: unknown) => cause,
     )
-    expect(isTranscriptionRejected(rejection)).toBe(true)
+    expect(isTranscriptionOversize(rejection)).toBe(true)
+    expect(isTranscriptionRejected(rejection)).toBe(false)
 
     const rateLimited = recordingFetch([], () =>
       jsonResponse(429, { error: { message: 'Rate limit reached.' } }),

@@ -445,7 +445,7 @@ describe('reconcileAudioMemos', () => {
       stopped: { reason: 'io', message: 'disk full' },
     })
     expect(writeNoteMock).not.toHaveBeenCalled()
-    expect(transcribeMock).not.toHaveBeenCalled()
+    expect(transcribeMock).toHaveBeenCalledTimes(1)
   })
 
   it('a daily-note backlink without the note is a tombstone — deletion stays deleted', async () => {
@@ -504,7 +504,9 @@ describe('reconcileAudioMemos', () => {
     await reconcile()
 
     expect(readAssetMock.mock.calls.map(([path]) => path)).toEqual([
+      '.reflect/transcripts/audio-memo-2026-06-10-090000-000.m4a.json',
       earlier.audioPath,
+      '.reflect/transcripts/audio-memo-2026-06-11-153022-845.webm.json',
       MEMO.audioPath,
     ])
   })
@@ -624,11 +626,12 @@ describe('reconcileAudioMemos', () => {
   it('the abort gate stops between memos', async () => {
     const earlier = audioMemoIdentity(new Date(2026, 5, 10, 9, 0, 0, 0), 'audio/mp4')
     listDirMock.mockResolvedValue([fileMeta(earlier.audioPath), fileMeta(MEMO.audioPath)])
-    // The first memo checks at loop start, after category resolution, after
-    // the asset read, between transcription and enrichment, and after
-    // enrichment; stop at the next loop start.
+    // The first memo checks at loop start, at its segment loop, after the
+    // asset read, after the provider call, after category resolution, and
+    // before the note write; stop at the next loop start.
     const isStale = vi
       .fn()
+      .mockReturnValueOnce(false)
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(false)
