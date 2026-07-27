@@ -20,8 +20,10 @@ import {
   listFiles,
   readAsset,
   readNote,
+  readTranscriptCache,
   writeAsset,
   writeNote,
+  writeTranscriptCache,
 } from '../graph/commands'
 import { transcribeAudio } from '../ai/transcribe'
 import { TranscriptionRejectedError } from '../ai/transcribe-http'
@@ -43,8 +45,10 @@ vi.mock('../graph/commands', () => ({
   readAsset: vi.fn(),
   readAssetBinary: vi.fn(),
   readNote: vi.fn(),
+  readTranscriptCache: vi.fn(),
   writeAsset: vi.fn(),
   writeNote: vi.fn(),
+  writeTranscriptCache: vi.fn(),
 }))
 vi.mock('../ai/transcribe', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../ai/transcribe')>()),
@@ -69,6 +73,8 @@ const listFilesMock = vi.mocked(listFiles)
 const readAssetMock = vi.mocked(readAsset)
 const readNoteMock = vi.mocked(readNote)
 const writeAssetMock = vi.mocked(writeAsset)
+const readTranscriptCacheMock = vi.mocked(readTranscriptCache)
+const writeTranscriptCacheMock = vi.mocked(writeTranscriptCache)
 const writeNoteMock = vi.mocked(writeNote)
 const transcribeMock = vi.mocked(transcribeAudio)
 const getSecretMock = vi.mocked(getSecret)
@@ -109,6 +115,8 @@ beforeEach(() => {
   readAssetMock.mockResolvedValue(btoa('audio-bytes'))
   readNoteMock.mockResolvedValue('morning thoughts\n')
   writeAssetMock.mockResolvedValue(undefined)
+  readTranscriptCacheMock.mockRejectedValue({ kind: 'notFound', message: 'no cached transcript' })
+  writeTranscriptCacheMock.mockResolvedValue(undefined)
   writeNoteMock.mockResolvedValue(undefined)
   getSecretMock.mockResolvedValue('sk-live-key')
   transcribeMock.mockResolvedValue('memo transcript')
@@ -504,10 +512,12 @@ describe('reconcileAudioMemos', () => {
     await reconcile()
 
     expect(readAssetMock.mock.calls.map(([path]) => path)).toEqual([
-      '.reflect/transcripts/audio-memo-2026-06-10-090000-000.m4a.json',
       earlier.audioPath,
-      '.reflect/transcripts/audio-memo-2026-06-11-153022-845.webm.json',
       MEMO.audioPath,
+    ])
+    expect(readTranscriptCacheMock.mock.calls.map(([name]) => name)).toEqual([
+      'audio-memo-2026-06-10-090000-000.m4a.json',
+      'audio-memo-2026-06-11-153022-845.webm.json',
     ])
   })
 

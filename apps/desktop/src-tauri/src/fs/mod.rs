@@ -496,6 +496,61 @@ pub fn audio_memo_delete(path: String, generation: u64, state: State<GraphState>
     }
 }
 
+/// The per-segment transcript cache lives under `.reflect/transcripts/`:
+/// derived, rebuildable data (deleting it re-bills a transcription, never
+/// loses content), invisible to the watcher, indexer, and sync like the rest
+/// of `.reflect/`. It gets its own narrow commands because the attachment
+/// IPC is deliberately fenced to `assets/` and `audio-memos/`.
+fn transcript_cache_file(root: &Path, name: &str) -> AppResult<std::path::PathBuf> {
+    if name.is_empty()
+        || name.contains('/')
+        || name.contains('\\')
+        || name.contains('\0')
+        || name == "."
+        || name == ".."
+    {
+        return Err(AppError::traversal(format!(
+            "transcript cache name must be a plain filename: {name:?}"
+        )));
+    }
+    Ok(root.join(".reflect").join("transcripts").join(name))
+}
+
+/// Read one cached segment transcript; `notFound` when nothing is cached.
+#[tauri::command]
+pub fn transcript_cache_read(
+    name: String,
+    generation: u64,
+    state: State<GraphState>,
+) -> AppResult<String> {
+    let root = root_for_generation(&state, generation)?;
+    match fs::read_to_string(transcript_cache_file(&root, &name)?) {
+        Ok(contents) => Ok(contents),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            Err(AppError::not_found(format!("no cached transcript: {name}")))
+        }
+        Err(err) => Err(err.into()),
+    }
+}
+
+/// Cache one segment's transcription result. A torn write is harmless — the
+/// reader treats undecodable JSON as "no cache" and re-transcribes.
+#[tauri::command]
+pub fn transcript_cache_write(
+    name: String,
+    contents: String,
+    generation: u64,
+    state: State<GraphState>,
+) -> AppResult<()> {
+    let root = root_for_generation(&state, generation)?;
+    let path = transcript_cache_file(&root, &name)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(path, contents)?;
+    Ok(())
+}
+
 /// Read a binary asset's bytes as a **raw IPC response** — no base64, no
 /// JSON. Long audio memos read back for transcription would otherwise cross
 /// the bridge ~1.33× inflated inside one giant JSON string. Pinned to

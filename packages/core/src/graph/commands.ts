@@ -222,6 +222,23 @@ export async function readAssetBinary(
 }
 
 /**
+ * Per-segment transcript cache IO (`.reflect/transcripts/<name>`): derived
+ * data outside the attachment fence, so it rides its own narrow commands.
+ * The read throws `notFound` while nothing is cached.
+ */
+export async function readTranscriptCache(name: string, generation: number): Promise<string> {
+  return call('transcript_cache_read', { name, generation }, z.string())
+}
+
+export async function writeTranscriptCache(
+  name: string,
+  contents: string,
+  generation: number,
+): Promise<void> {
+  await call('transcript_cache_write', { name, contents, generation }, voidSchema)
+}
+
+/**
  * Delete one recording under `audio-memos/` — cancelling a session discards
  * its already-landed segments. Idempotent; scoped in Rust to `audio-memos/`
  * so this can never become a general file-delete IPC.

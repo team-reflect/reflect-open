@@ -7,7 +7,7 @@ import {
   groupAudioMemoSessions,
   isSessionClosed,
   isSessionReady,
-  partTranscriptPath,
+  partTranscriptName,
   stitchSessionTranscript,
   type AudioMemoPart,
 } from './audio-memo-session'
@@ -120,10 +120,8 @@ describe('transcript cache codec', () => {
     expect(decodePartResult('{"other": 1}')).toBeNull()
   })
 
-  it('caches next to the segment name under .reflect/transcripts', () => {
-    expect(partTranscriptPath(part({ part: 2 }))).toBe(
-      `.reflect/transcripts/${MEMO.base}.part-002.m4a.json`,
-    )
+  it('names the cache entry after the segment file', () => {
+    expect(partTranscriptName(part({ part: 2 }))).toBe(`${MEMO.base}.part-002.m4a.json`)
   })
 })
 

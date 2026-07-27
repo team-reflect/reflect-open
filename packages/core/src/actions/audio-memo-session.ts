@@ -3,8 +3,13 @@ import { errorMessage, isAppError } from '../errors'
 import { TRANSCRIPTION_MAX_SEGMENT_BYTES, type TranscriptionProvider } from '../ai/provider-config'
 import { transcribeAudio } from '../ai/transcribe'
 import { isTranscriptionOversize, isTranscriptionRejected } from '../ai/transcribe-http'
-import { base64ToBytes, bytesToBase64 } from '../lib/base64'
-import { readAsset, readAssetBinary, writeAsset } from '../graph/commands'
+import { base64ToBytes } from '../lib/base64'
+import {
+  readAsset,
+  readAssetBinary,
+  readTranscriptCache,
+  writeTranscriptCache,
+} from '../graph/commands'
 import { hasBinaryIpc } from '../ipc/bridge'
 import type { AudioMemoIdentity } from './audio-memo'
 
@@ -112,12 +117,9 @@ export type AudioMemoPartResult = { text: string } | { rejected: string }
  * watcher, indexer, and sync never see it. Derived data: deleting it costs a
  * re-transcription, never content.
  */
-const TRANSCRIPTS_DIR = '.reflect/transcripts'
-
-/** Where `part`'s transcription result is cached. */
-export function partTranscriptPath(part: AudioMemoPart): string {
-  const fileName = part.path.slice(part.path.lastIndexOf('/') + 1)
-  return `${TRANSCRIPTS_DIR}/${fileName}.json`
+/** The cache entry's filename under `.reflect/transcripts/`. */
+export function partTranscriptName(part: AudioMemoPart): string {
+  return `${part.path.slice(part.path.lastIndexOf('/') + 1)}.json`
 }
 
 const partResultSchema = z.union([
@@ -167,14 +169,14 @@ async function readPartTranscript(
 ): Promise<AudioMemoPartResult | null> {
   let raw: string
   try {
-    raw = await readAsset(partTranscriptPath(part), generation)
+    raw = await readTranscriptCache(partTranscriptName(part), generation)
   } catch (cause) {
     if (isAppError(cause) && cause.kind === 'notFound') {
       return null
     }
     throw cause
   }
-  return decodePartResult(new TextDecoder().decode(base64ToBytes(raw)))
+  return decodePartResult(raw)
 }
 
 async function writePartTranscript(
@@ -182,8 +184,7 @@ async function writePartTranscript(
   result: AudioMemoPartResult,
   generation: number,
 ): Promise<void> {
-  const bytes = new TextEncoder().encode(encodePartResult(result))
-  await writeAsset(partTranscriptPath(part), bytesToBase64(bytes), generation)
+  await writeTranscriptCache(partTranscriptName(part), encodePartResult(result), generation)
 }
 
 export interface TranscribeSessionPartsInput {
