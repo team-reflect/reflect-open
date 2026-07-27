@@ -10,13 +10,19 @@ import {
   type AudioMemoEnrichmentCredentials,
 } from '../ai/audio-memo-title'
 import { buildAudioMemoTranscript } from '../ai/audio-memo-transcript'
+import { AUDIO_EXTENSION_BY_MIME, baseMimeType } from '../ai/transcribe'
+import { base64ToBytes, bytesToBase64 } from '../lib/base64'
 import {
-  AUDIO_EXTENSION_BY_MIME,
-  base64ToBytes,
-  baseMimeType,
-  bytesToBase64,
-} from '../ai/transcribe'
-import { listDir, listFiles, readAsset, readNote, writeAsset, writeNote } from '../graph/commands'
+  listDir,
+  listFiles,
+  readAsset,
+  readAssetBinary,
+  readNote,
+  writeAsset,
+  writeNote,
+} from '../graph/commands'
+import { writeAssetStreamed } from '../graph/assets'
+import { hasBinaryIpc } from '../ipc/bridge'
 import { AUDIO_MEMOS_DIR, audioMemoPath, dailyPath, notePath } from '../graph/paths'
 import { appendListItemUnderBacklinkedHeading, wikiLinkSafe } from '../markdown/edit'
 import { getSecret } from '../secrets/keychain'
@@ -182,13 +188,22 @@ export type CaptureAudioMemoOutcome =
  * Persist one recording into the graph — the durable step, no network. The
  * transcription happens later, in {@link reconcileAudioMemos}.
  */
+async function writeAudioMemoAsset(path: string, audio: Blob, generation: number): Promise<void> {
+  if (hasBinaryIpc()) {
+    await writeAssetStreamed(path, audio, generation)
+    return
+  }
+  // Browser dev's in-memory bridge has no binary transport; recordings there
+  // are short enough for the base64 JSON route.
+  await writeAsset(path, bytesToBase64(new Uint8Array(await audio.arrayBuffer())), generation)
+}
+
 export async function captureAudioMemo(
   input: CaptureAudioMemoInput,
 ): Promise<CaptureAudioMemoOutcome> {
   const memo = audioMemoIdentity(input.recordedAt, input.mimeType)
   try {
-    const encoded = bytesToBase64(new Uint8Array(await input.audio.arrayBuffer()))
-    await writeAsset(memo.audioPath, encoded, input.generation)
+    await writeAudioMemoAsset(memo.audioPath, input.audio, input.generation)
   } catch (cause) {
     return { ok: false, message: errorMessage(cause) }
   }
@@ -420,9 +435,10 @@ export async function reconcileAudioMemos(
     try {
       memosNoteTitle ??= await ensureBacklinkTarget(MEMOS_NOTE_TITLE, input.generation)
       if (stale()) return stalled()
-      const audio = new Blob([base64ToBytes(await readAsset(memo.audioPath, input.generation))], {
-        type: memo.mimeType,
-      })
+      const bytes = hasBinaryIpc()
+        ? await readAssetBinary(memo.audioPath, input.generation)
+        : base64ToBytes(await readAsset(memo.audioPath, input.generation))
+      const audio = new Blob([bytes], { type: memo.mimeType })
       if (stale()) {
         return stalled()
       }

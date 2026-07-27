@@ -116,8 +116,8 @@ export {
   type ContextWindowOptions,
 } from '../ai/chat/context-window'
 export type { ModelMessage as ChatModelMessage } from 'ai'
+export { base64ToBytes } from '../lib/base64'
 export {
-  base64ToBytes,
   isTranscriptionRejected,
   transcribeAudio,
   TranscriptionRejectedError,
