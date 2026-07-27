@@ -45,6 +45,9 @@ export function SearchInput({
         value={value}
         onChange={(event) => onValueChange(event.target.value)}
         onKeyDown={(event) => {
+          if (event.nativeEvent.isComposing) {
+            return
+          }
           if (event.key === 'Enter') {
             event.currentTarget.blur()
           }

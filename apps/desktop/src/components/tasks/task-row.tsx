@@ -96,6 +96,9 @@ export function TaskRow({
   const done = task.checked
   const label = task.text || 'Empty task'
   const selectFromKeyboard = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (event.nativeEvent.isComposing) {
+      return
+    }
     if (event.key !== 'Enter' && event.key !== ' ') {
       return
     }

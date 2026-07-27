@@ -322,6 +322,9 @@ export function useSidebarResize(panel: ResizableSidebarPanel): SidebarResize {
 
   const onKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>): void => {
+      if (event.nativeEvent.isComposing) {
+        return
+      }
       if (dragRef.current !== null) {
         return
       }

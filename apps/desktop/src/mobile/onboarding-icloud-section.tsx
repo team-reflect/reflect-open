@@ -103,6 +103,9 @@ export function OnboardingIcloudSection(props: OnboardingIcloudSectionProps): Re
                 enterKeyHint="go"
                 onChange={(event) => setTypedName(event.target.value)}
                 onKeyDown={(event) => {
+                  if (event.nativeEvent.isComposing) {
+                    return
+                  }
                   if (event.key === 'Enter') {
                     create()
                   }

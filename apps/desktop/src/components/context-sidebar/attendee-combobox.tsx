@@ -150,6 +150,9 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
   }
 
   const onKeyDown = (keyEvent: KeyboardEvent<HTMLInputElement>): void => {
+    if (keyEvent.nativeEvent.isComposing) {
+      return
+    }
     if (keyEvent.key === 'Enter') {
       // Ours alone: preventDefault stops the dialog form submitting,
       // stopPropagation keeps cmdk's root handler from double-selecting.

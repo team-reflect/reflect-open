@@ -81,6 +81,9 @@ export function ModelCombobox({
   }
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.nativeEvent.isComposing) {
+      return
+    }
     if (event.key === 'Enter' && filteredCountRef.current === 0 && inputValue.trim()) {
       event.preventDefault()
       commit(inputValue.trim())

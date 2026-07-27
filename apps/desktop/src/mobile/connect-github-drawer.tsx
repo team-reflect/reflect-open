@@ -99,6 +99,9 @@ function ConnectWizardSheet({
                   enterKeyHint="go"
                   onChange={(event) => wizard.setRepoName(event.target.value)}
                   onKeyDown={(event) => {
+                    if (event.nativeEvent.isComposing) {
+                      return
+                    }
                     if (event.key === 'Enter') {
                       wizard.continueFromRepo()
                     }
@@ -129,6 +132,9 @@ function ConnectWizardSheet({
                   enterKeyHint="go"
                   onChange={(event) => wizard.setExistingRepo(event.target.value)}
                   onKeyDown={(event) => {
+                    if (event.nativeEvent.isComposing) {
+                      return
+                    }
                     if (event.key === 'Enter') {
                       wizard.continueFromRepo()
                     }

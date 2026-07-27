@@ -314,6 +314,9 @@ export function useAppShortcuts(): CommandContext {
     }
 
     function onKeyDown(event: KeyboardEvent) {
+      if (event.isComposing) {
+        return
+      }
       if (event.defaultPrevented) {
         // The focused editor gets first refusal. meowdown's `Mod-k` consumes the
         // keydown (preventDefault) only when it turns a selection or the link at

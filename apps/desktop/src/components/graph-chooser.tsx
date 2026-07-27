@@ -288,6 +288,9 @@ function IcloudCard({
               aria-invalid={nameTaken}
               onChange={(event) => setTypedName(event.target.value)}
               onKeyDown={(event) => {
+                if (event.nativeEvent.isComposing) {
+                  return
+                }
                 if (event.key === 'Enter') {
                   void create()
                 }
@@ -320,6 +323,9 @@ function IcloudCard({
               disabled={!available || pending}
               onChange={(event) => setTypedName(event.target.value)}
               onKeyDown={(event) => {
+                if (event.nativeEvent.isComposing) {
+                  return
+                }
                 if (event.key === 'Enter') {
                   void create()
                 }

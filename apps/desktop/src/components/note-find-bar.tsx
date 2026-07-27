@@ -34,7 +34,10 @@ export function NoteFindBar(): ReactElement | null {
   const canNavigate = total > 0
 
   function handleSearchKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
-    if (event.key !== 'Escape' || event.nativeEvent.isComposing) {
+    if (event.nativeEvent.isComposing) {
+      return
+    }
+    if (event.key !== 'Escape') {
       return
     }
     event.preventDefault()

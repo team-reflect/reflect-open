@@ -142,6 +142,9 @@ export function DestructiveSection(): ReactElement {
             disabled={deleting}
             onChange={(event) => setDeleteName(event.target.value)}
             onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing) {
+                return
+              }
               if (event.key === 'Enter') {
                 event.preventDefault()
                 void deleteGraphToTrash()

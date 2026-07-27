@@ -65,6 +65,9 @@ export function MobileTaskRow({ task, showSource, onEdit }: MobileTaskRowProps):
         aria-label={`Edit: ${label}`}
         onClick={edit}
         onKeyDown={(event) => {
+          if (event.nativeEvent.isComposing) {
+            return
+          }
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault()
             edit()
