@@ -111,9 +111,12 @@ export function repointPathWikiLinks(
   options: PathWikiLinkRepointOptions,
 ): string {
   const { fromPathKey, to } = options
-  // `#` would re-open fragment syntax inside the rewritten target; the
-  // bracket/pipe/newline characters would corrupt the link itself.
-  if (/[[\]|\r\n#]/.test(to)) {
+  // The written target must survive the round trip through the same
+  // reduction every reader applies: a `#` would re-open fragment syntax, a
+  // backslash or loose slash segment would turn the path into a *name*, and
+  // enumerating bad characters can never prove the opposite direction.
+  const reduced = wikiNoteReference(to)
+  if (reduced?.kind !== 'path' || reduced.path !== `${to}.md`) {
     throw new Error(`invalid wiki-link path target: ${to}`)
   }
   const splices: Splice[] = []

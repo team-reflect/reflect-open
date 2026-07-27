@@ -125,9 +125,14 @@ describe('repointPathWikiLinks', () => {
     expect(repointPathWikiLinks(source, options)).toBe(source)
   })
 
-  it('rejects a destination that has no wiki spelling', () => {
+  it.each([
+    ['a fragment separator', 'notes/c#-notes'],
+    ['a backslash', 'notes\\plan'],
+    ['a loose slash segment that reads as a name', 'notes/a / b'],
+    ['a bare name', 'plan'],
+  ])('rejects a destination with %s', (_reason, to) => {
     expect(() =>
-      repointPathWikiLinks('x', { fromPathKey: 'notes/a.md', to: 'notes/c#-notes' }),
-    ).toThrowError(/no wiki spelling|invalid wiki-link path target/)
+      repointPathWikiLinks('x', { fromPathKey: 'notes/a.md', to }),
+    ).toThrowError(/invalid wiki-link path target/)
   })
 })

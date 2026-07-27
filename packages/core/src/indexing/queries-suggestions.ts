@@ -1,4 +1,5 @@
 import { sql } from 'kysely'
+import { wikiNoteReference } from '../graph/note-reference'
 import { foldTag, normalizeWikiTarget } from '../markdown'
 import { generateDateSuggestions, type DateSuggestionContext } from './date-suggestions'
 import { db } from './db'
@@ -318,15 +319,19 @@ async function winningAliasesByPath(
  * address it by its own path. `[[notes/plan-2]]` names exactly one file, so
  * the row stays selectable instead of vanishing, and the link the user writes
  * never needs disambiguating later. A root-level file gains a `/` so the
- * target reads as a path rather than a name. A path containing `#` has no
- * wiki spelling (every consumer, Obsidian included, reads `#` as a fragment
- * separator), so such a note stays reachable through search and Markdown
- * hrefs but cannot be inserted from the `[[` menu.
+ * target reads as a path rather than a name.
+ *
+ * The address is proven by round trip: {@link wikiNoteReference} must reduce
+ * the spelling back to exactly this file. A path with no such spelling — a
+ * `#` reads as a fragment separator, a loose slash segment reads as a name —
+ * stays reachable through search and Markdown hrefs but cannot be inserted
+ * from the `[[` menu.
  */
 function pathQualifiedInsert(path: string): string | null {
   const target = path.replace(/\.md$/, '')
   const qualified = target.includes('/') ? target : `/${target}`
-  if (qualified.includes('#') || qualified !== qualified.trim()) {
+  const reduced = wikiNoteReference(qualified)
+  if (reduced?.kind !== 'path' || reduced.path !== path) {
     return null
   }
   return serializeWikiSuggestionAddress(qualified, null)

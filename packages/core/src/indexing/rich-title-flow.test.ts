@@ -189,12 +189,16 @@ describe('path-address fallback flow', () => {
   it('drops a row whose path has no wiki spelling', async () => {
     const database = openMigratedIndex()
     applyProjection(database, project('notes/c#-notes.md', '# Plan\n', 20))
+    // A trim-unstable slash segment reads back as a *name*, not a path, so
+    // the round-trip proof refuses it too.
+    applyProjection(database, project('notes/a /Plan.md', '# Plan\n', 15))
     applyProjection(database, project('notes/plan.md', '# Plan\n', 10))
     connectIndex(database)
     try {
       const { suggestions } = await suggestWikiLinkTargets('plan')
       // `#` reads as a fragment separator in every wiki consumer, so the
-      // hash-named duplicate cannot be inserted; its sibling still can.
+      // hash-named duplicate cannot be inserted; neither can the loose-slash
+      // path; the clean sibling still can.
       expect(suggestions.map((row) => row.insertText)).toEqual(['notes/plan'])
     } finally {
       setBridge(null)

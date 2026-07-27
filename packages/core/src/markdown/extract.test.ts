@@ -329,6 +329,16 @@ describe('parseNote — meowdown grammar recovery & new inline nodes', () => {
     expect(note.wikiLinks.map((link) => link.target)).toEqual(['Some Note'])
   })
 
+  it('never projects a traversal or hidden embed target as an asset', () => {
+    const note = parse('![[../cat.png]] and ![[.obsidian/cat.png]]')
+    expect(note.assets).toEqual([])
+    // The unsafe targets stay visible wiki links that resolve to nothing.
+    expect(note.wikiLinks.map((link) => link.target)).toEqual([
+      '../cat.png',
+      '.obsidian/cat.png',
+    ])
+  })
+
   it('strips highlight and inline-math marks from plain text, like other marks', () => {
     const note = parse('mark ==hi== and $x+y$ math')
     expect(note.text).toBe('mark hi and x+y math')

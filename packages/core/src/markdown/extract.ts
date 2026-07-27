@@ -194,10 +194,13 @@ function isAttachmentEmbedTarget(target: string): boolean {
  * Wiki embeds are vault-root relative and never URL-decoded (Obsidian's
  * rules). A bare filename stays bare: which folder it lives in is a question
  * only a live catalog can answer, and the privacy gate matches such a
- * reference by basename.
+ * reference by basename. A target that resolves to no safe attachment path
+ * (traversal, hidden components) returns null — it must never reach the
+ * asset projection.
  */
-function wikiEmbedAssetPath(target: string): string {
-  return resolveSegments([], target.replace(/^\//, '')) ?? target
+function wikiEmbedAssetPath(target: string): string | null {
+  const path = resolveSegments([], target.replace(/^\//, ''))
+  return path !== null && isAttachmentPath(path) ? path : null
 }
 
 /**
@@ -439,10 +442,16 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
 
       if (isWikiNodeName(name)) {
         const wiki = readWikiLink(body, wikiBracketStart(node), to, bodyOffset)
-        if (name === 'WikiEmbed' && isAttachmentEmbedTarget(wiki.target)) {
-          // `![[photo.png]]` names a file, not a note: it must never become
-          // a backlink row or resolve through the note-key tiers.
-          assets.push({ path: wikiEmbedAssetPath(wiki.target), from: wiki.from, to: wiki.to })
+        // `![[photo.png]]` names a file, not a note: it must never become a
+        // backlink row or resolve through the note-key tiers. An unsafe
+        // target (traversal, hidden components) stays a visible wiki link
+        // that resolves to nothing, never an asset row.
+        const assetPath =
+          name === 'WikiEmbed' && isAttachmentEmbedTarget(wiki.target)
+            ? wikiEmbedAssetPath(wiki.target)
+            : null
+        if (assetPath !== null) {
+          assets.push({ path: assetPath, from: wiki.from, to: wiki.to })
         } else {
           wikiLinks.push(wiki)
         }
