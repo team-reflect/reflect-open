@@ -348,26 +348,24 @@ pub async fn open_note_window(
         .background_color(theme_background_color(&window))
         // Build hidden and reveal on `PageLoadEvent::Finished` so the user
         // never sees WKWebView's default white backing while HTML/CSS/JS are
-        // still loading. The main window gets the same effect for free: its
-        // `visible: false` config only flips to visible on `RunEvent::Ready`,
-        // and Tauri's plugin + geometry-restore setup between builder and
-        // Ready gives the webview time to reach the same state. `Once` gates
-        // the reveal to the first Finished only: reloads (Cmd+R, dev HMR,
-        // webview crash recovery) otherwise re-run `set_focus`, stealing
-        // focus back to a note window the user has moved away from.
+        // still loading. The main window is gated the same way, from the
+        // app-level `on_page_load` hook in `lib.rs`. `Once` gates the reveal to
+        // the first Finished only: reloads (Cmd+R, dev HMR, webview crash
+        // recovery) otherwise re-run `set_focus`, stealing focus back to a note
+        // window the user has moved away from.
         .visible(false)
         .on_page_load({
             let revealed = Once::new();
-            move |window, payload| {
+            move |note_window, payload| {
                 if !matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
                     return;
                 }
                 revealed.call_once(|| {
-                    if let Err(err) = window.show() {
-                        tracing::warn!(error = %err, label = window.label(), "failed to show note window after page load");
+                    if let Err(err) = note_window.show() {
+                        tracing::warn!(error = %err, label = note_window.label(), "failed to show note window after page load");
                     }
-                    if let Err(err) = window.set_focus() {
-                        tracing::warn!(error = %err, label = window.label(), "failed to focus note window after page load");
+                    if let Err(err) = note_window.set_focus() {
+                        tracing::warn!(error = %err, label = note_window.label(), "failed to focus note window after page load");
                     }
                 });
             }
