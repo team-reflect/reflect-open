@@ -513,7 +513,15 @@ fn transcript_cache_file(root: &Path, name: &str) -> AppResult<std::path::PathBu
             "transcript cache name must be a plain filename: {name:?}"
         )));
     }
-    Ok(root.join(".reflect").join("transcripts").join(name))
+    // Through the shared guard: a cache directory (or entry) symlinked
+    // outside the graph must not redirect IO past the generation-pinned
+    // root. The plain-filename check above stays — `resolve` would accept a
+    // nested relative path, and a cache name must be a single segment.
+    let path = resolve(root, &format!(".reflect/transcripts/{name}"))?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    Ok(path)
 }
 
 /// Read one cached segment transcript; `notFound` when nothing is cached.
@@ -543,11 +551,7 @@ pub fn transcript_cache_write(
     state: State<GraphState>,
 ) -> AppResult<()> {
     let root = root_for_generation(&state, generation)?;
-    let path = transcript_cache_file(&root, &name)?;
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(path, contents)?;
+    fs::write(transcript_cache_file(&root, &name)?, contents)?;
     Ok(())
 }
 
@@ -924,6 +928,38 @@ pub(crate) fn invalidate_file_catalog(state: &GraphState, root: &Path) {
             ?error,
             "graph state lock poisoned while invalidating catalog"
         ),
+    }
+}
+
+#[cfg(test)]
+mod transcript_cache_tests {
+    use super::transcript_cache_file;
+
+    #[test]
+    fn accepts_a_plain_name_and_creates_the_cache_dir() {
+        let graph = tempfile::tempdir().expect("graph");
+        let path = transcript_cache_file(graph.path(), "memo.part-001.m4a.json").expect("path");
+        assert!(path.ends_with(".reflect/transcripts/memo.part-001.m4a.json"));
+        assert!(graph.path().join(".reflect/transcripts").is_dir());
+    }
+
+    #[test]
+    fn rejects_path_shaped_names() {
+        let graph = tempfile::tempdir().expect("graph");
+        assert!(transcript_cache_file(graph.path(), "../escape.json").is_err());
+        assert!(transcript_cache_file(graph.path(), "a/b.json").is_err());
+        assert!(transcript_cache_file(graph.path(), "").is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_a_cache_dir_symlinked_outside_the_graph() {
+        let graph = tempfile::tempdir().expect("graph");
+        let outside = tempfile::tempdir().expect("outside");
+        std::fs::create_dir_all(graph.path().join(".reflect")).expect("reflect dir");
+        std::os::unix::fs::symlink(outside.path(), graph.path().join(".reflect/transcripts"))
+            .expect("symlink");
+        assert!(transcript_cache_file(graph.path(), "memo.json").is_err());
     }
 }
 
