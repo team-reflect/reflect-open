@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { IndexedNote } from '@reflect/core'
+import { foldGraphPath, type IndexedNote } from '@reflect/core'
 import { createDevBridge } from '@/dev/dev-bridge'
 import { createDevFileStore } from '@/dev/dev-file-store'
 import { createDevIndexDb } from '@/dev/dev-index-db'
