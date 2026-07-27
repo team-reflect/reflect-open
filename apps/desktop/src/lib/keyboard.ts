@@ -1,4 +1,3 @@
-
 let isComposing = false
 let timer : ReturnType<typeof setTimeout> | undefined
 
