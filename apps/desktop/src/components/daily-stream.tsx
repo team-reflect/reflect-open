@@ -244,7 +244,6 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
         {...(restoredCache !== null ? { cache: restoredCache } : {})}
         itemSize={ESTIMATED_DAY_HEIGHT}
         bufferSize={2 * ESTIMATED_DAY_HEIGHT}
-        shift={true}
       >
         {(_, index) => {
           const date = dateAtIndex(dayWindow, index)
