@@ -1,5 +1,6 @@
 import tailwindcss from '@tailwindcss/vite'
 import { playwright } from '@vitest/browser-playwright'
+import { playwrightCommands } from 'vitest-browser-commands'
 import { defineDesktopProject } from './vitest.shared'
 
 const browserName = process.env.REFLECT_TEST_BROWSER === 'webkit' ? 'webkit' : 'chromium'
@@ -9,7 +10,7 @@ if (process.env.CI) {
 }
 
 export default defineDesktopProject({
-  plugins: [tailwindcss()],
+  plugins: [tailwindcss(), playwrightCommands()],
   test: {
     name: 'browser',
     include: ['src/**/*.test.tsx'],
