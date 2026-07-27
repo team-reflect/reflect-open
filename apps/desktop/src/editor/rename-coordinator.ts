@@ -95,16 +95,20 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
     if (target === currentPath) {
       return
     }
-    // Retarget inbound `[[notes/…]]` path links before the file moves: they
-    // point at a briefly-missing destination the move satisfies a moment
-    // later, whereas the reverse order would leave permanent dangling links
-    // whenever the rewrite failed. A failed rewrite must not block the move —
-    // those links dangle either way, and the filename projection is the
-    // user-visible half. Births skip this: nothing can hold a path link to a
-    // placeholder path that existed only inside this session.
+    const from = currentPath
+    await moveNoteCarryingSession(from, target, gen)
+    currentPath = target
+    // Retarget inbound `[[notes/…]]` path links only after the move landed: a
+    // refused move then touches nothing (rollback for free), while the
+    // reverse order would strand every rewritten source on a destination that
+    // never materialized. The source query still works post-move — the
+    // sources' own index rows keep the old target key until they reproject.
+    // A per-source failure dangles that source alone, the same residue as
+    // before. Births skip this: nothing can hold a path link to a placeholder
+    // path that existed only inside this session.
     if (options?.rewriteInboundPathLinks === true) {
       try {
-        await rewritePathLinksForMove(currentPath, target, {
+        await rewritePathLinksForMove(from, target, {
           pathLinkSources: getPathLinkSources,
           read: readNote,
           write: (forPath, contents) => writeNote(forPath, contents, gen),
@@ -113,8 +117,6 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
         console.error('path link rewrite failed:', cause)
       }
     }
-    await moveNoteCarryingSession(currentPath, target, gen)
-    currentPath = target
   }
 
   // Rewrite inbound links across the graph, record the old title as an alias,
