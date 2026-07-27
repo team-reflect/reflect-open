@@ -21,7 +21,13 @@ let failLoad: boolean
 let gateLoad: boolean
 let pendingLoad: (() => void) | null
 
-function releaseLoad(): void {
+/**
+ * Let the gated `settings_load` return. Awaiting the gate first matters: the
+ * bridge call is async, so a release that ran before `invoke` reached its
+ * `await` would be a silent no-op and the load would never settle.
+ */
+async function releaseLoad(): Promise<void> {
+  await vi.waitFor(() => expect(pendingLoad).not.toBeNull())
   pendingLoad?.()
   pendingLoad = null
 }
@@ -73,9 +79,14 @@ type Act = (callback: () => unknown) => Promise<void>
  */
 async function settleLoad(act: Act): Promise<void> {
   await act(async () => {
-    await vi.waitFor(() =>
-      expect(queryClient.getQueryState(SETTINGS_QUERY_KEY)?.status).not.toBe('pending'),
-    )
+    await vi.waitFor(() => {
+      // A query that has not been registered yet reads as `undefined`, which is
+      // also "not pending" — require the real settled state, or this returns
+      // before the load has even started.
+      const state = queryClient.getQueryState(SETTINGS_QUERY_KEY)
+      expect(state).toBeDefined()
+      expect(state?.status).not.toBe('pending')
+    })
   })
 }
 
@@ -128,7 +139,7 @@ describe('ThemeProvider', () => {
     const { act } = await renderHook(() => useTheme(), { wrapper })
     expect(document.documentElement.classList.contains('dark')).toBe(true)
 
-    releaseLoad()
+    await releaseLoad()
     await settleLoad(act)
     expect(cachedPreference()).toBe('dark')
     expect(document.documentElement.classList.contains('dark')).toBe(true)
