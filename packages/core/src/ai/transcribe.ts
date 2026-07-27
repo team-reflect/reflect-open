@@ -6,6 +6,7 @@ import {
   httpError,
   safeJson,
   send,
+  TranscriptionOversizeError,
   TranscriptionRejectedError,
   TRANSCRIPTION_TRANSFER_TIMEOUT_MS,
 } from './transcribe-http'
@@ -157,7 +158,21 @@ const geminiResponseSchema = z.object({
 const GEMINI_INSTRUCTION =
   'Transcribe this audio recording verbatim. Return only the transcribed text, with no commentary or formatting.'
 
+/**
+ * Raw-audio budget for a Gemini inline request: the whole JSON body must
+ * stay under Gemini's ~20 MB request cap, and inline audio rides it
+ * base64-encoded (~1.33×). Rotation-sized segments fit comfortably; this
+ * only fires when an encoder ignored the bitrate hint, and skipping beats
+ * letting the provider 400 the request into a tombstone.
+ */
+export const GEMINI_INLINE_MAX_BYTES = 12 * 1024 * 1024
+
 async function transcribeWithGemini(request: TranscriptionRequest): Promise<string> {
+  if (request.audio.size > GEMINI_INLINE_MAX_BYTES) {
+    throw new TranscriptionOversizeError(
+      `the recording does not fit a gemini inline request (${request.audio.size} bytes)`,
+    )
+  }
   const fetchFn = request.fetchFn ?? fetch
   const data = bytesToBase64(new Uint8Array(await request.audio.arrayBuffer()))
   const attempt = (model: string): Promise<Response> =>

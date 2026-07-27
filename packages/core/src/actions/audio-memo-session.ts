@@ -25,12 +25,20 @@ import type { AudioMemoIdentity } from './audio-memo'
  * Everything here is pure bookkeeping over already-parsed parts — grouping,
  * closed/ready judgement, transcript stitching, and the codec for the
  * per-part transcript cache under `.reflect/transcripts/`. The cache is what
- * makes retries cheap: a pass that dies at part 7 of 24 never re-bills the
+ * makes retries cheap: a pass that dies at part 7 of 12 never re-bills the
  * first six.
  */
 
-/** Rotate the recorder after this much audio; each segment is one file. */
-export const AUDIO_MEMO_SEGMENT_MS = 10 * 60_000
+/**
+ * Rotate the recorder after this much audio; each segment is one file.
+ * Twenty minutes is the ceiling the provider walls allow with margin: the
+ * OpenAI 4o transcription models refuse audio over 1500 s, and a throttled
+ * webview timer can overshoot the rotation tick, so the target must sit
+ * well under 25 minutes. At the requested 64 kbps a segment is ~9.6 MB;
+ * even an encoder that ignores the bitrate hint (~128 kbps) stays under
+ * OpenAI's 25 MiB request cap at ~19.2 MB.
+ */
+export const AUDIO_MEMO_SEGMENT_MS = 20 * 60_000
 
 /** Auto-stop cap for one recording session: four hours covers most meetings. */
 export const AUDIO_MEMO_MAX_DURATION_MS = 4 * 60 * 60_000

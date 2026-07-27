@@ -18,7 +18,7 @@ touches a Reflect server, because there isn't one.
   shortcut (`mod+\`). Lifecycle lives in
   `apps/desktop/src/providers/audio-memo-provider.tsx`.
 - **Capture is durable first.** One recording session runs up to four hours
-  and is stored as ten-minute segments: the recorder rotates on one open
+  and is stored as twenty-minute segments: the recorder rotates on one open
   microphone stream, each finished segment lands immediately in the graph's
   `audio-memos/` folder as a complete audio file
   (`<base>.part-NNN.<ext>`, the final one `-end`-marked), streamed over raw

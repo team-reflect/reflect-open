@@ -264,6 +264,21 @@ describe('transcribeAudio (google)', () => {
     expect(isTranscriptionRejected(failure)).toBe(true)
   })
 
+  it('skips a recording too large for an inline request instead of sending it', async () => {
+    const calls: RecordedCall[] = []
+    const fetchFn = recordingFetch(calls, () => geminiResponse('never reached'))
+    const oversized = request({
+      provider: 'google',
+      fetchFn,
+      audio: new Blob([new Uint8Array(13 * 1024 * 1024)], { type: 'audio/webm' }),
+    })
+
+    await expect(transcribeAudio(oversized)).rejects.toSatisfy((error) =>
+      isTranscriptionOversize(error),
+    )
+    expect(calls).toHaveLength(0)
+  })
+
   it('returns an empty transcript when no candidates come back', async () => {
     const fetchFn = recordingFetch([], () => jsonResponse(200, {}))
 
