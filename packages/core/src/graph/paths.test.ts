@@ -128,6 +128,10 @@ describe('graph paths', () => {
 describe('isCalendarDate', () => {
   it('accepts a real date and rejects an impossible one', () => {
     expect(isCalendarDate('2026-07-26')).toBe(true)
+    // No Date.UTC two-digit-year remap: year 99 is year 99, and proleptic
+    // year 0 is a leap year (divisible by 400) even though 1900 is not.
+    expect(isCalendarDate('0099-12-31')).toBe(true)
+    expect(isCalendarDate('0000-02-29')).toBe(true)
     expect(isCalendarDate('2026-02-29')).toBe(false)
     expect(isCalendarDate('2026-02-31')).toBe(false)
     expect(isCalendarDate('2026-13-01')).toBe(false)

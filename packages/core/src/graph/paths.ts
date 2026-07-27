@@ -68,9 +68,11 @@ export function isCalendarDate(date: string): boolean {
     return false
   }
   // The regex guarantees three numeric parts, so the destructure can't yield
-  // undefined.
+  // undefined. `setUTCFullYear` rather than `Date.UTC`: the latter remaps
+  // years 0-99 to 1900-1999, which would reject real dates like 0099-12-31.
   const [year, month, day] = date.split('-').map(Number) as [number, number, number]
-  const utc = new Date(Date.UTC(year, month - 1, day))
+  const utc = new Date(0)
+  utc.setUTCFullYear(year, month - 1, day)
   return (
     utc.getUTCFullYear() === year && utc.getUTCMonth() === month - 1 && utc.getUTCDate() === day
   )
