@@ -4,11 +4,11 @@ import {
   GOOGLE_TRANSCRIPTION_MODEL,
   OPENAI_TRANSCRIPTION_FALLBACK_MODEL,
   OPENAI_TRANSCRIPTION_MODEL,
-  bytesToBase64,
-  isTranscriptionRejected,
   transcribeAudio,
   type TranscriptionRequest,
 } from './transcribe'
+import { bytesToBase64 } from '../lib/base64'
+import { isTranscriptionRejected } from './transcribe-http'
 
 interface RecordedCall {
   url: string

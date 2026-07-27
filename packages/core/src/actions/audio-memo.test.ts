@@ -23,7 +23,8 @@ import {
   writeAsset,
   writeNote,
 } from '../graph/commands'
-import { transcribeAudio, TranscriptionRejectedError } from '../ai/transcribe'
+import { transcribeAudio } from '../ai/transcribe'
+import { TranscriptionRejectedError } from '../ai/transcribe-http'
 import { getSecret } from '../secrets/keychain'
 
 const generateAudioMemoTitleMock = vi.hoisted(() =>
