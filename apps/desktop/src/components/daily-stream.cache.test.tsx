@@ -88,10 +88,29 @@ function topRowIndex(container: Element): number {
 }
 
 async function waitForLoadedRows(): Promise<void> {
-  await vi.waitFor(() => {
-    expect(document.querySelectorAll('.reflect-note-loading').length).toBe(0)
-    expect(document.querySelectorAll('[data-testid=fake-editor]').length).toBeGreaterThan(0)
-  })
+  await vi.waitFor(
+    () => {
+      expect(document.querySelectorAll('.reflect-note-loading').length).toBe(0)
+      expect(document.querySelectorAll('[data-testid=fake-editor]').length).toBeGreaterThan(0)
+    },
+    { timeout: 5000 },
+  )
+}
+
+/**
+ * Wait for the anchor's imperative scroll to finish: virtua's `scrollToIndex`
+ * keeps re-pinning the target while row sizes settle, so a programmatic
+ * scroll fired too early is snapped back.
+ */
+async function waitForStableScroll(el: Element): Promise<void> {
+  await vi.waitFor(
+    async () => {
+      const before = el.scrollTop
+      await new Promise((resolve) => setTimeout(resolve, 200))
+      expect(el.scrollTop).toBe(before)
+    },
+    { timeout: 10_000 },
+  )
 }
 
 describe('daily-stream-cache', () => {
@@ -115,6 +134,7 @@ describe('daily-stream-cache', () => {
       const stream = page.getByTestId('daily-stream')
       await vi.waitFor(() => expect(stream.element().scrollTop).toBeGreaterThan(0))
       await waitForLoadedRows()
+      await waitForStableScroll(stream.element())
 
       // Walk downward through several rows so the measured layout (2000px
       // rows) diverges from the estimated one (220px rows) by dozens of rows'
@@ -122,6 +142,7 @@ describe('daily-stream-cache', () => {
       for (let step = 0; step < 3; step++) {
         stream.element().scrollTop += 3000
         await waitForLoadedRows()
+        await waitForStableScroll(stream.element())
       }
       const container = stream.element()
       const indexBefore = await vi.waitFor(() => {
@@ -145,8 +166,9 @@ describe('daily-stream-cache', () => {
       await waitForLoadedRows()
       // Without the snapshot the offset lands ~2800px-per-row short and the
       // top row is off by dozens of indexes; allow one row of settle noise.
-      await vi.waitFor(() =>
-        expect(Math.abs(topRowIndex(remounted) - indexBefore)).toBeLessThanOrEqual(1),
+      await vi.waitFor(
+        () => expect(Math.abs(topRowIndex(remounted) - indexBefore)).toBeLessThanOrEqual(1),
+        { timeout: 5000 },
       )
       await view.unmount()
     },
