@@ -128,6 +128,7 @@ export {
   audioMemoPartFromPath,
   audioMemoPartPath,
   captureAudioMemo,
+  captureAudioMemoPart,
   isSilentStop,
   listPendingAudioMemoSessions,
   reconcileAudioMemos,

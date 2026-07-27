@@ -3,6 +3,7 @@ import { RecordingWaveform } from '@/components/audio-memo/recording-waveform'
 import { Button } from '@/components/ui/button'
 import { PopoverContent } from '@/components/ui/popover'
 import { Spinner } from '@/components/ui/spinner'
+import { audioMemoCapWarning, formatRecordingElapsed } from '@/lib/recording-time'
 import { useAudioMemo } from '@/providers/audio-memo-provider'
 
 /**
@@ -18,6 +19,7 @@ import { useAudioMemo } from '@/providers/audio-memo-provider'
  */
 export function RecordingPopover(): ReactElement {
   const memo = useAudioMemo()
+  const capWarning = memo.phase === 'recording' ? audioMemoCapWarning(memo.elapsedMs) : null
 
   return (
     <PopoverContent
@@ -57,16 +59,15 @@ export function RecordingPopover(): ReactElement {
       ) : (
         <div className="flex items-center gap-3">
           {memo.stream ? <RecordingWaveform stream={memo.stream} /> : null}
-          <span className="text-sm font-medium tabular-nums">{formatElapsed(memo.elapsedMs)}</span>
+          <span className="text-sm font-medium tabular-nums">
+            {formatRecordingElapsed(memo.elapsedMs)}
+          </span>
+          {capWarning === null ? null : (
+            <span className="text-xs text-text-muted">{capWarning}</span>
+          )}
         </div>
       )}
     </PopoverContent>
   )
 }
 
-function formatElapsed(elapsedMs: number): string {
-  const totalSeconds = Math.floor(elapsedMs / 1000)
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}:${String(seconds).padStart(2, '0')}`
-}

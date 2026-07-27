@@ -244,6 +244,42 @@ export async function captureAudioMemo(
   return { ok: true, memo }
 }
 
+export interface CaptureAudioMemoPartInput {
+  /** One finished segment, as the recorder produced it. */
+  audio: Blob
+  /** The segment's MIME type, possibly with codec parameters. */
+  mimeType: string
+  /** When the *session* started — every part shares the session identity. */
+  recordedAt: Date
+  /** 1-based position within the session. */
+  part: number
+  /** True on the session's final segment. */
+  end: boolean
+  /** `GraphInfo.generation` — pins the write to the issuing graph. */
+  generation: number
+}
+
+/**
+ * Persist one session segment at its exact part path — the durable step, no
+ * network. Rotation calls this as each segment finishes, so a crash loses at
+ * most the segment still being recorded.
+ */
+export async function captureAudioMemoPart(
+  input: CaptureAudioMemoPartInput,
+): Promise<CaptureAudioMemoOutcome> {
+  const memo = audioMemoIdentity(input.recordedAt, input.mimeType)
+  try {
+    await writeAudioMemoAsset(
+      audioMemoPartPath(memo, input.part, input.end),
+      input.audio,
+      input.generation,
+    )
+  } catch (cause) {
+    return { ok: false, message: errorMessage(cause) }
+  }
+  return { ok: true, memo }
+}
+
 /** The day's note source at `generation`, where "no note yet" reads as empty. */
 async function dailyNoteSource(date: string, generation: number): Promise<string> {
   try {

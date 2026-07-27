@@ -222,6 +222,15 @@ export async function readAssetBinary(
 }
 
 /**
+ * Delete one recording under `audio-memos/` — cancelling a session discards
+ * its already-landed segments. Idempotent; scoped in Rust to `audio-memos/`
+ * so this can never become a general file-delete IPC.
+ */
+export async function deleteAudioMemo(path: string, generation: number): Promise<void> {
+  await call('audio_memo_delete', { path, generation }, voidSchema)
+}
+
+/**
  * Open an asset by graph-relative path in the system default application.
  * `generation` pins the request to the graph whose markdown produced the
  * image, so a delayed click after a graph switch cannot open another graph's

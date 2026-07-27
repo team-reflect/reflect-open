@@ -231,6 +231,13 @@ export async function transcribeSessionParts(
     if (part.sizeBytes > TRANSCRIPTION_MAX_SEGMENT_BYTES) {
       return { status: 'oversize' }
     }
+    if (part.sizeBytes === 0) {
+      // A stop can flush an empty final segment purely as the end marker —
+      // there is nothing to send a provider.
+      await writePartTranscript(part, { text: '' }, input.generation)
+      results.push({ text: '' })
+      continue
+    }
     const bytes = hasBinaryIpc()
       ? await readAssetBinary(part.path, input.generation)
       : base64ToBytes(await readAsset(part.path, input.generation))

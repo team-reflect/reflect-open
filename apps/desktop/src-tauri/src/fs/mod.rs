@@ -465,6 +465,26 @@ pub fn asset_write(
     Ok(())
 }
 
+/// Delete one recording under `audio-memos/`: cancelling a recording session
+/// discards the segments it already landed. Deliberately scoped to the
+/// `audio-memos/` prefix so this command can never grow into a general
+/// file-delete IPC. Idempotent — a segment deleted twice (or never written)
+/// is fine.
+#[tauri::command]
+pub fn audio_memo_delete(path: String, generation: u64, state: State<GraphState>) -> AppResult<()> {
+    if !path.starts_with("audio-memos/") {
+        return Err(AppError::traversal(format!(
+            "not an audio memo path: {path}"
+        )));
+    }
+    let root = root_for_generation(&state, generation)?;
+    match fs::remove_file(resolve(&root, &path)?) {
+        Ok(()) => Ok(()),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(err.into()),
+    }
+}
+
 /// Read a binary asset's bytes as a **raw IPC response** — no base64, no
 /// JSON. Long audio memos read back for transcription would otherwise cross
 /// the bridge ~1.33× inflated inside one giant JSON string. Pinned to

@@ -264,6 +264,7 @@ pub fn run() {
             fs::asset_write,
             fs::asset_read,
             fs::asset_read_binary,
+            fs::audio_memo_delete,
             fs::asset_open,
             fs::assets::asset_upload_begin,
             fs::assets::asset_upload_append,
