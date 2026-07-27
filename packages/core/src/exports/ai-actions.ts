@@ -125,9 +125,11 @@ export { transcribeAudio, type TranscriptionRequest } from '../ai/transcribe'
 export {
   audioMemoFromPath,
   audioMemoIdentity,
+  audioMemoPartFromPath,
+  audioMemoPartPath,
   captureAudioMemo,
   isSilentStop,
-  listPendingAudioMemos,
+  listPendingAudioMemoSessions,
   reconcileAudioMemos,
   type AudioMemoIdentity,
   type CaptureAudioMemoInput,
@@ -136,6 +138,11 @@ export {
   type ReconcileAudioMemosOutcome,
   type ReconcileStop,
 } from '../actions/audio-memo'
+export {
+  AUDIO_MEMO_MAX_DURATION_MS,
+  AUDIO_MEMO_SEGMENT_MS,
+  type AudioMemoSession,
+} from '../actions/audio-memo-session'
 export {
   captureAckSchema,
   captureEnvelopeSchema,

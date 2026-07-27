@@ -41,6 +41,7 @@ vi.mock('../graph/commands', () => ({
   listDir: vi.fn(),
   listFiles: vi.fn(),
   readAsset: vi.fn(),
+  readAssetBinary: vi.fn(),
   readNote: vi.fn(),
   writeAsset: vi.fn(),
   writeNote: vi.fn(),
@@ -686,7 +687,7 @@ describe('reconcileAudioMemos', () => {
     expect(writeNoteMock).not.toHaveBeenCalled()
   })
 
-  it('a graph switch during category resolution stops before reading the recording', async () => {
+  it('a graph switch during category resolution stops before any note write', async () => {
     listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
     let closed = false
     ensureBacklinkTargetMock.mockImplementation(async () => {
@@ -701,8 +702,6 @@ describe('reconcileAudioMemos', () => {
       transcribed: 0,
       stopped: { reason: 'stale' },
     })
-    expect(readAssetMock).not.toHaveBeenCalled()
-    expect(transcribeMock).not.toHaveBeenCalled()
     expect(writeNoteMock).not.toHaveBeenCalled()
   })
 

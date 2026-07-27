@@ -4,6 +4,7 @@ import {
   apiKeyHint,
   defaultAiProvider,
   pickTranscriptionConfig,
+  resolveTranscriptionTarget,
   withAiProviderAdded,
   withAiProviderRemoved,
   type AiProvidersState,
@@ -120,5 +121,53 @@ describe('defaultAiProvider', () => {
 
   it('returns null for the empty list', () => {
     expect(defaultAiProvider(state([], null))).toBeNull()
+  })
+})
+
+describe('resolveTranscriptionTarget', () => {
+  const keyed =
+    (available: Record<string, string>) =>
+    (id: string): Promise<string | null> =>
+      Promise.resolve(available[id] ?? null)
+
+  it('answers no-provider when nothing transcription-capable is configured', async () => {
+    const target = await resolveTranscriptionTarget(
+      state([config({ id: 'a', provider: 'anthropic' })], 'a'),
+      keyed({ a: 'sk-a' }),
+    )
+    expect(target).toBe('no-provider')
+  })
+
+  it('answers no-key when every capable entry is keyless', async () => {
+    const target = await resolveTranscriptionTarget(
+      state([config({ id: 'openai-1' })], 'openai-1'),
+      keyed({}),
+    )
+    expect(target).toBe('no-key')
+  })
+
+  it('prefers OpenAI entries and the app default within a provider', async () => {
+    const providers = state(
+      [
+        config({ id: 'google-1', provider: 'google' }),
+        config({ id: 'openai-1' }),
+        config({ id: 'openai-2' }),
+      ],
+      'openai-2',
+    )
+    const target = await resolveTranscriptionTarget(
+      providers,
+      keyed({ 'google-1': 'g', 'openai-1': 'o1', 'openai-2': 'o2' }),
+    )
+    expect(target).toMatchObject({ config: { id: 'openai-2' }, apiKey: 'o2' })
+  })
+
+  it('skips a keyless preferred entry instead of blocking a working one', async () => {
+    const providers = state(
+      [config({ id: 'openai-1' }), config({ id: 'google-1', provider: 'google' })],
+      'openai-1',
+    )
+    const target = await resolveTranscriptionTarget(providers, keyed({ 'google-1': 'g' }))
+    expect(target).toMatchObject({ config: { id: 'google-1' }, apiKey: 'g' })
   })
 })
