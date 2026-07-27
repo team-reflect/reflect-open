@@ -1,5 +1,5 @@
 import { isAppError } from '../errors'
-import { projectNoteAliases } from '../indexing/indexed-note'
+import { CLAIM_TIER, projectNoteAliases } from '../indexing/indexed-note'
 import {
   findNotesByPathKey,
   findWikiTargetMatch,
@@ -185,7 +185,7 @@ async function indexedResolution(
   generation: number,
   listNoteFiles: ListNoteFiles,
 ): Promise<ExistingMatchResolution | null> {
-  if (match.tier === 1) {
+  if (match.tier === CLAIM_TIER.dailyDate) {
     return resolutionForPaths(match.paths)
   }
   if (date !== undefined) {
@@ -194,7 +194,8 @@ async function indexedResolution(
       return daily
     }
   }
-  return match.tier === 0 ? null : resolutionForPaths(match.paths)
+  // An unclaimed key has no paths, which resolves to null on its own.
+  return resolutionForPaths(match.paths)
 }
 
 /**

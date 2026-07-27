@@ -92,11 +92,27 @@ import { serializeWikiSuggestionAddress } from './suggest'
  */
 export const PROJECTION_VERSION = 18
 
+/**
+ * Precedence of the spellings a note answers to (`note_claims.tier`): the
+ * lowest tier claiming a key wins it. The numbers are the storage encoding —
+ * migration 0019 and the CLI read the same values.
+ */
+export const CLAIM_TIER = {
+  /** Calendar-valid daily date (`daily/2026-07-26.md` answering to `2026-07-26`). */
+  dailyDate: 1,
+  /** Authored title (frontmatter or first heading; filename when untitled). */
+  title: 2,
+  /** Frontmatter or derived alias. */
+  alias: 3,
+  /** Filename stem — the weakest address, how Obsidian names every note. */
+  basename: 4,
+} as const
+
 export const indexedClaimSchema = z.object({
   /** Folded spelling this note answers to. */
   key: z.string(),
-  /** 1 calendar-valid daily date, 2 authored title, 3 alias, 4 filename stem. */
-  tier: z.number().int().min(1).max(4),
+  /** One of {@link CLAIM_TIER}. */
+  tier: z.number().int().min(CLAIM_TIER.dailyDate).max(CLAIM_TIER.basename),
 })
 export type IndexedClaim = z.infer<typeof indexedClaimSchema>
 
@@ -283,13 +299,13 @@ export function projectNoteClaims(
   }
   const date = isDaily(parsed.path) ? dateFromDailyPath(parsed.path) : null
   if (date !== null && isCalendarDate(date)) {
-    claim(date, 1)
+    claim(date, CLAIM_TIER.dailyDate)
   }
-  claim(foldKey(parsed.title), 2)
+  claim(foldKey(parsed.title), CLAIM_TIER.title)
   for (const alias of aliases) {
-    claim(alias.aliasKey, 3)
+    claim(alias.aliasKey, CLAIM_TIER.alias)
   }
-  claim(noteBasenameKey(parsed.path), 4)
+  claim(noteBasenameKey(parsed.path), CLAIM_TIER.basename)
   return claims
 }
 

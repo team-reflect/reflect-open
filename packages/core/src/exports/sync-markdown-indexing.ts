@@ -141,6 +141,7 @@ export {
   applyIndexChanges,
   hashContent,
   buildIndexedNote,
+  CLAIM_TIER,
   decodeTaskBreadcrumbs,
   encodeTaskBreadcrumbs,
   indexedNoteSchema,

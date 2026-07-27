@@ -329,10 +329,13 @@ export async function getNoteIdsByPath(paths: string[]): Promise<Map<string, str
 
 /** The winning tier's claimants for a folded key, preserving ambiguity. */
 export interface WikiTargetMatch {
-  /** 1 daily date, 2 authored title, 3 alias, 4 filename stem; 0 when unclaimed. */
+  /** One of `CLAIM_TIER`, or {@link UNCLAIMED_TIER} with no paths. */
   readonly tier: number
   readonly paths: readonly string[]
 }
+
+/** `WikiTargetMatch.tier` when nothing claims the key (never stored). */
+export const UNCLAIMED_TIER = 0
 
 /**
  * Look up one folded spelling. `note_claims` already encodes the precedence
@@ -344,7 +347,7 @@ export interface WikiTargetMatch {
  */
 export async function findWikiTargetMatch(key: string): Promise<WikiTargetMatch> {
   if (key === '') {
-    return { tier: 0, paths: [] }
+    return { tier: UNCLAIMED_TIER, paths: [] }
   }
   const rows = await db
     .selectFrom('noteClaims')
@@ -355,7 +358,7 @@ export async function findWikiTargetMatch(key: string): Promise<WikiTargetMatch>
     .execute()
   const tier = rows[0]?.tier
   return tier === undefined
-    ? { tier: 0, paths: [] }
+    ? { tier: UNCLAIMED_TIER, paths: [] }
     : {
         tier,
         paths: [...new Set(rows.filter((row) => row.tier === tier).map((row) => row.notePath))],

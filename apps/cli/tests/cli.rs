@@ -16,6 +16,12 @@ use reflect_cli::keys::fold_key;
 use reflect_cli::note_file::parse_note_meta;
 use reflect_cli::paths::{daily_path, today_date};
 
+/// `note_claims.tier` values (the desktop's `claim_tier`): lower wins.
+const TIER_DAILY_DATE: i64 = 1;
+const TIER_TITLE: i64 = 2;
+const TIER_ALIAS: i64 = 3;
+const TIER_BASENAME: i64 = 4;
+
 struct Fixture {
     dir: TempDir,
 }
@@ -86,14 +92,14 @@ impl Fixture {
                 // Calendar-valid only: an impossible `daily/2026-02-31.md` is
                 // an ordinary note and must never claim a date.
                 if reflect_cli::paths::parse_calendar_date(date).is_some() {
-                    claim(&mut claims, date.to_string(), 1);
+                    claim(&mut claims, date.to_string(), TIER_DAILY_DATE);
                 }
             }
-            claim(&mut claims, fold_key(&meta.title), 2);
+            claim(&mut claims, fold_key(&meta.title), TIER_TITLE);
             for alias in &meta.aliases {
-                claim(&mut claims, fold_key(alias), 3);
+                claim(&mut claims, fold_key(alias), TIER_ALIAS);
             }
-            claim(&mut claims, fold_key(stem), 4);
+            claim(&mut claims, fold_key(stem), TIER_BASENAME);
             for (key, tier) in &claims {
                 conn.execute(
                     "INSERT INTO note_claims(note_path, key, tier) VALUES(?1, ?2, ?3)",

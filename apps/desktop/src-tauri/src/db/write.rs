@@ -81,12 +81,30 @@ pub(super) struct IndexedAlias {
     pub(super) alias_key: String,
 }
 
+/// Precedence of the spellings a note answers to (`note_claims.tier`): the
+/// lowest tier claiming a key wins it. Mirrors `CLAIM_TIER` in
+/// `packages/core/src/indexing/indexed-note.ts`; the numbers are the storage
+/// encoding migration 0019 and the CLI read.
+pub(super) mod claim_tier {
+    /// Calendar-valid daily date.
+    pub const DAILY_DATE: i64 = 1;
+    /// Authored title. Production writes receive it from TypeScript inside
+    /// `IndexedClaim`; only the test fixtures restate it natively.
+    #[cfg(test)]
+    pub const TITLE: i64 = 2;
+    /// Frontmatter or derived alias (same test-only story as `TITLE`).
+    #[cfg(test)]
+    pub const ALIAS: i64 = 3;
+    /// Filename stem — the weakest address.
+    pub const BASENAME: i64 = 4;
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct IndexedClaim {
     /// Folded spelling this note answers to.
     pub(super) key: String,
-    /// 1 calendar-valid daily date, 2 authored title, 3 alias, 4 filename stem.
+    /// One of [`claim_tier`].
     pub(super) tier: i64,
 }
 
@@ -288,22 +306,22 @@ pub(super) fn move_note(
         // guard mirrors `projectNoteClaims`'s seen-set: a key a carried claim
         // already holds is not claimed again. (A move that changes which tier
         // should own a key converges on the next reprojection.)
-        conn.prepare_cached("DELETE FROM note_claims WHERE note_path = ?1 AND tier IN (1, 4)")?
-            .execute(params![to])?;
+        conn.prepare_cached("DELETE FROM note_claims WHERE note_path = ?1 AND tier IN (?2, ?3)")?
+            .execute(params![to, claim_tier::DAILY_DATE, claim_tier::BASENAME])?;
         if let Some(daily_date) = &address.daily_date {
             conn.prepare_cached(
                 "INSERT INTO note_claims(note_path, key, tier)
-                 SELECT ?1, ?2, 1
+                 SELECT ?1, ?2, ?3
                  WHERE NOT EXISTS (SELECT 1 FROM note_claims WHERE note_path = ?1 AND key = ?2)",
             )?
-            .execute(params![to, daily_date])?;
+            .execute(params![to, daily_date, claim_tier::DAILY_DATE])?;
         }
         conn.prepare_cached(
             "INSERT INTO note_claims(note_path, key, tier)
-             SELECT ?1, ?2, 4
+             SELECT ?1, ?2, ?3
              WHERE NOT EXISTS (SELECT 1 FROM note_claims WHERE note_path = ?1 AND key = ?2)",
         )?
-        .execute(params![to, address.basename_key])?;
+        .execute(params![to, address.basename_key, claim_tier::BASENAME])?;
     }
     conn.prepare_cached("UPDATE note_text SET note_path = ?2 WHERE note_path = ?1")?
         .execute(params![from, to])?;

@@ -1,5 +1,6 @@
 import sqlite3InitModule, { type Database, type SqlValue } from '@sqlite.org/sqlite-wasm'
 import {
+  CLAIM_TIER,
   dateFromDailyPath,
   encodeTaskBreadcrumbs,
   foldGraphPath,
@@ -237,11 +238,17 @@ export async function createDevIndexDb(): Promise<DevIndexDb> {
         // nothing and must not mint claims for a note that does not exist.
         run(db, 'UPDATE note_claims SET note_path = ? WHERE note_path = ?', [to, from])
         if (movedRows > 0) {
-          run(db, 'DELETE FROM note_claims WHERE note_path = ? AND tier IN (1, 4)', [to])
+          run(db, 'DELETE FROM note_claims WHERE note_path = ? AND tier IN (?, ?)', [
+            to,
+            CLAIM_TIER.dailyDate,
+            CLAIM_TIER.basename,
+          ])
           const date = dateFromDailyPath(to)
           const restated = [
-            ...(date !== null && isCalendarDate(date) ? [{ key: date, tier: 1 }] : []),
-            { key: noteBasenameKey(to), tier: 4 },
+            ...(date !== null && isCalendarDate(date)
+              ? [{ key: date, tier: CLAIM_TIER.dailyDate }]
+              : []),
+            { key: noteBasenameKey(to), tier: CLAIM_TIER.basename },
           ]
           for (const claim of restated) {
             run(

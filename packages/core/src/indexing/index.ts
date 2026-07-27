@@ -41,6 +41,7 @@ export {
 export { listTemplates, type TemplateEntry } from './template-list'
 export {
   buildIndexedNote,
+  CLAIM_TIER,
   decodeTaskBreadcrumbs,
   encodeTaskBreadcrumbs,
   indexedNoteSchema,

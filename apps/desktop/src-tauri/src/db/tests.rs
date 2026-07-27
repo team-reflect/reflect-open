@@ -12,8 +12,8 @@ use super::migrations::{migrate, migrate_to, open_in_memory, open_index_at, vali
 use super::query::run_query;
 use super::scan::scan_reconcile;
 use super::write::{
-    apply_note, clear_index, move_note, touch_note, IndexedAlias, IndexedClaim, IndexedEmail,
-    IndexedLink, IndexedNote, IndexedTag, IndexedTask, MovedNoteAddress,
+    apply_note, claim_tier, clear_index, move_note, touch_note, IndexedAlias, IndexedClaim,
+    IndexedEmail, IndexedLink, IndexedNote, IndexedTag, IndexedTask, MovedNoteAddress,
 };
 
 fn migrated() -> Connection {
@@ -43,8 +43,8 @@ fn push_claim(claims: &mut Vec<IndexedClaim>, key: &str, tier: i64) {
 
 fn note(path: &str, title: &str, links: Vec<IndexedLink>) -> IndexedNote {
     let mut claims = Vec::new();
-    push_claim(&mut claims, &title.to_lowercase(), 2);
-    push_claim(&mut claims, &stem_key(path), 4);
+    push_claim(&mut claims, &title.to_lowercase(), claim_tier::TITLE);
+    push_claim(&mut claims, &stem_key(path), claim_tier::BASENAME);
     IndexedNote {
         path: path.to_string(),
         id: None,
@@ -107,7 +107,7 @@ fn aliased_note(path: &str, title: &str, alias: &str) -> IndexedNote {
     }];
     let mut claims = Vec::new();
     push_claim(&mut claims, &title.to_lowercase(), 2);
-    push_claim(&mut claims, &alias.to_lowercase(), 3);
+    push_claim(&mut claims, &alias.to_lowercase(), claim_tier::ALIAS);
     push_claim(&mut claims, &stem_key(path), 4);
     indexed.claims = claims;
     indexed
@@ -118,9 +118,9 @@ fn daily_note(path: &str, date: &str) -> IndexedNote {
     indexed.kind = "daily".to_string();
     indexed.daily_date = Some(date.to_string());
     let mut claims = Vec::new();
-    push_claim(&mut claims, date, 1);
-    push_claim(&mut claims, &date.to_lowercase(), 2);
-    push_claim(&mut claims, &stem_key(path), 4);
+    push_claim(&mut claims, date, claim_tier::DAILY_DATE);
+    push_claim(&mut claims, &date.to_lowercase(), claim_tier::TITLE);
+    push_claim(&mut claims, &stem_key(path), claim_tier::BASENAME);
     indexed.claims = claims;
     indexed
 }
@@ -2115,9 +2115,9 @@ fn a_move_restates_the_path_derived_claims() {
     .unwrap();
     assert_eq!(claims.len(), 2);
     assert_eq!(claims[0]["key"], Value::from("kept title"));
-    assert_eq!(claims[0]["tier"], Value::from(2));
+    assert_eq!(claims[0]["tier"], Value::from(claim_tier::TITLE));
     assert_eq!(claims[1]["key"], Value::from("new-name"));
-    assert_eq!(claims[1]["tier"], Value::from(4));
+    assert_eq!(claims[1]["tier"], Value::from(claim_tier::BASENAME));
 
     let path_key = run_query(
         &conn,

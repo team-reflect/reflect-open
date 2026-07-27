@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { gistBodyHash, parseNote } from '../markdown'
-import { buildIndexedNote, indexedNoteSchema, PROJECTION_VERSION } from './indexed-note'
+import { buildIndexedNote, CLAIM_TIER, indexedNoteSchema, PROJECTION_VERSION } from './indexed-note'
 
 describe('buildIndexedNote', () => {
   it('carries the projection version that backfills path keys and claims', () => {
@@ -353,8 +353,8 @@ describe('projectNoteClaims (via buildIndexedNote)', () => {
       { ...meta, source: '# Weekly Planning' },
     )
     expect(titled.claims).toEqual([
-      { key: 'weekly planning', tier: 2 },
-      { key: 'plan', tier: 4 },
+      { key: 'weekly planning', tier: CLAIM_TIER.title },
+      { key: 'plan', tier: CLAIM_TIER.basename },
     ])
 
     // An untitled note already carries its filename as its title.
@@ -362,16 +362,16 @@ describe('projectNoteClaims (via buildIndexedNote)', () => {
       parseNote({ path: 'Projects/Plan.md', source: 'no heading here' }),
       { ...meta, source: 'no heading here' },
     )
-    expect(untitled.claims).toEqual([{ key: 'plan', tier: 2 }])
+    expect(untitled.claims).toEqual([{ key: 'plan', tier: CLAIM_TIER.title }])
   })
 
   it('claims a calendar-valid daily date but not an impossible one', () => {
     expect(
       buildIndexedNote(parseNote({ path: 'daily/2026-07-26.md', source: '' }), meta).claims,
-    ).toContainEqual({ key: '2026-07-26', tier: 1 })
+    ).toContainEqual({ key: '2026-07-26', tier: CLAIM_TIER.dailyDate })
     expect(
       buildIndexedNote(parseNote({ path: 'daily/2026-02-31.md', source: '' }), meta).claims,
-    ).not.toContainEqual({ key: '2026-02-31', tier: 1 })
+    ).not.toContainEqual({ key: '2026-02-31', tier: CLAIM_TIER.dailyDate })
   })
 
   it('claims aliases between the title and the stem', () => {
@@ -381,9 +381,9 @@ describe('projectNoteClaims (via buildIndexedNote)', () => {
       source,
     })
     expect(indexed.claims).toEqual([
-      { key: 'weekly planning', tier: 2 },
-      { key: 'roadmap', tier: 3 },
-      { key: 'plan', tier: 4 },
+      { key: 'weekly planning', tier: CLAIM_TIER.title },
+      { key: 'roadmap', tier: CLAIM_TIER.alias },
+      { key: 'plan', tier: CLAIM_TIER.basename },
     ])
   })
 
