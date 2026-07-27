@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.0-beta.21](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.20...v0.7.0-beta.21) (2026-07-27)
+
+
+### Bug Fixes
+
+* shrink the day carousel's slide belt ([#964](https://github.com/team-reflect/reflect-open/issues/964)) ([37de1d0](https://github.com/team-reflect/reflect-open/commit/37de1d094715c68963598e2cd3691df2c6b164e8))
+* update meowdown to ^0.59.1 ([#974](https://github.com/team-reflect/reflect-open/issues/974)) ([b0b8cb1](https://github.com/team-reflect/reflect-open/commit/b0b8cb1be1ee15e5d91838f175542336c3c1ac1a))
+
 ## [0.7.0-beta.20](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.19...v0.7.0-beta.20) (2026-07-27)
 
 
