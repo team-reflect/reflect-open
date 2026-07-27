@@ -79,6 +79,14 @@ interface NotePaneProps {
    */
   gutterClassName?: string
   /**
+   * Exact height for the loading placeholder: the pane last rendered this
+   * tall at this path, so reserving the same space keeps a virtualized row's
+   * size stable across a remount instead of collapsing and jumping back when
+   * the note arrives. The `editorClassName` min-height stays as the floor and
+   * the first-mount fallback.
+   */
+  placeholderHeight?: number
+  /**
    * Render the built-in desktop backlinks panel below the note (default).
    * The mobile surfaces pass `false` and mount their own touch-chrome
    * `IncomingBacklinks` section over the same data layer.
@@ -125,6 +133,7 @@ export function NotePaneComponent({
   className,
   editorClassName,
   gutterClassName,
+  placeholderHeight,
   showBacklinks = true,
   dailyDate,
   registerHandle,
@@ -257,6 +266,7 @@ export function NotePaneComponent({
     // daily-stream row reads as flicker while the stream anchors.
     return (
       <div
+        {...(placeholderHeight !== undefined ? { style: { height: placeholderHeight } } : {})}
         className={cn(
           'reflect-note-loading px-1 py-2 text-sm text-text-muted',
           gutterClassName,
