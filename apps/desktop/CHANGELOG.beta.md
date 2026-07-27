@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0-beta.22](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.21...v0.7.0-beta.22) (2026-07-27)
+
+
+### Features
+
+* support meeting-length audio memos via segmented recording ([#971](https://github.com/team-reflect/reflect-open/issues/971)) ([eabed7b](https://github.com/team-reflect/reflect-open/commit/eabed7b40858929de61f863aef460122c2a5a1f9))
+
 ## [0.7.0-beta.21](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.20...v0.7.0-beta.21) (2026-07-27)
 
 
