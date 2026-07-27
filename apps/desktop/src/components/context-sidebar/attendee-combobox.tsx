@@ -152,6 +152,11 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
 
   const onKeyDown = (keyEvent: KeyboardEvent<HTMLInputElement>): void => {
     if (isKeyboardEventComposing(keyEvent.nativeEvent)) {
+      // preventDefault keeps cmdk's root handler from selecting the highlighted
+      // entry on the Enter that commits the composition.
+      if (keyEvent.key === 'Enter') {
+        keyEvent.preventDefault()
+      }
       return
     }
     if (keyEvent.key === 'Enter') {

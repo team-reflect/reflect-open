@@ -152,11 +152,15 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
           onValueChange={setSelectedValue}
           onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
             if (isKeyboardEventComposing(event.nativeEvent)) {
+              // preventDefault keeps cmdk's root handler from selecting the
+              // highlighted item on the Enter that commits the composition.
+              if (event.key === 'Enter') {
+                event.preventDefault()
+              }
               return
             }
             // cmdk dispatches its custom select event after this handler. Drop
             // any abandoned pointer intent so Enter can never inherit it.
-
             if (event.key === 'Enter') {
               pendingNoteClickRef.current = null
             }

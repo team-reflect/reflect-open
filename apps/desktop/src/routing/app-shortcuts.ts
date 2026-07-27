@@ -303,6 +303,9 @@ export function useAppShortcuts(): CommandContext {
     }
 
     function onHistoryKeyDownCapture(event: KeyboardEvent) {
+      if (isKeyboardEventComposing(event)) {
+        return
+      }
       const id = idForKeyDown(event)
       if (id === null || isNativeMacosMenuCommand(id) || !HISTORY_COMMAND_IDS.has(id)) {
         return

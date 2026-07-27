@@ -1,5 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import { type OpenTask } from '@reflect/core'
+import { isKeyboardEventComposing } from '@/lib/keyboard'
 import { taskKey } from '@/lib/tasks/task-identity'
 import {
   insertTargetForBucket,
@@ -84,6 +85,9 @@ export function useTaskKeyboard({
       // Respect anything a focused widget already handled (e.g. the filters menu's
       // own arrow/Escape navigation).
       if (event.defaultPrevented) {
+        return
+      }
+      if (isKeyboardEventComposing(event)) {
         return
       }
       // ⌘⇧E toggles the filters menu (V1) — a screen-level chord that fires
