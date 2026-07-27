@@ -12,6 +12,7 @@ import {
   CommandList,
 } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { isKeyboardEventComposing } from '@/lib/keyboard'
 
 interface FilterCountSyncProps {
   countRef: React.MutableRefObject<number>
@@ -81,7 +82,7 @@ export function ModelCombobox({
   }
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.nativeEvent.isComposing) {
+    if (isKeyboardEventComposing(event.nativeEvent)) {
       return
     }
     if (event.key === 'Enter' && filteredCountRef.current === 0 && inputValue.trim()) {
