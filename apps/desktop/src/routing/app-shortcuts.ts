@@ -4,6 +4,7 @@ import { registerKeymap } from '@/editor/keymap'
 import { APP_COMMANDS } from '@/lib/commands/app-commands'
 import { runCommand } from '@/lib/commands/registry'
 import { todayIso } from '@/lib/dates'
+import { isKeyboardEventComposing } from '@/lib/keyboard'
 import { setMenuCommandDispatch } from '@/lib/native-menu/dispatch'
 import { isNativeMenuInstalled } from '@/lib/native-menu/menu'
 import { isMacosDesktop } from '@/lib/platform'
@@ -314,7 +315,7 @@ export function useAppShortcuts(): CommandContext {
     }
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.isComposing) {
+      if (isKeyboardEventComposing(event)) {
         return
       }
       if (event.defaultPrevented) {

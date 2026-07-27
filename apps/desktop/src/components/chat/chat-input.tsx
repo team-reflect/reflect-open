@@ -22,6 +22,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { imageFilesFrom } from '@/lib/chat-attachments'
 import { groupModelOptions } from '@/lib/chat-model-groups'
 import { keybindingFor } from '@/lib/commands/app-commands'
+import { isKeyboardEventComposing } from '@/lib/keyboard'
 import { useChatSession } from '@/providers/chat-provider'
 import { ChatHistoryMenu } from './chat-history-menu'
 
@@ -109,7 +110,7 @@ export function ChatInput(): ReactElement {
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
-            if (event.nativeEvent.isComposing) {
+            if (isKeyboardEventComposing(event.nativeEvent)) {
               return
             }
             if (event.key === 'Enter' && !event.shiftKey) {

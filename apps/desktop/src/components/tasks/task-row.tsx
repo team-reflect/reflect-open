@@ -8,6 +8,7 @@ import {
 import { Circle, CircleCheck } from 'lucide-react'
 import type { OpenTask } from '@reflect/core'
 import { formatDayLabel } from '@/lib/dates'
+import { isKeyboardEventComposing } from '@/lib/keyboard'
 import { taskKey } from '@/lib/tasks/task-identity'
 import { useTaskCheckboxToggle } from '@/lib/tasks/use-task-checkbox-toggle'
 import { cn } from '@/lib/utils'
@@ -96,7 +97,7 @@ export function TaskRow({
   const done = task.checked
   const label = task.text || 'Empty task'
   const selectFromKeyboard = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (event.nativeEvent.isComposing) {
+    if (isKeyboardEventComposing(event.nativeEvent)) {
       return
     }
     if (event.key !== 'Enter' && event.key !== ' ') {

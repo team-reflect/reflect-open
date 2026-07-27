@@ -11,6 +11,7 @@ import {
 } from 'react'
 import type { SearchStatus } from '@meowdown/core'
 import { noteEditorHandleFor } from '@/editor/editor-handle-registry'
+import { isKeyboardEventComposing } from '@/lib/keyboard'
 import {
   listenForFocusedNoteMenuCommands,
   type FocusedNoteMenuCommand,
@@ -138,7 +139,7 @@ export function NoteFindProvider({ children }: { children: ReactNode }): ReactEl
   useEffect(() => {
     if (target === null) return
     function onEscape(event: KeyboardEvent): void {
-      if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return
+      if (event.key !== 'Escape' || event.defaultPrevented || isKeyboardEventComposing(event)) return
       // Never consume the key: meowdown owns Escape inside the editor (its
       // menus close on it) and an overlay above the bar owns its own. This
       // only ends a Find session the user has already navigated away from.
@@ -182,7 +183,7 @@ export function NoteFindProvider({ children }: { children: ReactNode }): ReactEl
       })
 
     function onKeyDown(event: KeyboardEvent): void {
-      if (event.defaultPrevented || event.altKey || event.repeat || event.isComposing) return
+      if (event.defaultPrevented || event.altKey || event.repeat || isKeyboardEventComposing(event)) return
       if (!event.metaKey && !event.ctrlKey) return
       const key = event.key.toLowerCase()
       if (key === 'f' && !event.shiftKey) {

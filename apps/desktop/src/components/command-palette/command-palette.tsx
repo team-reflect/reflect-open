@@ -8,6 +8,7 @@ import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { runCommand } from '@/lib/commands/registry'
 import type { CommandContext } from '@/lib/commands/types'
 import { formatDayLabel } from '@/lib/dates'
+import { isKeyboardEventComposing } from '@/lib/keyboard'
 import { cn } from '@/lib/utils'
 import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
 import { useSettings } from '@/providers/settings-provider'
@@ -150,7 +151,7 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
           value={selectedValue}
           onValueChange={setSelectedValue}
           onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
-            if (event.nativeEvent.isComposing) {
+            if (isKeyboardEventComposing(event.nativeEvent)) {
               return
             }
             // cmdk dispatches its custom select event after this handler. Drop
