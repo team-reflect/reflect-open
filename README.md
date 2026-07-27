@@ -56,7 +56,7 @@ another git remote are connected directly by the user.
 
 You can also [build from source](#building-from-source).
 
-See [CHANGELOG.md](CHANGELOG.md) for release notes.
+See [CHANGELOG.md](apps/desktop/CHANGELOG.md) for release notes.
 
 ## Your Notes Are Files
 
