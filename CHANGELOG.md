@@ -1,0 +1,1 @@
+./apps/desktop/CHANGELOG.md
