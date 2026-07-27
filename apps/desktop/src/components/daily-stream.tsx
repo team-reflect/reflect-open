@@ -6,8 +6,10 @@ import type { NoteEditorHandle } from '@/editor/note-editor'
 import { formatDayLabel, todayIso } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 import { useSettings } from '@/providers/settings-provider'
+import { useGraph } from '@/providers/graph-provider'
 import { useToday } from '@/lib/use-today'
 import { createDayWindow, dateAtIndex, indexOfDate, neighborDate } from '@/lib/day-window'
+import { readDailyStreamSnapshot, saveDailyStreamSnapshot } from '@/lib/daily-stream-cache'
 import { useSetFocusedDailyDate } from '@/providers/focused-daily-provider'
 import { useRouter } from '@/routing/router'
 
@@ -55,6 +57,26 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
   const today = useToday()
   const targetDate = target.kind === 'today' ? today : target.date
   const { settings } = useSettings()
+  const { graph } = useGraph()
+  const graphRoot = graph?.root ?? null
+
+  // virtua's size cache dies with the component; without it a remount lays the
+  // whole window out from the flat estimate and a restored scroll offset lands
+  // on different content. Re-seed measurements from the last unmount's
+  // snapshot. Read in the state initializer: the `cache` prop is consumed once
+  // at store creation, so it must be present on the first render.
+  const [restoredCache] = useState(() =>
+    graphRoot !== null ? readDailyStreamSnapshot(graphRoot, dayWindow.start) : null,
+  )
+  useLayoutEffect(() => {
+    const handle = virtualizerRef.current
+    if (handle === null || graphRoot === null) {
+      return
+    }
+    return () => {
+      saveDailyStreamSnapshot(graphRoot, { cache: handle.cache, windowStart: dayWindow.start })
+    }
+  }, [graphRoot, dayWindow])
 
   // targetDate is read at arrival time, not reacted to. On the `today` route
   // it follows this component's live clock — the same value that paints the
@@ -219,9 +241,9 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
       <Virtualizer
         ref={virtualizerRef}
         data={data}
+        {...(restoredCache !== null ? { cache: restoredCache } : {})}
         itemSize={ESTIMATED_DAY_HEIGHT}
         bufferSize={2 * ESTIMATED_DAY_HEIGHT}
-        shift={true}
       >
         {(_, index) => {
           const date = dateAtIndex(dayWindow, index)
