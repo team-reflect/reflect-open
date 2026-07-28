@@ -163,6 +163,17 @@ describe('handleDeepLink', () => {
     expect(operationHandle.done).toHaveBeenCalled()
   })
 
+  it('spools a checkbox envelope for a checkbox link', async () => {
+    await handle('reflect://checkbox?text=pack+a+bag')
+
+    const [, json] = spoolMock.mock.calls[0]!
+    const envelope = textCaptureEnvelopeSchema.parse(JSON.parse(json))
+    expect(envelope.kind).toBe('checkbox')
+    expect(envelope.text).toBe('pack a bag')
+    expect(startOperationMock).toHaveBeenCalledWith('Checkbox added to today')
+    expect(operationHandle.done).toHaveBeenCalled()
+  })
+
   it('surfaces a spool failure instead of claiming success', async () => {
     spoolMock.mockRejectedValue(new Error('stale generation'))
 

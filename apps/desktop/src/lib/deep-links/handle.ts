@@ -63,7 +63,12 @@ export async function handleDeepLink(url: string, io: DeepLinkIo): Promise<void>
       return
     }
     case 'capture': {
-      const label = link.capture === 'task' ? 'Task added to today' : 'Added to today'
+      const label =
+        link.capture === 'task'
+          ? 'Task added to today'
+          : link.capture === 'checkbox'
+            ? 'Checkbox added to today'
+            : 'Added to today'
       try {
         // The URL parser enforces the same text constraints, so this parse is
         // belt-and-braces — but it is fallible, and a schema tightening must

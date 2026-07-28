@@ -289,7 +289,14 @@ function parseEnvelope(raw: string): InboxEnvelope | null {
 async function drainTextCapture(envelope: TextCaptureEnvelope, generation: number): Promise<boolean> {
   const daily = dailyPath(captureLocalDate(new Date(envelope.capturedAt)))
   const dailySource = await noteSource(daily, generation)
-  const line = envelope.kind === 'task' ? `- [ ] ${envelope.text}` : `- ${envelope.text}`
+  // `task` is Reflect's round `+` checkbox, the only marker the Tasks
+  // projection reads; `checkbox` is the square `- [ ]`, an inert daily item.
+  const line =
+    envelope.kind === 'task'
+      ? `+ [ ] ${envelope.text}`
+      : envelope.kind === 'checkbox'
+        ? `- [ ] ${envelope.text}`
+        : `- ${envelope.text}`
   const present = dailySource
     .split('\n')
     .some((existing) => existing.replace(/\r$/, '') === line)

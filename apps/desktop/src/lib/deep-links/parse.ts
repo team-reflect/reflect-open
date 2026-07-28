@@ -44,6 +44,8 @@ export function parseDeepLink(raw: string): DeepLink | null {
       return argument === '' ? null : { kind: 'openNote', target: argument }
     case 'append':
       return captureLink('append', url, argument)
+    case 'checkbox':
+      return captureLink('checkbox', url, argument)
     case 'task':
       return captureLink('task', url, argument)
     default:
