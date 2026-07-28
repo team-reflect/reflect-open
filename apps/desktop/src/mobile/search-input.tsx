@@ -1,8 +1,8 @@
 import { type ComponentProps, type ReactElement } from 'react'
 import { CircleX } from 'lucide-react'
+import { getIsComposing } from '@meowdown/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { isKeyboardEventComposing } from '@/lib/keyboard'
 import { cn } from '@/lib/utils'
 
 type SearchInputProps = Omit<
@@ -46,7 +46,7 @@ export function SearchInput({
         value={value}
         onChange={(event) => onValueChange(event.target.value)}
         onKeyDown={(event) => {
-          if (isKeyboardEventComposing(event.nativeEvent)) {
+          if (getIsComposing()) {
             return
           }
           if (event.key === 'Enter') {

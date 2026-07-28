@@ -1,6 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import { type OpenTask } from '@reflect/core'
-import { isKeyboardEventComposing } from '@/lib/keyboard'
+import { getIsComposing } from '@meowdown/core'
 import { taskKey } from '@/lib/tasks/task-identity'
 import {
   insertTargetForBucket,
@@ -87,7 +87,7 @@ export function useTaskKeyboard({
       if (event.defaultPrevented) {
         return
       }
-      if (isKeyboardEventComposing(event)) {
+      if (getIsComposing()) {
         return
       }
       // ⌘⇧E toggles the filters menu (V1) — a screen-level chord that fires

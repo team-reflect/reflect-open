@@ -9,6 +9,7 @@ import {
   suggestWikiTargets,
   type MeetingAttendee,
 } from '@reflect/core'
+import { getIsComposing } from '@meowdown/core'
 import { CommandItem, CommandList } from '@/components/ui/command'
 import { INPUT_CLASS_NAME } from '@/components/ui/input'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
@@ -17,7 +18,6 @@ import {
   type AutocompleteEntry,
 } from '@/editor/wiki-autocomplete-entries'
 import { useContactsAuthorization } from '@/hooks/use-contacts-authorization'
-import { isKeyboardEventComposing } from '@/lib/keyboard'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
@@ -151,7 +151,7 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
   }
 
   const onKeyDown = (keyEvent: KeyboardEvent<HTMLInputElement>): void => {
-    if (isKeyboardEventComposing(keyEvent.nativeEvent)) {
+    if (getIsComposing()) {
       // preventDefault keeps cmdk's root handler from selecting the highlighted
       // entry on the Enter that commits the composition.
       if (keyEvent.key === 'Enter') {

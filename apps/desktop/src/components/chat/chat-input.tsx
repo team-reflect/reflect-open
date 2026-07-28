@@ -1,5 +1,6 @@
 import { useMemo, type ReactElement } from 'react'
 import { ArrowUp, Plus, Square, X } from 'lucide-react'
+import { getIsComposing } from '@meowdown/core'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import {
   Attachment,
@@ -22,7 +23,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { imageFilesFrom } from '@/lib/chat-attachments'
 import { groupModelOptions } from '@/lib/chat-model-groups'
 import { keybindingFor } from '@/lib/commands/app-commands'
-import { isKeyboardEventComposing } from '@/lib/keyboard'
 import { useChatSession } from '@/providers/chat-provider'
 import { ChatHistoryMenu } from './chat-history-menu'
 
@@ -110,7 +110,7 @@ export function ChatInput(): ReactElement {
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
-            if (isKeyboardEventComposing(event.nativeEvent)) {
+            if (getIsComposing()) {
               return
             }
             if (event.key === 'Enter' && !event.shiftKey) {

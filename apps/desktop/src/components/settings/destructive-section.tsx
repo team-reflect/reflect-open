@@ -1,5 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { errorMessage } from '@reflect/core'
+import { getIsComposing } from '@meowdown/core'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -10,7 +11,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { isKeyboardEventComposing } from '@/lib/keyboard'
 import { useGraph } from '@/providers/graph-provider'
 import { SettingsField } from './field'
 import { SettingsSection } from './section'
@@ -143,7 +143,7 @@ export function DestructiveSection(): ReactElement {
             disabled={deleting}
             onChange={(event) => setDeleteName(event.target.value)}
             onKeyDown={(event) => {
-              if (isKeyboardEventComposing(event.nativeEvent)) {
+              if (getIsComposing()) {
                 return
               }
               if (event.key === 'Enter') {

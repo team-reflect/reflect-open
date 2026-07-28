@@ -2,13 +2,13 @@ import { memo, useEffect, useRef, useState, type KeyboardEvent, type ReactElemen
 import { Command } from 'cmdk'
 import { parseHighlights } from '@reflect/core'
 import { CalendarDays, FileText } from 'lucide-react'
+import { getIsComposing } from '@meowdown/core'
 import { Kbd } from '@/components/kbd'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { runCommand } from '@/lib/commands/registry'
 import type { CommandContext } from '@/lib/commands/types'
 import { formatDayLabel } from '@/lib/dates'
-import { isKeyboardEventComposing } from '@/lib/keyboard'
 import { cn } from '@/lib/utils'
 import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
 import { useSettings } from '@/providers/settings-provider'
@@ -151,7 +151,7 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
           value={selectedValue}
           onValueChange={setSelectedValue}
           onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
-            if (isKeyboardEventComposing(event.nativeEvent)) {
+            if (getIsComposing()) {
               // preventDefault keeps cmdk's root handler from selecting the
               // highlighted item on the Enter that commits the composition.
               if (event.key === 'Enter') {

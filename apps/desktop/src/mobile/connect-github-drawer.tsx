@@ -1,4 +1,5 @@
 import { useId, type ReactElement } from 'react'
+import { getIsComposing } from '@meowdown/core'
 import { InlineAlert } from '@/components/inline-alert'
 import { ConnectGithubFinishStep } from '@/components/settings/connect-github-finish-step'
 import { GithubAuthStep } from '@/components/settings/github-auth-step'
@@ -6,7 +7,6 @@ import { Button } from '@/components/ui/button'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { Input } from '@/components/ui/input'
 import { useConnectGithubWizard, type ConnectWizardStep } from '@/hooks/use-connect-github-wizard'
-import { isKeyboardEventComposing } from '@/lib/keyboard'
 
 interface ConnectGithubDrawerProps {
   open: boolean
@@ -100,7 +100,7 @@ function ConnectWizardSheet({
                   enterKeyHint="go"
                   onChange={(event) => wizard.setRepoName(event.target.value)}
                   onKeyDown={(event) => {
-                    if (isKeyboardEventComposing(event.nativeEvent)) {
+                    if (getIsComposing()) {
                       return
                     }
                     if (event.key === 'Enter') {
@@ -133,7 +133,7 @@ function ConnectWizardSheet({
                   enterKeyHint="go"
                   onChange={(event) => wizard.setExistingRepo(event.target.value)}
                   onKeyDown={(event) => {
-                    if (isKeyboardEventComposing(event.nativeEvent)) {
+                    if (getIsComposing()) {
                       return
                     }
                     if (event.key === 'Enter') {

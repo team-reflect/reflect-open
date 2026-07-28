@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { useCommandState } from 'cmdk'
 import { ChevronsUpDownIcon } from 'lucide-react'
 import { aiModelLabel, type AiModelOption, type AiProviderId } from '@reflect/core'
+import { getIsComposing } from '@meowdown/core'
 import { Button } from '@/components/ui/button'
 import {
   Command,
@@ -12,7 +13,6 @@ import {
   CommandList,
 } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { isKeyboardEventComposing } from '@/lib/keyboard'
 
 interface FilterCountSyncProps {
   countRef: React.MutableRefObject<number>
@@ -82,7 +82,7 @@ export function ModelCombobox({
   }
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (isKeyboardEventComposing(event.nativeEvent)) {
+    if (getIsComposing()) {
       // preventDefault keeps cmdk's root handler from selecting the highlighted
       // model on the Enter that commits the composition.
       if (event.key === 'Enter') {

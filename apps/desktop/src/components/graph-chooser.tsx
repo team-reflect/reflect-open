@@ -2,6 +2,7 @@ import { useId, useState, type ReactElement, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { hasBridge, icloudStatus } from '@reflect/core'
 import { Cloud, Folder, FolderPlus } from 'lucide-react'
+import { getIsComposing } from '@meowdown/core'
 import { InlineAlert } from '@/components/inline-alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -9,7 +10,6 @@ import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { useGraphColors } from '@/hooks/use-graph-colors'
 import { cleanGraphName, graphNameFromRoot, isGraphNameTaken } from '@/lib/graph-names'
-import { isKeyboardEventComposing } from '@/lib/keyboard'
 import { ICLOUD_STATUS_QUERY_KEY } from '@/lib/query-client'
 import { graphColorCss } from '@/lib/graph-colors'
 import { cn } from '@/lib/utils'
@@ -289,7 +289,7 @@ function IcloudCard({
               aria-invalid={nameTaken}
               onChange={(event) => setTypedName(event.target.value)}
               onKeyDown={(event) => {
-                if (isKeyboardEventComposing(event.nativeEvent)) {
+                if (getIsComposing()) {
                   return
                 }
                 if (event.key === 'Enter') {
@@ -324,7 +324,7 @@ function IcloudCard({
               disabled={!available || pending}
               onChange={(event) => setTypedName(event.target.value)}
               onKeyDown={(event) => {
-                if (isKeyboardEventComposing(event.nativeEvent)) {
+                if (getIsComposing()) {
                   return
                 }
                 if (event.key === 'Enter') {

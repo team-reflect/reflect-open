@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, type KeyboardEvent, type ReactElement } from 'react'
 import { ChevronDownIcon, ChevronUpIcon, XIcon } from 'lucide-react'
+import { getIsComposing } from '@meowdown/core'
 import { SearchIcon } from '@/components/icons/search-icon'
-import { isKeyboardEventComposing } from '@/lib/keyboard'
 import { useNoteFind } from '@/providers/note-find-provider'
 
 const FIND_BUTTON_CLASS =
@@ -35,7 +35,7 @@ export function NoteFindBar(): ReactElement | null {
   const canNavigate = total > 0
 
   function handleSearchKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
-    if (isKeyboardEventComposing(event.nativeEvent)) {
+    if (getIsComposing()) {
       return
     }
     if (event.key !== 'Escape') {
@@ -47,7 +47,7 @@ export function NoteFindBar(): ReactElement | null {
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
-    if (isKeyboardEventComposing(event.nativeEvent)) {
+    if (getIsComposing()) {
       return
     }
     const mod = event.metaKey || event.ctrlKey
