@@ -289,7 +289,10 @@ function parseEnvelope(raw: string): InboxEnvelope | null {
 async function drainTextCapture(envelope: TextCaptureEnvelope, generation: number): Promise<boolean> {
   const daily = dailyPath(captureLocalDate(new Date(envelope.capturedAt)))
   const dailySource = await noteSource(daily, generation)
-  const line = envelope.kind === 'task' ? `- [ ] ${envelope.text}` : `- ${envelope.text}`
+  // `+ ` is Reflect's round-task bullet — the only marker the Tasks
+  // projection indexes (see `snippet-tasks.ts`'s `round`). A `-` bullet here
+  // would render a clickable checkbox that never appears in the Tasks view.
+  const line = envelope.kind === 'task' ? `+ [ ] ${envelope.text}` : `- ${envelope.text}`
   const present = dailySource
     .split('\n')
     .some((existing) => existing.replace(/\r$/, '') === line)

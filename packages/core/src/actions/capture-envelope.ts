@@ -96,7 +96,7 @@ export const TEXT_CAPTURE_MAX_LENGTH = 10_000
 /**
  * What a text capture materializes as on the capture-day daily note. One
  * vocabulary end-to-end: the `reflect://append`/`reflect://task` URL verb IS
- * the envelope kind IS the drain behavior (`- ` bullet / `- [ ]` task).
+ * the envelope kind IS the drain behavior (`- ` bullet / `+ [ ]` round task).
  */
 export const textCaptureKindSchema = z.enum(['append', 'task'])
 

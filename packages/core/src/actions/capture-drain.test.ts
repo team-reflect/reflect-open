@@ -523,12 +523,12 @@ describe('drainCaptureInbox (text captures)', () => {
     expect(spool.size).toBe(0)
   })
 
-  it('appends a task envelope as an open GFM checkbox', async () => {
+  it('appends a task envelope as a round (+) task the Tasks projection indexes', async () => {
     addTextSpool(textEnvelope({ kind: 'task', text: 'buy milk' }))
 
     await drain()
 
-    expect(files.get(DAILY)).toBe('- [ ] buy milk\n')
+    expect(files.get(DAILY)).toBe('+ [ ] buy milk\n')
   })
 
   it('appends after existing daily content as its own block', async () => {
