@@ -160,7 +160,7 @@ notify = "8.2.0"
 notify-debouncer-full = "0.7.0"
 # Direct dependency on fastembed's own downloader, used to pre-fetch the
 # embedding model with byte-level progress (fastembed downloads silently).
-hf-hub = { version = "0.5.0", default-features = false, features = ["ureq", "native-tls"] }
+hf-hub = { version = "1.0.0", default-features = false, features = ["ureq", "native-tls"] }
 tauri-plugin-deep-link = "2.4.9"
 tauri-plugin-single-instance = { version = "2.4.2", features = ["deep-link"] }
 
