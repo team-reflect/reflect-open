@@ -79,6 +79,20 @@ describe('useWikiLinkNavigation', () => {
     await view.unmount()
   })
 
+  it('passes colon-bearing wiki-link targets through to resolution', async () => {
+    resolveOrCreateNoteWithTitle.mockResolvedValue({
+      kind: 'resolved',
+      path: 'notes/test-colon-link.md',
+    })
+    const view = await renderHost()
+
+    lastHandler?.('Test: Colon Link')
+
+    await vi.waitFor(() => expect(currentRoute(view)).toContain('notes/test-colon-link.md'))
+    expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Test: Colon Link', 1)
+    await view.unmount()
+  })
+
   it('arrives at a resolved note without a focus intent (no keyboard on navigation)', async () => {
     resolveOrCreateNoteWithTitle.mockResolvedValue({
       kind: 'resolved',

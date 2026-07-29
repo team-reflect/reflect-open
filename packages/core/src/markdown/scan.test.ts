@@ -27,6 +27,36 @@ describe('scanInlineWikiLinks', () => {
     expect(text.slice(link.displayFrom, link.displayTo)).toBe('Target')
   })
 
+  it('keeps colon-bearing wiki-link targets indexable', () => {
+    const text = [
+      '[[Test: Colon Link]]',
+      '[[Test:Colon NoSpace Link]]',
+      '[[Test:19]]',
+      '[[19:Test]]',
+      '[[Trailing:]]',
+      '[[:Leading]]',
+      '[[A:B:C]]',
+      '[[James 1:19-20]]',
+      '[[Target: Title|Alias: Display]]',
+      '[[Partners: Pricing & Strategy (2026-07-28)]]',
+      '[[Digest: follow-up — next steps]]',
+    ].join(' ')
+
+    expect(scanInlineWikiLinks(text).map((link) => [link.target, link.alias])).toEqual([
+      ['Test: Colon Link', null],
+      ['Test:Colon NoSpace Link', null],
+      ['Test:19', null],
+      ['19:Test', null],
+      ['Trailing:', null],
+      [':Leading', null],
+      ['A:B:C', null],
+      ['James 1:19-20', null],
+      ['Target: Title', 'Alias: Display'],
+      ['Partners: Pricing & Strategy (2026-07-28)', null],
+      ['Digest: follow-up — next steps', null],
+    ])
+  })
+
   it('respects code contexts, same as the indexer grammar', () => {
     expect(scanInlineWikiLinks('code `[[NotALink]]` stays literal')).toEqual([])
     expect(scanInlineWikiLinks('and [[]] is not a link')).toEqual([])
@@ -73,6 +103,22 @@ describe('scanInlineSegments', () => {
     expect(scanInlineSegments('[[2026-06-20|Friday]] ship')).toEqual([
       { kind: 'wikiLink', target: '2026-06-20', alias: 'Friday' },
       { kind: 'text', text: ' ship' },
+    ])
+  })
+
+  it('segments colon-bearing wiki links without confusing markdown links or URLs', () => {
+    expect(
+      scanInlineSegments(
+        'See [[Meeting: Plan|Plan: Alias]], [Docs: API](https://example.com/a:b), and https://example.com/a:b.',
+      ),
+    ).toEqual([
+      { kind: 'text', text: 'See ' },
+      { kind: 'wikiLink', target: 'Meeting: Plan', alias: 'Plan: Alias' },
+      { kind: 'text', text: ', ' },
+      { kind: 'link', text: 'Docs: API', href: 'https://example.com/a:b' },
+      { kind: 'text', text: ', and ' },
+      { kind: 'link', text: 'https://example.com/a:b', href: 'https://example.com/a:b' },
+      { kind: 'text', text: '.' },
     ])
   })
 
