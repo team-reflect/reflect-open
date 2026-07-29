@@ -32,9 +32,6 @@ interface DailyStreamProps {
  */
 const CONTENT_GUTTER = 'reflect-content-gutter'
 
-/** The size guess virtua uses for a row it has not measured yet. */
-export const ESTIMATED_DAY_HEIGHT = 220
-
 /**
  * The daily stream (Plan 06b): a virtualized chronological run of days — past
  * above, future below — where **every day is a virtual note**. Each visible row
@@ -213,7 +210,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
 
   // Always keep a few rows above and below the viewport/focused row mounted
   const keepMountedStart =  clamp(Math.min(scrollIndex, focusIndex) - 3, 0, dayWindow.count - 1)
-  const keepMountedEnd = clamp(Math.max(scrollIndex, focusIndex) + 5, 0, dayWindow.count - 1)
+  const keepMountedEnd = clamp(Math.max(scrollIndex, focusIndex) + 4, 0, dayWindow.count - 1)
 
   const keepMounted = useMemo(() => {
     const keepMounted: number[] = []
@@ -240,8 +237,7 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
       <Virtualizer
         ref={virtualizerRef}
         data={data}
-        itemSize={ESTIMATED_DAY_HEIGHT}
-        bufferSize={5 * ESTIMATED_DAY_HEIGHT}
+        bufferSize={500}
         keepMounted={keepMounted}
         shift={true}
         onScroll={onScrollOffset}
