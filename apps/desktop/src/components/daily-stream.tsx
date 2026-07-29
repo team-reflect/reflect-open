@@ -10,6 +10,7 @@ import { useToday } from '@/lib/use-today'
 import { createDayWindow, dateAtIndex, indexOfDate, neighborDate } from '@/lib/day-window'
 import { useSetFocusedDailyDate } from '@/providers/focused-daily-provider'
 import { useRouter } from '@/routing/router'
+import { clamp } from '@ocavue/utils'
 
 interface DailyStreamProps {
   /** The day to anchor/scroll to, or the live local day for the `today` route. */
@@ -52,6 +53,8 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
   // Per-row data is unused (the date is derived from the index); a stable array
   // of the window's length just tells virtua how many rows exist.
   const data = useMemo(() => Array.from({ length: dayWindow.count }), [dayWindow.count])
+  const [scrollIndex, setScrollIndex] = useState<number>(dayWindow.anchorIndex)
+  const [focusIndex, setFocusIndex] = useState<number>(dayWindow.anchorIndex)
   const today = useToday()
   const targetDate = target.kind === 'today' ? today : target.date
   const { settings } = useSettings()
@@ -202,6 +205,24 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
     virtualizerRef.current?.scrollToIndex(indexOfDate(dayWindow, target), { align: 'start' })
   }, [arrivalSeq, entryId, dayWindow, savedScroll])
 
+  const onScrollOffset = useCallback((offset: number) => {
+    const scrollIndex = virtualizerRef.current?.findItemIndex(offset)
+    if (scrollIndex == null) return
+    setScrollIndex(scrollIndex)
+  }, [])
+
+  // Always keep a few rows above and below the viewport/focused row mounted
+  const keepMountedStart =  clamp(Math.min(scrollIndex, focusIndex) - 3, 0, dayWindow.count - 1)
+  const keepMountedEnd = clamp(Math.max(scrollIndex, focusIndex) + 5, 0, dayWindow.count - 1)
+
+  const keepMounted = useMemo(() => {
+    const keepMounted: number[] = []
+    for (let i = keepMountedStart; i <= keepMountedEnd; i++) {
+      keepMounted.push(i)
+    }
+    return keepMounted
+  }, [keepMountedStart, keepMountedEnd])
+
   return (
     <div
       data-testid="daily-stream"
@@ -220,8 +241,10 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
         ref={virtualizerRef}
         data={data}
         itemSize={ESTIMATED_DAY_HEIGHT}
-        bufferSize={2 * ESTIMATED_DAY_HEIGHT}
+        bufferSize={5 * ESTIMATED_DAY_HEIGHT}
+        keepMounted={keepMounted}
         shift={true}
+        onScroll={onScrollOffset}
       >
         {(_, index) => {
           const date = dateAtIndex(dayWindow, index)
@@ -241,7 +264,10 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
               className="border-b border-border py-6"
               // Focus entering this row (clicking its editor, tabbing in) makes
               // it the day the sidebar describes.
-              onFocusCapture={() => setFocusedDailyDate(date)}
+              onFocusCapture={() => {
+                setFocusedDailyDate(date)
+                setFocusIndex(index)
+              }}
             >
               {/* V1 renders the date as the note's H1-sized subject, with
                   today's tinted brand (its `highlightSubject`). */}

@@ -8,6 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { flushSync } from 'react-dom'
+import { clamp } from '@ocavue/utils'
 
 const DRAG_ACTIVATE_PX = 8
 const DISMISS_FRACTION = 0.18
@@ -76,9 +77,6 @@ export interface ImageDismissDrag {
   finishSettle: () => void
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value))
-}
 
 function dragDistance(deltaX: number, deltaY: number): number {
   return Math.hypot(deltaX, deltaY)
