@@ -12,6 +12,9 @@ import { useSetFocusedDailyDate } from '@/providers/focused-daily-provider'
 import { useRouter } from '@/routing/router'
 import { clamp } from '@ocavue/utils'
 
+/** The size guess virtua uses for a row it has not measured yet. */
+export const ESTIMATED_DAY_HEIGHT = 220
+
 interface DailyStreamProps {
   /** The day to anchor/scroll to, or the live local day for the `today` route. */
   target: { kind: 'today' } | { kind: 'date'; date: string }
@@ -237,7 +240,8 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
       <Virtualizer
         ref={virtualizerRef}
         data={data}
-        bufferSize={500}
+        itemSize={ESTIMATED_DAY_HEIGHT}
+        bufferSize={2 * ESTIMATED_DAY_HEIGHT}
         keepMounted={keepMounted}
         shift={true}
         onScroll={onScrollOffset}
