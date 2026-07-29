@@ -26,6 +26,8 @@ export interface NewAiProvider {
   model: string
   apiKey: string
   isDefault: boolean
+  /** The regional deployment, for multi-region providers (MiniMax) only. */
+  region?: string | undefined
 }
 
 interface UseAiProvidersValue {
@@ -82,7 +84,13 @@ export function useAiProviders(): UseAiProvidersValue {
       updateSettingsWith((current) => {
         const next = withAiProviderAdded(
           { providers: current.aiProviders, defaultProviderId: current.defaultAiProviderId },
-          { id, provider: draft.provider, model: draft.model, keyHint: apiKeyHint(draft.apiKey) },
+          {
+            id,
+            provider: draft.provider,
+            model: draft.model,
+            keyHint: apiKeyHint(draft.apiKey),
+            ...(draft.region === undefined ? {} : { region: draft.region }),
+          },
           draft.isDefault,
         )
         return { aiProviders: next.providers, defaultAiProviderId: next.defaultProviderId }

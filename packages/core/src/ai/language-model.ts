@@ -4,6 +4,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import type { LanguageModel } from 'ai'
 import type { AiProviderConfig } from '../settings/schema'
 import { anthropicDirectBrowserAccessHeaders } from './anthropic-headers'
+import { minimaxBaseUrl } from './minimax'
 import { OPENROUTER_BASE_URL, openRouterAttributionHeaders } from './openrouter'
 
 /**
@@ -35,6 +36,13 @@ export function languageModel(
         baseURL: OPENROUTER_BASE_URL,
         headers: openRouterAttributionHeaders(),
         name: 'openrouter',
+      }).chat(config.model)
+    case 'minimax':
+      return createOpenAI({
+        apiKey,
+        fetch: fetchFn,
+        baseURL: minimaxBaseUrl(config.region),
+        name: 'minimax',
       }).chat(config.model)
   }
 }

@@ -89,6 +89,15 @@ export const AI_PROVIDERS: NonEmptyArray<AiProviderInfo> = [
       { id: 'openai/gpt-5.2', label: 'GPT-5.2', contextWindow: 400_000 },
     ],
   },
+  {
+    id: 'minimax',
+    label: 'MiniMax',
+    keyPlaceholder: 'eyJ…',
+    models: [
+      { id: 'MiniMax-M3', label: 'MiniMax-M3', contextWindow: 1_000_000 },
+      { id: 'MiniMax-M2.7', label: 'MiniMax-M2.7', contextWindow: 204_800 },
+    ],
+  },
 ]
 
 /** The catalog entry for `id` (every `AiProviderId` is in the catalog). */

@@ -49,7 +49,12 @@ export function useAddAiProviderSubmit({
       const apiKey = draft.apiKey.trim()
       try {
         if (!unverified) {
-          const validation = await validateApiKey(draft.provider, apiKey, providerFetch)
+          const validation = await validateApiKey(
+            draft.provider,
+            apiKey,
+            providerFetch,
+            draft.region,
+          )
           if (validation === 'invalid') {
             setSubmitError(`${aiProvider(draft.provider).label} rejected this API key.`)
             return

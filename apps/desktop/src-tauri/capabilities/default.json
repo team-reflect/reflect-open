@@ -23,6 +23,8 @@
         { "url": "https://api.anthropic.com/*" },
         { "url": "https://generativelanguage.googleapis.com/*" },
         { "url": "https://openrouter.ai/*" },
+        { "url": "https://api.minimax.io/*" },
+        { "url": "https://api.minimaxi.com/*" },
         { "url": "https://github.com/login/device/code" },
         { "url": "https://github.com/login/oauth/access_token" },
         { "url": "https://api.github.com/*" }

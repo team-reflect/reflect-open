@@ -176,6 +176,19 @@ describe('AiProvidersSection', () => {
     await expect.element(page.getByRole('option', { name: 'OpenRouter' })).toBeInTheDocument()
   })
 
+  it('reveals a region picker after choosing MiniMax', async () => {
+    await renderSection()
+    await expect.element(page.getByText(/No AI providers configured/)).toBeInTheDocument()
+
+    const dialog = await openDialog()
+    await expectLocatorToHaveCount(dialog.getByRole('combobox', { name: 'Region' }), 0)
+
+    await dialog.getByRole('combobox', { name: 'Provider' }).click()
+    await page.getByRole('option', { name: 'MiniMax' }).click()
+
+    await expect.element(dialog.getByRole('combobox', { name: 'Region' })).toBeInTheDocument()
+  })
+
   it('rejects a key the provider turns down, storing nothing', async () => {
     providerFetchMock.mockResolvedValue(new Response(null, { status: 401 }))
     await renderSection()

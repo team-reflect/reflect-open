@@ -313,7 +313,7 @@ export const graphColorsSchema = z
  * The cloud AI providers Reflect can call directly (BYOK — the user's own
  * keys, no Reflect-hosted proxy).
  */
-export const aiProviderIdSchema = z.enum(['openai', 'anthropic', 'google', 'openrouter'])
+export const aiProviderIdSchema = z.enum(['openai', 'anthropic', 'google', 'openrouter', 'minimax'])
 
 export type AiProviderId = z.infer<typeof aiProviderIdSchema>
 
@@ -330,6 +330,14 @@ export const aiProviderConfigSchema = z.object({
   provider: aiProviderIdSchema,
   model: z.string().min(1),
   keyHint: z.string().catch(''),
+  /**
+   * The regional deployment a multi-region provider (MiniMax) was configured
+   * against — persisted so dispatch and key validation target the same host
+   * the key was issued for. Absent for single-endpoint providers; an unknown
+   * id degrades to `undefined` (the provider's default region) rather than
+   * dropping the whole entry.
+   */
+  region: z.string().min(1).optional().catch(undefined),
 })
 
 export type AiProviderConfig = z.infer<typeof aiProviderConfigSchema>

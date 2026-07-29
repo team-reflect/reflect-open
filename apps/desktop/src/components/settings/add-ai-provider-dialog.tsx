@@ -1,6 +1,13 @@
 import { useEffect, type ReactElement } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
-import { AI_PROVIDERS, aiProvider, aiProviderIdSchema, type AiProviderId } from '@reflect/core'
+import {
+  AI_PROVIDERS,
+  aiProvider,
+  aiProviderIdSchema,
+  DEFAULT_MINIMAX_REGION_ID,
+  providerRegions,
+  type AiProviderId,
+} from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -33,6 +40,8 @@ interface AddAiProviderForm {
   model: string
   apiKey: string
   isDefault: boolean
+  /** The regional deployment; only meaningful for multi-region providers. */
+  region: string
 }
 
 const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
@@ -52,6 +61,7 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
       model: AI_PROVIDERS[0].models[0].id,
       apiKey: '',
       isDefault: false,
+      region: DEFAULT_MINIMAX_REGION_ID,
     },
   })
   const { submitError, unverified, resetUnverified, submit } = useAddAiProviderSubmit({
@@ -75,10 +85,15 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
 
   const providerId = useWatch({ control, name: 'provider' })
   const selectedModel = useWatch({ control, name: 'model' })
+  const selectedRegion = useWatch({ control, name: 'region' })
   const provider = aiProvider(providerId)
+  const regions = providerRegions(providerId)
 
   const submitForm = handleSubmit(async (values) => {
-    await submit(values)
+    await submit({
+      ...values,
+      region: providerRegions(values.provider) ? values.region : undefined,
+    })
   })
 
   return (
@@ -104,6 +119,8 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
                 const next = aiProvider(aiProviderIdSchema.parse(value))
                 setValue('provider', next.id)
                 setValue('model', next.models[0].id)
+                const nextRegions = providerRegions(next.id)
+                setValue('region', nextRegions ? nextRegions[0].id : DEFAULT_MINIMAX_REGION_ID)
                 resetUnverified()
               }}
             >
@@ -129,6 +146,27 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
               onChange={(modelId) => setValue('model', modelId)}
             />
           </div>
+
+          {regions ? (
+            <div className="flex flex-col gap-1">
+              <span className={FIELD_LABEL_CLASS}>Region</span>
+              <Select
+                value={selectedRegion}
+                onValueChange={(value) => setValue('region', value)}
+              >
+                <SelectTrigger aria-label="Region" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {regions.map((region) => (
+                    <SelectItem key={region.id} value={region.id}>
+                      {region.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
 
           <label className="flex flex-col gap-1">
             <span className={FIELD_LABEL_CLASS}>API key</span>

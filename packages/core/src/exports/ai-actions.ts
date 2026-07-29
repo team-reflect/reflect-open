@@ -29,6 +29,13 @@ export {
 } from '../ai/chat/model-options'
 export { validateApiKey, type ApiKeyValidation } from '../ai/validate-key'
 export {
+  MINIMAX_REGIONS,
+  DEFAULT_MINIMAX_REGION_ID,
+  minimaxBaseUrl,
+  providerRegions,
+  type MinimaxRegion,
+} from '../ai/minimax'
+export {
   assertCloudAllowed,
   cloudSafeAssetDescription,
   cloudSafeGraphContext,

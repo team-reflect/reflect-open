@@ -282,6 +282,17 @@ describe('settingsSchema', () => {
       expect(settingsSchema.parse({ aiProviders: [entry] }).aiProviders).toEqual([entry])
     })
 
+    it('accepts a MiniMax entry with its region', () => {
+      const entry = {
+        id: 'minimax',
+        provider: 'minimax',
+        model: 'MiniMax-M3',
+        keyHint: 'wxyz1',
+        region: 'cn_zh',
+      }
+      expect(settingsSchema.parse({ aiProviders: [entry] }).aiProviders).toEqual([entry])
+    })
+
     it('defaults the per-entry display fields', () => {
       const entry = { id: 'abc', provider: 'openai', model: 'gpt-5.1' }
       expect(settingsSchema.parse({ aiProviders: [entry] }).aiProviders).toEqual([

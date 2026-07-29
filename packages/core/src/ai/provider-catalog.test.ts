@@ -30,6 +30,14 @@ describe('AI_PROVIDERS', () => {
       keyPlaceholder: 'sk-or-v1-…',
     })
   })
+
+  it('includes MiniMax with its two curated models', () => {
+    expect(aiProvider('minimax')).toMatchObject({ id: 'minimax', label: 'MiniMax' })
+    expect(aiProvider('minimax').models).toEqual([
+      { id: 'MiniMax-M3', label: 'MiniMax-M3', contextWindow: 1_000_000 },
+      { id: 'MiniMax-M2.7', label: 'MiniMax-M2.7', contextWindow: 204_800 },
+    ])
+  })
 })
 
 describe('modelContextWindow', () => {
@@ -46,6 +54,8 @@ describe('modelContextWindow', () => {
   it('resolves a curated model and falls back for unknown ids', () => {
     expect(modelContextWindow('anthropic', 'claude-haiku-4-5')).toBe(200_000)
     expect(modelContextWindow('openrouter', 'openrouter/auto')).toBe(128_000)
+    expect(modelContextWindow('minimax', 'MiniMax-M3')).toBe(1_000_000)
+    expect(modelContextWindow('minimax', 'MiniMax-M2.7')).toBe(204_800)
     // Settings may carry ids added by a newer app version.
     expect(modelContextWindow('anthropic', 'claude-fable-6')).toBe(DEFAULT_CONTEXT_WINDOW)
   })

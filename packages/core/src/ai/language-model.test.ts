@@ -34,6 +34,49 @@ const OPENROUTER_CONFIG: AiProviderConfig = {
   keyHint: 'wxyz1',
 }
 
+const MINIMAX_GLOBAL_CONFIG: AiProviderConfig = {
+  id: 'cfg-minimax-global',
+  provider: 'minimax',
+  model: 'MiniMax-M3',
+  keyHint: 'wxyz1',
+  region: 'global_en',
+}
+
+const MINIMAX_CN_CONFIG: AiProviderConfig = {
+  id: 'cfg-minimax-cn',
+  provider: 'minimax',
+  model: 'MiniMax-M3',
+  keyHint: 'wxyz1',
+  region: 'cn_zh',
+}
+
+function recordingChatCompletionFetch(calls: RecordedCall[], model: string): typeof fetch {
+  return async (input, init) => {
+    calls.push({
+      url: String(input),
+      headers: new Headers(init?.headers),
+      body: typeof init?.body === 'string' ? init.body : null,
+    })
+    return new Response(
+      JSON.stringify({
+        id: 'chatcmpl_123',
+        object: 'chat.completion',
+        created: 0,
+        model,
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'ok' },
+            finish_reason: 'stop',
+          },
+        ],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )
+  }
+}
+
 function recordingAnthropicFetch(calls: RecordedCall[]): typeof fetch {
   return async (input, init) => {
     calls.push({
@@ -158,5 +201,42 @@ describe('languageModel', () => {
     expect(calls[0]!.headers.get('Authorization')).toBe('Bearer sk-or-v1-test')
     expect(calls[0]!.headers.get('HTTP-Referer')).toBe('https://reflect.app')
     expect(calls[0]!.headers.get('X-OpenRouter-Title')).toBe('Reflect')
+  })
+
+  it('routes MiniMax through its global OpenAI-compatible chat endpoint', async () => {
+    const calls: RecordedCall[] = []
+
+    await generateText({
+      model: languageModel(
+        MINIMAX_GLOBAL_CONFIG,
+        'mm-test',
+        recordingChatCompletionFetch(calls, MINIMAX_GLOBAL_CONFIG.model),
+      ),
+      prompt: 'hello',
+      maxRetries: 0,
+    })
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0]!.url).toBe('https://api.minimax.io/v1/chat/completions')
+    expect(calls[0]!.headers.get('Authorization')).toBe('Bearer mm-test')
+    expect(calls[0]!.body).toContain('"model":"MiniMax-M3"')
+  })
+
+  it('routes a China-region MiniMax entry to the China host', async () => {
+    const calls: RecordedCall[] = []
+
+    await generateText({
+      model: languageModel(
+        MINIMAX_CN_CONFIG,
+        'mm-test',
+        recordingChatCompletionFetch(calls, MINIMAX_CN_CONFIG.model),
+      ),
+      prompt: 'hello',
+      maxRetries: 0,
+    })
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0]!.url).toBe('https://api.minimaxi.com/v1/chat/completions')
+    expect(calls[0]!.headers.get('Authorization')).toBe('Bearer mm-test')
   })
 })

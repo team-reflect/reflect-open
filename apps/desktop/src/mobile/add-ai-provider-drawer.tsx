@@ -1,5 +1,12 @@
 import { useState, type ReactElement } from 'react'
-import { AI_PROVIDERS, aiProvider, aiProviderIdSchema, type AiProviderId } from '@reflect/core'
+import {
+  AI_PROVIDERS,
+  aiProvider,
+  aiProviderIdSchema,
+  DEFAULT_MINIMAX_REGION_ID,
+  providerRegions,
+  type AiProviderId,
+} from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert'
 import { Button } from '@/components/ui/button'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
@@ -57,6 +64,7 @@ function AddAiProviderSheet({
 }): ReactElement {
   const [providerId, setProviderId] = useState<AiProviderId>(AI_PROVIDERS[0].id)
   const [model, setModel] = useState(AI_PROVIDERS[0].models[0].id)
+  const [region, setRegion] = useState(DEFAULT_MINIMAX_REGION_ID)
   const [apiKey, setApiKey] = useState('')
   const [isDefault, setIsDefault] = useState(false)
   const [consented, setConsented] = useState(false)
@@ -66,11 +74,18 @@ function AddAiProviderSheet({
     onDone: onClose,
   })
   const provider = aiProvider(providerId)
+  const regions = providerRegions(providerId)
 
   const submitDraft = async (): Promise<void> => {
     setSubmitting(true)
     try {
-      await submit({ provider: providerId, model, apiKey, isDefault })
+      await submit({
+        provider: providerId,
+        model,
+        apiKey,
+        isDefault,
+        region: providerRegions(providerId) ? region : undefined,
+      })
     } finally {
       setSubmitting(false)
     }
@@ -93,6 +108,8 @@ function AddAiProviderSheet({
               const next = aiProvider(aiProviderIdSchema.parse(value))
               setProviderId(next.id)
               setModel(next.models[0].id)
+              const nextRegions = providerRegions(next.id)
+              setRegion(nextRegions ? nextRegions[0].id : DEFAULT_MINIMAX_REGION_ID)
               setConsented(false)
               resetUnverified()
             }}
@@ -125,6 +142,24 @@ function AddAiProviderSheet({
             </SelectContent>
           </Select>
         </div>
+
+        {regions ? (
+          <div className="flex flex-col gap-1">
+            <span className={FIELD_LABEL_CLASS}>Region</span>
+            <Select value={region} onValueChange={setRegion}>
+              <SelectTrigger aria-label="Region" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {regions.map((candidate) => (
+                  <SelectItem key={candidate.id} value={candidate.id}>
+                    {candidate.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
 
         <label className="flex flex-col gap-1">
           <span className={FIELD_LABEL_CLASS}>API key</span>

@@ -1,6 +1,7 @@
 import type { AiProviderId } from '../settings/schema'
 import { anthropicDirectBrowserAccessHeaders } from './anthropic-headers'
 import { APP_REVIEW_STUB_KEY } from './audio-memo-review-stub'
+import { minimaxBaseUrl } from './minimax'
 import { OPENROUTER_BASE_URL } from './openrouter'
 
 /**
@@ -24,7 +25,7 @@ interface KeyProbe {
   invalidStatuses: number[]
 }
 
-const PROBES: Record<AiProviderId, KeyProbe> = {
+const PROBES: Record<Exclude<AiProviderId, 'minimax'>, KeyProbe> = {
   openai: {
     url: 'https://api.openai.com/v1/models',
     headers: (key) => ({ Authorization: `Bearer ${key}` }),
@@ -53,14 +54,32 @@ const PROBES: Record<AiProviderId, KeyProbe> = {
 }
 
 /**
+ * The probe for `provider`. MiniMax is region-dependent — global and China
+ * keys live behind different hosts — so its probe is built from the chosen
+ * region's OpenAI-compatible root rather than stored statically.
+ */
+function keyProbe(provider: AiProviderId, region: string | undefined): KeyProbe {
+  if (provider === 'minimax') {
+    return {
+      url: `${minimaxBaseUrl(region)}/models`,
+      headers: (key) => ({ Authorization: `Bearer ${key}` }),
+      invalidStatuses: [401, 403],
+    }
+  }
+  return PROBES[provider]
+}
+
+/**
  * Probe `provider` with `apiKey`. `fetchFn` lets hosts substitute a
  * CORS-free transport (the desktop app passes the Tauri HTTP plugin's fetch;
- * `@reflect/core` itself stays platform-agnostic).
+ * `@reflect/core` itself stays platform-agnostic). `region` selects the host
+ * for multi-region providers (MiniMax) and is ignored by the rest.
  */
 export async function validateApiKey(
   provider: AiProviderId,
   apiKey: string,
   fetchFn: typeof fetch = fetch,
+  region?: string,
 ): Promise<ApiKeyValidation> {
   // Providers know nothing about the App Review demo key, so a probe would
   // reject it; accept it here so it can be saved and reach the canned
@@ -68,7 +87,7 @@ export async function validateApiKey(
   if (apiKey === APP_REVIEW_STUB_KEY) {
     return 'valid'
   }
-  const probe = PROBES[provider]
+  const probe = keyProbe(provider, region)
   let response: Response
   try {
     response = await fetchFn(probe.url, { method: 'GET', headers: probe.headers(apiKey) })

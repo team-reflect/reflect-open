@@ -47,6 +47,9 @@ export function audioMemoEnrichmentConfig(config: AiProviderConfig): AiProviderC
       return { ...config, model: GOOGLE_AUDIO_MEMO_ENRICHMENT_MODEL }
     case 'openrouter':
       return null
+    case 'minimax':
+      // No fixed small enrichment model is defined for this provider.
+      return null
   }
 }
 
