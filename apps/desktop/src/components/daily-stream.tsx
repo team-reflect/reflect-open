@@ -212,16 +212,15 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
   }, [])
 
   // Always keep a few rows above and below the viewport/focused row mounted
-  const keepMountedStart =  clamp(Math.min(scrollIndex, focusIndex) - 3, 0, dayWindow.count - 1)
-  const keepMountedEnd = clamp(Math.max(scrollIndex, focusIndex) + 4, 0, dayWindow.count - 1)
-
   const keepMounted = useMemo(() => {
-    const keepMounted: number[] = []
-    for (let i = keepMountedStart; i <= keepMountedEnd; i++) {
-      keepMounted.push(i)
+    const keepMounted = new Set<number>()
+    for (const referenceIndex of [focusIndex, scrollIndex]) {
+      for (let delta = -3; delta <= 3; delta++) {
+        keepMounted.add(clamp(referenceIndex + delta, 0, dayWindow.count - 1))
+      }
     }
-    return keepMounted
-  }, [keepMountedStart, keepMountedEnd])
+    return Array.from(keepMounted).sort()
+  }, [focusIndex, scrollIndex, dayWindow.count])
 
   return (
     <div
