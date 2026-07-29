@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.7.0...v0.8.0-beta) (2026-07-29)
+
+
+### Features
+
+* add a checkbox text-capture kind and drain task as a round task ([#982](https://github.com/team-reflect/reflect-open/issues/982)) ([4aa6c0b](https://github.com/team-reflect/reflect-open/commit/4aa6c0b7d0d4acc9541fb2a2ed988e95f604ceb0))
+
+
+### Bug Fixes
+
+* **desktop:** keep daily notes around mounted ([#986](https://github.com/team-reflect/reflect-open/issues/986)) ([7e6efb5](https://github.com/team-reflect/reflect-open/commit/7e6efb5a0ae025d04002f4ab31d7158dc9d11851))
+* update meowdown to ^0.60.0 ([#979](https://github.com/team-reflect/reflect-open/issues/979)) ([0abd282](https://github.com/team-reflect/reflect-open/commit/0abd282a44725ed0568cb6ddec73ee17f2105390))
+
 ## [0.7.0-beta.22](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.21...v0.7.0-beta.22) (2026-07-27)
 
 
