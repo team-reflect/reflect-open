@@ -29,6 +29,7 @@ function makeFakeEditor() {
     blur: vi.fn(),
     view: { dom },
     commands: {
+      cyclePlainList: makeCommand(),
       cycleCheckableList: makeCommand(),
       toggleList: makeCommand(),
       indentList: makeCommand(),
@@ -131,7 +132,7 @@ describe('FormattingToolbarBridge', () => {
     const commands = store.result.current!.commands
 
     commands.toggleBulletList()
-    expect(editor.commands.toggleList).toHaveBeenCalledWith({ kind: 'bullet' })
+    expect(editor.commands.cyclePlainList).toHaveBeenCalledWith()
     commands.cycleCheckableList()
     expect(editor.commands.cycleCheckableList).toHaveBeenCalledWith()
     commands.indent()

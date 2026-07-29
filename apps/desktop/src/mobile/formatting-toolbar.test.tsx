@@ -56,7 +56,7 @@ describe('MobileFormattingToolbar', () => {
     const buttons = screen.getAllByRole('button')
     expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual([
       'Slash command',
-      'Bullet list',
+      'Cycle list style',
       'Cycle checklist and task',
       'Link note',
       'Tag',
@@ -81,7 +81,7 @@ describe('MobileFormattingToolbar', () => {
     render(<MobileFormattingToolbar />)
     act(() => publishFormattingToolbar(owner, makeToolbar()))
 
-    const bullet = screen.getByRole('button', { name: 'Bullet list' })
+    const bullet = screen.getByRole('button', { name: 'Cycle list style' })
     // fireEvent returns false when a handler called preventDefault — the
     // contract that keeps the editor focused (and the keyboard up) mid-tap.
     expect(fireEvent.pointerDown(bullet)).toBe(false)
@@ -93,7 +93,7 @@ describe('MobileFormattingToolbar', () => {
     render(<MobileFormattingToolbar />)
     act(() => publishFormattingToolbar(owner, toolbar))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Bullet list' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cycle list style' }))
     expect(toolbar.commands.toggleBulletList).toHaveBeenCalledOnce()
 
     fireEvent.click(screen.getByRole('button', { name: 'Cycle checklist and task' }))

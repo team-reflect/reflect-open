@@ -70,7 +70,7 @@ export function FormattingToolbarBridge(): null {
       }
 
       const commands: FormattingToolbarCommands = {
-        toggleBulletList: () => run(() => editor.commands.toggleList({ kind: 'bullet' })),
+        toggleBulletList: () => run(() => editor.commands.cyclePlainList()),
         cycleCheckableList: () => run(() => editor.commands.cycleCheckableList()),
         indent: () => run(() => editor.commands.indentList()),
         dedent: () => run(() => editor.commands.dedentList()),
