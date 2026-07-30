@@ -26,7 +26,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@meowdown/core": "^0.63.0",
     "@meowdown/react": "^0.63.0",
-    "@ocavue/utils": "^1.0.0",
+    "@ocavue/utils": "^1.7.0",
     "@reflect/core": "workspace:*",
     "@reflect/db": "workspace:*",
     "@reflect/design-system": "workspace:*",
