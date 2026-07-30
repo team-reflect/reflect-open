@@ -73,8 +73,8 @@ importers:
         specifier: ^10.64.0
         version: 10.67.0(react@19.2.8)
       '@shadcn/react':
-        specifier: ^0.1.0
-        version: 0.1.0(@types/react@19.2.17)(react@19.2.8)
+        specifier: ^0.2.1
+        version: 0.2.1(@types/react@19.2.17)(react@19.2.8)
       '@tanstack/react-query':
         specifier: ^5.101.1
         version: 5.101.4(react@19.2.8)
@@ -185,8 +185,8 @@ importers:
         specifier: ^1.61.1
         version: 1.61.1
       shadcn:
-        specifier: ^4.11.0
-        version: 4.14.1(supports-color@7.2.0)(typescript@6.0.3)
+        specifier: ^4.16.0
+        version: 4.16.0(supports-color@7.2.0)(typescript@6.0.3)
       tailwindcss:
         specifier: ^4.3.1
         version: 4.3.3
@@ -1803,8 +1803,8 @@ packages:
     resolution: {integrity: sha512-fFJgCxs5hDyAm9BbZJ+LbA+LK2tjX5OoD0v0ARU4StR6KQmGUduoPs69yJ9AfqZ0om3Rlp5JDliiwFcNkasORA==}
     engines: {node: '>= 18'}
 
-  '@shadcn/react@0.1.0':
-    resolution: {integrity: sha512-6i67TEnqValsZY7e4exJ4rkHo2OdHXmDH152YulwSpuEUnTQYumHkXzFsaje7HB7GbMTWuI9x1Jn6sSduCYdeA==}
+  '@shadcn/react@0.2.1':
+    resolution: {integrity: sha512-5krgi3dRMKb5jH6a+qPzVJUy/54s0kKE4Rw4LjDfLqOdVQTWKUgxWf1kW8r912I0jX/Lzxqc+pgjkjWxUIK5BQ==}
     peerDependencies:
       '@types/react': '>=19'
       react: '>=19'
@@ -4967,8 +4967,8 @@ packages:
   setprototypeof@1.2.0:
     resolution: {integrity: sha512-E5LDX7Wrp85Kil5bhZv46j8jOeboKq5JMmYM3gVGdGH8xFpPWXUMsNrlODCrkoxMEeNi/XZIwuRvY4XNwYMJpw==}
 
-  shadcn@4.14.1:
-    resolution: {integrity: sha512-Xb4r150oGNexMBxUnWPG1emcaUlFbhzMOJubdA+k0NTkmhgBBycFZjTz9Aw2yQbpDR6QnIZbk234N20s/s7s9A==}
+  shadcn@4.16.0:
+    resolution: {integrity: sha512-kPr4RrQmbbZeAjwBYeBSpFvAHV8rkTlNPUluIxkRriq5TpevfFelVO5xvcF6oguHPVn0R6wPuVer4HudfcLy/A==}
     engines: {node: '>=20.18.1'}
     hasBin: true
 
@@ -7476,7 +7476,7 @@ snapshots:
       - supports-color
       - webpack
 
-  '@shadcn/react@0.1.0(@types/react@19.2.17)(react@19.2.8)':
+  '@shadcn/react@0.2.1(@types/react@19.2.17)(react@19.2.8)':
     optionalDependencies:
       '@types/react': 19.2.17
       react: 19.2.8
@@ -10854,7 +10854,7 @@ snapshots:
 
   setprototypeof@1.2.0: {}
 
-  shadcn@4.14.1(supports-color@7.2.0)(typescript@6.0.3):
+  shadcn@4.16.0(supports-color@7.2.0)(typescript@6.0.3):
     dependencies:
       '@babel/core': 7.29.7(supports-color@7.2.0)
       '@babel/parser': 7.29.7
