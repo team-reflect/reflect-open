@@ -22,7 +22,8 @@ export type FormattingTriggerText = '/' | '[[' | '#'
  * editor's identity or path.
  */
 export interface FormattingToolbarCommands {
-  toggleBulletList: () => void
+  /** Cycle other content -> bullet -> ordered -> text */
+  toggleBulletOrderedList: () => void
   /** Cycle other content → square checklist → round task → square checklist. */
   cycleCheckableList: () => void
   indent: () => void

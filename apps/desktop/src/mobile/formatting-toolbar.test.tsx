@@ -24,7 +24,7 @@ function makeToolbar(
       ...capabilities,
     },
     commands: {
-      toggleBulletList: vi.fn(),
+      toggleBulletOrderedList: vi.fn(),
       cycleCheckableList: vi.fn(),
       indent: vi.fn(),
       dedent: vi.fn(),
@@ -59,7 +59,7 @@ describe('MobileFormattingToolbar', () => {
     const buttons = page.getByRole('button').elements()
     expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual([
       'Slash command',
-      'Bullet list',
+      'Cycle list style',
       'Cycle checklist and task',
       'Link note',
       'Tag',
@@ -78,7 +78,7 @@ describe('MobileFormattingToolbar', () => {
     await render(<MobileFormattingToolbar />)
     await act(() => publishFormattingToolbar(owner, makeToolbar()))
 
-    const bullet = page.getByRole('button', { name: 'Bullet list' })
+    const bullet = page.getByRole('button', { name: 'Cycle list style' })
     // fireEvent returns false when a handler called preventDefault — the
     // contract that keeps the editor focused (and the keyboard up) mid-tap.
     expect(fireEvent.pointerDown(bullet)).toBe(false)
@@ -90,8 +90,8 @@ describe('MobileFormattingToolbar', () => {
     await render(<MobileFormattingToolbar />)
     await act(() => publishFormattingToolbar(owner, toolbar))
 
-    fireEvent.click(page.getByRole('button', { name: 'Bullet list' }))
-    expect(toolbar.commands.toggleBulletList).toHaveBeenCalledOnce()
+    fireEvent.click(page.getByRole('button', { name: 'Cycle list style' }))
+    expect(toolbar.commands.toggleBulletOrderedList).toHaveBeenCalledOnce()
 
     fireEvent.click(page.getByRole('button', { name: 'Cycle checklist and task' }))
     expect(toolbar.commands.cycleCheckableList).toHaveBeenCalledOnce()
