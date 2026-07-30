@@ -112,7 +112,7 @@ function AddAiProviderSheet({
 
         <div className="flex flex-col gap-1">
           <span className={FIELD_LABEL_CLASS}>Default model</span>
-          <Select value={model} onValueChange={setModel}>
+          <Select value={model} onValueChange={(value) => setModel(value ?? '')}>
             <SelectTrigger aria-label="Default model" className="w-full">
               <SelectValue />
             </SelectTrigger>
