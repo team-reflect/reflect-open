@@ -1,4 +1,4 @@
-import { useDeferredValue, useState, type KeyboardEvent, type ReactElement } from 'react'
+import { useDeferredValue, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
 import { Command as CommandPrimitive } from 'cmdk'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
@@ -12,7 +12,7 @@ import {
 import { getIsComposing } from '@meowdown/core'
 import { CommandItem, CommandList } from '@/components/ui/command'
 import { INPUT_CLASS_NAME } from '@/components/ui/input'
-import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
+import { Popover, PopoverContent } from '@/components/ui/popover'
 import {
   buildAutocompleteEntries,
   type AutocompleteEntry,
@@ -79,6 +79,7 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
   const [query, setQuery] = useState('')
   const [dismissed, setDismissed] = useState(false)
   const [highlighted, setHighlighted] = useState('')
+  const anchorRef = useRef<HTMLInputElement>(null)
   const deferredQuery = useDeferredValue(query)
   const searchTerm = deferredQuery.trim()
 
@@ -201,28 +202,28 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
         value={highlighted}
         onValueChange={setHighlighted}
       >
-        <PopoverAnchor asChild>
-          <CommandPrimitive.Input
-            value={query}
-            onValueChange={(value) => {
-              setQuery(value)
-              setDismissed(false)
-            }}
-            onKeyDown={onKeyDown}
-            onBlur={addTyped}
-            placeholder="Add attendee"
-            className={INPUT_CLASS_NAME}
-          />
-        </PopoverAnchor>
+        <CommandPrimitive.Input
+          ref={anchorRef}
+          value={query}
+          onValueChange={(value) => {
+            setQuery(value)
+            setDismissed(false)
+          }}
+          onKeyDown={onKeyDown}
+          onBlur={addTyped}
+          placeholder="Add attendee"
+          className={INPUT_CLASS_NAME}
+        />
         <PopoverContent
           align="start"
           sideOffset={4}
-          className="w-(--radix-popover-trigger-width) p-1"
+          anchor={anchorRef}
+          className="w-(--anchor-width) p-1"
           // The input keeps focus for the popover's whole life: no focus
           // steal on open/close, and no blur when a row is clicked (blur
           // would add the half-typed text before onSelect adds the row's).
-          onOpenAutoFocus={(focusEvent) => focusEvent.preventDefault()}
-          onCloseAutoFocus={(focusEvent) => focusEvent.preventDefault()}
+          initialFocus={false}
+          finalFocus={false}
           onMouseDown={(mouseEvent) => mouseEvent.preventDefault()}
         >
           <CommandList>

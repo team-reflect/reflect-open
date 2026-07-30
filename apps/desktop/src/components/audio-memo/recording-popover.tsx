@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import type { ComponentProps, ReactElement } from 'react'
 import { RecordingWaveform } from '@/components/audio-memo/recording-waveform'
 import { Button } from '@/components/ui/button'
 import { PopoverContent } from '@/components/ui/popover'
@@ -17,7 +17,11 @@ import { useAudioMemo } from '@/providers/audio-memo-provider'
  * recording can start immediately. Clicks elsewhere don't dismiss; the
  * recording owns its lifecycle.
  */
-export function RecordingPopover(): ReactElement {
+export function RecordingPopover({
+  anchor,
+}: {
+  anchor?: ComponentProps<typeof PopoverContent>['anchor']
+}): ReactElement {
   const memo = useAudioMemo()
   const capWarning = memo.phase === 'recording' ? audioMemoCapWarning(memo.elapsedMs) : null
 
@@ -26,16 +30,9 @@ export function RecordingPopover(): ReactElement {
       side="right"
       align="center"
       sideOffset={10}
+      anchor={anchor}
       className="w-auto px-3 py-2"
-      onOpenAutoFocus={(event) => event.preventDefault()}
-      onEscapeKeyDown={() => {
-        if (memo.phase === 'recording') {
-          memo.cancel()
-        } else if (memo.phase === 'error') {
-          memo.discard()
-        }
-      }}
-      onInteractOutside={(event) => event.preventDefault()}
+      initialFocus={false}
     >
       {memo.phase === 'error' ? (
         <div className="flex max-w-72 flex-col gap-2">

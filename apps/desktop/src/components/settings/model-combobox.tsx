@@ -98,24 +98,22 @@ export function ModelCombobox({
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          aria-label={ariaLabel}
-          className="w-full justify-between font-normal"
-        >
-          <span className="truncate">{aiModelLabel(provider, value)}</span>
-          <ChevronsUpDownIcon className="ml-2 size-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        className="p-0"
-        style={{ width: 'var(--radix-popover-trigger-width)' }}
-        align="start"
-      >
+      <PopoverTrigger
+        render={
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            aria-label={ariaLabel}
+            className="w-full justify-between font-normal"
+          >
+            <span className="truncate">{aiModelLabel(provider, value)}</span>
+            <ChevronsUpDownIcon className="ml-2 size-4 shrink-0 opacity-50" />
+          </Button>
+        }
+      />
+      <PopoverContent className="p-0" style={{ width: 'var(--anchor-width)' }} align="start">
         <Command>
           <FilterCountSync countRef={filteredCountRef} />
           <CommandInput
