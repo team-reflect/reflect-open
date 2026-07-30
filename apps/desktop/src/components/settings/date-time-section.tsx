@@ -62,6 +62,10 @@ export function DateTimeSection(): ReactElement {
         <div className="mt-3">
           <Select
             value={settings.dateFormat}
+            items={DATE_FORMAT_VALUES.map((value) => ({
+              value,
+              label: formatFullDate(today, value),
+            }))}
             onValueChange={(value) => updateSettings({ dateFormat: dateFormatSchema.parse(value) })}
           >
             <SelectTrigger aria-label="Date format" className="w-44">
@@ -81,6 +85,7 @@ export function DateTimeSection(): ReactElement {
         <div className="mt-3">
           <Select
             value={settings.weekStartDay}
+            items={WEEK_START_OPTIONS}
             onValueChange={(value) =>
               updateSettings({ weekStartDay: weekStartDaySchema.parse(value) })
             }
@@ -105,6 +110,7 @@ export function DateTimeSection(): ReactElement {
         <div className="mt-3">
           <Select
             value={settings.timeFormat}
+            items={TIME_FORMAT_OPTIONS}
             onValueChange={(value) => updateSettings({ timeFormat: timeFormatSchema.parse(value) })}
           >
             <SelectTrigger aria-label="Time format" className="w-36">

@@ -89,6 +89,10 @@ function AddAiProviderSheet({
           <span className={FIELD_LABEL_CLASS}>Provider</span>
           <Select
             value={provider.id}
+            items={AI_PROVIDERS.map((candidate) => ({
+              value: candidate.id,
+              label: candidate.label,
+            }))}
             onValueChange={(value) => {
               const next = aiProvider(aiProviderIdSchema.parse(value))
               setProviderId(next.id)
@@ -112,7 +116,14 @@ function AddAiProviderSheet({
 
         <div className="flex flex-col gap-1">
           <span className={FIELD_LABEL_CLASS}>Default model</span>
-          <Select value={model} onValueChange={(value) => setModel(value ?? '')}>
+          <Select
+            value={model}
+            items={provider.models.map((candidate) => ({
+              value: candidate.id,
+              label: candidate.label,
+            }))}
+            onValueChange={(value) => setModel(value ?? '')}
+          >
             <SelectTrigger aria-label="Default model" className="w-full">
               <SelectValue />
             </SelectTrigger>

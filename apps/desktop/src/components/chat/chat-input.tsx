@@ -142,6 +142,10 @@ export function ChatInput(): ReactElement {
         <div className="flex items-center gap-2 px-2.5 pb-2.5">
           <Select
             value={activeIndex >= 0 ? String(activeIndex) : ''}
+            items={modelOptions.map((option, index) => ({
+              value: String(index),
+              label: option.label,
+            }))}
             onValueChange={(value) => {
               const option = modelOptions[Number(value)]
               if (option !== undefined) {

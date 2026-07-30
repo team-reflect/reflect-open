@@ -105,6 +105,10 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
             <span className={FIELD_LABEL_CLASS}>Provider</span>
             <Select
               value={provider.id}
+              items={AI_PROVIDERS.map((candidate) => ({
+                value: candidate.id,
+                label: candidate.label,
+              }))}
               onValueChange={(value) => {
                 const next = aiProvider(aiProviderIdSchema.parse(value))
                 setValue('provider', next.id)
