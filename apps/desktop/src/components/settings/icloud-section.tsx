@@ -192,11 +192,13 @@ export function IcloudSettingsField(): ReactElement | null {
         {hosted ? null : (
           <div className="mt-2">
             <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-              <DialogTrigger asChild>
-                <Button size="xs" variant="outline" disabled={status?.available !== true}>
-                  Move graph to iCloud…
-                </Button>
-              </DialogTrigger>
+              <DialogTrigger
+                render={
+                  <Button size="xs" variant="outline" disabled={status?.available !== true}>
+                    Move graph to iCloud…
+                  </Button>
+                }
+              />
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Move this graph to iCloud Drive?</DialogTitle>
@@ -209,11 +211,13 @@ export function IcloudSettingsField(): ReactElement | null {
                   </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
-                  <DialogClose asChild>
-                    <Button variant="ghost" disabled={busy}>
-                      Cancel
-                    </Button>
-                  </DialogClose>
+                  <DialogClose
+                    render={
+                      <Button variant="ghost" disabled={busy}>
+                        Cancel
+                      </Button>
+                    }
+                  />
                   <Button disabled={busy} onClick={() => void moveToICloud()}>
                     {busy ? 'Moving…' : 'Move to iCloud'}
                   </Button>

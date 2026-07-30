@@ -139,11 +139,13 @@ export function CalendarIntegrationField(): ReactElement | null {
             {enabledCount}/{calendars.length} calendars selected
           </p>
           <Dialog>
-            <DialogTrigger asChild>
-              <Button type="button" variant="outline" size="sm">
-                Choose calendars…
-              </Button>
-            </DialogTrigger>
+            <DialogTrigger
+              render={
+                <Button type="button" variant="outline" size="sm">
+                  Choose calendars…
+                </Button>
+              }
+            />
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Choose calendars</DialogTitle>

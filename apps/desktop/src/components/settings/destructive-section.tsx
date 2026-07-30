@@ -106,11 +106,13 @@ export function DestructiveSection(): ReactElement {
             from saved graphs. Files stay on disk.
           </DialogDescription>
           <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="ghost" disabled={forgetting}>
-                Cancel
-              </Button>
-            </DialogClose>
+            <DialogClose
+              render={
+                <Button variant="ghost" disabled={forgetting}>
+                  Cancel
+                </Button>
+              }
+            />
             <Button variant="destructive" disabled={forgetting} onClick={() => void forgetGraph()}>
               {forgetting ? 'Forgetting…' : 'Forget graph'}
             </Button>
@@ -154,11 +156,13 @@ export function DestructiveSection(): ReactElement {
             </p>
           )}
           <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="ghost" disabled={deleting}>
-                Cancel
-              </Button>
-            </DialogClose>
+            <DialogClose
+              render={
+                <Button variant="ghost" disabled={deleting}>
+                  Cancel
+                </Button>
+              }
+            />
             <Button
               variant="destructive"
               disabled={!nameConfirmed || deleting}

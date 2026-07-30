@@ -125,11 +125,13 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
           </DialogDescription>
           {error !== null && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="ghost" disabled={busy}>
-                Cancel
-              </Button>
-            </DialogClose>
+            <DialogClose
+              render={
+                <Button variant="ghost" disabled={busy}>
+                  Cancel
+                </Button>
+              }
+            />
             <Button variant="destructive" disabled={busy} onClick={confirmDelete}>
               Delete
             </Button>
