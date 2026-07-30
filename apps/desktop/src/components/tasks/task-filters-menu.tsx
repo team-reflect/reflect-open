@@ -5,6 +5,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -51,16 +52,18 @@ export function TaskFiltersMenu({
         }
       />
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Tasks</DropdownMenuLabel>
-        {BUCKET_FILTERS.map(({ key, label }) => (
-          <DropdownMenuCheckboxItem
-            key={key}
-            checked={filters[key]}
-            onCheckedChange={() => toggle(key)}
-          >
-            {label}
-          </DropdownMenuCheckboxItem>
-        ))}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Tasks</DropdownMenuLabel>
+          {BUCKET_FILTERS.map(({ key, label }) => (
+            <DropdownMenuCheckboxItem
+              key={key}
+              checked={filters[key]}
+              onCheckedChange={() => toggle(key)}
+            >
+              {label}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
           checked={filters.archived}
