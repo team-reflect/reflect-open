@@ -75,11 +75,9 @@ export const gistFrontmatterSchema = z.object({
    * (file://, javascript:, etc.) are rejected so a crafted frontmatter
    * cannot open arbitrary resources.
    */
-  url: z
-    .string()
-    .refine((value) => value.startsWith('https://') || value.startsWith('http://'), {
-      message: 'gist url must be an http(s) url',
-    }),
+  url: z.string().refine((value) => value.startsWith('https://') || value.startsWith('http://'), {
+    message: 'gist url must be an http(s) url',
+  }),
   /** The gist filename the body was last published under. */
   file: z.string(),
   /** {@link gistBodyHash} of the body as last published (coerced like `id`). */
