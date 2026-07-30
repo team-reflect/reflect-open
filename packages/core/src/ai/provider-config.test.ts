@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { AiProviderConfig, HostedAiProviderConfig, OpenAiCompatibleProviderConfig } from '../settings/schema'
+import type {
+  AiProviderConfig,
+  HostedAiProviderConfig,
+  OpenAiCompatibleProviderConfig,
+} from '../settings/schema'
 import {
   apiKeyHint,
   defaultAiProvider,
@@ -22,7 +26,9 @@ function config(overrides: Partial<HostedAiProviderConfig>): HostedAiProviderCon
   }
 }
 
-function compatible(overrides: Partial<OpenAiCompatibleProviderConfig>): OpenAiCompatibleProviderConfig {
+function compatible(
+  overrides: Partial<OpenAiCompatibleProviderConfig>,
+): OpenAiCompatibleProviderConfig {
   return {
     id: 'compat',
     provider: 'openai-compatible',
@@ -188,16 +194,17 @@ describe('pickTranscriptionConfig', () => {
   })
 
   it('selects an openai-compatible entry when it has a transcription model', () => {
-    const providers = [
-      compatible({ id: 'local', transcriptionModel: 'whisper-large-v3' }),
-    ]
+    const providers = [compatible({ id: 'local', transcriptionModel: 'whisper-large-v3' })]
     expect(pickTranscriptionConfig(state(providers, 'local'))?.id).toBe('local')
   })
 })
 
 describe('defaultTranscriptionProvider', () => {
   it('returns the entry the transcription default id points at', () => {
-    const providers = [config({ id: 'oai' }), config({ id: 'gemini', provider: 'google', model: 'gemini-2.5-flash' })]
+    const providers = [
+      config({ id: 'oai' }),
+      config({ id: 'gemini', provider: 'google', model: 'gemini-2.5-flash' }),
+    ]
     expect(defaultTranscriptionProvider(state(providers, 'oai', 'gemini'))?.id).toBe('gemini')
   })
 
@@ -305,7 +312,7 @@ describe('resolveTranscriptionTarget', () => {
     expect(target).toBe('no-key')
   })
 
-it('prefers OpenAI entries and the transcription default within a provider', async () => {
+  it('prefers OpenAI entries and the transcription default within a provider', async () => {
     const providers = state(
       [
         config({ id: 'google-1', provider: 'google' }),
@@ -326,8 +333,6 @@ it('prefers OpenAI entries and the transcription default within a provider', asy
     const providers = state(
       [config({ id: 'openai-1' }), config({ id: 'google-1', provider: 'google' })],
       'openai-1',
-      'openai-1',
-    )
       'openai-1',
     )
     const target = await resolveTranscriptionTarget(providers, keyed({ 'google-1': 'g' }))

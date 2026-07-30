@@ -58,9 +58,7 @@ export function withAiProviderAdded(
  */
 export function withAiProviderRemoved(state: AiProvidersState, id: string): AiProvidersState {
   const providers = state.providers.filter((provider) => provider.id !== id)
-  const firstTranscription = providers.find((provider) =>
-    aiProviderSupportsTranscription(provider),
-  )
+  const firstTranscription = providers.find((provider) => aiProviderSupportsTranscription(provider))
   return {
     providers,
     defaultProviderId:
@@ -115,9 +113,7 @@ export function defaultTranscriptionProvider(state: AiProvidersState): AiProvide
  * default.
  */
 export function transcriptionProviders(state: AiProvidersState): AiProviderConfig[] {
-  const candidates = state.providers.filter((provider) =>
-    aiProviderSupportsTranscription(provider),
-  )
+  const candidates = state.providers.filter((provider) => aiProviderSupportsTranscription(provider))
   // Stable sort: OpenAI > Google > openai-compatible, default-first within each group.
   const groupOrder = (provider: string): number => {
     if (provider === 'openai') return 0
@@ -155,6 +151,18 @@ export function pickTranscriptionConfig(state: AiProvidersState): AiProviderConf
  */
 export type TranscriptionProvider = 'openai' | 'google' | 'openai-compatible'
 
+/**
+ * The ordered list of provider identifiers that support transcription,
+ * from highest to lowest priority. Used by consent UI to know which
+ * providers send audio data and by {@link resolveTranscriptionTarget}
+ * to order candidates.
+ */
+export const TRANSCRIPTION_PROVIDERS: readonly TranscriptionProvider[] = [
+  'openai',
+  'google',
+  'openai-compatible',
+]
+
 /** The transcription entry a pass should use, with its keychain key. */
 export interface TranscriptionTarget {
   config: AiProviderConfig
@@ -186,57 +194,6 @@ export async function resolveTranscriptionTarget(
   getKey: (id: string) => Promise<string | null>,
 ): Promise<TranscriptionTarget | TranscriptionMiss> {
   const candidates = transcriptionProviders(state)
-  if (candidates.length === 0) {
-    return 'no-provider'
-  }
-  for (const candidate of candidates) {
-    const apiKey = await getKey(candidate.id)
-    if (apiKey !== null) {
-      return { config: candidate, apiKey }
-    }
-  }
-  return 'no-key'
-}
-
-/** The transcription entry a pass should use, with its keychain key. */
-export interface TranscriptionTarget {
-  config: TranscriptionConfig
-  apiKey: string
-}
-
-/** Why no target resolved: nothing configured, or nothing with a key. */
-export type TranscriptionMiss = 'no-provider' | 'no-key'
-
-/**
- * Size guard for one recording segment, applied before any bytes are read.
- * Rotation-sized segments run a few megabytes, far under every provider's
- * request ceiling — this guards against encoder surprises (an ignored
- * bitrate hint), and tripping it skips the segment, never tombstones it.
- */
-export const TRANSCRIPTION_MAX_SEGMENT_BYTES = 24 * 1024 * 1024
-
-/**
- * The entry audio transcription should run on: providers in
- * {@link TRANSCRIPTION_PROVIDERS} order, the app-default entry first within
- * each, and the first whose keychain key resolves wins. A keyless entry is
- * skipped rather than stopping the pass — an unkeyed OpenAI entry must not
- * block a working Google one. `getKey` is the caller's (memoized) keychain
- * read, so a pass touches each entry's key at most once.
- */
-export async function resolveTranscriptionTarget(
-  state: AiProvidersState,
-  getKey: (id: string) => Promise<string | null>,
-): Promise<TranscriptionTarget | TranscriptionMiss> {
-  const candidates: TranscriptionConfig[] = []
-  for (const provider of TRANSCRIPTION_PROVIDERS) {
-    const entries = state.providers.filter(
-      (entry): entry is TranscriptionConfig => entry.provider === provider,
-    )
-    candidates.push(
-      ...entries.filter((entry) => entry.id === state.defaultProviderId),
-      ...entries.filter((entry) => entry.id !== state.defaultProviderId),
-    )
-  }
   if (candidates.length === 0) {
     return 'no-provider'
   }

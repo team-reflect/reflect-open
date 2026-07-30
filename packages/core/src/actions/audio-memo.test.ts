@@ -323,6 +323,7 @@ describe('reconcileAudioMemos', () => {
       providers: {
         providers: [...PROVIDERS.providers, ANTHROPIC_CONFIG],
         defaultProviderId: ANTHROPIC_CONFIG.id,
+        defaultTranscriptionProviderId: PROVIDERS.defaultTranscriptionProviderId,
       },
       formatTranscript: true,
     })
@@ -612,7 +613,9 @@ describe('reconcileAudioMemos', () => {
   it('reports a missing provider as config — the pass retries after settings change', async () => {
     listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
 
-    const outcome = await reconcile({ providers: { providers: [], defaultProviderId: null, defaultTranscriptionProviderId: null } })
+    const outcome = await reconcile({
+      providers: { providers: [], defaultProviderId: null, defaultTranscriptionProviderId: null },
+    })
 
     expect(outcome).toMatchObject({
       pending: 1,
