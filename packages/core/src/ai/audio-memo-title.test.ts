@@ -145,6 +145,7 @@ describe('generateAudioMemoTitle', () => {
       pickAudioMemoEnrichmentConfig({
         providers: [CONFIG, ANTHROPIC_CONFIG],
         defaultProviderId: ANTHROPIC_CONFIG.id,
+        defaultTranscriptionProviderId: null,
       }),
     ).toMatchObject({
       id: ANTHROPIC_CONFIG.id,
@@ -158,6 +159,7 @@ describe('generateAudioMemoTitle', () => {
       pickAudioMemoEnrichmentConfig({
         providers: [OPENROUTER_CONFIG, GOOGLE_CONFIG],
         defaultProviderId: OPENROUTER_CONFIG.id,
+        defaultTranscriptionProviderId: null,
       }),
     ).toMatchObject({
       id: GOOGLE_CONFIG.id,

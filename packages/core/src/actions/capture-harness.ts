@@ -55,8 +55,9 @@ export const getSecretMock = vi.mocked(getSecret)
 export const PROVIDERS: AiProvidersState = {
   providers: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.5', keyHint: 'wxyz1' }],
   defaultProviderId: 'cfg-openai',
+  defaultTranscriptionProviderId: 'cfg-openai',
 }
-export const NO_PROVIDERS: AiProvidersState = { providers: [], defaultProviderId: null }
+export const NO_PROVIDERS: AiProvidersState = { providers: [], defaultProviderId: null, defaultTranscriptionProviderId: null }
 
 /** 2026-06-11 15:30:22.845 local — every derived name is asserted from it. */
 export const CAPTURED_AT = new Date(2026, 5, 11, 15, 30, 22, 845)

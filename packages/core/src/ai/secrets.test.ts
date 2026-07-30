@@ -26,6 +26,7 @@ function openAiCompatibleConfig(
     model: 'llama-local',
     baseUrl: 'http://localhost:1234/v1',
     keyHint: '',
+    transcriptionModel: '',
     ...overrides,
   }
 }

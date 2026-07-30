@@ -40,6 +40,7 @@ const OPENAI_COMPATIBLE_CONFIG: AiProviderConfig = {
   model: 'llama-local',
   baseUrl: 'http://localhost:1234/v1',
   keyHint: '',
+  transcriptionModel: '',
 }
 
 function recordingAnthropicFetch(calls: RecordedCall[]): typeof fetch {
