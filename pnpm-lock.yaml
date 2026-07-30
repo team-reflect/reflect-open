@@ -112,7 +112,7 @@ importers:
         specifier: ^8.6.0
         version: 8.6.0(react@19.2.8)
       lucide-react:
-        specifier: ^1.22.0
+        specifier: ^1.27.0
         version: 1.27.0(react@19.2.8)
       radix-ui:
         specifier: ^1.6.0
