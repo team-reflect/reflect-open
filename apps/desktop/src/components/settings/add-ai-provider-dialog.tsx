@@ -1,6 +1,15 @@
 import { useEffect, type ReactElement } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
-import { AI_PROVIDERS, aiProvider, aiProviderIdSchema, type AiProviderId } from '@reflect/core'
+import {
+  AI_PROVIDERS,
+  DEFAULT_OPENAI_COMPATIBLE_BASE_URL,
+  aiProvider,
+  aiProviderIdSchema,
+  aiProviderRequiresApiKey,
+  isHttpBaseUrl,
+  isPlainHttpRemoteBaseUrl,
+  type AiProviderId,
+} from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -31,6 +40,7 @@ interface AddAiProviderDialogProps {
 interface AddAiProviderForm {
   provider: AiProviderId
   model: string
+  baseUrl: string
   apiKey: string
   isDefault: boolean
 }
@@ -50,6 +60,7 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
     defaultValues: {
       provider: AI_PROVIDERS[0].id,
       model: AI_PROVIDERS[0].models[0].id,
+      baseUrl: '',
       apiKey: '',
       isDefault: false,
     },
@@ -75,7 +86,10 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
 
   const providerId = useWatch({ control, name: 'provider' })
   const selectedModel = useWatch({ control, name: 'model' })
+  const baseUrlValue = useWatch({ control, name: 'baseUrl' })
   const provider = aiProvider(providerId)
+  const isOpenAICompatible = provider.id === 'openai-compatible'
+  const apiKeyRequired = aiProviderRequiresApiKey(provider.id)
 
   const submitForm = handleSubmit(async (values) => {
     await submit(values)
@@ -88,7 +102,7 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
         if (!isOpen) onClose()
       }}
     >
-      <DialogContent showCloseButton={false} className="max-w-sm">
+      <DialogContent showCloseButton={false} className="max-w-md">
         <DialogHeader>
           <DialogTitle>Add AI provider</DialogTitle>
           <DialogDescription>
@@ -113,6 +127,10 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
                 const next = aiProvider(aiProviderIdSchema.parse(value))
                 setValue('provider', next.id)
                 setValue('model', next.models[0].id)
+                setValue(
+                  'baseUrl',
+                  next.id === 'openai-compatible' ? DEFAULT_OPENAI_COMPATIBLE_BASE_URL : '',
+                )
                 resetUnverified()
               }}
             >
@@ -131,23 +149,77 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
 
           <div className="flex flex-col gap-1">
             <span className={FIELD_LABEL_CLASS}>Default model</span>
-            <ModelCombobox
-              value={selectedModel}
-              provider={provider.id}
-              models={provider.models}
-              onChange={(modelId) => setValue('model', modelId)}
-            />
+            {isOpenAICompatible ? (
+              <Input
+                aria-label="Default model"
+                autoComplete="off"
+                spellCheck={false}
+                {...register('model', {
+                  validate: (value) => value.trim().length > 0 || 'Enter a model id.',
+                  onChange: () => {
+                    resetUnverified()
+                  },
+                })}
+              />
+            ) : (
+              <ModelCombobox
+                value={selectedModel}
+                provider={provider.id}
+                models={provider.models}
+                onChange={(modelId) => {
+                  setValue('model', modelId)
+                  resetUnverified()
+                }}
+              />
+            )}
+            {formState.errors.model ? (
+              <span role="alert" className="text-xs text-red-600 dark:text-red-400">
+                {formState.errors.model.message}
+              </span>
+            ) : null}
           </div>
 
+          {isOpenAICompatible ? (
+            <label className="flex flex-col gap-1">
+              <span className={FIELD_LABEL_CLASS}>Endpoint base URL</span>
+              <Input
+                type="url"
+                placeholder={DEFAULT_OPENAI_COMPATIBLE_BASE_URL}
+                autoComplete="off"
+                spellCheck={false}
+                {...register('baseUrl', {
+                  validate: (value) => isHttpBaseUrl(value) || 'Enter an http(s) endpoint URL.',
+                  onChange: () => {
+                    resetUnverified()
+                  },
+                })}
+              />
+              {formState.errors.baseUrl ? (
+                <span role="alert" className="text-xs text-red-600 dark:text-red-400">
+                  {formState.errors.baseUrl.message}
+                </span>
+              ) : null}
+              {isPlainHttpRemoteBaseUrl(baseUrlValue) ? (
+                <InlineAlert tone="warning">
+                  This endpoint uses plain http, so the API key and note content are visible to the
+                  network in transit.
+                </InlineAlert>
+              ) : null}
+            </label>
+          ) : null}
+
           <label className="flex flex-col gap-1">
-            <span className={FIELD_LABEL_CLASS}>API key</span>
+            <span className={FIELD_LABEL_CLASS}>
+              {apiKeyRequired ? 'API key' : 'API key (optional)'}
+            </span>
             <Input
               type="password"
               placeholder={provider.keyPlaceholder}
               autoComplete="off"
               spellCheck={false}
               {...register('apiKey', {
-                validate: (value) => value.trim().length > 0 || 'Enter an API key.',
+                validate: (value) =>
+                  !apiKeyRequired || value.trim().length > 0 || 'Enter an API key.',
                 onChange: () => {
                   resetUnverified()
                 },

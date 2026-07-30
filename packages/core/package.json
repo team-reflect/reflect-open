@@ -16,6 +16,7 @@
     "@ai-sdk/anthropic": "^4.0.20",
     "@ai-sdk/google": "^4.0.24",
     "@ai-sdk/openai": "^4.0.20",
+    "@ai-sdk/openai-compatible": "^3.0.17",
     "@meowdown/markdown": "^0.63.0",
     "@reflect/db": "workspace:*",
     "@reflect/utils": "workspace:*",

@@ -31,7 +31,9 @@ import { ChatScreen } from './chat-screen'
 const streamChat = vi.hoisted(() =>
   vi.fn<(options: StreamChatOptions) => AsyncGenerator<ChatStreamEvent>>(),
 )
-const getSecret = vi.hoisted(() => vi.fn<(name: string) => Promise<string | null>>())
+const aiApiKeyForConfig = vi.hoisted(() =>
+  vi.fn<(config: AiProviderConfig) => Promise<string | null>>(),
+)
 const resolveWikiTarget = vi.hoisted(() =>
   vi.fn<
     (
@@ -46,7 +48,7 @@ const openRouteInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   streamChat,
-  getSecret,
+  aiApiKeyForConfig,
   resolveWikiTarget,
   loadChatGraphContext,
 }))
@@ -138,7 +140,7 @@ beforeEach(() => {
   settingsState.defaultId = null
   settingsState.selection = null
   streamChat.mockReset()
-  getSecret.mockReset().mockResolvedValue('sk-test')
+  aiApiKeyForConfig.mockReset().mockResolvedValue('sk-test')
   loadChatGraphContext.mockReset().mockResolvedValue(GRAPH_CONTEXT)
   resolveWikiTarget.mockReset().mockImplementation(async (target) => ({
     kind: 'resolved',
@@ -255,7 +257,7 @@ describe('ChatScreen', () => {
     expect(probedRoute).toEqual({ kind: 'note', path: 'notes/atlas.md' })
 
     // The turn went out with the keychain key and the full derived history.
-    expect(getSecret).toHaveBeenCalledWith('ai-api-key:m1')
+    expect(aiApiKeyForConfig).toHaveBeenCalledWith(MODEL)
     const options = streamChat.mock.lastCall?.[0]
     expect(options?.config).toEqual(MODEL)
     expect(options?.messages.at(-1)).toEqual({ role: 'user', content: 'when does atlas ship?' })
@@ -565,7 +567,7 @@ describe('ChatScreen', () => {
 
   it('surfaces a missing keychain entry as an in-transcript error', async () => {
     configureModel()
-    getSecret.mockResolvedValueOnce(null)
+    aiApiKeyForConfig.mockResolvedValueOnce(null)
     const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'hi{Enter}')

@@ -1,5 +1,12 @@
 import { useCallback, useState } from 'react'
-import { aiProvider, errorMessage, validateApiKey } from '@reflect/core'
+import {
+  aiProvider,
+  aiProviderRequiresApiKey,
+  errorMessage,
+  isHttpBaseUrl,
+  normalizeOpenAICompatibleBaseUrl,
+  validateApiKey,
+} from '@reflect/core'
 import { providerFetch } from '@/lib/provider-fetch'
 import type { NewAiProvider } from '@/hooks/use-ai-providers'
 
@@ -47,11 +54,35 @@ export function useAddAiProviderSubmit({
     async (draft: NewAiProvider): Promise<void> => {
       setSubmitError(null)
       const apiKey = draft.apiKey.trim()
+      const requiresApiKey = aiProviderRequiresApiKey(draft.provider)
+      const provider = aiProvider(draft.provider)
+      const baseUrl =
+        draft.provider === 'openai-compatible'
+          ? normalizeOpenAICompatibleBaseUrl(draft.baseUrl ?? '')
+          : undefined
+      if (requiresApiKey && apiKey === '') {
+        setSubmitError('Enter an API key.')
+        return
+      }
+      if (
+        draft.provider === 'openai-compatible' &&
+        (baseUrl === undefined || !isHttpBaseUrl(baseUrl))
+      ) {
+        setSubmitError('Enter an http(s) endpoint URL.')
+        return
+      }
       try {
         if (!unverified) {
-          const validation = await validateApiKey(draft.provider, apiKey, providerFetch)
+          const validation = await validateApiKey(
+            { provider: draft.provider, apiKey, baseUrl },
+            providerFetch,
+          )
           if (validation === 'invalid') {
-            setSubmitError(`${aiProvider(draft.provider).label} rejected this API key.`)
+            setSubmitError(
+              draft.provider === 'openai-compatible' && apiKey === ''
+                ? `${provider.label} endpoint requires an API key.`
+                : `${provider.label} rejected this API key.`,
+            )
             return
           }
           if (validation === 'unreachable') {
@@ -59,7 +90,7 @@ export function useAddAiProviderSubmit({
             return
           }
         }
-        await onAdd({ ...draft, apiKey })
+        await onAdd({ ...draft, apiKey, baseUrl })
         onDone()
       } catch (error: unknown) {
         setSubmitError(errorMessage(error))

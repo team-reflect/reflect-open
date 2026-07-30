@@ -1,6 +1,6 @@
 import { errorMessage, isAppError, toAppError, type AppError } from '../errors'
 import { pickTranscriptionConfig, type AiProvidersState } from '../ai/provider-config'
-import { aiKeySecretName } from '../ai/secrets'
+import { aiApiKeyForConfig, aiKeySecretName } from '../ai/secrets'
 import {
   audioMemoEnrichmentConfig,
   pickAudioMemoEnrichmentConfig,
@@ -516,7 +516,7 @@ export async function reconcileAudioMemos(
       ? null
       : enrichmentConfig.id === config.id
         ? apiKey
-        : await getKey(enrichmentConfig.id)
+        : await aiApiKeyForConfig(enrichmentConfig).catch(() => null)
   const fallbackEnrichmentConfig = audioMemoEnrichmentConfig(config)
   const enrichmentCredentials: AudioMemoEnrichmentCredentials | null =
     enrichmentConfig !== null && enrichmentApiKey !== null

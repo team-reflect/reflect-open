@@ -21,7 +21,7 @@ const audioMemoTitleSchema = z.object({
 export interface AudioMemoEnrichmentCredentials {
   /** The provider entry whose provider selects the fixed small enrichment model. */
   readonly config: AiProviderConfig
-  /** The BYOK API key, read from the OS keychain by the caller. */
+  /** The BYOK API key, or an empty string for no-key compatible endpoints. */
   readonly apiKey: string
 }
 
@@ -47,6 +47,8 @@ export function audioMemoEnrichmentConfig(config: AiProviderConfig): AiProviderC
       return { ...config, model: GOOGLE_AUDIO_MEMO_ENRICHMENT_MODEL }
     case 'openrouter':
       return null
+    case 'openai-compatible':
+      return config
   }
 }
 
@@ -54,7 +56,8 @@ export function audioMemoEnrichmentConfig(config: AiProviderConfig): AiProviderC
  * Pick the small-model provider for audio memo enrichment. The user's
  * default provider wins when it has a fixed small model; otherwise the
  * first supported configured provider is used. OpenRouter is skipped because
- * `openrouter/auto` is not a small-model guarantee.
+ * `openrouter/auto` is not a small-model guarantee; OpenAI-compatible entries
+ * use the model the user configured for that endpoint.
  */
 export function pickAudioMemoEnrichmentConfig(state: AiProvidersState): AiProviderConfig | null {
   const preferred = state.providers.find((provider) => provider.id === state.defaultProviderId)

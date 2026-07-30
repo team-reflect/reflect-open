@@ -25,7 +25,9 @@
         { "url": "https://openrouter.ai/*" },
         { "url": "https://github.com/login/device/code" },
         { "url": "https://github.com/login/oauth/access_token" },
-        { "url": "https://api.github.com/*" }
+        { "url": "https://api.github.com/*" },
+        { "url": "https://*:*" },
+        { "url": "http://*:*" }
       ]
     }
   ]

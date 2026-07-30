@@ -1,6 +1,12 @@
 import type { ReactElement } from 'react'
 import { Trash2 } from 'lucide-react'
-import { aiModelLabel, aiProvider, errorMessage, type AiProviderConfig } from '@reflect/core'
+import {
+  aiModelLabel,
+  aiProvider,
+  aiProviderRequiresApiKey,
+  errorMessage,
+  type AiProviderConfig,
+} from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import { startOperation } from '@/lib/operations'
 import { ModelCombobox } from './model-combobox'
@@ -34,6 +40,7 @@ export function AiProviderRow({
   const providerLabel = provider.label
   const modelLabel = aiModelLabel(config.provider, config.model)
   const name = `${providerLabel} — ${modelLabel}`
+  const showKeyHint = aiProviderRequiresApiKey(config.provider) || config.keyHint !== ''
 
   const remove = (): void => {
     onRemove(config.id).catch((error: unknown) => {
@@ -46,8 +53,17 @@ export function AiProviderRow({
       <div className="min-w-0">
         <div className="truncate text-sm font-medium text-text">{providerLabel}</div>
         <p className="mt-0.5 text-xs text-text-muted">
-          API key <span className="font-mono">·····{config.keyHint}</span>
+          {showKeyHint ? (
+            <>
+              API key <span className="font-mono">·····{config.keyHint}</span>
+            </>
+          ) : (
+            'No API key'
+          )}
         </p>
+        {config.provider === 'openai-compatible' ? (
+          <p className="mt-0.5 truncate text-xs text-text-muted">{config.baseUrl}</p>
+        ) : null}
       </div>
       <ModelCombobox
         value={config.model}

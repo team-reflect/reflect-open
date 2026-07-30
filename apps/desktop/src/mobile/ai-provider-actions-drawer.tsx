@@ -1,5 +1,11 @@
 import { useState, type ReactElement } from 'react'
-import { aiModelLabel, aiProvider, errorMessage, type AiProviderConfig } from '@reflect/core'
+import {
+  aiModelLabel,
+  aiProvider,
+  aiProviderRequiresApiKey,
+  errorMessage,
+  type AiProviderConfig,
+} from '@reflect/core'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { SettingsActionRow, SettingsGroup, SettingsSelectRow } from '@/mobile/settings-list'
 
@@ -45,6 +51,12 @@ export function AiProviderActionsDrawer({
             },
             ...providerInfo.models,
           ]
+  const title =
+    provider === null || providerInfo === null
+      ? ''
+      : aiProviderRequiresApiKey(provider.provider) || provider.keyHint !== ''
+        ? `${providerInfo.label} ·····${provider.keyHint}`
+        : `${providerInfo.label} · No API key`
 
   // A failed removal (keychain write, settings store) keeps the sheet open —
   // closing would read as success — and logs; the row is still there to retry.
@@ -65,9 +77,7 @@ export function AiProviderActionsDrawer({
       <DrawerContent aria-label="Manage AI provider">
         {provider !== null && providerInfo !== null ? (
           <>
-            <DrawerTitle className="px-4 pt-1">
-              {`${providerInfo.label} ·····${provider.keyHint}`}
-            </DrawerTitle>
+            <DrawerTitle className="px-4 pt-1">{title}</DrawerTitle>
             <div className="flex flex-col gap-6 px-4 pb-8 pt-4">
               <SettingsGroup header="Default model">
                 {models.map((model) => (

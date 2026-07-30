@@ -2,6 +2,7 @@ import { useId, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   aiProvider,
+  aiProviderRequiresApiKey,
   errorMessage,
   hasBridge,
   listNotes,
@@ -41,6 +42,14 @@ const THEME_OPTIONS: readonly SegmentedOption<ThemePreference>[] = [
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
 ]
+
+function aiProviderValue(provider: AiProviderConfig, defaultProviderId: string | null): string {
+  const credential =
+    aiProviderRequiresApiKey(provider.provider) || provider.keyHint !== ''
+      ? `·····${provider.keyHint}`
+      : 'No API key'
+  return provider.id === defaultProviderId ? `${credential} · Default` : credential
+}
 
 const TEXT_SIZE_OPTIONS: readonly SegmentedOption<EditorTextSize>[] = [
   { value: 'small', label: 'Small' },
@@ -186,7 +195,7 @@ export function MobileSettings(): ReactElement {
               <SettingsNavRow
                 key={provider.id}
                 label={aiProvider(provider.provider).label}
-                value={`·····${provider.keyHint}${provider.id === defaultProvider?.id ? ' · Default' : ''}`}
+                value={aiProviderValue(provider, defaultProvider?.id ?? null)}
                 onPress={() => {
                   setManagedProvider(provider)
                   setManageOpen(true)

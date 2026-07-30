@@ -2,7 +2,12 @@ import { render } from 'vitest-browser-react'
 import { page, userEvent, type Locator } from 'vitest/browser'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { setBridge, settingsSchema, type AiProviderConfig, type Settings } from '@reflect/core'
+import {
+  setBridge,
+  settingsSchema,
+  type HostedAiProviderConfig,
+  type Settings,
+} from '@reflect/core'
 import { SettingsProvider } from '@/providers/settings-provider'
 import { resetOperations } from '@/lib/operations'
 import { expectLocatorToHaveCount } from '@/test-utils/expect'
@@ -69,7 +74,7 @@ function lastSavedDoc(): Settings {
   return settingsSchema.parse(saved.at(-1))
 }
 
-function entry(overrides: Partial<AiProviderConfig>): AiProviderConfig {
+function entry(overrides: Partial<HostedAiProviderConfig>): HostedAiProviderConfig {
   return {
     id: 'id',
     provider: 'anthropic',
@@ -172,6 +177,38 @@ describe('AiProvidersSection', () => {
     await dialog.getByRole('combobox', { name: 'Provider' }).click()
 
     await expect.element(page.getByRole('option', { name: 'OpenRouter' })).toBeInTheDocument()
+    await expect
+      .element(page.getByRole('option', { name: 'OpenAI-compatible' }))
+      .toBeInTheDocument()
+  })
+
+  it('adds an OpenAI-compatible endpoint without storing an empty key', async () => {
+    await renderSection()
+    await expect.element(page.getByText(/No AI providers configured/)).toBeInTheDocument()
+
+    const dialog = await openDialog()
+    await dialog.getByRole('combobox', { name: 'Provider' }).click()
+    await page.getByRole('option', { name: 'OpenAI-compatible' }).click()
+    await dialog.getByLabelText('Endpoint base URL').fill('http://localhost:1234/v1/')
+    await dialog.getByLabelText('Default model').fill('llama-local')
+    await dialog.getByRole('button', { name: 'Add provider' }).click()
+
+    await vi.waitFor(() => expect(saved).toHaveLength(1))
+    const doc = lastSavedDoc()
+    const [added] = doc.aiProviders
+    expect(added).toMatchObject({
+      provider: 'openai-compatible',
+      model: 'llama-local',
+      baseUrl: 'http://localhost:1234/v1',
+      keyHint: '',
+    })
+    expect(providerFetchMock).toHaveBeenCalledWith(
+      'http://localhost:1234/v1/models',
+      expect.objectContaining({ method: 'GET', headers: {} }),
+    )
+    expect(secrets.size).toBe(0)
+    expect(JSON.stringify(saved)).not.toContain('localhost:1234/v1/')
+    await expectLocatorToHaveCount(page.getByRole('dialog'), 0)
   })
 
   it('rejects a key the provider turns down, storing nothing', async () => {
