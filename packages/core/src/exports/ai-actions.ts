@@ -29,6 +29,7 @@ export {
   pickTranscriptionConfig,
   resolveTranscriptionTarget,
   transcriptionProviders,
+  TRANSCRIPTION_PROVIDERS,
   type AiProvidersState,
   type TranscriptionProvider,
 } from '../ai/provider-config'
