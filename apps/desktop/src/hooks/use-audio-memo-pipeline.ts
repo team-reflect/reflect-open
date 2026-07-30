@@ -106,6 +106,7 @@ export function useAudioMemoPipeline(
     pickTranscriptionConfig({
       providers: settings.aiProviders,
       defaultProviderId: settings.defaultAiProviderId,
+      defaultTranscriptionProviderId: settings.defaultTranscriptionProviderId,
     }) !== null
 
   /** Committed recordings waiting their turn; the pump owns the head. */
@@ -131,11 +132,13 @@ export function useAudioMemoPipeline(
   const providersRef = useRef<AiProvidersState>({
     providers: settings.aiProviders,
     defaultProviderId: settings.defaultAiProviderId,
+    defaultTranscriptionProviderId: settings.defaultTranscriptionProviderId,
   })
   useEffect(() => {
     providersRef.current = {
       providers: settings.aiProviders,
       defaultProviderId: settings.defaultAiProviderId,
+      defaultTranscriptionProviderId: settings.defaultTranscriptionProviderId,
     }
   })
   const transcriptionFormatRef = useRef(settings.transcriptionFormat)

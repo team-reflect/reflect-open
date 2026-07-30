@@ -37,11 +37,13 @@ export function CaptureProvider({ graph, children }: CaptureProviderProps): Reac
   const providersRef = useRef<AiProvidersState>({
     providers: settings.aiProviders,
     defaultProviderId: settings.defaultAiProviderId,
+    defaultTranscriptionProviderId: settings.defaultTranscriptionProviderId,
   })
   useEffect(() => {
     providersRef.current = {
       providers: settings.aiProviders,
       defaultProviderId: settings.defaultAiProviderId,
+      defaultTranscriptionProviderId: settings.defaultTranscriptionProviderId,
     }
   })
 
