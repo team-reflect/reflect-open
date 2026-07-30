@@ -109,10 +109,7 @@ export function AiPromptDialog({ prompt, onSave, onClose }: AiPromptDialogProps)
           </label>
           <label className="flex flex-col gap-1.5">
             <span className={FIELD_LABEL_CLASS}>Result</span>
-            <Select
-              value={mode}
-              onValueChange={(value) => setValue('mode', value as AiPromptMode)}
-            >
+            <Select value={mode} onValueChange={(value) => setValue('mode', value as AiPromptMode)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>

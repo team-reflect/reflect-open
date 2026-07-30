@@ -270,8 +270,7 @@ describe('recently-completed', () => {
 
   it('is scoped to a graph root — switching graphs yields an empty set', async () => {
     const { result, rerender } = await renderHook(
-      ({ root }: { root: string } = { root: '/g' }) =>
-        useRecentlyCompleted(root, undefined),
+      ({ root }: { root: string } = { root: '/g' }) => useRecentlyCompleted(root, undefined),
       {
         initialProps: { root: '/g' },
       },

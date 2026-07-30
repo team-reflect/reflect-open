@@ -1,10 +1,7 @@
 import { useCallback } from 'react'
 import { dateFromDailyPath, type NoteRow, type PinnedNote } from '@reflect/core'
 import { useQueryClient } from '@tanstack/react-query'
-import {
-  invalidatePinnedNotesCache,
-  updatePinnedNotesCache,
-} from '@/lib/notes/pinned-notes-cache'
+import { invalidatePinnedNotesCache, updatePinnedNotesCache } from '@/lib/notes/pinned-notes-cache'
 import { useGraph } from '@/providers/graph-provider'
 
 function titleFromPath(path: string): string {
@@ -52,10 +49,7 @@ export interface OptimisticPinToggle {
  * Optimistically mirror the context-sidebar pin toggle into the pinned shelf.
  * The frontmatter write still owns truth; this only hides watcher/index latency.
  */
-export function useOptimisticPinToggle(
-  path: string,
-  row: NoteRow | null,
-): OptimisticPinToggle {
+export function useOptimisticPinToggle(path: string, row: NoteRow | null): OptimisticPinToggle {
   const { graph } = useGraph()
   const queryClient = useQueryClient()
 

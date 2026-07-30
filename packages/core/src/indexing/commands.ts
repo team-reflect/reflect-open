@@ -47,11 +47,7 @@ export async function removeFromIndex(path: string, generation: number): Promise
  * healed rename never re-embeds. Gated on the **index** generation like every
  * other reconcile-path write.
  */
-export async function moveIndexedRows(
-  from: string,
-  to: string,
-  generation: number,
-): Promise<void> {
+export async function moveIndexedRows(from: string, to: string, generation: number): Promise<void> {
   await call('index_move', { from, to, generation, toAddress: movedNoteAddress(to) }, voidSchema)
 }
 
@@ -77,11 +73,7 @@ function movedNoteAddress(path: string) {
  * the other index commands, `generation` here is the **graph** generation
  * (the `note_write` gate) — a rename is user-initiated file mutation.
  */
-export async function moveNoteIndexed(
-  from: string,
-  to: string,
-  generation: number,
-): Promise<void> {
+export async function moveNoteIndexed(from: string, to: string, generation: number): Promise<void> {
   await call(
     'note_move_indexed',
     {
@@ -183,11 +175,7 @@ export async function clearIndex(generation: number): Promise<void> {
  * Bookkeeping the TS policy layer owns — e.g. the projection-version stamp a
  * rebuild leaves behind. Reads go through the ordinary Kysely `db_query` path.
  */
-export async function setIndexMeta(
-  key: string,
-  value: string,
-  generation: number,
-): Promise<void> {
+export async function setIndexMeta(key: string, value: string, generation: number): Promise<void> {
   await call('index_meta_set', { key, value, generation }, voidSchema)
 }
 

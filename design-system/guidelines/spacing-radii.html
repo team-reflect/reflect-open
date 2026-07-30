@@ -1,26 +1,71 @@
 <!-- @dsCard group="Spacing" viewport="700x150" name="Radii" subtitle="Gentle — 8px house value, 7px search, full pills" -->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<link rel="stylesheet" href="../styles.css" />
-<style>
-  body { margin: 0; padding: 22px; background: var(--surface); font-family: var(--font-sans); }
-  .row { display: flex; gap: 18px; align-items: flex-start; }
-  .cell { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-  .box { width: 64px; height: 56px; background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--indigo-200); }
-  .px { font-size: 11px; font-weight: 600; color: var(--text); }
-  .lbl { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
-</style>
-</head>
-<body>
-  <div class="row">
-    <div class="cell"><div class="box" style="border-radius:var(--radius-sm)"></div><span class="px">4px</span><span class="lbl">sm · tags</span></div>
-    <div class="cell"><div class="box" style="border-radius:var(--radius-md)"></div><span class="px">7px</span><span class="lbl">md · search</span></div>
-    <div class="cell"><div class="box" style="border-radius:var(--radius-lg)"></div><span class="px">8px</span><span class="lbl">lg · house ★</span></div>
-    <div class="cell"><div class="box" style="border-radius:var(--radius-xl)"></div><span class="px">12px</span><span class="lbl">xl · modal</span></div>
-    <div class="cell"><div class="box" style="border-radius:var(--radius-2xl)"></div><span class="px">16px</span><span class="lbl">2xl · glass</span></div>
-    <div class="cell"><div class="box" style="border-radius:var(--radius-full)"></div><span class="px">full</span><span class="lbl">pill · avatar</span></div>
-  </div>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 22px;
+        background: var(--surface);
+        font-family: var(--font-sans);
+      }
+      .row {
+        display: flex;
+        gap: 18px;
+        align-items: flex-start;
+      }
+      .cell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      .box {
+        width: 64px;
+        height: 56px;
+        background: var(--accent-soft);
+        box-shadow: inset 0 0 0 1px var(--indigo-200);
+      }
+      .px {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .lbl {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="cell">
+        <div class="box" style="border-radius: var(--radius-sm)"></div>
+        <span class="px">4px</span><span class="lbl">sm · tags</span>
+      </div>
+      <div class="cell">
+        <div class="box" style="border-radius: var(--radius-md)"></div>
+        <span class="px">7px</span><span class="lbl">md · search</span>
+      </div>
+      <div class="cell">
+        <div class="box" style="border-radius: var(--radius-lg)"></div>
+        <span class="px">8px</span><span class="lbl">lg · house ★</span>
+      </div>
+      <div class="cell">
+        <div class="box" style="border-radius: var(--radius-xl)"></div>
+        <span class="px">12px</span><span class="lbl">xl · modal</span>
+      </div>
+      <div class="cell">
+        <div class="box" style="border-radius: var(--radius-2xl)"></div>
+        <span class="px">16px</span><span class="lbl">2xl · glass</span>
+      </div>
+      <div class="cell">
+        <div class="box" style="border-radius: var(--radius-full)"></div>
+        <span class="px">full</span><span class="lbl">pill · avatar</span>
+      </div>
+    </div>
+  </body>
 </html>

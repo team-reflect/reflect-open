@@ -158,9 +158,7 @@ export function connectIndex(database: DatabaseSync): void {
 }
 
 export async function expectSuggestionOpensItsPath(
-  suggestion: Awaited<
-    ReturnType<typeof suggestWikiLinkTargets>
-  >['suggestions'][number],
+  suggestion: Awaited<ReturnType<typeof suggestWikiLinkTargets>>['suggestions'][number],
 ): Promise<void> {
   expect(suggestion.path).not.toBeNull()
   const parsed = parseNote({

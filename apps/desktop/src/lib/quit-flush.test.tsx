@@ -102,5 +102,4 @@ describe('installQuitFlush', () => {
 
     dispose()
   })
-
 })

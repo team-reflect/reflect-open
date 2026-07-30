@@ -1,9 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  captureInboxSpool,
-  resolveNoteTarget,
-  textCaptureEnvelopeSchema,
-} from '@reflect/core'
+import { captureInboxSpool, resolveNoteTarget, textCaptureEnvelopeSchema } from '@reflect/core'
 import { handleDeepLink } from '@/lib/deep-links/handle'
 import { startOperation } from '@/lib/operations'
 

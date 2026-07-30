@@ -21,7 +21,9 @@ const activeGistOperations = new Set<string>()
 
 function claimGistOperation(path: string): boolean {
   if (activeGistOperations.has(path)) {
-    startOperation('Gist operation already running').fail('Wait for the current gist operation to finish')
+    startOperation('Gist operation already running').fail(
+      'Wait for the current gist operation to finish',
+    )
     return false
   }
   activeGistOperations.add(path)
@@ -77,7 +79,13 @@ export async function publishNoteToGist(path: string, generation: number): Promi
   const previous = parsed.frontmatter.gist
   const published =
     (previous !== undefined
-      ? await updateGist(token, previous.id, previous.file, { name: filename, content: body }, providerFetch)
+      ? await updateGist(
+          token,
+          previous.id,
+          previous.file,
+          { name: filename, content: body },
+          providerFetch,
+        )
       : null) ?? (await createGist(token, { name: filename, content: body }, providerFetch))
 
   const gist: GistFrontmatter = {

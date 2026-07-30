@@ -27,9 +27,7 @@ describe('highlightTitle', () => {
       { text: 'Car', highlighted: true },
       { text: 'pet Oscarpet', highlighted: false },
     ])
-    expect(segments('Oscarpet', 'car')).toEqual([
-      { text: 'Oscarpet', highlighted: false },
-    ])
+    expect(segments('Oscarpet', 'car')).toEqual([{ text: 'Oscarpet', highlighted: false }])
   })
 
   it('highlights unsegmented-script recall terms anywhere in the title', () => {

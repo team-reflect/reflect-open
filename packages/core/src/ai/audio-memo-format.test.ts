@@ -172,7 +172,11 @@ describe('formatAudioMemoTranscript', () => {
   })
 
   it.each([
-    ['drops a currency sign', 'The budget changed by -$50 today', 'The budget changed by $50 today.'],
+    [
+      'drops a currency sign',
+      'The budget changed by -$50 today',
+      'The budget changed by $50 today.',
+    ],
     ['changes a suffix currency', 'The price is 50€ today', 'The price is 50$ today.'],
     ['drops a spaced percentage', 'The margin is 50 % today', 'The margin is 50 today.'],
   ])('falls back when formatting %s', async (_case, transcript, body) => {

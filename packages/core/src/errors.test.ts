@@ -3,7 +3,16 @@ import { errorMessage, isAppError, ReflectError, toAppError } from './errors'
 
 describe('isAppError', () => {
   it('accepts every contract kind', () => {
-    for (const kind of ['io', 'notFound', 'traversal', 'noGraph', 'parse', 'auth', 'network', 'unknown']) {
+    for (const kind of [
+      'io',
+      'notFound',
+      'traversal',
+      'noGraph',
+      'parse',
+      'auth',
+      'network',
+      'unknown',
+    ]) {
       expect(isAppError({ kind, message: 'm' })).toBe(true)
     }
   })

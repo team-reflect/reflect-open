@@ -113,8 +113,7 @@ export function buildPaletteSections(options: {
     // (the lazy contract) — it must still be jumpable: synthesize its daily
     // path, and routeForPath downstream yields the daily route, where the
     // stream creates the file on first keystroke.
-    const path =
-      suggestion.path ?? (suggestion.date !== null ? dailyPath(suggestion.date) : null)
+    const path = suggestion.path ?? (suggestion.date !== null ? dailyPath(suggestion.date) : null)
     if (path !== null && !seen.has(path)) {
       seen.add(path)
       notes.push({

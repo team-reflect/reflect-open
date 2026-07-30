@@ -156,7 +156,10 @@ export async function drainCaptureInbox(
   }
   const spools = entries
     .filter((entry) => entry.path.endsWith('.json'))
-    .sort((first, second) => first.modifiedMs - second.modifiedMs || first.path.localeCompare(second.path))
+    .sort(
+      (first, second) =>
+        first.modifiedMs - second.modifiedMs || first.path.localeCompare(second.path),
+    )
 
   let drained = 0
   let deduped = 0
@@ -286,7 +289,10 @@ function parseEnvelope(raw: string): InboxEnvelope | null {
   return parsed.success ? parsed.data : null
 }
 
-async function drainTextCapture(envelope: TextCaptureEnvelope, generation: number): Promise<boolean> {
+async function drainTextCapture(
+  envelope: TextCaptureEnvelope,
+  generation: number,
+): Promise<boolean> {
   const daily = dailyPath(captureLocalDate(new Date(envelope.capturedAt)))
   const dailySource = await noteSource(daily, generation)
   // `task` is Reflect's round `+` checkbox, the only marker the Tasks
@@ -297,9 +303,7 @@ async function drainTextCapture(envelope: TextCaptureEnvelope, generation: numbe
       : envelope.kind === 'checkbox'
         ? `- [ ] ${envelope.text}`
         : `- ${envelope.text}`
-  const present = dailySource
-    .split('\n')
-    .some((existing) => existing.replace(/\r$/, '') === line)
+  const present = dailySource.split('\n').some((existing) => existing.replace(/\r$/, '') === line)
   if (present) {
     return true
   }

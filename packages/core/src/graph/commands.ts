@@ -173,11 +173,7 @@ export async function createNoteIfAbsent(
   contents: string,
   generation: number,
 ): Promise<NoteCreateOutcome> {
-  const outcome = await call(
-    'note_create',
-    { path, contents, generation },
-    noteCreateOutcomeSchema,
-  )
+  const outcome = await call('note_create', { path, contents, generation }, noteCreateOutcomeSchema)
   if (outcome.kind === 'created') {
     echoLocalWrite({ path, kind: 'upsert', modifiedMs: outcome.modifiedMs ?? Date.now() })
   }

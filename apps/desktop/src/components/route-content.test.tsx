@@ -271,7 +271,9 @@ describe('RouteContent', () => {
   it('never recreates an arbitrary missing vault path', async () => {
     const view = await renderRoute({ kind: 'note', path: 'Projects/missing.md' })
 
-    await expect.element(page.getByText(/Couldn’t open Projects\/missing\.md: missing/)).toBeVisible()
+    await expect
+      .element(page.getByText(/Couldn’t open Projects\/missing\.md: missing/))
+      .toBeVisible()
     await expect.element(page.getByTestId('fake-editor')).not.toBeInTheDocument()
     await act(() => flushOpenDocuments())
     expect(writes).toEqual([])

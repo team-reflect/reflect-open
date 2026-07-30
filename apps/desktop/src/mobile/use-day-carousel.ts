@@ -165,7 +165,9 @@ export function useDayCarousel(
   onSelect: (date: string) => void,
   onTarget: (date: string, navigationKey: string) => void,
 ): DayCarousel {
-  const [dayWindow, setDayWindow] = useState<DayWindow>(() => createDayWindow(date, CAROUSEL_WINDOW))
+  const [dayWindow, setDayWindow] = useState<DayWindow>(() =>
+    createDayWindow(date, CAROUSEL_WINDOW),
+  )
   // Frozen at mount: `embla-carousel-react` reinitializes whenever the options
   // object stops comparing equal, and `reInit` snaps to `startIndex` with no
   // animation — a render-derived `startIndex` would let every swipe's route
@@ -193,9 +195,7 @@ export function useDayCarousel(
   // state. Carry its identity in the state itself so an older queued updater
   // cannot restore the old mount radius after navigation has won.
   const selectedIndex =
-    selection.navigationKey === navigationKey || routeIndex === -1
-      ? selection.index
-      : routeIndex
+    selection.navigationKey === navigationKey || routeIndex === -1 ? selection.index : routeIndex
   if (selection.navigationKey !== navigationKey) {
     setSelection({ navigationKey, index: selectedIndex })
   }

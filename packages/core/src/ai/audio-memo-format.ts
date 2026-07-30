@@ -30,7 +30,10 @@ const FORMAT_SYSTEM_PROMPT = [
 ].join(' ')
 
 function normalizedTranscriptContent(value: string): string {
-  return value.normalize('NFC').toLowerCase().replace(/[^\p{L}\p{M}\p{N}]/gu, '')
+  return value
+    .normalize('NFC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{M}\p{N}]/gu, '')
 }
 
 function numberSignatures(value: string): readonly string[] {
@@ -93,11 +96,7 @@ export async function formatAudioMemoTranscript(
 
   try {
     const result = await generateText({
-      model: languageModel(
-        config,
-        request.credentials.apiKey,
-        request.fetchFn ?? fetch,
-      ),
+      model: languageModel(config, request.credentials.apiKey, request.fetchFn ?? fetch),
       output: Output.object({ schema: formattedAudioMemoSchema }),
       instructions: FORMAT_SYSTEM_PROMPT,
       prompt: `Transcript JSON string:\n${JSON.stringify(request.transcript)}`,

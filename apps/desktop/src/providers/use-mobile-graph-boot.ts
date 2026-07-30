@@ -292,8 +292,7 @@ export function useMobileGraphBoot(options: MobileGraphBootOptions): MobileGraph
       // without one, fall back to the kind's default root — the local path
       // never passes a root.
       const root =
-        chosenRoot ??
-        (mobileStorageInfo === null ? null : storageRoot(mobileStorageInfo, kind, ''))
+        chosenRoot ?? (mobileStorageInfo === null ? null : storageRoot(mobileStorageInfo, kind, ''))
       if (root === null) {
         throw new Error(
           kind === 'icloud'

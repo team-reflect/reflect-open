@@ -129,9 +129,7 @@ describe('NoteEditor smooth caret animation', () => {
     await pmRoot.click()
     const caret = page.getByTestId('virtual-caret')
     await expect.element(caret).toBeVisible()
-    expect(getComputedStyle(caret.element()).getPropertyValue('--meowdown-caret-glide')).toBe(
-      '0ms',
-    )
+    expect(getComputedStyle(caret.element()).getPropertyValue('--meowdown-caret-glide')).toBe('0ms')
   })
 })
 
@@ -256,7 +254,9 @@ describe('NoteEditor image lightbox', () => {
     expect(close.element().parentElement?.className).toContain(
       'left-[max(env(safe-area-inset-left),1rem)]',
     )
-    await expect.element(page.getByRole('dialog', { name: 'Image preview' }).locate('.bg-black')).toBeInTheDocument()
+    await expect
+      .element(page.getByRole('dialog', { name: 'Image preview' }).locate('.bg-black'))
+      .toBeInTheDocument()
   })
 
   it('dismisses the mobile image lightbox with a downward drag', async () => {

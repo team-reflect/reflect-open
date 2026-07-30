@@ -1,20 +1,12 @@
 import { isAppError } from '../errors'
 import { CLAIM_TIER, projectNoteAliases } from '../indexing/indexed-note'
-import {
-  findNotesByPathKey,
-  findWikiTargetMatch,
-  type WikiTargetMatch,
-} from '../indexing/queries'
+import { findNotesByPathKey, findWikiTargetMatch, type WikiTargetMatch } from '../indexing/queries'
 import { parseNote } from '../markdown/extract'
 import { foldFallbackTitleKey, foldKey } from '../markdown/keys'
 import { normalizeWikiTarget } from '../markdown/resolve'
 import { slugForTitle } from '../markdown/slug'
 import { listFiles, readNote } from './commands'
-import {
-  markdownNoteReference,
-  wikiNoteReference,
-  type NoteReference,
-} from './note-reference'
+import { markdownNoteReference, wikiNoteReference, type NoteReference } from './note-reference'
 import { dailyPath, foldGraphPath, NOTES_DIR } from './paths'
 
 /** The side-effect-free outcome of resolving one existing note-link target. */

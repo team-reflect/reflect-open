@@ -15,9 +15,7 @@ const suggestWikiTargets = vi.hoisted(() => vi.fn())
 const searchWithFilters = vi.hoisted(() => vi.fn())
 const retrieve = vi.hoisted(() => vi.fn())
 const readNote = vi.hoisted(() => vi.fn<(path: string) => Promise<string>>())
-const openRouteInNewWindow = vi.hoisted(() =>
-  vi.fn<(route: NoteRoute) => Promise<boolean>>(),
-)
+const openRouteInNewWindow = vi.hoisted(() => vi.fn<(route: NoteRoute) => Promise<boolean>>())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
@@ -43,9 +41,7 @@ vi.mock('@/lib/windows/open-in-new-window', async (importOriginal) => ({
 const embedReady = vi.hoisted(() => ({ value: false }))
 vi.mock('@/lib/use-embed-status', () => ({
   useEmbedStatus: () =>
-    embedReady.value
-      ? { status: 'ready', model: 'all-MiniLM-L6-v2' }
-      : { status: 'uninitialized' },
+    embedReady.value ? { status: 'ready', model: 'all-MiniLM-L6-v2' } : { status: 'uninitialized' },
 }))
 const semanticSetting = vi.hoisted(() => ({ enabled: false }))
 vi.mock('@/providers/settings-provider', () => ({
@@ -171,7 +167,12 @@ describe('CommandPalette', () => {
   it('a typed query shows ranked notes with highlighted snippets and Enter opens the top hit', async () => {
     suggestWikiTargets.mockResolvedValue([])
     searchWithFilters.mockResolvedValue([
-      { path: 'notes/rust.md', title: 'Rust Notes', snippet: 'about rust things', dailyDate: null },
+      {
+        path: 'notes/rust.md',
+        title: 'Rust Notes',
+        snippet: 'about rust things',
+        dailyDate: null,
+      },
     ])
     const { view } = await renderPalette('rust')
     await expect.element(view.getByText('Rust Notes')).toBeInTheDocument()
@@ -205,9 +206,7 @@ describe('CommandPalette', () => {
       kind: 'note',
       path: 'notes/rust.md',
     })
-    expect(view.getByTestId('route').element().textContent).toBe(
-      JSON.stringify({ kind: 'today' }),
-    )
+    expect(view.getByTestId('route').element().textContent).toBe(JSON.stringify({ kind: 'today' }))
     finishOpen(true)
   })
 

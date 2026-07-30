@@ -4,10 +4,7 @@ import { page } from 'vitest/browser'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, useEffect, useState, type ReactElement, type ReactNode } from 'react'
 import { setBridge } from '@reflect/core'
-import {
-  FocusedDailyProvider,
-  useFocusedDailyDate,
-} from '@/providers/focused-daily-provider'
+import { FocusedDailyProvider, useFocusedDailyDate } from '@/providers/focused-daily-provider'
 import { RouterProvider, useRouter } from '@/routing/router'
 import { formatDayLabel, todayIso } from '@/lib/dates'
 import { createDayWindow, dateAtIndex, indexOfDate } from '@/lib/day-window'
@@ -82,11 +79,7 @@ function SaveScrollProbe({ offset }: { offset: number }): ReactElement | null {
   return null
 }
 
-function NavigateTodayProbe({
-  onReady,
-}: {
-  onReady: (navigateToday: () => void) => void
-}): null {
+function NavigateTodayProbe({ onReady }: { onReady: (navigateToday: () => void) => void }): null {
   const { navigate } = useRouter()
   useEffect(() => {
     onReady(() => navigate({ kind: 'today' }))

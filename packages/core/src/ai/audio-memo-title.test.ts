@@ -2,10 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MockLanguageModelV3 } from 'ai/test'
 import type { LanguageModelV3Usage } from '@ai-sdk/provider'
 import type { AiProviderConfig } from '../settings/schema'
-import {
-  generateAudioMemoTitle,
-  pickAudioMemoEnrichmentConfig,
-} from './audio-memo-title'
+import { generateAudioMemoTitle, pickAudioMemoEnrichmentConfig } from './audio-memo-title'
 import { languageModel } from './language-model'
 
 vi.mock('./language-model', () => ({

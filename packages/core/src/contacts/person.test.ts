@@ -3,11 +3,7 @@ import { resolveOrCreateNoteWithTitle } from '../graph/create-note'
 import { setBridge } from '../ipc/bridge'
 import { getWikiAddressForPath } from '../indexing/queries-suggestions'
 import type { ContactMatch } from './commands'
-import {
-  ensurePersonNote,
-  resolvePerson,
-  resolvePersonContact,
-} from './person'
+import { ensurePersonNote, resolvePerson, resolvePersonContact } from './person'
 
 vi.mock('../graph/create-note', () => ({
   resolveOrCreateNoteWithTitle: vi.fn(),
@@ -63,17 +59,11 @@ describe('resolvePerson', () => {
   })
 
   it('queries all canonical emails and reuses one owner', async () => {
-    mockInvoke.mockResolvedValue([
-      { path: 'notes/ada.md', title: 'Ada Lovelace' },
-    ])
+    mockInvoke.mockResolvedValue([{ path: 'notes/ada.md', title: 'Ada Lovelace' }])
     getAddressMock.mockResolvedValue(address())
 
     await expect(
-      resolvePerson([
-        'Ada <ADA@example.com>',
-        'ada@example.com',
-        'work@example.com',
-      ]),
+      resolvePerson(['Ada <ADA@example.com>', 'ada@example.com', 'work@example.com']),
     ).resolves.toEqual({
       kind: 'existing',
       emails: ['ada@example.com', 'work@example.com'],
@@ -86,12 +76,7 @@ describe('resolvePerson', () => {
     expect(String(args['sql'])).toContain('note_emails')
     expect(String(args['sql'])).toContain('tags')
     expect(String(args['sql'])).not.toContain('limit')
-    expect(args['params']).toEqual([
-      'ada@example.com',
-      'work@example.com',
-      'person',
-      'note',
-    ])
+    expect(args['params']).toEqual(['ada@example.com', 'work@example.com', 'person', 'note'])
   })
 
   it('deduplicates one owner found through several emails', async () => {
@@ -101,9 +86,7 @@ describe('resolvePerson', () => {
     ])
     getAddressMock.mockResolvedValue(address())
 
-    await expect(
-      resolvePerson(['ada@example.com', 'work@example.com']),
-    ).resolves.toMatchObject({
+    await expect(resolvePerson(['ada@example.com', 'work@example.com'])).resolves.toMatchObject({
       kind: 'existing',
       path: 'notes/ada.md',
     })
@@ -115,9 +98,7 @@ describe('resolvePerson', () => {
       { path: 'notes/augusta.md', title: 'Augusta' },
     ])
 
-    await expect(
-      resolvePerson(['ada@example.com', 'work@example.com']),
-    ).resolves.toEqual({
+    await expect(resolvePerson(['ada@example.com', 'work@example.com'])).resolves.toEqual({
       kind: 'blocked',
       emails: ['ada@example.com', 'work@example.com'],
       reason: 'identity-conflict',
@@ -126,9 +107,7 @@ describe('resolvePerson', () => {
   })
 
   it('blocks a unique owner without a safe wiki address', async () => {
-    mockInvoke.mockResolvedValue([
-      { path: 'notes/ada.md', title: 'Ada Lovelace' },
-    ])
+    mockInvoke.mockResolvedValue([{ path: 'notes/ada.md', title: 'Ada Lovelace' }])
     getAddressMock.mockResolvedValue(null)
 
     await expect(resolvePerson(['ada@example.com'])).resolves.toEqual({
@@ -141,9 +120,7 @@ describe('resolvePerson', () => {
 
 describe('ensurePersonNote', () => {
   it('does not create when an owner already exists', async () => {
-    mockInvoke.mockResolvedValue([
-      { path: 'notes/ada.md', title: 'Ada Lovelace' },
-    ])
+    mockInvoke.mockResolvedValue([{ path: 'notes/ada.md', title: 'Ada Lovelace' }])
     getAddressMock.mockResolvedValue(address())
 
     await expect(
@@ -197,9 +174,7 @@ describe('ensurePersonNote', () => {
 
 describe('resolvePersonContact', () => {
   it('uses an existing email owner target even when its title differs', async () => {
-    mockInvoke.mockResolvedValue([
-      { path: 'notes/augusta.md', title: 'Augusta Ada King' },
-    ])
+    mockInvoke.mockResolvedValue([{ path: 'notes/augusta.md', title: 'Augusta Ada King' }])
     getAddressMock.mockResolvedValue({
       ...address('notes/augusta.md'),
       target: 'Augusta Ada King',

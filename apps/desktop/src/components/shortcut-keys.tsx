@@ -22,10 +22,7 @@ export function ShortcutKeys({ binding, ghost, className }: ShortcutKeysProps): 
   const keys = useMemo(() => formatBinding(binding, isApplePlatform()), [binding])
   if (ghost) {
     return (
-      <span
-        aria-hidden
-        className={cn('shrink-0 font-shortcut text-2xs uppercase', className)}
-      >
+      <span aria-hidden className={cn('shrink-0 font-shortcut text-2xs uppercase', className)}>
         {keys.join('')}
       </span>
     )

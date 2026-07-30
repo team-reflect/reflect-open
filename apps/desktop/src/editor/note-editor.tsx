@@ -306,8 +306,7 @@ export function NoteEditor({
       openSelectionMenu: () => innerRef.current?.openSelectionMenu(),
       startPendingReplacement: (options) =>
         innerRef.current?.startPendingReplacement(options) ?? false,
-      appendPendingReplacementText: (text) =>
-        innerRef.current?.appendPendingReplacementText(text),
+      appendPendingReplacementText: (text) => innerRef.current?.appendPendingReplacementText(text),
       acceptPendingReplacement: (options) => innerRef.current?.acceptPendingReplacement(options),
       discardPendingReplacement: () => innerRef.current?.discardPendingReplacement(),
       findNext: () => innerRef.current?.findNext(),
@@ -401,9 +400,9 @@ export function NoteEditor({
       // the source element drives the View Transition zoom.
       const sourceImage =
         event.target instanceof HTMLElement
-          ? event.target
+          ? (event.target
               .closest('.md-image-view-preview, .md-image-preview')
-              ?.querySelector('img') ?? null
+              ?.querySelector('img') ?? null)
           : null
       openLightbox(sourceImage, {
         src: displayUrl,

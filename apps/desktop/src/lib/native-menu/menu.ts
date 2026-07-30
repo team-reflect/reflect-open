@@ -145,7 +145,9 @@ function menuItemOptions(commandId: string, text?: string): MenuItemOptions {
   if (!appCommand) {
     throw new Error(`native menu references unknown command: ${commandId}`)
   }
-  const accelerator = appCommand.keybinding ? bindingToAccelerator(appCommand.keybinding) : undefined
+  const accelerator = appCommand.keybinding
+    ? bindingToAccelerator(appCommand.keybinding)
+    : undefined
   return {
     id: appCommand.id,
     text: text ?? appCommand.title,

@@ -263,7 +263,9 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
                             className="size-4 shrink-0 text-text-muted"
                           />
                           <span className="min-w-0 flex-1 truncate text-sm">{command.title}</span>
-                          {command.keybinding ? <ShortcutKeys binding={command.keybinding} /> : null}
+                          {command.keybinding ? (
+                            <ShortcutKeys binding={command.keybinding} />
+                          ) : null}
                         </span>
                       </Command.Item>
                     )

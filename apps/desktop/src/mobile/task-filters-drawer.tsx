@@ -39,7 +39,12 @@ export function TaskFiltersDrawer({
         <DrawerTitle>Task filters</DrawerTitle>
         <div className="flex flex-col">
           {BUCKETS.map(({ key, label }) => (
-            <FilterRow key={key} label={label} checked={filters[key]} onToggle={() => toggle(key)} />
+            <FilterRow
+              key={key}
+              label={label}
+              checked={filters[key]}
+              onToggle={() => toggle(key)}
+            />
           ))}
           <div className="my-1 border-t border-border" />
           <FilterRow

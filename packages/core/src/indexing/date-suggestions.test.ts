@@ -98,17 +98,31 @@ describe('generateDateSuggestions', () => {
     // "this week" also prefix-matches "weekend", so the Week row leads and the
     // Weekend row follows — we assert the leading Week row's anchor date.
     it('anchors this/next week to a Monday start', () => {
-      expect(gen('this week', 'dmy', 'monday')[0]).toEqual({ date: '2019-12-30', phrase: 'This Week' })
-      expect(gen('next week', 'dmy', 'monday')[0]).toEqual({ date: '2020-01-06', phrase: 'Next Week' })
+      expect(gen('this week', 'dmy', 'monday')[0]).toEqual({
+        date: '2019-12-30',
+        phrase: 'This Week',
+      })
+      expect(gen('next week', 'dmy', 'monday')[0]).toEqual({
+        date: '2020-01-06',
+        phrase: 'Next Week',
+      })
     })
 
     it('anchors this/next week to a Sunday start when configured', () => {
-      expect(gen('this week', 'dmy', 'sunday')[0]).toEqual({ date: '2019-12-29', phrase: 'This Week' })
-      expect(gen('next week', 'dmy', 'sunday')[0]).toEqual({ date: '2020-01-05', phrase: 'Next Week' })
+      expect(gen('this week', 'dmy', 'sunday')[0]).toEqual({
+        date: '2019-12-29',
+        phrase: 'This Week',
+      })
+      expect(gen('next week', 'dmy', 'sunday')[0]).toEqual({
+        date: '2020-01-05',
+        phrase: 'Next Week',
+      })
     })
 
     it('leaves weekday phrases unaffected by the week start', () => {
-      expect(gen('this monday', 'dmy', 'sunday')).toEqual([{ date: '2020-01-06', phrase: 'This Monday' }])
+      expect(gen('this monday', 'dmy', 'sunday')).toEqual([
+        { date: '2020-01-06', phrase: 'This Monday' },
+      ])
     })
   })
 

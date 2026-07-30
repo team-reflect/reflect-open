@@ -45,7 +45,12 @@ interface CalendarStripProps {
  * jump across months, and a **Today** affordance appears in the header when
  * the selection has wandered off today.
  */
-export function CalendarStrip({ date, today, resetSeq, onSelect }: CalendarStripProps): ReactElement {
+export function CalendarStrip({
+  date,
+  today,
+  resetSeq,
+  onSelect,
+}: CalendarStripProps): ReactElement {
   const { settings } = useSettings()
   const { navigate } = useRouter()
   const { emblaRef, weekWindow, displayedWeekStart, showWeekOf } = useWeekStrip(

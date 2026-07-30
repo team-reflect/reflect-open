@@ -19,13 +19,9 @@ export async function ensureBacklinkTarget(title: string, generation: number): P
   if (outcome.kind === 'unavailable') {
     return title
   }
-  const path =
-    outcome.kind === 'ambiguous' ? [...outcome.paths].sort().at(0) : outcome.path
+  const path = outcome.kind === 'ambiguous' ? [...outcome.paths].sort().at(0) : outcome.path
   if (path === undefined) {
-    throw new ReflectError(
-      'unknown',
-      `The [[${title}]] backlink target could not be resolved.`,
-    )
+    throw new ReflectError('unknown', `The [[${title}]] backlink target could not be resolved.`)
   }
   const source = await readNote(path, generation)
   const currentTitle = parseNote({ path, source }).title

@@ -4,10 +4,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useQueryClient } from '@tanstack/react-query'
 import { displayNoteTitle, errorMessage } from '@reflect/core'
 import type { PinnedNote } from '@reflect/core'
-import {
-  invalidatePinnedNotesCache,
-  updatePinnedNotesCache,
-} from '@/lib/notes/pinned-notes-cache'
+import { invalidatePinnedNotesCache, updatePinnedNotesCache } from '@/lib/notes/pinned-notes-cache'
 import { formatDayLabel } from '@/lib/dates'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { openNativeContextMenu } from '@/lib/native-menu/context-menu'
@@ -37,13 +34,9 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
     note.dailyDate !== null
       ? formatDayLabel(note.dailyDate, settings.dateFormat)
       : displayNoteTitle(note.title)
-  const {
-    isDragging,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-  } = useSortable({ id: note.path })
+  const { isDragging, listeners, setNodeRef, transform, transition } = useSortable({
+    id: note.path,
+  })
   const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -89,11 +82,7 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
         className="block w-full"
         {...listeners}
       >
-        <SidebarPinnedRowPreview
-          active={active}
-          label={label}
-          placeholder={isDragging}
-        />
+        <SidebarPinnedRowPreview active={active} label={label} placeholder={isDragging} />
       </button>
     </li>
   )

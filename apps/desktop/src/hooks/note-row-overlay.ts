@@ -91,7 +91,11 @@ function definedFields(patch: NoteRowOverlayPatch): NoteRowOverlay {
  * that is all `undefined`) is ignored — it would only leave a non-reconcilable
  * entry and leak `undefined` into merged rows.
  */
-export function setNoteRowOverlay(path: string, generation: number, patch: NoteRowOverlayPatch): void {
+export function setNoteRowOverlay(
+  path: string,
+  generation: number,
+  patch: NoteRowOverlayPatch,
+): void {
   const defined = definedFields(patch)
   if (Object.keys(defined).length === 0) {
     return
@@ -117,7 +121,10 @@ export function setNoteRowOverlay(path: string, generation: number, patch: NoteR
  * require one. Keep that asymmetry: it is the load-state boundary, not an
  * inconsistency to unify.
  */
-export function getNoteRowOverlay(path: string, generation: number | undefined): NoteRowOverlay | null {
+export function getNoteRowOverlay(
+  path: string,
+  generation: number | undefined,
+): NoteRowOverlay | null {
   if (generation === undefined) {
     return null
   }
@@ -131,7 +138,11 @@ export function getNoteRowOverlay(path: string, generation: number | undefined):
  * effect, never during render. A `null` row (note not indexed yet) or a
  * mismatched generation has nothing to reconcile, so the overlay is held.
  */
-export function reconcileNoteRowOverlay(path: string, generation: number, row: NoteRow | null): void {
+export function reconcileNoteRowOverlay(
+  path: string,
+  generation: number,
+  row: NoteRow | null,
+): void {
   const entry = overlays.get(path)
   if (entry === undefined || entry.generation !== generation || row === null) {
     return
@@ -178,7 +189,10 @@ export function resetNoteRowOverlays(): void {
  * row; with no row there is nothing to display yet (a publish targets an
  * already-indexed note), so `null` passes through.
  */
-export function applyNoteRowOverlay(row: NoteRow | null, overlay: NoteRowOverlay | null): NoteRow | null {
+export function applyNoteRowOverlay(
+  row: NoteRow | null,
+  overlay: NoteRowOverlay | null,
+): NoteRow | null {
   if (row === null || overlay === null) {
     return row
   }
@@ -186,7 +200,10 @@ export function applyNoteRowOverlay(row: NoteRow | null, overlay: NoteRowOverlay
 }
 
 /** Subscribe a component to `path`'s overlay on `generation`; `null` when none. */
-export function useNoteRowOverlay(path: string, generation: number | undefined): NoteRowOverlay | null {
+export function useNoteRowOverlay(
+  path: string,
+  generation: number | undefined,
+): NoteRowOverlay | null {
   const getSnapshot = useCallback(() => getNoteRowOverlay(path, generation), [path, generation])
   return useSyncExternalStore(subscribe, getSnapshot)
 }

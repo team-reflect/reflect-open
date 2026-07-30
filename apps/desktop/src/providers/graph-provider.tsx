@@ -178,8 +178,7 @@ export function GraphProvider({
       // `visibilitychange` below performs the active teardown; this dynamic
       // guard also closes the launch race where the first sync is scheduled
       // after iOS has already hidden the webview.
-      shouldSuspend: () =>
-        isMobilePlatform(platform) && document.visibilityState === 'hidden',
+      shouldSuspend: () => isMobilePlatform(platform) && document.visibilityState === 'hidden',
     }),
   )
 

@@ -56,10 +56,7 @@ describe('foldKey parity corpus', () => {
     .array(z.object({ input: z.string(), key: z.string() }))
     .parse(
       JSON.parse(
-        readFileSync(
-          new URL('../../../../fixtures/fold-key-parity.json', import.meta.url),
-          'utf8',
-        ),
+        readFileSync(new URL('../../../../fixtures/fold-key-parity.json', import.meta.url), 'utf8'),
       ),
     )
 

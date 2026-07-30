@@ -64,8 +64,7 @@ export function IntegrationsSection(): ReactElement | null {
   // mid-prompt, settings restored from another machine). Offer the prompt
   // again rather than sitting silently gated off. Suppressed while a prompt
   // is up, so it doesn't flash under the OS dialog on a fresh toggle.
-  const showPrompt =
-    settings.contactsEnabled && authorization === 'notDetermined' && !isPrompting
+  const showPrompt = settings.contactsEnabled && authorization === 'notDetermined' && !isPrompting
 
   async function promptForAccess(): Promise<void> {
     setIsPrompting(true)

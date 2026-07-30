@@ -164,7 +164,10 @@ export function httpError(
     return new ReflectError('auth', `${provider} rejected the API key (${status})`)
   }
   if (provider === 'google' && status === 400 && isInvalidKeyBody(body)) {
-    return new ReflectError('auth', `google rejected the API key (400): ${providerErrorMessage(body)}`)
+    return new ReflectError(
+      'auth',
+      `google rejected the API key (400): ${providerErrorMessage(body)}`,
+    )
   }
   if (status === 413) {
     return new TranscriptionOversizeError(
@@ -184,9 +187,7 @@ export function httpError(
 
 /** The provider's own error message when the body carries one, else the raw body. */
 export function providerErrorMessage(body: string): string {
-  const parsed = z
-    .object({ error: z.object({ message: z.string() }) })
-    .safeParse(safeJson(body))
+  const parsed = z.object({ error: z.object({ message: z.string() }) }).safeParse(safeJson(body))
   return parsed.success ? parsed.data.error.message : body.slice(0, 200)
 }
 

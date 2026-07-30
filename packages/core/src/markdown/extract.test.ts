@@ -94,7 +94,11 @@ describe('parseNote — links, assets, tags, text', () => {
   it('separates external links (with domain) from asset references', () => {
     const note = parse('[site](https://example.com/x) and ![pic](assets/photo.png)')
     expect(note.links).toEqual([
-      expect.objectContaining({ href: 'https://example.com/x', text: 'site', domain: 'example.com' }),
+      expect.objectContaining({
+        href: 'https://example.com/x',
+        text: 'site',
+        domain: 'example.com',
+      }),
     ])
     expect(note.assets).toEqual([
       expect.objectContaining({ path: 'notes/assets/photo.png' }),
@@ -122,10 +126,7 @@ describe('parseNote — links, assets, tags, text', () => {
 
   it('gives an explicit ./ or ../ spelling its single source-relative meaning', () => {
     const note = parse('![a](./assets/a.png) ![b](../Media/b.png)')
-    expect(note.assets.map((asset) => asset.path)).toEqual([
-      'notes/assets/a.png',
-      'Media/b.png',
-    ])
+    expect(note.assets.map((asset) => asset.path)).toEqual(['notes/assets/a.png', 'Media/b.png'])
   })
 
   it('gives a leading slash its single vault-root meaning', () => {
@@ -154,7 +155,9 @@ describe('parseNote — links, assets, tags, text', () => {
   })
 
   it('keeps markdown escapes literal inside code text', () => {
-    const note = parse('Rendered www\\.reddit.com, code `www\\.reddit.com`.\n\n```\nwww\\.reddit.com\n```')
+    const note = parse(
+      'Rendered www\\.reddit.com, code `www\\.reddit.com`.\n\n```\nwww\\.reddit.com\n```',
+    )
     expect(note.text).toBe('Rendered www.reddit.com, code www\\.reddit.com. www\\.reddit.com')
   })
 
@@ -333,10 +336,7 @@ describe('parseNote — meowdown grammar recovery & new inline nodes', () => {
     const note = parse('![[../cat.png]] and ![[.obsidian/cat.png]]')
     expect(note.assets).toEqual([])
     // The unsafe targets stay visible wiki links that resolve to nothing.
-    expect(note.wikiLinks.map((link) => link.target)).toEqual([
-      '../cat.png',
-      '.obsidian/cat.png',
-    ])
+    expect(note.wikiLinks.map((link) => link.target)).toEqual(['../cat.png', '.obsidian/cat.png'])
   })
 
   it('strips highlight and inline-math marks from plain text, like other marks', () => {

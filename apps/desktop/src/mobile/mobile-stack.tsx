@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactElement } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactElement,
+} from 'react'
 import { MobileScreen } from '@/mobile/mobile-screen'
 import type { AllNotesFilters } from '@/mobile/search-filters/filter-state'
 import { BACK_SWIPE_SETTLE_MS, useBackSwipe, type BackSwipeState } from '@/mobile/use-back-swipe'
@@ -284,7 +291,7 @@ export function MobileStack(props: MobileStackProps): ReactElement {
   const currentKey = layerKey(route)
   // What the back gesture reveals. A cold note entry has no history below
   // it, so it sits over today — where its back button lands too.
-  const belowRoute: Route | null = isStacked(route) ? backRoute ?? { kind: 'today' } : null
+  const belowRoute: Route | null = isStacked(route) ? (backRoute ?? { kind: 'today' }) : null
   const belowKey = belowRoute === null ? null : layerKey(belowRoute)
 
   const layers: StackLayer[] = []

@@ -63,10 +63,7 @@ export function ThemeProvider({ children }: ThemeProviderProps): ReactElement {
     root.style.colorScheme = resolvedTheme
   }, [resolvedTheme])
 
-  const setTheme = useCallback(
-    (next: Theme) => updateSettings({ theme: next }),
-    [updateSettings],
-  )
+  const setTheme = useCallback((next: Theme) => updateSettings({ theme: next }), [updateSettings])
 
   const value = useMemo<ThemeContextValue>(
     () => ({ theme, resolvedTheme, setTheme }),

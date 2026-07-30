@@ -59,9 +59,7 @@ export async function enrichSessionTranscript(
     return { title: formatted.title, body: formatted.body }
   }
   const title = await generateAudioMemoTitle({
-    ...(input.enrichmentCredentials !== null
-      ? { credentials: input.enrichmentCredentials }
-      : {}),
+    ...(input.enrichmentCredentials !== null ? { credentials: input.enrichmentCredentials } : {}),
     fetchFn: input.fetchFn,
     transcript: input.transcript.slice(0, TITLE_INPUT_MAX_CHARS),
     fallbackTitle: input.fallbackTitle,

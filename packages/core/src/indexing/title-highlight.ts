@@ -30,11 +30,7 @@ function foldWithSourceSpans(value: string): FoldedText {
   return { value: foldKey(value), sourceSpans }
 }
 
-function findRanges(
-  foldedTitle: FoldedText,
-  literal: string,
-  anywhere: boolean,
-): TextRange[] {
+function findRanges(foldedTitle: FoldedText, literal: string, anywhere: boolean): TextRange[] {
   const ranges: TextRange[] = []
   let searchFrom = 0
 
@@ -63,9 +59,7 @@ function titleRecallRanges(title: string, query: string): TextRange[] {
   }
 
   const foldedTitle = foldWithSourceSpans(title)
-  const termRanges = terms.map((term) =>
-    findRanges(foldedTitle, term.value, term.anywhere),
-  )
+  const termRanges = terms.map((term) => findRanges(foldedTitle, term.value, term.anywhere))
   if (termRanges.some((ranges) => ranges.length === 0)) {
     return []
   }

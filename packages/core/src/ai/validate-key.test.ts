@@ -50,9 +50,7 @@ describe('validateApiKey', () => {
     expect(await validateApiKey('anthropic', 'sk-test', fetchReturning(403))).toBe('invalid')
     // Gemini reports malformed keys as 400.
     expect(await validateApiKey('google', 'bad', fetchReturning(400))).toBe('invalid')
-    expect(await validateApiKey('openrouter', 'sk-or-v1-test', fetchReturning(401))).toBe(
-      'invalid',
-    )
+    expect(await validateApiKey('openrouter', 'sk-or-v1-test', fetchReturning(401))).toBe('invalid')
   })
 
   it('reads anything that is not an auth decision as unreachable', async () => {

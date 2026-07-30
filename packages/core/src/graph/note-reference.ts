@@ -122,10 +122,7 @@ export function wikiNoteReference(target: string): NoteReference | null {
  * wrote these files assumed. Reflect has never emitted a Markdown note link,
  * so there is no legacy root-relative spelling to keep working here.
  */
-export function markdownNoteReference(
-  sourcePath: string,
-  href: string,
-): NoteReference | null {
+export function markdownNoteReference(sourcePath: string, href: string): NoteReference | null {
   const trimmed = href.trim()
   if (trimmed === '' || URI_SCHEME_RE.test(trimmed) || trimmed.startsWith('//')) {
     return null

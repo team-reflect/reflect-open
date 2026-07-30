@@ -127,9 +127,7 @@ describe('AiProvidersSection', () => {
     await expect.element(page.getByText(/wxyz1/)).toBeInTheDocument()
     await expect.element(page.getByText(/abcd2/)).toBeInTheDocument()
     await expect.element(page.getByText('Default', { exact: true })).toBeInTheDocument()
-    await expect
-      .element(page.getByRole('button', { name: 'Make default' }))
-      .toBeInTheDocument()
+    await expect.element(page.getByRole('button', { name: 'Make default' })).toBeInTheDocument()
   })
 
   it('adds a model: key verified, then keychain + settings entry', async () => {
@@ -268,8 +266,14 @@ describe('AiProvidersSection', () => {
     // delete, so each settings update applies after the other's snapshot
     // went stale. A snapshot-based write would leave one row behind with
     // its key already gone from the keychain.
-    ;(page.getByRole('button', { name: 'Remove Anthropic — Claude Opus 4.8' }).element() as HTMLElement).click()
-    ;(page.getByRole('button', { name: 'Remove OpenAI — GPT-5.5' }).element() as HTMLElement).click()
+    ;(
+      page
+        .getByRole('button', { name: 'Remove Anthropic — Claude Opus 4.8' })
+        .element() as HTMLElement
+    ).click()
+    ;(
+      page.getByRole('button', { name: 'Remove OpenAI — GPT-5.5' }).element() as HTMLElement
+    ).click()
 
     await vi.waitFor(() =>
       expect(lastSavedDoc()).toMatchObject({ aiProviders: [], defaultAiProviderId: null }),
@@ -280,9 +284,7 @@ describe('AiProvidersSection', () => {
   it('make default moves the id', async () => {
     stored = twoStoredModels()
     await renderSection()
-    await expect
-      .element(page.getByRole('button', { name: 'Make default' }))
-      .toBeInTheDocument()
+    await expect.element(page.getByRole('button', { name: 'Make default' })).toBeInTheDocument()
 
     await page.getByRole('button', { name: 'Make default' }).click()
 
@@ -317,7 +319,9 @@ describe('AiProvidersSection', () => {
 
     // From the last control, Tab wraps to the first instead of escaping
     // into the settings page behind the modal.
-    expect(document.activeElement).toBe(dialog.getByLabelText('Provider', { exact: true }).element())
+    expect(document.activeElement).toBe(
+      dialog.getByLabelText('Provider', { exact: true }).element(),
+    )
   })
 
   it('falls back to the first entry when the default id dangles', async () => {
@@ -326,8 +330,6 @@ describe('AiProvidersSection', () => {
 
     await expect.element(page.getByText('Default', { exact: true })).toBeInTheDocument()
     // The badge lands on the first row; the second still offers "Make default".
-    await expect
-      .element(page.getByRole('button', { name: 'Make default' }))
-      .toBeInTheDocument()
+    await expect.element(page.getByRole('button', { name: 'Make default' })).toBeInTheDocument()
   })
 })

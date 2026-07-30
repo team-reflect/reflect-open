@@ -33,12 +33,14 @@ const streamChat = vi.hoisted(() =>
 )
 const getSecret = vi.hoisted(() => vi.fn<(name: string) => Promise<string | null>>())
 const resolveWikiTarget = vi.hoisted(() =>
-  vi.fn<(target: string) => Promise<{ kind: 'resolved'; ref: string } | { kind: 'unresolved'; text: string }>>(),
+  vi.fn<
+    (
+      target: string,
+    ) => Promise<{ kind: 'resolved'; ref: string } | { kind: 'unresolved'; text: string }>
+  >(),
 )
 const loadChatGraphContext = vi.hoisted(() =>
-  vi.fn<
-    (graphName: string, deps?: GraphContextDeps) => Promise<CloudSafe<CloudGraphContext>>
-  >(),
+  vi.fn<(graphName: string, deps?: GraphContextDeps) => Promise<CloudSafe<CloudGraphContext>>>(),
 )
 const openRouteInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
 vi.mock('@reflect/core', async (importOriginal) => ({
@@ -234,7 +236,10 @@ describe('ChatScreen', () => {
         },
       },
       { type: 'text-delta', text: 'It ships in June. [[Atlas]]' },
-      { type: 'complete', messages: [{ role: 'assistant', content: 'It ships in June. [[Atlas]]' }] },
+      {
+        type: 'complete',
+        messages: [{ role: 'assistant', content: 'It ships in June. [[Atlas]]' }],
+      },
     ])
     const view = await renderChat()
 
@@ -243,7 +248,9 @@ describe('ChatScreen', () => {
     await expect.element(view.getByText('when does atlas ship?')).toBeInTheDocument()
     await expect.element(view.getByText(/Searched “atlas” · 1 note/)).toBeInTheDocument()
     // The turn settled, so the answer renders as markdown (not plain text).
-    await expect.element(view.getByTestId('markdown-preview')).toHaveTextContent('It ships in June.')
+    await expect
+      .element(view.getByTestId('markdown-preview'))
+      .toHaveTextContent('It ships in June.')
     await view.getByRole('button', { name: 'Atlas', exact: true }).click()
     expect(probedRoute).toEqual({ kind: 'note', path: 'notes/atlas.md' })
 
@@ -606,9 +613,7 @@ describe('ChatScreen', () => {
     await vi.waitFor(() => expect(streamChat).toHaveBeenCalled())
     expect(streamChat.mock.lastCall?.[0]?.messages.at(-1)).toEqual({
       role: 'user',
-      content: [
-        { type: 'file', data: 'data:image/png;base64,iVBORw==', mediaType: 'image/png' },
-      ],
+      content: [{ type: 'file', data: 'data:image/png;base64,iVBORw==', mediaType: 'image/png' }],
     })
     // The queue cleared; the photo now lives in the transcript bubble.
     expect(view.getByRole('button', { name: 'Remove cat.png' }).query()).toBeNull()

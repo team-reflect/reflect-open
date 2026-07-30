@@ -158,15 +158,17 @@ function RoutedScreen(): ReactElement {
 function ReArrive(): ReactElement {
   const { navigate } = useRouter()
   return (
-    <button type="button" data-testid="re-arrive" onClick={() => navigate({ kind: 'allNotes', tag: null })}>
+    <button
+      type="button"
+      data-testid="re-arrive"
+      onClick={() => navigate({ kind: 'allNotes', tag: null })}
+    >
       re-arrive
     </button>
   )
 }
 
-function renderScreen(
-  client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
-) {
+function renderScreen(client = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   return render(
     <QueryClientProvider client={client}>
       <RouterProvider initialRoute={{ kind: 'allNotes', tag: null }}>
@@ -430,9 +432,9 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: null })
     const trashButton = view.getByRole('button', { name: /Trash \(1\)/ })
     await expect.element(trashButton).toBeInTheDocument()
-    expect(view.getByRole('group', { name: 'Filter by tag' }).element().previousElementSibling).toBe(
-      trashButton.element(),
-    )
+    expect(
+      view.getByRole('group', { name: 'Filter by tag' }).element().previousElementSibling,
+    ).toBe(trashButton.element())
 
     // ⌘-click a second row extends the selection.
     await view.getByText('Dandelion chocolate.').click({ modifiers: ['Meta'] })
@@ -573,7 +575,9 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     view
       .getByRole('button', { name: /New note/ })
       .element()
-      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+      .dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+      )
 
     expect(probedRoute(view)).toEqual({ kind: 'allNotes', tag: null })
     await view.unmount()
@@ -666,7 +670,9 @@ describe('AllNotesScreen — selection and bulk trash', () => {
     await view.getByRole('button', { name: /Trash \(1\)/ }).click()
     await expect.element(page.getByText('Trash 1 note?')).toBeInTheDocument()
 
-    const confirm = page.getByRole('button', { name: 'Trash', exact: true }).element() as HTMLElement
+    const confirm = page
+      .getByRole('button', { name: 'Trash', exact: true })
+      .element() as HTMLElement
     confirm.click()
     confirm.click() // a rapid second click must not double-delete
 

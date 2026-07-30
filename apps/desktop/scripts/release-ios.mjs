@@ -63,7 +63,8 @@ export function createTauriIosBuildArgs({
   verbose = false,
 }) {
   const args = ['tauri', 'ios', 'build', '--export-method', exportMethod, '--ci']
-  if (buildNumber) args.push('--config', JSON.stringify({ bundle: { iOS: { bundleVersion: buildNumber } } }))
+  if (buildNumber)
+    args.push('--config', JSON.stringify({ bundle: { iOS: { bundleVersion: buildNumber } } }))
   if (verbose) args.push('--verbose')
   return args
 }
@@ -75,7 +76,15 @@ export function createTauriIosBuildEnv({ apiKeyCredentials = null, baseEnv = pro
 
 /** Build the altool command that uploads an IPA to App Store Connect/TestFlight. */
 export function createAltoolUploadArgs({ authArgs, ipa, wait }) {
-  const args = ['altool', '--upload-package', ipa, ...authArgs, '--output-format', 'json', '--show-progress']
+  const args = [
+    'altool',
+    '--upload-package',
+    ipa,
+    ...authArgs,
+    '--output-format',
+    'json',
+    '--show-progress',
+  ]
   if (wait) args.push('--wait')
   return args
 }
@@ -87,7 +96,15 @@ export function createAltoolValidateArgs({ authArgs, ipa }) {
 
 /** Build the altool command that checks for an App Store Connect app record. */
 export function createAltoolListAppsArgs({ authArgs, bundleIdentifier }) {
-  return ['altool', '--list-apps', '--filter-bundle-id', bundleIdentifier, ...authArgs, '--output-format', 'json']
+  return [
+    'altool',
+    '--list-apps',
+    '--filter-bundle-id',
+    bundleIdentifier,
+    ...authArgs,
+    '--output-format',
+    'json',
+  ]
 }
 
 /** Return the standard App Store Connect API key lookup locations for altool. */
@@ -145,7 +162,8 @@ function ensureMacos() {
 
 function ensureTool(command, args, installHint) {
   const result = run(command, args)
-  if (result.status !== 0) fail(`${command} is not available. ${installHint}\n${result.output.trim()}`)
+  if (result.status !== 0)
+    fail(`${command} is not available. ${installHint}\n${result.output.trim()}`)
 }
 
 export function createTimestampBuildNumber(date = new Date()) {
@@ -209,7 +227,11 @@ function resolveApiKeyCredentials({ requirePrivateKey }) {
     keyPath = staged.keyPath
   } else if (!keyPath) {
     keyPath = firstExistingPath(
-      appStoreConnectPrivateKeySearchPaths({ cwd: process.cwd(), homeDir: homedir(), keyId: APPLE_API_KEY }),
+      appStoreConnectPrivateKeySearchPaths({
+        cwd: process.cwd(),
+        homeDir: homedir(),
+        keyId: APPLE_API_KEY,
+      }),
     )
   }
 
@@ -226,7 +248,11 @@ function resolveApiKeyCredentials({ requirePrivateKey }) {
   }
 
   return {
-    altoolArgs: createApiKeyAltoolArgs({ issuerId: APPLE_API_ISSUER, keyId: APPLE_API_KEY, keyPath }),
+    altoolArgs: createApiKeyAltoolArgs({
+      issuerId: APPLE_API_ISSUER,
+      keyId: APPLE_API_KEY,
+      keyPath,
+    }),
     cleanup,
     env: keyPath ? { APPLE_API_KEY_PATH: keyPath } : {},
     source: keyPath
@@ -416,7 +442,9 @@ function runTauriIosBuild({ apiKeyCredentials, buildNumber, exportMethod, verbos
     exportMethod,
     verbose,
   })
-  log(`building ${IOS_BUNDLE_IDENTIFIER} with export method ${exportMethod}${buildNumber ? `, build ${buildNumber}` : ''}…`)
+  log(
+    `building ${IOS_BUNDLE_IDENTIFIER} with export method ${exportMethod}${buildNumber ? `, build ${buildNumber}` : ''}…`,
+  )
   if (apiKeyCredentials) {
     log(`Tauri provisioning auth: ${apiKeyCredentials.source}`)
   } else {
@@ -454,7 +482,11 @@ function uploadIpaWithCredentials({ credentials, ipa, wait }) {
       env: { ...process.env, ...credentials.env },
     })
     if (result.status !== 0) fail('altool upload failed')
-    log(wait ? 'upload accepted and processing completed' : 'upload submitted to App Store Connect/TestFlight')
+    log(
+      wait
+        ? 'upload accepted and processing completed'
+        : 'upload submitted to App Store Connect/TestFlight',
+    )
   } finally {
     credentials.cleanup?.()
   }
@@ -517,7 +549,8 @@ function verifyAppStoreConnectAppRecord(credentials) {
         `  Do not reuse the old Capacitor app (${OLD_CAPACITOR_BUNDLE_IDENTIFIER}).`,
     )
   }
-  if (apps.length > 1) fail(`expected one App Store Connect app for ${IOS_BUNDLE_IDENTIFIER}, found ${apps.length}`)
+  if (apps.length > 1)
+    fail(`expected one App Store Connect app for ${IOS_BUNDLE_IDENTIFIER}, found ${apps.length}`)
 
   const [app] = apps
   const appleId = app && typeof app === 'object' && 'id' in app ? String(app.id) : 'unknown'
@@ -565,7 +598,8 @@ function preflight({ buildNumberFlag }) {
     log(`bundle identifier: ${IOS_BUNDLE_IDENTIFIER}`)
     log(
       `xcodebuild provisioning auth: ${
-        apiKeyCredentials?.source ?? 'local Xcode account/profiles (no App Store Connect API key configured)'
+        apiKeyCredentials?.source ??
+        'local Xcode account/profiles (no App Store Connect API key configured)'
       }`,
     )
     log(`altool upload auth: ${uploadCredentials.source}`)
@@ -625,7 +659,9 @@ async function main() {
   }
 
   const buildNumberFlag = flagValue(flags, '--build-number')
-  const exportMethod = resolveExportMethod(flagValue(flags, '--export-method') ?? DEFAULT_EXPORT_METHOD)
+  const exportMethod = resolveExportMethod(
+    flagValue(flags, '--export-method') ?? DEFAULT_EXPORT_METHOD,
+  )
   const ipaFlag = flagValue(flags, '--ipa')
   const wait = flags.includes('--wait')
   const verbose = flags.includes('--verbose')

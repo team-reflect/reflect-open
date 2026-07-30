@@ -479,7 +479,8 @@ describe('useNoteDocument', () => {
       installGraphFake({ files })
 
       const hook = await renderHook(
-        ({ path }: { path: string } = { path: 'notes/a.md' }) => useNoteDocument(path, 1, { trackRenames: true }),
+        ({ path }: { path: string } = { path: 'notes/a.md' }) =>
+          useNoteDocument(path, 1, { trackRenames: true }),
         { initialProps: { path: 'notes/a.md' } },
       )
       await hook.act(() => vi.advanceTimersByTimeAsync(0))
@@ -620,7 +621,9 @@ describe('useNoteDocument', () => {
 
       // The same note is reopened immediately and edited before the chain's
       // alias placement runs.
-      const paneA2 = await renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      const paneA2 = await renderHook(() =>
+        useNoteDocument('notes/a.md', 1, { trackRenames: true }),
+      )
       await paneA2.act(() => vi.advanceTimersByTimeAsync(0))
       await paneA2.act(() => paneA2.result.current.onEditorChange('# New Title\n\nfresh edit\n'))
       releaseRewrite()
@@ -940,9 +943,12 @@ describe('useNoteDocument', () => {
         return null
       })
 
-      const hook = await renderHook(({ path }: { path: string } = { path: 'notes/a.md' }) => useNoteDocument(path, 1), {
-        initialProps: { path: 'notes/a.md' },
-      })
+      const hook = await renderHook(
+        ({ path }: { path: string } = { path: 'notes/a.md' }) => useNoteDocument(path, 1),
+        {
+          initialProps: { path: 'notes/a.md' },
+        },
+      )
       await hook.act(() => vi.advanceTimersByTimeAsync(0))
 
       // Dirty edit, then switch notes before the debounce fires: the unmount
@@ -1052,9 +1058,12 @@ describe('useNoteDocument', () => {
         return null
       })
 
-      const hook = await renderHook(({ gen }: { gen: number } = { gen: 1 }) => useNoteDocument('notes/a.md', gen), {
-        initialProps: { gen: 1 },
-      })
+      const hook = await renderHook(
+        ({ gen }: { gen: number } = { gen: 1 }) => useNoteDocument('notes/a.md', gen),
+        {
+          initialProps: { gen: 1 },
+        },
+      )
       await hook.act(() => vi.advanceTimersByTimeAsync(0))
 
       // Reopening the same graph bumps the generation without remounting the

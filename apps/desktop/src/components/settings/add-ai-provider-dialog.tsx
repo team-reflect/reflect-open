@@ -82,7 +82,12 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
   })
 
   return (
-    <Dialog open onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
+    <Dialog
+      open
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onClose()
+      }}
+    >
       <DialogContent showCloseButton={false} className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Add AI provider</DialogTitle>
@@ -159,8 +164,7 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
           {submitError !== null ? <InlineAlert tone="error">{submitError}</InlineAlert> : null}
           {unverified ? (
             <InlineAlert tone="warning">
-              Couldn't reach {provider.label} to verify the key. Submit again to save it
-              unverified.
+              Couldn't reach {provider.label} to verify the key. Submit again to save it unverified.
             </InlineAlert>
           ) : null}
 

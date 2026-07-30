@@ -11,11 +11,7 @@ import {
   type ReadAssetResult,
   type ReadAssetsOutput,
 } from './read-assets'
-import {
-  MAX_NOTE_CONTENT_CHARS,
-  type ReadNoteResult,
-  type ReadNotesOutput,
-} from './read-notes'
+import { MAX_NOTE_CONTENT_CHARS, type ReadNoteResult, type ReadNotesOutput } from './read-notes'
 import {
   buildNoteTools,
   INVALID_TAG_ERROR,

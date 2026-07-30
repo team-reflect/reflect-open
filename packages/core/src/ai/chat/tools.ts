@@ -4,7 +4,11 @@ import { readNote } from '../../graph/commands'
 import { retrieve, type RetrievalHit, type RetrieveOptions } from '../../embeddings/retrieve'
 import { assetReferencingNotePaths } from '../../indexing/asset-refs'
 import { listDailyNotes, type DailyNoteRow, type DailyNotesRange } from '../../indexing/queries'
-import { listRecentNotes, type RecentNoteRow, type RecentNotesOptions } from '../../indexing/note-list'
+import {
+  listRecentNotes,
+  type RecentNoteRow,
+  type RecentNotesOptions,
+} from '../../indexing/note-list'
 import { parseFrontmatter, splitFrontmatter } from '../../markdown/frontmatter'
 import { isTagName } from '../../markdown/extract'
 import { buildReadOneAsset, readAssetsInput, type ReadAssetsOutput } from './read-assets'

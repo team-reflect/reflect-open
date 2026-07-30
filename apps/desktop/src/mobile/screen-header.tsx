@@ -15,7 +15,11 @@ interface MobileScreenHeaderProps {
  * control — the same chrome as the note screen, shared by the settings
  * screens so every card in the stack navigates the same way.
  */
-export function MobileScreenHeader({ title, onBack, trailing }: MobileScreenHeaderProps): ReactElement {
+export function MobileScreenHeader({
+  title,
+  onBack,
+  trailing,
+}: MobileScreenHeaderProps): ReactElement {
   return (
     <header className="grid h-11 shrink-0 grid-cols-[2.5rem_minmax(0,1fr)_2.5rem] items-center border-b border-border px-1">
       <Button

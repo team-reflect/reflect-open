@@ -24,7 +24,10 @@ export function MobileNote({ path }: { path: string }): ReactElement {
   const untitled = isUntitledNotePath(path)
 
   return (
-    <div className="flex h-full w-screen flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <div
+      className="flex h-full w-screen flex-col"
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    >
       <MobileScreenHeader
         title={untitled ? 'New note' : 'Edit note'}
         onBack={() => (canBack ? back() : navigate({ kind: 'today' }))}

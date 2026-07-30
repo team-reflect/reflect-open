@@ -156,7 +156,7 @@ export function useEditorAiMenu({
       const base =
         modelOverride === null
           ? defaultProvider
-          : providers.find((entry) => entry.id === modelOverride.configId) ?? null
+          : (providers.find((entry) => entry.id === modelOverride.configId) ?? null)
       if (base === null) {
         fail('Add an AI provider in Settings to use AI prompts.')
         return
@@ -263,7 +263,9 @@ export function useEditorAiMenu({
       // Restaging the same range resets the accumulated text without ending
       // the stage, so the preview stays up while the new attempt streams.
       const { prompt, context } = run
-      if (!editor.startPendingReplacement({ from: context.from, to: context.to, mode: prompt.mode })) {
+      if (
+        !editor.startPendingReplacement({ from: context.from, to: context.to, mode: prompt.mode })
+      ) {
         return
       }
       void streamRun(prompt, context, option)

@@ -136,8 +136,6 @@ describe('AddAiProviderDrawer', () => {
 
     await selectAnthropic()
 
-    await expect
-      .element(page.getByText(/audio memos send the recording/))
-      .not.toBeInTheDocument()
+    await expect.element(page.getByText(/audio memos send the recording/)).not.toBeInTheDocument()
   })
 })

@@ -3,158 +3,159 @@
  * Please do not edit it manually.
  */
 
-import type { ColumnType } from "kysely";
+import type { ColumnType } from 'kysely'
 
-export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
-  ? ColumnType<S, I | undefined, U>
-  : ColumnType<T, T | undefined, T>;
+export type Generated<T> =
+  T extends ColumnType<infer S, infer I, infer U>
+    ? ColumnType<S, I | undefined, U>
+    : ColumnType<T, T | undefined, T>
 
 export interface Aliases {
-  alias: string;
-  aliasKey: string;
-  notePath: string;
+  alias: string
+  aliasKey: string
+  notePath: string
 }
 
 export interface Assets {
-  assetPath: string;
-  notePath: string;
+  assetPath: string
+  notePath: string
 }
 
 export interface Backlinks {
-  alias: string | null;
-  kind: string | null;
-  posFrom: number | null;
-  posTo: number | null;
-  sourcePath: string | null;
-  targetPath: string | null;
-  targetRaw: string | null;
+  alias: string | null
+  kind: string | null
+  posFrom: number | null
+  posTo: number | null
+  sourcePath: string | null
+  targetPath: string | null
+  targetRaw: string | null
 }
 
 export interface ChatConversations {
-  createdMs: number;
-  id: string;
-  title: string;
-  updatedMs: number;
+  createdMs: number
+  id: string
+  title: string
+  updatedMs: number
 }
 
 export interface ChatMessages {
-  attachments: string;
-  conversationId: string;
-  createdMs: number;
-  id: string;
-  parts: string;
-  responseMessages: string;
-  seq: number;
-  userText: string;
+  attachments: string
+  conversationId: string
+  createdMs: number
+  id: string
+  parts: string
+  responseMessages: string
+  seq: number
+  userText: string
 }
 
 export interface EmbeddingChunks {
-  contentHash: string;
-  heading: string | null;
-  id: Generated<number | null>;
-  modelId: string;
-  notePath: string;
-  posFrom: number;
-  posTo: number;
-  text: string;
+  contentHash: string
+  heading: string | null
+  id: Generated<number | null>
+  modelId: string
+  notePath: string
+  posFrom: number
+  posTo: number
+  text: string
 }
 
 export interface IndexMeta {
-  key: string;
-  value: string;
+  key: string
+  value: string
 }
 
 export interface Links {
-  alias: string | null;
-  kind: string;
-  posFrom: number;
-  posTo: number;
-  sourcePath: string;
-  targetKey: string;
-  targetPathKey: string | null;
-  targetRaw: string;
+  alias: string | null
+  kind: string
+  posFrom: number
+  posTo: number
+  sourcePath: string
+  targetKey: string
+  targetPathKey: string | null
+  targetRaw: string
 }
 
 export interface NoteClaims {
-  key: string;
-  notePath: string;
-  tier: number;
+  key: string
+  notePath: string
+  tier: number
 }
 
 export interface NoteEmails {
-  email: string;
-  emailKey: string;
-  notePath: string;
+  email: string
+  emailKey: string
+  notePath: string
 }
 
 export interface NoteKeys {
-  claimCount: string | null;
-  key: string | null;
-  notePath: string | null;
+  claimCount: string | null
+  key: string | null
+  notePath: string | null
 }
 
 export interface Notes {
-  dailyDate: string | null;
-  fileHash: string;
-  gistStale: Generated<number>;
-  gistUrl: string | null;
-  hasConflict: Generated<number>;
-  id: string | null;
-  isPinned: Generated<number>;
-  isPrivate: Generated<number>;
-  kind: Generated<string>;
-  mtime: Generated<number>;
-  path: string;
-  pathKey: Generated<string>;
-  pinnedOrder: number | null;
-  preview: Generated<string>;
-  title: string;
-  titleKey: string;
-  updatedAt: Generated<number>;
+  dailyDate: string | null
+  fileHash: string
+  gistStale: Generated<number>
+  gistUrl: string | null
+  hasConflict: Generated<number>
+  id: string | null
+  isPinned: Generated<number>
+  isPrivate: Generated<number>
+  kind: Generated<string>
+  mtime: Generated<number>
+  path: string
+  pathKey: Generated<string>
+  pinnedOrder: number | null
+  preview: Generated<string>
+  title: string
+  titleKey: string
+  updatedAt: Generated<number>
 }
 
 export interface NoteText {
-  notePath: string;
-  text: string;
+  notePath: string
+  text: string
 }
 
 export interface SearchFts {
-  body: string | null;
-  path: string | null;
-  title: string | null;
+  body: string | null
+  path: string | null
+  title: string | null
 }
 
 export interface Tags {
-  notePath: string;
-  tag: string;
-  tagKey: Generated<string>;
+  notePath: string
+  tag: string
+  tagKey: Generated<string>
 }
 
 export interface Tasks {
-  breadcrumbs: Generated<string>;
-  checked: number;
-  dueDate: string | null;
-  markerOffset: number;
-  notePath: string;
-  raw: string;
-  text: string;
+  breadcrumbs: Generated<string>
+  checked: number
+  dueDate: string | null
+  markerOffset: number
+  notePath: string
+  raw: string
+  text: string
 }
 
 export interface DB {
-  aliases: Aliases;
-  assets: Assets;
-  backlinks: Backlinks;
-  chatConversations: ChatConversations;
-  chatMessages: ChatMessages;
-  embeddingChunks: EmbeddingChunks;
-  indexMeta: IndexMeta;
-  links: Links;
-  noteClaims: NoteClaims;
-  noteEmails: NoteEmails;
-  noteKeys: NoteKeys;
-  notes: Notes;
-  noteText: NoteText;
-  searchFts: SearchFts;
-  tags: Tags;
-  tasks: Tasks;
+  aliases: Aliases
+  assets: Assets
+  backlinks: Backlinks
+  chatConversations: ChatConversations
+  chatMessages: ChatMessages
+  embeddingChunks: EmbeddingChunks
+  indexMeta: IndexMeta
+  links: Links
+  noteClaims: NoteClaims
+  noteEmails: NoteEmails
+  noteKeys: NoteKeys
+  notes: Notes
+  noteText: NoteText
+  searchFts: SearchFts
+  tags: Tags
+  tasks: Tasks
 }

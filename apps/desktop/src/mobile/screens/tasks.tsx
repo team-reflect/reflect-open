@@ -1,12 +1,7 @@
 import { useDeferredValue, useMemo, useRef, useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Archive, CircleCheck, Plus, SlidersHorizontal } from 'lucide-react'
-import {
-  getCompletedTasks,
-  getOpenTasks,
-  hasBridge,
-  type OpenTask,
-} from '@reflect/core'
+import { getCompletedTasks, getOpenTasks, hasBridge, type OpenTask } from '@reflect/core'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { useRecentlyCompleted } from '@/lib/tasks/recently-completed'
@@ -90,8 +85,7 @@ export function MobileTasks(): ReactElement {
   const deferredQuery = useDeferredValue(query)
   const needle = (query === '' ? '' : deferredQuery).trim().toLowerCase()
   const groups = useMemo(
-    () =>
-      composeVisibleTaskGroups({ open, completed, recentlyCompleted, filters, needle, today }),
+    () => composeVisibleTaskGroups({ open, completed, recentlyCompleted, filters, needle, today }),
     [open, completed, recentlyCompleted, filters, needle, today],
   )
 
@@ -106,9 +100,7 @@ export function MobileTasks(): ReactElement {
       return null
     }
     const key = taskKey(editingTask)
-    return (
-      groups.flatMap((group) => group.tasks).find((row) => taskKey(row) === key) ?? editingTask
-    )
+    return groups.flatMap((group) => group.tasks).find((row) => taskKey(row) === key) ?? editingTask
   }, [groups, editingTask])
 
   const editTask = (task: OpenTask, options?: { autoFocus?: boolean; haptic?: boolean }): void => {
@@ -214,7 +206,9 @@ export function MobileTasks(): ReactElement {
         size="icon"
         aria-label="New task"
         className="fixed right-4 z-40 size-12 rounded-full shadow-lg"
-        style={{ bottom: 'calc(max(env(safe-area-inset-bottom), var(--keyboard-height, 0px)) + 4.25rem)' }}
+        style={{
+          bottom: 'calc(max(env(safe-area-inset-bottom), var(--keyboard-height, 0px)) + 4.25rem)',
+        }}
         onClick={() => onAdd(todaysDailyTarget(today))}
       >
         <Plus className="size-6" />

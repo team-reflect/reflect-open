@@ -28,9 +28,8 @@ vi.mock('@/lib/operations', async (importOriginal) => ({
   startOperation,
 }))
 
-const { createTemplate, insertTemplate, renameTemplate, templateBody } = await import(
-  './note-templates'
-)
+const { createTemplate, insertTemplate, renameTemplate, templateBody } =
+  await import('./note-templates')
 
 beforeEach(() => {
   vi.clearAllMocks()

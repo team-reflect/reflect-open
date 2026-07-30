@@ -25,11 +25,7 @@ describe('v1 subject alias flow', () => {
     const source = '[[capture-2026-07-23-154848|Old Title]]\n'
     applyProjection(
       database,
-      project(
-        subjectPath,
-        '---\naliases:\n  - capture-2026-07-23-154848\n---\n# Old Title\n',
-        20,
-      ),
+      project(subjectPath, '---\naliases:\n  - capture-2026-07-23-154848\n---\n# Old Title\n', 20),
     )
     applyProjection(database, project(sourcePath, source, 10))
     connectIndex(database)
@@ -92,9 +88,9 @@ describe('v1 subject alias flow', () => {
       })
       const inserted = suggestions[0]!.insertText
       expect(inserted).toBe('Tim MacCaw // Dad|Dad')
-      expect(parseNote({ path: 'notes/selected.md', source: `[[${inserted}]]` }).wikiLinks).toEqual([
-        expect.objectContaining({ target: 'Tim MacCaw // Dad', alias: 'Dad' }),
-      ])
+      expect(parseNote({ path: 'notes/selected.md', source: `[[${inserted}]]` }).wikiLinks).toEqual(
+        [expect.objectContaining({ target: 'Tim MacCaw // Dad', alias: 'Dad' })],
+      )
 
       // A standalone title is a stronger claimant than the subject alias. The
       // link, backlink, and autocomplete ranking must all move together.
@@ -109,11 +105,7 @@ describe('v1 subject alias flow', () => {
         { sourcePath: 'notes/family.md', targetRaw: 'Dad' },
       ])
 
-      const selected = project(
-        'notes/selected.md',
-        `# Selected\n\nCall [[${inserted}]].\n`,
-        40,
-      )
+      const selected = project('notes/selected.md', `# Selected\n\nCall [[${inserted}]].\n`, 40)
       applyProjection(database, selected)
       expect(selected.links).toEqual([
         expect.objectContaining({
@@ -137,8 +129,7 @@ describe('v1 subject alias flow', () => {
         { sourcePath: 'notes/family.md', targetRaw: 'Dad' },
       ])
 
-      const { suggestions: collidedSuggestions } =
-        await suggestWikiLinkTargets('Dad')
+      const { suggestions: collidedSuggestions } = await suggestWikiLinkTargets('Dad')
       expect(collidedSuggestions.map((suggestion) => suggestion.path)).toEqual([
         'notes/dad.md',
         'notes/tim-maccaw-dad.md',
@@ -183,18 +174,10 @@ describe('v1 subject alias flow', () => {
       // A duplicate-title candidate can still be addressed through its own
       // unique alias. The verified insertion must use that alias, not Shared.
       project('notes/a-shared.md', '# Shared\n', 30),
-      project(
-        'notes/z-shared.md',
-        '---\naliases:\n  - Second Shared\n---\n# Shared\n',
-        110,
-      ),
+      project('notes/z-shared.md', '---\naliases:\n  - Second Shared\n---\n# Shared\n', 110),
       // Raw alias keys survive ranking even when the same note's stronger
       // title candidate wins deduplication.
-      project(
-        'notes/ada-project.md',
-        '---\naliases:\n  - Ada Lovelace\n---\n# Ada Project\n',
-        115,
-      ),
+      project('notes/ada-project.md', '---\naliases:\n  - Ada Lovelace\n---\n# Ada Project\n', 115),
       // An unserializable alias is only a lost display text: the note stays
       // selectable through its safe, uniquely claimed canonical title.
       project(
@@ -204,11 +187,7 @@ describe('v1 subject alias flow', () => {
       ),
       // Unsafe syntax is never silently cleaned into a different key.
       project('notes/unsafe.md', '# Unsafe | Title\n', 120),
-      project(
-        'notes/escaped.md',
-        "---\ntitle: 'Escape \\. Title'\n---\nBody\n",
-        130,
-      ),
+      project('notes/escaped.md', "---\ntitle: 'Escape \\. Title'\n---\nBody\n", 130),
     ]
     for (const projection of projections) {
       applyProjection(database, projection)
@@ -221,18 +200,18 @@ describe('v1 subject alias flow', () => {
         dateFormat: 'dmy' as const,
         weekStartDay: 'monday' as const,
       }
-      const { suggestions: dateSuggestions } =
-        await suggestWikiLinkTargets('2026-07-10')
+      const { suggestions: dateSuggestions } = await suggestWikiLinkTargets('2026-07-10')
       // The daily owns the date key; the date-titled note stays selectable
       // through its path address instead of vanishing.
-      expect(
-        dateSuggestions.map(({ path, insertText }) => ({ path, insertText })),
-      ).toEqual([
+      expect(dateSuggestions.map(({ path, insertText }) => ({ path, insertText }))).toEqual([
         { path: 'daily/2026-07-10.md', insertText: '2026-07-10' },
         { path: 'notes/date-title.md', insertText: 'notes/date-title' },
       ])
-      const { suggestions: fuzzyDateSuggestions } =
-        await suggestWikiLinkTargets('today', 8, dateContext)
+      const { suggestions: fuzzyDateSuggestions } = await suggestWikiLinkTargets(
+        'today',
+        8,
+        dateContext,
+      )
       expect(fuzzyDateSuggestions).toMatchObject([
         {
           target: '2026-07-10',
@@ -241,15 +220,12 @@ describe('v1 subject alias flow', () => {
           generated: { phrase: 'Today' },
         },
       ])
-      await expect(
-        suggestWikiLinkTargets('tomorrow', 8, dateContext),
-      ).resolves.toEqual({
+      await expect(suggestWikiLinkTargets('tomorrow', 8, dateContext)).resolves.toEqual({
         suggestions: [],
         claimedTargetKeys: ['2026-07-11'],
         queryReadsAsDate: true,
       })
-      const { suggestions: invalidDateSuggestions } =
-        await suggestWikiLinkTargets('2026-02-31')
+      const { suggestions: invalidDateSuggestions } = await suggestWikiLinkTargets('2026-02-31')
       expect(invalidDateSuggestions.map((suggestion) => suggestion.path)).toEqual([
         'notes/invalid-date-title.md',
       ])
@@ -299,14 +275,12 @@ describe('v1 subject alias flow', () => {
         'notes/a-date-twin',
       ])
       // A uniquely claimed date-shaped title stays addressable.
-      const { suggestions: dateTitleSuggestions } =
-        await suggestWikiLinkTargets('2026-07-11')
+      const { suggestions: dateTitleSuggestions } = await suggestWikiLinkTargets('2026-07-11')
       expect(dateTitleSuggestions.map((suggestion) => suggestion.path)).toEqual([
         'notes/tomorrow-title.md',
       ])
 
-      const { suggestions: aliasSuggestions } =
-        await suggestWikiLinkTargets('Second Shared')
+      const { suggestions: aliasSuggestions } = await suggestWikiLinkTargets('Second Shared')
       expect(aliasSuggestions).toMatchObject([
         {
           path: 'notes/z-shared.md',
@@ -320,10 +294,7 @@ describe('v1 subject alias flow', () => {
       // note: its ambiguous ranked spelling is rescued through its unique alias.
       const sharedTitleResult = await suggestWikiLinkTargets('Shared')
       const { suggestions: sharedTitleSuggestions } = sharedTitleResult
-      expect(sharedTitleResult.claimedTargetKeys).toEqual([
-        'second shared',
-        'shared',
-      ])
+      expect(sharedTitleResult.claimedTargetKeys).toEqual(['second shared', 'shared'])
       expect(sharedTitleSuggestions).toMatchObject([
         {
           path: 'notes/z-shared.md',
@@ -335,10 +306,7 @@ describe('v1 subject alias flow', () => {
       ])
 
       const adaResult = await suggestWikiLinkTargets('Ada')
-      expect(adaResult.claimedTargetKeys).toEqual([
-        'ada lovelace',
-        'ada project',
-      ])
+      expect(adaResult.claimedTargetKeys).toEqual(['ada lovelace', 'ada project'])
       expect(adaResult.suggestions).toMatchObject([
         { path: 'notes/ada-project.md', target: 'Ada Project' },
       ])
@@ -356,8 +324,7 @@ describe('v1 subject alias flow', () => {
       )
       // The matched alias cannot be serialized, so insertion falls back to
       // the bare canonical title instead of dropping the note.
-      const { suggestions: unsafeAliasSuggestions } =
-        await suggestWikiLinkTargets('Zeta|Prime')
+      const { suggestions: unsafeAliasSuggestions } = await suggestWikiLinkTargets('Zeta|Prime')
       expect(unsafeAliasSuggestions).toMatchObject([
         {
           path: 'notes/zeta-project.md',

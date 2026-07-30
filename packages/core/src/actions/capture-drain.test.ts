@@ -99,10 +99,9 @@ describe('drainCaptureInbox', () => {
   })
 
   it('writes an iOS share capture with its in-page description into the raw save', async () => {
-    addSpool(
-      envelope({ source: 'ios-share', metaDescription: '  A page\nabout examples.  ' }),
-      { screenshot: false },
-    )
+    addSpool(envelope({ source: 'ios-share', metaDescription: '  A page\nabout examples.  ' }), {
+      screenshot: false,
+    })
 
     const outcome = await drain()
 
@@ -198,10 +197,7 @@ describe('drainCaptureInbox', () => {
       }),
     )
     await drain()
-    files.set(
-      DAILY,
-      '> ## [[Links]]\n>\n> - [[capture-2026-06-11-093000-000-0000|An article]]\n',
-    )
+    files.set(DAILY, '> ## [[Links]]\n>\n> - [[capture-2026-06-11-093000-000-0000|An article]]\n')
 
     addSpool(envelope())
     const outcome = await drain()
@@ -421,14 +417,12 @@ describe('drainCaptureInbox', () => {
   })
 
   it('drains two same-millisecond captures of different pages into distinct notes', async () => {
-    addSpool(
-      envelope({ id: '00000000-0000-4000-8000-000000000001', url: 'https://a.com' }),
-      { screenshot: false },
-    )
-    addSpool(
-      envelope({ id: 'ffff0000-0000-4000-8000-000000000002', url: 'https://b.com' }),
-      { screenshot: false },
-    )
+    addSpool(envelope({ id: '00000000-0000-4000-8000-000000000001', url: 'https://a.com' }), {
+      screenshot: false,
+    })
+    addSpool(envelope({ id: 'ffff0000-0000-4000-8000-000000000002', url: 'https://b.com' }), {
+      screenshot: false,
+    })
 
     const outcome = await drain()
 

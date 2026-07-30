@@ -24,7 +24,12 @@ function toolExchange(callId: string, outputChars: number): ModelMessage[] {
     {
       role: 'assistant',
       content: [
-        { type: 'tool-call', toolCallId: callId, toolName: 'read_notes', input: { paths: ['notes/a.md'] } },
+        {
+          type: 'tool-call',
+          toolCallId: callId,
+          toolName: 'read_notes',
+          input: { paths: ['notes/a.md'] },
+        },
       ],
     },
     {
@@ -50,7 +55,11 @@ describe('estimateTokens', () => {
     const photo: ModelMessage = {
       role: 'user',
       content: [
-        { type: 'file', data: `data:image/png;base64,${'a'.repeat(400_000)}`, mediaType: 'image/png' },
+        {
+          type: 'file',
+          data: `data:image/png;base64,${'a'.repeat(400_000)}`,
+          mediaType: 'image/png',
+        },
       ],
     }
     expect(estimateTokens(photo)).toBe(1_604)
@@ -67,9 +76,9 @@ describe('estimateTokens', () => {
 describe('fitToContextWindow', () => {
   it('passes an under-budget history through untouched', () => {
     const messages = [...turn(400, 400), ...turn(400, 400)]
-    expect(
-      fitToContextWindow(messages, { contextWindow: 1_000_000, systemPrompt: '' }),
-    ).toBe(messages)
+    expect(fitToContextWindow(messages, { contextWindow: 1_000_000, systemPrompt: '' })).toBe(
+      messages,
+    )
   })
 
   it('drops the oldest turns whole, at user-message boundaries', () => {

@@ -213,7 +213,8 @@ function renderScreen() {
       },
       findByRole: (...args: Parameters<typeof view.getByRole>) => find(view.getByRole(...args)),
       findByText: (...args: Parameters<typeof view.getByText>) => find(view.getByText(...args)),
-      getAllByText: (...args: Parameters<typeof view.getByText>) => view.getByText(...args).elements(),
+      getAllByText: (...args: Parameters<typeof view.getByText>) =>
+        view.getByText(...args).elements(),
       queryByLabelText: (...args: Parameters<typeof view.getByLabelText>) =>
         view.getByLabelText(...args).query(),
       queryByRole: (...args: Parameters<typeof view.getByRole>) => view.getByRole(...args).query(),
@@ -261,8 +262,19 @@ afterEach(async () => {
 describe('MobileTasks', () => {
   it('renders desktop’s groups with counts and source dates', async () => {
     getOpenTasks.mockResolvedValue([
-      task({ text: 'jotted today', dailyDate: '2026-06-14', notePath: 'daily/2026-06-14.md', markerOffset: 0 }),
-      task({ text: 'late', dueDate: '2026-06-01', dailyDate: '2026-06-01', notePath: 'daily/2026-06-01.md', markerOffset: 0 }),
+      task({
+        text: 'jotted today',
+        dailyDate: '2026-06-14',
+        notePath: 'daily/2026-06-14.md',
+        markerOffset: 0,
+      }),
+      task({
+        text: 'late',
+        dueDate: '2026-06-01',
+        dailyDate: '2026-06-01',
+        notePath: 'daily/2026-06-01.md',
+        markerOffset: 0,
+      }),
       task({ text: 'undated', markerOffset: 0 }),
     ])
     const view = await renderScreen()

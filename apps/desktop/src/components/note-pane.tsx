@@ -163,14 +163,8 @@ export function NotePaneComponent({
     // notes stay unseeded — the date is their identity.
     ...(needsSeed ? { missingSeed: seed.seed } : {}),
   })
-  const {
-    resolveImageUrl,
-    resolveAssetOpenPath,
-    openAsset,
-    saveFile,
-    resolveFileInfo,
-    saveError,
-  } = useAssetPersistence(generation, path)
+  const { resolveImageUrl, resolveAssetOpenPath, openAsset, saveFile, resolveFileInfo, saveError } =
+    useAssetPersistence(generation, path)
   const renderWikilinkHoverCard = useWikiLinkHoverPreview({
     generation,
     graphKey: graph?.root ?? null,
@@ -208,10 +202,7 @@ export function NotePaneComponent({
       aiEditorRef.current = handle
       if (handle === null) {
         if (registeredHandle.current !== null) {
-          unregisterNoteEditorHandle(
-            registeredHandle.current.path,
-            registeredHandle.current.handle,
-          )
+          unregisterNoteEditorHandle(registeredHandle.current.path, registeredHandle.current.handle)
           registeredHandle.current = null
         }
       } else {
@@ -240,7 +231,6 @@ export function NotePaneComponent({
     sessionEpoch: document.sessionEpoch,
     editorRef: aiEditorRef,
   })
-
 
   const handleExitBoundary: ExitBoundaryHandler | undefined = useMemo(() => {
     if (!dailyDate || !onExitBoundary) {
@@ -332,10 +322,7 @@ export function NotePaneComponent({
         ) : null}
 
         {document.conflict !== null ? (
-          <NoteConflictBanner
-            onKeepMine={document.keepMine}
-            onLoadTheirs={document.loadTheirs}
-          />
+          <NoteConflictBanner onKeepMine={document.keepMine} onLoadTheirs={document.loadTheirs} />
         ) : null}
 
         <SyncConflictNotice path={path} className="mb-4" />
@@ -374,9 +361,7 @@ export function NotePaneComponent({
         resolveFileInfo={resolveFileInfo}
         onWikiLinkClick={onWikiLinkClick}
         onNoteLinkClick={onNoteLinkClick}
-        {...(generation !== null && !isTouchEditorSurface()
-          ? { renderWikilinkHoverCard }
-          : {})}
+        {...(generation !== null && !isTouchEditorSurface() ? { renderWikilinkHoverCard } : {})}
         onTagClick={onTagClick}
         onWikilinkSearch={onWikilinkSearch}
         onTagSearch={onTagSearch}

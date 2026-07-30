@@ -90,9 +90,7 @@ describe('dates', () => {
     it('shows the short date beyond the current week, honoring the date format', () => {
       expect(formatRecencyLabel(new Date(2026, 5, 3, 13, 0).getTime(), mdy, now)).toBe('6/3/2026')
       expect(formatRecencyLabel(new Date(2026, 5, 3, 13, 0).getTime(), dmy, now)).toBe('3/6/2026')
-      expect(formatRecencyLabel(new Date(2026, 5, 3, 13, 0).getTime(), iso, now)).toBe(
-        '2026-06-03',
-      )
+      expect(formatRecencyLabel(new Date(2026, 5, 3, 13, 0).getTime(), iso, now)).toBe('2026-06-03')
       expect(formatRecencyLabel(new Date(2025, 11, 31, 13, 0).getTime(), mdy, now)).toBe(
         '12/31/2025',
       )

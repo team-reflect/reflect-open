@@ -23,7 +23,10 @@ interface NoteGistActionProps {
  * URL section owns the update action, including the stale-body nudge from the
  * index. Failures and success state surface through the operations status line.
  */
-export function NoteGistAction({ path, keybinding = null }: NoteGistActionProps): ReactElement | null {
+export function NoteGistAction({
+  path,
+  keybinding = null,
+}: NoteGistActionProps): ReactElement | null {
   const { graph } = useGraph()
   const connected = useGithubConnected()
   const row = useNoteRow(path)
@@ -70,10 +73,10 @@ export function NoteGistAction({ path, keybinding = null }: NoteGistActionProps)
   const label = isUnpublishing
     ? 'Unpublishing…'
     : isPublishing
-    ? 'Publishing…'
-    : published
-      ? 'Unpublish link'
-      : 'Share with private link'
+      ? 'Publishing…'
+      : published
+        ? 'Unpublish link'
+        : 'Share with private link'
   const tooltip = published
     ? 'Delete the private GitHub gist for this note'
     : 'Creates a secret GitHub gist and copies its private link'

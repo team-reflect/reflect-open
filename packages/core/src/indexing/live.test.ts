@@ -74,7 +74,9 @@ describe('applyIndexChanges', () => {
         return '# recreated then deleted'
       }
       if (command === 'index_apply_batch') {
-        order.push(...(args['notes'] as Array<{ path: string }>).map((note) => `apply:${note.path}`))
+        order.push(
+          ...(args['notes'] as Array<{ path: string }>).map((note) => `apply:${note.path}`),
+        )
       }
       if (command === 'index_remove') {
         order.push(`remove:${String(args['path'])}`)
@@ -132,7 +134,9 @@ describe('subscribeIndexChanges', () => {
         return '# content'
       }
       if (command === 'index_apply_batch') {
-        order.push(...(args['notes'] as Array<{ path: string }>).map((note) => `apply:${note.path}`))
+        order.push(
+          ...(args['notes'] as Array<{ path: string }>).map((note) => `apply:${note.path}`),
+        )
       }
       if (command === 'db_query') {
         return []
@@ -206,7 +210,9 @@ describe('subscribeIndexChanges', () => {
         return '# content'
       }
       if (command === 'index_apply_batch') {
-        order.push(...(args['notes'] as Array<{ path: string }>).map((note) => `apply:${note.path}`))
+        order.push(
+          ...(args['notes'] as Array<{ path: string }>).map((note) => `apply:${note.path}`),
+        )
       }
       if (command === 'db_query') {
         return []
@@ -237,7 +243,9 @@ describe('subscribeIndexChanges', () => {
         return '# content'
       }
       if (command === 'index_apply_batch') {
-        order.push(...(args['notes'] as Array<{ path: string }>).map((note) => `apply:${note.path}`))
+        order.push(
+          ...(args['notes'] as Array<{ path: string }>).map((note) => `apply:${note.path}`),
+        )
       }
       if (command === 'db_query') {
         return []
@@ -340,7 +348,12 @@ describe('applyIndexChanges move healing (Plan 17)', () => {
       if (command === 'db_query') {
         const params = (args['params'] as unknown[]) ?? []
         if (params.includes(OLD)) {
-          return [{ path: OLD, id: options?.rowId === undefined ? '01abcdefghjkmnpqrstvwxyz00' : options.rowId }]
+          return [
+            {
+              path: OLD,
+              id: options?.rowId === undefined ? '01abcdefghjkmnpqrstvwxyz00' : options.rowId,
+            },
+          ]
         }
         return [] // the upsert path is not indexed
       }

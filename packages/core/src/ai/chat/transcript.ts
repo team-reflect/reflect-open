@@ -64,8 +64,7 @@ export const NO_REPLY_NOTICE =
 /** Whether the parts already carry something the user can read as a reply. */
 function hasRenderableReply(parts: AssistantPart[]): boolean {
   return parts.some(
-    (part) =>
-      (part.kind === 'text' && part.text.trim() !== '') || part.kind === 'notice',
+    (part) => (part.kind === 'text' && part.text.trim() !== '') || part.kind === 'notice',
   )
 }
 
@@ -100,10 +99,7 @@ export function appendEvent(parts: AssistantPart[], event: ChatStreamEvent): Ass
         { kind: 'notice', tone: 'error', text: event.message },
       ]
     case 'aborted':
-      return [
-        ...settleTools(parts, 'Stopped.'),
-        { kind: 'notice', tone: 'info', text: 'Stopped.' },
-      ]
+      return [...settleTools(parts, 'Stopped.'), { kind: 'notice', tone: 'info', text: 'Stopped.' }]
     case 'complete':
       // A turn can settle with no reply — e.g. the model spent its whole step
       // budget on tool calls and never synthesized. Rather than leave the user
@@ -124,12 +120,13 @@ function settleTools(
   message: string,
   toolCallId?: string,
 ): AssistantPart[] {
-  return parts.map((part): AssistantPart =>
-    part.kind === 'tool' &&
-    isToolPending(part) &&
-    (toolCallId === undefined || part.call.toolCallId === toolCallId)
-      ? { ...part, error: message }
-      : part,
+  return parts.map(
+    (part): AssistantPart =>
+      part.kind === 'tool' &&
+      isToolPending(part) &&
+      (toolCallId === undefined || part.call.toolCallId === toolCallId)
+        ? { ...part, error: message }
+        : part,
   )
 }
 
@@ -138,10 +135,7 @@ function settleTools(
  * attached, otherwise image file parts (the data URL is the payload) followed by
  * the text — which may be absent entirely for a photo-only message.
  */
-export function userMessage(
-  text: string,
-  attachments: readonly ChatAttachment[],
-): ModelMessage {
+export function userMessage(text: string, attachments: readonly ChatAttachment[]): ModelMessage {
   if (attachments.length === 0) {
     return { role: 'user', content: text }
   }

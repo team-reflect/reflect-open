@@ -43,7 +43,10 @@ interface SyncConflictNoticeProps {
  * Mobile uses the same protected session contract and raw-text resolution
  * actions. The buttons are touch-sized there, but still call the same resolver.
  */
-export function SyncConflictNotice({ path, className }: SyncConflictNoticeProps): ReactElement | null {
+export function SyncConflictNotice({
+  path,
+  className,
+}: SyncConflictNoticeProps): ReactElement | null {
   const { graph } = useGraph()
   const { busy, error, resolve } = useConflictResolution(path)
   const { data } = useQuery({

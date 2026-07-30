@@ -52,7 +52,9 @@ test('both channels tag plain versions and draft their releases', () => {
 
 test('each channel chains its release into delivery', () => {
   for (const channel of ['stable', 'beta']) {
-    expect(workflow).toContain(`${channel}_created: \${{ steps.${channel}.outputs.releases_created }}`)
+    expect(workflow).toContain(
+      `${channel}_created: \${{ steps.${channel}.outputs.releases_created }}`,
+    )
     expect(workflow).toContain(`${channel}_tag: \${{ steps.${channel}.outputs.tag_name }}`)
     expect(workflow).toContain(`${channel}_commit: \${{ steps.${channel}.outputs.sha }}`)
     expect(workflow).toContain(`if: needs.release-please.outputs.${channel}_created == 'true'`)

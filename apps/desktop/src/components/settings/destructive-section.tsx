@@ -67,10 +67,7 @@ export function DestructiveSection(): ReactElement {
   return (
     <>
       <SettingsSection id="destructive">
-        <SettingsField
-          legend="Saved graph"
-          description="Forget this graph. Files stay on disk."
-        >
+        <SettingsField legend="Saved graph" description="Forget this graph. Files stay on disk.">
           <div className="mt-3 flex justify-start">
             <Button
               type="button"
@@ -105,9 +102,8 @@ export function DestructiveSection(): ReactElement {
         <DialogContent>
           <DialogTitle>Forget graph?</DialogTitle>
           <DialogDescription className="min-w-0">
-            Remove{' '}
-            <span className="font-mono text-text [overflow-wrap:anywhere]">{graphId}</span> from
-            saved graphs. Files stay on disk.
+            Remove <span className="font-mono text-text [overflow-wrap:anywhere]">{graphId}</span>{' '}
+            from saved graphs. Files stay on disk.
           </DialogDescription>
           <DialogFooter>
             <DialogClose asChild>

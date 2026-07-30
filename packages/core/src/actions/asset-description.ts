@@ -97,7 +97,13 @@ export interface ReconcileAssetDescriptionsOutcome {
 }
 
 /** Why an asset was skipped (no description written, nothing sent). */
-type AssetSkipReason = 'up-to-date' | 'unreferenced' | 'private' | 'user-authored' | 'oversize' | 'gone'
+type AssetSkipReason =
+  | 'up-to-date'
+  | 'unreferenced'
+  | 'private'
+  | 'user-authored'
+  | 'oversize'
+  | 'gone'
 
 /** Per-asset result; `stop` ends the whole pass, everything else is a tally. */
 type AssetStep =

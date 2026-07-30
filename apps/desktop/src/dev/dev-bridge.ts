@@ -1,9 +1,4 @@
-import {
-  indexedNoteSchema,
-  ReflectError,
-  type AppPlatform,
-  type IpcBridge,
-} from '@reflect/core'
+import { indexedNoteSchema, ReflectError, type AppPlatform, type IpcBridge } from '@reflect/core'
 import { z } from 'zod'
 import type { DevFileStore } from '@/dev/dev-file-store'
 import type { DevIndexDb } from '@/dev/dev-index-db'
@@ -308,7 +303,10 @@ function reconcileScan(files: DevFileStore, index: DevIndexDb) {
   const stored = new Map(
     index
       .query('SELECT path, mtime, file_hash FROM notes', [])
-      .map((row) => [String(row['path']), { mtime: Number(row['mtime']), hash: String(row['file_hash']) }]),
+      .map((row) => [
+        String(row['path']),
+        { mtime: Number(row['mtime']), hash: String(row['file_hash']) },
+      ]),
   )
   const now = Date.now()
   const listing = files.list()

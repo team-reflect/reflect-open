@@ -9,13 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { keybindingFor } from '@/lib/commands/app-commands'
 import { formatDayLabel } from '@/lib/dates'
-import {
-  addMonths,
-  buildMonthGrid,
-  monthLabel,
-  monthOf,
-  weekdayLabels,
-} from '@/lib/month-grid'
+import { addMonths, buildMonthGrid, monthLabel, monthOf, weekdayLabels } from '@/lib/month-grid'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
@@ -79,9 +73,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
   return (
     <div aria-label="Calendar" className="group min-w-36">
       <header className="flex items-center justify-between px-4 py-4">
-        <div className="cursor-default text-sm font-semibold text-text">
-          {monthLabel(month)}
-        </div>
+        <div className="cursor-default text-sm font-semibold text-text">{monthLabel(month)}</div>
         {/* window-drag-control lifts the buttons above the WindowDragRegion strip
             overlaying the title-bar band (see NavigateArrows for the contract). */}
         <nav className="window-drag-control flex items-center justify-center space-x-1 text-text-muted">
@@ -141,9 +133,7 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
                     aria-label={formatDayLabel(cell.date, settings.dateFormat)}
                     aria-current={isToday ? 'date' : undefined}
                     aria-pressed={isSelected}
-                    onClick={(event) =>
-                      navigateNoteLink({ kind: 'daily', date: cell.date }, event)
-                    }
+                    onClick={(event) => navigateNoteLink({ kind: 'daily', date: cell.date }, event)}
                     className={cn(
                       'relative cursor-default py-1.5 text-xs',
                       // Today stays fully visible even as an adjacent-month

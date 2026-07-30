@@ -71,7 +71,10 @@ function cleanHeadingText(raw: string): string {
   if (newline !== -1) {
     return unescapeMarkdownText(raw.slice(0, newline).trim()) // setext: heading text is the first line
   }
-  const text = raw.replace(/^#{1,6}[ \t]*/, '').replace(/[ \t]*#*[ \t]*$/, '').trim()
+  const text = raw
+    .replace(/^#{1,6}[ \t]*/, '')
+    .replace(/[ \t]*#*[ \t]*$/, '')
+    .trim()
   return unescapeMarkdownText(text)
 }
 
@@ -115,10 +118,7 @@ function isAssetHref(href: string): boolean {
  *
  * An explicit `/x`, `./x`, or `../x` has one meaning and gets one candidate.
  */
-export function attachmentReferenceCandidates(
-  sourcePath: string,
-  reference: string,
-): string[] {
+export function attachmentReferenceCandidates(sourcePath: string, reference: string): string[] {
   if (/^[a-z][a-z0-9+.-]*:/i.test(reference) || reference.startsWith('//')) {
     return []
   }
@@ -464,7 +464,14 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
         // `isTop` is the `Document` node: a heading anywhere else is nested in a
         // blockquote or list item, so it never opens or ends a real section.
         const topLevel = node.node.parent?.type.isTop === true
-        headings.push({ level: headingLevel, text, slug: slugify(text), topLevel, from: from + bodyOffset, to: to + bodyOffset })
+        headings.push({
+          level: headingLevel,
+          text,
+          slug: slugify(text),
+          topLevel,
+          from: from + bodyOffset,
+          to: to + bodyOffset,
+        })
         return true
       }
 

@@ -1,11 +1,5 @@
 import { sql } from 'kysely'
-import {
-  foldTag,
-  normalizeWikiTarget,
-  resolved,
-  unresolved,
-  type Resolution,
-} from '../markdown'
+import { foldTag, normalizeWikiTarget, resolved, unresolved, type Resolution } from '../markdown'
 import { db } from './db'
 import { inClauseChunks } from './query-utils'
 export {
@@ -236,7 +230,9 @@ export async function listDailyNotes(range: DailyNotesRange): Promise<DailyNoteR
     .limit(range.limit)
     .execute()
   return rows.flatMap((row) =>
-    row.dailyDate === null ? [] : [{ ...row, dailyDate: row.dailyDate, isPrivate: row.isPrivate !== 0 }],
+    row.dailyDate === null
+      ? []
+      : [{ ...row, dailyDate: row.dailyDate, isPrivate: row.isPrivate !== 0 }],
   )
 }
 

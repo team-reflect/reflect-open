@@ -30,7 +30,13 @@ interface AllNotesRowProps {
  * multi-select: plain = exclusive, ⌘/Ctrl = toggle, Shift = range); the
  * indicator gutter toggles it; the subject or a double-click opens the note.
  */
-export const AllNotesRow = memo(function AllNotesRow({ note, selected, onSelect, onToggle, onOpen }: AllNotesRowProps): ReactElement {
+export const AllNotesRow = memo(function AllNotesRow({
+  note,
+  selected,
+  onSelect,
+  onToggle,
+  onOpen,
+}: AllNotesRowProps): ReactElement {
   const { settings } = useSettings()
   return (
     <div
@@ -92,7 +98,9 @@ export const AllNotesRow = memo(function AllNotesRow({ note, selected, onSelect,
       >
         {note.title}
       </button>
-      <span className={cn('truncate text-[13px]', selected ? 'text-accent' : 'text-text-secondary')}>
+      <span
+        className={cn('truncate text-[13px]', selected ? 'text-accent' : 'text-text-secondary')}
+      >
         {note.snippet}
       </span>
       <span className="truncate text-right text-[13px] text-text-secondary">

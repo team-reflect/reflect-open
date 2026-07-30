@@ -44,7 +44,13 @@ export function ChatHistoryMenu(): ReactElement | null {
           <History aria-hidden />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent aria-label="Chat history" side="top" align="end" sideOffset={6} className="w-72">
+      <DropdownMenuContent
+        aria-label="Chat history"
+        side="top"
+        align="end"
+        sideOffset={6}
+        className="w-72"
+      >
         {conversations === undefined || conversations.length === 0 ? (
           <DropdownMenuItem disabled className="px-2 py-1.5 text-[13px] text-text-muted">
             No past chats

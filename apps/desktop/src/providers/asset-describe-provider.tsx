@@ -17,7 +17,10 @@ interface AssetDescribeProviderProps {
   children: ReactNode
 }
 
-export function AssetDescribeProvider({ graph, children }: AssetDescribeProviderProps): ReactElement {
+export function AssetDescribeProvider({
+  graph,
+  children,
+}: AssetDescribeProviderProps): ReactElement {
   const { settings } = useSettings()
   const describeAssets = settings.describeAssets
 

@@ -25,14 +25,8 @@ import { rewriteLinksForTitleChange } from './rename'
 describe('rich title flow', () => {
   it('projects a derived alias and serves search, insertion, and resolution', async () => {
     const database = openMigratedIndex()
-    const rich = project(
-      'notes/meeting-with-ada.md',
-      '# Meeting with [[Ada Lovelace|Ada]]\n',
-      20,
-    )
-    expect(rich.aliases).toEqual([
-      { alias: 'Meeting with Ada', aliasKey: 'meeting with ada' },
-    ])
+    const rich = project('notes/meeting-with-ada.md', '# Meeting with [[Ada Lovelace|Ada]]\n', 20)
+    expect(rich.aliases).toEqual([{ alias: 'Meeting with Ada', aliasKey: 'meeting with ada' }])
     applyProjection(database, rich)
     connectIndex(database)
     try {
@@ -147,9 +141,7 @@ describe('rich title flow', () => {
       ])
       await Promise.all(result.suggestions.map(expectSuggestionOpensItsPath))
       const navigation = await suggestWikiTargets('[[ [')
-      expect(navigation.map((suggestion) => suggestion.path)).toEqual([
-        'notes/degenerate.md',
-      ])
+      expect(navigation.map((suggestion) => suggestion.path)).toEqual(['notes/degenerate.md'])
     } finally {
       setBridge(null)
       database.close()

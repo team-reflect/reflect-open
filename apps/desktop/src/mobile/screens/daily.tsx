@@ -59,7 +59,12 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
 
   return (
     <div className="flex h-full w-screen flex-col">
-      <CalendarStrip date={targetDate ?? date} today={today} resetSeq={resetSeq} onSelect={select} />
+      <CalendarStrip
+        date={targetDate ?? date}
+        today={today}
+        resetSeq={resetSeq}
+        onSelect={select}
+      />
       <DayCarousel
         date={date}
         today={today}
@@ -74,7 +79,9 @@ export function MobileDaily({ date }: { date: string }): ReactElement {
         size="icon"
         aria-label="New note"
         className="fixed right-4 z-40 size-12 rounded-full shadow-lg"
-        style={{ bottom: 'calc(max(env(safe-area-inset-bottom), var(--keyboard-height, 0px)) + 4.25rem)' }}
+        style={{
+          bottom: 'calc(max(env(safe-area-inset-bottom), var(--keyboard-height, 0px)) + 4.25rem)',
+        }}
         onClick={() => navigate({ kind: 'note', path: untitledNotePath() })}
       >
         <Plus className="size-6" />

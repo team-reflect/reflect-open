@@ -61,9 +61,9 @@ describe('appendListItemUnderHeading', () => {
 
 describe('appendListItemUnderBacklinkedHeading', () => {
   it('creates a linked H2 section when the category is missing', () => {
-    expect(
-      appendListItemUnderBacklinkedHeading('morning notes\n', 'Links', '[[Article]]'),
-    ).toBe('morning notes\n\n## [[Links]]\n\n- [[Article]]\n')
+    expect(appendListItemUnderBacklinkedHeading('morning notes\n', 'Links', '[[Article]]')).toBe(
+      'morning notes\n\n## [[Links]]\n\n- [[Article]]\n',
+    )
   })
 
   it('matches a linked target case-insensitively and preserves its alias', () => {
@@ -306,12 +306,16 @@ describe('editTaskLine', () => {
 
   it('refuses content with an embedded newline (would split the item)', () => {
     const source = '+ [ ] one\n'
-    expect(() => editTaskLine(source, indexedTask(source), 'one\n+ [ ] two')).toThrow(TaskStaleError)
+    expect(() => editTaskLine(source, indexedTask(source), 'one\n+ [ ] two')).toThrow(
+      TaskStaleError,
+    )
   })
 
   it('refuses content with a carriage return too', () => {
     const source = '+ [ ] one\n'
-    expect(() => editTaskLine(source, indexedTask(source), 'one\r+ [ ] two')).toThrow(TaskStaleError)
+    expect(() => editTaskLine(source, indexedTask(source), 'one\r+ [ ] two')).toThrow(
+      TaskStaleError,
+    )
   })
 
   it('refuses loudly when the task line is gone', () => {
@@ -361,15 +365,17 @@ describe('appendTaskToContext', () => {
     const anchor = parseNote({ path: 'notes/n.md', source }).tasks[0]!
     const inserted = appendTaskToContext(source, anchor)
 
-    expect(inserted.source).toBe([
-      '+ StartupToolbox',
-      '  + Reflections',
-      '    + [ ] first',
-      '    + [ ] ',
-      '  + Later',
-      '    + [ ] third',
-      '',
-    ].join('\n'))
+    expect(inserted.source).toBe(
+      [
+        '+ StartupToolbox',
+        '  + Reflections',
+        '    + [ ] first',
+        '    + [ ] ',
+        '  + Later',
+        '    + [ ] third',
+        '',
+      ].join('\n'),
+    )
     const created = parseNote({ path: 'notes/n.md', source: inserted.source }).tasks.find(
       (task) => task.markerOffset === inserted.markerOffset,
     )

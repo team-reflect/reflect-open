@@ -52,9 +52,7 @@ export function CaptureProvider({ graph, children }: CaptureProviderProps): Reac
     const controller = createCaptureController({
       generation: graph.generation,
       getProviders: () => providersRef.current,
-      ...(mobile
-        ? { relaySharedInbox: () => captureSharedInboxRelay(graph.generation) }
-        : {}),
+      ...(mobile ? { relaySharedInbox: () => captureSharedInboxRelay(graph.generation) } : {}),
     })
     // Registration (the pointer-file rewrite) completes BEFORE the first
     // drain: on a graph switch this repoints the host at the new graph as
@@ -66,11 +64,12 @@ export function CaptureProvider({ graph, children }: CaptureProviderProps): Reac
     // already spooled must land regardless, and the extension surfaces
     // "host not found" with install guidance on its side. Mobile has no host
     // process at all: the share extension finds the App Group inbox itself.
-    const registered = hasBridge() && !mobile
-      ? captureHostRegister().catch((cause: unknown) => {
-          console.error('capture host registration failed:', cause)
-        })
-      : Promise.resolve()
+    const registered =
+      hasBridge() && !mobile
+        ? captureHostRegister().catch((cause: unknown) => {
+            console.error('capture host registration failed:', cause)
+          })
+        : Promise.resolve()
     void registered.then(() => {
       controller.start() // a no-op if the effect tore down while registering
     })

@@ -77,10 +77,7 @@ export function DateTimeSection(): ReactElement {
           </Select>
         </div>
       </SettingsField>
-      <SettingsField
-        legend="Start week on"
-        description="The first day shown in calendars."
-      >
+      <SettingsField legend="Start week on" description="The first day shown in calendars.">
         <div className="mt-3">
           <Select
             value={settings.weekStartDay}

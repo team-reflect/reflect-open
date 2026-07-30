@@ -113,9 +113,7 @@ export function ConnectGithubDialog({
           />
         ) : null}
 
-        {wizard.step === 'finish' ? (
-          <ConnectGithubFinishStep wizard={wizard} layout="row" />
-        ) : null}
+        {wizard.step === 'finish' ? <ConnectGithubFinishStep wizard={wizard} layout="row" /> : null}
 
         {wizard.step !== 'finish' && wizard.error !== null ? (
           <InlineAlert tone="error">{wizard.error}</InlineAlert>

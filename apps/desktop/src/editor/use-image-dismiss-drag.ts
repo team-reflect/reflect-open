@@ -77,17 +77,12 @@ export interface ImageDismissDrag {
   finishSettle: () => void
 }
 
-
 function dragDistance(deltaX: number, deltaY: number): number {
   return Math.hypot(deltaX, deltaY)
 }
 
 function dragProgress(deltaX: number, deltaY: number, height: number): number {
-  return clamp(
-    dragDistance(deltaX, deltaY) / Math.max(height * PROGRESS_TRAVEL_FRACTION, 1),
-    0,
-    1,
-  )
+  return clamp(dragDistance(deltaX, deltaY) / Math.max(height * PROGRESS_TRAVEL_FRACTION, 1), 0, 1)
 }
 
 /** Continue the drag vector so the image exits along the finger's line. */

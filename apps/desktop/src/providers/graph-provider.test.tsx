@@ -206,9 +206,7 @@ describe('GraphProvider open sequencing', () => {
     })
     await vi.waitFor(() => expect(invokeLog).toContain('graph_open:/a'))
     expect(invokeLog.indexOf('close_note_windows')).toBeGreaterThanOrEqual(0)
-    expect(invokeLog.indexOf('close_note_windows')).toBeLessThan(
-      invokeLog.indexOf('graph_open:/a'),
-    )
+    expect(invokeLog.indexOf('close_note_windows')).toBeLessThan(invokeLog.indexOf('graph_open:/a'))
     await act(async () => {
       resolveOpen('/a')
       await opened

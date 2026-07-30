@@ -45,9 +45,9 @@ function renderSection() {
 }
 
 beforeEach(() => {
-  listTemplates.mockReset().mockResolvedValue([
-    { path: 'templates/weekly-review.md', title: 'Weekly review', mtime: 1 },
-  ])
+  listTemplates
+    .mockReset()
+    .mockResolvedValue([{ path: 'templates/weekly-review.md', title: 'Weekly review', mtime: 1 }])
   openRouteInNewWindow.mockReset().mockResolvedValue(true)
 })
 

@@ -63,7 +63,10 @@ function activeEntry() {
 describe('SettingsNavigator', () => {
   it('lists every visible section in order', async () => {
     await renderNavigatorPage()
-    const labels = page.getByRole('button').elements().map((button) => button.textContent)
+    const labels = page
+      .getByRole('button')
+      .elements()
+      .map((button) => button.textContent)
     expect(labels).toEqual(VISIBLE_SECTIONS.map((section) => section.title))
   })
 

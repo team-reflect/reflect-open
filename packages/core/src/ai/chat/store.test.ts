@@ -26,13 +26,23 @@ const turn: ChatTurn = {
   id: 'turn-1',
   userText: 'what is this?',
   attachments: [
-    { id: 'att-1', name: 'cat.png', mediaType: 'image/png', dataUrl: 'data:image/png;base64,iVBORw==' },
+    {
+      id: 'att-1',
+      name: 'cat.png',
+      mediaType: 'image/png',
+      dataUrl: 'data:image/png;base64,iVBORw==',
+    },
   ],
   parts: [
     {
       kind: 'tool',
       call: { tool: 'search', toolCallId: 'tool-1', query: 'cat' },
-      result: { tool: 'search', toolCallId: 'tool-1', query: 'cat', hits: [{ path: 'notes/a.md', title: 'Cats' }] },
+      result: {
+        tool: 'search',
+        toolCallId: 'tool-1',
+        query: 'cat',
+        hits: [{ path: 'notes/a.md', title: 'Cats' }],
+      },
       error: null,
     },
     { kind: 'text', text: 'A cat, per [[Cats]].' },
@@ -90,10 +100,7 @@ describe('loadChatMessages', () => {
 
   it('drops an unreadable row but keeps the rest', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
-    invoke.mockResolvedValue([
-      messageRow({ id: 'turn-bad', parts: '{not json' }),
-      messageRow(),
-    ])
+    invoke.mockResolvedValue([messageRow({ id: 'turn-bad', parts: '{not json' }), messageRow()])
     const turns = await loadChatMessages('conv-1')
     expect(turns).toEqual([turn])
     expect(error).toHaveBeenCalledOnce()
@@ -101,9 +108,7 @@ describe('loadChatMessages', () => {
 
   it('drops a row whose parts fail validation', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    invoke.mockResolvedValue([
-      messageRow({ parts: JSON.stringify([{ kind: 'mystery' }]) }),
-    ])
+    invoke.mockResolvedValue([messageRow({ parts: JSON.stringify([{ kind: 'mystery' }]) })])
     expect(await loadChatMessages('conv-1')).toEqual([])
   })
 
@@ -114,7 +119,13 @@ describe('loadChatMessages', () => {
       {
         kind: 'tool',
         call: { tool: 'read', toolCallId: 'tool-2', path: 'notes/a.md' },
-        result: { tool: 'read', toolCallId: 'tool-2', path: 'notes/a.md', title: 'Cats', error: null },
+        result: {
+          tool: 'read',
+          toolCallId: 'tool-2',
+          path: 'notes/a.md',
+          title: 'Cats',
+          error: null,
+        },
         error: null,
       },
     ]

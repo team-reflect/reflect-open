@@ -78,7 +78,11 @@ export async function createNoteWithTitle(
   generation: number,
   body?: string,
 ): Promise<string> {
-  const claimed = await claimNotePathForSlug(slugForTitle(title), newNoteSource(title, body), generation)
+  const claimed = await claimNotePathForSlug(
+    slugForTitle(title),
+    newNoteSource(title, body),
+    generation,
+  )
   return claimed.path
 }
 
@@ -168,8 +172,13 @@ export async function resolveOrCreateNoteWithTitle(
 
   // On a lost claim, re-resolve both projections before considering a
   // suffix: the winner may be the note this link meant.
-  return claimNotePathForSlug(slugForTitle(title), newNoteSource(title, body), generation, async () => {
-    const collisionResolution = await resolveExistingWikiTarget(title, generation)
-    return collisionResolution.kind === 'missing' ? null : collisionResolution
-  })
+  return claimNotePathForSlug(
+    slugForTitle(title),
+    newNoteSource(title, body),
+    generation,
+    async () => {
+      const collisionResolution = await resolveExistingWikiTarget(title, generation)
+      return collisionResolution.kind === 'missing' ? null : collisionResolution
+    },
+  )
 }

@@ -21,9 +21,7 @@ export function NoteConflictBanner({
 }: NoteConflictBannerProps): ReactElement {
   return (
     <InlineAlert className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-      <span className="min-w-0 flex-1">
-        This note changed on disk while you had unsaved edits.
-      </span>
+      <span className="min-w-0 flex-1">This note changed on disk while you had unsaved edits.</span>
       <div className="flex gap-2">
         <Button size="xs" variant="outline" onClick={onKeepMine}>
           Keep mine

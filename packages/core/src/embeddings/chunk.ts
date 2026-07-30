@@ -1,9 +1,6 @@
 import { parseNote, splitFrontmatter } from '../markdown'
 import { hashContent } from '../indexing/hash'
-import {
-  MAX_ASSET_TEXT_CHARS,
-  type AssetDescriptionBody,
-} from '../indexing/asset-description-text'
+import { MAX_ASSET_TEXT_CHARS, type AssetDescriptionBody } from '../indexing/asset-description-text'
 
 /**
  * Sentence-aware note chunking (Plan 09). Sections split on headings, then
@@ -193,9 +190,8 @@ export async function chunkAssetDescriptions(
     const text = body.slice(0, budget)
     budget -= text.length
     const heading = assetBasename(assetPath)
-    const bodyChunks = await mergeRuntTail(
-      await chunkRun(text, offset, heading),
-      (from, to) => text.slice(from - offset, to - offset),
+    const bodyChunks = await mergeRuntTail(await chunkRun(text, offset, heading), (from, to) =>
+      text.slice(from - offset, to - offset),
     )
     chunks.push(...bodyChunks)
     offset += text.length + 2 // as if joined by the FTS fold's blank line

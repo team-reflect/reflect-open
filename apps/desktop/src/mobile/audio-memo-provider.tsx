@@ -86,8 +86,7 @@ const MobileAudioMemoContext = createContext<MobileAudioMemoContextValue | null>
 /** Auto-stop cap: bounds the transcription payload (desktop parity). */
 const MAX_DURATION_MS = 10 * 60_000
 
-const MIC_DENIED_REASON =
-  'Microphone access was denied. Allow it for Reflect in the Settings app.'
+const MIC_DENIED_REASON = 'Microphone access was denied. Allow it for Reflect in the Settings app.'
 
 interface MobileAudioMemoProviderProps {
   graph: GraphInfo
@@ -311,9 +310,7 @@ export function MobileAudioMemoProvider({
     ],
   )
 
-  return (
-    <MobileAudioMemoContext.Provider value={value}>{children}</MobileAudioMemoContext.Provider>
-  )
+  return <MobileAudioMemoContext.Provider value={value}>{children}</MobileAudioMemoContext.Provider>
 }
 
 /** Access the mobile audio-memo surface. Use within MobileAudioMemoProvider. */

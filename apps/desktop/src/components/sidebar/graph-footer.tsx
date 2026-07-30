@@ -178,10 +178,7 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
           </DropdownMenuItem>
           {/* Graph switching re-roots every window; note windows hide it. */}
           {isMainWindow() ? (
-            <DropdownMenuItem
-              onSelect={() => void chooseGraph()}
-              className={MENU_ITEM_CLASS}
-            >
+            <DropdownMenuItem onSelect={() => void chooseGraph()} className={MENU_ITEM_CLASS}>
               <FolderOpen aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
               <span className="min-w-0 flex-1 truncate">Open another graph…</span>
             </DropdownMenuItem>

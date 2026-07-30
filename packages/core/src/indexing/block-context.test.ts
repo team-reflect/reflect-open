@@ -12,7 +12,8 @@ function posOf(content: string, link: string): number {
 
 describe('blockContextAt', () => {
   it('returns the whole paragraph, not just the physical line', () => {
-    const content = 'intro line\n\nfirst wrapped line with [[Target]]\nsecond wrapped line\n\nafter\n'
+    const content =
+      'intro line\n\nfirst wrapped line with [[Target]]\nsecond wrapped line\n\nafter\n'
     expect(blockContextAt(content, posOf(content, '[[Target]]'))).toBe(
       'first wrapped line with [[Target]]\nsecond wrapped line',
     )
@@ -58,9 +59,7 @@ describe('blockContextAt', () => {
     // Divergence from old Reflect, where titles lived outside the document: the
     // section rule would inline the entire note for a title mention.
     const content = '# Meeting with [[Target]]\n\nagenda item one\n\nagenda item two\n'
-    expect(blockContextAt(content, posOf(content, '[[Target]]'))).toBe(
-      '# Meeting with [[Target]]',
-    )
+    expect(blockContextAt(content, posOf(content, '[[Target]]'))).toBe('# Meeting with [[Target]]')
   })
 
   it('keeps the section rule for a non-title H1', () => {

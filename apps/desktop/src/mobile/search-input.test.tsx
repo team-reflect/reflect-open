@@ -7,9 +7,7 @@ import { SearchInput } from './search-input'
 
 describe('SearchInput', () => {
   it('blurs the field on the return key (dismissing the iOS keyboard)', async () => {
-    const view = await render(
-      <SearchInput aria-label="Search" value="" onValueChange={vi.fn()} />,
-    )
+    const view = await render(<SearchInput aria-label="Search" value="" onValueChange={vi.fn()} />)
     const input = view.getByLabelText('Search').element() as HTMLInputElement
     input.focus()
     expect(document.activeElement).toBe(input)
@@ -18,9 +16,7 @@ describe('SearchInput', () => {
   })
 
   it('leaves the field focused for other keys', async () => {
-    const view = await render(
-      <SearchInput aria-label="Search" value="" onValueChange={vi.fn()} />,
-    )
+    const view = await render(<SearchInput aria-label="Search" value="" onValueChange={vi.fn()} />)
     const input = view.getByLabelText('Search').element() as HTMLInputElement
     input.focus()
     await userEvent.keyboard('a')
@@ -30,12 +26,7 @@ describe('SearchInput', () => {
   it('runs a caller-supplied onKeyDown after dismissing', async () => {
     const onKeyDown = vi.fn()
     const view = await render(
-      <SearchInput
-        aria-label="Search"
-        value=""
-        onValueChange={vi.fn()}
-        onKeyDown={onKeyDown}
-      />,
+      <SearchInput aria-label="Search" value="" onValueChange={vi.fn()} onKeyDown={onKeyDown} />,
     )
     const input = view.getByLabelText('Search').element() as HTMLInputElement
     input.focus()
@@ -44,9 +35,7 @@ describe('SearchInput', () => {
   })
 
   it('is a search-typed input', async () => {
-    const view = await render(
-      <SearchInput aria-label="Search" value="" onValueChange={vi.fn()} />,
-    )
+    const view = await render(<SearchInput aria-label="Search" value="" onValueChange={vi.fn()} />)
     await expect.element(view.getByLabelText('Search')).toHaveAttribute('type', 'search')
   })
 
@@ -75,11 +64,5 @@ describe('SearchInput', () => {
 
 function SearchInputHarness({ initialValue = '' }: { initialValue?: string }): ReactElement {
   const [value, setValue] = useState(initialValue)
-  return (
-    <SearchInput
-      aria-label="Search"
-      value={value}
-      onValueChange={setValue}
-    />
-  )
+  return <SearchInput aria-label="Search" value={value} onValueChange={setValue} />
 }

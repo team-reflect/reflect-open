@@ -124,54 +124,54 @@ vi.mock('./task-editor', () => ({
       }
     })
     return (
-    <div data-task-editor data-testid="task-editor">
-      <span>editing: {task.text}</span>
-      <button type="button" onClick={() => onCommit('edited content')}>
-        commit-edit
-      </button>
-      <button type="button" onClick={() => onContinue('edited content')}>
-        continue-edit
-      </button>
-      <button type="button" onClick={() => onContinue(null)}>
-        continue-unchanged
-      </button>
-      <button type="button" onClick={() => onContinue('')}>
-        continue-empty
-      </button>
-      <button type="button" onClick={() => onDelete()}>
-        delete-edit
-      </button>
-      <button type="button" onClick={() => onDeleteEmpty()}>
-        delete-empty-edit
-      </button>
-      <button type="button" onClick={() => onCancel()}>
-        cancel-edit
-      </button>
-      <button type="button" onClick={() => onComplete('edited content')}>
-        complete-edited
-      </button>
-      <button type="button" onClick={() => onComplete(null)}>
-        complete-unchanged
-      </button>
-      <button type="button" onClick={() => setCheckboxDraft('edited content')}>
-        stage-checkbox-edit
-      </button>
-      <button type="button" onClick={() => onConvertToBullet('edited content')}>
-        convert-edited
-      </button>
-      <button type="button" onClick={() => onConvertToBullet(null)}>
-        convert-unchanged
-      </button>
-      <button type="button" onClick={() => onFlush('edited content')}>
-        flush-edit
-      </button>
-      <button type="button" onClick={() => onNavigate(1, { span: false })}>
-        nav-down
-      </button>
-      <button type="button" onClick={() => onNavigate(-1, { span: false })}>
-        nav-up
-      </button>
-    </div>
+      <div data-task-editor data-testid="task-editor">
+        <span>editing: {task.text}</span>
+        <button type="button" onClick={() => onCommit('edited content')}>
+          commit-edit
+        </button>
+        <button type="button" onClick={() => onContinue('edited content')}>
+          continue-edit
+        </button>
+        <button type="button" onClick={() => onContinue(null)}>
+          continue-unchanged
+        </button>
+        <button type="button" onClick={() => onContinue('')}>
+          continue-empty
+        </button>
+        <button type="button" onClick={() => onDelete()}>
+          delete-edit
+        </button>
+        <button type="button" onClick={() => onDeleteEmpty()}>
+          delete-empty-edit
+        </button>
+        <button type="button" onClick={() => onCancel()}>
+          cancel-edit
+        </button>
+        <button type="button" onClick={() => onComplete('edited content')}>
+          complete-edited
+        </button>
+        <button type="button" onClick={() => onComplete(null)}>
+          complete-unchanged
+        </button>
+        <button type="button" onClick={() => setCheckboxDraft('edited content')}>
+          stage-checkbox-edit
+        </button>
+        <button type="button" onClick={() => onConvertToBullet('edited content')}>
+          convert-edited
+        </button>
+        <button type="button" onClick={() => onConvertToBullet(null)}>
+          convert-unchanged
+        </button>
+        <button type="button" onClick={() => onFlush('edited content')}>
+          flush-edit
+        </button>
+        <button type="button" onClick={() => onNavigate(1, { span: false })}>
+          nav-down
+        </button>
+        <button type="button" onClick={() => onNavigate(-1, { span: false })}>
+          nav-up
+        </button>
+      </div>
     )
   },
 }))
@@ -188,9 +188,7 @@ function RouteProbe(): ReactNode {
   return <output data-testid="route">{JSON.stringify(route)}</output>
 }
 
-function renderScreen(
-  client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
-) {
+function renderScreen(client = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   return render(
     <QueryClientProvider client={client}>
       <RouterProvider>
@@ -333,7 +331,12 @@ describe('TasksScreen', () => {
 
   it('groups tasks by date bucket then note, in display order', async () => {
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'daily/2026-06-14.md', dailyDate: '2026-06-14', text: 'today task', noteTitle: '2026-06-14' }),
+      task({
+        notePath: 'daily/2026-06-14.md',
+        dailyDate: '2026-06-14',
+        text: 'today task',
+        noteTitle: '2026-06-14',
+      }),
       // Overdue needs an explicit past due date (V1 asymmetry) — a bare past
       // daily-note task would be Current.
       task({ notePath: 'notes/d.md', dueDate: '2026-06-10', text: 'overdue task', noteTitle: 'D' }),
@@ -476,9 +479,7 @@ describe('TasksScreen', () => {
     ])
     const view = await renderScreen()
 
-    await userEvent.click(
-      await view.findByRole('button', { name: 'Tue, June 9th, 2026' }),
-    )
+    await userEvent.click(await view.findByRole('button', { name: 'Tue, June 9th, 2026' }))
 
     expect(view.getByTestId('route').element().textContent).toBe(
       '{"kind":"daily","date":"2026-06-09"}',
@@ -539,9 +540,9 @@ describe('TasksScreen', () => {
 
     await userEvent.keyboard('{Escape}')
     expect(view.queryByTestId('task-editor')).toBeNull()
-    expect(
-      view.getByRole('button', { name: 'first' }).element().getAttribute('aria-pressed'),
-    ).toBe('false')
+    expect(view.getByRole('button', { name: 'first' }).element().getAttribute('aria-pressed')).toBe(
+      'false',
+    )
     await view.unmount()
   })
 
@@ -568,7 +569,13 @@ describe('TasksScreen', () => {
     editTask.mockResolvedValue(undefined)
     deleteTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/p.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'P' }),
+      task({
+        notePath: 'notes/p.md',
+        markerOffset: 2,
+        raw: '[ ] first',
+        text: 'first',
+        noteTitle: 'P',
+      }),
     ])
     const view = await renderScreen()
 
@@ -599,7 +606,13 @@ describe('TasksScreen', () => {
   it('flush persists an edit without exiting edit mode (selection unchanged)', async () => {
     editTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/p.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'P' }),
+      task({
+        notePath: 'notes/p.md',
+        markerOffset: 2,
+        raw: '[ ] first',
+        text: 'first',
+        noteTitle: 'P',
+      }),
     ])
     const view = await renderScreen()
 
@@ -621,7 +634,13 @@ describe('TasksScreen', () => {
     editTask.mockResolvedValue(undefined)
     toggleTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/p.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'P' }),
+      task({
+        notePath: 'notes/p.md',
+        markerOffset: 2,
+        raw: '[ ] first',
+        text: 'first',
+        noteTitle: 'P',
+      }),
     ])
     const view = await renderScreen()
 
@@ -672,7 +691,13 @@ describe('TasksScreen', () => {
   it('completes from the editor: an unchanged task just toggles, no edit', async () => {
     toggleTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/p.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'P' }),
+      task({
+        notePath: 'notes/p.md',
+        markerOffset: 2,
+        raw: '[ ] first',
+        text: 'first',
+        noteTitle: 'P',
+      }),
     ])
     const view = await renderScreen()
 
@@ -735,8 +760,20 @@ describe('TasksScreen', () => {
   it('completes the selection with ⌘↵', async () => {
     toggleTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
-      task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] second', text: 'second', noteTitle: 'B' }),
+      task({
+        notePath: 'notes/a.md',
+        markerOffset: 2,
+        raw: '[ ] first',
+        text: 'first',
+        noteTitle: 'A',
+      }),
+      task({
+        notePath: 'notes/b.md',
+        markerOffset: 2,
+        raw: '[ ] second',
+        text: 'second',
+        noteTitle: 'B',
+      }),
     ])
     const view = await renderScreen()
 
@@ -753,8 +790,20 @@ describe('TasksScreen', () => {
   it('deletes a multi-selection with ⌘⌫', async () => {
     deleteTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
-      task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] second', text: 'second', noteTitle: 'B' }),
+      task({
+        notePath: 'notes/a.md',
+        markerOffset: 2,
+        raw: '[ ] first',
+        text: 'first',
+        noteTitle: 'A',
+      }),
+      task({
+        notePath: 'notes/b.md',
+        markerOffset: 2,
+        raw: '[ ] second',
+        text: 'second',
+        noteTitle: 'B',
+      }),
     ])
     const view = await renderScreen()
 
@@ -771,7 +820,13 @@ describe('TasksScreen', () => {
   it('a note group’s "+ Add" button inserts into that note and opens the editor', async () => {
     insertTask.mockResolvedValue(0)
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/proj.md', markerOffset: 2, raw: '[ ] a', text: 'a', noteTitle: 'Project' }),
+      task({
+        notePath: 'notes/proj.md',
+        markerOffset: 2,
+        raw: '[ ] a',
+        text: 'a',
+        noteTitle: 'Project',
+      }),
     ])
     const view = await renderScreen()
 
@@ -803,7 +858,13 @@ describe('TasksScreen', () => {
 
   it('Return adds a task to today’s daily and opens its inline editor', async () => {
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
+      task({
+        notePath: 'notes/a.md',
+        markerOffset: 2,
+        raw: '[ ] first',
+        text: 'first',
+        noteTitle: 'A',
+      }),
     ])
     const view = await renderScreen()
 
@@ -819,7 +880,13 @@ describe('TasksScreen', () => {
   it('dismissing the inserted row deletes the right note line (V1 empty cleanup)', async () => {
     deleteTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
+      task({
+        notePath: 'notes/a.md',
+        markerOffset: 2,
+        raw: '[ ] first',
+        text: 'first',
+        noteTitle: 'A',
+      }),
     ])
     const view = await renderScreen()
 
@@ -843,8 +910,20 @@ describe('TasksScreen', () => {
   it('Backspace deletes a row and lands the editor on the previous one (V1)', async () => {
     deleteTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
-      task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] second', text: 'second', noteTitle: 'B' }),
+      task({
+        notePath: 'notes/a.md',
+        markerOffset: 2,
+        raw: '[ ] first',
+        text: 'first',
+        noteTitle: 'A',
+      }),
+      task({
+        notePath: 'notes/b.md',
+        markerOffset: 2,
+        raw: '[ ] second',
+        text: 'second',
+        noteTitle: 'B',
+      }),
     ])
     const view = await renderScreen()
 
@@ -854,7 +933,10 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'delete-empty-edit' }))
 
     await waitFor(() =>
-      expect(deleteTask).toHaveBeenCalledWith(expect.objectContaining({ notePath: 'notes/b.md' }), 1),
+      expect(deleteTask).toHaveBeenCalledWith(
+        expect.objectContaining({ notePath: 'notes/b.md' }),
+        1,
+      ),
     )
     // Lands on the previous row, whose editor now opens.
     await view.findByText('editing: first')
@@ -865,7 +947,13 @@ describe('TasksScreen', () => {
     deleteTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([
       task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ]', text: '', noteTitle: 'A' }),
-      task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] keep', text: 'keep', noteTitle: 'B' }),
+      task({
+        notePath: 'notes/b.md',
+        markerOffset: 2,
+        raw: '[ ] keep',
+        text: 'keep',
+        noteTitle: 'B',
+      }),
     ])
     const view = await renderScreen()
 
@@ -883,7 +971,13 @@ describe('TasksScreen', () => {
     editTask.mockResolvedValue(undefined)
     insertTask.mockResolvedValue(7)
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
+      task({
+        notePath: 'notes/a.md',
+        markerOffset: 2,
+        raw: '[ ] first',
+        text: 'first',
+        noteTitle: 'A',
+      }),
     ])
     const view = await renderScreen()
 
@@ -945,9 +1039,7 @@ describe('TasksScreen', () => {
     await view.findByTestId('task-editor')
     expect(view.getByText('later')).toBeDefined()
 
-    await userEvent.click(
-      view.getByRole('button', { name: 'StartupToolbox → Reflections' }),
-    )
+    await userEvent.click(view.getByRole('button', { name: 'StartupToolbox → Reflections' }))
     expect(view.getByRole('button', { name: 'Convert to bullet 2' })).toBeDefined()
     await view.unmount()
   })
@@ -1014,7 +1106,13 @@ describe('TasksScreen', () => {
     deleteTask.mockResolvedValue(undefined)
     insertTask.mockResolvedValue(0)
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
+      task({
+        notePath: 'notes/a.md',
+        markerOffset: 2,
+        raw: '[ ] first',
+        text: 'first',
+        noteTitle: 'A',
+      }),
     ])
     const view = await renderScreen()
 
@@ -1023,7 +1121,10 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: 'continue-empty' }))
     // The cleared row is deleted (not edited to `+ [ ]`); editTask is never called.
     await waitFor(() =>
-      expect(deleteTask).toHaveBeenCalledWith(expect.objectContaining({ notePath: 'notes/a.md' }), 1),
+      expect(deleteTask).toHaveBeenCalledWith(
+        expect.objectContaining({ notePath: 'notes/a.md' }),
+        1,
+      ),
     )
     expect(editTask).not.toHaveBeenCalled()
     await view.unmount()
@@ -1031,8 +1132,20 @@ describe('TasksScreen', () => {
 
   it('↑/↓ in the editor move the selection between rows (V1)', async () => {
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
-      task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] second', text: 'second', noteTitle: 'B' }),
+      task({
+        notePath: 'notes/a.md',
+        markerOffset: 2,
+        raw: '[ ] first',
+        text: 'first',
+        noteTitle: 'A',
+      }),
+      task({
+        notePath: 'notes/b.md',
+        markerOffset: 2,
+        raw: '[ ] second',
+        text: 'second',
+        noteTitle: 'B',
+      }),
     ])
     const view = await renderScreen()
 
@@ -1048,7 +1161,13 @@ describe('TasksScreen', () => {
     window.sessionStorage.setItem('reflect.tasks.filter.archived', 'true')
     toggleTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] open', text: 'open', noteTitle: 'A' }),
+      task({
+        notePath: 'notes/a.md',
+        markerOffset: 2,
+        raw: '[ ] open',
+        text: 'open',
+        noteTitle: 'A',
+      }),
     ])
     getCompletedTasks.mockResolvedValue([
       task({
@@ -1074,8 +1193,20 @@ describe('TasksScreen', () => {
   it('scheduling the selection writes a due-date link to each task (V1)', async () => {
     editTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] plan', text: 'plan', noteTitle: 'A' }),
-      task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] ship', text: 'ship', noteTitle: 'B' }),
+      task({
+        notePath: 'notes/a.md',
+        markerOffset: 2,
+        raw: '[ ] plan',
+        text: 'plan',
+        noteTitle: 'A',
+      }),
+      task({
+        notePath: 'notes/b.md',
+        markerOffset: 2,
+        raw: '[ ] ship',
+        text: 'ship',
+        noteTitle: 'B',
+      }),
     ])
     const view = await renderScreen()
 
@@ -1096,8 +1227,20 @@ describe('TasksScreen', () => {
 
   it('converts a multi-selection to bullets via the toolbar button (no editor, bulk)', async () => {
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] plan', text: 'plan', noteTitle: 'A' }),
-      task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] ship', text: 'ship', noteTitle: 'B' }),
+      task({
+        notePath: 'notes/a.md',
+        markerOffset: 2,
+        raw: '[ ] plan',
+        text: 'plan',
+        noteTitle: 'A',
+      }),
+      task({
+        notePath: 'notes/b.md',
+        markerOffset: 2,
+        raw: '[ ] ship',
+        text: 'ship',
+        noteTitle: 'B',
+      }),
     ])
     const view = await renderScreen()
 
@@ -1106,8 +1249,14 @@ describe('TasksScreen', () => {
     await userEvent.click(view.getByRole('button', { name: /Convert to bullet 2/ }))
 
     await waitFor(() => expect(convertTaskToBullet).toHaveBeenCalledTimes(2))
-    expect(convertTaskToBullet).toHaveBeenCalledWith(expect.objectContaining({ notePath: 'notes/a.md' }), 1)
-    expect(convertTaskToBullet).toHaveBeenCalledWith(expect.objectContaining({ notePath: 'notes/b.md' }), 1)
+    expect(convertTaskToBullet).toHaveBeenCalledWith(
+      expect.objectContaining({ notePath: 'notes/a.md' }),
+      1,
+    )
+    expect(convertTaskToBullet).toHaveBeenCalledWith(
+      expect.objectContaining({ notePath: 'notes/b.md' }),
+      1,
+    )
     // The converted rows are no longer checkboxes, so they leave the view.
     await waitFor(() => expect(view.queryByText('plan')).toBeNull())
     expect(view.queryByText('ship')).toBeNull()
@@ -1116,8 +1265,20 @@ describe('TasksScreen', () => {
 
   it('converts a multi-selection to bullets with ⌘⇧K', async () => {
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] plan', text: 'plan', noteTitle: 'A' }),
-      task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] ship', text: 'ship', noteTitle: 'B' }),
+      task({
+        notePath: 'notes/a.md',
+        markerOffset: 2,
+        raw: '[ ] plan',
+        text: 'plan',
+        noteTitle: 'A',
+      }),
+      task({
+        notePath: 'notes/b.md',
+        markerOffset: 2,
+        raw: '[ ] ship',
+        text: 'ship',
+        noteTitle: 'B',
+      }),
     ])
     const view = await renderScreen()
 
@@ -1135,7 +1296,13 @@ describe('TasksScreen', () => {
     // Bugbot flagged (convert landing before the editor's commit) can't happen.
     editTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] plan', text: 'plan', noteTitle: 'A' }),
+      task({
+        notePath: 'notes/a.md',
+        markerOffset: 2,
+        raw: '[ ] plan',
+        text: 'plan',
+        noteTitle: 'A',
+      }),
     ])
     const view = await renderScreen()
 
@@ -1163,13 +1330,21 @@ describe('TasksScreen', () => {
   it('converts an edited row from the editor’s own ⌘⇧K (save then convert)', async () => {
     editTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] plan', text: 'plan', noteTitle: 'A' }),
+      task({
+        notePath: 'notes/a.md',
+        markerOffset: 2,
+        raw: '[ ] plan',
+        text: 'plan',
+        noteTitle: 'A',
+      }),
     ])
     const view = await renderScreen()
 
     await userEvent.click(await view.findByRole('button', { name: 'plan' }))
     await userEvent.click(view.getByRole('button', { name: 'convert-edited' }))
-    await waitFor(() => expect(editTask).toHaveBeenCalledWith(expect.anything(), 'edited content', 1))
+    await waitFor(() =>
+      expect(editTask).toHaveBeenCalledWith(expect.anything(), 'edited content', 1),
+    )
     await waitFor(() => expect(convertTaskToBullet).toHaveBeenCalled())
     await view.unmount()
   })
@@ -1177,8 +1352,20 @@ describe('TasksScreen', () => {
   it('⌘↵ reopens a selection that is already all checked (toggle both ways, V1)', async () => {
     toggleTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] one', text: 'one', noteTitle: 'A' }),
-      task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] two', text: 'two', noteTitle: 'B' }),
+      task({
+        notePath: 'notes/a.md',
+        markerOffset: 2,
+        raw: '[ ] one',
+        text: 'one',
+        noteTitle: 'A',
+      }),
+      task({
+        notePath: 'notes/b.md',
+        markerOffset: 2,
+        raw: '[ ] two',
+        text: 'two',
+        noteTitle: 'B',
+      }),
     ])
     const view = await renderScreen()
 
@@ -1211,9 +1398,9 @@ describe('TasksScreen', () => {
     fireEvent.keyDown(item, { key: 'ArrowDown' })
 
     expect(view.queryByTestId('task-editor')).toBeNull()
-    expect(
-      view.getByRole('button', { name: 'first' }).element().getAttribute('aria-pressed'),
-    ).toBe('false')
+    expect(view.getByRole('button', { name: 'first' }).element().getAttribute('aria-pressed')).toBe(
+      'false',
+    )
     menu.remove()
     await view.unmount()
   })
@@ -1234,7 +1421,11 @@ describe('TasksScreen', () => {
     await userEvent.click(await view.findByRole('button', { name: 'Complete: project task' }))
     await waitFor(() =>
       expect(toggleTask).toHaveBeenCalledWith(
-        expect.objectContaining({ notePath: 'notes/p.md', markerOffset: 5, raw: '[ ] project task' }),
+        expect.objectContaining({
+          notePath: 'notes/p.md',
+          markerOffset: 5,
+          raw: '[ ] project task',
+        }),
         1,
       ),
     )
@@ -1329,7 +1520,11 @@ describe('TasksScreen', () => {
 
     await waitFor(() =>
       expect(toggleTask).toHaveBeenCalledWith(
-        expect.objectContaining({ notePath: 'notes/p.md', markerOffset: 5, raw: '[ ] project task' }),
+        expect.objectContaining({
+          notePath: 'notes/p.md',
+          markerOffset: 5,
+          raw: '[ ] project task',
+        }),
         1,
       ),
     )
@@ -1435,14 +1630,22 @@ describe('TasksScreen', () => {
 
     await waitFor(() =>
       expect(editTask).toHaveBeenCalledWith(
-        expect.objectContaining({ notePath: 'notes/p.md', markerOffset: 5, raw: '[ ] project task' }),
+        expect.objectContaining({
+          notePath: 'notes/p.md',
+          markerOffset: 5,
+          raw: '[ ] project task',
+        }),
         'edited content',
         1,
       ),
     )
     await waitFor(() =>
       expect(toggleTask).toHaveBeenCalledWith(
-        expect.objectContaining({ notePath: 'notes/p.md', markerOffset: 5, raw: '[ ] edited content' }),
+        expect.objectContaining({
+          notePath: 'notes/p.md',
+          markerOffset: 5,
+          raw: '[ ] edited content',
+        }),
         1,
       ),
     )
@@ -1504,7 +1707,11 @@ describe('TasksScreen', () => {
 
     await waitFor(() =>
       expect(toggleTask).toHaveBeenLastCalledWith(
-        expect.objectContaining({ notePath: 'notes/p.md', markerOffset: 5, raw: '[x] project task' }),
+        expect.objectContaining({
+          notePath: 'notes/p.md',
+          markerOffset: 5,
+          raw: '[x] project task',
+        }),
         1,
       ),
     )
@@ -1532,7 +1739,11 @@ describe('TasksScreen', () => {
 
     await waitFor(() =>
       expect(toggleTask).toHaveBeenCalledWith(
-        expect.objectContaining({ notePath: 'notes/p.md', markerOffset: 5, raw: '[x] project task' }),
+        expect.objectContaining({
+          notePath: 'notes/p.md',
+          markerOffset: 5,
+          raw: '[x] project task',
+        }),
         1,
       ),
     )
@@ -1624,7 +1835,11 @@ describe('TasksScreen', () => {
 
     await waitFor(() =>
       expect(toggleTask).toHaveBeenCalledWith(
-        expect.objectContaining({ notePath: 'notes/p.md', markerOffset: 5, raw: '[x] project task' }),
+        expect.objectContaining({
+          notePath: 'notes/p.md',
+          markerOffset: 5,
+          raw: '[x] project task',
+        }),
         1,
       ),
     )
@@ -1654,14 +1869,22 @@ describe('TasksScreen', () => {
 
     await waitFor(() =>
       expect(editTask).toHaveBeenCalledWith(
-        expect.objectContaining({ notePath: 'notes/p.md', markerOffset: 5, raw: '[x] project task' }),
+        expect.objectContaining({
+          notePath: 'notes/p.md',
+          markerOffset: 5,
+          raw: '[x] project task',
+        }),
         'edited content',
         1,
       ),
     )
     await waitFor(() =>
       expect(toggleTask).toHaveBeenCalledWith(
-        expect.objectContaining({ notePath: 'notes/p.md', markerOffset: 5, raw: '[x] edited content' }),
+        expect.objectContaining({
+          notePath: 'notes/p.md',
+          markerOffset: 5,
+          raw: '[x] edited content',
+        }),
         1,
       ),
     )
@@ -1724,7 +1947,13 @@ describe('TasksScreen', () => {
   it('shows the Archive button after completing, and Archive hides the row', async () => {
     toggleTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/p.md', markerOffset: 5, raw: '[ ] project task', text: 'project task', noteTitle: 'P' }),
+      task({
+        notePath: 'notes/p.md',
+        markerOffset: 5,
+        raw: '[ ] project task',
+        text: 'project task',
+        noteTitle: 'P',
+      }),
     ])
     const view = await renderScreen()
 
@@ -1743,7 +1972,13 @@ describe('TasksScreen', () => {
   it('archives the session’s completed tasks with ⌘⇧↵', async () => {
     toggleTask.mockResolvedValue(undefined)
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/p.md', markerOffset: 5, raw: '[ ] project task', text: 'project task', noteTitle: 'P' }),
+      task({
+        notePath: 'notes/p.md',
+        markerOffset: 5,
+        raw: '[ ] project task',
+        text: 'project task',
+        noteTitle: 'P',
+      }),
     ])
     const view = await renderScreen()
 
@@ -1758,7 +1993,13 @@ describe('TasksScreen', () => {
     toggleTask.mockResolvedValue(undefined)
     deleteTask.mockRejectedValue(new Error('disk full'))
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] one', text: 'one', noteTitle: 'A' }),
+      task({
+        notePath: 'notes/a.md',
+        markerOffset: 2,
+        raw: '[ ] one',
+        text: 'one',
+        noteTitle: 'A',
+      }),
     ])
     const view = await renderScreen()
 
@@ -1793,8 +2034,20 @@ describe('TasksScreen', () => {
   it('refetches (does not restore a stale snapshot) when a bulk complete fails', async () => {
     toggleTask.mockRejectedValue(new Error('stale index'))
     getOpenTasks.mockResolvedValue([
-      task({ notePath: 'notes/a.md', markerOffset: 2, raw: '[ ] first', text: 'first', noteTitle: 'A' }),
-      task({ notePath: 'notes/b.md', markerOffset: 2, raw: '[ ] second', text: 'second', noteTitle: 'B' }),
+      task({
+        notePath: 'notes/a.md',
+        markerOffset: 2,
+        raw: '[ ] first',
+        text: 'first',
+        noteTitle: 'A',
+      }),
+      task({
+        notePath: 'notes/b.md',
+        markerOffset: 2,
+        raw: '[ ] second',
+        text: 'second',
+        noteTitle: 'B',
+      }),
     ])
     const view = await renderScreen()
 

@@ -90,7 +90,13 @@ const RESTORED_TURN: ChatTurn = {
 }
 
 function conversation(overrides: Partial<ChatConversation> = {}): ChatConversation {
-  return { id: 'conv-1', title: 'what did I write yesterday?', createdMs: 1, updatedMs: Date.now(), ...overrides }
+  return {
+    id: 'conv-1',
+    title: 'what did I write yesterday?',
+    createdMs: 1,
+    updatedMs: Date.now(),
+    ...overrides,
+  }
 }
 
 let session: ReturnType<typeof useChatSession> | null = null
@@ -193,7 +199,11 @@ describe('ChatProvider persistence', () => {
       { type: 'tool-call', call: { tool: 'read', toolCallId: 't1', paths: ['notes/a.md'] } },
       {
         type: 'tool-result',
-        result: { tool: 'read', toolCallId: 't1', notes: [{ path: 'notes/a.md', title: 'A', error: null }] },
+        result: {
+          tool: 'read',
+          toolCallId: 't1',
+          notes: [{ path: 'notes/a.md', title: 'A', error: null }],
+        },
       },
       { type: 'complete', messages: [{ role: 'assistant', content: 'noop' }] },
     ])

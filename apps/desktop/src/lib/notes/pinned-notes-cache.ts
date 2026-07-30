@@ -15,9 +15,6 @@ export function updatePinnedNotesCache(
 }
 
 /** Refetch pinned notes after a failed write so the sidebar reconciles with the index. */
-export function invalidatePinnedNotesCache(
-  queryClient: QueryClient,
-  graphRoot: string,
-): void {
+export function invalidatePinnedNotesCache(queryClient: QueryClient, graphRoot: string): void {
   void queryClient.invalidateQueries({ queryKey: pinnedNotesQueryKey(graphRoot) })
 }

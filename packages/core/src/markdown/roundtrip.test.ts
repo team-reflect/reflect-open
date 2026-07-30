@@ -8,8 +8,10 @@ import { parseNote } from './extract'
  * parses into a usable note, and position-based edits touch only what they must.
  */
 const CORPUS = {
-  reflect: '---\nid: 01HXX\naliases: [pjx]\n---\n# Project X\n\nLinks [[Charlotte]] and #status/active.\n',
-  obsidian: '# Notes\n\nSee [[Some Page|alias]] and ![img](assets/a.png) and [ext](https://x.com).\n',
+  reflect:
+    '---\nid: 01HXX\naliases: [pjx]\n---\n# Project X\n\nLinks [[Charlotte]] and #status/active.\n',
+  obsidian:
+    '# Notes\n\nSee [[Some Page|alias]] and ![img](assets/a.png) and [ext](https://x.com).\n',
   gfm: '## Tasks\n\n- [ ] todo\n- [x] done\n\n| a | b |\n| - | - |\n| 1 | 2 |\n\n~~strike~~\n',
   brokenFrontmatter: '---\nfoo: [unclosed\n---\n# Still Readable\n\n[[Linked]]\n',
   crlf: '# Title\r\n\r\nA [[Wiki]] link.\r\n',

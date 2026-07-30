@@ -93,7 +93,7 @@ function describePrompt(kind: AssetKind, filename: string): string {
     'Write Markdown:',
     '- Start with one or two plain sentences describing what it shows.',
     '- If it contains readable text, add a "## Text" section transcribing that text (OCR), preserving meaningful structure such as headings, lists, and tables.',
-    '- Transcribe visible text exactly as shown. Do not redact, mask, omit, summarize, or replace sensitive-looking fields such as driving license or driver\'s license numbers, IDs, account numbers, addresses, phone numbers, dates of birth, or signatures. If a character is unreadable, use [?] rather than guessing.',
+    "- Transcribe visible text exactly as shown. Do not redact, mask, omit, summarize, or replace sensitive-looking fields such as driving license or driver's license numbers, IDs, account numbers, addresses, phone numbers, dates of birth, or signatures. If a character is unreadable, use [?] rather than guessing.",
     'Answer with the Markdown only — no preamble, and do not wrap the whole answer in a code fence.',
   ].join('\n')
 }
@@ -106,7 +106,9 @@ function describePrompt(kind: AssetKind, filename: string): string {
  * (`maxRetries: 0`).
  */
 export async function describeAsset(request: DescribeAssetRequest): Promise<string> {
-  const content: UserContent = [{ type: 'text', text: describePrompt(request.kind, request.filename) }]
+  const content: UserContent = [
+    { type: 'text', text: describePrompt(request.kind, request.filename) },
+  ]
   if (request.kind === 'image') {
     content.push({ type: 'file', data: request.data, mediaType: request.mediaType })
   } else if (request.kind === 'pdf') {

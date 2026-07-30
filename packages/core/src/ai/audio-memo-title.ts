@@ -72,15 +72,19 @@ export function pickAudioMemoEnrichmentConfig(state: AiProvidersState): AiProvid
 }
 
 function firstContentLine(text: string): string {
-  return text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .find((line) => line !== '') ?? ''
+  return (
+    text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find((line) => line !== '') ?? ''
+  )
 }
 
 /** Sanitize and length-bound a generated title for Markdown and wiki-link use. */
 export function normalizedAudioMemoTitle(candidate: string): string | null {
-  const safe = wikiLinkSafe(firstContentLine(candidate)).replace(/[.!?]+$/u, '').trim()
+  const safe = wikiLinkSafe(firstContentLine(candidate))
+    .replace(/[.!?]+$/u, '')
+    .trim()
   const clipped = clipAtWordBoundary(safe, MAX_TITLE_CHARS)
   return clipped === '' ? null : clipped
 }
@@ -136,11 +140,7 @@ export async function generateAudioMemoTitle(
   }
   try {
     const result = await generateText({
-      model: languageModel(
-        titleConfig,
-        request.credentials.apiKey,
-        request.fetchFn ?? fetch,
-      ),
+      model: languageModel(titleConfig, request.credentials.apiKey, request.fetchFn ?? fetch),
       output: Output.object({ schema: audioMemoTitleSchema }),
       prompt: titlePrompt(request.transcript),
       abortSignal: AbortSignal.timeout(TITLE_TIMEOUT_MS),

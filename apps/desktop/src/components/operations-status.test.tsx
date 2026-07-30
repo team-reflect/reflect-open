@@ -125,7 +125,9 @@ describe('OperationsStatus', () => {
     await vi.waitFor(() => expect(toast.message).toHaveBeenCalled())
     const options = toast.message.mock.lastCall?.[1]
     options?.action?.onClick()
-    await vi.waitFor(() => expect(consoleError).toHaveBeenCalledWith('operation action failed:', error))
+    await vi.waitFor(() =>
+      expect(consoleError).toHaveBeenCalledWith('operation action failed:', error),
+    )
 
     consoleError.mockRestore()
   })

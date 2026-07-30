@@ -16,8 +16,7 @@ const NEXT_ARRIVAL = '0:2:2026-07-06'
 
 async function mountSwipeTarget(navigationKey: string) {
   return await renderHook(
-    (props: { navigationKey: string } = { navigationKey }) =>
-      useSwipeTarget(props.navigationKey),
+    (props: { navigationKey: string } = { navigationKey }) => useSwipeTarget(props.navigationKey),
     {
       initialProps: { navigationKey },
     },

@@ -558,9 +558,7 @@ describe('createBackupController', () => {
 
   it('going hidden does not trigger a cycle (backgrounding is the flush path)', async () => {
     const { calls } = fakeBridge()
-    const visibility = vi
-      .spyOn(document, 'visibilityState', 'get')
-      .mockReturnValue('hidden')
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
     const controller = createBackupController({ graph: GRAPH, indexGeneration: 1 })
     await controller.start()
     await vi.waitFor(() => {
@@ -747,16 +745,12 @@ describe('createBackupController', () => {
         {
           kind: 'merged',
           conflictedPaths: [],
-          changedFiles: [
-            { path: 'notes/from-remote-1.md', kind: 'upsert', modifiedMs: 123 },
-          ],
+          changedFiles: [{ path: 'notes/from-remote-1.md', kind: 'upsert', modifiedMs: 123 }],
         },
         {
           kind: 'merged',
           conflictedPaths: [],
-          changedFiles: [
-            { path: 'notes/from-remote-2.md', kind: 'upsert', modifiedMs: 456 },
-          ],
+          changedFiles: [{ path: 'notes/from-remote-2.md', kind: 'upsert', modifiedMs: 456 }],
         },
       ],
       pushOutcomes: [

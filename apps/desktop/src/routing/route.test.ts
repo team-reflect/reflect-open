@@ -74,7 +74,9 @@ describe('effectiveDailyDate', () => {
 
   it('falls back to the route’s own day when nothing is focused', () => {
     expect(effectiveDailyDate({ kind: 'today' }, TODAY, null)).toBe(TODAY)
-    expect(effectiveDailyDate({ kind: 'daily', date: '2026-06-09' }, TODAY, null)).toBe('2026-06-09')
+    expect(effectiveDailyDate({ kind: 'daily', date: '2026-06-09' }, TODAY, null)).toBe(
+      '2026-06-09',
+    )
   })
 
   it('is null off the daily views, even with a focused day (focus is irrelevant)', () => {
@@ -94,9 +96,9 @@ describe('focusedNotePathForRoute', () => {
   })
 
   it('keeps ordinary note and non-note routes unchanged', () => {
-    expect(
-      focusedNotePathForRoute({ kind: 'note', path: 'notes/a.md' }, TODAY, '2026-06-01'),
-    ).toBe('notes/a.md')
+    expect(focusedNotePathForRoute({ kind: 'note', path: 'notes/a.md' }, TODAY, '2026-06-01')).toBe(
+      'notes/a.md',
+    )
     expect(focusedNotePathForRoute({ kind: 'settings' }, TODAY, '2026-06-01')).toBeNull()
   })
 })

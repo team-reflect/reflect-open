@@ -79,11 +79,7 @@ export function CustomFilterMenu({
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={6} className="w-56 p-0">
         <Command label="Filter by another tag">
-          <CommandInput
-            value={query}
-            onValueChange={setQuery}
-            placeholder="Filter by any tag…"
-          />
+          <CommandInput value={query} onValueChange={setQuery} placeholder="Filter by any tag…" />
           <CommandList>
             {/* A force-mounted item never counts as a match, so cmdk would
                 show the empty state right above it — render one or the other. */}

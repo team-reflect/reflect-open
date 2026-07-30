@@ -220,8 +220,7 @@ export function SettingsProvider({ children }: SettingsProviderProps): ReactElem
     }
   }, [loadState])
   const whenSettingsLoaded = useCallback(
-    (): Promise<SettingsLoadOutcome> =>
-      loadSettle.current?.promise ?? Promise.resolve('failed'),
+    (): Promise<SettingsLoadOutcome> => loadSettle.current?.promise ?? Promise.resolve('failed'),
     [],
   )
 

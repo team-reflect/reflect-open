@@ -103,10 +103,7 @@ export function EditorSection(): ReactElement {
         </div>
       </SettingsField>
 
-      <SettingsField
-        legend="Text size"
-        description="The reading size of the note editor."
-      >
+      <SettingsField legend="Text size" description="The reading size of the note editor.">
         <div className="mt-3 @container">
           <div className="grid grid-cols-1 gap-2 @xl:grid-cols-3">
             {TEXT_SIZE_OPTIONS.map((option) => {

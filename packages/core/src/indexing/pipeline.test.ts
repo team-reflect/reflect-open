@@ -66,7 +66,9 @@ beforeEach(() => {
           ]
         }
         if (sql.includes('backlinks')) {
-          return [{ source_path: 'notes/b.md', target_raw: 'A', alias: null, pos_from: 0, pos_to: 3 }]
+          return [
+            { source_path: 'notes/b.md', target_raw: 'A', alias: null, pos_from: 0, pos_to: 3 },
+          ]
         }
         if (sql.includes('"notes"') && sql.includes('title_key')) {
           return [{ path: 'notes/a.md' }]
@@ -89,7 +91,9 @@ describe('indexNote', () => {
     expect(args.note['title']).toBe('Hello')
     expect(args.note['mtime']).toBe(5)
     expect(args.note['fileHash']).toMatch(/^[0-9a-f]{64}$/)
-    expect((args.note['links'] as { targetKey: string }[]).map((link) => link.targetKey)).toContain('world')
+    expect((args.note['links'] as { targetKey: string }[]).map((link) => link.targetKey)).toContain(
+      'world',
+    )
   })
 })
 
@@ -216,7 +220,9 @@ describe('rebuildIndex', () => {
 
     const applied = mockInvoke.mock.calls
       .filter(([command]) => command === 'index_apply_batch')
-      .map(([, args]) => (args as { notes: Array<{ path: string }> }).notes.map((note) => note.path))
+      .map(([, args]) =>
+        (args as { notes: Array<{ path: string }> }).notes.map((note) => note.path),
+      )
     expect(applied).toEqual([
       ['notes/a.md', 'notes/b.md', 'notes/c.md'],
       ['notes/a.md', 'notes/b.md'],
@@ -244,9 +250,7 @@ describe('rebuildIndex', () => {
 
     await rebuildIndex({ generation: 1, onSkippedNote: (note) => skipped.push(note) })
 
-    expect(skipped).toEqual([
-      { path: 'notes/bad.md', message: 'unexpected end of hex escape' },
-    ])
+    expect(skipped).toEqual([{ path: 'notes/bad.md', message: 'unexpected end of hex escape' }])
     expect(mockInvoke.mock.calls.some(([command]) => command === 'index_meta_set')).toBe(true)
   })
 

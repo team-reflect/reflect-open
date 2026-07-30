@@ -121,9 +121,7 @@ describe('createDevIndexDb', () => {
     expect(tasks).toEqual([{ text: 'Do the thing', breadcrumbs: '["Project"]', checked: 0 }])
 
     const emails = db.query('SELECT email, email_key FROM note_emails', [])
-    expect(emails).toEqual([
-      { email: 'Sample@Example.com', email_key: 'sample@example.com' },
-    ])
+    expect(emails).toEqual([{ email: 'Sample@Example.com', email_key: 'sample@example.com' }])
 
     const hits = db.query("SELECT path FROM search_fts WHERE search_fts MATCH 'sync'", [])
     expect(hits).toEqual([{ path: 'notes/sample.md' }])
@@ -160,10 +158,7 @@ describe('createDevIndexDb', () => {
 
     const hits = await searchWithFilters(parseSearchQuery('東京'))
 
-    expect(hits.map((hit) => hit.path)).toEqual([
-      'notes/tokyo-trip.md',
-      'notes/body-hit.md',
-    ])
+    expect(hits.map((hit) => hit.path)).toEqual(['notes/tokyo-trip.md', 'notes/body-hit.md'])
     expect(parseHighlights(hits[0]!.highlightedTitle)).toEqual([
       { text: '来週の', highlighted: false },
       { text: '東京', highlighted: true },
@@ -408,17 +403,13 @@ describe('createDevIndexDb', () => {
     db.moveNote('notes/sample.md', 'notes/renamed.md')
 
     expect(db.query('SELECT path FROM notes', [])).toEqual([{ path: 'notes/renamed.md' }])
-    expect(db.query('SELECT note_path FROM tags', [])).toEqual([
-      { note_path: 'notes/renamed.md' },
-    ])
+    expect(db.query('SELECT note_path FROM tags', [])).toEqual([{ note_path: 'notes/renamed.md' }])
     expect(db.query('SELECT note_path FROM note_emails', [])).toEqual([
       { note_path: 'notes/renamed.md' },
     ])
 
     db.applyNote(sampleNote({ path: 'notes/sample.md', id: '01hv3xq7c2dm8k4t9w5e6r1n98' }))
-    expect(() => db.moveNote('notes/sample.md', 'notes/renamed.md')).toThrowError(
-      /already indexed/,
-    )
+    expect(() => db.moveNote('notes/sample.md', 'notes/renamed.md')).toThrowError(/already indexed/)
     // The refused move must leave both notes' rows untouched.
     const paths = db.query('SELECT path FROM notes ORDER BY path', [])
     expect(paths).toEqual([{ path: 'notes/renamed.md' }, { path: 'notes/sample.md' }])
@@ -464,9 +455,7 @@ describe('createDevIndexDb', () => {
     expect(
       db.query('SELECT title, updated_ms FROM chat_conversations WHERE id = ?', ['c1']),
     ).toEqual([{ title: 'first question', updated_ms: 1 }])
-    expect(
-      db.query('SELECT id, seq, user_text FROM chat_messages ORDER BY seq', []),
-    ).toEqual([
+    expect(db.query('SELECT id, seq, user_text FROM chat_messages ORDER BY seq', [])).toEqual([
       { id: 'm1', seq: 0, user_text: 'one settled' },
       { id: 'm2', seq: 1, user_text: 'two' },
     ])
@@ -478,15 +467,18 @@ describe('createDevIndexDb', () => {
   it('clearing the index leaves chat history alone (the durable-tables rule)', async () => {
     const db = await openDb()
     db.applyNote(sampleNote())
-    db.saveChatMessage({ id: 'c1', title: 't', createdMs: 1, updatedMs: 1 }, {
-      id: 'm1',
-      conversationId: 'c1',
-      userText: 'hello',
-      attachments: '[]',
-      parts: '[]',
-      responseMessages: '[]',
-      createdMs: 1,
-    })
+    db.saveChatMessage(
+      { id: 'c1', title: 't', createdMs: 1, updatedMs: 1 },
+      {
+        id: 'm1',
+        conversationId: 'c1',
+        userText: 'hello',
+        attachments: '[]',
+        parts: '[]',
+        responseMessages: '[]',
+        createdMs: 1,
+      },
+    )
 
     db.clear()
 

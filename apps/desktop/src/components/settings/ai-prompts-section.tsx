@@ -29,12 +29,17 @@ export function AiPromptsSection(): ReactElement {
     <SettingsSection id="ai-prompts">
       {prompts.length === 0 ? (
         <p className="px-4 py-3.5 text-xs text-text-muted">
-          No saved prompts. Select text in a note and press ⌘⇧J to run the built-in prompts;
-          prompts you save here appear after them.
+          No saved prompts. Select text in a note and press ⌘⇧J to run the built-in prompts; prompts
+          you save here appear after them.
         </p>
       ) : (
         prompts.map((prompt) => (
-          <AiPromptRow key={prompt.id} prompt={prompt} onEdit={setEditing} onRemove={removePrompt} />
+          <AiPromptRow
+            key={prompt.id}
+            prompt={prompt}
+            onEdit={setEditing}
+            onRemove={removePrompt}
+          />
         ))
       )}
       <div className="px-4 py-2.5">

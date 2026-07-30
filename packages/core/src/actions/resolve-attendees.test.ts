@@ -1,10 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { resolvePerson } from '../contacts/person'
 import { resolveAttendeeContact } from '../contacts/resolve'
-import {
-  resolveMeetingAttendees,
-  resolveMeetingAttendeeTargets,
-} from './resolve-attendees'
+import { resolveMeetingAttendees, resolveMeetingAttendeeTargets } from './resolve-attendees'
 
 vi.mock('../contacts/person', () => ({
   resolvePerson: vi.fn(),
@@ -36,13 +33,8 @@ describe('resolveMeetingAttendees', () => {
     })
 
     await expect(
-      resolveMeetingAttendees(
-        [{ name: 'jane@corp.com', emails: ['jane@corp.com'] }],
-        false,
-      ),
-    ).resolves.toEqual([
-      { name: 'Jane Doe', emails: ['jane@corp.com'] },
-    ])
+      resolveMeetingAttendees([{ name: 'jane@corp.com', emails: ['jane@corp.com'] }], false),
+    ).resolves.toEqual([{ name: 'Jane Doe', emails: ['jane@corp.com'] }])
     expect(contactMock).not.toHaveBeenCalled()
   })
 
@@ -56,20 +48,14 @@ describe('resolveMeetingAttendees', () => {
     })
 
     await expect(
-      resolveMeetingAttendees(
-        [{ name: 'Jane@Corp.com', emails: ['jane@corp.com'] }],
-        true,
-      ),
+      resolveMeetingAttendees([{ name: 'Jane@Corp.com', emails: ['jane@corp.com'] }], true),
     ).resolves.toEqual([
       {
         name: 'Jane Doe',
         emails: ['jane@corp.com', 'jane@home.example'],
       },
     ])
-    expect(resolvePersonMock).toHaveBeenLastCalledWith([
-      'jane@corp.com',
-      'jane@home.example',
-    ])
+    expect(resolvePersonMock).toHaveBeenLastCalledWith(['jane@corp.com', 'jane@home.example'])
   })
 
   it('keeps a calendar display name while collecting all Contact emails', async () => {
@@ -82,20 +68,14 @@ describe('resolveMeetingAttendees', () => {
     })
 
     await expect(
-      resolveMeetingAttendees(
-        [{ name: 'Doe, Jane', emails: ['jane@corp.com'] }],
-        true,
-      ),
+      resolveMeetingAttendees([{ name: 'Doe, Jane', emails: ['jane@corp.com'] }], true),
     ).resolves.toEqual([
       {
         name: 'Doe, Jane',
         emails: ['jane@corp.com', 'jane@home.example'],
       },
     ])
-    expect(resolvePersonMock).toHaveBeenLastCalledWith([
-      'jane@corp.com',
-      'jane@home.example',
-    ])
+    expect(resolvePersonMock).toHaveBeenLastCalledWith(['jane@corp.com', 'jane@home.example'])
   })
 
   it('keeps a conflicted Contact selectable under its original name', async () => {
@@ -107,10 +87,12 @@ describe('resolveMeetingAttendees', () => {
 
     await expect(
       resolveMeetingAttendees(
-        [{
-          name: 'Jane Doe',
-          emails: ['jane@corp.com', 'jane@home.example'],
-        }],
+        [
+          {
+            name: 'Jane Doe',
+            emails: ['jane@corp.com', 'jane@home.example'],
+          },
+        ],
         true,
       ),
     ).resolves.toEqual([
@@ -142,10 +124,7 @@ describe('resolveMeetingAttendees', () => {
       })
 
     await expect(
-      resolveMeetingAttendeeTargets(
-        [{ name: 'jane@corp.com', emails: ['jane@corp.com'] }],
-        true,
-      ),
+      resolveMeetingAttendeeTargets([{ name: 'jane@corp.com', emails: ['jane@corp.com'] }], true),
     ).resolves.toEqual([
       {
         kind: 'plain',
@@ -169,10 +148,7 @@ describe('resolveMeetingAttendeeTargets', () => {
     })
 
     await expect(
-      resolveMeetingAttendeeTargets(
-        [{ name: 'jane@corp.com', emails: ['jane@corp.com'] }],
-        false,
-      ),
+      resolveMeetingAttendeeTargets([{ name: 'jane@corp.com', emails: ['jane@corp.com'] }], false),
     ).resolves.toEqual([
       {
         kind: 'existing',
@@ -192,10 +168,7 @@ describe('resolveMeetingAttendeeTargets', () => {
       })
 
       await expect(
-        resolveMeetingAttendeeTargets(
-          [{ name: 'Jane Doe', emails: ['jane@corp.com'] }],
-          false,
-        ),
+        resolveMeetingAttendeeTargets([{ name: 'Jane Doe', emails: ['jane@corp.com'] }], false),
       ).resolves.toEqual([
         {
           kind: 'plain',
@@ -207,10 +180,7 @@ describe('resolveMeetingAttendeeTargets', () => {
 
   it('returns a safe new target when no email owner exists', async () => {
     await expect(
-      resolveMeetingAttendeeTargets(
-        [{ name: 'Jane Doe', emails: ['JANE@corp.com'] }],
-        false,
-      ),
+      resolveMeetingAttendeeTargets([{ name: 'Jane Doe', emails: ['JANE@corp.com'] }], false),
     ).resolves.toEqual([
       {
         kind: 'new',

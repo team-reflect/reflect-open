@@ -1,6 +1,5 @@
 /** Header Anthropic requires when its API is called directly from browser code. */
-export const ANTHROPIC_DIRECT_BROWSER_ACCESS_HEADER =
-  'anthropic-dangerous-direct-browser-access'
+export const ANTHROPIC_DIRECT_BROWSER_ACCESS_HEADER = 'anthropic-dangerous-direct-browser-access'
 
 /** Opt-in value for {@link ANTHROPIC_DIRECT_BROWSER_ACCESS_HEADER}. */
 export const ANTHROPIC_DIRECT_BROWSER_ACCESS_VALUE = 'true'

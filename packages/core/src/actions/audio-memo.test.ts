@@ -33,9 +33,7 @@ const generateAudioMemoTitleMock = vi.hoisted(() =>
   vi.fn<(request: GenerateAudioMemoTitleRequest) => Promise<string>>(),
 )
 const formatAudioMemoTranscriptMock = vi.hoisted(() =>
-  vi.fn<
-    (request: FormatAudioMemoTranscriptRequest) => Promise<FormattedAudioMemoTranscript>
-  >(),
+  vi.fn<(request: FormatAudioMemoTranscriptRequest) => Promise<FormattedAudioMemoTranscript>>(),
 )
 const ensureBacklinkTargetMock = vi.hoisted(() => vi.fn())
 
@@ -282,9 +280,7 @@ describe('reconcileAudioMemos', () => {
     )
     expect(writeNoteMock).toHaveBeenCalledWith(
       'daily/2026-06-11.md',
-      expect.stringContaining(
-        '- [[audio-memo-2026-06-11-153022-845|Planning the launch]]',
-      ),
+      expect.stringContaining('- [[audio-memo-2026-06-11-153022-845|Planning the launch]]'),
       3,
     )
   })
@@ -471,7 +467,7 @@ describe('reconcileAudioMemos', () => {
     expect(writeNoteMock).not.toHaveBeenCalled()
   })
 
-  it('a same-second sibling backlink is not this memo\'s tombstone', async () => {
+  it("a same-second sibling backlink is not this memo's tombstone", async () => {
     // Same second, different milliseconds: identical display titles, distinct
     // bases. The earlier sibling is fully done; the later one must still run.
     const sibling = audioMemoIdentity(new Date(2026, 5, 11, 15, 30, 22, 100), 'audio/webm')
@@ -580,7 +576,9 @@ describe('reconcileAudioMemos', () => {
     )
     expect(writeNoteMock).toHaveBeenCalledWith(
       'daily/2026-06-11.md',
-      expect.stringContaining('- [[audio-memo-2026-06-11-153022-845|Audio memo 2026-06-11 15:30:22]]'),
+      expect.stringContaining(
+        '- [[audio-memo-2026-06-11-153022-845|Audio memo 2026-06-11 15:30:22]]',
+      ),
       3,
     )
   })

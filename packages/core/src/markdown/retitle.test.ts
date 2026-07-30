@@ -90,14 +90,11 @@ describe('retitleWikiLinks', () => {
   })
 })
 
-
 describe('repointPathWikiLinks', () => {
   const options = { fromPathKey: 'notes/plan-2.md', to: 'notes/roadmap' }
 
   it('retargets a plain path link when the file moves', () => {
-    expect(repointPathWikiLinks('See [[notes/plan-2]].', options)).toBe(
-      'See [[notes/roadmap]].',
-    )
+    expect(repointPathWikiLinks('See [[notes/plan-2]].', options)).toBe('See [[notes/roadmap]].')
   })
 
   it('keeps the display and the fragment byte-for-byte', () => {
@@ -110,9 +107,7 @@ describe('repointPathWikiLinks', () => {
   })
 
   it('matches the folded spelling, including a trailing .md and case', () => {
-    expect(repointPathWikiLinks('See [[Notes/Plan-2.md]].', options)).toBe(
-      'See [[notes/roadmap]].',
-    )
+    expect(repointPathWikiLinks('See [[Notes/Plan-2.md]].', options)).toBe('See [[notes/roadmap]].')
   })
 
   it('leaves a same-stem link in another folder untouched', () => {
@@ -131,8 +126,8 @@ describe('repointPathWikiLinks', () => {
     ['a loose slash segment that reads as a name', 'notes/a / b'],
     ['a bare name', 'plan'],
   ])('rejects a destination with %s', (_reason, to) => {
-    expect(() =>
-      repointPathWikiLinks('x', { fromPathKey: 'notes/a.md', to }),
-    ).toThrowError(/invalid wiki-link path target/)
+    expect(() => repointPathWikiLinks('x', { fromPathKey: 'notes/a.md', to })).toThrowError(
+      /invalid wiki-link path target/,
+    )
   })
 })

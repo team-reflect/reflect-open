@@ -1,7 +1,22 @@
-import { appendBlock, editTaskLine, errorMessage, isAppError, removeTaskLine, taskLineToBullet, toggleTaskMarker, upsertFrontmatter, type TaskMarker } from '@reflect/core'
+import {
+  appendBlock,
+  editTaskLine,
+  errorMessage,
+  isAppError,
+  removeTaskLine,
+  taskLineToBullet,
+  toggleTaskMarker,
+  upsertFrontmatter,
+  type TaskMarker,
+} from '@reflect/core'
 import { splitDoc } from './note-session-doc'
 import { frontmatterPatchToYaml, type FrontmatterPatch } from './note-session-frontmatter'
-import type { NoteSession, NoteSessionOptions, NoteSessionSnapshot, NoteSessionStatus } from './note-session-types'
+import type {
+  NoteSession,
+  NoteSessionOptions,
+  NoteSessionSnapshot,
+  NoteSessionStatus,
+} from './note-session-types'
 
 const DEFAULT_SAVE_DEBOUNCE_MS = 800
 

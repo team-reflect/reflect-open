@@ -161,8 +161,7 @@ export async function* streamChatTurn(
       // tools when the ceiling fires ends on a tool result with no reply — the
       // user sees tool activity, then silence. `stepNumber` counts completed
       // steps, so the last step that runs is `MAX_STEPS - 1`.
-      prepareStep: ({ stepNumber }) =>
-        stepNumber >= MAX_STEPS - 1 ? { toolChoice: 'none' } : {},
+      prepareStep: ({ stepNumber }) => (stepNumber >= MAX_STEPS - 1 ? { toolChoice: 'none' } : {}),
       ...(options.signal !== undefined ? { abortSignal: options.signal } : {}),
       // `step.response.messages` holds only the messages that step created,
       // so the running history is accumulated here rather than assigned.
@@ -197,7 +196,11 @@ export async function* streamChatTurn(
           break
         }
         case 'tool-error':
-          yield { type: 'tool-error', toolCallId: part.toolCallId, message: errorMessage(part.error) }
+          yield {
+            type: 'tool-error',
+            toolCallId: part.toolCallId,
+            message: errorMessage(part.error),
+          }
           break
         case 'abort':
           yield { type: 'aborted', messages: partialMessages() }

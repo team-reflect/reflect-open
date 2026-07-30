@@ -34,9 +34,7 @@ export function MonthTitle({ month }: MonthTitleProps): ReactElement {
   // must appear in the same paint or the roll flickers.
   if (shown !== month) {
     setShown(month)
-    setOutgoing(
-      reducedMotion ? null : { month: shown, direction: month > shown ? 'up' : 'down' },
-    )
+    setOutgoing(reducedMotion ? null : { month: shown, direction: month > shown ? 'up' : 'down' })
   }
 
   // The outgoing label leaves on `animationend` — a native listener, like
@@ -65,7 +63,8 @@ export function MonthTitle({ month }: MonthTitleProps): ReactElement {
         data-slot="month-title"
         className={cn(
           'block truncate leading-[1.5]',
-          outgoing && (outgoing.direction === 'up' ? 'month-title-enter-up' : 'month-title-enter-down'),
+          outgoing &&
+            (outgoing.direction === 'up' ? 'month-title-enter-up' : 'month-title-enter-down'),
         )}
       >
         {monthLabel(shown)}

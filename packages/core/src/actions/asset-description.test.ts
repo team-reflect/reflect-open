@@ -45,7 +45,9 @@ const getSecretMock = vi.mocked(getSecret)
 const describeMock = vi.mocked(describeAsset)
 
 const PROVIDERS: AiProvidersState = {
-  providers: [{ id: 'cfg-anthropic', provider: 'anthropic', model: 'claude-opus-4-8', keyHint: 'wxyz1' }],
+  providers: [
+    { id: 'cfg-anthropic', provider: 'anthropic', model: 'claude-opus-4-8', keyHint: 'wxyz1' },
+  ],
   defaultProviderId: 'cfg-anthropic',
 }
 const NO_PROVIDERS: AiProvidersState = { providers: [], defaultProviderId: null }
@@ -108,7 +110,9 @@ function privateNote(assetPath: string): string {
   return `---\nprivate: true\n---\n\n![](${assetPath})\n`
 }
 
-function input(overrides: Partial<ReconcileAssetDescriptionsInput> = {}): ReconcileAssetDescriptionsInput {
+function input(
+  overrides: Partial<ReconcileAssetDescriptionsInput> = {},
+): ReconcileAssetDescriptionsInput {
   return {
     providers: PROVIDERS,
     generation: GENERATION,
@@ -225,7 +229,11 @@ describe('reconcileAssetDescriptions', () => {
     expect(written).toContain('A flow diagram.')
     expect(written).toContain('provider: anthropic')
     expect(written).toContain('generatedAt: 2026-06-16T00:00:00.000Z')
-    expect(writeNoteMock).toHaveBeenCalledWith('assets/a.png.reflect.md', expect.any(String), GENERATION)
+    expect(writeNoteMock).toHaveBeenCalledWith(
+      'assets/a.png.reflect.md',
+      expect.any(String),
+      GENERATION,
+    )
   })
 
   it('skips an up-to-date managed description without calling the provider', async () => {
@@ -236,7 +244,14 @@ describe('reconcileAssetDescriptions', () => {
     files.set(
       'assets/a.png.reflect.md',
       buildDescriptionSource(
-        { source: 'assets/a.png', sourceHash: hash, sourceSize: 5, provider: 'anthropic', model: 'm', generatedAt: 'x' },
+        {
+          source: 'assets/a.png',
+          sourceHash: hash,
+          sourceSize: 5,
+          provider: 'anthropic',
+          model: 'm',
+          generatedAt: 'x',
+        },
         'old',
       ),
     )
@@ -283,7 +298,14 @@ describe('reconcileAssetDescriptions', () => {
     files.set(
       'assets/a.png.reflect.md',
       buildDescriptionSource(
-        { source: 'assets/a.png', sourceHash: 'oldhash', sourceSize: 5, provider: 'anthropic', model: 'm', generatedAt: 'x' },
+        {
+          source: 'assets/a.png',
+          sourceHash: 'oldhash',
+          sourceSize: 5,
+          provider: 'anthropic',
+          model: 'm',
+          generatedAt: 'x',
+        },
         'old',
       ),
     )
@@ -358,7 +380,9 @@ describe('reconcileAssetDescriptions', () => {
       .mockRejectedValueOnce(new AssetDescriptionRejectedError('unsupported'))
       .mockResolvedValueOnce('A PDF.')
 
-    const outcome = await reconcileAssetDescriptions(input({ changed: ['assets/a.png', 'assets/b.pdf'] }))
+    const outcome = await reconcileAssetDescriptions(
+      input({ changed: ['assets/a.png', 'assets/b.pdf'] }),
+    )
 
     expect(outcome.refused).toBe(1)
     expect(outcome.described).toBe(1)

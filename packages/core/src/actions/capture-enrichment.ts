@@ -342,9 +342,7 @@ export async function reconcileCaptureEnrichment(
       if (snapshot === null) {
         continue
       }
-      const previewImage = metadataComplete
-        ? null
-        : await fetchLinkPreviewImage(snapshot.meta)
+      const previewImage = metadataComplete ? null : await fetchLinkPreviewImage(snapshot.meta)
       if (stale()) {
         return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
       }
@@ -377,7 +375,7 @@ export async function reconcileCaptureEnrichment(
       const metadataDisplayTitle = metadataTitle ?? snapshot.title
       const metadataDescription = hasDescription(snapshot.body)
         ? null
-        : pageMeta?.description ?? null
+        : (pageMeta?.description ?? null)
       let metadataBody =
         metadataDescription !== null
           ? withDescription(snapshot.body, metadataDescription)

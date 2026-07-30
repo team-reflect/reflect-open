@@ -89,7 +89,12 @@ export interface BackSwipe {
  * `transitionend` can land in the same frame, so completion needs a
  * synchronous once-guard.
  */
-export function useBackSwipe({ enabled, reducedMotion, onPop, containerRef }: BackSwipeOptions): BackSwipe {
+export function useBackSwipe({
+  enabled,
+  reducedMotion,
+  onPop,
+  containerRef,
+}: BackSwipeOptions): BackSwipe {
   const stateRef = useRef<BackSwipeState>(IDLE)
   const [state, setState] = useState<BackSwipeState>(IDLE)
 
@@ -201,8 +206,7 @@ export function useBackSwipe({ enabled, reducedMotion, onPop, containerRef }: Ba
         current.velocity > POP_VELOCITY_PX_PER_MS &&
         current.deltaX > MIN_FLICK_DX_PX &&
         performance.now() - current.sampleTime <= VELOCITY_STALE_MS
-      const pops =
-        !interrupted && (current.deltaX > current.width * POP_FRACTION || flicked)
+      const pops = !interrupted && (current.deltaX > current.width * POP_FRACTION || flicked)
       if (reducedMotion) {
         commit(IDLE)
         if (pops) {

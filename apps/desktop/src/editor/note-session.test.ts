@@ -147,9 +147,7 @@ describe('createNoteSession', () => {
     await session.flush()
 
     expect(reconcilePendingEditorInput).toHaveBeenCalledOnce()
-    expect(writes).toEqual([
-      { path: 'notes/a.md', contents: '# 🧠 Business ideas\n' },
-    ])
+    expect(writes).toEqual([{ path: 'notes/a.md', contents: '# 🧠 Business ideas\n' }])
   })
 
   it('discard detaches without writing — even with a pending edit (delete path)', async () => {
@@ -501,9 +499,7 @@ describe('missing-note seed (new ordinary notes)', () => {
     h.session.editorChanged('# My Note\n\nFirst line.\n')
     await settled()
 
-    expect(h.writes).toEqual([
-      { path: 'notes/a.md', contents: '# My Note\n\nFirst line.\n' },
-    ])
+    expect(h.writes).toEqual([{ path: 'notes/a.md', contents: '# My Note\n\nFirst line.\n' }])
     expect(h.snapshots.at(-1)?.missing).toBe(false)
     expect(h.snapshots.at(-1)?.dirty).toBe(false)
   })
@@ -800,7 +796,9 @@ describe('commitTaskToggle', () => {
     await settled()
 
     h.session.editorChanged('+ [ ] something else entirely\n')
-    await expect(h.session.commitTaskToggle(firstTask(source))).rejects.toBeInstanceOf(TaskStaleError)
+    await expect(h.session.commitTaskToggle(firstTask(source))).rejects.toBeInstanceOf(
+      TaskStaleError,
+    )
   })
 })
 

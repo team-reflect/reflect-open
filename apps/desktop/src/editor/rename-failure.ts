@@ -19,10 +19,7 @@ export interface RenamePhaseFailures {
  * when every phase succeeded. The operation label already names the rename;
  * the message says what failed and what that means for the user's links.
  */
-export function composeRenameFailure(
-  from: string,
-  failures: RenamePhaseFailures,
-): string | null {
+export function composeRenameFailure(from: string, failures: RenamePhaseFailures): string | null {
   const parts: string[] = []
   if (failures.rewrite !== null && failures.alias !== null) {
     parts.push(
@@ -33,7 +30,9 @@ export function composeRenameFailure(
       `${failures.rewrite} — links were not rewritten, but "${from}" was kept as an alias so they still resolve`,
     )
   } else if (failures.alias !== null) {
-    parts.push(`links were rewritten, but recording "${from}" as an alias failed: ${failures.alias}`)
+    parts.push(
+      `links were rewritten, but recording "${from}" as an alias failed: ${failures.alias}`,
+    )
   }
   if (failures.move !== null) {
     parts.push(`the file keeps its old name (${failures.move})`)

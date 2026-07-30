@@ -17,8 +17,7 @@ export function sectionEnd(
   sourceLength: number,
 ): number {
   return (
-    headings.find(
-      (heading) => heading.from > target.from && heading.level <= target.level,
-    )?.from ?? sourceLength
+    headings.find((heading) => heading.from > target.from && heading.level <= target.level)?.from ??
+    sourceLength
   )
 }

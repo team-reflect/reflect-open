@@ -92,9 +92,7 @@ describe('GraphChooser', () => {
     await expect.element(page.getByRole('heading', { name: 'iCloud' })).toBeVisible()
     await expect.element(page.getByText('Recommended')).toBeVisible()
     await expect.element(page.getByText(/Open an existing folder/)).toBeVisible()
-    await expect
-      .element(page.getByRole('heading', { name: 'A folder you choose' }))
-      .toBeVisible()
+    await expect.element(page.getByRole('heading', { name: 'A folder you choose' })).toBeVisible()
     await expect.element(page.getByRole('button', { name: /Choose a folder/ })).toBeVisible()
     await expect.element(page.getByText(/Reflect keeps its files where they are/)).toBeVisible()
   })
@@ -129,9 +127,7 @@ describe('GraphChooser', () => {
     await render(<GraphChooser />, { wrapper })
 
     await expect.element(page.getByRole('button', { name: 'Notes' })).toBeVisible()
-    await expect
-      .element(page.getByText('Open an existing graph from iCloud Drive.'))
-      .toBeVisible()
+    await expect.element(page.getByText('Open an existing graph from iCloud Drive.')).toBeVisible()
     await expect.element(page.getByText('or create new graph')).toBeVisible()
     await userEvent.click(page.getByRole('button', { name: 'Work', exact: true }))
 
@@ -187,15 +183,9 @@ describe('GraphChooser', () => {
     vi.stubEnv('TAURI_ENV_PLATFORM', 'windows')
     await render(<GraphChooser />, { wrapper })
 
-    await expect
-      .element(page.getByRole('heading', { name: 'A folder you choose' }))
-      .toBeVisible()
-    await expect
-      .element(page.getByRole('heading', { name: 'iCloud' }))
-      .not.toBeInTheDocument()
-    await expect
-      .element(page.getByText(/existing Markdown folder on this computer/))
-      .toBeVisible()
+    await expect.element(page.getByRole('heading', { name: 'A folder you choose' })).toBeVisible()
+    await expect.element(page.getByRole('heading', { name: 'iCloud' })).not.toBeInTheDocument()
+    await expect.element(page.getByText(/existing Markdown folder on this computer/)).toBeVisible()
   })
 
   // The provider auto-opens the most recent graph on mount, so the chooser's
@@ -218,9 +208,7 @@ describe('GraphChooser', () => {
     await expect.element(page.getByText('personal', { exact: true })).toBeVisible()
     await userEvent.click(page.getByRole('button', { name: 'Forget personal' }))
 
-    await expect
-      .element(page.getByText('personal', { exact: true }))
-      .not.toBeInTheDocument()
+    await expect.element(page.getByText('personal', { exact: true })).not.toBeInTheDocument()
     expect(invokeLog).toContainEqual(['forget_recent', { root: '/graphs/personal' }])
   })
 

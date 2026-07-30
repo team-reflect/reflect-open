@@ -110,9 +110,7 @@ const VALID_TEXT = {
 describe('textCaptureEnvelopeSchema', () => {
   it('accepts both capture kinds', () => {
     expect(textCaptureEnvelopeSchema.parse(VALID_TEXT)).toEqual(VALID_TEXT)
-    expect(
-      textCaptureEnvelopeSchema.safeParse({ ...VALID_TEXT, kind: 'task' }).success,
-    ).toBe(true)
+    expect(textCaptureEnvelopeSchema.safeParse({ ...VALID_TEXT, kind: 'task' }).success).toBe(true)
   })
 
   it('accepts the iOS share sheet as a text producer', () => {

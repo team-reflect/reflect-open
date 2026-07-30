@@ -106,10 +106,7 @@ export interface PathWikiLinkRepointOptions {
  * folder is never touched. Markdown hrefs stay as written: Reflect never
  * emits them, and rewriting other tools' files is not this pipeline's job.
  */
-export function repointPathWikiLinks(
-  source: string,
-  options: PathWikiLinkRepointOptions,
-): string {
+export function repointPathWikiLinks(source: string, options: PathWikiLinkRepointOptions): string {
   const { fromPathKey, to } = options
   // The written target must survive the round trip through the same
   // reduction every reader applies: a `#` would re-open fragment syntax, a

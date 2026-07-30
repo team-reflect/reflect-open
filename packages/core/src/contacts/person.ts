@@ -46,9 +46,7 @@ export interface ExistingPersonContactResolution extends ExistingPersonResolutio
 export interface BlockedPersonContactResolution {
   readonly kind: 'blocked'
   readonly contact: ContactMatch
-  readonly reason:
-    | BlockedPersonResolution['reason']
-    | 'unaddressable-contact'
+  readonly reason: BlockedPersonResolution['reason'] | 'unaddressable-contact'
 }
 
 /** A Contact row ready for a wikilink surface, or a reason to hide it. */
@@ -87,9 +85,7 @@ async function personOwners(emails: readonly string[]): Promise<PersonOwnerRow[]
  * no ownership priority: zero unique owner paths is missing, one is reusable,
  * and more than one is a conflict.
  */
-export async function resolvePerson(
-  values: readonly string[],
-): Promise<PersonResolution> {
+export async function resolvePerson(values: readonly string[]): Promise<PersonResolution> {
   const emails = canonicalEmails(values)
   if (emails.length === 0) {
     return { kind: 'missing', emails }
@@ -164,9 +160,5 @@ export async function ensurePersonNote(
   if (resolution.kind !== 'missing') {
     return resolution
   }
-  return resolveOrCreateNoteWithTitle(
-    input.title,
-    input.generation,
-    input.body,
-  )
+  return resolveOrCreateNoteWithTitle(input.title, input.generation, input.body)
 }

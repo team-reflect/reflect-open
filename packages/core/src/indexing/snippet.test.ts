@@ -95,9 +95,7 @@ describe('previewSnippet', () => {
   })
 
   it('only strips the title at a word boundary, never a mere prefix', () => {
-    expect(previewSnippet('Healthy habits compound.', 'Health')).toBe(
-      'Healthy habits compound.',
-    )
+    expect(previewSnippet('Healthy habits compound.', 'Health')).toBe('Healthy habits compound.')
   })
 
   it('keeps a repeated title beyond the leading occurrence', () => {

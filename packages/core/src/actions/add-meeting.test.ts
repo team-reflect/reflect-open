@@ -123,10 +123,12 @@ describe('addMeetingToDaily', () => {
 
     const outcome = await addMeetingToDaily(
       input({
-        attendees: [{
-          name: 'Ada Lovelace',
-          emails: ['ada@example.com'],
-        }],
+        attendees: [
+          {
+            name: 'Ada Lovelace',
+            emails: ['ada@example.com'],
+          },
+        ],
         backlinkMeeting: false,
         startTime: '9:00am',
       }),
@@ -177,9 +179,10 @@ describe('addMeetingToDaily', () => {
       '## Meetings\n\n- 9:00am met with [[Ada Lovelace]] for [[Standup]]\n',
     )
 
-    await expect(
-      addMeetingToDaily(input({ attendees: [{ name: 'Carol' }] })),
-    ).resolves.toEqual({ appended: false, createdNotes: [] })
+    await expect(addMeetingToDaily(input({ attendees: [{ name: 'Carol' }] }))).resolves.toEqual({
+      appended: false,
+      createdNotes: [],
+    })
     expect(writeNoteMock).not.toHaveBeenCalled()
     expect(resolveAttendeesMock).not.toHaveBeenCalled()
     expect(ensurePersonMock).not.toHaveBeenCalled()
@@ -235,11 +238,7 @@ describe('addMeetingToDaily', () => {
     expect(createNoteMock).not.toHaveBeenCalled()
 
     await addMeetingToDaily(input())
-    expect(createNoteMock).toHaveBeenCalledWith(
-      'Standup',
-      GENERATION,
-      '- Type: #meeting',
-    )
+    expect(createNoteMock).toHaveBeenCalledWith('Standup', GENERATION, '- Type: #meeting')
 
     createNoteMock.mockClear()
     resolveWikiTargetMock.mockResolvedValue(resolved('notes/standup.md'))
@@ -269,9 +268,9 @@ describe('addMeetingToDaily', () => {
   })
 
   it('rejects an empty meeting name before writing', async () => {
-    await expect(
-      addMeetingToDaily(input({ title: '  [|]  ' })),
-    ).rejects.toThrow('a meeting needs a name')
+    await expect(addMeetingToDaily(input({ title: '  [|]  ' }))).rejects.toThrow(
+      'a meeting needs a name',
+    )
     expect(writeNoteMock).not.toHaveBeenCalled()
   })
 })
@@ -291,10 +290,12 @@ describe('attendee identity outcomes', () => {
 
     const outcome = await addMeetingToDaily(
       input({
-        attendees: [{
-          name: 'jane@corp.com',
-          emails: ['jane@corp.com'],
-        }],
+        attendees: [
+          {
+            name: 'jane@corp.com',
+            emails: ['jane@corp.com'],
+          },
+        ],
         backlinkMeeting: false,
       }),
     )
@@ -323,10 +324,12 @@ describe('attendee identity outcomes', () => {
 
       await addMeetingToDaily(
         input({
-          attendees: [{
-            name: 'Jane Doe',
-            emails: ['jane@corp.com'],
-          }],
+          attendees: [
+            {
+              name: 'Jane Doe',
+              emails: ['jane@corp.com'],
+            },
+          ],
           backlinkMeeting: false,
         }),
       )
@@ -346,10 +349,12 @@ describe('attendee identity outcomes', () => {
     await expect(
       addMeetingToDaily(
         input({
-          attendees: [{
-            name: 'Jane',
-            emails: ['jane@corp.com'],
-          }],
+          attendees: [
+            {
+              name: 'Jane',
+              emails: ['jane@corp.com'],
+            },
+          ],
         }),
       ),
     ).rejects.toThrow('index unavailable')
@@ -365,10 +370,12 @@ describe('attendee identity outcomes', () => {
 
     const outcome = await addMeetingToDaily(
       input({
-        attendees: [{
-          name: 'Ada Lovelace',
-          emails: ['ada@example.com'],
-        }],
+        attendees: [
+          {
+            name: 'Ada Lovelace',
+            emails: ['ada@example.com'],
+          },
+        ],
         backlinkMeeting: false,
       }),
     )
@@ -405,19 +412,13 @@ describe('Contact prefill', () => {
       },
     ])
 
-    await addMeetingToDaily(
-      input({ attendees: [ADA], lookupContacts: true }),
-    )
+    await addMeetingToDaily(input({ attendees: [ADA], lookupContacts: true }))
 
-    expect(invoke).toHaveBeenCalledWith(
-      'contacts_lookup_by_email',
-      { email: 'ada@example.com' },
-    )
+    expect(invoke).toHaveBeenCalledWith('contacts_lookup_by_email', { email: 'ada@example.com' })
     expect(ensurePersonMock).toHaveBeenCalledWith({
       title: 'Ada Lovelace',
       emails: ['ada@example.com'],
-      body:
-        '- Type: #person\n- Email: ada@example.com\n- Phone: +1 555-0100',
+      body: '- Type: #person\n- Email: ada@example.com\n- Phone: +1 555-0100',
       generation: GENERATION,
     })
   })

@@ -152,11 +152,11 @@ targets:
       base:
         ENABLE_BITCODE: false
         ARCHS: [arm64]
-        VALID_ARCHS: arm64 
+        VALID_ARCHS: arm64
         LIBRARY_SEARCH_PATHS[arch=x86_64]: $(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)
         LIBRARY_SEARCH_PATHS[arch=arm64]: $(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)
         ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
-        SWIFT_VERSION: "5.0"
+        SWIFT_VERSION: '5.0'
         EXCLUDED_ARCHS[sdk=iphoneos*]: x86_64
       groups: [app]
     dependencies:
@@ -240,7 +240,7 @@ targets:
         PRODUCT_NAME: ShareExtension
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: 789ULN5MZB
-        SWIFT_VERSION: "5.0"
+        SWIFT_VERSION: '5.0'
         TARGETED_DEVICE_FAMILY: 1,2
       # An appex bundle id must be prefixed by its containing app's bundle
       # id, so the extension follows the app's flavor (see settingGroups).
@@ -280,7 +280,7 @@ targets:
   RecordingWidget:
     type: app-extension
     platform: iOS
-    deploymentTarget: "16.2"
+    deploymentTarget: '16.2'
     sources:
       - path: RecordingWidget/RecordingWidgetBundle.swift
       - path: RecordingWidget/RecordAudioWidget.swift
@@ -305,7 +305,7 @@ targets:
         PRODUCT_NAME: RecordingWidget
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: 789ULN5MZB
-        SWIFT_VERSION: "5.0"
+        SWIFT_VERSION: '5.0'
         TARGETED_DEVICE_FAMILY: 1,2
       configs:
         debug:

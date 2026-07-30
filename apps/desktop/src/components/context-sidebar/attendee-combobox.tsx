@@ -82,7 +82,11 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
   const deferredQuery = useDeferredValue(query)
   const searchTerm = deferredQuery.trim()
 
-  const { data: fetched, isFetching, isPlaceholderData } = useQuery({
+  const {
+    data: fetched,
+    isFetching,
+    isPlaceholderData,
+  } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'attendee-suggestions', searchTerm, contactsInMenu],
     queryFn: async () => {
       const [suggestions, contacts] = await Promise.all([
@@ -124,13 +128,10 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
   // keepPreviousData shows the prior query's rows meanwhile). Enter may only
   // take the highlighted row or add typed text only when the rows answer
   // exactly what is typed. Pending results must not discard Contact emails.
-  const entriesMatchInput =
-    !isFetching && !isPlaceholderData && searchTerm === query.trim()
+  const entriesMatchInput = !isFetching && !isPlaceholderData && searchTerm === query.trim()
   const exactContact = entriesMatchInput
     ? entries.find(
-        (entry) =>
-          entry.kind === 'contact' &&
-          foldKey(entry.contact.fullName) === foldKey(query),
+        (entry) => entry.kind === 'contact' && foldKey(entry.contact.fullName) === foldKey(query),
       )
     : undefined
 

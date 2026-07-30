@@ -106,9 +106,7 @@ export async function suggestWikiLinkTargets(
  * the path-first counterpart to text search: it uses the same canonical title,
  * `note_keys` winner checks, rich-title address, and alias rescue.
  */
-export async function getWikiAddressForPath(
-  path: string,
-): Promise<WikiLinkSuggestion | null> {
+export async function getWikiAddressForPath(path: string): Promise<WikiLinkSuggestion | null> {
   const note = await db
     .selectFrom('notes')
     .where('path', '=', path)
@@ -122,13 +120,7 @@ export async function getWikiAddressForPath(
   if (candidate === undefined) {
     return null
   }
-  const result = await verifyWikiSuggestionAddresses(
-    [candidate],
-    [note.titleKey],
-    1,
-    '',
-    false,
-  )
+  const result = await verifyWikiSuggestionAddresses([candidate], [note.titleKey], 1, '', false)
   return result.suggestions[0] ?? null
 }
 
@@ -146,9 +138,7 @@ async function queryWikiTargetCandidates(
     .orderBy('mtime', 'desc')
     .limit(50)
   if (key !== '') {
-    titleQuery = titleQuery.where(
-      sql<boolean>`title_key LIKE ${likeContains(key)} ESCAPE '\\'`,
-    )
+    titleQuery = titleQuery.where(sql<boolean>`title_key LIKE ${likeContains(key)} ESCAPE '\\'`)
   }
   const titles: TitleCandidate[] = await titleQuery.execute()
 
@@ -177,8 +167,7 @@ async function queryWikiTargetCandidates(
   // a collision loser must not prevent a lower-ranked, addressable note from
   // filling the requested menu capacity.
   const ranked = rankWikiSuggestions(key, titles, aliases, titles.length + aliases.length)
-  const dates =
-    dateGen === undefined ? [] : generateDateSuggestions(query, dateGen)
+  const dates = dateGen === undefined ? [] : generateDateSuggestions(query, dateGen)
   const candidateTargetKeys = new Set<string>()
   for (const title of titles) {
     candidateTargetKeys.add(title.titleKey)
@@ -235,10 +224,7 @@ interface WikiAddressWinner {
   claimCount: number
 }
 
-function winnerAddressesPath(
-  path: string,
-  winner: WikiAddressWinner | undefined,
-): boolean {
+function winnerAddressesPath(path: string, winner: WikiAddressWinner | undefined): boolean {
   return winner?.path === path && winner.claimCount === 1
 }
 
@@ -261,19 +247,13 @@ function addressableAsRanked(
   const canonicalInsert =
     serializeWikiSuggestionAddress(candidate.target, candidate.alias) ??
     serializeWikiSuggestionAddress(candidate.target, null)
-  if (
-    winnerAddressesPath(candidate.path, canonicalWinner) &&
-    canonicalInsert !== null
-  ) {
+  if (winnerAddressesPath(candidate.path, canonicalWinner) && canonicalInsert !== null) {
     return { ...candidate, insertText: canonicalInsert }
   }
   if (candidate.alias !== null) {
     const aliasKey = normalizeWikiTarget(candidate.alias).key
     const aliasInsert = serializeWikiSuggestionAddress(candidate.alias, null)
-    if (
-      winnerAddressesPath(candidate.path, winners.get(aliasKey)) &&
-      aliasInsert !== null
-    ) {
+    if (winnerAddressesPath(candidate.path, winners.get(aliasKey)) && aliasInsert !== null) {
       return { ...candidate, insertText: aliasInsert }
     }
   }
@@ -286,9 +266,7 @@ function addressableAsRanked(
  * tier. These rescue notes whose ranked spellings are ambiguous, lost, or
  * cannot be serialized.
  */
-async function winningAliasesByPath(
-  paths: ReadonlySet<string>,
-): Promise<Map<string, string[]>> {
+async function winningAliasesByPath(paths: ReadonlySet<string>): Promise<Map<string, string[]>> {
   const winning = new Map<string, string[]>()
   for (const chunk of inClauseChunks([...paths])) {
     const rows = await db
@@ -394,10 +372,7 @@ async function verifyWikiSuggestionAddresses(
   for (const candidate of candidates) {
     if (candidate.path === null) {
       const canonicalWinner = winners.get(normalizeWikiTarget(candidate.target).key)
-      const insertText = serializeWikiSuggestionAddress(
-        candidate.target,
-        candidate.alias,
-      )
+      const insertText = serializeWikiSuggestionAddress(candidate.target, candidate.alias)
       if (insertText !== null) {
         if (canonicalWinner === undefined) {
           verified.push({ ...candidate, insertText })

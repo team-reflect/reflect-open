@@ -35,14 +35,18 @@ describe('buildIndexedNote', () => {
 
     const wiki = indexed.links.filter((link) => link.kind === 'wiki')
     expect(
-      wiki.map((link) => ({ targetRaw: link.targetRaw, targetKey: link.targetKey, alias: link.alias })),
+      wiki.map((link) => ({
+        targetRaw: link.targetRaw,
+        targetKey: link.targetKey,
+        alias: link.alias,
+      })),
     ).toEqual([
       { targetRaw: 'Charlotte', targetKey: 'charlotte', alias: null },
       { targetRaw: 'Note', targetKey: 'note', alias: 'alias' },
     ])
-    expect(indexed.links.some((link) => link.kind === 'md' && link.targetRaw === 'https://x.com')).toBe(
-      true,
-    )
+    expect(
+      indexed.links.some((link) => link.kind === 'md' && link.targetRaw === 'https://x.com'),
+    ).toBe(true)
     expect(indexed.assets).toEqual(['notes/assets/p.png', 'assets/p.png'])
   })
 
@@ -269,8 +273,7 @@ describe('buildIndexedNote', () => {
   })
 
   it('flags notes carrying sync conflict markers', () => {
-    const source =
-      '# Shared\n\n<<<<<<< this device\nmine\n=======\ntheirs\n>>>>>>> other device\n'
+    const source = '# Shared\n\n<<<<<<< this device\nmine\n=======\ntheirs\n>>>>>>> other device\n'
     const indexed = buildIndexedNote(parseNote({ path: 'notes/shared.md', source }), {
       fileHash: 'h',
       mtime: 0,
@@ -310,16 +313,12 @@ describe('projectNoteAliases — derived linkable rich-title aliases', () => {
       source,
     })
     expect(indexed.title).toBe('Meeting with [[Ada Lovelace|Ada]]')
-    expect(indexed.aliases).toEqual([
-      { alias: 'Meeting with Ada', aliasKey: 'meeting with ada' },
-    ])
+    expect(indexed.aliases).toEqual([{ alias: 'Meeting with Ada', aliasKey: 'meeting with ada' }])
   })
 
   it('does not duplicate a frontmatter alias that owns the same key', () => {
     expect(
-      aliasesOf(
-        '---\naliases: ["Meeting with Ada"]\n---\n# Meeting with [[Ada Lovelace|Ada]]\n',
-      ),
+      aliasesOf('---\naliases: ["Meeting with Ada"]\n---\n# Meeting with [[Ada Lovelace|Ada]]\n'),
     ).toEqual([{ alias: 'Meeting with Ada', aliasKey: 'meeting with ada' }])
   })
 
@@ -389,10 +388,10 @@ describe('projectNoteClaims (via buildIndexedNote)', () => {
 
   it('claims nothing for a template', () => {
     expect(
-      buildIndexedNote(
-        parseNote({ path: 'templates/meeting.md', source: '# Meeting' }),
-        { ...meta, source: '# Meeting' },
-      ).claims,
+      buildIndexedNote(parseNote({ path: 'templates/meeting.md', source: '# Meeting' }), {
+        ...meta,
+        source: '# Meeting',
+      }).claims,
     ).toEqual([])
   })
 })

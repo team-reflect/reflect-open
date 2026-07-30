@@ -49,9 +49,7 @@ function bindBridge({
         return query(sql, params)
       }
       const candidate = params[0]
-      return sql.includes('"path" = ?') && taken.has(String(candidate))
-        ? [{ path: candidate }]
-        : []
+      return sql.includes('"path" = ?') && taken.has(String(candidate)) ? [{ path: candidate }] : []
     }
     if (command === 'note_exists') {
       return taken.has(String(args?.['path']))
@@ -122,9 +120,7 @@ describe('createNoteWithTitle', () => {
     expect(path).toBe('notes/business-ideas.md')
     const write = invoke.mock.calls.find(([command]) => command === 'note_create')
     const args = write?.[1] as { contents: string }
-    expect(args.contents).toMatch(
-      /^---\nid: [0-9a-z]{26}\n---\n# 🧠 Business ideas\n$/,
-    )
+    expect(args.contents).toMatch(/^---\nid: [0-9a-z]{26}\n---\n# 🧠 Business ideas\n$/)
   })
 
   it('suffixes the slug when the bare path is taken', async () => {
@@ -271,8 +267,7 @@ describe('resolveOrCreateNoteWithTitle', () => {
     const invoke = bindBridge({
       files: {
         'notes/business-ideas.md': '# Business ideas\n',
-        'notes/business-ideas-2.md':
-          '---\naliases: [Business ideas]\n---\n# Incubator\n',
+        'notes/business-ideas-2.md': '---\naliases: [Business ideas]\n---\n# Incubator\n',
       },
     })
 
@@ -301,8 +296,7 @@ describe('resolveOrCreateNoteWithTitle', () => {
     const invoke = bindBridge({
       files: {
         'notes/business-ideas.md': '# 🧠 Business ideas\n',
-        'notes/business-ideas-2.md':
-          '---\naliases: ["💡 Business ideas"]\n---\n# Incubator\n',
+        'notes/business-ideas-2.md': '---\naliases: ["💡 Business ideas"]\n---\n# Incubator\n',
       },
     })
 
@@ -316,8 +310,7 @@ describe('resolveOrCreateNoteWithTitle', () => {
   it('includes parsed aliases in the fallback match', async () => {
     const invoke = bindBridge({
       files: {
-        'notes/business-ideas.md':
-          '---\naliases: ["🧠Business ideas"]\n---\n# Incubator\n',
+        'notes/business-ideas.md': '---\naliases: ["🧠Business ideas"]\n---\n# Incubator\n',
       },
     })
 

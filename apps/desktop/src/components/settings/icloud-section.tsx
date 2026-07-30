@@ -116,9 +116,7 @@ export function IcloudSettingsField(): ReactElement | null {
   const conflictCount = conflicted.data?.length
   const forkCount = duplicateIds.data?.length
   const hasReviewIssues =
-    conflictCount !== undefined &&
-    forkCount !== undefined &&
-    (conflictCount > 0 || forkCount > 0)
+    conflictCount !== undefined && forkCount !== undefined && (conflictCount > 0 || forkCount > 0)
 
   async function moveToICloud(): Promise<void> {
     if (graph === null) {
@@ -148,7 +146,10 @@ export function IcloudSettingsField(): ReactElement | null {
         // Append rather than replace: a disconnect failure above must stay
         // visible alongside this one — both tell the user something distinct.
         setError((previous) =>
-          [previous, 'The copy landed in iCloud but could not be opened — open it from Saved graphs.']
+          [
+            previous,
+            'The copy landed in iCloud but could not be opened — open it from Saved graphs.',
+          ]
             .filter(Boolean)
             .join(' '),
         )
@@ -200,8 +201,8 @@ export function IcloudSettingsField(): ReactElement | null {
                 <DialogHeader>
                   <DialogTitle>Move this graph to iCloud Drive?</DialogTitle>
                   <DialogDescription>
-                    Your notes are copied into iCloud Drive and the graph reopens there. The
-                    current folder stays on disk, untouched, as a recovery copy.
+                    Your notes are copied into iCloud Drive and the graph reopens there. The current
+                    folder stays on disk, untouched, as a recovery copy.
                     {backupConnected
                       ? ' GitHub sync is disconnected from the recovery copy; you can reconnect GitHub sync after the iCloud graph opens.'
                       : ''}

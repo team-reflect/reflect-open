@@ -16,9 +16,11 @@ interface NativeMenuForTest {
 }
 
 const menuNew = vi.hoisted(() =>
-  vi.fn(async (_options?: NativeMenuOptionsForTest): Promise<NativeMenuForTest> => ({
-    popup,
-  })),
+  vi.fn(
+    async (_options?: NativeMenuOptionsForTest): Promise<NativeMenuForTest> => ({
+      popup,
+    }),
+  ),
 )
 
 vi.mock('@tauri-apps/api/core', () => ({ isTauri }))

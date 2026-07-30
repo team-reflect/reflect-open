@@ -4,11 +4,7 @@ import { useFileChanges } from '@/lib/use-file-changes'
 import { createDocumentBinding, type DocumentBinding } from './document-binding'
 import type { NoteEditorHandle } from './note-editor'
 import { createRenameCoordinator } from './rename-coordinator'
-import {
-  createNoteSession,
-  INITIAL_NOTE_SNAPSHOT,
-  type NoteSessionSnapshot,
-} from './note-session'
+import { createNoteSession, INITIAL_NOTE_SNAPSHOT, type NoteSessionSnapshot } from './note-session'
 import { checkRoundTrip } from './roundtrip'
 
 /**

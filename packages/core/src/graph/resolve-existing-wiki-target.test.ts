@@ -23,10 +23,7 @@ function bindBridge({
   const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
     if (command === 'db_query') {
       const params = args?.['params']
-      return query?.(
-        String(args?.['sql'] ?? ''),
-        Array.isArray(params) ? params : [],
-      ) ?? []
+      return query?.(String(args?.['sql'] ?? ''), Array.isArray(params) ? params : []) ?? []
     }
     if (command === 'list_files') {
       return [
@@ -332,7 +329,9 @@ describe('resolveExistingWikiTarget', () => {
     const invoke = bindBridge()
 
     await expect(resolveExistingWikiTarget('Absent', 7)).resolves.toEqual({ kind: 'missing' })
-    expect(invoke.mock.calls.filter(([command]) => command === 'db_query').length).toBeGreaterThan(1)
+    expect(invoke.mock.calls.filter(([command]) => command === 'db_query').length).toBeGreaterThan(
+      1,
+    )
     expect(invoke).toHaveBeenCalledWith('list_files', { generation: 7 })
     expectNoWrites(invoke)
   })
@@ -431,16 +430,16 @@ describe('resolveExistingWikiTarget — path and stem dimensions', () => {
   it('resolves a fragment-only target to its source note', async () => {
     const invoke = bindBridge()
 
-    await expect(
-      resolveExistingWikiTarget('#Next', 7, 'Projects/Plan.md'),
-    ).resolves.toEqual({ kind: 'resolved', path: 'Projects/Plan.md' })
+    await expect(resolveExistingWikiTarget('#Next', 7, 'Projects/Plan.md')).resolves.toEqual({
+      kind: 'resolved',
+      path: 'Projects/Plan.md',
+    })
     expect(invoke).not.toHaveBeenCalled()
   })
 
   it('treats a percent sign in a bare target as literal text', async () => {
     const invoke = bindBridge({
-      query: (sql) =>
-        sql.includes('note_claims') ? [{ note_path: 'notes/100.md', tier: 2 }] : [],
+      query: (sql) => (sql.includes('note_claims') ? [{ note_path: 'notes/100.md', tier: 2 }] : []),
     })
 
     await expect(resolveExistingWikiTarget('100%', 7)).resolves.toEqual({
@@ -480,9 +479,9 @@ describe('resolveExistingMarkdownTarget', () => {
     await expect(
       resolveExistingMarkdownTarget('https://example.com/x.md', 'Note.md', 7),
     ).resolves.toEqual({ kind: 'missing' })
-    await expect(
-      resolveExistingMarkdownTarget('../../outside.md', 'Note.md', 7),
-    ).resolves.toEqual({ kind: 'missing' })
+    await expect(resolveExistingMarkdownTarget('../../outside.md', 'Note.md', 7)).resolves.toEqual({
+      kind: 'missing',
+    })
     expect(invoke).not.toHaveBeenCalled()
   })
 })

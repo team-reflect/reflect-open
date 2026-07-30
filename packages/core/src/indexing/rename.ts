@@ -133,11 +133,7 @@ export async function rewriteLinksForTitleChange(
   const backlinkSources = new Set<string>()
   const candidateTargets = new Map<string, string>()
   for (const backlink of backlinks) {
-    if (
-      backlink.sourcePath === null ||
-      backlink.targetRaw === null ||
-      backlink.alias === null
-    ) {
+    if (backlink.sourcePath === null || backlink.targetRaw === null || backlink.alias === null) {
       continue
     }
     backlinkSources.add(backlink.sourcePath)
@@ -212,13 +208,11 @@ export function nextAliases(
     (alias) => previousAutoAlias === null || foldKey(alias) !== foldKey(previousAutoAlias),
   )
   const fromKey = foldKey(from)
-  const redundant =
-    foldKey(to) === fromKey || next.some((alias) => foldKey(alias) === fromKey)
+  const redundant = foldKey(to) === fromKey || next.some((alias) => foldKey(alias) === fromKey)
   if (!redundant) {
     next.push(from)
   }
-  const unchanged =
-    next.length === current.length && next.every((alias, i) => alias === current[i])
+  const unchanged = next.length === current.length && next.every((alias, i) => alias === current[i])
   return unchanged ? null : next
 }
 

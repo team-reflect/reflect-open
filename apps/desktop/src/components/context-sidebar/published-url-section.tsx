@@ -106,7 +106,9 @@ export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactEl
               <Icon aria-hidden className="size-3.5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>{copyState === 'copied' ? 'Copied' : 'Copy published URL'}</TooltipContent>
+          <TooltipContent>
+            {copyState === 'copied' ? 'Copied' : 'Copy published URL'}
+          </TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -117,7 +119,10 @@ export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactEl
               aria-label="Update published gist"
               onClick={() => void updateGist()}
               disabled={isUpdating}
-              className={cn('text-text-muted hover:text-text', row?.gistStale === true && 'text-accent')}
+              className={cn(
+                'text-text-muted hover:text-text',
+                row?.gistStale === true && 'text-accent',
+              )}
             >
               <RefreshCw aria-hidden className={cn('size-3.5', isUpdating && 'animate-spin')} />
             </Button>

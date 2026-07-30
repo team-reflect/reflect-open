@@ -73,7 +73,10 @@ export function NoteTrashAction({ path }: NoteTrashActionProps): ReactElement | 
         </span>
       </button>
 
-      <Dialog open={confirmingTrash} onOpenChange={(open) => !isTrashing && setConfirmingTrash(open)}>
+      <Dialog
+        open={confirmingTrash}
+        onOpenChange={(open) => !isTrashing && setConfirmingTrash(open)}
+      >
         <DialogContent>
           <DialogTitle>Trash this note?</DialogTitle>
           <DialogDescription>

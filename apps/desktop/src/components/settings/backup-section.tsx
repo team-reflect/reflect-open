@@ -34,7 +34,9 @@ function statusLine(backup: Extract<BackupState, { phase: 'connected' }>): strin
   }
 }
 
-function githubRepoBrowserUrl(repo: NonNullable<Extract<BackupState, { phase: 'connected' }>['repo']>): string {
+function githubRepoBrowserUrl(
+  repo: NonNullable<Extract<BackupState, { phase: 'connected' }>['repo']>,
+): string {
   return `https://github.com/${repo.owner}/${repo.name}`
 }
 
@@ -72,7 +74,9 @@ export function BackupSettingsField(): ReactElement {
 
   const repoLabel =
     backup.phase === 'connected'
-      ? (backup.repo !== null ? `${backup.repo.owner}/${backup.repo.name}` : backup.remoteUrl)
+      ? backup.repo !== null
+        ? `${backup.repo.owner}/${backup.repo.name}`
+        : backup.remoteUrl
       : null
   // A hand-wired non-GitHub remote (Plan 16) renders the section host-neutral.
   const genericRemote = backup.phase === 'connected' && backup.repo === null

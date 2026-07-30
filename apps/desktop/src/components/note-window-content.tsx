@@ -22,8 +22,7 @@ import { useRouter } from '@/routing/router'
 export function NoteWindowContent(): ReactElement {
   const { route } = useRouter()
   const { settings } = useSettings()
-  const dailyDate =
-    route.kind === 'daily' ? route.date : route.kind === 'today' ? todayIso() : null
+  const dailyDate = route.kind === 'daily' ? route.date : route.kind === 'today' ? todayIso() : null
 
   // The OS window title follows the shown note — the day label for dailies,
   // the indexed title otherwise (it tracks renames because the row rides the
@@ -33,7 +32,7 @@ export function NoteWindowContent(): ReactElement {
     dailyDate !== null
       ? formatDayLabel(dailyDate, settings.dateFormat)
       : route.kind === 'note'
-        ? noteRow?.title ?? null
+        ? (noteRow?.title ?? null)
         : null,
   )
 

@@ -194,7 +194,9 @@ describe('transcribeAudio (google)', () => {
     const calls: RecordedCall[] = []
     const fetchFn = recordingFetch(calls, () => geminiResponse(' transcript here '))
 
-    const text = await transcribeAudio(request({ provider: 'google', apiKey: 'AIza-test', fetchFn }))
+    const text = await transcribeAudio(
+      request({ provider: 'google', apiKey: 'AIza-test', fetchFn }),
+    )
 
     expect(text).toBe('transcript here')
     expect(calls[0]!.url).toBe(
@@ -257,9 +259,9 @@ describe('transcribeAudio (google)', () => {
       jsonResponse(400, { error: { message: 'Invalid audio content.' } }),
     )
 
-    const failure: unknown = await transcribeAudio(
-      request({ provider: 'google', fetchFn }),
-    ).catch((cause: unknown) => cause)
+    const failure: unknown = await transcribeAudio(request({ provider: 'google', fetchFn })).catch(
+      (cause: unknown) => cause,
+    )
 
     expect(isTranscriptionRejected(failure)).toBe(true)
   })

@@ -272,7 +272,10 @@ export async function refreshGithubAuth(
     }),
   })
   if (!response.ok) {
-    throw new ReflectError('network', `GitHub token refresh failed (${response.status}); will retry`)
+    throw new ReflectError(
+      'network',
+      `GitHub token refresh failed (${response.status}); will retry`,
+    )
   }
   const parsed = await readJson(response, tokenResponseSchema, 'token refresh')
   if (parsed.access_token !== undefined) {

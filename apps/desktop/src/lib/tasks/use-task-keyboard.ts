@@ -93,14 +93,22 @@ export function useTaskKeyboard({
       // ⌘⇧E toggles the filters menu (V1) — a screen-level chord that fires
       // regardless of focus, before the surface-scoping bails, so the same keys
       // open and close it (the open menu portals outside the surface).
-      if ((event.metaKey || event.ctrlKey) && event.shiftKey && (event.key === 'e' || event.key === 'E')) {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.shiftKey &&
+        (event.key === 'e' || event.key === 'E')
+      ) {
         event.preventDefault()
         onToggleFilters()
         return
       }
       // ⌘⇧S opens/closes the schedule calendar for the selection (V1) — also a
       // screen-level chord, but only when there's something to schedule.
-      if ((event.metaKey || event.ctrlKey) && event.shiftKey && (event.key === 's' || event.key === 'S')) {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.shiftKey &&
+        (event.key === 's' || event.key === 'S')
+      ) {
         if (selection.selectedCount > 0) {
           event.preventDefault()
           onToggleSchedule()
@@ -112,7 +120,12 @@ export function useTaskKeyboard({
       // its own keys — only `body`/no-focus and elements inside the surface drive the
       // shortcuts. `body` is allowed so they still fire when focus falls back to it.
       const root = rootRef.current
-      if (root !== null && target !== null && target !== root.ownerDocument.body && !root.contains(target)) {
+      if (
+        root !== null &&
+        target !== null &&
+        target !== root.ownerDocument.body &&
+        !root.contains(target)
+      ) {
         return
       }
       // Back off when a focused control inside the surface owns the key: the inline

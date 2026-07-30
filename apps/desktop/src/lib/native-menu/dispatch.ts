@@ -1,9 +1,6 @@
 import { isTauri } from '@tauri-apps/api/core'
 import { emitTo, type UnlistenFn } from '@tauri-apps/api/event'
-import {
-  getAllWebviewWindows,
-  getCurrentWebviewWindow,
-} from '@tauri-apps/api/webviewWindow'
+import { getAllWebviewWindows, getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { z } from 'zod'
 
 /**
@@ -21,11 +18,7 @@ type MenuCommandDispatch = (commandId: string) => void
 
 let current: MenuCommandDispatch | null = null
 
-const FocusedNoteMenuCommandSchema = z.enum([
-  'note.find',
-  'note.findNext',
-  'note.findPrevious',
-])
+const FocusedNoteMenuCommandSchema = z.enum(['note.find', 'note.findNext', 'note.findPrevious'])
 
 /** Native menu commands whose target is the focused note webview. */
 export type FocusedNoteMenuCommand = z.infer<typeof FocusedNoteMenuCommandSchema>
@@ -102,13 +95,10 @@ export async function listenForFocusedNoteMenuCommands(
   if (!isTauri()) {
     return () => {}
   }
-  return getCurrentWebviewWindow().listen<unknown>(
-    FOCUSED_NOTE_MENU_EVENT,
-    ({ payload }) => {
-      const command = FocusedNoteMenuCommandSchema.safeParse(payload)
-      if (command.success) {
-        dispatch(command.data)
-      }
-    },
-  )
+  return getCurrentWebviewWindow().listen<unknown>(FOCUSED_NOTE_MENU_EVENT, ({ payload }) => {
+    const command = FocusedNoteMenuCommandSchema.safeParse(payload)
+    if (command.success) {
+      dispatch(command.data)
+    }
+  })
 }

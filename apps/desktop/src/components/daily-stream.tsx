@@ -271,7 +271,11 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
               {/* V1 renders the date as the note's H1-sized subject, with
                   today's tinted brand (its `highlightSubject`). */}
               <h2
-                className={cn('reflect-daily-subject mb-3', CONTENT_GUTTER, isToday && 'text-accent')}
+                className={cn(
+                  'reflect-daily-subject mb-3',
+                  CONTENT_GUTTER,
+                  isToday && 'text-accent',
+                )}
                 onClick={() => handleSubjectClick(date)}
               >
                 {formatDayLabel(date, settings.dateFormat)}

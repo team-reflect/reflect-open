@@ -95,7 +95,6 @@ function uploadFilename(mimeType: string): string {
   return `memo.${AUDIO_EXTENSION_BY_MIME[baseMimeType(mimeType)] ?? 'm4a'}`
 }
 
-
 const openAiResponseSchema = z.object({ text: z.string() })
 
 function isModelNotFound(body: string): boolean {
@@ -135,7 +134,10 @@ async function transcribeWithOpenAi(request: TranscriptionRequest): Promise<stri
 
   const parsed = openAiResponseSchema.safeParse(safeJson(body))
   if (!parsed.success) {
-    throw new ReflectError('parse', `unrecognized openai transcription response: ${body.slice(0, 200)}`)
+    throw new ReflectError(
+      'parse',
+      `unrecognized openai transcription response: ${body.slice(0, 200)}`,
+    )
   }
   return parsed.data.text.trim()
 }
@@ -223,5 +225,8 @@ async function transcribeWithGemini(request: TranscriptionRequest): Promise<stri
     )
   }
   const parts = candidate?.content?.parts ?? []
-  return parts.map((part) => part.text ?? '').join('').trim()
+  return parts
+    .map((part) => part.text ?? '')
+    .join('')
+    .trim()
 }

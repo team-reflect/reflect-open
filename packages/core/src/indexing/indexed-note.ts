@@ -1,9 +1,5 @@
 import { z } from 'zod'
-import {
-  markdownNoteReference,
-  noteBasenameKey,
-  wikiNoteReference,
-} from '../graph/note-reference'
+import { markdownNoteReference, noteBasenameKey, wikiNoteReference } from '../graph/note-reference'
 import {
   dateFromDailyPath,
   foldGraphPath,

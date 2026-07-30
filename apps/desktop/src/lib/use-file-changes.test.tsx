@@ -122,10 +122,7 @@ describe('useFileChanges', () => {
     const view = await render(<Host handler={handler} />)
     await flushMicrotasks()
 
-    expect(consoleError).toHaveBeenCalledWith(
-      'file-change subscription failed:',
-      expect.any(Error),
-    )
+    expect(consoleError).toHaveBeenCalledWith('file-change subscription failed:', expect.any(Error))
     expect(handler).not.toHaveBeenCalled()
     await expect(view.unmount()).resolves.toBeUndefined()
     consoleError.mockRestore()

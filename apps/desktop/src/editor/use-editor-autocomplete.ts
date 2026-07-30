@@ -103,11 +103,13 @@ export function useEditorAutocomplete(): EditorAutocomplete {
       const contacts = contactResolutions.flatMap((resolution) =>
         resolution.kind === 'blocked'
           ? []
-          : [{
-              contact: resolution.contact,
-              target: resolution.insertText,
-              ownerPath: resolution.kind === 'existing' ? resolution.path : null,
-            }],
+          : [
+              {
+                contact: resolution.contact,
+                target: resolution.insertText,
+                ownerPath: resolution.kind === 'existing' ? resolution.path : null,
+              },
+            ],
       )
       const blockedContactNames = contactResolutions.flatMap((resolution) =>
         resolution.kind === 'blocked' ? [resolution.contact.fullName] : [],
@@ -169,7 +171,11 @@ export function useEditorAutocomplete(): EditorAutocomplete {
         // A generated date leads with its phrase ("Next Friday"), resolved day
         // as the detail; everything else keeps the title/alias/daily form.
         if (generated !== undefined && date !== null) {
-          return { target, label: generated.phrase, detail: formatDayLabel(date, settings.dateFormat) }
+          return {
+            target,
+            label: generated.phrase,
+            detail: formatDayLabel(date, settings.dateFormat),
+          }
         }
         // A rich title reads as its rendered form; the raw form stays the identity.
         const displayedTitle = displayNoteTitle(title)

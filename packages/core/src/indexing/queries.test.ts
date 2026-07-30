@@ -31,10 +31,7 @@ afterEach(() => {
 
 describe('dailyDatesInRange', () => {
   it('queries the notes daily_date column with inclusive bounds', async () => {
-    mockInvoke.mockResolvedValue([
-      { daily_date: '2026-06-01' },
-      { daily_date: '2026-06-09' },
-    ])
+    mockInvoke.mockResolvedValue([{ daily_date: '2026-06-01' }, { daily_date: '2026-06-09' }])
 
     const dates = await dailyDatesInRange('2026-06-01', '2026-06-30')
 
@@ -363,9 +360,7 @@ describe('getBacklinksWithContext', () => {
     const countQuery = dbQueries().find(({ sql }) => sql.includes('count(*)'))
     expect(countQuery?.sql).toContain('inner join "notes"')
 
-    const contextQuery = dbQueries().find(({ sql }) =>
-      sql.includes('"backlinks"."pos_from"'),
-    )
+    const contextQuery = dbQueries().find(({ sql }) => sql.includes('"backlinks"."pos_from"'))
     expect(contextQuery?.sql).toContain('"backlinks"."source_path"')
     expect(contextQuery?.sql).toContain('"backlinks"."pos_from"')
   })
@@ -395,13 +390,7 @@ describe('getBacklinksWithContext', () => {
     const sourceQuery = dbQueries().find(({ sql }) => sql.includes('select distinct'))
     expect(sourceQuery?.sql).toContain('"backlinks"."source_path" >')
     expect(sourceQuery?.sql.toLowerCase()).not.toContain(' offset ')
-    expect(sourceQuery?.params).toEqual([
-      'notes/target.md',
-      1_000,
-      1_000,
-      'notes/previous.md',
-      2,
-    ])
+    expect(sourceQuery?.params).toEqual(['notes/target.md', 1_000, 1_000, 'notes/previous.md', 2])
   })
 
   it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
@@ -475,11 +464,7 @@ describe('getBacklinksWithContext', () => {
           title: 'Source',
           recencyMs: 1_000,
           content,
-          positions: [
-            5,
-            content.lastIndexOf('[[target]] line'),
-            content.indexOf('another'),
-          ],
+          positions: [5, content.lastIndexOf('[[target]] line'), content.indexOf('another')],
         },
       ],
     })
@@ -541,12 +526,10 @@ describe('getDuplicateNoteIds', () => {
   })
 
   it('groups every path claiming a duplicated id, ordered', async () => {
-    mockInvoke
-      .mockResolvedValueOnce([{ id: 'dup-1' }])
-      .mockResolvedValueOnce([
-        { id: 'dup-1', path: 'notes/a.md' },
-        { id: 'dup-1', path: 'notes/b.md' },
-      ])
+    mockInvoke.mockResolvedValueOnce([{ id: 'dup-1' }]).mockResolvedValueOnce([
+      { id: 'dup-1', path: 'notes/a.md' },
+      { id: 'dup-1', path: 'notes/b.md' },
+    ])
 
     await expect(getDuplicateNoteIds()).resolves.toEqual([
       { id: 'dup-1', paths: ['notes/a.md', 'notes/b.md'] },
@@ -625,7 +608,11 @@ describe('suggestWikiTargets', () => {
 
     expect(result.map((row) => row.target)).toEqual(['Today', '2020-01-01'])
     expect(result[0]!.path).toBe('notes/today.md')
-    expect(result[1]).toMatchObject({ date: '2020-01-01', generated: { phrase: 'Today' }, path: null })
+    expect(result[1]).toMatchObject({
+      date: '2020-01-01',
+      generated: { phrase: 'Today' },
+      path: null,
+    })
   })
 
   it('does not synthesise dates without a clock (legacy callers unchanged)', async () => {

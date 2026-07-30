@@ -33,7 +33,8 @@ export function Button({
     borderRadius: 'var(--radius-lg)',
     border: '1px solid transparent',
     cursor: disabled ? 'not-allowed' : 'pointer',
-    transition: 'background var(--duration-base) var(--ease-in-out), color var(--duration-fast), box-shadow var(--duration-base), opacity var(--duration-fast)',
+    transition:
+      'background var(--duration-base) var(--ease-in-out), color var(--duration-fast), box-shadow var(--duration-base), opacity var(--duration-fast)',
     whiteSpace: 'nowrap',
     ...pad,
   }
@@ -66,8 +67,7 @@ export function Button({
       background:
         'linear-gradient(180deg,rgba(60,8,126,0) 0%,rgba(60,8,126,.32) 100%),rgba(113,47,255,.12)',
       color: 'var(--purple-text)',
-      boxShadow:
-        'inset 0 0 12px rgba(191,151,255,.24), inset 0 0 0 1px rgba(207,184,255,.24)',
+      boxShadow: 'inset 0 0 12px rgba(191,151,255,.24), inset 0 0 0 1px rgba(207,184,255,.24)',
       backdropFilter: 'blur(8px)',
     },
   }
@@ -98,7 +98,13 @@ export function Button({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       className={className}
-      style={{ ...base, ...variants[variant], ...hoverStyle, opacity: disabled ? 0.6 : 1, ...style }}
+      style={{
+        ...base,
+        ...variants[variant],
+        ...hoverStyle,
+        opacity: disabled ? 0.6 : 1,
+        ...style,
+      }}
     >
       {leadingIcon}
       {children}

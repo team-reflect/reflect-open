@@ -1,10 +1,4 @@
-import {
-  openIndex,
-  subscribeIndexChanges,
-  syncIndex,
-  watchStart,
-  watchStop,
-} from '@reflect/core'
+import { openIndex, subscribeIndexChanges, syncIndex, watchStart, watchStop } from '@reflect/core'
 
 /**
  * The active graph's index lifecycle, factored out of `GraphProvider` so the

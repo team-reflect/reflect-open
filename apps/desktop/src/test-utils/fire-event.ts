@@ -13,7 +13,10 @@ function dispatch(target: EventTarget, event: Event): boolean {
 function setValue(target: EventTarget, value: string): void {
   const element = resolveElement(target)
   if (element instanceof HTMLTextAreaElement) {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(element, value)
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(
+      element,
+      value,
+    )
     return
   }
   if (element instanceof HTMLInputElement) {
@@ -39,10 +42,16 @@ export const fireEvent = {
     return dispatch(target, new FocusEvent('focusin', { bubbles: true, cancelable: true }))
   },
   keyDown(target: EventTarget, init: KeyboardEventInit = {}): boolean {
-    return dispatch(target, new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }))
+    return dispatch(
+      target,
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }),
+    )
   },
   mouseDown(target: EventTarget, init: MouseEventInit = {}): boolean {
-    return dispatch(target, new MouseEvent('mousedown', { bubbles: true, cancelable: true, ...init }))
+    return dispatch(
+      target,
+      new MouseEvent('mousedown', { bubbles: true, cancelable: true, ...init }),
+    )
   },
   pointerDown(target: EventTarget, init: PointerEventInit = {}): boolean {
     return dispatch(

@@ -155,9 +155,7 @@ describe('useWikiLinkNavigation', () => {
     lastHandler?.('2026-06-09')
 
     await vi.waitFor(() =>
-      expect(operationFail).toHaveBeenCalledWith(
-        expect.stringContaining('currently unavailable'),
-      ),
+      expect(operationFail).toHaveBeenCalledWith(expect.stringContaining('currently unavailable')),
     )
     expect(currentRoute(view)).toContain('"today"')
     await view.unmount()
@@ -266,9 +264,7 @@ describe('useWikiLinkNavigation', () => {
     lastHandler?.('Business ideas')
 
     await vi.waitFor(() =>
-      expect(operationFail).toHaveBeenCalledWith(
-        expect.stringContaining('currently unavailable'),
-      ),
+      expect(operationFail).toHaveBeenCalledWith(expect.stringContaining('currently unavailable')),
     )
     expect(currentRoute(view)).toContain('"today"')
     expect(resolveWikiTarget).not.toHaveBeenCalled()
@@ -327,9 +323,7 @@ describe('useWikiLinkNavigation', () => {
       </RouterProvider>,
     )
     lastHandler?.('Target')
-    await vi.waitFor(() =>
-      expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Target', 1),
-    )
+    await vi.waitFor(() => expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Target', 1))
     // Unmount only the host; the router (and probe) live on, so a navigate
     // slipping through the guard would be visible as a route change.
     await view.rerender(
@@ -356,9 +350,7 @@ describe('useWikiLinkNavigation', () => {
     const view = await renderHost()
 
     lastHandler?.('Older')
-    await vi.waitFor(() =>
-      expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Older', 1),
-    )
+    await vi.waitFor(() => expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Older', 1))
     lastHandler?.('Newer')
     await vi.waitFor(() => expect(currentRoute(view)).toContain('notes/newer.md'))
     finishOlder({ kind: 'resolved', path: 'notes/older.md' })
@@ -379,9 +371,7 @@ describe('useWikiLinkNavigation', () => {
     const view = await renderHost()
 
     lastHandler?.('Target')
-    await vi.waitFor(() =>
-      expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Target', 1),
-    )
+    await vi.waitFor(() => expect(resolveOrCreateNoteWithTitle).toHaveBeenCalledWith('Target', 1))
     navigate?.({ kind: 'settings' })
     await vi.waitFor(() => expect(currentRoute(view)).toContain('"settings"'))
 
