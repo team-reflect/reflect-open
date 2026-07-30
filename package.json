@@ -42,5 +42,5 @@
   "nano-staged": {
     "*": "oxfmt --no-error-on-unmatched-pattern"
   },
-  "packageManager": "pnpm@11.9.0"
+  "packageManager": "pnpm@11.18.0"
 }
