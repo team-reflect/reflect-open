@@ -30,6 +30,7 @@ describe('settingsSchema', () => {
       graphColors: {},
       aiProviders: [],
       defaultAiProviderId: null,
+      defaultTranscriptionProviderId: null,
       chatModelSelection: null,
       chatSystemPrompt: '',
       aiPrompts: [],
@@ -59,6 +60,7 @@ describe('settingsSchema', () => {
     expect(DEFAULT_SETTINGS.graphColors).toEqual({})
     expect(DEFAULT_SETTINGS.aiProviders).toEqual([])
     expect(DEFAULT_SETTINGS.defaultAiProviderId).toBeNull()
+    expect(DEFAULT_SETTINGS.defaultTranscriptionProviderId).toBeNull()
     expect(DEFAULT_SETTINGS.chatModelSelection).toBeNull()
     expect(DEFAULT_SETTINGS.chatSystemPrompt).toBe('')
     expect(DEFAULT_SETTINGS.aiPrompts).toEqual([])
@@ -240,6 +242,7 @@ describe('settingsSchema', () => {
       graphColors: {},
       aiProviders: [],
       defaultAiProviderId: null,
+      defaultTranscriptionProviderId: null,
       chatModelSelection: null,
       chatSystemPrompt: '',
       aiPrompts: [],
@@ -297,7 +300,7 @@ describe('settingsSchema', () => {
         keyHint: '',
       }
       expect(settingsSchema.parse({ aiProviders: [entry] }).aiProviders).toEqual([
-        { ...entry, baseUrl: 'http://localhost:1234/v1' },
+        { ...entry, baseUrl: 'http://localhost:1234/v1', transcriptionModel: '' },
       ])
     })
 
