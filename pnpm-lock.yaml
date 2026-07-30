@@ -12,12 +12,18 @@ importers:
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3
+      nano-staged:
+        specifier: ^1.0.2
+        version: 1.0.2
       oxfmt:
         specifier: ^0.61.0
         version: 0.61.0
       oxlint:
         specifier: ^1.71.0
         version: 1.75.0
+      simple-git-hooks:
+        specifier: ^2.13.1
+        version: 2.13.1
       turbo:
         specifier: ^2.10.0
         version: 2.10.6
@@ -4770,6 +4776,11 @@ packages:
     resolution: {integrity: sha512-yTW+2okrElHiH4fsiz/+/zc0EDo9BDDoC3iKk8dpv1GeRc9nUWzUZHx6TofMWErchhUQR8hY9/Eu1Uja9x1nqA==}
     engines: {node: '>=20.17'}
 
+  nano-staged@1.0.2:
+    resolution: {integrity: sha512-Fytar3zHLY99nlMfqPPbraxZodqQAHPpdPRyYaplL+lB9DCR6pUrafxbG+Btz4+7fO5Rm/+DO4ZeDO/nLSUMhw==}
+    engines: {node: ^22 || >= 24}
+    hasBin: true
+
   nanoid@3.3.16:
     resolution: {integrity: sha512-bzlKTyNJ7+LdGIIwy8ijFpIqEQIvafahV7eYykJ8Cvh42EdJeODoJ6gUJXpQJvej1BddH8OqTXZNE/KfbWAu8Q==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
@@ -5551,6 +5562,10 @@ packages:
 
   simple-get@4.0.1:
     resolution: {integrity: sha512-brv7p5WgH0jmQJr1ZDDfKDOSeWWg+OVypG99A/5vYGPqJ6pxiaHLy8nxtFjBA7oMa01ebA9gfh1uMCFqOuXxvA==}
+
+  simple-git-hooks@2.13.1:
+    resolution: {integrity: sha512-WszCLXwT4h2k1ufIXAgsbiTOazqqevFCIncOuUBZJ91DdvWcC5+OFkluWRQPrcuSYd8fjq+o2y1QfWqYMoAToQ==}
+    hasBin: true
 
   sirv@3.0.2:
     resolution: {integrity: sha512-2wcC/oGxHis/BoHkkPwldgiPSYcpZK3JU28WoMVv55yHJgcZ8rlXvuG9iZggz+sU1d4bRgIGASwyWqjxu3FM0g==}
@@ -11174,6 +11189,8 @@ snapshots:
 
   nano-spawn@2.1.0: {}
 
+  nano-staged@1.0.2: {}
+
   nanoid@3.3.16: {}
 
   nanospinner@1.2.2:
@@ -12150,6 +12167,8 @@ snapshots:
       decompress-response: 6.0.0
       once: 1.4.0
       simple-concat: 1.0.1
+
+  simple-git-hooks@2.13.1: {}
 
   sirv@3.0.2:
     dependencies:
