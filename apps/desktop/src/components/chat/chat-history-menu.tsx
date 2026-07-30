@@ -39,11 +39,13 @@ export function ChatHistoryMenu(): ReactElement | null {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label="Chat history">
-          <History aria-hidden />
-        </Button>
-      </DropdownMenuTrigger>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="ghost" size="icon-sm" aria-label="Chat history">
+            <History aria-hidden />
+          </Button>
+        }
+      />
       <DropdownMenuContent
         aria-label="Chat history"
         side="top"
@@ -61,7 +63,7 @@ export function ChatHistoryMenu(): ReactElement | null {
             return (
               <DropdownMenuItem
                 key={conversation.id}
-                onSelect={() => {
+                onClick={() => {
                   if (!current) {
                     void openConversation(conversation.id)
                   }

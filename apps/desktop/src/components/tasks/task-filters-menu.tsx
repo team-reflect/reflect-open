@@ -39,12 +39,17 @@ export function TaskFiltersMenu({
 }: TaskFiltersMenuProps): ReactElement {
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="window-drag-control text-xs font-normal text-text-muted">
-          <ListFilter aria-hidden className="size-3.5" />
-          Task filters
-        </Button>
-      </DropdownMenuTrigger>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="ghost"
+            className="window-drag-control text-xs font-normal text-text-muted"
+          >
+            <ListFilter aria-hidden className="size-3.5" />
+            Task filters
+          </Button>
+        }
+      />
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>Tasks</DropdownMenuLabel>
         {BUCKET_FILTERS.map(({ key, label }) => (
@@ -52,7 +57,6 @@ export function TaskFiltersMenu({
             key={key}
             checked={filters[key]}
             onCheckedChange={() => toggle(key)}
-            onSelect={(event) => event.preventDefault()}
           >
             {label}
           </DropdownMenuCheckboxItem>
@@ -61,7 +65,6 @@ export function TaskFiltersMenu({
         <DropdownMenuCheckboxItem
           checked={filters.archived}
           onCheckedChange={() => toggle('archived')}
-          onSelect={(event) => event.preventDefault()}
         >
           Show archived tasks
         </DropdownMenuCheckboxItem>

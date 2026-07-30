@@ -83,37 +83,39 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
           <TooltipTrigger
             delay={700}
             render={
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="group h-auto min-w-0 flex-1 justify-start gap-2.5 px-1.5 py-1 text-left"
-                >
-                  <GraphSwatch
-                    color={colorFor(graph.root)}
-                    className={cn('h-5 w-5', indexing && 'motion-safe:animate-pulse')}
-                  />
-                  <span className="min-w-0 truncate text-xs font-medium text-text-secondary transition-colors duration-100 group-hover:text-text">
-                    {graph.name}
-                  </span>
-                  {dot !== null ? (
-                    <>
-                      <span
-                        aria-hidden
-                        className={cn('h-1.5 w-1.5 flex-none rounded-full', dot.className)}
-                      />
-                      <span role="status" className="sr-only">
-                        {dot.label}
-                      </span>
-                    </>
-                  ) : null}
-                  {indexing ? (
-                    <span role="status" className="sr-only">
-                      Indexing
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="group h-auto min-w-0 flex-1 justify-start gap-2.5 px-1.5 py-1 text-left"
+                  >
+                    <GraphSwatch
+                      color={colorFor(graph.root)}
+                      className={cn('h-5 w-5', indexing && 'motion-safe:animate-pulse')}
+                    />
+                    <span className="min-w-0 truncate text-xs font-medium text-text-secondary transition-colors duration-100 group-hover:text-text">
+                      {graph.name}
                     </span>
-                  ) : null}
-                </Button>
-              </DropdownMenuTrigger>
+                    {dot !== null ? (
+                      <>
+                        <span
+                          aria-hidden
+                          className={cn('h-1.5 w-1.5 flex-none rounded-full', dot.className)}
+                        />
+                        <span role="status" className="sr-only">
+                          {dot.label}
+                        </span>
+                      </>
+                    ) : null}
+                    {indexing ? (
+                      <span role="status" className="sr-only">
+                        Indexing
+                      </span>
+                    ) : null}
+                  </Button>
+                }
+              />
             }
           />
           <TooltipContent>{graph.root}</TooltipContent>
@@ -128,7 +130,7 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
                   delay={700}
                   render={
                     <DropdownMenuItem
-                      onSelect={() => {
+                      onClick={() => {
                         if (!current) {
                           void openRecent(recent.root)
                         }
@@ -159,7 +161,7 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
               {GRAPH_COLOR_OPTIONS.map((option) => (
                 <DropdownMenuItem
                   key={option.id}
-                  onSelect={() => setColor(graph.root, option.id)}
+                  onClick={() => setColor(graph.root, option.id)}
                   className={MENU_ITEM_CLASS}
                 >
                   <GraphSwatch color={option.id} className="size-3.5 rounded" />
@@ -172,7 +174,7 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
             </DropdownMenuSubContent>
           </DropdownMenuSub>
           <DropdownMenuItem
-            onSelect={() => {
+            onClick={() => {
               void revealItemInDir(graph.root).catch((cause: unknown) => {
                 console.error('open graph folder failed:', cause)
               })
@@ -184,13 +186,13 @@ export function GraphFooter({ graph, context }: GraphFooterProps): ReactElement 
           </DropdownMenuItem>
           {/* Graph switching re-roots every window; note windows hide it. */}
           {isMainWindow() ? (
-            <DropdownMenuItem onSelect={() => void chooseGraph()} className={MENU_ITEM_CLASS}>
+            <DropdownMenuItem onClick={() => void chooseGraph()} className={MENU_ITEM_CLASS}>
               <FolderOpen aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
               <span className="min-w-0 flex-1 truncate">Open another graph…</span>
             </DropdownMenuItem>
           ) : null}
           <DropdownMenuItem
-            onSelect={() => void runCommand('settings.open', context)}
+            onClick={() => void runCommand('settings.open', context)}
             className={MENU_ITEM_CLASS}
           >
             <Settings aria-hidden strokeWidth={1.75} className="size-3.5 shrink-0" />
