@@ -23,7 +23,8 @@
     "tauri:dev": "pnpm --filter @reflect/desktop tauri:dev",
     "tauri:ios:dev": "pnpm --filter @reflect/desktop tauri:ios:dev",
     "tauri:build:dev": "pnpm --filter @reflect/desktop tauri:build:dev",
-    "tauri:build:beta": "pnpm --filter @reflect/desktop tauri:build:beta"
+    "tauri:build:beta": "pnpm --filter @reflect/desktop tauri:build:beta",
+    "postinstall": "simple-git-hooks"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
