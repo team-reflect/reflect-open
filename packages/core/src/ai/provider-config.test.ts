@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { AiProviderConfig, HostedAiProviderConfig } from '../settings/schema'
+import type { AiProviderConfig, HostedAiProviderConfig, OpenAiCompatibleProviderConfig } from '../settings/schema'
 import {
   apiKeyHint,
   defaultAiProvider,
+  defaultTranscriptionProvider,
   pickTranscriptionConfig,
   resolveTranscriptionTarget,
+  transcriptionProviders,
   withAiProviderAdded,
   withAiProviderRemoved,
   type AiProvidersState,
@@ -20,8 +22,28 @@ function config(overrides: Partial<HostedAiProviderConfig>): HostedAiProviderCon
   }
 }
 
-function state(providers: AiProviderConfig[], defaultProviderId: string | null): AiProvidersState {
-  return { providers, defaultProviderId }
+function compatible(overrides: Partial<OpenAiCompatibleProviderConfig>): OpenAiCompatibleProviderConfig {
+  return {
+    id: 'compat',
+    provider: 'openai-compatible',
+    model: 'local-model',
+    keyHint: '',
+    baseUrl: 'http://localhost:1234/v1',
+    transcriptionModel: '',
+    ...overrides,
+  }
+}
+
+function state(
+  providers: AiProviderConfig[],
+  defaultProviderId: string | null,
+  defaultTranscriptionProviderId?: string | null,
+): AiProvidersState {
+  return {
+    providers,
+    defaultProviderId,
+    defaultTranscriptionProviderId: defaultTranscriptionProviderId ?? null,
+  }
 }
 
 describe('apiKeyHint', () => {
@@ -38,9 +60,11 @@ describe('apiKeyHint', () => {
 
 describe('withAiProviderAdded', () => {
   it('makes the first entry the default even when not requested', () => {
-    expect(withAiProviderAdded(state([], null), config({ id: 'a' }), false)).toEqual(
-      state([config({ id: 'a' })], 'a'),
-    )
+    expect(withAiProviderAdded(state([], null), config({ id: 'a' }), false)).toEqual({
+      providers: [config({ id: 'a' })],
+      defaultProviderId: 'a',
+      defaultTranscriptionProviderId: 'a', // OpenAI is transcription-capable
+    })
   })
 
   it('appends a non-default entry without touching the default', () => {
@@ -53,6 +77,27 @@ describe('withAiProviderAdded', () => {
   it('an entry added as default takes over', () => {
     const before = state([config({ id: 'a' })], 'a')
     expect(withAiProviderAdded(before, config({ id: 'b' }), true).defaultProviderId).toBe('b')
+  })
+
+  it('does not set a non-transcription-capable first entry as transcription default', () => {
+    const result = withAiProviderAdded(
+      state([], null),
+      config({ id: 'claude', provider: 'anthropic', model: 'claude-fable-5' }),
+      false,
+    )
+    expect(result.defaultProviderId).toBe('claude')
+    expect(result.defaultTranscriptionProviderId).toBeNull()
+  })
+
+  it('a transcription-capable entry added as default sets both defaults', () => {
+    const before = state([config({ id: 'a' })], 'a')
+    const result = withAiProviderAdded(
+      before,
+      compatible({ id: 'local', transcriptionModel: 'whisper-1' }),
+      true,
+    )
+    expect(result.defaultProviderId).toBe('local')
+    expect(result.defaultTranscriptionProviderId).toBe('local')
   })
 })
 
@@ -70,6 +115,36 @@ describe('withAiProviderRemoved', () => {
   it('removing the last entry clears the default', () => {
     expect(withAiProviderRemoved(state([config({ id: 'a' })], 'a'), 'a')).toEqual(state([], null))
   })
+
+  it('promotes the next transcription-capable entry when the transcription default is removed', () => {
+    const providers = [
+      config({ id: 'oai', provider: 'openai' }),
+      config({ id: 'gemini', provider: 'google', model: 'gemini-2.5-flash' }),
+    ]
+    const before = state(providers, 'oai', 'oai')
+    const result = withAiProviderRemoved(before, 'oai')
+    expect(result.defaultTranscriptionProviderId).toBe('gemini')
+  })
+
+  it('clears the transcription default when no transcription-capable entries remain', () => {
+    const providers = [
+      config({ id: 'oai', provider: 'openai' }),
+      config({ id: 'claude', provider: 'anthropic', model: 'claude-fable-5' }),
+    ]
+    const before = state(providers, 'claude', 'oai')
+    const result = withAiProviderRemoved(before, 'oai')
+    expect(result.defaultTranscriptionProviderId).toBeNull()
+  })
+
+  it('leaves the transcription default unchanged when a non-default entry is removed', () => {
+    const providers = [
+      config({ id: 'oai', provider: 'openai' }),
+      config({ id: 'claude', provider: 'anthropic', model: 'claude-fable-5' }),
+    ]
+    const before = state(providers, 'claude', 'oai')
+    const result = withAiProviderRemoved(before, 'claude')
+    expect(result.defaultTranscriptionProviderId).toBe('oai')
+  })
 })
 
 describe('pickTranscriptionConfig', () => {
@@ -83,7 +158,13 @@ describe('pickTranscriptionConfig', () => {
 
   it('prefers the app default among entries of the chosen provider', () => {
     const providers = [config({ id: 'first' }), config({ id: 'second' })]
-    expect(pickTranscriptionConfig(state(providers, 'second'))?.id).toBe('second')
+    expect(
+      pickTranscriptionConfig({
+        providers,
+        defaultProviderId: 'second',
+        defaultTranscriptionProviderId: 'second',
+      })?.id,
+    ).toBe('second')
   })
 
   it('falls back to google when no openai entry exists', () => {
@@ -104,6 +185,84 @@ describe('pickTranscriptionConfig', () => {
 
   it('returns null for the empty list', () => {
     expect(pickTranscriptionConfig(state([], null))).toBeNull()
+  })
+
+  it('selects an openai-compatible entry when it has a transcription model', () => {
+    const providers = [
+      compatible({ id: 'local', transcriptionModel: 'whisper-large-v3' }),
+    ]
+    expect(pickTranscriptionConfig(state(providers, 'local'))?.id).toBe('local')
+  })
+})
+
+describe('defaultTranscriptionProvider', () => {
+  it('returns the entry the transcription default id points at', () => {
+    const providers = [config({ id: 'oai' }), config({ id: 'gemini', provider: 'google', model: 'gemini-2.5-flash' })]
+    expect(defaultTranscriptionProvider(state(providers, 'oai', 'gemini'))?.id).toBe('gemini')
+  })
+
+  it('falls back to the first transcription-capable entry when the default is null', () => {
+    const providers = [
+      config({ id: 'claude', provider: 'anthropic', model: 'claude-fable-5' }),
+      config({ id: 'oai', provider: 'openai' }),
+    ]
+    expect(defaultTranscriptionProvider(state(providers, 'claude', null))?.id).toBe('oai')
+  })
+
+  it('skips a dangling or non-transcription-capable default', () => {
+    const providers = [
+      config({ id: 'claude', provider: 'anthropic', model: 'claude-fable-5' }),
+      config({ id: 'gemini', provider: 'google', model: 'gemini-2.5-flash' }),
+    ]
+    // Anthropic is set as transcription default but doesn't support transcription
+    expect(defaultTranscriptionProvider(state(providers, 'claude', 'claude'))?.id).toBe('gemini')
+  })
+
+  it('returns null when no transcription-capable entries exist', () => {
+    const providers = [
+      config({ id: 'claude', provider: 'anthropic', model: 'claude-fable-5' }),
+      config({ id: 'openrouter', provider: 'openrouter', model: 'openrouter/auto' }),
+    ]
+    expect(defaultTranscriptionProvider(state(providers, 'claude', null))).toBeNull()
+  })
+})
+
+describe('transcriptionProviders', () => {
+  it('orders OpenAI before Google before openai-compatible', () => {
+    const providers = [
+      compatible({ id: 'local', transcriptionModel: 'whisper-1' }),
+      config({ id: 'gemini', provider: 'google', model: 'gemini-2.5-flash' }),
+      config({ id: 'oai', provider: 'openai' }),
+    ]
+    const result = transcriptionProviders(state(providers, 'oai'))
+    expect(result.map((p) => p.provider)).toEqual(['openai', 'google', 'openai-compatible'])
+  })
+
+  it('puts the transcription default first within each provider group', () => {
+    const providers = [
+      config({ id: 'oai-first', provider: 'openai' }),
+      config({ id: 'oai-second', provider: 'openai' }),
+    ]
+    const result = transcriptionProviders(state(providers, 'oai-first', 'oai-second'))
+    expect(result.map((p) => p.id)).toEqual(['oai-second', 'oai-first'])
+  })
+
+  it('excludes non-transcription-capable providers', () => {
+    const providers = [
+      config({ id: 'claude', provider: 'anthropic', model: 'claude-fable-5' }),
+      config({ id: 'oai', provider: 'openai' }),
+      compatible({ id: 'local', transcriptionModel: '' }),
+    ]
+    const result = transcriptionProviders(state(providers, 'claude'))
+    expect(result.map((p) => p.id)).toEqual(['oai'])
+  })
+
+  it('returns an empty array when nothing is transcription-capable', () => {
+    const providers = [
+      config({ id: 'claude', provider: 'anthropic', model: 'claude-fable-5' }),
+      compatible({ id: 'local', transcriptionModel: '' }),
+    ]
+    expect(transcriptionProviders(state(providers, 'claude'))).toEqual([])
   })
 })
 
@@ -146,13 +305,14 @@ describe('resolveTranscriptionTarget', () => {
     expect(target).toBe('no-key')
   })
 
-  it('prefers OpenAI entries and the app default within a provider', async () => {
+it('prefers OpenAI entries and the transcription default within a provider', async () => {
     const providers = state(
       [
         config({ id: 'google-1', provider: 'google' }),
         config({ id: 'openai-1' }),
         config({ id: 'openai-2' }),
       ],
+      'openai-2',
       'openai-2',
     )
     const target = await resolveTranscriptionTarget(
@@ -165,6 +325,9 @@ describe('resolveTranscriptionTarget', () => {
   it('skips a keyless preferred entry instead of blocking a working one', async () => {
     const providers = state(
       [config({ id: 'openai-1' }), config({ id: 'google-1', provider: 'google' })],
+      'openai-1',
+      'openai-1',
+    )
       'openai-1',
     )
     const target = await resolveTranscriptionTarget(providers, keyed({ 'google-1': 'g' }))
