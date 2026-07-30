@@ -29,11 +29,13 @@ export function AssetDescribeProvider({
   const providersRef = useRef<AiProvidersState>({
     providers: settings.aiProviders,
     defaultProviderId: settings.defaultAiProviderId,
+    defaultTranscriptionProviderId: settings.defaultTranscriptionProviderId,
   })
   useEffect(() => {
     providersRef.current = {
       providers: settings.aiProviders,
       defaultProviderId: settings.defaultAiProviderId,
+      defaultTranscriptionProviderId: settings.defaultTranscriptionProviderId,
     }
   })
 

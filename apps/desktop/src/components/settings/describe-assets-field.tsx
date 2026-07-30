@@ -39,6 +39,7 @@ export function DescribeAssetsField(): ReactElement {
     const providers: AiProvidersState = {
       providers: settings.aiProviders,
       defaultProviderId: settings.defaultAiProviderId,
+      defaultTranscriptionProviderId: settings.defaultTranscriptionProviderId,
     }
     setRunning(true)
     try {
