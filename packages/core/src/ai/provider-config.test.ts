@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type {
   AiProviderConfig,
   HostedAiProviderConfig,
@@ -293,8 +293,8 @@ describe('defaultAiProvider', () => {
 describe('resolveTranscriptionTarget', () => {
   const keyed =
     (available: Record<string, string>) =>
-    (id: string): Promise<string | null> =>
-      Promise.resolve(available[id] ?? null)
+    (config: { id: string }): Promise<string | null> =>
+      Promise.resolve(available[config.id] ?? null)
 
   it('answers no-provider when nothing transcription-capable is configured', async () => {
     const target = await resolveTranscriptionTarget(
@@ -337,5 +337,18 @@ describe('resolveTranscriptionTarget', () => {
     )
     const target = await resolveTranscriptionTarget(providers, keyed({ 'google-1': 'g' }))
     expect(target).toMatchObject({ config: { id: 'google-1' }, apiKey: 'g' })
+  })
+
+  it('resolves a no-key openai-compatible entry when the keychain has no key', async () => {
+    const providers = state(
+      [compatible({ id: 'local', transcriptionModel: 'whisper-large-v3', keyHint: '' })],
+      'local',
+      'local',
+    )
+    const getKey = vi.fn<(config: AiProviderConfig) => Promise<string | null>>(async (config) =>
+      config.id === 'local' ? '' : null,
+    )
+    const target = await resolveTranscriptionTarget(providers, getKey)
+    expect(target).toMatchObject({ config: { id: 'local' }, apiKey: '' })
   })
 })

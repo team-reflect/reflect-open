@@ -193,14 +193,14 @@ export const TRANSCRIPTION_MAX_SEGMENT_BYTES = 24 * 1024 * 1024
  */
 export async function resolveTranscriptionTarget(
   state: AiProvidersState,
-  getKey: (id: string) => Promise<string | null>,
+  getKey: (config: AiProviderConfig) => Promise<string | null>,
 ): Promise<TranscriptionTarget | TranscriptionMiss> {
   const candidates = transcriptionProviders(state)
   if (candidates.length === 0) {
     return 'no-provider'
   }
   for (const candidate of candidates) {
-    const apiKey = await getKey(candidate.id)
+    const apiKey = await getKey(candidate)
     if (apiKey !== null) {
       return { config: candidate, apiKey }
     }
