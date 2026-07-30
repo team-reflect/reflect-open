@@ -20,7 +20,7 @@ function makeToolbar(
       ...overrides,
     },
     commands: {
-      toggleBulletOrderedList: vi.fn(),
+      cycleBulletOrderedList: vi.fn(),
       cycleCheckableList: vi.fn(),
       indent: vi.fn(),
       dedent: vi.fn(),

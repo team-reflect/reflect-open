@@ -114,7 +114,7 @@ describe('FormattingToolbarBridge', () => {
     await pmRoot.getByText('alpha').click()
     await expect.element(toolbarState).toHaveTextContent('has-toolbar')
 
-    captured.toolbar?.commands.toggleBulletOrderedList()
+    captured.toolbar?.commands.cycleBulletOrderedList()
     await vi.waitFor(() => {
       expect(handle.getMarkdown()).toBe('- alpha\n')
     })

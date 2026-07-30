@@ -705,7 +705,7 @@ describe('MobileShell', () => {
       publishFormattingToolbar(owner, {
         capabilities: { canIndent: true, canDedent: false, canMoveUp: true, canMoveDown: true },
         commands: {
-          toggleBulletOrderedList: vi.fn(),
+          cycleBulletOrderedList: vi.fn(),
           cycleCheckableList: vi.fn(),
           indent: vi.fn(),
           dedent: vi.fn(),

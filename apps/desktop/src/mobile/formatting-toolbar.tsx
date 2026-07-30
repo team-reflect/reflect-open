@@ -54,7 +54,7 @@ export function MobileFormattingToolbar(): ReactElement | null {
         <ToolbarButton
           label="Cycle list style"
           icon={<List className="size-5" />}
-          onPress={commands.toggleBulletOrderedList}
+          onPress={commands.cycleBulletOrderedList}
         />
         <ToolbarButton
           label="Cycle checklist and task"

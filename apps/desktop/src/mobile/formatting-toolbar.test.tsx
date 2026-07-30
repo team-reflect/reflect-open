@@ -24,7 +24,7 @@ function makeToolbar(
       ...capabilities,
     },
     commands: {
-      toggleBulletOrderedList: vi.fn(),
+      cycleBulletOrderedList: vi.fn(),
       cycleCheckableList: vi.fn(),
       indent: vi.fn(),
       dedent: vi.fn(),
@@ -91,7 +91,7 @@ describe('MobileFormattingToolbar', () => {
     await act(() => publishFormattingToolbar(owner, toolbar))
 
     fireEvent.click(page.getByRole('button', { name: 'Cycle list style' }))
-    expect(toolbar.commands.toggleBulletOrderedList).toHaveBeenCalledOnce()
+    expect(toolbar.commands.cycleBulletOrderedList).toHaveBeenCalledOnce()
 
     fireEvent.click(page.getByRole('button', { name: 'Cycle checklist and task' }))
     expect(toolbar.commands.cycleCheckableList).toHaveBeenCalledOnce()
