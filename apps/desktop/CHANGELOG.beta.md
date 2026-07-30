@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta...v0.8.0-beta.1) (2026-07-30)
+
+
+### Features
+
+* cycle mobile editor list style ([#990](https://github.com/team-reflect/reflect-open/issues/990)) ([185a021](https://github.com/team-reflect/reflect-open/commit/185a021d74989ccffe4778aad318b389e9ddaa4d))
+
 ## [0.8.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.7.0...v0.8.0-beta) (2026-07-29)
 
 
