@@ -71,7 +71,7 @@ export interface UseAudioMemoPipelineValue {
   pendingCount: number
   /** True while a reconcile pass has memos to transcribe. */
   transcribing: boolean
-  /** False when no OpenAI/Gemini model is configured. */
+  /** False when no transcription-capable model is configured. */
   hasTranscriptionConfig: boolean
   /** The failure shown in the error phase. */
   error: string | null

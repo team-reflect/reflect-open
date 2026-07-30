@@ -23,12 +23,16 @@ const PROVIDER: AiProviderConfig = {
 
 const onMakeDefault = vi.fn<(id: string) => void>()
 const onSetDefaultModel = vi.fn<(id: string, model: string) => void>()
+const onSetTranscriptionModel = vi.fn<(id: string, model: string) => void>()
+const onMakeTranscriptionDefault = vi.fn<(id: string) => void>()
 const onRemove = vi.fn<(id: string) => Promise<void>>()
 const onOpenChange = vi.fn<(open: boolean) => void>()
 
 beforeEach(() => {
   onMakeDefault.mockReset()
   onSetDefaultModel.mockReset()
+  onSetTranscriptionModel.mockReset()
+  onMakeTranscriptionDefault.mockReset()
   onRemove.mockReset().mockResolvedValue(undefined)
   onOpenChange.mockReset()
 })
@@ -38,10 +42,13 @@ async function renderSheet(isDefault = false) {
     <AiProviderActionsDrawer
       provider={PROVIDER}
       isDefault={isDefault}
+      isTranscriptionDefault={false}
       open
       onOpenChange={onOpenChange}
       onMakeDefault={onMakeDefault}
       onSetDefaultModel={onSetDefaultModel}
+      onSetTranscriptionModel={onSetTranscriptionModel}
+      onMakeTranscriptionDefault={onMakeTranscriptionDefault}
       onRemove={onRemove}
     />,
   )
@@ -51,7 +58,7 @@ describe('AiProviderActionsDrawer', () => {
   it('makes the provider the default and closes', async () => {
     await renderSheet()
 
-    await page.getByRole('button', { name: 'Use as default' }).click()
+    await page.getByRole('button', { name: 'Use as default for chat' }).click()
 
     expect(onMakeDefault).toHaveBeenCalledWith('p1')
     expect(onOpenChange).toHaveBeenCalledWith(false)
@@ -60,7 +67,7 @@ describe('AiProviderActionsDrawer', () => {
   it('the default provider cannot be re-defaulted', async () => {
     await renderSheet(true)
 
-    await expect.element(page.getByRole('button', { name: 'Default provider' })).toBeDisabled()
+    await expect.element(page.getByRole('button', { name: 'Default for chat' })).toBeDisabled()
   })
 
   it('changes the provider default model and closes', async () => {

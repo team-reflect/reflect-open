@@ -3,41 +3,67 @@ import {
   aiModelLabel,
   aiProvider,
   aiProviderRequiresApiKey,
+  aiProviderSupportsTranscription,
   errorMessage,
+  GOOGLE_TRANSCRIPTION_MODEL,
+  OPENAI_TRANSCRIPTION_MODEL,
   type AiProviderConfig,
 } from '@reflect/core'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
+import { Input } from '@/components/ui/input'
 import { SettingsActionRow, SettingsGroup, SettingsSelectRow } from '@/mobile/settings-list'
 
 interface AiProviderActionsDrawerProps {
   /** The provider the sheet manages; null renders nothing (exit animation). */
   provider: AiProviderConfig | null
-  /** Whether that provider is the current app default. */
+  /** Whether that provider is the current chat default. */
   isDefault: boolean
+  /** Whether that provider is the current transcription default. */
+  isTranscriptionDefault: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
   onMakeDefault: (id: string) => void
   onSetDefaultModel: (id: string, model: string) => void
+  onSetTranscriptionModel: (id: string, model: string) => void
+  onMakeTranscriptionDefault: (id: string) => void
   /** Delete the key from the keychain, then drop the settings entry. */
   onRemove: (id: string) => Promise<void>
 }
 
+function transcriptionModelLabel(config: AiProviderConfig): string {
+  if (config.provider === 'openai') {
+    return OPENAI_TRANSCRIPTION_MODEL
+  }
+  if (config.provider === 'google') {
+    return GOOGLE_TRANSCRIPTION_MODEL
+  }
+  if (config.provider === 'openai-compatible') {
+    return config.transcriptionModel
+  }
+  return ''
+}
+
 /**
  * The per-provider management sheet (the {@link NoteActionsMenu} pattern):
- * tapping a configured provider row in Settings offers make-default and
- * remove. Removing deletes the keychain entry first, exactly like desktop —
- * both actions come from `useAiProviders`, this is only the touch shell.
+ * tapping a configured provider row in Settings offers make-default, remove,
+ * and model selection for both chat and transcription. Removing deletes the
+ * keychain entry first, exactly like desktop — both actions come from
+ * `useAiProviders`, this is only the touch shell.
  */
 export function AiProviderActionsDrawer({
   provider,
   isDefault,
+  isTranscriptionDefault,
   open,
   onOpenChange,
   onMakeDefault,
   onSetDefaultModel,
+  onSetTranscriptionModel,
+  onMakeTranscriptionDefault,
   onRemove,
 }: AiProviderActionsDrawerProps): ReactElement {
   const [removing, setRemoving] = useState(false)
+  const [editingTranscriptionModel, setEditingTranscriptionModel] = useState('')
   const providerInfo = provider === null ? null : aiProvider(provider.provider)
   const models =
     provider === null || providerInfo === null
@@ -51,6 +77,8 @@ export function AiProviderActionsDrawer({
             },
             ...providerInfo.models,
           ]
+  const supportsTranscription = provider !== null && aiProviderSupportsTranscription(provider)
+  const isOpenAICompatible = provider?.provider === 'openai-compatible'
   const title =
     provider === null || providerInfo === null
       ? ''
@@ -92,15 +120,61 @@ export function AiProviderActionsDrawer({
                   />
                 ))}
               </SettingsGroup>
+
+              {supportsTranscription ? (
+                <SettingsGroup header="Transcription model">
+                  {isOpenAICompatible ? (
+                    <div className="px-4 py-2">
+                      <Input
+                        aria-label="Transcription model"
+                        autoComplete="off"
+                        spellCheck={false}
+                        placeholder="Leave empty to disable transcription"
+                        defaultValue={provider.transcriptionModel}
+                        onChange={(event) => {
+                          setEditingTranscriptionModel(event.target.value)
+                        }}
+                        onBlur={() => {
+                          if (editingTranscriptionModel !== provider.transcriptionModel) {
+                            onSetTranscriptionModel(provider.id, editingTranscriptionModel)
+                          }
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <SettingsSelectRow
+                      label={transcriptionModelLabel(provider)}
+                      selected
+                      disabled
+                      onPress={() => {}}
+                    />
+                  )}
+                </SettingsGroup>
+              ) : null}
+
               <SettingsGroup>
                 <SettingsActionRow
-                  label={isDefault ? 'Default provider' : 'Use as default'}
+                  label={isDefault ? 'Default for chat' : 'Use as default for chat'}
                   disabled={isDefault}
                   onPress={() => {
                     onMakeDefault(provider.id)
                     onOpenChange(false)
                   }}
                 />
+                {supportsTranscription ? (
+                  <SettingsActionRow
+                    label={
+                      isTranscriptionDefault
+                        ? 'Default for transcription'
+                        : 'Use as default for transcription'
+                    }
+                    disabled={isTranscriptionDefault}
+                    onPress={() => {
+                      onMakeTranscriptionDefault(provider.id)
+                      onOpenChange(false)
+                    }}
+                  />
+                ) : null}
                 <SettingsActionRow
                   label="Remove provider"
                   tone="destructive"
