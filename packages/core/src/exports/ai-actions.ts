@@ -3,6 +3,7 @@ export {
   aiProvider,
   aiModelLabel,
   aiProviderRequiresApiKey,
+  aiProviderSupportsTranscription,
   DEFAULT_CONTEXT_WINDOW,
   modelContextWindow,
   type AiProviderInfo,
@@ -20,14 +21,15 @@ export {
 export { setSecret, getSecret, deleteSecret } from '../secrets/keychain'
 export {
   KEY_HINT_LENGTH,
-  TRANSCRIPTION_PROVIDERS,
   apiKeyHint,
   withAiProviderAdded,
   withAiProviderRemoved,
   defaultAiProvider,
+  defaultTranscriptionProvider,
   pickTranscriptionConfig,
+  resolveTranscriptionTarget,
+  transcriptionProviders,
   type AiProvidersState,
-  type TranscriptionConfig,
   type TranscriptionProvider,
 } from '../ai/provider-config'
 export {

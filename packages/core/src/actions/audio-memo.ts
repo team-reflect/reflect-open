@@ -1,5 +1,9 @@
 import { errorMessage, isAppError, toAppError, type AppError } from '../errors'
-import { pickTranscriptionConfig, type AiProvidersState } from '../ai/provider-config'
+import {
+  pickTranscriptionConfig,
+  type AiProvidersState,
+  type TranscriptionProvider,
+} from '../ai/provider-config'
 import { aiApiKeyForConfig, aiKeySecretName } from '../ai/secrets'
 import {
   audioMemoEnrichmentConfig,
@@ -366,6 +370,63 @@ function recordingLinks(session: AudioMemoSession): string {
     .join(' · ')
 }
 
+/**
+ * The note body for one memo: the transcript, a placeholder for silence, or
+ * — when the provider refuses the recording itself — a failure notice that
+ * tombstones the memo. Anything transient (offline, auth, rate limit)
+ * rethrows and stops the pass.
+ */
+async function memoNoteBody(input: {
+  audio: Blob
+  memo: AudioMemoIdentity
+  config: AiProviderConfig
+  apiKey: string
+  titleCredentials: { config: AiProviderConfig; apiKey: string } | null
+  fetchFn?: typeof fetch | undefined
+}): Promise<{ body: string; title: string; rejected: boolean }> {
+  try {
+    const text = await transcribeAudio({
+      provider: input.config.provider as TranscriptionProvider,
+      apiKey: input.apiKey,
+      audio: input.audio,
+      mimeType: input.memo.mimeType,
+      fetchFn: input.fetchFn,
+      ...(input.config.provider === 'openai-compatible'
+        ? {
+            baseUrl: input.config.baseUrl,
+            model: input.config.transcriptionModel,
+          }
+        : {}),
+    })
+    const title =
+      text === ''
+        ? input.memo.title
+        : await generateAudioMemoTitle({
+            ...(input.titleCredentials !== null
+              ? {
+                  credentials: {
+                    config: input.titleCredentials.config,
+                    apiKey: input.titleCredentials.apiKey,
+                  },
+                }
+              : {}),
+            fetchFn: input.fetchFn,
+            transcript: text,
+            fallbackTitle: input.memo.title,
+          })
+    return { body: text === '' ? 'No speech detected.' : text, title, rejected: false }
+  } catch (cause) {
+    if (!isTranscriptionRejected(cause)) {
+      throw cause
+    }
+    return {
+      body: `Transcription failed: ${errorMessage(cause)}`,
+      title: input.memo.title,
+      rejected: true,
+    }
+  }
+}
+
 /** The category note every audio-memo section backlinks. */
 const MEMOS_NOTE_TITLE = 'Audio memos'
 /**
@@ -494,7 +555,7 @@ export async function reconcileAudioMemos(
       pending: sessions.length,
       transcribed: 0,
       rejected: 0,
-      stopped: { reason: 'config', message: 'No OpenAI or Gemini model is configured.' },
+      stopped: { reason: 'config', message: 'No transcription provider is configured.' },
     }
   }
   if (target === 'no-key') {
