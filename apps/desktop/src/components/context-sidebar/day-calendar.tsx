@@ -86,16 +86,18 @@ export function DayCalendar({ selectedDate, today }: DayCalendarProps): ReactEle
             <ChevronLeftIcon />
           </button>
           <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                aria-label="Jump to today"
-                onClick={() => navigate({ kind: 'today' })}
-                className={HEADER_BUTTON_CLASS}
-              >
-                <CalendarIcon />
-              </button>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  aria-label="Jump to today"
+                  onClick={() => navigate({ kind: 'today' })}
+                  className={HEADER_BUTTON_CLASS}
+                >
+                  <CalendarIcon />
+                </button>
+              }
+            />
             <TooltipContent>
               Jump to Today {TODAY_BINDING && <ShortcutKeys binding={TODAY_BINDING} />}
             </TooltipContent>

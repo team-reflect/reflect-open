@@ -22,25 +22,27 @@ export function AudioMemoButton(): ReactElement {
   if (memo.phase === 'idle' || memo.phase === 'requesting') {
     return (
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Record audio memo"
-            aria-disabled={!memo.available || undefined}
-            onClick={() => {
-              if (memo.available) {
-                memo.toggle()
-              }
-            }}
-            className={cn(
-              'text-text-muted hover:text-text-secondary dark:hover:text-text',
-              !memo.available && 'opacity-50 hover:bg-transparent hover:text-text-muted',
-            )}
-          >
-            <MicIcon className="size-5" />
-          </Button>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Record audio memo"
+              aria-disabled={!memo.available || undefined}
+              onClick={() => {
+                if (memo.available) {
+                  memo.toggle()
+                }
+              }}
+              className={cn(
+                'text-text-muted hover:text-text-secondary dark:hover:text-text',
+                !memo.available && 'opacity-50 hover:bg-transparent hover:text-text-muted',
+              )}
+            >
+              <MicIcon className="size-5" />
+            </Button>
+          }
+        />
         <TooltipContent side="bottom">
           {memo.unavailableReason ?? 'Record audio memo'}
         </TooltipContent>

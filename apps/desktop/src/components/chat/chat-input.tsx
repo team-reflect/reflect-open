@@ -173,12 +173,14 @@ export function ChatInput(): ReactElement {
           <ChatHistoryMenu />
           {turns.length > 0 && !streaming ? (
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="sm" onClick={newChat}>
-                  <Plus aria-hidden data-icon="inline-start" />
-                  New chat
-                </Button>
-              </TooltipTrigger>
+              <TooltipTrigger
+                render={
+                  <Button variant="ghost" size="sm" onClick={newChat}>
+                    <Plus aria-hidden data-icon="inline-start" />
+                    New chat
+                  </Button>
+                }
+              />
               <TooltipContent side="top">
                 New chat {NEW_CHAT_BINDING ? <ShortcutKeys binding={NEW_CHAT_BINDING} /> : null}
               </TooltipContent>
