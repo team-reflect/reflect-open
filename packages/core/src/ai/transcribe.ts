@@ -128,11 +128,16 @@ async function transcribeWithOpenAi(request: TranscriptionRequest): Promise<stri
     const form = new FormData()
     form.append('file', request.audio, uploadFilename(request.mimeType))
     form.append('model', model)
-    return send(fetchFn, endpoint, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${request.apiKey}` },
-      body: form,
-    }, { timeoutMs: TRANSCRIPTION_TRANSFER_TIMEOUT_MS, isStale: request.isStale })
+    return send(
+      fetchFn,
+      endpoint,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${request.apiKey}` },
+        body: form,
+      },
+      { timeoutMs: TRANSCRIPTION_TRANSFER_TIMEOUT_MS, isStale: request.isStale },
+    )
   }
 
   const model = request.model ?? OPENAI_TRANSCRIPTION_MODEL

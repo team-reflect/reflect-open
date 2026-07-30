@@ -33,7 +33,11 @@ vi.mock('@/lib/operations', () => ({
   startOperation: () => ({ progress: vi.fn(), done: vi.fn(), fail: failOperation }),
 }))
 
-const NO_PROVIDERS = { providers: [], defaultProviderId: null, defaultTranscriptionProviderId: null }
+const NO_PROVIDERS = {
+  providers: [],
+  defaultProviderId: null,
+  defaultTranscriptionProviderId: null,
+}
 
 function drained(overrides: Partial<DrainCaptureInboxOutcome> = {}): DrainCaptureInboxOutcome {
   return { pending: 0, drained: 0, deduped: 0, invalid: 0, stopped: null, ...overrides }

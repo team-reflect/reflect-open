@@ -36,7 +36,11 @@ const PROVIDERS: AiProvidersState = {
   defaultProviderId: 'cfg-openai',
   defaultTranscriptionProviderId: 'cfg-openai',
 }
-const NO_PROVIDERS: AiProvidersState = { providers: [], defaultProviderId: null, defaultTranscriptionProviderId: null }
+const NO_PROVIDERS: AiProvidersState = {
+  providers: [],
+  defaultProviderId: null,
+  defaultTranscriptionProviderId: null,
+}
 
 const DRAINED: ReconcileAudioMemosOutcome = {
   pending: 0,

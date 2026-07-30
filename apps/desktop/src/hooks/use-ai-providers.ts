@@ -47,7 +47,7 @@ interface UseAiProvidersValue {
   removeProvider: (id: string) => Promise<void>
   /** Make the entry with `id` the app-wide default. */
   makeDefault: (id: string) => void
-/** Change the default model used by the configured provider entry. */
+  /** Change the default model used by the configured provider entry. */
   setDefaultModel: (id: string, model: string) => void
   /** Make the entry with `id` the transcription default. */
   makeTranscriptionDefault: (id: string) => void
@@ -106,11 +106,19 @@ export function useAiProviders(): UseAiProvidersValue {
                 keyHint: apiKeyHint(apiKey),
               }
         const next = withAiProviderAdded(
-          { providers: current.aiProviders, defaultProviderId: current.defaultAiProviderId, defaultTranscriptionProviderId: current.defaultTranscriptionProviderId },
+          {
+            providers: current.aiProviders,
+            defaultProviderId: current.defaultAiProviderId,
+            defaultTranscriptionProviderId: current.defaultTranscriptionProviderId,
+          },
           entry,
           draft.isDefault,
         )
-        return { aiProviders: next.providers, defaultAiProviderId: next.defaultProviderId, defaultTranscriptionProviderId: next.defaultTranscriptionProviderId }
+        return {
+          aiProviders: next.providers,
+          defaultAiProviderId: next.defaultProviderId,
+          defaultTranscriptionProviderId: next.defaultTranscriptionProviderId,
+        }
       })
     },
     [whenSettingsLoaded, updateSettingsWith],
@@ -127,10 +135,18 @@ export function useAiProviders(): UseAiProvidersValue {
       await deleteSecret(aiKeySecretName(id))
       updateSettingsWith((current) => {
         const next = withAiProviderRemoved(
-          { providers: current.aiProviders, defaultProviderId: current.defaultAiProviderId, defaultTranscriptionProviderId: current.defaultTranscriptionProviderId },
+          {
+            providers: current.aiProviders,
+            defaultProviderId: current.defaultAiProviderId,
+            defaultTranscriptionProviderId: current.defaultTranscriptionProviderId,
+          },
           id,
         )
-        return { aiProviders: next.providers, defaultAiProviderId: next.defaultProviderId, defaultTranscriptionProviderId: next.defaultTranscriptionProviderId }
+        return {
+          aiProviders: next.providers,
+          defaultAiProviderId: next.defaultProviderId,
+          defaultTranscriptionProviderId: next.defaultTranscriptionProviderId,
+        }
       })
     },
     [updateSettingsWith],
@@ -143,7 +159,7 @@ export function useAiProviders(): UseAiProvidersValue {
     [updateSettingsWith],
   )
 
-const setDefaultModel = useCallback(
+  const setDefaultModel = useCallback(
     (id: string, model: string): void => {
       const normalizedModel = model.trim()
       if (normalizedModel === '') {

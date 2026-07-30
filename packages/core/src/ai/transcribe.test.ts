@@ -343,7 +343,14 @@ describe('transcribeAudio (openai-compatible)', () => {
     const fetchFn = recordingFetch([], () => jsonResponse(401, { error: { message: 'bad key' } }))
 
     await expect(
-      transcribeAudio(request({ provider: 'openai-compatible', baseUrl: 'https://loc.al/v1', model: 'm', fetchFn })),
+      transcribeAudio(
+        request({
+          provider: 'openai-compatible',
+          baseUrl: 'https://loc.al/v1',
+          model: 'm',
+          fetchFn,
+        }),
+      ),
     ).rejects.toMatchObject({ kind: 'auth' })
   })
 
@@ -363,7 +370,14 @@ describe('transcribeAudio (openai-compatible)', () => {
     const fetchFn = recordingFetch([], () => jsonResponse(200, { transcript: 'wrong shape' }))
 
     await expect(
-      transcribeAudio(request({ provider: 'openai-compatible', baseUrl: 'https://loc.al/v1', model: 'm', fetchFn })),
+      transcribeAudio(
+        request({
+          provider: 'openai-compatible',
+          baseUrl: 'https://loc.al/v1',
+          model: 'm',
+          fetchFn,
+        }),
+      ),
     ).rejects.toMatchObject({ kind: 'parse' })
   })
 
@@ -373,7 +387,14 @@ describe('transcribeAudio (openai-compatible)', () => {
     }
 
     await expect(
-      transcribeAudio(request({ provider: 'openai-compatible', baseUrl: 'https://loc.al/v1', model: 'm', fetchFn })),
+      transcribeAudio(
+        request({
+          provider: 'openai-compatible',
+          baseUrl: 'https://loc.al/v1',
+          model: 'm',
+          fetchFn,
+        }),
+      ),
     ).rejects.toMatchObject({ kind: 'network' })
   })
 

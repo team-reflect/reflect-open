@@ -77,7 +77,11 @@ describe('chatModelOptions', () => {
 describe('resolveChatModel', () => {
   const entryA = config({ id: 'a' })
   const entryB = config({ id: 'b', provider: 'openai', model: 'gpt-5.5' })
-  const state = { providers: [entryA, entryB], defaultProviderId: 'b', defaultTranscriptionProviderId: null }
+  const state = {
+    providers: [entryA, entryB],
+    defaultProviderId: 'b',
+    defaultTranscriptionProviderId: null,
+  }
 
   it('falls back to the default entry and its configured model with no selection', () => {
     expect(resolveChatModel(state, null)).toEqual(entryB)
@@ -95,6 +99,11 @@ describe('resolveChatModel', () => {
   })
 
   it('returns null when nothing is configured', () => {
-    expect(resolveChatModel({ providers: [], defaultProviderId: null, defaultTranscriptionProviderId: null }, null)).toBeNull()
+    expect(
+      resolveChatModel(
+        { providers: [], defaultProviderId: null, defaultTranscriptionProviderId: null },
+        null,
+      ),
+    ).toBeNull()
   })
 })
