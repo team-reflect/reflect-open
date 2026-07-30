@@ -644,7 +644,7 @@ describe('AudioMemoProvider', () => {
     expect(recorderControls.startSpy).toHaveBeenCalled()
   })
 
-  it('is unavailable without an OpenAI or Gemini model, and nothing runs', async () => {
+  it('is unavailable without a transcription-capable model, and nothing runs', async () => {
     SETTINGS.current = {
       aiProviders: [
         { id: 'claude', provider: 'anthropic', model: 'claude-fable-5', keyHint: 'wxyz1' },
@@ -655,7 +655,7 @@ describe('AudioMemoProvider', () => {
     const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
 
     expect(result.current.available).toBe(false)
-    expect(result.current.unavailableReason).toMatch(/OpenAI or Gemini/)
+    expect(result.current.unavailableReason).toMatch(/OpenAI/)
 
     await act(async () => {
       result.current.toggle()

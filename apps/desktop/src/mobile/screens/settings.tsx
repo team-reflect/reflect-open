@@ -78,8 +78,17 @@ export function MobileSettings(): ReactElement {
   const status = useMobileSyncStatus()
   const [disconnecting, setDisconnecting] = useState(false)
   const [connectOpen, setConnectOpen] = useState(false)
-  const { providers, defaultProvider, addProvider, removeProvider, makeDefault, setDefaultModel } =
-    useAiProviders()
+  const {
+    providers,
+    defaultProvider,
+    transcriptionProvider,
+    addProvider,
+    removeProvider,
+    makeDefault,
+    setDefaultModel,
+    setTranscriptionModel,
+    makeTranscriptionDefault,
+  } = useAiProviders()
   const [addProviderOpen, setAddProviderOpen] = useState(false)
   const [systemPromptOpen, setSystemPromptOpen] = useState(false)
   const audioMemoDescriptionId = useId()
@@ -279,10 +288,15 @@ export function MobileSettings(): ReactElement {
       <AiProviderActionsDrawer
         provider={managedProvider}
         isDefault={managedProvider !== null && managedProvider.id === defaultProvider?.id}
+        isTranscriptionDefault={
+          managedProvider !== null && managedProvider.id === transcriptionProvider?.id
+        }
         open={manageOpen}
         onOpenChange={setManageOpen}
         onMakeDefault={makeDefault}
         onSetDefaultModel={setDefaultModel}
+        onSetTranscriptionModel={setTranscriptionModel}
+        onMakeTranscriptionDefault={makeTranscriptionDefault}
         onRemove={removeProvider}
       />
       <ChatSystemPromptDrawer

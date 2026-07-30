@@ -37,14 +37,16 @@ export function apiKeyHint(key: string): string {
 export function withAiProviderAdded(
   state: AiProvidersState,
   entry: AiProviderConfig,
-  makeDefault: boolean,
+  isDefault: boolean,
+  isTranscriptionDefault?: boolean,
 ): AiProvidersState {
   const isFirst = state.providers.length === 0
+  const makeTranscriptionDefault = isTranscriptionDefault ?? isDefault
   return {
     providers: [...state.providers, entry],
-    defaultProviderId: makeDefault || isFirst ? entry.id : state.defaultProviderId,
+    defaultProviderId: isDefault || isFirst ? entry.id : state.defaultProviderId,
     defaultTranscriptionProviderId:
-      makeDefault || (isFirst && aiProviderSupportsTranscription(entry))
+      makeTranscriptionDefault || (isFirst && aiProviderSupportsTranscription(entry))
         ? entry.id
         : state.defaultTranscriptionProviderId,
   }

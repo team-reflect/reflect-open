@@ -40,9 +40,11 @@ interface AddAiProviderDialogProps {
 interface AddAiProviderForm {
   provider: AiProviderId
   model: string
+  transcriptionModel: string
   baseUrl: string
   apiKey: string
   isDefault: boolean
+  isTranscriptionDefault: boolean
 }
 
 const FIELD_LABEL_CLASS = 'text-xs font-medium text-text-secondary'
@@ -60,9 +62,11 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
     defaultValues: {
       provider: AI_PROVIDERS[0].id,
       model: AI_PROVIDERS[0].models[0].id,
+      transcriptionModel: '',
       baseUrl: '',
       apiKey: '',
       isDefault: false,
+      isTranscriptionDefault: false,
     },
   })
   const { submitError, unverified, resetUnverified, submit } = useAddAiProviderSubmit({
@@ -180,6 +184,23 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
           </div>
 
           {isOpenAICompatible ? (
+            <div className="flex flex-col gap-1">
+              <span className={FIELD_LABEL_CLASS}>Transcription model</span>
+              <Input
+                aria-label="Transcription model"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="Leave empty to disable transcription"
+                {...register('transcriptionModel', {
+                  onChange: () => {
+                    resetUnverified()
+                  },
+                })}
+              />
+            </div>
+          ) : null}
+
+          {isOpenAICompatible ? (
             <label className="flex flex-col gap-1">
               <span className={FIELD_LABEL_CLASS}>Endpoint base URL</span>
               <Input
@@ -234,7 +255,16 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
 
           <label className="flex items-center gap-2">
             <input type="checkbox" className="accent-accent" {...register('isDefault')} />
-            <span className="text-sm text-text">Use as the default provider</span>
+            <span className="text-sm text-text">Use as default for chat</span>
+          </label>
+
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              className="accent-accent"
+              {...register('isTranscriptionDefault')}
+            />
+            <span className="text-sm text-text">Use as default for transcription</span>
           </label>
 
           {submitError !== null ? <InlineAlert tone="error">{submitError}</InlineAlert> : null}

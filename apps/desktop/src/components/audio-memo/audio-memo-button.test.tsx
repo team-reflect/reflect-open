@@ -44,7 +44,8 @@ beforeEach(() => {
 describe('AudioMemoButton', () => {
   it('unavailable renders aria-disabled — never natively disabled — and ignores clicks', async () => {
     memo.available = false
-    memo.unavailableReason = 'Add an OpenAI or Gemini model in Settings to record audio memos'
+    memo.unavailableReason =
+      'Add an OpenAI, Gemini, or OpenAI-compatible model in Settings to record audio memos'
     const view = await renderButton()
 
     // aria-disabled (not `disabled`) keeps pointer events alive so the

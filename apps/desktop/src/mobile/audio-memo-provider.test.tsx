@@ -548,7 +548,7 @@ describe('MobileAudioMemoProvider', () => {
     }
   })
 
-  it('without an OpenAI or Gemini model, toggle opens the drawer for key setup, never the mic', async () => {
+  it('without a transcription-capable model, toggle opens the drawer for key setup, never the mic', async () => {
     SETTINGS.current = {
       aiProviders: [
         {

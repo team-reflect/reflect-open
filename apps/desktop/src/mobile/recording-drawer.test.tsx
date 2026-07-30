@@ -105,7 +105,7 @@ describe('RecordingDrawer', () => {
     const view = await render(<RecordingDrawer />)
 
     await expect
-      .element(view.getByText(/send the recording to OpenAI or Google Gemini/))
+      .element(view.getByText(/send the recording to your transcription provider/))
       .toBeVisible()
     expect(view.getByRole('button', { name: 'Stop recording' }).query()).toBeNull()
 
