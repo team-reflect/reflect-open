@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.1...v0.8.0-beta.2) (2026-07-30)
+
+
+### Features
+
+* support OpenAI-compatible AI providers ([#996](https://github.com/team-reflect/reflect-open/issues/996)) ([2ff6ce3](https://github.com/team-reflect/reflect-open/commit/2ff6ce3f6e1825819492772d6c1f1593d501fc87))
+
 ## [0.8.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta...v0.8.0-beta.1) (2026-07-30)
 
 
