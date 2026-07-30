@@ -4,7 +4,8 @@ import {
   type AiProvidersState,
   type TranscriptionProvider,
 } from '../ai/provider-config'
-import { aiApiKeyForConfig, aiKeySecretName } from '../ai/secrets'
+import type { AiProviderConfig } from '../settings/schema'
+import { aiApiKeyForConfig } from '../ai/secrets'
 import {
   audioMemoEnrichmentConfig,
   pickAudioMemoEnrichmentConfig,
@@ -28,7 +29,6 @@ import {
 } from './audio-memo-session'
 import { AUDIO_MEMOS_DIR, audioMemoPath, dailyPath, notePath } from '../graph/paths'
 import { appendListItemUnderBacklinkedHeading, wikiLinkSafe } from '../markdown/edit'
-import { getSecret } from '../secrets/keychain'
 import { ensureBacklinkTarget } from './backlink-target'
 
 /**
@@ -484,11 +484,11 @@ export async function reconcileAudioMemos(
   // user fixes their model configuration must see the fix. Keys are read at
   // most once per entry per pass.
   const keys = new Map<string, Promise<string | null>>()
-  const getKey = (id: string): Promise<string | null> => {
-    let key = keys.get(id)
+  const getKey = (config: AiProviderConfig): Promise<string | null> => {
+    let key = keys.get(config.id)
     if (key === undefined) {
-      key = getSecret(aiKeySecretName(id)).catch(() => null)
-      keys.set(id, key)
+      key = aiApiKeyForConfig(config).catch(() => null)
+      keys.set(config.id, key)
     }
     return key
   }
@@ -578,6 +578,9 @@ export async function reconcileAudioMemos(
         generation: input.generation,
         fetchFn: input.fetchFn,
         isStale: stale,
+        ...(config.provider === 'openai-compatible'
+          ? { baseUrl: config.baseUrl, model: config.transcriptionModel }
+          : {}),
       })
       if (parts.status === 'stale') {
         return stalled()

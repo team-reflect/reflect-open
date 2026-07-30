@@ -256,6 +256,36 @@ describe('reconcileAudioMemos', () => {
     expect(formatAudioMemoTranscriptMock).not.toHaveBeenCalled()
   })
 
+  it('forwards baseUrl and transcriptionModel for an openai-compatible provider', async () => {
+    listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
+
+    const compatibleProviders: AiProvidersState = {
+      providers: [
+        {
+          id: 'local',
+          provider: 'openai-compatible',
+          model: 'gpt-4o-mini',
+          baseUrl: 'http://127.0.0.1:8000/v1',
+          transcriptionModel: 'whisper-large-v3',
+          keyHint: '',
+        },
+      ],
+      defaultProviderId: 'local',
+      defaultTranscriptionProviderId: 'local',
+    }
+
+    const outcome = await reconcile({ providers: compatibleProviders })
+
+    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, stopped: null })
+    expect(transcribeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'openai-compatible',
+        baseUrl: 'http://127.0.0.1:8000/v1',
+        model: 'whisper-large-v3',
+      }),
+    )
+  })
+
   it('formats and names a fresh transcript in one best-effort AI pass when enabled', async () => {
     listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
 

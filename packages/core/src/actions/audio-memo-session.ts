@@ -199,6 +199,17 @@ export interface TranscribeSessionPartsInput {
   session: AudioMemoSession
   provider: TranscriptionProvider
   apiKey: string
+  /**
+   * Base URL for `openai-compatible` providers - forwarded to
+   * {@link transcribeAudio} as `{baseUrl}/audio/transcriptions`. Omitted for
+   * hosted providers, which use their catalog endpoints.
+   */
+  baseUrl?: string
+  /**
+   * Model id for `openai-compatible` providers; hosted providers use their
+   * hardcoded transcription models with fallback retry, so this is omitted.
+   */
+  model?: string
   generation: number
   fetchFn?: typeof fetch | undefined
   /** Abort gate, consulted before and after every slow await. */
@@ -262,6 +273,8 @@ export async function transcribeSessionParts(
         mimeType: part.memo.mimeType,
         fetchFn: input.fetchFn,
         isStale: input.isStale,
+        ...(input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
+        ...(input.model !== undefined ? { model: input.model } : {}),
       })
       result = { text }
     } catch (cause) {
