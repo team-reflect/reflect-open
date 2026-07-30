@@ -380,6 +380,15 @@ export type HostedAiProviderConfig = z.infer<typeof hostedAiProviderConfigSchema
 const openAiCompatibleProviderConfigSchema = aiProviderConfigBaseSchema.extend({
   provider: z.literal('openai-compatible'),
   baseUrl: openAiCompatibleBaseUrlSchema,
+  /**
+   * Model for the OpenAI-compatible audio transcription endpoint
+   * (`{baseUrl}/audio/transcriptions`).  When empty (the default) this
+   * provider is not eligible for transcription — the reconciler skips it
+   * the same way it skips Anthropic and OpenRouter.  Because the model is
+   * user-supplied, it is stored here rather than in the catalog; hosted
+   * providers' transcription models stay in transcribe.ts.
+   */
+  transcriptionModel: z.string().catch(''),
 })
 
 export type OpenAiCompatibleProviderConfig = z.infer<typeof openAiCompatibleProviderConfigSchema>
@@ -400,6 +409,17 @@ export type AiProviderConfig = z.infer<typeof aiProviderConfigSchema>
  * `defaultAiProvider`, which falls back to the first entry.
  */
 export const defaultAiProviderIdSchema = z.string().nullable().catch(null)
+
+/**
+ * The `aiProviders` entry transcription should use by default.  Independent
+ * of {@link defaultAiProviderIdSchema} because chat and transcription may
+ * route through different providers (a user may prefer a local whisper
+ * server for transcription while keeping a hosted provider for chat).
+ * `null` (the default) means no explicit transcription default — readers
+ * fall back to the first transcription-capable provider.  A dangling id is
+ * legal and resolves the same way as the chat default.
+ */
+export const defaultTranscriptionProviderIdSchema = z.string().nullable().catch(null)
 
 /**
  * The model the chat last used: a configured `aiProviders` entry (`configId`)
@@ -523,6 +543,7 @@ export const settingsSchema = z.looseObject({
   graphColors: graphColorsSchema,
   aiProviders: aiProvidersSchema,
   defaultAiProviderId: defaultAiProviderIdSchema,
+  defaultTranscriptionProviderId: defaultTranscriptionProviderIdSchema,
   chatModelSelection: chatModelSelectionSchema,
   chatSystemPrompt: chatSystemPromptSchema,
   aiPrompts: aiPromptsSchema,
