@@ -41,16 +41,18 @@ export function AiPreviewActions({
       </Button>
       {modelOptions.length > 0 ? (
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" aria-label="Retry with another model">
-              <ChevronDownIcon />
-            </Button>
-          </DropdownMenuTrigger>
+          <DropdownMenuTrigger
+            render={
+              <Button variant="ghost" size="sm" aria-label="Retry with another model">
+                <ChevronDownIcon />
+              </Button>
+            }
+          />
           <DropdownMenuContent align="start">
             {modelOptions.map((option) => (
               <DropdownMenuItem
                 key={`${option.configId}:${option.modelId}`}
-                onSelect={() => onRetry(option)}
+                onClick={() => onRetry(option)}
               >
                 {option.label}
               </DropdownMenuItem>

@@ -10,11 +10,7 @@ export {
   isCaptureSpoolPath,
   type CaptureIdentity,
 } from './capture-identity'
-export {
-  captureNoteMeta,
-  type CaptureNoteMeta,
-  type CaptureStatus,
-} from './capture-note'
+export { captureNoteMeta, type CaptureNoteMeta, type CaptureStatus } from './capture-note'
 export {
   drainCaptureInbox,
   type DrainCaptureInboxInput,

@@ -3,10 +3,7 @@ import { useDoubleTap } from '@/hooks/use-double-tap'
 import { MobileFormattingToolbar } from '@/mobile/formatting-toolbar'
 import { MobileStack } from '@/mobile/mobile-stack'
 import { MobileTabBar, tabRootFor, type MobileTab } from '@/mobile/mobile-tab-bar'
-import {
-  EMPTY_ALL_NOTES_FILTERS,
-  type AllNotesFilters,
-} from '@/mobile/search-filters/filter-state'
+import { EMPTY_ALL_NOTES_FILTERS, type AllNotesFilters } from '@/mobile/search-filters/filter-state'
 import { useKeyboardVisible } from '@/mobile/use-keyboard'
 import { useWakeToToday } from '@/mobile/use-wake-to-today'
 import { routesEqual, type Route } from '@/routing/route'

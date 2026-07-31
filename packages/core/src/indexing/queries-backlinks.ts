@@ -116,11 +116,7 @@ export async function getBacklinksWithContext(
     .selectFrom('backlinks')
     .innerJoin('notes', 'notes.path', 'backlinks.sourcePath')
     .where('targetPath', '=', path)
-    .select([
-      'backlinks.sourcePath',
-      'notes.title as sourceTitle',
-      sourceRecency.as('recencyMs'),
-    ])
+    .select(['backlinks.sourcePath', 'notes.title as sourceTitle', sourceRecency.as('recencyMs')])
     .$narrowType<{ sourcePath: string }>()
     .distinct()
   if (options.cursor !== null) {
@@ -162,10 +158,12 @@ export async function getBacklinksWithContext(
     .selectFrom('backlinks')
     .innerJoin('notes', 'notes.path', 'backlinks.sourcePath')
     .where('targetPath', '=', path)
-    .where(throughSource({
-      recencyMs: lastSource.recencyMs,
-      sourcePath: lastSource.sourcePath,
-    }))
+    .where(
+      throughSource({
+        recencyMs: lastSource.recencyMs,
+        sourcePath: lastSource.sourcePath,
+      }),
+    )
     .select(['backlinks.sourcePath', 'backlinks.posFrom'])
     .$narrowType<{ sourcePath: string; posFrom: number }>()
   if (options.cursor !== null) {

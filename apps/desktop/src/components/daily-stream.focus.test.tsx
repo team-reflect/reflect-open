@@ -69,6 +69,8 @@ vi.mock('@/components/note-pane', () => ({
         appendPendingReplacementText: () => {},
         acceptPendingReplacement: () => {},
         discardPendingReplacement: () => {},
+        findNext: () => {},
+        findPrevious: () => {},
       })
       return () => registerHandle(dailyDate, null)
     }, [dailyDate, registerHandle])
@@ -120,8 +122,7 @@ async function renderStream() {
       </RouterProvider>
     </div>,
   )
-  const paneFor = (date: string) =>
-    page.locate(`[data-testid="pane-probe"][data-date="${date}"]`)
+  const paneFor = (date: string) => page.locate(`[data-testid="pane-probe"][data-date="${date}"]`)
   return {
     view,
     navigate: (route: Route, options?: NavigateOptions) => navigate(route, options),
@@ -157,10 +158,7 @@ describe('DailyStream arrival focus', () => {
     expect(heading).not.toBeNull()
     fireEvent.click(heading!)
 
-    expect(focusLog.calls).toEqual([
-      `focus:${yesterday}`,
-      `setSelection:${yesterday}:start`,
-    ])
+    expect(focusLog.calls).toEqual([`focus:${yesterday}`, `setSelection:${yesterday}:start`])
     await view.unmount()
   })
 

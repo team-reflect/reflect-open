@@ -25,7 +25,7 @@ export const DEEP_LINK_TEXT_MAX_LENGTH = TEXT_CAPTURE_MAX_LENGTH
  *   `tasks`) that map straight onto {@link Route}.
  * - `openNote` — `note/<target>`, where `<target>` still needs resolution
  *   (frontmatter id → date → title → alias) against the open graph's index.
- * - `capture` — `append`/`task` write links, spooled into `.reflect/inbox/`.
+ * - `capture` — `append`/`checkbox`/`task` write links, spooled into `.reflect/inbox/`.
  *   The capture kind is core's {@link TextCaptureKind} — the URL verb, the
  *   envelope kind, and the drain behavior share the one vocabulary.
  */

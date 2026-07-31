@@ -3,15 +3,13 @@ import { displayNoteTitle, wikiLinkTargetForTitle } from './note-title'
 
 describe('displayNoteTitle', () => {
   it('flattens wiki links to their alias and markdown links to their text', () => {
-    expect(
-      displayNoteTitle('Meeting with [[Ada Lovelace|Ada]] about [Notes](https://x.com)'),
-    ).toBe('Meeting with Ada about Notes')
+    expect(displayNoteTitle('Meeting with [[Ada Lovelace|Ada]] about [Notes](https://x.com)')).toBe(
+      'Meeting with Ada about Notes',
+    )
   })
 
   it('uses the target when a wiki link has no alias', () => {
-    expect(displayNoteTitle('Meeting with [[Ada Lovelace]]')).toBe(
-      'Meeting with Ada Lovelace',
-    )
+    expect(displayNoteTitle('Meeting with [[Ada Lovelace]]')).toBe('Meeting with Ada Lovelace')
   })
 })
 
@@ -21,9 +19,7 @@ describe('wikiLinkTargetForTitle', () => {
   })
 
   it('flattens an aliased embedded link to its alias', () => {
-    expect(wikiLinkTargetForTitle('Meeting with [[Ada Lovelace|Ada]]')).toBe(
-      'Meeting with Ada',
-    )
+    expect(wikiLinkTargetForTitle('Meeting with [[Ada Lovelace|Ada]]')).toBe('Meeting with Ada')
   })
 
   it('flattens an unaliased embedded link to its target', () => {

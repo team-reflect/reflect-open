@@ -8,7 +8,8 @@ import { startOperation } from '@/lib/operations'
 import { providerFetch } from '@/lib/provider-fetch'
 import { invalidateIndexQueries } from '@/lib/query-client'
 
-let inFlight: { generation: number; promise: Promise<ReconcileAssetDescriptionsOutcome> } | null = null
+let inFlight: { generation: number; promise: Promise<ReconcileAssetDescriptionsOutcome> } | null =
+  null
 
 /**
  * Describe every existing eligible asset with user-visible status (Plan 20):

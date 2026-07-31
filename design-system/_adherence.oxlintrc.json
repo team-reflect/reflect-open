@@ -1,8 +1,5 @@
 {
-  "plugins": [
-    "react",
-    "import"
-  ],
+  "plugins": ["react", "import"],
   "rules": {
     "react/forbid-elements": [
       "warn",
@@ -105,9 +102,7 @@
   },
   "overrides": [
     {
-      "files": [
-        "**/index.js"
-      ],
+      "files": ["**/index.js"],
       "rules": {
         "no-restricted-imports": "off"
       }
@@ -387,8 +382,6 @@
       "--duration-base": "other",
       "--duration-slow": "other"
     },
-    "fontFamilies": [
-      "InterVariable"
-    ]
+    "fontFamilies": ["InterVariable"]
   }
 }

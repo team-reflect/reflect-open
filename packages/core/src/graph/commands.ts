@@ -173,11 +173,7 @@ export async function createNoteIfAbsent(
   contents: string,
   generation: number,
 ): Promise<NoteCreateOutcome> {
-  const outcome = await call(
-    'note_create',
-    { path, contents, generation },
-    noteCreateOutcomeSchema,
-  )
+  const outcome = await call('note_create', { path, contents, generation }, noteCreateOutcomeSchema)
   if (outcome.kind === 'created') {
     echoLocalWrite({ path, kind: 'upsert', modifiedMs: outcome.modifiedMs ?? Date.now() })
   }
@@ -205,6 +201,46 @@ export async function writeAsset(
  */
 export async function readAsset(path: string, generation: number): Promise<string> {
   return call('asset_read', { path, generation }, z.string())
+}
+
+/**
+ * {@link readAsset} without the base64 detour: the bytes come back as a raw
+ * IPC response. For large reads (a meeting-length audio memo read back for
+ * transcription) the base64 route would inflate the payload ~1.33× inside one
+ * giant JSON string. Only on binary-capable bridges (see `hasBinaryIpc`).
+ */
+export async function readAssetBinary(
+  path: string,
+  generation: number,
+): Promise<Uint8Array<ArrayBuffer>> {
+  const buffer = await call('asset_read_binary', { path, generation }, z.instanceof(ArrayBuffer))
+  return new Uint8Array(buffer)
+}
+
+/**
+ * Per-segment transcript cache IO (`.reflect/transcripts/<name>`): derived
+ * data outside the attachment fence, so it rides its own narrow commands.
+ * The read throws `notFound` while nothing is cached.
+ */
+export async function readTranscriptCache(name: string, generation: number): Promise<string> {
+  return call('transcript_cache_read', { name, generation }, z.string())
+}
+
+export async function writeTranscriptCache(
+  name: string,
+  contents: string,
+  generation: number,
+): Promise<void> {
+  await call('transcript_cache_write', { name, contents, generation }, voidSchema)
+}
+
+/**
+ * Delete one recording under `audio-memos/` — cancelling a session discards
+ * its already-landed segments. Idempotent; scoped in Rust to `audio-memos/`
+ * so this can never become a general file-delete IPC.
+ */
+export async function deleteAudioMemo(path: string, generation: number): Promise<void> {
+  await call('audio_memo_delete', { path, generation }, voidSchema)
 }
 
 /**

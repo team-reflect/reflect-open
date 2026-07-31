@@ -1,17 +1,15 @@
 import { isAppError } from '../errors'
-import {
-  findExactWikiTargetMatches,
-  type ExactWikiTargetMatch,
-} from '../indexing/queries'
-import { projectNoteAliases } from '../indexing/indexed-note'
-import { foldFallbackTitleKey, foldKey } from '../markdown/keys'
+import { CLAIM_TIER, projectNoteAliases } from '../indexing/indexed-note'
+import { findNotesByPathKey, findWikiTargetMatch, type WikiTargetMatch } from '../indexing/queries'
 import { parseNote } from '../markdown/extract'
+import { foldFallbackTitleKey, foldKey } from '../markdown/keys'
 import { normalizeWikiTarget } from '../markdown/resolve'
 import { slugForTitle } from '../markdown/slug'
 import { listFiles, readNote } from './commands'
-import { dailyPath, NOTES_DIR } from './paths'
+import { markdownNoteReference, wikiNoteReference, type NoteReference } from './note-reference'
+import { dailyPath, foldGraphPath, NOTES_DIR } from './paths'
 
-/** The side-effect-free outcome of resolving one existing wiki-link target. */
+/** The side-effect-free outcome of resolving one existing note-link target. */
 export type ExistingWikiTargetResolution =
   | { readonly kind: 'resolved'; readonly path: string }
   | { readonly kind: 'ambiguous'; readonly paths: readonly string[] }
@@ -174,12 +172,12 @@ async function dailyFileResolution(
  * indexed regular title or alias with the same ISO date spelling.
  */
 async function indexedResolution(
-  match: ExactWikiTargetMatch,
+  match: WikiTargetMatch,
   date: string | undefined,
   generation: number,
   listNoteFiles: ListNoteFiles,
 ): Promise<ExistingMatchResolution | null> {
-  if (match.kind === 'date') {
+  if (match.tier === CLAIM_TIER.dailyDate) {
     return resolutionForPaths(match.paths)
   }
   if (date !== undefined) {
@@ -188,24 +186,22 @@ async function indexedResolution(
       return daily
     }
   }
-  return match.kind === 'missing' ? null : resolutionForPaths(match.paths)
+  // An unclaimed key has no paths, which resolves to null on its own.
+  return resolutionForPaths(match.paths)
 }
 
 /**
- * Resolve an existing wiki target without creating or modifying anything.
- *
- * The index supplies date/title/alias precedence and preserves ambiguity. A
- * generation-pinned disk probe fills two intentional index-lag gaps: a daily
- * file is checked before a lower indexed tier, and an index miss scans only
- * the regular note's slug family. A final index lookup closes the common race
- * where indexing completes during the disk scan. An alias stored outside its
- * title's slug family therefore remains missing until the index sees it.
+ * The bare-name pipeline: index tiers (daily date, title, alias, filename
+ * stem via `note_claims`), the daily file probe, the bounded slug-family disk
+ * scan, then the index again to close the race where indexing completes
+ * during the disk scan. An alias stored outside its title's slug family
+ * therefore remains missing until the index sees it.
  */
-export async function resolveExistingWikiTarget(
-  target: string,
+async function resolveBareKey(
+  key: string,
   generation: number,
 ): Promise<ExistingWikiTargetResolution> {
-  const normalized = normalizeWikiTarget(target)
+  const normalized = normalizeWikiTarget(key)
   if (normalized.key === '') {
     return { kind: 'missing' }
   }
@@ -216,7 +212,7 @@ export async function resolveExistingWikiTarget(
   }
 
   const indexed = await indexedResolution(
-    await findExactWikiTargetMatches(normalized.raw),
+    await findWikiTargetMatch(normalized.key),
     normalized.date,
     generation,
     listNoteFiles,
@@ -233,10 +229,80 @@ export async function resolveExistingWikiTarget(
   }
 
   const reResolved = await indexedResolution(
-    await findExactWikiTargetMatches(normalized.raw),
+    await findWikiTargetMatch(normalized.key),
     normalized.date,
     generation,
     listNoteFiles,
   )
   return reResolved ?? { kind: 'missing' }
+}
+
+/**
+ * A path names one file, so the index needs no ranking and the disk probe is
+ * exactly one read. This is why path links need none of the bounded
+ * slug-family scan a bare name needs.
+ */
+async function pathResolution(
+  path: string,
+  generation: number,
+): Promise<ExistingMatchResolution | null> {
+  const indexed = await findNotesByPathKey(foldGraphPath(path))
+  const resolution = resolutionForPaths(indexed)
+  if (resolution !== null) {
+    return resolution
+  }
+  try {
+    await readNote(path, generation)
+    return { kind: 'resolved', path }
+  } catch (cause) {
+    // Absent is a real answer: a path link to a file that does not exist is a
+    // broken link, never an invitation to open a same-named file elsewhere.
+    return isAppError(cause) && cause.kind === 'notFound'
+      ? null
+      : { kind: 'unavailable', paths: [path] }
+  }
+}
+
+async function resolveReference(
+  reference: NoteReference,
+  sourcePath: string,
+  generation: number,
+): Promise<ExistingWikiTargetResolution> {
+  if (reference.kind === 'self') {
+    // Reopening the current note is a no-op. Reporting `missing` here would
+    // send the writable resolver off to create a note named `#Heading`.
+    return sourcePath === '' ? { kind: 'missing' } : { kind: 'resolved', path: sourcePath }
+  }
+  if (reference.kind === 'path') {
+    return (await pathResolution(reference.path, generation)) ?? { kind: 'missing' }
+  }
+  return resolveBareKey(reference.key, generation)
+}
+
+/**
+ * Resolve an existing wiki target without creating or modifying anything.
+ * `sourcePath` matters only for a bare `[[#Heading]]`, which stays inside its
+ * own note; a path-qualified wiki target is vault-root relative.
+ */
+export async function resolveExistingWikiTarget(
+  target: string,
+  generation: number,
+  sourcePath = '',
+): Promise<ExistingWikiTargetResolution> {
+  const reference = wikiNoteReference(target)
+  return reference === null
+    ? { kind: 'missing' }
+    : resolveReference(reference, sourcePath, generation)
+}
+
+/** Resolve a standard Markdown note href from the note that contains it. */
+export async function resolveExistingMarkdownTarget(
+  href: string,
+  sourcePath: string,
+  generation: number,
+): Promise<ExistingWikiTargetResolution> {
+  const reference = markdownNoteReference(sourcePath, href)
+  return reference === null
+    ? { kind: 'missing' }
+    : resolveReference(reference, sourcePath, generation)
 }

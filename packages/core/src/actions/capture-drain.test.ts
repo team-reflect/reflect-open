@@ -99,10 +99,9 @@ describe('drainCaptureInbox', () => {
   })
 
   it('writes an iOS share capture with its in-page description into the raw save', async () => {
-    addSpool(
-      envelope({ source: 'ios-share', metaDescription: '  A page\nabout examples.  ' }),
-      { screenshot: false },
-    )
+    addSpool(envelope({ source: 'ios-share', metaDescription: '  A page\nabout examples.  ' }), {
+      screenshot: false,
+    })
 
     const outcome = await drain()
 
@@ -156,7 +155,20 @@ describe('drainCaptureInbox', () => {
     expect(daily.match(/## \[\[Links\]\]/g)).toHaveLength(1)
     expect(daily).not.toContain('## Links\n')
     expect(daily).toContain('[[capture-2026-06-11-090000-000-0000|Old]]')
-    expect(daily).toContain('- [[capture-2026-06-11-153022-845-7c9e|An article]]')
+    expect(daily).toContain(
+      '## [[Links]]\n\n- [[capture-2026-06-11-153022-845-7c9e|An article]]\n\n[[capture-2026-06-11-090000-000-0000|Old]]',
+    )
+  })
+
+  it('extends only the leading Links list, before later daily-note prose', async () => {
+    files.set(DAILY, '## [[Links]]\n\n- [[Old]]\n- [[Older]]\n\nScratchpad for later.\n')
+    addSpool(envelope())
+
+    await drain()
+
+    expect(files.get(DAILY)).toBe(
+      '## [[Links]]\n\n- [[Old]]\n- [[Older]]\n- [[capture-2026-06-11-153022-845-7c9e|An article]]\n\nScratchpad for later.\n',
+    )
   })
 
   it('reuses an existing linked Links section for same-day dedup', async () => {
@@ -175,6 +187,26 @@ describe('drainCaptureInbox', () => {
     const daily = files.get(DAILY) ?? ''
     expect(daily.match(/## \[\[Links\]\]/g)).toHaveLength(1)
     expect(daily.match(/capture-2026-06-11-093000-000-0000/g)).toHaveLength(1)
+  })
+
+  it('does not treat a nested Links heading as the daily capture section', async () => {
+    addSpool(
+      envelope({
+        id: '00000000-0000-4000-8000-000000000001',
+        capturedAt: new Date(2026, 5, 11, 9, 30, 0, 0).toISOString(),
+      }),
+    )
+    await drain()
+    files.set(DAILY, '> ## [[Links]]\n>\n> - [[capture-2026-06-11-093000-000-0000|An article]]\n')
+
+    addSpool(envelope())
+    const outcome = await drain()
+
+    expect(outcome.deduped).toBe(0)
+    expect(files.has(IDENTITY.notePath)).toBe(true)
+    expect(files.get(DAILY)).toContain(
+      '\n## [[Links]]\n\n- [[capture-2026-06-11-153022-845-7c9e|An article]]\n',
+    )
   })
 
   it('upgrades a legacy heading even when a same-day recapture is deduplicated', async () => {
@@ -385,14 +417,12 @@ describe('drainCaptureInbox', () => {
   })
 
   it('drains two same-millisecond captures of different pages into distinct notes', async () => {
-    addSpool(
-      envelope({ id: '00000000-0000-4000-8000-000000000001', url: 'https://a.com' }),
-      { screenshot: false },
-    )
-    addSpool(
-      envelope({ id: 'ffff0000-0000-4000-8000-000000000002', url: 'https://b.com' }),
-      { screenshot: false },
-    )
+    addSpool(envelope({ id: '00000000-0000-4000-8000-000000000001', url: 'https://a.com' }), {
+      screenshot: false,
+    })
+    addSpool(envelope({ id: 'ffff0000-0000-4000-8000-000000000002', url: 'https://b.com' }), {
+      screenshot: false,
+    })
 
     const outcome = await drain()
 
@@ -487,12 +517,20 @@ describe('drainCaptureInbox (text captures)', () => {
     expect(spool.size).toBe(0)
   })
 
-  it('appends a task envelope as an open GFM checkbox', async () => {
+  it('appends a task envelope as a round (+) task the Tasks view projects', async () => {
     addTextSpool(textEnvelope({ kind: 'task', text: 'buy milk' }))
 
     await drain()
 
-    expect(files.get(DAILY)).toBe('- [ ] buy milk\n')
+    expect(files.get(DAILY)).toBe('+ [ ] buy milk\n')
+  })
+
+  it('appends a checkbox envelope as a square GFM checkbox', async () => {
+    addTextSpool(textEnvelope({ kind: 'checkbox', text: 'pack a bag' }))
+
+    await drain()
+
+    expect(files.get(DAILY)).toBe('- [ ] pack a bag\n')
   })
 
   it('appends after existing daily content as its own block', async () => {

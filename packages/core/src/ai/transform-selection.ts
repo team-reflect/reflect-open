@@ -28,7 +28,7 @@ const TRANSFORM_SYSTEM_PROMPT = [
 export interface TransformSelectionOptions {
   /** The provider entry to call, with `model` set to the model id to use. */
   config: AiProviderConfig
-  /** The BYOK API key, read from the OS keychain by the caller. */
+  /** The BYOK API key, or an empty string for no-key compatible endpoints. */
   apiKey: string
   /**
    * Transport for the provider call — the desktop passes its shell fetch
@@ -85,12 +85,12 @@ export async function* streamTransformTurn(
   try {
     const result = streamText({
       model,
-      system: TRANSFORM_SYSTEM_PROMPT,
+      instructions: TRANSFORM_SYSTEM_PROMPT,
       prompt: options.prompt,
       ...(options.signal !== undefined ? { abortSignal: options.signal } : {}),
     })
 
-    for await (const part of result.fullStream) {
+    for await (const part of result.stream) {
       switch (part.type) {
         case 'text-delta':
           text += part.text

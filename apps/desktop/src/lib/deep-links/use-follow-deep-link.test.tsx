@@ -6,9 +6,7 @@ import { RouterProvider, useRouter } from '@/routing/router'
 import { type FollowDeepLink, useFollowDeepLink } from './use-follow-deep-link'
 
 const dispatchDeepLink = vi.hoisted(() => vi.fn())
-const openDeepLinkInNewWindow = vi.hoisted(() =>
-  vi.fn<(href: string) => Promise<boolean>>(),
-)
+const openDeepLinkInNewWindow = vi.hoisted(() => vi.fn<(href: string) => Promise<boolean>>())
 const openRouteInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
 
 vi.mock('@/lib/deep-links/intake', () => ({ dispatchDeepLink }))
@@ -26,9 +24,7 @@ function Host(): ReactElement {
   return (
     <button
       type="button"
-      onClick={(event) =>
-        openNoteLink({ kind: 'note', path: 'notes/newer-link.md' }, event)
-      }
+      onClick={(event) => openNoteLink({ kind: 'note', path: 'notes/newer-link.md' }, event)}
     >
       Open newer note link
     </button>
@@ -76,9 +72,7 @@ describe('useFollowDeepLink', () => {
 
     modifierClick()
 
-    await vi.waitFor(() =>
-      expect(dispatchDeepLink).toHaveBeenCalledWith('reflect://note/older'),
-    )
+    await vi.waitFor(() => expect(dispatchDeepLink).toHaveBeenCalledWith('reflect://note/older'))
   })
 
   it('falls back to in-window dispatch when the window open rejects', async () => {
@@ -87,9 +81,7 @@ describe('useFollowDeepLink', () => {
 
     modifierClick()
 
-    await vi.waitFor(() =>
-      expect(dispatchDeepLink).toHaveBeenCalledWith('reflect://note/older'),
-    )
+    await vi.waitFor(() => expect(dispatchDeepLink).toHaveBeenCalledWith('reflect://note/older'))
   })
 
   it('drops a failed fallback after a newer router navigation', async () => {
@@ -172,10 +164,7 @@ describe('useFollowDeepLink', () => {
     await settle()
 
     expect(openDeepLinkInNewWindow).toHaveBeenCalledTimes(1)
-    expect(dispatchDeepLink.mock.calls).toEqual([
-      [url],
-      ['reflect://note/older'],
-    ])
+    expect(dispatchDeepLink.mock.calls).toEqual([[url], ['reflect://note/older']])
   })
 
   it.each(['reflect://today', 'reflect://note/newer'])(

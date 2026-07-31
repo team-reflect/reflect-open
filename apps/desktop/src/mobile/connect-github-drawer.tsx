@@ -1,4 +1,5 @@
 import { useId, type ReactElement } from 'react'
+import { getIsComposing } from '@meowdown/core'
 import { InlineAlert } from '@/components/inline-alert'
 import { ConnectGithubFinishStep } from '@/components/settings/connect-github-finish-step'
 import { GithubAuthStep } from '@/components/settings/github-auth-step'
@@ -99,6 +100,9 @@ function ConnectWizardSheet({
                   enterKeyHint="go"
                   onChange={(event) => wizard.setRepoName(event.target.value)}
                   onKeyDown={(event) => {
+                    if (getIsComposing()) {
+                      return
+                    }
                     if (event.key === 'Enter') {
                       wizard.continueFromRepo()
                     }
@@ -129,6 +133,9 @@ function ConnectWizardSheet({
                   enterKeyHint="go"
                   onChange={(event) => wizard.setExistingRepo(event.target.value)}
                   onKeyDown={(event) => {
+                    if (getIsComposing()) {
+                      return
+                    }
                     if (event.key === 'Enter') {
                       wizard.continueFromRepo()
                     }

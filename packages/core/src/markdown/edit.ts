@@ -1,12 +1,18 @@
 import type { SyntaxNode } from '@meowdown/markdown'
+import { appendListItemAtHeading, listItemBlock } from './append-list-item'
+import { appendHeadingSection } from './append-section'
 import { parseNote } from './extract'
 import { splitFrontmatter } from './frontmatter'
 import { parseBody } from './grammar'
+import { topLevelHeadings } from './heading-blocks'
 import { foldKey } from './keys'
+import { lineEndingAt, offsetBeforeLineEnding } from './line-endings'
+import type { Heading, TaskMarker, WikiLink } from './model'
 import { normalizeWikiTarget } from './resolve'
 import { scanInlineWikiLinks } from './scan'
 import { parseTaskMarker } from './task-marker'
-import type { Heading, TaskMarker, WikiLink } from './model'
+
+export { appendBlock } from './append-section'
 
 /**
  * Source-level edit helpers (Plan 03). These splice the original string by node
@@ -156,17 +162,6 @@ function nearestParentListItem(taskNode: SyntaxNode): SyntaxNode | null {
   return null
 }
 
-function insertionLineEnding(source: string, insertionOffset: number): '\r\n' | '\n' {
-  if (source.startsWith('\r\n', insertionOffset)) {
-    return '\r\n'
-  }
-  if (source[insertionOffset] === '\n') {
-    return '\n'
-  }
-  const previousNewline = source.lastIndexOf('\n', insertionOffset - 1)
-  return previousNewline > 0 && source[previousNewline - 1] === '\r' ? '\r\n' : '\n'
-}
-
 /**
  * Add an empty task to the end of `task`'s nearest parent-list context. The new
  * line reuses the task's exact indentation and round-list prefix, so parsing it
@@ -191,14 +186,12 @@ export function appendTaskToContext(
     throw new TaskStaleError('task no longer has a parent list context')
   }
 
-  const contextEnd = bodyOffset + contextItem.to
   // Lezer's CRLF ranges end between `\r` and `\n`; splice before the pair so
   // the inserted line cannot inherit a lone LF at either boundary.
-  const insertionOffset =
-    source[contextEnd - 1] === '\r' && source[contextEnd] === '\n' ? contextEnd - 1 : contextEnd
+  const insertionOffset = offsetBeforeLineEnding(source, bodyOffset + contextItem.to)
   const lineStart = source.lastIndexOf('\n', locatedOffset - 1) + 1
   const linePrefix = source.slice(lineStart, locatedOffset)
-  const lineEnding = insertionLineEnding(source, insertionOffset)
+  const lineEnding = lineEndingAt(source, insertionOffset)
   const trailingLineEnding = insertionOffset === source.length ? lineEnding : ''
   const inserted = `${lineEnding}${linePrefix}[ ] ${trailingLineEnding}`
   return {
@@ -274,104 +267,37 @@ export function clearTaskDueDate(content: string): string {
   return removed.replace(/[ \t]{2,}/g, ' ').trim()
 }
 
-interface Splice {
-  from: number
-  to: number
-  text: string
-}
-
-/** Apply non-overlapping splices, right-to-left so earlier offsets stay valid. */
-function applySplices(source: string, splices: Splice[]): string {
-  let result = source
-  for (const splice of [...splices].sort((a, b) => b.from - a.from)) {
-    result = result.slice(0, splice.from) + splice.text + result.slice(splice.to)
-  }
-  return result
-}
-
-/**
- * Rewrite the target of every `[[from]]` / `[[from|alias]]` to `to`
- * (case-insensitive match on the trimmed target), preserving each alias and all
- * surrounding text. Used by the rename-rewrite flow.
- */
-export function renameWikiLink(source: string, from: string, to: string): string {
-  // `[[…]]` has no escaping, so a target can't contain the bracket/pipe/newline
-  // characters that delimit the syntax — writing one would corrupt the link.
-  if (/[[\]|\r\n]/.test(to)) {
-    throw new Error(`invalid wiki-link target (cannot contain [ ] | or a newline): ${to}`)
-  }
-  const fromKey = from.trim().toLowerCase()
-  const { wikiLinks } = parseNote({ path: '', source })
-  const splices = wikiLinks
-    .filter((link) => link.target.toLowerCase() === fromKey)
-    .map<Splice>((link) => ({
-      from: link.from,
-      to: link.to,
-      text: link.alias ? `[[${to}|${link.alias}]]` : `[[${to}]]`,
-    }))
-  return applySplices(source, splices)
-}
-
-function nextSectionStart(headings: Heading[], target: Heading, eof: number): number {
-  const next = headings.find((heading) => heading.from > target.from && heading.level <= target.level)
-  return next ? next.from : eof
-}
-
 /**
  * `[[…]]` has no escaping — strip the characters that would corrupt a link
  * before embedding untrusted text (a page title, a meeting name) in one.
  */
 export function wikiLinkSafe(text: string): string {
-  return text.replace(/[[\]|\r\n]/g, ' ').replace(/\s+/g, ' ').trim()
+  return text
+    .replace(/[[\]|\r\n]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 /**
- * Append `block` as its own paragraph at the end of the note, one blank line
- * after the existing content (none for an empty note). The flat variant of
- * {@link appendUnderHeading}, for content that stands on its own rather than
- * landing under a section heading.
+ * Insert an unordered-list item into the list beneath the first matching
+ * top-level heading. If the heading is missing, append a new H2 section.
+ * `content` carries no bullet marker; see {@link appendListItemAtHeading}.
  */
-export function appendBlock(source: string, block: string): string {
-  const base = source.replace(/\s*$/, '')
-  const prefix = base.length > 0 ? `${base}\n\n` : ''
-  return `${prefix}${block.trim()}\n`
-}
-
-/**
- * Insert `block` at the end of the section under the first heading whose text
- * matches `heading` (case-insensitive). If no such heading exists, append a new
- * `## heading` section at end of file. Used by capture (Plan 11) and the
- * add-meeting action.
- */
-export function appendUnderHeading(source: string, heading: string, block: string): string {
+export function appendListItemUnderHeading(
+  source: string,
+  heading: string,
+  content: string,
+): string {
   const headingKey = heading.trim().toLowerCase()
   const { headings } = parseNote({ path: '', source })
-  const target = headings.find((candidate) => candidate.text.toLowerCase() === headingKey)
+  const target = topLevelHeadings(headings).find(
+    (candidate) => candidate.text.toLowerCase() === headingKey,
+  )
 
-  if (!target) {
-    return appendHeadingSection(source, heading, block)
+  if (target === undefined) {
+    return appendHeadingSection(source, heading, listItemBlock(content))
   }
-
-  return appendAtHeading(source, headings, target, block)
-}
-
-function appendHeadingSection(source: string, heading: string, block: string): string {
-  const base = source.replace(/\s*$/, '')
-  const prefix = base.length > 0 ? `${base}\n\n` : ''
-  return `${prefix}## ${heading.trim()}\n\n${block}\n`
-}
-
-function appendAtHeading(
-  source: string,
-  headings: Heading[],
-  target: Heading,
-  block: string,
-): string {
-  const sectionEnd = nextSectionStart(headings, target, source.length)
-  const head = source.slice(0, sectionEnd).replace(/\s*$/, '')
-  const tail = source.slice(sectionEnd)
-  const inserted = `${head}\n\n${block}`
-  return tail ? `${inserted}\n\n${tail}` : `${inserted}\n`
+  return appendListItemAtHeading(source, target, content)
 }
 
 /** The target when a heading consists entirely of one parsed wiki link. */
@@ -420,12 +346,14 @@ function matchingBacklinkedHeading(
   wikiLinks: readonly WikiLink[],
   titles: readonly string[],
 ): Heading | undefined {
-  const matches = headings.filter((heading) =>
-    heading.level === 2 &&
-    titles.some((title) => headingMatchesBacklinkedTitle(source, heading, wikiLinks, title)),
+  const matches = topLevelHeadings(headings).filter(
+    (heading) =>
+      heading.level === 2 &&
+      titles.some((title) => headingMatchesBacklinkedTitle(source, heading, wikiLinks, title)),
   )
   return (
-    matches.find((heading) => linkedHeadingTarget(source, heading, wikiLinks) !== null) ?? matches[0]
+    matches.find((heading) => linkedHeadingTarget(source, heading, wikiLinks) !== null) ??
+    matches[0]
   )
 }
 
@@ -443,28 +371,33 @@ export function upgradeSectionHeadingBacklink(
     throw new Error('a backlinked heading needs a title')
   }
   const { headings, wikiLinks } = parseNote({ path: '', source })
-  const target = matchingBacklinkedHeading(source, headings, wikiLinks, [safeTitle, ...matchingTitles])
+  const target = matchingBacklinkedHeading(source, headings, wikiLinks, [
+    safeTitle,
+    ...matchingTitles,
+  ])
   if (target === undefined || linkedHeadingTarget(source, target, wikiLinks) !== null) {
     return source
   }
+  // Lezer ends a CRLF heading between the `\r` and the `\n`, so rewriting up to
+  // `target.to` would drop the `\r` and leave that one line LF-terminated.
+  const headingEnd = offsetBeforeLineEnding(source, target.to)
   return (
     source.slice(0, target.from) +
     `${'#'.repeat(target.level)} [[${safeTitle}]]` +
-    source.slice(target.to)
+    source.slice(headingEnd)
   )
 }
 
 /**
- * Append `block` under a section whose heading is itself a wiki link. New
- * sections are emitted as `## [[Title]]`; an existing linked heading is reused,
- * including an aliased display spelling. The old app-generated `## Title` form
- * is upgraded in place so the next automatic append adds the missing backlink
- * without splitting one category across duplicate sections.
+ * Insert one unordered-list item into the list beneath a backlinked H2.
+ * Existing legacy plain headings are upgraded in place; a missing section is
+ * appended as `## [[Title]]`. `content` carries no bullet marker; see
+ * {@link appendListItemAtHeading}.
  */
-export function appendUnderBacklinkedHeading(
+export function appendListItemUnderBacklinkedHeading(
   source: string,
   title: string,
-  block: string,
+  content: string,
   matchingTitles: readonly string[] = [],
 ): string {
   const safeTitle = wikiLinkSafe(title)
@@ -474,15 +407,13 @@ export function appendUnderBacklinkedHeading(
   const linkedHeading = `[[${safeTitle}]]`
   const upgraded = upgradeSectionHeadingBacklink(source, safeTitle, matchingTitles)
   const { headings, wikiLinks } = parseNote({ path: '', source: upgraded })
-  const target = matchingBacklinkedHeading(
-    upgraded,
-    headings,
-    wikiLinks,
-    [safeTitle, ...matchingTitles],
-  )
+  const target = matchingBacklinkedHeading(upgraded, headings, wikiLinks, [
+    safeTitle,
+    ...matchingTitles,
+  ])
 
   if (target === undefined) {
-    return appendHeadingSection(upgraded, linkedHeading, block)
+    return appendHeadingSection(upgraded, linkedHeading, listItemBlock(content))
   }
-  return appendAtHeading(upgraded, headings, target, block)
+  return appendListItemAtHeading(upgraded, target, content)
 }

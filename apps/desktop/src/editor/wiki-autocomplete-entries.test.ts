@@ -242,11 +242,13 @@ describe('buildAutocompleteEntries', () => {
       [suggestion({ target: 'Ada Lovelace', title: 'Ada Lovelace' })],
       {
         offerCreate: true,
-        contacts: [{
-          contact: ada,
-          target: 'Augusta Ada King',
-          ownerPath: 'notes/augusta.md',
-        }],
+        contacts: [
+          {
+            contact: ada,
+            target: 'Augusta Ada King',
+            ownerPath: 'notes/augusta.md',
+          },
+        ],
       },
     )
     expect(entries.filter((entry) => entry.kind === 'contact')).toEqual([
@@ -272,11 +274,13 @@ describe('buildAutocompleteEntries', () => {
       ],
       {
         offerCreate: true,
-        contacts: [{
-          contact: ada,
-          target: 'Augusta Ada King',
-          ownerPath: 'notes/augusta.md',
-        }],
+        contacts: [
+          {
+            contact: ada,
+            target: 'Augusta Ada King',
+            ownerPath: 'notes/augusta.md',
+          },
+        ],
       },
     )
     expect(entries.filter((entry) => entry.kind === 'contact')).toEqual([])

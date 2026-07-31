@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { dailyPath } from '@reflect/core'
+import { getIsComposing } from '@meowdown/core'
 import { usePalette } from '@/components/command-palette/palette-provider'
 import { registerKeymap } from '@/editor/keymap'
 import { APP_COMMANDS } from '@/lib/commands/app-commands'
@@ -14,12 +14,13 @@ import { useAudioMemo } from '@/providers/audio-memo-provider'
 import { useChatSession } from '@/providers/chat-provider'
 import { useFocusedDailyDate } from '@/providers/focused-daily-provider'
 import { useGraph } from '@/providers/graph-provider'
+import { useNoteFindActions } from '@/providers/note-find-provider'
 import { useNoteTemplates } from '@/providers/note-templates-provider'
 import { useSettings } from '@/providers/settings-provider'
 import { useShortcuts } from '@/providers/shortcuts-provider'
 import { useSidebar } from '@/providers/sidebar-provider'
 import { useTheme } from '@/providers/theme-provider'
-import { effectiveDailyDate, notePathForRoute } from './route'
+import { focusedNotePathForRoute } from './route'
 import { useRouter } from './router'
 
 /**
@@ -45,7 +46,12 @@ const HISTORY_COMMAND_IDS = new Set(['history.back', 'history.forward'])
 // AppKit owns this key equivalent on macOS. Keep it in the registry for
 // display, collision detection, and the plain-browser/non-macOS fallback, but
 // do not consume its keydown in the webview before the native menu sees it.
-const NATIVE_MACOS_MENU_COMMAND_IDS = new Set(['sidebar.toggle'])
+const NATIVE_MACOS_MENU_COMMAND_IDS = new Set([
+  'sidebar.toggle',
+  'note.find',
+  'note.findNext',
+  'note.findPrevious',
+])
 
 const CODE_TO_BINDING_KEY: Record<string, string> = {
   BracketLeft: '[',
@@ -142,11 +148,7 @@ function idForKeyDown(event: KeyboardEvent): string | null {
 }
 
 function isNativeMacosMenuCommand(commandId: string): boolean {
-  return (
-    isMacosDesktop &&
-    isNativeMenuInstalled() &&
-    NATIVE_MACOS_MENU_COMMAND_IDS.has(commandId)
-  )
+  return isMacosDesktop && isNativeMenuInstalled() && NATIVE_MACOS_MENU_COMMAND_IDS.has(commandId)
 }
 
 /**
@@ -173,6 +175,11 @@ export function useAppShortcuts(): CommandContext {
   const { toggle: toggleAudioMemo } = useAudioMemo()
   const { newChat } = useChatSession()
   const { updateSettings } = useSettings()
+  const {
+    openForPath: openNoteFindForPath,
+    next: findNextInNote,
+    previous: findPreviousInNote,
+  } = useNoteFindActions()
 
   // The palette is modal: app shortcuts must not navigate behind its overlay.
   // A ref keeps the listener stable across open/close renders.
@@ -212,18 +219,21 @@ export function useAppShortcuts(): CommandContext {
       // Resolve through the focused stream day so a note-scoped command targets
       // the same day the context sidebar shows (see `effectiveDailyDate`); off
       // the daily views it falls back to the routed note.
-      notePath: () => {
-        const route = routeRef.current
-        const today = todayIso()
-        const daily = effectiveDailyDate(route, today, focusedDailyDateRef.current)
-        return daily !== null ? dailyPath(daily) : notePathForRoute(route, today)
-      },
+      notePath: () =>
+        focusedNotePathForRoute(routeRef.current, todayIso(), focusedDailyDateRef.current),
       back,
       forward,
       clearScrollState,
       toggleTheme: () => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark'),
       toggleSidebar,
       newChat,
+      openNoteFind: () => {
+        openNoteFindForPath(
+          focusedNotePathForRoute(routeRef.current, todayIso(), focusedDailyDateRef.current),
+        )
+      },
+      findNextInNote,
+      findPreviousInNote,
       switchGraph: (index) => {
         const recent = recentsRef.current[index]
         if (recent === undefined || recent.root === graphRootRef.current) {
@@ -257,6 +267,9 @@ export function useAppShortcuts(): CommandContext {
       openTemplateCreate,
       toggleSidebar,
       newChat,
+      openNoteFindForPath,
+      findNextInNote,
+      findPreviousInNote,
       toggleAudioMemo,
       updateSettings,
     ],
@@ -286,6 +299,9 @@ export function useAppShortcuts(): CommandContext {
     }
 
     function onHistoryKeyDownCapture(event: KeyboardEvent) {
+      if (getIsComposing()) {
+        return
+      }
       const id = idForKeyDown(event)
       if (id === null || isNativeMacosMenuCommand(id) || !HISTORY_COMMAND_IDS.has(id)) {
         return
@@ -298,6 +314,9 @@ export function useAppShortcuts(): CommandContext {
     }
 
     function onKeyDown(event: KeyboardEvent) {
+      if (getIsComposing()) {
+        return
+      }
       if (event.defaultPrevented) {
         // The focused editor gets first refusal. meowdown's `Mod-k` consumes the
         // keydown (preventDefault) only when it turns a selection or the link at

@@ -1,10 +1,6 @@
 import type { ReactElement } from 'react'
 import type { ChatAttachment } from '@reflect/core'
-import {
-  Attachment,
-  AttachmentGroup,
-  AttachmentMedia,
-} from '@/components/ui/attachment'
+import { Attachment, AttachmentGroup, AttachmentMedia } from '@/components/ui/attachment'
 
 interface ChatUserAttachmentsProps {
   attachments: readonly ChatAttachment[]

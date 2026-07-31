@@ -380,9 +380,7 @@ describe('createSyncEngine', () => {
         return {
           kind: 'merged',
           conflictedPaths: [],
-          changedFiles: [
-            { path: `notes/remote-${mergeCount}.md`, kind: 'upsert' },
-          ],
+          changedFiles: [{ path: `notes/remote-${mergeCount}.md`, kind: 'upsert' }],
         }
       }
       if (command === 'git_push') {
@@ -703,12 +701,7 @@ describe('createSyncEngine', () => {
     pushGate.resolve?.(PUSHED)
     await vi.runAllTimersAsync()
     // The mid-cycle edit got its own follow-up cycle.
-    expect(commandsOf(calls)).toEqual([
-      'git_commit_all',
-      'git_push',
-      'git_commit_all',
-      'git_push',
-    ])
+    expect(commandsOf(calls)).toEqual(['git_commit_all', 'git_push', 'git_commit_all', 'git_push'])
     engine.stop()
   })
 
@@ -860,7 +853,12 @@ describe('createSyncEngine', () => {
     const third = engine.syncNow()
     await vi.runAllTimersAsync()
     // Only the first cycle has started; the others coalesced, not interleaved.
-    expect(commandsOf(calls)).toEqual(['git_commit_all', 'git_fetch', 'git_merge_remote', 'git_push'])
+    expect(commandsOf(calls)).toEqual([
+      'git_commit_all',
+      'git_fetch',
+      'git_merge_remote',
+      'git_push',
+    ])
 
     pushGates.shift()?.(PUSHED)
     await vi.runAllTimersAsync()

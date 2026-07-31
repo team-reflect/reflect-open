@@ -29,7 +29,10 @@ interface IncomingBacklinksProps {
  * failed query surfaces as an alert, because a failing query means the index
  * is broken, not that the note is unlinked.
  */
-export function IncomingBacklinks({ path, className }: IncomingBacklinksProps): ReactElement | null {
+export function IncomingBacklinks({
+  path,
+  className,
+}: IncomingBacklinksProps): ReactElement | null {
   const {
     groups,
     count,

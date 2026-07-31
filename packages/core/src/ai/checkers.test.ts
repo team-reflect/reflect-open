@@ -164,8 +164,8 @@ describe('cloudSafeSelection', () => {
   })
 
   it('refuses to mint a selection from a private note', () => {
-    expect(() =>
-      cloudSafeSelection({ path: PRIVATE_PATH, isPrivate: true }, PRIVATE_BODY),
-    ).toThrow(PrivateNoteError)
+    expect(() => cloudSafeSelection({ path: PRIVATE_PATH, isPrivate: true }, PRIVATE_BODY)).toThrow(
+      PrivateNoteError,
+    )
   })
 })

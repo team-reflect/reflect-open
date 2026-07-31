@@ -39,12 +39,20 @@ export function ChatHistoryMenu(): ReactElement | null {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label="Chat history">
-          <History aria-hidden />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent aria-label="Chat history" side="top" align="end" sideOffset={6} className="w-72">
+      <DropdownMenuTrigger
+        render={
+          <Button variant="ghost" size="icon-sm" aria-label="Chat history">
+            <History aria-hidden />
+          </Button>
+        }
+      />
+      <DropdownMenuContent
+        aria-label="Chat history"
+        side="top"
+        align="end"
+        sideOffset={6}
+        className="w-72"
+      >
         {conversations === undefined || conversations.length === 0 ? (
           <DropdownMenuItem disabled className="px-2 py-1.5 text-[13px] text-text-muted">
             No past chats
@@ -55,7 +63,7 @@ export function ChatHistoryMenu(): ReactElement | null {
             return (
               <DropdownMenuItem
                 key={conversation.id}
-                onSelect={() => {
+                onClick={() => {
                   if (!current) {
                     void openConversation(conversation.id)
                   }

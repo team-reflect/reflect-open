@@ -23,7 +23,13 @@ export function insertTargetForTask(task: OpenTask): InsertTaskTarget {
 
 /** Today's daily note as an insert target — V1's "add to Today" / Current bucket. */
 export function todaysDailyTarget(today: string): InsertTaskTarget {
-  return { notePath: dailyPath(today), noteTitle: today, dailyDate: today, isPinned: false, pinnedOrder: null }
+  return {
+    notePath: dailyPath(today),
+    noteTitle: today,
+    dailyDate: today,
+    isPinned: false,
+    pinnedOrder: null,
+  }
 }
 
 /**

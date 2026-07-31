@@ -75,9 +75,7 @@ export function addMonths(month: string, delta: number): string {
  */
 export function weekdayLabels(weekStartsOn: 0 | 1 = 1): string[] {
   const weekStart = startOfWeek(new Date(), { weekStartsOn })
-  return [...Array(7).keys()].map((dayOffset) =>
-    format(addDays(weekStart, dayOffset), 'EEEEEE'),
-  )
+  return [...Array(7).keys()].map((dayOffset) => format(addDays(weekStart, dayOffset), 'EEEEEE'))
 }
 
 /**
@@ -86,14 +84,8 @@ export function weekdayLabels(weekStartsOn: 0 | 1 = 1): string[] {
  */
 export function buildMonthGrid(month: string, weekStartsOn: 0 | 1 = 1): MonthGrid {
   const monthStart = startOfMonth(parseMonth(month))
-  const gridStart = format(
-    startOfWeek(monthStart, { weekStartsOn }),
-    ISO_DATE_FORMAT,
-  )
-  const gridEnd = format(
-    endOfWeek(endOfMonth(monthStart), { weekStartsOn }),
-    ISO_DATE_FORMAT,
-  )
+  const gridStart = format(startOfWeek(monthStart, { weekStartsOn }), ISO_DATE_FORMAT)
+  const gridEnd = format(endOfWeek(endOfMonth(monthStart), { weekStartsOn }), ISO_DATE_FORMAT)
 
   const weeks: MonthGridCell[][] = []
   let cursor = gridStart

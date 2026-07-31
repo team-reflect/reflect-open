@@ -30,7 +30,8 @@ describe('ConflictNoteView', () => {
   })
 
   it('marks an empty side instead of collapsing it', async () => {
-    const stacked = '<<<<<<< Mac\nmac\n=======\nphone\n>>>>>>> iPhone\n<<<<<<< Mac\n=======\nipad\n>>>>>>> iPad\n'
+    const stacked =
+      '<<<<<<< Mac\nmac\n=======\nphone\n>>>>>>> iPhone\n<<<<<<< Mac\n=======\nipad\n>>>>>>> iPad\n'
     const screen = await render(<ConflictNoteView content={stacked} />)
 
     await expect.element(screen.getByText('Empty on this side')).toBeInTheDocument()
@@ -38,7 +39,9 @@ describe('ConflictNoteView', () => {
   })
 
   it('shows an unterminated block verbatim rather than styling it', async () => {
-    const screen = await render(<ConflictNoteView content={'before\n<<<<<<< this device\nkept line'} />)
+    const screen = await render(
+      <ConflictNoteView content={'before\n<<<<<<< this device\nkept line'} />,
+    )
 
     await expect.element(screen.getByText(/<<<<<<< this device/)).toBeInTheDocument()
     await expect.element(screen.getByText(/kept line/)).toBeInTheDocument()

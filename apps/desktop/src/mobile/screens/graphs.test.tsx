@@ -44,9 +44,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   mobileStorage: vi.fn(async () => storageInfo.current),
 }))
 
-const completeOnboarding = vi.hoisted(() =>
-  vi.fn(async (_kind: string, _root?: string) => {}),
-)
+const completeOnboarding = vi.hoisted(() => vi.fn(async (_kind: string, _root?: string) => {}))
 const graphState = vi.hoisted(() => ({ root: '/iCloud/Documents/Notes' }))
 vi.mock('@/providers/graph-provider', () => ({
   useGraph: () => ({
@@ -113,9 +111,7 @@ describe('MobileGraphs', () => {
     await mount()
 
     await userEvent.click(page.getByRole('button', { name: 'This device' }))
-    await vi.waitFor(() =>
-      expect(completeOnboarding).toHaveBeenCalledWith('local', '/Documents'),
-    )
+    await vi.waitFor(() => expect(completeOnboarding).toHaveBeenCalledWith('local', '/Documents'))
   })
 
   it('creates a graph through the sheet, not an inline form', async () => {
@@ -159,8 +155,6 @@ describe('MobileGraphs', () => {
     await mount()
 
     await expect.element(page.getByText(/iCloud Drive isn’t available/)).toBeVisible()
-    await expect
-      .element(page.getByRole('button', { name: 'New graph' }))
-      .not.toBeInTheDocument()
+    await expect.element(page.getByRole('button', { name: 'New graph' })).not.toBeInTheDocument()
   })
 })

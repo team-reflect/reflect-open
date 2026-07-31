@@ -1,9 +1,8 @@
 import { memo, useCallback, useMemo, useRef, useState, type ReactElement } from 'react'
-import type { ExitBoundaryHandler } from '@meowdown/core'
+import type { ExitBoundaryHandler, SearchStatus } from '@meowdown/core'
 import {
   detectConflictMarkers,
   isDaily,
-  isReflectManagedNotePath,
   isTemplatePath,
   isUntitledNotePath,
   untitledNoteSeed,
@@ -29,11 +28,13 @@ import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete'
 import { useNoteDocument } from '@/editor/use-note-document'
 import { useTagNavigation } from '@/editor/use-tag-navigation'
 import { useTemplateSlashItems } from '@/editor/use-template-slash-items'
+import { useMarkdownLinkNavigation } from '@/editor/use-markdown-link-navigation'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
 import { useWikiLinkHoverPreview } from '@/editor/use-wiki-link-hover-preview'
 import { isTouchEditorSurface } from '@/lib/platform-surface'
 import { cn } from '@/lib/utils'
 import { useGraph } from '@/providers/graph-provider'
+import { useNoteSearchQuery, useNoteSearchReport } from '@/providers/note-find-provider'
 import { useSettings } from '@/providers/settings-provider'
 
 interface NotePaneProps {
@@ -151,10 +152,10 @@ export function NotePaneComponent({
   }
   const document = useNoteDocument(path, generation, {
     createIfMissing: lazyCreate,
-    // Only direct `notes/*.md` paths can be Reflect-managed. The coordinator
-    // verifies valid ULID frontmatter before any automation; adopted notes,
-    // templates, dailies, and arbitrary vault paths save content in place.
-    trackRenames: isReflectManagedNotePath(path),
+    // Every editable regular note maintains title-addressed links and
+    // title-mirroring backlink displays. The coordinator separately limits
+    // title-derived file moves to Reflect-managed notes.
+    trackRenames: !dailyNote && !template,
     // A missing ordinary note opens as a name-me template (old Reflect's
     // new-note flow): the seed — `id:` frontmatter plus an empty H1 the
     // caret lands in, ghosted "Untitled" by the title placeholder — only
@@ -162,14 +163,8 @@ export function NotePaneComponent({
     // notes stay unseeded — the date is their identity.
     ...(needsSeed ? { missingSeed: seed.seed } : {}),
   })
-  const {
-    resolveImageUrl,
-    resolveAssetOpenPath,
-    openAsset,
-    saveFile,
-    resolveFileInfo,
-    saveError,
-  } = useAssetPersistence(generation, path)
+  const { resolveImageUrl, resolveAssetOpenPath, openAsset, saveFile, resolveFileInfo, saveError } =
+    useAssetPersistence(generation, path)
   const renderWikilinkHoverCard = useWikiLinkHoverPreview({
     generation,
     graphKey: graph?.root ?? null,
@@ -178,11 +173,20 @@ export function NotePaneComponent({
     resolveAssetOpenPath,
   })
   const onWikiLinkClick = useWikiLinkNavigation(generation)
+  const onNoteLinkClick = useMarkdownLinkNavigation(generation, path)
   const onTagClick = useTagNavigation()
   const { onWikilinkSearch, onTagSearch } = useEditorAutocomplete()
 
   const bindEditor = document.bindEditor
   const aiEditorRef = useRef<NoteEditorHandle | null>(null)
+  // Find is one session per window: only the targeted note gets a query, and
+  // only its status reaches the Find bar.
+  const searchQuery = useNoteSearchQuery(path)
+  const reportSearchStatus = useNoteSearchReport()
+  const handleSearchChange = useCallback(
+    (status: SearchStatus) => reportSearchStatus(path, status),
+    [path, reportSearchStatus],
+  )
   // The registry entry this pane made, so unmount removes exactly it (a
   // remount of the same path may already have re-registered).
   const registeredHandle = useRef<{ path: string; handle: NoteEditorHandle } | null>(null)
@@ -198,10 +202,7 @@ export function NotePaneComponent({
       aiEditorRef.current = handle
       if (handle === null) {
         if (registeredHandle.current !== null) {
-          unregisterNoteEditorHandle(
-            registeredHandle.current.path,
-            registeredHandle.current.handle,
-          )
+          unregisterNoteEditorHandle(registeredHandle.current.path, registeredHandle.current.handle)
           registeredHandle.current = null
         }
       } else {
@@ -230,7 +231,6 @@ export function NotePaneComponent({
     sessionEpoch: document.sessionEpoch,
     editorRef: aiEditorRef,
   })
-
 
   const handleExitBoundary: ExitBoundaryHandler | undefined = useMemo(() => {
     if (!dailyDate || !onExitBoundary) {
@@ -322,10 +322,7 @@ export function NotePaneComponent({
         ) : null}
 
         {document.conflict !== null ? (
-          <NoteConflictBanner
-            onKeepMine={document.keepMine}
-            onLoadTheirs={document.loadTheirs}
-          />
+          <NoteConflictBanner onKeepMine={document.keepMine} onLoadTheirs={document.loadTheirs} />
         ) : null}
 
         <SyncConflictNotice path={path} className="mb-4" />
@@ -346,6 +343,8 @@ export function NotePaneComponent({
         onChange={document.onEditorChange}
         markMode={markModeFromSyntax(settings.editorMarkdownSyntax)}
         spellCheck={settings.editorSpellCheck}
+        searchQuery={searchQuery}
+        onSearchChange={handleSearchChange}
         smoothCaretAnimation={settings.editorSmoothCaretAnimation}
         timeFormat={settings.timeFormat}
         bulletAfterHeading={settings.editorBulletAfterHeading}
@@ -361,9 +360,8 @@ export function NotePaneComponent({
         resolveFileLink={resolveAssetFileLink}
         resolveFileInfo={resolveFileInfo}
         onWikiLinkClick={onWikiLinkClick}
-        {...(generation !== null && !isTouchEditorSurface()
-          ? { renderWikilinkHoverCard }
-          : {})}
+        onNoteLinkClick={onNoteLinkClick}
+        {...(generation !== null && !isTouchEditorSurface() ? { renderWikilinkHoverCard } : {})}
         onTagClick={onTagClick}
         onWikilinkSearch={onWikilinkSearch}
         onTagSearch={onTagSearch}

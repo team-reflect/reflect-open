@@ -398,9 +398,7 @@ describe('SettingsProvider', () => {
     await act(() => {
       releaseLoad()
     })
-    await vi.waitFor(() =>
-      expect(result.current.settings.aiProviders).toEqual([persisted, added]),
-    )
+    await vi.waitFor(() => expect(result.current.settings.aiProviders).toEqual([persisted, added]))
     await vi.waitFor(() =>
       expect(saved).toEqual([expect.objectContaining({ aiProviders: [persisted, added] })]),
     )

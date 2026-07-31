@@ -112,6 +112,27 @@ const APP_COMMANDS: AppCommand[] = [
     },
   },
   {
+    id: 'note.find',
+    title: 'Find in note…',
+    keywords: ['search', 'text', 'page'],
+    keybinding: 'Mod-f',
+    run: (context) => context.openNoteFind(),
+  },
+  {
+    id: 'note.findNext',
+    title: 'Find next',
+    keywords: ['search', 'match', 'forward'],
+    keybinding: 'Mod-g',
+    run: (context) => context.findNextInNote(),
+  },
+  {
+    id: 'note.findPrevious',
+    title: 'Find previous',
+    keywords: ['search', 'match', 'backward'],
+    keybinding: 'Mod-Shift-g',
+    run: (context) => context.findPreviousInNote(),
+  },
+  {
     id: 'chat.open',
     title: 'Chat',
     keywords: ['ai', 'assistant', 'copilot', 'ask'],

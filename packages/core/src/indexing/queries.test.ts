@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setBridge } from '../ipc/bridge'
 import {
   dailyDatesInRange,
-  findExactWikiTargetMatches,
+  findNotesByPathKey,
+  findWikiTargetMatch,
   getBacklinksWithContext,
   getDuplicateNoteIds,
   getNoteIdsByPath,
@@ -30,10 +31,7 @@ afterEach(() => {
 
 describe('dailyDatesInRange', () => {
   it('queries the notes daily_date column with inclusive bounds', async () => {
-    mockInvoke.mockResolvedValue([
-      { daily_date: '2026-06-01' },
-      { daily_date: '2026-06-09' },
-    ])
+    mockInvoke.mockResolvedValue([{ daily_date: '2026-06-01' }, { daily_date: '2026-06-09' }])
 
     const dates = await dailyDatesInRange('2026-06-01', '2026-06-30')
 
@@ -153,64 +151,52 @@ describe('resolveWikiTarget', () => {
   })
 })
 
-describe('findExactWikiTargetMatches', () => {
-  it('returns every exact title in path order without querying aliases', async () => {
+describe('findWikiTargetMatch', () => {
+  it('returns the winning tier in one indexed read, preserving ambiguity', async () => {
     mockInvoke.mockResolvedValue([
-      { path: 'notes/business-ideas-2.md' },
-      { path: 'notes/business-ideas.md' },
+      { note_path: 'notes/business-ideas-2.md', tier: 2 },
+      { note_path: 'notes/business-ideas.md', tier: 2 },
+      { note_path: 'archive/business-ideas.md', tier: 4 },
     ])
 
-    await expect(findExactWikiTargetMatches('Business ideas')).resolves.toEqual({
-      kind: 'title',
+    await expect(findWikiTargetMatch('business ideas')).resolves.toEqual({
+      tier: 2,
       paths: ['notes/business-ideas-2.md', 'notes/business-ideas.md'],
     })
 
     expect(mockInvoke).toHaveBeenCalledTimes(1)
     const [, args] = mockInvoke.mock.calls[0]!
     const sql = String(args['sql'])
-    expect(sql).toContain('title_key')
-    expect(sql).toContain('distinct')
-    expect(sql).toContain('order by "path"')
-    expect(sql).toContain('"kind" != ?')
-    expect(args['params']).toEqual(['business ideas', 'template'])
+    expect(sql).toContain('note_claims')
+    expect(sql).toContain('order by "tier"')
+    expect(args['params']).toEqual(['business ideas'])
   })
 
-  it('queries exact aliases only after titles miss', async () => {
-    mockInvoke
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        { note_path: 'notes/alias-a.md' },
-        { note_path: 'notes/alias-b.md' },
-      ])
-
-    await expect(findExactWikiTargetMatches('Business ideas')).resolves.toEqual({
-      kind: 'alias',
-      paths: ['notes/alias-a.md', 'notes/alias-b.md'],
-    })
-
-    expect(mockInvoke).toHaveBeenCalledTimes(2)
-    const [, args] = mockInvoke.mock.calls[1]!
-    const sql = String(args['sql'])
-    expect(sql).toContain('from "aliases"')
-    expect(sql).toContain('inner join "notes"')
-    expect(sql).toContain('distinct')
-    expect(sql).toContain('order by "note_path"')
-    expect(sql).toContain('"notes"."kind" != ?')
-    expect(args['params']).toEqual(['business ideas', 'template'])
+  it('reports an unclaimed key as tier 0 and never queries when the key is blank', async () => {
+    mockInvoke.mockResolvedValue([])
+    await expect(findWikiTargetMatch('missing')).resolves.toEqual({ tier: 0, paths: [] })
+    await expect(findWikiTargetMatch('')).resolves.toEqual({ tier: 0, paths: [] })
+    expect(mockInvoke).toHaveBeenCalledTimes(1)
   })
 
-  it('preserves daily-date precedence before titles and aliases', async () => {
-    mockInvoke.mockResolvedValue([{ path: 'daily/2026-06-09.md' }])
+  it('reads a daily-date claim from the same table as every other tier', async () => {
+    mockInvoke.mockResolvedValue([{ note_path: 'daily/2026-06-09.md', tier: 1 }])
 
-    await expect(findExactWikiTargetMatches('2026-06-09')).resolves.toEqual({
-      kind: 'date',
+    await expect(findWikiTargetMatch('2026-06-09')).resolves.toEqual({
+      tier: 1,
       paths: ['daily/2026-06-09.md'],
     })
+  })
+})
 
-    expect(mockInvoke).toHaveBeenCalledTimes(1)
+describe('findNotesByPathKey', () => {
+  it('selects by the folded path and never queries a blank key', async () => {
+    mockInvoke.mockResolvedValue([{ path: 'Projects/Plan.md' }])
+    await expect(findNotesByPathKey('projects/plan.md')).resolves.toEqual(['Projects/Plan.md'])
     const [, args] = mockInvoke.mock.calls[0]!
-    expect(String(args['sql'])).toContain('daily_date')
-    expect(args['params']).toEqual(['2026-06-09', 'template'])
+    expect(String(args['sql'])).toContain('path_key')
+    await expect(findNotesByPathKey('')).resolves.toEqual([])
+    expect(mockInvoke).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -374,9 +360,7 @@ describe('getBacklinksWithContext', () => {
     const countQuery = dbQueries().find(({ sql }) => sql.includes('count(*)'))
     expect(countQuery?.sql).toContain('inner join "notes"')
 
-    const contextQuery = dbQueries().find(({ sql }) =>
-      sql.includes('"backlinks"."pos_from"'),
-    )
+    const contextQuery = dbQueries().find(({ sql }) => sql.includes('"backlinks"."pos_from"'))
     expect(contextQuery?.sql).toContain('"backlinks"."source_path"')
     expect(contextQuery?.sql).toContain('"backlinks"."pos_from"')
   })
@@ -406,13 +390,7 @@ describe('getBacklinksWithContext', () => {
     const sourceQuery = dbQueries().find(({ sql }) => sql.includes('select distinct'))
     expect(sourceQuery?.sql).toContain('"backlinks"."source_path" >')
     expect(sourceQuery?.sql.toLowerCase()).not.toContain(' offset ')
-    expect(sourceQuery?.params).toEqual([
-      'notes/target.md',
-      1_000,
-      1_000,
-      'notes/previous.md',
-      2,
-    ])
+    expect(sourceQuery?.params).toEqual(['notes/target.md', 1_000, 1_000, 'notes/previous.md', 2])
   })
 
   it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
@@ -486,11 +464,7 @@ describe('getBacklinksWithContext', () => {
           title: 'Source',
           recencyMs: 1_000,
           content,
-          positions: [
-            5,
-            content.lastIndexOf('[[target]] line'),
-            content.indexOf('another'),
-          ],
+          positions: [5, content.lastIndexOf('[[target]] line'), content.indexOf('another')],
         },
       ],
     })
@@ -552,12 +526,10 @@ describe('getDuplicateNoteIds', () => {
   })
 
   it('groups every path claiming a duplicated id, ordered', async () => {
-    mockInvoke
-      .mockResolvedValueOnce([{ id: 'dup-1' }])
-      .mockResolvedValueOnce([
-        { id: 'dup-1', path: 'notes/a.md' },
-        { id: 'dup-1', path: 'notes/b.md' },
-      ])
+    mockInvoke.mockResolvedValueOnce([{ id: 'dup-1' }]).mockResolvedValueOnce([
+      { id: 'dup-1', path: 'notes/a.md' },
+      { id: 'dup-1', path: 'notes/b.md' },
+    ])
 
     await expect(getDuplicateNoteIds()).resolves.toEqual([
       { id: 'dup-1', paths: ['notes/a.md', 'notes/b.md'] },
@@ -636,7 +608,11 @@ describe('suggestWikiTargets', () => {
 
     expect(result.map((row) => row.target)).toEqual(['Today', '2020-01-01'])
     expect(result[0]!.path).toBe('notes/today.md')
-    expect(result[1]).toMatchObject({ date: '2020-01-01', generated: { phrase: 'Today' }, path: null })
+    expect(result[1]).toMatchObject({
+      date: '2020-01-01',
+      generated: { phrase: 'Today' },
+      path: null,
+    })
   })
 
   it('does not synthesise dates without a clock (legacy callers unchanged)', async () => {

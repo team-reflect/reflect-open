@@ -2,104 +2,145 @@ import { describe, expect, it } from 'vitest'
 import { parseNote } from './extract'
 import {
   appendBlock,
+  appendListItemUnderBacklinkedHeading,
+  appendListItemUnderHeading,
   appendTaskLine,
   appendTaskToContext,
-  appendUnderBacklinkedHeading,
-  appendUnderHeading,
   clearTaskDueDate,
   editTaskLine,
   removeTaskLine,
-  renameWikiLink,
   setTaskDueDate,
   taskLineToBullet,
   TaskStaleError,
   toggleTaskMarker,
 } from './edit'
 
-describe('renameWikiLink', () => {
-  it('rewrites matching targets, preserves aliases, skips code and non-matches', () => {
-    const source = '[[Foo]] and [[foo|bar]] and `[[Foo]]` and [[Other]]'
-    expect(renameWikiLink(source, 'Foo', 'Baz')).toBe(
-      '[[Baz]] and [[Baz|bar]] and `[[Foo]]` and [[Other]]',
+describe('appendListItemUnderHeading', () => {
+  it("extends the section's bullet list and stays before later prose and lists", () => {
+    const source =
+      '## Meetings\n\n- [[Kickoff]]\n- [[Planning]]\n\nNotes for next time.\n\n- Personal reminder\n'
+    expect(appendListItemUnderHeading(source, 'Meetings', '[[Standup]]')).toBe(
+      '## Meetings\n\n- [[Kickoff]]\n- [[Planning]]\n- [[Standup]]\n\nNotes for next time.\n\n- Personal reminder\n',
     )
   })
 
-  it('is a byte-identical no-op when nothing matches', () => {
-    const source = 'see [[Alpha]] and [[Beta]]'
-    expect(renameWikiLink(source, 'Gamma', 'Delta')).toBe(source)
-  })
-
-  it('matches on the trimmed, case-folded target', () => {
-    const source = '[[ Foo ]] and [[Foo]] and [[ foo|bar]]'
-    expect(renameWikiLink(source, 'Foo', 'Baz')).toBe('[[Baz]] and [[Baz]] and [[Baz|bar]]')
-  })
-
-  it('rejects a destination target containing wiki-link syntax', () => {
-    expect(() => renameWikiLink('[[Foo]]', 'Foo', 'A|B')).toThrow(/invalid wiki-link target/i)
-  })
-})
-
-describe('appendUnderHeading', () => {
-  const doc = '# A\n\nalpha\n\n# B\n\nbeta'
-
-  it('inserts at the end of a heading section, before the next sibling heading', () => {
-    expect(appendUnderHeading(doc, 'A', '- new')).toBe('# A\n\nalpha\n\n- new\n\n# B\n\nbeta')
-  })
-
-  it('appends at end of file for the last section', () => {
-    expect(appendUnderHeading(doc, 'B', '- new')).toBe('# A\n\nalpha\n\n# B\n\nbeta\n\n- new\n')
-  })
-
-  it('creates a new section when the heading is missing', () => {
-    expect(appendUnderHeading(doc, 'Inbox', '- new')).toBe(
-      '# A\n\nalpha\n\n# B\n\nbeta\n\n## Inbox\n\n- new\n',
+  it('starts a bullet list directly beneath the heading when prose comes first', () => {
+    const source = '## Meetings\n\nNotes for next time.\n'
+    expect(appendListItemUnderHeading(source, 'Meetings', '[[Standup]]')).toBe(
+      '## Meetings\n\n- [[Standup]]\n\nNotes for next time.\n',
     )
   })
 
-  it('matches the heading case-insensitively', () => {
-    expect(appendUnderHeading(doc, 'a', '- new')).toBe('# A\n\nalpha\n\n- new\n\n# B\n\nbeta')
+  it('reuses the list marker already in use', () => {
+    const source = '## Meetings\n\n* [[Kickoff]]\n\nNotes for next time.\n'
+    expect(appendListItemUnderHeading(source, 'Meetings', '[[Standup]]')).toBe(
+      '## Meetings\n\n* [[Kickoff]]\n* [[Standup]]\n\nNotes for next time.\n',
+    )
+  })
+  it('joins the list the section already has, even when prose comes first', () => {
+    const source = '## Meetings\n\nAgenda I typed this morning:\n\n- [[Kickoff]]\n'
+    expect(appendListItemUnderHeading(source, 'Meetings', '[[Standup]]')).toBe(
+      '## Meetings\n\nAgenda I typed this morning:\n\n- [[Kickoff]]\n- [[Standup]]\n',
+    )
+  })
+
+  it('starts its own list rather than joining one under a subheading', () => {
+    const source = '## Meetings\n\nAgenda:\n\n### Follow-ups\n\n- [[Chase invoice]]\n'
+    expect(appendListItemUnderHeading(source, 'Meetings', '[[Standup]]')).toBe(
+      '## Meetings\n\n- [[Standup]]\n\nAgenda:\n\n### Follow-ups\n\n- [[Chase invoice]]\n',
+    )
+  })
+
+  it('ignores an ordered list and starts an unordered one', () => {
+    const source = '## Meetings\n\n1. Standup\n'
+    expect(appendListItemUnderHeading(source, 'Meetings', '[[Standup]]')).toBe(
+      '## Meetings\n\n- [[Standup]]\n\n1. Standup\n',
+    )
   })
 })
 
-describe('appendUnderBacklinkedHeading', () => {
+describe('appendListItemUnderBacklinkedHeading', () => {
   it('creates a linked H2 section when the category is missing', () => {
-    expect(appendUnderBacklinkedHeading('morning notes\n', 'Links', '- [[Article]]')).toBe(
+    expect(appendListItemUnderBacklinkedHeading('morning notes\n', 'Links', '[[Article]]')).toBe(
       'morning notes\n\n## [[Links]]\n\n- [[Article]]\n',
-    )
-  })
-
-  it('appends to an existing linked section without duplicating it', () => {
-    const source = '## [[Links]]\n\n- [[Old]]\n\n## Other\n\ntext\n'
-    expect(appendUnderBacklinkedHeading(source, 'Links', '- [[New]]')).toBe(
-      '## [[Links]]\n\n- [[Old]]\n\n- [[New]]\n\n## Other\n\ntext\n',
     )
   })
 
   it('matches a linked target case-insensitively and preserves its alias', () => {
     const source = '## [[LINKS|Saved links]]\n\n- [[Old]]\n'
-    expect(appendUnderBacklinkedHeading(source, 'Links', '- [[New]]')).toBe(
-      '## [[LINKS|Saved links]]\n\n- [[Old]]\n\n- [[New]]\n',
-    )
-  })
-
-  it('upgrades a legacy plain section in place and preserves its content', () => {
-    const source = 'intro\n\n## links\n\n- [[Old]]\n\n## Other\n\ntext\n'
-    expect(appendUnderBacklinkedHeading(source, 'Links', '- [[New]]')).toBe(
-      'intro\n\n## [[Links]]\n\n- [[Old]]\n\n- [[New]]\n\n## Other\n\ntext\n',
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
+      '## [[LINKS|Saved links]]\n\n- [[Old]]\n- [[New]]\n',
     )
   })
 
   it('does not mistake escaped literal brackets for a linked heading', () => {
     const source = '## \\[[Links]]\n\nliteral brackets\n'
-    expect(appendUnderBacklinkedHeading(source, 'Links', '- [[New]]')).toBe(
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
       '## \\[[Links]]\n\nliteral brackets\n\n## [[Links]]\n\n- [[New]]\n',
     )
   })
 
   it('preserves a user-authored plain heading at another level', () => {
     const source = '# Links\n\ntitle-like content\n'
-    expect(appendUnderBacklinkedHeading(source, 'Links', '- [[New]]')).toBe(
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
       '# Links\n\ntitle-like content\n\n## [[Links]]\n\n- [[New]]\n',
+    )
+  })
+
+  it('extends the list without crossing later prose or a subheading', () => {
+    const source =
+      '## [[Links]]\n\n- [[Old]]\n  - context\n- [[Older]]\n\nScratchpad.\n\n### Follow-up\n\ntext\n'
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
+      '## [[Links]]\n\n- [[Old]]\n  - context\n- [[Older]]\n- [[New]]\n\nScratchpad.\n\n### Follow-up\n\ntext\n',
+    )
+  })
+
+  it('starts the list directly beneath the linked heading when prose comes first', () => {
+    const source = '## [[Links]]\n\nScratchpad.\n'
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
+      '## [[Links]]\n\n- [[New]]\n\nScratchpad.\n',
+    )
+  })
+
+  it('handles frontmatter offsets and upgrades a legacy heading in place', () => {
+    const source = '---\nprivate: true\n---\n\n## Links\n\n- [[Old]]\n\nScratchpad.\n'
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
+      '---\nprivate: true\n---\n\n## [[Links]]\n\n- [[Old]]\n- [[New]]\n\nScratchpad.\n',
+    )
+  })
+
+  it('preserves CRLF while inserting before prose', () => {
+    const source = '## Links\r\n\r\n- [[Old]]\r\n\r\nScratchpad.\r\n'
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
+      '## [[Links]]\r\n\r\n- [[Old]]\r\n- [[New]]\r\n\r\nScratchpad.\r\n',
+    )
+  })
+
+  it('preserves a nested matching heading and creates a top-level section', () => {
+    const source = '> ## [[Links]]\n> - [[Quoted]]\n\nOutside the quote.\n'
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
+      '> ## [[Links]]\n> - [[Quoted]]\n\nOutside the quote.\n\n## [[Links]]\n\n- [[New]]\n',
+    )
+  })
+
+  it('preserves a matching heading nested in a list item', () => {
+    const source = '- ## [[Links]]\n  - [[Nested]]\n\nOutside the list.\n'
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
+      '- ## [[Links]]\n  - [[Nested]]\n\nOutside the list.\n\n## [[Links]]\n\n- [[New]]\n',
+    )
+  })
+
+  it("joins a linked section's existing list from below its prose", () => {
+    const source = '## [[Links]]\n\nReading list for today:\n\n- [[Old]]\n'
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
+      '## [[Links]]\n\nReading list for today:\n\n- [[Old]]\n- [[New]]\n',
+    )
+  })
+
+  it('uses CRLF when creating a missing section', () => {
+    const source = 'Morning notes.\r\n'
+    expect(appendListItemUnderBacklinkedHeading(source, 'Links', '[[New]]')).toBe(
+      'Morning notes.\r\n\r\n## [[Links]]\r\n\r\n- [[New]]\r\n',
     )
   })
 })
@@ -126,6 +167,10 @@ describe('appendBlock', () => {
 
   it('trims the block itself', () => {
     expect(appendBlock('alpha', '  new text \n')).toBe('alpha\n\nnew text\n')
+  })
+
+  it('preserves CRLF when appending a block', () => {
+    expect(appendBlock('alpha\r\n', 'new text')).toBe('alpha\r\n\r\nnew text\r\n')
   })
 })
 
@@ -261,12 +306,16 @@ describe('editTaskLine', () => {
 
   it('refuses content with an embedded newline (would split the item)', () => {
     const source = '+ [ ] one\n'
-    expect(() => editTaskLine(source, indexedTask(source), 'one\n+ [ ] two')).toThrow(TaskStaleError)
+    expect(() => editTaskLine(source, indexedTask(source), 'one\n+ [ ] two')).toThrow(
+      TaskStaleError,
+    )
   })
 
   it('refuses content with a carriage return too', () => {
     const source = '+ [ ] one\n'
-    expect(() => editTaskLine(source, indexedTask(source), 'one\r+ [ ] two')).toThrow(TaskStaleError)
+    expect(() => editTaskLine(source, indexedTask(source), 'one\r+ [ ] two')).toThrow(
+      TaskStaleError,
+    )
   })
 
   it('refuses loudly when the task line is gone', () => {
@@ -316,15 +365,17 @@ describe('appendTaskToContext', () => {
     const anchor = parseNote({ path: 'notes/n.md', source }).tasks[0]!
     const inserted = appendTaskToContext(source, anchor)
 
-    expect(inserted.source).toBe([
-      '+ StartupToolbox',
-      '  + Reflections',
-      '    + [ ] first',
-      '    + [ ] ',
-      '  + Later',
-      '    + [ ] third',
-      '',
-    ].join('\n'))
+    expect(inserted.source).toBe(
+      [
+        '+ StartupToolbox',
+        '  + Reflections',
+        '    + [ ] first',
+        '    + [ ] ',
+        '  + Later',
+        '    + [ ] third',
+        '',
+      ].join('\n'),
+    )
     const created = parseNote({ path: 'notes/n.md', source: inserted.source }).tasks.find(
       (task) => task.markerOffset === inserted.markerOffset,
     )

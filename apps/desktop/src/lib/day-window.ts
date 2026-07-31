@@ -87,11 +87,7 @@ export function indexWithin(window: DayWindow, date: string): number {
  * The in-window day `delta` steps from `date` (`-1` = previous, `+1` = next), or
  * `null` at the window's edge or when `date` lies outside it.
  */
-export function neighborDate(
-  window: DayWindow,
-  date: string,
-  delta: 1 | -1,
-): string | null {
+export function neighborDate(window: DayWindow, date: string, delta: 1 | -1): string | null {
   const index = indexWithin(window, date)
   if (index < 0) {
     return null

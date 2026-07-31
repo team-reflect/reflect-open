@@ -355,7 +355,11 @@ function contextLinesAt(
   const raw = body.slice(lineStart, lineEndAt(body, bodyPos))
   const leading = raw.length - raw.trimStart().length
   return {
-    context: { lines: [raw.trim()], origins: [lineStart + leading], sourceLines: [raw.slice(leading)] },
+    context: {
+      lines: [raw.trim()],
+      origins: [lineStart + leading],
+      sourceLines: [raw.slice(leading)],
+    },
     bodyOffset,
   }
 }

@@ -1,26 +1,71 @@
 <!-- @dsCard group="Spacing" viewport="700x170" name="Elevation & hairlines" subtitle="Mostly flat — borders carry hierarchy" -->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<link rel="stylesheet" href="../styles.css" />
-<style>
-  body { margin: 0; padding: 26px; background: var(--surface-app); font-family: var(--font-sans); }
-  .row { display: flex; gap: 18px; align-items: center; }
-  .cell { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-  .box { width: 96px; height: 60px; background: var(--surface); border-radius: var(--radius-lg); }
-  .lbl { font-size: 11px; font-weight: 500; color: var(--text); }
-  .tok { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
-  .hair { border-bottom: 1px solid var(--border); box-shadow: var(--border-hairline); }
-</style>
-</head>
-<body>
-  <div class="row">
-    <div class="cell"><div class="box" style="box-shadow:inset 0 0 0 1px var(--border)"></div><span class="lbl">Border</span><span class="tok">1px · gray-200</span></div>
-    <div class="cell"><div class="box" style="box-shadow:var(--shadow-input)"></div><span class="lbl">Input</span><span class="tok">--shadow-input</span></div>
-    <div class="cell"><div class="box" style="box-shadow:var(--shadow-md)"></div><span class="lbl">Card / pop</span><span class="tok">--shadow-md</span></div>
-    <div class="cell"><div class="box" style="box-shadow:var(--shadow-pop)"></div><span class="lbl">Modal</span><span class="tok">--shadow-pop</span></div>
-    <div class="cell"><div class="box hair"></div><span class="lbl">Hairline</span><span class="tok">shadow-border-b</span></div>
-  </div>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 26px;
+        background: var(--surface-app);
+        font-family: var(--font-sans);
+      }
+      .row {
+        display: flex;
+        gap: 18px;
+        align-items: center;
+      }
+      .cell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }
+      .box {
+        width: 96px;
+        height: 60px;
+        background: var(--surface);
+        border-radius: var(--radius-lg);
+      }
+      .lbl {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text);
+      }
+      .tok {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-muted);
+      }
+      .hair {
+        border-bottom: 1px solid var(--border);
+        box-shadow: var(--border-hairline);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="cell">
+        <div class="box" style="box-shadow: inset 0 0 0 1px var(--border)"></div>
+        <span class="lbl">Border</span><span class="tok">1px · gray-200</span>
+      </div>
+      <div class="cell">
+        <div class="box" style="box-shadow: var(--shadow-input)"></div>
+        <span class="lbl">Input</span><span class="tok">--shadow-input</span>
+      </div>
+      <div class="cell">
+        <div class="box" style="box-shadow: var(--shadow-md)"></div>
+        <span class="lbl">Card / pop</span><span class="tok">--shadow-md</span>
+      </div>
+      <div class="cell">
+        <div class="box" style="box-shadow: var(--shadow-pop)"></div>
+        <span class="lbl">Modal</span><span class="tok">--shadow-pop</span>
+      </div>
+      <div class="cell">
+        <div class="box hair"></div>
+        <span class="lbl">Hairline</span><span class="tok">shadow-border-b</span>
+      </div>
+    </div>
+  </body>
 </html>

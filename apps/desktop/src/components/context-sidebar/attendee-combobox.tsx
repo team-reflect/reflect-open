@@ -1,4 +1,4 @@
-import { useDeferredValue, useState, type KeyboardEvent, type ReactElement } from 'react'
+import { useDeferredValue, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
 import { Command as CommandPrimitive } from 'cmdk'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
@@ -9,9 +9,10 @@ import {
   suggestWikiTargets,
   type MeetingAttendee,
 } from '@reflect/core'
+import { getIsComposing } from '@meowdown/core'
 import { CommandItem, CommandList } from '@/components/ui/command'
 import { INPUT_CLASS_NAME } from '@/components/ui/input'
-import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
+import { Popover, PopoverContent } from '@/components/ui/popover'
 import {
   buildAutocompleteEntries,
   type AutocompleteEntry,
@@ -78,10 +79,15 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
   const [query, setQuery] = useState('')
   const [dismissed, setDismissed] = useState(false)
   const [highlighted, setHighlighted] = useState('')
+  const anchorRef = useRef<HTMLInputElement>(null)
   const deferredQuery = useDeferredValue(query)
   const searchTerm = deferredQuery.trim()
 
-  const { data: fetched, isFetching, isPlaceholderData } = useQuery({
+  const {
+    data: fetched,
+    isFetching,
+    isPlaceholderData,
+  } = useQuery({
     queryKey: [INDEX_QUERY_SCOPE, graph?.root, 'attendee-suggestions', searchTerm, contactsInMenu],
     queryFn: async () => {
       const [suggestions, contacts] = await Promise.all([
@@ -123,13 +129,10 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
   // keepPreviousData shows the prior query's rows meanwhile). Enter may only
   // take the highlighted row or add typed text only when the rows answer
   // exactly what is typed. Pending results must not discard Contact emails.
-  const entriesMatchInput =
-    !isFetching && !isPlaceholderData && searchTerm === query.trim()
+  const entriesMatchInput = !isFetching && !isPlaceholderData && searchTerm === query.trim()
   const exactContact = entriesMatchInput
     ? entries.find(
-        (entry) =>
-          entry.kind === 'contact' &&
-          foldKey(entry.contact.fullName) === foldKey(query),
+        (entry) => entry.kind === 'contact' && foldKey(entry.contact.fullName) === foldKey(query),
       )
     : undefined
 
@@ -150,6 +153,14 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
   }
 
   const onKeyDown = (keyEvent: KeyboardEvent<HTMLInputElement>): void => {
+    if (getIsComposing()) {
+      // preventDefault keeps cmdk's root handler from selecting the highlighted
+      // entry on the Enter that commits the composition.
+      if (keyEvent.key === 'Enter') {
+        keyEvent.preventDefault()
+      }
+      return
+    }
     if (keyEvent.key === 'Enter') {
       // Ours alone: preventDefault stops the dialog form submitting,
       // stopPropagation keeps cmdk's root handler from double-selecting.
@@ -191,28 +202,28 @@ export function AttendeeCombobox({ attendees, onAdd }: AttendeeComboboxProps): R
         value={highlighted}
         onValueChange={setHighlighted}
       >
-        <PopoverAnchor asChild>
-          <CommandPrimitive.Input
-            value={query}
-            onValueChange={(value) => {
-              setQuery(value)
-              setDismissed(false)
-            }}
-            onKeyDown={onKeyDown}
-            onBlur={addTyped}
-            placeholder="Add attendee"
-            className={INPUT_CLASS_NAME}
-          />
-        </PopoverAnchor>
+        <CommandPrimitive.Input
+          ref={anchorRef}
+          value={query}
+          onValueChange={(value) => {
+            setQuery(value)
+            setDismissed(false)
+          }}
+          onKeyDown={onKeyDown}
+          onBlur={addTyped}
+          placeholder="Add attendee"
+          className={INPUT_CLASS_NAME}
+        />
         <PopoverContent
           align="start"
           sideOffset={4}
-          className="w-(--radix-popover-trigger-width) p-1"
+          anchor={anchorRef}
+          className="w-(--anchor-width) p-1"
           // The input keeps focus for the popover's whole life: no focus
           // steal on open/close, and no blur when a row is clicked (blur
           // would add the half-typed text before onSelect adds the row's).
-          onOpenAutoFocus={(focusEvent) => focusEvent.preventDefault()}
-          onCloseAutoFocus={(focusEvent) => focusEvent.preventDefault()}
+          initialFocus={false}
+          finalFocus={false}
           onMouseDown={(mouseEvent) => mouseEvent.preventDefault()}
         >
           <CommandList>

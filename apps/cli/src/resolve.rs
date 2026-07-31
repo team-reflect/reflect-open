@@ -1,8 +1,9 @@
 //! `<note>` argument resolution for `show`/`path`. The order mirrors
 //! `resolveWikiLink` (`packages/core/src/markdown/resolve.ts`) with a path
 //! convenience first-class for a CLI: calendar-valid `YYYY-MM-DD` → explicit
-//! graph path → title fold-key → alias fold-key. Index-backed when the index
-//! is open; otherwise a file scan derives the same titles/aliases.
+//! graph path → title fold-key → alias fold-key → filename-stem fold-key.
+//! Index-backed when the index is open; otherwise a file scan derives the
+//! same keys.
 
 use std::path::{Component, Path, PathBuf};
 
@@ -76,25 +77,17 @@ fn absolute_graph_relative(candidate: &Path, canonical_root: &Path) -> Option<Pa
     })
 }
 
-/// Title matches first, alias matches only when no title matched — the
-/// `byTitle ?? byAlias` precedence — each tier ordered by path so collisions
-/// resolve deterministically (same rule as the desktop's `resolveWikiTarget`).
+/// The winning tier's claimants for a folded key. `note_claims` encodes the
+/// desktop's precedence (date, authored title, alias, filename stem) and
+/// templates claim nothing, so the CLI reads the same ranking instead of
+/// restating it tier by tier.
 fn index_lookup(conn: &Connection, key: &str) -> Result<Vec<String>, CliError> {
-    // Templates never resolve by title/alias (the desktop rule) — only an
-    // explicit `templates/...` path argument reaches one.
-    let by_title = collect_paths(
-        conn,
-        "SELECT path FROM notes WHERE title_key = ?1 AND kind != 'template' ORDER BY path",
-        key,
-    )?;
-    if !by_title.is_empty() {
-        return Ok(by_title);
-    }
     collect_paths(
         conn,
-        "SELECT note_path FROM aliases
-         JOIN notes ON notes.path = aliases.note_path AND notes.kind != 'template'
-         WHERE alias_key = ?1 ORDER BY note_path",
+        "SELECT note_path FROM note_claims
+          WHERE key = ?1
+            AND tier = (SELECT min(tier) FROM note_claims WHERE key = ?1)
+          ORDER BY note_path",
         key,
     )
 }
@@ -115,11 +108,13 @@ fn collect_paths(conn: &Connection, sql: &str, key: &str) -> Result<Vec<String>,
 fn scan_lookup(root: &Path, key: &str) -> Result<Vec<String>, CliError> {
     let mut by_title = Vec::new();
     let mut by_alias = Vec::new();
+    let mut by_stem = Vec::new();
     for note in walk_notes(root) {
         if note.rel_path.starts_with("templates/") {
             continue; // templates never resolve by title/alias
         }
         let Ok(content) = std::fs::read_to_string(root.join(&note.rel_path)) else {
+            // An unreadable or evicted note hides itself, not the whole lookup.
             continue;
         };
         let meta = parse_note_meta(&note.rel_path, &content);
@@ -127,13 +122,24 @@ fn scan_lookup(root: &Path, key: &str) -> Result<Vec<String>, CliError> {
             by_title.push(note.rel_path);
         } else if meta.aliases.iter().any(|alias| fold_key(alias) == key) {
             by_alias.push(note.rel_path);
+        } else if fold_key(note_stem(&note.rel_path)) == key {
+            by_stem.push(note.rel_path);
         }
     }
-    Ok(if by_title.is_empty() {
+    Ok(if !by_title.is_empty() {
+        by_title
+    } else if !by_alias.is_empty() {
         by_alias
     } else {
-        by_title
+        by_stem
     })
+}
+
+/// The filename stem a note answers to as its weakest address (the desktop's
+/// `noteBasenameKey`, before folding).
+fn note_stem(rel_path: &str) -> &str {
+    let filename = rel_path.rsplit('/').next().unwrap_or(rel_path);
+    filename.strip_suffix(".md").unwrap_or(filename)
 }
 
 /// Resolve a `<note>` argument. Ambiguous matches resolve to the first path

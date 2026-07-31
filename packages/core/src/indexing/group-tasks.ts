@@ -203,13 +203,28 @@ export function groupTasks(tasks: readonly OpenTask[], today: string): TaskGroup
 
   const dateGroups: TaskGroup[] = []
   if (current.length > 0) {
-    dateGroups.push({ kind: 'current', label: 'Current', notePath: null, tasks: current.sort(compareDated) })
+    dateGroups.push({
+      kind: 'current',
+      label: 'Current',
+      notePath: null,
+      tasks: current.sort(compareDated),
+    })
   }
   if (overdue.length > 0) {
-    dateGroups.push({ kind: 'overdue', label: 'Overdue', notePath: null, tasks: overdue.sort(compareDated) })
+    dateGroups.push({
+      kind: 'overdue',
+      label: 'Overdue',
+      notePath: null,
+      tasks: overdue.sort(compareDated),
+    })
   }
   if (upcoming.length > 0) {
-    dateGroups.push({ kind: 'upcoming', label: 'Upcoming', notePath: null, tasks: upcoming.sort(compareDated) })
+    dateGroups.push({
+      kind: 'upcoming',
+      label: 'Upcoming',
+      notePath: null,
+      tasks: upcoming.sort(compareDated),
+    })
   }
 
   const noteGroups: TaskGroup[] = [...byNote.values()]

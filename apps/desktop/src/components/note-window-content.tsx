@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react'
 import { dailyPath } from '@reflect/core'
+import { NoteFindBar } from '@/components/note-find-bar'
 import { RouteContent } from '@/components/route-content'
 import { SingleNoteView } from '@/components/single-note-view'
 import { useNoteRow } from '@/hooks/use-note-row'
@@ -21,8 +22,7 @@ import { useRouter } from '@/routing/router'
 export function NoteWindowContent(): ReactElement {
   const { route } = useRouter()
   const { settings } = useSettings()
-  const dailyDate =
-    route.kind === 'daily' ? route.date : route.kind === 'today' ? todayIso() : null
+  const dailyDate = route.kind === 'daily' ? route.date : route.kind === 'today' ? todayIso() : null
 
   // The OS window title follows the shown note — the day label for dailies,
   // the indexed title otherwise (it tracks renames because the row rides the
@@ -32,12 +32,12 @@ export function NoteWindowContent(): ReactElement {
     dailyDate !== null
       ? formatDayLabel(dailyDate, settings.dateFormat)
       : route.kind === 'note'
-        ? noteRow?.title ?? null
+        ? (noteRow?.title ?? null)
         : null,
   )
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-surface text-text">
+    <div className="relative h-screen w-screen overflow-hidden bg-surface text-text">
       {dailyDate !== null ? (
         <SingleNoteView
           path={dailyPath(dailyDate)}
@@ -53,6 +53,7 @@ export function NoteWindowContent(): ReactElement {
       ) : (
         <RouteContent />
       )}
+      <NoteFindBar />
     </div>
   )
 }

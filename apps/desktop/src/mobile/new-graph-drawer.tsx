@@ -1,5 +1,6 @@
 import { useId, useState, type ReactElement } from 'react'
 import { errorMessage } from '@reflect/core'
+import { getIsComposing } from '@meowdown/core'
 import { Button } from '@/components/ui/button'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'
 import { Input } from '@/components/ui/input'
@@ -84,6 +85,9 @@ export function NewGraphDrawer({
               enterKeyHint="go"
               onChange={(event) => setTypedName(event.target.value)}
               onKeyDown={(event) => {
+                if (getIsComposing()) {
+                  return
+                }
                 if (event.key === 'Enter') {
                   create()
                 }

@@ -1,70 +1,165 @@
 <!-- @dsCard group="Components" viewport="700x300" name="Buttons" subtitle="Variants, sizes, states — primary indigo to glass" -->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<link rel="stylesheet" href="../../styles.css" />
-<style>
-  body { margin: 0; font-family: var(--font-sans); }
-  .panel { padding: 22px 24px; }
-  .panel.light { background: var(--surface); }
-  .panel.dark-space { background: var(--space-black); position: relative; overflow: hidden; }
-  .panel.dark-space::before { content:""; position:absolute; inset:0; background: radial-gradient(50% 120% at 50% -20%, rgba(148,101,255,.18), rgba(3,0,20,0) 70%); }
-  .label { font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); margin: 0 0 12px; position: relative; }
-  .dark-space .label { color: rgba(255,255,255,.5); }
-  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; position: relative; }
-  .row + .label { margin-top: 22px; }
-</style>
-</head>
-<body>
-  <div id="root"></div>
-  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
-  <script src="../../_ds_bundle.js"></script>
-  <script type="text/babel">
-    const NS = 'ReflectDesignSystem_06b075'
-    const Mic = (p) => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>)
-    const Plus = (p) => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>)
-
-    function Demo() {
-      const { Button, IconButton } = window[NS]
-      return (
-        <React.Fragment>
-          <div className="panel light">
-            <p className="label">App buttons</p>
-            <div className="row">
-              <Button variant="primary">Start free trial</Button>
-              <Button variant="secondary">Import</Button>
-              <Button variant="white" leadingIcon={<Mic />}>Record</Button>
-              <Button variant="text">Cancel</Button>
-              <Button variant="primary" disabled>Saving…</Button>
-            </div>
-            <p className="label">Sizes &amp; icons</p>
-            <div className="row">
-              <Button variant="primary" size="sm" leadingIcon={<Plus />}>New note</Button>
-              <Button variant="primary" size="md" leadingIcon={<Plus />}>New note</Button>
-              <IconButton label="Record"><Mic /></IconButton>
-              <IconButton label="Add" active><Plus /></IconButton>
-            </div>
-          </div>
-          <div className="panel dark-space">
-            <p className="label">Marketing · deep space</p>
-            <div className="row">
-              <Button variant="space">Start free trial</Button>
-              <Button variant="space" size="sm">Login</Button>
-            </div>
-          </div>
-        </React.Fragment>
-      )
-    }
-    ;(function boot(n) {
-      if (window[NS] && window[NS].Button) {
-        ReactDOM.createRoot(document.getElementById('root')).render(<Demo />)
-      } else if (n < 120) {
-        setTimeout(() => boot(n + 1), 50)
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        font-family: var(--font-sans);
       }
-    })(0)
-  </script>
-</body>
+      .panel {
+        padding: 22px 24px;
+      }
+      .panel.light {
+        background: var(--surface);
+      }
+      .panel.dark-space {
+        background: var(--space-black);
+        position: relative;
+        overflow: hidden;
+      }
+      .panel.dark-space::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          50% 120% at 50% -20%,
+          rgba(148, 101, 255, 0.18),
+          rgba(3, 0, 20, 0) 70%
+        );
+      }
+      .label {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin: 0 0 12px;
+        position: relative;
+      }
+      .dark-space .label {
+        color: rgba(255, 255, 255, 0.5);
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        position: relative;
+      }
+      .row + .label {
+        margin-top: 22px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script
+      src="https://unpkg.com/react@18.3.1/umd/react.development.js"
+      integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
+      integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"
+      integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y"
+      crossorigin="anonymous"
+    ></script>
+    <script src="../../_ds_bundle.js"></script>
+    <script type="text/babel">
+      const NS = 'ReflectDesignSystem_06b075'
+      const Mic = (p) => (
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          {...p}
+        >
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+          <line x1="12" y1="19" x2="12" y2="22" />
+        </svg>
+      )
+      const Plus = (p) => (
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          {...p}
+        >
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+      )
+
+      function Demo() {
+        const { Button, IconButton } = window[NS]
+        return (
+          <React.Fragment>
+            <div className="panel light">
+              <p className="label">App buttons</p>
+              <div className="row">
+                <Button variant="primary">Start free trial</Button>
+                <Button variant="secondary">Import</Button>
+                <Button variant="white" leadingIcon={<Mic />}>
+                  Record
+                </Button>
+                <Button variant="text">Cancel</Button>
+                <Button variant="primary" disabled>
+                  Saving…
+                </Button>
+              </div>
+              <p className="label">Sizes &amp; icons</p>
+              <div className="row">
+                <Button variant="primary" size="sm" leadingIcon={<Plus />}>
+                  New note
+                </Button>
+                <Button variant="primary" size="md" leadingIcon={<Plus />}>
+                  New note
+                </Button>
+                <IconButton label="Record">
+                  <Mic />
+                </IconButton>
+                <IconButton label="Add" active>
+                  <Plus />
+                </IconButton>
+              </div>
+            </div>
+            <div className="panel dark-space">
+              <p className="label">Marketing · deep space</p>
+              <div className="row">
+                <Button variant="space">Start free trial</Button>
+                <Button variant="space" size="sm">
+                  Login
+                </Button>
+              </div>
+            </div>
+          </React.Fragment>
+        )
+      }
+      ;(function boot(n) {
+        if (window[NS] && window[NS].Button) {
+          ReactDOM.createRoot(document.getElementById('root')).render(<Demo />)
+        } else if (n < 120) {
+          setTimeout(() => boot(n + 1), 50)
+        }
+      })(0)
+    </script>
+  </body>
 </html>

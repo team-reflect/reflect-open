@@ -1,22 +1,13 @@
 import { useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
-import {
-  errorMessage,
-  hasBridge,
-  mobileStorage,
-  type MobileStorageKind,
-} from '@reflect/core'
+import { errorMessage, hasBridge, mobileStorage, type MobileStorageKind } from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert'
 import { Spinner } from '@/components/ui/spinner'
 import { graphNameFromRoot } from '@/lib/graph-names'
 import { NewGraphDrawer } from '@/mobile/new-graph-drawer'
 import { MobileScreenHeader } from '@/mobile/screen-header'
-import {
-  SettingsActionRow,
-  SettingsGroup,
-  SettingsSelectRow,
-} from '@/mobile/settings-list'
+import { SettingsActionRow, SettingsGroup, SettingsSelectRow } from '@/mobile/settings-list'
 import { useGraph } from '@/providers/graph-provider'
 import { useRouter } from '@/routing/router'
 

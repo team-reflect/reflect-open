@@ -1,29 +1,84 @@
 <!-- @dsCard group="Spacing" viewport="700x150" name="Spacing scale" subtitle="4px base grid — Reflect's chrome is dense" -->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<link rel="stylesheet" href="../styles.css" />
-<style>
-  body { margin: 0; padding: 22px; background: var(--surface); font-family: var(--font-sans); }
-  .row { display: flex; align-items: flex-end; gap: 14px; }
-  .cell { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-  .bar { background: var(--accent); border-radius: 3px; width: 100%; }
-  .wrap { width: 30px; display:flex; align-items:flex-end; height: 56px; }
-  .lbl { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
-  .px { font-size: 11px; font-weight: 600; color: var(--text); }
-</style>
-</head>
-<body>
-  <div class="row">
-    <div class="cell"><div class="wrap"><div class="bar" style="height:4px"></div></div><span class="px">4</span><span class="lbl">1</span></div>
-    <div class="cell"><div class="wrap"><div class="bar" style="height:8px"></div></div><span class="px">8</span><span class="lbl">2</span></div>
-    <div class="cell"><div class="wrap"><div class="bar" style="height:12px"></div></div><span class="px">12</span><span class="lbl">3</span></div>
-    <div class="cell"><div class="wrap"><div class="bar" style="height:16px"></div></div><span class="px">16</span><span class="lbl">4</span></div>
-    <div class="cell"><div class="wrap"><div class="bar" style="height:24px"></div></div><span class="px">24</span><span class="lbl">6</span></div>
-    <div class="cell"><div class="wrap"><div class="bar" style="height:32px"></div></div><span class="px">32</span><span class="lbl">8</span></div>
-    <div class="cell"><div class="wrap"><div class="bar" style="height:48px"></div></div><span class="px">48</span><span class="lbl">12</span></div>
-    <div class="cell"><div class="wrap"><div class="bar" style="height:56px"></div></div><span class="px">64</span><span class="lbl">16</span></div>
-  </div>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 22px;
+        background: var(--surface);
+        font-family: var(--font-sans);
+      }
+      .row {
+        display: flex;
+        align-items: flex-end;
+        gap: 14px;
+      }
+      .cell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      .bar {
+        background: var(--accent);
+        border-radius: 3px;
+        width: 100%;
+      }
+      .wrap {
+        width: 30px;
+        display: flex;
+        align-items: flex-end;
+        height: 56px;
+      }
+      .lbl {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-muted);
+      }
+      .px {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="cell">
+        <div class="wrap"><div class="bar" style="height: 4px"></div></div>
+        <span class="px">4</span><span class="lbl">1</span>
+      </div>
+      <div class="cell">
+        <div class="wrap"><div class="bar" style="height: 8px"></div></div>
+        <span class="px">8</span><span class="lbl">2</span>
+      </div>
+      <div class="cell">
+        <div class="wrap"><div class="bar" style="height: 12px"></div></div>
+        <span class="px">12</span><span class="lbl">3</span>
+      </div>
+      <div class="cell">
+        <div class="wrap"><div class="bar" style="height: 16px"></div></div>
+        <span class="px">16</span><span class="lbl">4</span>
+      </div>
+      <div class="cell">
+        <div class="wrap"><div class="bar" style="height: 24px"></div></div>
+        <span class="px">24</span><span class="lbl">6</span>
+      </div>
+      <div class="cell">
+        <div class="wrap"><div class="bar" style="height: 32px"></div></div>
+        <span class="px">32</span><span class="lbl">8</span>
+      </div>
+      <div class="cell">
+        <div class="wrap"><div class="bar" style="height: 48px"></div></div>
+        <span class="px">48</span><span class="lbl">12</span>
+      </div>
+      <div class="cell">
+        <div class="wrap"><div class="bar" style="height: 56px"></div></div>
+        <span class="px">64</span><span class="lbl">16</span>
+      </div>
+    </div>
+  </body>
 </html>

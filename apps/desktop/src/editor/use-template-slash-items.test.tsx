@@ -39,6 +39,8 @@ function fakeEditor(): NoteEditorHandle & { inserted: string[] } {
     appendPendingReplacementText: () => {},
     acceptPendingReplacement: () => {},
     discardPendingReplacement: () => {},
+    findNext: () => {},
+    findPrevious: () => {},
   }
 }
 

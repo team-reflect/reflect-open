@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ToolCallOptions } from 'ai'
+import type { ToolExecutionOptions } from 'ai'
 import type { RetrievalHit, RetrieveOptions } from '../../embeddings/retrieve'
 import type { DailyNoteRow, DailyNotesRange } from '../../indexing/queries'
 import type { RecentNoteRow, RecentNotesOptions } from '../../indexing/note-list'
@@ -11,11 +11,7 @@ import {
   type ReadAssetResult,
   type ReadAssetsOutput,
 } from './read-assets'
-import {
-  MAX_NOTE_CONTENT_CHARS,
-  type ReadNoteResult,
-  type ReadNotesOutput,
-} from './read-notes'
+import { MAX_NOTE_CONTENT_CHARS, type ReadNoteResult, type ReadNotesOutput } from './read-notes'
 import {
   buildNoteTools,
   INVALID_TAG_ERROR,
@@ -26,7 +22,11 @@ import {
   type SearchNotesOutput,
 } from './tools'
 
-const CALL: ToolCallOptions = { toolCallId: 'call-1', messages: [] }
+const CALL: ToolExecutionOptions<Record<string, unknown>> = {
+  toolCallId: 'call-1',
+  messages: [],
+  context: {},
+}
 
 // Sentinels that cannot collide with prompt copy or fixture prose, so the
 // not-in-payload assertions below can never pass vacuously.
@@ -363,7 +363,7 @@ describe('read_assets', () => {
       {
         [SIDECAR]: `---\nreflectAsset: true\n---\n${DESCRIPTION_BODY}\n`,
         [spacedSidecar]: `---\nreflectAsset: true\n---\n${DESCRIPTION_BODY}\n`,
-        'notes/deck.md': '# Deck\n\n![a](./assets/chart.png)\n\n![b](assets/chart%20one.png)\n',
+        'notes/deck.md': '# Deck\n\n![a](assets/chart.png)\n\n![b](assets/chart%20one.png)\n',
       },
       ['notes/deck.md'],
     )

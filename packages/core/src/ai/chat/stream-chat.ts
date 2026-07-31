@@ -1,4 +1,4 @@
-import { stepCountIs, streamText, type LanguageModel, type ModelMessage } from 'ai'
+import { isStepCount, streamText, type LanguageModel, type ModelMessage } from 'ai'
 import { errorMessage } from '../../errors'
 import { languageModel } from '../language-model'
 import { modelContextWindow } from '../provider-catalog'
@@ -36,7 +36,7 @@ export const MAX_STEPS = 12
 export interface StreamChatOptions {
   /** The provider entry to call, with `model` set to the model id to use. */
   config: AiProviderConfig
-  /** The BYOK API key, read from the OS keychain by the caller. */
+  /** The BYOK API key, or an empty string for no-key compatible endpoints. */
   apiKey: string
   /**
    * Transport for the provider call — the desktop passes its shell fetch
@@ -147,7 +147,7 @@ export async function* streamChatTurn(
   try {
     const result = streamText({
       model,
-      system: chatSystemPrompt({
+      instructions: chatSystemPrompt({
         today: options.today,
         context: options.context,
         semanticSearchEnabled: options.semanticSearchEnabled,
@@ -155,28 +155,29 @@ export async function* streamChatTurn(
       }),
       messages: options.messages,
       tools,
-      stopWhen: stepCountIs(MAX_STEPS),
+      stopWhen: isStepCount(MAX_STEPS),
       // On the final permitted step, disable tools so the model must answer
       // from what it has already gathered. Without this a turn still calling
       // tools when the ceiling fires ends on a tool result with no reply — the
       // user sees tool activity, then silence. `stepNumber` counts completed
       // steps, so the last step that runs is `MAX_STEPS - 1`.
-      prepareStep: ({ stepNumber }) =>
-        stepNumber >= MAX_STEPS - 1 ? { toolChoice: 'none' } : {},
+      prepareStep: ({ stepNumber }) => (stepNumber >= MAX_STEPS - 1 ? { toolChoice: 'none' } : {}),
       ...(options.signal !== undefined ? { abortSignal: options.signal } : {}),
-      onStepFinish: (step) => {
-        stepMessages = [...step.response.messages]
+      // `step.response.messages` holds only the messages that step created,
+      // so the running history is accumulated here rather than assigned.
+      onStepEnd: (step) => {
+        stepMessages = [...stepMessages, ...step.response.messages]
       },
     })
 
-    for await (const part of result.fullStream) {
+    for await (const part of result.stream) {
       switch (part.type) {
         case 'text-delta':
           pendingText += part.text
           yield { type: 'text-delta', text: part.text }
           break
         case 'finish-step':
-          // onStepFinish has already folded this step's text into
+          // onStepEnd has already folded this step's text into
           // stepMessages; only unfinished-step text may count as partial.
           pendingText = ''
           break
@@ -195,7 +196,11 @@ export async function* streamChatTurn(
           break
         }
         case 'tool-error':
-          yield { type: 'tool-error', toolCallId: part.toolCallId, message: errorMessage(part.error) }
+          yield {
+            type: 'tool-error',
+            toolCallId: part.toolCallId,
+            message: errorMessage(part.error),
+          }
           break
         case 'abort':
           yield { type: 'aborted', messages: partialMessages() }
@@ -208,8 +213,7 @@ export async function* streamChatTurn(
       }
     }
 
-    const response = await result.response
-    yield { type: 'complete', messages: response.messages }
+    yield { type: 'complete', messages: await result.responseMessages }
   } catch (cause) {
     // Belt and braces: most failures surface as `error` parts above, but a
     // synchronous throw (bad config, aborted before first byte) lands here.

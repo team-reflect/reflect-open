@@ -85,7 +85,8 @@ export function useListSelection(orderedKeys: readonly string[]): ListSelection 
     if (firstIndex === -1 || secondIndex === -1) {
       return [secondKey]
     }
-    const [lo, hi] = firstIndex <= secondIndex ? [firstIndex, secondIndex] : [secondIndex, firstIndex]
+    const [lo, hi] =
+      firstIndex <= secondIndex ? [firstIndex, secondIndex] : [secondIndex, firstIndex]
     return order.slice(lo, hi + 1)
   }, [])
 
@@ -149,7 +150,11 @@ export function useListSelection(orderedKeys: readonly string[]): ListSelection 
     const from = cursorRef.current ?? anchorRef.current
     const index = from === null ? -1 : order.indexOf(from)
     const next =
-      index === -1 ? (direction === 1 ? 0 : order.length - 1) : clamp(index + direction, order.length)
+      index === -1
+        ? direction === 1
+          ? 0
+          : order.length - 1
+        : clamp(index + direction, order.length)
     const key = order[next]!
     setSelected(new Set([key]))
     anchorRef.current = key

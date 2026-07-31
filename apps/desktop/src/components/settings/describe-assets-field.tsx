@@ -77,13 +77,18 @@ export function DescribeAssetsField(): ReactElement {
         ) : null}
       </div>
       {confirming ? (
-        <Dialog open onOpenChange={(isOpen) => { if (!isOpen) setConfirming(false) }}>
+        <Dialog
+          open
+          onOpenChange={(isOpen) => {
+            if (!isOpen) setConfirming(false)
+          }}
+        >
           <DialogContent showCloseButton={false} className="max-w-sm">
             <DialogHeader>
               <DialogTitle>Backfill assets?</DialogTitle>
               <DialogDescription>
-                Images and PDFs in non-private notes will be sent to your AI provider so their
-                text can appear in search. Assets that already have OCR are skipped.
+                Images and PDFs in non-private notes will be sent to your AI provider so their text
+                can appear in search. Assets that already have OCR are skipped.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>

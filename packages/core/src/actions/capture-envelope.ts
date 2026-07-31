@@ -95,10 +95,14 @@ export const TEXT_CAPTURE_MAX_LENGTH = 10_000
 
 /**
  * What a text capture materializes as on the capture-day daily note. One
- * vocabulary end-to-end: the `reflect://append`/`reflect://task` URL verb IS
- * the envelope kind IS the drain behavior (`- ` bullet / `- [ ]` task).
+ * vocabulary end-to-end: the `reflect://append`/`reflect://checkbox`/
+ * `reflect://task` URL verb IS the envelope kind IS the drain behavior
+ * (`- ` bullet / `- [ ]` square checkbox / `+ [ ]` round task). Only the
+ * round `+` task is projected into the Tasks view; `checkbox` is an inert
+ * daily-note item, the same square-vs-round split the editor draws between a
+ * plain checkbox and a real task.
  */
-export const textCaptureKindSchema = z.enum(['append', 'task'])
+export const textCaptureKindSchema = z.enum(['append', 'checkbox', 'task'])
 
 /**
  * Where a text capture originated. Deliberately separate from
@@ -110,11 +114,12 @@ export const textCaptureKindSchema = z.enum(['append', 'task'])
 export const textCaptureSourceSchema = z.enum(['deep-link', 'ios-share'])
 
 /**
- * A text write (`reflect://append?text=…` / `reflect://task?text=…`),
- * spooled into the same capture inbox the native-messaging host writes. One
- * single line of plain text — the drain appends it to the capture-day daily
- * note as a bullet (`append`) or an open task (`task`), so an envelope can
- * never smuggle extra markdown blocks into the graph.
+ * A text write (`reflect://append?text=…` / `reflect://checkbox?text=…` /
+ * `reflect://task?text=…`), spooled into the same capture inbox the
+ * native-messaging host writes. One single line of plain text — the drain
+ * appends it to the capture-day daily note as a bullet (`append`), a square
+ * checkbox (`checkbox`), or a round task (`task`), so an envelope can never
+ * smuggle extra markdown blocks into the graph.
  */
 export const textCaptureEnvelopeSchema = z.object({
   /** Envelope format version; bump on breaking changes. */

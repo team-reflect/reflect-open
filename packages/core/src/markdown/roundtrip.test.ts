@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { renameWikiLink } from './edit'
+import { retitleWikiLinks } from './retitle'
 import { parseNote } from './extract'
 
 /**
@@ -8,8 +8,10 @@ import { parseNote } from './extract'
  * parses into a usable note, and position-based edits touch only what they must.
  */
 const CORPUS = {
-  reflect: '---\nid: 01HXX\naliases: [pjx]\n---\n# Project X\n\nLinks [[Charlotte]] and #status/active.\n',
-  obsidian: '# Notes\n\nSee [[Some Page|alias]] and ![img](assets/a.png) and [ext](https://x.com).\n',
+  reflect:
+    '---\nid: 01HXX\naliases: [pjx]\n---\n# Project X\n\nLinks [[Charlotte]] and #status/active.\n',
+  obsidian:
+    '# Notes\n\nSee [[Some Page|alias]] and ![img](assets/a.png) and [ext](https://x.com).\n',
   gfm: '## Tasks\n\n- [ ] todo\n- [x] done\n\n| a | b |\n| - | - |\n| 1 | 2 |\n\n~~strike~~\n',
   brokenFrontmatter: '---\nfoo: [unclosed\n---\n# Still Readable\n\n[[Linked]]\n',
   crlf: '# Title\r\n\r\nA [[Wiki]] link.\r\n',
@@ -42,15 +44,19 @@ describe('markdown corpus', () => {
   })
 })
 
+function retitle(fromKey: string, to: string) {
+  return { repoint: { fromKey, to }, display: null, subjectTargetKeys: new Set<string>() }
+}
+
 describe('edits are non-destructive', () => {
   it('renaming a non-existent target is byte-identical across the whole corpus', () => {
     for (const source of Object.values(CORPUS)) {
-      expect(renameWikiLink(source, 'Nonexistent', 'Whatever')).toBe(source)
+      expect(retitleWikiLinks(source, retitle('nonexistent', 'Whatever'))).toBe(source)
     }
   })
 
   it('preserves CRLF line endings outside the edited span', () => {
-    const renamed = renameWikiLink(CORPUS.crlf, 'Wiki', 'Renamed')
+    const renamed = retitleWikiLinks(CORPUS.crlf, retitle('wiki', 'Renamed'))
     expect(renamed).toBe('# Title\r\n\r\nA [[Renamed]] link.\r\n')
   })
 })

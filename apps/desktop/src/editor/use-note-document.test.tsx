@@ -46,6 +46,8 @@ function fakeEditor(): NoteEditorHandle & { applied: string[] } {
     appendPendingReplacementText: () => {},
     acceptPendingReplacement: () => {},
     discardPendingReplacement: () => {},
+    findNext: () => {},
+    findPrevious: () => {},
   }
 }
 
@@ -132,7 +134,7 @@ function installGraphFake({ files, linkSources, resolveTitleTo }: GraphFakeOptio
       return files[(args as { path: string }).path] !== undefined
     }
     if (command === 'note_move_indexed') {
-      const { from, to } = args as { from: string; to: string }
+      const { from, to } = (args as { request: { from: string; to: string } }).request
       // Mirrors the Rust command for the paths these tests exercise: a free
       // destination renames (occupied ones refuse, but no test stages that).
       if (files[to] === undefined && files[from] !== undefined) {
@@ -429,7 +431,7 @@ describe('useNoteDocument', () => {
     }
   })
 
-  it('saves an adopted retitle in place without rewriting, aliasing, or moving', async () => {
+  it('maintains links for an adopted retitle without moving its file', async () => {
     vi.useFakeTimers()
     try {
       const files: Record<string, string> = {
@@ -456,10 +458,12 @@ describe('useNoteDocument', () => {
       })
       await hook.act(() => vi.runAllTimersAsync())
 
-      expect(files['notes/adopted.md']).toBe('# New Title\n')
+      expect(files['notes/adopted.md']).toBe(
+        upsertFrontmatter('# New Title\n', { aliases: ['Old Title'] }),
+      )
       expect(files['notes/new-title.md']).toBeUndefined()
-      expect(files['notes/source.md']).toBe('see [[Old Title]]\n')
-      expect(linkQueries).toEqual([])
+      expect(files['notes/source.md']).toBe('see [[New Title]]\n')
+      expect(linkQueries).toEqual(['sources-query'])
       await hook.unmount()
     } finally {
       vi.useRealTimers()
@@ -475,7 +479,8 @@ describe('useNoteDocument', () => {
       installGraphFake({ files })
 
       const hook = await renderHook(
-        ({ path }: { path: string } = { path: 'notes/a.md' }) => useNoteDocument(path, 1, { trackRenames: true }),
+        ({ path }: { path: string } = { path: 'notes/a.md' }) =>
+          useNoteDocument(path, 1, { trackRenames: true }),
         { initialProps: { path: 'notes/a.md' } },
       )
       await hook.act(() => vi.advanceTimersByTimeAsync(0))
@@ -616,7 +621,9 @@ describe('useNoteDocument', () => {
 
       // The same note is reopened immediately and edited before the chain's
       // alias placement runs.
-      const paneA2 = await renderHook(() => useNoteDocument('notes/a.md', 1, { trackRenames: true }))
+      const paneA2 = await renderHook(() =>
+        useNoteDocument('notes/a.md', 1, { trackRenames: true }),
+      )
       await paneA2.act(() => vi.advanceTimersByTimeAsync(0))
       await paneA2.act(() => paneA2.result.current.onEditorChange('# New Title\n\nfresh edit\n'))
       releaseRewrite()
@@ -936,9 +943,12 @@ describe('useNoteDocument', () => {
         return null
       })
 
-      const hook = await renderHook(({ path }: { path: string } = { path: 'notes/a.md' }) => useNoteDocument(path, 1), {
-        initialProps: { path: 'notes/a.md' },
-      })
+      const hook = await renderHook(
+        ({ path }: { path: string } = { path: 'notes/a.md' }) => useNoteDocument(path, 1),
+        {
+          initialProps: { path: 'notes/a.md' },
+        },
+      )
       await hook.act(() => vi.advanceTimersByTimeAsync(0))
 
       // Dirty edit, then switch notes before the debounce fires: the unmount
@@ -1048,9 +1058,12 @@ describe('useNoteDocument', () => {
         return null
       })
 
-      const hook = await renderHook(({ gen }: { gen: number } = { gen: 1 }) => useNoteDocument('notes/a.md', gen), {
-        initialProps: { gen: 1 },
-      })
+      const hook = await renderHook(
+        ({ gen }: { gen: number } = { gen: 1 }) => useNoteDocument('notes/a.md', gen),
+        {
+          initialProps: { gen: 1 },
+        },
+      )
       await hook.act(() => vi.advanceTimersByTimeAsync(0))
 
       // Reopening the same graph bumps the generation without remounting the

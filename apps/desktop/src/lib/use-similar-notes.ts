@@ -44,8 +44,5 @@ export function useSimilarNotes(path: string): RetrievalHit[] {
   // Slice off the query result (reference-stable via structural sharing) only
   // when it or the gate changes, so consumers get a stable array across the
   // sidebar's frequent re-renders instead of a fresh one every call.
-  return useMemo(
-    () => (enabled ? (data ?? []).slice(0, SIMILAR_NOTES_LIMIT) : []),
-    [data, enabled],
-  )
+  return useMemo(() => (enabled ? (data ?? []).slice(0, SIMILAR_NOTES_LIMIT) : []), [data, enabled])
 }

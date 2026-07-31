@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { parseNote } from '../markdown'
 import { foldKey } from '../markdown/keys'
 import {
+  isWikiLinkSafeText,
   mergeDateSuggestions,
   rankWikiSuggestions,
   serializeWikiSuggestionAddress,
@@ -10,11 +11,7 @@ import {
   type WikiSuggestion,
 } from './suggest'
 
-function note(
-  title: string,
-  mtime = 0,
-  extra?: Partial<TitleCandidate>,
-): TitleCandidate {
+function note(title: string, mtime = 0, extra?: Partial<TitleCandidate>): TitleCandidate {
   return {
     path: `notes/${title.toLowerCase().replaceAll(' ', '-')}.md`,
     title,
@@ -83,6 +80,19 @@ describe('rankWikiSuggestions', () => {
   })
 })
 
+describe('isWikiLinkSafeText', () => {
+  it('accepts ordinary title text', () => {
+    expect(isWikiLinkSafeText('Meeting with Ada')).toBe(true)
+    expect(isWikiLinkSafeText('')).toBe(true)
+  })
+
+  it('rejects every character that would corrupt a link, backslash included', () => {
+    for (const text of ['a[b', 'a]b', 'a|b', 'a\\b', 'a\rb', 'a\nb']) {
+      expect(isWikiLinkSafeText(text)).toBe(false)
+    }
+  })
+})
+
 describe('wiki suggestion serialization', () => {
   it('preserves an alias as display text while targeting the canonical note', () => {
     const suggestion = rankWikiSuggestions(
@@ -92,10 +102,7 @@ describe('wiki suggestion serialization', () => {
       8,
     )[0]!
 
-    const insertText = serializeWikiSuggestionAddress(
-      suggestion.target,
-      suggestion.alias,
-    )
+    const insertText = serializeWikiSuggestionAddress(suggestion.target, suggestion.alias)
     expect(insertText).toBe('Tim MacCaw // Dad|Dad')
     expect(parseNote({ path: 'notes/source.md', source: `[[${insertText}]]` }).wikiLinks).toEqual([
       expect.objectContaining({ target: 'Tim MacCaw // Dad', alias: 'Dad' }),
@@ -133,10 +140,7 @@ describe('wiki suggestion serialization', () => {
   })
 })
 
-function ranked(
-  title: string,
-  extra?: Partial<WikiSuggestion>,
-): WikiSuggestion {
+function ranked(title: string, extra?: Partial<WikiSuggestion>): WikiSuggestion {
   return {
     target: title,
     path: `notes/${title.toLowerCase().replaceAll(' ', '-')}.md`,
@@ -256,11 +260,10 @@ describe('mergeDateSuggestions — rich titles', () => {
       [],
       8,
     )
-    const merged = mergeDateSuggestions(
-      [ranked!],
-      [{ date: '2026-07-14', phrase: '3 days ago' }],
-      { key: foldKey('3 days ago [[Trip]]'), limit: 8 },
-    )
+    const merged = mergeDateSuggestions([ranked!], [{ date: '2026-07-14', phrase: '3 days ago' }], {
+      key: foldKey('3 days ago [[Trip]]'),
+      limit: 8,
+    })
     expect(merged[0]).toBe(ranked)
     expect(merged[1]).toMatchObject({ date: '2026-07-14' })
   })

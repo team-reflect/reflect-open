@@ -13,7 +13,9 @@ const runGistPublish = vi.hoisted(() =>
     async () => 'https://gist.github.com/alex/g1',
   ),
 )
-const runGistUnpublish = vi.hoisted(() => vi.fn<(path: string, generation: number) => Promise<boolean>>(async () => true))
+const runGistUnpublish = vi.hoisted(() =>
+  vi.fn<(path: string, generation: number) => Promise<boolean>>(async () => true),
+)
 
 vi.mock('@/hooks/use-github-connected', () => ({ useGithubConnected }))
 vi.mock('@/hooks/use-note-row', () => ({ useNoteRow }))
@@ -108,5 +110,4 @@ describe('NoteGistAction', () => {
       .element(view.getByRole('button', { name: /Share with private link/ }))
       .toBeInTheDocument()
   })
-
 })

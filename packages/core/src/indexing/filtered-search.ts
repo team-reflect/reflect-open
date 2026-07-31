@@ -305,9 +305,7 @@ export async function searchWithFilters(
       'lexical.ftsHighlightedTitle',
       'lexical.snippet',
     ])
-    .where(
-      sql<boolean>`("lexical"."path" is not null or ${titleMatch.containsAllTerms})`,
-    )
+    .where(sql<boolean>`("lexical"."path" is not null or ${titleMatch.containsAllTerms})`)
     .orderBy(titleMatch.rank)
     .orderBy(sql`coalesce("lexical"."rank", 0)`)
     .orderBy('filteredNotes.isPinned', 'desc')

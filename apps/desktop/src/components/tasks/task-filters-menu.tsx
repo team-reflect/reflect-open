@@ -5,6 +5,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -39,29 +40,34 @@ export function TaskFiltersMenu({
 }: TaskFiltersMenuProps): ReactElement {
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="window-drag-control text-xs font-normal text-text-muted">
-          <ListFilter aria-hidden className="size-3.5" />
-          Task filters
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Tasks</DropdownMenuLabel>
-        {BUCKET_FILTERS.map(({ key, label }) => (
-          <DropdownMenuCheckboxItem
-            key={key}
-            checked={filters[key]}
-            onCheckedChange={() => toggle(key)}
-            onSelect={(event) => event.preventDefault()}
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="ghost"
+            className="window-drag-control text-xs font-normal text-text-muted"
           >
-            {label}
-          </DropdownMenuCheckboxItem>
-        ))}
+            <ListFilter aria-hidden className="size-3.5" />
+            Task filters
+          </Button>
+        }
+      />
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Tasks</DropdownMenuLabel>
+          {BUCKET_FILTERS.map(({ key, label }) => (
+            <DropdownMenuCheckboxItem
+              key={key}
+              checked={filters[key]}
+              onCheckedChange={() => toggle(key)}
+            >
+              {label}
+            </DropdownMenuCheckboxItem>
+          ))}
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuCheckboxItem
           checked={filters.archived}
           onCheckedChange={() => toggle('archived')}
-          onSelect={(event) => event.preventDefault()}
         >
           Show archived tasks
         </DropdownMenuCheckboxItem>

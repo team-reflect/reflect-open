@@ -1,5 +1,108 @@
 # Changelog
 
+## [0.8.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.2...v0.8.0-beta.3) (2026-07-31)
+
+
+### Features
+
+* **mobile:** add an image button to the keyboard toolbar ([#1001](https://github.com/team-reflect/reflect-open/issues/1001)) ([afceb0b](https://github.com/team-reflect/reflect-open/commit/afceb0be58bb61e51431bcb52e3f7f4df54edd6b))
+
+
+### Bug Fixes
+
+* update meowdown to ^0.63.1 ([#1005](https://github.com/team-reflect/reflect-open/issues/1005)) ([0491123](https://github.com/team-reflect/reflect-open/commit/0491123f21596fbda50be71f5803c41a9f7d5feb))
+
+## [0.8.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.1...v0.8.0-beta.2) (2026-07-30)
+
+
+### Features
+
+* support OpenAI-compatible AI providers ([#996](https://github.com/team-reflect/reflect-open/issues/996)) ([2ff6ce3](https://github.com/team-reflect/reflect-open/commit/2ff6ce3f6e1825819492772d6c1f1593d501fc87))
+
+## [0.8.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta...v0.8.0-beta.1) (2026-07-30)
+
+
+### Features
+
+* cycle mobile editor list style ([#990](https://github.com/team-reflect/reflect-open/issues/990)) ([185a021](https://github.com/team-reflect/reflect-open/commit/185a021d74989ccffe4778aad318b389e9ddaa4d))
+
+## [0.8.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.7.0...v0.8.0-beta) (2026-07-29)
+
+
+### Features
+
+* add a checkbox text-capture kind and drain task as a round task ([#982](https://github.com/team-reflect/reflect-open/issues/982)) ([4aa6c0b](https://github.com/team-reflect/reflect-open/commit/4aa6c0b7d0d4acc9541fb2a2ed988e95f604ceb0))
+
+
+### Bug Fixes
+
+* **desktop:** keep daily notes around mounted ([#986](https://github.com/team-reflect/reflect-open/issues/986)) ([7e6efb5](https://github.com/team-reflect/reflect-open/commit/7e6efb5a0ae025d04002f4ab31d7158dc9d11851))
+* update meowdown to ^0.60.0 ([#979](https://github.com/team-reflect/reflect-open/issues/979)) ([0abd282](https://github.com/team-reflect/reflect-open/commit/0abd282a44725ed0568cb6ddec73ee17f2105390))
+
+## [0.7.0-beta.22](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.21...v0.7.0-beta.22) (2026-07-27)
+
+
+### Features
+
+* support meeting-length audio memos via segmented recording ([#971](https://github.com/team-reflect/reflect-open/issues/971)) ([eabed7b](https://github.com/team-reflect/reflect-open/commit/eabed7b40858929de61f863aef460122c2a5a1f9))
+
+## [0.7.0-beta.21](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.20...v0.7.0-beta.21) (2026-07-27)
+
+
+### Bug Fixes
+
+* shrink the day carousel's slide belt ([#964](https://github.com/team-reflect/reflect-open/issues/964)) ([37de1d0](https://github.com/team-reflect/reflect-open/commit/37de1d094715c68963598e2cd3691df2c6b164e8))
+* update meowdown to ^0.59.1 ([#974](https://github.com/team-reflect/reflect-open/issues/974)) ([b0b8cb1](https://github.com/team-reflect/reflect-open/commit/b0b8cb1be1ee15e5d91838f175542336c3c1ac1a))
+
+## [0.7.0-beta.20](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.19...v0.7.0-beta.20) (2026-07-27)
+
+
+### Features
+
+* resolve vault links and attachments ([#956](https://github.com/team-reflect/reflect-open/issues/956)) ([37978c5](https://github.com/team-reflect/reflect-open/commit/37978c597057c7c4448d0db86890a6f850bd3156))
+
+
+### Bug Fixes
+
+* prevent Enter from sending during IME composition ([#965](https://github.com/team-reflect/reflect-open/issues/965)) ([0e4658b](https://github.com/team-reflect/reflect-open/commit/0e4658b87c9f3d7b957441973ebb1b3083f73afb))
+
+## [0.7.0-beta.19](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.18...v0.7.0-beta.19) (2026-07-26)
+
+
+### Features
+
+* find text within notes ([#955](https://github.com/team-reflect/reflect-open/issues/955)) ([22fda1b](https://github.com/team-reflect/reflect-open/commit/22fda1bf5b85d045bc286de55f45a1f883a7a0cd))
+
+
+### Bug Fixes
+
+* keep automatic daily entries in their lists ([#940](https://github.com/team-reflect/reflect-open/issues/940)) ([48ba8c2](https://github.com/team-reflect/reflect-open/commit/48ba8c2ae7a9d15bbb7d83d7929dddb4a351edfb))
+* keep note history when a graph's GitHub backup is signed out ([#950](https://github.com/team-reflect/reflect-open/issues/950)) ([8f1e475](https://github.com/team-reflect/reflect-open/commit/8f1e4758b72cf18268697a217ec18f12b8d10d7a))
+* reduce mobile week-row note dot to 50% opacity ([#951](https://github.com/team-reflect/reflect-open/issues/951)) ([4c359b6](https://github.com/team-reflect/reflect-open/commit/4c359b6f405590e9347d581e66031b2da2a18e88))
+* update meowdown to ^0.58.3 ([#948](https://github.com/team-reflect/reflect-open/issues/948)) ([97c50d6](https://github.com/team-reflect/reflect-open/commit/97c50d6f4a84c9871fd2442667a13eefa8d52dfe))
+
+## [0.7.0-beta.18](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.17...v0.7.0-beta.18) (2026-07-24)
+
+
+### Bug Fixes
+
+* sync stable backlink labels when notes are retitled ([#943](https://github.com/team-reflect/reflect-open/issues/943)) ([4e04603](https://github.com/team-reflect/reflect-open/commit/4e04603a645bfba1d8a4f96e087aaad79667b684))
+
+## [0.7.0-beta.17](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.16...v0.7.0-beta.17) (2026-07-24)
+
+
+### Features
+
+* allow GitHub sign-out with no connected graph ([#945](https://github.com/team-reflect/reflect-open/issues/945)) ([d0638e9](https://github.com/team-reflect/reflect-open/commit/d0638e9fa7fdeed350730e2a2d995d9edd9174c3))
+
+
+### Bug Fixes
+
+* reuse person notes by contact email ([#931](https://github.com/team-reflect/reflect-open/issues/931)) ([75c26ee](https://github.com/team-reflect/reflect-open/commit/75c26ee56bbbddbe1c814916445ea0a695ea260b))
+* soften iOS calendar note markers ([#941](https://github.com/team-reflect/reflect-open/issues/941)) ([ed2e6c4](https://github.com/team-reflect/reflect-open/commit/ed2e6c46c64127f68a3ca78083a6602bede8cf8b))
+* update meowdown to ^0.58.0 ([#934](https://github.com/team-reflect/reflect-open/issues/934)) ([a23f257](https://github.com/team-reflect/reflect-open/commit/a23f2572a75449c866620ab776e83234f50ad001))
+* update meowdown to ^0.58.1 ([#935](https://github.com/team-reflect/reflect-open/issues/935)) ([fdf422e](https://github.com/team-reflect/reflect-open/commit/fdf422ec2079552473d4d71d8010d4d7938de9d4))
+
 ## [0.7.0-beta.16](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.15...v0.7.0-beta.16) (2026-07-23)
 
 

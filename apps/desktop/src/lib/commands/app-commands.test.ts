@@ -78,6 +78,9 @@ function fakeContext(overrides?: Partial<CommandContext>) {
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
     newChat: vi.fn(),
+    openNoteFind: vi.fn(),
+    findNextInNote: vi.fn(),
+    findPreviousInNote: vi.fn(),
     switchGraph: vi.fn(),
     toggleAudioMemo: vi.fn(),
     generation: () => 7,
@@ -163,6 +166,17 @@ describe('app commands', () => {
     const { context, navigated } = fakeContext()
     await command('settings.open').run(context)
     expect(navigated).toEqual([{ kind: 'settings' }])
+  })
+
+  it('note Find commands use the shared window-scoped capabilities', async () => {
+    const { context } = fakeContext()
+    await command('note.find').run(context)
+    await command('note.findNext').run(context)
+    await command('note.findPrevious').run(context)
+
+    expect(context.openNoteFind).toHaveBeenCalledTimes(1)
+    expect(context.findNextInNote).toHaveBeenCalledTimes(1)
+    expect(context.findPreviousInNote).toHaveBeenCalledTimes(1)
   })
 
   it('shortcuts.show opens the ⌘/ cheat-sheet through the context capability', async () => {

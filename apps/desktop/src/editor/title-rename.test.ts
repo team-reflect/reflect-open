@@ -26,9 +26,7 @@ describe('createTitleRenameTracker', () => {
     tracker.saved('# New Title\n')
     expect(renames).toEqual([])
     vi.advanceTimersByTime(5000)
-    expect(renames).toEqual([
-      { from: 'Old Title', to: 'New Title', previousAutoAlias: null },
-    ])
+    expect(renames).toEqual([{ from: 'Old Title', to: 'New Title', previousAutoAlias: null }])
   })
 
   it('re-arms on every save: intermediate titles never fire', () => {
@@ -81,9 +79,7 @@ describe('createTitleRenameTracker', () => {
     expect(renames).toEqual([])
     tracker.saved('# D\n')
     tracker.settle()
-    expect(renames).toEqual([
-      { from: 'C', to: 'D', previousAutoAlias: null },
-    ])
+    expect(renames).toEqual([{ from: 'C', to: 'D', previousAutoAlias: null }])
   })
 
   it('chained renames carry the previous auto-alias for pruning', () => {
@@ -119,9 +115,7 @@ describe('createTitleRenameTracker', () => {
     conflictParked = false
     tracker.saved('# B\n') // "keep mine" re-saves the same title → re-arms
     vi.advanceTimersByTime(5000)
-    expect(renames).toEqual([
-      { from: 'A', to: 'B', previousAutoAlias: null },
-    ])
+    expect(renames).toEqual([{ from: 'A', to: 'B', previousAutoAlias: null }])
   })
 
   it('an H1 edit under an explicit frontmatter title is not a rename', () => {
@@ -159,9 +153,7 @@ describe('createTitleRenameTracker', () => {
     tracker.baseline('')
     tracker.saved('# Named On The Way Out\n')
     tracker.settle() // teardown/blur before the quiet period elapses
-    expect(renames).toEqual([
-      { from: null, to: 'Named On The Way Out', previousAutoAlias: null },
-    ])
+    expect(renames).toEqual([{ from: null, to: 'Named On The Way Out', previousAutoAlias: null }])
   })
 
   it('a birth cleared back to untitled never fires', () => {
@@ -182,9 +174,7 @@ describe('createTitleRenameTracker', () => {
     expect(renames).toEqual([]) // untitled is not a rename target
     tracker.saved('# B\n')
     tracker.settle()
-    expect(renames).toEqual([
-      { from: 'A', to: 'B', previousAutoAlias: null },
-    ])
+    expect(renames).toEqual([{ from: 'A', to: 'B', previousAutoAlias: null }])
   })
 
   it('does nothing after dispose', () => {

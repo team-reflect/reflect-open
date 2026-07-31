@@ -60,7 +60,10 @@ describe('gatherAssetDescriptionText', () => {
   })
 
   it('also folds a user-authored description file (no managed marker)', async () => {
-    files.set('assets/a.png.reflect.md', '# My own caption\n\nHand-written notes about this image.\n')
+    files.set(
+      'assets/a.png.reflect.md',
+      '# My own caption\n\nHand-written notes about this image.\n',
+    )
     const text = await gatherAssetDescriptionText(['assets/a.png'])
     expect(text).toContain('Hand-written notes about this image.')
   })
@@ -89,10 +92,7 @@ describe('gatherAssetDescriptionBodies', () => {
     files.set('assets/a.png.reflect.md', '---\nreflectAsset: true\n---\n\nA flow diagram.\n')
     files.set('assets/b.pdf.reflect.md', '---\nreflectAsset: true\n---\n\nQ4 revenue report.\n')
 
-    const { bodies, evicted } = await gatherAssetDescriptionBodies([
-      'assets/a.png',
-      'assets/b.pdf',
-    ])
+    const { bodies, evicted } = await gatherAssetDescriptionBodies(['assets/a.png', 'assets/b.pdf'])
 
     expect(bodies).toEqual([
       { assetPath: 'assets/a.png', body: 'A flow diagram.' },
@@ -130,10 +130,7 @@ describe('gatherAssetDescriptionBodies', () => {
     files.set('assets/b.pdf.reflect.md', '---\nreflectAsset: true\n---\n\nStill local.\n')
     readNoteMock.mockResolvedValueOnce({ kind: 'evicted' }) // assets/a.png's sidecar
 
-    const { bodies, evicted } = await gatherAssetDescriptionBodies([
-      'assets/a.png',
-      'assets/b.pdf',
-    ])
+    const { bodies, evicted } = await gatherAssetDescriptionBodies(['assets/a.png', 'assets/b.pdf'])
 
     expect(bodies).toEqual([{ assetPath: 'assets/b.pdf', body: 'Still local.' }])
     expect(evicted).toEqual(['assets/a.png'])

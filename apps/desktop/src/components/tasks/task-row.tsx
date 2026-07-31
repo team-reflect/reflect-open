@@ -7,6 +7,7 @@ import {
 } from 'react'
 import { Circle, CircleCheck } from 'lucide-react'
 import type { OpenTask } from '@reflect/core'
+import { getIsComposing } from '@meowdown/core'
 import { formatDayLabel } from '@/lib/dates'
 import { taskKey } from '@/lib/tasks/task-identity'
 import { useTaskCheckboxToggle } from '@/lib/tasks/use-task-checkbox-toggle'
@@ -96,6 +97,9 @@ export function TaskRow({
   const done = task.checked
   const label = task.text || 'Empty task'
   const selectFromKeyboard = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (getIsComposing()) {
+      return
+    }
     if (event.key !== 'Enter' && event.key !== ' ') {
       return
     }

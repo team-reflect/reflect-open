@@ -54,6 +54,16 @@ export interface WikiLinkSuggestion extends WikiSuggestion {
 const WIKI_LINK_RESERVED_CHARACTERS = /[[\]|\\\r\n]/u
 
 /**
+ * Whether `text` survives being written inside `[[…]]`. Stricter than
+ * {@link wikiLinkSafe}, which strips the delimiters but leaves a backslash
+ * alone: text that `wikiLinkSafe` cleaned can still fail here, and a caller
+ * embedding a title in a link must fail closed rather than write it anyway.
+ */
+export function isWikiLinkSafeText(text: string): boolean {
+  return !WIKI_LINK_RESERVED_CHARACTERS.test(text)
+}
+
+/**
  * Serialize one textual wiki-link address and optional display label.
  *
  * Wiki-link syntax has no way to preserve its delimiters, and Markdown consumes
@@ -68,8 +78,8 @@ export function serializeWikiSuggestionAddress(
 ): string | null {
   if (
     target.trim() === '' ||
-    WIKI_LINK_RESERVED_CHARACTERS.test(target) ||
-    (display !== null && WIKI_LINK_RESERVED_CHARACTERS.test(display))
+    !isWikiLinkSafeText(target) ||
+    (display !== null && !isWikiLinkSafeText(display))
   ) {
     return null
   }

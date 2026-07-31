@@ -42,11 +42,15 @@ vi.mock('@/lib/query-client', () => ({
 }))
 
 const PROVIDERS: AiProvidersState = {
-  providers: [{ id: 'cfg-anthropic', provider: 'anthropic', model: 'claude-opus-4-8', keyHint: 'wxyz1' }],
+  providers: [
+    { id: 'cfg-anthropic', provider: 'anthropic', model: 'claude-opus-4-8', keyHint: 'wxyz1' },
+  ],
   defaultProviderId: 'cfg-anthropic',
 }
 
-function outcome(overrides: Partial<ReconcileAssetDescriptionsOutcome> = {}): ReconcileAssetDescriptionsOutcome {
+function outcome(
+  overrides: Partial<ReconcileAssetDescriptionsOutcome> = {},
+): ReconcileAssetDescriptionsOutcome {
   return {
     pending: 1,
     described: 1,
@@ -150,7 +154,9 @@ describe('createAssetDescribeController', () => {
   })
 
   it('does not re-index when nothing was described this pass', async () => {
-    reconcileAssetDescriptions.mockResolvedValueOnce(outcome({ described: 0, describedAssetPaths: [] }))
+    reconcileAssetDescriptions.mockResolvedValueOnce(
+      outcome({ described: 0, describedAssetPaths: [] }),
+    )
     create().start()
     await flush()
     emitApplied([upsert('assets/a.png')])

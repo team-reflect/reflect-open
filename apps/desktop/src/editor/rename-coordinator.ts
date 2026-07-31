@@ -1,10 +1,13 @@
 import {
   errorMessage,
+  getBacklinks,
   getLinkSources,
+  getPathLinkSources,
   isReflectManagedNote,
   readNote,
   resolveWikiTarget,
   rewriteLinksForTitleChange,
+  rewritePathLinksForMove,
   slugPathForTitle,
   writeNote,
 } from '@reflect/core'
@@ -17,21 +20,22 @@ import { createTitleRenameTracker } from './title-rename'
 import type { TitleRename } from './title-rename'
 
 /**
- * Owns one Reflect-managed note's auto-rename lifecycle: the settled-title
- * tracker, the serialized rewrite chain, where the old-title alias lands —
- * and the **file move** that keeps the filename a projection of the title
- * (`docs/readable-filenames.md`).
+ * Owns one note's auto-rename lifecycle: the settled-title tracker, serialized
+ * link maintenance, old-title alias placement, and the optional **file move**
+ * that keeps a Reflect-managed filename a projection of the title
+ * (`docs/readable-filenames.md`). Adopted and stable-path notes participate in
+ * link maintenance but keep their paths.
  *
- * A settled rename runs three phases, each failing independently with an
+ * A settled rename can run three phases, each failing independently with an
  * honest report (see `rename-failure.ts`):
  *
- * 1. **Rewrite** inbound `[[old title]]` links across the graph;
+ * 1. **Rewrite** inbound title targets and title-mirroring displays;
  * 2. **Alias** the old title onto this note (`alias-placement.ts`) — the
  *    safety net for links the rewrite missed;
  * 3. **Move** the file onto the new title's slug (`move-note.ts`).
  *
- * A *birth* (the first authored title on an untitled note) runs phase 3
- * alone: nothing links to a title that never existed.
+ * A *birth* (the first authored title on an untitled note) runs phase 3 alone
+ * for Reflect-managed notes; other notes already have their permanent path.
  *
  * Extracted from `useNoteDocument` for the same reason the session was —
  * lifecycle coupling (pane teardown, quit, note switches) belongs to an owned
@@ -74,25 +78,52 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
   let currentPath = options.path
   /** Serializes rewrites — a second settle waits for the first. */
   let chain: Promise<void> = Promise.resolve()
+  /** Latest source saved or adopted by this session, used only for move ownership. */
+  let latestSource = ''
 
   /**
    * Move the file onto its title's slug path (Plan 17). A failed move leaves
    * the filename drifting (cosmetic — resolution never reads filenames) until
    * the next settled rename re-derives it.
    */
-  const runMove = async (title: string, gen: number): Promise<void> => {
+  const runMove = async (
+    title: string,
+    gen: number,
+    options?: { rewriteInboundPathLinks?: boolean },
+  ): Promise<void> => {
     const target = await slugPathForTitle(currentPath, title)
     if (target === currentPath) {
       return
     }
-    await moveNoteCarryingSession(currentPath, target, gen)
+    const from = currentPath
+    await moveNoteCarryingSession(from, target, gen)
     currentPath = target
+    // Retarget inbound `[[notes/…]]` path links only after the move landed: a
+    // refused move then touches nothing (rollback for free), while the
+    // reverse order would strand every rewritten source on a destination that
+    // never materialized. The source query still works post-move — the
+    // sources' own index rows keep the old target key until they reproject.
+    // A per-source failure dangles that source alone, the same residue as
+    // before. Births skip this: nothing can hold a path link to a placeholder
+    // path that existed only inside this session.
+    if (options?.rewriteInboundPathLinks === true) {
+      try {
+        await rewritePathLinksForMove(from, target, {
+          pathLinkSources: getPathLinkSources,
+          read: readNote,
+          write: (forPath, contents) => writeNote(forPath, contents, gen),
+        })
+      } catch (cause) {
+        console.error('path link rewrite failed:', cause)
+      }
+    }
   }
 
-  // Rewrite inbound links across the graph, record the old title as an alias
-  // on this note, then move the file onto the new title's slug. Every write
-  // carries the generation read at run time (stale → loud rejection in Rust —
-  // a rename pending across a graph switch is dropped, never cross-written).
+  // Rewrite inbound links across the graph, record the old title as an alias,
+  // then move only a Reflect-managed file onto the new title's slug. Every
+  // write carries the generation read at run time (stale → loud rejection in
+  // Rust). A rename pending across a graph switch is dropped, never
+  // cross-written.
   const runRename = (rename: TitleRename): void => {
     chain = chain.then(async () => {
       const gen = generation()
@@ -107,6 +138,9 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
         return
       }
       if (rename.from === null) {
+        if (!isReflectManagedNote(currentPath, latestSource)) {
+          return
+        }
         // A birth: the first authored title on an untitled note. Nothing
         // links to a title that never existed — no rewrite, no alias — but
         // the file sheds its placeholder name for the title's slug.
@@ -136,6 +170,7 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
             to: rename.to,
             io: {
               sources: getLinkSources,
+              backlinks: getBacklinks,
               read: readNote,
               write: (forPath, contents) => writeNote(forPath, contents, gen),
               resolve: resolveWikiTarget,
@@ -159,15 +194,15 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
             console.error('rename alias placement failed:', cause)
           }
         }
-        // The collision guard above is about the OLD title's links — when the
-        // old title belongs to a different note now, links stay theirs and no
-        // alias is claimed. The *filename* derives from the NEW title, so the
-        // move happens regardless.
-        try {
-          await runMove(rename.to, gen)
-        } catch (cause) {
-          failures.move = errorMessage(cause)
-          console.error('note file move failed:', cause)
+        // Link maintenance applies to every editable note. Filename projection
+        // is a separate capability: stable-path and adopted notes stay put.
+        if (isReflectManagedNote(currentPath, latestSource)) {
+          try {
+            await runMove(rename.to, gen, { rewriteInboundPathLinks: true })
+          } catch (cause) {
+            failures.move = errorMessage(cause)
+            console.error('note file move failed:', cause)
+          }
         }
       } finally {
         const failure = composeRenameFailure(from, failures)
@@ -188,15 +223,9 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
 
   return {
     content(content: string, origin: NoteContentOrigin): void {
+      latestSource = content
       if (origin === 'saved') {
-        // Only direct `notes/*.md` files carrying a valid Reflect ULID opt in
-        // to graph-wide automation. Adopted vault files save their content in
-        // place; a retitle never moves them, rewrites links, or adds aliases.
-        if (isReflectManagedNote(currentPath, content)) {
-          tracker.saved(content)
-        } else {
-          tracker.baseline(content)
-        }
+        tracker.saved(content)
       } else {
         tracker.baseline(content) // load/external: new ground truth, no rewrite
       }

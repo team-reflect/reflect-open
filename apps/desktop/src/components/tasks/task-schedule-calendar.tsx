@@ -1,4 +1,4 @@
-import { useState, type ReactElement, type ReactNode } from 'react'
+import { useState, type ReactElement } from 'react'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { type WeekStartDay } from '@reflect/core'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -16,7 +16,7 @@ interface TaskScheduleCalendarProps {
   /** Set the selection's due date (an ISO day), or clear it with `null`. */
   onSchedule: (isoDate: string | null) => void
   /** The trigger the popover anchors to (the toolbar's "Schedule" button). */
-  children: ReactNode
+  children: ReactElement
 }
 
 /** Maps the week-start setting to date-fns' numeric convention. */
@@ -59,7 +59,7 @@ export function TaskScheduleCalendar({
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>{children}</PopoverTrigger>
+      <PopoverTrigger render={children} />
       <PopoverContent align="end" className="w-auto p-0" aria-label="Schedule">
         <header className="flex items-center justify-between px-4 pt-3 pb-1">
           <div className="text-sm font-semibold text-text">{monthLabel(month)}</div>

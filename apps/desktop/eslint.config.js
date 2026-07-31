@@ -36,10 +36,7 @@ export default tseslint.config(
     // gate for app-wide singletons) — its callers get the same deps checking.
     files: ['src/**/*.{ts,tsx}'],
     rules: {
-      'react-hooks/exhaustive-deps': [
-        'warn',
-        { additionalHooks: '^useMainWindowEffect$' },
-      ],
+      'react-hooks/exhaustive-deps': ['warn', { additionalHooks: '^useMainWindowEffect$' }],
     },
   },
   {

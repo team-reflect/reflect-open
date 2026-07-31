@@ -4,11 +4,7 @@ import { useFileChanges } from '@/lib/use-file-changes'
 import { createDocumentBinding, type DocumentBinding } from './document-binding'
 import type { NoteEditorHandle } from './note-editor'
 import { createRenameCoordinator } from './rename-coordinator'
-import {
-  createNoteSession,
-  INITIAL_NOTE_SNAPSHOT,
-  type NoteSessionSnapshot,
-} from './note-session'
+import { createNoteSession, INITIAL_NOTE_SNAPSHOT, type NoteSessionSnapshot } from './note-session'
 import { checkRoundTrip } from './roundtrip'
 
 /**
@@ -47,10 +43,10 @@ export interface NoteDocumentOptions {
    */
   createIfMissing?: boolean
   /**
-   * Auto-rewrite inbound `[[links]]` (and move the file onto its title's slug,
-   * Plan 17) when this note's settled title changes. The coordinator still
-   * requires a direct `notes/*.md` path with valid Reflect ULID frontmatter;
-   * adopted notes remain content-only even when this lifecycle is enabled.
+   * Maintain inbound `[[links]]` when this note's settled title changes. The
+   * coordinator separately requires a direct `notes/*.md` path with valid
+   * Reflect ULID frontmatter before moving a file onto its title's slug, so
+   * adopted and stable-path notes keep their filenames.
    */
   trackRenames?: boolean
   /**

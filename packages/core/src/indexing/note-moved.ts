@@ -16,9 +16,7 @@ export const NOTE_MOVED_EVENT = 'note:moved'
 const noteMovedSchema = z.object({ from: z.string(), to: z.string() })
 
 /** Subscribe to committed note moves (graph-relative `from` → `to` paths). */
-export function subscribeNoteMoved(
-  handler: (from: string, to: string) => void,
-): Promise<Unlisten> {
+export function subscribeNoteMoved(handler: (from: string, to: string) => void): Promise<Unlisten> {
   return getBridge().listen(NOTE_MOVED_EVENT, (payload) => {
     const parsed = noteMovedSchema.safeParse(payload)
     if (parsed.success) {

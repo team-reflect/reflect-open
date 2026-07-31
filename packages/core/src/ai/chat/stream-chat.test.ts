@@ -52,7 +52,9 @@ function stream(parts: LanguageModelV3StreamPart[]): LanguageModelV3StreamResult
  * indexes by the post-push call count, skipping element 0 — a function keeps
  * the sequencing explicit instead.)
  */
-function sequence(results: LanguageModelV3StreamResult[]): () => Promise<LanguageModelV3StreamResult> {
+function sequence(
+  results: LanguageModelV3StreamResult[],
+): () => Promise<LanguageModelV3StreamResult> {
   let index = 0
   return async () => {
     const next = results[index]
@@ -160,7 +162,10 @@ describe('streamChatTurn', () => {
         semanticSearchEnabled: true,
         customSystemPrompt: '',
         context: null,
-        toolDeps: { retrieveFn: async () => [PUBLIC_HIT, PRIVATE_HIT], readNoteFn: async () => 'launch plan\n' },
+        toolDeps: {
+          retrieveFn: async () => [PUBLIC_HIT, PRIVATE_HIT],
+          readNoteFn: async () => 'launch plan\n',
+        },
       }),
     )
 
@@ -200,7 +205,10 @@ describe('streamChatTurn', () => {
         semanticSearchEnabled: true,
         customSystemPrompt: '',
         context: null,
-        toolDeps: { retrieveFn: async () => [PUBLIC_HIT, PRIVATE_HIT], readNoteFn: async () => 'launch plan\n' },
+        toolDeps: {
+          retrieveFn: async () => [PUBLIC_HIT, PRIVATE_HIT],
+          readNoteFn: async () => 'launch plan\n',
+        },
       }),
     )
 
@@ -296,11 +304,11 @@ describe('streamChatTurn', () => {
   })
 
   it('keeps every completed step when cut short after multiple tool rounds', async () => {
-    // Pins the SDK semantic the engine relies on: each onStepFinish's
-    // `response.messages` is *cumulative* across steps, so assigning (not
-    // appending) yields the full paired history. If an `ai` upgrade ever
-    // makes it per-step, this starts failing instead of silently dropping
-    // earlier rounds.
+    // Pins the SDK semantic the engine relies on: each onStepEnd's
+    // `response.messages` holds *only that step's* messages, so appending
+    // (not assigning) yields the full paired history. If an `ai` upgrade ever
+    // makes it cumulative again, this starts failing instead of silently
+    // duplicating earlier rounds.
     const model = new MockLanguageModelV3({
       doStream: sequence([
         toolCallTurn('atlas', 'call-1'),

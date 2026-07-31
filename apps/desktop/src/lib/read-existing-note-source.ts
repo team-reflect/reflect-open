@@ -9,10 +9,7 @@ import { openSession } from '@/editor/open-documents'
  * closed note falls back to a generation-pinned read so a graph switch cannot
  * return content from the newly active graph.
  */
-export async function readExistingNoteSource(
-  path: string,
-  generation: number,
-): Promise<string> {
+export async function readExistingNoteSource(path: string, generation: number): Promise<string> {
   const session = openSession(path)
   if (session !== null) {
     const liveContent = session.liveContent()

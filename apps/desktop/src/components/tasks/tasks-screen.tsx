@@ -113,8 +113,7 @@ export function TasksScreen(): ReactElement {
 
   const needle = query.trim().toLowerCase()
   const groups = useMemo(
-    () =>
-      composeVisibleTaskGroups({ open, completed, recentlyCompleted, filters, needle, today }),
+    () => composeVisibleTaskGroups({ open, completed, recentlyCompleted, filters, needle, today }),
     [open, completed, recentlyCompleted, filters, needle, today],
   )
 
@@ -212,8 +211,7 @@ export function TasksScreen(): ReactElement {
     }
   }, [actions, selection, selectedTasks])
   const openNote = useCallback(
-    (path: string, event?: NewWindowClickEvent) =>
-      navigateNoteLink(routeForPath(path), event),
+    (path: string, event?: NewWindowClickEvent) => navigateNoteLink(routeForPath(path), event),
     [navigateNoteLink],
   )
   useTaskKeyboard({
@@ -312,11 +310,7 @@ export function TasksScreen(): ReactElement {
           onOpenChange={setFiltersOpen}
         />
       </header>
-      <div
-        ref={setScrollElement}
-        onScroll={onScroll}
-        className="min-h-0 flex-1 overflow-auto pb-8"
-      >
+      <div ref={setScrollElement} onScroll={onScroll} className="min-h-0 flex-1 overflow-auto pb-8">
         {isError ? (
           <p role="alert" className="px-4 py-6 text-sm text-text-muted lg:px-12">
             Couldn’t load tasks.

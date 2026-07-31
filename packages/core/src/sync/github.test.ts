@@ -442,7 +442,7 @@ describe('runDeviceFlow', () => {
     await expect(
       runDeviceFlow({
         clientId: 'test-app',
-      fetchFn: scriptedFetch([{ error: 'access_denied' }]),
+        fetchFn: scriptedFetch([{ error: 'access_denied' }]),
         onCode: () => {},
         sleep: async () => {},
         now: () => 0,
@@ -456,7 +456,7 @@ describe('runDeviceFlow', () => {
     await expect(
       runDeviceFlow({
         clientId: 'test-app',
-      fetchFn: scriptedFetch([]),
+        fetchFn: scriptedFetch([]),
         onCode: () => {},
         sleep: async () => {
           clock += 600_000 // two sleeps blow past the 900s deadline

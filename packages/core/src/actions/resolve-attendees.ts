@@ -1,7 +1,4 @@
-import {
-  resolvePerson,
-  type PersonResolution,
-} from '../contacts/person'
+import { resolvePerson, type PersonResolution } from '../contacts/person'
 import { resolveAttendeeContact } from '../contacts/resolve'
 import { serializeWikiSuggestionAddress } from '../indexing/suggest'
 import { canonicalEmail, canonicalEmails } from '../markdown/email-fields'
@@ -25,13 +22,8 @@ export type ResolvedMeetingAttendee =
       readonly attendee: MeetingAttendee
     }
 
-function normalizedAttendee(
-  attendee: MeetingAttendee,
-  emails: readonly string[],
-): MeetingAttendee {
-  return emails.length === 0
-    ? { name: attendee.name }
-    : { name: attendee.name, emails }
+function normalizedAttendee(attendee: MeetingAttendee, emails: readonly string[]): MeetingAttendee {
+  return emails.length === 0 ? { name: attendee.name } : { name: attendee.name, emails }
 }
 
 function targetFromPerson(
@@ -64,10 +56,7 @@ function targetFromPerson(
   }
   return {
     kind: 'new',
-    attendee:
-      resolution.emails.length === 0
-        ? { name }
-        : { name, emails: resolution.emails },
+    attendee: resolution.emails.length === 0 ? { name } : { name, emails: resolution.emails },
     insertText,
   }
 }
@@ -108,11 +97,7 @@ export async function resolveMeetingAttendeeTargets(
   attendees: readonly MeetingAttendee[],
   lookupContacts: boolean,
 ): Promise<ResolvedMeetingAttendee[]> {
-  return Promise.all(
-    attendees.map((attendee) =>
-      resolveMeetingAttendee(attendee, lookupContacts),
-    ),
-  )
+  return Promise.all(attendees.map((attendee) => resolveMeetingAttendee(attendee, lookupContacts)))
 }
 
 /**

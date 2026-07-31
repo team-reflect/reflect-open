@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { diagnosticsSnapshotSchema, type IndexedNote } from '@reflect/core'
+import { diagnosticsSnapshotSchema, foldGraphPath, type IndexedNote } from '@reflect/core'
 import { createDevBridge } from '@/dev/dev-bridge'
 import { createDevFileStore } from '@/dev/dev-file-store'
 import { createDevIndexDb } from '@/dev/dev-index-db'
@@ -16,6 +16,7 @@ function projection(path: string, mtime: number, fileHash: string): IndexedNote 
     id: null,
     title: path,
     titleKey: path,
+    pathKey: foldGraphPath(path),
     kind: 'note',
     dailyDate: null,
     isPrivate: false,
@@ -32,6 +33,7 @@ function projection(path: string, mtime: number, fileHash: string): IndexedNote 
     links: [],
     tags: [],
     aliases: [],
+    claims: [],
     emails: [],
     assets: [],
     tasks: [],

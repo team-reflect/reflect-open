@@ -4,14 +4,18 @@ import { renderHook } from 'vitest-browser-react'
 import type {
   AiProvidersState,
   AudioMemoIdentity,
-  CaptureAudioMemoInput,
   CaptureAudioMemoOutcome,
+  CaptureAudioMemoPartInput,
   GraphInfo,
   Settings,
 } from '@reflect/core'
+import type { UseAudioRecorderOptions } from '@/hooks/use-audio-recorder'
 
-const captureAudioMemo = vi.hoisted(() =>
-  vi.fn<(input: CaptureAudioMemoInput) => Promise<CaptureAudioMemoOutcome>>(),
+const captureAudioMemoPart = vi.hoisted(() =>
+  vi.fn<(input: CaptureAudioMemoPartInput) => Promise<CaptureAudioMemoOutcome>>(),
+)
+const deleteAudioMemo = vi.hoisted(() =>
+  vi.fn<(path: string, generation: number) => Promise<void>>(async () => {}),
 )
 const failOperation = vi.hoisted(() => vi.fn<(message: string) => void>())
 const toggleSidebar = vi.hoisted(() => vi.fn())
@@ -65,14 +69,15 @@ const recorderControls = vi.hoisted(() => ({
   releaseStop: () => {},
   /** Make start() reject like a denied getUserMedia. */
   failStart: null as DOMException | null,
-  options: null as { maxDurationMs?: number; onMaxDuration?: () => void } | null,
+  options: null as UseAudioRecorderOptions | null,
 }))
 
 const sidebarState = vi.hoisted(() => ({ collapsed: false }))
 
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
-  captureAudioMemo,
+  captureAudioMemoPart,
+  deleteAudioMemo,
 }))
 
 vi.mock('@/lib/transcription-reconciler', () => ({
@@ -81,7 +86,7 @@ vi.mock('@/lib/transcription-reconciler', () => ({
 
 vi.mock('@/hooks/use-audio-recorder', () => ({
   isRecordingSupported: () => recorderControls.supported,
-  useAudioRecorder: (options: { maxDurationMs?: number; onMaxDuration?: () => void }) => {
+  useAudioRecorder: (options: UseAudioRecorderOptions) => {
     recorderControls.options = options
     const [status, setStatus] = useState<'idle' | 'requesting' | 'recording'>('idle')
     return {
@@ -103,7 +108,17 @@ vi.mock('@/hooks/use-audio-recorder', () => ({
           })
         }
         setStatus('idle')
-        return recorderControls.stopResult
+        const recording = recorderControls.stopResult
+        if (recording === null) {
+          return null
+        }
+        options.onSegment?.({
+          blob: recording.blob,
+          mimeType: recording.mimeType,
+          part: 1,
+          end: true,
+        })
+        return { mimeType: recording.mimeType, durationMs: recording.durationMs, parts: 1 }
       },
       cancel: () => {
         recorderControls.cancelSpy()
@@ -172,7 +187,7 @@ beforeEach(() => {
     defaultAiProviderId: 'cfg-openai',
     transcriptionFormat: true,
   }
-  captureAudioMemo.mockResolvedValue({ ok: true, memo: MEMO })
+  captureAudioMemoPart.mockResolvedValue({ ok: true, memo: MEMO })
   reconcilerControls.fake.getTranscribing.mockReturnValue(false)
   reconcilerControls.listeners.clear()
   createTranscriptionReconciler.mockReturnValue(reconcilerControls.fake)
@@ -193,10 +208,12 @@ describe('AudioMemoProvider', () => {
     })
     await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
 
-    expect(captureAudioMemo).toHaveBeenCalledWith({
+    expect(captureAudioMemoPart).toHaveBeenCalledWith({
       audio: RECORDING.blob,
       mimeType: 'audio/mp4',
       recordedAt: expect.any(Date),
+      part: 1,
+      end: true,
       generation: 3,
     })
   })
@@ -268,11 +285,11 @@ describe('AudioMemoProvider', () => {
     })
 
     expect(result.current.phase).toBe('idle')
-    expect(captureAudioMemo).not.toHaveBeenCalled()
+    expect(captureAudioMemoPart).not.toHaveBeenCalled()
   })
 
   it('a capture failure parks an error whose retry re-runs the same recording', async () => {
-    captureAudioMemo
+    captureAudioMemoPart
       .mockResolvedValueOnce({ ok: false, message: 'disk full' })
       .mockResolvedValueOnce({ ok: true, memo: MEMO })
     const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
@@ -291,15 +308,16 @@ describe('AudioMemoProvider', () => {
       result.current.retry()
     })
     await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
-    expect(captureAudioMemo).toHaveBeenCalledTimes(2)
-    expect(captureAudioMemo).toHaveBeenLastCalledWith(
+    expect(captureAudioMemoPart).toHaveBeenCalledTimes(2)
+    expect(captureAudioMemoPart).toHaveBeenLastCalledWith(
       expect.objectContaining({ audio: RECORDING.blob }),
     )
   })
 
   it('arms the recorder cap and saves when it fires', async () => {
     const { result, act } = await renderHook(() => useAudioMemo(), { wrapper })
-    expect(recorderControls.options?.maxDurationMs).toBe(10 * 60_000)
+    expect(recorderControls.options?.segmentMs).toBe(20 * 60_000)
+    expect(recorderControls.options?.maxDurationMs).toBe(4 * 60 * 60_000)
 
     await act(async () => {
       result.current.toggle()
@@ -308,7 +326,7 @@ describe('AudioMemoProvider', () => {
       recorderControls.options?.onMaxDuration?.()
     })
 
-    await vi.waitFor(() => expect(captureAudioMemo).toHaveBeenCalled())
+    await vi.waitFor(() => expect(captureAudioMemoPart).toHaveBeenCalled())
   })
 
   it('collapsing the sidebar mid-recording stops and saves', async () => {
@@ -322,7 +340,7 @@ describe('AudioMemoProvider', () => {
     sidebarState.collapsed = true
     await rerender()
 
-    await vi.waitFor(() => expect(captureAudioMemo).toHaveBeenCalled())
+    await vi.waitFor(() => expect(captureAudioMemoPart).toHaveBeenCalled())
   })
 
   it('the stop click commits immediately — no recording-phase gap for Esc to cancel in', async () => {
@@ -343,7 +361,7 @@ describe('AudioMemoProvider', () => {
       recorderControls.releaseStop()
     })
     await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
-    expect(captureAudioMemo).toHaveBeenCalledTimes(1)
+    expect(captureAudioMemoPart).toHaveBeenCalledTimes(1)
   })
 
   it('a mic click landing in the stop gap starts the next memo once the recorder frees', async () => {
@@ -371,12 +389,12 @@ describe('AudioMemoProvider', () => {
     })
     await vi.waitFor(() => expect(result.current.phase).toBe('recording'))
     expect(recorderControls.startSpy).toHaveBeenCalledTimes(2)
-    expect(captureAudioMemo).toHaveBeenCalledTimes(1)
+    expect(captureAudioMemoPart).toHaveBeenCalledTimes(1)
   })
 
   it('a new recording can start while a capture is pending, and captures run serially in order', async () => {
     let releaseFirst: (outcome: CaptureAudioMemoOutcome) => void = () => {}
-    captureAudioMemo.mockImplementationOnce(
+    captureAudioMemoPart.mockImplementationOnce(
       () =>
         new Promise<CaptureAudioMemoOutcome>((resolve) => {
           releaseFirst = resolve
@@ -410,22 +428,22 @@ describe('AudioMemoProvider', () => {
     expect(result.current.phase).toBe('transcribing')
     expect(result.current.pendingCount).toBe(2)
     // Serial: the second memo waits — captures must land in recording order.
-    expect(captureAudioMemo).toHaveBeenCalledTimes(1)
+    expect(captureAudioMemoPart).toHaveBeenCalledTimes(1)
 
     await act(async () => {
       releaseFirst({ ok: true, memo: MEMO })
     })
     await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
     expect(result.current.pendingCount).toBe(0)
-    expect(captureAudioMemo).toHaveBeenCalledTimes(2)
-    expect(captureAudioMemo).toHaveBeenLastCalledWith(
+    expect(captureAudioMemoPart).toHaveBeenCalledTimes(2)
+    expect(captureAudioMemoPart).toHaveBeenLastCalledWith(
       expect.objectContaining({ audio: second.blob }),
     )
   })
 
   it('a failure parks the queue; retry lands the failed memo before the ones behind it', async () => {
     let releaseFirst: (outcome: CaptureAudioMemoOutcome) => void = () => {}
-    captureAudioMemo.mockImplementationOnce(
+    captureAudioMemoPart.mockImplementationOnce(
       () =>
         new Promise<CaptureAudioMemoOutcome>((resolve) => {
           releaseFirst = resolve
@@ -458,20 +476,20 @@ describe('AudioMemoProvider', () => {
     await vi.waitFor(() => expect(result.current.phase).toBe('error'))
     // The second memo holds behind the failure — retrying later must not
     // write the first recording after the second.
-    expect(captureAudioMemo).toHaveBeenCalledTimes(1)
+    expect(captureAudioMemoPart).toHaveBeenCalledTimes(1)
 
     await act(async () => {
       result.current.retry()
     })
     await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
-    expect(captureAudioMemo).toHaveBeenCalledTimes(3)
-    expect(captureAudioMemo.mock.calls[1]?.[0].audio).toBe(RECORDING.blob)
-    expect(captureAudioMemo.mock.calls[2]?.[0].audio).toBe(second.blob)
+    expect(captureAudioMemoPart).toHaveBeenCalledTimes(3)
+    expect(captureAudioMemoPart.mock.calls[1]?.[0].audio).toBe(RECORDING.blob)
+    expect(captureAudioMemoPart.mock.calls[2]?.[0].audio).toBe(second.blob)
   })
 
   it('discarding a failed memo releases the queue behind it', async () => {
     let releaseFirst: (outcome: CaptureAudioMemoOutcome) => void = () => {}
-    captureAudioMemo.mockImplementationOnce(
+    captureAudioMemoPart.mockImplementationOnce(
       () =>
         new Promise<CaptureAudioMemoOutcome>((resolve) => {
           releaseFirst = resolve
@@ -507,8 +525,8 @@ describe('AudioMemoProvider', () => {
       result.current.discard()
     })
     await vi.waitFor(() => expect(result.current.phase).toBe('idle'))
-    expect(captureAudioMemo).toHaveBeenCalledTimes(2)
-    expect(captureAudioMemo).toHaveBeenLastCalledWith(
+    expect(captureAudioMemoPart).toHaveBeenCalledTimes(2)
+    expect(captureAudioMemoPart).toHaveBeenLastCalledWith(
       expect.objectContaining({ audio: second.blob }),
     )
   })
@@ -562,11 +580,11 @@ describe('AudioMemoProvider', () => {
     await rerender()
 
     expect(recorderControls.cancelSpy).toHaveBeenCalled()
-    expect(captureAudioMemo).not.toHaveBeenCalled()
+    expect(captureAudioMemoPart).not.toHaveBeenCalled()
   })
 
   it('a capture failure while the sidebar is collapsed surfaces through operations', async () => {
-    captureAudioMemo.mockResolvedValue({ ok: false, message: 'disk full' })
+    captureAudioMemoPart.mockResolvedValue({ ok: false, message: 'disk full' })
     const { result, act, rerender } = await renderHook(() => useAudioMemo(), { wrapper })
 
     await act(async () => {
@@ -579,7 +597,7 @@ describe('AudioMemoProvider', () => {
   })
 
   it('a parked error never invisibly blocks recording: toggle surfaces, then clears it', async () => {
-    captureAudioMemo.mockResolvedValue({ ok: false, message: 'disk full' })
+    captureAudioMemoPart.mockResolvedValue({ ok: false, message: 'disk full' })
     const { result, act, rerender } = await renderHook(() => useAudioMemo(), { wrapper })
 
     // Fail a capture, then collapse — the error popover unmounts with the mic.
@@ -661,7 +679,7 @@ describe('AudioMemoProvider', () => {
 
     expect(result.current.phase).toBe('idle')
     expect(recorderControls.cancelSpy).toHaveBeenCalled()
-    expect(captureAudioMemo).not.toHaveBeenCalled()
+    expect(captureAudioMemoPart).not.toHaveBeenCalled()
   })
 
   it('shows the transcribing phase while the reconciler reports work', async () => {

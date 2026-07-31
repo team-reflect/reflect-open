@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import { foldFallbackTitleKey, foldKey, foldTag } from './keys'
 
 describe('foldKey', () => {
@@ -45,5 +47,20 @@ describe('foldTag', () => {
 
   it('is idempotent', () => {
     expect(foldTag(foldTag('Book'))).toBe('book')
+  })
+})
+
+describe('foldKey parity corpus', () => {
+  // The same corpus pins the CLI's `fold_key`; see `apps/cli/src/keys.rs`.
+  const fixtures = z
+    .array(z.object({ input: z.string(), key: z.string() }))
+    .parse(
+      JSON.parse(
+        readFileSync(new URL('../../../../fixtures/fold-key-parity.json', import.meta.url), 'utf8'),
+      ),
+    )
+
+  it.each(fixtures)('folds %j like the CLI does', ({ input, key }) => {
+    expect(foldKey(input)).toBe(key)
   })
 })

@@ -161,9 +161,7 @@ describe('buildHistory', () => {
         userText: 'where is the plan?',
         attachments: [],
         parts: [],
-        responseMessages: [
-          { role: 'assistant', content: 'In [[Atlas]].' },
-        ],
+        responseMessages: [{ role: 'assistant', content: 'In [[Atlas]].' }],
         status: 'done',
       },
       {
@@ -230,7 +228,7 @@ describe('buildHistory', () => {
     expect(buildHistory(turns)).toEqual([
       {
         role: 'user',
-        content: [{ type: 'image', image: photo.dataUrl, mediaType: 'image/png' }],
+        content: [{ type: 'file', data: photo.dataUrl, mediaType: 'image/png' }],
       },
       { role: 'assistant', content: 'A cat.' },
     ])
@@ -253,7 +251,7 @@ describe('userMessage', () => {
     expect(userMessage('what is this?', [photo])).toEqual({
       role: 'user',
       content: [
-        { type: 'image', image: photo.dataUrl, mediaType: 'image/png' },
+        { type: 'file', data: photo.dataUrl, mediaType: 'image/png' },
         { type: 'text', text: 'what is this?' },
       ],
     })
@@ -262,7 +260,7 @@ describe('userMessage', () => {
   it('omits the text part for a photo-only message', () => {
     expect(userMessage('', [photo])).toEqual({
       role: 'user',
-      content: [{ type: 'image', image: photo.dataUrl, mediaType: 'image/png' }],
+      content: [{ type: 'file', data: photo.dataUrl, mediaType: 'image/png' }],
     })
   })
 })

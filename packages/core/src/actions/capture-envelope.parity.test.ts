@@ -16,9 +16,7 @@ describe('capture wire-message contract fixtures', () => {
     'accepts: %s',
     (_name, message) => {
       const parsed = captureWireMessageSchema.safeParse(message)
-      expect(parsed.success, JSON.stringify(parsed.success ? null : parsed.error.issues)).toBe(
-        true,
-      )
+      expect(parsed.success, JSON.stringify(parsed.success ? null : parsed.error.issues)).toBe(true)
     },
   )
 

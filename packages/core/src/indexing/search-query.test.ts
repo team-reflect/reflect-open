@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  buildFtsMatch,
-  containsUnsegmentedScript,
-  titleRecallNeedles,
-} from './search-query'
+import { buildFtsMatch, containsUnsegmentedScript, titleRecallNeedles } from './search-query'
 
 describe('buildFtsMatch', () => {
   it('returns null for an empty or whitespace-only query', () => {

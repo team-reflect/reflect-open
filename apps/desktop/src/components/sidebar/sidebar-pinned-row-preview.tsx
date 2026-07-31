@@ -18,9 +18,9 @@ export function SidebarPinnedRowPreview({
     ? 'bg-surface-hover text-transparent'
     : overlay
       ? 'bg-white text-text-secondary'
-    : active
-      ? 'bg-surface-hover text-text-secondary dark:bg-transparent'
-    : 'text-text-secondary hover:bg-surface-hover hover:text-text'
+      : active
+        ? 'bg-surface-hover text-text-secondary dark:bg-transparent'
+        : 'text-text-secondary hover:bg-surface-hover hover:text-text'
 
   return (
     <span

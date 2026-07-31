@@ -39,8 +39,13 @@ are addressed by date instead. A human-written
 
 ```text
 reflect://append?text=call%20the%20bank    a bullet on today's daily note
-reflect://task?text=buy%20milk             an open task on today's daily note
+reflect://checkbox?text=pack%20a%20bag     a square checkbox on today's daily note
+reflect://task?text=buy%20milk             a round task on today's daily note (shows in Tasks)
 ```
+
+`task` writes Reflect's round (`+`) task, so it appears in the Tasks view;
+`checkbox` writes a plain square (`- [ ]`) checkbox that stays on the daily
+note only. `append` writes a plain bullet.
 
 A URL scheme is a world-invokable surface — any web page can attempt
 `reflect://` — so writes are deliberately narrow: **one line of plain text,
@@ -51,9 +56,9 @@ browser captures use — never spliced directly into a note by the URL
 handler. There is no URL that writes into an arbitrary note, creates a note
 with content, or runs a command.
 
-Success and failure surface on the status line ("Added to today", "Task
-added to today"); the appended line is deduplicated exactly, so a crashed
-drain re-runs cleanly.
+Success and failure surface on the status line ("Added to today", "Checkbox
+added to today", "Task added to today"); the appended line is deduplicated
+exactly, so a crashed drain re-runs cleanly.
 
 ## Platform notes
 

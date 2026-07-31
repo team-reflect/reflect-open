@@ -37,9 +37,7 @@ describe('rowForHit', () => {
   })
 
   it('highlights free-text matches in the note title', () => {
-    const row = rowForHit(
-      hit({ title: 'Tim MacCaw', highlightedTitle: '\u0001Tim Mac\u0002Caw' }),
-    )
+    const row = rowForHit(hit({ title: 'Tim MacCaw', highlightedTitle: '\u0001Tim Mac\u0002Caw' }))
     expect(row.titleSegments).toEqual([
       { text: 'Tim Mac', highlighted: true },
       { text: 'Caw', highlighted: false },
@@ -47,9 +45,7 @@ describe('rowForHit', () => {
   })
 
   it('uses the index title markers for tokenizer-normalized matches', () => {
-    const row = rowForHit(
-      hit({ title: 'Café Alpha', highlightedTitle: '\u0001Café\u0002 Alpha' }),
-    )
+    const row = rowForHit(hit({ title: 'Café Alpha', highlightedTitle: '\u0001Café\u0002 Alpha' }))
     expect(row.titleSegments).toEqual([
       { text: 'Café', highlighted: true },
       { text: ' Alpha', highlighted: false },
@@ -70,10 +66,7 @@ describe('matchingTagFacets', () => {
   ]
 
   it('matches case-insensitively on folded substrings', () => {
-    expect(matchingTagFacets(facets, 'boo').map((facet) => facet.tag)).toEqual([
-      'Book',
-      'notebook',
-    ])
+    expect(matchingTagFacets(facets, 'boo').map((facet) => facet.tag)).toEqual(['Book', 'notebook'])
   })
 
   it('lists every tag for a bare # (empty partial)', () => {

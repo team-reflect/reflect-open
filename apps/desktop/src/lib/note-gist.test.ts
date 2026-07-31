@@ -28,14 +28,20 @@ vi.mock('@reflect/core', async (importOriginal) => ({
 vi.mock('@/editor/open-documents', () => ({ openSession }))
 vi.mock('@/lib/operations', () => ({ startOperation }))
 
-const { publishNoteToGist, runGistPublish, runGistUnpublish, unpublishNoteGist } = await import('./note-gist')
+const { publishNoteToGist, runGistPublish, runGistUnpublish, unpublishNoteGist } =
+  await import('./note-gist')
 
 const PUBLISHED = { id: 'g1', htmlUrl: 'https://gist.github.com/alex/g1' }
 const BODY = '# A\n\nhello\n'
 
 /** A note already carrying a gist block (published as `Old.md`, hash stale). */
 const REPUBLISH_SOURCE = upsertFrontmatter(BODY, {
-  gist: { id: 'g0', url: 'https://gist.github.com/alex/g0', file: 'Old.md', hash: 'feedfacefeedface' },
+  gist: {
+    id: 'g0',
+    url: 'https://gist.github.com/alex/g0',
+    file: 'Old.md',
+    hash: 'feedfacefeedface',
+  },
 })
 
 beforeEach(() => {

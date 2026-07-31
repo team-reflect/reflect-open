@@ -25,12 +25,14 @@ import { fireEvent } from '@/test-utils/fire-event'
 const streamChat = vi.hoisted(() =>
   vi.fn<(options: StreamChatOptions) => AsyncGenerator<ChatStreamEvent>>(),
 )
-const getSecret = vi.hoisted(() => vi.fn<(name: string) => Promise<string | null>>())
+const aiApiKeyForConfig = vi.hoisted(() =>
+  vi.fn<(config: AiProviderConfig) => Promise<string | null>>(),
+)
 const loadChatGraphContext = vi.hoisted(() => vi.fn<(graphName: string) => Promise<null>>())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   streamChat,
-  getSecret,
+  aiApiKeyForConfig,
   loadChatGraphContext,
 }))
 
@@ -82,7 +84,7 @@ beforeEach(() => {
   settingsState.models = []
   settingsState.defaultId = null
   streamChat.mockReset()
-  getSecret.mockReset().mockResolvedValue('sk-test')
+  aiApiKeyForConfig.mockReset().mockResolvedValue('sk-test')
   loadChatGraphContext.mockReset().mockResolvedValue(null)
 })
 

@@ -98,6 +98,10 @@ export function appMenuLayout(): AppSubmenuLayout[] {
         predefined('Copy'),
         predefined('Paste'),
         predefined('SelectAll'),
+        separator(),
+        command('note.find'),
+        command('note.findNext'),
+        command('note.findPrevious'),
       ],
     },
     {
@@ -141,7 +145,9 @@ function menuItemOptions(commandId: string, text?: string): MenuItemOptions {
   if (!appCommand) {
     throw new Error(`native menu references unknown command: ${commandId}`)
   }
-  const accelerator = appCommand.keybinding ? bindingToAccelerator(appCommand.keybinding) : undefined
+  const accelerator = appCommand.keybinding
+    ? bindingToAccelerator(appCommand.keybinding)
+    : undefined
   return {
     id: appCommand.id,
     text: text ?? appCommand.title,
@@ -185,8 +191,8 @@ function isMacosDesktop(): boolean {
  */
 export async function installNativeMenu(): Promise<void> {
   // Menu actions use channels owned by the webview that created them. A note
-  // window has no command dispatcher, so it must not replace the app-wide
-  // menu installed by the main workspace with an inert copy.
+  // window must not replace the app-wide menu with an inert copy; the main
+  // channel forwards note-local Find commands to whichever window is focused.
   if (!isMacosDesktop() || !isMainWindow()) {
     return
   }

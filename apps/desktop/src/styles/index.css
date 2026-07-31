@@ -9,12 +9,12 @@ Cascade layer order, low to high priority.
 */
 @layer theme, base, components, utilities, design, meowdown;
 
-@import 'tailwindcss' ;
+@import 'tailwindcss';
 @import '@reflect/design-system/styles.css' layer(design);
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
-@import "@meowdown/core/style.css";
-@import "@meowdown/react/style.css";
+@import '@meowdown/core/style.css';
+@import '@meowdown/react/style.css';
 
 /* Tailwind v4 dark variant keyed to the design-system `.dark` scope set by the
    ThemeProvider on <html>. */
@@ -362,11 +362,21 @@ html:root {
    heading reads as subordinate to the title, not a second one: auto-appended
    sections (`## [[Links]]`, `## [[Audio memos]]`) land at H2, one size below the
    subject; H3 sits at body size, carried by weight rather than scale. */
-.reflect-editor h1 { @apply text-note-subject; } /* text-xl, 20px */
-.reflect-editor h2 { font-size: var(--text-lg, 1.125rem); } /* 18px */
-.reflect-editor h3 { font-size: var(--text-base, 1rem); } /* 16px */
-.reflect-editor h1:first-child { margin-top: 0; }
-.reflect-editor .reflect-note-title { @apply text-note-subject; }
+.reflect-editor h1 {
+  @apply text-note-subject;
+} /* text-xl, 20px */
+.reflect-editor h2 {
+  font-size: var(--text-lg, 1.125rem);
+} /* 18px */
+.reflect-editor h3 {
+  font-size: var(--text-base, 1rem);
+} /* 16px */
+.reflect-editor h1:first-child {
+  margin-top: 0;
+}
+.reflect-editor .reflect-note-title {
+  @apply text-note-subject;
+}
 
 /* The new-note flow's name field: ghost "Untitled" over the seeded empty H1
    (`editor/title-placeholder.ts`) without occupying layout, so the caret
@@ -444,8 +454,8 @@ html:root {
    so the placeholder must keep its layout size either way. */
 .reflect-note-loading {
   opacity: 0;
-  animation: reflect-note-loading-reveal var(--duration-slow, 300ms)
-    var(--ease-standard, ease) 400ms forwards;
+  animation: reflect-note-loading-reveal var(--duration-slow, 300ms) var(--ease-standard, ease)
+    400ms forwards;
 }
 
 @keyframes reflect-note-loading-reveal {
@@ -644,7 +654,10 @@ html:root {
 .reflect-editor .prosemirror-flat-list[data-list-kind='task'] > .list-marker {
   justify-content: start;
 }
-.reflect-editor .prosemirror-flat-list[data-list-kind='task'] > .list-marker input[type='checkbox'] {
+.reflect-editor
+  .prosemirror-flat-list[data-list-kind='task']
+  > .list-marker
+  input[type='checkbox'] {
   transform: translateY(-0.06em);
 }
 
@@ -653,6 +666,14 @@ html:root {
    utilities), so the global outline above would stack a second ring on top.
    Its rule is unlayered, so a Tailwind utility can't opt out, so do it here. */
 :where([data-slot='input'], [data-slot='textarea'], [cmdk-input]):focus-visible {
+  outline: none;
+}
+
+/* ---- Find in note ------------------------------------------------------
+   The pill is the focus treatment: it exists only while its input is focused,
+   so the global outline above would draw a second box inside it. Unlayered,
+   like the shadcn opt-out above, because a Tailwind utility cannot beat it. */
+.reflect-find-input:focus-visible {
   outline: none;
 }
 

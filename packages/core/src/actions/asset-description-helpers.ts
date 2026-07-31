@@ -79,7 +79,9 @@ export interface ManagedDescription {
  * (no `reflectAsset: true`) and must never be overwritten or trusted.
  */
 export function readManagedDescription(source: string): ManagedDescription | null {
-  const parsed = managedDescriptionSchema.safeParse(parseFrontmatter(splitFrontmatter(source).raw).data)
+  const parsed = managedDescriptionSchema.safeParse(
+    parseFrontmatter(splitFrontmatter(source).raw).data,
+  )
   if (!parsed.success) {
     return null
   }
@@ -113,4 +115,3 @@ export function base64ByteLength(base64: string): number {
   const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0
   return Math.floor((length * 3) / 4) - padding
 }
-

@@ -68,7 +68,11 @@ describe('ShortcutsDialog', () => {
     if (row === null) {
       throw new Error('AI menu shortcut row was not rendered')
     }
-    expect([...row.querySelectorAll('kbd')].map((keycap) => keycap.textContent)).toEqual(['⌘', '⇧', 'J'])
+    expect([...row.querySelectorAll('kbd')].map((keycap) => keycap.textContent)).toEqual([
+      '⌘',
+      '⇧',
+      'J',
+    ])
   })
 
   it('keeps the sheet within the viewport and scrolls the shortcut rows', async () => {
@@ -84,7 +88,10 @@ describe('ShortcutsDialog', () => {
     const dialog = await openDialog()
     expect(dialog.className).toContain('lg:max-w-5xl')
     expect(dialog.className).toContain('xl:max-w-6xl')
-    const editorList = page.getByRole('heading', { name: 'Editor' }).element().parentElement?.querySelector('ul')
+    const editorList = page
+      .getByRole('heading', { name: 'Editor' })
+      .element()
+      .parentElement?.querySelector('ul')
     expect(editorList?.className).toContain('lg:columns-2')
     expect(editorList?.className).toContain('xl:columns-3')
   })

@@ -60,11 +60,7 @@ const UNSEGMENTED_SCRIPT_RANGES: ReadonlyArray<readonly [number, number]> = [
 export function containsUnsegmentedScript(value: string): boolean {
   for (const char of value) {
     const codePoint = char.codePointAt(0) ?? 0
-    if (
-      UNSEGMENTED_SCRIPT_RANGES.some(
-        ([start, end]) => codePoint >= start && codePoint <= end,
-      )
-    ) {
+    if (UNSEGMENTED_SCRIPT_RANGES.some(([start, end]) => codePoint >= start && codePoint <= end)) {
       return true
     }
   }
@@ -80,10 +76,12 @@ export interface TitleRecallTerm {
 
 /** Resolve query terms into the shared title-recall matching policy. */
 export function titleRecallTerms(query: string): TitleRecallTerm[] {
-  return splitSearchTerms(query).map(foldKey).map((value) => ({
-    value,
-    anywhere: containsUnsegmentedScript(value),
-  }))
+  return splitSearchTerms(query)
+    .map(foldKey)
+    .map((value) => ({
+      value,
+      anywhere: containsUnsegmentedScript(value),
+    }))
 }
 
 /**
@@ -95,9 +93,7 @@ export function titleRecallTerms(query: string): TitleRecallTerm[] {
  * cannot segment those, so word starts don't exist to anchor on.
  */
 export function titleRecallNeedles(query: string): string[] {
-  return titleRecallTerms(query).map((term) =>
-    term.anywhere ? term.value : ` ${term.value}`,
-  )
+  return titleRecallTerms(query).map((term) => (term.anywhere ? term.value : ` ${term.value}`))
 }
 
 export interface TitleMatchSql {

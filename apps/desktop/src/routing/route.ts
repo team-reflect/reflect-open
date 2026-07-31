@@ -92,7 +92,7 @@ export function effectiveDailyDate(
   focusedDailyDate: string | null,
 ): string | null {
   const routed = dailyDateForRoute(route, today)
-  return routed === null ? null : focusedDailyDate ?? routed
+  return routed === null ? null : (focusedDailyDate ?? routed)
 }
 
 /**
@@ -106,6 +106,21 @@ export function notePathForRoute(route: Route, today: string): string | null {
   }
   const daily = dailyDateForRoute(route, today)
   return daily === null ? null : dailyPath(daily)
+}
+
+/**
+ * The note file the user is currently working in. Daily views resolve through
+ * the focused stream day; all other routes use their directly addressed note.
+ * This is the shared target for note-scoped commands and transient note chrome
+ * such as Find, so neither can drift to a different virtualized day.
+ */
+export function focusedNotePathForRoute(
+  route: Route,
+  today: string,
+  focusedDailyDate: string | null,
+): string | null {
+  const daily = effectiveDailyDate(route, today, focusedDailyDate)
+  return daily !== null ? dailyPath(daily) : notePathForRoute(route, today)
 }
 
 /**

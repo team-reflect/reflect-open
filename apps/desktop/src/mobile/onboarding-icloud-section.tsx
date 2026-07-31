@@ -1,9 +1,15 @@
 import { useId, useState, type ReactElement } from 'react'
 import { Cloud, FolderOpen } from 'lucide-react'
+import { getIsComposing } from '@meowdown/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
-import { cleanGraphName, graphNameFromRoot, graphRootForName, isGraphNameTaken } from '@/lib/graph-names'
+import {
+  cleanGraphName,
+  graphNameFromRoot,
+  graphRootForName,
+  isGraphNameTaken,
+} from '@/lib/graph-names'
 import { OnboardingIcloudHeader } from '@/mobile/onboarding-icloud-header'
 
 const DEFAULT_ICLOUD_NOTES_NAME = 'Notes'
@@ -103,6 +109,9 @@ export function OnboardingIcloudSection(props: OnboardingIcloudSectionProps): Re
                 enterKeyHint="go"
                 onChange={(event) => setTypedName(event.target.value)}
                 onKeyDown={(event) => {
+                  if (getIsComposing()) {
+                    return
+                  }
                   if (event.key === 'Enter') {
                     create()
                   }
@@ -112,9 +121,7 @@ export function OnboardingIcloudSection(props: OnboardingIcloudSectionProps): Re
               />
             </div>
             {nameTaken ? (
-              <p className="text-xs text-destructive">
-                That name already exists in iCloud Drive.
-              </p>
+              <p className="text-xs text-destructive">That name already exists in iCloud Drive.</p>
             ) : null}
             <Button
               type="button"

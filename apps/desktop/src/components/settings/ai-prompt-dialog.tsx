@@ -111,6 +111,7 @@ export function AiPromptDialog({ prompt, onSave, onClose }: AiPromptDialogProps)
             <span className={FIELD_LABEL_CLASS}>Result</span>
             <Select
               value={mode}
+              items={{ replace: 'Replaces the selection', append: 'Inserted below the selection' }}
               onValueChange={(value) => setValue('mode', value as AiPromptMode)}
             >
               <SelectTrigger>

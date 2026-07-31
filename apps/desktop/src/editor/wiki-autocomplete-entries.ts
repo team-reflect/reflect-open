@@ -89,9 +89,7 @@ export function buildAutocompleteEntries<Suggestion extends WikiSuggestion>(
   // matching, so it must keep suppressing Create and contact rows.
   const resolvable = new Set<string>()
   const suggestionPaths = new Set<string>()
-  const fallbackResolvable = new Set(
-    [...claimedTargetKeys].map(foldFallbackTitleKey),
-  )
+  const fallbackResolvable = new Set([...claimedTargetKeys].map(foldFallbackTitleKey))
   for (const suggestion of suggestions) {
     if (suggestion.path !== null) {
       suggestionPaths.add(suggestion.path)
@@ -146,14 +144,12 @@ export function buildAutocompleteEntries<Suggestion extends WikiSuggestion>(
     contacts.some(({ contact }) => foldKey(contact.fullName) === key) ||
     (options.blockedContactNames ?? []).some((name) => foldKey(name) === key)
   const canSerializeCreate =
-    !options.requireSerializableWikiText ||
-    serializeWikiSuggestionAddress(title, null) !== null
+    !options.requireSerializableWikiText || serializeWikiSuggestionAddress(title, null) !== null
   // A leading-emoji/whitespace fallback candidate is either the existing note
   // to reuse or an ambiguity to leave unresolved. Neither case may offer a
   // duplicate-creating row.
   const fallbackKey = foldFallbackTitleKey(title)
-  const hasFallbackCollision =
-    fallbackKey !== '' && fallbackResolvable.has(fallbackKey)
+  const hasFallbackCollision = fallbackKey !== '' && fallbackResolvable.has(fallbackKey)
   if (
     !resolvesAsTyped &&
     !claimedTargetKeys.has(key) &&

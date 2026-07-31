@@ -1,5 +1,6 @@
 import { useMemo, type ReactElement } from 'react'
 import { ArrowUp, Plus, Square, X } from 'lucide-react'
+import { getIsComposing } from '@meowdown/core'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import {
   Attachment,
@@ -109,6 +110,9 @@ export function ChatInput(): ReactElement {
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
+            if (getIsComposing()) {
+              return
+            }
             if (event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault()
               submit()
@@ -138,6 +142,10 @@ export function ChatInput(): ReactElement {
         <div className="flex items-center gap-2 px-2.5 pb-2.5">
           <Select
             value={activeIndex >= 0 ? String(activeIndex) : ''}
+            items={modelOptions.map((option, index) => ({
+              value: String(index),
+              label: option.label,
+            }))}
             onValueChange={(value) => {
               const option = modelOptions[Number(value)]
               if (option !== undefined) {
@@ -169,12 +177,14 @@ export function ChatInput(): ReactElement {
           <ChatHistoryMenu />
           {turns.length > 0 && !streaming ? (
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="sm" onClick={newChat}>
-                  <Plus aria-hidden data-icon="inline-start" />
-                  New chat
-                </Button>
-              </TooltipTrigger>
+              <TooltipTrigger
+                render={
+                  <Button variant="ghost" size="sm" onClick={newChat}>
+                    <Plus aria-hidden data-icon="inline-start" />
+                    New chat
+                  </Button>
+                }
+              />
               <TooltipContent side="top">
                 New chat {NEW_CHAT_BINDING ? <ShortcutKeys binding={NEW_CHAT_BINDING} /> : null}
               </TooltipContent>

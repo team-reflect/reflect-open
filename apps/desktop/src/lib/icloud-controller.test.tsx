@@ -28,7 +28,11 @@ interface ScanCall {
   recordBaseline: boolean
 }
 
-const GRAPH = { root: '/Users/alex/Library/Mobile Documents/iCloud~app/Documents/Notes', name: 'Notes', generation: 7 }
+const GRAPH = {
+  root: '/Users/alex/Library/Mobile Documents/iCloud~app/Documents/Notes',
+  name: 'Notes',
+  generation: 7,
+}
 
 let invoked: Array<[string, Record<string, unknown>]>
 let scanCalls: ScanCall[]
@@ -70,9 +74,7 @@ beforeEach(() => {
                 resolve({ changed: [], needsReview: [], deferred: [], autoResolved: 0 })
             })
           }
-          return (
-            scripted ?? { changed: [], needsReview: [], deferred: [], autoResolved: 0 }
-          )
+          return scripted ?? { changed: [], needsReview: [], deferred: [], autoResolved: 0 }
         }
         case 'note_read':
           return '# merged\n'
@@ -139,9 +141,9 @@ async function settleScan(advanceMs = 1_100): Promise<void> {
 describe('isICloudRoot', () => {
   it('matches container and iCloud Drive paths, and nothing else', () => {
     expect(isICloudRoot(GRAPH.root)).toBe(true)
-    expect(
-      isICloudRoot('/Users/alex/Library/Mobile Documents/com~apple~CloudDocs/Notes'),
-    ).toBe(true)
+    expect(isICloudRoot('/Users/alex/Library/Mobile Documents/com~apple~CloudDocs/Notes')).toBe(
+      true,
+    )
     expect(isICloudRoot('/Users/alex/Documents/Notes')).toBe(false)
   })
 })

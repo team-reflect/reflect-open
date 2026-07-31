@@ -27,11 +27,10 @@ export function AiProviderConsent({
   return (
     <div className="flex flex-col gap-2">
       <p className="text-sm text-text-muted">
-        When you use AI features, Reflect sends data directly to {provider.label} using this
-        key: AI chat sends your messages and the notes the assistant reads
-        {sendsAudio ? ', and audio memos send the recording audio for transcription' : ''}.
-        Nothing passes through a Reflect server, and notes you mark as private are never
-        sent.{' '}
+        When you use AI features, Reflect sends data directly to {provider.label} using this key: AI
+        chat sends your messages and the notes the assistant reads
+        {sendsAudio ? ', and audio memos send the recording audio for transcription' : ''}. Nothing
+        passes through a Reflect server, and notes you mark as private are never sent.{' '}
         <button
           type="button"
           className="underline"

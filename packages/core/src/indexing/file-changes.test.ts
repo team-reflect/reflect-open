@@ -56,10 +56,7 @@ describe('subscribeFileChanges', () => {
     emitFromBridge([{ path: 'notes/watched.md', kind: 'upsert' }])
     emitFileChanges([{ path: 'notes/merged.md', kind: 'upsert' }])
 
-    expect(received.map((batch) => batch[0]!.path)).toEqual([
-      'notes/watched.md',
-      'notes/merged.md',
-    ])
+    expect(received.map((batch) => batch[0]!.path)).toEqual(['notes/watched.md', 'notes/merged.md'])
     unlisten()
   })
 })

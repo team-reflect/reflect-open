@@ -1,21 +1,5 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactElement,
-} from 'react'
-import {
-  ArrowRight,
-  CalendarDays,
-  Check,
-  CircleCheck,
-  List,
-  Trash2,
-  Undo2,
-  X,
-} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
+import { ArrowRight, CalendarDays, Check, CircleCheck, List, Trash2, Undo2, X } from 'lucide-react'
 import { Priority } from '@meowdown/core'
 import { useKeymap } from '@meowdown/react'
 import type { OpenTask } from '@reflect/core'
@@ -255,11 +239,7 @@ export function MobileTaskEditSheet({
           </NoteEditor>
         </div>
         <div className="flex flex-wrap items-center gap-1.5" aria-label="Schedule">
-          <ScheduleChip
-            label="Today"
-            active={dueDate === today}
-            onClick={() => schedule(today)}
-          />
+          <ScheduleChip label="Today" active={dueDate === today} onClick={() => schedule(today)} />
           <ScheduleChip
             label="Tomorrow"
             active={dueDate === addDaysIso(today, 1)}
@@ -271,9 +251,7 @@ export function MobileTaskEditSheet({
             onClick={() => schedule(addDaysIso(today, 7))}
           />
           <ScheduleChip
-            label={
-              dueDate !== null ? formatDayLabel(dueDate, settings.dateFormat) : 'Pick date'
-            }
+            label={dueDate !== null ? formatDayLabel(dueDate, settings.dateFormat) : 'Pick date'}
             icon={<CalendarDays aria-hidden className="size-3.5" />}
             active={showCalendar}
             onClick={toggleCalendar}
@@ -375,9 +353,7 @@ function ScheduleChip({
       onClick={onClick}
       className={cn(
         'flex h-8 items-center gap-1 whitespace-nowrap rounded-full border px-3 text-xs font-medium',
-        active
-          ? 'border-accent/40 bg-accent-soft text-text'
-          : 'border-border text-text-muted',
+        active ? 'border-accent/40 bg-accent-soft text-text' : 'border-border text-text-muted',
       )}
     >
       {active && icon === undefined ? <Check aria-hidden className="size-3.5" /> : icon}

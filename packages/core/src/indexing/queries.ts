@@ -1,11 +1,5 @@
 import { sql } from 'kysely'
-import {
-  foldTag,
-  normalizeWikiTarget,
-  resolved,
-  unresolved,
-  type Resolution,
-} from '../markdown'
+import { foldTag, normalizeWikiTarget, resolved, unresolved, type Resolution } from '../markdown'
 import { db } from './db'
 import { inClauseChunks } from './query-utils'
 export {
@@ -34,6 +28,18 @@ export {
  */
 
 /** Distinct source paths of links whose folded target key is `targetKey`. */
+/** Distinct source paths of links that name a file by folded vault path. */
+export async function getPathLinkSources(targetPathKey: string): Promise<string[]> {
+  const rows = await db
+    .selectFrom('links')
+    .where('targetPathKey', '=', targetPathKey)
+    .select('sourcePath')
+    .distinct()
+    .orderBy('sourcePath')
+    .execute()
+  return rows.map((row) => row.sourcePath)
+}
+
 export async function getLinkSources(targetKey: string): Promise<string[]> {
   const rows = await db
     .selectFrom('links')
@@ -224,7 +230,9 @@ export async function listDailyNotes(range: DailyNotesRange): Promise<DailyNoteR
     .limit(range.limit)
     .execute()
   return rows.flatMap((row) =>
-    row.dailyDate === null ? [] : [{ ...row, dailyDate: row.dailyDate, isPrivate: row.isPrivate !== 0 }],
+    row.dailyDate === null
+      ? []
+      : [{ ...row, dailyDate: row.dailyDate, isPrivate: row.isPrivate !== 0 }],
   )
 }
 
@@ -315,67 +323,57 @@ export async function getNoteIdsByPath(paths: string[]): Promise<Map<string, str
   return ids
 }
 
-/** Exact indexed date/title/alias candidates, preserving ambiguity within the winning tier. */
-export type ExactWikiTargetMatch =
-  | { readonly kind: 'date'; readonly paths: readonly string[] }
-  | { readonly kind: 'title'; readonly paths: readonly string[] }
-  | { readonly kind: 'alias'; readonly paths: readonly string[] }
-  | { readonly kind: 'missing'; readonly paths: readonly [] }
+/** The winning tier's claimants for a folded key, preserving ambiguity. */
+export interface WikiTargetMatch {
+  /** One of `CLAIM_TIER`, or {@link UNCLAIMED_TIER} with no paths. */
+  readonly tier: number
+  readonly paths: readonly string[]
+}
+
+/** `WikiTargetMatch.tier` when nothing claims the key (never stored). */
+export const UNCLAIMED_TIER = 0
 
 /**
- * Find every indexed path that exactly claims `target`, with ordinary wiki
- * resolution precedence: calendar date, then title, then alias. Unlike
- * {@link resolveWikiTarget}, this does not collapse a tier to its first path;
- * callers that may create on a miss need to distinguish one existing note
- * from several notes claiming the same spelling.
+ * Look up one folded spelling. `note_claims` already encodes the precedence
+ * (templates claim nothing), so this is a single indexed read rather than one
+ * query per tier. Unlike {@link resolveWikiTarget}, this does not collapse a
+ * tier to its first path; callers that may create on a miss need to
+ * distinguish one existing note from several notes claiming the same
+ * spelling.
  */
-export async function findExactWikiTargetMatches(
-  target: string,
-): Promise<ExactWikiTargetMatch> {
-  const normalized = normalizeWikiTarget(target)
-  if (normalized.key === '') {
-    return { kind: 'missing', paths: [] }
+export async function findWikiTargetMatch(key: string): Promise<WikiTargetMatch> {
+  if (key === '') {
+    return { tier: UNCLAIMED_TIER, paths: [] }
   }
+  const rows = await db
+    .selectFrom('noteClaims')
+    .where('key', '=', key)
+    .select(['notePath', 'tier'])
+    .orderBy('tier')
+    .orderBy('notePath')
+    .execute()
+  const tier = rows[0]?.tier
+  return tier === undefined
+    ? { tier: UNCLAIMED_TIER, paths: [] }
+    : {
+        tier,
+        paths: [...new Set(rows.filter((row) => row.tier === tier).map((row) => row.notePath))],
+      }
+}
 
-  if (normalized.date !== undefined) {
-    const dateRows = await db
-      .selectFrom('notes')
-      .where('dailyDate', '=', normalized.date)
-      .where('kind', '!=', 'template')
-      .select('path')
-      .distinct()
-      .orderBy('path')
-      .execute()
-    if (dateRows.length > 0) {
-      return { kind: 'date', paths: dateRows.map((row) => row.path) }
-    }
+/** Every indexed note whose folded path matches, sorted. */
+export async function findNotesByPathKey(pathKey: string): Promise<string[]> {
+  if (pathKey === '') {
+    return []
   }
-
-  const titleRows = await db
+  const rows = await db
     .selectFrom('notes')
-    .where('titleKey', '=', normalized.key)
-    .where('kind', '!=', 'template')
+    .where('pathKey', '=', pathKey)
     .select('path')
     .distinct()
     .orderBy('path')
     .execute()
-  if (titleRows.length > 0) {
-    return { kind: 'title', paths: titleRows.map((row) => row.path) }
-  }
-
-  const aliasRows = await db
-    .selectFrom('aliases')
-    .innerJoin('notes', 'notes.path', 'aliases.notePath')
-    .where('aliasKey', '=', normalized.key)
-    .where('notes.kind', '!=', 'template')
-    .select('notePath')
-    .distinct()
-    .orderBy('notePath')
-    .execute()
-  if (aliasRows.length > 0) {
-    return { kind: 'alias', paths: aliasRows.map((row) => row.notePath) }
-  }
-  return { kind: 'missing', paths: [] }
+  return rows.map((row) => row.path)
 }
 
 /**

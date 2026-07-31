@@ -67,17 +67,19 @@ describe('settingsSchema', () => {
   it('accepts valid values', () => {
     expect(settingsSchema.parse({ editorMarkdownSyntax: 'show' }).editorMarkdownSyntax).toBe('show')
     expect(settingsSchema.parse({ editorMarkdownSyntax: 'hide' }).editorMarkdownSyntax).toBe('hide')
-    expect(settingsSchema.parse({ editorMarkdownSyntax: 'hybrid' }).editorMarkdownSyntax).toBe('hybrid')
+    expect(settingsSchema.parse({ editorMarkdownSyntax: 'hybrid' }).editorMarkdownSyntax).toBe(
+      'hybrid',
+    )
     expect(settingsSchema.parse({ editorSpellCheck: false }).editorSpellCheck).toBe(false)
     expect(settingsSchema.parse({ editorSpellCheck: true }).editorSpellCheck).toBe(true)
     expect(settingsSchema.parse({ editorDefaultBullet: false }).editorDefaultBullet).toBe(false)
     expect(settingsSchema.parse({ editorDefaultBullet: true }).editorDefaultBullet).toBe(true)
-    expect(
-      settingsSchema.parse({ editorBulletAfterHeading: false }).editorBulletAfterHeading,
-    ).toBe(false)
-    expect(
-      settingsSchema.parse({ editorBulletAfterHeading: true }).editorBulletAfterHeading,
-    ).toBe(true)
+    expect(settingsSchema.parse({ editorBulletAfterHeading: false }).editorBulletAfterHeading).toBe(
+      false,
+    )
+    expect(settingsSchema.parse({ editorBulletAfterHeading: true }).editorBulletAfterHeading).toBe(
+      true,
+    )
     expect(
       settingsSchema.parse({ editorSmoothCaretAnimation: false }).editorSmoothCaretAnimation,
     ).toBe(false)
@@ -112,9 +114,9 @@ describe('settingsSchema', () => {
     expect(settingsSchema.parse({ transcriptionFormat: false }).transcriptionFormat).toBe(false)
     expect(settingsSchema.parse({ contactsEnabled: true }).contactsEnabled).toBe(true)
     expect(settingsSchema.parse({ contactsEnabled: false }).contactsEnabled).toBe(false)
-    expect(
-      settingsSchema.parse({ allNotesFilterTags: ['meeting'] }).allNotesFilterTags,
-    ).toEqual(['meeting'])
+    expect(settingsSchema.parse({ allNotesFilterTags: ['meeting'] }).allNotesFilterTags).toEqual([
+      'meeting',
+    ])
     expect(settingsSchema.parse({ allNotesFilterTags: [] }).allNotesFilterTags).toEqual([])
     expect(settingsSchema.parse({ calendarEnabled: true }).calendarEnabled).toBe(true)
     expect(settingsSchema.parse({ calendarEnabled: false }).calendarEnabled).toBe(false)
@@ -139,22 +141,26 @@ describe('settingsSchema', () => {
   })
 
   it('degrades an invalid value to its default instead of failing the load', () => {
-    expect(settingsSchema.parse({ editorMarkdownSyntax: 'sideways' }).editorMarkdownSyntax).toBe('hide')
+    expect(settingsSchema.parse({ editorMarkdownSyntax: 'sideways' }).editorMarkdownSyntax).toBe(
+      'hide',
+    )
     expect(settingsSchema.parse({ editorMarkdownSyntax: 42 }).editorMarkdownSyntax).toBe('hide')
     expect(settingsSchema.parse({ editorSpellCheck: 'off' }).editorSpellCheck).toBe(true)
     expect(settingsSchema.parse({ editorSpellCheck: 0 }).editorSpellCheck).toBe(true)
     expect(settingsSchema.parse({ editorDefaultBullet: 'on' }).editorDefaultBullet).toBe(true)
     expect(settingsSchema.parse({ editorDefaultBullet: 0 }).editorDefaultBullet).toBe(true)
-    expect(
-      settingsSchema.parse({ editorBulletAfterHeading: 'on' }).editorBulletAfterHeading,
-    ).toBe(true)
-    expect(settingsSchema.parse({ editorBulletAfterHeading: 0 }).editorBulletAfterHeading).toBe(true)
+    expect(settingsSchema.parse({ editorBulletAfterHeading: 'on' }).editorBulletAfterHeading).toBe(
+      true,
+    )
+    expect(settingsSchema.parse({ editorBulletAfterHeading: 0 }).editorBulletAfterHeading).toBe(
+      true,
+    )
     expect(
       settingsSchema.parse({ editorSmoothCaretAnimation: 'on' }).editorSmoothCaretAnimation,
     ).toBe(true)
-    expect(
-      settingsSchema.parse({ editorSmoothCaretAnimation: 0 }).editorSmoothCaretAnimation,
-    ).toBe(true)
+    expect(settingsSchema.parse({ editorSmoothCaretAnimation: 0 }).editorSmoothCaretAnimation).toBe(
+      true,
+    )
     expect(settingsSchema.parse({ editorTextSize: 'huge' }).editorTextSize).toBe('small')
     expect(settingsSchema.parse({ editorTextSize: 3 }).editorTextSize).toBe('small')
     expect(settingsSchema.parse({ editorFullWidth: 'yes' }).editorFullWidth).toBe(false)
@@ -282,6 +288,19 @@ describe('settingsSchema', () => {
       expect(settingsSchema.parse({ aiProviders: [entry] }).aiProviders).toEqual([entry])
     })
 
+    it('accepts OpenAI-compatible entries with an http base URL', () => {
+      const entry = {
+        id: 'local',
+        provider: 'openai-compatible',
+        model: 'llama-local',
+        baseUrl: 'http://localhost:1234/v1/',
+        keyHint: '',
+      }
+      expect(settingsSchema.parse({ aiProviders: [entry] }).aiProviders).toEqual([
+        { ...entry, baseUrl: 'http://localhost:1234/v1' },
+      ])
+    })
+
     it('defaults the per-entry display fields', () => {
       const entry = { id: 'abc', provider: 'openai', model: 'gpt-5.1' }
       expect(settingsSchema.parse({ aiProviders: [entry] }).aiProviders).toEqual([
@@ -292,6 +311,30 @@ describe('settingsSchema', () => {
     it('drops a corrupt entry without losing the rest', () => {
       const parsed = settingsSchema.parse({
         aiProviders: [valid, { provider: 'aliens' }, 42],
+      })
+      expect(parsed.aiProviders).toEqual([valid])
+    })
+
+    it('drops OpenAI-compatible entries without a safe base URL', () => {
+      const parsed = settingsSchema.parse({
+        aiProviders: [
+          valid,
+          { id: 'local', provider: 'openai-compatible', model: 'llama-local', keyHint: '' },
+          {
+            id: 'socket',
+            provider: 'openai-compatible',
+            model: 'llama-local',
+            baseUrl: 'file:///tmp/model.sock',
+            keyHint: '',
+          },
+          {
+            id: 'query',
+            provider: 'openai-compatible',
+            model: 'llama-local',
+            baseUrl: 'http://localhost:1234/v1?token=abc',
+            keyHint: '',
+          },
+        ],
       })
       expect(parsed.aiProviders).toEqual([valid])
     })

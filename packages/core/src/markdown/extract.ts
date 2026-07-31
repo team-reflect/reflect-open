@@ -1,9 +1,10 @@
 import type { SyntaxNode } from '@meowdown/markdown'
-import { dateFromDailyPath, isDaily } from '../graph/paths'
+import { dateFromDailyPath, isAttachmentPath, isDaily } from '../graph/paths'
 import { parseFrontmatter, splitFrontmatter } from './frontmatter'
 import { parseBody } from './grammar'
 import { foldTag } from './keys'
 import { parseInlineLink } from './link-syntax'
+import { headingLevelOf } from './node-types'
 import { buildPlainText, plainTextOfRange, unescapeMarkdownText } from './plain-text'
 import { normalizeWikiTarget } from './resolve'
 import { taskBreadcrumbs } from './task-breadcrumbs'
@@ -65,17 +66,15 @@ function isLiteralPlainTextNode(name: string): boolean {
   return name === 'InlineCode' || name === 'FencedCode' || name === 'CodeBlock'
 }
 
-function headingLevelOf(name: string): number | null {
-  const match = /^(?:ATXHeading|SetextHeading)([1-6])$/.exec(name)
-  return match ? Number(match[1]) : null
-}
-
 function cleanHeadingText(raw: string): string {
   const newline = raw.indexOf('\n')
   if (newline !== -1) {
     return unescapeMarkdownText(raw.slice(0, newline).trim()) // setext: heading text is the first line
   }
-  const text = raw.replace(/^#{1,6}[ \t]*/, '').replace(/[ \t]*#*[ \t]*$/, '').trim()
+  const text = raw
+    .replace(/^#{1,6}[ \t]*/, '')
+    .replace(/[ \t]*#*[ \t]*$/, '')
+    .trim()
   return unescapeMarkdownText(text)
 }
 
@@ -105,6 +104,103 @@ function isAssetHref(href: string): boolean {
     return false // external scheme, protocol-relative, or in-page anchor
   }
   return /(^|\/)assets\//.test(href)
+}
+
+/**
+ * Every graph-relative path an authored attachment reference can mean, in
+ * resolution order.
+ *
+ * `assets/x.png` is genuinely two things: Reflect has always written it
+ * vault-root relative, while CommonMark and Obsidian read it as
+ * source-relative. Both spellings are kept so neither an old Reflect note nor
+ * an imported vault loses its images. The index stores both, which is inert
+ * because only a path that exists on disk is ever consulted.
+ *
+ * An explicit `/x`, `./x`, or `../x` has one meaning and gets one candidate.
+ */
+export function attachmentReferenceCandidates(sourcePath: string, reference: string): string[] {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(reference) || reference.startsWith('//')) {
+    return []
+  }
+  const authored = decodeReferencePath(reference)
+  if (authored === '') {
+    return []
+  }
+  if (authored.startsWith('/')) {
+    return keepAttachments([resolveSegments([], authored.slice(1))])
+  }
+  if (authored.startsWith('./') || authored.startsWith('../')) {
+    return keepAttachments([resolveSegments(parentSegments(sourcePath), authored)])
+  }
+  return keepAttachments([
+    resolveSegments(parentSegments(sourcePath), authored),
+    resolveSegments([], authored),
+  ])
+}
+
+/** Strip the fragment and query, then percent-decode. */
+function decodeReferencePath(reference: string): string {
+  const beforeQuery = (reference.split('#')[0] ?? '').split('?')[0] ?? ''
+  try {
+    return decodeURIComponent(beforeQuery)
+  } catch {
+    return beforeQuery // a malformed escape keeps the raw spelling, as before
+  }
+}
+
+function parentSegments(sourcePath: string): readonly string[] {
+  const segments = sourcePath.split('/')
+  segments.pop()
+  return segments
+}
+
+function resolveSegments(base: readonly string[], authored: string): string | null {
+  if (authored.includes('\\') || authored.includes('\0')) {
+    return null
+  }
+  const segments = [...base]
+  for (const segment of authored.split('/')) {
+    if (segment === '' || segment === '.') {
+      continue
+    }
+    if (segment === '..') {
+      if (segments.pop() === undefined) {
+        return null
+      }
+      continue
+    }
+    if (segment.startsWith('.')) {
+      return null
+    }
+    segments.push(segment)
+  }
+  return segments.length === 0 ? null : segments.join('/')
+}
+
+function keepAttachments(candidates: readonly (string | null)[]): string[] {
+  return [
+    ...new Set(
+      candidates.filter((path): path is string => path !== null && isAttachmentPath(path)),
+    ),
+  ]
+}
+
+/** Does this wiki-embed target name a supported attachment rather than a note? */
+function isAttachmentEmbedTarget(target: string): boolean {
+  return target !== '' && isAttachmentPath(target.split('/').at(-1) ?? target)
+}
+
+/**
+ * Wiki embeds are vault-root relative and never URL-decoded (Obsidian's
+ * rules). A bare filename stays bare: which folder it lives in is a question
+ * only a live catalog can answer, and the privacy gate matches such a
+ * reference by basename. A target that resolves to no safe attachment path
+ * (traversal, hidden components) returns null — it must never reach the
+ * asset projection.
+ */
+function wikiEmbedAssetPath(target: string): string | null {
+  const path = resolveSegments([], target.replace(/^\//, ''))
+  return path !== null && isAttachmentPath(path) ? path : null
 }
 
 /**
@@ -345,23 +441,50 @@ export function parseNote(input: { path: string; source: string }): ParsedNote {
       }
 
       if (isWikiNodeName(name)) {
-        wikiLinks.push(readWikiLink(body, wikiBracketStart(node), to, bodyOffset))
+        const wiki = readWikiLink(body, wikiBracketStart(node), to, bodyOffset)
+        // `![[photo.png]]` names a file, not a note: it must never become a
+        // backlink row or resolve through the note-key tiers. An unsafe
+        // target (traversal, hidden components) stays a visible wiki link
+        // that resolves to nothing, never an asset row.
+        const assetPath =
+          name === 'WikiEmbed' && isAttachmentEmbedTarget(wiki.target)
+            ? wikiEmbedAssetPath(wiki.target)
+            : null
+        if (assetPath !== null) {
+          assets.push({ path: assetPath, from: wiki.from, to: wiki.to })
+        } else {
+          wikiLinks.push(wiki)
+        }
         return false
       }
 
-      const headingLevel = headingLevelOf(name)
-      if (headingLevel) {
+      const headingLevel = headingLevelOf(node)
+      if (headingLevel !== null) {
         const text = cleanHeadingText(body.slice(from, to))
-        headings.push({ level: headingLevel, text, slug: slugify(text), from: from + bodyOffset, to: to + bodyOffset })
+        // `isTop` is the `Document` node: a heading anywhere else is nested in a
+        // blockquote or list item, so it never opens or ends a real section.
+        const topLevel = node.node.parent?.type.isTop === true
+        headings.push({
+          level: headingLevel,
+          text,
+          slug: slugify(text),
+          topLevel,
+          from: from + bodyOffset,
+          to: to + bodyOffset,
+        })
         return true
       }
 
       if (name === 'Link' || name === 'Image') {
         const link = readLink(body, from, to, bodyOffset)
         if (link) {
-          const assetPath = canonicalAssetPath(link.href)
-          if (assetPath !== null) {
-            assets.push({ path: assetPath, from: link.from, to: link.to })
+          const candidates = attachmentReferenceCandidates(path, link.href)
+          if (candidates.length > 0) {
+            // One authored reference, several spellings of the same file: the
+            // span is shared, and consumers treat `assets` as a path set.
+            for (const candidate of candidates) {
+              assets.push({ path: candidate, from: link.from, to: link.to })
+            }
           } else {
             links.push(link)
           }

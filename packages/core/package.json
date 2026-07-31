@@ -3,31 +3,33 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
     "./capture-envelope": "./src/actions/capture-envelope.ts"
   },
-  "types": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --config ../../vitest.config.ts --project core-browser --project core-node"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.96",
-    "@ai-sdk/google": "^3.0.84",
-    "@ai-sdk/openai": "^3.0.84",
-    "@meowdown/markdown": "^0.58.0",
+    "@ai-sdk/anthropic": "^4.0.20",
+    "@ai-sdk/google": "^4.0.24",
+    "@ai-sdk/openai": "^4.0.20",
+    "@ai-sdk/openai-compatible": "^3.0.12",
+    "@meowdown/markdown": "^0.63.1",
     "@reflect/db": "workspace:*",
     "@reflect/utils": "workspace:*",
-    "ai": "^6.0.211",
+    "ai": "^7.0.37",
     "kysely": "^0.28.17",
     "ulidx": "^2.4.1",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@ai-sdk/provider": "^3.0.11",
-    "jsdom": "^29.1.1",
+    "@ai-sdk/provider": "^4.0.3",
+    "@vitest/browser-playwright": "^4.1.10",
+    "playwright": "^1.61.1",
     "sqlite-vec": "^0.1.9",
     "typescript": "~6.0.3",
     "vitest": "^4.1.10"

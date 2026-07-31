@@ -96,7 +96,9 @@ function extractNumber(tokens: readonly string[]): number | null {
 
 function extractUnit(tokens: readonly string[]): Unit | null {
   for (const token of tokens) {
-    const unit = UNITS.find((candidate) => candidate.startsWith(token) || `${candidate}s`.startsWith(token))
+    const unit = UNITS.find(
+      (candidate) => candidate.startsWith(token) || `${candidate}s`.startsWith(token),
+    )
     if (unit !== undefined) {
       return unit
     }
@@ -108,7 +110,11 @@ function extractDirection(tokens: readonly string[]): Direction | null {
   const hasPast = tokens.includes('ago')
   const hasFuture = tokens.some(
     (token) =>
-      token === 'from' || token === 'now' || token === 'later' || token === 'in' || token === 'hence',
+      token === 'from' ||
+      token === 'now' ||
+      token === 'later' ||
+      token === 'in' ||
+      token === 'hence',
   )
   if (hasPast && !hasFuture) {
     return 'past'
@@ -132,7 +138,10 @@ function shiftByUnit(today: string, unit: Unit, amount: number): string {
   }
 }
 
-function relativeSuggestions(tokens: readonly string[], context: DateSuggestionContext): DateSuggestion[] {
+function relativeSuggestions(
+  tokens: readonly string[],
+  context: DateSuggestionContext,
+): DateSuggestion[] {
   const amount = extractNumber(tokens)
   if (amount === null) {
     return []
@@ -161,7 +170,9 @@ function relativeSuggestions(tokens: readonly string[], context: DateSuggestionC
       }
       const plural = amount === 1 ? '' : 's'
       const phrase =
-        direction === 'future' ? `${amount} ${unit}${plural} from now` : `${amount} ${unit}${plural} ago`
+        direction === 'future'
+          ? `${amount} ${unit}${plural} from now`
+          : `${amount} ${unit}${plural} ago`
       results.push({ date, phrase })
     }
   }
@@ -276,7 +287,11 @@ interface NlCandidate {
  * word (`mon` → *…Monday*, `yest` → *Yesterday*); a two-token query matches the
  * modifier then the unit (`next fri` → *Next Friday*).
  */
-function phraseMatches(tokens: readonly string[], modifier: Modifier | null, unitWord: string): boolean {
+function phraseMatches(
+  tokens: readonly string[],
+  modifier: Modifier | null,
+  unitWord: string,
+): boolean {
   const [first, second] = tokens
   if (tokens.length === 1 && first !== undefined) {
     return unitWord.startsWith(first)
@@ -297,8 +312,20 @@ function naturalLanguageSuggestions(
   }
   const candidates: NlCandidate[] = [
     { phrase: 'Today', date: context.today, modifier: null, unitWord: 'today', sort: 0 },
-    { phrase: 'Yesterday', date: addDaysIso(context.today, -1), modifier: null, unitWord: 'yesterday', sort: 1 },
-    { phrase: 'Tomorrow', date: addDaysIso(context.today, 1), modifier: null, unitWord: 'tomorrow', sort: 2 },
+    {
+      phrase: 'Yesterday',
+      date: addDaysIso(context.today, -1),
+      modifier: null,
+      unitWord: 'yesterday',
+      sort: 1,
+    },
+    {
+      phrase: 'Tomorrow',
+      date: addDaysIso(context.today, 1),
+      modifier: null,
+      unitWord: 'tomorrow',
+      sort: 2,
+    },
   ]
   MODIFIERS.forEach((modifier, modifierIndex) => {
     for (const unit of NL_UNITS) {
@@ -387,7 +414,10 @@ function typedDateSuggestions(
  * specific phrasing wins). Returns `[]` for an empty query or one no
  * interpretation recognises.
  */
-export function generateDateSuggestions(query: string, context: DateSuggestionContext): DateSuggestion[] {
+export function generateDateSuggestions(
+  query: string,
+  context: DateSuggestionContext,
+): DateSuggestion[] {
   const trimmed = query.trim()
   if (trimmed === '') {
     return []

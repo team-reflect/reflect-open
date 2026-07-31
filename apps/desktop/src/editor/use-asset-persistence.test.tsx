@@ -240,7 +240,9 @@ describe('useAssetPersistence resolveFileInfo', () => {
     const invoke = installListingBridge([])
     await renderPersistence({ generation: 3 })
 
-    await expect(persistence!.resolveFileInfo('https://example.com/q3.pdf')).resolves.toBeUndefined()
+    await expect(
+      persistence!.resolveFileInfo('https://example.com/q3.pdf'),
+    ).resolves.toBeUndefined()
     await expect(persistence!.resolveFileInfo('assets/../secrets.env')).resolves.toBeUndefined()
     expect(invoke).not.toHaveBeenCalled()
   })
@@ -389,5 +391,4 @@ describe('useAssetPersistence errors', () => {
     await expect(savePromise).resolves.toBeNull()
     expect(persistence!.saveError).toBeNull()
   })
-
 })

@@ -79,10 +79,7 @@ const EDGE_DASHES_RE = /^-+|-+$/g
  */
 export function slugForTitle(title: string): string {
   const folded = title.normalize('NFC').toLowerCase()
-  const dashed = folded
-    .replace(STRIP_RE, '')
-    .replace(SEPARATOR_RE, '-')
-    .replace(EDGE_DASHES_RE, '')
+  const dashed = folded.replace(STRIP_RE, '').replace(SEPARATOR_RE, '-').replace(EDGE_DASHES_RE, '')
   // Cap on code points, then re-trim: the cut can land right after a dash.
   const capped = [...dashed].slice(0, MAX_SLUG_CHARS).join('').replace(EDGE_DASHES_RE, '')
   if (capped === '') {

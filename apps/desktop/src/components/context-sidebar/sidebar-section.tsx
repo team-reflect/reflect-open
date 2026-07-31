@@ -22,11 +22,7 @@ function readOpenState(storageKey: string): boolean {
  * open/closed state persisted per section for the session so a collapsed
  * section stays collapsed while navigating between days and notes.
  */
-export function SidebarSection({
-  storageKey,
-  title,
-  children,
-}: SidebarSectionProps): ReactElement {
+export function SidebarSection({ storageKey, title, children }: SidebarSectionProps): ReactElement {
   const [open, setOpen] = useState(() => readOpenState(storageKey))
 
   const toggle = (): void => {

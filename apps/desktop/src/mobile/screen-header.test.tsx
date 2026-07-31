@@ -18,14 +18,12 @@ describe('MobileScreenHeader', () => {
     }
     expect(Array.from(header.classList)).toContain('grid')
     expect(Array.from(header.classList)).toContain('h-11')
-    expect(Array.from(header.classList)).toContain(
-      'grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]',
-    )
+    expect(Array.from(header.classList)).toContain('grid-cols-[2.5rem_minmax(0,1fr)_2.5rem]')
     expect(Array.from(header.classList)).toContain('items-center')
 
-    expect(
-      Array.from(view.getByRole('button', { name: 'Back' }).element().classList),
-    ).toContain('justify-self-center')
+    expect(Array.from(view.getByRole('button', { name: 'Back' }).element().classList)).toContain(
+      'justify-self-center',
+    )
     expect(
       Array.from(view.getByRole('heading', { name: 'Roadmap' }).element().classList),
     ).toContain('text-center')

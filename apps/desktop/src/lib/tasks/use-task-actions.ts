@@ -1,12 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { type OpenTask } from '@reflect/core'
-import {
-  convertTaskToBullet,
-  deleteTask,
-  editTask,
-  insertTask,
-  toggleTask,
-} from '@/lib/note-task'
+import { convertTaskToBullet, deleteTask, editTask, insertTask, toggleTask } from '@/lib/note-task'
 import { editAndToggleError, isEditAndToggleError } from '@/lib/tasks/edit-and-toggle-error'
 import {
   archiveRecentlyCompleted,
@@ -191,7 +185,10 @@ export function useTaskActions(): TaskActions {
       // The delete dropped checked rows from the session's struck set; if it
       // failed they're still `[x]` on disk, so restore them or they'd vanish from
       // the default list (gone from open, struck-set, and the unloaded archived query).
-      markRecentlyCompleted(root, tasks.filter((task) => task.checked))
+      markRecentlyCompleted(
+        root,
+        tasks.filter((task) => task.checked),
+      )
     },
   })
 
@@ -272,7 +269,10 @@ export function useTaskActions(): TaskActions {
       // The convert dropped checked rows from the session's struck set; if it
       // failed they're still `[x]` on disk, so restore them or they'd vanish from
       // the default list (gone from open, struck-set, and the unloaded archived query).
-      markRecentlyCompleted(root, tasks.filter((task) => task.checked))
+      markRecentlyCompleted(
+        root,
+        tasks.filter((task) => task.checked),
+      )
     },
   })
 

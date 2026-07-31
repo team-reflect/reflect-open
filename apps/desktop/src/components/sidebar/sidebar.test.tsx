@@ -18,9 +18,7 @@ import { expectLocatorToHaveCount } from '@/test-utils/expect'
 
 const getPinnedNotes = vi.hoisted(() => vi.fn<() => Promise<PinnedNote[]>>(async () => []))
 const revealItemInDir = vi.hoisted(() => vi.fn<(path: string) => Promise<void>>(async () => {}))
-const openRouteInNewWindow = vi.hoisted(() =>
-  vi.fn<(route: NoteRoute) => Promise<boolean>>(),
-)
+const openRouteInNewWindow = vi.hoisted(() => vi.fn<(route: NoteRoute) => Promise<boolean>>())
 const openRecent = vi.hoisted(() => vi.fn())
 const pickAndOpen = vi.hoisted(() => vi.fn())
 const chooseGraph = vi.hoisted(() => vi.fn())
@@ -142,6 +140,9 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
     toggleTheme: vi.fn(),
     toggleSidebar: vi.fn(),
     newChat: vi.fn(),
+    openNoteFind: vi.fn(),
+    findNextInNote: vi.fn(),
+    findPreviousInNote: vi.fn(),
     switchGraph: vi.fn(),
     toggleAudioMemo: vi.fn(),
     generation: () => 1,
@@ -307,9 +308,7 @@ describe('Sidebar', () => {
     const pinnedSection = view.getByRole('region', { name: /pinned notes/i })
     await expect.element(pinnedSection).toHaveTextContent('Meeting with Ada')
     expect(pinnedSection.element().textContent).not.toContain('[[Ada Lovelace|Ada]]')
-    await expect
-      .element(view.getByRole('button', { name: 'Meeting with Ada' }))
-      .toBeInTheDocument()
+    await expect.element(view.getByRole('button', { name: 'Meeting with Ada' })).toBeInTheDocument()
   })
 
   it('All notes is inactive while the active note is pinned', async () => {
@@ -333,30 +332,28 @@ describe('Sidebar', () => {
   })
 
   it('right-click unpins a pinned row through the native context menu', async () => {
-    getPinnedNotes.mockResolvedValue([
-      { path: 'notes/rust.md', title: 'Rust', dailyDate: null },
-    ])
+    getPinnedNotes.mockResolvedValue([{ path: 'notes/rust.md', title: 'Rust', dailyDate: null }])
     const { view } = await renderSidebar()
     const rust = view.getByRole('button', { name: 'Rust' })
 
     await rust.click({ button: 'right' })
 
-    await vi.waitFor(() => expect(openNativeContextMenu).toHaveBeenCalledWith({
-      items: [
-        expect.objectContaining({
-          text: 'Unpin Note',
-        }),
-      ],
-    }))
+    await vi.waitFor(() =>
+      expect(openNativeContextMenu).toHaveBeenCalledWith({
+        items: [
+          expect.objectContaining({
+            text: 'Unpin Note',
+          }),
+        ],
+      }),
+    )
     await expectLocatorToHaveCount(view.getByRole('button', { name: 'Rust' }), 0)
     expect(unpinNote).toHaveBeenCalledWith('notes/rust.md', 1)
   })
 
   it('restores an optimistically removed pinned row when unpin fails', async () => {
     unpinNote.mockRejectedValueOnce(new Error('disk failed'))
-    getPinnedNotes.mockResolvedValue([
-      { path: 'notes/rust.md', title: 'Rust', dailyDate: null },
-    ])
+    getPinnedNotes.mockResolvedValue([{ path: 'notes/rust.md', title: 'Rust', dailyDate: null }])
     const { view } = await renderSidebar()
     const rust = view.getByRole('button', { name: 'Rust' })
 
@@ -367,9 +364,7 @@ describe('Sidebar', () => {
   })
 
   it('history arrows walk the router stack and disable at its edges', async () => {
-    getPinnedNotes.mockResolvedValue([
-      { path: 'notes/rust.md', title: 'Rust', dailyDate: null },
-    ])
+    getPinnedNotes.mockResolvedValue([{ path: 'notes/rust.md', title: 'Rust', dailyDate: null }])
     const { view } = await renderSidebar()
     const backButton = view.getByRole('button', { name: 'Go back' })
     const forwardButton = view.getByRole('button', { name: 'Go forward' })
@@ -395,7 +390,9 @@ describe('Sidebar', () => {
     await view.getByRole('button', { name: /Notes/ }).click()
     const work = page.getByRole('menuitem', { name: 'Work' })
     await expect.element(work).toBeVisible()
-    expect([...work.element().querySelectorAll('kbd')].map((keycap) => keycap.textContent)).toContain('2')
+    expect(
+      [...work.element().querySelectorAll('kbd')].map((keycap) => keycap.textContent),
+    ).toContain('2')
     await work.click()
     expect(openRecent).toHaveBeenCalledWith('/work')
 

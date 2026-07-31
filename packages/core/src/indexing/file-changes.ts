@@ -35,9 +35,7 @@ const localHandlers = new Set<(changes: FileChange[]) => void>()
  * subscription builds on it, and the editor (Plan 05) uses it for
  * external-change reconciliation of the open note.
  */
-export function subscribeFileChanges(
-  handler: (changes: FileChange[]) => void,
-): Promise<Unlisten> {
+export function subscribeFileChanges(handler: (changes: FileChange[]) => void): Promise<Unlisten> {
   localHandlers.add(handler)
   return getBridge()
     .listen(FILE_CHANGES_EVENT, (payload) => {

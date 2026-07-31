@@ -79,23 +79,18 @@ export function V1ImportDialog({ state, onCancel, onDismiss }: V1ImportDialogPro
   return (
     <Dialog
       open={state.phase !== 'idle'}
-      onOpenChange={(next) => {
-        if (!next && !running) {
-          onDismiss()
+      onOpenChange={(next, eventDetails) => {
+        if (next) {
+          return
         }
+        if (running || eventDetails.reason === 'outside-press') {
+          eventDetails.cancel()
+          return
+        }
+        onDismiss()
       }}
     >
-      <DialogContent
-        showCloseButton={false}
-        onInteractOutside={(event) => {
-          event.preventDefault()
-        }}
-        onEscapeKeyDown={(event) => {
-          if (running) {
-            event.preventDefault()
-          }
-        }}
-      >
+      <DialogContent showCloseButton={false}>
         {state.phase === 'running' ? (
           <>
             <DialogTitle>Importing from Reflect V1</DialogTitle>

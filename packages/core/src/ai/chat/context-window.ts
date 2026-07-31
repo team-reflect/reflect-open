@@ -21,7 +21,7 @@ const CHARS_PER_TOKEN = 4
 
 /**
  * Flat per-image estimate. Providers downscale and bill far below the data
- * URL's size, so estimating from `image.length` would wildly overshoot
+ * URL's size, so estimating from `data.length` would wildly overshoot
  * (a 1 MB photo is ~340k chars of base64 but ~1.6k tokens).
  */
 const IMAGE_TOKENS = 1_600
@@ -78,8 +78,10 @@ function partTokens(part: ContentPart): number {
     case 'text':
     case 'reasoning':
       return textTokens(part.text)
-    case 'image':
-      return IMAGE_TOKENS
+    case 'file':
+      // Attachments arrive as image file parts; anything else falls through
+      // to its JSON size like the other parts.
+      return part.mediaType.startsWith('image') ? IMAGE_TOKENS : textTokens(JSON.stringify(part))
     default:
       // Tool calls, tool results, files: the JSON encoding is what travels.
       return textTokens(JSON.stringify(part))

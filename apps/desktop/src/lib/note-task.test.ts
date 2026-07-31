@@ -257,9 +257,7 @@ describe('continueTaskInContext', () => {
     ].join('\n')
     expect(writeNote).toHaveBeenCalledWith('notes/a.md', written, 7)
     const writtenTasks = parseNote({ path: 'notes/a.md', source: written }).tasks
-    const created = writtenTasks.find(
-      (task) => task.markerOffset === result.created.markerOffset,
-    )
+    const created = writtenTasks.find((task) => task.markerOffset === result.created.markerOffset)
     expect(created?.breadcrumbs).toEqual(['StartupToolbox', 'Reflections'])
     expect(result.offsetChanges[1]?.marker?.markerOffset).toBe(writtenTasks[2]?.markerOffset)
   })

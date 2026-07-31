@@ -86,8 +86,7 @@ export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
     const result = part.result?.tool === 'search' ? part.result : null
     return (
       <ChipFrame pending={pending} icon={<Search aria-hidden className="size-3.5" />}>
-        Searched “{call.query}”
-        {result !== null ? countSuffix(result.hits.length, 'note') : ''}
+        Searched “{call.query}”{result !== null ? countSuffix(result.hits.length, 'note') : ''}
         {result !== null ? <NoteLinks notes={result.hits} onOpen={openNote} /> : null}
       </ChipFrame>
     )
@@ -104,8 +103,10 @@ export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
         >
           #{call.tag}
         </button>
+      ) : call.tag !== null ? (
+        `#${call.tag}`
       ) : (
-        (call.tag !== null ? `#${call.tag}` : 'recent')
+        'recent'
       )
     return (
       <ChipFrame pending={pending} icon={<History aria-hidden className="size-3.5" />}>

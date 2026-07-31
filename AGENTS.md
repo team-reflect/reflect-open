@@ -69,7 +69,7 @@ under `.github/release-please/`.
 
 1. Make your changes
 2. Run typecheck (`pnpm typecheck`)
-3. Run lint (`pnpm lint`) — fix any errors; `pnpm lint:fix` auto-fixes where possible
+3. Run lint (`pnpm lint`) — fix any errors; `pnpm fix` auto-fixes where possible
 4. Run specific tests for your changes (`pnpm test --run path/to/test`)
 
 `pnpm check` runs typecheck + lint together. Run it before declaring any work done.

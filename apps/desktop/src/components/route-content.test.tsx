@@ -3,7 +3,7 @@ import { cleanup, render } from 'vitest-browser-react'
 import { page } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, type ReactElement } from 'react'
-import { setBridge } from '@reflect/core'
+import { setBridge, upsertFrontmatter } from '@reflect/core'
 import { PaletteProvider, usePalette } from '@/components/command-palette/palette-provider'
 import { flushOpenDocuments } from '@/editor/open-documents'
 import type { NoteEditorHandle } from '@/editor/note-editor'
@@ -61,6 +61,8 @@ vi.mock('@/editor/note-editor', async () => {
           appendPendingReplacementText: () => {},
           acceptPendingReplacement: () => {},
           discardPendingReplacement: () => {},
+          findNext: () => {},
+          findPrevious: () => {},
         })
         return () => handleRef?.(null)
       }, [handleRef])
@@ -209,6 +211,24 @@ describe('RouteContent', () => {
     await view.unmount()
   })
 
+  it('tracks an adopted nested note retitle while keeping its path', async () => {
+    const path = 'Projects/exist.md'
+    files[path] = '# Old Title\n'
+    const view = await renderRoute({ kind: 'note', path })
+    await expect.element(page.getByLabelText(`Editing ${path}`)).toBeVisible()
+
+    await act(() => editorProbe.onChange?.('# New Title\n'))
+    await act(() => flushOpenDocuments())
+
+    expect(files[path]).toBe(
+      upsertFrontmatter('# New Title\n', {
+        aliases: ['Old Title'],
+      }),
+    )
+    expect(files['notes/new-title.md']).toBeUndefined()
+    await view.unmount()
+  })
+
   it('omits the wiki-link hover renderer on a touch editor surface', async () => {
     setPlatformSurface({ touchEditor: true })
     files['notes/exist.md'] = '# Hello\n'
@@ -251,7 +271,9 @@ describe('RouteContent', () => {
   it('never recreates an arbitrary missing vault path', async () => {
     const view = await renderRoute({ kind: 'note', path: 'Projects/missing.md' })
 
-    await expect.element(page.getByText(/Couldn’t open Projects\/missing\.md: missing/)).toBeVisible()
+    await expect
+      .element(page.getByText(/Couldn’t open Projects\/missing\.md: missing/))
+      .toBeVisible()
     await expect.element(page.getByTestId('fake-editor')).not.toBeInTheDocument()
     await act(() => flushOpenDocuments())
     expect(writes).toEqual([])

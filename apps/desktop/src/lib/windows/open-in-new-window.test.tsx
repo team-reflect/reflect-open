@@ -63,9 +63,7 @@ describe('openRouteInNewWindow', () => {
     finishOpen()
     await expect(Promise.all([first, second])).resolves.toEqual([true, true])
 
-    await expect(
-      openRouteInNewWindow({ kind: 'note', path: 'notes/foo.md' }),
-    ).resolves.toBe(true)
+    await expect(openRouteInNewWindow({ kind: 'note', path: 'notes/foo.md' })).resolves.toBe(true)
     expect(openNoteWindow).toHaveBeenCalledTimes(2)
   })
 

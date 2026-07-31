@@ -1,9 +1,7 @@
 import type { Route } from '@/routing/route'
 
 /** What the AppShell's right context region should describe for a route. */
-export type ContextSidebarTarget =
-  | { kind: 'daily'; date: string }
-  | { kind: 'note'; path: string }
+export type ContextSidebarTarget = { kind: 'daily'; date: string } | { kind: 'note'; path: string }
 
 /**
  * The subject of the context sidebar for `route`, or `null` when the route

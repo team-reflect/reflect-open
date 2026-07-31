@@ -174,9 +174,7 @@ export function useTaskEditorFinalizer({
         // to persist first — the new text, `''` for an emptied row, or `null` when
         // unchanged (don't rewrite) — so the insert can sequence after the save.
         const result = resolveTaskEdit(initial, currentRef.current)
-        onContinue(
-          result.type === 'commit' ? result.content : result.type === 'delete' ? '' : null,
-        )
+        onContinue(result.type === 'commit' ? result.content : result.type === 'delete' ? '' : null)
       },
       cancel: () => {
         if (!claim()) {

@@ -20,19 +20,20 @@ import {
   listFiles,
   readAsset,
   readNote,
+  readTranscriptCache,
   writeAsset,
   writeNote,
+  writeTranscriptCache,
 } from '../graph/commands'
-import { transcribeAudio, TranscriptionRejectedError } from '../ai/transcribe'
+import { transcribeAudio } from '../ai/transcribe'
+import { TranscriptionRejectedError } from '../ai/transcribe-http'
 import { getSecret } from '../secrets/keychain'
 
 const generateAudioMemoTitleMock = vi.hoisted(() =>
   vi.fn<(request: GenerateAudioMemoTitleRequest) => Promise<string>>(),
 )
 const formatAudioMemoTranscriptMock = vi.hoisted(() =>
-  vi.fn<
-    (request: FormatAudioMemoTranscriptRequest) => Promise<FormattedAudioMemoTranscript>
-  >(),
+  vi.fn<(request: FormatAudioMemoTranscriptRequest) => Promise<FormattedAudioMemoTranscript>>(),
 )
 const ensureBacklinkTargetMock = vi.hoisted(() => vi.fn())
 
@@ -40,9 +41,12 @@ vi.mock('../graph/commands', () => ({
   listDir: vi.fn(),
   listFiles: vi.fn(),
   readAsset: vi.fn(),
+  readAssetBinary: vi.fn(),
   readNote: vi.fn(),
+  readTranscriptCache: vi.fn(),
   writeAsset: vi.fn(),
   writeNote: vi.fn(),
+  writeTranscriptCache: vi.fn(),
 }))
 vi.mock('../ai/transcribe', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../ai/transcribe')>()),
@@ -67,6 +71,8 @@ const listFilesMock = vi.mocked(listFiles)
 const readAssetMock = vi.mocked(readAsset)
 const readNoteMock = vi.mocked(readNote)
 const writeAssetMock = vi.mocked(writeAsset)
+const readTranscriptCacheMock = vi.mocked(readTranscriptCache)
+const writeTranscriptCacheMock = vi.mocked(writeTranscriptCache)
 const writeNoteMock = vi.mocked(writeNote)
 const transcribeMock = vi.mocked(transcribeAudio)
 const getSecretMock = vi.mocked(getSecret)
@@ -107,6 +113,8 @@ beforeEach(() => {
   readAssetMock.mockResolvedValue(btoa('audio-bytes'))
   readNoteMock.mockResolvedValue('morning thoughts\n')
   writeAssetMock.mockResolvedValue(undefined)
+  readTranscriptCacheMock.mockRejectedValue({ kind: 'notFound', message: 'no cached transcript' })
+  writeTranscriptCacheMock.mockResolvedValue(undefined)
   writeNoteMock.mockResolvedValue(undefined)
   getSecretMock.mockResolvedValue('sk-live-key')
   transcribeMock.mockResolvedValue('memo transcript')
@@ -272,9 +280,7 @@ describe('reconcileAudioMemos', () => {
     )
     expect(writeNoteMock).toHaveBeenCalledWith(
       'daily/2026-06-11.md',
-      expect.stringContaining(
-        '- [[audio-memo-2026-06-11-153022-845|Planning the launch]]',
-      ),
+      expect.stringContaining('- [[audio-memo-2026-06-11-153022-845|Planning the launch]]'),
       3,
     )
   })
@@ -397,7 +403,22 @@ describe('reconcileAudioMemos', () => {
 
     expect(writeNoteMock).toHaveBeenCalledWith(
       'daily/2026-06-11.md',
-      '## [[Audio memos]]\n\n- [[audio-memo-2026-06-10-090000-000|Yesterday]]\n\n- [[audio-memo-2026-06-11-153022-845|Memo Transcript]]\n',
+      '## [[Audio memos]]\n\n- [[audio-memo-2026-06-10-090000-000|Yesterday]]\n- [[audio-memo-2026-06-11-153022-845|Memo Transcript]]\n',
+      3,
+    )
+  })
+
+  it('extends only the leading memo list, before later daily-note prose', async () => {
+    listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
+    readNoteMock.mockResolvedValue(
+      '## [[Audio memos]]\n\n- [[audio-memo-2026-06-10-090000-000|Yesterday]]\n\nScratchpad for later.\n',
+    )
+
+    await reconcile()
+
+    expect(writeNoteMock).toHaveBeenCalledWith(
+      'daily/2026-06-11.md',
+      '## [[Audio memos]]\n\n- [[audio-memo-2026-06-10-090000-000|Yesterday]]\n- [[audio-memo-2026-06-11-153022-845|Memo Transcript]]\n\nScratchpad for later.\n',
       3,
     )
   })
@@ -428,7 +449,7 @@ describe('reconcileAudioMemos', () => {
       stopped: { reason: 'io', message: 'disk full' },
     })
     expect(writeNoteMock).not.toHaveBeenCalled()
-    expect(transcribeMock).not.toHaveBeenCalled()
+    expect(transcribeMock).toHaveBeenCalledTimes(1)
   })
 
   it('a daily-note backlink without the note is a tombstone — deletion stays deleted', async () => {
@@ -446,7 +467,7 @@ describe('reconcileAudioMemos', () => {
     expect(writeNoteMock).not.toHaveBeenCalled()
   })
 
-  it('a same-second sibling backlink is not this memo\'s tombstone', async () => {
+  it("a same-second sibling backlink is not this memo's tombstone", async () => {
     // Same second, different milliseconds: identical display titles, distinct
     // bases. The earlier sibling is fully done; the later one must still run.
     const sibling = audioMemoIdentity(new Date(2026, 5, 11, 15, 30, 22, 100), 'audio/webm')
@@ -489,6 +510,10 @@ describe('reconcileAudioMemos', () => {
     expect(readAssetMock.mock.calls.map(([path]) => path)).toEqual([
       earlier.audioPath,
       MEMO.audioPath,
+    ])
+    expect(readTranscriptCacheMock.mock.calls.map(([name]) => name)).toEqual([
+      'audio-memo-2026-06-10-090000-000.m4a.json',
+      'audio-memo-2026-06-11-153022-845.webm.json',
     ])
   })
 
@@ -551,7 +576,9 @@ describe('reconcileAudioMemos', () => {
     )
     expect(writeNoteMock).toHaveBeenCalledWith(
       'daily/2026-06-11.md',
-      expect.stringContaining('- [[audio-memo-2026-06-11-153022-845|Audio memo 2026-06-11 15:30:22]]'),
+      expect.stringContaining(
+        '- [[audio-memo-2026-06-11-153022-845|Audio memo 2026-06-11 15:30:22]]',
+      ),
       3,
     )
   })
@@ -607,11 +634,12 @@ describe('reconcileAudioMemos', () => {
   it('the abort gate stops between memos', async () => {
     const earlier = audioMemoIdentity(new Date(2026, 5, 10, 9, 0, 0, 0), 'audio/mp4')
     listDirMock.mockResolvedValue([fileMeta(earlier.audioPath), fileMeta(MEMO.audioPath)])
-    // The first memo checks at loop start, after category resolution, after
-    // the asset read, between transcription and enrichment, and after
-    // enrichment; stop at the next loop start.
+    // The first memo checks at loop start, at its segment loop, after the
+    // asset read, after the provider call, after category resolution, and
+    // before the note write; stop at the next loop start.
     const isStale = vi
       .fn()
+      .mockReturnValueOnce(false)
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(false)
@@ -670,7 +698,7 @@ describe('reconcileAudioMemos', () => {
     expect(writeNoteMock).not.toHaveBeenCalled()
   })
 
-  it('a graph switch during category resolution stops before reading the recording', async () => {
+  it('a graph switch during category resolution stops before any note write', async () => {
     listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
     let closed = false
     ensureBacklinkTargetMock.mockImplementation(async () => {
@@ -685,8 +713,6 @@ describe('reconcileAudioMemos', () => {
       transcribed: 0,
       stopped: { reason: 'stale' },
     })
-    expect(readAssetMock).not.toHaveBeenCalled()
-    expect(transcribeMock).not.toHaveBeenCalled()
     expect(writeNoteMock).not.toHaveBeenCalled()
   })
 

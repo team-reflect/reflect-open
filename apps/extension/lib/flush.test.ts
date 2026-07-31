@@ -16,7 +16,9 @@ vi.mock('wxt/browser', () => ({
           }
           const wanted = Array.isArray(keys) ? keys : [keys]
           return Promise.resolve(
-            Object.fromEntries(wanted.filter((key) => store.has(key)).map((key) => [key, store.get(key)])),
+            Object.fromEntries(
+              wanted.filter((key) => store.has(key)).map((key) => [key, store.get(key)]),
+            ),
           )
         },
         set: (items: Record<string, unknown>) => {

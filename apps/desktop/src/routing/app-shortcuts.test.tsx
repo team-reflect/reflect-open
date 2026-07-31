@@ -14,7 +14,19 @@ const newChat = vi.hoisted(() => vi.fn())
 const openRecent = vi.hoisted(() => vi.fn())
 const openRouteInNewWindow = vi.hoisted(() => vi.fn(async () => true))
 
+const openNoteFindForPath = vi.hoisted(() => vi.fn(() => true))
+const findNextInNote = vi.hoisted(() => vi.fn())
+const findPreviousInNote = vi.hoisted(() => vi.fn())
+
 vi.mock('@/lib/windows/open-in-new-window', () => ({ openRouteInNewWindow }))
+vi.mock('@/providers/note-find-provider', () => ({
+  useNoteFindActions: () => ({
+    openForPath: openNoteFindForPath,
+    next: findNextInNote,
+    previous: findPreviousInNote,
+  }),
+}))
+
 vi.mock('@/lib/native-menu/menu', () => ({
   isNativeMenuInstalled: () => false,
 }))
@@ -55,6 +67,9 @@ registerAppCommands() // production does this in main.tsx
 beforeEach(() => {
   openRecent.mockClear()
   openRouteInNewWindow.mockClear()
+  openNoteFindForPath.mockClear()
+  findNextInNote.mockClear()
+  findPreviousInNote.mockClear()
 })
 
 function shortcutsHook() {
@@ -210,6 +225,24 @@ describe('app shortcuts', () => {
     expect(result.current.palette.open).toBe(true)
   })
 
+  it('⌘F targets the current note and ⌘G traverses its matches', async () => {
+    const { result, act } = await shortcutsHook()
+    await act(() => press('n'))
+    const opened = result.current.router.route
+    if (opened.kind !== 'note') {
+      throw new Error('expected the new-note route')
+    }
+
+    await act(() => press('f'))
+    expect(openNoteFindForPath).toHaveBeenCalledWith(opened.path)
+
+    await act(() => press('g'))
+    expect(findNextInNote).toHaveBeenCalledTimes(1)
+
+    await act(() => press('g', { shiftKey: true }))
+    expect(findPreviousInNote).toHaveBeenCalledTimes(1)
+  })
+
   it('⌘\\ toggles the sidebar in both directions', async () => {
     const { result, act } = await shortcutsHook()
     expect(result.current.sidebar.collapsed).toBe(false)
@@ -318,9 +351,7 @@ describe('app shortcuts', () => {
 
     const opened = result.current.router.route
     await act(() => {
-      window.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'n', metaKey: true, repeat: true }),
-      )
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', metaKey: true, repeat: true }))
     })
     expect(result.current.router.route).toEqual(opened) // held key doesn't spam notes
   })
@@ -353,9 +384,7 @@ describe('app shortcuts', () => {
   it('ignores chords with extra modifiers', async () => {
     const { result, act } = await shortcutsHook()
     await act(() => {
-      window.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'n', metaKey: true, altKey: true }),
-      )
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', metaKey: true, altKey: true }))
     })
     expect(result.current.router.route).toEqual({ kind: 'today' })
   })

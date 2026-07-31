@@ -286,10 +286,7 @@ export function RouterProvider({
     }
   }, [])
 
-  const savedScroll = useCallback(
-    () => scrollById.current.get(currentId.current) ?? null,
-    [],
-  )
+  const savedScroll = useCallback(() => scrollById.current.get(currentId.current) ?? null, [])
   const navigationRevision = useCallback(() => navigationRevisionRef.current, [])
 
   const value = useMemo<RouterValue>(() => {

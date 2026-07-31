@@ -57,13 +57,7 @@ export {
   type GithubRepo,
   type GithubUser,
 } from './github'
-export {
-  createGist,
-  updateGist,
-  deleteGist,
-  type PublishedGist,
-  type GistFile,
-} from './gists'
+export { createGist, updateGist, deleteGist, type PublishedGist, type GistFile } from './gists'
 export {
   createSyncEngine,
   isSyncError,

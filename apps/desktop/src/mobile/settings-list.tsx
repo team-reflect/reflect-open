@@ -53,13 +53,7 @@ export function SettingsGroup({
 }
 
 /** A static label / value pair (version, note count, …). */
-export function SettingsValueRow({
-  label,
-  value,
-}: {
-  label: string
-  value: string
-}): ReactElement {
+export function SettingsValueRow({ label, value }: { label: string; value: string }): ReactElement {
   return (
     <div className={ROW_CLASS}>
       <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -77,7 +71,12 @@ interface SettingsNavRowProps {
 }
 
 /** A disclosure row: tapping navigates deeper (trailing chevron). */
-export function SettingsNavRow({ label, value, onPress, disabled }: SettingsNavRowProps): ReactElement {
+export function SettingsNavRow({
+  label,
+  value,
+  onPress,
+  disabled,
+}: SettingsNavRowProps): ReactElement {
   return (
     <button type="button" className={PRESSABLE_ROW_CLASS} onClick={onPress} disabled={disabled}>
       <span className="min-w-0 flex-1 truncate font-medium">{label}</span>
@@ -136,7 +135,11 @@ export function SettingsSegmentedRow<Value extends string>({
   return (
     <div className={cn(ROW_CLASS, 'justify-between')}>
       <span className="min-w-0 truncate">{label}</span>
-      <div role="radiogroup" aria-label={label} className="flex shrink-0 rounded-lg bg-secondary p-0.5">
+      <div
+        role="radiogroup"
+        aria-label={label}
+        className="flex shrink-0 rounded-lg bg-secondary p-0.5"
+      >
         {options.map((option) => {
           const selected = option.value === value
           return (

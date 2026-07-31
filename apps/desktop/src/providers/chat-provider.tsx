@@ -8,13 +8,12 @@ import {
   type ReactNode,
 } from 'react'
 import {
-  aiKeySecretName,
+  aiApiKeyForConfig,
   appendEvent,
   buildHistory,
   chatModelOptions,
   deleteChatConversation,
   errorMessage,
-  getSecret,
   hasBridge,
   listChatConversations,
   loadChatGraphContext,
@@ -35,11 +34,7 @@ import { todayIso } from '@/lib/dates'
 import { isMobileSurface } from '@/lib/platform-surface'
 import { providerFetch } from '@/lib/provider-fetch'
 import { invalidateChatQueries } from '@/lib/query-client'
-import {
-  ChatContext,
-  type ChatContextValue,
-  type ChatStatus,
-} from '@/providers/chat-context'
+import { ChatContext, type ChatContextValue, type ChatStatus } from '@/providers/chat-context'
 import { conversationTitle } from '@/providers/chat-title'
 import { useGraph } from '@/providers/graph-provider'
 import { useSettings } from '@/providers/settings-provider'
@@ -255,9 +250,7 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
 
       const updateTurn = (updater: (turn: ChatTurn) => ChatTurn) => {
         localTurn = updater(localTurn)
-        setTurns((current) =>
-          current.map((turn) => (turn.id === turnId ? updater(turn) : turn)),
-        )
+        setTurns((current) => current.map((turn) => (turn.id === turnId ? updater(turn) : turn)))
       }
       const applyEvent = (event: ChatStreamEvent) => {
         updateTurn((turn) => ({ ...turn, parts: appendEvent(turn.parts, event) }))
@@ -283,7 +276,7 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
         // The graph overview degrades to null (prompt without the block)
         // rather than blocking the turn — a cold index shouldn't kill chat.
         const [apiKey, context] = await Promise.all([
-          getSecret(aiKeySecretName(config.id)),
+          aiApiKeyForConfig(config),
           loadChatGraphContext(graph.name).catch((cause: unknown) => {
             console.error('chat graph context failed:', errorMessage(cause))
             return null

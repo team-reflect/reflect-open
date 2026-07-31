@@ -2,6 +2,7 @@ import { ulid } from 'ulidx'
 import { upsertFrontmatter } from '../markdown/frontmatter'
 import { slugForTitle } from '../markdown/slug'
 import { createNoteIfAbsent } from './commands'
+import { wikiNoteReference } from './note-reference'
 import { notePath } from './paths'
 import {
   resolveExistingWikiTarget,
@@ -77,7 +78,11 @@ export async function createNoteWithTitle(
   generation: number,
   body?: string,
 ): Promise<string> {
-  const claimed = await claimNotePathForSlug(slugForTitle(title), newNoteSource(title, body), generation)
+  const claimed = await claimNotePathForSlug(
+    slugForTitle(title),
+    newNoteSource(title, body),
+    generation,
+  )
   return claimed.path
 }
 
@@ -153,10 +158,27 @@ export async function resolveOrCreateNoteWithTitle(
     return existing
   }
 
+  // Only a bare name may invent a titled note under `notes/`. A path target
+  // names one exact missing file and a `#heading` or unsafe target names
+  // none; creating a note *titled* with those spellings would be worse than
+  // refusing.
+  const reference = wikiNoteReference(title)
+  if (reference?.kind !== 'key') {
+    return {
+      kind: 'unavailable',
+      paths: reference?.kind === 'path' ? [reference.path] : [],
+    }
+  }
+
   // On a lost claim, re-resolve both projections before considering a
   // suffix: the winner may be the note this link meant.
-  return claimNotePathForSlug(slugForTitle(title), newNoteSource(title, body), generation, async () => {
-    const collisionResolution = await resolveExistingWikiTarget(title, generation)
-    return collisionResolution.kind === 'missing' ? null : collisionResolution
-  })
+  return claimNotePathForSlug(
+    slugForTitle(title),
+    newNoteSource(title, body),
+    generation,
+    async () => {
+      const collisionResolution = await resolveExistingWikiTarget(title, generation)
+      return collisionResolution.kind === 'missing' ? null : collisionResolution
+    },
+  )
 }

@@ -30,37 +30,41 @@ export function NavigateArrows(): ReactElement {
       <Tooltip>
         {/* Span wrapper keeps pointer events alive when the button is disabled,
             so the tooltip still opens at the start of the history stack. */}
-        <TooltipTrigger asChild>
-          <span>
-            <button
-              type="button"
-              aria-label="Go back"
-              disabled={!canBack}
-              onClick={back}
-              className={BUTTON_CLASS}
-            >
-              <ChevronLeft aria-hidden className="size-4" />
-            </button>
-          </span>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <span>
+              <button
+                type="button"
+                aria-label="Go back"
+                disabled={!canBack}
+                onClick={back}
+                className={BUTTON_CLASS}
+              >
+                <ChevronLeft aria-hidden className="size-4" />
+              </button>
+            </span>
+          }
+        />
         <TooltipContent>
           Go back {BACK_BINDING && <ShortcutKeys binding={BACK_BINDING} />}
         </TooltipContent>
       </Tooltip>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <span>
-            <button
-              type="button"
-              aria-label="Go forward"
-              disabled={!canForward}
-              onClick={forward}
-              className={BUTTON_CLASS}
-            >
-              <ChevronRight aria-hidden className="size-4" />
-            </button>
-          </span>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <span>
+              <button
+                type="button"
+                aria-label="Go forward"
+                disabled={!canForward}
+                onClick={forward}
+                className={BUTTON_CLASS}
+              >
+                <ChevronRight aria-hidden className="size-4" />
+              </button>
+            </span>
+          }
+        />
         <TooltipContent>
           Go forward {FORWARD_BINDING && <ShortcutKeys binding={FORWARD_BINDING} />}
         </TooltipContent>

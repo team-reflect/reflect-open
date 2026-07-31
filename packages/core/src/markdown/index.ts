@@ -38,19 +38,18 @@ export {
 } from './scan'
 export {
   appendBlock,
-  appendUnderHeading,
   appendTaskLine,
   appendTaskToContext,
   wikiLinkSafe,
   editTaskLine,
   removeTaskLine,
-  renameWikiLink,
   setTaskDueDate,
   clearTaskDueDate,
   taskLineToBullet,
   toggleTaskMarker,
   TaskStaleError,
 } from './edit'
+export { retitleWikiLinks, type WikiLinkRetitleOptions } from './retitle'
 export { displayNoteTitle, wikiLinkTargetForTitle } from './note-title'
 export { parseTaskMarker } from './task-marker'
 export {
@@ -64,12 +63,7 @@ export {
   type ConflictSegment,
   type ConflictSide,
 } from './conflict-markers'
-export {
-  canonicalEmail,
-  canonicalEmails,
-  extractEmailFields,
-  foldEmail,
-} from './email-fields'
+export { canonicalEmail, canonicalEmails, extractEmailFields, foldEmail } from './email-fields'
 export { foldFallbackTitleKey, foldKey, foldTag } from './keys'
 export { gistBodyHash, gistFilename } from './gist'
 export { slugForTitle } from './slug'

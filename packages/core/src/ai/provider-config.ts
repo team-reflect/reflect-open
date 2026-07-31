@@ -101,3 +101,54 @@ export function pickTranscriptionConfig(state: AiProvidersState): TranscriptionC
   }
   return null
 }
+
+/** The transcription entry a pass should use, with its keychain key. */
+export interface TranscriptionTarget {
+  config: TranscriptionConfig
+  apiKey: string
+}
+
+/** Why no target resolved: nothing configured, or nothing with a key. */
+export type TranscriptionMiss = 'no-provider' | 'no-key'
+
+/**
+ * Size guard for one recording segment, applied before any bytes are read.
+ * Rotation-sized segments run a few megabytes, far under every provider's
+ * request ceiling — this guards against encoder surprises (an ignored
+ * bitrate hint), and tripping it skips the segment, never tombstones it.
+ */
+export const TRANSCRIPTION_MAX_SEGMENT_BYTES = 24 * 1024 * 1024
+
+/**
+ * The entry audio transcription should run on: providers in
+ * {@link TRANSCRIPTION_PROVIDERS} order, the app-default entry first within
+ * each, and the first whose keychain key resolves wins. A keyless entry is
+ * skipped rather than stopping the pass — an unkeyed OpenAI entry must not
+ * block a working Google one. `getKey` is the caller's (memoized) keychain
+ * read, so a pass touches each entry's key at most once.
+ */
+export async function resolveTranscriptionTarget(
+  state: AiProvidersState,
+  getKey: (id: string) => Promise<string | null>,
+): Promise<TranscriptionTarget | TranscriptionMiss> {
+  const candidates: TranscriptionConfig[] = []
+  for (const provider of TRANSCRIPTION_PROVIDERS) {
+    const entries = state.providers.filter(
+      (entry): entry is TranscriptionConfig => entry.provider === provider,
+    )
+    candidates.push(
+      ...entries.filter((entry) => entry.id === state.defaultProviderId),
+      ...entries.filter((entry) => entry.id !== state.defaultProviderId),
+    )
+  }
+  if (candidates.length === 0) {
+    return 'no-provider'
+  }
+  for (const candidate of candidates) {
+    const apiKey = await getKey(candidate.id)
+    if (apiKey !== null) {
+      return { config: candidate, apiKey }
+    }
+  }
+  return 'no-key'
+}
