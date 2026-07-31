@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { HostedAiProviderConfig } from '../../settings/schema'
+import type { HostedAiProviderConfig, OpenAiCompatibleProviderConfig } from '../../settings/schema'
 import { aiProvider } from '../provider-catalog'
 import { chatModelOptions, resolveChatModel } from './model-options'
 
@@ -9,6 +9,20 @@ function config(overrides: Partial<HostedAiProviderConfig>): HostedAiProviderCon
     provider: 'anthropic',
     model: 'claude-sonnet-4-6',
     keyHint: 'hint1',
+    ...overrides,
+  }
+}
+
+function compatible(
+  overrides: Partial<OpenAiCompatibleProviderConfig>,
+): OpenAiCompatibleProviderConfig {
+  return {
+    id: 'local',
+    provider: 'openai-compatible',
+    model: 'local-model',
+    baseUrl: 'http://localhost:1234/v1',
+    keyHint: '',
+    transcriptionModel: '',
     ...overrides,
   }
 }
@@ -57,6 +71,21 @@ describe('chatModelOptions', () => {
       modelId: 'llama-local',
       label: 'llama-local',
     })
+  })
+
+  it('offers local-model and disabled from the OpenAI-compatible catalog', () => {
+    const options = chatModelOptions([compatible({ id: 'local' })])
+    expect(options.map((option) => option.modelId)).toEqual(['local-model', 'disabled'])
+  })
+
+  it('excludes an entry whose chat model is the disabled sentinel', () => {
+    const options = chatModelOptions([
+      compatible({ id: 'whisper-only', model: 'disabled', transcriptionModel: 'whisper-1' }),
+      config({ id: 'claude' }),
+    ])
+    expect(options.some((option) => option.configId === 'whisper-only')).toBe(false)
+    expect(options.every((option) => option.configId === 'claude')).toBe(true)
+    expect(options.length).toBeGreaterThan(0)
   })
 
   it('groups options consecutively per configured entry', () => {

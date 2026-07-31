@@ -382,11 +382,12 @@ const openAiCompatibleProviderConfigSchema = aiProviderConfigBaseSchema.extend({
   baseUrl: openAiCompatibleBaseUrlSchema,
   /**
    * Model for the OpenAI-compatible audio transcription endpoint
-   * (`{baseUrl}/audio/transcriptions`).  When empty (the default) this
-   * provider is not eligible for transcription — the reconciler skips it
-   * the same way it skips Anthropic and OpenRouter.  Because the model is
-   * user-supplied, it is stored here rather than in the catalog; hosted
-   * providers' transcription models stay in transcribe.ts.
+   * (`{baseUrl}/audio/transcriptions`).  The legacy unset value `''` (the
+   * default) and the `'disabled'` sentinel both mean this provider is not
+   * eligible for transcription — the reconciler skips it the same way it
+   * skips Anthropic and OpenRouter.  Because the model is user-supplied,
+   * it is stored here rather than in the catalog; hosted providers'
+   * transcription models stay in transcribe.ts.
    */
   transcriptionModel: z.string().catch(''),
 })

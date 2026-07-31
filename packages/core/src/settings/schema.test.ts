@@ -311,6 +311,30 @@ describe('settingsSchema', () => {
       ])
     })
 
+    it('passes the disabled sentinel through both model slots', () => {
+      const entry = {
+        id: 'whisper-only',
+        provider: 'openai-compatible',
+        model: 'disabled',
+        baseUrl: 'http://localhost:1234/v1',
+        keyHint: '',
+        transcriptionModel: 'disabled',
+      }
+      expect(settingsSchema.parse({ aiProviders: [entry] }).aiProviders).toEqual([entry])
+    })
+
+    it('preserves a legacy unset transcription model', () => {
+      const entry = {
+        id: 'local',
+        provider: 'openai-compatible',
+        model: 'llama-local',
+        baseUrl: 'http://localhost:1234/v1',
+        keyHint: '',
+        transcriptionModel: '',
+      }
+      expect(settingsSchema.parse({ aiProviders: [entry] }).aiProviders).toEqual([entry])
+    })
+
     it('drops a corrupt entry without losing the rest', () => {
       const parsed = settingsSchema.parse({
         aiProviders: [valid, { provider: 'aliens' }, 42],

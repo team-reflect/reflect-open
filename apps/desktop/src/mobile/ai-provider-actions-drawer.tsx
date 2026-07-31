@@ -3,6 +3,7 @@ import {
   aiModelLabel,
   aiProvider,
   aiProviderRequiresApiKey,
+  aiProviderSupportsChat,
   aiProviderSupportsTranscription,
   errorMessage,
   GOOGLE_TRANSCRIPTION_MODEL,
@@ -43,6 +44,33 @@ function transcriptionModelLabel(config: AiProviderConfig): string {
   return ''
 }
 
+/** A key-change-aware input that resets its draft when the provider changes. */
+function TranscriptionModelInput({
+  provider,
+  onSetTranscriptionModel,
+}: {
+  provider: Extract<AiProviderConfig, { provider: 'openai-compatible' }>
+  onSetTranscriptionModel: (id: string, model: string) => void
+}): ReactElement {
+  const [draft, setDraft] = useState(provider.transcriptionModel)
+  return (
+    <Input
+      aria-label="Transcription model"
+      autoComplete="off"
+      spellCheck={false}
+      placeholder="Model id, or 'disabled'"
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={() => {
+        const next = draft.trim()
+        if (next !== provider.transcriptionModel) {
+          onSetTranscriptionModel(provider.id, next)
+        }
+      }}
+    />
+  )
+}
+
 /**
  * The per-provider management sheet (the {@link NoteActionsMenu} pattern):
  * tapping a configured provider row in Settings offers make-default, remove,
@@ -63,7 +91,6 @@ export function AiProviderActionsDrawer({
   onRemove,
 }: AiProviderActionsDrawerProps): ReactElement {
   const [removing, setRemoving] = useState(false)
-  const [editingTranscriptionModel, setEditingTranscriptionModel] = useState('')
   const providerInfo = provider === null ? null : aiProvider(provider.provider)
   const models =
     provider === null || providerInfo === null
@@ -79,6 +106,10 @@ export function AiProviderActionsDrawer({
           ]
   const supportsTranscription = provider !== null && aiProviderSupportsTranscription(provider)
   const isOpenAICompatible = provider?.provider === 'openai-compatible'
+  const supportsChat = provider !== null && aiProviderSupportsChat(provider)
+  // Keep the transcription section visible for openai-compatible even when the
+  // model is disabled, so the user can re-enable it without re-adding the entry.
+  const showTranscriptionControls = isOpenAICompatible || supportsTranscription
   const title =
     provider === null || providerInfo === null
       ? ''
@@ -121,24 +152,13 @@ export function AiProviderActionsDrawer({
                 ))}
               </SettingsGroup>
 
-              {supportsTranscription ? (
+              {showTranscriptionControls ? (
                 <SettingsGroup header="Transcription model">
                   {isOpenAICompatible ? (
                     <div className="px-4 py-2">
-                      <Input
-                        aria-label="Transcription model"
-                        autoComplete="off"
-                        spellCheck={false}
-                        placeholder="Leave empty to disable transcription"
-                        defaultValue={provider.transcriptionModel}
-                        onChange={(event) => {
-                          setEditingTranscriptionModel(event.target.value)
-                        }}
-                        onBlur={() => {
-                          if (editingTranscriptionModel !== provider.transcriptionModel) {
-                            onSetTranscriptionModel(provider.id, editingTranscriptionModel)
-                          }
-                        }}
+                      <TranscriptionModelInput
+                        provider={provider}
+                        onSetTranscriptionModel={onSetTranscriptionModel}
                       />
                     </div>
                   ) : (
@@ -155,20 +175,20 @@ export function AiProviderActionsDrawer({
               <SettingsGroup>
                 <SettingsActionRow
                   label={isDefault ? 'Default for chat' : 'Use as default for chat'}
-                  disabled={isDefault}
+                  disabled={isDefault || !supportsChat}
                   onPress={() => {
                     onMakeDefault(provider.id)
                     onOpenChange(false)
                   }}
                 />
-                {supportsTranscription ? (
+                {showTranscriptionControls ? (
                   <SettingsActionRow
                     label={
                       isTranscriptionDefault
                         ? 'Default for transcription'
                         : 'Use as default for transcription'
                     }
-                    disabled={isTranscriptionDefault}
+                    disabled={isTranscriptionDefault || !supportsTranscription}
                     onPress={() => {
                       onMakeTranscriptionDefault(provider.id)
                       onOpenChange(false)

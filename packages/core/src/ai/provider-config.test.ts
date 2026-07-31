@@ -189,6 +189,14 @@ describe('pickTranscriptionConfig', () => {
     expect(pickTranscriptionConfig(state(providers, 'claude'))).toBeNull()
   })
 
+  it('returns null when the only openai-compatible entries have unset or disabled transcription models', () => {
+    const providers = [
+      compatible({ id: 'unset' }),
+      compatible({ id: 'off', transcriptionModel: 'disabled' }),
+    ]
+    expect(pickTranscriptionConfig(state(providers, 'unset'))).toBeNull()
+  })
+
   it('returns null for the empty list', () => {
     expect(pickTranscriptionConfig(state([], null))).toBeNull()
   })
@@ -223,6 +231,14 @@ describe('defaultTranscriptionProvider', () => {
     ]
     // Anthropic is set as transcription default but doesn't support transcription
     expect(defaultTranscriptionProvider(state(providers, 'claude', 'claude'))?.id).toBe('gemini')
+  })
+
+  it('skips a transcription default whose model is disabled', () => {
+    const providers = [
+      config({ id: 'oai', provider: 'openai' }),
+      compatible({ id: 'off', transcriptionModel: 'disabled' }),
+    ]
+    expect(defaultTranscriptionProvider(state(providers, 'oai', 'off'))?.id).toBe('oai')
   })
 
   it('returns null when no transcription-capable entries exist', () => {
@@ -264,6 +280,15 @@ describe('transcriptionProviders', () => {
     expect(result.map((p) => p.id)).toEqual(['oai'])
   })
 
+  it('excludes an openai-compatible entry whose transcription model is disabled', () => {
+    const providers = [
+      config({ id: 'oai', provider: 'openai' }),
+      compatible({ id: 'off', transcriptionModel: 'disabled' }),
+    ]
+    const result = transcriptionProviders(state(providers, 'oai'))
+    expect(result.map((p) => p.id)).toEqual(['oai'])
+  })
+
   it('returns an empty array when nothing is transcription-capable', () => {
     const providers = [
       config({ id: 'claude', provider: 'anthropic', model: 'claude-fable-5' }),
@@ -283,6 +308,25 @@ describe('defaultAiProvider', () => {
     const providers = [config({ id: 'a' }), config({ id: 'b' })]
     expect(defaultAiProvider(state(providers, null))?.id).toBe('a')
     expect(defaultAiProvider(state(providers, 'gone'))?.id).toBe('a')
+  })
+
+  it('skips a chat-disabled entry when resolving a null or dangling id', () => {
+    const providers = [compatible({ id: 'whisper-only', model: 'disabled' }), config({ id: 'oai' })]
+    expect(defaultAiProvider(state(providers, null))?.id).toBe('oai')
+    expect(defaultAiProvider(state(providers, 'gone'))?.id).toBe('oai')
+  })
+
+  it('skips the stored default when its chat model is disabled', () => {
+    const providers = [config({ id: 'oai' }), compatible({ id: 'whisper-only', model: 'disabled' })]
+    expect(defaultAiProvider(state(providers, 'whisper-only'))?.id).toBe('oai')
+  })
+
+  it('still returns the id-targeted entry when nothing is chat-capable', () => {
+    const providers = [
+      compatible({ id: 'whisper-only', model: 'disabled', transcriptionModel: 'whisper-1' }),
+    ]
+    expect(defaultAiProvider(state(providers, 'whisper-only'))?.id).toBe('whisper-only')
+    expect(defaultAiProvider(state(providers, null))?.id).toBe('whisper-only')
   })
 
   it('returns null for the empty list', () => {

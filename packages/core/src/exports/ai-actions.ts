@@ -3,6 +3,7 @@ export {
   aiProvider,
   aiModelLabel,
   aiProviderRequiresApiKey,
+  aiProviderSupportsChat,
   aiProviderSupportsTranscription,
   DEFAULT_CONTEXT_WINDOW,
   modelContextWindow,
@@ -13,6 +14,7 @@ export { aiKeySecretName, aiApiKeyForConfig } from '../ai/secrets'
 export {
   DEFAULT_OPENAI_COMPATIBLE_BASE_URL,
   DEFAULT_OPENAI_COMPATIBLE_MODEL,
+  DISABLED_OPENAI_COMPATIBLE_MODEL,
   isHttpBaseUrl,
   isPlainHttpRemoteBaseUrl,
   normalizeOpenAICompatibleBaseUrl,

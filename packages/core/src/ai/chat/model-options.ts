@@ -1,5 +1,5 @@
 import type { AiProviderConfig, AiProviderId, ChatModelSelection } from '../../settings/schema'
-import { aiProvider } from '../provider-catalog'
+import { aiProvider, aiProviderSupportsChat } from '../provider-catalog'
 import { defaultAiProvider, type AiProvidersState } from '../provider-config'
 
 /**
@@ -26,21 +26,25 @@ export type { ChatModelSelection }
 /**
  * Every model the chat picker offers, grouped consecutively per configured
  * entry: the provider's curated catalog, plus the entry's configured default
- * model when it's a custom id outside the catalog.
+ * model when it's a custom id outside the catalog.  Entries whose chat model
+ * is the `'disabled'` sentinel offer nothing — the picker cannot switch to
+ * them.
  */
 export function chatModelOptions(providers: AiProviderConfig[]): ChatModelOption[] {
-  return providers.flatMap((entry) => {
-    const catalog = aiProvider(entry.provider).models
-    const models = catalog.some((model) => model.id === entry.model)
-      ? catalog
-      : [...catalog, { id: entry.model, label: entry.model }]
-    return models.map((model) => ({
-      configId: entry.id,
-      provider: entry.provider,
-      modelId: model.id,
-      label: model.label,
-    }))
-  })
+  return providers
+    .filter((entry) => aiProviderSupportsChat(entry))
+    .flatMap((entry) => {
+      const catalog = aiProvider(entry.provider).models
+      const models = catalog.some((model) => model.id === entry.model)
+        ? catalog
+        : [...catalog, { id: entry.model, label: entry.model }]
+      return models.map((model) => ({
+        configId: entry.id,
+        provider: entry.provider,
+        modelId: model.id,
+        label: model.label,
+      }))
+    })
 }
 
 /**

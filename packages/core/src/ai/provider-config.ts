@@ -1,5 +1,5 @@
 import type { AiProviderConfig } from '../settings/schema'
-import { aiProviderSupportsTranscription } from './provider-catalog'
+import { aiProviderSupportsChat, aiProviderSupportsTranscription } from './provider-catalog'
 
 /**
  * Pure transforms over the configured-AI-provider state (Plan 10). The
@@ -75,11 +75,19 @@ export function withAiProviderRemoved(state: AiProvidersState, id: string): AiPr
 /**
  * The entry AI features should use when no explicit choice is made: the one
  * `defaultProviderId` points at, falling back to the first entry when the id
- * is null or dangling.
+ * is null or dangling.  Entries whose chat model is the `'disabled'`
+ * sentinel are skipped in both passes — when nothing chat-capable exists
+ * the id-targeted entry still wins over returning nothing, so the stored
+ * default never silently dies.
  */
 export function defaultAiProvider(state: AiProvidersState): AiProviderConfig | null {
+  const targeted = state.providers.find((provider) => provider.id === state.defaultProviderId)
+  if (targeted !== undefined && aiProviderSupportsChat(targeted)) {
+    return targeted
+  }
   return (
-    state.providers.find((provider) => provider.id === state.defaultProviderId) ??
+    state.providers.find((provider) => aiProviderSupportsChat(provider)) ??
+    targeted ??
     state.providers[0] ??
     null
   )
@@ -109,7 +117,8 @@ export function defaultTranscriptionProvider(state: AiProvidersState): AiProvide
 /**
  * Every configured provider that supports transcription, in preference
  * order: OpenAI entries first, then Google, then any `openai-compatible`
- * entry with a non-empty `transcriptionModel`.  Within each provider group
+ * entry whose `transcriptionModel` is a real model (not the legacy unset
+ * `''` or the `'disabled'` sentinel).  Within each provider group
  * the app default wins over the first entry; for transcription the
  * dedicated `defaultTranscriptionProviderId` is used instead of the chat
  * default.
@@ -146,7 +155,8 @@ export function pickTranscriptionConfig(state: AiProvidersState): AiProviderConf
 /**
  * Providers that can serve transcription requests.  `openai` and `google`
  * are known at compile-time; `openai-compatible` entries become eligible
- * when the user supplies a non-empty `transcriptionModel`.  The type is
+ * when the user supplies a real `transcriptionModel` (`''` and `'disabled'`
+ * both stay ineligible).  The type is
  * intentionally narrower than {@link AiProviderId} — Anthropic and
  * OpenRouter have no transcription path and should never reach
  * {@link transcribeAudio}.

@@ -95,6 +95,24 @@ function twoStoredModels(): Record<string, unknown> {
   }
 }
 
+/** One OpenAI-compatible entry (whisper endpoint) plus one hosted default. */
+function compatibleStoredModels(transcriptionModel: string): Record<string, unknown> {
+  return {
+    aiProviders: [
+      entry({ id: 'a' }),
+      {
+        id: 'local',
+        provider: 'openai-compatible',
+        model: 'local-model',
+        baseUrl: 'http://127.0.0.1:8000/v1',
+        keyHint: '',
+        transcriptionModel,
+      },
+    ],
+    defaultAiProviderId: 'a',
+  }
+}
+
 async function openDialog(): Promise<Locator> {
   await page.getByRole('button', { name: /add provider/i }).click()
   return page.getByRole('dialog', { name: 'Add AI provider' })
@@ -133,6 +151,13 @@ describe('AiProvidersSection', () => {
     await expect.element(page.getByText(/abcd2/)).toBeInTheDocument()
     await expect.element(page.getByText('Default', { exact: true })).toBeInTheDocument()
     await expect.element(page.getByRole('button', { name: 'Make default' })).toBeInTheDocument()
+    // Hosted transcription rows show the fixed model as an inert combo.
+    const transcriptionCombo = page.getByRole('combobox', {
+      name: 'Transcription model for OpenAI',
+    })
+    await expect.element(transcriptionCombo).toBeInTheDocument()
+    await expect.element(transcriptionCombo).toBeDisabled()
+    await expect.element(transcriptionCombo).toHaveTextContent(/gpt-4o-mini-transcribe/)
   })
 
   it('adds a model: key verified, then keychain + settings entry', async () => {
@@ -373,5 +398,65 @@ describe('AiProvidersSection', () => {
     await expect.element(page.getByText('Default', { exact: true })).toBeInTheDocument()
     // The badge lands on the first row; the second still offers "Make default".
     await expect.element(page.getByRole('button', { name: 'Make default' })).toBeInTheDocument()
+  })
+
+  it('an openai-compatible entry keeps its transcription combo when the model is disabled', async () => {
+    stored = compatibleStoredModels('disabled')
+    await renderSection()
+
+    const combo = page.getByRole('combobox', { name: 'Transcription model for OpenAI-compatible' })
+    await expect.element(combo).toBeInTheDocument()
+    await expect.element(combo).toHaveTextContent(/Disabled/)
+    // Disabled transcription can never become the default, but the control
+    // stays visible so the entry can be re-enabled in place.
+    await expect
+      .element(page.getByRole('button', { name: 'Make transcription default' }))
+      .toBeDisabled()
+  })
+
+  it('a chat-disabled entry cannot be made the chat default', async () => {
+    stored = {
+      ...compatibleStoredModels('local-model'),
+      defaultTranscriptionProviderId: 'hosted',
+      aiProviders: [
+        entry({ id: 'a' }),
+        entry({ id: 'hosted', provider: 'openai', model: 'gpt-5.5', keyHint: 'abcd2' }),
+        {
+          id: 'local',
+          provider: 'openai-compatible',
+          model: 'disabled',
+          baseUrl: 'http://127.0.0.1:8000/v1',
+          keyHint: '',
+          transcriptionModel: 'local-model',
+        },
+      ],
+    }
+    await renderSection()
+
+    const makeDefaults = page.getByRole('button', { name: 'Make default' })
+    await expectLocatorToHaveCount(makeDefaults, 2)
+    await expect.element(makeDefaults.nth(1)).toBeDisabled()
+    // Transcription stays enabled on the same row (the hosted entry is the
+    // transcription default, so the local one still offers the button).
+    await expect
+      .element(page.getByRole('button', { name: 'Make transcription default' }))
+      .toBeEnabled()
+  })
+
+  it('offers the catalog list (local-model, Disabled) in the transcription combo', async () => {
+    stored = compatibleStoredModels('local-model')
+    await renderSection()
+
+    await page.getByRole('combobox', { name: 'Transcription model for OpenAI-compatible' }).click()
+
+    await expect.element(page.getByRole('option', { name: /Local model/ })).toBeInTheDocument()
+    await expect.element(page.getByRole('option', { name: /Disabled/ })).toBeInTheDocument()
+
+    await page.getByRole('option', { name: /Disabled/ }).click()
+    await vi.waitFor(() =>
+      expect(lastSavedDoc().aiProviders).toContainEqual(
+        expect.objectContaining({ id: 'local', transcriptionModel: 'disabled' }),
+      ),
+    )
   })
 })

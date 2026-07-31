@@ -90,6 +90,7 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
 
   const providerId = useWatch({ control, name: 'provider' })
   const selectedModel = useWatch({ control, name: 'model' })
+  const transcriptionModelValue = useWatch({ control, name: 'transcriptionModel' })
   const baseUrlValue = useWatch({ control, name: 'baseUrl' })
   const provider = aiProvider(providerId)
   const isOpenAICompatible = provider.id === 'openai-compatible'
@@ -131,6 +132,10 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
                 const next = aiProvider(aiProviderIdSchema.parse(value))
                 setValue('provider', next.id)
                 setValue('model', next.models[0].id)
+                setValue(
+                  'transcriptionModel',
+                  next.id === 'openai-compatible' ? next.models[0].id : '',
+                )
                 setValue(
                   'baseUrl',
                   next.id === 'openai-compatible' ? DEFAULT_OPENAI_COMPATIBLE_BASE_URL : '',
@@ -186,16 +191,15 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
           {isOpenAICompatible ? (
             <div className="flex flex-col gap-1">
               <span className={FIELD_LABEL_CLASS}>Transcription model</span>
-              <Input
-                aria-label="Transcription model"
-                autoComplete="off"
-                spellCheck={false}
-                placeholder="Leave empty to disable transcription"
-                {...register('transcriptionModel', {
-                  onChange: () => {
-                    resetUnverified()
-                  },
-                })}
+              <ModelCombobox
+                value={transcriptionModelValue}
+                provider={provider.id}
+                models={provider.models}
+                onChange={(modelId) => {
+                  setValue('transcriptionModel', modelId)
+                  resetUnverified()
+                }}
+                ariaLabel="Transcription model"
               />
             </div>
           ) : null}
@@ -258,14 +262,16 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
             <span className="text-sm text-text">Use as default for chat</span>
           </label>
 
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              className="accent-accent"
-              {...register('isTranscriptionDefault')}
-            />
-            <span className="text-sm text-text">Use as default for transcription</span>
-          </label>
+          {provider.supportsTranscription || isOpenAICompatible ? (
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="accent-accent"
+                {...register('isTranscriptionDefault')}
+              />
+              <span className="text-sm text-text">Use as default for transcription</span>
+            </label>
+          ) : null}
 
           {submitError !== null ? <InlineAlert tone="error">{submitError}</InlineAlert> : null}
           {unverified ? (

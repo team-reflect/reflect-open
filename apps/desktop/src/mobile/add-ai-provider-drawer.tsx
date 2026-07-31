@@ -125,7 +125,7 @@ function AddAiProviderSheet({
               const next = aiProvider(aiProviderIdSchema.parse(value))
               setProviderId(next.id)
               setModel(next.models[0].id)
-              setTranscriptionModel('')
+              setTranscriptionModel(next.id === 'openai-compatible' ? next.models[0].id : '')
               setBaseUrl(next.id === 'openai-compatible' ? DEFAULT_OPENAI_COMPATIBLE_BASE_URL : '')
               setConsented(false)
               resetUnverified()
@@ -186,17 +186,28 @@ function AddAiProviderSheet({
         {isOpenAICompatible ? (
           <div className="flex flex-col gap-1">
             <span className={FIELD_LABEL_CLASS}>Transcription model</span>
-            <Input
-              aria-label="Transcription model"
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="Leave empty to disable transcription"
+            <Select
               value={transcriptionModel}
-              onChange={(event) => {
-                setTranscriptionModel(event.target.value)
+              items={provider.models.map((candidate) => ({
+                value: candidate.id,
+                label: candidate.label,
+              }))}
+              onValueChange={(value) => {
+                setTranscriptionModel(value ?? '')
                 resetUnverified()
               }}
-            />
+            >
+              <SelectTrigger aria-label="Transcription model" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {provider.models.map((candidate) => (
+                  <SelectItem key={candidate.id} value={candidate.id}>
+                    {candidate.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         ) : null}
 
@@ -256,15 +267,17 @@ function AddAiProviderSheet({
           <span className="text-sm text-text">Use as default for chat</span>
         </label>
 
-        <label className="flex items-center gap-2 py-1">
-          <input
-            type="checkbox"
-            className="accent-accent"
-            checked={isTranscriptionDefault}
-            onChange={(event) => setIsTranscriptionDefault(event.target.checked)}
-          />
-          <span className="text-sm text-text">Use as default for transcription</span>
-        </label>
+        {provider.supportsTranscription || isOpenAICompatible ? (
+          <label className="flex items-center gap-2 py-1">
+            <input
+              type="checkbox"
+              className="accent-accent"
+              checked={isTranscriptionDefault}
+              onChange={(event) => setIsTranscriptionDefault(event.target.checked)}
+            />
+            <span className="text-sm text-text">Use as default for transcription</span>
+          </label>
+        ) : null}
 
         {submitError !== null ? <InlineAlert tone="error">{submitError}</InlineAlert> : null}
         {unverified ? (

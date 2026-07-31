@@ -1,5 +1,8 @@
 import type { AiProviderConfig, AiProviderId } from '../settings/schema'
-import { DEFAULT_OPENAI_COMPATIBLE_MODEL } from './openai-compatible'
+import {
+  DEFAULT_OPENAI_COMPATIBLE_MODEL,
+  DISABLED_OPENAI_COMPATIBLE_MODEL,
+} from './openai-compatible'
 
 /** A compile-time guarantee that an array has at least one element. */
 type NonEmptyArray<ElementType> = [ElementType, ...ElementType[]]
@@ -113,7 +116,12 @@ export const AI_PROVIDERS: NonEmptyArray<AiProviderInfo> = [
     apiKeyRequired: false,
     supportsTranscription: false,
     keyPlaceholder: 'Optional API key',
-    models: [{ id: DEFAULT_OPENAI_COMPATIBLE_MODEL, label: 'Local model', contextWindow: 128_000 }],
+    // `local-model` first as the picker default; `disabled` opts the entry
+    // out of chat (and, on the transcription slot, out of transcription).
+    models: [
+      { id: DEFAULT_OPENAI_COMPATIBLE_MODEL, label: 'Local model', contextWindow: 128_000 },
+      { id: DISABLED_OPENAI_COMPATIBLE_MODEL, label: 'Disabled', contextWindow: 128_000 },
+    ],
   },
 ]
 
@@ -134,13 +142,32 @@ export function aiProviderRequiresApiKey(id: AiProviderId): boolean {
 /**
  * Whether a configured provider is eligible for audio transcription.  For
  * hosted providers this is a catalog constant; for `openai-compatible` it
- * is true when the user supplied a non-empty `transcriptionModel`.
+ * is true only when the user supplied a real `transcriptionModel` — both
+ * the legacy unset value (`''`) and the `'disabled'` sentinel mean the
+ * entry does not transcribe.
  */
 export function aiProviderSupportsTranscription(config: AiProviderConfig): boolean {
   if (config.provider === 'openai-compatible') {
-    return config.transcriptionModel !== ''
+    return (
+      config.transcriptionModel !== '' &&
+      config.transcriptionModel !== DISABLED_OPENAI_COMPATIBLE_MODEL
+    )
   }
   return aiProvider(config.provider).supportsTranscription
+}
+
+/**
+ * Whether a configured provider can serve chat turns.  Always true for
+ * hosted providers; an `openai-compatible` entry opts out of chat by
+ * setting `model` to the `'disabled'` sentinel (e.g. a whisper-only
+ * endpoint), which keeps it out of the model picker and out of default
+ * resolution.
+ */
+export function aiProviderSupportsChat(config: AiProviderConfig): boolean {
+  if (config.provider === 'openai-compatible') {
+    return config.model !== DISABLED_OPENAI_COMPATIBLE_MODEL
+  }
+  return true
 }
 
 /**

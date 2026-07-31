@@ -4,6 +4,7 @@ import {
   aiModelLabel,
   aiProvider,
   aiProviderRequiresApiKey,
+  aiProviderSupportsChat,
   aiProviderSupportsTranscription,
   DEFAULT_CONTEXT_WINDOW,
   errorMessage,
@@ -50,8 +51,10 @@ function transcriptionModelLabel(config: AiProviderConfig): string {
  * One configured AI provider in the settings list: provider + default model,
  * the stored key's trailing characters, and the default/remove controls. The
  * row owns its own removal (including surfacing a keychain failure as an
- * operation). Transcription-capable providers show a second row with the
- * transcription model and default control.
+ * operation). OpenAI-compatible rows always show a second model row for
+ * transcription — picking the catalog's Disabled option (or clearing the
+ * model) keeps the combo visible but greys out the default control; hosted
+ * transcription-capable providers show their fixed model as an inert combo.
  */
 export function AiProviderRow({
   config,
@@ -70,6 +73,10 @@ export function AiProviderRow({
   const showKeyHint = aiProviderRequiresApiKey(config.provider) || config.keyHint !== ''
   const supportsTranscription = aiProviderSupportsTranscription(config)
   const isOpenAICompatible = config.provider === 'openai-compatible'
+  const supportsChat = aiProviderSupportsChat(config)
+  // The transcription combo always shows for openai-compatible — even when the
+  // model is the disabled sentinel — so the user can re-enable it in place.
+  const showTranscriptionControls = isOpenAICompatible || supportsTranscription
 
   const remove = (): void => {
     onRemove(config.id).catch((error: unknown) => {
@@ -103,12 +110,12 @@ export function AiProviderRow({
           onChange={(model) => onSetDefaultModel(config.id, model)}
           ariaLabel={`Default model for ${providerLabel}`}
         />
-        {supportsTranscription ? (
+        {showTranscriptionControls ? (
           isOpenAICompatible ? (
             <ModelCombobox
               value={config.transcriptionModel}
               provider={config.provider}
-              models={[]}
+              models={provider.models}
               onChange={(model) => onSetTranscriptionModel(config.id, model)}
               ariaLabel={`Transcription model for ${providerLabel}`}
             />
@@ -142,6 +149,7 @@ export function AiProviderRow({
               type="button"
               variant="ghost"
               size="xs"
+              disabled={!supportsChat}
               onClick={() => onMakeDefault(config.id)}
               className="shrink-0 text-text-secondary hover:bg-surface-hover hover:text-text"
             >
@@ -149,7 +157,7 @@ export function AiProviderRow({
             </Button>
           )}
         </div>
-        {supportsTranscription ? (
+        {showTranscriptionControls ? (
           <div className="flex h-8 items-center">
             {isTranscriptionDefault ? (
               <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-soft-text">
@@ -160,6 +168,7 @@ export function AiProviderRow({
                 type="button"
                 variant="ghost"
                 size="xs"
+                disabled={!supportsTranscription}
                 onClick={() => onMakeTranscriptionDefault(config.id)}
                 className="shrink-0 text-text-secondary hover:bg-surface-hover hover:text-text"
               >
