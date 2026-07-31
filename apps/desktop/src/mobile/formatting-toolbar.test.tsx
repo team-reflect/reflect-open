@@ -7,10 +7,12 @@ import {
   publishFormattingToolbar,
   type FormattingToolbar,
 } from '@/editor/formatting-toolbar-store'
+import { pickFiles } from '@/lib/pick-files'
 import { fireEvent } from '@/test-utils/fire-event'
 import { MobileFormattingToolbar } from './formatting-toolbar'
 
 vi.mock('@/mobile/haptics', () => ({ hapticImpactLight: vi.fn() }))
+vi.mock('@/lib/pick-files', () => ({ pickFiles: vi.fn(async () => []) }))
 
 function makeToolbar(
   capabilities: Partial<FormattingToolbar['capabilities']> = {},
@@ -21,6 +23,7 @@ function makeToolbar(
       canDedent: true,
       canMoveUp: true,
       canMoveDown: true,
+      canAttachFiles: true,
       ...capabilities,
     },
     commands: {
@@ -32,6 +35,7 @@ function makeToolbar(
       moveDown: vi.fn(),
       insertTrigger: vi.fn(),
       dismissKeyboard: vi.fn(),
+      attachFiles: vi.fn(),
       scrollCaretIntoView: vi.fn(),
     },
   }
@@ -67,6 +71,7 @@ describe('MobileFormattingToolbar', () => {
       'Indent',
       'Move up',
       'Move down',
+      'Insert image',
       'Hide keyboard',
     ])
     await expect.element(page.getByRole('button', { name: 'Outdent' })).toBeDisabled()
@@ -107,5 +112,27 @@ describe('MobileFormattingToolbar', () => {
 
     fireEvent.click(page.getByRole('button', { name: 'Hide keyboard' }))
     expect(toolbar.commands.dismissKeyboard).toHaveBeenCalledOnce()
+  })
+
+  it('hides the image button for an editor that cannot persist files', async () => {
+    await render(<MobileFormattingToolbar />)
+    await act(() => publishFormattingToolbar(owner, makeToolbar({ canAttachFiles: false })))
+
+    expect(page.getByRole('button', { name: 'Insert image' }).query()).toBeNull()
+  })
+
+  it('hands the picked images to the editor', async () => {
+    const picked = [new File(['png'], 'photo.png', { type: 'image/png' })]
+    vi.mocked(pickFiles).mockResolvedValueOnce(picked)
+    const toolbar = makeToolbar()
+    await render(<MobileFormattingToolbar />)
+    await act(() => publishFormattingToolbar(owner, toolbar))
+
+    fireEvent.click(page.getByRole('button', { name: 'Insert image' }))
+
+    expect(pickFiles).toHaveBeenCalledWith({ accept: 'image/*', multiple: true })
+    await vi.waitFor(() => {
+      expect(toolbar.commands.attachFiles).toHaveBeenCalledWith(picked)
+    })
   })
 })
