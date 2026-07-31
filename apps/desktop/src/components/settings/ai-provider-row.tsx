@@ -77,7 +77,7 @@ export function AiProviderRow({
   }
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 px-4 py-3">
+    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-start gap-3 px-4 py-3">
       <div className="min-w-0">
         <div className="truncate text-sm font-medium text-text">{providerLabel}</div>
         <p className="mt-0.5 text-xs text-text-muted">
@@ -94,15 +94,31 @@ export function AiProviderRow({
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center gap-2">
-          <ModelCombobox
-            value={config.model}
-            provider={config.provider}
-            models={provider.models}
-            onChange={(model) => onSetDefaultModel(config.id, model)}
-            ariaLabel={`Default model for ${providerLabel}`}
-          />
+      <div className="flex flex-col items-end gap-1.5">
+        <ModelCombobox
+          value={config.model}
+          provider={config.provider}
+          models={provider.models}
+          onChange={(model) => onSetDefaultModel(config.id, model)}
+          ariaLabel={`Default model for ${providerLabel}`}
+        />
+        {supportsTranscription ? (
+          isOpenAICompatible ? (
+            <ModelCombobox
+              value={config.transcriptionModel}
+              provider={config.provider}
+              models={[]}
+              onChange={(model) => onSetTranscriptionModel(config.id, model)}
+              ariaLabel={`Transcription model for ${providerLabel}`}
+            />
+          ) : (
+            <span className="text-xs text-text-muted">{transcriptionModelLabel(config)}</span>
+          )
+        ) : null}
+      </div>
+
+      <div className="flex flex-col items-end gap-1.5">
+        <div className="flex h-8 items-center">
           {isDefault ? (
             <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-soft-text">
               Default
@@ -119,23 +135,11 @@ export function AiProviderRow({
             </Button>
           )}
         </div>
-
         {supportsTranscription ? (
-          <div className="flex items-center gap-2">
-            {isOpenAICompatible ? (
-              <ModelCombobox
-                value={config.transcriptionModel}
-                provider={config.provider}
-                models={[]}
-                onChange={(model) => onSetTranscriptionModel(config.id, model)}
-                ariaLabel={`Transcription model for ${providerLabel}`}
-              />
-            ) : (
-              <span className="text-xs text-text-muted">{transcriptionModelLabel(config)}</span>
-            )}
+          <div className="flex h-8 items-center">
             {isTranscriptionDefault ? (
               <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-soft-text">
-                Transcription
+                Transcription default
               </span>
             ) : (
               <Button
@@ -145,7 +149,7 @@ export function AiProviderRow({
                 onClick={() => onMakeTranscriptionDefault(config.id)}
                 className="shrink-0 text-text-secondary hover:bg-surface-hover hover:text-text"
               >
-                Make transcription
+                Make transcription default
               </Button>
             )}
           </div>
@@ -158,7 +162,7 @@ export function AiProviderRow({
         size="icon-sm"
         aria-label={`Remove ${name}`}
         onClick={remove}
-        className="text-text-muted hover:bg-surface-hover hover:text-text"
+        className="self-center text-text-muted hover:bg-surface-hover hover:text-text"
       >
         <Trash2 aria-hidden strokeWidth={1.75} />
       </Button>

@@ -113,7 +113,11 @@ export function ModelCombobox({
           </Button>
         }
       />
-      <PopoverContent className="p-0" style={{ width: 'var(--anchor-width)' }} align="start">
+      <PopoverContent
+        className="p-0"
+        style={{ width: 'max(var(--anchor-width), 20rem)' }}
+        align="start"
+      >
         <Command>
           <FilterCountSync countRef={filteredCountRef} />
           <CommandInput

@@ -21,7 +21,7 @@ export function SettingsSection({ id, children }: SettingsSectionProps): ReactEl
   return (
     <section id={settingsSectionDomId(id)} aria-label={title} className="mt-8 first:mt-0">
       <h2 className="px-1 text-[13px] font-semibold text-text">{title}</h2>
-      <div className="mt-2 divide-y divide-border rounded-lg border border-border bg-surface shadow-sm">
+      <div className="mt-2 divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
         {children}
       </div>
     </section>
