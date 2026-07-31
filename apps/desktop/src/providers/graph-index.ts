@@ -243,9 +243,10 @@ export function createGraphIndex(options: GraphIndexOptions = {}): GraphIndex {
             }
           },
         })
-        // Aborted passes resolve early with partial counters — logging them
-        // as "finished" would misread as a fast healthy pass.
-        if (!controller.signal.aborted) {
+        // Superseded passes (aborted, or stale under a newer open) resolve
+        // early with partial counters — logging them as "finished" would
+        // misread as a fast healthy pass.
+        if (!controller.signal.aborted && !isStale()) {
           console.info(
             `index: pass finished in ${Math.round(performance.now() - passStarted)}ms — read ${passWorked} of ${passTotal} files`,
           )
