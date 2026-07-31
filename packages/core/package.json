@@ -10,7 +10,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --config ../../vitest.config.ts --project core-browser --project core-node"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.20",
@@ -28,7 +28,8 @@
   },
   "devDependencies": {
     "@ai-sdk/provider": "^4.0.3",
-    "jsdom": "^29.1.1",
+    "@vitest/browser-playwright": "^4.1.10",
+    "playwright": "^1.61.1",
     "sqlite-vec": "^0.1.9",
     "typescript": "~6.0.3",
     "vitest": "^4.1.10"

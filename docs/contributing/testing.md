@@ -1,15 +1,15 @@
 # Testing
 
-JS tests run on [Vitest](https://vitest.dev). The desktop app
-(`apps/desktop`) additionally uses
+JS tests run on [Vitest](https://vitest.dev). Anything that needs a DOM uses
 [Vitest browser mode](https://vitest.dev/guide/browser/) with the Playwright
-provider, so editor and component tests run in a real browser instead of
-jsdom. Rust tests are plain `cargo test` (see `AGENTS.md`).
+provider, so it runs in a real browser. Rust tests are plain `cargo test`
+(see `AGENTS.md`).
 
 ## Test projects
 
 The root `vitest.config.ts` collects every app and package into one Vitest
-workspace. The desktop app has two project configs:
+workspace. Two packages split themselves into a browser project and a node
+project:
 
 - **`apps/desktop/vitest.browser.config.ts` (`browser`)**:
   `src/**/*.test.tsx`, executed in a real browser. Chromium by
@@ -18,6 +18,15 @@ workspace. The desktop app has two project configs:
 - **`apps/desktop/vitest.node.config.ts` (`node`)**:
   `src/**/*.test.ts` plus `scripts/**/*.test.mjs`, executed in a plain node
   environment.
+- **`packages/core/vitest.browser.config.ts` (`core-browser`)**:
+  `src/**/*.test.tsx`. Only `meta-scrape` lives here: `parsePageMeta` uses
+  the host's `DOMParser`, and in production that host is always a browser
+  (the Tauri webview, or the extension), never node.
+- **`packages/core/vitest.node.config.ts` (`core-node`)**: `src/**/*.test.ts`,
+  the rest of the package, in a plain node environment.
+
+`packages/db`, `packages/utils` and `apps/extension` are pure node and have
+no config of their own.
 
 The routing rule is the file extension, with no exception list: `.test.ts`
 means "pure logic, node environment", `.test.tsx` means "needs a DOM, real
