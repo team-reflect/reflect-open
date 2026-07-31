@@ -20,6 +20,11 @@ const startOperation = vi.hoisted(() =>
   vi.fn(() => ({ progress: vi.fn(), done: operationDone, fail: operationFail })),
 )
 const isApplePlatform = vi.hoisted(() => vi.fn(() => false))
+const useGraph = vi.hoisted(() =>
+  vi.fn<() => { graph: { root: string; name: string; generation: number } | null }>(() => ({
+    graph: { root: '/g', name: 'g', generation: 7 },
+  })),
+)
 vi.mock('@tauri-apps/api/path', () => ({ join: joinPath }))
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
@@ -35,9 +40,7 @@ vi.mock('@/lib/note-pin', () => ({ toggleNotePinned }))
 vi.mock('@/lib/note-private', () => ({ toggleNotePrivate }))
 vi.mock('@/lib/note-delete', () => ({ deleteOpenNote }))
 vi.mock('@/lib/operations', () => ({ startOperation }))
-vi.mock('@/providers/graph-provider', () => ({
-  useGraph: () => ({ graph: { root: '/g', name: 'g', generation: 7 } }),
-}))
+vi.mock('@/providers/graph-provider', () => ({ useGraph }))
 
 async function renderSection(path: string, showTrash = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -65,6 +68,9 @@ beforeEach(() => {
   operationDone.mockClear()
   operationFail.mockClear()
   isApplePlatform.mockReturnValue(false)
+  useGraph.mockReset().mockReturnValue({
+    graph: { root: '/g', name: 'g', generation: 7 },
+  })
   Reflect.deleteProperty(navigator, 'clipboard')
 })
 
@@ -257,6 +263,21 @@ describe('NoteActionsSection copy-path action', () => {
 
     await vi.waitFor(() => expect(startOperation).toHaveBeenCalledWith('Copying note path'))
     expect(operationFail).toHaveBeenCalledWith('Path unavailable')
+    await view.unmount()
+  })
+
+  it('reports when no graph is open', async () => {
+    useGraph.mockReturnValue({ graph: null })
+    const writeText = vi.fn(async () => {})
+    stubClipboard(writeText)
+    const view = await renderSection('notes/a.md')
+
+    await userEvent.click(view.getByRole('button', { name: 'Copy note path' }))
+
+    expect(startOperation).toHaveBeenCalledWith('Copying note path')
+    expect(operationFail).toHaveBeenCalledWith('No graph is open')
+    expect(joinPath).not.toHaveBeenCalled()
+    expect(writeText).not.toHaveBeenCalled()
     await view.unmount()
   })
 })

@@ -20,6 +20,7 @@ export function NoteCopyPathAction({ path }: NoteCopyPathActionProps): ReactElem
 
   const copyPath = async (): Promise<void> => {
     if (graph === null) {
+      startOperation('Copying note path').fail('No graph is open')
       return
     }
     try {
