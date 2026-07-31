@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.8.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.2...v0.8.0-beta.3) (2026-07-31)
+
+
+### Features
+
+* **mobile:** add an image button to the keyboard toolbar ([#1001](https://github.com/team-reflect/reflect-open/issues/1001)) ([afceb0b](https://github.com/team-reflect/reflect-open/commit/afceb0be58bb61e51431bcb52e3f7f4df54edd6b))
+
+
+### Bug Fixes
+
+* update meowdown to ^0.63.1 ([#1005](https://github.com/team-reflect/reflect-open/issues/1005)) ([0491123](https://github.com/team-reflect/reflect-open/commit/0491123f21596fbda50be71f5803c41a9f7d5feb))
+
 ## [0.8.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.1...v0.8.0-beta.2) (2026-07-30)
 
 
