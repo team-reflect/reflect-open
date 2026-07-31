@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { DiagnosticsSnapshot } from '@reflect/core'
-import {
-  prepareDiagnosticsShare,
-  sharePreparedDiagnostics,
-} from './diagnostics-share'
+import { prepareDiagnosticsShare, sharePreparedDiagnostics } from './diagnostics-share'
 
 const snapshot: DiagnosticsSnapshot = {
   schemaVersion: 1,

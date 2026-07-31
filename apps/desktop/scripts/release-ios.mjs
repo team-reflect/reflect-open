@@ -79,8 +79,7 @@ export function createTauriIosBuildEnv({ apiKeyCredentials = null, baseEnv = pro
     ...baseEnv,
     // Rust release builds otherwise omit the line tables Xcode needs when it
     // creates the app dSYM, leaving native crash addresses unsymbolicated.
-    CARGO_PROFILE_RELEASE_DEBUG:
-      baseEnv.CARGO_PROFILE_RELEASE_DEBUG || 'line-tables-only',
+    CARGO_PROFILE_RELEASE_DEBUG: baseEnv.CARGO_PROFILE_RELEASE_DEBUG || 'line-tables-only',
     CI: 'true',
     ...(apiKeyCredentials?.env ?? {}),
   }
@@ -154,7 +153,8 @@ export function inspectNativeSentryConfiguration(env = process.env) {
   if (!hasAuthToken || !hasDsn) {
     return {
       enabled: false,
-      error: 'native Sentry configuration is incomplete; set both SENTRY_AUTH_TOKEN and VITE_SENTRY_DSN',
+      error:
+        'native Sentry configuration is incomplete; set both SENTRY_AUTH_TOKEN and VITE_SENTRY_DSN',
     }
   }
   if (!isProductionSentryDsn(env.VITE_SENTRY_DSN)) {

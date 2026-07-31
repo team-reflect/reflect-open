@@ -257,9 +257,7 @@ export function MobileSettings(): ReactElement {
 
           <SettingsGroup
             header="About"
-            footer={
-              diagnostics.error === null ? null : `Diagnostics: ${diagnostics.error}`
-            }
+            footer={diagnostics.error === null ? null : `Diagnostics: ${diagnostics.error}`}
           >
             <SettingsValueRow
               label="Notes"

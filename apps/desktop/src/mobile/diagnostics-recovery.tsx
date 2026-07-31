@@ -60,7 +60,7 @@ export function DiagnosticsRecovery(): ReactElement {
           Diagnostics contains only app/build details, startup stages, and termination markers—not
           notes, filenames, paths, settings, or general logs.
         </p>
-        {retryError ?? diagnostics.error ? (
+        {(retryError ?? diagnostics.error) ? (
           <p role="alert" className="mt-3 text-xs text-destructive">
             {retryError ?? diagnostics.error}
           </p>

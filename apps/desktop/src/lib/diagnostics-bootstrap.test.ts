@@ -17,15 +17,11 @@ describe('resolveDiagnosticsStartup', () => {
 
   it('does not warm storage or the platform tree in safe mode', async () => {
     const warm = vi.fn()
-    await prepareApplicationStartup(
-      true,
-      warm,
-      async () => ({
-        safeMode: true,
-        reason: 'repeatedWebContentTerminations',
-        recentWebContentTerminations: 3,
-      }),
-    )
+    await prepareApplicationStartup(true, warm, async () => ({
+      safeMode: true,
+      reason: 'repeatedWebContentTerminations',
+      recentWebContentTerminations: 3,
+    }))
     expect(warm).not.toHaveBeenCalled()
   })
 
@@ -50,6 +46,17 @@ describe('resolveDiagnosticsStartup', () => {
     await expect(resolveDiagnosticsStartup(false, bootstrap)).resolves.toEqual(
       NORMAL_DIAGNOSTICS_STATUS,
     )
+    expect(bootstrap).not.toHaveBeenCalled()
+  })
+
+  it('warms synchronously and returns normal status off iOS', () => {
+    const warm = vi.fn()
+    const bootstrap = vi.fn()
+
+    const startup = prepareApplicationStartup(false, warm, bootstrap)
+
+    expect(startup).toEqual(NORMAL_DIAGNOSTICS_STATUS)
+    expect(warm).toHaveBeenCalledOnce()
     expect(bootstrap).not.toHaveBeenCalled()
   })
 })

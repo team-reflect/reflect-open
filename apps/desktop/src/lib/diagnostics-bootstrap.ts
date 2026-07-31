@@ -1,13 +1,12 @@
-import {
-  bootstrapDiagnostics,
-  type DiagnosticsStatus,
-} from '@reflect/core'
+import { bootstrapDiagnostics, type DiagnosticsStatus } from '@reflect/core'
 
 export const NORMAL_DIAGNOSTICS_STATUS: DiagnosticsStatus = {
   safeMode: false,
   reason: null,
   recentWebContentTerminations: 0,
 }
+
+export type DiagnosticsStartup = DiagnosticsStatus | Promise<DiagnosticsStatus>
 
 /**
  * Reads iOS recovery state before the ordinary provider tree mounts. A
@@ -33,14 +32,19 @@ export async function resolveDiagnosticsStartup(
  * Keeping this sequencing in one helper makes the “safe mode opens no notes”
  * invariant independently testable.
  */
-export async function prepareApplicationStartup(
+export function prepareApplicationStartup(
   enabled: boolean,
   warm: () => void,
   bootstrap: () => Promise<DiagnosticsStatus> = bootstrapDiagnostics,
-): Promise<DiagnosticsStatus> {
-  const status = await resolveDiagnosticsStartup(enabled, bootstrap)
-  if (!status.safeMode) {
+): DiagnosticsStartup {
+  if (!enabled) {
     warm()
+    return NORMAL_DIAGNOSTICS_STATUS
   }
-  return status
+  return resolveDiagnosticsStartup(true, bootstrap).then((status) => {
+    if (!status.safeMode) {
+      warm()
+    }
+    return status
+  })
 }

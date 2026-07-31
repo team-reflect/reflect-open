@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import {
-  errorMessage,
-  getDiagnosticsSnapshot,
-  type DiagnosticsSnapshot,
-} from '@reflect/core'
+import { errorMessage, getDiagnosticsSnapshot, type DiagnosticsSnapshot } from '@reflect/core'
 
 export interface PreparedDiagnosticsShare {
   readonly filename: string
@@ -12,16 +8,12 @@ export interface PreparedDiagnosticsShare {
 }
 
 /** Builds the share payload ahead of the user's tap so WebKit activation survives. */
-export function prepareDiagnosticsShare(
-  snapshot: DiagnosticsSnapshot,
-): PreparedDiagnosticsShare {
+export function prepareDiagnosticsShare(snapshot: DiagnosticsSnapshot): PreparedDiagnosticsShare {
   const suffix = snapshot.build ?? String(snapshot.generatedAtMs)
   const filename = `reflect-diagnostics-${suffix}.json`
   const text = `${JSON.stringify(snapshot, null, 2)}\n`
   const file =
-    typeof File === 'undefined'
-      ? null
-      : new File([text], filename, { type: 'application/json' })
+    typeof File === 'undefined' ? null : new File([text], filename, { type: 'application/json' })
   return { filename, text, file }
 }
 

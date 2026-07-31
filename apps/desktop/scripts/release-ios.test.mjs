@@ -126,9 +126,7 @@ test('native diagnostics accept only the production Reflect Sentry DSN', () => {
     ),
   ).toBe(true)
   expect(
-    isProductionSentryDsn(
-      'https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/1',
-    ),
+    isProductionSentryDsn('https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/1'),
   ).toBe(false)
   expect(isProductionSentryDsn('https://public@example.test/4511705649971200')).toBe(false)
 })
@@ -158,10 +156,7 @@ test('Mach-O UUID parsing normalizes every archive architecture', () => {
         'UUID: 01234567-89AB-CDEF-0123-456789ABCDEF (arm64e) /tmp/Reflect',
       ].join('\n'),
     ),
-  ).toEqual([
-    '01234567-89AB-CDEF-0123-456789ABCDEF',
-    'ABCDEFAB-CDEF-ABCD-EFAB-CDEFABCDEFAB',
-  ])
+  ).toEqual(['01234567-89AB-CDEF-0123-456789ABCDEF', 'ABCDEFAB-CDEF-ABCD-EFAB-CDEFABCDEFAB'])
 })
 
 test('altool upload uses package upload with API key auth and optional processing wait', () => {

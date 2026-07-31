@@ -4,7 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { hasBridge, type DiagnosticsStatus } from '@reflect/core'
 import { queryClient } from '@/lib/query-client'
 import { registerAppCommands } from '@/lib/commands/app-commands'
-import { prepareApplicationStartup } from '@/lib/diagnostics-bootstrap'
+import { NORMAL_DIAGNOSTICS_STATUS, prepareApplicationStartup } from '@/lib/diagnostics-bootstrap'
 import { initializeExceptionTelemetry } from '@/lib/exception-telemetry'
 import { installNativeMenu } from '@/lib/native-menu/menu'
 import { installTauriBridge } from '@/lib/tauri-bridge'
@@ -17,8 +17,7 @@ import '@/styles/index.css'
 
 const reactRootOptions = initializeExceptionTelemetry()
 installTauriBridge()
-const diagnosticsEnabled =
-  hasBridge() && import.meta.env.TAURI_ENV_PLATFORM === 'ios'
+const diagnosticsEnabled = hasBridge() && import.meta.env.TAURI_ENV_PLATFORM === 'ios'
 // Start the ordinary boot-critical work only once native recovery mode has
 // cleared it. Safe mode must not resolve iCloud or mount a graph.
 const diagnosticsStartup = prepareApplicationStartup(diagnosticsEnabled, warmPlatformRoot)
@@ -39,11 +38,16 @@ const DiagnosticsRecovery = lazy(() =>
 )
 
 function AppBootstrap(): ReactElement {
-  const [diagnostics, setDiagnostics] = useState<DiagnosticsStatus | null>(null)
+  const [diagnostics, setDiagnostics] = useState<DiagnosticsStatus | null>(
+    diagnosticsEnabled ? null : NORMAL_DIAGNOSTICS_STATUS,
+  )
 
   useEffect(() => {
+    if (!diagnosticsEnabled) {
+      return
+    }
     let active = true
-    void diagnosticsStartup.then((status) => {
+    void Promise.resolve(diagnosticsStartup).then((status) => {
       if (active) {
         setDiagnostics(status)
       }

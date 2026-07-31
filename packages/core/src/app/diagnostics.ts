@@ -2,7 +2,10 @@ import { z } from 'zod'
 import { call } from '../ipc/invoke'
 
 const timestampSchema = z.number().int().nonnegative()
-const buildSchema = z.string().regex(/^[0-9]{1,32}$/).nullable()
+const buildSchema = z
+  .string()
+  .regex(/^[0-9]{1,32}$/)
+  .nullable()
 const appVersionSchema = z
   .string()
   .max(64)
@@ -100,9 +103,7 @@ export async function bootstrapDiagnostics(): Promise<DiagnosticsStatus> {
 }
 
 /** Records one closed lifecycle checkpoint without accepting arbitrary text. */
-export async function recordDiagnosticCheckpoint(
-  checkpoint: DiagnosticCheckpoint,
-): Promise<void> {
+export async function recordDiagnosticCheckpoint(checkpoint: DiagnosticCheckpoint): Promise<void> {
   await call('diagnostics_checkpoint', { checkpoint }, z.null())
 }
 

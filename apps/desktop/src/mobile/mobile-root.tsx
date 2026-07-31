@@ -1,9 +1,5 @@
 import { useEffect, type ReactElement } from 'react'
-import {
-  recordDiagnosticCheckpoint,
-  setLocalWriteEcho,
-  type AppPlatform,
-} from '@reflect/core'
+import { recordDiagnosticCheckpoint, setLocalWriteEcho, type AppPlatform } from '@reflect/core'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { setPlatformSurface } from '@/lib/platform-surface'
 import { MobileApp } from '@/mobile/mobile-app'
