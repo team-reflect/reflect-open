@@ -243,9 +243,13 @@ export function createGraphIndex(options: GraphIndexOptions = {}): GraphIndex {
             }
           },
         })
-        console.info(
-          `index: pass finished in ${Math.round(performance.now() - passStarted)}ms — read ${passWorked} of ${passTotal} files`,
-        )
+        // Aborted passes resolve early with partial counters — logging them
+        // as "finished" would misread as a fast healthy pass.
+        if (!controller.signal.aborted) {
+          console.info(
+            `index: pass finished in ${Math.round(performance.now() - passStarted)}ms — read ${passWorked} of ${passTotal} files`,
+          )
+        }
         if (isStale() || isSuspended()) {
           return
         }
