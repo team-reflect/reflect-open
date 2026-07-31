@@ -146,41 +146,28 @@ function AddAiProviderSheet({
 
         <div className="flex flex-col gap-1">
           <span className={FIELD_LABEL_CLASS}>Default model</span>
-          {isOpenAICompatible ? (
-            <Input
-              aria-label="Default model"
-              autoComplete="off"
-              spellCheck={false}
-              value={model}
-              onChange={(event) => {
-                setModel(event.target.value)
-                resetUnverified()
-              }}
-            />
-          ) : (
-            <Select
-              value={model}
-              items={provider.models.map((candidate) => ({
-                value: candidate.id,
-                label: candidate.label,
-              }))}
-              onValueChange={(value) => {
-                setModel(value ?? '')
-                resetUnverified()
-              }}
-            >
-              <SelectTrigger aria-label="Default model" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {provider.models.map((candidate) => (
-                  <SelectItem key={candidate.id} value={candidate.id}>
-                    {candidate.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          <Select
+            value={model}
+            items={provider.models.map((candidate) => ({
+              value: candidate.id,
+              label: candidate.label,
+            }))}
+            onValueChange={(value) => {
+              setModel(value ?? '')
+              resetUnverified()
+            }}
+          >
+            <SelectTrigger aria-label="Default model" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {provider.models.map((candidate) => (
+                <SelectItem key={candidate.id} value={candidate.id}>
+                  {candidate.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {isOpenAICompatible ? (

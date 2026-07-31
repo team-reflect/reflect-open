@@ -148,7 +148,9 @@ describe('AddAiProviderDrawer', () => {
     fireEvent.change(page.getByLabelText('Endpoint base URL'), {
       target: { value: 'http://localhost:1234/v1' },
     })
-    fireEvent.change(page.getByLabelText('Default model'), { target: { value: 'llama-local' } })
+    // The chat model is the catalog Select (local-model / Disabled).
+    await page.getByRole('combobox', { name: 'Default model' }).click()
+    await page.getByRole('option', { name: 'Local model' }).click()
     await consentCheckbox().click()
     await page.getByRole('button', { name: 'Add provider' }).click()
 
@@ -167,7 +169,7 @@ describe('AddAiProviderDrawer', () => {
         provider: 'openai-compatible',
         apiKey: '',
         baseUrl: 'http://localhost:1234/v1',
-        model: 'llama-local',
+        model: 'local-model',
       }),
     )
   })

@@ -158,29 +158,15 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
 
           <div className="flex flex-col gap-1">
             <span className={FIELD_LABEL_CLASS}>Default model</span>
-            {isOpenAICompatible ? (
-              <Input
-                aria-label="Default model"
-                autoComplete="off"
-                spellCheck={false}
-                {...register('model', {
-                  validate: (value) => value.trim().length > 0 || 'Enter a model id.',
-                  onChange: () => {
-                    resetUnverified()
-                  },
-                })}
-              />
-            ) : (
-              <ModelCombobox
-                value={selectedModel}
-                provider={provider.id}
-                models={provider.models}
-                onChange={(modelId) => {
-                  setValue('model', modelId)
-                  resetUnverified()
-                }}
-              />
-            )}
+            <ModelCombobox
+              value={selectedModel}
+              provider={provider.id}
+              models={provider.models}
+              onChange={(modelId) => {
+                setValue('model', modelId)
+                resetUnverified()
+              }}
+            />
             {formState.errors.model ? (
               <span role="alert" className="text-xs text-red-600 dark:text-red-400">
                 {formState.errors.model.message}

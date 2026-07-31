@@ -215,7 +215,11 @@ describe('AiProvidersSection', () => {
     await dialog.getByRole('combobox', { name: 'Provider' }).click()
     await page.getByRole('option', { name: 'OpenAI-compatible' }).click()
     await dialog.getByLabelText('Endpoint base URL').fill('http://localhost:1234/v1/')
-    await dialog.getByLabelText('Default model').fill('llama-local')
+    // The model picker is the same combobox as hosted providers: type a
+    // custom id and commit it with Enter.
+    await dialog.getByRole('combobox', { name: 'Default model' }).click()
+    await page.getByPlaceholder('Search or type a model name…').fill('llama-local')
+    await userEvent.keyboard('{Enter}')
     await dialog.getByRole('button', { name: 'Add provider' }).click()
 
     await vi.waitFor(() => expect(saved).toHaveLength(1))
