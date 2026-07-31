@@ -416,10 +416,18 @@ fn shared_inbox_dir() -> Option<PathBuf> {
 /// them. Returns how many envelopes moved; zero without a shared container.
 /// Called by the mobile capture controller on launch and every foreground.
 #[tauri::command]
-pub fn capture_shared_inbox_relay(generation: u64, state: State<GraphState>) -> AppResult<u32> {
+pub async fn capture_shared_inbox_relay(
+    generation: u64,
+    state: State<'_, GraphState>,
+) -> AppResult<u32> {
     let root = root_for_generation(&state, generation)?;
     match shared_inbox_dir() {
-        Some(shared) => relay_shared_spools(&shared, &root),
+        // App Group directory IO belongs on the blocking pool: this fires on
+        // every launch and foreground, on what is the touch-delivery thread
+        // for sync commands on iOS.
+        Some(shared) => {
+            crate::blocking::run_blocking(move || relay_shared_spools(&shared, &root)).await
+        }
         None => Ok(0),
     }
 }

@@ -28,7 +28,9 @@ use std::path::Path;
 use serde::Serialize;
 use tauri::State;
 
-use crate::error::{AppError, AppResult};
+use crate::blocking::run_blocking;
+
+use crate::error::AppResult;
 use crate::fs::GraphState;
 
 use self::commit::CommitOutcome;
@@ -114,16 +116,6 @@ fn setup(root: &Path, remote_url: Option<String>, branch: Option<String>) -> App
     }
     drop(repo);
     status(root)
-}
-
-async fn run_blocking<T, F>(task: F) -> AppResult<T>
-where
-    T: Send + 'static,
-    F: FnOnce() -> AppResult<T> + Send + 'static,
-{
-    tauri::async_runtime::spawn_blocking(task)
-        .await
-        .map_err(|err| AppError::io(format!("git task panicked: {err}")))?
 }
 
 /// Snapshot the backup repository (cheap, no network).

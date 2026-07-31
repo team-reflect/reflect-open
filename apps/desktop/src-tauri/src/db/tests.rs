@@ -1187,11 +1187,11 @@ fn stale_generation_writes_are_dropped_end_to_end() {
     }
 
     let count = |label: &str| -> Value {
-        let rows = super::db_query(
+        let rows = tauri::async_runtime::block_on(super::db_query(
             "SELECT count(*) AS n FROM notes".to_string(),
             vec![],
-            app.state(),
-        )
+            app.handle().clone(),
+        ))
         .unwrap_or_else(|err| panic!("{label}: {err:?}"));
         rows[0]["n"].clone()
     };
@@ -1244,11 +1244,11 @@ fn stale_generation_writes_are_dropped_end_to_end() {
     // index_meta_set rides the same gate: stale stamps vanish, fresh ones land
     // (and upsert — the projection-version stamp is written after every rebuild).
     let meta = |label: &str| -> Vec<serde_json::Map<String, Value>> {
-        super::db_query(
+        tauri::async_runtime::block_on(super::db_query(
             "SELECT value FROM index_meta WHERE key = 'k'".to_string(),
             vec![],
-            app.state(),
-        )
+            app.handle().clone(),
+        ))
         .unwrap_or_else(|err| panic!("{label}: {err:?}"))
     };
     super::index_meta_set(

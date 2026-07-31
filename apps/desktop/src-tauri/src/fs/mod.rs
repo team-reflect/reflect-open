@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use serde::Serialize;
-use tauri::{Emitter, State};
+use tauri::{Emitter, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::error::{AppError, AppResult};
@@ -331,15 +331,20 @@ pub fn graph_open(path: String, state: State<GraphState>) -> AppResult<GraphInfo
 
 /// Read a note's markdown by graph-relative path. `generation`, when given,
 /// pins the read to the issuing graph session (see [`root_for`]).
+///
+/// Off the main thread on purpose: this read *does* materialize an evicted
+/// iCloud note (that is its contract — bulk passes use [`note_read_local`]),
+/// and an on-demand download from a sync command would freeze the whole app
+/// for its duration, exactly like the old synchronous asset protocol.
 #[tauri::command]
-pub fn note_read(
+pub async fn note_read(
     path: String,
     generation: Option<u64>,
-    state: State<GraphState>,
+    state: State<'_, GraphState>,
 ) -> AppResult<String> {
     let root = root_for(&state, generation)?;
     let abs = resolve(&root, &path)?;
-    Ok(io::read_note_no_follow(&root, &abs)?)
+    crate::blocking::run_blocking(move || Ok(io::read_note_no_follow(&root, &abs)?)).await
 }
 
 /// How a [`note_read_local`] request found the note on disk.
@@ -378,7 +383,7 @@ pub async fn note_read_local(
     let root = root_for(&state, generation)?;
     let abs = resolve(&root, &path)?;
     let read_root = root;
-    tauri::async_runtime::spawn_blocking(move || {
+    crate::blocking::run_blocking(move || {
         // Best-effort: when the guard refuses to engage, the read keeps a
         // slim stat-then-read race (an eviction landing between the two
         // materializes that one file).
@@ -402,7 +407,6 @@ pub async fn note_read_local(
         }
     })
     .await
-    .map_err(|err| AppError::io(err.to_string()))?
 }
 
 /// Atomically write a note's markdown by graph-relative path. `generation` pins
@@ -822,9 +826,19 @@ fn move_to_graph_trash(root: &Path, abs: &Path) -> AppResult<()> {
 
 /// List eligible Markdown notes anywhere in the vault. `generation`, when
 /// given, pins the listing to the issuing graph session (see [`root_for`]).
+///
+/// Async because a cold catalog is a full-tree walk; the cached case pays
+/// one thread hop, which is noise next to the IPC round-trip itself.
 #[tauri::command]
-pub fn list_files(generation: Option<u64>, state: State<GraphState>) -> AppResult<Vec<FileMeta>> {
-    Ok(file_catalog(&state, generation)?.notes)
+pub async fn list_files<R: tauri::Runtime>(
+    generation: Option<u64>,
+    app: tauri::AppHandle<R>,
+) -> AppResult<Vec<FileMeta>> {
+    crate::blocking::run_blocking(move || {
+        let state = app.state::<GraphState>();
+        Ok(file_catalog(&state, generation)?.notes)
+    })
+    .await
 }
 
 /// List supported local attachments from the same cached catalog as

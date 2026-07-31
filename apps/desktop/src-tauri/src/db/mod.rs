@@ -24,7 +24,7 @@ use std::sync::{Mutex, MutexGuard};
 
 use rusqlite::{params, Connection};
 use serde_json::{Map, Value};
-use tauri::State;
+use tauri::{Manager, State};
 
 use crate::background_task::{self, BackgroundTaskState};
 use crate::error::{AppError, AppResult};
@@ -343,35 +343,42 @@ pub fn index_move<R: tauri::Runtime>(
 /// returns the empty scan — that pass is superseded and its writes would be
 /// dropped anyway, so "nothing to do" is the honest answer.
 #[tauri::command]
-pub fn index_reconcile_scan(
+pub async fn index_reconcile_scan<R: tauri::Runtime>(
     generation: u64,
-    graph: State<GraphState>,
-    index: State<IndexState>,
+    app: tauri::AppHandle<R>,
 ) -> AppResult<scan::ReconcileScan> {
-    let started = std::time::Instant::now();
-    let root = crate::fs::current_root(&graph)?;
-    let walk_started = std::time::Instant::now();
-    let files = crate::fs::note_files(&root);
-    let walk_ms = walk_started.elapsed().as_millis() as u64;
-    let state = lock_state(&index)?;
-    if state.generation != generation {
-        return Ok(scan::ReconcileScan::empty());
-    }
-    let conn = state.conn.as_ref().ok_or_else(AppError::no_graph)?;
-    let now_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_millis() as u64)
-        .unwrap_or(0);
-    let scan = scan::scan_reconcile(conn, &files, now_ms)?;
-    tracing::info!(
-        files = scan.total,
-        candidates = scan.candidates.len(),
-        orphans = scan.orphans.len(),
-        walk_ms,
-        total_ms = started.elapsed().as_millis() as u64,
-        "index_reconcile_scan"
-    );
-    Ok(scan)
+    // Async on purpose: this is one uninterruptible O(graph) walk + table
+    // read, and as a sync command it occupied the iOS main thread — the
+    // post-paint "I can see a note but can't tap it" freeze on every open.
+    crate::blocking::run_blocking(move || {
+        let started = std::time::Instant::now();
+        let graph = app.state::<GraphState>();
+        let root = crate::fs::current_root(&graph)?;
+        let walk_started = std::time::Instant::now();
+        let files = crate::fs::note_files(&root);
+        let walk_ms = walk_started.elapsed().as_millis() as u64;
+        let index = app.state::<IndexState>();
+        let state = lock_state(&index)?;
+        if state.generation != generation {
+            return Ok(scan::ReconcileScan::empty());
+        }
+        let conn = state.conn.as_ref().ok_or_else(AppError::no_graph)?;
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|elapsed| elapsed.as_millis() as u64)
+            .unwrap_or(0);
+        let scan = scan::scan_reconcile(conn, &files, now_ms)?;
+        tracing::info!(
+            files = scan.total,
+            candidates = scan.candidates.len(),
+            orphans = scan.orphans.len(),
+            walk_ms,
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            "index_reconcile_scan"
+        );
+        Ok(scan)
+    })
+    .await
 }
 
 /// One `index_touch` entry: re-stamp `path`'s stored mtime to `mtime`
@@ -544,13 +551,22 @@ pub fn embed_remove(
 }
 
 /// Execute a read query (compiled by Kysely on the frontend) and return rows.
+///
+/// Async on purpose: sync commands run on the main thread, which on iOS also
+/// owns touch delivery — a long FTS scan there reads as a frozen app. The
+/// state mutex (not the thread) is what serializes reads against writes, so
+/// hopping to the blocking pool changes nothing about ordering.
 #[tauri::command]
-pub fn db_query(
+pub async fn db_query<R: tauri::Runtime>(
     sql: String,
     params: Vec<Value>,
-    index: State<IndexState>,
+    app: tauri::AppHandle<R>,
 ) -> AppResult<Vec<Map<String, Value>>> {
-    let state = lock_state(&index)?;
-    let conn = state.conn.as_ref().ok_or_else(AppError::no_graph)?;
-    query::run_query(conn, &sql, &params)
+    crate::blocking::run_blocking(move || {
+        let index = app.state::<IndexState>();
+        let state = lock_state(&index)?;
+        let conn = state.conn.as_ref().ok_or_else(AppError::no_graph)?;
+        query::run_query(conn, &sql, &params)
+    })
+    .await
 }

@@ -85,11 +85,10 @@ pub async fn icloud_conflicts_scan(
     let started = std::time::Instant::now();
     let root = crate::fs::root_for_generation(&state, generation)?;
     let sweep_root = root.clone();
-    let outcome = tauri::async_runtime::spawn_blocking(move || {
+    let outcome = crate::blocking::run_blocking(move || {
         run_sweep(&sweep_root, &skip_paths, &ingested_paths, record_baseline)
     })
-    .await
-    .map_err(|err| AppError::io(err.to_string()))?;
+    .await;
     if let Ok(outcome) = &outcome {
         tracing::info!(
             changed = outcome.changed.len(),

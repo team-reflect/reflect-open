@@ -15,6 +15,7 @@
 //! [`error`] (the shared error contract).
 
 mod background_task;
+mod blocking;
 mod calendar;
 mod capture;
 mod conflict;
