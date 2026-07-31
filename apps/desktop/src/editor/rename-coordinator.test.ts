@@ -19,6 +19,7 @@ const io = vi.hoisted(() => ({
   rewriteLinksForTitleChange: vi.fn(),
   getBacklinks: vi.fn(),
   getLinkSources: vi.fn(),
+  getPathLinkSources: vi.fn(),
   readNote: vi.fn(),
   writeNote: vi.fn(),
   resolveWikiTarget: vi.fn(),
@@ -30,6 +31,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
   rewriteLinksForTitleChange: io.rewriteLinksForTitleChange,
   getBacklinks: io.getBacklinks,
   getLinkSources: io.getLinkSources,
+  getPathLinkSources: io.getPathLinkSources,
   readNote: io.readNote,
   writeNote: io.writeNote,
   resolveWikiTarget: io.resolveWikiTarget,
@@ -136,6 +138,8 @@ beforeEach(() => {
   })
   io.getBacklinks.mockReset()
   io.getBacklinks.mockResolvedValue([])
+  io.getPathLinkSources.mockReset()
+  io.getPathLinkSources.mockResolvedValue([])
   io.readNote.mockReset()
   io.writeNote.mockReset()
   io.writeNote.mockResolvedValue(undefined)

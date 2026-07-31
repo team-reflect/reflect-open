@@ -210,8 +210,7 @@ describe('useDayCarousel', () => {
           date: DATE,
           navigationKey: NAVIGATION_KEY,
         },
-      ) =>
-        useDayCarousel(date, navigationKey, onSelect, onTarget),
+      ) => useDayCarousel(date, navigationKey, onSelect, onTarget),
       {
         initialProps: { date: DATE, navigationKey: NAVIGATION_KEY },
       },

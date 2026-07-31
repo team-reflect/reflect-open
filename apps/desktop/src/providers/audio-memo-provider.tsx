@@ -9,8 +9,21 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import { errorMessage, type GraphInfo } from '@reflect/core'
-import { isRecordingSupported, useAudioRecorder } from '@/hooks/use-audio-recorder'
+import {
+  AUDIO_MEMO_MAX_DURATION_MS,
+  AUDIO_MEMO_SEGMENT_MS,
+  audioMemoIdentity,
+  audioMemoPartPath,
+  deleteAudioMemo,
+  errorMessage,
+  type AudioMemoIdentity,
+  type GraphInfo,
+} from '@reflect/core'
+import {
+  isRecordingSupported,
+  useAudioRecorder,
+  type RecorderSegment,
+} from '@/hooks/use-audio-recorder'
 import { useAudioMemoPipeline } from '@/hooks/use-audio-memo-pipeline'
 import { useSettings } from '@/providers/settings-provider'
 import { useSidebar } from '@/providers/sidebar-provider'
@@ -60,8 +73,14 @@ interface AudioMemoContextValue {
 
 const AudioMemoContext = createContext<AudioMemoContextValue | null>(null)
 
-/** Auto-stop cap: bounds the transcription payload (Gemini inlines base64). */
-const MAX_DURATION_MS = 10 * 60_000
+/** A live session's bookkeeping: identity once known, and cancel cleanup. */
+interface LiveSession {
+  recordedAt: Date
+  memo: AudioMemoIdentity | null
+  cancelled: boolean
+  /** Segment paths already durably written, in case of a later cancel. */
+  captured: string[]
+}
 
 const NO_PROVIDER_REASON = 'Add an OpenAI or Gemini model in Settings to record audio memos'
 const UNSUPPORTED_REASON = 'Audio recording is not supported on this platform'
@@ -89,9 +108,12 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
   const [stopping, setStopping] = useState(false)
 
   const stopAndSaveRef = useRef<() => void>(() => {})
+  const handleSegmentRef = useRef<(segment: RecorderSegment) => void>(() => {})
   const recorder = useAudioRecorder({
-    maxDurationMs: MAX_DURATION_MS,
+    segmentMs: AUDIO_MEMO_SEGMENT_MS,
+    maxDurationMs: AUDIO_MEMO_MAX_DURATION_MS,
     onMaxDuration: () => stopAndSaveRef.current(),
+    onSegment: (segment) => handleSegmentRef.current(segment),
   })
   // The hook's functions are stable; the wrapper object is not (elapsed ticks
   // remint it every render). Callbacks and effects must hang off the
@@ -114,6 +136,37 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
     isErrorSurfaceVisible: () => !collapsedRef.current,
   })
 
+  const sessionRef = useRef<LiveSession | null>(null)
+  const generationRef = useRef(graph.generation)
+  useEffect(() => {
+    generationRef.current = graph.generation
+  })
+  const enqueueCapture = pipeline.enqueue
+  useEffect(() => {
+    handleSegmentRef.current = (segment: RecorderSegment) => {
+      const session = sessionRef.current
+      if (session === null || session.cancelled) {
+        return
+      }
+      session.memo ??= audioMemoIdentity(session.recordedAt, segment.mimeType)
+      const path = audioMemoPartPath(session.memo, segment.part, segment.end)
+      enqueueCapture({
+        audio: segment.blob,
+        mimeType: segment.mimeType,
+        recordedAt: session.recordedAt,
+        segment: { part: segment.part, end: segment.end },
+        onCaptured: () => {
+          // A cancel may land while this segment's write is in flight — its
+          // bytes are durable by now, so the cancel cleanup runs here.
+          if (session.cancelled) {
+            return deleteAudioMemo(path, generationRef.current).catch(() => {})
+          }
+          session.captured.push(path)
+        },
+      })
+    }
+  })
+
   /** Re-entry guard for the stop click's await gap. */
   const stoppingRef = useRef(false)
   /** The in-flight stop, so a mic click in the gap can chain the next memo. */
@@ -129,6 +182,8 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
     }
     try {
       await startRecorder()
+      // Identity derives from the session's start — every segment shares it.
+      sessionRef.current = { recordedAt: new Date(), memo: null, cancelled: false, captured: [] }
     } catch (cause) {
       pipeline.reportError(
         cause instanceof DOMException && cause.name === 'NotAllowedError'
@@ -149,14 +204,9 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
     setStopping(true)
     const settled = (async (): Promise<void> => {
       try {
-        const recording = await stopRecorder()
-        if (recording !== null) {
-          pipeline.enqueue({
-            audio: recording.blob,
-            mimeType: recording.mimeType,
-            recordedAt: new Date(),
-          })
-        }
+        // Segments (including the final one) flow through onSegment as the
+        // recorder rotates; the stop only flushes and summarizes.
+        await stopRecorder()
       } finally {
         stoppingRef.current = false
         setStopping(false)
@@ -199,6 +249,16 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
   }, [recorder.status, pipeline, stopAndSave, cancelRecorder, start, toggleSidebar])
 
   const cancel = useCallback((): void => {
+    const session = sessionRef.current
+    if (session !== null) {
+      // Discard means discard: segments already on disk go too. Segments
+      // whose write is still in flight delete themselves via onCaptured.
+      session.cancelled = true
+      for (const path of session.captured) {
+        void deleteAudioMemo(path, generationRef.current).catch(() => {})
+      }
+      session.captured = []
+    }
     cancelRecorder()
   }, [cancelRecorder])
 

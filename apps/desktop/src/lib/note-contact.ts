@@ -30,10 +30,7 @@ import { commitNoteFrontmatter, readNoteSource } from '@/lib/note-frontmatter'
  * a stale card must neither merge the wrong details nor dismiss the new
  * title's own suggestion.
  */
-async function sourceIfStillMatching(
-  path: string,
-  contact: ContactMatch,
-): Promise<string | null> {
+async function sourceIfStillMatching(path: string, contact: ContactMatch): Promise<string | null> {
   const source = await readNoteSource(path)
   const title = parseNote({ path, source }).title
   return matchContactForTitle(title, [contact]) === null ? null : source
@@ -99,9 +96,5 @@ export async function ignoreContactSuggestion(
   if (ignored.some((name) => contactNamesEqual(name, contact.fullName))) {
     return
   }
-  await commitNoteFrontmatter(
-    path,
-    { ignoredContacts: [...ignored, contact.fullName] },
-    generation,
-  )
+  await commitNoteFrontmatter(path, { ignoredContacts: [...ignored, contact.fullName] }, generation)
 }

@@ -13,9 +13,7 @@ const payloadSchema = z.array(z.string())
  * batches; the subscriber debounces into a conflict sweep, which is where
  * resolution actually happens.
  */
-export function subscribeIcloudConflicts(
-  handler: (paths: string[]) => void,
-): Promise<Unlisten> {
+export function subscribeIcloudConflicts(handler: (paths: string[]) => void): Promise<Unlisten> {
   return getBridge().listen(ICLOUD_CONFLICTS_EVENT, (payload) => {
     const parsed = payloadSchema.safeParse(payload)
     if (parsed.success) {

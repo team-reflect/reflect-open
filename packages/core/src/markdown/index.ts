@@ -63,12 +63,7 @@ export {
   type ConflictSegment,
   type ConflictSide,
 } from './conflict-markers'
-export {
-  canonicalEmail,
-  canonicalEmails,
-  extractEmailFields,
-  foldEmail,
-} from './email-fields'
+export { canonicalEmail, canonicalEmails, extractEmailFields, foldEmail } from './email-fields'
 export { foldFallbackTitleKey, foldKey, foldTag } from './keys'
 export { gistBodyHash, gistFilename } from './gist'
 export { slugForTitle } from './slug'

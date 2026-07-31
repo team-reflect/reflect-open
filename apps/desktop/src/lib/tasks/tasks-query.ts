@@ -6,7 +6,9 @@ import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
  * (which reads it) and a task row (which optimistically updates it on
  * completion), so the two can't drift.
  */
-export function tasksQueryKey(graphRoot: string | undefined): readonly [string, string | undefined, 'tasks'] {
+export function tasksQueryKey(
+  graphRoot: string | undefined,
+): readonly [string, string | undefined, 'tasks'] {
   return [INDEX_QUERY_SCOPE, graphRoot, 'tasks']
 }
 

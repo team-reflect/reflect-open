@@ -41,7 +41,8 @@ const KEYCHAIN_SERVICE = 'reflect-notary'
 const UPDATER_KEYCHAIN_SERVICE = 'reflect-updater'
 const APP_SPECIFIC_PASSWORD_URL = 'https://account.apple.com'
 const BETA_UPDATER_FEED_TAG = 'updater-beta'
-const STABLE_UPDATER_ENDPOINT = 'https://github.com/team-reflect/reflect-open/releases/latest/download/latest.json'
+const STABLE_UPDATER_ENDPOINT =
+  'https://github.com/team-reflect/reflect-open/releases/latest/download/latest.json'
 const APPLE_SILICON_MAC_TARGET = 'aarch64-apple-darwin'
 const INTEL_MAC_TARGET = 'x86_64-apple-darwin'
 const INTEL_ONNX_RUNTIME_VERSION = '1.23.2'
@@ -150,7 +151,10 @@ export function createTauriBuildArgs({ flavor, resourceConfig = null, target }) 
   // time so a stable build always polls the stable feed, no matter which
   // branch it was cut from. This is what makes releases branch-independent.
   if (flavor === 'stable') {
-    buildArgs.push('--config', JSON.stringify({ plugins: { updater: { endpoints: [STABLE_UPDATER_ENDPOINT] } } }))
+    buildArgs.push(
+      '--config',
+      JSON.stringify({ plugins: { updater: { endpoints: [STABLE_UPDATER_ENDPOINT] } } }),
+    )
   }
   if (resourceConfig) {
     buildArgs.push('--config', JSON.stringify(resourceConfig))
@@ -217,7 +221,9 @@ function findSigningIdentity() {
 
   const { output } = run('security', ['find-identity', '-v', '-p', 'codesigning'])
   const identities = [
-    ...new Set([...output.matchAll(/"(Developer ID Application: [^"]+)"/g)].map((match) => match[1])),
+    ...new Set(
+      [...output.matchAll(/"(Developer ID Application: [^"]+)"/g)].map((match) => match[1]),
+    ),
   ]
   if (identities.length === 0) {
     fail(
@@ -228,7 +234,9 @@ function findSigningIdentity() {
     )
   }
   if (identities.length > 1) {
-    log(`multiple Developer ID identities found; using "${identities[0]}" (override with APPLE_SIGNING_IDENTITY)`)
+    log(
+      `multiple Developer ID identities found; using "${identities[0]}" (override with APPLE_SIGNING_IDENTITY)`,
+    )
   }
   return identities[0]
 }
@@ -242,7 +250,8 @@ function findSigningIdentity() {
 function resolveTeamId(identity) {
   if (process.env.APPLE_TEAM_ID) return process.env.APPLE_TEAM_ID
   const teamId = identity.match(/\(([0-9A-Z]{10})\)$/)?.[1]
-  if (!teamId) fail(`could not extract a team ID from identity "${identity}" — set APPLE_TEAM_ID explicitly`)
+  if (!teamId)
+    fail(`could not extract a team ID from identity "${identity}" — set APPLE_TEAM_ID explicitly`)
   return teamId
 }
 
@@ -262,12 +271,21 @@ function readKeychainCredentials() {
  * Returns { notarytoolArgs, source } or null when nothing is found.
  */
 function resolveNotaryCredentials(identity) {
-  const { APPLE_API_KEY, APPLE_API_ISSUER, APPLE_API_KEY_PATH, APPLE_ID, APPLE_PASSWORD } = process.env
+  const { APPLE_API_KEY, APPLE_API_ISSUER, APPLE_API_KEY_PATH, APPLE_ID, APPLE_PASSWORD } =
+    process.env
 
   if (APPLE_API_KEY && APPLE_API_ISSUER) {
-    if (!APPLE_API_KEY_PATH) fail('APPLE_API_KEY is set but APPLE_API_KEY_PATH (path to the .p8 file) is not')
+    if (!APPLE_API_KEY_PATH)
+      fail('APPLE_API_KEY is set but APPLE_API_KEY_PATH (path to the .p8 file) is not')
     return {
-      notarytoolArgs: ['--key', APPLE_API_KEY_PATH, '--key-id', APPLE_API_KEY, '--issuer', APPLE_API_ISSUER],
+      notarytoolArgs: [
+        '--key',
+        APPLE_API_KEY_PATH,
+        '--key-id',
+        APPLE_API_KEY,
+        '--issuer',
+        APPLE_API_ISSUER,
+      ],
       source: 'App Store Connect API key (environment)',
     }
   }
@@ -284,7 +302,14 @@ function resolveNotaryCredentials(identity) {
   if (!stored) return null
   const teamId = resolveTeamId(identity)
   return {
-    notarytoolArgs: ['--apple-id', stored.account, '--password', stored.password, '--team-id', teamId],
+    notarytoolArgs: [
+      '--apple-id',
+      stored.account,
+      '--password',
+      stored.password,
+      '--team-id',
+      teamId,
+    ],
     source: `Apple ID ${stored.account} (keychain item "${KEYCHAIN_SERVICE}")`,
   }
 }
@@ -315,7 +340,9 @@ function resolveUpdaterSigningEnv() {
 function releaseTargetConfig(target) {
   const config = MACOS_RELEASE_TARGETS[target]
   if (!config) {
-    fail(`unsupported macOS release target "${target}" — one of: ${Object.keys(MACOS_RELEASE_TARGETS).join(', ')}`)
+    fail(
+      `unsupported macOS release target "${target}" — one of: ${Object.keys(MACOS_RELEASE_TARGETS).join(', ')}`,
+    )
   }
   return config
 }
@@ -444,7 +471,14 @@ export function createUpdaterManifest({ artifacts, pubDate, slug, tag, version }
 }
 
 function writeUpdaterManifest({ artifacts, outputDir, tag, version }) {
-  const slug = capture('gh', ['repo', 'view', '--json', 'nameWithOwner', '-q', '.nameWithOwner']).trim()
+  const slug = capture('gh', [
+    'repo',
+    'view',
+    '--json',
+    'nameWithOwner',
+    '-q',
+    '.nameWithOwner',
+  ]).trim()
   const manifest = createUpdaterManifest({
     artifacts,
     pubDate: new Date().toISOString(),
@@ -469,7 +503,9 @@ function writeUpdaterArtifacts({ flavor, target, updater }) {
   rmSync(updaterArchive, { force: true })
   rmSync(updaterSignature, { force: true })
   log(`creating updater archive ${basename(updaterArchive)} from finalized ${basename(app)}…`)
-  execFileSync('tar', createUpdaterArchiveArgs({ app, archive: updaterArchive }), { stdio: 'inherit' })
+  execFileSync('tar', createUpdaterArchiveArgs({ app, archive: updaterArchive }), {
+    stdio: 'inherit',
+  })
 
   log(`signing updater archive ${basename(updaterArchive)}…`)
   const result = spawnSync('pnpm', ['tauri', 'signer', 'sign', updaterArchive], {
@@ -488,7 +524,17 @@ function writeUpdaterArtifacts({ flavor, target, updater }) {
 
 /** Build the hdiutil arguments used to create the release DMG. */
 export function createDmgArgs({ dmg, sourceFolder, volumeName }) {
-  return ['create', '-volname', volumeName, '-srcfolder', sourceFolder, '-ov', '-format', 'UDZO', dmg]
+  return [
+    'create',
+    '-volname',
+    volumeName,
+    '-srcfolder',
+    sourceFolder,
+    '-ov',
+    '-format',
+    'UDZO',
+    dmg,
+  ]
 }
 
 /** Build the codesign arguments used for the DMG container. */
@@ -549,8 +595,12 @@ export function mergeMacosProfileIdentityEntitlements({
   bundleIdentifier,
   profileEntitlements,
 }) {
-  if (!isRecord(appEntitlements)) throw new Error('configured macOS entitlements are not a dictionary')
-  const identityEntitlements = macosProfileIdentityEntitlements({ bundleIdentifier, profileEntitlements })
+  if (!isRecord(appEntitlements))
+    throw new Error('configured macOS entitlements are not a dictionary')
+  const identityEntitlements = macosProfileIdentityEntitlements({
+    bundleIdentifier,
+    profileEntitlements,
+  })
 
   for (const [key, value] of Object.entries(identityEntitlements)) {
     if (Object.hasOwn(appEntitlements, key) && appEntitlements[key] !== value) {
@@ -569,8 +619,12 @@ export function assertMacosProfileIdentityEntitlements({
   profileEntitlements,
   signedEntitlements,
 }) {
-  if (!isRecord(signedEntitlements)) throw new Error('signed macOS entitlements are not a dictionary')
-  const identityEntitlements = macosProfileIdentityEntitlements({ bundleIdentifier, profileEntitlements })
+  if (!isRecord(signedEntitlements))
+    throw new Error('signed macOS entitlements are not a dictionary')
+  const identityEntitlements = macosProfileIdentityEntitlements({
+    bundleIdentifier,
+    profileEntitlements,
+  })
 
   for (const [key, value] of Object.entries(identityEntitlements)) {
     if (signedEntitlements[key] !== value) {
@@ -630,7 +684,11 @@ function prepareMacosSigningEntitlements({ app, flavor }) {
   const appEntitlementsPath = macosEntitlementsPath(flavor)
   const configuredProfilePath = macosProvisioningProfilePath(flavor)
   if (!configuredProfilePath) {
-    return { cleanup: () => {}, description: basename(appEntitlementsPath), path: appEntitlementsPath }
+    return {
+      cleanup: () => {},
+      description: basename(appEntitlementsPath),
+      path: appEntitlementsPath,
+    }
   }
 
   const embeddedProfilePath = join(app, 'Contents', 'embedded.provisionprofile')
@@ -688,7 +746,9 @@ function resignMacosApp({ flavor, identity, keychain, target }) {
   try {
     log('re-signing macOS sidecars without app entitlements…')
     for (const sidecar of macosSidecarPaths(app)) {
-      execFileSync('codesign', codesignArgs({ identity, keychain, path: sidecar }), { stdio: 'inherit' })
+      execFileSync('codesign', codesignArgs({ identity, keychain, path: sidecar }), {
+        stdio: 'inherit',
+      })
     }
 
     log(`re-signing ${basename(app)} with ${signingEntitlements.description}…`)
@@ -705,7 +765,8 @@ function resignMacosApp({ flavor, identity, keychain, target }) {
 function importSigningCertificate() {
   const { APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD } = process.env
   if (!APPLE_CERTIFICATE) return null
-  if (!APPLE_CERTIFICATE_PASSWORD) fail('APPLE_CERTIFICATE is set but APPLE_CERTIFICATE_PASSWORD is not')
+  if (!APPLE_CERTIFICATE_PASSWORD)
+    fail('APPLE_CERTIFICATE is set but APPLE_CERTIFICATE_PASSWORD is not')
 
   const tempDir = mkdtempSync(join(tmpdir(), 'reflect-signing-'))
   const certificatePath = join(tempDir, 'certificate.p12')
@@ -715,20 +776,47 @@ function importSigningCertificate() {
 
   try {
     writeFileSync(certificatePath, Buffer.from(APPLE_CERTIFICATE, 'base64'), { mode: 0o600 })
-    execFileSync('security', ['create-keychain', '-p', keychainPassword, keychainPath], { stdio: 'inherit' })
-    execFileSync('security', ['set-keychain-settings', '-lut', '21600', keychainPath], { stdio: 'inherit' })
-    execFileSync('security', ['unlock-keychain', '-p', keychainPassword, keychainPath], { stdio: 'inherit' })
-    execFileSync('security', ['list-keychains', '-d', 'user', '-s', keychainPath, ...previousKeychains], {
+    execFileSync('security', ['create-keychain', '-p', keychainPassword, keychainPath], {
+      stdio: 'inherit',
+    })
+    execFileSync('security', ['set-keychain-settings', '-lut', '21600', keychainPath], {
+      stdio: 'inherit',
+    })
+    execFileSync('security', ['unlock-keychain', '-p', keychainPassword, keychainPath], {
       stdio: 'inherit',
     })
     execFileSync(
       'security',
-      ['import', certificatePath, '-k', keychainPath, '-P', APPLE_CERTIFICATE_PASSWORD, '-T', '/usr/bin/codesign'],
+      ['list-keychains', '-d', 'user', '-s', keychainPath, ...previousKeychains],
+      {
+        stdio: 'inherit',
+      },
+    )
+    execFileSync(
+      'security',
+      [
+        'import',
+        certificatePath,
+        '-k',
+        keychainPath,
+        '-P',
+        APPLE_CERTIFICATE_PASSWORD,
+        '-T',
+        '/usr/bin/codesign',
+      ],
       { stdio: 'inherit' },
     )
     execFileSync(
       'security',
-      ['set-key-partition-list', '-S', 'apple-tool:,apple:,codesign:', '-s', '-k', keychainPassword, keychainPath],
+      [
+        'set-key-partition-list',
+        '-S',
+        'apple-tool:,apple:,codesign:',
+        '-s',
+        '-k',
+        keychainPassword,
+        keychainPath,
+      ],
       { stdio: 'inherit' },
     )
     rmSync(certificatePath, { force: true })
@@ -742,9 +830,13 @@ function importSigningCertificate() {
 function cleanupSigningCertificate(signingCertificate) {
   if (!signingCertificate) return
   if (signingCertificate.previousKeychains?.length) {
-    spawnSync('security', ['list-keychains', '-d', 'user', '-s', ...signingCertificate.previousKeychains], {
-      stdio: 'ignore',
-    })
+    spawnSync(
+      'security',
+      ['list-keychains', '-d', 'user', '-s', ...signingCertificate.previousKeychains],
+      {
+        stdio: 'ignore',
+      },
+    )
   }
   if (existsSync(signingCertificate.keychainPath)) {
     spawnSync('security', ['delete-keychain', signingCertificate.keychainPath], { stdio: 'ignore' })
@@ -768,9 +860,13 @@ function createDmg({ flavor, identity, keychain, target }) {
     mkdirSync(dirname(dmg), { recursive: true })
     if (existsSync(dmg)) rmSync(dmg)
     log(`creating ${basename(dmg)} from ${basename(app)}…`)
-    execFileSync('hdiutil', createDmgArgs({ dmg, sourceFolder: stagingDir, volumeName: conf.productName }), {
-      stdio: 'inherit',
-    })
+    execFileSync(
+      'hdiutil',
+      createDmgArgs({ dmg, sourceFolder: stagingDir, volumeName: conf.productName }),
+      {
+        stdio: 'inherit',
+      },
+    )
     log(`signing ${basename(dmg)}…`)
     execFileSync('codesign', signDmgArgs({ dmg, identity, keychain }), { stdio: 'inherit' })
   } finally {
@@ -782,7 +878,15 @@ function submitNotarization({ credentials, label, path }) {
   log(`submitting ${basename(path)} to Apple's notary service (typically 1-10 minutes)…`)
   const submit = spawnSync(
     'xcrun',
-    ['notarytool', 'submit', path, ...credentials.notarytoolArgs, '--wait', '--output-format', 'json'],
+    [
+      'notarytool',
+      'submit',
+      path,
+      ...credentials.notarytoolArgs,
+      '--wait',
+      '--output-format',
+      'json',
+    ],
     { encoding: 'utf8' },
   )
   let verdict = {}
@@ -868,7 +972,8 @@ function verifySidecarsLaunch({ flavor, target }) {
     const result = spawnSync(check.binary, check.args, { encoding: 'utf8', input: '' })
     const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim()
     if (result.error) fail(`${check.description} failed:\n${result.error.message}`)
-    if (result.status !== 0) fail(`${check.description} exited ${result.status ?? 'without a status'}:\n${output}`)
+    if (result.status !== 0)
+      fail(`${check.description} exited ${result.status ?? 'without a status'}:\n${output}`)
     if (check.outputPattern && !check.outputPattern.test(output)) {
       fail(`${check.description} printed unexpected output:\n${output}`)
     }
@@ -898,10 +1003,12 @@ function verify({ notarized, flavor, target }) {
   if (!existsSync(app)) fail(`${app} does not exist — run \`pnpm release:macos\` first`)
   if (!existsSync(dmg)) fail(`${dmg} does not exist — run \`pnpm release:macos\` first`)
 
-  expectCheck('codesign verify (app)', 'codesign', ['--verify', '--deep', '--strict', '--verbose=2', app], [
-    'valid on disk',
-    'satisfies its Designated Requirement',
-  ])
+  expectCheck(
+    'codesign verify (app)',
+    'codesign',
+    ['--verify', '--deep', '--strict', '--verbose=2', app],
+    ['valid on disk', 'satisfies its Designated Requirement'],
+  )
   try {
     verifyMacosProfileIdentityEntitlements({ app, flavor })
   } catch (error) {
@@ -910,22 +1017,36 @@ function verify({ notarized, flavor, target }) {
   verifySidecarsLaunch({ flavor, target })
 
   if (!notarized) {
-    log('signed-only verification passed (not notarized: Gatekeeper will reject this bundle on other Macs)')
+    log(
+      'signed-only verification passed (not notarized: Gatekeeper will reject this bundle on other Macs)',
+    )
     return
   }
 
-  expectCheck('Gatekeeper (app)', 'spctl', ['--assess', '--type', 'execute', '-v', app], [
-    'accepted',
-    'source=Notarized Developer ID',
-  ])
-  expectCheck('stapled ticket (app)', 'xcrun', ['stapler', 'validate', app], ['The validate action worked!'])
+  expectCheck(
+    'Gatekeeper (app)',
+    'spctl',
+    ['--assess', '--type', 'execute', '-v', app],
+    ['accepted', 'source=Notarized Developer ID'],
+  )
+  expectCheck(
+    'stapled ticket (app)',
+    'xcrun',
+    ['stapler', 'validate', app],
+    ['The validate action worked!'],
+  )
   expectCheck(
     'Gatekeeper (dmg)',
     'spctl',
     ['--assess', '--type', 'open', '--context', 'context:primary-signature', '-v', dmg],
     ['accepted', 'source=Notarized Developer ID'],
   )
-  expectCheck('stapled ticket (dmg)', 'xcrun', ['stapler', 'validate', dmg], ['The validate action worked!'])
+  expectCheck(
+    'stapled ticket (dmg)',
+    'xcrun',
+    ['stapler', 'validate', dmg],
+    ['The validate action worked!'],
+  )
 }
 
 function printArtifacts(flavor, target) {
@@ -964,15 +1085,30 @@ function exportReleaseArtifacts({ artifactDir, flavor, target }) {
   const exported = {
     dmg: join(
       artifactDir,
-      releaseAssetName({ productName: conf.productName, version: conf.version, target, type: 'dmg' }),
+      releaseAssetName({
+        productName: conf.productName,
+        version: conf.version,
+        target,
+        type: 'dmg',
+      }),
     ),
     updaterArchive: join(
       artifactDir,
-      releaseAssetName({ productName: conf.productName, version: conf.version, target, type: 'updaterArchive' }),
+      releaseAssetName({
+        productName: conf.productName,
+        version: conf.version,
+        target,
+        type: 'updaterArchive',
+      }),
     ),
     updaterSignature: join(
       artifactDir,
-      releaseAssetName({ productName: conf.productName, version: conf.version, target, type: 'updaterSignature' }),
+      releaseAssetName({
+        productName: conf.productName,
+        version: conf.version,
+        target,
+        type: 'updaterSignature',
+      }),
     ),
   }
 
@@ -1002,22 +1138,34 @@ function exportReleaseArtifacts({ artifactDir, flavor, target }) {
   log(`exported ${targetConfig.label} release artifacts to ${artifactDir}`)
 }
 
-function readReleaseArtifact({ artifactDir, expectedFlavor, expectedProductName, expectedTarget, expectedVersion }) {
+function readReleaseArtifact({
+  artifactDir,
+  expectedFlavor,
+  expectedProductName,
+  expectedTarget,
+  expectedVersion,
+}) {
   const metadataPath = join(artifactDir, `${expectedTarget}.json`)
   if (!existsSync(metadataPath)) fail(`missing release artifact metadata ${metadataPath}`)
 
   const metadata = JSON.parse(readFileSync(metadataPath, 'utf8'))
   const targetConfig = releaseTargetConfig(metadata.target)
-  if (metadata.target !== expectedTarget) fail(`${metadataPath} describes ${metadata.target}, expected ${expectedTarget}`)
+  if (metadata.target !== expectedTarget)
+    fail(`${metadataPath} describes ${metadata.target}, expected ${expectedTarget}`)
   if (metadata.version !== expectedVersion) {
     fail(`${metadataPath} describes version ${metadata.version}, expected ${expectedVersion}`)
   }
-  if (metadata.flavor !== expectedFlavor) fail(`${metadataPath} describes flavor ${metadata.flavor}, expected ${expectedFlavor}`)
+  if (metadata.flavor !== expectedFlavor)
+    fail(`${metadataPath} describes flavor ${metadata.flavor}, expected ${expectedFlavor}`)
   if (metadata.productName !== expectedProductName) {
-    fail(`${metadataPath} describes product ${metadata.productName}, expected ${expectedProductName}`)
+    fail(
+      `${metadataPath} describes product ${metadata.productName}, expected ${expectedProductName}`,
+    )
   }
   if (metadata.platform !== targetConfig.platform) {
-    fail(`${metadataPath} describes platform ${metadata.platform}, expected ${targetConfig.platform}`)
+    fail(
+      `${metadataPath} describes platform ${metadata.platform}, expected ${targetConfig.platform}`,
+    )
   }
 
   const artifact = {
@@ -1061,7 +1209,9 @@ function build({ artifactDir, notarize, requireUpdater = false, flavor, target }
         '  updates. Run `pnpm release:macos setup-updater` once, or export TAURI_SIGNING_PRIVATE_KEY.',
     )
   } else {
-    log('no updater signing key — skipping updater artifacts (run `pnpm release:macos setup-updater` to set one up)')
+    log(
+      'no updater signing key — skipping updater artifacts (run `pnpm release:macos setup-updater` to set one up)',
+    )
   }
 
   let credentials = null
@@ -1123,7 +1273,8 @@ function ensureGhReady() {
     fail('GitHub CLI not found — install it from https://cli.github.com and run `gh auth login`')
   }
   const auth = run('gh', ['auth', 'status'])
-  if (auth.status !== 0) fail(`gh is not authenticated — run \`gh auth login\`\n${auth.output.trim()}`)
+  if (auth.status !== 0)
+    fail(`gh is not authenticated — run \`gh auth login\`\n${auth.output.trim()}`)
 }
 
 /**
@@ -1136,8 +1287,13 @@ function ensurePublishableCommit() {
     fail('the working tree has uncommitted changes — commit or stash them before publishing')
   }
   const commit = capture('git', ['rev-parse', 'HEAD']).trim()
-  if (capture('git', ['branch', '--remotes', '--contains', commit, '--list', 'origin/*']).trim() === '') {
-    fail('HEAD is not on any origin branch — push it first so the release tag points at published code')
+  if (
+    capture('git', ['branch', '--remotes', '--contains', commit, '--list', 'origin/*']).trim() ===
+    ''
+  ) {
+    fail(
+      'HEAD is not on any origin branch — push it first so the release tag points at published code',
+    )
   }
   return commit
 }
@@ -1150,11 +1306,19 @@ function ensurePublishableCommit() {
 function findReleaseByTag(tag) {
   const result = spawnSync(
     'gh',
-    ['api', '--paginate', 'repos/{owner}/{repo}/releases', '--jq', `.[] | select(.tag_name == ${JSON.stringify(tag)})`],
+    [
+      'api',
+      '--paginate',
+      'repos/{owner}/{repo}/releases',
+      '--jq',
+      `.[] | select(.tag_name == ${JSON.stringify(tag)})`,
+    ],
     { encoding: 'utf8' },
   )
   if (result.status !== 0) {
-    fail(`could not list GitHub releases:\n${`${result.stdout ?? ''}${result.stderr ?? ''}`.trim()}`)
+    fail(
+      `could not list GitHub releases:\n${`${result.stdout ?? ''}${result.stderr ?? ''}`.trim()}`,
+    )
   }
   const line = (result.stdout ?? '').split('\n').find((candidate) => candidate.trim() !== '')
   return line ? JSON.parse(line) : null
@@ -1171,7 +1335,9 @@ function ensureReleaseAcceptsAssets(release, tag) {
   const names = (release.assets ?? []).map((asset) => asset.name)
   const shipped = names.some((name) => name.endsWith('.dmg') || name === 'latest.json')
   if (shipped && !release.draft) {
-    fail(`release ${tag} already has published artifacts — bump "version" in apps/desktop/package.json first`)
+    fail(
+      `release ${tag} already has published artifacts — bump "version" in apps/desktop/package.json first`,
+    )
   }
 }
 
@@ -1189,7 +1355,9 @@ function ensureReleaseTargetsCommit(release, tag, commit) {
     // target_commitish may be a branch name; resolve it to its origin tip.
     const resolved = run('git', ['rev-parse', '--verify', `refs/remotes/origin/${target}`])
     if (resolved.status !== 0) {
-      fail(`draft release ${tag} targets "${target}", which is neither a commit nor a known origin branch`)
+      fail(
+        `draft release ${tag} targets "${target}", which is neither a commit nor a known origin branch`,
+      )
     }
     taggedCommit = resolved.output.trim()
   }
@@ -1244,7 +1412,9 @@ export function createMacDownloadNotice({ productName }) {
   const appleSiliconDmg = githubAssetName(
     releaseAssetName({ productName, target: APPLE_SILICON_MAC_TARGET, type: 'dmg' }),
   )
-  const intelDmg = githubAssetName(releaseAssetName({ productName, target: INTEL_MAC_TARGET, type: 'dmg' }))
+  const intelDmg = githubAssetName(
+    releaseAssetName({ productName, target: INTEL_MAC_TARGET, type: 'dmg' }),
+  )
 
   return [
     MAC_DOWNLOAD_NOTICE_HEADING,
@@ -1267,7 +1437,9 @@ export function appendMacDownloadNotice({ body, productName }) {
 
 /** Fetch GitHub's generated release notes body before creating the release. */
 function generateReleaseNotesBody({ commit, tag }) {
-  const result = spawnSync('gh', createGenerateReleaseNotesArgs({ commit, tag }), { encoding: 'utf8' })
+  const result = spawnSync('gh', createGenerateReleaseNotesArgs({ commit, tag }), {
+    encoding: 'utf8',
+  })
   if (result.status !== 0) {
     const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim()
     fail(`generating GitHub release notes failed${output ? `\n${output}` : ''}`)
@@ -1296,7 +1468,16 @@ function writeReleaseNotes({ commit, outputDir, productName, tag }) {
 }
 
 /** Build the GitHub CLI args that publish the release and upload artifacts. */
-export function createReleaseArgs({ assets, commit, draft, notesPath, prerelease, productName, tag, version }) {
+export function createReleaseArgs({
+  assets,
+  commit,
+  draft,
+  notesPath,
+  prerelease,
+  productName,
+  tag,
+  version,
+}) {
   const releaseArgs = [
     'release',
     'create',
@@ -1329,8 +1510,23 @@ export function createExistingReleaseUploadArgs({ assets, tag }) {
  * review — the undraft itself, which makes the release visible to users only
  * once every asset is in place.
  */
-export function createFinalizeReleaseArgs({ keepDraft, notesPath, prerelease, productName, tag, version }) {
-  const args = ['release', 'edit', tag, '--title', `${productName} ${version}`, '--notes-file', notesPath]
+export function createFinalizeReleaseArgs({
+  keepDraft,
+  notesPath,
+  prerelease,
+  productName,
+  tag,
+  version,
+}) {
+  const args = [
+    'release',
+    'edit',
+    tag,
+    '--title',
+    `${productName} ${version}`,
+    '--notes-file',
+    notesPath,
+  ]
   if (prerelease) {
     args.push('--prerelease', '--latest=false')
   } else {
@@ -1437,7 +1633,9 @@ function findNewestPublishedBetaVersion() {
     { encoding: 'utf8' },
   )
   if (result.status !== 0) {
-    fail(`could not list published beta releases:\n${`${result.stdout ?? ''}${result.stderr ?? ''}`.trim()}`)
+    fail(
+      `could not list published beta releases:\n${`${result.stdout ?? ''}${result.stderr ?? ''}`.trim()}`,
+    )
   }
 
   try {
@@ -1457,19 +1655,27 @@ function updateBetaFeed({ commit, dmgPaths, manifestPath }) {
         stdio: ['inherit', 'pipe', 'inherit'],
       })
       if (upload.status !== 0) {
-        fail(`updating the beta ${step.label} failed${upload.stdout ? `\n${upload.stdout.trim()}` : ''}`)
+        fail(
+          `updating the beta ${step.label} failed${upload.stdout ? `\n${upload.stdout.trim()}` : ''}`,
+        )
       }
     }
     return
   }
   if (!/release not found/i.test(existing.output)) {
-    fail(`could not check GitHub for the ${BETA_UPDATER_FEED_TAG} updater feed:\n${existing.output.trim()}`)
+    fail(
+      `could not check GitHub for the ${BETA_UPDATER_FEED_TAG} updater feed:\n${existing.output.trim()}`,
+    )
   }
   log(`creating ${BETA_UPDATER_FEED_TAG} downloads and updater feed…`)
-  const create = spawnSync('gh', createBetaFeedReleaseArgs({ assets: [...dmgPaths, manifestPath], commit }), {
-    encoding: 'utf8',
-    stdio: ['inherit', 'pipe', 'inherit'],
-  })
+  const create = spawnSync(
+    'gh',
+    createBetaFeedReleaseArgs({ assets: [...dmgPaths, manifestPath], commit }),
+    {
+      encoding: 'utf8',
+      stdio: ['inherit', 'pipe', 'inherit'],
+    },
+  )
   if (create.status !== 0) {
     fail(`creating the beta downloads failed${create.stdout ? `\n${create.stdout.trim()}` : ''}`)
   }
@@ -1482,7 +1688,9 @@ function downloadReleaseAssets({ assetNames, outputDir, tag }) {
     stdio: ['inherit', 'pipe', 'inherit'],
   })
   if (download.status !== 0) {
-    fail(`downloading release assets from ${tag} failed${download.stdout ? `\n${download.stdout.trim()}` : ''}`)
+    fail(
+      `downloading release assets from ${tag} failed${download.stdout ? `\n${download.stdout.trim()}` : ''}`,
+    )
   }
 
   const paths = assetNames.map((assetName) => join(outputDir, assetName))
@@ -1569,11 +1777,22 @@ function ensurePublishableRelease({ flavorFlag }) {
 /** Run release publish checks without building artifacts or creating a release. */
 function preflight({ flavorFlag }) {
   const { commit, release, tag } = ensurePublishableRelease({ flavorFlag })
-  log(`${tag} is publishable from ${commit.slice(0, 7)}${release ? ' (into the existing draft release)' : ''}`)
+  log(
+    `${tag} is publishable from ${commit.slice(0, 7)}${release ? ' (into the existing draft release)' : ''}`,
+  )
 }
 
 /** Fill the release-please draft release: upload the artifacts, then finalize. */
-function publishIntoExistingRelease({ assets, draft, prerelease, productName, release, releaseNotesPath, tag, version }) {
+function publishIntoExistingRelease({
+  assets,
+  draft,
+  prerelease,
+  productName,
+  release,
+  releaseNotesPath,
+  tag,
+  version,
+}) {
   log(`uploading ${assets.length} assets to the ${release.draft ? 'draft ' : ''}release ${tag}…`)
   const upload = spawnSync('gh', createExistingReleaseUploadArgs({ assets, tag }), {
     encoding: 'utf8',
@@ -1587,13 +1806,26 @@ function publishIntoExistingRelease({ assets, draft, prerelease, productName, re
   // unmoved) until every asset — latest.json included — is in place.
   const finalize = spawnSync(
     'gh',
-    createFinalizeReleaseArgs({ keepDraft: draft, notesPath: releaseNotesPath, prerelease, productName, tag, version }),
+    createFinalizeReleaseArgs({
+      keepDraft: draft,
+      notesPath: releaseNotesPath,
+      prerelease,
+      productName,
+      tag,
+      version,
+    }),
     { encoding: 'utf8', stdio: ['inherit', 'pipe', 'inherit'] },
   )
   if (finalize.status !== 0) {
-    fail(`finalizing the GitHub release failed${finalize.stdout ? `\n${finalize.stdout.trim()}` : ''}`)
+    fail(
+      `finalizing the GitHub release failed${finalize.stdout ? `\n${finalize.stdout.trim()}` : ''}`,
+    )
   }
-  log(draft ? `draft release ${tag} updated — publish it from the GitHub UI` : `release published: ${tag}`)
+  log(
+    draft
+      ? `draft release ${tag} updated — publish it from the GitHub UI`
+      : `release published: ${tag}`,
+  )
 }
 
 /**
@@ -1602,7 +1834,9 @@ function publishIntoExistingRelease({ assets, draft, prerelease, productName, re
  * as a brand-new release (the manual workflow_dispatch fallback).
  */
 function publish({ deferBetaFeed, draft, flavorFlag, fromArtifacts }) {
-  const { commit, flavor, productName, release, tag, version } = ensurePublishableRelease({ flavorFlag })
+  const { commit, flavor, productName, release, tag, version } = ensurePublishableRelease({
+    flavorFlag,
+  })
   const artifactDir = fromArtifacts ?? mkdtempSync(join(tmpdir(), 'reflect-release-assets-'))
 
   if (!fromArtifacts) {
@@ -1620,7 +1854,11 @@ function publish({ deferBetaFeed, draft, flavorFlag, fromArtifacts }) {
   })
   const manifestPath = writeUpdaterManifest({ artifacts, outputDir: artifactDir, tag, version })
   const assets = [
-    ...artifacts.flatMap((artifact) => [artifact.dmg, artifact.updaterArchive, artifact.updaterSignature]),
+    ...artifacts.flatMap((artifact) => [
+      artifact.dmg,
+      artifact.updaterArchive,
+      artifact.updaterSignature,
+    ]),
     manifestPath,
   ]
   // Pre-releases are invisible to `releases/latest` — the stable updater feed —
@@ -1631,8 +1869,20 @@ function publish({ deferBetaFeed, draft, flavorFlag, fromArtifacts }) {
     // release-please already wrote the changelog into the release body; keep
     // it and append the Mac download chooser.
     const releaseNotesPath = join(artifactDir, RELEASE_NOTES_FILENAME)
-    writeFileSync(releaseNotesPath, appendMacDownloadNotice({ body: release.body ?? '', productName }))
-    publishIntoExistingRelease({ assets, draft, prerelease, productName, release, releaseNotesPath, tag, version })
+    writeFileSync(
+      releaseNotesPath,
+      appendMacDownloadNotice({ body: release.body ?? '', productName }),
+    )
+    publishIntoExistingRelease({
+      assets,
+      draft,
+      prerelease,
+      productName,
+      release,
+      releaseNotesPath,
+      tag,
+      version,
+    })
   } else {
     const releaseNotesPath = writeReleaseNotes({
       commit,
@@ -1640,7 +1890,9 @@ function publish({ deferBetaFeed, draft, flavorFlag, fromArtifacts }) {
       productName,
       tag,
     })
-    log(`creating GitHub ${prerelease ? 'pre-release' : 'release'} ${tag} from commit ${commit.slice(0, 7)}…`)
+    log(
+      `creating GitHub ${prerelease ? 'pre-release' : 'release'} ${tag} from commit ${commit.slice(0, 7)}…`,
+    )
     const releaseArgs = createReleaseArgs({
       assets,
       commit,
@@ -1651,8 +1903,12 @@ function publish({ deferBetaFeed, draft, flavorFlag, fromArtifacts }) {
       tag,
       version,
     })
-    const result = spawnSync('gh', releaseArgs, { encoding: 'utf8', stdio: ['inherit', 'pipe', 'inherit'] })
-    if (result.status !== 0) fail(`creating the GitHub release failed${result.stdout ? `\n${result.stdout.trim()}` : ''}`)
+    const result = spawnSync('gh', releaseArgs, {
+      encoding: 'utf8',
+      stdio: ['inherit', 'pipe', 'inherit'],
+    })
+    if (result.status !== 0)
+      fail(`creating the GitHub release failed${result.stdout ? `\n${result.stdout.trim()}` : ''}`)
     log(`${draft ? 'draft release created' : 'release published'}: ${result.stdout.trim()}`)
   }
 
@@ -1711,7 +1967,9 @@ function setupUpdater() {
       { cwd: appDir, encoding: 'utf8' },
     )
     if (generate.status !== 0 || !existsSync(keyPath)) {
-      fail(`generating the updater keypair failed:\n${generate.stdout ?? ''}${generate.stderr ?? ''}`)
+      fail(
+        `generating the updater keypair failed:\n${generate.stdout ?? ''}${generate.stderr ?? ''}`,
+      )
     }
     const store = run('security', [
       'add-generic-password',
@@ -1768,8 +2026,12 @@ async function main() {
   const command = commands[0] ?? 'build'
   const flavorFlag = flags.find((flag) => flag.startsWith('--flavor='))?.slice('--flavor='.length)
   const targetFlag = flags.find((flag) => flag.startsWith('--target='))?.slice('--target='.length)
-  const artifactDir = flags.find((flag) => flag.startsWith('--artifact-dir='))?.slice('--artifact-dir='.length)
-  const fromArtifacts = flags.find((flag) => flag.startsWith('--from-artifacts='))?.slice('--from-artifacts='.length)
+  const artifactDir = flags
+    .find((flag) => flag.startsWith('--artifact-dir='))
+    ?.slice('--artifact-dir='.length)
+  const fromArtifacts = flags
+    .find((flag) => flag.startsWith('--from-artifacts='))
+    ?.slice('--from-artifacts='.length)
   const unknownFlag = flags.find(
     (flag) =>
       !['--no-notarize', '--draft', '--defer-beta-feed', '--help'].includes(flag) &&
@@ -1783,17 +2045,20 @@ async function main() {
     fail(`unknown --flavor "${flavorFlag}" — one of: ${Object.keys(FLAVOR_OVERLAYS).join(', ')}`)
   }
   if (targetFlag) releaseTargetConfig(targetFlag)
-  if (targetFlag && !['build', 'verify'].includes(command)) fail('--target only applies to build and verify')
+  if (targetFlag && !['build', 'verify'].includes(command))
+    fail('--target only applies to build and verify')
   if (artifactDir && command !== 'build') fail('--artifact-dir only applies to build')
   if (fromArtifacts && command !== 'publish') fail('--from-artifacts only applies to publish')
-  if (flags.includes('--defer-beta-feed') && command !== 'publish') fail('--defer-beta-feed only applies to publish')
+  if (flags.includes('--defer-beta-feed') && command !== 'publish')
+    fail('--defer-beta-feed only applies to publish')
   if (flags.includes('--help')) {
     console.log(USAGE)
     return
   }
 
   const needsMacos =
-    ['build', 'setup', 'setup-updater', 'verify'].includes(command) || (command === 'publish' && !fromArtifacts)
+    ['build', 'setup', 'setup-updater', 'verify'].includes(command) ||
+    (command === 'publish' && !fromArtifacts)
   if (needsMacos && process.platform !== 'darwin') fail('this command only runs on macOS')
 
   const notarize = !flags.includes('--no-notarize')

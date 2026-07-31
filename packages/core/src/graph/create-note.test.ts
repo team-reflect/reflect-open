@@ -49,9 +49,7 @@ function bindBridge({
         return query(sql, params)
       }
       const candidate = params[0]
-      return sql.includes('"path" = ?') && taken.has(String(candidate))
-        ? [{ path: candidate }]
-        : []
+      return sql.includes('"path" = ?') && taken.has(String(candidate)) ? [{ path: candidate }] : []
     }
     if (command === 'note_exists') {
       return taken.has(String(args?.['path']))
@@ -122,9 +120,7 @@ describe('createNoteWithTitle', () => {
     expect(path).toBe('notes/business-ideas.md')
     const write = invoke.mock.calls.find(([command]) => command === 'note_create')
     const args = write?.[1] as { contents: string }
-    expect(args.contents).toMatch(
-      /^---\nid: [0-9a-z]{26}\n---\n# 🧠 Business ideas\n$/,
-    )
+    expect(args.contents).toMatch(/^---\nid: [0-9a-z]{26}\n---\n# 🧠 Business ideas\n$/)
   })
 
   it('suffixes the slug when the bare path is taken', async () => {
@@ -150,8 +146,8 @@ describe('resolveOrCreateNoteWithTitle', () => {
   it('uses exact index resolution before reading the slug family', async () => {
     const invoke = bindBridge({
       query: (sql, params) =>
-        sql.includes('"title_key" = ?') && params[0] === 'business ideas'
-          ? [{ path: 'notes/indexed.md' }]
+        sql.includes('note_claims') && params[0] === 'business ideas'
+          ? [{ note_path: 'notes/indexed.md', tier: 2 }]
           : [],
     })
 
@@ -165,27 +161,21 @@ describe('resolveOrCreateNoteWithTitle', () => {
 
   it('preserves indexed daily-date precedence over a regular title', async () => {
     const invoke = bindBridge({
-      query: (sql) => {
-        if (sql.includes('"daily_date" = ?')) {
-          return [{ path: 'daily/2026-06-09.md' }]
-        }
-        if (sql.includes('"title_key" = ?')) {
-          return [{ path: 'notes/date-title.md' }]
-        }
-        return []
-      },
+      query: (sql) =>
+        sql.includes('note_claims')
+          ? [
+              { note_path: 'daily/2026-06-09.md', tier: 1 },
+              { note_path: 'notes/date-title.md', tier: 2 },
+            ]
+          : [],
     })
 
     await expect(resolveOrCreateNoteWithTitle('2026-06-09', 7)).resolves.toEqual({
       kind: 'resolved',
       path: 'daily/2026-06-09.md',
     })
-    expect(
-      invoke.mock.calls.some(
-        ([command, args]) =>
-          command === 'db_query' && String(args?.['sql']).includes('"title_key" = ?'),
-      ),
-    ).toBe(false)
+    // The tier-1 daily claim resolves without a disk probe.
+    expect(invoke.mock.calls.some(([command]) => command === 'note_read')).toBe(false)
   })
 
   it('reuses an unindexed daily file instead of creating a regular date-titled note', async () => {
@@ -207,8 +197,11 @@ describe('resolveOrCreateNoteWithTitle', () => {
   it('refuses multiple indexed notes claiming the same exact title', async () => {
     const invoke = bindBridge({
       query: (sql, params) =>
-        sql.includes('"title_key" = ?') && params[0] === 'business ideas'
-          ? [{ path: 'notes/business-ideas-2.md' }, { path: 'notes/business-ideas.md' }]
+        sql.includes('note_claims') && params[0] === 'business ideas'
+          ? [
+              { note_path: 'notes/business-ideas-2.md', tier: 2 },
+              { note_path: 'notes/business-ideas.md', tier: 2 },
+            ]
           : [],
     })
 
@@ -221,40 +214,30 @@ describe('resolveOrCreateNoteWithTitle', () => {
   })
 
   it('prefers indexed title matches over aliases', async () => {
-    const titleInvoke = bindBridge({
-      query: (sql) => {
-        if (sql.includes('"title_key" = ?')) {
-          return [{ path: 'notes/titled.md' }]
-        }
-        if (sql.includes('from "aliases"')) {
-          return [
-            { note_path: 'notes/alias-a.md' },
-            { note_path: 'notes/alias-b.md' },
-          ]
-        }
-        return []
-      },
+    bindBridge({
+      query: (sql) =>
+        sql.includes('note_claims')
+          ? [
+              { note_path: 'notes/titled.md', tier: 2 },
+              { note_path: 'notes/alias-a.md', tier: 3 },
+              { note_path: 'notes/alias-b.md', tier: 3 },
+            ]
+          : [],
     })
 
     await expect(resolveOrCreateNoteWithTitle('Business ideas', 7)).resolves.toEqual({
       kind: 'resolved',
       path: 'notes/titled.md',
     })
-    expect(
-      titleInvoke.mock.calls.some(
-        ([command, args]) =>
-          command === 'db_query' && String(args?.['sql']).includes('from "aliases"'),
-      ),
-    ).toBe(false)
   })
 
   it('refuses multiple indexed notes claiming the same exact alias', async () => {
     const aliasInvoke = bindBridge({
       query: (sql) =>
-        sql.includes('from "aliases"')
+        sql.includes('note_claims')
           ? [
-              { note_path: 'notes/alias-b.md' },
-              { note_path: 'notes/alias-a.md' },
+              { note_path: 'notes/alias-a.md', tier: 3 },
+              { note_path: 'notes/alias-b.md', tier: 3 },
             ]
           : [],
     })
@@ -284,8 +267,7 @@ describe('resolveOrCreateNoteWithTitle', () => {
     const invoke = bindBridge({
       files: {
         'notes/business-ideas.md': '# Business ideas\n',
-        'notes/business-ideas-2.md':
-          '---\naliases: [Business ideas]\n---\n# Incubator\n',
+        'notes/business-ideas-2.md': '---\naliases: [Business ideas]\n---\n# Incubator\n',
       },
     })
 
@@ -314,8 +296,7 @@ describe('resolveOrCreateNoteWithTitle', () => {
     const invoke = bindBridge({
       files: {
         'notes/business-ideas.md': '# 🧠 Business ideas\n',
-        'notes/business-ideas-2.md':
-          '---\naliases: ["💡 Business ideas"]\n---\n# Incubator\n',
+        'notes/business-ideas-2.md': '---\naliases: ["💡 Business ideas"]\n---\n# Incubator\n',
       },
     })
 
@@ -329,8 +310,7 @@ describe('resolveOrCreateNoteWithTitle', () => {
   it('includes parsed aliases in the fallback match', async () => {
     const invoke = bindBridge({
       files: {
-        'notes/business-ideas.md':
-          '---\naliases: ["🧠Business ideas"]\n---\n# Incubator\n',
+        'notes/business-ideas.md': '---\naliases: ["🧠Business ideas"]\n---\n# Incubator\n',
       },
     })
 
@@ -400,11 +380,11 @@ describe('resolveOrCreateNoteWithTitle', () => {
     let titleLookups = 0
     const invoke = bindBridge({
       query: (sql) => {
-        if (!sql.includes('"title_key" = ?')) {
+        if (!sql.includes('note_claims')) {
           return []
         }
         titleLookups += 1
-        return titleLookups === 2 ? [{ path: 'notes/synced.md' }] : []
+        return titleLookups === 2 ? [{ note_path: 'notes/synced.md', tier: 2 }] : []
       },
     })
 
@@ -422,7 +402,7 @@ describe('resolveOrCreateNoteWithTitle', () => {
     const invoke = bindBridge({
       files,
       query: (sql) => {
-        if (!sql.includes('"title_key" = ?')) {
+        if (!sql.includes('note_claims')) {
           return []
         }
         titleLookups += 1

@@ -94,34 +94,43 @@ export function PublishedUrlSection({ path }: PublishedUrlSectionProps): ReactEl
           {url}
         </a>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              aria-label="Copy published URL"
-              onClick={() => void copyUrl()}
-              className="text-text-muted hover:text-text"
-            >
-              <Icon aria-hidden className="size-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{copyState === 'copied' ? 'Copied' : 'Copy published URL'}</TooltipContent>
+          <TooltipTrigger
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Copy published URL"
+                onClick={() => void copyUrl()}
+                className="text-text-muted hover:text-text"
+              >
+                <Icon aria-hidden className="size-3.5" />
+              </Button>
+            }
+          />
+          <TooltipContent>
+            {copyState === 'copied' ? 'Copied' : 'Copy published URL'}
+          </TooltipContent>
         </Tooltip>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              aria-label="Update published gist"
-              onClick={() => void updateGist()}
-              disabled={isUpdating}
-              className={cn('text-text-muted hover:text-text', row?.gistStale === true && 'text-accent')}
-            >
-              <RefreshCw aria-hidden className={cn('size-3.5', isUpdating && 'animate-spin')} />
-            </Button>
-          </TooltipTrigger>
+          <TooltipTrigger
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Update published gist"
+                onClick={() => void updateGist()}
+                disabled={isUpdating}
+                className={cn(
+                  'text-text-muted hover:text-text',
+                  row?.gistStale === true && 'text-accent',
+                )}
+              >
+                <RefreshCw aria-hidden className={cn('size-3.5', isUpdating && 'animate-spin')} />
+              </Button>
+            }
+          />
           <TooltipContent>
             {row?.gistStale === true ? 'Update gist with latest note' : 'Update published gist'}
           </TooltipContent>

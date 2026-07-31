@@ -139,7 +139,9 @@ function scrubDebugMeta(debugMeta: ErrorEvent['debug_meta']): ErrorEvent['debug_
       return []
     }
     const codeFile = scrubFilename(image.code_file)
-    return codeFile ? [{ type: 'sourcemap' as const, code_file: codeFile, debug_id: image.debug_id }] : []
+    return codeFile
+      ? [{ type: 'sourcemap' as const, code_file: codeFile, debug_id: image.debug_id }]
+      : []
   })
   return images?.length ? { images } : undefined
 }
@@ -161,9 +163,7 @@ function scrubException(exception: Exception): Exception {
   }
   if (exception.stacktrace?.frames) {
     scrubbed.stacktrace = {
-      frames: exception.stacktrace.frames
-        .slice(-MAX_STACK_FRAME_COUNT)
-        .map(scrubStackFrame),
+      frames: exception.stacktrace.frames.slice(-MAX_STACK_FRAME_COUNT).map(scrubStackFrame),
     }
   }
   return scrubbed

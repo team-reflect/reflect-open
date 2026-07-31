@@ -169,7 +169,9 @@ export function captureDescriptionFromBody(body: string): string | undefined {
   if (descriptionLine === -1) {
     return undefined
   }
-  const description = metadataValue(metadataLines[descriptionLine]!.slice(DESCRIPTION_PREFIX.length))
+  const description = metadataValue(
+    metadataLines[descriptionLine]!.slice(DESCRIPTION_PREFIX.length),
+  )
   return description === '' ? undefined : description
 }
 

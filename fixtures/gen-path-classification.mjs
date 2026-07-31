@@ -12,8 +12,26 @@
 
 const RESERVED = new Set(['assets', 'audio-memos'])
 const ATTACHMENTS = new Set([
-  '3gp', 'avif', 'bmp', 'flac', 'gif', 'jpeg', 'jpg', 'm4a', 'mkv', 'mov',
-  'mp3', 'mp4', 'ogg', 'ogv', 'pdf', 'png', 'svg', 'wav', 'webm', 'webp',
+  '3gp',
+  'avif',
+  'bmp',
+  'flac',
+  'gif',
+  'jpeg',
+  'jpg',
+  'm4a',
+  'mkv',
+  'mov',
+  'mp3',
+  'mp4',
+  'ogg',
+  'ogv',
+  'pdf',
+  'png',
+  'svg',
+  'wav',
+  'webm',
+  'webp',
 ])
 
 // ASCII-only lowering — the shared policy never folds beyond ASCII.
@@ -81,11 +99,37 @@ const SEEDS = [
 ]
 
 /** The generated sweep: directories × stems × extension mutations. */
-const DIRS = ['', 'notes/', 'daily/', 'templates/', 'Projects/deep/', 'assets/', 'Assets/', 'aSSets/', 'audio-memos/', '.hidden/', 'notes/.private/']
+const DIRS = [
+  '',
+  'notes/',
+  'daily/',
+  'templates/',
+  'Projects/deep/',
+  'assets/',
+  'Assets/',
+  'aSSets/',
+  'audio-memos/',
+  '.hidden/',
+  'notes/.private/',
+]
 const STEMS = ['note', 'İstanbul', 'K-kelvin', 'trailing.', 'no']
 const EXTS = [
-  'md', 'MD', 'mD', 'md ', 'markdown', 'txt', '',
-  'png', 'PNG', 'jPeG', 'm\u212Av', 'mkv', 'M4A', 'pdf', 'svg', 'zip',
+  'md',
+  'MD',
+  'mD',
+  'md ',
+  'markdown',
+  'txt',
+  '',
+  'png',
+  'PNG',
+  'jPeG',
+  'm\u212Av',
+  'mkv',
+  'M4A',
+  'pdf',
+  'svg',
+  'zip',
 ]
 
 const paths = new Set(SEEDS)
@@ -98,7 +142,11 @@ for (const dir of DIRS) {
 }
 
 const rows = [...paths].map((path) => ({ path, kind: expected(path) }))
-const json = `[\n${rows.map((row) => `  ${JSON.stringify(row.path)}`).map((p, i) => `{ "path": ${p.trim()}, "kind": ${JSON.stringify(rows[i].kind)} }`).map((line) => `  ${line}`).join(',\n')}\n]\n`
+const json = `[\n${rows
+  .map((row) => `  ${JSON.stringify(row.path)}`)
+  .map((p, i) => `{ "path": ${p.trim()}, "kind": ${JSON.stringify(rows[i].kind)} }`)
+  .map((line) => `  ${line}`)
+  .join(',\n')}\n]\n`
 
 const { writeFileSync } = await import('node:fs')
 const target = new URL('./graph-path-classification.json', import.meta.url)

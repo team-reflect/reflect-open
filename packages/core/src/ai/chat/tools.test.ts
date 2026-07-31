@@ -11,11 +11,7 @@ import {
   type ReadAssetResult,
   type ReadAssetsOutput,
 } from './read-assets'
-import {
-  MAX_NOTE_CONTENT_CHARS,
-  type ReadNoteResult,
-  type ReadNotesOutput,
-} from './read-notes'
+import { MAX_NOTE_CONTENT_CHARS, type ReadNoteResult, type ReadNotesOutput } from './read-notes'
 import {
   buildNoteTools,
   INVALID_TAG_ERROR,
@@ -367,7 +363,7 @@ describe('read_assets', () => {
       {
         [SIDECAR]: `---\nreflectAsset: true\n---\n${DESCRIPTION_BODY}\n`,
         [spacedSidecar]: `---\nreflectAsset: true\n---\n${DESCRIPTION_BODY}\n`,
-        'notes/deck.md': '# Deck\n\n![a](./assets/chart.png)\n\n![b](assets/chart%20one.png)\n',
+        'notes/deck.md': '# Deck\n\n![a](assets/chart.png)\n\n![b](assets/chart%20one.png)\n',
       },
       ['notes/deck.md'],
     )

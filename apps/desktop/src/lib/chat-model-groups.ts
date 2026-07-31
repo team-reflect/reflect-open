@@ -9,6 +9,13 @@ export interface ModelOptionGroup {
   options: Array<{ option: ChatModelOption; value: string }>
 }
 
+function providerQualifier(provider: AiProviderConfig): string {
+  if (provider.provider === 'openai-compatible') {
+    return provider.baseUrl
+  }
+  return provider.keyHint === '' ? '' : `·····${provider.keyHint}`
+}
+
 /**
  * The flat option list regrouped per configured provider for rendering
  * (options arrive consecutively per entry). Values are list indexes — model
@@ -30,10 +37,11 @@ export function groupModelOptions(
     const providerLabel = aiProvider(option.provider).label
     const duplicated =
       providers.filter((provider) => provider.provider === option.provider).length > 1
-    const keyHint = providers.find((provider) => provider.id === option.configId)?.keyHint ?? ''
+    const configured = providers.find((provider) => provider.id === option.configId) ?? null
+    const qualifier = configured === null ? '' : providerQualifier(configured)
     groups.push({
       configId: option.configId,
-      label: duplicated && keyHint !== '' ? `${providerLabel} ·····${keyHint}` : providerLabel,
+      label: duplicated && qualifier !== '' ? `${providerLabel} · ${qualifier}` : providerLabel,
       options: [item],
     })
   })

@@ -2,6 +2,7 @@ import { memo, useEffect, useRef, useState, type KeyboardEvent, type ReactElemen
 import { Command } from 'cmdk'
 import { parseHighlights } from '@reflect/core'
 import { CalendarDays, FileText } from 'lucide-react'
+import { getIsComposing } from '@meowdown/core'
 import { Kbd } from '@/components/kbd'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
@@ -150,6 +151,14 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
           value={selectedValue}
           onValueChange={setSelectedValue}
           onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
+            if (getIsComposing()) {
+              // preventDefault keeps cmdk's root handler from selecting the
+              // highlighted item on the Enter that commits the composition.
+              if (event.key === 'Enter') {
+                event.preventDefault()
+              }
+              return
+            }
             // cmdk dispatches its custom select event after this handler. Drop
             // any abandoned pointer intent so Enter can never inherit it.
             if (event.key === 'Enter') {
@@ -254,7 +263,9 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
                             className="size-4 shrink-0 text-text-muted"
                           />
                           <span className="min-w-0 flex-1 truncate text-sm">{command.title}</span>
-                          {command.keybinding ? <ShortcutKeys binding={command.keybinding} /> : null}
+                          {command.keybinding ? (
+                            <ShortcutKeys binding={command.keybinding} />
+                          ) : null}
                         </span>
                       </Command.Item>
                     )

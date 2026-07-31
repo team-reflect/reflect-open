@@ -351,9 +351,7 @@ describe('app shortcuts', () => {
 
     const opened = result.current.router.route
     await act(() => {
-      window.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'n', metaKey: true, repeat: true }),
-      )
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', metaKey: true, repeat: true }))
     })
     expect(result.current.router.route).toEqual(opened) // held key doesn't spam notes
   })
@@ -386,9 +384,7 @@ describe('app shortcuts', () => {
   it('ignores chords with extra modifiers', async () => {
     const { result, act } = await shortcutsHook()
     await act(() => {
-      window.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'n', metaKey: true, altKey: true }),
-      )
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', metaKey: true, altKey: true }))
     })
     expect(result.current.router.route).toEqual({ kind: 'today' })
   })

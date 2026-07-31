@@ -10,10 +10,10 @@
 
 :root {
   /* Families */
-  --font-sans: 'InterVariable', ui-sans-serif, system-ui, -apple-system,
-               'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco,
-               Consolas, monospace;
+  --font-sans:
+    'InterVariable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, Consolas, monospace;
   /* The note editor / reading surface can swap to a serif */
   --font-reading: 'InterVariable', Georgia, 'Times New Roman', serif;
   /* Keyboard-shortcut glyphs (⌘ ⌥ ⇧) — system-ui renders them cleanly */
@@ -22,36 +22,36 @@
   /* ---- Type scale (px) -----------------------------------
      Named for usage. App chrome lives in 2xs–sm; prose in
      base–lg; the site display sizes are display-* .          */
-  --text-2xs:  0.75rem;   /* 12px — section headers, ghost shortcut hints, meta */
-  --text-xs:   0.8125rem; /* 13px — sidebar note rows, captions, labels         */
-  --text-sm:   0.875rem;  /* 14px — buttons, menu items, default chrome */
-  --text-base: 1rem;      /* 16px — editor body                  */
-  --text-lg:   1.125rem;  /* 18px — lead paragraphs              */
-  --text-xl:   1.25rem;   /* 20px — note title / note H2 / daily-note date */
-  --text-2xl:  1.5rem;    /* 24px — prose H1                     */
-  --text-3xl:  1.875rem;  /* 30px                                */
+  --text-2xs: 0.75rem; /* 12px — section headers, ghost shortcut hints, meta */
+  --text-xs: 0.8125rem; /* 13px — sidebar note rows, captions, labels         */
+  --text-sm: 0.875rem; /* 14px — buttons, menu items, default chrome */
+  --text-base: 1rem; /* 16px — editor body                  */
+  --text-lg: 1.125rem; /* 18px — lead paragraphs              */
+  --text-xl: 1.25rem; /* 20px — note title / note H2 / daily-note date */
+  --text-2xl: 1.5rem; /* 24px — prose H1                     */
+  --text-3xl: 1.875rem; /* 30px                                */
 
   /* Marketing display sizes */
-  --display-sm:  2.5rem;   /* 40px  */
-  --display-md:  3.5rem;   /* 56px  */
-  --display-lg:  4.5rem;   /* 72px  — hero "Think better"        */
+  --display-sm: 2.5rem; /* 40px  */
+  --display-md: 3.5rem; /* 56px  */
+  --display-lg: 4.5rem; /* 72px  — hero "Think better"        */
 
   /* ---- Weights ------------------------------------------- */
-  --weight-normal:   400;
-  --weight-medium:   500;   /* the workhorse — buttons, nav, titles */
+  --weight-normal: 400;
+  --weight-medium: 500; /* the workhorse — buttons, nav, titles */
   --weight-semibold: 600;
-  --weight-bold:     700;
+  --weight-bold: 700;
 
   /* ---- Line heights -------------------------------------- */
-  --leading-none:    1;
-  --leading-tight:   1.15;  /* display headings                */
-  --leading-snug:    1.35;
-  --leading-normal:  1.5;   /* UI text                         */
-  --leading-relaxed: 1.7;   /* editor prose                    */
+  --leading-none: 1;
+  --leading-tight: 1.15; /* display headings                */
+  --leading-snug: 1.35;
+  --leading-normal: 1.5; /* UI text                         */
+  --leading-relaxed: 1.7; /* editor prose                    */
 
   /* ---- Letter spacing ------------------------------------ */
-  --tracking-tight:  -0.02em;  /* display / large headings      */
-  --tracking-snug:   -0.011em; /* default Inter optical setting */
+  --tracking-tight: -0.02em; /* display / large headings      */
+  --tracking-snug: -0.011em; /* default Inter optical setting */
   --tracking-normal: 0;
-  --tracking-wide:   0.04em;   /* small caps-y section labels   */
+  --tracking-wide: 0.04em; /* small caps-y section labels   */
 }

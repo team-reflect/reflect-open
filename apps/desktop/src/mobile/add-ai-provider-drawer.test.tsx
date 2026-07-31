@@ -2,7 +2,7 @@ import { cleanup, render } from 'vitest-browser-react'
 import { page, type Locator } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
-import type { ApiKeyValidation } from '@reflect/core'
+import type { ApiKeyValidation, ApiKeyValidationInput } from '@reflect/core'
 import { fireEvent } from '@/test-utils/fire-event'
 
 /**
@@ -13,7 +13,7 @@ import { fireEvent } from '@/test-utils/fire-event'
  */
 
 const validateApiKey = vi.hoisted(() =>
-  vi.fn<(provider: string, key: string, fetchFn?: typeof fetch) => Promise<ApiKeyValidation>>(),
+  vi.fn<(input: ApiKeyValidationInput, fetchFn?: typeof fetch) => Promise<ApiKeyValidation>>(),
 )
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
@@ -136,8 +136,39 @@ describe('AddAiProviderDrawer', () => {
 
     await selectAnthropic()
 
-    await expect
-      .element(page.getByText(/audio memos send the recording/))
-      .not.toBeInTheDocument()
+    await expect.element(page.getByText(/audio memos send the recording/)).not.toBeInTheDocument()
+  })
+
+  it('submits an OpenAI-compatible endpoint without requiring an API key', async () => {
+    validateApiKey.mockResolvedValue('valid')
+    await renderSheet()
+
+    await page.getByRole('combobox', { name: 'Provider' }).click()
+    await page.getByRole('option', { name: 'OpenAI-compatible' }).click()
+    fireEvent.change(page.getByLabelText('Endpoint base URL'), {
+      target: { value: 'http://localhost:1234/v1' },
+    })
+    fireEvent.change(page.getByLabelText('Default model'), { target: { value: 'llama-local' } })
+    await consentCheckbox().click()
+    await page.getByRole('button', { name: 'Add provider' }).click()
+
+    await vi.waitFor(() =>
+      expect(validateApiKey).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: 'openai-compatible',
+          apiKey: '',
+          baseUrl: 'http://localhost:1234/v1',
+        }),
+        expect.any(Function),
+      ),
+    )
+    expect(onAdd).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'openai-compatible',
+        apiKey: '',
+        baseUrl: 'http://localhost:1234/v1',
+        model: 'llama-local',
+      }),
+    )
   })
 })

@@ -84,9 +84,11 @@ export function appendListItemAtHeading(source: string, target: Heading, content
   // end up below the new item instead of being collapsed away.
   const existingGap = source.slice(anchor, tail)
   const suffix =
-    following === null ? lineEnding
-    : existingGap.includes(lineEnding.repeat(2)) ? existingGap
-    : lineEnding.repeat(2)
+    following === null
+      ? lineEnding
+      : existingGap.includes(lineEnding.repeat(2))
+        ? existingGap
+        : lineEnding.repeat(2)
   return source.slice(0, anchor) + lineEnding.repeat(2) + item + suffix + source.slice(tail)
 }
 

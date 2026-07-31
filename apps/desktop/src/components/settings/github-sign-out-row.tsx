@@ -51,33 +51,37 @@ export function GithubSignOutRow({ signOut, description }: GithubSignOutRowProps
         <p className="text-xs text-text-muted">{description}</p>
       </div>
       <Dialog open={open} onOpenChange={setDialogOpen}>
-        <DialogTrigger asChild>
-          <Button
-            variant="destructive"
-            size="sm"
-            title="Removes the GitHub token from this machine"
-            disabled={action.pending}
-          >
-            Sign out of GitHub…
-          </Button>
-        </DialogTrigger>
+        <DialogTrigger
+          render={
+            <Button
+              variant="destructive"
+              size="sm"
+              title="Removes the GitHub token from this machine"
+              disabled={action.pending}
+            >
+              Sign out of GitHub…
+            </Button>
+          }
+        />
         <DialogContent showCloseButton={!action.pending}>
           <DialogHeader>
             <DialogTitle>Sign out of GitHub?</DialogTitle>
             <DialogDescription>
-              This removes the GitHub token from this machine. Every
-              GitHub-backed graph will stop backing up until you sign in again.
+              This removes the GitHub token from this machine. Every GitHub-backed graph will stop
+              backing up until you sign in again.
             </DialogDescription>
           </DialogHeader>
           {action.error !== null ? (
             <p className="text-xs text-red-700 dark:text-red-300">{action.error}</p>
           ) : null}
           <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline" disabled={action.pending}>
-                Cancel
-              </Button>
-            </DialogClose>
+            <DialogClose
+              render={
+                <Button variant="outline" disabled={action.pending}>
+                  Cancel
+                </Button>
+              }
+            />
             <Button
               variant="destructive"
               disabled={action.pending}

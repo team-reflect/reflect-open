@@ -26,9 +26,7 @@ export interface BacklinkSource {
  * vanished between the index query and the file read) are dropped, but the
  * source group itself still renders so the reference stays discoverable.
  */
-export function groupBacklinksBySource(
-  backlinks: readonly BacklinkContext[],
-): BacklinkSource[] {
+export function groupBacklinksBySource(backlinks: readonly BacklinkContext[]): BacklinkSource[] {
   const groups = new Map<string, BacklinkSource>()
   for (const backlink of backlinks) {
     let group = groups.get(backlink.sourcePath)

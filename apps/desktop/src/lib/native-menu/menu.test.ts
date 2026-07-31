@@ -50,11 +50,8 @@ vi.mock('@tauri-apps/api/menu', () => ({
 vi.mock('@/lib/windows/window-role', () => ({ isMainWindow }))
 
 const { APP_COMMANDS, keybindingFor } = await import('@/lib/commands/app-commands')
-const {
-  dispatchMenuCommand,
-  listenForFocusedNoteMenuCommands,
-  setMenuCommandDispatch,
-} = await import('./dispatch')
+const { dispatchMenuCommand, listenForFocusedNoteMenuCommands, setMenuCommandDispatch } =
+  await import('./dispatch')
 const { appMenuLayout, installNativeMenu, isNativeMenuInstalled } = await import('./menu')
 
 beforeEach(() => {
@@ -259,4 +256,3 @@ describe('focused note menu dispatch', () => {
     expect(dispatch).toHaveBeenCalledWith('note.findNext')
   })
 })
-

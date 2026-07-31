@@ -31,20 +31,24 @@ import { ChatScreen } from './chat-screen'
 const streamChat = vi.hoisted(() =>
   vi.fn<(options: StreamChatOptions) => AsyncGenerator<ChatStreamEvent>>(),
 )
-const getSecret = vi.hoisted(() => vi.fn<(name: string) => Promise<string | null>>())
+const aiApiKeyForConfig = vi.hoisted(() =>
+  vi.fn<(config: AiProviderConfig) => Promise<string | null>>(),
+)
 const resolveWikiTarget = vi.hoisted(() =>
-  vi.fn<(target: string) => Promise<{ kind: 'resolved'; ref: string } | { kind: 'unresolved'; text: string }>>(),
+  vi.fn<
+    (
+      target: string,
+    ) => Promise<{ kind: 'resolved'; ref: string } | { kind: 'unresolved'; text: string }>
+  >(),
 )
 const loadChatGraphContext = vi.hoisted(() =>
-  vi.fn<
-    (graphName: string, deps?: GraphContextDeps) => Promise<CloudSafe<CloudGraphContext>>
-  >(),
+  vi.fn<(graphName: string, deps?: GraphContextDeps) => Promise<CloudSafe<CloudGraphContext>>>(),
 )
 const openRouteInNewWindow = vi.hoisted(() => vi.fn<() => Promise<boolean>>())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   streamChat,
-  getSecret,
+  aiApiKeyForConfig,
   resolveWikiTarget,
   loadChatGraphContext,
 }))
@@ -136,7 +140,7 @@ beforeEach(() => {
   settingsState.defaultId = null
   settingsState.selection = null
   streamChat.mockReset()
-  getSecret.mockReset().mockResolvedValue('sk-test')
+  aiApiKeyForConfig.mockReset().mockResolvedValue('sk-test')
   loadChatGraphContext.mockReset().mockResolvedValue(GRAPH_CONTEXT)
   resolveWikiTarget.mockReset().mockImplementation(async (target) => ({
     kind: 'resolved',
@@ -234,7 +238,10 @@ describe('ChatScreen', () => {
         },
       },
       { type: 'text-delta', text: 'It ships in June. [[Atlas]]' },
-      { type: 'complete', messages: [{ role: 'assistant', content: 'It ships in June. [[Atlas]]' }] },
+      {
+        type: 'complete',
+        messages: [{ role: 'assistant', content: 'It ships in June. [[Atlas]]' }],
+      },
     ])
     const view = await renderChat()
 
@@ -243,12 +250,14 @@ describe('ChatScreen', () => {
     await expect.element(view.getByText('when does atlas ship?')).toBeInTheDocument()
     await expect.element(view.getByText(/Searched “atlas” · 1 note/)).toBeInTheDocument()
     // The turn settled, so the answer renders as markdown (not plain text).
-    await expect.element(view.getByTestId('markdown-preview')).toHaveTextContent('It ships in June.')
+    await expect
+      .element(view.getByTestId('markdown-preview'))
+      .toHaveTextContent('It ships in June.')
     await view.getByRole('button', { name: 'Atlas', exact: true }).click()
     expect(probedRoute).toEqual({ kind: 'note', path: 'notes/atlas.md' })
 
     // The turn went out with the keychain key and the full derived history.
-    expect(getSecret).toHaveBeenCalledWith('ai-api-key:m1')
+    expect(aiApiKeyForConfig).toHaveBeenCalledWith(MODEL)
     const options = streamChat.mock.lastCall?.[0]
     expect(options?.config).toEqual(MODEL)
     expect(options?.messages.at(-1)).toEqual({ role: 'user', content: 'when does atlas ship?' })
@@ -558,7 +567,7 @@ describe('ChatScreen', () => {
 
   it('surfaces a missing keychain entry as an in-transcript error', async () => {
     configureModel()
-    getSecret.mockResolvedValueOnce(null)
+    aiApiKeyForConfig.mockResolvedValueOnce(null)
     const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'hi{Enter}')
@@ -606,9 +615,7 @@ describe('ChatScreen', () => {
     await vi.waitFor(() => expect(streamChat).toHaveBeenCalled())
     expect(streamChat.mock.lastCall?.[0]?.messages.at(-1)).toEqual({
       role: 'user',
-      content: [
-        { type: 'file', data: 'data:image/png;base64,iVBORw==', mediaType: 'image/png' },
-      ],
+      content: [{ type: 'file', data: 'data:image/png;base64,iVBORw==', mediaType: 'image/png' }],
     })
     // The queue cleared; the photo now lives in the transcript bubble.
     expect(view.getByRole('button', { name: 'Remove cat.png' }).query()).toBeNull()

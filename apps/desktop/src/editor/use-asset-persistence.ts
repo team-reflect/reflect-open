@@ -106,10 +106,7 @@ export interface AssetPersistence {
  * from) the wrong graph; `path`, when given, scopes the error banner to the
  * note being edited (a pane is reused across note switches).
  */
-export function useAssetPersistence(
-  generation: number | null,
-  path?: string,
-): AssetPersistence {
+export function useAssetPersistence(generation: number | null, path?: string): AssetPersistence {
   const [saveError, setSaveError] = useState<AssetSaveError | null>(null)
   // Stamps the note session a save was started for. The pane outlives the
   // note (and graph session) it shows, so a save that finishes after a

@@ -8,6 +8,7 @@ import { setPlatformSurface } from '@/lib/platform-surface'
 import { expectLocatorToHaveCount } from '@/test-utils/expect'
 import { pasteFiles } from '@/test-utils/file-events'
 import '@/test-utils/locator'
+import { hover, unhover } from '@/test-utils/mouse'
 import { NoteEditor, type NoteEditorHandle } from './note-editor'
 
 vi.mock('@tauri-apps/plugin-opener', () => ({
@@ -128,9 +129,7 @@ describe('NoteEditor smooth caret animation', () => {
     await pmRoot.click()
     const caret = page.getByTestId('virtual-caret')
     await expect.element(caret).toBeVisible()
-    expect(getComputedStyle(caret.element()).getPropertyValue('--meowdown-caret-glide')).toBe(
-      '0ms',
-    )
+    expect(getComputedStyle(caret.element()).getPropertyValue('--meowdown-caret-glide')).toBe('0ms')
   })
 })
 
@@ -158,15 +157,20 @@ describe('NoteEditor touch-surface input hygiene', () => {
   })
 
   it('shows the block handle on hover on desktop', async () => {
+    // Park the mouse first: the pointer position persists across tests, and the
+    // block handle only opens on pointer events, so the hover below must be a
+    // real movement into the fresh editor.
+    await unhover()
     await render(<NoteEditor initialContent="Hello" blockHandle={true} />)
-    await pmRoot.getByText('Hello').hover()
+    await hover(pmRoot.getByText('Hello'))
     await expect.element(page.getByTestId('block-handle')).toBeVisible()
   })
 
   it('pins the block handle off on the touch surface', async () => {
     setPlatformSurface({ touchEditor: true })
+    await unhover()
     await render(<NoteEditor initialContent="Hello" blockHandle={true} />)
-    await pmRoot.getByText('Hello').hover()
+    await hover(pmRoot.getByText('Hello'))
     await expect.element(pmRoot.getByText('Hello')).toBeVisible()
     await expectLocatorToHaveCount(page.getByTestId('block-handle'), 0)
   })
@@ -250,7 +254,9 @@ describe('NoteEditor image lightbox', () => {
     expect(close.element().parentElement?.className).toContain(
       'left-[max(env(safe-area-inset-left),1rem)]',
     )
-    await expect.element(page.getByRole('dialog', { name: 'Image preview' }).locate('.bg-black')).toBeInTheDocument()
+    await expect
+      .element(page.getByRole('dialog', { name: 'Image preview' }).locate('.bg-black'))
+      .toBeInTheDocument()
   })
 
   it('dismisses the mobile image lightbox with a downward drag', async () => {

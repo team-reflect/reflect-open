@@ -83,6 +83,11 @@ describe('parseDeepLink', () => {
       capture: 'append',
       text: 'hello world',
     })
+    expect(parseDeepLink('reflect://checkbox?text=pack+a+bag')).toEqual({
+      kind: 'capture',
+      capture: 'checkbox',
+      text: 'pack a bag',
+    })
     expect(parseDeepLink('reflect://task?text=Buy+milk')).toEqual({
       kind: 'capture',
       capture: 'task',

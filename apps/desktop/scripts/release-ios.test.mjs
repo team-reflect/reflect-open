@@ -58,9 +58,9 @@ test('required iOS release commands generate timestamp build numbers instead of 
     delete process.env.BUILD_NUMBER
     process.env.GITHUB_RUN_NUMBER = '10'
 
-    expect(resolveBuildNumber(null, { required: true, now: new Date('2026-07-05T09:04:30Z') })).toBe(
-      '202607050904',
-    )
+    expect(
+      resolveBuildNumber(null, { required: true, now: new Date('2026-07-05T09:04:30Z') }),
+    ).toBe('202607050904')
   } finally {
     if (previousBuildNumber === undefined) {
       delete process.env.BUILD_NUMBER
@@ -214,7 +214,9 @@ test('IPA appex lookup finds each embedded extension bundle once', () => {
 })
 
 test('IPA appex lookup returns empty for an IPA without extensions', () => {
-  expect(findIpaAppexPaths(['Payload/Reflect.app/', 'Payload/Reflect.app/Info.plist'].join('\n'))).toEqual([])
+  expect(
+    findIpaAppexPaths(['Payload/Reflect.app/', 'Payload/Reflect.app/Info.plist'].join('\n')),
+  ).toEqual([])
 })
 
 test('Info.plist export-compliance false values are normalized', () => {

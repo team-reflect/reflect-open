@@ -9,10 +9,7 @@ import type { NoteRoute } from '@/routing/route'
 import { useRouter } from '@/routing/router'
 
 /** Open one concrete note from a link-like UI control. */
-export type NoteLinkNavigation = (
-  route: NoteRoute,
-  event?: NewWindowClickEvent,
-) => void
+export type NoteLinkNavigation = (route: NoteRoute, event?: NewWindowClickEvent) => void
 
 /**
  * Apply the app-wide note-link convention: a plain click navigates in the

@@ -96,7 +96,10 @@ describe('composeVisibleTaskGroups', () => {
 
   it('filters by the search needle across open and struck rows', () => {
     const groups = composeVisibleTaskGroups({
-      open: [task({ text: 'buy milk', markerOffset: 0 }), task({ text: 'call mum', markerOffset: 10 })],
+      open: [
+        task({ text: 'buy milk', markerOffset: 0 }),
+        task({ text: 'call mum', markerOffset: 10 }),
+      ],
       completed: undefined,
       recentlyCompleted: [],
       filters: ALL_ON,

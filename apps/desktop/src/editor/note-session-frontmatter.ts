@@ -57,8 +57,7 @@ export function frontmatterPatchToYaml(patch: FrontmatterPatch): Record<string, 
     yaml['private'] = patch.private === false ? undefined : true
   }
   if (patch.ignoredContacts !== undefined) {
-    yaml['ignoredContacts'] =
-      patch.ignoredContacts.length === 0 ? undefined : patch.ignoredContacts
+    yaml['ignoredContacts'] = patch.ignoredContacts.length === 0 ? undefined : patch.ignoredContacts
   }
   if (patch.gist !== undefined) {
     if (patch.gist === false) {

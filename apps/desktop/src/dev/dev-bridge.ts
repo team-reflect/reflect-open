@@ -1,9 +1,4 @@
-import {
-  indexedNoteSchema,
-  ReflectError,
-  type AppPlatform,
-  type IpcBridge,
-} from '@reflect/core'
+import { indexedNoteSchema, ReflectError, type AppPlatform, type IpcBridge } from '@reflect/core'
 import { z } from 'zod'
 import type { DevFileStore } from '@/dev/dev-file-store'
 import type { DevIndexDb } from '@/dev/dev-index-db'
@@ -24,6 +19,9 @@ const pathArgsSchema = z.object({ path: z.string() })
 const writeArgsSchema = z.object({ path: z.string(), contents: z.string() })
 const createArgsSchema = writeArgsSchema.extend({ generation: z.number().int().nonnegative() })
 const moveArgsSchema = z.object({ from: z.string(), to: z.string() })
+const moveRequestArgsSchema = z.object({
+  request: z.object({ from: z.string(), to: z.string() }),
+})
 const metaArgsSchema = z.object({ key: z.string(), value: z.string() })
 const touchArgsSchema = z.object({
   entries: z.array(z.object({ path: z.string(), mtime: z.number() })),
@@ -153,7 +151,9 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
       case 'dir_list':
         return files.listDir(z.object({ dir: z.string() }).parse(args).dir)
       case 'note_move_indexed': {
-        const { from, to } = moveArgsSchema.parse(args)
+        const {
+          request: { from, to },
+        } = moveRequestArgsSchema.parse(args)
         if (!files.exists(from)) {
           throw new ReflectError('notFound', `cannot move note: ${from} does not exist`)
         }
@@ -303,7 +303,10 @@ function reconcileScan(files: DevFileStore, index: DevIndexDb) {
   const stored = new Map(
     index
       .query('SELECT path, mtime, file_hash FROM notes', [])
-      .map((row) => [String(row['path']), { mtime: Number(row['mtime']), hash: String(row['file_hash']) }]),
+      .map((row) => [
+        String(row['path']),
+        { mtime: Number(row['mtime']), hash: String(row['file_hash']) },
+      ]),
   )
   const now = Date.now()
   const listing = files.list()

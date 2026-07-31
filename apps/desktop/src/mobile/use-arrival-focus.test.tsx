@@ -6,8 +6,7 @@ async function mountFocus(initial: Omit<ArrivalFocusOptions, 'target'>) {
   const focus = vi.fn()
   const target = { current: { focus } as unknown as HTMLElement }
   const hook = await renderHook(
-    (props: Omit<ArrivalFocusOptions, 'target'> = initial) =>
-      useArrivalFocus({ ...props, target }),
+    (props: Omit<ArrivalFocusOptions, 'target'> = initial) => useArrivalFocus({ ...props, target }),
     { initialProps: initial },
   )
   return { hook, focus }

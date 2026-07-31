@@ -215,11 +215,13 @@ function TemplateDeleteDialog({ template, onClose }: TemplateDialogProps): React
           </span>
         ) : null}
         <DialogFooter>
-          <DialogClose asChild>
-            <Button type="button" variant="outline" size="sm">
-              Cancel
-            </Button>
-          </DialogClose>
+          <DialogClose
+            render={
+              <Button type="button" variant="outline" size="sm">
+                Cancel
+              </Button>
+            }
+          />
           <Button
             type="button"
             variant="destructive"

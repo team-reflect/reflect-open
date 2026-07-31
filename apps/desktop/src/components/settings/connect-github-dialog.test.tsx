@@ -106,9 +106,7 @@ describe('ConnectGithubDialog', () => {
     await page.getByRole('button', { name: 'Continue' }).click()
 
     // The guide names the exact repo and opens the prefilled create page.
-    await expect
-      .element(page.getByText(/waiting for the repository/i))
-      .toBeInTheDocument()
+    await expect.element(page.getByText(/waiting for the repository/i)).toBeInTheDocument()
     await page.getByRole('button', { name: 'Create on GitHub…' }).click()
     expect(openedUrls).toHaveBeenCalledWith(
       expect.stringContaining('https://github.com/new?name=g-backup'),
@@ -337,9 +335,7 @@ describe('ConnectGithubDialog', () => {
 
     await page.getByRole('button', { name: 'Continue' }).click()
 
-    await expect
-      .element(page.getByText(/waiting for the repository/i))
-      .toBeInTheDocument()
+    await expect.element(page.getByText(/waiting for the repository/i)).toBeInTheDocument()
     await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(sync.connectExistingRepo.mock.calls.length).toBeGreaterThanOrEqual(3)
     expect(sync.connectNewRepo).toHaveBeenCalledTimes(1)

@@ -2,10 +2,7 @@ import { useEffect, useRef } from 'react'
 import { addPluginListener, invoke } from '@tauri-apps/api/core'
 import { hasBridge } from '@reflect/core'
 import { z } from 'zod'
-import {
-  nativeRecordingStatus,
-  stopActiveRecording,
-} from '@/mobile/use-native-audio-recorder'
+import { nativeRecordingStatus, stopActiveRecording } from '@/mobile/use-native-audio-recorder'
 import type { StagedRecordingInput } from '@/mobile/use-staged-recording-ingest'
 
 /**

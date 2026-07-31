@@ -1,6 +1,7 @@
 import { type ReactElement } from 'react'
 import { Circle, CircleCheck } from 'lucide-react'
 import type { OpenTask } from '@reflect/core'
+import { getIsComposing } from '@meowdown/core'
 import { TaskText } from '@/components/tasks/task-text'
 import { formatShortDate } from '@/lib/dates'
 import { taskKey } from '@/lib/tasks/task-identity'
@@ -65,6 +66,9 @@ export function MobileTaskRow({ task, showSource, onEdit }: MobileTaskRowProps):
         aria-label={`Edit: ${label}`}
         onClick={edit}
         onKeyDown={(event) => {
+          if (getIsComposing()) {
+            return
+          }
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault()
             edit()

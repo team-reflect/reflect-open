@@ -5,6 +5,7 @@ import {
   Brackets,
   ChevronDown,
   Hash,
+  Image as ImageIcon,
   IndentDecrease,
   IndentIncrease,
   List,
@@ -12,6 +13,7 @@ import {
   Slash,
 } from 'lucide-react'
 import { useFormattingToolbar } from '@/editor/formatting-toolbar-store'
+import { pickFiles } from '@/lib/pick-files'
 import { hapticImpactLight } from '@/mobile/haptics'
 
 /**
@@ -24,11 +26,11 @@ import { hapticImpactLight } from '@/mobile/haptics'
  * free because the plugin reports their overlap as 0.
  *
  * Item set and order are V1's toolbar spec (the porting doc's requirements
- * list) minus AI prediction and image capture, which have no v2 substrate
- * yet — plus a dismiss button, which V1 never needed because iOS gives a
- * `contenteditable` no Done key. Renders nothing while no editor is focused:
- * the All-tab search field raises the keyboard too, and formatting buttons
- * would be dead weight there.
+ * list) minus AI prediction, which has no v2 substrate yet — plus a dismiss
+ * button, which V1 never needed because iOS gives a `contenteditable` no
+ * Done key. Renders nothing while no editor is focused: the All-tab search
+ * field raises the keyboard too, and formatting buttons would be dead weight
+ * there.
  *
  * The dismiss button is pinned outside the scrollable region so it stays
  * visible even when the formatting buttons overflow on narrow screens.
@@ -52,9 +54,9 @@ export function MobileFormattingToolbar(): ReactElement | null {
           onPress={() => commands.insertTrigger('/')}
         />
         <ToolbarButton
-          label="Bullet list"
+          label="Cycle list style"
           icon={<List className="size-5" />}
-          onPress={commands.toggleBulletList}
+          onPress={commands.cycleBulletOrderedList}
         />
         <ToolbarButton
           label="Cycle checklist and task"
@@ -95,6 +97,18 @@ export function MobileFormattingToolbar(): ReactElement | null {
           disabled={!capabilities.canMoveDown}
           onPress={commands.moveDown}
         />
+        {capabilities.canAttachFiles ? (
+          <ToolbarButton
+            label="Insert image"
+            icon={<ImageIcon className="size-5" />}
+            // `commands` is read here, not after the picker returns: the
+            // sheet takes focus from the editor, which clears the published
+            // toolbar, but the command still holds its own editor.
+            onPress={() =>
+              void pickFiles({ accept: 'image/*', multiple: true }).then(commands.attachFiles)
+            }
+          />
+        ) : null}
       </div>
       <div className="shrink-0 border-l border-border px-1">
         <ToolbarButton

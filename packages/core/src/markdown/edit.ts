@@ -272,7 +272,10 @@ export function clearTaskDueDate(content: string): string {
  * before embedding untrusted text (a page title, a meeting name) in one.
  */
 export function wikiLinkSafe(text: string): string {
-  return text.replace(/[[\]|\r\n]/g, ' ').replace(/\s+/g, ' ').trim()
+  return text
+    .replace(/[[\]|\r\n]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 /**
@@ -349,7 +352,8 @@ function matchingBacklinkedHeading(
       titles.some((title) => headingMatchesBacklinkedTitle(source, heading, wikiLinks, title)),
   )
   return (
-    matches.find((heading) => linkedHeadingTarget(source, heading, wikiLinks) !== null) ?? matches[0]
+    matches.find((heading) => linkedHeadingTarget(source, heading, wikiLinks) !== null) ??
+    matches[0]
   )
 }
 
@@ -367,7 +371,10 @@ export function upgradeSectionHeadingBacklink(
     throw new Error('a backlinked heading needs a title')
   }
   const { headings, wikiLinks } = parseNote({ path: '', source })
-  const target = matchingBacklinkedHeading(source, headings, wikiLinks, [safeTitle, ...matchingTitles])
+  const target = matchingBacklinkedHeading(source, headings, wikiLinks, [
+    safeTitle,
+    ...matchingTitles,
+  ])
   if (target === undefined || linkedHeadingTarget(source, target, wikiLinks) !== null) {
     return source
   }
@@ -400,12 +407,10 @@ export function appendListItemUnderBacklinkedHeading(
   const linkedHeading = `[[${safeTitle}]]`
   const upgraded = upgradeSectionHeadingBacklink(source, safeTitle, matchingTitles)
   const { headings, wikiLinks } = parseNote({ path: '', source: upgraded })
-  const target = matchingBacklinkedHeading(
-    upgraded,
-    headings,
-    wikiLinks,
-    [safeTitle, ...matchingTitles],
-  )
+  const target = matchingBacklinkedHeading(upgraded, headings, wikiLinks, [
+    safeTitle,
+    ...matchingTitles,
+  ])
 
   if (target === undefined) {
     return appendHeadingSection(upgraded, linkedHeading, listItemBlock(content))

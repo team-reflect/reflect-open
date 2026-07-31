@@ -19,10 +19,7 @@ interface SnippetToggleInput {
  * item's own first-line text must all agree; any mismatch means the two walks
  * drifted, and a toggle would hit the wrong task. `null` refuses.
  */
-function anchorFor(
-  tasks: readonly SnippetTask[],
-  payload: TaskClickPayload,
-): SnippetTask | null {
+function anchorFor(tasks: readonly SnippetTask[], payload: TaskClickPayload): SnippetTask | null {
   const anchor = tasks[payload.index]
   if (anchor === undefined || anchor.checked !== payload.checked || anchor.text !== payload.text) {
     return null

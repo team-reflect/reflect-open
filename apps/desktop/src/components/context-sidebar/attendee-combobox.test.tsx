@@ -105,9 +105,7 @@ describe('AttendeeCombobox', () => {
   })
 
   it('blur does not bypass an exact Contact row', async () => {
-    contactLinkSuggestions.mockResolvedValue([
-      contact('Grace Hopper', 'grace@example.com'),
-    ])
+    contactLinkSuggestions.mockResolvedValue([contact('Grace Hopper', 'grace@example.com')])
     const input = await renderCombobox()
 
     await input.fill('Grace Hopper')

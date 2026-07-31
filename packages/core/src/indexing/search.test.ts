@@ -20,8 +20,6 @@ describe('parseHighlights', () => {
   })
 
   it('handles a snippet that is one whole match', () => {
-    expect(parseHighlights(mark('everything'))).toEqual([
-      { text: 'everything', highlighted: true },
-    ])
+    expect(parseHighlights(mark('everything'))).toEqual([{ text: 'everything', highlighted: true }])
   })
 })

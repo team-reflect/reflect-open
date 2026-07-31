@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
+import { getIsComposing } from '@meowdown/core'
 import { usePalette } from '@/components/command-palette/palette-provider'
 import { registerKeymap } from '@/editor/keymap'
 import { APP_COMMANDS } from '@/lib/commands/app-commands'
@@ -147,11 +148,7 @@ function idForKeyDown(event: KeyboardEvent): string | null {
 }
 
 function isNativeMacosMenuCommand(commandId: string): boolean {
-  return (
-    isMacosDesktop &&
-    isNativeMenuInstalled() &&
-    NATIVE_MACOS_MENU_COMMAND_IDS.has(commandId)
-  )
+  return isMacosDesktop && isNativeMenuInstalled() && NATIVE_MACOS_MENU_COMMAND_IDS.has(commandId)
 }
 
 /**
@@ -302,6 +299,9 @@ export function useAppShortcuts(): CommandContext {
     }
 
     function onHistoryKeyDownCapture(event: KeyboardEvent) {
+      if (getIsComposing()) {
+        return
+      }
       const id = idForKeyDown(event)
       if (id === null || isNativeMacosMenuCommand(id) || !HISTORY_COMMAND_IDS.has(id)) {
         return
@@ -314,6 +314,9 @@ export function useAppShortcuts(): CommandContext {
     }
 
     function onKeyDown(event: KeyboardEvent) {
+      if (getIsComposing()) {
+        return
+      }
       if (event.defaultPrevented) {
         // The focused editor gets first refusal. meowdown's `Mod-k` consumes the
         // keydown (preventDefault) only when it turns a selection or the link at

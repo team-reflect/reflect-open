@@ -177,15 +177,18 @@ export function CapturePopup(): ReactElement {
         <p className="text-xs text-text-muted">
           {holdMessage(save.result)}{' '}
           {save.result.holdReason === 'no-host' ? (
-            <a href={RELEASES_URL} target="_blank" rel="noreferrer" className="text-accent underline">
+            <a
+              href={RELEASES_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="text-accent underline"
+            >
               Download Reflect
             </a>
           ) : null}
         </p>
       ) : null}
-      {save.phase === 'failed' ? (
-        <p className="text-xs text-destructive">{save.message}</p>
-      ) : null}
+      {save.phase === 'failed' ? <p className="text-xs text-destructive">{save.message}</p> : null}
       {save.phase === 'idle' && heldCount > 0 ? (
         <p className="text-xs text-text-muted">
           {heldCount} earlier {heldCount === 1 ? 'capture' : 'captures'} waiting for Reflect.

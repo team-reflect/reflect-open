@@ -4,11 +4,11 @@ import {
   GOOGLE_TRANSCRIPTION_MODEL,
   OPENAI_TRANSCRIPTION_FALLBACK_MODEL,
   OPENAI_TRANSCRIPTION_MODEL,
-  bytesToBase64,
-  isTranscriptionRejected,
   transcribeAudio,
   type TranscriptionRequest,
 } from './transcribe'
+import { bytesToBase64 } from '../lib/base64'
+import { isTranscriptionOversize, isTranscriptionRejected } from './transcribe-http'
 
 interface RecordedCall {
   url: string
@@ -105,14 +105,15 @@ describe('transcribeAudio (openai)', () => {
     expect(calls).toHaveLength(1)
   })
 
-  it('an oversized payload is a rejection; a rate limit stays a retryable network error', async () => {
+  it('an oversized payload is an oversize skip; a rate limit stays a retryable network error', async () => {
     const tooLarge = recordingFetch([], () =>
       jsonResponse(413, { error: { message: 'Maximum content size exceeded.' } }),
     )
     const rejection: unknown = await transcribeAudio(request({ fetchFn: tooLarge })).catch(
       (cause: unknown) => cause,
     )
-    expect(isTranscriptionRejected(rejection)).toBe(true)
+    expect(isTranscriptionOversize(rejection)).toBe(true)
+    expect(isTranscriptionRejected(rejection)).toBe(false)
 
     const rateLimited = recordingFetch([], () =>
       jsonResponse(429, { error: { message: 'Rate limit reached.' } }),
@@ -122,6 +123,19 @@ describe('transcribeAudio (openai)', () => {
     )
     expect(isTranscriptionRejected(transient)).toBe(false)
     expect(transient).toMatchObject({ kind: 'network' })
+  })
+
+  it('settles a non-STOP finish as a rejection — retrying replays the same finish', async () => {
+    const fetchFn = recordingFetch([], () =>
+      jsonResponse(200, {
+        candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [{ text: 'partial' }] } }],
+      }),
+    )
+
+    const outcome = transcribeAudio(request({ provider: 'google', fetchFn }))
+
+    await expect(outcome).rejects.toSatisfy((error) => isTranscriptionRejected(error))
+    await expect(outcome).rejects.toThrow(/stopped early \(MAX_TOKENS\)/)
   })
 
   it('reports a rejected key as an auth error', async () => {
@@ -180,7 +194,9 @@ describe('transcribeAudio (google)', () => {
     const calls: RecordedCall[] = []
     const fetchFn = recordingFetch(calls, () => geminiResponse(' transcript here '))
 
-    const text = await transcribeAudio(request({ provider: 'google', apiKey: 'AIza-test', fetchFn }))
+    const text = await transcribeAudio(
+      request({ provider: 'google', apiKey: 'AIza-test', fetchFn }),
+    )
 
     expect(text).toBe('transcript here')
     expect(calls[0]!.url).toBe(
@@ -243,11 +259,26 @@ describe('transcribeAudio (google)', () => {
       jsonResponse(400, { error: { message: 'Invalid audio content.' } }),
     )
 
-    const failure: unknown = await transcribeAudio(
-      request({ provider: 'google', fetchFn }),
-    ).catch((cause: unknown) => cause)
+    const failure: unknown = await transcribeAudio(request({ provider: 'google', fetchFn })).catch(
+      (cause: unknown) => cause,
+    )
 
     expect(isTranscriptionRejected(failure)).toBe(true)
+  })
+
+  it('skips a recording too large for an inline request instead of sending it', async () => {
+    const calls: RecordedCall[] = []
+    const fetchFn = recordingFetch(calls, () => geminiResponse('never reached'))
+    const oversized = request({
+      provider: 'google',
+      fetchFn,
+      audio: new Blob([new Uint8Array(13 * 1024 * 1024)], { type: 'audio/webm' }),
+    })
+
+    await expect(transcribeAudio(oversized)).rejects.toSatisfy((error) =>
+      isTranscriptionOversize(error),
+    )
+    expect(calls).toHaveLength(0)
   })
 
   it('returns an empty transcript when no candidates come back', async () => {

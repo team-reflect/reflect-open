@@ -27,7 +27,9 @@ function coercePrivate(value: unknown): boolean {
   if (typeof value === 'number') return value === 1
   if (typeof value === 'string') {
     const normalized = value.trim().toLowerCase()
-    return normalized === 'true' || normalized === 'yes' || normalized === 'on' || normalized === '1'
+    return (
+      normalized === 'true' || normalized === 'yes' || normalized === 'on' || normalized === '1'
+    )
   }
   return false
 }
@@ -42,7 +44,9 @@ function coercePinned(value: unknown): boolean | number {
   if (typeof value === 'number') return Number.isFinite(value) ? value : false
   if (typeof value === 'string') {
     const normalized = value.trim().toLowerCase()
-    return normalized === 'true' || normalized === 'yes' || normalized === 'on' || normalized === '1'
+    return (
+      normalized === 'true' || normalized === 'yes' || normalized === 'on' || normalized === '1'
+    )
   }
   return false
 }
@@ -71,10 +75,9 @@ export const gistFrontmatterSchema = z.object({
    * (file://, javascript:, etc.) are rejected so a crafted frontmatter
    * cannot open arbitrary resources.
    */
-  url: z.string().refine(
-    (value) => value.startsWith('https://') || value.startsWith('http://'),
-    { message: 'gist url must be an http(s) url' },
-  ),
+  url: z.string().refine((value) => value.startsWith('https://') || value.startsWith('http://'), {
+    message: 'gist url must be an http(s) url',
+  }),
   /** The gist filename the body was last published under. */
   file: z.string(),
   /** {@link gistBodyHash} of the body as last published (coerced like `id`). */
@@ -87,35 +90,34 @@ export type GistFrontmatter = z.infer<typeof gistFrontmatterSchema>
  * Built to tolerate external edits — bad known fields fall back via `.catch`
  * rather than failing the whole parse and making a note unreadable.
  */
-export const frontmatterSchema = z
-  .looseObject({
-    /** Reserved stable id. Not auto-written in the first wave (identity = path). */
-    id: z.string().optional().catch(undefined),
-    aliases: z.array(z.string()).catch([]).default([]),
-    /** Hard privacy flag: such notes must never be sent to any external service. */
-    private: z.preprocess(coercePrivate, z.boolean()).default(false),
-    /**
-     * Pinned to the sidebar's Pinned section: `true`, or a number for an
-     * explicit order. Unpinned notes omit the key. Read through
-     * {@link isPinned}/{@link pinnedOrder} — `pinned: 0` is a pinned note.
-     */
-    pinned: z.preprocess(coercePinned, z.union([z.boolean(), z.number()])).default(false),
-    /**
-     * The published GitHub Gist block. A hand-mangled block degrades to
-     * "never published" (`.catch`) rather than an unreadable note; the next
-     * publish then creates a fresh gist and rewrites it whole.
-     */
-    gist: gistFrontmatterSchema.optional().catch(undefined),
-    /**
-     * Contact names whose suggested-contact card was dismissed on this note
-     * (v1's `ignoredContactNames`). Per contact, not per note: ignoring "Ada"
-     * must not suppress a later "Grace" suggestion after a retitle. An added
-     * contact needs no mark — the details it writes into the body suppress
-     * the card by content. A mangled value degrades to the empty list; the
-     * card reappears, nothing breaks.
-     */
-    ignoredContacts: z.array(z.string()).catch([]).default([]),
-  })
+export const frontmatterSchema = z.looseObject({
+  /** Reserved stable id. Not auto-written in the first wave (identity = path). */
+  id: z.string().optional().catch(undefined),
+  aliases: z.array(z.string()).catch([]).default([]),
+  /** Hard privacy flag: such notes must never be sent to any external service. */
+  private: z.preprocess(coercePrivate, z.boolean()).default(false),
+  /**
+   * Pinned to the sidebar's Pinned section: `true`, or a number for an
+   * explicit order. Unpinned notes omit the key. Read through
+   * {@link isPinned}/{@link pinnedOrder} — `pinned: 0` is a pinned note.
+   */
+  pinned: z.preprocess(coercePinned, z.union([z.boolean(), z.number()])).default(false),
+  /**
+   * The published GitHub Gist block. A hand-mangled block degrades to
+   * "never published" (`.catch`) rather than an unreadable note; the next
+   * publish then creates a fresh gist and rewrites it whole.
+   */
+  gist: gistFrontmatterSchema.optional().catch(undefined),
+  /**
+   * Contact names whose suggested-contact card was dismissed on this note
+   * (v1's `ignoredContactNames`). Per contact, not per note: ignoring "Ada"
+   * must not suppress a later "Grace" suggestion after a retitle. An added
+   * contact needs no mark — the details it writes into the body suppress
+   * the card by content. A mangled value degrades to the empty list; the
+   * card reappears, nothing breaks.
+   */
+  ignoredContacts: z.array(z.string()).catch([]).default([]),
+})
 export type Frontmatter = z.infer<typeof frontmatterSchema>
 
 /** Is the note pinned at all? Never truthiness — `pinned: 0` is order 0, pinned. */

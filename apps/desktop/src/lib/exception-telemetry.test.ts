@@ -12,9 +12,7 @@ describe('parseExceptionTelemetryDsn', () => {
       parseExceptionTelemetryDsn(
         ' https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/4511705649971200 ',
       ),
-    ).toBe(
-      'https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/4511705649971200',
-    )
+    ).toBe('https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/4511705649971200')
     expect(
       parseExceptionTelemetryDsn(
         'https://0123456789abcdef0123456789abcdef@evil.example/4511705649971200',

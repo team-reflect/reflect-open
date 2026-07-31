@@ -23,9 +23,7 @@ vi.mock('@/components/context-sidebar/daily-context-sidebar', () => ({
   ),
 }))
 vi.mock('@/components/context-sidebar/note-context-sidebar', () => ({
-  NoteContextSidebar: ({ path }: { path: string }) => (
-    <div data-testid="note-context">{path}</div>
-  ),
+  NoteContextSidebar: ({ path }: { path: string }) => <div data-testid="note-context">{path}</div>,
 }))
 vi.mock('@/components/embeddings-sync', () => ({ EmbeddingsSync: () => null }))
 vi.mock('@/components/note-find-bar', () => ({ NoteFindBar: () => null }))
@@ -74,9 +72,7 @@ describe('WorkspaceContent', () => {
   it('hides and restores the workspace and daily context sidebars together', async () => {
     const view = await render(<WorkspaceContent graph={GRAPH} />)
 
-    await expect
-      .element(view.getByRole('complementary', { name: 'Workspace' }))
-      .toBeInTheDocument()
+    await expect.element(view.getByRole('complementary', { name: 'Workspace' })).toBeInTheDocument()
     await expect.element(view.getByRole('complementary', { name: 'Context' })).toBeInTheDocument()
     expect(view.getByTestId('daily-context').element().textContent).toBe('2026-07-11')
 
@@ -87,9 +83,7 @@ describe('WorkspaceContent', () => {
 
     workspaceState.collapsed = false
     await view.rerender(<WorkspaceContent graph={GRAPH} />)
-    await expect
-      .element(view.getByRole('complementary', { name: 'Workspace' }))
-      .toBeInTheDocument()
+    await expect.element(view.getByRole('complementary', { name: 'Workspace' })).toBeInTheDocument()
     await expect.element(view.getByRole('complementary', { name: 'Context' })).toBeInTheDocument()
   })
 

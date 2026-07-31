@@ -3,7 +3,11 @@ import { MockLanguageModelV3 } from 'ai/test'
 import type { LanguageModelV3CallOptions, LanguageModelV3Usage } from '@ai-sdk/provider'
 import { describe, expect, it, vi } from 'vitest'
 import type { AiProviderConfig } from '../settings/schema'
-import { describeAsset, isAssetDescriptionRejected, type DescribeAssetRequest } from './describe-asset'
+import {
+  describeAsset,
+  isAssetDescriptionRejected,
+  type DescribeAssetRequest,
+} from './describe-asset'
 import { languageModel } from './language-model'
 
 vi.mock('./language-model', () => ({

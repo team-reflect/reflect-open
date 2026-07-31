@@ -7,7 +7,9 @@ import {
   classifyGraphPath,
   dailyPath,
   dateFromDailyPath,
+  foldGraphPath,
   isAttachmentPath,
+  isCalendarDate,
   isDaily,
   isNotePath,
   isSafeVisibleGraphPath,
@@ -120,5 +122,35 @@ describe('graph paths', () => {
   it('extracts the date from a daily path, else null', () => {
     expect(dateFromDailyPath('daily/2026-06-09.md')).toBe('2026-06-09')
     expect(dateFromDailyPath('notes/foo.md')).toBeNull()
+  })
+})
+
+describe('isCalendarDate', () => {
+  it('accepts a real date and rejects an impossible one', () => {
+    expect(isCalendarDate('2026-07-26')).toBe(true)
+    // No Date.UTC two-digit-year remap: year 99 is year 99, and proleptic
+    // year 0 is a leap year (divisible by 400) even though 1900 is not.
+    expect(isCalendarDate('0099-12-31')).toBe(true)
+    expect(isCalendarDate('0000-02-29')).toBe(true)
+    expect(isCalendarDate('2026-02-29')).toBe(false)
+    expect(isCalendarDate('2026-02-31')).toBe(false)
+    expect(isCalendarDate('2026-13-01')).toBe(false)
+    expect(isCalendarDate('not-a-date')).toBe(false)
+  })
+})
+
+describe('foldGraphPath', () => {
+  it('lowers ASCII only, never the full Unicode fold', () => {
+    expect(foldGraphPath('Projects/Plan.MD')).toBe('projects/plan.md')
+    // NFC's singleton mappings apply (KELVIN SIGN decomposes to K, then the
+    // ASCII fold lowers it) — safe because every comparand passes through
+    // this same fold. What must NOT happen is toLowerCase-style folding of
+    // characters NFC leaves alone.
+    expect(foldGraphPath('\u212a.md')).toBe('k.md')
+    expect(foldGraphPath('\u0130.md')).toBe('\u0130.md')
+  })
+
+  it('normalizes NFD to NFC before folding', () => {
+    expect(foldGraphPath('Cafe\u0301.md')).toBe('caf\u00e9.md')
   })
 })

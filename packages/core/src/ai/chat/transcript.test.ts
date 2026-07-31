@@ -161,9 +161,7 @@ describe('buildHistory', () => {
         userText: 'where is the plan?',
         attachments: [],
         parts: [],
-        responseMessages: [
-          { role: 'assistant', content: 'In [[Atlas]].' },
-        ],
+        responseMessages: [{ role: 'assistant', content: 'In [[Atlas]].' }],
         status: 'done',
       },
       {

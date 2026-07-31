@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { retitleWikiLinks } from './retitle'
+import { repointPathWikiLinks, retitleWikiLinks } from './retitle'
 
 /** Repoint only: the shape the pre-stable-display rewrite always used. */
 function repointOnly(fromKey: string, to: string) {
@@ -90,3 +90,44 @@ describe('retitleWikiLinks', () => {
   })
 })
 
+describe('repointPathWikiLinks', () => {
+  const options = { fromPathKey: 'notes/plan-2.md', to: 'notes/roadmap' }
+
+  it('retargets a plain path link when the file moves', () => {
+    expect(repointPathWikiLinks('See [[notes/plan-2]].', options)).toBe('See [[notes/roadmap]].')
+  })
+
+  it('keeps the display and the fragment byte-for-byte', () => {
+    expect(repointPathWikiLinks('See [[notes/plan-2|The Plan]].', options)).toBe(
+      'See [[notes/roadmap|The Plan]].',
+    )
+    expect(repointPathWikiLinks('See [[notes/plan-2#Next steps]].', options)).toBe(
+      'See [[notes/roadmap#Next steps]].',
+    )
+  })
+
+  it('matches the folded spelling, including a trailing .md and case', () => {
+    expect(repointPathWikiLinks('See [[Notes/Plan-2.md]].', options)).toBe('See [[notes/roadmap]].')
+  })
+
+  it('leaves a same-stem link in another folder untouched', () => {
+    const source = 'See [[archive/plan-2]] and [[plan-2]].'
+    expect(repointPathWikiLinks(source, options)).toBe(source)
+  })
+
+  it('leaves markdown hrefs untouched', () => {
+    const source = 'See [plan](notes/plan-2.md).'
+    expect(repointPathWikiLinks(source, options)).toBe(source)
+  })
+
+  it.each([
+    ['a fragment separator', 'notes/c#-notes'],
+    ['a backslash', 'notes\\plan'],
+    ['a loose slash segment that reads as a name', 'notes/a / b'],
+    ['a bare name', 'plan'],
+  ])('rejects a destination with %s', (_reason, to) => {
+    expect(() => repointPathWikiLinks('x', { fromPathKey: 'notes/a.md', to })).toThrowError(
+      /invalid wiki-link path target/,
+    )
+  })
+})

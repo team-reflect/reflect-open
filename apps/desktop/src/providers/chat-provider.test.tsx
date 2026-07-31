@@ -25,6 +25,7 @@ import { ChatProvider, useChatSession } from '@/providers/chat-provider'
 
 const core = vi.hoisted(() => ({
   streamChat: vi.fn<(options: StreamChatOptions) => AsyncGenerator<ChatStreamEvent>>(),
+  aiApiKeyForConfig: vi.fn<(config: AiProviderConfig) => Promise<string | null>>(),
   getSecret: vi.fn<(name: string) => Promise<string | null>>(),
   hasBridge: vi.fn<() => boolean>(),
   loadChatGraphContext: vi.fn<(graphName: string) => Promise<null>>(),
@@ -90,7 +91,13 @@ const RESTORED_TURN: ChatTurn = {
 }
 
 function conversation(overrides: Partial<ChatConversation> = {}): ChatConversation {
-  return { id: 'conv-1', title: 'what did I write yesterday?', createdMs: 1, updatedMs: Date.now(), ...overrides }
+  return {
+    id: 'conv-1',
+    title: 'what did I write yesterday?',
+    createdMs: 1,
+    updatedMs: Date.now(),
+    ...overrides,
+  }
 }
 
 let session: ReturnType<typeof useChatSession> | null = null
@@ -128,6 +135,7 @@ beforeEach(() => {
   settingsState.semanticSearchEnabled = false
   settingsState.chatSystemPrompt = ''
   core.hasBridge.mockReturnValue(true)
+  core.aiApiKeyForConfig.mockResolvedValue('sk-test')
   core.getSecret.mockResolvedValue('sk-test')
   core.loadChatGraphContext.mockResolvedValue(null)
   core.listChatConversations.mockResolvedValue([])
@@ -193,7 +201,11 @@ describe('ChatProvider persistence', () => {
       { type: 'tool-call', call: { tool: 'read', toolCallId: 't1', paths: ['notes/a.md'] } },
       {
         type: 'tool-result',
-        result: { tool: 'read', toolCallId: 't1', notes: [{ path: 'notes/a.md', title: 'A', error: null }] },
+        result: {
+          tool: 'read',
+          toolCallId: 't1',
+          notes: [{ path: 'notes/a.md', title: 'A', error: null }],
+        },
       },
       { type: 'complete', messages: [{ role: 'assistant', content: 'noop' }] },
     ])

@@ -43,7 +43,10 @@ describe('extractSnippetTasks', () => {
   it('feeds toggleTaskMarker the exact coordinates it validates', () => {
     const content = '- [[Target]] kickoff\n  + [ ] prep agenda\n  + [x] send invite\n'
     const [first] = tasksFor(content)
-    const toggled = toggleTaskMarker(content, { markerOffset: first!.markerOffset, raw: first!.raw })
+    const toggled = toggleTaskMarker(content, {
+      markerOffset: first!.markerOffset,
+      raw: first!.raw,
+    })
     expect(toggled.checked).toBe(true)
     expect(toggled.source).toBe('- [[Target]] kickoff\n  + [x] prep agenda\n  + [x] send invite\n')
   })
@@ -85,11 +88,7 @@ describe('extractSnippetTasks', () => {
   it('counts checkboxes in document order, nested after their parent', () => {
     const content = '+ [ ] parent [[Target]]\n  + [ ] child one\n  + [ ] child two\n'
     const tasks = tasksFor(content)
-    expect(tasks.map((task) => task.text)).toEqual([
-      'parent [[Target]]',
-      'child one',
-      'child two',
-    ])
+    expect(tasks.map((task) => task.text)).toEqual(['parent [[Target]]', 'child one', 'child two'])
     // Each anchors at increasing source offsets.
     const offsets = tasks.map((task) => task.markerOffset)
     expect([...offsets].sort((a, b) => a - b)).toEqual(offsets)

@@ -26,7 +26,7 @@ const MAX_TITLE_CHARS = 100
 export interface DescribePageRequest {
   /** The provider entry to call (the app default). */
   config: AiProviderConfig
-  /** The BYOK API key, read from the OS keychain by the caller. */
+  /** The BYOK API key, or an empty string for no-key compatible endpoints. */
   apiKey: string
   /** Host transport (the Tauri HTTP plugin's fetch; tests pass a stub). */
   fetchFn?: typeof fetch | undefined
@@ -104,10 +104,7 @@ function classify(cause: unknown): Error {
 }
 
 function describePrompt(request: DescribePageRequest): string {
-  const lines = [
-    'Enrich this web page capture for a bookmark note:',
-    `URL: ${request.url}`,
-  ]
+  const lines = ['Enrich this web page capture for a bookmark note:', `URL: ${request.url}`]
   if (request.title.trim() !== '') {
     lines.push(`Captured title: ${request.title.trim()}`)
   }
@@ -128,7 +125,7 @@ function describePrompt(request: DescribePageRequest): string {
   }
   lines.push(
     'Ground both fields in the extracted page text when present, and the screenshot when one is attached.',
-    "title: the page's own title cleaned up for display — drop the site name, separators, and SEO clutter; keep the page's language and its plain wording. The captured title may not describe the page at all: share sheets often supply boilerplate (\"See this Instagram post by @user\"), a bare domain, or message text — in that case build the title from the meta title, page text, or screenshot instead of keeping it. Never invent an editorial retitle; when the captured title already describes the page cleanly, return it unchanged.",
+    'title: the page\'s own title cleaned up for display — drop the site name, separators, and SEO clutter; keep the page\'s language and its plain wording. The captured title may not describe the page at all: share sheets often supply boilerplate ("See this Instagram post by @user"), a bare domain, or message text — in that case build the title from the meta title, page text, or screenshot instead of keeping it. Never invent an editorial retitle; when the captured title already describes the page cleanly, return it unchanged.',
     'description: one or two plain sentences describing the page — no preamble, no markdown.',
   )
   return lines.join('\n')

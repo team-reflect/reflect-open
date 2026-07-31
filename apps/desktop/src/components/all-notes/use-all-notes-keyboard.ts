@@ -59,7 +59,12 @@ export function useAllNotesKeyboard({
       // Focus outside the surface keeps its own keys; `body`/no-focus and elements
       // inside the surface drive the shortcuts.
       const root = rootRef.current
-      if (root !== null && target !== null && target !== root.ownerDocument.body && !root.contains(target)) {
+      if (
+        root !== null &&
+        target !== null &&
+        target !== root.ownerDocument.body &&
+        !root.contains(target)
+      ) {
         return
       }
       // Back off for a focused control inside the surface that owns the key.

@@ -141,7 +141,10 @@ describe('taskRawWithContent', () => {
 
 describe('withEditedTask', () => {
   it('rewrites the matching row’s text and raw, leaving others', () => {
-    expect(withEditedTask([a, b], b, 'edited')).toEqual([a, { ...b, raw: '[ ] edited', text: 'edited' }])
+    expect(withEditedTask([a, b], b, 'edited')).toEqual([
+      a,
+      { ...b, raw: '[ ] edited', text: 'edited' },
+    ])
   })
 
   it('stores plain text (markdown stripped) while raw keeps the markup', () => {

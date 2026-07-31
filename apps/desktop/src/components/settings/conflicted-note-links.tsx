@@ -27,11 +27,7 @@ function ConflictedNoteLink({ note }: ConflictedNoteLinkProps): ReactElement {
           <span className="block truncate font-medium">{note.title}</span>
           <span className="block truncate text-[11px] opacity-75">{note.path}</span>
         </span>
-        <ChevronRight
-          aria-hidden
-          className="size-3.5 shrink-0 opacity-60"
-          strokeWidth={1.75}
-        />
+        <ChevronRight aria-hidden className="size-3.5 shrink-0 opacity-60" strokeWidth={1.75} />
       </Button>
     </li>
   )

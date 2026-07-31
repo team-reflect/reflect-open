@@ -42,7 +42,9 @@ export function calendarAvailable(): boolean {
  * window regains focus: exactly the "flip it in System Settings and come
  * back" path.
  */
-export function useCalendarAuthorization(enabled: boolean): CalendarAuthorizationStatus | undefined {
+export function useCalendarAuthorization(
+  enabled: boolean,
+): CalendarAuthorizationStatus | undefined {
   const query = useQuery({
     queryKey: CALENDAR_AUTH_QUERY_KEY,
     queryFn: calendarAuthorizationStatus,
@@ -83,8 +85,7 @@ export function useCalendars(enabled: boolean): CalendarsResult {
  */
 export function useDayEvents(date: string): CalendarEvent[] {
   const { settings } = useSettings()
-  const enabled =
-    settings.calendarEnabled && settings.calendarIds.length > 0 && calendarAvailable()
+  const enabled = settings.calendarEnabled && settings.calendarIds.length > 0 && calendarAvailable()
   const query = useQuery({
     queryKey: ['calendar', 'events', date, settings.calendarIds],
     queryFn: () => {
@@ -97,10 +98,7 @@ export function useDayEvents(date: string): CalendarEvent[] {
   // Gate on `enabled`, not just the cache: the query keeps its last payload
   // after the integration is switched off, and stale meetings must not
   // linger in the sidebar.
-  return useMemo(
-    () => (enabled ? displayEvents(query.data ?? []) : []),
-    [enabled, query.data],
-  )
+  return useMemo(() => (enabled ? displayEvents(query.data ?? []) : []), [enabled, query.data])
 }
 
 /**

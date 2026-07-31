@@ -10,12 +10,7 @@ import {
   DialogFooter,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  Drawer,
-  DrawerContent,
-  DrawerTitle,
-  DrawerTrigger,
-} from '@/components/ui/drawer'
+import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer'
 import { toggleNotePinned } from '@/lib/note-pin'
 import { deleteOpenNote } from '@/lib/note-delete'
 import { shareNote } from '@/mobile/share'
@@ -130,11 +125,13 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
           </DialogDescription>
           {error !== null && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="ghost" disabled={busy}>
-                Cancel
-              </Button>
-            </DialogClose>
+            <DialogClose
+              render={
+                <Button variant="ghost" disabled={busy}>
+                  Cancel
+                </Button>
+              }
+            />
             <Button variant="destructive" disabled={busy} onClick={confirmDelete}>
               Delete
             </Button>

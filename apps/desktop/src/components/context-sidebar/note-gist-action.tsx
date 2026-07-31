@@ -23,7 +23,10 @@ interface NoteGistActionProps {
  * URL section owns the update action, including the stale-body nudge from the
  * index. Failures and success state surface through the operations status line.
  */
-export function NoteGistAction({ path, keybinding = null }: NoteGistActionProps): ReactElement | null {
+export function NoteGistAction({
+  path,
+  keybinding = null,
+}: NoteGistActionProps): ReactElement | null {
   const { graph } = useGraph()
   const connected = useGithubConnected()
   const row = useNoteRow(path)
@@ -70,10 +73,10 @@ export function NoteGistAction({ path, keybinding = null }: NoteGistActionProps)
   const label = isUnpublishing
     ? 'Unpublishing…'
     : isPublishing
-    ? 'Publishing…'
-    : published
-      ? 'Unpublish link'
-      : 'Share with private link'
+      ? 'Publishing…'
+      : published
+        ? 'Unpublish link'
+        : 'Share with private link'
   const tooltip = published
     ? 'Delete the private GitHub gist for this note'
     : 'Creates a secret GitHub gist and copies its private link'
@@ -81,22 +84,24 @@ export function NoteGistAction({ path, keybinding = null }: NoteGistActionProps)
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          onClick={() => void (published ? onUnpublish() : onPublish())}
-          disabled={isBusy}
-          className="group relative flex w-full items-center space-x-2 rounded-lg px-3 py-2 text-start transition-colors duration-100 hover:bg-surface-hover disabled:opacity-50"
-        >
-          <span className="flex h-5 w-5 flex-none items-center justify-center text-text-muted transition-colors duration-100 group-hover:text-text">
-            <Icon size={14} aria-hidden />
-          </span>
-          <span className="min-w-0 flex-1 truncate text-xs font-medium">{label}</span>
-          {keybinding !== null ? (
-            <ShortcutKeys binding={keybinding} className="invisible group-hover:visible" />
-          ) : null}
-        </button>
-      </TooltipTrigger>
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            onClick={() => void (published ? onUnpublish() : onPublish())}
+            disabled={isBusy}
+            className="group relative flex w-full items-center space-x-2 rounded-lg px-3 py-2 text-start transition-colors duration-100 hover:bg-surface-hover disabled:opacity-50"
+          >
+            <span className="flex h-5 w-5 flex-none items-center justify-center text-text-muted transition-colors duration-100 group-hover:text-text">
+              <Icon size={14} aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1 truncate text-xs font-medium">{label}</span>
+            {keybinding !== null ? (
+              <ShortcutKeys binding={keybinding} className="invisible group-hover:visible" />
+            ) : null}
+          </button>
+        }
+      />
       <TooltipContent>{tooltip}</TooltipContent>
     </Tooltip>
   )

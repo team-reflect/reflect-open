@@ -5,10 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { format } from 'date-fns'
 import { act, StrictMode, type ReactElement } from 'react'
 import { setBridge } from '@reflect/core'
-import {
-  clearFormattingToolbar,
-  publishFormattingToolbar,
-} from '@/editor/formatting-toolbar-store'
+import { clearFormattingToolbar, publishFormattingToolbar } from '@/editor/formatting-toolbar-store'
 import { RouterProvider, useRouter } from '@/routing/router'
 import type { Route } from '@/routing/route'
 import { addDaysIso, formatDayLabel, parseIsoDate, todayIso } from '@/lib/dates'
@@ -216,11 +213,7 @@ beforeEach(async () => {
   })
 })
 
-function mount(
-  initialRoute: Route,
-  probeRoute?: Route,
-  options?: { strict?: boolean },
-) {
+function mount(initialRoute: Route, probeRoute?: Route, options?: { strict?: boolean }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const tree = (
     <QueryClientProvider client={queryClient}>
@@ -264,11 +257,7 @@ function visibleLayer(view: BrowserView): HTMLElement {
 /**
  * Dispatch a pointer event the gesture hook can read.
  */
-async function firePointer(
-  element: Element,
-  type: string,
-  init: PointerEventInit,
-): Promise<void> {
+async function firePointer(element: Element, type: string, init: PointerEventInit): Promise<void> {
   await act(() => {
     element.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, ...init }))
   })
@@ -303,10 +292,8 @@ function dayCellLabel(date: string): string {
  */
 function shownMonth(view: BrowserView): string | null {
   return (
-    view
-      .getByRole('heading', { level: 1 })
-      .element()
-      .querySelector('[data-slot="month-title"]')?.textContent ?? null
+    view.getByRole('heading', { level: 1 }).element().querySelector('[data-slot="month-title"]')
+      ?.textContent ?? null
   )
 }
 
@@ -328,7 +315,9 @@ describe('MobileShell', () => {
     await expect.element(view.getByText(formatDayLabel(today, 'mdy'))).toBeVisible()
     await waitFor(() => {
       const editors = view.getByTestId('fake-editor').elements()
-      expect(editors.some((editor) => editor.textContent?.includes('captured on the go'))).toBe(true)
+      expect(editors.some((editor) => editor.textContent?.includes('captured on the go'))).toBe(
+        true,
+      )
     })
   })
 
@@ -400,9 +389,7 @@ describe('MobileShell', () => {
     const nextFortnight = addDaysIso(today, 14)
     const view = await mount({ kind: 'today' })
 
-    await fireClick(
-      view.getByRole('button', { name: dayCellLabel(nextFortnight) }).element(),
-    )
+    await fireClick(view.getByRole('button', { name: dayCellLabel(nextFortnight) }).element())
     await expect
       .element(view.getByRole('button', { name: dayCellLabel(nextFortnight) }))
       .toHaveAttribute('aria-current', 'date')
@@ -703,9 +690,15 @@ describe('MobileShell', () => {
 
     await act(() =>
       publishFormattingToolbar(owner, {
-        capabilities: { canIndent: true, canDedent: false, canMoveUp: true, canMoveDown: true },
+        capabilities: {
+          canIndent: true,
+          canDedent: false,
+          canMoveUp: true,
+          canMoveDown: true,
+          canAttachFiles: false,
+        },
         commands: {
-          toggleBulletList: vi.fn(),
+          cycleBulletOrderedList: vi.fn(),
           cycleCheckableList: vi.fn(),
           indent: vi.fn(),
           dedent: vi.fn(),
@@ -713,6 +706,7 @@ describe('MobileShell', () => {
           moveDown: vi.fn(),
           insertTrigger: vi.fn(),
           dismissKeyboard: vi.fn(),
+          attachFiles: vi.fn(),
           scrollCaretIntoView: vi.fn(),
         },
       }),
@@ -736,9 +730,9 @@ describe('MobileShell', () => {
     await waitFor(() => {
       expect((box.element() as HTMLInputElement).value).toBe('meeting')
     })
-    expect(
-      view.getByRole('button', { name: 'All' }).element().getAttribute('aria-current'),
-    ).toBe('page')
+    expect(view.getByRole('button', { name: 'All' }).element().getAttribute('aria-current')).toBe(
+      'page',
+    )
 
     await user.click(view.getByRole('button', { name: 'Clear search' }))
 
@@ -815,11 +809,8 @@ describe('MobileStack transitions & back-swipe', () => {
     expect(entering!.className).toContain('mobile-stack-slide-in')
     expect(origin!.getAttribute('aria-hidden')).toBe('true')
     expect(
-      page
-        .elementLocator(origin!)
-        .locate('h1')
-        .element()
-        .querySelector('[data-slot="month-title"]')?.textContent,
+      page.elementLocator(origin!).locate('h1').element().querySelector('[data-slot="month-title"]')
+        ?.textContent,
     ).toBe(monthLabel(monthOf(todayIso())))
     expect(view.container.querySelector('.mobile-stack-scrim')).toBeTruthy()
 
@@ -881,9 +872,9 @@ describe('MobileStack transitions & back-swipe', () => {
     const layers = stackLayers(view)
     expect(layers).toHaveLength(3)
     expect(layers.at(-1)!.className).toContain('mobile-stack-slide-out')
-    expect(
-      page.elementLocator(visibleLayer(view)).getByRole('heading').element().textContent,
-    ).toBe('Edit note')
+    expect(page.elementLocator(visibleLayer(view)).getByRole('heading').element().textContent).toBe(
+      'Edit note',
+    )
     await finishAnimation(layers.at(-1)!)
     expect(stackLayers(view)).toHaveLength(2)
   })

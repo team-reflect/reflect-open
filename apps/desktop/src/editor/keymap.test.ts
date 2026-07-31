@@ -7,9 +7,9 @@ describe('keymap registry', () => {
   })
 
   it('registers all-or-nothing: a colliding batch commits no keys', () => {
-    expect(() =>
-      registerKeymap('app', { 'Mod-zz-unique': 'fine', 'Mod-b': 'collides' }),
-    ).toThrow(/duplicate keybinding/)
+    expect(() => registerKeymap('app', { 'Mod-zz-unique': 'fine', 'Mod-b': 'collides' })).toThrow(
+      /duplicate keybinding/,
+    )
     expect(listRegisteredBindings().has('Mod-zz-unique')).toBe(false)
     expect(listRegisteredBindings().get('Mod-b')).toBe('editor') // untouched
   })

@@ -8,9 +8,17 @@
  * written to the index can never drift from the keys looked up against it.
  */
 
-/** Trim surrounding whitespace and case-fold `value` to its match key. */
+/**
+ * Trim surrounding whitespace and case-fold `value` to its match key. NFC
+ * first: macOS hands back NFD filenames, and a filename-derived key must
+ * equal the same name typed by hand. Full Unicode lowering, unlike
+ * `foldGraphPath`'s ASCII-only rule: name keys are compared between humans,
+ * path keys are compared against the filesystem via Rust's byte-wise fold.
+ * Mirrored by the CLI's `fold_key`; `fixtures/fold-key-parity.json` keeps the
+ * two implementations honest.
+ */
 export function foldKey(value: string): string {
-  return value.trim().toLowerCase()
+  return value.normalize('NFC').trim().toLowerCase()
 }
 
 /**

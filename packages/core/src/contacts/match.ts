@@ -18,12 +18,7 @@ import { contactDetailsMarkdown } from './markdown'
  * silently reject it here.
  */
 function normalizeName(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .toLowerCase()
+  return value.normalize('NFD').replace(/\p{M}/gu, '').trim().replace(/\s+/g, ' ').toLowerCase()
 }
 
 /**
@@ -52,9 +47,7 @@ export function matchContactForTitle(
   if (wanted === '') {
     return null
   }
-  const exact = candidates.filter(
-    (candidate) => normalizeName(candidate.fullName) === wanted,
-  )
+  const exact = candidates.filter((candidate) => normalizeName(candidate.fullName) === wanted)
   if (exact.length === 0) {
     return null
   }
@@ -87,10 +80,7 @@ export async function suggestContactForTitle(title: string): Promise<ContactMatc
  * than two characters answer empty — one letter matches half the address
  * book. Callers gate on the integration being enabled and readable.
  */
-export async function contactLinkSuggestions(
-  query: string,
-  limit = 4,
-): Promise<ContactMatch[]> {
+export async function contactLinkSuggestions(query: string, limit = 4): Promise<ContactMatch[]> {
   const trimmed = query.trim()
   if (trimmed.length < 2) {
     return []

@@ -257,11 +257,13 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
       console.error('iCloud watch failed to start:', err)
       // Sweeps still run off file-change batches; carry on.
     }
-    disposers.push(subscribeOwnWrites((path) => {
-      const now = Date.now()
-      ownWrites.set(path, now)
-      pruneOwnWrites(now)
-    }))
+    disposers.push(
+      subscribeOwnWrites((path) => {
+        const now = Date.now()
+        ownWrites.set(path, now)
+        pruneOwnWrites(now)
+      }),
+    )
     // Subscriptions are defensive like the watch above: a failed listen must
     // not reject start() (an unhandled rejection at the provider's call site)
     // or skip the initial sweep below — resume triggers and the baseline scan

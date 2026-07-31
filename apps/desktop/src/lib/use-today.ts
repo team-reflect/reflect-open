@@ -14,10 +14,13 @@ export function useToday(): string {
     const arm = (): void => {
       const now = new Date()
       const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-      timer = setTimeout(() => {
-        setToday(todayIso())
-        arm()
-      }, midnight.getTime() - now.getTime() + 250)
+      timer = setTimeout(
+        () => {
+          setToday(todayIso())
+          arm()
+        },
+        midnight.getTime() - now.getTime() + 250,
+      )
     }
     arm()
     return () => {

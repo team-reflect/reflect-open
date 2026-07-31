@@ -51,6 +51,16 @@ export function hasBridge(): boolean {
   return activeBridge !== null
 }
 
+/**
+ * True when the installed bridge has the raw-binary transport ({@link
+ * IpcBridge.invokeBinary}) — i.e. a real native shell, not the browser-dev
+ * in-memory bridge. Callers use this to choose streamed binary asset IO over
+ * the base64 JSON fallback.
+ */
+export function hasBinaryIpc(): boolean {
+  return activeBridge !== null && activeBridge.invokeBinary !== undefined
+}
+
 /** The installed bridge; throws when called before {@link setBridge}. */
 export function getBridge(): IpcBridge {
   if (activeBridge === null) {

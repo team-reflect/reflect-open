@@ -71,8 +71,7 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   const orderedPaths = useMemo(() => (notes ?? []).map((note) => note.path), [notes])
   const selection = useListSelection(orderedPaths)
   const openNote = useCallback(
-    (path: string, event?: NewWindowClickEvent) =>
-      navigateNoteLink(routeForPath(path), event),
+    (path: string, event?: NewWindowClickEvent) => navigateNoteLink(routeForPath(path), event),
     [navigateNoteLink],
   )
   const handleFilterSelect = useCallback(
@@ -145,11 +144,7 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
               </span>
             </Button>
           ) : null}
-          <AllNotesFilters
-            tag={tag}
-            facets={facets ?? []}
-            onSelect={handleFilterSelect}
-          />
+          <AllNotesFilters tag={tag} facets={facets ?? []} onSelect={handleFilterSelect} />
           <NewNoteButton />
         </div>
       </header>

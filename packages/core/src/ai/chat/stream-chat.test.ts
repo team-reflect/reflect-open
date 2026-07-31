@@ -52,7 +52,9 @@ function stream(parts: LanguageModelV3StreamPart[]): LanguageModelV3StreamResult
  * indexes by the post-push call count, skipping element 0 — a function keeps
  * the sequencing explicit instead.)
  */
-function sequence(results: LanguageModelV3StreamResult[]): () => Promise<LanguageModelV3StreamResult> {
+function sequence(
+  results: LanguageModelV3StreamResult[],
+): () => Promise<LanguageModelV3StreamResult> {
   let index = 0
   return async () => {
     const next = results[index]
@@ -160,7 +162,10 @@ describe('streamChatTurn', () => {
         semanticSearchEnabled: true,
         customSystemPrompt: '',
         context: null,
-        toolDeps: { retrieveFn: async () => [PUBLIC_HIT, PRIVATE_HIT], readNoteFn: async () => 'launch plan\n' },
+        toolDeps: {
+          retrieveFn: async () => [PUBLIC_HIT, PRIVATE_HIT],
+          readNoteFn: async () => 'launch plan\n',
+        },
       }),
     )
 
@@ -200,7 +205,10 @@ describe('streamChatTurn', () => {
         semanticSearchEnabled: true,
         customSystemPrompt: '',
         context: null,
-        toolDeps: { retrieveFn: async () => [PUBLIC_HIT, PRIVATE_HIT], readNoteFn: async () => 'launch plan\n' },
+        toolDeps: {
+          retrieveFn: async () => [PUBLIC_HIT, PRIVATE_HIT],
+          readNoteFn: async () => 'launch plan\n',
+        },
       }),
     )
 

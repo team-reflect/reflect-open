@@ -193,7 +193,9 @@ describe('router', () => {
     const { result, act } = await routerHook()
     expect(result.current.arrivalFocusEditor).toBe(false)
 
-    await act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }, { focusEditor: true }))
+    await act(() =>
+      result.current.navigate({ kind: 'note', path: 'notes/a.md' }, { focusEditor: true }),
+    )
     expect(result.current.arrivalFocusEditor).toBe(true)
 
     // The next arrival overwrites the intent — it can never leak onto a
@@ -204,7 +206,9 @@ describe('router', () => {
 
   it('clears the focusEditor intent on history moves', async () => {
     const { result, act } = await routerHook()
-    await act(() => result.current.navigate({ kind: 'note', path: 'notes/a.md' }, { focusEditor: true }))
+    await act(() =>
+      result.current.navigate({ kind: 'note', path: 'notes/a.md' }, { focusEditor: true }),
+    )
     await act(() => result.current.back())
     expect(result.current.arrivalFocusEditor).toBe(false)
 

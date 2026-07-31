@@ -125,7 +125,6 @@ export interface BackupController {
   dispose(): void
 }
 
-
 export function createBackupController(options: BackupControllerOptions): BackupController {
   const generation = options.graph.generation
   const indexGeneration = options.indexGeneration
@@ -355,8 +354,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
         // visible/focus trigger below replays a full cycle on foreground.
         // The background flusher's protected local commit bypasses this
         // engine deliberately.
-        canStartCycle: () =>
-          !isMobileSurface() || document.visibilityState !== 'hidden',
+        canStartCycle: () => !isMobileSurface() || document.visibilityState !== 'hidden',
         // The managed token is for github.com only — a generic host must
         // never receive it. Rust resolves generic credentials locally.
         getToken: repo === null ? async () => null : () => getGithubToken(providerFetch),

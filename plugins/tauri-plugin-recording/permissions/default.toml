@@ -1,15 +1,15 @@
 [default]
 description = "Record audio memos natively, manage the staging directory, and subscribe to recording events"
 permissions = [
-    "allow-start-recording",
-    "allow-stop-recording",
-    "allow-cancel-recording",
-    "allow-recording-status",
-    "allow-actions-ready",
-    "allow-action-performed",
-    "allow-list-staged",
-    "allow-read-staged",
-    "allow-delete-staged",
-    "allow-registerListener",
-    "allow-remove-listener",
+  "allow-start-recording",
+  "allow-stop-recording",
+  "allow-cancel-recording",
+  "allow-recording-status",
+  "allow-actions-ready",
+  "allow-action-performed",
+  "allow-list-staged",
+  "allow-read-staged",
+  "allow-delete-staged",
+  "allow-registerListener",
+  "allow-remove-listener",
 ]

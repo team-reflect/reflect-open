@@ -44,7 +44,9 @@ describe('detectConflictMarkers', () => {
 
   it('clears once the user resolves by editing the markers away', () => {
     const resolved = CONFLICTED.split('\n')
-      .filter((line) => !line.startsWith('<<<<<<<') && line !== '=======' && !line.startsWith('>>>>>>>'))
+      .filter(
+        (line) => !line.startsWith('<<<<<<<') && line !== '=======' && !line.startsWith('>>>>>>>'),
+      )
       .join('\n')
     expect(detectConflictMarkers(resolved)).toBe(false)
   })
@@ -83,9 +85,7 @@ describe('resolveConflictMarkers', () => {
       '>>>>>>> other device',
       'outro',
     ].join('\n')
-    expect(resolveConflictMarkers(twoBlocks, 'theirs')).toBe(
-      'intro\nb1\nmiddle  \nb2\noutro',
-    )
+    expect(resolveConflictMarkers(twoBlocks, 'theirs')).toBe('intro\nb1\nmiddle  \nb2\noutro')
   })
 
   it('handles CRLF sources', () => {
@@ -172,15 +172,11 @@ describe('parseConflictMarkers', () => {
 
   it('flows an unterminated block back into the text verbatim', () => {
     const truncated = 'before\n<<<<<<< this device\nkept line'
-    expect(parseConflictMarkers(truncated)).toEqual([
-      { kind: 'text', text: truncated },
-    ])
+    expect(parseConflictMarkers(truncated)).toEqual([{ kind: 'text', text: truncated }])
   })
 
   it('is a single text segment on unconflicted text', () => {
-    expect(parseConflictMarkers('plain\ntext\n')).toEqual([
-      { kind: 'text', text: 'plain\ntext\n' },
-    ])
+    expect(parseConflictMarkers('plain\ntext\n')).toEqual([{ kind: 'text', text: 'plain\ntext\n' }])
   })
 })
 

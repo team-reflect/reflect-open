@@ -65,9 +65,7 @@ describe('ConnectGithubDrawer', () => {
 
     // The local graph's display name is the sandbox folder ("Documents") —
     // the prefill must be the fixed fallback, not a graph-derived slug.
-    await expect
-      .element(page.getByLabelText('Repository name'))
-      .toHaveValue('reflect-backup')
+    await expect.element(page.getByLabelText('Repository name')).toHaveValue('reflect-backup')
     await page.getByRole('button', { name: 'Continue' }).click()
 
     await vi.waitFor(() =>
@@ -115,18 +113,14 @@ describe('ConnectGithubDrawer', () => {
 
     // Close: the body unmounts entirely (which also stops any polls).
     await view.rerender(<ConnectGithubDrawer open={false} onOpenChange={onOpenChange} />)
-    await expect
-      .element(page.getByRole('button', { name: 'Continue' }))
-      .not.toBeInTheDocument()
+    await expect.element(page.getByRole('button', { name: 'Continue' })).not.toBeInTheDocument()
 
     // Reopen: back to the repo step defaults, no leaked error or mode.
     await view.rerender(<ConnectGithubDrawer open onOpenChange={onOpenChange} />)
     await expect
       .element(page.getByRole('radio', { name: /create a new private repository/i }))
       .toBeChecked()
-    await expect
-      .element(page.getByLabelText('Repository name'))
-      .toHaveValue('reflect-backup')
+    await expect.element(page.getByLabelText('Repository name')).toHaveValue('reflect-backup')
     await expect
       .element(page.getByText('Enter the repository as owner/name or a GitHub URL.'))
       .not.toBeInTheDocument()

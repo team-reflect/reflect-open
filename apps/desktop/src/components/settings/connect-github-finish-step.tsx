@@ -132,12 +132,12 @@ export function ConnectGithubFinishStep({
       {!wizard.pending && wizard.error !== null ? (
         <>
           <InlineAlert tone="error">{wizard.error}</InlineAlert>
-          {view.kind === 'idle' ? (
-            // A failed connect must never strand the user here — offer the
-            // way back to a different repository. (The parked handoffs render
-            // their own escapes.)
-            changeRepository()
-          ) : null}
+          {view.kind === 'idle'
+            ? // A failed connect must never strand the user here — offer the
+              // way back to a different repository. (The parked handoffs render
+              // their own escapes.)
+              changeRepository()
+            : null}
         </>
       ) : null}
     </div>

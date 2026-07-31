@@ -210,9 +210,7 @@ describe('useEditorAutocomplete', () => {
     })
     const { result } = await renderHook(() => useEditorAutocomplete())
 
-    await expect(
-      result.current.onWikilinkSearch('Ada Lovelace'),
-    ).resolves.toEqual([])
+    await expect(result.current.onWikilinkSearch('Ada Lovelace')).resolves.toEqual([])
   })
 
   it('reports a failed Contact creation through the operation UI', async () => {

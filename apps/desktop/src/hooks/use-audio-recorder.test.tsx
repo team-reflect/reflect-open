@@ -68,7 +68,8 @@ describe('useAudioRecorder', () => {
   it('records with the first supported container and assembles the result', async () => {
     const track = { stop: vi.fn() }
     getUserMedia.mockResolvedValue(fakeStream([track]))
-    const { result } = await renderHook(() => useAudioRecorder())
+    const onSegment = vi.fn()
+    const { result } = await renderHook(() => useAudioRecorder({ onSegment }))
 
     await act(async () => {
       await result.current.start()
@@ -87,7 +88,18 @@ describe('useAudioRecorder', () => {
     expect(recording).not.toBeNull()
     expect(recording?.mimeType).toBe('audio/mp4')
     expect(recording?.durationMs).toBe(3000)
-    expect(recording?.blob.size).toBeGreaterThan(0)
+    expect(recording?.parts).toBe(1)
+    expect(onSegment).toHaveBeenCalledTimes(1)
+    const segment = onSegment.mock.calls[0]![0] as {
+      blob: Blob
+      mimeType: string
+      part: number
+      end: boolean
+    }
+    expect(segment.blob.size).toBeGreaterThan(0)
+    expect(segment.mimeType).toBe('audio/mp4')
+    expect(segment.part).toBe(1)
+    expect(segment.end).toBe(true)
     expect(track.stop).toHaveBeenCalled()
     expect(result.current.status).toBe('idle')
     expect(result.current.elapsedMs).toBe(0)

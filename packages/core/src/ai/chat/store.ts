@@ -106,7 +106,12 @@ function upgradeLegacyReadPart(part: unknown): unknown {
   const upgraded: Record<string, unknown> = { ...part }
   const rawCall = part['call']
   const rawResult = part['result']
-  if (isRecord(rawCall) && rawCall['tool'] === 'read' && 'path' in rawCall && !('paths' in rawCall)) {
+  if (
+    isRecord(rawCall) &&
+    rawCall['tool'] === 'read' &&
+    'path' in rawCall &&
+    !('paths' in rawCall)
+  ) {
     const { path, ...rest } = rawCall
     upgraded['call'] = { ...rest, paths: [path] }
   }

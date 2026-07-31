@@ -23,7 +23,10 @@ interface SuggestedContactCardProps {
  * query cache is settled optimistically so it hides without waiting for the
  * watcher round trip.
  */
-export function SuggestedContactCard({ path, className }: SuggestedContactCardProps): ReactElement | null {
+export function SuggestedContactCard({
+  path,
+  className,
+}: SuggestedContactCardProps): ReactElement | null {
   const { graph } = useGraph()
   const queryClient = useQueryClient()
   const contact = useSuggestedContact(path)

@@ -17,9 +17,7 @@ const dailyDatesInRange = vi.hoisted(() => vi.fn())
 const relatedNotes = vi.hoisted(() => vi.fn())
 const readNote = vi.hoisted(() => vi.fn())
 const useNoteRow = vi.hoisted(() => vi.fn<(path: string) => NoteRow | null>(() => null))
-const openRouteInNewWindow = vi.hoisted(() =>
-  vi.fn<(route: NoteRoute) => Promise<boolean>>(),
-)
+const openRouteInNewWindow = vi.hoisted(() => vi.fn<(route: NoteRoute) => Promise<boolean>>())
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),
   hasBridge: () => true,
@@ -257,9 +255,7 @@ describe('DailyContextSidebar sections', () => {
   it('the calendar is not collapsible', async () => {
     const view = await renderSidebar('2026-06-09')
     await expect.element(page.getByText(monthLabel(monthOf('2026-06-09')))).toBeVisible()
-    await expect
-      .element(page.getByRole('button', { name: /^Calendar$/ }))
-      .not.toBeInTheDocument()
+    await expect.element(page.getByRole('button', { name: /^Calendar$/ })).not.toBeInTheDocument()
     await view.unmount()
   })
 })

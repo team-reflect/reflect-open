@@ -100,9 +100,7 @@ describe('buildMonthGrid', () => {
 
       const cells = grid.weeks.flat()
       for (let index = 1; index < cells.length; index += 1) {
-        expect(utcMillis(cells[index]!.date) - utcMillis(cells[index - 1]!.date)).toBe(
-          DAY_MILLIS,
-        )
+        expect(utcMillis(cells[index]!.date) - utcMillis(cells[index - 1]!.date)).toBe(DAY_MILLIS)
       }
 
       const dates = cells.map((cell) => cell.date)

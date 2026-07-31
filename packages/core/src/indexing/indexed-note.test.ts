@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { gistBodyHash, parseNote } from '../markdown'
-import { buildIndexedNote, indexedNoteSchema, PROJECTION_VERSION } from './indexed-note'
+import { buildIndexedNote, CLAIM_TIER, indexedNoteSchema, PROJECTION_VERSION } from './indexed-note'
 
 describe('buildIndexedNote', () => {
-  it('carries the projection version that backfills legacy contact emails', () => {
-    expect(PROJECTION_VERSION).toBe(17)
+  it('carries the projection version that backfills path keys and claims', () => {
+    expect(PROJECTION_VERSION).toBe(18)
   })
 
   it('flattens a parsed note into the index payload', () => {
@@ -35,15 +35,19 @@ describe('buildIndexedNote', () => {
 
     const wiki = indexed.links.filter((link) => link.kind === 'wiki')
     expect(
-      wiki.map((link) => ({ targetRaw: link.targetRaw, targetKey: link.targetKey, alias: link.alias })),
+      wiki.map((link) => ({
+        targetRaw: link.targetRaw,
+        targetKey: link.targetKey,
+        alias: link.alias,
+      })),
     ).toEqual([
       { targetRaw: 'Charlotte', targetKey: 'charlotte', alias: null },
       { targetRaw: 'Note', targetKey: 'note', alias: 'alias' },
     ])
-    expect(indexed.links.some((link) => link.kind === 'md' && link.targetRaw === 'https://x.com')).toBe(
-      true,
-    )
-    expect(indexed.assets).toEqual(['assets/p.png'])
+    expect(
+      indexed.links.some((link) => link.kind === 'md' && link.targetRaw === 'https://x.com'),
+    ).toBe(true)
+    expect(indexed.assets).toEqual(['notes/assets/p.png', 'assets/p.png'])
   })
 
   it('derives v1 subject aliases from a `//` title, after frontmatter aliases', () => {
@@ -269,8 +273,7 @@ describe('buildIndexedNote', () => {
   })
 
   it('flags notes carrying sync conflict markers', () => {
-    const source =
-      '# Shared\n\n<<<<<<< this device\nmine\n=======\ntheirs\n>>>>>>> other device\n'
+    const source = '# Shared\n\n<<<<<<< this device\nmine\n=======\ntheirs\n>>>>>>> other device\n'
     const indexed = buildIndexedNote(parseNote({ path: 'notes/shared.md', source }), {
       fileHash: 'h',
       mtime: 0,
@@ -310,16 +313,12 @@ describe('projectNoteAliases — derived linkable rich-title aliases', () => {
       source,
     })
     expect(indexed.title).toBe('Meeting with [[Ada Lovelace|Ada]]')
-    expect(indexed.aliases).toEqual([
-      { alias: 'Meeting with Ada', aliasKey: 'meeting with ada' },
-    ])
+    expect(indexed.aliases).toEqual([{ alias: 'Meeting with Ada', aliasKey: 'meeting with ada' }])
   })
 
   it('does not duplicate a frontmatter alias that owns the same key', () => {
     expect(
-      aliasesOf(
-        '---\naliases: ["Meeting with Ada"]\n---\n# Meeting with [[Ada Lovelace|Ada]]\n',
-      ),
+      aliasesOf('---\naliases: ["Meeting with Ada"]\n---\n# Meeting with [[Ada Lovelace|Ada]]\n'),
     ).toEqual([{ alias: 'Meeting with Ada', aliasKey: 'meeting with ada' }])
   })
 
@@ -341,5 +340,83 @@ describe('projectNoteAliases — derived linkable rich-title aliases', () => {
 
   it('skips a derived form the wiki-link syntax cannot address', () => {
     expect(aliasesOf('# C:\\notes [[Ada Lovelace|Ada]]\n')).toEqual([])
+  })
+})
+
+describe('projectNoteClaims (via buildIndexedNote)', () => {
+  const meta = { fileHash: 'h', mtime: 1, source: '' }
+
+  it('claims the filename stem only when the authored title differs', () => {
+    const titled = buildIndexedNote(
+      parseNote({ path: 'Projects/Plan.md', source: '# Weekly Planning' }),
+      { ...meta, source: '# Weekly Planning' },
+    )
+    expect(titled.claims).toEqual([
+      { key: 'weekly planning', tier: CLAIM_TIER.title },
+      { key: 'plan', tier: CLAIM_TIER.basename },
+    ])
+
+    // An untitled note already carries its filename as its title.
+    const untitled = buildIndexedNote(
+      parseNote({ path: 'Projects/Plan.md', source: 'no heading here' }),
+      { ...meta, source: 'no heading here' },
+    )
+    expect(untitled.claims).toEqual([{ key: 'plan', tier: CLAIM_TIER.title }])
+  })
+
+  it('claims a calendar-valid daily date but not an impossible one', () => {
+    expect(
+      buildIndexedNote(parseNote({ path: 'daily/2026-07-26.md', source: '' }), meta).claims,
+    ).toContainEqual({ key: '2026-07-26', tier: CLAIM_TIER.dailyDate })
+    expect(
+      buildIndexedNote(parseNote({ path: 'daily/2026-02-31.md', source: '' }), meta).claims,
+    ).not.toContainEqual({ key: '2026-02-31', tier: CLAIM_TIER.dailyDate })
+  })
+
+  it('claims aliases between the title and the stem', () => {
+    const source = '---\naliases: [Roadmap]\n---\n# Weekly Planning'
+    const indexed = buildIndexedNote(parseNote({ path: 'Projects/Plan.md', source }), {
+      ...meta,
+      source,
+    })
+    expect(indexed.claims).toEqual([
+      { key: 'weekly planning', tier: CLAIM_TIER.title },
+      { key: 'roadmap', tier: CLAIM_TIER.alias },
+      { key: 'plan', tier: CLAIM_TIER.basename },
+    ])
+  })
+
+  it('claims nothing for a template', () => {
+    expect(
+      buildIndexedNote(parseNote({ path: 'templates/meeting.md', source: '# Meeting' }), {
+        ...meta,
+        source: '# Meeting',
+      }).claims,
+    ).toEqual([])
+  })
+})
+
+describe('path addressing (via buildIndexedNote)', () => {
+  const meta = { fileHash: 'h', mtime: 1, source: '' }
+
+  it('folds the note path into pathKey', () => {
+    expect(
+      buildIndexedNote(parseNote({ path: 'Projects/Plan.md', source: '' }), meta).pathKey,
+    ).toBe('projects/plan.md')
+  })
+
+  it('stamps targetPathKey for path-form links and null for name-form links', () => {
+    const source = 'See [[Projects/Plan]] and [[Plan]] and [rel](./Sibling.md).'
+    const indexed = buildIndexedNote(parseNote({ path: 'Journal/Today.md', source }), {
+      ...meta,
+      source,
+    })
+    expect(
+      indexed.links.map((link) => ({ raw: link.targetRaw, pathKey: link.targetPathKey })),
+    ).toEqual([
+      { raw: 'Projects/Plan', pathKey: 'projects/plan.md' },
+      { raw: 'Plan', pathKey: null },
+      { raw: './Sibling.md', pathKey: 'journal/sibling.md' },
+    ])
   })
 })

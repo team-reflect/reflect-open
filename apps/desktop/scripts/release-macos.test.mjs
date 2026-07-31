@@ -99,7 +99,15 @@ test('draft release uploads clobber so a crashed publish can retry', () => {
       assets: ['Reflect.dmg', 'Reflect.app.tar.gz', 'latest.json'],
       tag: 'v0.5.0-beta.1',
     }),
-  ).toEqual(['release', 'upload', 'v0.5.0-beta.1', 'Reflect.dmg', 'Reflect.app.tar.gz', 'latest.json', '--clobber'])
+  ).toEqual([
+    'release',
+    'upload',
+    'v0.5.0-beta.1',
+    'Reflect.dmg',
+    'Reflect.app.tar.gz',
+    'latest.json',
+    '--clobber',
+  ])
 })
 
 test('finalizing a beta draft keeps the pre-release flag and undrafts last', () => {
@@ -286,7 +294,9 @@ test('beta feed version comparison handles release-please beta boundaries', () =
 })
 
 test('beta feed version comparison rejects unsupported versions', () => {
-  expect(() => compareReleaseVersions('0.6.0-rc.1', '0.6.0-beta.14')).toThrow('unsupported release version')
+  expect(() => compareReleaseVersions('0.6.0-rc.1', '0.6.0-beta.14')).toThrow(
+    'unsupported release version',
+  )
 })
 
 test('beta feed selects the newest immutable published beta tag', () => {
@@ -300,20 +310,31 @@ test('beta feed selects the newest immutable published beta tag', () => {
       '',
     ]),
   ).toBe('0.6.0-beta.14')
-  expect(() => newestBetaVersionFromTags(['updater-beta', 'v0.5.0'])).toThrow('published beta releases')
+  expect(() => newestBetaVersionFromTags(['updater-beta', 'v0.5.0'])).toThrow(
+    'published beta releases',
+  )
 })
 
 test('release builds ask Tauri for the app bundle only', () => {
   const args = createTauriBuildArgs({ flavor: 'stable', target: 'x86_64-apple-darwin' })
 
-  expect(args.slice(0, 6)).toEqual(['tauri', 'build', '--target', 'x86_64-apple-darwin', '--bundles', 'app'])
+  expect(args.slice(0, 6)).toEqual([
+    'tauri',
+    'build',
+    '--target',
+    'x86_64-apple-darwin',
+    '--bundles',
+    'app',
+  ])
   expect(args).not.toContain('dmg')
   expect(args).not.toContain(JSON.stringify({ bundle: { createUpdaterArtifacts: true } }))
   expect(args).toContain(
     JSON.stringify({
       plugins: {
         updater: {
-          endpoints: ['https://github.com/team-reflect/reflect-open/releases/latest/download/latest.json'],
+          endpoints: [
+            'https://github.com/team-reflect/reflect-open/releases/latest/download/latest.json',
+          ],
         },
       },
     }),
@@ -469,13 +490,12 @@ test('sidecar launch checks cover native targets and Intel under Rosetta', () =>
 })
 
 test('updater archive is created from the finalized app bundle', () => {
-  expect(createUpdaterArchiveArgs({ app: '/tmp/build/Reflect.app', archive: '/tmp/build/Reflect.app.tar.gz' })).toEqual([
-    '-czf',
-    '/tmp/build/Reflect.app.tar.gz',
-    '-C',
-    '/tmp/build',
-    'Reflect.app',
-  ])
+  expect(
+    createUpdaterArchiveArgs({
+      app: '/tmp/build/Reflect.app',
+      archive: '/tmp/build/Reflect.app.tar.gz',
+    }),
+  ).toEqual(['-czf', '/tmp/build/Reflect.app.tar.gz', '-C', '/tmp/build', 'Reflect.app'])
 })
 
 test('updater manifest includes both macOS release targets', () => {
@@ -525,7 +545,9 @@ test('updater manifest includes both macOS release targets', () => {
 })
 
 test('DMG creation uses direct hdiutil packaging', () => {
-  expect(createDmgArgs({ dmg: 'Reflect.dmg', sourceFolder: '/tmp/stage', volumeName: 'Reflect' })).toEqual([
+  expect(
+    createDmgArgs({ dmg: 'Reflect.dmg', sourceFolder: '/tmp/stage', volumeName: 'Reflect' }),
+  ).toEqual([
     'create',
     '-volname',
     'Reflect',
@@ -539,9 +561,18 @@ test('DMG creation uses direct hdiutil packaging', () => {
 })
 
 test('DMG signing timestamps the container', () => {
-  expect(signDmgArgs({ dmg: 'Reflect.dmg', identity: 'Developer ID Application: Reflect App, LLC (789ULN5MZB)' })).toEqual(
-    ['--force', '--sign', 'Developer ID Application: Reflect App, LLC (789ULN5MZB)', '--timestamp', 'Reflect.dmg'],
-  )
+  expect(
+    signDmgArgs({
+      dmg: 'Reflect.dmg',
+      identity: 'Developer ID Application: Reflect App, LLC (789ULN5MZB)',
+    }),
+  ).toEqual([
+    '--force',
+    '--sign',
+    'Developer ID Application: Reflect App, LLC (789ULN5MZB)',
+    '--timestamp',
+    'Reflect.dmg',
+  ])
 })
 
 test('DMG signing can target a temporary CI keychain', () => {
@@ -567,7 +598,10 @@ test('macOS keychain list output is parsed as paths', () => {
     parseKeychainList(`    "/Users/runner/Library/Keychains/login.keychain-db"
     "/Library/Keychains/System.keychain"
 `),
-  ).toEqual(['/Users/runner/Library/Keychains/login.keychain-db', '/Library/Keychains/System.keychain'])
+  ).toEqual([
+    '/Users/runner/Library/Keychains/login.keychain-db',
+    '/Library/Keychains/System.keychain',
+  ])
 })
 
 test('described errors keep the stdout and stderr captured by execFileSync', () => {

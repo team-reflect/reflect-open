@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { groupTaskContexts, groupTasks, taskDateBucket, visibleTaskBreadcrumbs } from './group-tasks'
+import {
+  groupTaskContexts,
+  groupTasks,
+  taskDateBucket,
+  visibleTaskBreadcrumbs,
+} from './group-tasks'
 import type { OpenTask } from './queries'
 
 const TODAY = '2026-06-14'
@@ -121,13 +126,25 @@ describe('groupTasks', () => {
     const groups = groupTasks(
       [
         // future due date inside a PAST daily note → Upcoming
-        task({ notePath: 'daily/2026-06-10.md', dailyDate: PAST, dueDate: FUTURE, text: 'pushed-out' }),
+        task({
+          notePath: 'daily/2026-06-10.md',
+          dailyDate: PAST,
+          dueDate: FUTURE,
+          text: 'pushed-out',
+        }),
         // past due date inside a FUTURE daily note → Overdue
-        task({ notePath: 'daily/2026-06-20.md', dailyDate: FUTURE, dueDate: PAST, text: 'pulled-in' }),
+        task({
+          notePath: 'daily/2026-06-20.md',
+          dailyDate: FUTURE,
+          dueDate: PAST,
+          text: 'pulled-in',
+        }),
       ],
       TODAY,
     )
-    const byKind = Object.fromEntries(groups.map((group) => [group.kind, group.tasks.map((entry) => entry.text)]))
+    const byKind = Object.fromEntries(
+      groups.map((group) => [group.kind, group.tasks.map((entry) => entry.text)]),
+    )
     expect(byKind['overdue']).toEqual(['pulled-in'])
     expect(byKind['upcoming']).toEqual(['pushed-out'])
     expect(byKind['current']).toBeUndefined()
@@ -187,7 +204,12 @@ describe('groupTasks', () => {
         task({ notePath: 'notes/new.md', noteTitle: 'New', updatedAt: 200 }),
         task({ notePath: 'notes/pin2.md', noteTitle: 'Pin2', isPinned: true, pinnedOrder: 2 }),
         task({ notePath: 'notes/pin1.md', noteTitle: 'Pin1', isPinned: true, pinnedOrder: 1 }),
-        task({ notePath: 'notes/pinbare.md', noteTitle: 'PinBare', isPinned: true, pinnedOrder: null }),
+        task({
+          notePath: 'notes/pinbare.md',
+          noteTitle: 'PinBare',
+          isPinned: true,
+          pinnedOrder: null,
+        }),
       ],
       TODAY,
     )

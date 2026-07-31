@@ -39,9 +39,7 @@ export function normalizeWikiTarget(target: string): NormalizedTarget {
 }
 
 /** Outcome of resolving a `[[wiki link]]` against the graph. */
-export type Resolution =
-  | { kind: 'resolved'; ref: string }
-  | { kind: 'unresolved'; text: string }
+export type Resolution = { kind: 'resolved'; ref: string } | { kind: 'unresolved'; text: string }
 
 export function resolved(ref: string): Resolution {
   return { kind: 'resolved', ref }

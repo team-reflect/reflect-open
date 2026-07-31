@@ -85,8 +85,7 @@ async function mountStrip(date: string = DATE, weekStart: WeekStartDay = WEEK_ST
         date: currentDate,
         weekStart: currentWeekStart,
       }: { date: string; weekStart: WeekStartDay } = { date, weekStart },
-    ) =>
-      useWeekStrip(currentDate, currentWeekStart),
+    ) => useWeekStrip(currentDate, currentWeekStart),
     { initialProps: { date, weekStart } },
   )
 }

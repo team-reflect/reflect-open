@@ -94,26 +94,49 @@ describe('parseNote — links, assets, tags, text', () => {
   it('separates external links (with domain) from asset references', () => {
     const note = parse('[site](https://example.com/x) and ![pic](assets/photo.png)')
     expect(note.links).toEqual([
-      expect.objectContaining({ href: 'https://example.com/x', text: 'site', domain: 'example.com' }),
+      expect.objectContaining({
+        href: 'https://example.com/x',
+        text: 'site',
+        domain: 'example.com',
+      }),
     ])
-    expect(note.assets).toEqual([expect.objectContaining({ path: 'assets/photo.png' })])
+    expect(note.assets).toEqual([
+      expect.objectContaining({ path: 'notes/assets/photo.png' }),
+      expect.objectContaining({ path: 'assets/photo.png' }),
+    ])
+  })
+
+  it('keeps both spellings of an unqualified reference', () => {
+    // Reflect has always written `assets/…` vault-root relative; CommonMark
+    // reads it source-relative. Neither may lose its image.
+    const note = parse('![pic](assets/photo.png)')
+    expect(note.assets.map((asset) => asset.path)).toEqual([
+      'notes/assets/photo.png',
+      'assets/photo.png',
+    ])
   })
 
   it('decodes percent-encoded asset hrefs to the on-disk path', () => {
-    const note = parse('![pic](assets/my%20photo.png) and ![two](assets/a%2Bb.pdf)')
+    const note = parse('![pic](assets/my%20photo.png)')
     expect(note.assets.map((asset) => asset.path)).toEqual([
+      'notes/assets/my photo.png',
       'assets/my photo.png',
-      'assets/a+b.pdf',
     ])
   })
 
-  it('canonicalizes ./ and .. asset path spellings to the on-disk form', () => {
-    const note = parse('![a](./assets/a.png) ![b](assets/sub/../b.png) ![c](assets//c.png)')
-    expect(note.assets.map((asset) => asset.path)).toEqual([
-      'assets/a.png',
-      'assets/b.png',
-      'assets/c.png',
-    ])
+  it('gives an explicit ./ or ../ spelling its single source-relative meaning', () => {
+    const note = parse('![a](./assets/a.png) ![b](../Media/b.png)')
+    expect(note.assets.map((asset) => asset.path)).toEqual(['notes/assets/a.png', 'Media/b.png'])
+  })
+
+  it('gives a leading slash its single vault-root meaning', () => {
+    const note = parse('![a](/Media/a.png)')
+    expect(note.assets.map((asset) => asset.path)).toEqual(['Media/a.png'])
+  })
+
+  it('collapses . and empty segments and refuses escapes above the root', () => {
+    const note = parse('![c](assets//c.png) ![out](../../out.png)', 'plan.md')
+    expect(note.assets.map((asset) => asset.path)).toEqual(['assets/c.png'])
   })
 
   it('extracts body #tags only, deduped case-insensitively', () => {
@@ -132,7 +155,9 @@ describe('parseNote — links, assets, tags, text', () => {
   })
 
   it('keeps markdown escapes literal inside code text', () => {
-    const note = parse('Rendered www\\.reddit.com, code `www\\.reddit.com`.\n\n```\nwww\\.reddit.com\n```')
+    const note = parse(
+      'Rendered www\\.reddit.com, code `www\\.reddit.com`.\n\n```\nwww\\.reddit.com\n```',
+    )
     expect(note.text).toBe('Rendered www.reddit.com, code www\\.reddit.com. www\\.reddit.com')
   })
 
@@ -290,9 +315,28 @@ describe('parseNote — meowdown grammar recovery & new inline nodes', () => {
     expect(parse('[[ ]]').wikiLinks).toEqual([])
   })
 
-  it('projects a ![[x]] embed as a wiki link row spanning only the brackets', () => {
+  it('projects a ![[x]] attachment embed as an asset, not a wiki link', () => {
     const note = parse('See ![[photo.png]] here')
-    expect(note.wikiLinks).toEqual([{ target: 'photo.png', alias: undefined, from: 5, to: 18 }])
+    expect(note.wikiLinks).toEqual([])
+    expect(note.assets).toEqual([{ path: 'photo.png', from: 5, to: 18 }])
+  })
+
+  it('projects a path-qualified attachment embed at its vault-root path', () => {
+    const note = parse('![[Media/photo.png]]')
+    expect(note.assets.map((asset) => asset.path)).toEqual(['Media/photo.png'])
+  })
+
+  it('keeps a note embed as a wiki link', () => {
+    const note = parse('![[Some Note]]')
+    expect(note.assets).toEqual([])
+    expect(note.wikiLinks.map((link) => link.target)).toEqual(['Some Note'])
+  })
+
+  it('never projects a traversal or hidden embed target as an asset', () => {
+    const note = parse('![[../cat.png]] and ![[.obsidian/cat.png]]')
+    expect(note.assets).toEqual([])
+    // The unsafe targets stay visible wiki links that resolve to nothing.
+    expect(note.wikiLinks.map((link) => link.target)).toEqual(['../cat.png', '.obsidian/cat.png'])
   })
 
   it('strips highlight and inline-math marks from plain text, like other marks', () => {

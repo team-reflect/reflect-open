@@ -13,7 +13,9 @@ type DownloadHandler = Parameters<
   NonNullable<Awaited<ReturnType<typeof check>>>['downloadAndInstall']
 >[0]
 
-function fakeUpdate(overrides: { version?: string; install?: (onEvent?: DownloadHandler) => Promise<void> } = {}) {
+function fakeUpdate(
+  overrides: { version?: string; install?: (onEvent?: DownloadHandler) => Promise<void> } = {},
+) {
   return {
     version: overrides.version ?? '0.2.0',
     downloadAndInstall: vi.fn(overrides.install ?? (() => Promise.resolve())),

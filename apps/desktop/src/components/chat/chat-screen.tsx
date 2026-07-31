@@ -29,8 +29,8 @@ export function ChatScreen(): ReactElement {
           <MessageSquare aria-hidden strokeWidth={1.5} className="size-8 text-text-muted" />
           <h2 className="mt-4 text-lg font-semibold text-text">Chat with your notes</h2>
           <p className="mt-2 text-sm text-text-muted">
-            Add an AI provider to start chatting. Reflect calls the provider directly with your
-            own key — it stays in the system keychain, and private notes are never sent.
+            Add an AI provider to start chatting. Reflect calls the provider directly with your own
+            key — it stays in the system keychain, and private notes are never sent.
           </p>
           <Button className="mt-5" onClick={() => navigate({ kind: 'settings' })}>
             Add an AI provider

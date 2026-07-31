@@ -77,11 +77,8 @@ export function AllNotesTrashDialog({
       }}
     >
       <DialogContent
-        onOpenAutoFocus={(event) => {
-          // Focus the confirm action so ⌘⌫ → Return completes from the keyboard.
-          event.preventDefault()
-          confirmButtonRef.current?.focus()
-        }}
+        // Focus the confirm action so ⌘⌫ → Return completes from the keyboard.
+        initialFocus={confirmButtonRef}
       >
         <DialogTitle>
           Trash {count} {count === 1 ? 'note' : 'notes'}?
@@ -91,11 +88,13 @@ export function AllNotesTrashDialog({
           {count === 1 ? 'it' : 'them'}.
         </DialogDescription>
         <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="ghost" disabled={isTrashing}>
-              Cancel
-            </Button>
-          </DialogClose>
+          <DialogClose
+            render={
+              <Button variant="ghost" disabled={isTrashing}>
+                Cancel
+              </Button>
+            }
+          />
           <Button
             ref={confirmButtonRef}
             variant="destructive"

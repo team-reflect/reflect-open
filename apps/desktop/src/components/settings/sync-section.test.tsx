@@ -145,9 +145,7 @@ describe('SyncSection', () => {
     await expect
       .element(section.getByText('2 notes are still downloading from iCloud.'))
       .toBeInTheDocument()
-    await expect
-      .element(section.getByText('1 note needs review, 1 sync fork'))
-      .toBeInTheDocument()
+    await expect.element(section.getByText('1 note needs review, 1 sync fork')).toBeInTheDocument()
     await expect
       .element(section.getByRole('button', { name: /A.*notes\/a\.md/ }))
       .toBeInTheDocument()
@@ -165,9 +163,7 @@ describe('SyncSection', () => {
     await renderSection()
 
     const section = page.getByRole('region', { name: 'Sync' })
-    await section
-      .getByRole('button', { name: /Conflicted note.*notes\/conflicted\.md/ })
-      .click()
+    await section.getByRole('button', { name: /Conflicted note.*notes\/conflicted\.md/ }).click()
 
     await expect.element(page.getByTestId('route')).toHaveTextContent('notes/conflicted.md')
   })

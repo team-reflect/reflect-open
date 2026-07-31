@@ -19,9 +19,9 @@ describe('formatParagraphs', () => {
 
 describe('samePageUrl', () => {
   it('accepts normalized-equivalent page URLs', () => {
-    expect(samePageUrl('https://example.com:443/article#intro', 'https://example.com/article')).toBe(
-      true,
-    )
+    expect(
+      samePageUrl('https://example.com:443/article#intro', 'https://example.com/article'),
+    ).toBe(true)
   })
 
   it('rejects different pages', () => {

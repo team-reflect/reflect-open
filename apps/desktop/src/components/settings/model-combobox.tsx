@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactElement } from 'react'
 import { useCommandState } from 'cmdk'
 import { ChevronsUpDownIcon } from 'lucide-react'
 import { aiModelLabel, type AiModelOption, type AiProviderId } from '@reflect/core'
+import { getIsComposing } from '@meowdown/core'
 import { Button } from '@/components/ui/button'
 import {
   Command,
@@ -81,6 +82,14 @@ export function ModelCombobox({
   }
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (getIsComposing()) {
+      // preventDefault keeps cmdk's root handler from selecting the highlighted
+      // model on the Enter that commits the composition.
+      if (event.key === 'Enter') {
+        event.preventDefault()
+      }
+      return
+    }
     if (event.key === 'Enter' && filteredCountRef.current === 0 && inputValue.trim()) {
       event.preventDefault()
       commit(inputValue.trim())
@@ -89,24 +98,22 @@ export function ModelCombobox({
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          aria-label={ariaLabel}
-          className="w-full justify-between font-normal"
-        >
-          <span className="truncate">{aiModelLabel(provider, value)}</span>
-          <ChevronsUpDownIcon className="ml-2 size-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        className="p-0"
-        style={{ width: 'var(--radix-popover-trigger-width)' }}
-        align="start"
-      >
+      <PopoverTrigger
+        render={
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            aria-label={ariaLabel}
+            className="w-full justify-between font-normal"
+          >
+            <span className="truncate">{aiModelLabel(provider, value)}</span>
+            <ChevronsUpDownIcon className="ml-2 size-4 shrink-0 opacity-50" />
+          </Button>
+        }
+      />
+      <PopoverContent className="p-0" style={{ width: 'var(--anchor-width)' }} align="start">
         <Command>
           <FilterCountSync countRef={filteredCountRef} />
           <CommandInput
@@ -117,9 +124,8 @@ export function ModelCombobox({
           />
           <CommandList>
             <CommandEmpty>
-              Press{' '}
-              <kbd className="rounded bg-muted px-1 py-0.5 font-mono text-xs">Enter</kbd>{' '}
-              to use &ldquo;{inputValue}&rdquo;
+              Press <kbd className="rounded bg-muted px-1 py-0.5 font-mono text-xs">Enter</kbd> to
+              use &ldquo;{inputValue}&rdquo;
             </CommandEmpty>
             <CommandGroup>
               {models.map((model) => (

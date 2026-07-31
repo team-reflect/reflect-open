@@ -1,119 +1,68 @@
-import { errorMessage } from '../errors'
-import type { TranscriptionConfig } from './provider-config'
 import type { AudioMemoEnrichmentCredentials } from './audio-memo-title'
 import { generateAudioMemoTitle } from './audio-memo-title'
 import { formatAudioMemoTranscript } from './audio-memo-format'
-import { APP_REVIEW_STUB_KEY, stubTranscriptBody } from './audio-memo-review-stub'
-import { isTranscriptionRejected, transcribeAudio } from './transcribe'
 
-export interface BuildAudioMemoTranscriptInput {
-  /** The recording bytes read back from the graph. */
-  readonly audio: Blob
-  /** Stored MIME type paired with the recording bytes. */
-  readonly mimeType: string
-  /** Fixed transcription provider and its configured entry. */
-  readonly config: TranscriptionConfig
-  /** Transcription-provider key read from the OS keychain. */
-  readonly apiKey: string
-  /** Small-model credentials for formatting and content-derived naming. */
+/**
+ * Best-effort enrichment of one session's stitched transcript: an optional
+ * formatting pass and a content-derived title. Enrichment never gates the
+ * transcript — every failure path falls back to the raw text and the
+ * timestamp title, because the transcript is already durable by the time
+ * this runs.
+ */
+
+/**
+ * Past this the formatting model reliably times out or fails the verbatim
+ * equivalence check (`retainsTranscriptContent`), so the call would be paid
+ * and then discarded. Roughly forty minutes of speech.
+ */
+export const FORMAT_MAX_CHARS = 24_000
+
+/**
+ * A title needs the opening of the meeting, not its entirety — and capping
+ * the input keeps the title call's cost flat no matter how long the session
+ * ran.
+ */
+export const TITLE_INPUT_MAX_CHARS = 4_000
+
+export interface EnrichSessionTranscriptInput {
+  /** The stitched, non-empty session transcript. */
+  readonly transcript: string
+  /** Small-model credentials for formatting and naming; `null` skips both. */
   readonly enrichmentCredentials: AudioMemoEnrichmentCredentials | null
-  /** Whether to run the combined formatting and naming pass. */
+  /** Whether the combined formatting-and-naming pass is enabled. */
   readonly formatTranscript: boolean
-  /** Timestamp-derived title used when speech or enrichment cannot name the memo. */
+  /** Timestamp-derived title used when enrichment cannot name the memo. */
   readonly fallbackTitle: string
   /** Host transport (the Tauri HTTP plugin's fetch; tests pass a stub). */
   readonly fetchFn?: typeof fetch | undefined
-  /** Abort gate checked between speech-to-text and optional enrichment. */
-  readonly isStale?: (() => boolean) | undefined
 }
 
-export interface BuiltAudioMemoTranscript {
-  readonly status: 'ready'
-  /** Markdown stored as the memo note's body. */
-  readonly body: string
-  /** Title stored on the memo note and its daily-note backlink. */
+export interface EnrichedSessionTranscript {
   readonly title: string
-  /** Whether the speech-to-text provider permanently refused the recording. */
-  readonly rejected: boolean
+  readonly body: string
 }
 
-export interface StaleAudioMemoTranscript {
-  /** The graph session ended after speech-to-text, before optional enrichment. */
-  readonly status: 'stale'
-}
-
-export type BuildAudioMemoTranscriptOutcome =
-  | BuiltAudioMemoTranscript
-  | StaleAudioMemoTranscript
-
-/**
- * Build one memo's note content from its durable recording. Speech-to-text
- * failures remain retryable except for provider refusal; optional enrichment
- * is best-effort and falls back to the raw transcript internally.
- */
-export async function buildAudioMemoTranscript(
-  input: BuildAudioMemoTranscriptInput,
-): Promise<BuildAudioMemoTranscriptOutcome> {
-  if (input.apiKey === APP_REVIEW_STUB_KEY) {
-    return {
-      status: 'ready',
-      body: stubTranscriptBody(),
-      title: input.fallbackTitle,
-      rejected: false,
-    }
-  }
-
-  try {
-    const text = await transcribeAudio({
-      provider: input.config.provider,
-      apiKey: input.apiKey,
-      audio: input.audio,
-      mimeType: input.mimeType,
+export async function enrichSessionTranscript(
+  input: EnrichSessionTranscriptInput,
+): Promise<EnrichedSessionTranscript> {
+  if (
+    input.formatTranscript &&
+    input.enrichmentCredentials !== null &&
+    input.transcript.length <= FORMAT_MAX_CHARS
+  ) {
+    const formatted = await formatAudioMemoTranscript({
+      credentials: input.enrichmentCredentials,
       fetchFn: input.fetchFn,
-    })
-    if (input.isStale?.() === true) {
-      return { status: 'stale' }
-    }
-    if (text === '') {
-      return {
-        status: 'ready',
-        body: 'No speech detected.',
-        title: input.fallbackTitle,
-        rejected: false,
-      }
-    }
-    if (input.formatTranscript && input.enrichmentCredentials !== null) {
-      const formatted = await formatAudioMemoTranscript({
-        credentials: input.enrichmentCredentials,
-        fetchFn: input.fetchFn,
-        transcript: text,
-        fallbackTitle: input.fallbackTitle,
-      })
-      return {
-        status: 'ready',
-        body: formatted.body,
-        title: formatted.title,
-        rejected: false,
-      }
-    }
-    const title = await generateAudioMemoTitle({
-      ...(input.enrichmentCredentials !== null
-        ? { credentials: input.enrichmentCredentials }
-        : {}),
-      fetchFn: input.fetchFn,
-      transcript: text,
+      transcript: input.transcript,
       fallbackTitle: input.fallbackTitle,
     })
-    return { status: 'ready', body: text, title, rejected: false }
-  } catch (cause) {
-    if (!isTranscriptionRejected(cause)) {
-      throw cause
-    }
-    return {
-      status: 'ready',
-      body: `Transcription failed: ${errorMessage(cause)}`,
-      title: input.fallbackTitle,
-      rejected: true,
-    }
+    return { title: formatted.title, body: formatted.body }
   }
+  const title = await generateAudioMemoTitle({
+    ...(input.enrichmentCredentials !== null ? { credentials: input.enrichmentCredentials } : {}),
+    fetchFn: input.fetchFn,
+    transcript: input.transcript.slice(0, TITLE_INPUT_MAX_CHARS),
+    fallbackTitle: input.fallbackTitle,
+  })
+  return { title, body: input.transcript }
 }

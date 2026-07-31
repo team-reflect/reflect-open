@@ -92,7 +92,7 @@ export function effectiveDailyDate(
   focusedDailyDate: string | null,
 ): string | null {
   const routed = dailyDateForRoute(route, today)
-  return routed === null ? null : focusedDailyDate ?? routed
+  return routed === null ? null : (focusedDailyDate ?? routed)
 }
 
 /**

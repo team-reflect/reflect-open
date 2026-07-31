@@ -1,5 +1,71 @@
 # Changelog
 
+## [0.8.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.2...v0.8.0-beta.3) (2026-07-31)
+
+
+### Features
+
+* **mobile:** add an image button to the keyboard toolbar ([#1001](https://github.com/team-reflect/reflect-open/issues/1001)) ([afceb0b](https://github.com/team-reflect/reflect-open/commit/afceb0be58bb61e51431bcb52e3f7f4df54edd6b))
+
+
+### Bug Fixes
+
+* update meowdown to ^0.63.1 ([#1005](https://github.com/team-reflect/reflect-open/issues/1005)) ([0491123](https://github.com/team-reflect/reflect-open/commit/0491123f21596fbda50be71f5803c41a9f7d5feb))
+
+## [0.8.0-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.1...v0.8.0-beta.2) (2026-07-30)
+
+
+### Features
+
+* support OpenAI-compatible AI providers ([#996](https://github.com/team-reflect/reflect-open/issues/996)) ([2ff6ce3](https://github.com/team-reflect/reflect-open/commit/2ff6ce3f6e1825819492772d6c1f1593d501fc87))
+
+## [0.8.0-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta...v0.8.0-beta.1) (2026-07-30)
+
+
+### Features
+
+* cycle mobile editor list style ([#990](https://github.com/team-reflect/reflect-open/issues/990)) ([185a021](https://github.com/team-reflect/reflect-open/commit/185a021d74989ccffe4778aad318b389e9ddaa4d))
+
+## [0.8.0-beta](https://github.com/team-reflect/reflect-open/compare/v0.7.0...v0.8.0-beta) (2026-07-29)
+
+
+### Features
+
+* add a checkbox text-capture kind and drain task as a round task ([#982](https://github.com/team-reflect/reflect-open/issues/982)) ([4aa6c0b](https://github.com/team-reflect/reflect-open/commit/4aa6c0b7d0d4acc9541fb2a2ed988e95f604ceb0))
+
+
+### Bug Fixes
+
+* **desktop:** keep daily notes around mounted ([#986](https://github.com/team-reflect/reflect-open/issues/986)) ([7e6efb5](https://github.com/team-reflect/reflect-open/commit/7e6efb5a0ae025d04002f4ab31d7158dc9d11851))
+* update meowdown to ^0.60.0 ([#979](https://github.com/team-reflect/reflect-open/issues/979)) ([0abd282](https://github.com/team-reflect/reflect-open/commit/0abd282a44725ed0568cb6ddec73ee17f2105390))
+
+## [0.7.0-beta.22](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.21...v0.7.0-beta.22) (2026-07-27)
+
+
+### Features
+
+* support meeting-length audio memos via segmented recording ([#971](https://github.com/team-reflect/reflect-open/issues/971)) ([eabed7b](https://github.com/team-reflect/reflect-open/commit/eabed7b40858929de61f863aef460122c2a5a1f9))
+
+## [0.7.0-beta.21](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.20...v0.7.0-beta.21) (2026-07-27)
+
+
+### Bug Fixes
+
+* shrink the day carousel's slide belt ([#964](https://github.com/team-reflect/reflect-open/issues/964)) ([37de1d0](https://github.com/team-reflect/reflect-open/commit/37de1d094715c68963598e2cd3691df2c6b164e8))
+* update meowdown to ^0.59.1 ([#974](https://github.com/team-reflect/reflect-open/issues/974)) ([b0b8cb1](https://github.com/team-reflect/reflect-open/commit/b0b8cb1be1ee15e5d91838f175542336c3c1ac1a))
+
+## [0.7.0-beta.20](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.19...v0.7.0-beta.20) (2026-07-27)
+
+
+### Features
+
+* resolve vault links and attachments ([#956](https://github.com/team-reflect/reflect-open/issues/956)) ([37978c5](https://github.com/team-reflect/reflect-open/commit/37978c597057c7c4448d0db86890a6f850bd3156))
+
+
+### Bug Fixes
+
+* prevent Enter from sending during IME composition ([#965](https://github.com/team-reflect/reflect-open/issues/965)) ([0e4658b](https://github.com/team-reflect/reflect-open/commit/0e4658b87c9f3d7b957441973ebb1b3083f73afb))
+
 ## [0.7.0-beta.19](https://github.com/team-reflect/reflect-open/compare/v0.7.0-beta.18...v0.7.0-beta.19) (2026-07-26)
 
 

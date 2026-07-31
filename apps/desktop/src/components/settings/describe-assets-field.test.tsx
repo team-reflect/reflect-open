@@ -19,7 +19,12 @@ vi.mock('@/lib/asset-backfill', () => ({
   backfillAssetDescriptionsVisibly: backfill,
 }))
 
-const PROVIDER = { id: 'cfg', provider: 'anthropic' as const, model: 'claude-opus-4-8', keyHint: 'wxyz1' }
+const PROVIDER = {
+  id: 'cfg',
+  provider: 'anthropic' as const,
+  model: 'claude-opus-4-8',
+  keyHint: 'wxyz1',
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -44,12 +49,8 @@ describe('DescribeAssetsField', () => {
   it('disables the backfill until an AI provider is configured', async () => {
     settingsRef.current = { ...settingsRef.current, aiProviders: [], defaultAiProviderId: null }
     await render(<DescribeAssetsField />)
-    await expect
-      .element(page.getByRole('button', { name: /backfill assets/i }))
-      .toBeDisabled()
-    await expect
-      .element(page.getByText(/add an ai provider to enable this/i))
-      .toBeInTheDocument()
+    await expect.element(page.getByRole('button', { name: /backfill assets/i })).toBeDisabled()
+    await expect.element(page.getByText(/add an ai provider to enable this/i)).toBeInTheDocument()
   })
 
   it('confirms the cost before running the backfill, then runs it pinned to the graph', async () => {

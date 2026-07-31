@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { noteBasenameKey } from '../graph/note-reference'
+import { dateFromDailyPath, foldGraphPath, isCalendarDate } from '../graph/paths'
 import { call } from '../ipc/invoke'
 import type { IndexedNote } from './indexed-note'
 
@@ -45,12 +47,22 @@ export async function removeFromIndex(path: string, generation: number): Promise
  * healed rename never re-embeds. Gated on the **index** generation like every
  * other reconcile-path write.
  */
-export async function moveIndexedRows(
-  from: string,
-  to: string,
-  generation: number,
-): Promise<void> {
-  await call('index_move', { from, to, generation }, voidSchema)
+export async function moveIndexedRows(from: string, to: string, generation: number): Promise<void> {
+  await call('index_move', { from, to, generation, toAddress: movedNoteAddress(to) }, voidSchema)
+}
+
+/**
+ * The path-derived addressing a row move must re-state: the folded destination
+ * path plus the tier-1/tier-4 claims that derive from it. Folded here because
+ * Rust never folds; mirrors `projectNoteClaims`'s path-derived tiers.
+ */
+function movedNoteAddress(path: string) {
+  const date = dateFromDailyPath(path)
+  return {
+    pathKey: foldGraphPath(path),
+    basenameKey: noteBasenameKey(path),
+    dailyDate: date !== null && isCalendarDate(date) ? date : null,
+  }
 }
 
 /**
@@ -61,12 +73,20 @@ export async function moveIndexedRows(
  * the other index commands, `generation` here is the **graph** generation
  * (the `note_write` gate) — a rename is user-initiated file mutation.
  */
-export async function moveNoteIndexed(
-  from: string,
-  to: string,
-  generation: number,
-): Promise<void> {
-  await call('note_move_indexed', { from, to, generation }, voidSchema)
+export async function moveNoteIndexed(from: string, to: string, generation: number): Promise<void> {
+  await call(
+    'note_move_indexed',
+    {
+      request: {
+        from,
+        to,
+        toAddress: movedNoteAddress(to),
+        fromAddress: movedNoteAddress(from),
+      },
+      generation,
+    },
+    voidSchema,
+  )
 }
 
 const scanCandidateSchema = z.object({
@@ -155,11 +175,7 @@ export async function clearIndex(generation: number): Promise<void> {
  * Bookkeeping the TS policy layer owns — e.g. the projection-version stamp a
  * rebuild leaves behind. Reads go through the ordinary Kysely `db_query` path.
  */
-export async function setIndexMeta(
-  key: string,
-  value: string,
-  generation: number,
-): Promise<void> {
+export async function setIndexMeta(key: string, value: string, generation: number): Promise<void> {
   await call('index_meta_set', { key, value, generation }, voidSchema)
 }
 

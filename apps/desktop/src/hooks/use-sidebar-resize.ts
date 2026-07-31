@@ -12,6 +12,7 @@ import {
   SIDEBAR_WIDTH_RANGE,
   type SidebarWidthRange,
 } from '@reflect/core'
+import { getIsComposing } from '@meowdown/core'
 import { useSettings } from '@/providers/settings-provider'
 
 /** How far one arrow-key press moves the divider, in CSS pixels. */
@@ -322,6 +323,9 @@ export function useSidebarResize(panel: ResizableSidebarPanel): SidebarResize {
 
   const onKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLElement>): void => {
+      if (getIsComposing()) {
+        return
+      }
       if (dragRef.current !== null) {
         return
       }

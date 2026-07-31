@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  canonicalEmail,
-  canonicalEmails,
-  extractEmailFields,
-  foldEmail,
-} from './email-fields'
+import { canonicalEmail, canonicalEmails, extractEmailFields, foldEmail } from './email-fields'
 
 describe('foldEmail', () => {
   it('trims and lowercases', () => {
@@ -27,12 +22,7 @@ describe('foldEmail', () => {
 describe('canonicalEmails', () => {
   it('canonicalizes, removes blanks, and deduplicates in order', () => {
     expect(
-      canonicalEmails([
-        ' Ada@Example.com ',
-        '<ada@example.com>',
-        '',
-        'ada@work.example',
-      ]),
+      canonicalEmails([' Ada@Example.com ', '<ada@example.com>', '', 'ada@work.example']),
     ).toEqual(['ada@example.com', 'ada@work.example'])
   })
 })
@@ -73,10 +63,7 @@ describe('extractEmailFields', () => {
       '  - [555-1234](tel:555-1234)',
     ].join('\n')
 
-    expect(extractEmailFields(body)).toEqual([
-      'Ada@Example.com',
-      'ada@work.example',
-    ])
+    expect(extractEmailFields(body)).toEqual(['Ada@Example.com', 'ada@work.example'])
   })
 
   it('reads pre-2023 V1 Emails fields and nested mailto links', () => {
@@ -86,16 +73,11 @@ describe('extractEmailFields', () => {
       '  - <ada@work.example>',
     ].join('\n')
 
-    expect(extractEmailFields(body)).toEqual([
-      'Ada@Example.com',
-      'ada@work.example',
-    ])
+    expect(extractEmailFields(body)).toEqual(['Ada@Example.com', 'ada@work.example'])
   })
 
   it('handles an indented legacy field and tab-indented child', () => {
-    expect(extractEmailFields('  * EMAIL:\n\t+ <ada@example.com>')).toEqual([
-      'ada@example.com',
-    ])
+    expect(extractEmailFields('  * EMAIL:\n\t+ <ada@example.com>')).toEqual(['ada@example.com'])
   })
 
   it('ends a legacy field at a sibling and ignores unrelated nested addresses', () => {
@@ -110,24 +92,19 @@ describe('extractEmailFields', () => {
   })
 
   it('does not extend a populated inline field into nested list items', () => {
-    const body = [
-      '- Email: owner@example.com',
-      '  - unrelated@example.com',
-    ].join('\n')
+    const body = ['- Email: owner@example.com', '  - unrelated@example.com'].join('\n')
 
     expect(extractEmailFields(body)).toEqual(['owner@example.com'])
   })
 
   it('ignores indented prose under a legacy Email field', () => {
-    expect(
-      extractEmailFields('- Email:\n  Reach Ada at unrelated@example.com'),
-    ).toEqual([])
+    expect(extractEmailFields('- Email:\n  Reach Ada at unrelated@example.com')).toEqual([])
   })
 
   it('deduplicates bare and angle-wrapped field values', () => {
-    expect(
-      extractEmailFields('- Email: <Ada@Example.com>\n- Email: ada@example.com'),
-    ).toEqual(['Ada@Example.com'])
+    expect(extractEmailFields('- Email: <Ada@Example.com>\n- Email: ada@example.com')).toEqual([
+      'Ada@Example.com',
+    ])
   })
 
   it('unwraps a mailto link, collapsing the text/href pair', () => {

@@ -17,11 +17,22 @@ touches a Reflect server, because there isn't one.
 - **Entry point.** The microphone control in the sidebar, with a global
   shortcut (`mod+\`). Lifecycle lives in
   `apps/desktop/src/providers/audio-memo-provider.tsx`.
-- **Capture is durable first.** The recording (max 10 minutes) is saved
-  immediately into the graph's `audio-memos/` folder. Transcription is a
-  separate, retryable step — a failed or missing transcription never loses
-  the audio.
-- **Transcription.** Runs against the user's own OpenAI or Gemini key
+- **Capture is durable first.** One recording session runs up to four hours
+  and is stored as twenty-minute segments: the recorder rotates on one open
+  microphone stream, each finished segment lands immediately in the graph's
+  `audio-memos/` folder as a complete audio file
+  (`<base>.part-NNN.<ext>`, the final one `-end`-marked), streamed over raw
+  binary IPC. A crash loses at most the segment still being recorded.
+  Transcription is a separate, retryable step — a failed or missing
+  transcription never loses the audio.
+- **Transcription.** Per segment, then assembled per session: segment-sized
+  files fit every provider's single request, so a meeting-length recording
+  needs no provider-side large-file mechanism and works on an OpenAI-only
+  configuration. Each segment's transcript is cached under
+  `.reflect/transcripts/` (a failed pass never re-bills finished segments;
+  segments transcribe while the session is still recording); once the
+  session is closed and gap-free, the transcripts are stitched into one
+  note. Runs against the user's own OpenAI or Gemini key
   (chosen by `pickTranscriptionConfig` in `@reflect/core`; keys in the OS
   keychain via `apps/desktop/src-tauri/src/secrets.rs`). By default, the fresh
   transcript receives one best-effort small-model pass that adds punctuation,

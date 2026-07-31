@@ -2,12 +2,21 @@ export {
   AI_PROVIDERS,
   aiProvider,
   aiModelLabel,
+  aiProviderRequiresApiKey,
   DEFAULT_CONTEXT_WINDOW,
   modelContextWindow,
   type AiProviderInfo,
   type AiModelOption,
 } from '../ai/provider-catalog'
-export { aiKeySecretName } from '../ai/secrets'
+export { aiKeySecretName, aiApiKeyForConfig } from '../ai/secrets'
+export {
+  DEFAULT_OPENAI_COMPATIBLE_BASE_URL,
+  DEFAULT_OPENAI_COMPATIBLE_MODEL,
+  isHttpBaseUrl,
+  isPlainHttpRemoteBaseUrl,
+  normalizeOpenAICompatibleBaseUrl,
+  OPENAI_COMPATIBLE_PROVIDER_ID,
+} from '../ai/openai-compatible'
 export { setSecret, getSecret, deleteSecret } from '../secrets/keychain'
 export {
   KEY_HINT_LENGTH,
@@ -27,7 +36,11 @@ export {
   type ChatModelOption,
   type ChatModelSelection,
 } from '../ai/chat/model-options'
-export { validateApiKey, type ApiKeyValidation } from '../ai/validate-key'
+export {
+  validateApiKey,
+  type ApiKeyValidation,
+  type ApiKeyValidationInput,
+} from '../ai/validate-key'
 export {
   assertCloudAllowed,
   cloudSafeAssetDescription,
@@ -78,11 +91,7 @@ export {
   MAX_CONTEXT_TAGS,
   type GraphContextDeps,
 } from '../ai/chat/graph-context'
-export {
-  streamChat,
-  type ChatStreamEvent,
-  type StreamChatOptions,
-} from '../ai/chat/stream-chat'
+export { streamChat, type ChatStreamEvent, type StreamChatOptions } from '../ai/chat/stream-chat'
 export {
   BUILT_IN_AI_PROMPTS,
   filterAiPrompts,
@@ -116,27 +125,32 @@ export {
   type ContextWindowOptions,
 } from '../ai/chat/context-window'
 export type { ModelMessage as ChatModelMessage } from 'ai'
-export {
-  base64ToBytes,
-  isTranscriptionRejected,
-  transcribeAudio,
-  TranscriptionRejectedError,
-  type TranscriptionRequest,
-} from '../ai/transcribe'
+export { base64ToBytes } from '../lib/base64'
+export { isTranscriptionRejected, TranscriptionRejectedError } from '../ai/transcribe-http'
+export { transcribeAudio, type TranscriptionRequest } from '../ai/transcribe'
 export {
   audioMemoFromPath,
   audioMemoIdentity,
+  audioMemoPartFromPath,
+  audioMemoPartPath,
   captureAudioMemo,
+  captureAudioMemoPart,
   isSilentStop,
-  listPendingAudioMemos,
+  listPendingAudioMemoSessions,
   reconcileAudioMemos,
   type AudioMemoIdentity,
   type CaptureAudioMemoInput,
   type CaptureAudioMemoOutcome,
+  type CaptureAudioMemoPartInput,
   type ReconcileAudioMemosInput,
   type ReconcileAudioMemosOutcome,
   type ReconcileStop,
 } from '../actions/audio-memo'
+export {
+  AUDIO_MEMO_MAX_DURATION_MS,
+  AUDIO_MEMO_SEGMENT_MS,
+  type AudioMemoSession,
+} from '../actions/audio-memo-session'
 export {
   captureAckSchema,
   captureEnvelopeSchema,
@@ -188,12 +202,7 @@ export {
   type CalendarAttendee,
   type CalendarEvent,
 } from '../calendar/commands'
-export {
-  displayEvents,
-  isDeclinedByUser,
-  defaultAttendees,
-  dayRange,
-} from '../calendar/events'
+export { displayEvents, isDeclinedByUser, defaultAttendees, dayRange } from '../calendar/events'
 export {
   addMeetingToDaily,
   meetingLine,

@@ -1,27 +1,73 @@
 <!-- @dsCard group="Colors" viewport="700x150" name="Neutrals · Cool grey" subtitle="The UI workhorse ramp — text, borders, surfaces" -->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<link rel="stylesheet" href="../styles.css" />
-<style>
-  body { margin: 0; padding: 20px; background: var(--surface); }
-  .row { display: flex; gap: 8px; }
-  .sw { flex: 1; display: flex; flex-direction: column; gap: 6px; }
-  .chip { height: 56px; border-radius: var(--radius-lg); box-shadow: inset 0 0 0 1px rgba(11,19,36,.06); }
-  .name { font-family: var(--font-sans); font-size: 11px; font-weight: var(--weight-medium); color: var(--text); }
-  .hex { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); }
-</style>
-</head>
-<body>
-  <div class="row">
-    <div class="sw"><div class="chip" style="background:var(--coolgray-50)"></div><span class="name">50</span><span class="hex">#F9FAFB</span></div>
-    <div class="sw"><div class="chip" style="background:var(--coolgray-100)"></div><span class="name">100</span><span class="hex">#F3F4F6</span></div>
-    <div class="sw"><div class="chip" style="background:var(--coolgray-200)"></div><span class="name">200</span><span class="hex">#E5E7EB</span></div>
-    <div class="sw"><div class="chip" style="background:var(--coolgray-400)"></div><span class="name">400</span><span class="hex">#9CA3AF</span></div>
-    <div class="sw"><div class="chip" style="background:var(--coolgray-500)"></div><span class="name">500</span><span class="hex">#6B7280</span></div>
-    <div class="sw"><div class="chip" style="background:var(--coolgray-700)"></div><span class="name">700</span><span class="hex">#374151</span></div>
-    <div class="sw"><div class="chip" style="background:var(--coolgray-900)"></div><span class="name">900 · text</span><span class="hex">#111827</span></div>
-  </div>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../styles.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        background: var(--surface);
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+      }
+      .sw {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .chip {
+        height: 56px;
+        border-radius: var(--radius-lg);
+        box-shadow: inset 0 0 0 1px rgba(11, 19, 36, 0.06);
+      }
+      .name {
+        font-family: var(--font-sans);
+        font-size: 11px;
+        font-weight: var(--weight-medium);
+        color: var(--text);
+      }
+      .hex {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--text-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="sw">
+        <div class="chip" style="background: var(--coolgray-50)"></div>
+        <span class="name">50</span><span class="hex">#F9FAFB</span>
+      </div>
+      <div class="sw">
+        <div class="chip" style="background: var(--coolgray-100)"></div>
+        <span class="name">100</span><span class="hex">#F3F4F6</span>
+      </div>
+      <div class="sw">
+        <div class="chip" style="background: var(--coolgray-200)"></div>
+        <span class="name">200</span><span class="hex">#E5E7EB</span>
+      </div>
+      <div class="sw">
+        <div class="chip" style="background: var(--coolgray-400)"></div>
+        <span class="name">400</span><span class="hex">#9CA3AF</span>
+      </div>
+      <div class="sw">
+        <div class="chip" style="background: var(--coolgray-500)"></div>
+        <span class="name">500</span><span class="hex">#6B7280</span>
+      </div>
+      <div class="sw">
+        <div class="chip" style="background: var(--coolgray-700)"></div>
+        <span class="name">700</span><span class="hex">#374151</span>
+      </div>
+      <div class="sw">
+        <div class="chip" style="background: var(--coolgray-900)"></div>
+        <span class="name">900 · text</span><span class="hex">#111827</span>
+      </div>
+    </div>
+  </body>
 </html>

@@ -87,8 +87,16 @@ export {
   mayContainNotes,
   isTemplatePath,
   dateFromDailyPath,
+  foldGraphPath,
+  isCalendarDate,
   type GraphPathKind,
 } from '../graph/paths'
+export {
+  wikiNoteReference,
+  markdownNoteReference,
+  noteBasenameKey,
+  type NoteReference,
+} from '../graph/note-reference'
 export {
   isValidReflectNoteId,
   isReflectManagedNotePath,
@@ -131,6 +139,7 @@ export {
   listDir,
   noteExists,
   deleteNote,
+  deleteAudioMemo,
   listFiles,
   listAttachments,
   vaultScanStats,
@@ -161,6 +170,7 @@ export {
   type ResolveOrCreateNoteResult,
 } from '../graph/create-note'
 export {
+  resolveExistingMarkdownTarget,
   resolveExistingWikiTarget,
   type ExistingWikiTargetResolution,
 } from '../graph/resolve-existing-wiki-target'
@@ -193,6 +203,7 @@ export {
   graphColorsSchema,
   GRAPH_COLOR_IDS,
   aiProviderIdSchema,
+  openAiCompatibleBaseUrlSchema,
   aiProviderConfigSchema,
   aiProvidersSchema,
   defaultAiProviderIdSchema,
@@ -217,7 +228,10 @@ export {
   type GraphColor,
   type GraphColors,
   type AiProviderId,
+  type HostedAiProviderId,
   type AiProviderConfig,
+  type HostedAiProviderConfig,
+  type OpenAiCompatibleProviderConfig,
   type AiPrompt,
   type AiPromptMode,
 } from '../settings/schema'

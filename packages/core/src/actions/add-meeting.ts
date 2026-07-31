@@ -12,10 +12,7 @@ import { parseNote } from '../markdown/extract'
 import { sectionEnd, topLevelHeadings } from '../markdown/heading-blocks'
 import { foldKey } from '../markdown/keys'
 import { slugForTitle } from '../markdown/slug'
-import {
-  resolveMeetingAttendeeTargets,
-  type ResolvedMeetingAttendee,
-} from './resolve-attendees'
+import { resolveMeetingAttendeeTargets, type ResolvedMeetingAttendee } from './resolve-attendees'
 
 /**
  * "Add to daily note" for a calendar event — the write half of the calendar
@@ -196,10 +193,7 @@ async function personNoteBody(attendee: MeetingAttendee, lookupContacts: boolean
       }
     }
   }
-  return [
-    PERSON_NOTE_BODY,
-    ...emails.map((email) => `- Email: ${email}`),
-  ].join('\n')
+  return [PERSON_NOTE_BODY, ...emails.map((email) => `- Email: ${email}`)].join('\n')
 }
 
 /** One attendee fragment ready for daily-note Markdown serialization. */
@@ -230,9 +224,7 @@ export function meetingLine(input: {
     parts.push(
       input.attendees
         .map((attendee) =>
-          attendee.kind === 'linked'
-            ? `[[${attendee.insertText}]]`
-            : attendee.text,
+          attendee.kind === 'linked' ? `[[${attendee.insertText}]]` : attendee.text,
         )
         .join(', '),
     )
@@ -272,9 +264,7 @@ export async function addMeetingToDaily(input: AddMeetingInput): Promise<AddMeet
   // after the person) would just duplicate the link — drop it.
   const attendees = normalizeAttendees(
     await resolveMeetingAttendeeTargets(input.attendees, lookupContacts),
-  ).filter(
-    ({ attendee }) => attendee.name.toLowerCase() !== title.toLowerCase(),
-  )
+  ).filter(({ attendee }) => attendee.name.toLowerCase() !== title.toLowerCase())
   const line = meetingLine({
     title,
     attendees: attendees.map((resolved) =>

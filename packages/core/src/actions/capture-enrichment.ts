@@ -5,7 +5,7 @@ import {
   type PageEnrichment,
 } from '../ai/describe-page'
 import { defaultAiProvider, type AiProvidersState } from '../ai/provider-config'
-import { aiKeySecretName } from '../ai/secrets'
+import { aiApiKeyForConfig } from '../ai/secrets'
 import { errorMessage, isAppError, toAppError } from '../errors'
 import {
   captureLinkPreview,
@@ -18,7 +18,6 @@ import {
 import { dailyPath } from '../graph/paths'
 import { hashContent } from '../indexing/hash'
 import { parseFrontmatter, splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter'
-import { getSecret } from '../secrets/keychain'
 import type { AiProviderConfig } from '../settings/schema'
 import type { ReconcileStop } from './audio-memo'
 import {
@@ -198,7 +197,7 @@ export async function reconcileCaptureEnrichment(
   let providerStop: ReconcileStop | null = null
   if (config !== null) {
     try {
-      apiKey = await getSecret(aiKeySecretName(config.id))
+      apiKey = await aiApiKeyForConfig(config)
     } catch (cause) {
       const error = toAppError(cause)
       providerStop = { reason: error.kind, message: error.message }
@@ -342,9 +341,7 @@ export async function reconcileCaptureEnrichment(
       if (snapshot === null) {
         continue
       }
-      const previewImage = metadataComplete
-        ? null
-        : await fetchLinkPreviewImage(snapshot.meta)
+      const previewImage = metadataComplete ? null : await fetchLinkPreviewImage(snapshot.meta)
       if (stale()) {
         return outcome({ reason: 'stale', message: 'the graph session ended mid-pass' })
       }
@@ -377,7 +374,7 @@ export async function reconcileCaptureEnrichment(
       const metadataDisplayTitle = metadataTitle ?? snapshot.title
       const metadataDescription = hasDescription(snapshot.body)
         ? null
-        : pageMeta?.description ?? null
+        : (pageMeta?.description ?? null)
       let metadataBody =
         metadataDescription !== null
           ? withDescription(snapshot.body, metadataDescription)

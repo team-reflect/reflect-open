@@ -19,7 +19,9 @@ vi.mock('@/providers/graph-provider', () => ({
 // The action itself is covered in @reflect/core; here it is the seam the
 // dialog submits through. The attendee combobox's suggestion sources are
 // stubbed empty — the combobox itself is covered by its own test file.
-const addMeetingToDaily = vi.hoisted(() => vi.fn(async () => ({ appended: true, createdNotes: [] })))
+const addMeetingToDaily = vi.hoisted(() =>
+  vi.fn(async () => ({ appended: true, createdNotes: [] })),
+)
 const suggestWikiTargets = vi.hoisted(() => vi.fn(async () => []))
 const contactLinkSuggestions = vi.hoisted(() => vi.fn(async () => []))
 // Identity by default: the email → note-title canonicalization is covered in
@@ -126,9 +128,7 @@ describe('DailyEventsSection', () => {
       eventAt(10, { title: 'OOO banner', allDay: true }),
       eventAt(11, {
         title: 'Declined sync',
-        attendees: [
-          { name: 'Me', isCurrentUser: true, isPerson: true, status: 'declined' },
-        ],
+        attendees: [{ name: 'Me', isCurrentUser: true, isPerson: true, status: 'declined' }],
       }),
     ]
     await renderSection()
@@ -284,9 +284,7 @@ describe('DailyEventsSection', () => {
     await page.getByRole('button', { name: /add to daily note/i }).click()
 
     await vi.waitFor(() =>
-      expect(addMeetingToDaily).toHaveBeenCalledWith(
-        expect.objectContaining({ attendees: [] }),
-      ),
+      expect(addMeetingToDaily).toHaveBeenCalledWith(expect.objectContaining({ attendees: [] })),
     )
   })
 

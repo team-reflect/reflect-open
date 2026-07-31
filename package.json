@@ -1,16 +1,20 @@
 {
   "name": "@reflect/monorepo",
-  "private": true,
   "version": "0.1.0",
+  "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.9.0",
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "test": "vitest",
-    "lint": "oxlint apps packages && pnpm --filter @reflect/desktop lint:react",
-    "lint:fix": "oxlint --fix apps packages",
+    "lint": "pnpm run lint:oxfmt && pnpm run lint:oxlint && pnpm run lint:react",
+    "lint:oxfmt": "oxfmt --check",
+    "lint:oxlint": "oxlint apps packages",
+    "lint:react": "pnpm --filter @reflect/desktop lint:react",
+    "fix": "pnpm run fix:oxfmt && pnpm run fix:oxlint",
+    "fix:oxfmt": "oxfmt",
+    "fix:oxlint": "oxlint --fix apps packages",
     "check": "pnpm typecheck && pnpm lint",
     "tauri": "pnpm --filter @reflect/desktop tauri",
     "release:ios": "pnpm --filter @reflect/desktop release:ios",
@@ -19,13 +23,24 @@
     "tauri:dev": "pnpm --filter @reflect/desktop tauri:dev",
     "tauri:ios:dev": "pnpm --filter @reflect/desktop tauri:ios:dev",
     "tauri:build:dev": "pnpm --filter @reflect/desktop tauri:build:dev",
-    "tauri:build:beta": "pnpm --filter @reflect/desktop tauri:build:beta"
+    "tauri:build:beta": "pnpm --filter @reflect/desktop tauri:build:beta",
+    "postinstall": "simple-git-hooks"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "nano-staged": "^1.0.2",
+    "oxfmt": "^0.61.0",
     "oxlint": "^1.71.0",
+    "simple-git-hooks": "^2.13.1",
     "turbo": "^2.10.0",
     "typescript": "~6.0.3",
     "vitest": "^4.1.10"
-  }
+  },
+  "simple-git-hooks": {
+    "pre-commit": "./node_modules/.bin/nano-staged --allow-empty -u"
+  },
+  "nano-staged": {
+    "*": "oxfmt --no-error-on-unmatched-pattern"
+  },
+  "packageManager": "pnpm@11.18.0"
 }

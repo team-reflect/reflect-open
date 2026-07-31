@@ -5,7 +5,9 @@ import type { GraphInfo } from '@reflect/core'
 import type { DeepLinkIo } from '@/lib/deep-links/handle'
 import { beginLinkNavigationIntent } from '@/lib/windows/link-navigation-intent'
 
-const setDeepLinkHandler = vi.hoisted(() => vi.fn<(handler: ((url: string) => void) | null) => void>())
+const setDeepLinkHandler = vi.hoisted(() =>
+  vi.fn<(handler: ((url: string) => void) | null) => void>(),
+)
 const handleDeepLink = vi.hoisted(() =>
   vi.fn<(url: string, io: DeepLinkIo) => Promise<void>>(async () => {}),
 )

@@ -80,11 +80,7 @@ describe('reconcileCaptureEnrichment', () => {
 
     expect(outcome).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
     expect(linkPreviewMock).toHaveBeenCalledWith(CAPTURE_URL)
-    expect(writeAssetMock).toHaveBeenCalledWith(
-      IDENTITY.assetPath,
-      btoa('preview-jpeg'),
-      3,
-    )
+    expect(writeAssetMock).toHaveBeenCalledWith(IDENTITY.assetPath, btoa('preview-jpeg'), 3)
     const note = files.get(IDENTITY.notePath) ?? ''
     expect(note).toContain(`captureScreenshot: ${IDENTITY.assetPath}`)
     expect(note).toContain(`![An article from metadata](${IDENTITY.assetPath})`)
@@ -129,11 +125,7 @@ describe('reconcileCaptureEnrichment', () => {
 
     expect(outcome.enriched).toBe(1)
     expect(linkPreviewMock).toHaveBeenCalledWith(CAPTURE_URL)
-    expect(writeAssetMock).toHaveBeenCalledWith(
-      IDENTITY.assetPath,
-      btoa('preview-jpeg'),
-      3,
-    )
+    expect(writeAssetMock).toHaveBeenCalledWith(IDENTITY.assetPath, btoa('preview-jpeg'), 3)
   })
 
   it('continues metadata enrichment when the link preview request fails', async () => {
@@ -212,7 +204,9 @@ describe('reconcileCaptureEnrichment', () => {
 
     expect(outcome).toEqual({ pending: 1, enriched: 1, skipped: 0, stopped: null })
     const note = files.get(IDENTITY.notePath) ?? ''
-    expect(note).toContain('- Type: #link\n- Description: An AI description of the page.\n\n## Selection')
+    expect(note).toContain(
+      '- Type: #link\n- Description: An AI description of the page.\n\n## Selection',
+    )
     expect(note).not.toContain('A scraped description.')
     expect(note).toContain('- Description: A line from the captured article.')
     expect(note).toContain('## Article heading')
@@ -304,9 +298,7 @@ describe('reconcileCaptureEnrichment', () => {
     expect(note).toContain('captureStatus: done')
     expect(note).not.toContain('captureProvider')
     const daily = files.get(DAILY) ?? ''
-    expect(daily).toContain(
-      '- [[capture-2026-06-11-153022-845-7c9e|An article from its metadata]]',
-    )
+    expect(daily).toContain('- [[capture-2026-06-11-153022-845-7c9e|An article from its metadata]]')
     expect(daily).not.toContain('|example.com]]')
     expect(describeMock).not.toHaveBeenCalled()
   })
@@ -603,10 +595,9 @@ describe('reconcileCaptureEnrichment', () => {
       envelope({ source: 'ios-share', url: 'https://www.instagram.com/reel/example/', title: '' }),
       { screenshot: false },
     )
-    addSpool(
-      envelope({ id: laterId, capturedAt: laterAt.toISOString(), title: 'An article' }),
-      { screenshot: false },
-    )
+    addSpool(envelope({ id: laterId, capturedAt: laterAt.toISOString(), title: 'An article' }), {
+      screenshot: false,
+    })
     expect((await drain()).stopped).toBeNull()
     writeNoteMock.mockClear()
     scrapeMock.mockImplementation(async (url) => {
@@ -646,10 +637,9 @@ describe('reconcileCaptureEnrichment', () => {
     addSpool(envelope({ url: 'https://www.instagram.com/reel/example/', title: '' }), {
       screenshot: false,
     })
-    addSpool(
-      envelope({ id: laterId, capturedAt: laterAt.toISOString(), title: 'An article' }),
-      { screenshot: false },
-    )
+    addSpool(envelope({ id: laterId, capturedAt: laterAt.toISOString(), title: 'An article' }), {
+      screenshot: false,
+    })
     expect((await drain()).stopped).toBeNull()
     writeNoteMock.mockClear()
     scrapeMock.mockImplementation(async (url) => {

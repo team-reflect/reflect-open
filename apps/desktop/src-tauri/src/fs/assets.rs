@@ -20,7 +20,7 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
@@ -133,13 +133,7 @@ impl<'a> NameCandidates<'a> {
             attempt @ 2..=SEQUENTIAL_NAME_PROBES => Ok(Some(format!("{stem}-{attempt}{ext}"))),
             attempt if attempt <= MAX_NAME_PROBES => {
                 if self.digest.is_none() {
-                    use std::fmt::Write;
-                    let bytes = fs::read(&self.contents)?;
-                    let mut hex = String::with_capacity(8);
-                    for byte in &Sha256::digest(&bytes)[..4] {
-                        let _ = write!(hex, "{byte:02x}");
-                    }
-                    self.digest = Some(hex);
+                    self.digest = Some(sha256_hex_prefix(&self.contents)?);
                 }
                 let digest = self.digest.as_deref().expect("digest just computed");
                 let round = attempt - SEQUENTIAL_NAME_PROBES;
@@ -154,15 +148,40 @@ impl<'a> NameCandidates<'a> {
     }
 }
 
+fn sha256_hex_prefix(path: &Path) -> AppResult<String> {
+    use std::fmt::Write as FmtWrite;
+
+    let mut file = fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let bytes_read = file.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..bytes_read]);
+    }
+
+    let digest = hasher.finalize();
+    let mut hex = String::with_capacity(8);
+    for byte in &digest[..4] {
+        write!(&mut hex, "{byte:02x}").expect("writing to String cannot fail");
+    }
+    Ok(hex)
+}
+
 /// Persist `temp` under `assets_dir` as `desired`, probing [`NameCandidates`]
 /// until a name is free. `persist_noclobber` is the collision check *and* the
 /// claim (`O_EXCL` semantics), so two concurrent intakes of the same name can
-/// never clobber each other. Returns the winning filename.
+/// never clobber each other. Like [`persist_exact`], fsyncs before the rename
+/// — durability is the persist helpers' job, never their callers. Returns the
+/// winning filename.
 fn persist_unique(
     mut temp: tempfile::NamedTempFile,
     assets_dir: &Path,
     desired: &str,
 ) -> AppResult<String> {
+    temp.as_file().sync_all()?;
     let mut candidates = NameCandidates::new(desired, temp.path().to_path_buf());
     while let Some(candidate) = candidates.next()? {
         match temp.persist_noclobber(assets_dir.join(&candidate)) {
@@ -269,10 +288,62 @@ pub fn asset_upload_commit(
     // lookup would otherwise skip invalidation and strand a stale catalog.
     let root = root_for_generation(&state, generation)?;
     let assets_dir = assets_dir_for(&state, generation, &desired_name)?;
-    upload.file.as_file().sync_all()?;
     let final_name = persist_unique(upload.file, &assets_dir, &desired_name)?;
     super::invalidate_file_catalog(&state, &root);
     Ok(format!("assets/{final_name}"))
+}
+
+/// Persist a staged upload at an exact target path, creating parent
+/// directories. No-clobber: the temp file only ever *claims* a free path, so
+/// a concurrent writer's file is never overwritten. Like [`persist_unique`],
+/// fsyncs before the rename — durability is the persist helpers' job, never
+/// their callers'.
+fn persist_exact(temp: tempfile::NamedTempFile, target: &Path) -> AppResult<()> {
+    // An iCloud-evicted file occupies its path through its `.icloud` stub
+    // alone — `persist_noclobber` would happily claim the logical name and
+    // collide with the re-download (Plan 21).
+    if super::file_occupied(target) {
+        return Err(AppError::io(format!(
+            "target already exists: {}",
+            target.display()
+        )));
+    }
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    temp.as_file().sync_all()?;
+    temp.persist_noclobber(target)
+        .map_err(|err| AppError::io(err.to_string()))?;
+    Ok(())
+}
+
+/// Finish a streamed upload at an **exact graph-relative path** — the audio
+/// memo intake, where `audio-memos/<base>.<ext>` *is* the memo's identity
+/// (its transcription note and daily-note backlink share the basename), so
+/// the `assets/` collision renaming of [`asset_upload_commit`] would corrupt
+/// it. Memo basenames carry millisecond precision; an existing file at
+/// `path` is a bug and fails loudly rather than being clobbered.
+#[tauri::command]
+pub fn asset_upload_commit_path(
+    id: String,
+    path: String,
+    generation: u64,
+    state: State<GraphState>,
+    uploads: State<AssetUploads>,
+) -> AppResult<()> {
+    let upload = lock_uploads(&uploads)?
+        .remove(&id)
+        .ok_or_else(|| AppError::not_found(format!("unknown upload: {id}")))?;
+    if upload.generation != generation {
+        return Err(AppError::io(
+            "upload was started for a different graph session; dropping it",
+        ));
+    }
+    let root = root_for_generation(&state, generation)?;
+    let target = resolve(&root, &path)?;
+    persist_exact(upload.file, &target)?;
+    super::invalidate_file_catalog(&state, &root);
+    Ok(())
 }
 
 /// Discard an in-flight upload; dropping the temp file deletes it. Idempotent
@@ -302,7 +373,6 @@ pub fn asset_import(
     let root = root_for_generation(&state, generation)?;
     let mut temp = tempfile::NamedTempFile::new_in(staging_dir(&root)?)?;
     std::io::copy(&mut fs::File::open(source)?, temp.as_file_mut())?;
-    temp.as_file().sync_all()?;
     let assets_dir = assets_dir_for(&state, generation, &desired_name)?;
     let final_name = persist_unique(temp, &assets_dir, &desired_name)?;
     super::invalidate_file_catalog(&state, &root);
@@ -376,14 +446,36 @@ mod tests {
             fs::write(assets.join(format!("image-{suffix}.png")), b"existing").unwrap();
         }
         let temp = temp_in(graph.path(), b"fresh screenshot");
+        let expected_digest = sha256_hex_prefix(temp.path()).unwrap();
         let name = persist_unique(temp, &assets, "image.png").unwrap();
         let digest = name
             .strip_prefix("image-")
             .and_then(|rest| rest.strip_suffix(".png"))
             .unwrap();
-        assert_eq!(digest.len(), 8);
-        assert!(digest.chars().all(|ch| ch.is_ascii_hexdigit()));
+        assert_eq!(digest, expected_digest);
         assert_eq!(fs::read(assets.join(&name)).unwrap(), b"fresh screenshot");
+    }
+
+    #[test]
+    fn sha256_hex_prefix_hashes_large_files_incrementally() {
+        use std::fmt::Write as FmtWrite;
+
+        let graph = tempdir().unwrap();
+        let mut temp = tempfile::NamedTempFile::new_in(graph.path()).unwrap();
+        let mut hasher = Sha256::new();
+        let chunk = [7_u8; 1024];
+        for _ in 0..100 {
+            temp.write_all(&chunk).unwrap();
+            hasher.update(chunk);
+        }
+
+        let digest = hasher.finalize();
+        let mut expected = String::with_capacity(8);
+        for byte in &digest[..4] {
+            write!(&mut expected, "{byte:02x}").unwrap();
+        }
+
+        assert_eq!(sha256_hex_prefix(temp.path()).unwrap(), expected);
     }
 
     #[test]
@@ -394,6 +486,30 @@ mod tests {
         fs::write(assets.join("README"), b"first").unwrap();
         let temp = temp_in(graph.path(), b"second");
         assert_eq!(persist_unique(temp, &assets, "README").unwrap(), "README-2");
+    }
+
+    #[test]
+    fn persist_exact_creates_parents_and_writes_the_target() {
+        let graph = tempdir().unwrap();
+        bootstrap(graph.path()).unwrap();
+        let temp = temp_in(graph.path(), b"opus bytes");
+        let target = graph
+            .path()
+            .join("audio-memos/audio-memo-2026-07-19-090000-000.m4a");
+        persist_exact(temp, &target).unwrap();
+        assert_eq!(fs::read(&target).unwrap(), b"opus bytes");
+    }
+
+    #[test]
+    fn persist_exact_never_clobbers_an_existing_file() {
+        let graph = tempdir().unwrap();
+        bootstrap(graph.path()).unwrap();
+        let target = graph.path().join("audio-memos/memo.m4a");
+        fs::create_dir_all(target.parent().unwrap()).unwrap();
+        fs::write(&target, b"first").unwrap();
+        let temp = temp_in(graph.path(), b"second");
+        assert!(persist_exact(temp, &target).is_err());
+        assert_eq!(fs::read(&target).unwrap(), b"first");
     }
 
     #[test]

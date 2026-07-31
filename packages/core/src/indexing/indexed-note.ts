@@ -1,5 +1,12 @@
 import { z } from 'zod'
-import { dateFromDailyPath, isDaily, isTemplatePath } from '../graph/paths'
+import { markdownNoteReference, noteBasenameKey, wikiNoteReference } from '../graph/note-reference'
+import {
+  dateFromDailyPath,
+  foldGraphPath,
+  isCalendarDate,
+  isDaily,
+  isTemplatePath,
+} from '../graph/paths'
 import {
   detectConflictMarkers,
   extractEmailFields,
@@ -73,14 +80,45 @@ import { serializeWikiSuggestionAddress } from './suggest'
  * and the backfilled alias rows.
  * 17 - legacy nested `Email` / `Emails` contact fields and canonical email
  * identities: unchanged V1 person notes need their `note_emails` rows rebuilt.
+ * 18 - path addressing (`notes.path_key`, `links.target_path_key`) and the
+ * `note_claims` projection that replaces the tiered `note_keys` derivation:
+ * existing rows carry no claims and no path keys, so vault-path links and
+ * filename-stem links stay unresolved until reprojected. Name keys also gain
+ * NFC folding (`foldKey`), so NFD-spelled titles need their keys rebuilt.
  */
-export const PROJECTION_VERSION = 17
+export const PROJECTION_VERSION = 18
+
+/**
+ * Precedence of the spellings a note answers to (`note_claims.tier`): the
+ * lowest tier claiming a key wins it. The numbers are the storage encoding —
+ * migration 0019 and the CLI read the same values.
+ */
+export const CLAIM_TIER = {
+  /** Calendar-valid daily date (`daily/2026-07-26.md` answering to `2026-07-26`). */
+  dailyDate: 1,
+  /** Authored title (frontmatter or first heading; filename when untitled). */
+  title: 2,
+  /** Frontmatter or derived alias. */
+  alias: 3,
+  /** Filename stem — the weakest address, how Obsidian names every note. */
+  basename: 4,
+} as const
+
+export const indexedClaimSchema = z.object({
+  /** Folded spelling this note answers to. */
+  key: z.string(),
+  /** One of {@link CLAIM_TIER}. */
+  tier: z.number().int().min(CLAIM_TIER.dailyDate).max(CLAIM_TIER.basename),
+})
+export type IndexedClaim = z.infer<typeof indexedClaimSchema>
 
 export const indexedLinkSchema = z.object({
   kind: z.enum(['wiki', 'md']),
   targetRaw: z.string(),
   /** Normalized match key: case-folded wiki target, or the lowercased href for md links. */
   targetKey: z.string(),
+  /** Folded vault path when the link names a file; null when it names a note. */
+  targetPathKey: z.string().nullable(),
   alias: z.string().nullable(),
   posFrom: z.number(),
   posTo: z.number(),
@@ -148,6 +186,8 @@ export const indexedNoteSchema = z.object({
   id: z.string().nullable(),
   title: z.string(),
   titleKey: z.string(),
+  /** ASCII-folded graph path: what a path-qualified link joins against. */
+  pathKey: z.string(),
   /** Derived from the path; templates are excluded from note surfaces. */
   kind: noteKindSchema,
   dailyDate: z.string().nullable(),
@@ -176,6 +216,8 @@ export const indexedNoteSchema = z.object({
   links: z.array(indexedLinkSchema),
   tags: z.array(indexedTagSchema),
   aliases: z.array(indexedAliasSchema),
+  /** Every folded spelling this note answers to (see `note_claims`). */
+  claims: z.array(indexedClaimSchema),
   /** Emails the note owns via `- Email:` contact-field bullets. */
   emails: z.array(indexedEmailSchema),
   assets: z.array(z.string()),
@@ -226,6 +268,44 @@ export function projectNoteAliases(parsed: ParsedNote): IndexedAlias[] {
 }
 
 /**
+ * Every folded spelling this note answers to, with the tier that settles a
+ * contest against another note. Templates claim nothing: they are reachable
+ * only through an explicit `templates/…` path.
+ *
+ * A note with no authored title already carries its filename as its title
+ * (`deriveTitle`), so the filename tier only adds an address for a note
+ * whose H1 or frontmatter title differs from its filename. A key a stronger
+ * tier already claims is skipped, so `claim_count` counts notes, not
+ * spellings.
+ */
+export function projectNoteClaims(
+  parsed: ParsedNote,
+  aliases: readonly IndexedAlias[],
+): IndexedClaim[] {
+  if (isTemplatePath(parsed.path)) {
+    return []
+  }
+  const claims: IndexedClaim[] = []
+  const seen = new Set<string>()
+  const claim = (key: string, tier: number): void => {
+    if (key !== '' && !seen.has(key)) {
+      seen.add(key)
+      claims.push({ key, tier })
+    }
+  }
+  const date = isDaily(parsed.path) ? dateFromDailyPath(parsed.path) : null
+  if (date !== null && isCalendarDate(date)) {
+    claim(date, CLAIM_TIER.dailyDate)
+  }
+  claim(foldKey(parsed.title), CLAIM_TIER.title)
+  for (const alias of aliases) {
+    claim(alias.aliasKey, CLAIM_TIER.alias)
+  }
+  claim(noteBasenameKey(parsed.path), CLAIM_TIER.basename)
+  return claims
+}
+
+/**
  * Flatten a parsed note into the index payload. `meta.source` is the raw
  * markdown the note was parsed from — conflict markers are detected on it
  * (not on the extracted plain text, which may reshape marker lines).
@@ -234,22 +314,31 @@ export function buildIndexedNote(
   parsed: ParsedNote,
   meta: { fileHash: string; mtime: number; source: string; assetText?: string },
 ): IndexedNote {
-  const wikiLinks: IndexedLink[] = parsed.wikiLinks.map((link) => ({
-    kind: 'wiki',
-    targetRaw: link.target,
-    targetKey: normalizeWikiTarget(link.target).key,
-    alias: link.alias ?? null,
-    posFrom: link.from,
-    posTo: link.to,
-  }))
-  const mdLinks: IndexedLink[] = parsed.links.map((link) => ({
-    kind: 'md',
-    targetRaw: link.href,
-    targetKey: link.href.toLowerCase(),
-    alias: null,
-    posFrom: link.from,
-    posTo: link.to,
-  }))
+  const wikiLinks: IndexedLink[] = parsed.wikiLinks.map((link) => {
+    const reference = wikiNoteReference(link.target)
+    return {
+      kind: 'wiki' as const,
+      targetRaw: link.target,
+      targetKey: normalizeWikiTarget(link.target).key,
+      targetPathKey: reference?.kind === 'path' ? foldGraphPath(reference.path) : null,
+      alias: link.alias ?? null,
+      posFrom: link.from,
+      posTo: link.to,
+    }
+  })
+  const mdLinks: IndexedLink[] = parsed.links.map((link) => {
+    const reference = markdownNoteReference(parsed.path, link.href)
+    return {
+      kind: 'md' as const,
+      targetRaw: link.href,
+      targetKey: link.href.toLowerCase(),
+      targetPathKey: reference?.kind === 'path' ? foldGraphPath(reference.path) : null,
+      alias: null,
+      posFrom: link.from,
+      posTo: link.to,
+    }
+  })
+  const aliases = projectNoteAliases(parsed)
   const body = splitFrontmatter(meta.source).body
 
   return {
@@ -257,6 +346,7 @@ export function buildIndexedNote(
     id: parsed.id ?? null,
     title: parsed.title,
     titleKey: foldKey(parsed.title),
+    pathKey: foldGraphPath(parsed.path),
     kind: isDaily(parsed.path) ? 'daily' : isTemplatePath(parsed.path) ? 'template' : 'note',
     dailyDate: isDaily(parsed.path) ? dateFromDailyPath(parsed.path) : null,
     isPrivate: parsed.frontmatter.private,
@@ -276,9 +366,12 @@ export function buildIndexedNote(
     preview: previewSnippet(parsed.text, parsed.title),
     links: [...wikiLinks, ...mdLinks],
     tags: parsed.tags.map((tag) => ({ tag, tagKey: foldTag(tag) })),
-    aliases: projectNoteAliases(parsed),
+    aliases,
+    claims: projectNoteClaims(parsed, aliases),
     emails: extractEmailFields(body).map((email) => ({ email, emailKey: foldEmail(email) })),
-    assets: parsed.assets.map((asset) => asset.path),
+    // One reference can contribute several candidate spellings; the
+    // projection stores each path once.
+    assets: [...new Set(parsed.assets.map((asset) => asset.path))],
     tasks: parsed.tasks.map((task) => ({
       markerOffset: task.markerOffset,
       text: task.text,

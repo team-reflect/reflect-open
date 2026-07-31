@@ -100,7 +100,10 @@ export function GithubAuthStep({ onAuthed, repoName }: GithubAuthStepProps): Rea
    * code in this dialog is out of sight. If copying isn't possible, hold the
    * handoff and have the user copy by hand first.
    */
-  async function copyCodeAndOpen(flow: { userCode: string; verificationUri: string }): Promise<void> {
+  async function copyCodeAndOpen(flow: {
+    userCode: string
+    verificationUri: string
+  }): Promise<void> {
     if (copyState !== 'failed') {
       try {
         await navigator.clipboard.writeText(flow.userCode)
@@ -169,8 +172,8 @@ export function GithubAuthStep({ onAuthed, repoName }: GithubAuthStepProps): Rea
               ) : (
                 'your backup repository'
               )}{' '}
-              (GitHub → Settings → Developer settings → Fine-grained tokens). It is stored in
-              your OS keychain, never in your graph.
+              (GitHub → Settings → Developer settings → Fine-grained tokens). It is stored in your
+              OS keychain, never in your graph.
             </p>
             <label className="flex flex-col gap-1">
               <span className={FIELD_LABEL_CLASS}>Personal access token</span>

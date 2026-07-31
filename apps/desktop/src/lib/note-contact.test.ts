@@ -97,9 +97,7 @@ describe('addContactToNote', () => {
 
     await addContactToNote('notes/Ada Lovelace.md', ADA, 3)
 
-    expect(commitBodyAppend).toHaveBeenCalledWith(
-      '- Email: ada@example.com\n- Phone: +1 555 0100',
-    )
+    expect(commitBodyAppend).toHaveBeenCalledWith('- Email: ada@example.com\n- Phone: +1 555 0100')
   })
 
   it('is retry-idempotent: a body already carrying the block writes nothing', async () => {
@@ -113,9 +111,7 @@ describe('addContactToNote', () => {
   it('skips when the body already has hand-typed details (stale card)', async () => {
     // The card would have been suppressed had its query refetched; Add must
     // apply the same content gate rather than stack a second block.
-    const { session, commitBodyAppend } = fakeSession(
-      '# Ada Lovelace\n\nWork mail ada@work.com\n',
-    )
+    const { session, commitBodyAppend } = fakeSession('# Ada Lovelace\n\nWork mail ada@work.com\n')
     openSession.mockReturnValue(session)
 
     await addContactToNote('notes/Ada Lovelace.md', ADA, 3)

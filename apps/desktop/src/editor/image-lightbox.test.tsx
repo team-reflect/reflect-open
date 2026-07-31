@@ -10,16 +10,18 @@ function installMatchMedia(reducedMotion: boolean): void {
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
     writable: true,
-    value: vi.fn((query: string): MediaQueryList => ({
-      matches: reducedMotion && query === '(prefers-reduced-motion: reduce)',
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })),
+    value: vi.fn(
+      (query: string): MediaQueryList => ({
+        matches: reducedMotion && query === '(prefers-reduced-motion: reduce)',
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      }),
+    ),
   })
 }
 
@@ -56,8 +58,9 @@ async function renderMobileLightbox(): Promise<RenderedLightbox> {
   if (!(image instanceof HTMLImageElement)) {
     throw new Error('lightbox image missing')
   }
-  const closeChrome = page.getByRole('button', { name: 'Close', exact: true }).element()
-    .parentElement
+  const closeChrome = page
+    .getByRole('button', { name: 'Close', exact: true })
+    .element().parentElement
   if (!(closeChrome instanceof HTMLElement)) {
     throw new Error('close chrome missing')
   }

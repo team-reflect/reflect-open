@@ -37,10 +37,11 @@ export function WorkspaceHeader({
 }: WorkspaceHeaderProps): ReactElement {
   return (
     <header className="flex items-center justify-between gap-4 border-b border-black/10 px-6 py-3 dark:border-white/10">
-      <Tooltip delayDuration={700}>
-        <TooltipTrigger asChild>
-          <h1 className="truncate text-sm font-semibold">{graphName}</h1>
-        </TooltipTrigger>
+      <Tooltip>
+        <TooltipTrigger
+          delay={700}
+          render={<h1 className="truncate text-sm font-semibold">{graphName}</h1>}
+        />
         <TooltipContent>{graphRoot}</TooltipContent>
       </Tooltip>
       <div className="flex items-center gap-3">
@@ -61,16 +62,18 @@ export function WorkspaceHeader({
           {resolvedTheme === 'dark' ? 'Light' : 'Dark'} mode
         </button>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              aria-label="Open settings"
-              onClick={onOpenSettings}
-              className="rounded-md border border-black/10 p-1.5 text-[color:var(--text-secondary)] dark:border-white/10"
-            >
-              <Settings aria-hidden className="size-3.5" />
-            </button>
-          </TooltipTrigger>
+          <TooltipTrigger
+            render={
+              <button
+                type="button"
+                aria-label="Open settings"
+                onClick={onOpenSettings}
+                className="rounded-md border border-black/10 p-1.5 text-[color:var(--text-secondary)] dark:border-white/10"
+              >
+                <Settings aria-hidden className="size-3.5" />
+              </button>
+            }
+          />
           <TooltipContent>
             Settings {SETTINGS_BINDING && <ShortcutKeys binding={SETTINGS_BINDING} />}
           </TooltipContent>

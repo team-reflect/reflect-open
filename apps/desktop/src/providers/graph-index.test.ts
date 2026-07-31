@@ -8,13 +8,7 @@ vi.mock('@reflect/core', () => ({
   watchStop: vi.fn(),
 }))
 
-import {
-  openIndex,
-  syncIndex,
-  subscribeIndexChanges,
-  watchStart,
-  watchStop,
-} from '@reflect/core'
+import { openIndex, syncIndex, subscribeIndexChanges, watchStart, watchStop } from '@reflect/core'
 import { createGraphIndex } from './graph-index'
 
 const mockOpen = vi.mocked(openIndex)

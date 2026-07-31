@@ -74,8 +74,7 @@ describe('parseFrontmatter', () => {
 
   it('reads the ignored-contacts list; junk degrades to empty', () => {
     expect(
-      parseFrontmatter('ignoredContacts:\n  - Ada Lovelace\n  - Grace Hopper').data
-        .ignoredContacts,
+      parseFrontmatter('ignoredContacts:\n  - Ada Lovelace\n  - Grace Hopper').data.ignoredContacts,
     ).toEqual(['Ada Lovelace', 'Grace Hopper'])
     expect(parseFrontmatter('ignoredContacts: banana').data.ignoredContacts).toEqual([])
     expect(parseFrontmatter('ignoredContacts:\n  - 42').data.ignoredContacts).toEqual([])
@@ -141,7 +140,12 @@ describe('upsertFrontmatter', () => {
   })
 
   it('writes a nested mapping (the gist block) and round-trips it through the parser', () => {
-    const gist = { id: 'g1', url: 'https://gist.github.com/alex/g1', file: 'A.md', hash: 'ab12cd34ef56ab78' }
+    const gist = {
+      id: 'g1',
+      url: 'https://gist.github.com/alex/g1',
+      file: 'A.md',
+      hash: 'ab12cd34ef56ab78',
+    }
     const next = upsertFrontmatter('# A\n\nbody', { gist })
     const split = splitFrontmatter(next)
     expect(split.body).toBe('# A\n\nbody')
@@ -189,14 +193,12 @@ describe('frontmatter gist block', () => {
 
   it('rejects a non-http(s) gist url, degrading to "never published"', () => {
     expect(
-      parseFrontmatter(
-        'gist:\n  id: g1\n  url: file:///etc/passwd\n  file: A.md\n  hash: h1',
-      ).data.gist,
+      parseFrontmatter('gist:\n  id: g1\n  url: file:///etc/passwd\n  file: A.md\n  hash: h1').data
+        .gist,
     ).toBeUndefined()
     expect(
-      parseFrontmatter(
-        'gist:\n  id: g1\n  url: javascript:alert(1)\n  file: A.md\n  hash: h1',
-      ).data.gist,
+      parseFrontmatter('gist:\n  id: g1\n  url: javascript:alert(1)\n  file: A.md\n  hash: h1').data
+        .gist,
     ).toBeUndefined()
   })
 

@@ -40,13 +40,22 @@ describe('resolveWikiLink', () => {
   }
 
   it('resolves by date, title, then alias', () => {
-    expect(resolveWikiLink('2026-06-09', lookup)).toEqual({ kind: 'resolved', ref: 'daily/2026-06-09.md' })
-    expect(resolveWikiLink('Project X', lookup)).toEqual({ kind: 'resolved', ref: 'notes/project-x.md' })
+    expect(resolveWikiLink('2026-06-09', lookup)).toEqual({
+      kind: 'resolved',
+      ref: 'daily/2026-06-09.md',
+    })
+    expect(resolveWikiLink('Project X', lookup)).toEqual({
+      kind: 'resolved',
+      ref: 'notes/project-x.md',
+    })
     expect(resolveWikiLink('pjx', lookup)).toEqual({ kind: 'resolved', ref: 'notes/project-x.md' })
   })
 
   it('returns the original text when unresolved', () => {
-    expect(resolveWikiLink('Unknown Page', lookup)).toEqual({ kind: 'unresolved', text: 'Unknown Page' })
+    expect(resolveWikiLink('Unknown Page', lookup)).toEqual({
+      kind: 'unresolved',
+      text: 'Unknown Page',
+    })
   })
 })
 

@@ -96,11 +96,13 @@ describe('contactLinkSuggestions', () => {
   })
 
   it('keeps word-prefix matches, dropping nameless and detail-less contacts', async () => {
-    const invoke = vi.fn().mockResolvedValue([
-      ada,
-      { fullName: '', givenName: '', familyName: '', emails: ['x@example.com'], phones: [] },
-      { fullName: 'Ada Byron', givenName: 'Ada', familyName: 'Byron', emails: [], phones: [] },
-    ])
+    const invoke = vi
+      .fn()
+      .mockResolvedValue([
+        ada,
+        { fullName: '', givenName: '', familyName: '', emails: ['x@example.com'], phones: [] },
+        { fullName: 'Ada Byron', givenName: 'Ada', familyName: 'Byron', emails: [], phones: [] },
+      ])
     setBridge({ invoke, listen: async () => () => {} })
 
     await expect(contactLinkSuggestions('Ada')).resolves.toEqual([ada])
@@ -116,7 +118,14 @@ describe('contactLinkSuggestions', () => {
       phones: [],
     })
     setBridge({
-      invoke: async () => [named(1), { ...named(1), emails: ['dupe@example.com'] }, named(2), named(3), named(4), named(5)],
+      invoke: async () => [
+        named(1),
+        { ...named(1), emails: ['dupe@example.com'] },
+        named(2),
+        named(3),
+        named(4),
+        named(5),
+      ],
       listen: async () => () => {},
     })
 

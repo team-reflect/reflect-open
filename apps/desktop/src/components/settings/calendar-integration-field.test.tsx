@@ -106,9 +106,7 @@ describe('CalendarIntegrationField', () => {
 
     await page.getByRole('button', { name: /choose calendars/i }).click()
 
-    await expect
-      .element(page.getByRole('dialog', { name: 'Choose calendars' }))
-      .toBeInTheDocument()
+    await expect.element(page.getByRole('dialog', { name: 'Choose calendars' })).toBeInTheDocument()
     await expect.element(page.getByText('Google')).toBeInTheDocument()
     await expect.element(page.getByText('iCloud')).toBeInTheDocument()
     await expect.element(page.getByRole('checkbox', { name: 'Work' })).toBeInTheDocument()

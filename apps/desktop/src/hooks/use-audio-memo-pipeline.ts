@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import {
   captureAudioMemo,
+  captureAudioMemoPart,
   errorMessage,
   pickTranscriptionConfig,
   type AiProvidersState,
@@ -35,6 +36,8 @@ export interface PendingAudioCapture {
   audio: Blob
   mimeType: string
   recordedAt: Date
+  /** Session segment placement; absent for a legacy single-file capture. */
+  segment?: { part: number; end: boolean }
   /**
    * Runs after the recording's bytes are durably in the graph — mobile
    * deletes its native staged file here. A failure is logged, never parked:
@@ -194,7 +197,16 @@ export function useAudioMemoPipeline(
         }
         let outcome: Awaited<ReturnType<typeof captureAudioMemo>>
         try {
-          outcome = await captureAudioMemo({ ...capture, generation: graph.generation })
+          outcome = capture.segment
+            ? await captureAudioMemoPart({
+                audio: capture.audio,
+                mimeType: capture.mimeType,
+                recordedAt: capture.recordedAt,
+                part: capture.segment.part,
+                end: capture.segment.end,
+                generation: graph.generation,
+              })
+            : await captureAudioMemo({ ...capture, generation: graph.generation })
         } catch (cause) {
           outcome = { ok: false, message: errorMessage(cause) }
         } finally {

@@ -95,9 +95,10 @@ export function relocateRecentlyCompleted(
   if (root !== graphRoot || changes.length === 0) {
     return
   }
-  const next = withRelocatedTaskMarkers(tasks, notePath, changes, {
-    matchUniqueRaw: true,
-  }) ?? tasks
+  const next =
+    withRelocatedTaskMarkers(tasks, notePath, changes, {
+      matchUniqueRaw: true,
+    }) ?? tasks
   if (next !== tasks) {
     tasks = next
     emit()
@@ -187,7 +188,10 @@ export function useRecentlyCompleted(
   }, [root, open])
   const getSnapshot = useCallback(() => (root === graphRoot ? tasks : EMPTY), [root])
   const struck = useSyncExternalStore(subscribe, getSnapshot)
-  return useMemo(() => (open === undefined ? struck : withoutReopened(struck, open)), [struck, open])
+  return useMemo(
+    () => (open === undefined ? struck : withoutReopened(struck, open)),
+    [struck, open],
+  )
 }
 
 /** Test-only: clear the singleton between cases. */

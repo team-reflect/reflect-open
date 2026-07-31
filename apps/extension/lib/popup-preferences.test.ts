@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  readIncludePageTextPreference,
-  writeIncludePageTextPreference,
-} from './popup-preferences'
+import { readIncludePageTextPreference, writeIncludePageTextPreference } from './popup-preferences'
 
 const store = new Map<string, unknown>()
 

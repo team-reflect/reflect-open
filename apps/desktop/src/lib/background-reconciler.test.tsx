@@ -112,7 +112,11 @@ describe('createBackgroundReconciler', () => {
 
   it('retries on window focus/online and removes the listeners on dispose', async () => {
     let calls = 0
-    const reconciler = createBackgroundReconciler({ pass: async () => { calls += 1 } })
+    const reconciler = createBackgroundReconciler({
+      pass: async () => {
+        calls += 1
+      },
+    })
     reconciler.retryOnWake()
 
     window.dispatchEvent(new Event('focus'))
@@ -128,7 +132,6 @@ describe('createBackgroundReconciler', () => {
     await tick()
     expect(calls).toBe(2) // listener removed on dispose
   })
-
 
   it('runs onDispose teardowns once, and immediately when already disposed', () => {
     const before = vi.fn()

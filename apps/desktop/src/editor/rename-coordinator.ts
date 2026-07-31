@@ -2,10 +2,12 @@ import {
   errorMessage,
   getBacklinks,
   getLinkSources,
+  getPathLinkSources,
   isReflectManagedNote,
   readNote,
   resolveWikiTarget,
   rewriteLinksForTitleChange,
+  rewritePathLinksForMove,
   slugPathForTitle,
   writeNote,
 } from '@reflect/core'
@@ -84,13 +86,37 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
    * the filename drifting (cosmetic — resolution never reads filenames) until
    * the next settled rename re-derives it.
    */
-  const runMove = async (title: string, gen: number): Promise<void> => {
+  const runMove = async (
+    title: string,
+    gen: number,
+    options?: { rewriteInboundPathLinks?: boolean },
+  ): Promise<void> => {
     const target = await slugPathForTitle(currentPath, title)
     if (target === currentPath) {
       return
     }
-    await moveNoteCarryingSession(currentPath, target, gen)
+    const from = currentPath
+    await moveNoteCarryingSession(from, target, gen)
     currentPath = target
+    // Retarget inbound `[[notes/…]]` path links only after the move landed: a
+    // refused move then touches nothing (rollback for free), while the
+    // reverse order would strand every rewritten source on a destination that
+    // never materialized. The source query still works post-move — the
+    // sources' own index rows keep the old target key until they reproject.
+    // A per-source failure dangles that source alone, the same residue as
+    // before. Births skip this: nothing can hold a path link to a placeholder
+    // path that existed only inside this session.
+    if (options?.rewriteInboundPathLinks === true) {
+      try {
+        await rewritePathLinksForMove(from, target, {
+          pathLinkSources: getPathLinkSources,
+          read: readNote,
+          write: (forPath, contents) => writeNote(forPath, contents, gen),
+        })
+      } catch (cause) {
+        console.error('path link rewrite failed:', cause)
+      }
+    }
   }
 
   // Rewrite inbound links across the graph, record the old title as an alias,
@@ -172,7 +198,7 @@ export function createRenameCoordinator(options: RenameCoordinatorOptions): Rena
         // is a separate capability: stable-path and adopted notes stay put.
         if (isReflectManagedNote(currentPath, latestSource)) {
           try {
-            await runMove(rename.to, gen)
+            await runMove(rename.to, gen, { rewriteInboundPathLinks: true })
           } catch (cause) {
             failures.move = errorMessage(cause)
             console.error('note file move failed:', cause)
