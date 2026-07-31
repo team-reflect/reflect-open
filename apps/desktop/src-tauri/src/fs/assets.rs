@@ -85,7 +85,7 @@ fn ensure_asset_name(name: &str) -> AppResult<()> {
 
 /// Split `name` into (stem, `.ext`) for suffix probing; the extension stays
 /// attached through collisions (`report.pdf` → `report-2.pdf`).
-fn split_name(name: &str) -> (&str, &str) {
+pub(super) fn split_name(name: &str) -> (&str, &str) {
     match name.rfind('.') {
         // A leading dot is a hidden file, not an extension.
         Some(idx) if idx > 0 => name.split_at(idx),

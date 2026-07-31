@@ -13,7 +13,7 @@
 //! can simply retry.
 
 use std::collections::HashMap;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -518,12 +518,20 @@ pub(super) fn plan_asset_name(
     taken: &std::collections::HashSet<String>,
 ) -> AppResult<PlannedAssetName> {
     let mut candidates = super::assets::NameCandidates::new(desired, staged.to_path_buf());
+    let mut probe_count = 0;
     while let Some(candidate) = candidates.next()? {
+        probe_count += 1;
         if taken.contains(&candidate) {
             continue;
         }
         let target = assets_dir.join(&candidate);
         if !target.exists() && !super::io::file_occupied(&target) {
+            if probe_count > super::assets::SEQUENTIAL_NAME_PROBES {
+                if let Some(name) = legacy_numbered_reuse_name(assets_dir, desired, staged, taken)?
+                {
+                    return Ok(PlannedAssetName { name, reuse: true });
+                }
+            }
             return Ok(PlannedAssetName {
                 name: candidate,
                 reuse: false,
@@ -542,6 +550,26 @@ pub(super) fn plan_asset_name(
     )))
 }
 
+fn legacy_numbered_reuse_name(
+    assets_dir: &Path,
+    desired: &str,
+    staged: &Path,
+    taken: &std::collections::HashSet<String>,
+) -> AppResult<Option<String>> {
+    let (stem, ext) = super::assets::split_name(desired);
+    for suffix in (super::assets::SEQUENTIAL_NAME_PROBES + 1)..=super::assets::MAX_NAME_PROBES {
+        let candidate = format!("{stem}-{suffix}{ext}");
+        if taken.contains(&candidate) {
+            continue;
+        }
+        let target = assets_dir.join(&candidate);
+        if target.is_file() && same_file_bytes(&target, staged)? {
+            return Ok(Some(candidate));
+        }
+    }
+    Ok(None)
+}
+
 /// Whether two files hold identical bytes (length check first, so comparing
 /// large attachments is cheap in the common differing case).
 pub(super) fn same_file_bytes(existing: &Path, staged: &Path) -> AppResult<bool> {
@@ -550,7 +578,23 @@ pub(super) fn same_file_bytes(existing: &Path, staged: &Path) -> AppResult<bool>
     if existing_meta.len() != staged_meta.len() {
         return Ok(false);
     }
-    Ok(std::fs::read(existing)? == std::fs::read(staged)?)
+    let mut existing_file = std::fs::File::open(existing)?;
+    let mut staged_file = std::fs::File::open(staged)?;
+    let mut existing_buffer = [0_u8; 64 * 1024];
+    let mut staged_buffer = [0_u8; 64 * 1024];
+    loop {
+        let existing_read = existing_file.read(&mut existing_buffer)?;
+        let staged_read = staged_file.read(&mut staged_buffer)?;
+        if existing_read != staged_read {
+            return Ok(false);
+        }
+        if existing_read == 0 {
+            return Ok(true);
+        }
+        if existing_buffer[..existing_read] != staged_buffer[..staged_read] {
+            return Ok(false);
+        }
+    }
 }
 
 /// Persist a staged download at its planned name. The plan already verified
@@ -788,5 +832,48 @@ mod tests {
         let planned_other = plan_asset_name(&assets, "image.png", &other, &taken).unwrap();
         assert_ne!(planned_other.name, planned.name);
         assert!(!planned_other.reuse);
+    }
+
+    #[test]
+    fn plan_reuses_legacy_numbered_names_after_digest_switch() {
+        let dir = tempdir().unwrap();
+        let assets = dir.path().join("assets");
+        fs::create_dir_all(&assets).unwrap();
+        let staged = dir.path().join("staged");
+        fs::write(&staged, b"same old screenshot").unwrap();
+        fs::write(assets.join("image-9.png"), b"same old screenshot").unwrap();
+
+        let mut taken = HashSet::from(["image.png".to_string()]);
+        for suffix in 2..=crate::fs::assets::SEQUENTIAL_NAME_PROBES {
+            taken.insert(format!("image-{suffix}.png"));
+        }
+
+        let planned = plan_asset_name(&assets, "image.png", &staged, &taken).unwrap();
+        assert_eq!(planned.name, "image-9.png");
+        assert!(planned.reuse);
+    }
+
+    #[test]
+    fn same_file_bytes_compares_large_files_incrementally() {
+        let dir = tempdir().unwrap();
+        let first = dir.path().join("first");
+        let second = dir.path().join("second");
+        let different = dir.path().join("different");
+        let mut first_file = fs::File::create(&first).unwrap();
+        let mut second_file = fs::File::create(&second).unwrap();
+        let mut different_file = fs::File::create(&different).unwrap();
+        let chunk = [11_u8; 1024];
+        let different_chunk = [12_u8; 1024];
+        for _ in 0..100 {
+            first_file.write_all(&chunk).unwrap();
+            second_file.write_all(&chunk).unwrap();
+            different_file.write_all(&different_chunk).unwrap();
+        }
+        drop(first_file);
+        drop(second_file);
+        drop(different_file);
+
+        assert!(same_file_bytes(&first, &second).unwrap());
+        assert!(!same_file_bytes(&first, &different).unwrap());
     }
 }
