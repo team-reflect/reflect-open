@@ -690,7 +690,13 @@ describe('MobileShell', () => {
 
     await act(() =>
       publishFormattingToolbar(owner, {
-        capabilities: { canIndent: true, canDedent: false, canMoveUp: true, canMoveDown: true },
+        capabilities: {
+          canIndent: true,
+          canDedent: false,
+          canMoveUp: true,
+          canMoveDown: true,
+          canAttachFiles: false,
+        },
         commands: {
           cycleBulletOrderedList: vi.fn(),
           cycleCheckableList: vi.fn(),
@@ -700,6 +706,7 @@ describe('MobileShell', () => {
           moveDown: vi.fn(),
           insertTrigger: vi.fn(),
           dismissKeyboard: vi.fn(),
+          attachFiles: vi.fn(),
           scrollCaretIntoView: vi.fn(),
         },
       }),

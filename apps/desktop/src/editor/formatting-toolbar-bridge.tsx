@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useEditor } from '@meowdown/react'
-import type { EditorExtension } from '@meowdown/core'
+import { buildFileMarkdown, type EditorExtension } from '@meowdown/core'
+import { toPortableImageFile } from '@/lib/image-file'
 import { isTouchEditorSurface } from '@/lib/platform-surface'
 import {
   clearFormattingToolbar,
@@ -28,9 +29,26 @@ import {
  *
  * The command surface also carries `scrollCaretIntoView` for the keyboard's
  * caret reveal; no toolbar button calls it.
+ *
+ * `saveFile` is the same handler meowdown gets for paste and drop, so the
+ * toolbar's attach button persists files down the one path and inserts the
+ * markdown a paste would have inserted. Editors without one publish
+ * `canAttachFiles: false` and the toolbar leaves the button out.
  */
-export function FormattingToolbarBridge(): null {
+export function FormattingToolbarBridge({
+  saveFile,
+}: {
+  /** Persist a file and resolve its markdown destination (undefined declines). */
+  saveFile?: (file: File) => Promise<string | undefined>
+}): null {
   const editor = useEditor<EditorExtension>()
+  // Read through a ref like the editor's other host callbacks: a changing
+  // identity must not tear down and re-attach the published toolbar.
+  const saveFileRef = useRef(saveFile)
+  useLayoutEffect(() => {
+    saveFileRef.current = saveFile
+  }, [saveFile])
+  const canAttachFiles = saveFile !== undefined
 
   useEffect(() => {
     if (!isTouchEditorSurface()) {
@@ -57,6 +75,7 @@ export function FormattingToolbarBridge(): null {
           canDedent: editor.commands.dedentList.canExec(),
           canMoveUp: editor.commands.moveList.canExec('up'),
           canMoveDown: editor.commands.moveList.canExec('down'),
+          canAttachFiles,
         }
       }
 
@@ -79,6 +98,31 @@ export function FormattingToolbarBridge(): null {
         insertTrigger: (text: FormattingTriggerText) =>
           run(() => editor.commands.insertTrigger(text)),
         dismissKeyboard: () => editor.blur(),
+        attachFiles: async (files: File[]) => {
+          const save = saveFileRef.current
+          if (save === undefined) {
+            return
+          }
+          const markdown: string[] = []
+          for (const picked of files) {
+            const file = await toPortableImageFile(picked)
+            // `saveFile` owns its failures (it resolves undefined and the
+            // pane raises the banner), so a file that did not land is
+            // skipped and the ones that did are still linked.
+            const destination = await save(file)
+            if (destination !== undefined) {
+              markdown.push(buildFileMarkdown(file, destination))
+            }
+          }
+          // The picker outlives the keyboard, and on iOS the sheet took focus
+          // away to open — refocusing puts the caret (and the keyboard) back
+          // where the tap left them, and the insert lands there.
+          if (markdown.length === 0 || !editor.mounted) {
+            return
+          }
+          editor.focus()
+          run(() => editor.commands.insertMarkdown(markdown.join('\n')))
+        },
         // Not wrapped in `run()`: this never changes the document. Skipped
         // mid-composition, where a dispatch would end the composition and eat
         // a half-typed CJK character.
@@ -145,7 +189,10 @@ export function FormattingToolbarBridge(): null {
       }
       teardown?.()
     }
-  }, [editor])
+    // `canAttachFiles` is fixed per editor in practice (a pane either has a
+    // saveFile or does not), so re-attaching on a flip costs nothing and
+    // keeps the published capability honest.
+  }, [editor, canAttachFiles])
 
   return null
 }

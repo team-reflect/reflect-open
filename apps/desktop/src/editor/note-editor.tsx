@@ -467,7 +467,11 @@ export function NoteEditor({
         onExitBoundary={handleExitBoundary}
       >
         <EditorInputTraits />
-        <FormattingToolbarBridge />
+        {/* Only a pane that persists files gets the toolbar's attach button;
+            `handleFilePaste` is the same handler meowdown pastes through. */}
+        <FormattingToolbarBridge
+          {...(saveFile !== undefined ? { saveFile: handleFilePaste } : {})}
+        />
         {renderWikilinkHoverCard !== undefined ? (
           <WikilinkHoverCard className="reflect-hover-card">
             {renderWikilinkHoverCard}

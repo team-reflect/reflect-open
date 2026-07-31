@@ -17,6 +17,7 @@ function makeToolbar(
       canDedent: false,
       canMoveUp: false,
       canMoveDown: false,
+      canAttachFiles: false,
       ...overrides,
     },
     commands: {
@@ -28,6 +29,7 @@ function makeToolbar(
       moveDown: vi.fn(),
       insertTrigger: vi.fn(),
       dismissKeyboard: vi.fn(),
+      attachFiles: vi.fn(),
       scrollCaretIntoView: vi.fn(),
     },
   }
