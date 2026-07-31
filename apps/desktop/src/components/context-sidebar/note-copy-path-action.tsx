@@ -11,9 +11,10 @@ interface NoteCopyPathActionProps {
 }
 
 /**
- * Copies the note's absolute filesystem path for pasting into agent chats and
- * other tools outside Reflect. Joining through Tauri preserves the host
- * platform's path syntax.
+ * Resolves the note at the graph-relative `path` prop to an absolute filesystem
+ * path and copies it for use in agent chats and other tools outside Reflect.
+ * Joining through Tauri preserves the host platform's path syntax; success and
+ * failure feedback appears through the app-wide operations status.
  */
 export function NoteCopyPathAction({ path }: NoteCopyPathActionProps): ReactElement {
   const { graph } = useGraph()
