@@ -5,6 +5,7 @@ import {
   aiProvider,
   aiProviderRequiresApiKey,
   aiProviderSupportsTranscription,
+  DEFAULT_CONTEXT_WINDOW,
   errorMessage,
   GOOGLE_TRANSCRIPTION_MODEL,
   OPENAI_TRANSCRIPTION_MODEL,
@@ -112,7 +113,20 @@ export function AiProviderRow({
               ariaLabel={`Transcription model for ${providerLabel}`}
             />
           ) : (
-            <span className="text-xs text-text-muted">{transcriptionModelLabel(config)}</span>
+            <ModelCombobox
+              value={transcriptionModelLabel(config)}
+              provider={config.provider}
+              models={[
+                {
+                  id: transcriptionModelLabel(config),
+                  label: transcriptionModelLabel(config),
+                  contextWindow: DEFAULT_CONTEXT_WINDOW,
+                },
+              ]}
+              onChange={() => {}}
+              ariaLabel={`Transcription model for ${providerLabel}`}
+              disabled
+            />
           )
         ) : null}
       </div>
