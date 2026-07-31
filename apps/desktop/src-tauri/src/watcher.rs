@@ -43,7 +43,7 @@ const CHANGE_EVENT: &str = "index:changed";
 /// removed (or the platform demanded a rescan), and its descendants were
 /// never enumerated per file. Carries no payload — the frontend answers with
 /// one full reconcile pass.
-const RECONCILE_EVENT: &str = "index:reconcile";
+pub(crate) const RECONCILE_EVENT: &str = "index:reconcile";
 
 /// Holds the active debouncer; dropping it stops the background watch thread.
 #[derive(Default)]

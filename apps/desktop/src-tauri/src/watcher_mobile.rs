@@ -15,6 +15,11 @@ use tauri::State;
 
 use crate::error::AppResult;
 
+/// The coarse "run one full reconcile" signal — same name as the desktop
+/// watcher's constant so `icloud::watch` can emit it on either platform.
+/// On mobile it is the iCloud watch's gather round that uses it.
+pub(crate) const RECONCILE_EVENT: &str = "index:reconcile";
+
 /// Unit stand-in for the desktop watcher state, so `lib.rs` manages the same
 /// type name on every platform.
 #[derive(Default)]

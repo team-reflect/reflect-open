@@ -234,7 +234,7 @@ fn advance_base_if_clean(root: &Path, rel: &str, shadow: &ShadowStore, fill_only
     if crate::fs::ensure_relative(rel).is_err() {
         return;
     }
-    if fill_only && shadow.base(rel).is_some() {
+    if fill_only && shadow.has_base(rel) {
         return;
     }
     let abs = root.join(rel);

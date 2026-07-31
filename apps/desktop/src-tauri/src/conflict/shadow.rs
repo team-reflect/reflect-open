@@ -60,6 +60,13 @@ impl ShadowStore {
         fs::read_to_string(path).ok()
     }
 
+    /// Whether a base is recorded for a note, without reading it. The
+    /// baseline fill pass probes every note on every start — as a `base()`
+    /// call that was a full read of the entire store per launch.
+    pub fn has_base(&self, rel: &str) -> bool {
+        self.entry_path(rel, "").is_some_and(|path| path.is_file())
+    }
+
     /// Record `content` as the note's synced base (atomic).
     pub fn record(&self, rel: &str, content: &str) -> AppResult<()> {
         let path = self
@@ -189,8 +196,16 @@ mod tests {
     fn records_and_reads_a_base() {
         let (_dir, store) = store();
         assert_eq!(store.base("notes/a.md"), None);
+        assert!(!store.has_base("notes/a.md"));
         store.record("notes/a.md", "# synced\n").unwrap();
         assert_eq!(store.base("notes/a.md"), Some("# synced\n".to_string()));
+        assert!(store.has_base("notes/a.md"));
+    }
+
+    #[test]
+    fn has_base_refuses_traversal_shapes_like_base() {
+        let (_dir, store) = store();
+        assert!(!store.has_base("../outside.md"));
     }
 
     #[test]
