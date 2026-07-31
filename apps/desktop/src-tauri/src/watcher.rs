@@ -22,7 +22,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use notify::{RecommendedWatcher, RecursiveMode};
-use notify_debouncer_full::{new_debouncer, DebounceEventResult, Debouncer, RecommendedCache};
+use notify_debouncer_full::{new_debouncer_opt, DebounceEventResult, Debouncer, NoCache};
 use reflect_graph_paths::{
     classify, evicted_logical_path, eviction_placeholder, has_pruned_component, wire_path,
     GraphPathKind,
@@ -43,8 +43,17 @@ const CHANGE_EVENT: &str = "index:changed";
 const RECONCILE_EVENT: &str = "index:reconcile";
 
 /// Holds the active debouncer; dropping it stops the background watch thread.
+///
+/// `NoCache`, not the platform-recommended `FileIdMap`: the file-ID cache
+/// exists only to stitch rename pairs into single events, and [`collect_changes`]
+/// never reads event kinds — it re-stats every reported path and derives
+/// upsert-vs-remove itself, so a stitched rename and its unstitched halves
+/// reduce to the same batch. `FileIdMap` would instead stat **every path under
+/// the graph root** (including `.git/objects/**` and `.reflect/`, which grow
+/// without bound) at every `watch_start` and again on every FSEvents rescan —
+/// a multi-second CPU burn at launch on mature graphs.
 #[derive(Default)]
-pub struct WatcherState(pub Mutex<Option<Debouncer<RecommendedWatcher, RecommendedCache>>>);
+pub struct WatcherState(pub Mutex<Option<Debouncer<RecommendedWatcher, NoCache>>>);
 
 /// A debounced change to a tracked file, sent to the frontend.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -188,7 +197,7 @@ fn collect_changes(paths: &[PathBuf], root: &Path) -> BatchEffects {
 
 fn lock_watcher<'a>(
     watcher: &'a State<WatcherState>,
-) -> AppResult<std::sync::MutexGuard<'a, Option<Debouncer<RecommendedWatcher, RecommendedCache>>>> {
+) -> AppResult<std::sync::MutexGuard<'a, Option<Debouncer<RecommendedWatcher, NoCache>>>> {
     watcher.0.lock().map_err(|err| {
         tracing::error!(?err, "watcher state lock poisoned by an earlier panic");
         AppError::io("watcher state lock poisoned")
@@ -220,8 +229,9 @@ pub fn watch_start(
     // index:changed against the now-current graph.
     *lock_watcher(&watcher)? = None;
 
+    let started = std::time::Instant::now();
     let handler_root = root.clone();
-    let mut debouncer = new_debouncer(
+    let mut debouncer = new_debouncer_opt::<_, RecommendedWatcher, NoCache>(
         Duration::from_millis(400),
         None,
         move |result: DebounceEventResult| {
@@ -247,6 +257,8 @@ pub fn watch_start(
                 let _ = app.emit(RECONCILE_EVENT, ());
             }
         },
+        NoCache::new(),
+        notify::Config::default(),
     )
     .map_err(|err| AppError::io(err.to_string()))?;
 
@@ -257,6 +269,10 @@ pub fn watch_start(
     // Dropping any previous debouncer here stops its thread.
     *lock_watcher(&watcher)? = Some(debouncer);
     drop(graph_guard);
+    tracing::info!(
+        elapsed_ms = started.elapsed().as_millis() as u64,
+        "watch_start installed"
+    );
     Ok(())
 }
 

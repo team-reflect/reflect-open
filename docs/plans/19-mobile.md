@@ -305,6 +305,13 @@ Steps 1 and 2 are the existential gates; nothing else starts until both pass.
    > `ios.project.yml` (`libz.tbd`, `libiconv.tbd`); after editing the
    > template, re-run `tauri ios init` to regenerate `gen/apple/`.
    > Remaining: the same probes on a physical iPhone.
+   >
+   > **Status (2026-07-31): `spike_mobile.rs` removed.** The formal
+   > physical-device probe run never happened, but every probed capability has
+   > long since shipped in production iOS features (keychain-backed secrets,
+   > the SQLite/FTS5 index, `Documents/` graphs, libgit2 GitHub sync), which
+   > settles the gate. The probe itself had become a startup cost: it ran on
+   > every launch, on the main thread, after the window was shown.
 
 2. **Gate spike B — editing on a real iPhone (timeboxed).** Prototype the
    Swift keyboard plugin (decision 8) far enough to evaluate honestly, then

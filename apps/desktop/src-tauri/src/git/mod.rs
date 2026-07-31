@@ -173,7 +173,17 @@ pub async fn git_commit_all(
     state: State<'_, GraphState>,
 ) -> AppResult<CommitOutcome> {
     let root = crate::fs::root_for_generation(&state, generation)?;
-    run_blocking(move || commit::commit_all(&root, &message, MAX_FILE_BYTES)).await
+    let started = std::time::Instant::now();
+    let outcome = run_blocking(move || commit::commit_all(&root, &message, MAX_FILE_BYTES)).await;
+    if let Ok(outcome) = &outcome {
+        tracing::info!(
+            committed = outcome.committed,
+            ahead = outcome.ahead,
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            "git_commit_all"
+        );
+    }
+    outcome
 }
 
 /// Fetch `origin` and report ahead/behind for the current branch.

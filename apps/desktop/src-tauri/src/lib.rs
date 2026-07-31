@@ -51,11 +51,6 @@ mod watcher;
 #[path = "watcher_mobile.rs"]
 mod watcher;
 
-// TEMPORARY (Plan 19 spike A): on-device capability probes; delete with the
-// spike once the runtime gate verdict is recorded in the plan.
-#[cfg(mobile)]
-mod spike_mobile;
-
 use tauri::{Emitter, Manager};
 
 /// Returns the application version from Tauri's resolved package metadata.
@@ -207,9 +202,6 @@ pub fn run() {
     // The main window starts hidden (`visible: false`); desktop reveals it on
     // Ready after restoring geometry, but mobile has no window-state plugin,
     // so show it here or the UI would never appear.
-    //
-    // (Also runs the TEMPORARY Plan 19 spike-A capability probe — delete that
-    // line with the spike, but keep the window show.)
     #[cfg(mobile)]
     let builder = builder.setup(|app| {
         // Before anything else can crash: this is the only reporter that sees
@@ -220,7 +212,6 @@ pub fn run() {
         if let Some(window) = app.get_webview_window(windows::MAIN_WINDOW_LABEL) {
             window.show()?;
         }
-        spike_mobile::run_self_check(app.handle());
         Ok(())
     });
 

@@ -82,6 +82,7 @@ pub async fn icloud_conflicts_scan(
     record_baseline: bool,
     state: State<'_, GraphState>,
 ) -> AppResult<SweepOutcome> {
+    let started = std::time::Instant::now();
     let root = crate::fs::root_for_generation(&state, generation)?;
     let sweep_root = root.clone();
     let outcome = tauri::async_runtime::spawn_blocking(move || {
@@ -89,6 +90,16 @@ pub async fn icloud_conflicts_scan(
     })
     .await
     .map_err(|err| AppError::io(err.to_string()))?;
+    if let Ok(outcome) = &outcome {
+        tracing::info!(
+            changed = outcome.changed.len(),
+            deferred = outcome.deferred.len(),
+            auto_resolved = outcome.auto_resolved,
+            record_baseline,
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            "icloud_conflicts_scan"
+        );
+    }
     // The sweep folds conflict siblings into canonical notes; a cached
     // listing from before those renames would pin the conflict names.
     crate::fs::invalidate_file_catalog(&state, &root);

@@ -348,8 +348,10 @@ pub fn index_reconcile_scan(
     graph: State<GraphState>,
     index: State<IndexState>,
 ) -> AppResult<scan::ReconcileScan> {
+    let started = std::time::Instant::now();
     let root = crate::fs::current_root(&graph)?;
     let files = crate::fs::note_files(&root);
+    let walk_ms = started.elapsed().as_millis() as u64;
     let state = lock_state(&index)?;
     if state.generation != generation {
         return Ok(scan::ReconcileScan::empty());
@@ -359,7 +361,16 @@ pub fn index_reconcile_scan(
         .duration_since(std::time::UNIX_EPOCH)
         .map(|elapsed| elapsed.as_millis() as u64)
         .unwrap_or(0);
-    scan::scan_reconcile(conn, &files, now_ms)
+    let scan = scan::scan_reconcile(conn, &files, now_ms)?;
+    tracing::info!(
+        files = scan.total,
+        candidates = scan.candidates.len(),
+        orphans = scan.orphans.len(),
+        walk_ms,
+        total_ms = started.elapsed().as_millis() as u64,
+        "index_reconcile_scan"
+    );
+    Ok(scan)
 }
 
 /// One `index_touch` entry: re-stamp `path`'s stored mtime to `mtime`

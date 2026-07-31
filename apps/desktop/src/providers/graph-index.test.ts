@@ -62,6 +62,9 @@ describe('createGraphIndex', () => {
       generation: 5,
       signal: expect.any(AbortSignal),
       onMoved,
+      // Always wired, even with no consumer: the pass-summary log reads the
+      // progress counters through it.
+      onFileProgress: expect.any(Function),
     })
     expect(mockSubscribe).toHaveBeenCalledWith(5, onApplied, onMoved, expect.any(Function))
     // The initial reconcile is itself an index change: invalidate once there.
