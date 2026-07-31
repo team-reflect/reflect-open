@@ -2127,3 +2127,50 @@ fn a_move_restates_the_path_derived_claims() {
     .unwrap();
     assert_eq!(path_key[0]["path_key"], Value::from("notes/new-name.md"));
 }
+
+/// The reconcile scan must list the root its index generation was opened
+/// for. Async commands have no main-thread ordering against `graph_open`,
+/// so a scan queued across a graph switch could otherwise walk the freshly
+/// swapped root and diff another graph's files against this index — in the
+/// window before the switch's `index_open` bumps the generation, that delta
+/// would pass the staleness gate.
+#[test]
+fn reconcile_scan_walks_the_index_sessions_root_not_the_current_graph() {
+    use tauri::Manager;
+    let app = tauri::test::mock_builder()
+        .build(tauri::test::mock_context(tauri::test::noop_assets()))
+        .expect("mock app");
+    app.manage(crate::fs::GraphState::default());
+    app.manage(super::IndexState::default());
+    app.manage(crate::background_task::BackgroundTaskState::default());
+
+    let graph_a = tempfile::tempdir().expect("tempdir");
+    let graph_b = tempfile::tempdir().expect("tempdir");
+    std::fs::write(graph_a.path().join("one.md"), "# one\n").unwrap();
+    std::fs::write(graph_b.path().join("two.md"), "# two\n").unwrap();
+    std::fs::write(graph_b.path().join("three.md"), "# three\n").unwrap();
+
+    {
+        let state: tauri::State<crate::fs::GraphState> = app.state();
+        let mut inner = state.0.lock().unwrap();
+        inner.generation = 1;
+        inner.root = Some(graph_a.path().to_path_buf());
+    }
+    let generation = super::index_open(app.state(), app.state(), app.state()).expect("open");
+
+    // The switch's first half: `graph_open` swapped the root, `index_open`
+    // hasn't run yet — the exact window a queued scan can land in.
+    {
+        let state: tauri::State<crate::fs::GraphState> = app.state();
+        let mut inner = state.0.lock().unwrap();
+        inner.generation = 2;
+        inner.root = Some(graph_b.path().to_path_buf());
+    }
+
+    let scan = tauri::async_runtime::block_on(super::index_reconcile_scan(
+        generation,
+        app.handle().clone(),
+    ))
+    .expect("scan");
+    assert_eq!(scan.total, 1, "must list graph A, the index session's root");
+}

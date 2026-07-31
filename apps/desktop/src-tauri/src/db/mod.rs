@@ -50,6 +50,14 @@ pub use write::IndexedNote;
 struct IndexInner {
     generation: u64,
     conn: Option<Connection>,
+    /// The graph root this generation's index was opened for. Reconcile
+    /// scans list *this* root, never the graph state's current one: with
+    /// async commands there is no main-thread FIFO ordering scans against
+    /// `graph_open`, so a queued scan could otherwise walk a freshly-swapped
+    /// root and diff another graph's files against this index — in the
+    /// window before the switch's `index_open` bumps the generation, that
+    /// delta would pass the staleness gate and drive cross-graph writes.
+    root: Option<std::path::PathBuf>,
 }
 
 /// The active graph's index state (`conn` is `None` until `index_open`).
@@ -125,9 +133,13 @@ pub fn index_open(
     let mut state = lock_state(&index)?;
     state.generation += 1;
     // Drop the old connection before opening; if the open fails we return with
-    // `conn = None` (reads then error) rather than a stale connection.
+    // `conn = None` (reads then error) rather than a stale connection. The
+    // root is rebound with it, under the same lock, so a generation can never
+    // pair with another graph's root (see `IndexInner::root`).
     state.conn = None;
+    state.root = None;
     state.conn = Some(migrations::open_index_at(&root)?);
+    state.root = Some(root);
     Ok(state.generation)
 }
 
@@ -338,10 +350,11 @@ pub fn index_move<R: tauri::Runtime>(
 
 /// Compute the open-path reconcile delta natively (see [`scan`]): list the
 /// graph's notes, compare against the stored rows, and return only what
-/// needs work. The listing happens **before** the index lock is taken, so
-/// thousands of stats never block concurrent reads. A stale generation
-/// returns the empty scan — that pass is superseded and its writes would be
-/// dropped anyway, so "nothing to do" is the honest answer.
+/// needs work. The walk runs **without** the index lock held, so thousands
+/// of stats never block concurrent reads; the generation is checked again
+/// after it, so a graph switch mid-walk yields the empty scan. A stale
+/// generation returns the empty scan — that pass is superseded and its
+/// writes would be dropped anyway, so "nothing to do" is the honest answer.
 #[tauri::command]
 pub async fn index_reconcile_scan<R: tauri::Runtime>(
     generation: u64,
@@ -352,12 +365,21 @@ pub async fn index_reconcile_scan<R: tauri::Runtime>(
     // post-paint "I can see a note but can't tap it" freeze on every open.
     crate::blocking::run_blocking(move || {
         let started = std::time::Instant::now();
-        let graph = app.state::<GraphState>();
-        let root = crate::fs::current_root(&graph)?;
+        let index = app.state::<IndexState>();
+        // The root comes from the index session, not the graph state: async
+        // commands have no ordering against `graph_open`, and listing a
+        // just-swapped root against this generation's rows would diff two
+        // different graphs (see `IndexInner::root`).
+        let root = {
+            let state = lock_state(&index)?;
+            if state.generation != generation {
+                return Ok(scan::ReconcileScan::empty());
+            }
+            state.root.clone().ok_or_else(AppError::no_graph)?
+        };
         let walk_started = std::time::Instant::now();
         let files = crate::fs::note_files(&root);
         let walk_ms = walk_started.elapsed().as_millis() as u64;
-        let index = app.state::<IndexState>();
         let state = lock_state(&index)?;
         if state.generation != generation {
             return Ok(scan::ReconcileScan::empty());
