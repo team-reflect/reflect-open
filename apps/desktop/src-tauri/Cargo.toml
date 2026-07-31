@@ -42,7 +42,7 @@ tempfile = { workspace = true }
 sha2 = { workspace = true }
 dirs = "6.0.0"
 tauri-plugin-dialog = "2.7.1"
-base64 = "0.22.1"
+base64 = "0.23.0"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 keyring = { version = "3.6.3", features = [
