@@ -834,9 +834,21 @@ pub async fn list_files<R: tauri::Runtime>(
     generation: Option<u64>,
     app: tauri::AppHandle<R>,
 ) -> AppResult<Vec<FileMeta>> {
+    // Pin the graph session before the hop, like `note_read` and `db_query`:
+    // an unpinned call resolved inside the closure could list a root swapped
+    // in after the invoke (the rebuild path calls this without a
+    // generation). A pinned call the switch superseded fails the
+    // `file_catalog` generation check instead of listing the wrong graph.
+    let generation = match generation {
+        Some(generation) => generation,
+        None => {
+            let state = app.state::<GraphState>();
+            current_graph_info(&state)?.generation
+        }
+    };
     crate::blocking::run_blocking(move || {
         let state = app.state::<GraphState>();
-        Ok(file_catalog(&state, generation)?.notes)
+        Ok(file_catalog(&state, Some(generation))?.notes)
     })
     .await
 }
