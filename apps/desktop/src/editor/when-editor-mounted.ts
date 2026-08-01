@@ -15,7 +15,10 @@ const MOUNT_RETRY_FRAMES = 30
  * Returns a cancel function for effect cleanup; canceling after `run` has
  * fired (or after the budget lapsed) is a no-op.
  */
-export function whenEditorMounted(editor: { readonly mounted: boolean }, run: () => void): () => void {
+export function whenEditorMounted(
+  editor: { readonly mounted: boolean },
+  run: () => void,
+): () => void {
   let frame: number | null = null
   let attempts = 0
   const check = (): void => {
