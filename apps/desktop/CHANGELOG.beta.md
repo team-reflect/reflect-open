@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.8.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.4...v0.8.0-beta.5) (2026-08-01)
+
+
+### Bug Fixes
+
+* compute "Similar notes" once per note per session instead of on every index change ([#1017](https://github.com/team-reflect/reflect-open/issues/1017)) ([a433408](https://github.com/team-reflect/reflect-open/commit/a4334089c4cc00e6d4217e882d87d6bfe04ab73c))
+* cut iCloud sync's battery cost on large graphs ([#963](https://github.com/team-reflect/reflect-open/issues/963)) ([a81deef](https://github.com/team-reflect/reflect-open/commit/a81deefc47f25b8e9a330002f33701929b8fef0f))
+* **ios:** remove redundant whole-graph work on every iCloud open ([#1010](https://github.com/team-reflect/reflect-open/issues/1010)) ([81ebd9a](https://github.com/team-reflect/reflect-open/commit/81ebd9ac97a0da53040c30671a5979693fbd51b5))
+* **ios:** stop the brief input freeze right after the app opens ([#1009](https://github.com/team-reflect/reflect-open/issues/1009)) ([93f7a5f](https://github.com/team-reflect/reflect-open/commit/93f7a5f76ecf3790d8d687402c9d99d60423a5eb))
+* reduce battery drain from mobile scrolling and idle polling ([#962](https://github.com/team-reflect/reflect-open/issues/962)) ([cc5e3eb](https://github.com/team-reflect/reflect-open/commit/cc5e3ebaaeaa0d0fd68adc3e93a74cd340de96e2))
+* reduce CPU usage at app startup ([#1008](https://github.com/team-reflect/reflect-open/issues/1008)) ([eac6258](https://github.com/team-reflect/reflect-open/commit/eac6258adad850a40abaf29a13a83f3302cbbaec))
+
 ## [0.8.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.3...v0.8.0-beta.4) (2026-08-01)
 
 
