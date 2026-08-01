@@ -65,6 +65,28 @@ export function throttledInvalidateIndexQueries(): void {
   }, INVALIDATE_THROTTLE_MS - elapsed)
 }
 
+/**
+ * "Similar notes" results nest under this key — deliberately *outside*
+ * {@link INDEX_QUERY_SCOPE}. Every other index-backed read is one cheap SQLite
+ * query, so refetching the lot after any applied batch is fine; a neighbor
+ * lookup is up to seventeen vector KNN queries (one per seed chunk), and under
+ * the index scope it re-ran for changes it has nothing to do with — a remote
+ * sync batch, a Git commit, an asset description, your own keystrokes in an
+ * unrelated pane. With its own scope the panel computes once per note per
+ * session, which is what it's for.
+ */
+export const SIMILAR_QUERY_SCOPE = 'similar'
+
+/**
+ * Forget cached neighbors on a graph switch. The graph root is part of the key
+ * so stale rows could never be *read* after a switch, but these entries are
+ * kept for the whole session ({@link SIMILAR_QUERY_SCOPE}) and would otherwise
+ * never be collected — memory hygiene, same as the note-row overlays.
+ */
+export function dropSimilarNotesQueries(): void {
+  queryClient.removeQueries({ queryKey: [SIMILAR_QUERY_SCOPE] })
+}
+
 /** The iCloud container listing (`icloud_status`) — read by the graph chooser and Settings → iCloud. */
 export const ICLOUD_STATUS_QUERY_KEY = ['icloud-status'] as const
 

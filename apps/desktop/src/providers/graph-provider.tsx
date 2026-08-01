@@ -28,7 +28,11 @@ import {
 import { followHealedMove } from '@/editor/move-note'
 import { resetNoteRowOverlays } from '@/hooks/note-row-overlay'
 import { setIndexProgress } from '@/lib/index-progress'
-import { dropIcloudStatusQuery, throttledInvalidateIndexQueries } from '@/lib/query-client'
+import {
+  dropIcloudStatusQuery,
+  dropSimilarNotesQueries,
+  throttledInvalidateIndexQueries,
+} from '@/lib/query-client'
 import { ensureWelcomeNote } from '@/lib/welcome-note'
 import { closeSecondaryWindows } from '@/lib/windows/close-secondary-windows'
 import { isMainWindow, requireMainWindow } from '@/lib/windows/window-role'
@@ -259,10 +263,12 @@ export function GraphProvider({
           // Rust index connection is swapped, so a stale pass can't write into
           // this graph's index.
           await index.stop()
-          // Reclaim the prior graph's optimistic note-row overlays. They're
-          // already invisible here (scoped by generation), so this is memory
+          // Reclaim the prior graph's optimistic note-row overlays and its
+          // session-held "Similar notes" results. Both are already invisible
+          // here (scoped by generation / graph root), so this is memory
           // hygiene, not correctness.
           resetNoteRowOverlays()
+          dropSimilarNotesQueries()
           // Open the index *before* 'ready' so reads can't hit the previous
           // graph's index. Best-effort: an index failure doesn't block editing.
           const generation = await index.open()
