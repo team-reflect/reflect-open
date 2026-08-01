@@ -114,10 +114,12 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
    * a timer — the request survives instead, so a long sweep neither chains
    * straight into the next one (ingest) nor delays conflict handling by the
    * wide window (prompt). The requested scope rides along and merges the
-   * same way scopes always merge (`'full'` is sticky): without it, a
-   * mid-sweep conflict signal would replay as a default-`'full'` sweep —
-   * another O(N) version pass, in exactly the overlap case the scoping
-   * exists for.
+   * same way scopes always merge (`'full'` is sticky). Mechanically the
+   * sweep's coverage always comes from {@link nextScanScope}; what carrying
+   * the scope prevents is the replay's `scheduleScan` call passing the
+   * *default* `'full'` and re-arming the sticky flag — which turned every
+   * mid-sweep conflict signal into another O(N) version pass, in exactly
+   * the overlap case the scoping exists for.
    */
   let queuedScan: { urgency: 'prompt' | 'ingest'; scope: IcloudSweepScope } | null = null
   let lastScanEndedAt = 0

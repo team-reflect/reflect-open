@@ -248,11 +248,12 @@ pub async fn icloud_request_downloads(
     .map_err(|err| AppError::io(err.to_string()))?
 }
 
-/// The app container's `Documents/` directory, if resolvable — shared with
-/// the watch's query-coverage check ([`super::watch`]). Can block on first
-/// use (the OS may initialize the container); call off the main thread.
-pub(crate) fn ubiquity_documents_dir() -> Option<PathBuf> {
-    platform::ubiquity_documents_dir()
+/// The app container's `Documents/` directory as a pure lookup — nothing is
+/// created — shared with the watch's query-coverage check
+/// ([`super::watch`]). Can block on first use (the OS may initialize the
+/// container); call off the main thread.
+pub(crate) fn ubiquity_documents_path() -> Option<PathBuf> {
+    platform::ubiquity_documents_path()
 }
 
 #[cfg(any(target_os = "ios", target_os = "macos"))]
@@ -264,15 +265,24 @@ mod platform {
     /// The container's `Documents/` directory, created if missing. `None`
     /// when iCloud Drive is unavailable (signed out, entitlement missing).
     pub fn ubiquity_documents_dir() -> Option<PathBuf> {
-        let manager = NSFileManager::defaultManager();
-        let container = manager.URLForUbiquityContainerIdentifier(None)?;
-        let path = container.path()?.to_string();
-        let documents = PathBuf::from(path).join("Documents");
+        let documents = ubiquity_documents_path()?;
         if let Err(err) = std::fs::create_dir_all(&documents) {
             tracing::warn!(%err, "failed to create iCloud Documents directory");
             return None;
         }
         Some(documents)
+    }
+
+    /// The same path **without creating anything** — for pure lookups like
+    /// the watch's coverage check. Creating the container's `Documents/` as
+    /// a side effect there would plant an empty, user-visible "Reflect"
+    /// folder in iCloud Drive just because the user opened a graph kept
+    /// elsewhere; only adoption and mobile storage may create it.
+    pub fn ubiquity_documents_path() -> Option<PathBuf> {
+        let manager = NSFileManager::defaultManager();
+        let container = manager.URLForUbiquityContainerIdentifier(None)?;
+        let path = container.path()?.to_string();
+        Some(PathBuf::from(path).join("Documents"))
     }
 
     /// Walk `root` counting evicted files — legacy `.icloud` stubs (spotted
@@ -366,6 +376,11 @@ mod platform {
     /// No iCloud Drive container off Apple platforms (Android, and
     /// Windows/Linux desktop builds).
     pub fn ubiquity_documents_dir() -> Option<PathBuf> {
+        None
+    }
+
+    /// See above — no container to look up either.
+    pub fn ubiquity_documents_path() -> Option<PathBuf> {
         None
     }
 

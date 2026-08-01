@@ -46,25 +46,63 @@ pub async fn icloud_watch_start(
     // app's own ubiquity container only, so for any other iCloud path (a
     // desktop graph in the user's general iCloud Drive) the gather produces
     // an empty view that must read as "unknown", never "no conflicts".
-    // Resolved off the main thread: the container API can block on first use.
+    // Resolved off the main thread: the container API can block on first
+    // use. Best-effort — a failed probe degrades to "not authoritative"
+    // (sweeps go full, the safe direction) rather than failing the start:
+    // on mobile this watch is the sole external-change source, and losing
+    // it over a coverage probe would be the far worse trade.
     let authoritative = {
         let root = root.clone();
-        crate::blocking::run_blocking(move || Ok(query_covers_root(&root))).await?
+        crate::blocking::run_blocking(move || Ok(query_covers_root(&root)))
+            .await
+            .unwrap_or(false)
     };
     platform::start(app, root, emit_file_changes, authoritative)
 }
 
 /// See [`icloud_watch_start`]: `root` lives inside the app's own ubiquity
-/// container. Both sides canonicalized — iOS containers sit behind the
-/// `/var` → `/private/var` symlink, and a lexical compare would miss.
+/// container. The lookup is a pure path resolve — watching a graph kept
+/// elsewhere in iCloud Drive must not create the container as a side effect.
 fn query_covers_root(root: &str) -> bool {
-    let Some(documents) = super::storage::ubiquity_documents_dir() else {
-        return false;
-    };
+    match super::storage::ubiquity_documents_path() {
+        Some(documents) => root_within(std::path::Path::new(root), &documents),
+        None => false,
+    }
+}
+
+/// Canonicalized prefix check — iOS containers sit behind the `/var` →
+/// `/private/var` symlink, and a lexical compare would miss. A path that
+/// fails to canonicalize (not on disk) compares as spelled.
+fn root_within(root: &std::path::Path, documents: &std::path::Path) -> bool {
     fn canonical(path: &std::path::Path) -> std::path::PathBuf {
         std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
     }
-    canonical(std::path::Path::new(root)).starts_with(canonical(&documents))
+    canonical(root).starts_with(canonical(documents))
+}
+
+#[cfg(test)]
+mod coverage_tests {
+    use super::root_within;
+
+    #[test]
+    fn resolves_symlinked_spellings_before_comparing() {
+        let dir = tempfile::tempdir().unwrap();
+        let documents = dir.path().join("container/Documents");
+        std::fs::create_dir_all(documents.join("Graph")).unwrap();
+        std::os::unix::fs::symlink(dir.path().join("container"), dir.path().join("alias")).unwrap();
+
+        assert!(root_within(&documents.join("Graph"), &documents));
+        // The same graph reached through a symlinked spelling still matches —
+        // the iOS `/var` → `/private/var` shape.
+        assert!(root_within(
+            &dir.path().join("alias/Documents/Graph"),
+            &documents
+        ));
+        // A sibling outside the container never does.
+        let elsewhere = dir.path().join("CloudDocs/Graph");
+        std::fs::create_dir_all(&elsewhere).unwrap();
+        assert!(!root_within(&elsewhere, &documents));
+    }
 }
 
 /// Command: stop the active watch (graph switch or shutdown). Idempotent.
