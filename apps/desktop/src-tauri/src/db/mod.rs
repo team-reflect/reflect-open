@@ -43,9 +43,6 @@ pub use write::IndexedNote;
 /// mutate a newly-opened index, regardless of caller timing (needed once the
 /// watcher in Plan 04b indexes outside the serialized open flow).
 ///
-/// The single connection also means reads (`db_query`) and writes (`index_*`)
-/// are serialized — a long FTS scan briefly blocks an apply and vice versa.
-/// Acceptable at first-wave scale; a read-pool / WAL reader split can come later.
 #[derive(Default)]
 struct IndexInner {
     generation: u64,
@@ -60,16 +57,43 @@ struct IndexInner {
     root: Option<std::path::PathBuf>,
 }
 
-/// The active graph's index state (`conn` is `None` until `index_open`).
+/// The `db_query` reader: a second, **read-only** connection under its own
+/// lock. Queries run on the blocking pool now, and the write commands are
+/// still synchronous main-thread calls — if both shared one mutex, a long
+/// FTS scan holding it would make the next `index_apply`/`index_touch` block
+/// the iOS main thread for the read's duration, recreating the exact
+/// touch-delivery stall the async conversion removed. Under WAL the reader
+/// sees the last committed state, so a query after an awaited write still
+/// reads its result; it just never contends with one. Rebound (with its own
+/// generation copy, so the pair swaps atomically for readers of *this* lock)
+/// by `index_open` while the writer lock is held — lock order is always
+/// writer → reader, nothing locks the reverse way.
 #[derive(Default)]
-pub struct IndexState(Mutex<IndexInner>);
+struct ReadInner {
+    generation: u64,
+    conn: Option<Connection>,
+}
+
+/// The active graph's index state (`conn`s are `None` until `index_open`).
+#[derive(Default)]
+pub struct IndexState {
+    inner: Mutex<IndexInner>,
+    read: Mutex<ReadInner>,
+}
 
 fn lock_state<'a>(index: &'a State<IndexState>) -> AppResult<MutexGuard<'a, IndexInner>> {
-    index.0.lock().map_err(|err| {
+    index.inner.lock().map_err(|err| {
         // A poisoned lock means a command panicked while holding it — the panic
         // itself is the bug; this context points at the blast radius.
         tracing::error!(?err, "index state lock poisoned by an earlier panic");
         AppError::io("index state lock poisoned")
+    })
+}
+
+fn lock_read<'a>(index: &'a State<IndexState>) -> AppResult<MutexGuard<'a, ReadInner>> {
+    index.read.lock().map_err(|err| {
+        tracing::error!(?err, "index read lock poisoned by an earlier panic");
+        AppError::io("index read lock poisoned")
     })
 }
 
@@ -132,13 +156,23 @@ pub fn index_open(
         .ok_or_else(AppError::no_graph)?;
     let mut state = lock_state(&index)?;
     state.generation += 1;
-    // Drop the old connection before opening; if the open fails we return with
-    // `conn = None` (reads then error) rather than a stale connection. The
-    // root is rebound with it, under the same lock, so a generation can never
-    // pair with another graph's root (see `IndexInner::root`).
+    // Drop the old connections before opening; if an open fails we return
+    // with `conn = None` (reads then error) rather than a stale connection.
+    // The root is rebound with the writer, under the same lock, so a
+    // generation can never pair with another graph's root (see
+    // `IndexInner::root`). The reader rebinds while the writer lock is still
+    // held (writer → reader lock order), after the writer created/migrated
+    // the file it opens read-only.
     state.conn = None;
     state.root = None;
+    {
+        let mut read = lock_read(&index)?;
+        read.conn = None;
+    }
     state.conn = Some(migrations::open_index_at(&root)?);
+    let mut read = lock_read(&index)?;
+    read.conn = Some(migrations::open_index_read_only_at(&root)?);
+    read.generation = state.generation;
     state.root = Some(root);
     Ok(state.generation)
 }
@@ -575,19 +609,35 @@ pub fn embed_remove(
 /// Execute a read query (compiled by Kysely on the frontend) and return rows.
 ///
 /// Async on purpose: sync commands run on the main thread, which on iOS also
-/// owns touch delivery — a long FTS scan there reads as a frozen app. The
-/// state mutex (not the thread) is what serializes reads against writes, so
-/// hopping to the blocking pool changes nothing about ordering.
+/// owns touch delivery — a long FTS scan there reads as a frozen app. Runs
+/// on the dedicated read-only connection ([`ReadInner`]) so it never holds
+/// the writer lock a sync write command would block the main thread waiting
+/// for.
 #[tauri::command]
 pub async fn db_query<R: tauri::Runtime>(
     sql: String,
     params: Vec<Value>,
     app: tauri::AppHandle<R>,
 ) -> AppResult<Vec<Map<String, Value>>> {
+    // Pin the index session before the hop: with no main-thread FIFO, a
+    // graph switch can rebind the index between invoke and execution, and a
+    // query issued for graph A must not return graph B's rows — the frontend
+    // caches results under root-scoped keys with `staleTime: Infinity`, so
+    // one crossed response would be served as fresh forever. An erroring
+    // superseded query is honest instead: its observers unmounted with the
+    // switch, so nothing retries it against the wrong graph.
+    let requested = {
+        let index = app.state::<IndexState>();
+        let generation = lock_read(&index)?.generation;
+        generation
+    };
     crate::blocking::run_blocking(move || {
         let index = app.state::<IndexState>();
-        let state = lock_state(&index)?;
-        let conn = state.conn.as_ref().ok_or_else(AppError::no_graph)?;
+        let read = lock_read(&index)?;
+        if read.generation != requested {
+            return Err(AppError::io("index reopened during query"));
+        }
+        let conn = read.conn.as_ref().ok_or_else(AppError::no_graph)?;
         query::run_query(conn, &sql, &params)
     })
     .await
