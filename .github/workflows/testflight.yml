@@ -102,9 +102,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Resolve build number
+        id: build_number
         run: |
           build_number="$(date -u +%Y%m%d%H%M)"
           echo "BUILD_NUMBER=$build_number" >> "$GITHUB_ENV"
+          echo "value=$build_number" >> "$GITHUB_OUTPUT"
           echo "Using TestFlight CFBundleVersion $build_number"
 
       - name: Build and upload to TestFlight
@@ -124,12 +126,37 @@ jobs:
           fi
           pnpm release:ios "${args[@]}"
 
+      # Xcode Organizer symbolicates a TestFlight crash report from the local
+      # archive, which a CI runner throws away. Keep it so an Apple `.ips` that
+      # arrives weeks later can still be read.
+      - name: Package the Xcode archive
+        if: always()
+        run: |
+          archive="apps/desktop/src-tauri/gen/apple/build/reflect-open_iOS.xcarchive"
+          if [ ! -d "$archive" ]; then
+            echo "::warning::No Xcode archive was produced; skipping symbol packaging"
+            exit 0
+          fi
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$archive" "$RUNNER_TEMP/reflect-ios-xcarchive-$BUILD_NUMBER.zip"
+
       # The exported IPA, kept for post-hoc signing/entitlements inspection —
       # TestFlight builds cannot be downloaded back from App Store Connect.
       - name: Upload IPA artifact
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: reflect-ios-ipa
+          name: reflect-ios-ipa-${{ steps.build_number.outputs.value }}
           path: apps/desktop/src-tauri/gen/apple/build/arm64/*.ipa
           if-no-files-found: ignore
+          retention-days: 90
+
+      - name: Upload Xcode archive artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: reflect-ios-xcarchive-${{ steps.build_number.outputs.value }}
+          path: ${{ runner.temp }}/reflect-ios-xcarchive-${{ steps.build_number.outputs.value }}.zip
+          if-no-files-found: ignore
+          retention-days: 90
+          compression-level: 0

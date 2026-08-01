@@ -3,8 +3,8 @@
 Reflect is local-first: your notes are markdown files in a folder you chose, the search
 index is SQLite in `.reflect/` beside them, and **no Reflect-hosted server exists in any
 path** — there is no product analytics and no account. Official release builds send
-scrubbed JavaScript exception diagnostics to Sentry. Every network call the app can make
-is listed here, with what it carries.
+scrubbed WebView and native crash diagnostics to Sentry. Every network call the app can
+make is listed here, with what it carries.
 
 The one hard rule sits above all of it: **a note with `private: true` frontmatter never
 has its content sent to any external service.** This is enforced in code at every AI
@@ -101,24 +101,34 @@ disk at call time), and it is covered by tests.
 
 ## Exception diagnostics (on in official release builds)
 
-- **Where:** Sentry, for errors raised in the React/WebView layer. Native process crashes
-  remain covered by the operating system's crash reporting.
-- **What:** an allow-listed diagnostic containing the exception class, sanitized
-  JavaScript stack locations, the app version, and whether the exception was marked
-  handled. A small set of vetted structural error messages that cannot contain document
-  data is kept; all other exception text is redacted. Stack filenames are reduced to
-  bundle basenames. Request
-  data, note content, note titles, graph paths, local filesystem paths, breadcrumbs,
-  console output, session replay, tracing, and user identifiers are not collected. Sentry
-  is also configured not to store the transport IP address with events.
+- **Where:** Sentry. The React/WebView SDK handles JavaScript exceptions; on iOS a
+  native SDK handles host-process crashes, fully blocking main-thread hangs, watchdog
+  terminations, and converted Apple MetricKit diagnostics — the failures that never
+  reach the JavaScript layer, and that arrive in TestFlight with no usable stack.
+- **What:** an allow-listed diagnostic containing the JavaScript exception class (or a
+  fixed native failure category), sanitized stack locations, the app/build version, and
+  whether the exception was marked handled. Native reports also carry non-identifying
+  OS/device model, architecture, memory, storage, battery, and thermal facts, which are
+  what distinguish a resource termination from a code defect. A small set of vetted
+  JavaScript structural error messages that cannot contain document data is kept; every
+  native exception value and all other exception text is redacted. JavaScript filenames
+  and native loaded-image names are reduced to basenames.
+- **Never collected:** request data, note content, note titles, graph paths, local
+  filesystem paths, native source paths, frame variables, source context lines, thread
+  names, breadcrumbs, console or Rust tracing output, session replay, performance
+  traces and profiles, screenshots, view hierarchy, raw MetricKit payloads, and user
+  identifiers. Sentry is also configured not to store the transport IP address with
+  events.
 - **When:** only when an official desktop or iOS release raises an uncaught JavaScript
-  error, an unhandled promise rejection, or a caught/recoverable React error. Development
-  and self-built apps without the release DSN do not initialize Sentry.
+  error, an unhandled promise rejection, or a caught/recoverable React error — and on
+  iOS, the native failure categories above. Development and self-built apps without the
+  release DSN do not initialize either SDK.
 - **Operational safeguards:** Sentry's server-side and default scrubbers are enabled, IP
   address storage and server-side JavaScript source scraping are disabled, and explicit
   sensitive-field rules cover notes, graph paths, requests, and user identifiers. Private
-  source maps are uploaded during official builds for readable stacks, then deleted from
-  the app bundle.
+  JavaScript source maps and native dSYMs are uploaded during official builds so stacks
+  are readable; native symbol uploads exclude sources, and neither kind of symbol file
+  ships as readable source in the app bundle.
 
 ## Housekeeping calls
 

@@ -7,13 +7,17 @@ import {
   createAltoolUploadArgs,
   createAltoolValidateArgs,
   createApiKeyAltoolArgs,
+  createSentryDebugFilesUploadArgs,
   createTimestampBuildNumber,
   createTauriIosBuildEnv,
   createTauriIosBuildArgs,
   findIpaAppexPaths,
   findIpaInfoPlistPath,
+  inspectNativeSentryConfiguration,
   isFalsePlistValue,
+  isProductionSentryDsn,
   normalizeApiKeyContent,
+  parseDwarfdumpUuids,
   resolveBuildNumber,
 } from './release-ios.mjs'
 
@@ -93,8 +97,76 @@ test('iOS release builds expose the staged API key path to Tauri signing', () =>
     APPLE_API_ISSUER: 'issuer-uuid',
     APPLE_API_KEY: 'ABC123DEFG',
     APPLE_API_KEY_PATH: '/tmp/AuthKey_ABC123DEFG.p8',
+    CARGO_PROFILE_RELEASE_DEBUG: 'line-tables-only',
     CI: 'true',
   })
+})
+
+test('iOS release builds emit Rust line tables so the app dSYM can symbolicate native frames', () => {
+  expect(createTauriIosBuildEnv({ baseEnv: {} }).CARGO_PROFILE_RELEASE_DEBUG).toBe(
+    'line-tables-only',
+  )
+  expect(
+    createTauriIosBuildEnv({ baseEnv: { CARGO_PROFILE_RELEASE_DEBUG: 'full' } })
+      .CARGO_PROFILE_RELEASE_DEBUG,
+  ).toBe('full')
+})
+
+test('native dSYMs upload without source bundles', () => {
+  expect(createSentryDebugFilesUploadArgs('/build/reflect-open_iOS.xcarchive')).toEqual([
+    'debug-files',
+    'upload',
+    '--org',
+    'reflect-64',
+    '--project',
+    'reflect-open',
+    '--type',
+    'dsym',
+    '--no-sources',
+    '--wait-for',
+    '60',
+    '/build/reflect-open_iOS.xcarchive',
+  ])
+})
+
+test('only the production Reflect Sentry project enables native symbol upload', () => {
+  const dsn =
+    'https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/4511705649971200'
+  expect(isProductionSentryDsn(dsn)).toBe(true)
+  expect(isProductionSentryDsn('https://public@example.test/1')).toBe(false)
+  expect(isProductionSentryDsn(undefined)).toBe(false)
+
+  expect(
+    inspectNativeSentryConfiguration({ SENTRY_AUTH_TOKEN: 'token', VITE_SENTRY_DSN: dsn }),
+  ).toEqual({ enabled: true, error: null })
+  expect(inspectNativeSentryConfiguration({})).toEqual({ enabled: false, error: null })
+})
+
+test('partial or foreign native Sentry configuration fails the release instead of shipping blind', () => {
+  const dsn =
+    'https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/4511705649971200'
+  expect(inspectNativeSentryConfiguration({ SENTRY_AUTH_TOKEN: 'token' }).error).toMatch(
+    /incomplete/,
+  )
+  expect(inspectNativeSentryConfiguration({ VITE_SENTRY_DSN: dsn }).error).toMatch(/incomplete/)
+  expect(
+    inspectNativeSentryConfiguration({
+      SENTRY_AUTH_TOKEN: 'token',
+      VITE_SENTRY_DSN: 'https://public@example.test/1',
+    }).error,
+  ).toMatch(/production Reflect Sentry project/)
+})
+
+test('dwarfdump UUIDs are parsed per architecture and compared order-independently', () => {
+  expect(
+    parseDwarfdumpUuids(
+      [
+        'UUID: 3fbb0e0d-6cbb-3d0e-9e26-06f2ff1a09f2 (arm64) /build/Reflect.app/Reflect',
+        'warning: no debug map',
+      ].join('\n'),
+    ),
+  ).toEqual(['3FBB0E0D-6CBB-3D0E-9E26-06F2FF1A09F2'])
+  expect(parseDwarfdumpUuids('')).toEqual([])
 })
 
 test('altool upload uses package upload with API key auth and optional processing wait', () => {

@@ -63,8 +63,10 @@ for `pnpm release:ios testflight`.
 4. **Sentry exception telemetry credentials.** Set the public `VITE_SENTRY_DSN` and the
    private, build-only `SENTRY_AUTH_TOKEN` for local TestFlight builds. Configure them in
    GitHub as the repository secrets `SENTRY_DSN` and `SENTRY_AUTH_TOKEN`; the TestFlight
-   workflow requires both before building. The token needs release/source-map upload
-   scope only and must never use the `VITE_` prefix or enter the app bundle.
+   workflow requires both before building. The DSN initializes both the WebView and the
+   iOS native SDK. The token must be allowed to upload JavaScript source maps and native
+   debug files to the `reflect-open` project; it must never use the `VITE_` prefix or
+   enter the app bundle.
 
 5. **A monotonically increasing build number.** TestFlight rejects duplicate
    `CFBundleVersion` values for the same marketing version. The GitHub Action
@@ -75,7 +77,7 @@ for `pnpm release:ios testflight`.
    builds: a lower `CFBundleVersion` can upload successfully while TestFlight
    still appears to show the previous timestamp build as the latest.
 
-5. **Xcode on macOS.** The workflow and local script use `xcodebuild`, Tauri's
+6. **Xcode on macOS.** The workflow and local script use `xcodebuild`, Tauri's
    iOS build command, and `xcrun altool`.
 
 ## Commands
@@ -96,7 +98,12 @@ Runs `pnpm tauri ios build --export-method app-store-connect --ci`, using the
 signed-in Xcode account locally or the App Store Connect API key environment
 when the key is configured. The build number is merged into the Tauri config as
 `bundle.iOS.bundleVersion`. The IPA lands under
-`apps/desktop/src-tauri/gen/apple/build/`.
+`apps/desktop/src-tauri/gen/apple/build/`. Release builds retain Rust line
+tables so Xcode can produce a dSYM that symbolicates native frames. When the
+Sentry credentials are set, the helper requires the current archive's main dSYM,
+verifies its UUID against the archived executable, and uploads only that
+archive's native symbols — without source bundles — before returning. Supplying
+only one of the DSN or token is a release error.
 
 ```bash
 pnpm release:ios testflight --wait
@@ -125,7 +132,11 @@ the upload flow.
 
 Use **Actions -> TestFlight -> Run workflow**. The workflow builds on
 `macos-26`, uploads the IPA to App Store Connect, and serializes runs so two
-uploads do not race each other.
+uploads do not race each other. It keeps both the exported IPA and a
+metadata-preserving ZIP of the exact `.xcarchive` for 90 days. The archive holds
+the matching binaries and dSYMs needed to symbolicate an Apple `.ips` report
+that arrives later; the archive is packaged even when the run failed, so the
+evidence survives a release blocker.
 
 Configure these repository secrets:
 
@@ -134,6 +145,8 @@ Configure these repository secrets:
 | `APPLE_API_KEY` | App Store Connect API key ID |
 | `APPLE_API_ISSUER` | App Store Connect issuer UUID |
 | `APPLE_API_KEY_CONTENT` | Contents of `AuthKey_<KEY>.p8` |
+| `SENTRY_DSN` | Public DSN for the production Reflect Sentry project |
+| `SENTRY_AUTH_TOKEN` | Build-only token allowed to upload releases, source maps, and debug files |
 
 The workflow does not accept a build-number input. Each run resolves one UTC
 timestamp build number, logs it, and passes the same value to both `preflight`
@@ -184,3 +197,16 @@ workflow.
 - **Export-compliance prompt appears again**: rebuild from an Xcode project that
   includes `ITSAppUsesNonExemptEncryption=false` in the iOS Info.plist. The
   release helper refuses to upload IPAs that are missing this key.
+- **A TestFlight feedback ZIP has no stack**: expected. Tester feedback carries a
+  screenshot and device metadata, not a crash report, and many `WKWebView`
+  content-process deaths, jetsam kills, and watchdog terminations never produce
+  one. Read the native crash/hang/watchdog events in Sentry instead, or ask for
+  the Apple `.ips` report.
+- **An Apple `.ips` report is unsymbolicated**: download the
+  `reflect-ios-xcarchive-<build>` artifact for that exact TestFlight build,
+  confirm its executable UUID appears in the report, and symbolicate against the
+  archive's dSYM. An IPA alone does not contain one.
+- **Sentry reports "missing debug information"**: check the release helper's
+  `sentry-cli debug-files upload` output. Publication fails when native Sentry is
+  configured but no dSYM exists or the upload is rejected; JavaScript source-map
+  upload does not cover Rust or Swift frames.
