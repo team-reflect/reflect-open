@@ -117,7 +117,11 @@ export function isSessionReady(session: AudioMemoSession, nowMs: number): boolea
   )
 }
 
-/** A segment's terminal transcription result, as cached and as stitched. */
+/**
+ * A segment's terminal transcription result, as cached and as stitched: either
+ * the transcribed text, or a short reason the provider refused it (cached so a
+ * retry never re-bills a segment that would refuse the same bytes).
+ */
 export type AudioMemoPartResult = { text: string } | { rejected: string }
 
 /**
@@ -145,6 +149,7 @@ export function decodePartResult(raw: string): AudioMemoPartResult | null {
   }
 }
 
+/** Serialize a part result for the `.reflect/transcripts/` cache. */
 export function encodePartResult(result: AudioMemoPartResult): string {
   return JSON.stringify(result)
 }
@@ -195,6 +200,7 @@ async function writePartTranscript(
   await writeTranscriptCache(partTranscriptName(part), encodePartResult(result), generation)
 }
 
+/** Input to {@link transcribeSessionParts}: one session plus the provider credentials and transport hooks. */
 export interface TranscribeSessionPartsInput {
   session: AudioMemoSession
   provider: TranscriptionProvider
@@ -216,6 +222,7 @@ export interface TranscribeSessionPartsInput {
   isStale: () => boolean
 }
 
+/** Outcome of {@link transcribeSessionParts}: terminal results, a wait signal, a skip signal, or a stale abort. */
 export type TranscribeSessionPartsOutcome =
   /** Every segment has a terminal result, in part order. */
   | { status: 'done'; results: AudioMemoPartResult[] }

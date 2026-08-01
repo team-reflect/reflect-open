@@ -203,6 +203,7 @@ export function audioMemoPartPath(memo: AudioMemoIdentity, part: number, end: bo
   return audioMemoPath(`${memo.base}.part-${pad(part, 3)}${end ? '-end' : ''}.${extension}`)
 }
 
+/** Input to {@link captureAudioMemo}: one recording plus the graph pin. */
 export interface CaptureAudioMemoInput {
   /** The recording, as the recorder produced it. */
   audio: Blob
@@ -233,6 +234,12 @@ async function writeAudioMemoAsset(path: string, audio: Blob, generation: number
   await writeAsset(path, bytesToBase64(new Uint8Array(await audio.arrayBuffer())), generation)
 }
 
+/**
+ * Persist one recording into the graph - the durable step, no network. The
+ * recording is written under `audio-memos/`; transcription happens later, in
+ * {@link reconcileAudioMemos}. A write failure is returned as data (the
+ * caller retries with the same recording), never thrown.
+ */
 export async function captureAudioMemo(
   input: CaptureAudioMemoInput,
 ): Promise<CaptureAudioMemoOutcome> {
@@ -245,6 +252,7 @@ export async function captureAudioMemo(
   return { ok: true, memo }
 }
 
+/** Input to {@link captureAudioMemoPart}: one finished segment plus the graph pin. */
 export interface CaptureAudioMemoPartInput {
   /** One finished segment, as the recorder produced it. */
   audio: Blob
@@ -420,6 +428,7 @@ export function isSilentStop(stopped: ReconcileStop): boolean {
   return stopped.reason === 'network' || stopped.reason === 'config' || stopped.reason === 'stale'
 }
 
+/** Input to {@link reconcileAudioMemos}: the configured-provider state, graph pin, and transport hooks. */
 export interface ReconcileAudioMemosInput {
   /** The configured-providers state — decides the provider and keychain entry. */
   providers: AiProvidersState
@@ -435,6 +444,7 @@ export interface ReconcileAudioMemosInput {
   onPending?: (count: number) => void
 }
 
+/** Outcome of {@link reconcileAudioMemos}: counts and the stop reason, if the pass did not drain. */
 export interface ReconcileAudioMemosOutcome {
   /** Memos that had no transcription when the pass started. */
   pending: number

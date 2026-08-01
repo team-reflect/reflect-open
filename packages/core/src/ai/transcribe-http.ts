@@ -35,6 +35,7 @@ export const TRANSCRIPTION_TIMEOUT_MS = 120_000
  */
 export const TRANSCRIPTION_TRANSFER_TIMEOUT_MS = 5 * 60_000
 
+/** Per-call overrides for {@link send}: a transfer timeout and the pass's abort gate. */
 export interface SendOptions {
   /** Overrides {@link TRANSCRIPTION_TIMEOUT_MS} for this call. */
   timeoutMs?: number

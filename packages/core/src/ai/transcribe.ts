@@ -22,6 +22,7 @@ import {
  * (stale gate, timeouts, error ladder) is `ai/transcribe-http`.
  */
 
+/** The OpenAI transcription model sent on every audio-memo pass (fixed, not user-chosen). */
 export const OPENAI_TRANSCRIPTION_MODEL = 'gpt-4o-mini-transcribe'
 
 /**
@@ -30,6 +31,7 @@ export const OPENAI_TRANSCRIPTION_MODEL = 'gpt-4o-mini-transcribe'
  */
 export const OPENAI_TRANSCRIPTION_FALLBACK_MODEL = 'whisper-1'
 
+/** The Gemini transcription model sent on every audio-memo pass (fixed, not user-chosen). */
 export const GOOGLE_TRANSCRIPTION_MODEL = 'gemini-3.5-flash'
 
 /**
