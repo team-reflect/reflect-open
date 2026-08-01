@@ -177,7 +177,11 @@ fn is_pruned_dir(name: &str, path: &Path) -> bool {
     is_pruned_dir_name(name) || has_cachedir_tag(path)
 }
 
-fn is_pruned_dir_name(name: &str) -> bool {
+/// Whether a single name is on the default prune list ([`PRUNED_DIR_NAMES`]),
+/// case-folded. The name-level half of [`has_pruned_component`], exported for
+/// walkers that filter by component as they descend (the desktop watcher's
+/// file-ID cache) rather than by assembled wire path.
+pub fn is_pruned_dir_name(name: &str) -> bool {
     PRUNED_DIR_NAMES
         .iter()
         .any(|pruned| name.eq_ignore_ascii_case(pruned))

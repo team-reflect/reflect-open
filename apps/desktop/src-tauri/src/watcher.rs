@@ -17,18 +17,21 @@
 //! frontend answers with its ordinary full reconcile pass — re-list, hash
 //! gate, prune. One coarse signal instead of a shadow manifest.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Duration;
 
+use file_id::{get_file_id, FileId};
 use notify::{RecommendedWatcher, RecursiveMode};
-use notify_debouncer_full::{new_debouncer_opt, DebounceEventResult, Debouncer, NoCache};
+use notify_debouncer_full::{new_debouncer_opt, DebounceEventResult, Debouncer, FileIdCache};
 use reflect_graph_paths::{
-    classify, evicted_logical_path, eviction_placeholder, has_pruned_component, wire_path,
-    GraphPathKind,
+    classify, evicted_logical_path, eviction_placeholder, has_pruned_component, is_pruned_dir_name,
+    wire_path, GraphPathKind,
 };
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
+use walkdir::WalkDir;
 
 use crate::error::{AppError, AppResult};
 use crate::fs::GraphState;
@@ -43,17 +46,94 @@ const CHANGE_EVENT: &str = "index:changed";
 const RECONCILE_EVENT: &str = "index:reconcile";
 
 /// Holds the active debouncer; dropping it stops the background watch thread.
-///
-/// `NoCache`, not the platform-recommended `FileIdMap`: the file-ID cache
-/// exists only to stitch rename pairs into single events, and [`collect_changes`]
-/// never reads event kinds — it re-stats every reported path and derives
-/// upsert-vs-remove itself, so a stitched rename and its unstitched halves
-/// reduce to the same batch. `FileIdMap` would instead stat **every path under
-/// the graph root** (including `.git/objects/**` and `.reflect/`, which grow
-/// without bound) at every `watch_start` and again on every FSEvents rescan —
-/// a multi-second CPU burn at launch on mature graphs.
 #[derive(Default)]
-pub struct WatcherState(pub Mutex<Option<Debouncer<RecommendedWatcher, NoCache>>>);
+pub struct WatcherState(pub Mutex<Option<Debouncer<RecommendedWatcher, PrunedFileIdMap>>>);
+
+/// The debouncer's file-ID cache, pruned to the trees that can carry tracked
+/// files.
+///
+/// The platform-recommended `FileIdMap` stats **every path under the graph
+/// root** — including `.git/objects/**` (which local history grows on every
+/// edit session) and `.reflect/` — at every `watch_start` and again on every
+/// FSEvents rescan: a multi-second launch burn on mature graphs. But the
+/// cache cannot simply be dropped (`NoCache`): FSEvents carries no rename
+/// cookies, so file IDs are the only thing stitching an external
+/// `old.md → new.md` into one event. Unstitched, the From/To halves sit in
+/// independent debounce queues and can flush in different batches — and the
+/// frontend's move healing pairs remove+upsert **within one batch** only, so
+/// a split rename degrades to delete+create: open sessions and routes miss
+/// the move and derived state is rebuilt instead of carried.
+///
+/// So: same cache contract, pruned walk. Below the watch root, hidden names
+/// (`.git`, `.reflect`, `.DS_Store` — the same blackout `collect_changes`
+/// applies to events) and the shared prune list (`node_modules` and friends)
+/// never enter the cache, at install time or from later create events.
+/// Rename stitching only matters for paths the watcher tracks, and those are
+/// exactly the paths the pruned walk retains — visible temp names included,
+/// so an external editor's atomic `note.md.tmp → note.md` save still
+/// stitches. Components *above* the root don't count: a graph legitimately
+/// lives under a hidden directory like `~/.config`.
+#[derive(Debug)]
+pub struct PrunedFileIdMap {
+    root: PathBuf,
+    paths: HashMap<PathBuf, FileId>,
+}
+
+impl PrunedFileIdMap {
+    fn new(root: PathBuf) -> Self {
+        Self {
+            root,
+            paths: HashMap::new(),
+        }
+    }
+}
+
+/// Whether `path` may enter the cache: every component below `root` must be
+/// visible and off the prune list. Paths outside the root pass — the cache
+/// has no opinion on other watch targets.
+fn cache_keeps(root: &Path, path: &Path) -> bool {
+    let Ok(rel) = path.strip_prefix(root) else {
+        return true;
+    };
+    rel.components().all(|component| {
+        let name = component.as_os_str().to_string_lossy();
+        !name.starts_with('.') && !is_pruned_dir_name(&name)
+    })
+}
+
+impl FileIdCache for PrunedFileIdMap {
+    fn cached_file_id(&self, path: &Path) -> Option<impl AsRef<FileId>> {
+        self.paths.get(path)
+    }
+
+    fn add_path(&mut self, path: &Path, recursive_mode: RecursiveMode) {
+        let depth = if recursive_mode == RecursiveMode::Recursive {
+            usize::MAX
+        } else {
+            1
+        };
+        let root = self.root.clone();
+        let walk = WalkDir::new(path)
+            .follow_links(false)
+            .max_depth(depth)
+            .into_iter()
+            // `filter_entry` prunes whole subtrees: the walk never descends
+            // into an excluded directory, which is the entire point.
+            .filter_entry(move |entry| cache_keeps(&root, entry.path()));
+        for entry in walk {
+            let Ok(entry) = entry else { continue };
+            let path = entry.into_path();
+            let Ok(file_id) = get_file_id(&path) else {
+                continue;
+            };
+            self.paths.insert(path, file_id);
+        }
+    }
+
+    fn remove_path(&mut self, path: &Path) {
+        self.paths.retain(|cached, _| !cached.starts_with(path));
+    }
+}
 
 /// A debounced change to a tracked file, sent to the frontend.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -197,7 +277,7 @@ fn collect_changes(paths: &[PathBuf], root: &Path) -> BatchEffects {
 
 fn lock_watcher<'a>(
     watcher: &'a State<WatcherState>,
-) -> AppResult<std::sync::MutexGuard<'a, Option<Debouncer<RecommendedWatcher, NoCache>>>> {
+) -> AppResult<std::sync::MutexGuard<'a, Option<Debouncer<RecommendedWatcher, PrunedFileIdMap>>>> {
     watcher.0.lock().map_err(|err| {
         tracing::error!(?err, "watcher state lock poisoned by an earlier panic");
         AppError::io("watcher state lock poisoned")
@@ -231,7 +311,7 @@ pub fn watch_start(
 
     let started = std::time::Instant::now();
     let handler_root = root.clone();
-    let mut debouncer = new_debouncer_opt::<_, RecommendedWatcher, NoCache>(
+    let mut debouncer = new_debouncer_opt::<_, RecommendedWatcher, PrunedFileIdMap>(
         Duration::from_millis(400),
         None,
         move |result: DebounceEventResult| {
@@ -257,7 +337,7 @@ pub fn watch_start(
                 let _ = app.emit(RECONCILE_EVENT, ());
             }
         },
-        NoCache::new(),
+        PrunedFileIdMap::new(root.clone()),
         notify::Config::default(),
     )
     .map_err(|err| AppError::io(err.to_string()))?;
@@ -576,5 +656,70 @@ mod tests {
         assert_eq!(effects.changes.len(), 1);
         assert_eq!(effects.changes[0].path, "notes/a.md");
         assert_eq!(effects.changes[0].kind, "upsert");
+    }
+
+    #[test]
+    fn cache_walk_skips_hidden_and_pruned_trees() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("notes")).unwrap();
+        std::fs::create_dir_all(root.join(".git/objects/aa")).unwrap();
+        std::fs::create_dir_all(root.join(".reflect")).unwrap();
+        std::fs::create_dir_all(root.join("node_modules/pkg")).unwrap();
+        std::fs::write(root.join("notes/a.md"), "note").unwrap();
+        // Visible temp names must stay cached: an external editor's atomic
+        // save renames `note.md.tmp -> note.md`, and stitching that pair is
+        // the reason this cache exists at all.
+        std::fs::write(root.join("notes/b.md.tmp"), "tmp").unwrap();
+        std::fs::write(root.join(".git/objects/aa/bb"), "obj").unwrap();
+        std::fs::write(root.join(".reflect/index.sqlite"), "db").unwrap();
+        std::fs::write(root.join("node_modules/pkg/x.js"), "js").unwrap();
+
+        let mut cache = PrunedFileIdMap::new(root.to_path_buf());
+        cache.add_path(root, RecursiveMode::Recursive);
+
+        assert!(cache.paths.contains_key(&root.join("notes/a.md")));
+        assert!(cache.paths.contains_key(&root.join("notes/b.md.tmp")));
+        assert!(
+            !cache
+                .paths
+                .keys()
+                .any(|path| path.starts_with(root.join(".git"))
+                    || path.starts_with(root.join(".reflect"))
+                    || path.starts_with(root.join("node_modules"))),
+            "hidden and pruned trees must never enter the cache"
+        );
+    }
+
+    #[test]
+    fn cache_event_adds_respect_the_same_prune() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join(".git/objects")).unwrap();
+        std::fs::create_dir_all(root.join("notes")).unwrap();
+        std::fs::write(root.join(".git/objects/loose"), "obj").unwrap();
+        std::fs::write(root.join("notes/new.md"), "note").unwrap();
+
+        let mut cache = PrunedFileIdMap::new(root.to_path_buf());
+        // Per-event adds arrive as single paths, not walks: `.git` churn from
+        // the local-history commits must not grow the cache over a session.
+        cache.add_path(&root.join(".git/objects/loose"), RecursiveMode::Recursive);
+        assert!(cache.paths.is_empty());
+        cache.add_path(&root.join("notes/new.md"), RecursiveMode::Recursive);
+        assert!(cache.paths.contains_key(&root.join("notes/new.md")));
+    }
+
+    #[test]
+    fn cache_has_no_opinion_above_its_root() {
+        // A graph legitimately lives under a hidden directory (~/.config):
+        // only components *below* the watch root are screened.
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join(".config/graph");
+        std::fs::create_dir_all(root.join("notes")).unwrap();
+        std::fs::write(root.join("notes/a.md"), "note").unwrap();
+
+        let mut cache = PrunedFileIdMap::new(root.clone());
+        cache.add_path(&root, RecursiveMode::Recursive);
+        assert!(cache.paths.contains_key(&root.join("notes/a.md")));
     }
 }

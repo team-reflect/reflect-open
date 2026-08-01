@@ -12,7 +12,10 @@ use std::path::{Component, Path, PathBuf};
 
 mod walk;
 
-pub use walk::{has_pruned_component, walk_catalog, FileCatalog, FileEntry, REFLECT_IGNORE_FILE};
+pub use walk::{
+    has_pruned_component, is_pruned_dir_name, walk_catalog, FileCatalog, FileEntry,
+    REFLECT_IGNORE_FILE,
+};
 
 /// Root trees reserved for Reflect-managed attachments and recordings.
 /// Markdown under either tree is content, not a note.

@@ -4880,6 +4880,7 @@ dependencies = [
  "dirs",
  "dispatch2",
  "fastembed",
+ "file-id",
  "git2",
  "hf-hub 0.5.0",
  "image",
@@ -4919,6 +4920,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "trash",
+ "walkdir",
  "xattr",
  "zip 8.6.0",
 ]

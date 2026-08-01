@@ -350,8 +350,9 @@ pub fn index_reconcile_scan(
 ) -> AppResult<scan::ReconcileScan> {
     let started = std::time::Instant::now();
     let root = crate::fs::current_root(&graph)?;
+    let walk_started = std::time::Instant::now();
     let files = crate::fs::note_files(&root);
-    let walk_ms = started.elapsed().as_millis() as u64;
+    let walk_ms = walk_started.elapsed().as_millis() as u64;
     let state = lock_state(&index)?;
     if state.generation != generation {
         return Ok(scan::ReconcileScan::empty());

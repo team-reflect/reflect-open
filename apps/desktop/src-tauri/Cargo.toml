@@ -158,6 +158,10 @@ tauri-plugin-window-state = "2.4.1"
 trash = "5.2.6"
 notify = "8.2.0"
 notify-debouncer-full = "0.7.0"
+# The watcher's pruned file-ID cache (rename stitching without the full-tree
+# walk) reuses the debouncer's own building blocks directly.
+file-id = "0.2.3"
+walkdir = "2.5.0"
 # Direct dependency on fastembed's own downloader, used to pre-fetch the
 # embedding model with byte-level progress (fastembed downloads silently).
 hf-hub = { version = "0.5.0", default-features = false, features = ["ureq", "native-tls"] }
