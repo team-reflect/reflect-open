@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.3...v0.8.0-beta.4) (2026-08-01)
+
+
+### Bug Fixes
+
+* symbolicate native iOS crashes from TestFlight builds ([#1012](https://github.com/team-reflect/reflect-open/issues/1012)) ([08b1ca1](https://github.com/team-reflect/reflect-open/commit/08b1ca1f6deb84dbe5bb91b34bb0274c39f0c46b))
+
 ## [0.8.0-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.2...v0.8.0-beta.3) (2026-07-31)
 
 
