@@ -175,8 +175,14 @@ targets:
       # + the recording Live Activity; embedded and signed with the app.
       - target: RecordingWidget
         embed: true
+      # Sentry-Dynamic, not Sentry: the default product is a prebuilt STATIC
+      # xcframework, and Xcode 26 links it correctly but then embeds a
+      # synthesized stub Sentry.framework (a 49KB symbol-less dylib whose
+      # install name is a swbuild temp path) into Frameworks/. App Store
+      # Connect rejects that stub with ITMS-90035 "Invalid Signature", killing
+      # every TestFlight upload. The dynamic product embeds the real dylib.
       - package: Sentry
-        product: Sentry
+        product: Sentry-Dynamic
       - framework: libapp.a
         embed: false
       # libgit2 (vendored into libapp.a) needs zlib and iconv at the final

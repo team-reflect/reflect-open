@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0B64041CFADD8313F72A847E /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = C8AADCC30FF3C34B87DA6BCD /* Sentry */; };
+		0B64041CFADD8313F72A847E /* Sentry-Dynamic in Frameworks */ = {isa = PBXBuildFile; productRef = 27BF2501FCD1BD0D24DB4908 /* Sentry-Dynamic */; };
 		14BE6EF4AB511AC099410853 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 57BCB79C0774021318852985 /* main.mm */; };
 		1C8847A7F1C163FBA53373F9 /* ExtensionClass.js in Resources */ = {isa = PBXBuildFile; fileRef = 536E4F5E21B7DCC3C7ECDC1A /* ExtensionClass.js */; };
 		266B3807E809464C8FC14146 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FDC9BB81FAB5AF8D65160799 /* Metal.framework */; };
@@ -75,6 +75,7 @@
 
 /* Begin PBXFileReference section */
 		05ABE058940EC4D96B7CA5D9 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		069F78703991523CA2662E65 /* blocking.rs */ = {isa = PBXFileReference; path = blocking.rs; sourceTree = "<group>"; };
 		088536D8F462855DCFDA7B06 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 		08B3817A23175E584BA6FD8D /* error.rs */ = {isa = PBXFileReference; path = error.rs; sourceTree = "<group>"; };
 		11AB73085CB07EA1B7A3533C /* reflect-open_iOS.dev.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "reflect-open_iOS.dev.entitlements"; sourceTree = "<group>"; };
@@ -153,7 +154,6 @@
 		D3691D8F671B7FA21D1E7BD7 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		D7AC6BF821D47F74D41DFAFE /* RecordAudioWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordAudioWidget.swift; sourceTree = "<group>"; };
 		D7DA2E13EA6655A16DFDE015 /* secrets.rs */ = {isa = PBXFileReference; path = secrets.rs; sourceTree = "<group>"; };
-		D8F1F4787BA60FD05FD83FD1 /* spike_mobile.rs */ = {isa = PBXFileReference; path = spike_mobile.rs; sourceTree = "<group>"; };
 		DB54D6D030C08888E9D17442 /* RecordingWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = RecordingWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		DBD22A8C59FD8892E5F139EC /* tests.rs */ = {isa = PBXFileReference; path = tests.rs; sourceTree = "<group>"; };
 		DD5CA5DD1A0A2C6898BF16AE /* tests.rs */ = {isa = PBXFileReference; path = tests.rs; sourceTree = "<group>"; };
@@ -174,7 +174,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0B64041CFADD8313F72A847E /* Sentry in Frameworks */,
+				0B64041CFADD8313F72A847E /* Sentry-Dynamic in Frameworks */,
 				9D7F5A94048CECBFC3D89BBA /* libapp.a in Frameworks */,
 				319EDF8F46AB05DFBA9D674F /* libz.tbd in Frameworks */,
 				E9E7B6C59015E7301EE63308 /* libiconv.tbd in Frameworks */,
@@ -292,6 +292,7 @@
 			isa = PBXGroup;
 			children = (
 				D2398DBC3478C5F96CC89402 /* background_task.rs */,
+				069F78703991523CA2662E65 /* blocking.rs */,
 				772B62ED093A33BDCD1864D8 /* calendar.rs */,
 				2490DACB2171344E8D9A8807 /* capture.rs */,
 				ADB23521181EEB9EF095D4AB /* contacts.rs */,
@@ -310,7 +311,6 @@
 				D7DA2E13EA6655A16DFDE015 /* secrets.rs */,
 				18A732A38CD75FF514E4CF86 /* settings.rs */,
 				2FA419867A84041644CC42E9 /* skill.rs */,
-				D8F1F4787BA60FD05FD83FD1 /* spike_mobile.rs */,
 				F3173A0D7E498896FAC5A43E /* watcher_mobile.rs */,
 				4EE64B671C831953394179E2 /* watcher.rs */,
 				ACE1CDF45CDBB8D7B2446E36 /* windows.rs */,
@@ -482,7 +482,7 @@
 			);
 			name = "reflect-open_iOS";
 			packageProductDependencies = (
-				C8AADCC30FF3C34B87DA6BCD /* Sentry */,
+				27BF2501FCD1BD0D24DB4908 /* Sentry-Dynamic */,
 			);
 			productName = "reflect-open_iOS";
 			productReference = BC3901740F3A40252C3750C7 /* reflect-open_iOS.app */;
@@ -701,7 +701,7 @@
 				CODE_SIGN_ENTITLEMENTS = "reflect-open_iOS/reflect-open_iOS.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 789ULN5MZB;
+				DEVELOPMENT_TEAM = "789ULN5MZB";
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -716,7 +716,7 @@
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = app.reflect.ios;
-				PRODUCT_NAME = Reflect;
+				PRODUCT_NAME = "Reflect";
 				REFLECT_DISPLAY_NAME = Reflect;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
@@ -864,7 +864,7 @@
 				CODE_SIGN_ENTITLEMENTS = "reflect-open_iOS/reflect-open_iOS.dev.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 789ULN5MZB;
+				DEVELOPMENT_TEAM = "789ULN5MZB";
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -878,8 +878,8 @@
 				);
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				PRODUCT_BUNDLE_IDENTIFIER = app.reflect.ios.dev;
-				PRODUCT_NAME = Reflect;
+				PRODUCT_BUNDLE_IDENTIFIER = app.reflect.ios;
+				PRODUCT_NAME = "Reflect";
 				REFLECT_DISPLAY_NAME = "Reflect Dev";
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
@@ -997,10 +997,10 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		C8AADCC30FF3C34B87DA6BCD /* Sentry */ = {
+		27BF2501FCD1BD0D24DB4908 /* Sentry-Dynamic */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 66F54EA13384DC78CB89C8EA /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
-			productName = Sentry;
+			productName = "Sentry-Dynamic";
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

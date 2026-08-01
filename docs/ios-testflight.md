@@ -206,6 +206,14 @@ workflow.
   `reflect-ios-xcarchive-<build>` artifact for that exact TestFlight build,
   confirm its executable UUID appears in the report, and symbolicate against the
   archive's dSYM. An IPA alone does not contain one.
+- **`Invalid Signature … Reflect.app/Frameworks/Sentry.framework/Sentry is not
+  properly signed` (ITMS-90035)**: the Sentry SPM dependency is pointing at the
+  default `Sentry` product again. That product is a prebuilt *static*
+  xcframework; Xcode 26 links it into the app binary correctly but then embeds
+  a synthesized stub `Sentry.framework` (a tiny symbol-less dylib with a
+  `swbuild` temp-path install name) that App Store Connect rejects. Keep the
+  dependency on `Sentry-Dynamic` in `ios.project.yml` and
+  `gen/apple/project.yml`, and regenerate the Xcode project with `xcodegen`.
 - **Sentry reports "missing debug information"**: check the release helper's
   `sentry-cli debug-files upload` output. Publication fails when native Sentry is
   configured but no dSYM exists or the upload is rejected; JavaScript source-map
