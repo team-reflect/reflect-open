@@ -263,6 +263,26 @@ describe('ChatScreen', () => {
     expect(options?.messages.at(-1)).toEqual({ role: 'user', content: 'when does atlas ship?' })
   })
 
+  it('copies a settled reply as the markdown the model wrote', async () => {
+    configureModel()
+    scriptTurn([
+      { type: 'text-delta', text: 'It ships in June. [[Atlas]]' },
+      {
+        type: 'complete',
+        messages: [{ role: 'assistant', content: 'It ships in June. [[Atlas]]' }],
+      },
+    ])
+    const writeText = vi.fn(async () => {})
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    const view = await renderChat()
+
+    await userEvent.type(view.getByLabelText('Chat message'), 'when does atlas ship?{Enter}')
+    await view.getByRole('button', { name: 'Copy reply' }).click()
+
+    // The wiki link survives the copy, so a pasted reply still links.
+    expect(writeText).toHaveBeenCalledWith('It ships in June. [[Atlas]]')
+  })
+
   it('opens ⌘-clicked tool-result and read-note links in new windows', async () => {
     configureModel()
     scriptTurn([
@@ -541,6 +561,8 @@ describe('ChatScreen', () => {
     // Visible immediately as plain text — never re-parsed per delta.
     await expect.element(view.getByText('Streaming **markdown**')).toBeInTheDocument()
     expect(view.getByTestId('markdown-preview').query()).toBeNull()
+    // Nothing to copy until the reply is whole.
+    expect(view.getByRole('button', { name: 'Copy reply' }).query()).toBeNull()
   })
 
   it('rejects a second send fired before the first one has rendered', async () => {

@@ -2,9 +2,11 @@ import type { ReactElement } from 'react'
 import type { ChatTurn as ChatTurnModel } from '@reflect/core'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Marker, MarkerContent } from '@/components/ui/marker'
-import { Message, MessageContent, MessageGroup } from '@/components/ui/message'
+import { Message, MessageContent, MessageFooter, MessageGroup } from '@/components/ui/message'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
+import { assistantReplyMarkdown } from '@/lib/chat-copy'
 import { ChatAssistantPart } from './chat-assistant-part'
+import { ChatCopyButton } from './chat-copy-button'
 import { ChatUserAttachments } from './chat-user-attachments'
 
 interface ChatTurnProps {
@@ -24,10 +26,15 @@ interface ChatTurnProps {
  *
  * Wiki navigation passes a null generation deliberately: a clicked citation
  * that doesn't resolve must never *create* a note the model hallucinated.
+ *
+ * A settled turn that produced answer text gets a hover-revealed copy button
+ * under it; a turn that only ran tools or errored has nothing to copy, so it
+ * gets none.
  */
 export function ChatTurn({ turn }: ChatTurnProps): ReactElement {
   const navigateWikiLink = useWikiLinkNavigation(null)
   const lastIndex = turn.parts.length - 1
+  const replyMarkdown = turn.status === 'done' ? assistantReplyMarkdown(turn) : null
 
   return (
     <MessageGroup className="gap-6">
@@ -61,6 +68,11 @@ export function ChatTurn({ turn }: ChatTurnProps): ReactElement {
               onWikiLinkClick={navigateWikiLink}
             />
           ))}
+          {replyMarkdown !== null ? (
+            <MessageFooter className="-mt-1 opacity-0 transition-opacity group-hover/message:opacity-100 focus-within:opacity-100">
+              <ChatCopyButton text={replyMarkdown} />
+            </MessageFooter>
+          ) : null}
         </MessageContent>
       </Message>
     </MessageGroup>
