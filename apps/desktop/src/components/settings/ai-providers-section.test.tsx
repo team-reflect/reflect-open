@@ -355,10 +355,15 @@ describe('AiProvidersSection', () => {
     await userEvent.keyboard('{Tab}')
 
     // From the last control, Tab wraps to the first instead of escaping
-    // into the settings page behind the modal.
-    expect(document.activeElement).toBe(
-      dialog.getByLabelText('Provider', { exact: true }).element(),
-    )
+    // into the settings page behind the modal. Base UI traps by letting Tab
+    // land on a sentinel guard span for a beat, then teleporting focus to
+    // the wrap target — poll for the settled state, not the interim one
+    // (WebKit reliably exposes the interim beat).
+    await vi.waitFor(() => {
+      expect(document.activeElement).toBe(
+        dialog.getByLabelText('Provider', { exact: true }).element(),
+      )
+    })
   })
 
   it('falls back to the first entry when the default id dangles', async () => {
