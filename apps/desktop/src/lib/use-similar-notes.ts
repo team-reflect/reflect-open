@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useEffect, useMemo } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { hasBridge, isDaily, relatedNotes, type RetrievalHit } from '@reflect/core'
 import { readNoteSource } from '@/lib/note-frontmatter'
 import { isOstensiblyEmptyNoteSource } from '@/lib/note-emptiness'
@@ -29,7 +29,10 @@ const SIMILAR_NOTES_LIMIT = 6
  * — it must reopen the gate when a blank daily gets its first line — and an
  * empty *result* is left stale so a note whose vectors land later (a fresh
  * note, a backfill still running) fills in on its next mount instead of being
- * frozen at "no neighbors" for the session.
+ * frozen at "no neighbors" for the session. The gate closing works the other
+ * way too: a daily observed empty has had its content *wiped*, so its cached
+ * neighbors describe deleted text — they're dropped, and the refill recomputes
+ * instead of being served the old note's panel from cache.
  *
  * Gated on `semanticSearchEnabled` so disabling semantic search empties every
  * surface immediately: the query stops fetching, and the cached rows are
@@ -39,6 +42,7 @@ const SIMILAR_NOTES_LIMIT = 6
 export function useSimilarNotes(path: string): RetrievalHit[] {
   const { graph } = useGraph()
   const { settings } = useSettings()
+  const queryClient = useQueryClient()
   const bridgeAvailable = hasBridge()
   const dailyNote = isDaily(path)
   const { data: dailyNoteIsEmpty } = useQuery({
@@ -46,6 +50,20 @@ export function useSimilarNotes(path: string): RetrievalHit[] {
     queryFn: async () => isOstensiblyEmptyNoteSource(await readNoteSource(path)),
     enabled: bridgeAvailable && graph !== null && dailyNote && settings.semanticSearchEnabled,
   })
+  const graphRoot = graph?.root
+  // A daily observed empty was cleared: its cached neighbors (frozen at
+  // `staleTime: Infinity` below) describe the deleted content, and re-enabling
+  // the query on refill would serve them straight from cache. Dropping the
+  // entry makes the refill compute fresh. Safe to run repeatedly — the query
+  // is disabled while the gate is closed, so there's no in-flight fetch.
+  useEffect(() => {
+    if (dailyNoteIsEmpty === true) {
+      queryClient.removeQueries({
+        queryKey: [SIMILAR_QUERY_SCOPE, graphRoot, path],
+        exact: true,
+      })
+    }
+  }, [dailyNoteIsEmpty, queryClient, graphRoot, path])
   const enabled =
     bridgeAvailable &&
     graph !== null &&

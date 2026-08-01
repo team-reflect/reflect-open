@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderHook } from 'vitest-browser-react'
 import type { ReactNode } from 'react'
 import type { RetrievalHit } from '@reflect/core'
-import { INDEX_QUERY_SCOPE } from './query-client'
+import { INDEX_QUERY_SCOPE, SIMILAR_QUERY_SCOPE } from './query-client'
 import { useSimilarNotes } from './use-similar-notes'
 
 const relatedNotes = vi.hoisted(() => vi.fn())
@@ -132,6 +132,39 @@ describe('useSimilarNotes', () => {
     })
     await vi.waitFor(() => expect(third.result.current.length).toBe(1))
     await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(relatedNotes).toHaveBeenCalledTimes(2)
+  })
+
+  it('recomputes neighbors after a daily note is cleared and refilled', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const first = await renderHook(() => useSimilarNotes('daily/2026-06-09.md'), {
+      wrapper: wrapper(client),
+    })
+    await vi.waitFor(() => expect(first.result.current.length).toBe(2))
+    expect(relatedNotes).toHaveBeenCalledTimes(1)
+    await first.unmount()
+
+    // The daily's body is wiped: the emptiness gate closes, and the cached
+    // neighbors — they describe the deleted content — must be dropped with it.
+    readNote.mockResolvedValue('- \n')
+    const cleared = await renderHook(() => useSimilarNotes('daily/2026-06-09.md'), {
+      wrapper: wrapper(client),
+    })
+    const similarKey = [SIMILAR_QUERY_SCOPE, '/g', 'daily/2026-06-09.md']
+    await vi.waitFor(() => expect(client.getQueryData(similarKey)).toBeUndefined())
+    expect(cleared.result.current).toEqual([])
+    await cleared.unmount()
+
+    // New content arrives: the refill computes fresh instead of serving the
+    // old note's neighbors from the session cache.
+    readNote.mockResolvedValue('- rewritten entry\n')
+    relatedNotes.mockResolvedValue([hit('notes/c.md')])
+    const refilled = await renderHook(() => useSimilarNotes('daily/2026-06-09.md'), {
+      wrapper: wrapper(client),
+    })
+    await vi.waitFor(() =>
+      expect(refilled.result.current.map((h) => h.path)).toEqual(['notes/c.md']),
+    )
     expect(relatedNotes).toHaveBeenCalledTimes(2)
   })
 
