@@ -93,6 +93,7 @@ pub async fn icloud_conflicts_scan(
     if let Ok(outcome) = &outcome {
         tracing::info!(
             changed = outcome.changed.len(),
+            needs_review = outcome.needs_review.len(),
             deferred = outcome.deferred.len(),
             auto_resolved = outcome.auto_resolved,
             record_baseline,

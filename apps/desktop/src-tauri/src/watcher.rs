@@ -722,4 +722,30 @@ mod tests {
         cache.add_path(&root, RecursiveMode::Recursive);
         assert!(cache.paths.contains_key(&root.join("notes/a.md")));
     }
+
+    #[test]
+    fn cache_remove_path_evicts_the_whole_subtree() {
+        // A stale entry after a directory rename/remove would keep matching
+        // the old path's file ID and mis-stitch a later event.
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("notes/sub")).unwrap();
+        std::fs::write(root.join("notes/a.md"), "a").unwrap();
+        std::fs::write(root.join("notes/sub/b.md"), "b").unwrap();
+        std::fs::write(root.join("top.md"), "top").unwrap();
+
+        let mut cache = PrunedFileIdMap::new(root.to_path_buf());
+        cache.add_path(root, RecursiveMode::Recursive);
+        assert!(cache.paths.contains_key(&root.join("notes/sub/b.md")));
+
+        cache.remove_path(&root.join("notes"));
+        assert!(
+            !cache
+                .paths
+                .keys()
+                .any(|path| path.starts_with(root.join("notes"))),
+            "the removed subtree must be fully evicted"
+        );
+        assert!(cache.paths.contains_key(&root.join("top.md")));
+    }
 }
