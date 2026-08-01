@@ -55,14 +55,32 @@ impl ShadowStore {
     }
 
     /// The base content for a note, when one has been recorded.
+    ///
+    /// A definitively corrupt entry — the bytes read fine but aren't UTF-8 —
+    /// is removed on sight: [`has_base`](Self::has_base) answers by
+    /// existence, so a corrupt file left in place would make every baseline
+    /// fill skip the note while every merge sees no base. Forgetting it
+    /// restores the store's rebuildable contract (the next fill re-records).
+    /// A read *error* is left alone: it may be transient, and deleting a
+    /// possibly-good base over it would be worse than one degraded merge.
     pub fn base(&self, rel: &str) -> Option<String> {
         let path = self.entry_path(rel, "")?;
-        fs::read_to_string(path).ok()
+        let bytes = fs::read(path).ok()?;
+        match String::from_utf8(bytes) {
+            Ok(content) => Some(content),
+            Err(_) => {
+                self.forget(rel);
+                None
+            }
+        }
     }
 
     /// Whether a base is recorded for a note, without reading it. The
     /// baseline fill pass probes every note on every start — as a `base()`
-    /// call that was a full read of the entire store per launch.
+    /// call that was a full read of the entire store per launch. Existence
+    /// is the honest answer here because [`base`](Self::base) deletes
+    /// definitively-corrupt entries, so a lingering entry is either usable
+    /// or transiently unreadable — never permanently dead.
     pub fn has_base(&self, rel: &str) -> bool {
         self.entry_path(rel, "").is_some_and(|path| path.is_file())
     }
@@ -206,6 +224,17 @@ mod tests {
     fn has_base_refuses_traversal_shapes_like_base() {
         let (_dir, store) = store();
         assert!(!store.has_base("../outside.md"));
+    }
+
+    #[test]
+    fn a_corrupt_base_is_forgotten_on_read_so_the_fill_can_re_record() {
+        let (dir, store) = store();
+        let entry = dir.path().join(".reflect/sync-base/notes/a.md");
+        fs::create_dir_all(entry.parent().unwrap()).unwrap();
+        fs::write(&entry, [0xff, 0xfe, 0x00]).unwrap(); // not UTF-8
+        assert!(store.has_base("notes/a.md")); // exists — fill would skip it
+        assert_eq!(store.base("notes/a.md"), None); // unusable → forgotten
+        assert!(!store.has_base("notes/a.md")); // next fill re-records
     }
 
     #[test]

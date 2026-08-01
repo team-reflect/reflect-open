@@ -486,21 +486,23 @@ mod platform {
                 let root = std::path::Path::new(root.trim_end_matches('/'));
                 crate::fs::invalidate_file_catalog(&state, root);
             }
-            if emit_file_changes {
-                if is_update {
-                    let _ = app.emit("index:changed", round.changes);
-                } else {
-                    // The gather round diffs against an empty snapshot, so
-                    // its "changes" are every downloaded note in the graph —
-                    // not news, just the watch coming up. Emitting them sent
-                    // an O(graph) payload through every index:changed
-                    // listener on each open. The open-path reconcile already
-                    // covers on-disk state; one coarse reconcile signal
-                    // (coalesced by the frontend) closes the small window
-                    // between its listing and the gather completing.
-                    let _ = app.emit(crate::watcher::RECONCILE_EVENT, ());
-                }
+            if emit_file_changes && is_update {
+                let _ = app.emit("index:changed", round.changes);
             }
+        }
+        if emit_file_changes && !is_update {
+            // The gather round diffs against an empty snapshot, so its
+            // "changes" are every downloaded note in the graph — not news,
+            // just the watch coming up. Emitting them sent an O(graph)
+            // payload through every index:changed listener on each open.
+            // The open-path reconcile already covers on-disk state; one
+            // coarse reconcile signal (coalesced by the frontend) closes the
+            // window between its listing and the gather completing. Emitted
+            // regardless of the round's diff: what raced in may be invisible
+            // to it — a deletion leaves the empty-snapshot diff empty, and
+            // placeholders never appear as changes at all — so an empty
+            // gather proves nothing about that window.
+            let _ = app.emit(crate::watcher::RECONCILE_EVENT, ());
         }
         if !round.conflicts.is_empty() {
             let mut conflicts = round.conflicts;
