@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.5...v0.8.0-beta.6) (2026-08-01)
+
+
+### Bug Fixes
+
+* **ios:** switch Sentry to the dynamic SPM product so TestFlight uploads pass ([#1018](https://github.com/team-reflect/reflect-open/issues/1018)) ([4658424](https://github.com/team-reflect/reflect-open/commit/4658424437255750df9dff34d4d8bd564851fa31))
+
 ## [0.8.0-beta.5](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.4...v0.8.0-beta.5) (2026-08-01)
 
 
