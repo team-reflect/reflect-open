@@ -248,6 +248,13 @@ pub async fn icloud_request_downloads(
     .map_err(|err| AppError::io(err.to_string()))?
 }
 
+/// The app container's `Documents/` directory, if resolvable — shared with
+/// the watch's query-coverage check ([`super::watch`]). Can block on first
+/// use (the OS may initialize the container); call off the main thread.
+pub(crate) fn ubiquity_documents_dir() -> Option<PathBuf> {
+    platform::ubiquity_documents_dir()
+}
+
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 mod platform {
     use std::path::{Path, PathBuf};

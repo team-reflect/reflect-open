@@ -37,12 +37,34 @@ use crate::error::AppResult;
 /// reports file events; double delivery is harmless but wasteful). Conflict
 /// paths always emit as `icloud:conflicts`.
 #[tauri::command]
-pub fn icloud_watch_start(
+pub async fn icloud_watch_start(
     root: String,
     emit_file_changes: bool,
     app: tauri::AppHandle,
 ) -> AppResult<()> {
-    platform::start(app, root, emit_file_changes)
+    // Whether the query's scope actually covers this root — it lists the
+    // app's own ubiquity container only, so for any other iCloud path (a
+    // desktop graph in the user's general iCloud Drive) the gather produces
+    // an empty view that must read as "unknown", never "no conflicts".
+    // Resolved off the main thread: the container API can block on first use.
+    let authoritative = {
+        let root = root.clone();
+        crate::blocking::run_blocking(move || Ok(query_covers_root(&root))).await?
+    };
+    platform::start(app, root, emit_file_changes, authoritative)
+}
+
+/// See [`icloud_watch_start`]: `root` lives inside the app's own ubiquity
+/// container. Both sides canonicalized — iOS containers sit behind the
+/// `/var` → `/private/var` symlink, and a lexical compare would miss.
+fn query_covers_root(root: &str) -> bool {
+    let Some(documents) = super::storage::ubiquity_documents_dir() else {
+        return false;
+    };
+    fn canonical(path: &std::path::Path) -> std::path::PathBuf {
+        std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+    }
+    canonical(std::path::Path::new(root)).starts_with(canonical(&documents))
 }
 
 /// Command: stop the active watch (graph switch or shutdown). Idempotent.
@@ -130,19 +152,35 @@ mod platform {
     static SNAPSHOT: LazyLock<Mutex<HashMap<String, TrackedState>>> =
         LazyLock::new(|| Mutex::new(HashMap::new()));
 
-    /// Paths the provider currently flags as carrying unresolved conflict
-    /// versions — maintained by the same rounds that emit `icloud:conflicts`,
-    /// and consumed by the scoped conflict sweep so it checks `NSFileVersion`
-    /// only where the provider says a conflict exists instead of once per
-    /// note. Valid only once [`GATHERED`] is set: before the gather round the
-    /// set is empty for the wrong reason.
-    static CONFLICTED: LazyLock<Mutex<HashSet<String>>> =
-        LazyLock::new(|| Mutex::new(HashSet::new()));
+    /// The scoped sweep's candidate view: the paths the provider currently
+    /// flags as carrying unresolved conflict versions, maintained by the
+    /// same rounds that emit `icloud:conflicts`. Everything that decides
+    /// whether the view may be *trusted* lives in the same struct, under one
+    /// lock, so a reader can never observe a torn combination (readiness
+    /// from one watch, paths from another):
+    ///
+    /// - `epoch` pins the view to one install; rounds carry the epoch their
+    ///   watch was installed with, and a stale round — an old query's
+    ///   in-flight gather completing after teardown or after a newer graph's
+    ///   install — folds into nothing.
+    /// - `authoritative` records whether the query's scope actually covers
+    ///   the watched root (the app's own ubiquity container). For any other
+    ///   iCloud path the query gathers an *empty* view that must read as
+    ///   "unknown", never "no conflicts".
+    /// - `gathered` flips only when a full listing of this epoch lands;
+    ///   before that the set is empty for the wrong reason.
+    #[derive(Default)]
+    struct ConflictView {
+        epoch: u64,
+        authoritative: bool,
+        gathered: bool,
+        paths: HashSet<String>,
+    }
 
-    /// True once the current watch's gather round has seeded a complete
-    /// view. Cleared on install and teardown — a stopped or restarted watch
-    /// must answer "unknown", never "no conflicts".
-    static GATHERED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    /// The live [`ConflictView`]. Install epochs start at 1, so the default
+    /// view (epoch 0) can never accept a round.
+    static CONFLICT_VIEW: LazyLock<Mutex<ConflictView>> =
+        LazyLock::new(|| Mutex::new(ConflictView::default()));
 
     /// Content-change date last download-requested, per graph-relative path.
     /// The OS treats repeat requests as no-ops, but *issuing* them is not
@@ -174,12 +212,19 @@ mod platform {
     /// (dropping observer tokens does not deregister them).
     static EPOCH: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
-    pub fn start(app: tauri::AppHandle, root: String, emit_file_changes: bool) -> AppResult<()> {
+    pub fn start(
+        app: tauri::AppHandle,
+        root: String,
+        emit_file_changes: bool,
+        authoritative: bool,
+    ) -> AppResult<()> {
         use std::sync::atomic::Ordering;
         let epoch = EPOCH.fetch_add(1, Ordering::SeqCst) + 1;
         let handle = app.clone();
-        app.run_on_main_thread(move || install(handle, root, emit_file_changes, epoch))
-            .map_err(|err| AppError::io(format!("failed to reach the main thread: {err}")))
+        app.run_on_main_thread(move || {
+            install(handle, root, emit_file_changes, authoritative, epoch)
+        })
+        .map_err(|err| AppError::io(format!("failed to reach the main thread: {err}")))
     }
 
     pub fn stop(app: tauri::AppHandle) -> AppResult<()> {
@@ -200,8 +245,7 @@ mod platform {
     /// against installs.
     fn teardown_active(mtm: MainThreadMarker) {
         // A stopped watch must answer "unknown", never "no conflicts".
-        GATHERED.store(false, std::sync::atomic::Ordering::SeqCst);
-        CONFLICTED.lock().expect("conflict lock").clear();
+        *CONFLICT_VIEW.lock().expect("conflict view lock") = ConflictView::default();
         let Some(bound) = ACTIVE.lock().expect("watch lock").take() else {
             return;
         };
@@ -238,7 +282,13 @@ mod platform {
     /// aborts when a later `start`/`stop` has superseded this one's epoch —
     /// so rapid graph switches can never leave two queries running or
     /// install a watch after its graph closed.
-    fn install(app: tauri::AppHandle, root: String, emit_file_changes: bool, epoch: u64) {
+    fn install(
+        app: tauri::AppHandle,
+        root: String,
+        emit_file_changes: bool,
+        authoritative: bool,
+        epoch: u64,
+    ) {
         use std::sync::atomic::Ordering;
         let mtm = MainThreadMarker::new().expect("run_on_main_thread is the main thread");
         teardown_active(mtm);
@@ -247,8 +297,12 @@ mod platform {
         }
         SNAPSHOT.lock().expect("snapshot lock").clear();
         NUDGED.lock().expect("nudge lock").clear();
-        CONFLICTED.lock().expect("conflict lock").clear();
-        GATHERED.store(false, Ordering::SeqCst);
+        *CONFLICT_VIEW.lock().expect("conflict view lock") = ConflictView {
+            epoch,
+            authoritative,
+            gathered: false,
+            paths: HashSet::new(),
+        };
         let query = NSMetadataQuery::new();
         query.setNotificationBatchingInterval(UPDATE_BATCHING_INTERVAL_S);
 
@@ -297,7 +351,7 @@ mod platform {
         let handler_roots = roots.clone();
         let emit_app = app.clone();
         let block = RcBlock::new(move |notification: NonNull<NSNotification>| {
-            handle_notification(&app, &handler_roots, emit_file_changes, notification);
+            handle_notification(&app, &handler_roots, emit_file_changes, epoch, notification);
         });
         let center = NSNotificationCenter::defaultCenter();
         let query_object: &AnyObject = &query;
@@ -494,12 +548,40 @@ mod platform {
     }
 
     /// The scoped sweep's candidate set — see the outer
-    /// [`super::conflicted_paths`] for the contract.
+    /// [`super::conflicted_paths`] for the contract. One lock read: the
+    /// trust conditions and the paths come from the same view, and the
+    /// epoch check also covers "the watch was stopped but its main-thread
+    /// teardown hasn't run yet" (stop bumps [`EPOCH`] synchronously).
     pub(crate) fn conflicted_paths() -> Option<HashSet<String>> {
-        if !GATHERED.load(std::sync::atomic::Ordering::SeqCst) {
-            return None;
+        use std::sync::atomic::Ordering;
+        let view = CONFLICT_VIEW.lock().expect("conflict view lock");
+        (view.authoritative && view.gathered && view.epoch == EPOCH.load(Ordering::SeqCst))
+            .then(|| view.paths.clone())
+    }
+
+    /// Fold one round's conflict information into the live view, iff the
+    /// round belongs to the view's install epoch — a stale round from a
+    /// torn-down watch (an old query's gather completing late) must never
+    /// seed or poison a newer watch's view. A full listing (`rebuild`)
+    /// replaces the set wholesale and is the only round shape that may
+    /// declare the view gathered.
+    fn fold_conflicts_into_view(
+        view: &mut ConflictView,
+        epoch: u64,
+        upserted: &[ItemState],
+        removed: &[String],
+        rebuild: bool,
+    ) {
+        if view.epoch != epoch {
+            return;
         }
-        Some(CONFLICTED.lock().expect("conflict lock").clone())
+        if rebuild {
+            view.paths.clear();
+        }
+        apply_conflict_delta(&mut view.paths, upserted, removed);
+        if rebuild {
+            view.gathered = true;
+        }
     }
 
     /// One gathering/update round. Updates apply the notification's own
@@ -511,6 +593,7 @@ mod platform {
         app: &tauri::AppHandle,
         roots: &[String],
         emit_file_changes: bool,
+        epoch: u64,
         notification: NonNull<NSNotification>,
     ) {
         let notification = unsafe { notification.as_ref() };
@@ -524,8 +607,8 @@ mod platform {
         let is_update = &*notification.name() == unsafe { NSMetadataQueryDidUpdateNotification };
         let round = if is_update {
             match update_delta(notification, roots) {
-                Some((upserted, removed)) => update_round(&upserted, &removed),
-                None => full_round(&query, roots, true),
+                Some((upserted, removed)) => update_round(&upserted, &removed, epoch),
+                None => full_round(&query, roots, true, epoch),
             }
         } else {
             // The gather round: this watch just started, with an empty
@@ -534,7 +617,7 @@ mod platform {
             // every app open, an unpaced download storm that pinned
             // fileproviderd. The reconcile's targeted downloads own
             // open-path catch-up; this round only seeds the snapshot.
-            full_round(&query, roots, false)
+            full_round(&query, roots, false, epoch)
         };
 
         if !round.changes.is_empty() {
@@ -575,7 +658,7 @@ mod platform {
     /// Apply one update notification's delta: nudge placeholders whose
     /// content this device lacks, fold the delta into the snapshot, and drop
     /// nudge marks for removed items.
-    fn update_round(upserted: &[ItemState], removed: &[String]) -> Round {
+    fn update_round(upserted: &[ItemState], removed: &[String], epoch: u64) -> Round {
         nudge_pending(upserted);
         let changes = {
             let mut snapshot = SNAPSHOT.lock().expect("snapshot lock");
@@ -588,8 +671,8 @@ mod platform {
             }
         }
         {
-            let mut conflicted = CONFLICTED.lock().expect("conflict lock");
-            apply_conflict_delta(&mut conflicted, upserted, removed);
+            let mut view = CONFLICT_VIEW.lock().expect("conflict view lock");
+            fold_conflicts_into_view(&mut view, epoch, upserted, removed, false);
         }
         Round {
             changes,
@@ -604,7 +687,7 @@ mod platform {
     /// [`apply_update_delta`] (every listed item as an upsert, every
     /// snapshot row missing from the listing as a remove) so the full and
     /// incremental paths share one set of diff rules and can never drift.
-    fn full_round(query: &NSMetadataQuery, roots: &[String], nudge: bool) -> Round {
+    fn full_round(query: &NSMetadataQuery, roots: &[String], nudge: bool, epoch: u64) -> Round {
         query.disableUpdates();
         let results = query.results();
         let mut items: Vec<ItemState> = Vec::new();
@@ -638,13 +721,12 @@ mod platform {
             apply_update_delta(&mut snapshot, &items, &removed)
         };
         {
-            // A full listing is authoritative — rebuild the set wholesale,
-            // and only a full listing may declare the view complete.
-            let mut conflicted = CONFLICTED.lock().expect("conflict lock");
-            conflicted.clear();
-            apply_conflict_delta(&mut conflicted, &items, &[]);
+            // A full listing is authoritative — rebuild the set wholesale;
+            // only a full listing may declare the view complete, and only
+            // for the epoch it belongs to.
+            let mut view = CONFLICT_VIEW.lock().expect("conflict view lock");
+            fold_conflicts_into_view(&mut view, epoch, &items, &[], true);
         }
-        GATHERED.store(true, std::sync::atomic::Ordering::SeqCst);
         Round {
             changes,
             conflicts: conflicted_rels(&items),
@@ -774,8 +856,8 @@ mod platform {
     #[cfg(test)]
     mod tests {
         use super::{
-            apply_conflict_delta, apply_update_delta, plan_nudges, root_variants,
-            tracked_note_relpath, ItemState, TrackedState,
+            apply_conflict_delta, apply_update_delta, fold_conflicts_into_view, plan_nudges,
+            root_variants, tracked_note_relpath, ConflictView, ItemState, TrackedState,
         };
         use std::collections::{HashMap, HashSet};
 
@@ -811,6 +893,55 @@ mod platform {
                 .collect();
             shapes.sort();
             shapes
+        }
+
+        fn conflicted_item(rel: &str) -> ItemState {
+            ItemState {
+                conflict: true,
+                ..item(rel, true, Some(1))
+            }
+        }
+
+        #[test]
+        fn a_stale_rounds_conflicts_never_reach_a_newer_view() {
+            // The race: an old query's in-flight round completes after
+            // teardown (epoch 0) or after a newer install (epoch 2). Either
+            // way it must fold into nothing — a candidate sweep trusting a
+            // poisoned or resurrected view would skip real conflicts.
+            let mut view = ConflictView {
+                epoch: 2,
+                authoritative: true,
+                gathered: false,
+                paths: HashSet::new(),
+            };
+            fold_conflicts_into_view(&mut view, 1, &[conflicted_item("notes/a.md")], &[], true);
+            assert!(!view.gathered, "a stale gather must not declare readiness");
+            assert!(view.paths.is_empty());
+        }
+
+        #[test]
+        fn a_current_rounds_rebuild_replaces_and_seeds_the_view() {
+            let mut view = ConflictView {
+                epoch: 3,
+                authoritative: true,
+                gathered: false,
+                paths: HashSet::from(["notes/stale.md".to_string()]),
+            };
+            fold_conflicts_into_view(&mut view, 3, &[conflicted_item("notes/a.md")], &[], true);
+            assert!(view.gathered);
+            assert_eq!(view.paths, HashSet::from(["notes/a.md".to_string()]));
+
+            // A later delta of the same epoch edits in place without
+            // touching readiness.
+            fold_conflicts_into_view(
+                &mut view,
+                3,
+                &[item("notes/a.md", true, Some(2))],
+                &["notes/b.md".to_string()],
+                false,
+            );
+            assert!(view.gathered);
+            assert!(view.paths.is_empty());
         }
 
         #[test]
@@ -1056,7 +1187,12 @@ mod platform {
 
     /// No iCloud metadata queries off Apple platforms — honest no-ops so the
     /// command surface never branches.
-    pub fn start(_app: tauri::AppHandle, _root: String, _emit_file_changes: bool) -> AppResult<()> {
+    pub fn start(
+        _app: tauri::AppHandle,
+        _root: String,
+        _emit_file_changes: bool,
+        _authoritative: bool,
+    ) -> AppResult<()> {
         Ok(())
     }
 

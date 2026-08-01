@@ -107,15 +107,19 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
   let scanTimerDue = 0
   let scanRunning = false
   /**
-   * The most urgent trigger class that arrived while a sweep was running,
-   * replayed on its own window once the sweep ends: `'prompt'` (conflict
-   * signal, resume) reschedules on {@link SCAN_DEBOUNCE_MS}; `'ingest'`
-   * (arrival batches) respects the full ingest spacing. Requests that land
-   * mid-sweep don't arm a timer — the class survives instead, so a long
-   * sweep neither chains straight into the next one (ingest) nor delays
-   * conflict handling by the wide window (prompt).
+   * The request that arrived while a sweep was running, replayed on its own
+   * window once the sweep ends: `'prompt'` urgency (conflict signal, resume)
+   * reschedules on {@link SCAN_DEBOUNCE_MS}; `'ingest'` (arrival batches)
+   * respects the full ingest spacing. Requests that land mid-sweep don't arm
+   * a timer — the request survives instead, so a long sweep neither chains
+   * straight into the next one (ingest) nor delays conflict handling by the
+   * wide window (prompt). The requested scope rides along and merges the
+   * same way scopes always merge (`'full'` is sticky): without it, a
+   * mid-sweep conflict signal would replay as a default-`'full'` sweep —
+   * another O(N) version pass, in exactly the overlap case the scoping
+   * exists for.
    */
-  let queuedScan: 'prompt' | 'ingest' | null = null
+  let queuedScan: { urgency: 'prompt' | 'ingest'; scope: IcloudSweepScope } | null = null
   let lastScanEndedAt = 0
   /**
    * Version-check coverage for the next sweep. `'full'` is sticky until a
@@ -142,8 +146,11 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
       nextScanScope = 'full' // sticky until a sweep consumes it
     }
     if (scanRunning) {
-      const requested = delayMs <= SCAN_DEBOUNCE_MS ? 'prompt' : 'ingest'
-      queuedScan = requested === 'prompt' ? 'prompt' : (queuedScan ?? 'ingest')
+      const urgency = delayMs <= SCAN_DEBOUNCE_MS ? 'prompt' : 'ingest'
+      queuedScan = {
+        urgency: urgency === 'prompt' || queuedScan?.urgency === 'prompt' ? 'prompt' : 'ingest',
+        scope: scope === 'full' || queuedScan?.scope === 'full' ? 'full' : 'candidates',
+      }
       return
     }
     const due = Date.now() + delayMs
@@ -165,11 +172,11 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
    * to the watch's conflict candidates — during a bulk sync these fire every
    * spacing window, and a full per-note version check each time was the
    * sweep's dominant cost on a large graph. */
-  function scheduleIngestScan(): void {
+  function scheduleIngestScan(scope: IcloudSweepScope = 'candidates'): void {
     const sinceLastScan = Date.now() - lastScanEndedAt
     scheduleScan(
       Math.max(INGEST_SCAN_DEBOUNCE_MS, INGEST_SCAN_MIN_SPACING_MS - sinceLastScan),
-      'candidates',
+      scope,
     )
   }
 
@@ -179,8 +186,8 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
     }
     if (scanRunning) {
       // Unreachable in the current shape (mid-run requests never arm a
-      // timer), kept as a safe fallback: replay promptly.
-      queuedScan = 'prompt'
+      // timer), kept as a safe fallback: replay promptly and thoroughly.
+      queuedScan = { urgency: 'prompt', scope: 'full' }
       return
     }
     scanRunning = true
@@ -217,10 +224,10 @@ export function createIcloudController(options: IcloudControllerOptions): Icloud
       if (queuedScan !== null) {
         const replay = queuedScan
         queuedScan = null
-        if (replay === 'prompt') {
-          scheduleScan()
+        if (replay.urgency === 'prompt') {
+          scheduleScan(SCAN_DEBOUNCE_MS, replay.scope)
         } else {
-          scheduleIngestScan()
+          scheduleIngestScan(replay.scope)
         }
       }
     }

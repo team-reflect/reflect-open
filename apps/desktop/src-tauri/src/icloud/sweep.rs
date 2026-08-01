@@ -125,6 +125,7 @@ pub async fn icloud_conflicts_scan(
             deferred = outcome.deferred.len(),
             auto_resolved = outcome.auto_resolved,
             record_baseline,
+            scope = ?scope,
             elapsed_ms = started.elapsed().as_millis() as u64,
             "icloud_conflicts_scan"
         );

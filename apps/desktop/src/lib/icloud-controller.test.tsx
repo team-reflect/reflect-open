@@ -343,10 +343,30 @@ describe('createIcloudController', () => {
     expect(scanCalls).toHaveLength(1)
 
     // The sweep ends → the queued conflict replays promptly (1s), never on
-    // the wide ingest window.
+    // the wide ingest window — and with its own candidates scope, not the
+    // default full: replaying the O(N) version pass on overlap would undo
+    // the scoping in exactly the case it exists for.
     releaseScan?.()
     await settleScan()
     expect(scanCalls).toHaveLength(2)
+    expect(scanCalls[1]?.scope).toBe('candidates')
+  })
+
+  it('a mid-sweep resume keeps its full scope through the replay', async () => {
+    scanResults.push('hang')
+    const icloud = controller()
+    await icloud.start()
+    await settleScan() // the baseline sweep starts — and hangs
+    expect(scanCalls).toHaveLength(1)
+
+    // A resume (full) and a conflict signal (candidates) both land mid-sweep:
+    // full is sticky through the merge, whatever the arrival order.
+    listeners.get('icloud:conflicts')?.(['notes/a.md'])
+    window.dispatchEvent(new Event('focus'))
+    releaseScan?.()
+    await settleScan()
+    expect(scanCalls).toHaveLength(2)
+    expect(scanCalls[1]?.scope).toBe('full')
   })
 
   it('an arrival caught mid-sweep replays on the ingest spacing', async () => {
