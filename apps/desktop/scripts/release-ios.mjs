@@ -143,7 +143,14 @@ export function createSentryDebugFilesUploadArgs(path) {
   ]
 }
 
-/** Accept only the production Reflect Sentry project configured in the clients. */
+/**
+ * Accept only the production Reflect Sentry project configured in the clients.
+ *
+ * The org/project identity is asserted in three places that must rotate
+ * together: here, `parseExceptionTelemetryDsn` in
+ * `src/lib/exception-telemetry.ts` (WebView SDK), and `parse_native_dsn` in
+ * `src-tauri/src/native_diagnostics.rs` (iOS native SDK).
+ */
 export function isProductionSentryDsn(value) {
   return /^https:\/\/[0-9a-f]{32}@o463484\.ingest\.us\.sentry\.io\/4511705649971200$/.test(
     value ?? '',

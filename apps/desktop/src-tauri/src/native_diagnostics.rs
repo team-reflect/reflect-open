@@ -10,9 +10,13 @@ use std::ffi::{c_char, CString};
 const SENTRY_DSN_PREFIX: &str = "https://";
 const SENTRY_ENDPOINT: &str = "o463484.ingest.us.sentry.io/4511705649971200";
 
-/// Accept only the production Reflect project DSN, mirroring
-/// `parseExceptionTelemetryDsn` in `src/lib/exception-telemetry.ts`. Forks and
-/// local builds without the secret simply never start the native SDK.
+/// Accept only the production Reflect project DSN. Forks and local builds
+/// without the secret simply never start the native SDK.
+///
+/// The org/project identity is asserted in three places that must rotate
+/// together: here, `parseExceptionTelemetryDsn` in
+/// `src/lib/exception-telemetry.ts` (WebView SDK), and `isProductionSentryDsn`
+/// in `scripts/release-ios.mjs` (symbol upload).
 fn parse_native_dsn(value: Option<&str>) -> Option<&str> {
     let value = value?.trim();
     let remainder = value.strip_prefix(SENTRY_DSN_PREFIX)?;

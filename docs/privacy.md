@@ -3,8 +3,9 @@
 Reflect is local-first: your notes are markdown files in a folder you chose, the search
 index is SQLite in `.reflect/` beside them, and **no Reflect-hosted server exists in any
 path** — there is no product analytics and no account. Official release builds send
-scrubbed WebView and native crash diagnostics to Sentry. Every network call the app can
-make is listed here, with what it carries.
+scrubbed WebView diagnostics to Sentry, and official iOS release builds also send scrubbed
+native crash diagnostics. Every network call the app can make is listed here, with what it
+carries.
 
 The one hard rule sits above all of it: **a note with `private: true` frontmatter never
 has its content sent to any external service.** This is enforced in code at every AI
