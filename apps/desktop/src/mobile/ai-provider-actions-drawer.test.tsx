@@ -1,5 +1,5 @@
 import { render } from 'vitest-browser-react'
-import { page } from 'vitest/browser'
+import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import type { AiProviderConfig } from '@reflect/core'
@@ -129,6 +129,9 @@ describe('AiProviderActionsDrawer', () => {
     const view = await renderSheet(false, COMPATIBLE_P1)
     await expect.element(page.getByLabelText('Transcription model')).toHaveValue('whisper-1')
 
+    // An unsaved edit - the draft now diverges from the provider's model.
+    await page.getByLabelText('Transcription model').fill('whisper-edited-draft')
+
     await view.rerender(
       <AiProviderActionsDrawer
         provider={COMPATIBLE_P2}
@@ -144,7 +147,12 @@ describe('AiProviderActionsDrawer', () => {
       />,
     )
 
+    // The remounted input carries the new provider's model, not the stale draft.
     await expect.element(page.getByLabelText('Transcription model')).toHaveValue('whisper-large-v3')
+
+    // Blurring the fresh input would, without the key, save the previous
+    // provider's draft under the new provider id. The key keeps that path dead.
+    await userEvent.tab()
     expect(onSetTranscriptionModel).not.toHaveBeenCalled()
   })
 })
