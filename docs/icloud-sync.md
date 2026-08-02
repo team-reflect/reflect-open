@@ -77,6 +77,32 @@ in CI. What *needs a real container* (and the two-device manual matrix in
 the plan doc) is the `NSMetadataQuery` watch, `NSFileVersion` conflict
 delivery, and download/eviction behavior.
 
+## Known log noise: `BRItemCollectionGatherer - Repeatedly can't watch item`
+
+With a graph open, the app process logs CloudDocs errors — a burst while the
+`NSMetadataQuery` watch gathers, then one round per graph write:
+
+```
+[ERROR] … NSError: NSFileProviderInternalErrorDomain 15 … while gathering
+[CRIT] UNREACHABLE: … BRItemCollectionGatherer - Repeatedly can't watch item …
+```
+
+This is Apple's query machinery tripping over the directories Reflect
+deliberately excludes from sync (`.reflect`, and `.git` on desktop — see
+`mark_dir_local_only` in `fs/io.rs`): they exist on disk inside the watched
+root, but carry no identity in the provider database, so the gatherer's
+per-item watch fails, retries, and gives up with the `UNREACHABLE` fault.
+Any FS event under an excluded tree re-attempts once — on desktop that means
+every note save, because the local Git history engine commits into `.git`.
+
+Verified benign (2026-08-02): touching a file inside `.git` reproduces the
+error within milliseconds, the failing watches are exactly the items sync
+must ignore, and the query demonstrably keeps delivering update rounds (and
+the conflict view keeps functioning) after the faults. Don't chase this
+signature; a real watcher failure looks different — `startQuery` returning
+false (logged as `iCloud metadata query failed to start`, surfaced via the
+`icloud:watch-failed` event) or update rounds ceasing entirely.
+
 ## Deliberately not here (yet)
 
 - **AI-assisted resolution** — the ladder already produces the
