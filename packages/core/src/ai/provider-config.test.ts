@@ -105,6 +105,17 @@ describe('withAiProviderAdded', () => {
     expect(result.defaultProviderId).toBe('local')
     expect(result.defaultTranscriptionProviderId).toBe('local')
   })
+
+  it('does not set a non-transcription-capable entry as transcription default when added as app default', () => {
+    const before = state([config({ id: 'oai' })], 'oai', 'oai')
+    const result = withAiProviderAdded(
+      before,
+      config({ id: 'claude', provider: 'anthropic', model: 'claude-fable-5' }),
+      true,
+    )
+    expect(result.defaultProviderId).toBe('claude')
+    expect(result.defaultTranscriptionProviderId).toBe('oai')
+  })
 })
 
 describe('withAiProviderRemoved', () => {

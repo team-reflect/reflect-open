@@ -1,6 +1,7 @@
 import type { AiProviderConfig, AiProviderId, ChatModelSelection } from '../../settings/schema'
 import { aiProvider, aiProviderSupportsChat } from '../provider-catalog'
 import { defaultAiProvider, type AiProvidersState } from '../provider-config'
+import { DISABLED_OPENAI_COMPATIBLE_MODEL } from '../openai-compatible'
 
 /**
  * The chat screen's model picker (Plan 10): every configured provider offers
@@ -27,14 +28,17 @@ export type { ChatModelSelection }
  * Every model the chat picker offers, grouped consecutively per configured
  * entry: the provider's curated catalog, plus the entry's configured default
  * model when it's a custom id outside the catalog.  Entries whose chat model
- * is the `'disabled'` sentinel offer nothing — the picker cannot switch to
- * them.
+ * is the `'disabled'` sentinel offer nothing - the picker cannot switch to
+ * them.  The `'disabled'` sentinel (an OpenAI-compatible catalog option that
+ * opts an entry out of chat) is itself never offered as a pickable model.
  */
 export function chatModelOptions(providers: AiProviderConfig[]): ChatModelOption[] {
   return providers
     .filter((entry) => aiProviderSupportsChat(entry))
     .flatMap((entry) => {
-      const catalog = aiProvider(entry.provider).models
+      const catalog = aiProvider(entry.provider).models.filter(
+        (model) => model.id !== DISABLED_OPENAI_COMPATIBLE_MODEL,
+      )
       const models = catalog.some((model) => model.id === entry.model)
         ? catalog
         : [...catalog, { id: entry.model, label: entry.model }]

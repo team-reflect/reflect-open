@@ -77,6 +77,8 @@ export function AiProviderRow({
   // The transcription combo always shows for openai-compatible — even when the
   // model is the disabled sentinel — so the user can re-enable it in place.
   const showTranscriptionControls = isOpenAICompatible || supportsTranscription
+  const entryQualifier = isOpenAICompatible ? config.baseUrl : modelLabel
+  const fixedTranscriptionLabel = transcriptionModelLabel(config)
 
   const remove = (): void => {
     onRemove(config.id).catch((error: unknown) => {
@@ -108,7 +110,7 @@ export function AiProviderRow({
           provider={config.provider}
           models={provider.models}
           onChange={(model) => onSetDefaultModel(config.id, model)}
-          ariaLabel={`Default model for ${providerLabel}`}
+          ariaLabel={`Default model for ${providerLabel} (${entryQualifier})`}
         />
         {showTranscriptionControls ? (
           isOpenAICompatible ? (
@@ -117,21 +119,21 @@ export function AiProviderRow({
               provider={config.provider}
               models={provider.models}
               onChange={(model) => onSetTranscriptionModel(config.id, model)}
-              ariaLabel={`Transcription model for ${providerLabel}`}
+              ariaLabel={`Transcription model for ${providerLabel} (${entryQualifier})`}
             />
           ) : (
             <ModelCombobox
-              value={transcriptionModelLabel(config)}
+              value={fixedTranscriptionLabel}
               provider={config.provider}
               models={[
                 {
-                  id: transcriptionModelLabel(config),
-                  label: transcriptionModelLabel(config),
+                  id: fixedTranscriptionLabel,
+                  label: fixedTranscriptionLabel,
                   contextWindow: DEFAULT_CONTEXT_WINDOW,
                 },
               ]}
               onChange={() => {}}
-              ariaLabel={`Transcription model for ${providerLabel}`}
+              ariaLabel={`Transcription model for ${providerLabel} (${entryQualifier})`}
               disabled
             />
           )

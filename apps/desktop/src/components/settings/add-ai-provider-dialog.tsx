@@ -3,6 +3,7 @@ import { useForm, useWatch } from 'react-hook-form'
 import {
   AI_PROVIDERS,
   DEFAULT_OPENAI_COMPATIBLE_BASE_URL,
+  DISABLED_OPENAI_COMPATIBLE_MODEL,
   aiProvider,
   aiProviderIdSchema,
   aiProviderRequiresApiKey,
@@ -253,6 +254,9 @@ export function AddAiProviderDialog({ onAdd, onClose }: AddAiProviderDialogProps
               <input
                 type="checkbox"
                 className="accent-accent"
+                disabled={
+                  isOpenAICompatible && transcriptionModelValue === DISABLED_OPENAI_COMPATIBLE_MODEL
+                }
                 {...register('isTranscriptionDefault')}
               />
               <span className="text-sm text-text">Use as default for transcription</span>

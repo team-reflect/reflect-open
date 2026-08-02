@@ -157,6 +157,7 @@ export function AiProviderActionsDrawer({
                   {isOpenAICompatible ? (
                     <div className="px-4 py-2">
                       <TranscriptionModelInput
+                        key={provider.id}
                         provider={provider}
                         onSetTranscriptionModel={onSetTranscriptionModel}
                       />

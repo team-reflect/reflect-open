@@ -127,6 +127,13 @@ function AddAiProviderSheet({
               setModel(next.models[0].id)
               setTranscriptionModel(next.id === 'openai-compatible' ? next.models[0].id : '')
               setBaseUrl(next.id === 'openai-compatible' ? DEFAULT_OPENAI_COMPATIBLE_BASE_URL : '')
+              // A provider that can't transcribe can't be the transcription
+              // default - the checkbox is hidden in that case, so clear the
+              // stale flag to keep submitDraft from storing a default for a
+              // transcription-incapable provider (mirrors desktop's reset).
+              if (!(next.supportsTranscription || next.id === 'openai-compatible')) {
+                setIsTranscriptionDefault(false)
+              }
               setConsented(false)
               resetUnverified()
             }}
@@ -146,45 +153,32 @@ function AddAiProviderSheet({
 
         <div className="flex flex-col gap-1">
           <span className={FIELD_LABEL_CLASS}>Default model</span>
-          <Select
-            value={model}
-            items={provider.models.map((candidate) => ({
-              value: candidate.id,
-              label: candidate.label,
-            }))}
-            onValueChange={(value) => {
-              setModel(value ?? '')
-              resetUnverified()
-            }}
-          >
-            <SelectTrigger aria-label="Default model" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {provider.models.map((candidate) => (
-                <SelectItem key={candidate.id} value={candidate.id}>
-                  {candidate.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {isOpenAICompatible ? (
-          <div className="flex flex-col gap-1">
-            <span className={FIELD_LABEL_CLASS}>Transcription model</span>
+          {isOpenAICompatible ? (
+            <Input
+              type="text"
+              aria-label="Default model"
+              placeholder={provider.models[0].id}
+              autoComplete="off"
+              spellCheck={false}
+              value={model}
+              onChange={(event) => {
+                setModel(event.target.value)
+                resetUnverified()
+              }}
+            />
+          ) : (
             <Select
-              value={transcriptionModel}
+              value={model}
               items={provider.models.map((candidate) => ({
                 value: candidate.id,
                 label: candidate.label,
               }))}
               onValueChange={(value) => {
-                setTranscriptionModel(value ?? '')
+                setModel(value ?? '')
                 resetUnverified()
               }}
             >
-              <SelectTrigger aria-label="Transcription model" className="w-full">
+              <SelectTrigger aria-label="Default model" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -195,6 +189,24 @@ function AddAiProviderSheet({
                 ))}
               </SelectContent>
             </Select>
+          )}
+        </div>
+
+        {isOpenAICompatible ? (
+          <div className="flex flex-col gap-1">
+            <span className={FIELD_LABEL_CLASS}>Transcription model</span>
+            <Input
+              type="text"
+              aria-label="Transcription model"
+              placeholder="Model id, or 'disabled'"
+              autoComplete="off"
+              spellCheck={false}
+              value={transcriptionModel}
+              onChange={(event) => {
+                setTranscriptionModel(event.target.value)
+                resetUnverified()
+              }}
+            />
           </div>
         ) : null}
 

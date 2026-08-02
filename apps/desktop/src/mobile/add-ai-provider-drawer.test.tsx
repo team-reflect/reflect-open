@@ -148,9 +148,10 @@ describe('AddAiProviderDrawer', () => {
     fireEvent.change(page.getByLabelText('Endpoint base URL'), {
       target: { value: 'http://localhost:1234/v1' },
     })
-    // The chat model is the catalog Select (local-model / Disabled).
-    await page.getByRole('combobox', { name: 'Default model' }).click()
-    await page.getByRole('option', { name: 'Local model' }).click()
+    // The chat model defaults to the catalog's local-model id and is a
+    // free-form text input on OpenAI-compatible (endpoint-specific ids are
+    // not in any catalog), so the default already satisfies the required
+    // field without a selection.
     await consentCheckbox().click()
     await page.getByRole('button', { name: 'Add provider' }).click()
 
@@ -171,6 +172,68 @@ describe('AddAiProviderDrawer', () => {
         baseUrl: 'http://localhost:1234/v1',
         model: 'local-model',
       }),
+    )
+  })
+
+  it('accepts a custom chat model and transcription model for OpenAI-compatible', async () => {
+    validateApiKey.mockResolvedValue('valid')
+    await renderSheet()
+
+    await page.getByRole('combobox', { name: 'Provider' }).click()
+    await page.getByRole('option', { name: 'OpenAI-compatible' }).click()
+    fireEvent.change(page.getByLabelText('Endpoint base URL'), {
+      target: { value: 'http://localhost:1234/v1' },
+    })
+    // Free-form text entry for endpoint-specific model ids.
+    fireEvent.change(page.getByLabelText('Default model'), {
+      target: { value: 'my-org/finetuned-chat' },
+    })
+    fireEvent.change(page.getByLabelText('Transcription model'), {
+      target: { value: 'whisper-large-v3' },
+    })
+    await consentCheckbox().click()
+    await page.getByRole('button', { name: 'Add provider' }).click()
+
+    await vi.waitFor(() =>
+      expect(onAdd).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: 'openai-compatible',
+          model: 'my-org/finetuned-chat',
+          transcriptionModel: 'whisper-large-v3',
+          baseUrl: 'http://localhost:1234/v1',
+        }),
+      ),
+    )
+  })
+
+  it('clears the transcription-default flag when switching to a transcription-incapable provider', async () => {
+    validateApiKey.mockResolvedValue('valid')
+    await renderSheet()
+
+    // OpenAI-compatible is transcription-capable (the checkbox shows); tick it.
+    await page.getByRole('combobox', { name: 'Provider' }).click()
+    await page.getByRole('option', { name: 'OpenAI-compatible' }).click()
+    await page.getByRole('checkbox', { name: 'Use as default for transcription' }).click()
+    await expect
+      .element(page.getByRole('checkbox', { name: 'Use as default for transcription' }))
+      .toBeChecked()
+
+    // Anthropic cannot transcribe - the checkbox disappears and the stale
+    // flag is cleared so submitDraft can't store a default for it.
+    await page.getByRole('combobox', { name: 'Provider' }).click()
+    await page.getByRole('option', { name: 'Anthropic' }).click()
+    await expect
+      .element(page.getByRole('checkbox', { name: 'Use as default for transcription' }))
+      .not.toBeInTheDocument()
+
+    fireEvent.change(page.getByLabelText('API key'), { target: { value: 'sk-ant-key' } })
+    await consentCheckbox().click()
+    await page.getByRole('button', { name: 'Add provider' }).click()
+
+    await vi.waitFor(() =>
+      expect(onAdd).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'anthropic', isTranscriptionDefault: false }),
+      ),
     )
   })
 })

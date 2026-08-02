@@ -21,6 +21,24 @@ const PROVIDER: AiProviderConfig = {
   keyHint: '12345',
 }
 
+const COMPATIBLE_P1: AiProviderConfig = {
+  id: 'p1',
+  provider: 'openai-compatible',
+  model: 'local-model',
+  baseUrl: 'http://localhost:1234/v1',
+  transcriptionModel: 'whisper-1',
+  keyHint: '',
+}
+
+const COMPATIBLE_P2: AiProviderConfig = {
+  id: 'p2',
+  provider: 'openai-compatible',
+  model: 'local-model',
+  baseUrl: 'http://localhost:5678/v1',
+  transcriptionModel: 'whisper-large-v3',
+  keyHint: '',
+}
+
 const onMakeDefault = vi.fn<(id: string) => void>()
 const onSetDefaultModel = vi.fn<(id: string, model: string) => void>()
 const onSetTranscriptionModel = vi.fn<(id: string, model: string) => void>()
@@ -37,10 +55,10 @@ beforeEach(() => {
   onOpenChange.mockReset()
 })
 
-async function renderSheet(isDefault = false) {
-  await render(
+async function renderSheet(isDefault = false, provider: AiProviderConfig = PROVIDER) {
+  return render(
     <AiProviderActionsDrawer
-      provider={PROVIDER}
+      provider={provider}
       isDefault={isDefault}
       isTranscriptionDefault={false}
       open
@@ -97,8 +115,36 @@ describe('AiProviderActionsDrawer', () => {
 
     await vi.waitFor(() => expect(consoleError).toHaveBeenCalled())
     expect(onOpenChange).not.toHaveBeenCalled()
-    // The pending spinner cleared — the row is pressable again.
+    // The pending spinner cleared - the row is pressable again.
     await expect.element(page.getByRole('button', { name: 'Remove provider' })).toBeEnabled()
     consoleError.mockRestore()
+  })
+
+  it('resets the transcription model input draft when the provider changes', async () => {
+    // TranscriptionModelInput holds a useState draft seeded from the provider.
+    // Without a key, opening a second OpenAI-compatible provider in the same
+    // mounted sheet would show the previous provider's model and blur would
+    // save it under the new provider id. The key remounts the input on
+    // provider change, resetting the draft to the new provider's value.
+    const view = await renderSheet(false, COMPATIBLE_P1)
+    await expect.element(page.getByLabelText('Transcription model')).toHaveValue('whisper-1')
+
+    await view.rerender(
+      <AiProviderActionsDrawer
+        provider={COMPATIBLE_P2}
+        isDefault={false}
+        isTranscriptionDefault={false}
+        open
+        onOpenChange={onOpenChange}
+        onMakeDefault={onMakeDefault}
+        onSetDefaultModel={onSetDefaultModel}
+        onSetTranscriptionModel={onSetTranscriptionModel}
+        onMakeTranscriptionDefault={onMakeTranscriptionDefault}
+        onRemove={onRemove}
+      />,
+    )
+
+    await expect.element(page.getByLabelText('Transcription model')).toHaveValue('whisper-large-v3')
+    expect(onSetTranscriptionModel).not.toHaveBeenCalled()
   })
 })

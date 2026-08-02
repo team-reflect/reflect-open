@@ -1,8 +1,8 @@
-import { errorMessage, isAppError, toAppError, type AppError } from '../errors'
+import { errorMessage, isAppError, ReflectError, toAppError, type AppError } from '../errors'
 import {
   pickTranscriptionConfig,
+  isTranscriptionProvider,
   type AiProvidersState,
-  type TranscriptionProvider,
 } from '../ai/provider-config'
 import type { AiProviderConfig } from '../settings/schema'
 import { aiApiKeyForConfig } from '../ai/secrets'
@@ -581,9 +581,12 @@ export async function reconcileAudioMemos(
         transcribed += 1
         continue
       }
+      if (!isTranscriptionProvider(config.provider)) {
+        throw new ReflectError('unknown', `Unsupported transcription provider: ${config.provider}`)
+      }
       const parts = await transcribeSessionParts({
         session,
-        provider: config.provider as TranscriptionProvider,
+        provider: config.provider,
         apiKey,
         generation: input.generation,
         fetchFn: input.fetchFn,

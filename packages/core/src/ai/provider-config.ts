@@ -41,7 +41,8 @@ export function withAiProviderAdded(
   isTranscriptionDefault?: boolean,
 ): AiProvidersState {
   const isFirst = state.providers.length === 0
-  const makeTranscriptionDefault = isTranscriptionDefault ?? isDefault
+  const makeTranscriptionDefault =
+    isTranscriptionDefault ?? (isDefault && aiProviderSupportsTranscription(entry))
   return {
     providers: [...state.providers, entry],
     defaultProviderId: isDefault || isFirst ? entry.id : state.defaultProviderId,
@@ -131,21 +132,20 @@ export function transcriptionProviders(state: AiProvidersState): AiProviderConfi
     if (provider === 'google') return 1
     return 2 // openai-compatible
   }
-  return candidates.sort((a, b) => {
-    const groupDiff = groupOrder(a.provider) - groupOrder(b.provider)
+  return candidates.sort((left, right) => {
+    const groupDiff = groupOrder(left.provider) - groupOrder(right.provider)
     if (groupDiff !== 0) return groupDiff
-    const aDefault = a.id === state.defaultTranscriptionProviderId ? 0 : 1
-    const bDefault = b.id === state.defaultTranscriptionProviderId ? 0 : 1
-    return aDefault - bDefault
+    const leftDefault = left.id === state.defaultTranscriptionProviderId ? 0 : 1
+    const rightDefault = right.id === state.defaultTranscriptionProviderId ? 0 : 1
+    return leftDefault - rightDefault
   })
 }
 
 /**
  * The configured entry audio transcription should run on: the first
- * transcription-capable provider whose keychain key resolves.  Providers
- * are tried in {@link transcriptionProviders} order; a keyless entry is
- * skipped rather than stopping the pass.  `null` means no capable provider
- * is configured — the feature is unavailable.
+ * transcription-capable provider, in {@link transcriptionProviders} order.
+ * `null` means no capable provider is configured - the feature is
+ * unavailable.
  */
 export function pickTranscriptionConfig(state: AiProvidersState): AiProviderConfig | null {
   const candidates = transcriptionProviders(state)
@@ -174,6 +174,15 @@ export const TRANSCRIPTION_PROVIDERS: readonly TranscriptionProvider[] = [
   'google',
   'openai-compatible',
 ]
+
+/**
+ * Type guard: is `provider` one of the identifiers that supports
+ * transcription? Narrows the union for call sites that must branch on the
+ * concrete provider (e.g. {@link transcribeAudio}).
+ */
+export function isTranscriptionProvider(provider: string): provider is TranscriptionProvider {
+  return (TRANSCRIPTION_PROVIDERS as readonly string[]).includes(provider)
+}
 
 /** The transcription entry a pass should use, with its keychain key. */
 export interface TranscriptionTarget {

@@ -73,9 +73,16 @@ describe('chatModelOptions', () => {
     })
   })
 
-  it('offers local-model and disabled from the OpenAI-compatible catalog', () => {
+  it('offers local-model but not the disabled sentinel from the OpenAI-compatible catalog', () => {
     const options = chatModelOptions([compatible({ id: 'local' })])
-    expect(options.map((option) => option.modelId)).toEqual(['local-model', 'disabled'])
+    expect(options.map((option) => option.modelId)).toEqual(['local-model'])
+    expect(options.some((option) => option.modelId === 'disabled')).toBe(false)
+  })
+
+  it('excludes the disabled sentinel even when the entry has a custom model', () => {
+    const options = chatModelOptions([compatible({ id: 'local', model: 'whisper-1' })])
+    expect(options.some((option) => option.modelId === 'disabled')).toBe(false)
+    expect(options.some((option) => option.modelId === 'whisper-1')).toBe(true)
   })
 
   it('excludes an entry whose chat model is the disabled sentinel', () => {
