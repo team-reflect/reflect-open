@@ -82,7 +82,7 @@ delivery, and download/eviction behavior.
 With a graph open, the app process logs CloudDocs errors — a burst while the
 `NSMetadataQuery` watch gathers, then one round per graph write:
 
-```
+```text
 [ERROR] … NSError: NSFileProviderInternalErrorDomain 15 … while gathering
 [CRIT] UNREACHABLE: … BRItemCollectionGatherer - Repeatedly can't watch item …
 ```
