@@ -198,10 +198,14 @@ pub fn run() {
     // (see `open_note_window` in windows.rs). `Once` fires exactly on the
     // first Finished so reloads (⌘R, dev HMR, webview crash recovery)
     // never re-steal focus. `on_page_load` also fires for note windows;
-    // filter by label so this handler only reveals the main one.
+    // filter by label so this handler only reveals the main one. Ready still
+    // matters as the point where the fallback reveal is armed, below.
+    #[cfg(desktop)]
+    let revealed_main = std::sync::Arc::new(std::sync::Once::new());
+
     #[cfg(desktop)]
     let builder = {
-        let revealed = std::sync::Once::new();
+        let revealed = std::sync::Arc::clone(&revealed_main);
         builder.on_page_load(move |webview, payload| {
             if webview.label() != windows::MAIN_WINDOW_LABEL {
                 return;
@@ -229,9 +233,9 @@ pub fn run() {
     #[cfg(mobile)]
     let builder = builder.plugin(tauri_plugin_recording::init());
 
-    // The main window starts hidden (`visible: false`); desktop reveals it on
-    // Ready after restoring geometry, but mobile has no window-state plugin,
-    // so show it here or the UI would never appear.
+    // The main window starts hidden (`visible: false`); desktop reveals it
+    // from the page-load hook above after restoring geometry, but mobile has
+    // no window-state plugin, so show it here or the UI would never appear.
     #[cfg(mobile)]
     let builder = builder.setup(|app| {
         // Before anything else can crash: this is the only reporter that sees
@@ -373,7 +377,24 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app, event| match &event {
+        .run(move |app, event| match &event {
+            // Ready no longer reveals the main window — the page-load hook
+            // above does, once the webview has painted. It is still the first
+            // point where the window and an app handle both exist, so arm the
+            // fallback that reveals it anyway if that load never finishes.
+            // (Arming from `.setup()` would silently replace the deep-link
+            // registration hook, which Tauri stores as a single callback.)
+            #[cfg(desktop)]
+            tauri::RunEvent::Ready => {
+                let app = app.clone();
+                windows::arm_reveal_fallback(
+                    &revealed_main,
+                    windows::MAIN_WINDOW_LABEL,
+                    move || {
+                        windows::surface_main_window(&app);
+                    },
+                );
+            }
             // Clicking the Dock icon is macOS's recovery path when an app has
             // no visible windows. Surface the hidden/minimized main window,
             // or recreate it after an unexpected destruction.

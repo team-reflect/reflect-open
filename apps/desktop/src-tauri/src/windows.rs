@@ -11,7 +11,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
-use std::sync::{Mutex, MutexGuard, Once};
+use std::sync::{Arc, Mutex, MutexGuard, Once};
 
 use serde::Serialize;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
@@ -78,18 +78,26 @@ pub(crate) fn restorable_window_state_flags() -> tauri_plugin_window_state::Stat
         | StateFlags::FULLSCREEN
 }
 
+/// `--surface-app` in the `:root` scope of
+/// `design-system/tokens/colors.css` (`#f8fafa`).
+const SURFACE_APP_LIGHT: tauri::webview::Color = tauri::webview::Color(248, 250, 250, 255);
+
+/// `--surface-app` in the `.dark` scope of
+/// `design-system/tokens/colors.css` (`#0a0f1e`).
+const SURFACE_APP_DARK: tauri::webview::Color = tauri::webview::Color(10, 15, 30, 255);
+
 /// Resolve the OS-preferred theme background for `window`. Values mirror
-/// `--surface-app` in `design-system/tokens/colors.css` (`:root` and `.dark`
-/// scopes) so the native layer matches the first webview paint.
+/// `--surface-app` so the native layer matches the first webview paint;
+/// `native_background_matches_the_surface_app_token` keeps them from drifting
+/// out of step with the stylesheet.
 fn theme_background_color<R: tauri::Runtime>(
     window: &tauri::WebviewWindow<R>,
 ) -> tauri::webview::Color {
-    use tauri::webview::Color;
     use tauri::Theme;
 
     match window.theme() {
-        Ok(Theme::Dark) => Color(10, 15, 30, 255),
-        _ => Color(248, 250, 250, 255),
+        Ok(Theme::Dark) => SURFACE_APP_DARK,
+        _ => SURFACE_APP_LIGHT,
     }
 }
 
@@ -104,6 +112,55 @@ fn theme_background_color<R: tauri::Runtime>(
 fn apply_theme_background<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>) {
     if let Err(err) = window.set_background_color(Some(theme_background_color(window))) {
         tracing::warn!(error = %err, label = window.label(), "failed to set window background color");
+    }
+}
+
+/// How long a window waits for its webview's first `PageLoadEvent::Finished`
+/// before revealing itself anyway.
+#[cfg(desktop)]
+const REVEAL_FALLBACK_DELAY: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Reveal a window even if its webview's first `PageLoadEvent::Finished` never
+/// arrives.
+///
+/// Windows build hidden and reveal from that event, which trades the startup
+/// flash for a dependency on the load completing. Without this fallback a
+/// webview that never finishes loading strands its window hidden forever: the
+/// main window makes the launch look like it silently did nothing (macOS can
+/// recover through a Dock click, but Windows and Linux have no equivalent for
+/// a window with no taskbar entry), and a note window is worse still — the
+/// registry keeps its entry, so every later open of that target focuses a
+/// window nobody can see.
+///
+/// `gate` is the same `Once` the page-load hook holds, so whichever path
+/// arrives first wins and the other becomes a no-op. Tauri window handles
+/// proxy to the event loop, making the reveal safe from this thread; once the
+/// app has shut down the calls simply fail and are logged.
+#[cfg(desktop)]
+pub(crate) fn arm_reveal_fallback<F>(gate: &Arc<Once>, label: &str, reveal: F)
+where
+    F: FnOnce() + Send + 'static,
+{
+    let gate = Arc::clone(gate);
+    let label = label.to_owned();
+    std::thread::spawn(move || {
+        std::thread::sleep(REVEAL_FALLBACK_DELAY);
+        gate.call_once(|| {
+            tracing::warn!(label = %label, "page load never finished; revealing window anyway");
+            reveal();
+        });
+    });
+}
+
+/// Show and focus a freshly built note window. Unlike `surface_window` this
+/// skips unminimize and the background repaint: the window has never been on
+/// screen, and its background was seeded at build time.
+fn reveal_note_window<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>) {
+    if let Err(err) = window.show() {
+        tracing::warn!(error = %err, label = window.label(), "failed to show note window");
+    }
+    if let Err(err) = window.set_focus() {
+        tracing::warn!(error = %err, label = window.label(), "failed to focus note window");
     }
 }
 
@@ -339,6 +396,10 @@ pub async fn open_note_window(
     };
     let cascade = cascade_offset(&app);
 
+    // Shared by the page-load hook below and the fallback armed after the
+    // build, so the window is revealed exactly once whichever gets there first.
+    let revealed = Arc::new(Once::new());
+
     let mut builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::default())
         .title("Reflect")
         .inner_size(1000.0, 650.0)
@@ -349,25 +410,20 @@ pub async fn open_note_window(
         // Build hidden and reveal on `PageLoadEvent::Finished` so the user
         // never sees WKWebView's default white backing while HTML/CSS/JS are
         // still loading. The main window is gated the same way, from the
-        // app-level `on_page_load` hook in `lib.rs`. `Once` gates the reveal to
-        // the first Finished only: reloads (Cmd+R, dev HMR, webview crash
-        // recovery) otherwise re-run `set_focus`, stealing focus back to a note
-        // window the user has moved away from.
+        // app-level `on_page_load` hook in `lib.rs`. The shared `Once` gates
+        // the reveal to the first Finished only: reloads (Cmd+R, dev HMR,
+        // webview crash recovery) otherwise re-run `set_focus`, stealing focus
+        // back to a note window the user has moved away from. It also settles
+        // the race with the fallback armed after the build, for the load that
+        // never finishes at all.
         .visible(false)
         .on_page_load({
-            let revealed = Once::new();
+            let revealed = Arc::clone(&revealed);
             move |note_window, payload| {
                 if !matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
                     return;
                 }
-                revealed.call_once(|| {
-                    if let Err(err) = note_window.show() {
-                        tracing::warn!(error = %err, label = note_window.label(), "failed to show note window after page load");
-                    }
-                    if let Err(err) = note_window.set_focus() {
-                        tracing::warn!(error = %err, label = note_window.label(), "failed to focus note window after page load");
-                    }
-                });
+                revealed.call_once(|| reveal_note_window(&note_window));
             }
         })
         // Match the main window: HTML5 drops must reach the webview (chat and
@@ -386,16 +442,35 @@ pub async fn open_note_window(
         builder = builder.position(position.x + cascade, position.y + cascade);
     }
 
-    if let Err(err) = builder.build() {
-        // Be defensive if a window created outside this command claimed the
-        // reserved label: surface it and preserve its one-shot bootstrap.
-        if focus_existing(&app, &label, &deep_link, &invoking_label) {
-            return Ok(());
+    let note_window = match builder.build() {
+        Ok(note_window) => note_window,
+        Err(err) => {
+            // Be defensive if a window created outside this command claimed the
+            // reserved label: surface it and preserve its one-shot bootstrap.
+            if focus_existing(&app, &label, &deep_link, &invoking_label) {
+                return Ok(());
+            }
+            // Keep the pending bootstrap for a later serialized retry, which
+            // reuses this preferred reservation.
+            return Err(AppError::io(format!("failed to open note window: {err}")));
         }
-        // Keep the pending bootstrap for a later serialized retry, which
-        // reuses this preferred reservation.
-        return Err(AppError::io(format!("failed to open note window: {err}")));
+    };
+
+    // The registry now routes this target here, so a webview that never
+    // finishes loading would strand the note behind a permanently hidden
+    // window rather than merely failing to show one.
+    #[cfg(desktop)]
+    {
+        let note_label = note_window.label().to_owned();
+        arm_reveal_fallback(&revealed, &note_label, move || {
+            reveal_note_window(&note_window)
+        });
     }
+    // Mobile builds compile this command but have no hidden-window failure to
+    // recover from (one fullscreen webview, revealed in `run`).
+    #[cfg(not(desktop))]
+    let _ = note_window;
+
     Ok(())
 }
 
@@ -476,6 +551,54 @@ pub fn window_bootstrap(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Read `--surface-app` out of one scope of the design-system token sheet.
+    ///
+    /// Stops at the scope's closing brace so `.reflect-space` — which declares
+    /// the same custom property — can't be misread as `.dark`, and trims the
+    /// value so both the aligned and the `oxfmt`-collapsed spellings parse.
+    #[cfg(desktop)]
+    fn surface_app_token(css: &str, scope: &str) -> tauri::webview::Color {
+        let block = css
+            .split_once(&format!("{scope} {{"))
+            .unwrap_or_else(|| panic!("`{scope}` scope missing from colors.css"))
+            .1
+            .split_once('}')
+            .unwrap_or_else(|| panic!("`{scope}` scope is unterminated"))
+            .0;
+        let value = block
+            .split_once("--surface-app:")
+            .unwrap_or_else(|| panic!("`--surface-app` missing from the `{scope}` scope"))
+            .1
+            .split(';')
+            .next()
+            .expect("split yields at least one element")
+            .trim();
+        let hex = value.strip_prefix('#').unwrap_or_else(|| {
+            panic!("`--surface-app` in `{scope}` is not a hex literal: {value}")
+        });
+        assert_eq!(
+            hex.len(),
+            6,
+            "`--surface-app` in `{scope}` is not a 6-digit hex literal: {value}"
+        );
+        let rgb = u32::from_str_radix(hex, 16)
+            .unwrap_or_else(|err| panic!("`--surface-app` in `{scope}` is not hex: {err}"));
+        tauri::webview::Color((rgb >> 16) as u8, (rgb >> 8) as u8, rgb as u8, 255)
+    }
+
+    /// The native window background is seeded before the webview paints, so a
+    /// value that drifts from `--surface-app` reintroduces exactly the flash
+    /// this seeding exists to prevent — one shade briefly showing through
+    /// before the frontend's own background lands. The constants can't be
+    /// derived from the stylesheet at build time, so assert they agree.
+    #[cfg(desktop)]
+    #[test]
+    fn native_background_matches_the_surface_app_token() {
+        let css = include_str!("../../../../design-system/tokens/colors.css");
+        assert_eq!(surface_app_token(css, ":root"), SURFACE_APP_LIGHT);
+        assert_eq!(surface_app_token(css, ".dark"), SURFACE_APP_DARK);
+    }
 
     #[cfg(desktop)]
     #[test]
