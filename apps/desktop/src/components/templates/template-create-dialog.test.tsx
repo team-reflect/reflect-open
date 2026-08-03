@@ -67,6 +67,9 @@ describe('TemplateCreateDialog', () => {
     await userEvent.click(page.getByRole('button', { name: 'Create' }))
 
     await vi.waitFor(() => expect(createTemplate).toHaveBeenCalledWith('Weekly review', 1))
+    // The creation await resolves after the assertion above, so wait for the
+    // close it triggers — reopening is only a remount once the form is gone.
+    await expect.element(page.getByPlaceholder('Template name')).not.toBeInTheDocument()
 
     await userEvent.click(page.getByRole('button', { name: 'New template' }))
 
