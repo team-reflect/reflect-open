@@ -14,6 +14,7 @@ import { FocusModeToggle } from '@/components/sidebar/focus-mode-toggle'
 import { SidebarResizeHandle } from '@/components/sidebar-resize-handle'
 import { TemplateCreateDialog } from '@/components/templates/template-create-dialog'
 import { TemplatePicker } from '@/components/templates/template-picker'
+import { hasMacosTitleBarOverlay } from '@/lib/window-chrome'
 import { useDailyContextTarget } from '@/providers/focused-daily-provider'
 import { useSidebar } from '@/providers/sidebar-provider'
 import { useAppShortcuts } from '@/routing/app-shortcuts'
@@ -63,7 +64,9 @@ export function WorkspaceContent({ graph }: WorkspaceContentProps): ReactElement
           <FocusModeToggle
             context={commandContext}
             collapsed
-            className="window-drag-control absolute top-2 right-2 z-10"
+            className={
+              hasMacosTitleBarOverlay ? 'absolute top-16 left-8 z-10' : 'absolute top-2 left-2 z-10'
+            }
           />
         ) : null}
         <div className="min-h-0 flex-1">

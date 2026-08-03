@@ -33,9 +33,14 @@ vi.mock('@/components/sidebar/sidebar', () => ({
   Sidebar: () => <div data-testid="workspace-sidebar" />,
 }))
 vi.mock('@/components/sidebar/focus-mode-toggle', () => ({
-  FocusModeToggle: ({ collapsed }: { collapsed: boolean }) =>
-    collapsed ? <button type="button">Exit focus mode</button> : null,
+  FocusModeToggle: ({ collapsed, className }: { collapsed: boolean; className?: string }) =>
+    collapsed ? (
+      <button type="button" className={className}>
+        Exit focus mode
+      </button>
+    ) : null,
 }))
+vi.mock('@/lib/window-chrome', () => ({ hasMacosTitleBarOverlay: true }))
 vi.mock('@/components/templates/template-create-dialog', () => ({
   TemplateCreateDialog: () => null,
 }))
@@ -84,7 +89,10 @@ describe('WorkspaceContent', () => {
     await view.rerender(<WorkspaceContent graph={GRAPH} />)
     expect(view.getByRole('complementary', { name: 'Workspace' }).query()).toBeNull()
     expect(view.getByRole('complementary', { name: 'Context' }).query()).toBeNull()
-    await expect.element(view.getByRole('button', { name: 'Exit focus mode' })).toBeInTheDocument()
+    const exitFocusMode = view.getByRole('button', { name: 'Exit focus mode' })
+    await expect.element(exitFocusMode).toBeInTheDocument()
+    expect(exitFocusMode.element().getAttribute('class')).toContain('left-8')
+    expect(exitFocusMode.element().getAttribute('class')).toContain('top-16')
 
     workspaceState.collapsed = false
     await view.rerender(<WorkspaceContent graph={GRAPH} />)
