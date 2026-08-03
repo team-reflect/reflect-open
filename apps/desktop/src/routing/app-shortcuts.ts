@@ -42,6 +42,7 @@ export const APP_BINDINGS = registerKeymap(
 
 const BINDING_TO_ID = new Map(BOUND_COMMANDS.map(({ binding, command }) => [binding, command.id]))
 const HISTORY_COMMAND_IDS = new Set(['history.back', 'history.forward'])
+const APP_CHROME_COMMAND_IDS = new Set([...HISTORY_COMMAND_IDS, 'sidebar.toggle'])
 
 // AppKit owns this key equivalent on macOS. Keep it in the registry for
 // display, collision detection, and the plain-browser/non-macOS fallback, but
@@ -298,18 +299,23 @@ export function useAppShortcuts(): CommandContext {
       return true
     }
 
-    function onHistoryKeyDownCapture(event: KeyboardEvent) {
+    function onAppChromeKeyDownCapture(event: KeyboardEvent) {
       if (getIsComposing()) {
         return
       }
       const id = idForKeyDown(event)
-      if (id === null || isNativeMacosMenuCommand(id) || !HISTORY_COMMAND_IDS.has(id)) {
+      if (id === null || isNativeMacosMenuCommand(id) || !APP_CHROME_COMMAND_IDS.has(id)) {
         return
       }
       if (triggerCommand(id)) {
-        // History navigation is app chrome, so it wins even when the focused
-        // editor would otherwise consume the bracket chord while bubbling.
+        // History and focus mode are app chrome, so they win even when the
+        // focused editor would otherwise consume the chord while bubbling.
         event.preventDefault()
+        if (id === 'sidebar.toggle') {
+          // Meowdown also binds ⌘. to bullet folding. Unlike history keys,
+          // focus mode must never perform an editor action as a side effect.
+          event.stopPropagation()
+        }
       }
     }
 
@@ -336,11 +342,11 @@ export function useAppShortcuts(): CommandContext {
     }
 
     setMenuCommandDispatch(triggerCommand)
-    window.addEventListener('keydown', onHistoryKeyDownCapture, true)
+    window.addEventListener('keydown', onAppChromeKeyDownCapture, true)
     window.addEventListener('keydown', onKeyDown)
     return () => {
       setMenuCommandDispatch(null)
-      window.removeEventListener('keydown', onHistoryKeyDownCapture, true)
+      window.removeEventListener('keydown', onAppChromeKeyDownCapture, true)
       window.removeEventListener('keydown', onKeyDown)
     }
   }, [context, closeShortcuts])

@@ -1,7 +1,7 @@
 /**
- * Converts a keymap-registry binding (`Mod-d`, `Mod-\`, …) into the
+ * Converts a keymap-registry binding (`Mod-d`, `Mod-.`, …) into the
  * accelerator string Tauri's menu layer (muda) parses — `CmdOrCtrl+D`,
- * `CmdOrCtrl+\`. Same binding grammar as `lib/keybindings.ts`: ProseMirror
+ * `CmdOrCtrl+.`. Same binding grammar as `lib/keybindings.ts`: ProseMirror
  * style, parts joined by `-`, a trailing `-` meaning the literal `-` key.
  *
  * muda accepts single letters and punctuation verbatim (`[`, `]`, `\`, `,`,

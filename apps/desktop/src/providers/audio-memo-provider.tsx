@@ -33,7 +33,7 @@ import { useSidebar } from '@/providers/sidebar-provider'
  * the bridge to the shared capture pipeline (`useAudioMemoPipeline`, which
  * owns the serial capture queue and the transcription reconciler). State
  * lives here — above the sidebar — because the mic button unmounts with the
- * sidebar (`Mod-\`), and a recording must never outlive its UI invisibly:
+ * sidebar (`Mod-.`), and a recording must never outlive its UI invisibly:
  * collapsing mid-recording stops and saves instead of leaving a hidden hot
  * microphone.
  */

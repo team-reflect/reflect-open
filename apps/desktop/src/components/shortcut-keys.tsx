@@ -4,7 +4,7 @@ import { formatBinding, isApplePlatform } from '@/lib/keybindings'
 import { cn } from '@/lib/utils'
 
 interface ShortcutKeysProps {
-  /** A keymap-registry binding, e.g. `Mod-d` or `Mod-\`. */
+  /** A keymap-registry binding, e.g. `Mod-d` or `Mod-.`. */
   binding: string
   /** Render as borderless inline text (V1's search-bar ⌘K) instead of a keycap pill. */
   ghost?: boolean

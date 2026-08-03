@@ -11,7 +11,7 @@ import {
 /**
  * Side-panel visibility state, provided once per workspace so the shell
  * (which renders or hides both sidebar regions) and the command registry
- * (`⌘\` / "Toggle sidebar") share one source of truth. Session-only by
+ * (`⌘.` / "Toggle focus mode") share one source of truth. Session-only by
  * design — a relaunch starts expanded.
  */
 

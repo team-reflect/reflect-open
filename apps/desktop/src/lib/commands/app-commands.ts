@@ -316,9 +316,9 @@ const APP_COMMANDS: AppCommand[] = [
   },
   {
     id: 'sidebar.toggle',
-    title: 'Toggle sidebar',
-    keywords: ['collapse', 'expand', 'navigation', 'focus'],
-    keybinding: 'Mod-\\',
+    title: 'Toggle focus mode',
+    keywords: ['collapse', 'expand', 'sidebar', 'navigation', 'focus'],
+    keybinding: 'Mod-.',
     run: (context) => context.toggleSidebar(),
   },
   {

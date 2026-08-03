@@ -55,8 +55,15 @@ export function listRegisteredBindings(): ReadonlyMap<string, KeymapScope> {
  */
 const SHARED_WITH_APP: ReadonlySet<string> = new Set(['Mod-k'])
 
+// Focus mode is workspace chrome, so it intentionally takes precedence over
+// Meowdown's bullet-folding shortcut in Reflect. Keep it out of the editor
+// registry; `useAppShortcuts` captures it before the editor sees the event.
+const APP_CHROME_BINDINGS: ReadonlySet<string> = new Set(['Mod-.'])
+
 const EDITOR_BINDINGS = Object.fromEntries(
-  Object.entries(EDITOR_KEY_BINDINGS).filter(([key]) => !SHARED_WITH_APP.has(key)),
+  Object.entries(EDITOR_KEY_BINDINGS).filter(
+    ([key]) => !SHARED_WITH_APP.has(key) && !APP_CHROME_BINDINGS.has(key),
+  ),
 )
 
 /** The editor-scope binding that opens the AI menu on the current selection. */

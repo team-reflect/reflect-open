@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { notePathForRoute } from '@/routing/route'
 import { useRouter } from '@/routing/router'
 import { GraphFooter } from './graph-footer'
+import { FocusModeToggle } from './focus-mode-toggle'
 import { NavigateArrows } from './navigate-arrows'
 import { SidebarItem } from './sidebar-item'
 import { SidebarPinned } from './sidebar-pinned'
@@ -31,8 +32,8 @@ interface SidebarProps {
  * Pinned shelf, and the graph switcher footer. Most nav rows run registered
  * commands so a binding and its behavior stay one definition; the Daily notes
  * row is a capture gesture like `Mod-D` — it asks the stream to focus today
- * with the caret at the end, ready to append. (Sidebar collapse stays on
- * `Mod-\` via the command registry.)
+ * with the caret at the end, ready to append. Its top-right focus-mode action
+ * uses the same command as the keyboard shortcut.
  */
 export function Sidebar({ graph, context }: SidebarProps): ReactElement {
   const { route } = useRouter()
@@ -55,7 +56,8 @@ export function Sidebar({ graph, context }: SidebarProps): ReactElement {
         hasMacosTitleBarOverlay ? 'pt-2' : 'pt-2.5',
       )}
     >
-      <div className="flex flex-none items-center justify-end px-2 pt-1">
+      <div className="flex flex-none items-center justify-end gap-1 px-2 pt-1">
+        <FocusModeToggle context={context} collapsed={false} />
         <NavigateArrows />
       </div>
 

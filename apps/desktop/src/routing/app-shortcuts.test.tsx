@@ -129,7 +129,7 @@ describe('app shortcuts', () => {
       'Mod-[',
       'Mod-]',
       'Mod-k',
-      'Mod-\\',
+      'Mod-.',
       'Alt-Mod-l',
       'Meta-1',
       'Meta-9',
@@ -243,15 +243,29 @@ describe('app shortcuts', () => {
     expect(findPreviousInNote).toHaveBeenCalledTimes(1)
   })
 
-  it('⌘\\ toggles the sidebar in both directions', async () => {
+  it('⌘. toggles focus mode in both directions', async () => {
     const { result, act } = await shortcutsHook()
     expect(result.current.sidebar.collapsed).toBe(false)
 
-    await act(() => press('\\'))
+    await act(() => press('.'))
     expect(result.current.sidebar.collapsed).toBe(true)
 
-    await act(() => press('\\'))
+    await act(() => press('.'))
     expect(result.current.sidebar.collapsed).toBe(false)
+  })
+
+  it('⌘. enters focus mode before the focused editor can consume it', async () => {
+    const { result, act } = await shortcutsHook()
+    const editor = document.createElement('div')
+    const editorKeydown = vi.fn((event: KeyboardEvent) => event.preventDefault())
+    document.body.append(editor)
+    editor.addEventListener('keydown', editorKeydown)
+
+    await act(() => pressFrom(editor, '.'))
+
+    expect(result.current.sidebar.collapsed).toBe(true)
+    expect(editorKeydown).not.toHaveBeenCalled()
+    editor.remove()
   })
 
   it('defers ⌘K to a focused editor that already handled it', async () => {

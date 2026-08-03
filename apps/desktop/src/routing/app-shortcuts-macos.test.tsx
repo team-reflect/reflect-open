@@ -87,7 +87,7 @@ describe('app shortcuts on macOS', () => {
   it('keeps the macOS webview fallback until the native menu is installed', async () => {
     const { result, act } = await shortcutsHook()
     const event = new KeyboardEvent('keydown', {
-      key: '\\',
+      key: '.',
       metaKey: true,
       cancelable: true,
     })
@@ -99,11 +99,11 @@ describe('app shortcuts on macOS', () => {
     expect(result.current.sidebar.collapsed).toBe(true)
   })
 
-  it('leaves ⌘\\ to the native macOS menu accelerator', async () => {
+  it('leaves ⌘. to the native macOS menu accelerator', async () => {
     nativeMenu.installed = true
     const { result, act } = await shortcutsHook()
     const event = new KeyboardEvent('keydown', {
-      key: '\\',
+      key: '.',
       metaKey: true,
       cancelable: true,
     })
