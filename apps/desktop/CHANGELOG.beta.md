@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.0-beta.7](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.6...v0.8.0-beta.7) (2026-08-03)
+
+
+### Features
+
+* copy an AI chat reply to the clipboard ([#1016](https://github.com/team-reflect/reflect-open/issues/1016)) ([83c4d84](https://github.com/team-reflect/reflect-open/commit/83c4d84a08bb27c0ee3958ec6dd56977a54fa7e3))
+
+
+### Bug Fixes
+
+* **desktop:** eliminate white flash on window startup ([#882](https://github.com/team-reflect/reflect-open/issues/882)) ([e83cd86](https://github.com/team-reflect/reflect-open/commit/e83cd86a62179212dc2c30a1c5f210e8131c00f7))
+* update meowdown to ^0.64.0 ([#1027](https://github.com/team-reflect/reflect-open/issues/1027)) ([45a3b39](https://github.com/team-reflect/reflect-open/commit/45a3b39203dc6e99c22da186d294c804909d3f9e))
+
 ## [0.8.0-beta.6](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.5...v0.8.0-beta.6) (2026-08-01)
 
 
