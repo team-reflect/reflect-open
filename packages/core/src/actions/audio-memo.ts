@@ -1,6 +1,11 @@
-import { errorMessage, isAppError, toAppError, type AppError } from '../errors'
-import { pickTranscriptionConfig, type AiProvidersState } from '../ai/provider-config'
-import { aiApiKeyForConfig, aiKeySecretName } from '../ai/secrets'
+import { errorMessage, isAppError, ReflectError, toAppError, type AppError } from '../errors'
+import {
+  pickTranscriptionConfig,
+  isTranscriptionProvider,
+  type AiProvidersState,
+} from '../ai/provider-config'
+import type { AiProviderConfig } from '../settings/schema'
+import { aiApiKeyForConfig } from '../ai/secrets'
 import {
   audioMemoEnrichmentConfig,
   pickAudioMemoEnrichmentConfig,
@@ -24,7 +29,6 @@ import {
 } from './audio-memo-session'
 import { AUDIO_MEMOS_DIR, audioMemoPath, dailyPath, notePath } from '../graph/paths'
 import { appendListItemUnderBacklinkedHeading, wikiLinkSafe } from '../markdown/edit'
-import { getSecret } from '../secrets/keychain'
 import { ensureBacklinkTarget } from './backlink-target'
 
 /**
@@ -199,6 +203,7 @@ export function audioMemoPartPath(memo: AudioMemoIdentity, part: number, end: bo
   return audioMemoPath(`${memo.base}.part-${pad(part, 3)}${end ? '-end' : ''}.${extension}`)
 }
 
+/** Input to {@link captureAudioMemo}: one recording plus the graph pin. */
 export interface CaptureAudioMemoInput {
   /** The recording, as the recorder produced it. */
   audio: Blob
@@ -229,6 +234,12 @@ async function writeAudioMemoAsset(path: string, audio: Blob, generation: number
   await writeAsset(path, bytesToBase64(new Uint8Array(await audio.arrayBuffer())), generation)
 }
 
+/**
+ * Persist one recording into the graph - the durable step, no network. The
+ * recording is written under `audio-memos/`; transcription happens later, in
+ * {@link reconcileAudioMemos}. A write failure is returned as data (the
+ * caller retries with the same recording), never thrown.
+ */
 export async function captureAudioMemo(
   input: CaptureAudioMemoInput,
 ): Promise<CaptureAudioMemoOutcome> {
@@ -241,6 +252,7 @@ export async function captureAudioMemo(
   return { ok: true, memo }
 }
 
+/** Input to {@link captureAudioMemoPart}: one finished segment plus the graph pin. */
 export interface CaptureAudioMemoPartInput {
   /** One finished segment, as the recorder produced it. */
   audio: Blob
@@ -416,6 +428,7 @@ export function isSilentStop(stopped: ReconcileStop): boolean {
   return stopped.reason === 'network' || stopped.reason === 'config' || stopped.reason === 'stale'
 }
 
+/** Input to {@link reconcileAudioMemos}: the configured-provider state, graph pin, and transport hooks. */
 export interface ReconcileAudioMemosInput {
   /** The configured-providers state — decides the provider and keychain entry. */
   providers: AiProvidersState
@@ -431,6 +444,7 @@ export interface ReconcileAudioMemosInput {
   onPending?: (count: number) => void
 }
 
+/** Outcome of {@link reconcileAudioMemos}: counts and the stop reason, if the pass did not drain. */
 export interface ReconcileAudioMemosOutcome {
   /** Memos that had no transcription when the pass started. */
   pending: number
@@ -480,11 +494,11 @@ export async function reconcileAudioMemos(
   // user fixes their model configuration must see the fix. Keys are read at
   // most once per entry per pass.
   const keys = new Map<string, Promise<string | null>>()
-  const getKey = (id: string): Promise<string | null> => {
-    let key = keys.get(id)
+  const getKey = (config: AiProviderConfig): Promise<string | null> => {
+    let key = keys.get(config.id)
     if (key === undefined) {
-      key = getSecret(aiKeySecretName(id)).catch(() => null)
-      keys.set(id, key)
+      key = aiApiKeyForConfig(config).catch(() => null)
+      keys.set(config.id, key)
     }
     return key
   }
@@ -494,7 +508,7 @@ export async function reconcileAudioMemos(
       pending: sessions.length,
       transcribed: 0,
       rejected: 0,
-      stopped: { reason: 'config', message: 'No OpenAI or Gemini model is configured.' },
+      stopped: { reason: 'config', message: 'No transcription provider is configured.' },
     }
   }
   if (target === 'no-key') {
@@ -567,6 +581,9 @@ export async function reconcileAudioMemos(
         transcribed += 1
         continue
       }
+      if (!isTranscriptionProvider(config.provider)) {
+        throw new ReflectError('unknown', `Unsupported transcription provider: ${config.provider}`)
+      }
       const parts = await transcribeSessionParts({
         session,
         provider: config.provider,
@@ -574,6 +591,9 @@ export async function reconcileAudioMemos(
         generation: input.generation,
         fetchFn: input.fetchFn,
         isStale: stale,
+        ...(config.provider === 'openai-compatible'
+          ? { baseUrl: config.baseUrl, model: config.transcriptionModel }
+          : {}),
       })
       if (parts.status === 'stale') {
         return stalled()

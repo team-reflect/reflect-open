@@ -1,5 +1,5 @@
 import { render } from 'vitest-browser-react'
-import { page } from 'vitest/browser'
+import { page, userEvent } from 'vitest/browser'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import type { AiProviderConfig } from '@reflect/core'
@@ -21,27 +21,52 @@ const PROVIDER: AiProviderConfig = {
   keyHint: '12345',
 }
 
+const COMPATIBLE_P1: AiProviderConfig = {
+  id: 'p1',
+  provider: 'openai-compatible',
+  model: 'local-model',
+  baseUrl: 'http://localhost:1234/v1',
+  transcriptionModel: 'whisper-1',
+  keyHint: '',
+}
+
+const COMPATIBLE_P2: AiProviderConfig = {
+  id: 'p2',
+  provider: 'openai-compatible',
+  model: 'local-model',
+  baseUrl: 'http://localhost:5678/v1',
+  transcriptionModel: 'whisper-large-v3',
+  keyHint: '',
+}
+
 const onMakeDefault = vi.fn<(id: string) => void>()
 const onSetDefaultModel = vi.fn<(id: string, model: string) => void>()
+const onSetTranscriptionModel = vi.fn<(id: string, model: string) => void>()
+const onMakeTranscriptionDefault = vi.fn<(id: string) => void>()
 const onRemove = vi.fn<(id: string) => Promise<void>>()
 const onOpenChange = vi.fn<(open: boolean) => void>()
 
 beforeEach(() => {
   onMakeDefault.mockReset()
   onSetDefaultModel.mockReset()
+  onSetTranscriptionModel.mockReset()
+  onMakeTranscriptionDefault.mockReset()
   onRemove.mockReset().mockResolvedValue(undefined)
   onOpenChange.mockReset()
 })
 
-async function renderSheet(isDefault = false) {
-  await render(
+async function renderSheet(isDefault = false, provider: AiProviderConfig = PROVIDER) {
+  return render(
     <AiProviderActionsDrawer
-      provider={PROVIDER}
+      provider={provider}
       isDefault={isDefault}
+      isTranscriptionDefault={false}
       open
       onOpenChange={onOpenChange}
       onMakeDefault={onMakeDefault}
       onSetDefaultModel={onSetDefaultModel}
+      onSetTranscriptionModel={onSetTranscriptionModel}
+      onMakeTranscriptionDefault={onMakeTranscriptionDefault}
       onRemove={onRemove}
     />,
   )
@@ -51,7 +76,7 @@ describe('AiProviderActionsDrawer', () => {
   it('makes the provider the default and closes', async () => {
     await renderSheet()
 
-    await page.getByRole('button', { name: 'Use as default' }).click()
+    await page.getByRole('button', { name: 'Use as default for chat' }).click()
 
     expect(onMakeDefault).toHaveBeenCalledWith('p1')
     expect(onOpenChange).toHaveBeenCalledWith(false)
@@ -60,7 +85,7 @@ describe('AiProviderActionsDrawer', () => {
   it('the default provider cannot be re-defaulted', async () => {
     await renderSheet(true)
 
-    await expect.element(page.getByRole('button', { name: 'Default provider' })).toBeDisabled()
+    await expect.element(page.getByRole('button', { name: 'Default for chat' })).toBeDisabled()
   })
 
   it('changes the provider default model and closes', async () => {
@@ -90,8 +115,44 @@ describe('AiProviderActionsDrawer', () => {
 
     await vi.waitFor(() => expect(consoleError).toHaveBeenCalled())
     expect(onOpenChange).not.toHaveBeenCalled()
-    // The pending spinner cleared — the row is pressable again.
+    // The pending spinner cleared - the row is pressable again.
     await expect.element(page.getByRole('button', { name: 'Remove provider' })).toBeEnabled()
     consoleError.mockRestore()
+  })
+
+  it('resets the transcription model input draft when the provider changes', async () => {
+    // TranscriptionModelInput holds a useState draft seeded from the provider.
+    // Without a key, opening a second OpenAI-compatible provider in the same
+    // mounted sheet would show the previous provider's model and blur would
+    // save it under the new provider id. The key remounts the input on
+    // provider change, resetting the draft to the new provider's value.
+    const view = await renderSheet(false, COMPATIBLE_P1)
+    await expect.element(page.getByLabelText('Transcription model')).toHaveValue('whisper-1')
+
+    // An unsaved edit - the draft now diverges from the provider's model.
+    await page.getByLabelText('Transcription model').fill('whisper-edited-draft')
+
+    await view.rerender(
+      <AiProviderActionsDrawer
+        provider={COMPATIBLE_P2}
+        isDefault={false}
+        isTranscriptionDefault={false}
+        open
+        onOpenChange={onOpenChange}
+        onMakeDefault={onMakeDefault}
+        onSetDefaultModel={onSetDefaultModel}
+        onSetTranscriptionModel={onSetTranscriptionModel}
+        onMakeTranscriptionDefault={onMakeTranscriptionDefault}
+        onRemove={onRemove}
+      />,
+    )
+
+    // The remounted input carries the new provider's model, not the stale draft.
+    await expect.element(page.getByLabelText('Transcription model')).toHaveValue('whisper-large-v3')
+
+    // Blurring the fresh input would, without the key, save the previous
+    // provider's draft under the new provider id. The key keeps that path dead.
+    await userEvent.tab()
+    expect(onSetTranscriptionModel).not.toHaveBeenCalled()
   })
 })

@@ -3,6 +3,8 @@ export {
   aiProvider,
   aiModelLabel,
   aiProviderRequiresApiKey,
+  aiProviderSupportsChat,
+  aiProviderSupportsTranscription,
   DEFAULT_CONTEXT_WINDOW,
   modelContextWindow,
   type AiProviderInfo,
@@ -12,6 +14,7 @@ export { aiKeySecretName, aiApiKeyForConfig } from '../ai/secrets'
 export {
   DEFAULT_OPENAI_COMPATIBLE_BASE_URL,
   DEFAULT_OPENAI_COMPATIBLE_MODEL,
+  DISABLED_OPENAI_COMPATIBLE_MODEL,
   isHttpBaseUrl,
   isPlainHttpRemoteBaseUrl,
   normalizeOpenAICompatibleBaseUrl,
@@ -20,14 +23,16 @@ export {
 export { setSecret, getSecret, deleteSecret } from '../secrets/keychain'
 export {
   KEY_HINT_LENGTH,
-  TRANSCRIPTION_PROVIDERS,
   apiKeyHint,
   withAiProviderAdded,
   withAiProviderRemoved,
   defaultAiProvider,
+  defaultTranscriptionProvider,
   pickTranscriptionConfig,
+  resolveTranscriptionTarget,
+  transcriptionProviders,
+  TRANSCRIPTION_PROVIDERS,
   type AiProvidersState,
-  type TranscriptionConfig,
   type TranscriptionProvider,
 } from '../ai/provider-config'
 export {
@@ -127,7 +132,12 @@ export {
 export type { ModelMessage as ChatModelMessage } from 'ai'
 export { base64ToBytes } from '../lib/base64'
 export { isTranscriptionRejected, TranscriptionRejectedError } from '../ai/transcribe-http'
-export { transcribeAudio, type TranscriptionRequest } from '../ai/transcribe'
+export {
+  transcribeAudio,
+  OPENAI_TRANSCRIPTION_MODEL,
+  GOOGLE_TRANSCRIPTION_MODEL,
+  type TranscriptionRequest,
+} from '../ai/transcribe'
 export {
   audioMemoFromPath,
   audioMemoIdentity,

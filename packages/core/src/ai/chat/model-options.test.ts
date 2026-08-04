@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { HostedAiProviderConfig } from '../../settings/schema'
+import type { HostedAiProviderConfig, OpenAiCompatibleProviderConfig } from '../../settings/schema'
 import { aiProvider } from '../provider-catalog'
 import { chatModelOptions, resolveChatModel } from './model-options'
 
@@ -9,6 +9,20 @@ function config(overrides: Partial<HostedAiProviderConfig>): HostedAiProviderCon
     provider: 'anthropic',
     model: 'claude-sonnet-4-6',
     keyHint: 'hint1',
+    ...overrides,
+  }
+}
+
+function compatible(
+  overrides: Partial<OpenAiCompatibleProviderConfig>,
+): OpenAiCompatibleProviderConfig {
+  return {
+    id: 'local',
+    provider: 'openai-compatible',
+    model: 'local-model',
+    baseUrl: 'http://localhost:1234/v1',
+    keyHint: '',
+    transcriptionModel: '',
     ...overrides,
   }
 }
@@ -48,6 +62,7 @@ describe('chatModelOptions', () => {
         model: 'llama-local',
         baseUrl: 'http://localhost:1234/v1',
         keyHint: '',
+        transcriptionModel: '',
       },
     ])
     expect(options.at(-1)).toEqual({
@@ -56,6 +71,28 @@ describe('chatModelOptions', () => {
       modelId: 'llama-local',
       label: 'llama-local',
     })
+  })
+
+  it('offers local-model but not the disabled sentinel from the OpenAI-compatible catalog', () => {
+    const options = chatModelOptions([compatible({ id: 'local' })])
+    expect(options.map((option) => option.modelId)).toEqual(['local-model'])
+    expect(options.some((option) => option.modelId === 'disabled')).toBe(false)
+  })
+
+  it('excludes the disabled sentinel even when the entry has a custom model', () => {
+    const options = chatModelOptions([compatible({ id: 'local', model: 'whisper-1' })])
+    expect(options.some((option) => option.modelId === 'disabled')).toBe(false)
+    expect(options.some((option) => option.modelId === 'whisper-1')).toBe(true)
+  })
+
+  it('excludes an entry whose chat model is the disabled sentinel', () => {
+    const options = chatModelOptions([
+      compatible({ id: 'whisper-only', model: 'disabled', transcriptionModel: 'whisper-1' }),
+      config({ id: 'claude' }),
+    ])
+    expect(options.some((option) => option.configId === 'whisper-only')).toBe(false)
+    expect(options.every((option) => option.configId === 'claude')).toBe(true)
+    expect(options.length).toBeGreaterThan(0)
   })
 
   it('groups options consecutively per configured entry', () => {
@@ -76,7 +113,11 @@ describe('chatModelOptions', () => {
 describe('resolveChatModel', () => {
   const entryA = config({ id: 'a' })
   const entryB = config({ id: 'b', provider: 'openai', model: 'gpt-5.5' })
-  const state = { providers: [entryA, entryB], defaultProviderId: 'b' }
+  const state = {
+    providers: [entryA, entryB],
+    defaultProviderId: 'b',
+    defaultTranscriptionProviderId: null,
+  }
 
   it('falls back to the default entry and its configured model with no selection', () => {
     expect(resolveChatModel(state, null)).toEqual(entryB)
@@ -94,6 +135,11 @@ describe('resolveChatModel', () => {
   })
 
   it('returns null when nothing is configured', () => {
-    expect(resolveChatModel({ providers: [], defaultProviderId: null }, null)).toBeNull()
+    expect(
+      resolveChatModel(
+        { providers: [], defaultProviderId: null, defaultTranscriptionProviderId: null },
+        null,
+      ),
+    ).toBeNull()
   })
 })

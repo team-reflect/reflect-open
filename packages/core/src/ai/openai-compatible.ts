@@ -1,13 +1,32 @@
+/** The settings-doc provider id for OpenAI-compatible entries. */
 export const OPENAI_COMPATIBLE_PROVIDER_ID = 'openai-compatible'
 
+/** The default base URL offered to a new OpenAI-compatible entry (a local LM Studio server). */
 export const DEFAULT_OPENAI_COMPATIBLE_BASE_URL = 'http://localhost:1234/v1'
 
+/** The default model id offered to a new OpenAI-compatible entry (LM Studio's placeholder). */
 export const DEFAULT_OPENAI_COMPATIBLE_MODEL = 'local-model'
 
+/**
+ * Sentinel model id for OpenAI-compatible entries: setting a slot (`model`
+ * or `transcriptionModel`) to `disabled` opts the entry out of that feature
+ * — a chat-disabled entry never appears in the model picker and is skipped
+ * by default resolution, a transcription-disabled entry is treated like the
+ * legacy unset value (`''`). The id is offered as a catalog option, so it
+ * round-trips through the settings schema like any real model id.
+ */
+export const DISABLED_OPENAI_COMPATIBLE_MODEL = 'disabled'
+
+/** Trim surrounding whitespace and any trailing slashes from a base URL. */
 export function normalizeOpenAICompatibleBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/u, '')
 }
 
+/**
+ * Whether `value` is an `http:` or `https:` URL with no query string or hash -
+ * a bare transport + host [+ path], the shape a transcription/chat endpoint is
+ * appended to. Rejects anything that isn't URL-parseable.
+ */
 export function isHttpBaseUrl(value: string): boolean {
   try {
     const url = new URL(normalizeOpenAICompatibleBaseUrl(value))

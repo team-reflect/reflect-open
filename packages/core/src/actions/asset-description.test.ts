@@ -49,8 +49,13 @@ const PROVIDERS: AiProvidersState = {
     { id: 'cfg-anthropic', provider: 'anthropic', model: 'claude-opus-4-8', keyHint: 'wxyz1' },
   ],
   defaultProviderId: 'cfg-anthropic',
+  defaultTranscriptionProviderId: null,
 }
-const NO_PROVIDERS: AiProvidersState = { providers: [], defaultProviderId: null }
+const NO_PROVIDERS: AiProvidersState = {
+  providers: [],
+  defaultProviderId: null,
+  defaultTranscriptionProviderId: null,
+}
 
 const GENERATION = 7
 const NOW = (): Date => new Date('2026-06-16T00:00:00.000Z')

@@ -59,7 +59,7 @@ interface MobileAudioMemoContextValue {
   pendingCount: number
   /** False without the native bridge. */
   available: boolean
-  /** False when no OpenAI/Gemini model is configured; the drawer then guides key setup. */
+  /** False when no transcription-capable model is configured; the drawer then guides key setup. */
   hasTranscriptionConfig: boolean
   /** The failure shown in the error phase. */
   error: string | null

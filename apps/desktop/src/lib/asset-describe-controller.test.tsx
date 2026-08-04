@@ -46,6 +46,7 @@ const PROVIDERS: AiProvidersState = {
     { id: 'cfg-anthropic', provider: 'anthropic', model: 'claude-opus-4-8', keyHint: 'wxyz1' },
   ],
   defaultProviderId: 'cfg-anthropic',
+  defaultTranscriptionProviderId: null,
 }
 
 function outcome(

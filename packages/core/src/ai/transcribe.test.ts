@@ -298,6 +298,126 @@ describe('transcribeAudio (google)', () => {
   })
 })
 
+describe('transcribeAudio (openai-compatible)', () => {
+  it('posts multipart with a custom model to the configured base URL', async () => {
+    const calls: RecordedCall[] = []
+    const fetchFn = recordingFetch(calls, () => jsonResponse(200, { text: ' hello ' }))
+
+    const text = await transcribeAudio(
+      request({
+        provider: 'openai-compatible',
+        baseUrl: 'https://transcribe.example.com/v1',
+        model: 'whisper-large-v3',
+        fetchFn,
+      }),
+    )
+
+    expect(text).toBe('hello')
+    expect(calls).toHaveLength(1)
+    expect(calls[0]!.url).toBe('https://transcribe.example.com/v1/audio/transcriptions')
+    expect(calls[0]!.headers['Authorization']).toBe('Bearer sk-test')
+    const form = calls[0]!.body as FormData
+    expect(form.get('model')).toBe('whisper-large-v3')
+  })
+
+  it('does not fall back when the custom model is not found', async () => {
+    const calls: RecordedCall[] = []
+    const fetchFn = recordingFetch(calls, () =>
+      jsonResponse(404, { error: { message: 'no such model', code: 'model_not_found' } }),
+    )
+
+    await expect(
+      transcribeAudio(
+        request({
+          provider: 'openai-compatible',
+          baseUrl: 'https://transcribe.example.com/v1',
+          model: 'my-custom-model',
+          fetchFn,
+        }),
+      ),
+    ).rejects.toMatchObject({ kind: 'network' })
+    expect(calls).toHaveLength(1)
+  })
+
+  it('reports a rejected key as an auth error', async () => {
+    const fetchFn = recordingFetch([], () => jsonResponse(401, { error: { message: 'bad key' } }))
+
+    await expect(
+      transcribeAudio(
+        request({
+          provider: 'openai-compatible',
+          baseUrl: 'https://loc.al/v1',
+          model: 'm',
+          fetchFn,
+        }),
+      ),
+    ).rejects.toMatchObject({ kind: 'auth' })
+  })
+
+  it('marks a refused recording as a rejection', async () => {
+    const fetchFn = recordingFetch([], () =>
+      jsonResponse(400, { error: { message: 'Invalid audio format.', code: null } }),
+    )
+
+    const failure: unknown = await transcribeAudio(
+      request({ provider: 'openai-compatible', baseUrl: 'https://loc.al/v1', model: 'm', fetchFn }),
+    ).catch((cause: unknown) => cause)
+
+    expect(isTranscriptionRejected(failure)).toBe(true)
+  })
+
+  it('reports an unrecognizable success body as a parse error', async () => {
+    const fetchFn = recordingFetch([], () => jsonResponse(200, { transcript: 'wrong shape' }))
+
+    await expect(
+      transcribeAudio(
+        request({
+          provider: 'openai-compatible',
+          baseUrl: 'https://loc.al/v1',
+          model: 'm',
+          fetchFn,
+        }),
+      ),
+    ).rejects.toMatchObject({ kind: 'parse' })
+  })
+
+  it('reports a network error on fetch failure', async () => {
+    const fetchFn: typeof fetch = async () => {
+      throw new TypeError('offline')
+    }
+
+    await expect(
+      transcribeAudio(
+        request({
+          provider: 'openai-compatible',
+          baseUrl: 'https://loc.al/v1',
+          model: 'm',
+          fetchFn,
+        }),
+      ),
+    ).rejects.toMatchObject({ kind: 'network' })
+  })
+
+  it('sends the model as an empty string when none is configured — the guard gate prevents this', async () => {
+    const calls: RecordedCall[] = []
+    const fetchFn = recordingFetch(calls, () => jsonResponse(200, { text: 'ok' }))
+
+    // Simulate what happens when the aiProviderSupportsTranscription guard
+    // is bypassed and an empty transcriptionModel reaches the provider.
+    await transcribeAudio(
+      request({
+        provider: 'openai-compatible',
+        baseUrl: 'https://loc.al/v1',
+        model: '',
+        fetchFn,
+      }),
+    )
+
+    const form = calls[0]!.body as FormData
+    expect(form.get('model')).toBe('')
+  })
+})
+
 describe('bytesToBase64', () => {
   it('matches btoa on small payloads', () => {
     expect(bytesToBase64(new TextEncoder().encode('abc'))).toBe(btoa('abc'))

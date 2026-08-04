@@ -34,8 +34,13 @@ vi.mock('@/lib/operations', () => ({
 const PROVIDERS: AiProvidersState = {
   providers: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
   defaultProviderId: 'cfg-openai',
+  defaultTranscriptionProviderId: 'cfg-openai',
 }
-const NO_PROVIDERS: AiProvidersState = { providers: [], defaultProviderId: null }
+const NO_PROVIDERS: AiProvidersState = {
+  providers: [],
+  defaultProviderId: null,
+  defaultTranscriptionProviderId: null,
+}
 
 const DRAINED: ReconcileAudioMemosOutcome = {
   pending: 0,

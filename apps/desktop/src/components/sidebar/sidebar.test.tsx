@@ -251,7 +251,8 @@ describe('Sidebar', () => {
 
   it('the mic button disables (without vanishing) when no provider can transcribe', async () => {
     audioMemo.available = false
-    audioMemo.unavailableReason = 'Add an OpenAI or Gemini model in Settings to record audio memos'
+    audioMemo.unavailableReason =
+      'Add an OpenAI, Gemini, or OpenAI-compatible model in Settings to record audio memos'
     const { view } = await renderSidebar()
     const micButton = view.getByRole('button', { name: /record audio memo/i })
     await expect.element(micButton).toHaveAttribute('aria-disabled', 'true')

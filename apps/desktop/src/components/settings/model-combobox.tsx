@@ -42,6 +42,11 @@ interface ModelComboboxProps {
   onChange: (modelId: string) => void
   /** Accessible name for the trigger when multiple model pickers are visible. */
   ariaLabel?: string
+  /**
+   * Show the trigger as inert: the popover never opens and the control reads
+   * as disabled. For fixed models the curated list cannot change.
+   */
+  disabled?: boolean
 }
 
 /**
@@ -55,6 +60,7 @@ export function ModelCombobox({
   models,
   onChange,
   ariaLabel = 'Default model',
+  disabled = false,
 }: ModelComboboxProps): ReactElement {
   const [open, setOpen] = useState(false)
   const [inputValue, setInputValue] = useState('')
@@ -71,7 +77,7 @@ export function ModelCombobox({
   }
 
   const handleOpenChange = (isOpen: boolean) => {
-    setOpen(isOpen)
+    setOpen(disabled ? false : isOpen)
     if (!isOpen) clearInput()
   }
 
@@ -106,6 +112,7 @@ export function ModelCombobox({
             role="combobox"
             aria-expanded={open}
             aria-label={ariaLabel}
+            disabled={disabled}
             className="w-full justify-between font-normal"
           >
             <span className="truncate">{aiModelLabel(provider, value)}</span>
@@ -113,7 +120,11 @@ export function ModelCombobox({
           </Button>
         }
       />
-      <PopoverContent className="p-0" style={{ width: 'var(--anchor-width)' }} align="start">
+      <PopoverContent
+        className="p-0"
+        style={{ width: 'max(var(--anchor-width), 20rem)' }}
+        align="start"
+      >
         <Command>
           <FilterCountSync countRef={filteredCountRef} />
           <CommandInput

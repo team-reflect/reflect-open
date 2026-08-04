@@ -81,7 +81,11 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
   // The picker's choice lives in the settings document, not session state, so
   // the model used last is the one the next session starts on.
   const activeModel = resolveChatModel(
-    { providers, defaultProviderId: settings.defaultAiProviderId },
+    {
+      providers,
+      defaultProviderId: settings.defaultAiProviderId,
+      defaultTranscriptionProviderId: settings.defaultTranscriptionProviderId,
+    },
     settings.chatModelSelection,
   )
 

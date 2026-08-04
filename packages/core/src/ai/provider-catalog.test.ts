@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import type { AiProviderConfig } from '../settings/schema'
 import {
   AI_PROVIDERS,
   DEFAULT_CONTEXT_WINDOW,
   aiProvider,
+  aiProviderSupportsChat,
+  aiProviderSupportsTranscription,
   modelContextWindow,
 } from './provider-catalog'
 
@@ -38,6 +41,77 @@ describe('AI_PROVIDERS', () => {
       apiKeyRequired: false,
       keyPlaceholder: 'Optional API key',
     })
+  })
+
+  it('offers local-model (first) and disabled for OpenAI-compatible entries', () => {
+    expect(aiProvider('openai-compatible').models.map((model) => model.id)).toEqual([
+      'local-model',
+      'disabled',
+    ])
+  })
+})
+
+describe('aiProviderSupportsChat', () => {
+  const openaiCompatible = (model: string): AiProviderConfig => ({
+    id: 'local',
+    provider: 'openai-compatible',
+    model,
+    keyHint: '',
+    baseUrl: 'http://localhost:1234/v1',
+    transcriptionModel: '',
+  })
+
+  it('is always true for hosted providers', () => {
+    const hosted: AiProviderConfig = {
+      id: 'oai',
+      provider: 'openai',
+      model: 'gpt-5.4',
+      keyHint: '',
+    }
+    expect(aiProviderSupportsChat(hosted)).toBe(true)
+  })
+
+  it('is true for a real model and false for the disabled sentinel', () => {
+    expect(aiProviderSupportsChat(openaiCompatible('local-model'))).toBe(true)
+    expect(aiProviderSupportsChat(openaiCompatible('llama-local'))).toBe(true)
+    expect(aiProviderSupportsChat(openaiCompatible('disabled'))).toBe(false)
+  })
+})
+
+describe('aiProviderSupportsTranscription', () => {
+  const openaiCompatible = (transcriptionModel: string): AiProviderConfig => ({
+    id: 'local',
+    provider: 'openai-compatible',
+    model: 'local-model',
+    keyHint: '',
+    baseUrl: 'http://localhost:1234/v1',
+    transcriptionModel,
+  })
+
+  it('follows the catalog constant for hosted providers', () => {
+    const openai: AiProviderConfig = {
+      id: 'oai',
+      provider: 'openai',
+      model: 'gpt-5.4',
+      keyHint: '',
+    }
+    const anthropic: AiProviderConfig = {
+      id: 'claude',
+      provider: 'anthropic',
+      model: 'claude-fable-5',
+      keyHint: '',
+    }
+    expect(aiProviderSupportsTranscription(openai)).toBe(true)
+    expect(aiProviderSupportsTranscription(anthropic)).toBe(false)
+  })
+
+  it('is false for the legacy unset value and the disabled sentinel', () => {
+    expect(aiProviderSupportsTranscription(openaiCompatible(''))).toBe(false)
+    expect(aiProviderSupportsTranscription(openaiCompatible('disabled'))).toBe(false)
+  })
+
+  it('is true for a real transcription model', () => {
+    expect(aiProviderSupportsTranscription(openaiCompatible('whisper-large-v3'))).toBe(true)
   })
 })
 

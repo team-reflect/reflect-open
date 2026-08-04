@@ -1,4 +1,5 @@
 import type { AiProviderConfig } from '../settings/schema'
+import { aiProviderSupportsChat, aiProviderSupportsTranscription } from './provider-catalog'
 
 /**
  * Pure transforms over the configured-AI-provider state (Plan 10). The
@@ -13,6 +14,7 @@ import type { AiProviderConfig } from '../settings/schema'
 export interface AiProvidersState {
   providers: AiProviderConfig[]
   defaultProviderId: string | null
+  defaultTranscriptionProviderId: string | null
 }
 
 /** How many trailing key characters are kept as the display hint. */
@@ -29,82 +31,162 @@ export function apiKeyHint(key: string): string {
 
 /**
  * Append `entry`; it becomes the default when requested or when it is the
- * first entry.
+ * first entry.  The transcription default follows the same rule for
+ * transcription-capable entries.
  */
 export function withAiProviderAdded(
   state: AiProvidersState,
   entry: AiProviderConfig,
-  makeDefault: boolean,
+  isDefault: boolean,
+  isTranscriptionDefault?: boolean,
 ): AiProvidersState {
+  const isFirst = state.providers.length === 0
+  const makeTranscriptionDefault =
+    isTranscriptionDefault ?? (isDefault && aiProviderSupportsTranscription(entry))
   return {
     providers: [...state.providers, entry],
-    defaultProviderId:
-      makeDefault || state.providers.length === 0 ? entry.id : state.defaultProviderId,
+    defaultProviderId: isDefault || isFirst ? entry.id : state.defaultProviderId,
+    defaultTranscriptionProviderId:
+      makeTranscriptionDefault || (isFirst && aiProviderSupportsTranscription(entry))
+        ? entry.id
+        : state.defaultTranscriptionProviderId,
   }
 }
 
 /**
  * Remove the entry with `id`. If it was the default, the first remaining
- * entry takes over (`null` when the list empties).
+ * entry takes over (`null` when the list empties).  The transcription
+ * default likewise promotes the first remaining transcription-capable
+ * entry, or `null` when none remain.
  */
 export function withAiProviderRemoved(state: AiProvidersState, id: string): AiProvidersState {
   const providers = state.providers.filter((provider) => provider.id !== id)
+  const firstTranscription = providers.find((provider) => aiProviderSupportsTranscription(provider))
   return {
     providers,
     defaultProviderId:
       state.defaultProviderId === id ? (providers[0]?.id ?? null) : state.defaultProviderId,
+    defaultTranscriptionProviderId:
+      state.defaultTranscriptionProviderId === id
+        ? (firstTranscription?.id ?? null)
+        : state.defaultTranscriptionProviderId,
   }
 }
 
 /**
  * The entry AI features should use when no explicit choice is made: the one
  * `defaultProviderId` points at, falling back to the first entry when the id
- * is null or dangling.
+ * is null or dangling.  Entries whose chat model is the `'disabled'`
+ * sentinel are skipped in both passes — when nothing chat-capable exists
+ * the id-targeted entry still wins over returning nothing, so the stored
+ * default never silently dies.
  */
 export function defaultAiProvider(state: AiProvidersState): AiProviderConfig | null {
+  const targeted = state.providers.find((provider) => provider.id === state.defaultProviderId)
+  if (targeted !== undefined && aiProviderSupportsChat(targeted)) {
+    return targeted
+  }
   return (
-    state.providers.find((provider) => provider.id === state.defaultProviderId) ??
+    state.providers.find((provider) => aiProviderSupportsChat(provider)) ??
+    targeted ??
     state.providers[0] ??
     null
   )
 }
 
 /**
- * Providers with a speech-to-text path, in preference order. Anthropic and
- * OpenRouter have no dedicated transcription path in this app.
+ * The entry transcription should use when no explicit choice is made: the
+ * one `defaultTranscriptionProviderId` points at, falling back to the first
+ * transcription-capable entry, or `null` when none are configured.
  */
-export const TRANSCRIPTION_PROVIDERS = ['openai', 'google'] as const
-
-export type TranscriptionProvider = (typeof TRANSCRIPTION_PROVIDERS)[number]
-
-/** A configured entry known to belong to a transcription-capable provider. */
-export type TranscriptionConfig = AiProviderConfig & { provider: TranscriptionProvider }
+export function defaultTranscriptionProvider(state: AiProvidersState): AiProviderConfig | null {
+  const preferred =
+    state.defaultTranscriptionProviderId !== null
+      ? state.providers.find(
+          (provider) =>
+            provider.id === state.defaultTranscriptionProviderId &&
+            aiProviderSupportsTranscription(provider),
+        )
+      : undefined
+  return (
+    preferred ??
+    state.providers.find((provider) => aiProviderSupportsTranscription(provider)) ??
+    null
+  )
+}
 
 /**
- * The configured entry audio transcription should run on: any OpenAI entry
- * wins over any Google entry, and within a provider the app default wins over
- * the first. `null` means no capable provider is configured — the feature is
- * unavailable. The entry only addresses the provider + API key; the
- * transcription model itself is fixed per provider (see `transcribe.ts`), so
- * the entry's default-model choice never transfers.
+ * Every configured provider that supports transcription, in preference
+ * order: OpenAI entries first, then Google, then any `openai-compatible`
+ * entry whose `transcriptionModel` is a real model (not the legacy unset
+ * `''` or the `'disabled'` sentinel).  Within each provider group
+ * the app default wins over the first entry; for transcription the
+ * dedicated `defaultTranscriptionProviderId` is used instead of the chat
+ * default.
  */
-export function pickTranscriptionConfig(state: AiProvidersState): TranscriptionConfig | null {
-  for (const provider of TRANSCRIPTION_PROVIDERS) {
-    const candidates = state.providers.filter(
-      (candidate): candidate is TranscriptionConfig => candidate.provider === provider,
-    )
-    if (candidates.length > 0) {
-      return (
-        candidates.find((candidate) => candidate.id === state.defaultProviderId) ?? candidates[0]!
-      )
-    }
+export function transcriptionProviders(state: AiProvidersState): AiProviderConfig[] {
+  const candidates = state.providers.filter((provider) => aiProviderSupportsTranscription(provider))
+  // Stable sort: OpenAI > Google > openai-compatible, default-first within each group.
+  const groupOrder = (provider: string): number => {
+    if (provider === 'openai') return 0
+    if (provider === 'google') return 1
+    return 2 // openai-compatible
   }
-  return null
+  return candidates.sort((left, right) => {
+    const groupDiff = groupOrder(left.provider) - groupOrder(right.provider)
+    if (groupDiff !== 0) return groupDiff
+    const leftDefault = left.id === state.defaultTranscriptionProviderId ? 0 : 1
+    const rightDefault = right.id === state.defaultTranscriptionProviderId ? 0 : 1
+    return leftDefault - rightDefault
+  })
+}
+
+/**
+ * The configured entry audio transcription should run on: the first
+ * transcription-capable provider, in {@link transcriptionProviders} order.
+ * `null` means no capable provider is configured - the feature is
+ * unavailable.
+ */
+export function pickTranscriptionConfig(state: AiProvidersState): AiProviderConfig | null {
+  const candidates = transcriptionProviders(state)
+  return candidates[0] ?? null
+}
+
+/**
+ * Providers that can serve transcription requests.  `openai` and `google`
+ * are known at compile-time; `openai-compatible` entries become eligible
+ * when the user supplies a real `transcriptionModel` (`''` and `'disabled'`
+ * both stay ineligible).  The type is
+ * intentionally narrower than {@link AiProviderId} — Anthropic and
+ * OpenRouter have no transcription path and should never reach
+ * {@link transcribeAudio}.
+ */
+export type TranscriptionProvider = 'openai' | 'google' | 'openai-compatible'
+
+/**
+ * The ordered list of provider identifiers that support transcription,
+ * from highest to lowest priority. Used by consent UI to know which
+ * providers send audio data and by {@link resolveTranscriptionTarget}
+ * to order candidates.
+ */
+export const TRANSCRIPTION_PROVIDERS: readonly TranscriptionProvider[] = [
+  'openai',
+  'google',
+  'openai-compatible',
+]
+
+/**
+ * Type guard: is `provider` one of the identifiers that supports
+ * transcription? Narrows the union for call sites that must branch on the
+ * concrete provider (e.g. {@link transcribeAudio}).
+ */
+export function isTranscriptionProvider(provider: string): provider is TranscriptionProvider {
+  return (TRANSCRIPTION_PROVIDERS as readonly string[]).includes(provider)
 }
 
 /** The transcription entry a pass should use, with its keychain key. */
 export interface TranscriptionTarget {
-  config: TranscriptionConfig
+  config: AiProviderConfig
   apiKey: string
 }
 
@@ -121,31 +203,23 @@ export const TRANSCRIPTION_MAX_SEGMENT_BYTES = 24 * 1024 * 1024
 
 /**
  * The entry audio transcription should run on: providers in
- * {@link TRANSCRIPTION_PROVIDERS} order, the app-default entry first within
- * each, and the first whose keychain key resolves wins. A keyless entry is
- * skipped rather than stopping the pass — an unkeyed OpenAI entry must not
- * block a working Google one. `getKey` is the caller's (memoized) keychain
- * read, so a pass touches each entry's key at most once.
+ * {@link transcriptionProviders} order, the transcription-default entry
+ * first within each provider group, and the first whose keychain key
+ * resolves wins. A keyless entry is skipped rather than stopping the pass
+ * — an unkeyed OpenAI entry must not block a working Google one. `getKey`
+ * is the caller's (memoized) keychain read, so a pass touches each entry's
+ * key at most once.
  */
 export async function resolveTranscriptionTarget(
   state: AiProvidersState,
-  getKey: (id: string) => Promise<string | null>,
+  getKey: (config: AiProviderConfig) => Promise<string | null>,
 ): Promise<TranscriptionTarget | TranscriptionMiss> {
-  const candidates: TranscriptionConfig[] = []
-  for (const provider of TRANSCRIPTION_PROVIDERS) {
-    const entries = state.providers.filter(
-      (entry): entry is TranscriptionConfig => entry.provider === provider,
-    )
-    candidates.push(
-      ...entries.filter((entry) => entry.id === state.defaultProviderId),
-      ...entries.filter((entry) => entry.id !== state.defaultProviderId),
-    )
-  }
+  const candidates = transcriptionProviders(state)
   if (candidates.length === 0) {
     return 'no-provider'
   }
   for (const candidate of candidates) {
-    const apiKey = await getKey(candidate.id)
+    const apiKey = await getKey(candidate)
     if (apiKey !== null) {
       return { config: candidate, apiKey }
     }

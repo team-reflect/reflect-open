@@ -65,9 +65,11 @@ function AddAiProviderSheet({
 }): ReactElement {
   const [providerId, setProviderId] = useState<AiProviderId>(AI_PROVIDERS[0].id)
   const [model, setModel] = useState(AI_PROVIDERS[0].models[0].id)
+  const [transcriptionModel, setTranscriptionModel] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [isDefault, setIsDefault] = useState(false)
+  const [isTranscriptionDefault, setIsTranscriptionDefault] = useState(false)
   const [consented, setConsented] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const { submitError, unverified, resetUnverified, submit } = useAddAiProviderSubmit({
@@ -81,7 +83,15 @@ function AddAiProviderSheet({
   const submitDraft = async (): Promise<void> => {
     setSubmitting(true)
     try {
-      await submit({ provider: providerId, model, baseUrl, apiKey, isDefault })
+      await submit({
+        provider: providerId,
+        model,
+        transcriptionModel,
+        baseUrl,
+        apiKey,
+        isDefault,
+        isTranscriptionDefault,
+      })
     } finally {
       setSubmitting(false)
     }
@@ -115,7 +125,15 @@ function AddAiProviderSheet({
               const next = aiProvider(aiProviderIdSchema.parse(value))
               setProviderId(next.id)
               setModel(next.models[0].id)
+              setTranscriptionModel(next.id === 'openai-compatible' ? next.models[0].id : '')
               setBaseUrl(next.id === 'openai-compatible' ? DEFAULT_OPENAI_COMPATIBLE_BASE_URL : '')
+              // A provider that can't transcribe can't be the transcription
+              // default - the checkbox is hidden in that case, so clear the
+              // stale flag to keep submitDraft from storing a default for a
+              // transcription-incapable provider (mirrors desktop's reset).
+              if (!(next.supportsTranscription || next.id === 'openai-compatible')) {
+                setIsTranscriptionDefault(false)
+              }
               setConsented(false)
               resetUnverified()
             }}
@@ -137,7 +155,9 @@ function AddAiProviderSheet({
           <span className={FIELD_LABEL_CLASS}>Default model</span>
           {isOpenAICompatible ? (
             <Input
+              type="text"
               aria-label="Default model"
+              placeholder={provider.models[0].id}
               autoComplete="off"
               spellCheck={false}
               value={model}
@@ -171,6 +191,24 @@ function AddAiProviderSheet({
             </Select>
           )}
         </div>
+
+        {isOpenAICompatible ? (
+          <div className="flex flex-col gap-1">
+            <span className={FIELD_LABEL_CLASS}>Transcription model</span>
+            <Input
+              type="text"
+              aria-label="Transcription model"
+              placeholder="Model id, or 'disabled'"
+              autoComplete="off"
+              spellCheck={false}
+              value={transcriptionModel}
+              onChange={(event) => {
+                setTranscriptionModel(event.target.value)
+                resetUnverified()
+              }}
+            />
+          </div>
+        ) : null}
 
         {isOpenAICompatible ? (
           <label className="flex flex-col gap-1">
@@ -225,8 +263,20 @@ function AddAiProviderSheet({
             checked={isDefault}
             onChange={(event) => setIsDefault(event.target.checked)}
           />
-          <span className="text-sm text-text">Use as the default provider</span>
+          <span className="text-sm text-text">Use as default for chat</span>
         </label>
+
+        {provider.supportsTranscription || isOpenAICompatible ? (
+          <label className="flex items-center gap-2 py-1">
+            <input
+              type="checkbox"
+              className="accent-accent"
+              checked={isTranscriptionDefault}
+              onChange={(event) => setIsTranscriptionDefault(event.target.checked)}
+            />
+            <span className="text-sm text-text">Use as default for transcription</span>
+          </label>
+        ) : null}
 
         {submitError !== null ? <InlineAlert tone="error">{submitError}</InlineAlert> : null}
         {unverified ? (

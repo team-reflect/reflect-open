@@ -65,6 +65,7 @@ describe('DescribeAssetsField', () => {
     expect(backfill).toHaveBeenCalledWith(5, {
       providers: [PROVIDER],
       defaultProviderId: 'cfg',
+      defaultTranscriptionProviderId: null,
     })
   })
 

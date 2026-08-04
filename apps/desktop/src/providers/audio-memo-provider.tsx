@@ -53,7 +53,7 @@ interface AudioMemoContextValue {
   stream: MediaStream | null
   /** Recordings committed but not yet written to the graph. */
   pendingCount: number
-  /** False when no OpenAI/Gemini model is configured or the platform can't record. */
+  /** False when no transcription-capable model is configured or the platform can't record. */
   available: boolean
   /** Why the mic is disabled (tooltip copy), null when `available`. */
   unavailableReason: string | null
@@ -82,7 +82,8 @@ interface LiveSession {
   captured: string[]
 }
 
-const NO_PROVIDER_REASON = 'Add an OpenAI or Gemini model in Settings to record audio memos'
+const NO_PROVIDER_REASON =
+  'Add an OpenAI, Gemini, or OpenAI-compatible model in Settings to record audio memos'
 const UNSUPPORTED_REASON = 'Audio recording is not supported on this platform'
 
 /** Same macOS check as `hasMacosTitleBarOverlay` — settings paths differ per OS. */

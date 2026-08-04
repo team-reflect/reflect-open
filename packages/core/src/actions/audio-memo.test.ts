@@ -80,6 +80,7 @@ const getSecretMock = vi.mocked(getSecret)
 const PROVIDERS: AiProvidersState = {
   providers: [{ id: 'cfg-openai', provider: 'openai', model: 'gpt-5.1', keyHint: 'wxyz1' }],
   defaultProviderId: 'cfg-openai',
+  defaultTranscriptionProviderId: 'cfg-openai',
 }
 
 const ANTHROPIC_CONFIG = {
@@ -255,6 +256,36 @@ describe('reconcileAudioMemos', () => {
     expect(formatAudioMemoTranscriptMock).not.toHaveBeenCalled()
   })
 
+  it('forwards baseUrl and transcriptionModel for an openai-compatible provider', async () => {
+    listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
+
+    const compatibleProviders: AiProvidersState = {
+      providers: [
+        {
+          id: 'local',
+          provider: 'openai-compatible',
+          model: 'gpt-4o-mini',
+          baseUrl: 'http://127.0.0.1:8000/v1',
+          transcriptionModel: 'whisper-large-v3',
+          keyHint: '',
+        },
+      ],
+      defaultProviderId: 'local',
+      defaultTranscriptionProviderId: 'local',
+    }
+
+    const outcome = await reconcile({ providers: compatibleProviders })
+
+    expect(outcome).toEqual({ pending: 1, transcribed: 1, rejected: 0, stopped: null })
+    expect(transcribeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'openai-compatible',
+        baseUrl: 'http://127.0.0.1:8000/v1',
+        model: 'whisper-large-v3',
+      }),
+    )
+  })
+
   it('formats and names a fresh transcript in one best-effort AI pass when enabled', async () => {
     listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
 
@@ -295,6 +326,7 @@ describe('reconcileAudioMemos', () => {
       providers: {
         providers: [...PROVIDERS.providers, ANTHROPIC_CONFIG],
         defaultProviderId: ANTHROPIC_CONFIG.id,
+        defaultTranscriptionProviderId: null,
       },
     })
 
@@ -321,6 +353,7 @@ describe('reconcileAudioMemos', () => {
       providers: {
         providers: [...PROVIDERS.providers, ANTHROPIC_CONFIG],
         defaultProviderId: ANTHROPIC_CONFIG.id,
+        defaultTranscriptionProviderId: PROVIDERS.defaultTranscriptionProviderId,
       },
       formatTranscript: true,
     })
@@ -610,7 +643,9 @@ describe('reconcileAudioMemos', () => {
   it('reports a missing provider as config — the pass retries after settings change', async () => {
     listDirMock.mockResolvedValue([fileMeta(MEMO.audioPath)])
 
-    const outcome = await reconcile({ providers: { providers: [], defaultProviderId: null } })
+    const outcome = await reconcile({
+      providers: { providers: [], defaultProviderId: null, defaultTranscriptionProviderId: null },
+    })
 
     expect(outcome).toMatchObject({
       pending: 1,

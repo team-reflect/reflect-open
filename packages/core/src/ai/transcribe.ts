@@ -22,6 +22,7 @@ import {
  * (stale gate, timeouts, error ladder) is `ai/transcribe-http`.
  */
 
+/** The OpenAI transcription model sent on every audio-memo pass (fixed, not user-chosen). */
 export const OPENAI_TRANSCRIPTION_MODEL = 'gpt-4o-mini-transcribe'
 
 /**
@@ -30,6 +31,7 @@ export const OPENAI_TRANSCRIPTION_MODEL = 'gpt-4o-mini-transcribe'
  */
 export const OPENAI_TRANSCRIPTION_FALLBACK_MODEL = 'whisper-1'
 
+/** The Gemini transcription model sent on every audio-memo pass (fixed, not user-chosen). */
 export const GOOGLE_TRANSCRIPTION_MODEL = 'gemini-3.5-flash'
 
 /**
@@ -57,6 +59,19 @@ export interface TranscriptionRequest {
    * `network` error.
    */
   isStale?: (() => boolean) | undefined
+  /**
+   * Base URL for the transcription endpoint — only used for
+   * `openai-compatible` providers (`{baseUrl}/audio/transcriptions`);
+   * hosted providers use their catalog endpoints.
+   */
+  baseUrl?: string
+  /**
+   * Model id for the transcription request — only used for
+   * `openai-compatible` providers; hosted providers use hardcoded models
+   * with fallback retry. When omitted, {@link OPENAI_TRANSCRIPTION_MODEL}
+   * is used.
+   */
+  model?: string
 }
 
 /**
@@ -66,9 +81,10 @@ export interface TranscriptionRequest {
  * shape is unrecognizable.
  */
 export async function transcribeAudio(request: TranscriptionRequest): Promise<string> {
-  return request.provider === 'openai'
-    ? transcribeWithOpenAi(request)
-    : transcribeWithGemini(request)
+  if (request.provider === 'google') {
+    return transcribeWithGemini(request)
+  }
+  return transcribeWithOpenAi(request)
 }
 
 /** `audio/webm;codecs=opus` → `audio/webm` — parameters confuse provider sniffing. */
@@ -106,13 +122,17 @@ function isModelNotFound(body: string): boolean {
 
 async function transcribeWithOpenAi(request: TranscriptionRequest): Promise<string> {
   const fetchFn = request.fetchFn ?? fetch
+  const endpoint = request.baseUrl
+    ? `${request.baseUrl}/audio/transcriptions`
+    : 'https://api.openai.com/v1/audio/transcriptions'
+
   const attempt = (model: string): Promise<Response> => {
     const form = new FormData()
     form.append('file', request.audio, uploadFilename(request.mimeType))
     form.append('model', model)
     return send(
       fetchFn,
-      'https://api.openai.com/v1/audio/transcriptions',
+      endpoint,
       {
         method: 'POST',
         headers: { Authorization: `Bearer ${request.apiKey}` },
@@ -122,14 +142,15 @@ async function transcribeWithOpenAi(request: TranscriptionRequest): Promise<stri
     )
   }
 
-  let response = await attempt(OPENAI_TRANSCRIPTION_MODEL)
+  const model = request.model ?? OPENAI_TRANSCRIPTION_MODEL
+  let response = await attempt(model)
   let body = await response.text()
-  if (!response.ok && isModelNotFound(body)) {
+  if (!response.ok && request.model === undefined && isModelNotFound(body)) {
     response = await attempt(OPENAI_TRANSCRIPTION_FALLBACK_MODEL)
     body = await response.text()
   }
   if (!response.ok) {
-    throw httpError('openai', response.status, body)
+    throw httpError(request.provider, response.status, body)
   }
 
   const parsed = openAiResponseSchema.safeParse(safeJson(body))

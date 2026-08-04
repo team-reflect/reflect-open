@@ -4,6 +4,7 @@ import {
   aiProviderRequiresApiKey,
   apiKeyHint,
   defaultAiProvider,
+  defaultTranscriptionProvider,
   deleteSecret,
   normalizeOpenAICompatibleBaseUrl,
   setSecret,
@@ -29,12 +30,16 @@ export interface NewAiProvider {
   baseUrl?: string | undefined
   apiKey: string
   isDefault: boolean
+  isTranscriptionDefault: boolean
+  transcriptionModel?: string | undefined
 }
 
 interface UseAiProvidersValue {
   providers: AiProviderConfig[]
   /** The entry AI features use by default (null only when the list is empty). */
   defaultProvider: AiProviderConfig | null
+  /** The entry transcription uses by default (null when none are transcription-capable). */
+  transcriptionProvider: AiProviderConfig | null
   /**
    * Store the key in the keychain, then add the settings entry. Rejects (and
    * adds nothing) if the keychain write fails — so an entry can never point
@@ -49,6 +54,10 @@ interface UseAiProvidersValue {
   makeDefault: (id: string) => void
   /** Change the default model used by the configured provider entry. */
   setDefaultModel: (id: string, model: string) => void
+  /** Change the transcription model used by the configured provider entry. */
+  setTranscriptionModel: (id: string, model: string) => void
+  /** Make the entry with `id` the transcription default. */
+  makeTranscriptionDefault: (id: string) => void
 }
 
 export function useAiProviders(): UseAiProvidersValue {
@@ -57,6 +66,13 @@ export function useAiProviders(): UseAiProvidersValue {
   const defaultProvider = defaultAiProvider({
     providers,
     defaultProviderId: settings.defaultAiProviderId,
+    defaultTranscriptionProviderId: settings.defaultTranscriptionProviderId,
+  })
+
+  const transcriptionProvider = defaultTranscriptionProvider({
+    providers,
+    defaultProviderId: settings.defaultAiProviderId,
+    defaultTranscriptionProviderId: settings.defaultTranscriptionProviderId,
   })
 
   // Every write goes through `updateSettingsWith` so the state is rebuilt
@@ -94,6 +110,7 @@ export function useAiProviders(): UseAiProvidersValue {
                 model: draft.model,
                 baseUrl: normalizeOpenAICompatibleBaseUrl(draft.baseUrl ?? ''),
                 keyHint: apiKeyHint(apiKey),
+                transcriptionModel: draft.transcriptionModel ?? '',
               }
             : {
                 id,
@@ -102,11 +119,20 @@ export function useAiProviders(): UseAiProvidersValue {
                 keyHint: apiKeyHint(apiKey),
               }
         const next = withAiProviderAdded(
-          { providers: current.aiProviders, defaultProviderId: current.defaultAiProviderId },
+          {
+            providers: current.aiProviders,
+            defaultProviderId: current.defaultAiProviderId,
+            defaultTranscriptionProviderId: current.defaultTranscriptionProviderId,
+          },
           entry,
           draft.isDefault,
+          draft.isTranscriptionDefault,
         )
-        return { aiProviders: next.providers, defaultAiProviderId: next.defaultProviderId }
+        return {
+          aiProviders: next.providers,
+          defaultAiProviderId: next.defaultProviderId,
+          defaultTranscriptionProviderId: next.defaultTranscriptionProviderId,
+        }
       })
     },
     [whenSettingsLoaded, updateSettingsWith],
@@ -123,10 +149,18 @@ export function useAiProviders(): UseAiProvidersValue {
       await deleteSecret(aiKeySecretName(id))
       updateSettingsWith((current) => {
         const next = withAiProviderRemoved(
-          { providers: current.aiProviders, defaultProviderId: current.defaultAiProviderId },
+          {
+            providers: current.aiProviders,
+            defaultProviderId: current.defaultAiProviderId,
+            defaultTranscriptionProviderId: current.defaultTranscriptionProviderId,
+          },
           id,
         )
-        return { aiProviders: next.providers, defaultAiProviderId: next.defaultProviderId }
+        return {
+          aiProviders: next.providers,
+          defaultAiProviderId: next.defaultProviderId,
+          defaultTranscriptionProviderId: next.defaultTranscriptionProviderId,
+        }
       })
     },
     [updateSettingsWith],
@@ -154,12 +188,39 @@ export function useAiProviders(): UseAiProvidersValue {
     [updateSettingsWith],
   )
 
+  const setTranscriptionModel = useCallback(
+    (id: string, model: string): void => {
+      const normalizedModel = model.trim()
+      updateSettingsWith((current) => ({
+        aiProviders: current.aiProviders.map((provider) =>
+          provider.id === id && provider.provider === 'openai-compatible'
+            ? { ...provider, transcriptionModel: normalizedModel }
+            : provider,
+        ),
+        ...(current.defaultTranscriptionProviderId === id && normalizedModel === ''
+          ? { defaultTranscriptionProviderId: null }
+          : {}),
+      }))
+    },
+    [updateSettingsWith],
+  )
+
+  const makeTranscriptionDefault = useCallback(
+    (id: string): void => {
+      updateSettingsWith(() => ({ defaultTranscriptionProviderId: id }))
+    },
+    [updateSettingsWith],
+  )
+
   return {
     providers,
     defaultProvider,
+    transcriptionProvider,
     addProvider,
     removeProvider,
     makeDefault,
     setDefaultModel,
+    setTranscriptionModel,
+    makeTranscriptionDefault,
   }
 }
