@@ -113,7 +113,10 @@ export function repointPathWikiLinks(source: string, options: PathWikiLinkRepoin
   // backslash or loose slash segment would turn the path into a *name*, and
   // enumerating bad characters can never prove the opposite direction.
   const reduced = wikiNoteReference(to)
-  if ((reduced?.kind !== 'path' && reduced?.kind !== 'pathOrKey') || reduced.path !== `${to}.md`) {
+  if (
+    (reduced?.kind !== 'path' && reduced?.kind !== 'pathOrKey') ||
+    reduced.path !== `${to}.md`
+  ) {
     throw new Error(`invalid wiki-link path target: ${to}`)
   }
   const splices: Splice[] = []

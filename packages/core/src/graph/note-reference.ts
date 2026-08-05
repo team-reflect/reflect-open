@@ -133,7 +133,9 @@ export function wikiNoteReference(target: string): NoteReference | null {
       return { kind: 'path', path: resolved }
     }
     const key = foldKey(path.replace(MARKDOWN_EXTENSION_RE, ''))
-    return key === '' ? { kind: 'path', path: resolved } : { kind: 'pathOrKey', path: resolved, key }
+    return key === ''
+      ? { kind: 'path', path: resolved }
+      : { kind: 'pathOrKey', path: resolved, key }
   }
   const key = foldKey(path.replace(MARKDOWN_EXTENSION_RE, ''))
   return key === '' ? null : { kind: 'key', key }

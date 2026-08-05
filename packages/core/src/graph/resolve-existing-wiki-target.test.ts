@@ -520,7 +520,7 @@ describe('resolveExistingWikiTarget: colon and slash names', () => {
     expectNoWrites(invoke)
   })
 
-  it('reports an unreadable exact-path match unavailable instead of name-falling back', async () => {
+  it('keeps an unreadable exact-path match unavailable, not name-resolved', async () => {
     const invoke = bindBridge({
       readErrors: ['john/sally meeting notes.md'],
       query: (sql) =>
