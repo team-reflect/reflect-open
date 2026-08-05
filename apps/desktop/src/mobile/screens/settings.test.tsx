@@ -38,8 +38,11 @@ vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl }))
 
 const settingsState = vi.hoisted(() => ({ current: {} as Settings }))
 const updateSettings = vi.hoisted(() => vi.fn())
+// Routed through the `updateSettings` spy (see beforeEach) so prompt-list
+// edits assert on the patch their functional update produces.
+const updateSettingsWith = vi.hoisted(() => vi.fn())
 vi.mock('@/providers/settings-provider', () => ({
-  useSettings: () => ({ settings: settingsState.current, updateSettings }),
+  useSettings: () => ({ settings: settingsState.current, updateSettings, updateSettingsWith }),
 }))
 
 const navigate = vi.hoisted(() => vi.fn())
@@ -96,6 +99,9 @@ beforeEach(async () => {
     signOut: vi.fn(async () => {}),
   }
   vi.mocked(getConflictedNotes).mockResolvedValue([])
+  updateSettingsWith.mockImplementation((updater: (current: Settings) => Partial<Settings>) => {
+    updateSettings(updater(settingsState.current))
+  })
 })
 
 afterEach(async () => {
@@ -226,6 +232,62 @@ describe('MobileSettings', () => {
     await expect
       .element(page.getByRole('textbox', { name: 'System prompt instructions' }))
       .not.toBeInTheDocument()
+  })
+
+  it('adds a saved AI prompt from the AI prompts group', async () => {
+    const user = userEvent
+    await mount()
+
+    await user.click(page.getByRole('button', { name: 'Add prompt' }))
+    const sheet = page.getByTestId('drawer')
+    await user.fill(sheet.getByRole('textbox', { name: 'Label' }), 'Shorten')
+    await user.fill(sheet.getByRole('textbox', { name: 'Prompt' }), 'Shorten: {{selectedText}}')
+    await user.click(sheet.getByRole('button', { name: 'Add prompt' }))
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      aiPrompts: [
+        expect.objectContaining({
+          label: 'Shorten',
+          body: 'Shorten: {{selectedText}}',
+          mode: 'replace',
+        }),
+      ],
+    })
+  })
+
+  it('edits a saved AI prompt through its row', async () => {
+    const user = userEvent
+    const saved = {
+      id: 'p1',
+      label: 'Translate to French',
+      body: 'Translate: {{selectedText}}',
+      mode: 'replace' as const,
+    }
+    settingsState.current = { ...settingsState.current, aiPrompts: [saved] }
+    await mount()
+
+    await user.click(page.getByRole('button', { name: 'Translate to French' }))
+    const sheet = page.getByTestId('drawer')
+    await user.fill(sheet.getByRole('textbox', { name: 'Label' }), 'Translate to German')
+    await user.click(sheet.getByRole('button', { name: 'Save' }))
+
+    expect(updateSettings).toHaveBeenCalledWith({
+      aiPrompts: [{ ...saved, label: 'Translate to German' }],
+    })
+  })
+
+  it('removes a saved AI prompt from the edit sheet', async () => {
+    const user = userEvent
+    settingsState.current = {
+      ...settingsState.current,
+      aiPrompts: [{ id: 'p1', label: 'Shorten', body: 'Shorten this.', mode: 'replace' }],
+    }
+    await mount()
+
+    await user.click(page.getByRole('button', { name: 'Shorten' }))
+    await user.click(page.getByTestId('drawer').getByRole('button', { name: 'Remove' }))
+
+    expect(updateSettings).toHaveBeenCalledWith({ aiPrompts: [] })
   })
 
   it('shows the connected repo and the live plain-language status', async () => {
