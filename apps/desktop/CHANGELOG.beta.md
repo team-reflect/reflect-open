@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1-beta](https://github.com/team-reflect/reflect-open/compare/v0.8.0...v0.8.1-beta) (2026-08-05)
+
+
+### Bug Fixes
+
+* **desktop:** resync today's date after system sleep ([#1032](https://github.com/team-reflect/reflect-open/issues/1032)) ([366b4cd](https://github.com/team-reflect/reflect-open/commit/366b4cd17e1fa9ac200757caf371ba326fa57419))
+
 ## [0.8.0-beta.8](https://github.com/team-reflect/reflect-open/compare/v0.8.0-beta.7...v0.8.0-beta.8) (2026-08-04)
 
 
