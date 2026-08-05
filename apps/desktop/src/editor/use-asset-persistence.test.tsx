@@ -307,6 +307,76 @@ describe('useAssetPersistence resolveFileInfo', () => {
   })
 })
 
+/** A bridge whose `asset_open` and `asset_reveal` outcomes are scripted. */
+function installOpenBridge({
+  openFails,
+  revealFails = false,
+}: {
+  openFails: boolean
+  revealFails?: boolean
+}): ReturnType<typeof vi.fn> {
+  const invoke = vi.fn(async (command: string) => {
+    if (command === 'asset_open' && openFails) {
+      throw { kind: 'traversal', message: 'not a supported attachment path: assets/tool.xyz' }
+    }
+    if (command === 'asset_reveal' && revealFails) {
+      throw { kind: 'notFound', message: 'asset not found: assets/tool.xyz' }
+    }
+    return null
+  })
+  setBridge({ invoke, invokeBinary: async () => null, listen: async () => () => {} })
+  return invoke
+}
+
+describe('useAssetPersistence openAsset', () => {
+  it('opens without touching the reveal fallback', async () => {
+    const invoke = installOpenBridge({ openFails: false })
+    const { act } = await renderPersistence({ generation: 3 })
+
+    await act(async () => {
+      await persistence!.openAsset('assets/q3-report.pdf')
+    })
+
+    expect(invoke.mock.calls.map(([command]) => command)).toEqual(['asset_open'])
+    expect(operations).toHaveLength(0)
+  })
+
+  it('degrades a refused file type to a reveal, with a status-line note', async () => {
+    const invoke = installOpenBridge({ openFails: true })
+    const { act } = await renderPersistence({ generation: 3 })
+
+    await act(async () => {
+      await persistence!.openAsset('assets/tool.xyz')
+    })
+
+    expect(invoke.mock.calls.map(([command]) => command)).toEqual(['asset_open', 'asset_reveal'])
+    const warning = operations.find((operation) => operation.status === 'warning')
+    expect(warning?.message).toMatch(/revealed in Finder/)
+  })
+
+  it('surfaces the open error when the reveal fails too', async () => {
+    installOpenBridge({ openFails: true, revealFails: true })
+    const { act } = await renderPersistence({ generation: 3 })
+
+    await act(async () => {
+      await persistence!.openAsset('assets/tool.xyz')
+    })
+
+    const failure = operations.find((operation) => operation.status === 'failed')
+    expect(failure?.message).toBe('not a supported attachment path: assets/tool.xyz')
+  })
+
+  it('declines without a graph session', async () => {
+    const invoke = installOpenBridge({ openFails: false })
+    const { act } = await renderPersistence({ generation: null })
+
+    await act(async () => {
+      await persistence!.openAsset('assets/q3-report.pdf')
+    })
+    expect(invoke).not.toHaveBeenCalled()
+  })
+})
+
 /** A bridge whose appends fail until `heal()` is called. */
 function installFailingBridge(): { heal: () => void } {
   const state = { failing: true }

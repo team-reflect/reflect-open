@@ -7,6 +7,7 @@ import {
   errorMessage,
   listDir,
   openAsset as openAssetCommand,
+  revealAsset as revealAssetCommand,
   type FileMeta,
 } from '@reflect/core'
 import { formatBytes } from '@/lib/format-bytes'
@@ -72,7 +73,11 @@ export interface AssetPersistence {
   resolveImageUrl: (src: string) => string | null
   /** Vet a source as a graph-relative asset path for {@link openAsset} (null for remote/unsafe). */
   resolveAssetOpenPath: (src: string) => string | null
-  /** Open a vetted graph-relative asset path in the OS default application. */
+  /**
+   * Open a vetted graph-relative asset path in the OS default application.
+   * A refused file type degrades to revealing the file in the OS file
+   * manager; a failed open surfaces on the status line, never a rejection.
+   */
   openAsset: (path: string) => Promise<void>
   /**
    * Persist a pasted/dropped file into `assets/`, returning its graph-relative
@@ -163,7 +168,21 @@ export function useAssetPersistence(generation: number | null, path?: string): A
       if (generation === null) {
         return
       }
-      await openAssetCommand(assetPath, generation)
+      try {
+        await openAssetCommand(assetPath, generation)
+      } catch (openCause) {
+        // A refused file type still deserves a visible outcome: fall back to
+        // the file manager. When even the reveal fails (missing or evicted
+        // file), report the original open error — that is the user's intent.
+        try {
+          await revealAssetCommand(assetPath, generation)
+          startOperation('Opening attachment').warn(
+            'This file type can’t be opened directly, so it was revealed in Finder instead.',
+          )
+        } catch {
+          startOperation('Opening attachment').fail(errorMessage(openCause))
+        }
+      }
     },
     [generation],
   )
