@@ -158,12 +158,13 @@ export async function resolveOrCreateNoteWithTitle(
     return existing
   }
 
-  // Only a bare name may invent a titled note under `notes/`. A path target
-  // names one exact missing file and a `#heading` or unsafe target names
-  // none; creating a note *titled* with those spellings would be worse than
-  // refusing.
+  // A bare name invents a titled note under `notes/`; so does an ambiguous
+  // slashed spelling once both of its readings have missed, because the
+  // author typed it where a title goes. Only an explicitly rooted path (one
+  // exact missing file) and a `#heading` or unsafe target (which name
+  // nothing creatable) refuse.
   const reference = wikiNoteReference(title)
-  if (reference?.kind !== 'key') {
+  if (reference?.kind !== 'key' && reference?.kind !== 'pathOrKey') {
     return {
       kind: 'unavailable',
       paths: reference?.kind === 'path' ? [reference.path] : [],

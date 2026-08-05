@@ -492,13 +492,13 @@ describe('resolveExistingWikiTarget: colon and slash names', () => {
     const invoke = bindBridge({
       query: (sql) =>
         sql.includes('note_claims')
-          ? [{ note_path: 'notes/john-sally-meeting-notes.md', tier: 2 }]
+          ? [{ note_path: 'notes/johnsally-meeting-notes.md', tier: 2 }]
           : [],
     })
 
     await expect(resolveExistingWikiTarget('john/sally meeting notes', 7)).resolves.toEqual({
       kind: 'resolved',
-      path: 'notes/john-sally-meeting-notes.md',
+      path: 'notes/johnsally-meeting-notes.md',
     })
     expectNoWrites(invoke)
   })
@@ -509,7 +509,7 @@ describe('resolveExistingWikiTarget: colon and slash names', () => {
         sql.includes('path_key')
           ? [{ path: 'john/sally meeting notes.md' }]
           : sql.includes('note_claims')
-            ? [{ note_path: 'notes/john-sally-meeting-notes.md', tier: 2 }]
+            ? [{ note_path: 'notes/johnsally-meeting-notes.md', tier: 2 }]
             : [],
     })
 
@@ -525,7 +525,7 @@ describe('resolveExistingWikiTarget: colon and slash names', () => {
       readErrors: ['john/sally meeting notes.md'],
       query: (sql) =>
         sql.includes('note_claims')
-          ? [{ note_path: 'notes/john-sally-meeting-notes.md', tier: 2 }]
+          ? [{ note_path: 'notes/johnsally-meeting-notes.md', tier: 2 }]
           : [],
     })
 

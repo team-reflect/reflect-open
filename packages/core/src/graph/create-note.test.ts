@@ -447,6 +447,51 @@ describe('resolveOrCreateNoteWithTitle', () => {
       /^---\nid: [0-9a-z]{26}\n---\n# Ada Lovelace\n\n- Type: #person\n$/,
     )
   })
+
+  it('creates a colon-prefixed title as an ordinary note', async () => {
+    const invoke = bindBridge()
+
+    await expect(
+      resolveOrCreateNoteWithTitle('Test: Long With Parens & Ampersand Follow-up', 7),
+    ).resolves.toEqual({
+      kind: 'created',
+      path: 'notes/test-long-with-parens-ampersand-follow-up.md',
+    })
+    const write = invoke.mock.calls.find(([command]) => command === 'note_create')
+    const args = write?.[1] as { contents: string }
+    expect(args.contents).toContain('# Test: Long With Parens & Ampersand Follow-up\n')
+  })
+
+  it('creates a slashed title once both of its readings miss', async () => {
+    const invoke = bindBridge()
+
+    await expect(resolveOrCreateNoteWithTitle('john/sally meeting notes', 7)).resolves.toEqual({
+      kind: 'created',
+      path: 'notes/johnsally-meeting-notes.md',
+    })
+    const write = invoke.mock.calls.find(([command]) => command === 'note_create')
+    const args = write?.[1] as { contents: string }
+    expect(args.contents).toContain('# john/sally meeting notes\n')
+  })
+
+  it('reuses the exact file instead of creating for a slashed spelling', async () => {
+    bindBridge({ files: { 'john/sally meeting notes.md': '# Whatever' } })
+
+    await expect(resolveOrCreateNoteWithTitle('john/sally meeting notes', 7)).resolves.toEqual({
+      kind: 'resolved',
+      path: 'john/sally meeting notes.md',
+    })
+  })
+
+  it('still refuses to create for a rooted path target', async () => {
+    const invoke = bindBridge()
+
+    await expect(resolveOrCreateNoteWithTitle('/Plan', 7)).resolves.toEqual({
+      kind: 'unavailable',
+      paths: ['Plan.md'],
+    })
+    expect(invoke.mock.calls.some(([command]) => command === 'note_create')).toBe(false)
+  })
 })
 
 describe('untitledNoteSeed', () => {
