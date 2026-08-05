@@ -1155,10 +1155,14 @@ mod move_tests {
     #[test]
     fn asset_open_accepts_supported_attachments_anywhere_and_nothing_else() {
         assert!(ensure_readable_attachment_path("assets/cat.png").is_ok());
+        assert!(ensure_readable_attachment_path("assets/report.docx").is_ok());
+        assert!(ensure_readable_attachment_path("assets/archive.zip").is_ok());
         assert!(ensure_readable_attachment_path("Projects/Media/cat.png").is_ok());
         assert!(ensure_readable_attachment_path("audio-memos/memo.m4a").is_ok());
-        // Notes, hidden components, traversal, and extensionless paths refuse.
+        // Notes, hidden components, traversal, extensionless paths, and
+        // executable formats refuse.
         assert!(ensure_readable_attachment_path("notes/secret.md").is_err());
+        assert!(ensure_readable_attachment_path("tools/script.sh").is_err());
         assert!(ensure_readable_attachment_path(".obsidian/cat.png").is_err());
         assert!(ensure_readable_attachment_path("../cat.png").is_err());
         assert!(ensure_readable_attachment_path("assets/").is_err());
