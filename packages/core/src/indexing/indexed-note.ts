@@ -320,7 +320,10 @@ export function buildIndexedNote(
       kind: 'wiki' as const,
       targetRaw: link.target,
       targetKey: normalizeWikiTarget(link.target).key,
-      targetPathKey: reference?.kind === 'path' ? foldGraphPath(reference.path) : null,
+      targetPathKey:
+        reference?.kind === 'path' || reference?.kind === 'pathOrKey'
+          ? foldGraphPath(reference.path)
+          : null,
       alias: link.alias ?? null,
       posFrom: link.from,
       posTo: link.to,

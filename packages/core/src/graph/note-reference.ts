@@ -5,7 +5,9 @@ import { isNotePath, isSafeVisibleGraphPath } from './paths'
  * One authored note link reduced to how it must be looked up.
  *
  * `path` names a file, `key` names a note by title / alias / filename stem,
- * and `self` is a bare `#Heading` that never leaves its source note.
+ * `pathOrKey` is a non-rooted slashed target that could be either (an exact
+ * file wins, a note title is the fallback), and `self` is a bare `#Heading`
+ * that never leaves its source note.
  *
  * A `#fragment` is stripped and discarded: it must not reach the lookup (or
  * `[[Plan#Next]]` would search for a note called `Plan#Next`), and Reflect
@@ -15,9 +17,17 @@ import { isNotePath, isSafeVisibleGraphPath } from './paths'
 export type NoteReference =
   | { readonly kind: 'path'; readonly path: string }
   | { readonly kind: 'key'; readonly key: string }
+  | { readonly kind: 'pathOrKey'; readonly path: string; readonly key: string }
   | { readonly kind: 'self' }
 
 const URI_SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i
+/**
+ * A scheme with an authority (`https://…`). Wiki targets are only refused as
+ * URIs in this form: a colon alone is ordinary title punctuation
+ * (`[[Meeting: notes]]`), while Markdown hrefs keep the broad scheme rule
+ * because CommonMark really does read `Test:` as a scheme there.
+ */
+const URI_AUTHORITY_RE = /^[a-z][a-z0-9+.-]*:\/\//i
 const MARKDOWN_EXTENSION_RE = /\.md$/i
 
 /**
@@ -94,13 +104,19 @@ function parentSegments(sourcePath: string): readonly string[] {
  * optional explicit leading `/`). A slash inside loose text stays a name:
  * Reflect's own v1 subject aliases (`[[Tim MacCaw // Dad]]`) are names with a
  * `//` separator, and no filesystem path has components wrapped in spaces.
+ *
+ * A non-rooted path-shaped target is genuinely ambiguous (`[[john/sally
+ * meeting notes]]` is a plausible title and a plausible vault path), so it
+ * reduces to `pathOrKey` carrying both readings, and resolution decides
+ * (exact file first, folded name second). Only an explicit leading `/` pins
+ * the strict path reading.
  */
 export function wikiNoteReference(target: string): NoteReference | null {
   const path = wikiTargetPath(target.trim())
   if (path === '') {
     return target.includes('#') ? { kind: 'self' } : null
   }
-  if (URI_SCHEME_RE.test(path) || path.includes('\\') || path.includes('\0')) {
+  if (URI_AUTHORITY_RE.test(path) || path.includes('\\') || path.includes('\0')) {
     return null
   }
   const rooted = path.startsWith('/')
@@ -110,7 +126,14 @@ export function wikiNoteReference(target: string): NoteReference | null {
     body.split('/').every((segment) => segment !== '' && segment === segment.trim())
   if (rooted || pathShaped) {
     const resolved = body === '' ? null : notePathFrom([], body)
-    return resolved === null ? null : { kind: 'path', path: resolved }
+    if (resolved === null) {
+      return null
+    }
+    if (rooted) {
+      return { kind: 'path', path: resolved }
+    }
+    const key = foldKey(path.replace(MARKDOWN_EXTENSION_RE, ''))
+    return key === '' ? { kind: 'path', path: resolved } : { kind: 'pathOrKey', path: resolved, key }
   }
   const key = foldKey(path.replace(MARKDOWN_EXTENSION_RE, ''))
   return key === '' ? null : { kind: 'key', key }

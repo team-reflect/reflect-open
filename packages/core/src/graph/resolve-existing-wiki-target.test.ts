@@ -461,6 +461,92 @@ describe('resolveExistingWikiTarget — path and stem dimensions', () => {
   })
 })
 
+describe('resolveExistingWikiTarget: colon and slash names', () => {
+  it('resolves a colon-prefixed title through the index', async () => {
+    const invoke = bindBridge({
+      query: (sql) =>
+        sql.includes('note_claims')
+          ? [{ note_path: 'notes/test-long-with-parens-ampersand-follow-up.md', tier: 2 }]
+          : [],
+    })
+
+    await expect(
+      resolveExistingWikiTarget('Test: Long With Parens & Ampersand Follow-up', 7),
+    ).resolves.toEqual({
+      kind: 'resolved',
+      path: 'notes/test-long-with-parens-ampersand-follow-up.md',
+    })
+    expectNoWrites(invoke)
+  })
+
+  it('still refuses a URL-shaped target outright', async () => {
+    const invoke = bindBridge()
+
+    await expect(resolveExistingWikiTarget('https://example.com/Plan', 7)).resolves.toEqual({
+      kind: 'missing',
+    })
+    expect(invoke).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the folded name when a slashed target names no file', async () => {
+    const invoke = bindBridge({
+      query: (sql) =>
+        sql.includes('note_claims')
+          ? [{ note_path: 'notes/john-sally-meeting-notes.md', tier: 2 }]
+          : [],
+    })
+
+    await expect(resolveExistingWikiTarget('john/sally meeting notes', 7)).resolves.toEqual({
+      kind: 'resolved',
+      path: 'notes/john-sally-meeting-notes.md',
+    })
+    expectNoWrites(invoke)
+  })
+
+  it('prefers the exact file over a note titled with the same slashed spelling', async () => {
+    const invoke = bindBridge({
+      query: (sql) =>
+        sql.includes('path_key')
+          ? [{ path: 'john/sally meeting notes.md' }]
+          : sql.includes('note_claims')
+            ? [{ note_path: 'notes/john-sally-meeting-notes.md', tier: 2 }]
+            : [],
+    })
+
+    await expect(resolveExistingWikiTarget('john/sally meeting notes', 7)).resolves.toEqual({
+      kind: 'resolved',
+      path: 'john/sally meeting notes.md',
+    })
+    expectNoWrites(invoke)
+  })
+
+  it('reports an unreadable exact-path match unavailable instead of name-falling back', async () => {
+    const invoke = bindBridge({
+      readErrors: ['john/sally meeting notes.md'],
+      query: (sql) =>
+        sql.includes('note_claims')
+          ? [{ note_path: 'notes/john-sally-meeting-notes.md', tier: 2 }]
+          : [],
+    })
+
+    await expect(resolveExistingWikiTarget('john/sally meeting notes', 7)).resolves.toEqual({
+      kind: 'unavailable',
+      paths: ['john/sally meeting notes.md'],
+    })
+    expectNoWrites(invoke)
+  })
+
+  it('keeps a rooted path strict, with no name fallback', async () => {
+    const invoke = bindBridge({
+      query: (sql) =>
+        sql.includes('note_claims') ? [{ note_path: 'notes/plan.md', tier: 2 }] : [],
+    })
+
+    await expect(resolveExistingWikiTarget('/Plan', 7)).resolves.toEqual({ kind: 'missing' })
+    expectNoWrites(invoke)
+  })
+})
+
 describe('resolveExistingMarkdownTarget', () => {
   it('resolves a source-relative Markdown href', async () => {
     const invoke = bindBridge({

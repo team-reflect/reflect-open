@@ -10,18 +10,20 @@ describe('wikiNoteReference', () => {
     expect(wikiNoteReference('Plan.md')).toEqual({ kind: 'key', key: 'plan' })
   })
 
-  it('reads a slashed target as a vault-root path, never source-relative', () => {
+  it('reads a slashed target as a path with a name fallback, never source-relative', () => {
     expect(wikiNoteReference('Projects/Plan')).toEqual({
-      kind: 'path',
+      kind: 'pathOrKey',
       path: 'Projects/Plan.md',
+      key: 'projects/plan',
     })
   })
 
   it('strips a fragment so it never reaches the lookup', () => {
     expect(wikiNoteReference('Plan#Next steps')).toEqual({ kind: 'key', key: 'plan' })
     expect(wikiNoteReference('Projects/Plan#Next')).toEqual({
-      kind: 'path',
+      kind: 'pathOrKey',
       path: 'Projects/Plan.md',
+      key: 'projects/plan',
     })
   })
 
@@ -33,8 +35,9 @@ describe('wikiNoteReference', () => {
 
   it('collapses . and .. inside a vault path', () => {
     expect(wikiNoteReference('Projects/./sub/../Plan')).toEqual({
-      kind: 'path',
+      kind: 'pathOrKey',
       path: 'Projects/Plan.md',
+      key: 'projects/./sub/../plan',
     })
   })
 
@@ -46,21 +49,55 @@ describe('wikiNoteReference', () => {
       key: 'tim maccaw // dad',
     })
     expect(wikiNoteReference('a / b')).toEqual({ kind: 'key', key: 'a / b' })
-    // An explicit leading slash is always a path, even for a root-level file.
+    // An explicit leading slash is always a strict path, even for a root-level file.
     expect(wikiNoteReference('/Plan')).toEqual({ kind: 'path', path: 'Plan.md' })
+  })
+
+  it('keeps a colon inside a bare name, only refusing a real authority form', () => {
+    expect(wikiNoteReference('Test: Long With Parens & Ampersand Follow-up')).toEqual({
+      kind: 'key',
+      key: 'test: long with parens & ampersand follow-up',
+    })
+    expect(wikiNoteReference('Test:Colon NoSpace Link')).toEqual({
+      kind: 'key',
+      key: 'test:colon nospace link',
+    })
+    expect(wikiNoteReference('C: drive')).toEqual({ kind: 'key', key: 'c: drive' })
+    expect(wikiNoteReference('9:30 standup')).toEqual({ kind: 'key', key: '9:30 standup' })
+    expect(wikiNoteReference('mailto:x@y.com')).toEqual({ kind: 'key', key: 'mailto:x@y.com' })
+  })
+
+  it('carries both readings for a slashed name', () => {
+    expect(wikiNoteReference('john/sally meeting notes')).toEqual({
+      kind: 'pathOrKey',
+      path: 'john/sally meeting notes.md',
+      key: 'john/sally meeting notes',
+    })
+    expect(wikiNoteReference('A/B testing')).toEqual({
+      kind: 'pathOrKey',
+      path: 'A/B testing.md',
+      key: 'a/b testing',
+    })
+    expect(wikiNoteReference('Notes/Plan-2.md')).toEqual({
+      kind: 'pathOrKey',
+      path: 'Notes/Plan-2.md',
+      key: 'notes/plan-2',
+    })
   })
 
   it('treats a percent sign as a literal character', () => {
     expect(wikiNoteReference('100%')).toEqual({ kind: 'key', key: '100%' })
     expect(wikiNoteReference('50% off')).toEqual({ kind: 'key', key: '50% off' })
     expect(wikiNoteReference('Projects/100% Off')).toEqual({
-      kind: 'path',
+      kind: 'pathOrKey',
       path: 'Projects/100% Off.md',
+      key: 'projects/100% off',
     })
     // No decoding: this names a file literally called `My%20Plan.md`.
     expect(wikiNoteReference('Projects/My%20Plan')).toEqual({
-      kind: 'path',
+      kind: 'pathOrKey',
       path: 'Projects/My%20Plan.md',
+      key: 'projects/my%20plan',
     })
   })
 
