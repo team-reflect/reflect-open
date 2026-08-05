@@ -51,8 +51,10 @@ function start(): void {
   syncToday()
   scheduleMidnightRollover()
   heartbeat = setInterval(syncToday, 60_000)
-  document.addEventListener('visibilitychange', syncToday)
-  window.addEventListener('focus', syncToday)
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', syncToday)
+  }
 }
 
 function stop(): void {
@@ -64,8 +66,10 @@ function stop(): void {
     clearInterval(heartbeat)
     heartbeat = null
   }
-  document.removeEventListener('visibilitychange', syncToday)
-  window.removeEventListener('focus', syncToday)
+
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('visibilitychange', syncToday)
+  }
 }
 
 /** `useSyncExternalStore` subscribe; timers run only while subscribed. */
