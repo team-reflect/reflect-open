@@ -137,6 +137,46 @@ describe('DailyStream', () => {
     await view.unmount()
   })
 
+  it('anchors a today arrival to the real day after a slept-through midnight', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 5, 27, 23, 59, 0))
+    let navigateToday: () => void = () => {
+      throw new Error('navigate not ready')
+    }
+    const view = await render(
+      <StreamProviders>
+        <DailyStream target={{ kind: 'today' }} />
+        <NavigateTodayProbe
+          onReady={(run) => {
+            navigateToday = run
+          }}
+        />
+      </StreamProviders>,
+    )
+
+    // Simulated sleep: the wall clock jumps but no timer fires (DOM timers
+    // run on a monotonic clock that pauses while the machine sleeps). The
+    // midnight timeout is now hours away in timer time; the store's
+    // heartbeat is what notices the new date.
+    vi.setSystemTime(new Date(2026, 5, 28, 9, 0, 0))
+    await act(async () => {
+      vi.advanceTimersByTime(60_000)
+    })
+    await act(async () => {
+      navigateToday()
+    })
+
+    const dayWindow = createDayWindow('2026-06-27')
+    const expected = indexOfDate(dayWindow, '2026-06-28') * ESTIMATED_DAY_HEIGHT
+    await vi.waitFor(() =>
+      expect(page.getByTestId('daily-stream').element().scrollTop).toBeGreaterThan(
+        expected - ESTIMATED_DAY_HEIGHT,
+      ),
+    )
+    await expect.element(page.getByText(formatDayLabel('2026-06-28', 'mdy'))).toBeVisible()
+    await view.unmount()
+  })
+
   it('mounts straight at a restored entry’s saved offset, not the anchor', async () => {
     const view = await render(
       <StreamProviders>
