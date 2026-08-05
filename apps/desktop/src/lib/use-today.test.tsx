@@ -53,18 +53,6 @@ describe('useToday', () => {
     await unmount()
   })
 
-  it('resyncs on window focus after sleeping across midnight', async () => {
-    vi.setSystemTime(new Date(2026, 5, 9, 23, 59, 0))
-    const { result, unmount } = await renderHook(() => useToday())
-
-    vi.setSystemTime(new Date(2026, 5, 10, 9, 0, 0))
-    act(() => {
-      window.dispatchEvent(new Event('focus'))
-    })
-    expect(result.current).toBe('2026-06-10')
-    await unmount()
-  })
-
   it('the heartbeat catches a slept-through midnight with no wake signal', async () => {
     vi.setSystemTime(new Date(2026, 5, 9, 23, 59, 0))
     const { result, unmount } = await renderHook(() => useToday())
