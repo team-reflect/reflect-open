@@ -105,10 +105,8 @@ private enum NativeDiagnostics {
       options.enableFileIOTracing = false
       options.enableCoreDataTracing = false
 
-      if #available(iOS 15.0, *) {
-        options.enableMetricKit = true
-        options.enableMetricKitRawPayload = false
-      }
+      options.enableMetricKit = true
+      options.enableMetricKitRawPayload = false
 
       options.beforeSend = { event in
         scrub(event: event)

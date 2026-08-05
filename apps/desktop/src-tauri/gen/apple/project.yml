@@ -2,7 +2,7 @@ name: reflect-open
 options:
   bundleIdPrefix: app.reflect
   deploymentTarget:
-    iOS: 14.0
+    iOS: 15.0
 packages:
   # Native crash/hang reporting (NativeDiagnostics.swift). Pinned exactly:
   # Sentry 9 raises the minimum to iOS 15, above Reflect's deployment target.
