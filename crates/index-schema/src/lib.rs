@@ -62,7 +62,9 @@ mod schema {
             M::up(include_str!("../migrations/0017_task_breadcrumbs.sql")),
             M::up(include_str!("../migrations/0018_note_key_precedence.sql")),
             M::up(include_str!("../migrations/0019_note_claims.sql")),
-            M::up(include_str!("../migrations/0020_backlink_name_fallback.sql")),
+            M::up(include_str!(
+                "../migrations/0020_backlink_name_fallback.sql"
+            )),
         ])
     });
 
