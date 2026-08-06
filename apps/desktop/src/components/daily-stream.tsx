@@ -201,17 +201,20 @@ export function DailyStream({ target }: DailyStreamProps): ReactElement {
       focusPending.current = null
       pendingFocusRef.current = null
       virtualizerRef.current?.scrollTo(restored)
-      return
+    } else {
+      const target = targetDateRef.current
+      pendingFocusRef.current = null
+      focusPending.current = {
+        date: target,
+        selection: arrivalFocusEditorRef.current ? 'end' : 'start',
+      }
+      virtualizerRef.current?.scrollToIndex(indexOfDate(dayWindow, target), { align: 'start' })
     }
-    const target = targetDateRef.current
-    pendingFocusRef.current = null
-    focusPending.current = {
-      date: target,
-      selection: arrivalFocusEditorRef.current ? 'end' : 'start',
-    }
-    virtualizerRef.current?.scrollToIndex(indexOfDate(dayWindow, target), { align: 'start' })
     // One bounded pre-paint render per arrival, not a cascade: the bumped
-    // render changes none of this effect's dependencies.
+    // render changes none of this effect's dependencies. The restored branch
+    // needs it too: a row still rendering an earlier arrival's `autoFocus`
+    // would otherwise keep it past the cancellation above and steal focus
+    // when its lazy editor mounts.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     republishFocusPending((seq) => seq + 1)
   }, [arrivalSeq, entryId, dayWindow, savedScroll])
