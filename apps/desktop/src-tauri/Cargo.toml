@@ -25,7 +25,7 @@ tauri-build = { version = "2.6.3", features = [] }
 [dependencies]
 # `devtools` compiles the web inspector into release builds too (it is otherwise
 # debug-only), so a shipped app stays debuggable — see `src/devtools.rs`.
-tauri = { version = "2.11.3", features = ["devtools"] }
+tauri = { version = "2.11.5", features = ["devtools"] }
 tauri-plugin-opener = "2.5.4"
 # Decodes `reflect-asset://` request paths (`fs/asset_protocol.rs`); the same
 # crate tauri itself uses for its protocol URLs.
@@ -197,4 +197,4 @@ tauri-plugin-keyboard = { path = "../../../plugins/tauri-plugin-keyboard" }
 tauri-plugin-recording = { path = "../../../plugins/tauri-plugin-recording" }
 
 [dev-dependencies]
-tauri = { version = "2.11.2", features = ["test"] }
+tauri = { version = "2.11.5", features = ["test"] }

@@ -85,7 +85,7 @@ importers:
         specifier: ^2.4.9
         version: 2.4.9
       '@tauri-apps/plugin-dialog':
-        specifier: ^2.7.1
+        specifier: ^2.7.2
         version: 2.7.2
       '@tauri-apps/plugin-http':
         specifier: ^2.5.9
@@ -161,7 +161,7 @@ importers:
         specifier: ^4.3.1
         version: 4.3.3(vite@8.1.5)
       '@tauri-apps/cli':
-        specifier: ^2.11.3
+        specifier: ^2.11.4
         version: 2.11.4
       '@types/react':
         specifier: ^19.2.17
