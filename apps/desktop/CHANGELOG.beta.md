@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.1-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.8.1-beta.2...v0.8.1-beta.3) (2026-08-06)
+
+
+### Bug Fixes
+
+* **ios:** stop `nm` dSYM output from overflowing `execFileSync` maxBuffer ([#1053](https://github.com/team-reflect/reflect-open/issues/1053)) ([b6905f3](https://github.com/team-reflect/reflect-open/commit/b6905f35a686f01314882f11e70091cef4e6f685))
+* resolve wiki links whose titles contain `:` or `/` ([#1039](https://github.com/team-reflect/reflect-open/issues/1039)) ([db7d843](https://github.com/team-reflect/reflect-open/commit/db7d843dc9cd0394f1306f70683ee73b85feaeda))
+
 ## [0.8.1-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.8.1-beta.1...v0.8.1-beta.2) (2026-08-06)
 
 
