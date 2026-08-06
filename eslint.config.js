@@ -75,6 +75,10 @@ export default defineESLintConfig(
       'regexp/use-ignore-case': 'off',
       'unicorn/no-return-array-push': 'off',
       'unicorn/number-literal-case': 'off',
+      'unicorn/prefer-array-from-map': 'off',
+      'unicorn/no-computed-property-existence-check': 'off',
+      'unicorn/prefer-then-catch': 'off',
+      'unicorn/no-useless-undefined': 'off',
     },
   },
 )
