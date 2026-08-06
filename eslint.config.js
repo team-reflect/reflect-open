@@ -64,7 +64,6 @@ export default defineESLintConfig(
       'unicorn/no-unnecessary-splice': 'off',
       'unicorn/number-literal-case': 'off',
       'unicorn/prefer-add-event-listener': 'off',
-      'unicorn/prefer-array-from-map': 'off',
       'unicorn/prefer-then-catch': 'off',
     },
   },
