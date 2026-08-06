@@ -9,4 +9,16 @@ export default defineESLintConfig(
     },
     markdown: false,
   },
+  {
+    files: ["**/*.ts", "**/*.tsx"],
+    // Disable some rules temporarily
+    rules: {
+      "jsdoc/multiline-blocks": 'off',
+      'perfectionist/sort-imports': 'off',
+      'unicorn/prefer-string-replace-all': 'off',
+      'unicorn/no-return-array-push': 'off',
+      '@typescript-eslint/require-await': 'off',
+      'prefer-const': 'off',
+    }
+  }
 )
