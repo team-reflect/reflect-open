@@ -33,7 +33,6 @@ export default defineESLintConfig(
       '@eslint-react/static-components': 'off',
       '@eslint-react/use-state': 'off',
       '@eslint-react/web-api-no-leaked-event-listener': 'off',
-      '@eslint-react/web-api-no-leaked-timeout': 'off',
       '@typescript-eslint/await-thenable': 'off',
       '@typescript-eslint/consistent-type-imports': 'off',
       '@typescript-eslint/no-base-to-string': 'off',

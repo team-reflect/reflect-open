@@ -147,6 +147,7 @@ export function useMobileGraphBoot(options: MobileGraphBootOptions): MobileGraph
       return
     }
     let active = true
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
     // The container resolve is the slow IPC on this path and depends on
     // nothing below — adopt the warm started at platform resolve (see
     // mobile-boot-warm.ts) or start one now, so it overlaps the settings
@@ -228,7 +229,7 @@ export function useMobileGraphBoot(options: MobileGraphBootOptions): MobileGraph
                   setMobileStorageResolving(false)
                   return
                 }
-                setTimeout(() => {
+                retryTimer = setTimeout(() => {
                   if (active) {
                     resolveWithRetries(attempt + 1, mobileStorage())
                   }
@@ -282,6 +283,7 @@ export function useMobileGraphBoot(options: MobileGraphBootOptions): MobileGraph
     })()
     return () => {
       active = false
+      clearTimeout(retryTimer)
     }
   }, [platform, openRecent, onParked, queryClient])
 
