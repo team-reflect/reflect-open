@@ -63,7 +63,6 @@ export default defineESLintConfig(
       'prefer-const': 'off',
       'react-hooks/exhaustive-deps': 'off',
       'react-hooks/globals': 'off',
-      'react-hooks/refs': 'off',
       'react-hooks/set-state-in-effect': 'off',
       'regexp/no-super-linear-backtracking': 'off',
       'regexp/no-unused-capturing-group': 'off',
