@@ -327,7 +327,7 @@ function naturalLanguageSuggestions(
       sort: 2,
     },
   ]
-  MODIFIERS.forEach((modifier, modifierIndex) => {
+  for (const [modifierIndex, modifier] of MODIFIERS.entries()) {
     for (const unit of NL_UNITS) {
       candidates.push({
         phrase: `${titleCase(modifier)} ${unit.display}`,
@@ -339,7 +339,7 @@ function naturalLanguageSuggestions(
         sort: 10 + unit.order * MODIFIERS.length + modifierIndex,
       })
     }
-  })
+  }
   return candidates
     .filter((candidate) => phraseMatches(tokens, candidate.modifier, candidate.unitWord))
     .sort((left, right) => left.sort - right.sort)
@@ -391,20 +391,20 @@ function typedDateSuggestions(
   const allowSwap = yearPart === undefined
   const seen = new Set<string>()
   const results: DateSuggestion[] = []
-  readings.forEach((reading, index) => {
+  for (const [index, reading] of readings.entries()) {
     if (index === 1 && !allowSwap) {
-      return
+      continue
     }
     if (reading.month < 1 || reading.month > 12) {
-      return
+      continue
     }
     const iso = isoFromParts(year, reading.month, reading.day)
     if (!isCalendarDate(iso) || seen.has(iso)) {
-      return
+      continue
     }
     seen.add(iso)
     results.push({ date: iso, phrase: rawQuery })
-  })
+  }
   return results
 }
 

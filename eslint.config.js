@@ -76,7 +76,6 @@ export default defineESLintConfig(
       'unicorn/class-reference-in-static-methods': 'off',
       'unicorn/escape-case': 'off',
       'unicorn/no-computed-property-existence-check': 'off',
-      'unicorn/no-for-each': 'off',
       'unicorn/no-optional-chaining-on-undeclared-variable': 'off',
       'unicorn/no-return-array-push': 'off',
       'unicorn/no-unnecessary-splice': 'off',

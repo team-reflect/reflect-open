@@ -133,7 +133,7 @@ export function fuseRanked(lists: RetrievalHit[][], limit: number): RetrievalHit
   const K = 60 // the standard RRF damping constant
   const fused = new Map<string, { hit: RetrievalHit; score: number }>()
   for (const list of lists) {
-    list.forEach((hit, index) => {
+    for (const [index, hit] of list.entries()) {
       const entry = fused.get(hit.path)
       const score = 1 / (K + index + 1)
       if (entry) {
@@ -145,7 +145,7 @@ export function fuseRanked(lists: RetrievalHit[][], limit: number): RetrievalHit
       } else {
         fused.set(hit.path, { hit: { ...hit }, score })
       }
-    })
+    }
   }
   return [...fused.values()]
     .sort((a, b) => b.score - a.score)

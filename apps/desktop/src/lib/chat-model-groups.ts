@@ -27,12 +27,12 @@ export function groupModelOptions(
   providers: AiProviderConfig[],
 ): ModelOptionGroup[] {
   const groups: ModelOptionGroup[] = []
-  options.forEach((option, index) => {
+  for (const [index, option] of options.entries()) {
     const item = { option, value: String(index) }
     const last = groups.at(-1)
     if (last?.configId === option.configId) {
       last.options.push(item)
-      return
+      continue
     }
     const providerLabel = aiProvider(option.provider).label
     const duplicated =
@@ -44,6 +44,6 @@ export function groupModelOptions(
       label: duplicated && qualifier !== '' ? `${providerLabel} · ${qualifier}` : providerLabel,
       options: [item],
     })
-  })
+  }
   return groups
 }

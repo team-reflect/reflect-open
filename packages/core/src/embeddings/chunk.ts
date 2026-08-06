@@ -138,10 +138,10 @@ export async function chunkNote(
   if (firstHeadingAt > bodyStart) {
     sections.push({ heading: null, from: bodyStart, to: firstHeadingAt })
   }
-  headings.forEach((heading, i) => {
+  for (const [i, heading] of headings.entries()) {
     const to = i + 1 < headings.length ? headings[i + 1]!.from : source.length
     sections.push({ heading: heading.text, from: heading.from, to })
-  })
+  }
 
   const chunks: NoteChunk[] = []
   for (const section of sections) {
