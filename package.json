@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "typecheck": "turbo run typecheck",
+    "typecheck": "tsc -b",
     "test": "vitest",
     "lint": "pnpm run lint:oxfmt && pnpm run lint:oxlint && pnpm run lint:react",
     "lint:oxfmt": "oxfmt --check",
@@ -27,6 +27,7 @@
     "postinstall": "simple-git-hooks"
   },
   "devDependencies": {
+    "@ocavue/tsconfig": "^0.7.1",
     "@types/node": "^24.0.0",
     "nano-staged": "^1.0.2",
     "oxfmt": "^0.61.0",

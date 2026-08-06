@@ -10,7 +10,6 @@
     "sidecar": "node scripts/build-sidecar.mjs",
     "release:ios": "node scripts/release-ios.mjs",
     "release:macos": "node scripts/release-macos.mjs",
-    "typecheck": "tsc --noEmit",
     "test": "vitest run --config ../../vitest.config.ts --project browser --project node",
     "test:install": "playwright install chromium webkit",
     "lint:react": "eslint .",
@@ -60,6 +59,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@ocavue/tsconfig": "^0.7.1",
     "@sentry/cli": "3.6.2",
     "@sentry/vite-plugin": "^5.3.0",
     "@sqlite.org/sqlite-wasm": "3.53.0-build1",

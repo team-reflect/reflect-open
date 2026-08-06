@@ -9,6 +9,9 @@ importers:
 
   .:
     devDependencies:
+      '@ocavue/tsconfig':
+        specifier: ^0.7.1
+        version: 0.7.1
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3
@@ -148,6 +151,9 @@ importers:
         specifier: 4.4.3
         version: 4.4.3
     devDependencies:
+      '@ocavue/tsconfig':
+        specifier: ^0.7.1
+        version: 0.7.1
       '@sentry/cli':
         specifier: 3.6.2
         version: 3.6.2
@@ -308,6 +314,9 @@ importers:
       '@ai-sdk/provider':
         specifier: ^4.0.3
         version: 4.0.4
+      '@ocavue/tsconfig':
+        specifier: ^0.7.1
+        version: 0.7.1
       '@vitest/browser-playwright':
         specifier: ^4.1.10
         version: 4.1.10(playwright@1.61.1)(vite@8.2.0)(vitest@4.1.10)
@@ -330,6 +339,9 @@ importers:
         specifier: ^0.28.17
         version: 0.28.17
     devDependencies:
+      '@ocavue/tsconfig':
+        specifier: ^0.7.1
+        version: 0.7.1
       '@types/better-sqlite3':
         specifier: ^7.6.13
         version: 7.6.13
@@ -351,6 +363,9 @@ importers:
 
   packages/utils:
     devDependencies:
+      '@ocavue/tsconfig':
+        specifier: ^0.7.1
+        version: 0.7.1
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
@@ -1066,6 +1081,9 @@ packages:
   '@nodelib/fs.walk@1.2.8':
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
+
+  '@ocavue/tsconfig@0.7.1':
+    resolution: {integrity: sha512-jw1LPUqi/f043s61WOYEWWA6P1ZSSYXR3KJXcNxBXXrxiUXhEAbuEBUmi6Qs8NduIVU3xCkbaYw5BU3UyL3G3A==}
 
   '@ocavue/utils@1.7.0':
     resolution: {integrity: sha512-yEk9ATNBjTZTtuVFMB/MAIF6zJBvJ2+lVNQvK2+O+ggEBGTgx2tp27d4FPgmD5bRsNHHP3D0SleQia/bvIeV8w==}
@@ -6781,6 +6799,8 @@ snapshots:
     dependencies:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
+
+  '@ocavue/tsconfig@0.7.1': {}
 
   '@ocavue/utils@1.7.0': {}
 
