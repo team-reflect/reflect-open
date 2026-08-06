@@ -10,7 +10,7 @@
 // next launch. A pinned `light`/`dark` wins here; `system`, a first launch, and
 // an unreadable cache all fall back to the OS preference. ThemeProvider
 // re-applies the real value once settings load.
-;{
+{
   // Keep in sync with THEME_PREFERENCE_CACHE_KEY in src/lib/theme-cache.ts.
   const PREFERENCE_KEY = 'reflect.theme.preference'
 

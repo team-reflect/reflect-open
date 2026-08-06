@@ -56,7 +56,11 @@ function bindBridge({
     }
     if (command === 'list_files') {
       return [
-        ...Object.entries(files).map(([path, value]) => ({ path, size: value!.length, modifiedMs: 1 })),
+        ...Object.entries(files).map(([path, value]) => ({
+          path,
+          size: value!.length,
+          modifiedMs: 1,
+        })),
         ...placeholders.map((path) => ({
           path,
           size: 0,

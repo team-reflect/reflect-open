@@ -24,7 +24,7 @@ export function useTaskCheckboxHaptics(): void {
       }
       hapticImpactLight()
     }
-    document.addEventListener('mousedown', onMouseDown, {capture: true})
+    document.addEventListener('mousedown', onMouseDown, { capture: true })
     return () => document.removeEventListener('mousedown', onMouseDown, true)
   }, [])
 }

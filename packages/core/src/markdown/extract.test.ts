@@ -158,7 +158,9 @@ describe('parseNote — links, assets, tags, text', () => {
     const note = parse(
       'Rendered www\\.reddit.com, code `www\\.reddit.com`.\n\n```\nwww\\.reddit.com\n```',
     )
-    expect(note.text).toBe(String.raw`Rendered www.reddit.com, code www\.reddit.com. www\.reddit.com`)
+    expect(note.text).toBe(
+      String.raw`Rendered www.reddit.com, code www\.reddit.com. www\.reddit.com`,
+    )
   })
 
   it('keeps #tags inside fenced code out of the tag list', () => {

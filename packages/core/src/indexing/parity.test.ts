@@ -20,15 +20,7 @@ import { buildFtsMatch } from './search-query'
  * regenerated file forces the Rust mirror to follow in the same PR.
  */
 
-const corpusDir = join(
-  import.meta.dirname,
-  '..',
-  '..',
-  '..',
-  '..',
-  'fixtures',
-  'parity',
-)
+const corpusDir = join(import.meta.dirname, '..', '..', '..', '..', 'fixtures', 'parity')
 const expectedFile = join(corpusDir, 'expected.json')
 
 /** Expectations for one fixture note — the derivations both sides must agree on. */

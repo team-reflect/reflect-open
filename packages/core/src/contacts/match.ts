@@ -18,7 +18,12 @@ import { contactDetailsMarkdown } from './markdown'
  * silently reject it here.
  */
 function normalizeName(value: string): string {
-  return value.normalize('NFD').replaceAll(/\p{M}/gu, '').trim().replaceAll(/\s+/g, ' ').toLowerCase()
+  return value
+    .normalize('NFD')
+    .replaceAll(/\p{M}/gu, '')
+    .trim()
+    .replaceAll(/\s+/g, ' ')
+    .toLowerCase()
 }
 
 /**
