@@ -56,7 +56,9 @@ function run(command, args) {
 }
 
 function capture(command, args) {
-  return execFileSync(command, args, { encoding: 'utf8' })
+  // `nm` on the dSYM emits megabytes; Node's default 1 MiB maxBuffer would
+  // kill the spawn with ENOBUFS.
+  return execFileSync(command, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
 }
 
 /** Build the altool authentication args for an App Store Connect API key. */
@@ -536,7 +538,7 @@ function assertCurrentArchiveSymbols() {
  * executable.
  */
 function assertNativeDiagnosticsLinkedIn() {
-  const symbols = capture('xcrun', ['nm', '-Uj', iosDsymBinary])
+  const symbols = capture('xcrun', ['nm', '-gUj', iosDsymBinary])
   if (!symbols.includes('_reflect_start_native_diagnostics')) {
     fail('the app binary does not contain the native diagnostics entry point')
   }
