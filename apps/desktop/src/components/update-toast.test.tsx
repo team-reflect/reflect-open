@@ -1,5 +1,6 @@
 import { render } from 'vitest-browser-react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { ExternalToast } from 'sonner'
 import type { UpdateState } from '@/lib/update-controller'
 import { UpdateToast } from './update-toast'
 
@@ -12,7 +13,7 @@ const update = vi.hoisted(() => ({
 const toast = vi.hoisted(() => ({
   dismiss: vi.fn(),
   error: vi.fn(),
-  loading: vi.fn(),
+  loading: vi.fn<(message: string, data?: ExternalToast) => string | number>(),
   message: vi.fn(),
   success: vi.fn(),
 }))
