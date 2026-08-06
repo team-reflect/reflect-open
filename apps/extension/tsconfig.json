@@ -1,11 +1,16 @@
 {
   "extends": "@ocavue/tsconfig/dom/app.json",
   "compilerOptions": {
+    "jsx": "react-jsx",
     "noUnusedParameters": true,
     "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true
+    "exactOptionalPropertyTypes": true,
+    /* Path aliases */
+    "paths": {
+      "@/*": ["./*"]
+    }
   },
-  "include": ["lib", "./*.ts"],
+  "include": ["./lib/**/*", "./entrypoints/**/*", "./.wxt/wxt.d.ts", "./.wxt/types/*", "./*.ts"],
   "references": [
     {
       "path": "../../packages/core/tsconfig.json"
