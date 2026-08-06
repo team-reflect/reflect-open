@@ -69,6 +69,7 @@ export default defineESLintConfig(
       'regexp/no-super-linear-backtracking': 'off',
       'regexp/no-unused-capturing-group': 'off',
       'regexp/optimal-quantifier-concatenation': 'off',
+      'regexp/no-useless-non-capturing-group': 'off',
       'unicorn/class-reference-in-static-methods': 'off',
       'unicorn/no-computed-property-existence-check': 'off',
       'unicorn/no-optional-chaining-on-undeclared-variable': 'off',
