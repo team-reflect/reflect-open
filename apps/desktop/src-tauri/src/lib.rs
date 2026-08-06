@@ -293,6 +293,7 @@ pub fn run() {
             fs::transcript_cache_read,
             fs::transcript_cache_write,
             fs::asset_open,
+            fs::asset_reveal,
             fs::assets::asset_upload_begin,
             fs::assets::asset_upload_append,
             fs::assets::asset_upload_commit,

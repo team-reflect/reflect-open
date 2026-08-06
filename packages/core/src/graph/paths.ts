@@ -15,28 +15,64 @@ export const AUDIO_MEMOS_DIR = 'audio-memos'
 /** Root trees whose Markdown files are attachment metadata, never notes. */
 const RESERVED_NOTE_TREES = new Set([ASSETS_DIR, AUDIO_MEMOS_DIR])
 
-/** Obsidian-compatible local attachment formats Reflect can render or open. */
+/**
+ * Local attachment formats Reflect can render or open: Obsidian-compatible
+ * media plus common document, text, data, and archive formats. Never
+ * executable or script formats. Must stay identical to the Rust list in
+ * `crates/graph-paths/src/lib.rs` and the fixture generator in
+ * `fixtures/gen-path-classification.mjs`.
+ */
 const ATTACHMENT_EXTENSIONS = new Set([
   '3gp',
+  '7z',
   'avif',
   'bmp',
+  'csv',
+  'doc',
+  'docx',
+  'epub',
   'flac',
   'gif',
+  'gz',
+  'heic',
+  'ics',
   'jpeg',
   'jpg',
+  'json',
+  'key',
+  'log',
   'm4a',
   'mkv',
   'mov',
   'mp3',
   'mp4',
+  'numbers',
+  'odp',
+  'ods',
+  'odt',
   'ogg',
   'ogv',
+  'pages',
   'pdf',
   'png',
+  'ppt',
+  'pptx',
+  'rtf',
   'svg',
+  'tar',
+  'tif',
+  'tiff',
+  'tsv',
+  'txt',
   'wav',
   'webm',
   'webp',
+  'xls',
+  'xlsx',
+  'xml',
+  'yaml',
+  'yml',
+  'zip',
 ])
 
 /** A supported content kind at a safe, visible graph-relative path. */
