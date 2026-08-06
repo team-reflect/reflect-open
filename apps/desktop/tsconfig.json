@@ -5,7 +5,6 @@
     "jsx": "react-jsx",
     "noUnusedParameters": true,
     "noUncheckedIndexedAccess": true,
-    "noPropertyAccessFromIndexSignature": true,
     "exactOptionalPropertyTypes": true,
 
     /* Path aliases */

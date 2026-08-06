@@ -3,7 +3,6 @@
   "compilerOptions": {
     "noUnusedParameters": true,
     "noUncheckedIndexedAccess": true,
-    "noPropertyAccessFromIndexSignature": true,
     "exactOptionalPropertyTypes": true
   },
   "include": ["src"]

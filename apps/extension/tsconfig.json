@@ -16,7 +16,6 @@
     "verbatimModuleSyntax": true,
     "noImplicitOverride": true,
     "noUncheckedIndexedAccess": true,
-    "noPropertyAccessFromIndexSignature": true,
     "exactOptionalPropertyTypes": true,
 
     // `tsc -b` needs the project to be composite; emit declarations into a
