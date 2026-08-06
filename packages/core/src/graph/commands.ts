@@ -254,6 +254,15 @@ export async function openAsset(path: string, generation: number): Promise<void>
 }
 
 /**
+ * Reveal a graph file in the OS file manager, the fallback when
+ * {@link openAsset} refuses a file type. Pinned to `generation` for the same
+ * reason.
+ */
+export async function revealAsset(path: string, generation: number): Promise<void> {
+  await call('asset_reveal', { path, generation }, voidSchema)
+}
+
+/**
  * List every file (any extension) under a graph-relative directory, e.g.
  * `audio-memos`. A missing directory lists as empty. Pinned to `generation`
  * for the same reason as {@link readAsset}.

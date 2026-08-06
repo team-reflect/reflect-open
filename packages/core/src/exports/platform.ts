@@ -137,6 +137,7 @@ export {
   writeAsset,
   readAsset,
   openAsset,
+  revealAsset,
   listDir,
   noteExists,
   deleteNote,
