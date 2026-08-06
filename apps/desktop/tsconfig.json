@@ -1,7 +1,6 @@
 {
   "extends": "@ocavue/tsconfig/dom/app.json",
   "compilerOptions": {
-    "useDefineForClassFields": true,
     "jsx": "react-jsx",
     "noUnusedParameters": true,
     "noUncheckedIndexedAccess": true,
