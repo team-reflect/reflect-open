@@ -9,7 +9,7 @@ class FakeMediaRecorder {
   static failConstruction = false
 
   static isTypeSupported(type: string): boolean {
-    return FakeMediaRecorder.supported.includes(type)
+    return this.supported.includes(type)
   }
 
   ondataavailable: ((event: { data: Blob }) => void) | null = null
