@@ -8,6 +8,7 @@ export default defineESLintConfig(
       files: ['**/*.tsx', './apps/desktop/src/**/*.ts'],
     },
     markdown: false,
+    packageJson: false,
   },
   {
     ignores: ['./design-system/', '**/.wxt/'],
