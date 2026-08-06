@@ -9,6 +9,7 @@ export default defineESLintConfig(
     },
     markdown: false,
     packageJson: false,
+    command: true,
   },
   {
     ignores: ['./design-system/', '**/.wxt/'],
@@ -19,6 +20,7 @@ export default defineESLintConfig(
     linterOptions: {
       reportUnusedDisableDirectives: 'off',
     },
+    /// keep-sorted
     rules: {
       '@eslint-react/dom-no-flush-sync': 'off',
       '@eslint-react/exhaustive-deps': 'off',
