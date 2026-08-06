@@ -22,7 +22,6 @@ export default defineESLintConfig(
     },
     /// keep-sorted
     rules: {
-      'unicorn/prefer-add-event-listener': 'off',
       '@eslint-react/dom-no-flush-sync': 'off',
       '@eslint-react/exhaustive-deps': 'off',
       '@eslint-react/naming-convention-ref-name': 'off',
@@ -83,6 +82,7 @@ export default defineESLintConfig(
       'unicorn/no-unnecessary-splice': 'off',
       'unicorn/no-useless-undefined': 'off',
       'unicorn/number-literal-case': 'off',
+      'unicorn/prefer-add-event-listener': 'off',
       'unicorn/prefer-array-from-map': 'off',
       'unicorn/prefer-then-catch': 'off',
       'unicorn/prefer-url-href': 'off',
