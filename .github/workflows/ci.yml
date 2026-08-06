@@ -57,14 +57,14 @@ jobs:
       fail-fast: false
       matrix:
         shard: ['1/3', '2/3', '3/3']
-        groups:
+        config:
           - os: ubuntu-latest
             browser: chromium
           - os: macos-latest
             browser: webkit
 
-    name: test ${{ matrix.groups.browser }} ${{ matrix.shard }}
-    runs-on: ${{ matrix.groups.os }}
+    name: test ${{ matrix.config.browser }} ${{ matrix.shard }}
+    runs-on: ${{ matrix.config.os }}
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -84,10 +84,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright
-        run: pnpm --filter @reflect/desktop exec playwright install ${{ matrix.groups.browser }}
+        run: pnpm --filter @reflect/desktop exec playwright install ${{ matrix.config.browser }}
 
       - name: Test
         run: pnpm run test --shard ${{ matrix.shard }}
+        env:
+          REFLECT_TEST_BROWSER: ${{ matrix.config.browser }}
 
   rust:
     name: fmt · clippy · test (Rust)
