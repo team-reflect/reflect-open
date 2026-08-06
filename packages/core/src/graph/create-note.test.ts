@@ -38,7 +38,7 @@ function bindBridge({
   readErrors = [],
   query,
   create,
-}: BridgeBehavior = {}): ReturnType<typeof vi.fn> {
+}: BridgeBehavior = {}) {
   const taken = new Set([...occupied, ...Object.keys(files), ...placeholders, ...readErrors])
   const unreadable = new Set(readErrors)
   const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {

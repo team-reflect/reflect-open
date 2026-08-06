@@ -10,7 +10,9 @@ const SOURCE: BacklinkSource = {
   snippets: [],
 }
 
-function mount(onOpen: (path: string, event?: { metaKey: boolean }) => void) {
+type OnOpen = (path: string, event?: { metaKey: boolean }) => void
+
+function mount(onOpen: OnOpen) {
   return render(
     <BacklinkSourceGroup
       source={SOURCE}
@@ -25,7 +27,7 @@ function mount(onOpen: (path: string, event?: { metaKey: boolean }) => void) {
 
 describe('BacklinkSourceGroup', () => {
   it('forwards the click event so ⌘-click can open a new window', async () => {
-    const onOpen = vi.fn()
+    const onOpen = vi.fn<OnOpen>()
     await mount(onOpen)
 
     await page.getByRole('button', { name: 'Source Note' }).click({ modifiers: ['Meta'] })
@@ -37,7 +39,7 @@ describe('BacklinkSourceGroup', () => {
   })
 
   it('plain clicks arrive without the modifier', async () => {
-    const onOpen = vi.fn()
+    const onOpen = vi.fn<OnOpen>()
     await mount(onOpen)
 
     await page.getByRole('button', { name: 'Source Note' }).click()
