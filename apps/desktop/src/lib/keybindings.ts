@@ -1,5 +1,5 @@
 /**
- * Display formatting for keymap-registry bindings (`Mod-d`, `Mod-\`, …).
+ * Display formatting for keymap-registry bindings (`Mod-d`, `Mod-.`, …).
  *
  * The registry's binding strings are ProseMirror-style — modifiers and a final
  * key joined by `-`. This module turns one into the per-key labels a keycap

@@ -142,7 +142,7 @@ describe('appMenuLayout', () => {
 })
 
 describe('installNativeMenu', () => {
-  it('installs sidebar.toggle as a native Command+\\ menu accelerator', async () => {
+  it('installs sidebar.toggle as a native Command+. menu accelerator', async () => {
     const dispatch = vi.fn()
     setMenuCommandDispatch(dispatch)
 
@@ -155,8 +155,8 @@ describe('installNativeMenu', () => {
 
     expect(sidebarToggle).toMatchObject({
       id: 'sidebar.toggle',
-      text: 'Toggle sidebar',
-      accelerator: 'CmdOrCtrl+\\',
+      text: 'Toggle focus mode',
+      accelerator: 'CmdOrCtrl+.',
     })
     expect(sidebarToggle?.action).toBeTypeOf('function')
     sidebarToggle?.action?.('sidebar.toggle')

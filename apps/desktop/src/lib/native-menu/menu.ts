@@ -185,7 +185,7 @@ function isMacosDesktop(): boolean {
  * menubar we haven't designed for, and every shortcut already works there
  * through the keydown path. Most keyboard equivalents the webview handles are
  * consumed before the menu sees them (`useAppShortcuts` prevents the default),
- * so a focused webview never double-fires a command. The sidebar toggle is
+ * so a focused webview never double-fires a command. The focus-mode toggle is
  * deliberately exempted there so its key equivalent belongs to this native
  * macOS application menu.
  */

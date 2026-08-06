@@ -243,6 +243,15 @@ describe('Sidebar', () => {
     expect(openPalette).toHaveBeenCalled()
   })
 
+  it('enters focus mode through the sidebar action', async () => {
+    const toggleSidebar = vi.fn()
+    const { view } = await renderSidebar({ toggleSidebar })
+
+    await view.getByRole('button', { name: 'Enter focus mode' }).click()
+
+    expect(toggleSidebar).toHaveBeenCalledTimes(1)
+  })
+
   it('the mic button starts an audio memo', async () => {
     const { view } = await renderSidebar()
     await view.getByRole('button', { name: /record audio memo/i }).click()

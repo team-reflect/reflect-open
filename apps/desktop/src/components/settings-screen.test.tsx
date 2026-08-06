@@ -1136,7 +1136,7 @@ describe('SettingsScreen', () => {
     const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' })
     // App scope (command titles) and editor scope (binding descriptions) still
     // come from the global cheat-sheet, not from a duplicated settings list.
-    await expect.element(dialog.getByText('Toggle sidebar')).toBeInTheDocument()
+    await expect.element(dialog.getByText('Toggle focus mode')).toBeInTheDocument()
     await expect.element(dialog.getByText('Go to today')).toBeInTheDocument()
     await expect.element(dialog.getByText('Bold')).toBeInTheDocument()
     await expect.element(dialog.getByText('Heading 1')).toBeInTheDocument()

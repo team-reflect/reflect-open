@@ -25,6 +25,7 @@ describe('formatBinding', () => {
 
   it('keeps punctuation keys verbatim', () => {
     expect(formatBinding('Mod-\\', true)).toEqual(['⌘', '\\'])
+    expect(formatBinding('Mod-.', true)).toEqual(['⌘', '.'])
     expect(formatBinding('Mod-,', true)).toEqual(['⌘', ','])
     expect(formatBinding('Mod-[', false)).toEqual(['Ctrl', '['])
   })

@@ -10,9 +10,11 @@ import { NoteFindBar } from '@/components/note-find-bar'
 import { RouteContent } from '@/components/route-content'
 import { ShortcutsDialog } from '@/components/shortcuts-dialog'
 import { Sidebar } from '@/components/sidebar/sidebar'
+import { FocusModeToggle } from '@/components/sidebar/focus-mode-toggle'
 import { SidebarResizeHandle } from '@/components/sidebar-resize-handle'
 import { TemplateCreateDialog } from '@/components/templates/template-create-dialog'
 import { TemplatePicker } from '@/components/templates/template-picker'
+import { hasMacosTitleBarOverlay } from '@/lib/window-chrome'
 import { useDailyContextTarget } from '@/providers/focused-daily-provider'
 import { useSidebar } from '@/providers/sidebar-provider'
 import { useAppShortcuts } from '@/routing/app-shortcuts'
@@ -58,6 +60,15 @@ export function WorkspaceContent({ graph }: WorkspaceContentProps): ReactElement
       contextEdge={<SidebarResizeHandle panel="context" />}
     >
       <div className="relative flex h-full flex-col">
+        {collapsed ? (
+          <FocusModeToggle
+            context={commandContext}
+            collapsed
+            className={
+              hasMacosTitleBarOverlay ? 'absolute top-16 left-8 z-10' : 'absolute top-2 left-2 z-10'
+            }
+          />
+        ) : null}
         <div className="min-h-0 flex-1">
           <RouteContent />
         </div>

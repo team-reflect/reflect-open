@@ -12,6 +12,7 @@ describe('bindingToAccelerator', () => {
     expect(bindingToAccelerator('Mod-[')).toBe('CmdOrCtrl+[')
     expect(bindingToAccelerator('Mod-]')).toBe('CmdOrCtrl+]')
     expect(bindingToAccelerator('Mod-\\')).toBe('CmdOrCtrl+\\')
+    expect(bindingToAccelerator('Mod-.')).toBe('CmdOrCtrl+.')
     expect(bindingToAccelerator('Mod-,')).toBe('CmdOrCtrl+,')
     expect(bindingToAccelerator('Mod-/')).toBe('CmdOrCtrl+/')
   })
