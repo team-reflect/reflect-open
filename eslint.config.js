@@ -67,7 +67,6 @@ export default defineESLintConfig(
       'unicorn/prefer-add-event-listener': 'off',
       'unicorn/prefer-array-from-map': 'off',
       'unicorn/prefer-then-catch': 'off',
-      'unicorn/prefer-url-href': 'off',
     },
   },
 )

@@ -68,7 +68,7 @@ const SENTRY_DSN_SCHEMA = z
       !url.search &&
       !url.hash,
   )
-  .transform((url) => url.toString())
+  .transform((url) => url.href)
 
 /** Accept only the production Reflect Sentry project DSN, while allowing public-key rotation. */
 export function parseExceptionTelemetryDsn(value: string | undefined): string | null {
