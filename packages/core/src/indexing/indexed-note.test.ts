@@ -419,4 +419,18 @@ describe('path addressing (via buildIndexedNote)', () => {
       { raw: './Sibling.md', pathKey: 'journal/sibling.md' },
     ])
   })
+
+  it('stores the classifier name key, empty when the target has no name reading', () => {
+    const source = 'See [[Projects/Plan#Next]] and [[Plan.md]] and [[/Rooted]] and [[Plan]].'
+    const indexed = buildIndexedNote(parseNote({ path: 'Journal/Today.md', source }), {
+      ...meta,
+      source,
+    })
+    expect(indexed.links.map((link) => ({ raw: link.targetRaw, key: link.targetKey }))).toEqual([
+      { raw: 'Projects/Plan#Next', key: 'projects/plan' },
+      { raw: 'Plan.md', key: 'plan' },
+      { raw: '/Rooted', key: '' },
+      { raw: 'Plan', key: 'plan' },
+    ])
+  })
 })

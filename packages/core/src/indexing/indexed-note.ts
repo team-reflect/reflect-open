@@ -15,7 +15,6 @@ import {
   foldTag,
   gistBodyHash,
   isPinned,
-  normalizeWikiTarget,
   pinnedOrder,
   splitFrontmatter,
   subjectAliases,
@@ -85,8 +84,12 @@ import { serializeWikiSuggestionAddress } from './suggest'
  * existing rows carry no claims and no path keys, so vault-path links and
  * filename-stem links stay unresolved until reprojected. Name keys also gain
  * NFC folding (`foldKey`), so NFD-spelled titles need their keys rebuilt.
+ * 19 - wiki `links.target_key` becomes the classifier's name key (fragment
+ * and `.md` stripped; '' for strict-path, self, and refused targets), so the
+ * backlinks view's name join matches navigation. Existing rows carry the raw
+ * fold and must reproject.
  */
-export const PROJECTION_VERSION = 18
+export const PROJECTION_VERSION = 19
 
 /**
  * Precedence of the spellings a note answers to (`note_claims.tier`): the
@@ -115,7 +118,11 @@ export type IndexedClaim = z.infer<typeof indexedClaimSchema>
 export const indexedLinkSchema = z.object({
   kind: z.enum(['wiki', 'md']),
   targetRaw: z.string(),
-  /** Normalized match key: case-folded wiki target, or the lowercased href for md links. */
+  /**
+   * Name key the link answers to: for wiki links, `wikiNoteReference`'s
+   * folded key ('' when the target has no name reading, i.e. a rooted path,
+   * `#self`, or a refused URI); for md links, the lowercased href.
+   */
   targetKey: z.string(),
   /** Folded vault path when the link names a file; null when it names a note. */
   targetPathKey: z.string().nullable(),
@@ -316,10 +323,15 @@ export function buildIndexedNote(
 ): IndexedNote {
   const wikiLinks: IndexedLink[] = parsed.wikiLinks.map((link) => {
     const reference = wikiNoteReference(link.target)
+    const hasNameReading = reference?.kind === 'key' || reference?.kind === 'pathOrKey'
     return {
       kind: 'wiki' as const,
       targetRaw: link.target,
-      targetKey: normalizeWikiTarget(link.target).key,
+      // The classifier's own name key (fragment and `.md` stripped), so the
+      // backlinks view joins exactly what navigation resolves. Empty when the
+      // target has no name reading (a rooted path, `#self`, a refused URI):
+      // no claim is ever '', so those rows can never name-join.
+      targetKey: hasNameReading ? reference.key : '',
       targetPathKey:
         reference?.kind === 'path' || reference?.kind === 'pathOrKey'
           ? foldGraphPath(reference.path)

@@ -92,4 +92,64 @@ describe('colon and slash title flow', () => {
       database.close()
     }
   })
+
+  it('gives a rooted path no name fallback, in resolution or backlinks', async () => {
+    const database = openMigratedIndex()
+    applyProjection(database, project('notes/missing.md', '# /Missing\n', 20))
+    applyProjection(database, project('daily/2026-08-04.md', 'See [[/Missing]].\n', 10))
+    connectIndex(database)
+
+    try {
+      await expect(resolveOrCreateNoteWithTitle('/Missing', 1)).resolves.toEqual({
+        kind: 'unavailable',
+        paths: ['Missing.md'],
+      })
+      await expect(getBacklinks('notes/missing.md')).resolves.toEqual([])
+    } finally {
+      setBridge(null)
+      database.close()
+    }
+  })
+
+  it('backlinks a fragment-carrying slashed target through its name fallback', async () => {
+    const database = openMigratedIndex()
+    const targetPath = 'notes/missingplan.md'
+    applyProjection(database, project(targetPath, '# Missing/Plan\n', 20))
+    applyProjection(database, project('daily/2026-08-04.md', 'See [[Missing/Plan#Next]].\n', 10))
+    connectIndex(database)
+
+    try {
+      await expect(resolveOrCreateNoteWithTitle('Missing/Plan#Next', 1)).resolves.toEqual({
+        kind: 'resolved',
+        path: targetPath,
+      })
+
+      const backlinks = await getBacklinks(targetPath)
+      expect(backlinks.map((row) => row.sourcePath)).toEqual(['daily/2026-08-04.md'])
+    } finally {
+      setBridge(null)
+      database.close()
+    }
+  })
+
+  it('backlinks a .md-suffixed slashed target through its name fallback', async () => {
+    const database = openMigratedIndex()
+    const targetPath = 'notes/missingplan.md'
+    applyProjection(database, project(targetPath, '# Missing/Plan\n', 20))
+    applyProjection(database, project('daily/2026-08-04.md', 'See [[Missing/Plan.md]].\n', 10))
+    connectIndex(database)
+
+    try {
+      await expect(resolveOrCreateNoteWithTitle('Missing/Plan.md', 1)).resolves.toEqual({
+        kind: 'resolved',
+        path: targetPath,
+      })
+
+      const backlinks = await getBacklinks(targetPath)
+      expect(backlinks.map((row) => row.sourcePath)).toEqual(['daily/2026-08-04.md'])
+    } finally {
+      setBridge(null)
+      database.close()
+    }
+  })
 })
