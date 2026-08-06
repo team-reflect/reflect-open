@@ -277,7 +277,26 @@ describe('ChatScreen', () => {
     const view = await renderChat()
 
     await userEvent.type(view.getByLabelText('Chat message'), 'when does atlas ship?{Enter}')
-    await view.getByRole('button', { name: 'Copy reply' }).click()
+    const copyButton = view.getByRole('button', { name: 'Copy reply' })
+    const copyFooter = copyButton.element().closest('[data-slot="message-footer"]')
+    if (!(copyFooter instanceof HTMLElement)) {
+      expect.unreachable('copy button did not render in a message footer')
+    }
+
+    expect(getComputedStyle(copyFooter).opacity).toBe('0')
+    expect(getComputedStyle(copyFooter).pointerEvents).toBe('none')
+    expect(getComputedStyle(copyButton.element()).width).toBe('20px')
+    expect(copyFooter.parentElement?.classList.contains('group/assistant-response')).toBe(true)
+    expect(copyFooter.classList.contains('group-hover/assistant-response:opacity-100')).toBe(true)
+
+    // The browser suite emulates touch, where hover media queries stay off;
+    // keyboard focus exercises the equivalent accessible reveal path.
+    copyButton.element().focus()
+    await vi.waitFor(() => {
+      expect(getComputedStyle(copyFooter).opacity).toBe('1')
+      expect(getComputedStyle(copyFooter).pointerEvents).toBe('auto')
+    })
+    await copyButton.click()
 
     // The wiki link survives the copy, so a pasted reply still links.
     expect(writeText).toHaveBeenCalledWith('It ships in June. [[Atlas]]')

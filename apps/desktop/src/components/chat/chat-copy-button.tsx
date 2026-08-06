@@ -56,9 +56,9 @@ export function ChatCopyButton({ text }: ChatCopyButtonProps): ReactElement {
             size="icon-xs"
             aria-label="Copy reply"
             onClick={() => void copyReply()}
-            className="text-text-muted hover:text-text"
+            className="size-5 rounded-md text-text-muted hover:text-text"
           >
-            <Icon aria-hidden className="size-3.5" />
+            <Icon aria-hidden className="size-3" />
           </Button>
         }
       />

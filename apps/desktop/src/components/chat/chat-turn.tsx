@@ -27,9 +27,9 @@ interface ChatTurnProps {
  * Wiki navigation passes a null generation deliberately: a clicked citation
  * that doesn't resolve must never *create* a note the model hallucinated.
  *
- * A settled turn that produced answer text gets a hover-revealed copy button
- * under it; a turn that only ran tools or errored has nothing to copy, so it
- * gets none.
+ * A settled turn that produced answer text gets a copy button revealed by
+ * hovering the response content or focusing the action; a turn that only ran
+ * tools or errored has nothing to copy, so it gets none.
  */
 export function ChatTurn({ turn }: ChatTurnProps): ReactElement {
   const navigateWikiLink = useWikiLinkNavigation(null)
@@ -52,7 +52,7 @@ export function ChatTurn({ turn }: ChatTurnProps): ReactElement {
       </Message>
 
       <Message align="start">
-        <MessageContent className="gap-2">
+        <MessageContent className="group/assistant-response w-fit max-w-full gap-2">
           {turn.parts.length === 0 && turn.status === 'streaming' ? (
             <Marker className="animate-pulse text-sm text-text-muted">
               <MarkerContent>Thinking…</MarkerContent>
@@ -69,7 +69,7 @@ export function ChatTurn({ turn }: ChatTurnProps): ReactElement {
             />
           ))}
           {replyMarkdown !== null ? (
-            <MessageFooter className="-mt-1 opacity-0 transition-opacity group-hover/message:opacity-100 focus-within:opacity-100">
+            <MessageFooter className="pointer-events-none -mt-1 opacity-0 transition-opacity duration-100 group-hover/assistant-response:pointer-events-auto group-hover/assistant-response:opacity-100 group-focus-within/assistant-response:pointer-events-auto group-focus-within/assistant-response:opacity-100">
               <ChatCopyButton text={replyMarkdown} />
             </MessageFooter>
           ) : null}
