@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1-beta.2](https://github.com/team-reflect/reflect-open/compare/v0.8.1-beta.1...v0.8.1-beta.2) (2026-08-06)
+
+
+### Bug Fixes
+
+* **ios:** check the native diagnostics entry point in the dSYM ([#1045](https://github.com/team-reflect/reflect-open/issues/1045)) ([8ddb4b0](https://github.com/team-reflect/reflect-open/commit/8ddb4b04fcbaab12f184c1761431851f5dc02d30))
+
 ## [0.8.1-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.8.1-beta...v0.8.1-beta.1) (2026-08-06)
 
 
