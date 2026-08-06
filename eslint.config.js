@@ -45,7 +45,6 @@ export default defineESLintConfig(
       '@typescript-eslint/require-await': 'off',
       '@typescript-eslint/return-await': 'off',
       '@typescript-eslint/unbound-method': 'off',
-      'antfu/top-level-function': 'off',
       'jsdoc/multiline-blocks': 'off',
       'jsdoc/no-multi-asterisks': 'off',
       'no-var': 'off',

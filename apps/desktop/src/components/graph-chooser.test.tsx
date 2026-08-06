@@ -22,13 +22,15 @@ let icloudStatusResponse: {
 let queryClient: QueryClient
 
 // Mirrors the main.tsx provider order: settings above the graph lifecycle.
-const wrapper = ({ children }: { children: ReactNode }) => (
-  <QueryClientProvider client={queryClient}>
-    <SettingsProvider>
-      <GraphProvider>{children}</GraphProvider>
-    </SettingsProvider>
-  </QueryClientProvider>
-)
+function wrapper({ children }: { children: ReactNode }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SettingsProvider>
+        <GraphProvider>{children}</GraphProvider>
+      </SettingsProvider>
+    </QueryClientProvider>
+  )
+}
 
 beforeEach(() => {
   vi.stubEnv('TAURI_ENV_PLATFORM', 'darwin')

@@ -62,11 +62,13 @@ function installFakeBridge(): void {
 
 let queryClient: QueryClient
 
-const wrapper = ({ children }: { children: ReactNode }) => (
-  <QueryClientProvider client={queryClient}>
-    <SettingsProvider>{children}</SettingsProvider>
-  </QueryClientProvider>
-)
+function wrapper({ children }: { children: ReactNode }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SettingsProvider>{children}</SettingsProvider>
+    </QueryClientProvider>
+  )
+}
 
 /** Resolves once the initial settings_load has populated the query cache. */
 async function loadSettled(): Promise<void> {

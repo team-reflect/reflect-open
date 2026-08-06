@@ -132,21 +132,25 @@ function resolveOpen(root: string): void {
   pendingOpens.delete(root)
 }
 
-const wrapper = ({ children }: { children: ReactNode }) => (
-  <QueryClientProvider client={queryClient}>
-    <SettingsProvider>
-      <GraphProvider>{children}</GraphProvider>
-    </SettingsProvider>
-  </QueryClientProvider>
-)
+function wrapper({ children }: { children: ReactNode }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SettingsProvider>
+        <GraphProvider>{children}</GraphProvider>
+      </SettingsProvider>
+    </QueryClientProvider>
+  )
+}
 
-const mobileWrapper = ({ children }: { children: ReactNode }) => (
-  <QueryClientProvider client={queryClient}>
-    <SettingsProvider>
-      <GraphProvider platform="ios">{children}</GraphProvider>
-    </SettingsProvider>
-  </QueryClientProvider>
-)
+function mobileWrapper({ children }: { children: ReactNode }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SettingsProvider>
+        <GraphProvider platform="ios">{children}</GraphProvider>
+      </SettingsProvider>
+    </QueryClientProvider>
+  )
+}
 
 beforeEach(() => {
   installFakeBridge()

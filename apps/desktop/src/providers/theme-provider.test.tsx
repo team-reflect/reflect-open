@@ -57,13 +57,15 @@ function installFakeBridge(): void {
 
 let queryClient: QueryClient
 
-const wrapper = ({ children }: { children: ReactNode }) => (
-  <QueryClientProvider client={queryClient}>
-    <SettingsProvider>
-      <ThemeProvider>{children}</ThemeProvider>
-    </SettingsProvider>
-  </QueryClientProvider>
-)
+function wrapper({ children }: { children: ReactNode }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SettingsProvider>
+        <ThemeProvider>{children}</ThemeProvider>
+      </SettingsProvider>
+    </QueryClientProvider>
+  )
+}
 
 type Act = (callback: () => unknown) => Promise<void>
 
