@@ -29,7 +29,6 @@ export default defineESLintConfig(
       '@eslint-react/no-use-context': 'off',
       '@eslint-react/purity': 'off',
       '@eslint-react/set-state-in-effect': 'off',
-      '@eslint-react/set-state-in-render': 'off',
       '@eslint-react/static-components': 'off',
       '@eslint-react/use-state': 'off',
       '@eslint-react/web-api-no-leaked-event-listener': 'off',
