@@ -9,7 +9,7 @@ exclude = ["/examples", "/dist-js", "/guest-js", "/node_modules"]
 links = "tauri-plugin-recording"
 
 [dependencies]
-tauri = { version = "2.11.2" }
+tauri = { version = "2.11.5" }
 serde = "1.0.228"
 thiserror = "2.0.18"
 
