@@ -530,10 +530,13 @@ function assertCurrentArchiveSymbols() {
 
 /**
  * The native reporter once shipped compiled-out for months without anyone
- * noticing; fail the release if the Swift entry point is missing.
+ * noticing; fail the release if the Swift entry point is missing. The archive
+ * step strips the app executable's symbol table, so look for the symbol in the
+ * dSYM, which `assertCurrentArchiveSymbols` has already UUID-matched to the
+ * executable.
  */
 function assertNativeDiagnosticsLinkedIn() {
-  const symbols = capture('xcrun', ['nm', '-Uj', iosAppBinary])
+  const symbols = capture('xcrun', ['nm', '-Uj', iosDsymBinary])
   if (!symbols.includes('_reflect_start_native_diagnostics')) {
     fail('the app binary does not contain the native diagnostics entry point')
   }
