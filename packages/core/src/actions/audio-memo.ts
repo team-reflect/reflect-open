@@ -1,5 +1,9 @@
 import { errorMessage, isAppError, toAppError, type AppError } from '../errors'
-import { pickTranscriptionConfig, type AiProvidersState } from '../ai/provider-config'
+import {
+  pickTranscriptionConfig,
+  resolveTranscriptionTarget,
+  type AiProvidersState,
+} from '../ai/provider-config'
 import { aiApiKeyForConfig, aiKeySecretName } from '../ai/secrets'
 import {
   audioMemoEnrichmentConfig,
@@ -9,7 +13,6 @@ import {
 import { enrichSessionTranscript } from '../ai/audio-memo-transcript'
 import { AUDIO_EXTENSION_BY_MIME, baseMimeType } from '../ai/transcribe'
 import { APP_REVIEW_STUB_KEY, stubTranscriptBody } from '../ai/audio-memo-review-stub'
-import { resolveTranscriptionTarget } from '../ai/provider-config'
 import { bytesToBase64 } from '../lib/base64'
 import { listDir, listFiles, readNote, writeAsset, writeNote } from '../graph/commands'
 import { writeAssetStreamed } from '../graph/assets'

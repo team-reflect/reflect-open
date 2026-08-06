@@ -1,6 +1,5 @@
-import { act } from 'react'
+import { act, useState, type ReactElement, type ReactNode } from 'react'
 import { cleanup, renderHook } from 'vitest-browser-react'
-import { useState, type ReactElement, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   AiProvidersState,

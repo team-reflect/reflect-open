@@ -50,7 +50,6 @@ export default defineESLintConfig(
       'antfu/top-level-function': 'off',
       'jsdoc/multiline-blocks': 'off',
       'jsdoc/no-multi-asterisks': 'off',
-      'no-duplicate-imports': 'off',
       'no-var': 'off',
       'perfectionist/sort-imports': 'off',
       'react-hooks/exhaustive-deps': 'off',
