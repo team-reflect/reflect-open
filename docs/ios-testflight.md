@@ -63,10 +63,10 @@ for `pnpm release:ios testflight`.
 4. **Sentry exception telemetry credentials.** Set the public `VITE_SENTRY_DSN` and the
    private, build-only `SENTRY_AUTH_TOKEN` for local TestFlight builds. Configure them in
    GitHub as the repository secrets `SENTRY_DSN` and `SENTRY_AUTH_TOKEN`; the TestFlight
-   workflow requires both before building. The DSN initializes both the WebView and the
-   iOS native SDK. The token must be allowed to upload JavaScript source maps and native
-   debug files to the `reflect-open` project; it must never use the `VITE_` prefix or
-   enter the app bundle.
+   workflow requires both before building. The DSN initializes the WebView SDK; the iOS
+   native SDK embeds its DSN as a constant in `NativeDiagnostics.swift`. The token must
+   be allowed to upload JavaScript source maps and native debug files to the
+   `reflect-open` project; it must never use the `VITE_` prefix or enter the app bundle.
 
 5. **A monotonically increasing build number.** TestFlight rejects duplicate
    `CFBundleVersion` values for the same marketing version. The GitHub Action
@@ -99,11 +99,12 @@ signed-in Xcode account locally or the App Store Connect API key environment
 when the key is configured. The build number is merged into the Tauri config as
 `bundle.iOS.bundleVersion`. The IPA lands under
 `apps/desktop/src-tauri/gen/apple/build/`. Release builds retain Rust line
-tables so Xcode can produce a dSYM that symbolicates native frames. When the
-Sentry credentials are set, the helper requires the current archive's main dSYM,
-verifies its UUID against the archived executable, and uploads only that
-archive's native symbols — without source bundles — before returning. Supplying
-only one of the DSN or token is a release error.
+tables so Xcode can produce a dSYM that symbolicates native frames. The helper
+requires the current archive's main dSYM, verifies its UUID against the archived
+executable, and asserts the native diagnostics entry point is linked into the
+executable. When `SENTRY_AUTH_TOKEN` is set it uploads only that archive's
+native symbols — without source bundles — before returning. A `VITE_SENTRY_DSN`
+that is not the production project is a release error.
 
 ```bash
 pnpm release:ios testflight --wait
@@ -215,6 +216,6 @@ workflow.
   dependency on `Sentry-Dynamic` in `ios.project.yml` and
   `gen/apple/project.yml`, and regenerate the Xcode project with `xcodegen`.
 - **Sentry reports "missing debug information"**: check the release helper's
-  `sentry-cli debug-files upload` output. Publication fails when native Sentry is
-  configured but no dSYM exists or the upload is rejected; JavaScript source-map
-  upload does not cover Rust or Swift frames.
+  `sentry-cli debug-files upload` output. Publication fails when the upload token
+  is configured but no dSYM exists or the upload is rejected; JavaScript
+  source-map upload does not cover Rust or Swift frames.

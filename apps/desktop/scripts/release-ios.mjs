@@ -21,7 +21,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 const DEFAULT_EXPORT_METHOD = 'app-store-connect'
 const EXPORT_METHODS = new Set(['app-store-connect', 'release-testing', 'debugging', 'validation'])
 const IOS_BUNDLE_IDENTIFIER = 'app.reflect.ios'
-const OLD_CAPACITOR_BUNDLE_IDENTIFIER = 'app.reflect.ReflectMobile'
 const NON_EXEMPT_ENCRYPTION_KEY = 'ITSAppUsesNonExemptEncryption'
 const KEYCHAIN_SERVICE = 'reflect-notary'
 const SHARE_EXTENSION_APP_GROUP = 'group.app.reflect'
@@ -148,8 +147,9 @@ export function createSentryDebugFilesUploadArgs(path) {
  *
  * The org/project identity is asserted in three places that must rotate
  * together: here, `parseExceptionTelemetryDsn` in
- * `src/lib/exception-telemetry.ts` (WebView SDK), and `parse_native_dsn` in
- * `src-tauri/src/native_diagnostics.rs` (iOS native SDK).
+ * `src/lib/exception-telemetry.ts` (WebView SDK), and the `dsn` constant in
+ * `src-tauri/gen/apple/Sources/reflect-open/NativeDiagnostics.swift` (iOS
+ * native SDK).
  */
 export function isProductionSentryDsn(value) {
   return /^https:\/\/[0-9a-f]{32}@o463484\.ingest\.us\.sentry\.io\/4511705649971200$/.test(
@@ -157,27 +157,19 @@ export function isProductionSentryDsn(value) {
   )
 }
 
-/** Inspect native symbol-upload credentials without exposing their values. */
-export function inspectNativeSentryConfiguration(env = process.env) {
-  const hasAuthToken = Boolean(env.SENTRY_AUTH_TOKEN)
-  const hasDsn = Boolean(env.VITE_SENTRY_DSN)
-  if (!hasAuthToken && !hasDsn) {
-    return { enabled: false, error: null }
-  }
-  if (!hasAuthToken || !hasDsn) {
-    return {
-      enabled: false,
-      error:
-        'native Sentry configuration is incomplete; set both SENTRY_AUTH_TOKEN and VITE_SENTRY_DSN',
-    }
-  }
-  if (!isProductionSentryDsn(env.VITE_SENTRY_DSN)) {
+/**
+ * Inspect Sentry upload credentials without exposing their values. The dSYM
+ * upload needs the auth token; the DSN, when present for the WebView build,
+ * must be the production project so official builds never report elsewhere.
+ */
+export function inspectSentryUploadConfiguration(env = process.env) {
+  if (env.VITE_SENTRY_DSN && !isProductionSentryDsn(env.VITE_SENTRY_DSN)) {
     return {
       enabled: false,
       error: 'VITE_SENTRY_DSN does not identify the production Reflect Sentry project',
     }
   }
-  return { enabled: true, error: null }
+  return { enabled: Boolean(env.SENTRY_AUTH_TOKEN), error: null }
 }
 
 /** Parse every Mach-O UUID from `dwarfdump --uuid` output. */
@@ -431,12 +423,8 @@ function readIpaInfoPlistRawValue(ipa, key) {
 function assertIpaBundleIdentifier(ipa) {
   const bundleIdentifier = readIpaInfoPlistRawValue(ipa, 'CFBundleIdentifier')
   if (bundleIdentifier !== IOS_BUNDLE_IDENTIFIER) {
-    const oldAppHint =
-      bundleIdentifier === OLD_CAPACITOR_BUNDLE_IDENTIFIER
-        ? ' This is the old Capacitor mobile app bundle id; refusing to upload over its TestFlight app.'
-        : ''
     fail(
-      `IPA bundle identifier is ${bundleIdentifier}, expected ${IOS_BUNDLE_IDENTIFIER}.${oldAppHint}\n` +
+      `IPA bundle identifier is ${bundleIdentifier}, expected ${IOS_BUNDLE_IDENTIFIER}.\n` +
         '  Check apps/desktop/src-tauri/tauri.ios.conf.json and ios.project.yml before uploading.',
     )
   }
@@ -540,13 +528,24 @@ function assertCurrentArchiveSymbols() {
   log(`archive executable and dSYM UUIDs match: ${appUuids.join(', ')}`)
 }
 
+/**
+ * The native reporter once shipped compiled-out for months without anyone
+ * noticing; fail the release if the Swift entry point is missing.
+ */
+function assertNativeDiagnosticsLinkedIn() {
+  const symbols = capture('xcrun', ['nm', '-Uj', iosAppBinary])
+  if (!symbols.includes('_reflect_start_native_diagnostics')) {
+    fail('the app binary does not contain the native diagnostics entry point')
+  }
+}
+
 function uploadNativeDebugFiles() {
-  const configuration = inspectNativeSentryConfiguration()
+  const configuration = inspectSentryUploadConfiguration()
   if (configuration.error !== null) {
     fail(configuration.error)
   }
   if (!configuration.enabled) {
-    log('native Sentry upload skipped (SENTRY_AUTH_TOKEN and VITE_SENTRY_DSN are not set)')
+    log('Sentry dSYM upload skipped (SENTRY_AUTH_TOKEN is not set)')
     return
   }
 
@@ -573,7 +572,7 @@ function ensureReleaseTools() {
 
 function runTauriIosBuild({ apiKeyCredentials, buildNumber, exportMethod, verbose }) {
   // Checked before the long build so a bad configuration fails in seconds.
-  const sentryConfiguration = inspectNativeSentryConfiguration()
+  const sentryConfiguration = inspectSentryUploadConfiguration()
   if (sentryConfiguration.error !== null) {
     fail(sentryConfiguration.error)
   }
@@ -609,6 +608,7 @@ function runTauriIosBuild({ apiKeyCredentials, buildNumber, exportMethod, verbos
   if (!ipa) fail(`tauri build succeeded, but no .ipa was found under ${iosBuildDir}`)
   assertIpaAppStoreMetadata(ipa)
   assertCurrentArchiveSymbols()
+  assertNativeDiagnosticsLinkedIn()
   uploadNativeDebugFiles()
   log(`IPA: ${ipa} (${(statSync(ipa).size / (1024 * 1024)).toFixed(1)} MB)`)
   return ipa
@@ -688,8 +688,7 @@ function verifyAppStoreConnectAppRecord(credentials) {
   if (apps.length === 0) {
     fail(
       `no App Store Connect app record exists for ${IOS_BUNDLE_IDENTIFIER}.\n` +
-        `  Create a new App Store Connect app for ${IOS_BUNDLE_IDENTIFIER} before uploading.\n` +
-        `  Do not reuse the old Capacitor app (${OLD_CAPACITOR_BUNDLE_IDENTIFIER}).`,
+        `  Create a new App Store Connect app for ${IOS_BUNDLE_IDENTIFIER} before uploading.`,
     )
   }
   if (apps.length > 1)
@@ -733,7 +732,7 @@ function testflight({ buildNumberFlag, exportMethod, wait, verbose }) {
 }
 
 function preflight({ buildNumberFlag }) {
-  const sentryConfiguration = inspectNativeSentryConfiguration()
+  const sentryConfiguration = inspectSentryUploadConfiguration()
   if (sentryConfiguration.error !== null) {
     fail(sentryConfiguration.error)
   }
@@ -750,7 +749,7 @@ function preflight({ buildNumberFlag }) {
       }`,
     )
     log(`altool upload auth: ${uploadCredentials.source}`)
-    log(`native Sentry: ${sentryConfiguration.enabled ? 'configured' : 'disabled'}`)
+    log(`Sentry uploads: ${sentryConfiguration.enabled ? 'configured' : 'disabled'}`)
     log(`xcodebuild: ${capture('xcodebuild', ['-version']).trim().replace(/\n/g, ' / ')}`)
     verifyAppStoreConnectAppRecord(uploadCredentials)
     log('preflight passed')
