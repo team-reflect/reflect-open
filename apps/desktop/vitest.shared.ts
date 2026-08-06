@@ -3,17 +3,18 @@ import { defineProject, type ViteUserConfig } from 'vitest/config'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 
-
 export function defineDesktopProject(project: {
   plugins?: ViteUserConfig['plugins']
   test: NonNullable<ViteUserConfig['test']>
 }): ViteUserConfig {
   return defineProject({
-    plugins: [react(),
+    plugins: [
+      react(),
       babel({
-            presets: [reactCompilerPreset()]
-          }),
-      ...(project.plugins ?? [])],
+        presets: [reactCompilerPreset()],
+      }),
+      ...(project.plugins ?? []),
+    ],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
