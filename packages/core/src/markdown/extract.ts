@@ -103,7 +103,7 @@ function isAssetHref(href: string): boolean {
   if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('//') || href.startsWith('#')) {
     return false // external scheme, protocol-relative, or in-page anchor
   }
-  return /(^|\/)assets\//.test(href)
+  return /(?:^|\/)assets\//.test(href)
 }
 
 /**

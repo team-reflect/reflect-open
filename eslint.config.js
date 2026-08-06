@@ -58,7 +58,6 @@ export default defineESLintConfig(
       'react-hooks/exhaustive-deps': 'off',
       'react-hooks/globals': 'off',
       'regexp/no-super-linear-backtracking': 'off',
-      'regexp/no-unused-capturing-group': 'off',
       'regexp/no-useless-non-capturing-group': 'off',
       'regexp/optimal-quantifier-concatenation': 'off',
       'unicorn/class-reference-in-static-methods': 'off',
