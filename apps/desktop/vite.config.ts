@@ -2,9 +2,10 @@ import { fileURLToPath } from 'node:url'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
 import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
-import { reactWithCompiler } from './react-compiler-plugin'
 // The single version source; tauri.conf.json's `version` also points here.
 import pkg from './package.json'
+import react, { reactCompilerPreset } from '@vitejs/plugin-react'
+import babel from '@rolldown/plugin-babel'
 
 // @ts-expect-error process is a Node.js global available in the Vite config context
 const host = process.env.TAURI_DEV_HOST
@@ -12,7 +13,12 @@ const host = process.env.TAURI_DEV_HOST
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [
-    reactWithCompiler(),
+
+    react(),
+      babel({
+            presets: [reactCompilerPreset()]
+          }),
+
     tailwindcss(),
     sentryVitePlugin({
       authToken: process.env.SENTRY_AUTH_TOKEN,
