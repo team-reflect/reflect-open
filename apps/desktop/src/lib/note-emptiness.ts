@@ -7,5 +7,5 @@ import { splitFrontmatter } from '@reflect/core'
  */
 export function isOstensiblyEmptyNoteSource(source: string): boolean {
   const { body } = splitFrontmatter(source)
-  return body.replaceAll(/[-+*#>[\]\r\n\s]/g, '') === ''
+  return body.replaceAll(/[-+*#>[\]\s]/g, '') === ''
 }

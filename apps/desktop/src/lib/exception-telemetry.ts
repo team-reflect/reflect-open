@@ -39,16 +39,16 @@ const SAFE_MECHANISM_TYPES = new Set([
   'onunhandledrejection',
 ])
 
-const SAFE_SCRIPT_BASENAME = /^[A-Za-z0-9_.-]+\.(?:js|jsx|mjs|ts|tsx)$/
+const SAFE_SCRIPT_BASENAME = /^[\w.-]+\.(?:js|jsx|mjs|ts|tsx)$/
 // These are the structural StepResult failures emitted by ProseMirror. Unknown or
 // newly introduced TransformError values stay redacted until they are audited.
 const SAFE_TRANSFORM_ERROR_VALUES = [
-  /^Cannot join [A-Za-z_][A-Za-z0-9_]* onto [A-Za-z_][A-Za-z0-9_]*$/,
+  /^Cannot join [A-Za-z_]\w* onto [A-Za-z_]\w*$/,
   /^Content does not fit in gap$/,
   /^Gap is not a flat range$/,
   /^Inconsistent open depths$/,
   /^Inserted content deeper than insertion position$/,
-  /^Invalid content for node [A-Za-z_][A-Za-z0-9_]*$/,
+  /^Invalid content for node [A-Za-z_]\w*$/,
   /^No node at (?:attribute|mark) step's position$/,
   /^Structure (?:gap-)?replace would overwrite content$/,
 ]

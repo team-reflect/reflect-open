@@ -262,7 +262,7 @@ function ensureBuildNumber(buildNumber, { required, now = new Date() }) {
     }
     return null
   }
-  if (!/^[0-9]+$/.test(buildNumber)) fail(`invalid build number "${buildNumber}" — use digits only`)
+  if (!/^\d+$/.test(buildNumber)) fail(`invalid build number "${buildNumber}" — use digits only`)
   return buildNumber
 }
 

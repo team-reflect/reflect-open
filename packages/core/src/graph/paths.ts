@@ -192,7 +192,7 @@ export function isDaily(path: string): boolean {
  * cannot reveal what an entry points at.
  */
 export function isSafeVisibleGraphPath(path: string): boolean {
-  if (path === '' || path.startsWith('/') || path.includes('\\') || /^[A-Za-z]:/.test(path)) {
+  if (path === '' || path.startsWith('/') || path.includes('\\') || /^[A-Z]:/i.test(path)) {
     return false
   }
   const components = path.split('/')

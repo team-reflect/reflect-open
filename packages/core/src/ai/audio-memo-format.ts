@@ -10,7 +10,7 @@ import { languageModel } from './language-model'
 
 const FORMAT_TIMEOUT_MS = 60_000
 const NUMBER_SIGNATURE_PATTERN =
-  /(?:(?:[+\-−±~≈#(]|\p{Sc})+\p{N}+|(?:[+\-−±~≈#(]\p{Sc}|\p{Sc}[+\-−±~≈#(]?)\s+\p{N}+|\p{N}+)(?:[.,:/\-\u{66B}\u{66C}]\p{N}+)*(?:\s*(?:\p{Sc}|[%‰‱°)]))?/gu
+  /(?:[+\-−±~≈#(\p{Sc}]+\p{N}+|(?:[+\-−±~≈#(]\p{Sc}|\p{Sc}[+\-−±~≈#(]?)\s+\p{N}+|\p{N}+)(?:[.,:/\-\u{66B}\u{66C}]\p{N}+)*(?:\s*[\p{Sc}%‰‱°)])?/gu
 
 const formattedAudioMemoSchema = z.object({
   title: z.string(),

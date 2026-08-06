@@ -74,7 +74,7 @@ function bindingKeyFor(event: KeyboardEvent): string {
   // Alt rewrites `event.key` on macOS (⌥L reports "Ò"), so alt chords match
   // letters and digits by physical code instead.
   if (event.altKey) {
-    const code = /^(?:Key([A-Z])|Digit([0-9]))$/.exec(event.code)
+    const code = /^(?:Key([A-Z])|Digit(\d))$/.exec(event.code)
     if (code !== null) {
       return (code[1] ?? code[2] ?? '').toLowerCase()
     }
@@ -86,7 +86,7 @@ function physicalDigitKeyFor(event: KeyboardEvent): string | null {
   if (event.altKey) {
     return null
   }
-  const match = /^Digit([0-9])$/.exec(event.code)
+  const match = /^Digit(\d)$/.exec(event.code)
   if (match === null) {
     return null
   }

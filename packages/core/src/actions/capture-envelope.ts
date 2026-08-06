@@ -28,7 +28,7 @@ function isHttpUrl(value: string): boolean {
 }
 
 /** Standard padded base64 (what `btoa`/`captureVisibleTab` produce). */
-const BASE64_RE = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
+const BASE64_RE = /^(?:[A-Z0-9+/]{4})*(?:[A-Z0-9+/]{2}==|[A-Z0-9+/]{3}=)?$/i
 
 /** One captured page, as spooled into the capture inbox. */
 export const captureEnvelopeSchema = z.object({
