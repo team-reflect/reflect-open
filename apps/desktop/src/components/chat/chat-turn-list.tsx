@@ -25,7 +25,17 @@ export function ChatTurnList(): ReactElement {
             <div className="mx-auto w-full max-w-2xl">
               <MessageScrollerContent className="gap-6 py-8">
                 {turns.map((turn) => (
-                  <MessageScrollerItem key={turn.id} messageId={turn.id} scrollAnchor>
+                  // The item's content-visibility paint containment clips at its
+                  // padding edge, cutting the copy button's focus ring where the
+                  // button sits flush with the turn's left/bottom edge. The
+                  // padding moves that clip edge outward; the negative margin
+                  // cancels it in layout, so the visual spacing is unchanged.
+                  <MessageScrollerItem
+                    key={turn.id}
+                    messageId={turn.id}
+                    scrollAnchor
+                    className="-m-1 p-1"
+                  >
                     <ChatTurn turn={turn} />
                   </MessageScrollerItem>
                 ))}
