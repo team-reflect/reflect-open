@@ -1,5 +1,3 @@
-# REVIEW: add __screenshots__ to .gitignore so that we don't get a lot of dgit diff
-# REVIEW: remove these two lines of comments
 # Logs
 logs
 *.log
@@ -9,6 +7,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+.eslintcache
 node_modules
 dist
 dist-ssr
@@ -44,4 +43,6 @@ dist-ssr
 
 # Vitest browser mode failure artifacts (screenshots, attachments)
 .vitest-attachments/
+.vitest-*/
+.vitest/
 __screenshots__/
