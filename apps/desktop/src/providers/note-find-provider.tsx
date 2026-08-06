@@ -1,7 +1,7 @@
 import {
   createContext,
   useCallback,
-  useContext,
+  use,
   useEffect,
   useMemo,
   useRef,
@@ -238,7 +238,7 @@ export function NoteFindProvider({ children }: { children: ReactNode }): ReactEl
 
 /** Access the current window's Find session. */
 export function useNoteFind(): NoteFindValue {
-  const value = useContext(NoteFindContext)
+  const value = use(NoteFindContext)
   if (value === null) {
     throw new Error('useNoteFind must be used within NoteFindProvider')
   }
@@ -247,7 +247,7 @@ export function useNoteFind(): NoteFindValue {
 
 /** Stable Find actions for shortcut plumbing that renders no Find UI. */
 export function useNoteFindActions(): NoteFindActions {
-  const value = useContext(NoteFindActionsContext)
+  const value = use(NoteFindActionsContext)
   if (value === null) {
     throw new Error('useNoteFindActions must be used within NoteFindProvider')
   }
@@ -256,11 +256,11 @@ export function useNoteFindActions(): NoteFindActions {
 
 /** The search query for one note, empty when it is not the Find target. */
 export function useNoteSearchQuery(path: string): string {
-  const target = useContext(NoteFindTargetContext)
+  const target = use(NoteFindTargetContext)
   return target?.path === path ? target.query : ''
 }
 
 /** Reports one note's search status to the window's Find session. */
 export function useNoteSearchReport(): (path: string, status: SearchStatus) => void {
-  return useContext(NoteFindReportContext)
+  return use(NoteFindReportContext)
 }

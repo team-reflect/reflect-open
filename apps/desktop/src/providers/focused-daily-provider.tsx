@@ -1,6 +1,6 @@
 import {
   createContext,
-  useContext,
+  use,
   useLayoutEffect,
   useState,
   type ReactElement,
@@ -47,12 +47,12 @@ export function FocusedDailyProvider({ children }: { children: ReactNode }): Rea
 
 /** The focused day, or `null` when nothing in the stream is focused. */
 export function useFocusedDailyDate(): string | null {
-  return useContext(FocusedDailyDateContext)
+  return use(FocusedDailyDateContext)
 }
 
 /** Record (or clear, with `null`) the focused day. No-op without a provider. */
 export function useSetFocusedDailyDate(): (date: string | null) => void {
-  return useContext(SetFocusedDailyDateContext)
+  return use(SetFocusedDailyDateContext)
 }
 
 /**

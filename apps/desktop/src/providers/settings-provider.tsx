@@ -1,7 +1,7 @@
 import {
   createContext,
   useCallback,
-  useContext,
+  use,
   useEffect,
   useMemo,
   useRef,
@@ -295,7 +295,7 @@ export function SettingsProvider({ children }: SettingsProviderProps): ReactElem
 
 /** Access the current settings and the updater. Use within a SettingsProvider. */
 export function useSettings(): SettingsContextValue {
-  const context = useContext(SettingsContext)
+  const context = use(SettingsContext)
   if (!context) {
     throw new Error('useSettings must be used within a SettingsProvider')
   }

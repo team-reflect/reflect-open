@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react'
+import { createContext, use } from 'react'
 import type { AiProviderConfig, ChatModelOption, ChatModelSelection, ChatTurn } from '@reflect/core'
 import type { ChatAttachment } from '@/lib/chat-attachments'
 
@@ -61,7 +61,7 @@ export const ChatContext = createContext<ChatContextValue | null>(null)
 
 /** Access the chat session. Use within a ChatProvider. */
 export function useChatSession(): ChatContextValue {
-  const context = useContext(ChatContext)
+  const context = use(ChatContext)
   if (!context) {
     throw new Error('useChatSession must be used within a ChatProvider')
   }

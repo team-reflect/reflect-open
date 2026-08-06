@@ -1,7 +1,7 @@
 import {
   createContext,
   useCallback,
-  useContext,
+  use,
   useMemo,
   useState,
   type ReactElement,
@@ -44,7 +44,7 @@ export function PaletteProvider({ children }: { children: ReactNode }): ReactEle
 }
 
 export function usePalette(): PaletteContextValue {
-  const context = useContext(PaletteContext)
+  const context = use(PaletteContext)
   if (!context) {
     throw new Error('usePalette must be used within a PaletteProvider')
   }

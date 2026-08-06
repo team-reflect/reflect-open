@@ -1,7 +1,7 @@
 import {
   createContext,
   useCallback,
-  useContext,
+  use,
   useEffect,
   useMemo,
   useRef,
@@ -565,7 +565,7 @@ export function GraphProvider({
 
 /** Access the active graph + open/choose actions. Use within a GraphProvider. */
 export function useGraph(): GraphContextValue {
-  const context = useContext(GraphContext)
+  const context = use(GraphContext)
   if (!context) {
     throw new Error('useGraph must be used within a GraphProvider')
   }

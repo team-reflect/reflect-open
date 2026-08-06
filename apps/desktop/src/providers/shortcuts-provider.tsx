@@ -1,7 +1,7 @@
 import {
   createContext,
   useCallback,
-  useContext,
+  use,
   useMemo,
   useState,
   type ReactElement,
@@ -41,7 +41,7 @@ export function ShortcutsProvider({ children }: { children: ReactNode }): ReactE
 }
 
 export function useShortcuts(): ShortcutsContextValue {
-  const context = useContext(ShortcutsContext)
+  const context = use(ShortcutsContext)
   if (!context) {
     throw new Error('useShortcuts must be used within a ShortcutsProvider')
   }

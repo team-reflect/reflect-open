@@ -1,7 +1,7 @@
 import {
   createContext,
   useCallback,
-  useContext,
+  use,
   useEffect,
   useMemo,
   useRef,
@@ -325,7 +325,7 @@ export function RouterProvider({
 
 /** Access the current route + navigation. Use within a RouterProvider. */
 export function useRouter(): RouterValue {
-  const context = useContext(RouterContext)
+  const context = use(RouterContext)
   if (!context) {
     throw new Error('useRouter must be used within a RouterProvider')
   }
@@ -338,7 +338,7 @@ export function useRouter(): RouterValue {
  * standalone component harnesses remain valid outside a full app router.
  */
 export function useNavigationRevision(): (() => number) | null {
-  return useContext(RouterContext)?.navigationRevision ?? null
+  return use(RouterContext)?.navigationRevision ?? null
 }
 
 interface RouterFreezeProps {
