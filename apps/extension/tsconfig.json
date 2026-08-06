@@ -1,35 +1,14 @@
 {
-  // The extension extends the WXT-generated config, so it can't also extend
-  // @ocavue/tsconfig like the other packages. The strictness block below must
-  // be kept in sync with that base by hand.
-  "extends": "./.wxt/tsconfig.json",
+  "extends": "@ocavue/tsconfig/dom/app.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "jsx": "react-jsx",
-    "skipLibCheck": true,
-    "isolatedModules": true,
-    "strict": true,
-    "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "verbatimModuleSyntax": true,
-    "noImplicitOverride": true,
     "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-
-    // `tsc -b` needs the project to be composite; emit declarations into a
-    // cache directory instead of the `noEmit` the WXT config sets.
-    "composite": true,
-    "noEmit": false,
-    "emitDeclarationOnly": true,
-    "sourceMap": true,
-    "declarationMap": true,
-    "outDir": "node_modules/.cache/tsconfig/out"
+    "exactOptionalPropertyTypes": true
   },
+  "include": ["src", "src/**/*.json", "./*.ts"],
   "references": [
     {
-      "path": "../../packages/core/tsconfig.json"
+"path": "../../packages/core/tsconfig.json"
     }
   ]
 }
