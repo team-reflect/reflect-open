@@ -22,6 +22,7 @@ export default defineESLintConfig(
     },
     /// keep-sorted
     rules: {
+      'unicorn/prefer-add-event-listener': 'off',
       '@eslint-react/dom-no-flush-sync': 'off',
       '@eslint-react/exhaustive-deps': 'off',
       '@eslint-react/naming-convention-ref-name': 'off',
