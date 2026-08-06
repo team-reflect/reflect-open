@@ -79,6 +79,10 @@ export default defineESLintConfig(
       'unicorn/no-computed-property-existence-check': 'off',
       'unicorn/prefer-then-catch': 'off',
       'unicorn/no-useless-undefined': 'off',
+      'unicorn/prefer-url-href': 'off',
+      'unicorn/no-unnecessary-splice': 'off',
+      'unicorn/class-reference-in-static-methods': 'off',
+      'unicorn/no-optional-chaining-on-undeclared-variable': 'off',
     },
   },
 )
