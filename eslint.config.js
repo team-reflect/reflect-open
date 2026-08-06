@@ -55,7 +55,6 @@ export default defineESLintConfig(
       'no-duplicate-imports': 'off',
       'no-var': 'off',
       'perfectionist/sort-imports': 'off',
-      'prefer-const': 'off',
       'react-hooks/exhaustive-deps': 'off',
       'react-hooks/globals': 'off',
       'regexp/no-super-linear-backtracking': 'off',

@@ -617,8 +617,7 @@ describe('createSyncEngine', () => {
         : defaultResponses(command),
     )
     const statuses: SyncStatus[] = []
-    let engine: ReturnType<typeof createSyncEngine>
-    engine = createSyncEngine({
+    const engine = createSyncEngine({
       generation: 1,
       getToken: async () => 'tok',
       onStatus: (status) => statuses.push(status),
