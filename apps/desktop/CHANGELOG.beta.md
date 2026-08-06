@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.1-beta.1](https://github.com/team-reflect/reflect-open/compare/v0.8.1-beta...v0.8.1-beta.1) (2026-08-06)
+
+
+### Bug Fixes
+
+* **mobile:** create and edit AI prompts in Settings ([#1035](https://github.com/team-reflect/reflect-open/issues/1035)) ([f273114](https://github.com/team-reflect/reflect-open/commit/f273114e2ae0660c0fe9f88079f076d2768434b8))
+* open any attachment file type from its pill ([#1040](https://github.com/team-reflect/reflect-open/issues/1040)) ([dcafc0c](https://github.com/team-reflect/reflect-open/commit/dcafc0cbbf57d3d22b4757d06c738b008dfab83b))
+* update meowdown to ^0.64.2 ([#1037](https://github.com/team-reflect/reflect-open/issues/1037)) ([6b0949c](https://github.com/team-reflect/reflect-open/commit/6b0949c1f0530e9d7dad69632d2f4bf0068495a4))
+* update meowdown to ^0.64.3 ([#1042](https://github.com/team-reflect/reflect-open/issues/1042)) ([91fd16e](https://github.com/team-reflect/reflect-open/commit/91fd16edd50e6150155095a54daea262d8c3cd8f))
+
 ## [0.8.1-beta](https://github.com/team-reflect/reflect-open/compare/v0.8.0...v0.8.1-beta) (2026-08-05)
 
 
