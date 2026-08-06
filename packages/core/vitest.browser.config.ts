@@ -9,7 +9,6 @@ export default defineProject({
     include: ['src/**/*.test.tsx'],
     sequence: { groupOrder: 100 },
     retry: process.env.CI ? 3 : 0,
-    slowTestThreshold: 10_000,
     browser: {
       enabled: true,
       provider: playwright(),

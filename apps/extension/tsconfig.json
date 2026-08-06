@@ -5,7 +5,7 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true
   },
-  "include": ["src", "src/**/*.json", "./*.ts"],
+  "include": ["lib", "./*.ts"],
   "references": [
     {
       "path": "../../packages/core/tsconfig.json"
