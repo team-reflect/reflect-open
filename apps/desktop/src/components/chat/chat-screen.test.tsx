@@ -285,6 +285,7 @@ describe('ChatScreen', () => {
 
     expect(getComputedStyle(copyFooter).opacity).toBe('0')
     expect(getComputedStyle(copyFooter).pointerEvents).toBe('none')
+    expect(getComputedStyle(copyButton.element()).pointerEvents).toBe('none')
     expect(getComputedStyle(copyButton.element()).width).toBe('20px')
     expect(copyFooter.parentElement?.classList.contains('group/assistant-response')).toBe(true)
     expect(copyFooter.classList.contains('group-hover/assistant-response:opacity-100')).toBe(true)
@@ -295,6 +296,7 @@ describe('ChatScreen', () => {
     await vi.waitFor(() => {
       expect(getComputedStyle(copyFooter).opacity).toBe('1')
       expect(getComputedStyle(copyFooter).pointerEvents).toBe('auto')
+      expect(getComputedStyle(copyButton.element()).pointerEvents).toBe('auto')
     })
     await copyButton.click()
 
