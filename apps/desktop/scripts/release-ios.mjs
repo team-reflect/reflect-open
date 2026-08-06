@@ -21,7 +21,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 const DEFAULT_EXPORT_METHOD = 'app-store-connect'
 const EXPORT_METHODS = new Set(['app-store-connect', 'release-testing', 'debugging', 'validation'])
 const IOS_BUNDLE_IDENTIFIER = 'app.reflect.ios'
-const OLD_CAPACITOR_BUNDLE_IDENTIFIER = 'app.reflect.ReflectMobile'
 const NON_EXEMPT_ENCRYPTION_KEY = 'ITSAppUsesNonExemptEncryption'
 const KEYCHAIN_SERVICE = 'reflect-notary'
 const SHARE_EXTENSION_APP_GROUP = 'group.app.reflect'
@@ -424,12 +423,8 @@ function readIpaInfoPlistRawValue(ipa, key) {
 function assertIpaBundleIdentifier(ipa) {
   const bundleIdentifier = readIpaInfoPlistRawValue(ipa, 'CFBundleIdentifier')
   if (bundleIdentifier !== IOS_BUNDLE_IDENTIFIER) {
-    const oldAppHint =
-      bundleIdentifier === OLD_CAPACITOR_BUNDLE_IDENTIFIER
-        ? ' This is the old Capacitor mobile app bundle id; refusing to upload over its TestFlight app.'
-        : ''
     fail(
-      `IPA bundle identifier is ${bundleIdentifier}, expected ${IOS_BUNDLE_IDENTIFIER}.${oldAppHint}\n` +
+      `IPA bundle identifier is ${bundleIdentifier}, expected ${IOS_BUNDLE_IDENTIFIER}.\n` +
         '  Check apps/desktop/src-tauri/tauri.ios.conf.json and ios.project.yml before uploading.',
     )
   }
@@ -693,8 +688,7 @@ function verifyAppStoreConnectAppRecord(credentials) {
   if (apps.length === 0) {
     fail(
       `no App Store Connect app record exists for ${IOS_BUNDLE_IDENTIFIER}.\n` +
-        `  Create a new App Store Connect app for ${IOS_BUNDLE_IDENTIFIER} before uploading.\n` +
-        `  Do not reuse the old Capacitor app (${OLD_CAPACITOR_BUNDLE_IDENTIFIER}).`,
+        `  Create a new App Store Connect app for ${IOS_BUNDLE_IDENTIFIER} before uploading.`,
     )
   }
   if (apps.length > 1)
