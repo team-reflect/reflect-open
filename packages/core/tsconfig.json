@@ -1,4 +1,17 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "include": ["src"]
+  "extends": "@ocavue/tsconfig/dom/app.json",
+  "compilerOptions": {
+    "noUnusedParameters": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true
+  },
+  "include": ["src", "src/**/*.json", "./*.ts"],
+  "references": [
+    {
+      "path": "../db/tsconfig.json"
+    },
+    {
+      "path": "../utils/tsconfig.json"
+    }
+  ]
 }

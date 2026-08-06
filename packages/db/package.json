@@ -8,7 +8,6 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:codegen": "node scripts/generate-schema.mjs"
   },
@@ -16,6 +15,7 @@
     "kysely": "^0.28.17"
   },
   "devDependencies": {
+    "@ocavue/tsconfig": "^0.7.1",
     "@types/better-sqlite3": "^7.6.13",
     "better-sqlite3": "^12.11.1",
     "kysely-codegen": "^0.20.0",

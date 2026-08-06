@@ -1,6 +1,6 @@
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'wxt'
-import { SAVE_CURRENT_PAGE_COMMAND } from './lib/commands'
+import { SAVE_CURRENT_PAGE_COMMAND } from './lib/commands.ts'
 
 /**
  * Pins the extension ID (`dlbliojklpickgimjdmjjdnbjdiomjik`) for **unpacked**

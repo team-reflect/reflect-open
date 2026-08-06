@@ -1,4 +1,4 @@
-import { tool, type TypedToolCall, type TypedToolResult } from 'ai'
+import { tool, type Tool, type TypedToolCall, type TypedToolResult } from 'ai'
 import { z } from 'zod'
 import { readNote } from '../../graph/commands'
 import { retrieve, type RetrievalHit, type RetrieveOptions } from '../../embeddings/retrieve'
@@ -88,7 +88,7 @@ export interface ListDailyNotesOutput {
   truncated: boolean
 }
 
-const searchNotesInput = z.object({
+export const searchNotesInput = z.object({
   query: z.string().min(1).describe('Full-text search query over the note graph'),
   limit: z
     .number()
@@ -99,7 +99,7 @@ const searchNotesInput = z.object({
     .describe(`How many notes to return (default ${DEFAULT_SEARCH_LIMIT})`),
 })
 
-const listRecentNotesInput = z.object({
+export const listRecentNotesInput = z.object({
   limit: z
     .number()
     .int()
@@ -118,7 +118,7 @@ const listRecentNotesInput = z.object({
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'an ISO date, YYYY-MM-DD')
 
-const listDailyNotesInput = z.object({
+export const listDailyNotesInput = z.object({
   start: isoDate.describe('First day of the range, inclusive (YYYY-MM-DD)'),
   end: isoDate.describe('Last day of the range, inclusive (YYYY-MM-DD)'),
 })
@@ -142,7 +142,7 @@ function listingCandidate(
  * production callers omit them and the tools run over the shared retrieval
  * layer and the live filesystem.
  */
-export function buildNoteTools(options: BuildNoteToolsOptions = {}) {
+export function buildNoteTools(options: BuildNoteToolsOptions = {}): NoteTools {
   const retrieveFn = options.retrieveFn ?? retrieve
   const readNoteFn = options.readNoteFn ?? readNote
   const listRecentNotesFn = options.listRecentNotesFn ?? listRecentNotes
@@ -261,8 +261,18 @@ function searchNotesDescription(semanticSearchEnabled: boolean): string {
   return `Search the user’s notes with lexical full-text search over titles and note bodies. ${suffix}`
 }
 
-/** The tool set type, for typed stream parts in the chat engine. */
-export type NoteTools = ReturnType<typeof buildNoteTools>
+/**
+ * The tool set type, for typed stream parts in the chat engine. Written out
+ * (rather than inferred from {@link buildNoteTools}) so the declaration the
+ * composite build emits only names types this package can import.
+ */
+export type NoteTools = {
+  search_notes: Tool<z.infer<typeof searchNotesInput>, SearchNotesOutput>
+  list_recent_notes: Tool<z.infer<typeof listRecentNotesInput>, ListRecentNotesOutput>
+  list_daily_notes: Tool<z.infer<typeof listDailyNotesInput>, ListDailyNotesOutput>
+  read_notes: Tool<z.infer<typeof readNotesInput>, ReadNotesOutput>
+  read_assets: Tool<z.infer<typeof readAssetsInput>, ReadAssetsOutput>
+}
 
 /** The hit slice tool-activity UI renders (full hits stay engine-side). */
 export type NoteHitSummary = Pick<CloudSearchHit, 'path' | 'title'>

@@ -7,7 +7,7 @@
     "dev": "wxt",
     "build": "wxt build",
     "zip": "WXT_STORE_BUILD=true wxt zip",
-    "typecheck": "wxt prepare && tsc --noEmit",
+    "typecheck": "wxt prepare && tsc -b",
     "test": "vitest run",
     "postinstall": "wxt prepare"
   },

@@ -26,8 +26,9 @@ export default defineDesktopProject({
         contextOptions: {
           reducedMotion: 'reduce',
           hasTouch: true,
-          permissions:
-            browserName === 'chromium' ? ['clipboard-read', 'clipboard-write'] : undefined,
+          ...(browserName === 'chromium'
+            ? { permissions: ['clipboard-read', 'clipboard-write'] }
+            : {}),
         },
       }),
       headless: !process.env.DEBUG,

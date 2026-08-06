@@ -1,7 +1,9 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "@ocavue/tsconfig/es/app.json",
   "compilerOptions": {
-    "lib": ["ES2022"]
+    "noUnusedParameters": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true
   },
   "include": ["src"]
 }
