@@ -12,6 +12,8 @@ allowBuilds:
 
 dedupePeers: true
 
+strictPeerDependencies: true
+
 ignoreWorkspaceRootCheck: true
 
 minimumReleaseAgeExclude:
