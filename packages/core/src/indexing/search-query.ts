@@ -40,20 +40,20 @@ export function buildFtsMatch(query: string): string | null {
  * (`apps/cli/src/keys.rs`); the two must move together.
  */
 const UNSEGMENTED_SCRIPT_RANGES: ReadonlyArray<readonly [number, number]> = [
-  [0x0E00, 0x0EFF], // Thai, Lao
-  [0x1000, 0x109F], // Myanmar
-  [0x1100, 0x11FF], // Hangul Jamo
-  [0x1780, 0x17FF], // Khmer
+  [0x0e00, 0x0eff], // Thai, Lao
+  [0x1000, 0x109f], // Myanmar
+  [0x1100, 0x11ff], // Hangul Jamo
+  [0x1780, 0x17ff], // Khmer
   [0x3005, 0x3007], // Japanese iteration marks (々〆〇)
-  [0x3040, 0x30FF], // Hiragana, Katakana
-  [0x3130, 0x318F], // Hangul Compatibility Jamo
-  [0x31F0, 0x31FF], // Katakana Phonetic Extensions
-  [0x3400, 0x4DBF], // CJK Extension A
-  [0x4E00, 0x9FFF], // CJK Unified Ideographs
-  [0xAC00, 0xD7AF], // Hangul Syllables
-  [0xF900, 0xFAFF], // CJK Compatibility Ideographs
-  [0xFF66, 0xFF9F], // Halfwidth Katakana
-  [0x20000, 0x2FA1F], // CJK Extensions B–F, Compatibility Supplement
+  [0x3040, 0x30ff], // Hiragana, Katakana
+  [0x3130, 0x318f], // Hangul Compatibility Jamo
+  [0x31f0, 0x31ff], // Katakana Phonetic Extensions
+  [0x3400, 0x4dbf], // CJK Extension A
+  [0x4e00, 0x9fff], // CJK Unified Ideographs
+  [0xac00, 0xd7af], // Hangul Syllables
+  [0xf900, 0xfaff], // CJK Compatibility Ideographs
+  [0xff66, 0xff9f], // Halfwidth Katakana
+  [0x20000, 0x2fa1f], // CJK Extensions B–F, Compatibility Supplement
 ]
 
 /** True when `value` contains a character from an unsegmented script. */

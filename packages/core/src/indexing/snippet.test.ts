@@ -5,13 +5,13 @@ import { lineAt, lineSnippet, previewSnippet } from './snippet'
 function hasLoneSurrogate(text: string): boolean {
   for (let index = 0; index < text.length; index++) {
     const code = text.charCodeAt(index)
-    if (code >= 0xD800 && code <= 0xDBFF) {
+    if (code >= 0xd800 && code <= 0xdbff) {
       const next = text.charCodeAt(index + 1)
-      if (!(next >= 0xDC00 && next <= 0xDFFF)) {
+      if (!(next >= 0xdc00 && next <= 0xdfff)) {
         return true
       }
       index++
-    } else if (code >= 0xDC00 && code <= 0xDFFF) {
+    } else if (code >= 0xdc00 && code <= 0xdfff) {
       return true
     }
   }

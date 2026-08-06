@@ -21,7 +21,7 @@ const PREVIEW_MAX_LENGTH = 120
 function sliceWithoutSplittingSurrogate(text: string, maxLength: number): string {
   const end = Math.min(maxLength, text.length)
   const lastCode = text.charCodeAt(end - 1)
-  const isLoneHighSurrogate = lastCode >= 0xD800 && lastCode <= 0xDBFF
+  const isLoneHighSurrogate = lastCode >= 0xd800 && lastCode <= 0xdbff
   return text.slice(0, isLoneHighSurrogate ? end - 1 : end)
 }
 
