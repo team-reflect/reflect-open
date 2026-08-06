@@ -29,8 +29,6 @@ mod graph_gitignore;
 mod icloud;
 mod link_preview;
 mod menu;
-#[cfg(any(target_os = "ios", test))]
-mod native_diagnostics;
 mod quit;
 mod recents;
 mod secrets;
@@ -238,11 +236,6 @@ pub fn run() {
     // no window-state plugin, so show it here or the UI would never appear.
     #[cfg(mobile)]
     let builder = builder.setup(|app| {
-        // Before anything else can crash: this is the only reporter that sees
-        // native failures (Rust panics, Swift crashes, main-thread hangs,
-        // watchdog kills), which reach TestFlight with no usable stack.
-        #[cfg(target_os = "ios")]
-        native_diagnostics::start(&app.package_info().version.to_string());
         if let Some(window) = app.get_webview_window(windows::MAIN_WINDOW_LABEL) {
             window.show()?;
         }
@@ -300,6 +293,7 @@ pub fn run() {
             fs::transcript_cache_read,
             fs::transcript_cache_write,
             fs::asset_open,
+            fs::asset_reveal,
             fs::assets::asset_upload_begin,
             fs::assets::asset_upload_append,
             fs::assets::asset_upload_commit,

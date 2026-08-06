@@ -13,7 +13,7 @@ import {
   createTauriIosBuildArgs,
   findIpaAppexPaths,
   findIpaInfoPlistPath,
-  inspectNativeSentryConfiguration,
+  inspectSentryUploadConfiguration,
   isFalsePlistValue,
   isProductionSentryDsn,
   normalizeApiKeyContent,
@@ -129,7 +129,7 @@ test('native dSYMs upload without source bundles', () => {
   ])
 })
 
-test('only the production Reflect Sentry project enables native symbol upload', () => {
+test('the auth token enables uploads and a foreign DSN fails the release', () => {
   const dsn =
     'https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/4511705649971200'
   expect(isProductionSentryDsn(dsn)).toBe(true)
@@ -137,20 +137,15 @@ test('only the production Reflect Sentry project enables native symbol upload', 
   expect(isProductionSentryDsn(undefined)).toBe(false)
 
   expect(
-    inspectNativeSentryConfiguration({ SENTRY_AUTH_TOKEN: 'token', VITE_SENTRY_DSN: dsn }),
+    inspectSentryUploadConfiguration({ SENTRY_AUTH_TOKEN: 'token', VITE_SENTRY_DSN: dsn }),
   ).toEqual({ enabled: true, error: null })
-  expect(inspectNativeSentryConfiguration({})).toEqual({ enabled: false, error: null })
-})
-
-test('partial or foreign native Sentry configuration fails the release instead of shipping blind', () => {
-  const dsn =
-    'https://0123456789abcdef0123456789abcdef@o463484.ingest.us.sentry.io/4511705649971200'
-  expect(inspectNativeSentryConfiguration({ SENTRY_AUTH_TOKEN: 'token' }).error).toMatch(
-    /incomplete/,
-  )
-  expect(inspectNativeSentryConfiguration({ VITE_SENTRY_DSN: dsn }).error).toMatch(/incomplete/)
+  expect(inspectSentryUploadConfiguration({ SENTRY_AUTH_TOKEN: 'token' })).toEqual({
+    enabled: true,
+    error: null,
+  })
+  expect(inspectSentryUploadConfiguration({})).toEqual({ enabled: false, error: null })
   expect(
-    inspectNativeSentryConfiguration({
+    inspectSentryUploadConfiguration({
       SENTRY_AUTH_TOKEN: 'token',
       VITE_SENTRY_DSN: 'https://public@example.test/1',
     }).error,

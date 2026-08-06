@@ -36,7 +36,7 @@ export function pickFiles({ accept, multiple = false }: PickFilesOptions = {}): 
       resolve(files)
     }
     input.addEventListener('change', () => settle([...(input.files ?? [])]), { once: true })
-    // `cancel` is WebKit 16.4+ and the app's deployment target is iOS 14, so
+    // `cancel` is WebKit 16.4+ and the app's deployment target is iOS 15, so
     // on older webviews a dismissal leaves the input attached until the next
     // pick collects it. Cleanup, never correctness.
     input.addEventListener('cancel', () => settle([]), { once: true })

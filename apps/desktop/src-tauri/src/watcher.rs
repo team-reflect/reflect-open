@@ -384,7 +384,7 @@ mod tests {
             Some("templates/journal.md")
         );
         assert_eq!(
-            tracked_relpath(Path::new("/g/templates/journal.txt"), root),
+            tracked_relpath(Path::new("/g/templates/journal.markdown"), root),
             None
         );
         // Adopted vaults keep markdown anywhere visible: root and nested
@@ -435,13 +435,13 @@ mod tests {
             tracked_relpath(Path::new("/g/.reflect/inbox-rejected/bad.json"), root),
             None
         );
-        // Not tracked: the index, non-markdown, dotfiles, outside root, or the
-        // audio-memos directory entry itself.
+        // Not tracked: the index, unsupported extensions, dotfiles, outside
+        // root, or the audio-memos directory entry itself.
         assert_eq!(
             tracked_relpath(Path::new("/g/.reflect/index.sqlite"), root),
             None
         );
-        assert_eq!(tracked_relpath(Path::new("/g/notes/x.txt"), root), None);
+        assert_eq!(tracked_relpath(Path::new("/g/notes/x.xyz"), root), None);
         assert_eq!(tracked_relpath(Path::new("/g/audio-memos"), root), None);
         assert_eq!(tracked_relpath(Path::new("/other/notes/a.md"), root), None);
     }
@@ -449,7 +449,12 @@ mod tests {
     #[test]
     fn tracks_supported_attachments_but_never_description_files() {
         let root = Path::new("/g");
-        for rel in ["assets/diagram.png", "Media/PHOTO.JPEG", "Docs/ref.pdf"] {
+        for rel in [
+            "assets/diagram.png",
+            "assets/data.txt",
+            "Media/PHOTO.JPEG",
+            "Docs/ref.pdf",
+        ] {
             let path = format!("/g/{rel}");
             assert_eq!(
                 tracked_relpath(Path::new(&path), root).as_deref(),
@@ -463,7 +468,7 @@ mod tests {
             tracked_relpath(Path::new("/g/assets/diagram.png.reflect.md"), root),
             None
         );
-        assert_eq!(tracked_relpath(Path::new("/g/assets/data.txt"), root), None);
+        assert_eq!(tracked_relpath(Path::new("/g/assets/data.xyz"), root), None);
         assert_eq!(tracked_relpath(Path::new("/g/assets/notes.md"), root), None);
         assert_eq!(tracked_relpath(Path::new("/g/assets/noext"), root), None);
     }
@@ -599,7 +604,7 @@ mod tests {
         );
         // The logical file must still pass the tracking rules.
         assert_eq!(
-            tracked_relpath(Path::new("/g/notes/.a.txt.icloud"), root),
+            tracked_relpath(Path::new("/g/notes/.a.xyz.icloud"), root),
             None
         );
     }

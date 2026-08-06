@@ -194,6 +194,8 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          targets: aarch64-apple-ios
 
       - name: Cache cargo build
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
@@ -205,3 +207,9 @@ jobs:
 
       - name: Check desktop library
         run: cargo check -p reflect-open --lib
+
+      # The TestFlight workflow is the only full iOS build and it never runs on
+      # pull requests, so type-check the iOS target here with the same feature
+      # set `tauri ios` builds with.
+      - name: Check iOS library
+        run: cargo check -p reflect-open --lib --target aarch64-apple-ios --no-default-features

@@ -15,7 +15,9 @@ edition = "2021"
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
 name = "reflect_open_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# `staticlib` links into the iOS app as `libapp.a`; `rlib` serves the desktop
+# binary. There is no Android target, so no `cdylib`.
+crate-type = ["staticlib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2.6.3", features = [] }
