@@ -7,8 +7,7 @@ import pkg from './package.json'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 
-// @ts-expect-error process is a Node.js global available in the Vite config context
-const host = process.env.TAURI_DEV_HOST
+const host: string | undefined = process.env.TAURI_DEV_HOST
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
