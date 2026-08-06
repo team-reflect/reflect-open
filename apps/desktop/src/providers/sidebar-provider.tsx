@@ -32,7 +32,7 @@ export function SidebarProvider({ children }: { children: ReactNode }): ReactEle
     () => ({ collapsed, toggleSidebar }),
     [collapsed, toggleSidebar],
   )
-  return <SidebarContext.Provider value={value}>{children}</SidebarContext.Provider>
+  return <SidebarContext value={value}>{children}</SidebarContext>
 }
 
 /** Access side-panel visibility + the toggle. Use within a SidebarProvider. */

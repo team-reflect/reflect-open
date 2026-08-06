@@ -226,13 +226,13 @@ export function NoteFindProvider({ children }: { children: ReactNode }): ReactEl
   )
 
   return (
-    <NoteFindActionsContext.Provider value={actions}>
-      <NoteFindReportContext.Provider value={report}>
-        <NoteFindTargetContext.Provider value={findTarget}>
-          <NoteFindContext.Provider value={value}>{children}</NoteFindContext.Provider>
-        </NoteFindTargetContext.Provider>
-      </NoteFindReportContext.Provider>
-    </NoteFindActionsContext.Provider>
+    <NoteFindActionsContext value={actions}>
+      <NoteFindReportContext value={report}>
+        <NoteFindTargetContext value={findTarget}>
+          <NoteFindContext value={value}>{children}</NoteFindContext>
+        </NoteFindTargetContext>
+      </NoteFindReportContext>
+    </NoteFindActionsContext>
   )
 }
 

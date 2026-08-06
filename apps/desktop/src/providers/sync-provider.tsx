@@ -112,7 +112,7 @@ export function SyncProvider({ graph, children }: SyncProviderProps): ReactEleme
     }
   }, [controller, backup])
 
-  return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>
+  return <SyncContext value={value}>{children}</SyncContext>
 }
 
 /** Backup state + actions; must be used under a {@link SyncProvider}. */

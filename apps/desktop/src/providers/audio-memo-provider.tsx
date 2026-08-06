@@ -325,7 +325,7 @@ export function AudioMemoProvider({ graph, children }: AudioMemoProviderProps): 
     ],
   )
 
-  return <AudioMemoContext.Provider value={value}>{children}</AudioMemoContext.Provider>
+  return <AudioMemoContext value={value}>{children}</AudioMemoContext>
 }
 
 /** Access the audio-memo surface. Use within an AudioMemoProvider. */

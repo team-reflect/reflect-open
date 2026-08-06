@@ -320,7 +320,7 @@ export function RouterProvider({
     savedScroll,
   ])
 
-  return <RouterContext.Provider value={value}>{children}</RouterContext.Provider>
+  return <RouterContext value={value}>{children}</RouterContext>
 }
 
 /** Access the current route + navigation. Use within a RouterProvider. */
@@ -365,7 +365,5 @@ export function RouterFreeze({ frozen, children }: RouterFreezeProps): ReactElem
   if (!frozen && captured !== live) {
     setCaptured(live)
   }
-  return (
-    <RouterContext.Provider value={frozen ? captured : live}>{children}</RouterContext.Provider>
-  )
+  return <RouterContext value={frozen ? captured : live}>{children}</RouterContext>
 }

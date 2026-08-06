@@ -40,7 +40,7 @@ export function PaletteProvider({ children }: { children: ReactNode }): ReactEle
     () => ({ open, query, openPalette, setQuery, closePalette }),
     [open, query, openPalette, closePalette],
   )
-  return <PaletteContext.Provider value={value}>{children}</PaletteContext.Provider>
+  return <PaletteContext value={value}>{children}</PaletteContext>
 }
 
 export function usePalette(): PaletteContextValue {

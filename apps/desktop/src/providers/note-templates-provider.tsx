@@ -63,7 +63,7 @@ export function NoteTemplatesProvider({ children }: { children: ReactNode }): Re
       closeTemplateCreate,
     ],
   )
-  return <NoteTemplatesContext.Provider value={value}>{children}</NoteTemplatesContext.Provider>
+  return <NoteTemplatesContext value={value}>{children}</NoteTemplatesContext>
 }
 
 export function useNoteTemplates(): NoteTemplatesContextValue {

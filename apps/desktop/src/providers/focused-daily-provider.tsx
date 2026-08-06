@@ -39,11 +39,9 @@ const SetFocusedDailyDateContext = createContext<(date: string | null) => void>(
 export function FocusedDailyProvider({ children }: { children: ReactNode }): ReactElement {
   const [focusedDate, setFocusedDate] = useState<string | null>(null)
   return (
-    <SetFocusedDailyDateContext.Provider value={setFocusedDate}>
-      <FocusedDailyDateContext.Provider value={focusedDate}>
-        {children}
-      </FocusedDailyDateContext.Provider>
-    </SetFocusedDailyDateContext.Provider>
+    <SetFocusedDailyDateContext value={setFocusedDate}>
+      <FocusedDailyDateContext value={focusedDate}>{children}</FocusedDailyDateContext>
+    </SetFocusedDailyDateContext>
   )
 }
 

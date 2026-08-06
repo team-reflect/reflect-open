@@ -290,7 +290,7 @@ export function SettingsProvider({ children }: SettingsProviderProps): ReactElem
     [settings, updateSettings, updateSettingsWith, whenSettingsLoaded],
   )
 
-  return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>
+  return <SettingsContext value={value}>{children}</SettingsContext>
 }
 
 /** Access the current settings and the updater. Use within a SettingsProvider. */

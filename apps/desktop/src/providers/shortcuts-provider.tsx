@@ -37,7 +37,7 @@ export function ShortcutsProvider({ children }: { children: ReactNode }): ReactE
     () => ({ open, openShortcuts, closeShortcuts }),
     [open, openShortcuts, closeShortcuts],
   )
-  return <ShortcutsContext.Provider value={value}>{children}</ShortcutsContext.Provider>
+  return <ShortcutsContext value={value}>{children}</ShortcutsContext>
 }
 
 export function useShortcuts(): ShortcutsContextValue {

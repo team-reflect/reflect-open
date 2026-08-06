@@ -560,7 +560,7 @@ export function GraphProvider({
     ],
   )
 
-  return <GraphContext.Provider value={value}>{children}</GraphContext.Provider>
+  return <GraphContext value={value}>{children}</GraphContext>
 }
 
 /** Access the active graph + open/choose actions. Use within a GraphProvider. */

@@ -454,5 +454,5 @@ export function ChatProvider({ graph, children }: ChatProviderProps): ReactEleme
       deleteConversation,
     ],
   )
-  return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>
+  return <ChatContext value={value}>{children}</ChatContext>
 }

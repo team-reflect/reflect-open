@@ -152,10 +152,10 @@ export function V1ImportProvider({ graph, children }: V1ImportProviderProps): Re
   )
 
   return (
-    <V1ImportContext.Provider value={value}>
+    <V1ImportContext value={value}>
       {children}
       <V1ImportDialog state={state} onCancel={cancelImport} onDismiss={dismiss} />
-    </V1ImportContext.Provider>
+    </V1ImportContext>
   )
 }
 

@@ -310,7 +310,7 @@ export function MobileAudioMemoProvider({
     ],
   )
 
-  return <MobileAudioMemoContext.Provider value={value}>{children}</MobileAudioMemoContext.Provider>
+  return <MobileAudioMemoContext value={value}>{children}</MobileAudioMemoContext>
 }
 
 /** Access the mobile audio-memo surface. Use within MobileAudioMemoProvider. */
