@@ -234,7 +234,7 @@ export function mergeDateSuggestions(
       foldKey(suggestion.title) === options.key ||
       (suggestion.alias !== null && foldKey(suggestion.alias) === options.key),
   )
-  const exact = exactIndex >= 0 ? rest[exactIndex] : undefined
+  const exact = rest[exactIndex]
   const ordered = exact
     ? [exact, ...dateRows, ...rest.filter((_, index) => index !== exactIndex)]
     : [...dateRows, ...rest]

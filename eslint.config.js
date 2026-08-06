@@ -63,7 +63,6 @@ export default defineESLintConfig(
       'unicorn/no-optional-chaining-on-undeclared-variable': 'off',
       'unicorn/no-return-array-push': 'off',
       'unicorn/no-unnecessary-splice': 'off',
-      'unicorn/no-useless-undefined': 'off',
       'unicorn/number-literal-case': 'off',
       'unicorn/prefer-add-event-listener': 'off',
       'unicorn/prefer-array-from-map': 'off',
