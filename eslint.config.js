@@ -26,7 +26,6 @@ export default defineESLintConfig(
       '@eslint-react/exhaustive-deps': 'off',
       '@eslint-react/naming-convention-ref-name': 'off',
       '@eslint-react/no-context-provider': 'off',
-      '@eslint-react/no-unnecessary-use-prefix': 'off',
       '@eslint-react/no-use-context': 'off',
       '@eslint-react/purity': 'off',
       '@eslint-react/set-state-in-effect': 'off',

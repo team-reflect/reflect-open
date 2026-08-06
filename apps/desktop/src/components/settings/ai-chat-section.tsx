@@ -28,7 +28,7 @@ export function AiChatSection(): ReactElement {
     updateSettings({ chatSystemPrompt: normalized })
   }
 
-  const useDefault = () => {
+  const resetToDefault = () => {
     draftRef.current = ''
     dirtyRef.current = false
     setDraft('')
@@ -80,7 +80,7 @@ export function AiChatSection(): ReactElement {
             variant="ghost"
             size="sm"
             disabled={normalizeChatSystemPrompt(currentDraft) === ''}
-            onClick={useDefault}
+            onClick={resetToDefault}
           >
             Use default
           </Button>
