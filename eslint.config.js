@@ -50,7 +50,6 @@ export default defineESLintConfig(
       '@typescript-eslint/return-await': 'off',
       '@typescript-eslint/unbound-method': 'off',
       'antfu/top-level-function': 'off',
-      'jsdoc/check-param-names': 'off',
       'jsdoc/multiline-blocks': 'off',
       'jsdoc/no-multi-asterisks': 'off',
       'no-duplicate-imports': 'off',

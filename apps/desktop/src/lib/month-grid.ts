@@ -80,6 +80,7 @@ export function weekdayLabels(weekStartsOn: 0 | 1 = 1): string[] {
 
 /**
  * Build the full-week grid for a `YYYY-MM` month.
+ * @param month - The month to build, as `YYYY-MM`.
  * @param weekStartsOn - 1 for Monday (default, ISO 8601); 0 for Sunday.
  */
 export function buildMonthGrid(month: string, weekStartsOn: 0 | 1 = 1): MonthGrid {
