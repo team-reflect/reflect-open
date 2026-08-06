@@ -34,7 +34,7 @@ const EMAIL_PATTERN = /[^\s@<>(),;:[\]]+@[^\s@<>(),;:[\]]+\.[^\s@<>(),;:[\]]+/g
  */
 export function canonicalEmail(email: string): string {
   const trimmed = email.trim()
-  const wrapped = trimmed.match(/^[^<>]*<\s*([^<>]+)\s*>$/)
+  const wrapped = trimmed.match(/^[^<>]*<\s*([^<>]+)>$/)
   const address = (wrapped?.[1] ?? trimmed).replace(/^mailto:/i, '').trim()
   return address.toLowerCase()
 }
