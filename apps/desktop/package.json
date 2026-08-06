@@ -1,8 +1,8 @@
 {
   "name": "@reflect/desktop",
-  "type": "module",
   "version": "0.8.1-beta.3",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

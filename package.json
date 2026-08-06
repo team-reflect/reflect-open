@@ -1,9 +1,8 @@
 {
   "name": "@reflect/monorepo",
-  "type": "module",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@11.18.0",
+  "type": "module",
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
@@ -41,10 +40,11 @@
     "typescript": "~6.0.3",
     "vitest": "^4.1.10"
   },
+  "simple-git-hooks": {
+    "pre-commit": "./node_modules/.bin/nano-staged --allow-empty -u"
+  },
   "nano-staged": {
     "*": "oxfmt --no-error-on-unmatched-pattern"
   },
-  "simple-git-hooks": {
-    "pre-commit": "./node_modules/.bin/nano-staged --allow-empty -u"
-  }
+  "packageManager": "pnpm@11.18.0"
 }
