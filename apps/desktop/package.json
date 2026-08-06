@@ -71,7 +71,7 @@
     "@vitejs/plugin-react": "^6.0.5",
     "@vitest/browser-playwright": "^4.1.10",
     "babel-plugin-react-compiler": "^1.0.0",
-    "eslint": "^10.5.0",
+    "eslint": "^10.7.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "playwright": "^1.61.1",
     "shadcn": "^4.16.0",
