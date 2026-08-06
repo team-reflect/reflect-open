@@ -11,7 +11,7 @@ import { useGraph } from '@/providers/graph-provider'
 /** Which control kicked off the in-flight choice, so only that one shows the
  * spinner/pending label (every button still disables). Container graph roots
  * are absolute paths, so the fixed tags can never collide with one. */
-type PendingChoice = string | 'icloud-create' | 'local' | null
+type PendingChoice = string | null
 
 /**
  * The mobile first-run screen (Plans 19/21) — shown until the user picks

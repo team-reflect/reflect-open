@@ -183,7 +183,7 @@ function CardHeader({
 /** What the iCloud card is busy doing: opening one listed graph (its root) or
  * creating a new one — so only the pressed control shows the spinner. Roots
  * are absolute paths, so `'create'` can never collide with one. */
-type IcloudBusy = string | 'create' | null
+type IcloudBusy = string | null
 
 /**
  * The recommended path. Lists every graph already in the container (a user
