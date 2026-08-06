@@ -314,7 +314,7 @@ function installOpenBridge({
 }: {
   openFails: boolean
   revealFails?: boolean
-}): ReturnType<typeof vi.fn> {
+}): ReturnType<typeof vi.fn<(command: string) => Promise<null>>> {
   const invoke = vi.fn(async (command: string) => {
     if (command === 'asset_open' && openFails) {
       throw { kind: 'traversal', message: 'not a supported attachment path: assets/tool.xyz' }
