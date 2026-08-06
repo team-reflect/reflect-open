@@ -15,7 +15,7 @@
     "fix": "pnpm run fix:oxfmt && pnpm run fix:oxlint && pnpm run fix:eslint",
     "fix:oxfmt": "oxfmt",
     "fix:oxlint": "oxlint --fix apps packages",
-    "fix:eslint": "eslint --cache --max-warnings 0 --fix",
+    "fix:eslint": "eslint --cache --max-warnings 0 --fix --prune-suppressions",
     "check": "pnpm typecheck && pnpm lint",
     "tauri": "pnpm --filter @reflect/desktop tauri",
     "release:ios": "pnpm --filter @reflect/desktop release:ios",
