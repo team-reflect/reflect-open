@@ -1,12 +1,13 @@
 import { render } from 'vitest-browser-react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetOperations, startOperation } from '@/lib/operations'
+import type { MockToastOptions } from '@/test-utils/sonner'
 import { OperationsStatus } from './operations-status'
 
 const toast = vi.hoisted(() => ({
   dismiss: vi.fn(),
   error: vi.fn(),
-  message: vi.fn(),
+  message: vi.fn<(message: string, data?: MockToastOptions) => string | number>(),
   warning: vi.fn(),
 }))
 
