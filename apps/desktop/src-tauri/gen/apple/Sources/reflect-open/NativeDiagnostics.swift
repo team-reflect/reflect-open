@@ -12,7 +12,16 @@ import Sentry
 /// file paths, source context, PII — is disabled or scrubbed here; see
 /// `docs/privacy.md`.
 private enum NativeDiagnostics {
-  private static var started = false
+  /// The production Reflect project. Sentry DSNs authorize event submission
+  /// only and are safe to embed in the binary; leaving this empty (as forks
+  /// do) disables the reporter entirely.
+  /// https://docs.sentry.io/concepts/key-terms/dsn-explainer/
+  private static let dsn = ""
+
+  /// Forks build under their own bundle identifier and stay silent even if
+  /// they carry a DSN.
+  private static let officialBundleIdentifier = "app.reflect.ios"
+
   private static let redacted = "[redacted]"
 
   /// Device/OS/app context fields that cannot describe a user's notes.
@@ -52,24 +61,22 @@ private enum NativeDiagnostics {
     ],
   ]
 
-  static func start(dsn: String, version: String) {
-    guard Thread.isMainThread else {
-      DispatchQueue.main.async {
-        start(dsn: dsn, version: version)
-      }
+  static func start() {
+    guard !dsn.isEmpty, Bundle.main.bundleIdentifier == officialBundleIdentifier else {
       return
     }
-    guard !started else {
-      return
-    }
-    started = true
 
-    let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String
+    let info = Bundle.main.infoDictionary
+    let version = info?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+    let build = info?["CFBundleVersion"] as? String
 
     SentrySDK.start { options in
       options.dsn = dsn
       // Matches the release name the webview SDK reports, so native and
-      // JavaScript events for one build group together.
+      // JavaScript events for one build group together. Tauri strips
+      // prerelease tags when it writes CFBundleShortVersionString, so beta
+      // builds report `reflect@x.y.z` while the webview reports the full
+      // package version.
       options.releaseName = "reflect@\(version)"
       options.dist = build
       options.environment = "production"
@@ -196,17 +203,11 @@ private enum NativeDiagnostics {
   }
 }
 
-/// Called once from Rust during Tauri's mobile setup; see `native_diagnostics.rs`.
+/// Called once from `main.mm` before Tauri boots, so crashes during Tauri
+/// initialization are already covered.
 @_cdecl("reflect_start_native_diagnostics")
-public func reflectStartNativeDiagnostics(
-  _ dsnPointer: UnsafePointer<CChar>?,
-  _ versionPointer: UnsafePointer<CChar>?
-) {
-  guard let dsnPointer, let versionPointer else {
-    return
-  }
-  NativeDiagnostics.start(
-    dsn: String(cString: dsnPointer),
-    version: String(cString: versionPointer)
-  )
+public func reflectStartNativeDiagnostics() {
+  #if !DEBUG
+    NativeDiagnostics.start()
+  #endif
 }

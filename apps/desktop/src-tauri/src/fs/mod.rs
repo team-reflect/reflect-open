@@ -621,6 +621,47 @@ fn open_asset_path(app: &tauri::AppHandle, path: &Path) -> AppResult<()> {
         .map_err(|err| AppError::io(err.to_string()))
 }
 
+/// Reveal a graph file in the OS file manager. Deliberately laxer than
+/// [`asset_open`]: revealing never executes anything, so lexical path safety
+/// plus existence is the whole requirement. This is the frontend's fallback
+/// when `asset_open` refuses a file type.
+#[tauri::command]
+pub fn asset_reveal(
+    path: String,
+    generation: u64,
+    app: tauri::AppHandle,
+    state: State<GraphState>,
+) -> AppResult<()> {
+    ensure_revealable_path(&path)?;
+    let root = root_for_generation(&state, generation)?;
+    let abs = resolve(&root, &path)?;
+    if !abs.is_file() {
+        return Err(AppError::not_found(format!("asset not found: {path}")));
+    }
+    reveal_asset_path(&app, &abs)
+}
+
+fn ensure_revealable_path(path: &str) -> AppResult<()> {
+    if reflect_graph_paths::is_safe_visible(path) {
+        return Ok(());
+    }
+    Err(AppError::traversal(format!(
+        "not a revealable path: {path}"
+    )))
+}
+
+#[cfg(target_os = "ios")]
+fn reveal_asset_path(_app: &tauri::AppHandle, _path: &Path) -> AppResult<()> {
+    Err(AppError::io("revealing files is not supported on iOS"))
+}
+
+#[cfg(not(target_os = "ios"))]
+fn reveal_asset_path(app: &tauri::AppHandle, path: &Path) -> AppResult<()> {
+    app.opener()
+        .reveal_item_in_dir(path)
+        .map_err(|err| AppError::io(err.to_string()))
+}
+
 #[cfg(any(target_os = "ios", test))]
 fn asset_file_url(path: &Path) -> AppResult<tauri::Url> {
     tauri::Url::from_file_path(path).map_err(|()| {
@@ -1101,7 +1142,9 @@ mod note_create_tests {
 
 #[cfg(test)]
 mod move_tests {
-    use super::{asset_file_url, ensure_readable_attachment_path, move_note_file};
+    use super::{
+        asset_file_url, ensure_readable_attachment_path, ensure_revealable_path, move_note_file,
+    };
     use std::fs;
 
     fn graph() -> tempfile::TempDir {
@@ -1155,14 +1198,30 @@ mod move_tests {
     #[test]
     fn asset_open_accepts_supported_attachments_anywhere_and_nothing_else() {
         assert!(ensure_readable_attachment_path("assets/cat.png").is_ok());
+        assert!(ensure_readable_attachment_path("assets/report.docx").is_ok());
+        assert!(ensure_readable_attachment_path("assets/archive.zip").is_ok());
         assert!(ensure_readable_attachment_path("Projects/Media/cat.png").is_ok());
         assert!(ensure_readable_attachment_path("audio-memos/memo.m4a").is_ok());
-        // Notes, hidden components, traversal, and extensionless paths refuse.
+        // Notes, hidden components, traversal, extensionless paths, and
+        // executable formats refuse.
         assert!(ensure_readable_attachment_path("notes/secret.md").is_err());
+        assert!(ensure_readable_attachment_path("tools/script.sh").is_err());
         assert!(ensure_readable_attachment_path(".obsidian/cat.png").is_err());
         assert!(ensure_readable_attachment_path("../cat.png").is_err());
         assert!(ensure_readable_attachment_path("assets/").is_err());
         assert!(ensure_readable_attachment_path("assets").is_err());
+    }
+
+    #[test]
+    fn asset_reveal_accepts_any_safe_visible_path_and_nothing_else() {
+        // The reveal fallback must cover exactly the files the open guard
+        // refuses by extension, so it checks lexical safety only.
+        assert!(ensure_revealable_path("assets/tool.xyz").is_ok());
+        assert!(ensure_revealable_path("assets/report.docx").is_ok());
+        assert!(ensure_revealable_path("Projects/Media/cat.png").is_ok());
+        assert!(ensure_revealable_path(".reflect/index.sqlite").is_err());
+        assert!(ensure_revealable_path("../outside.png").is_err());
+        assert!(ensure_revealable_path("/absolute.png").is_err());
     }
 
     #[test]

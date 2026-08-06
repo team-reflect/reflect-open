@@ -7,16 +7,19 @@ import {
   hasBridge,
   listNotes,
   normalizeChatSystemPrompt,
+  type AiPrompt,
   type AiProviderConfig,
   type EditorTextSize,
   type ThemePreference,
 } from '@reflect/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
+import { useAiPrompts } from '@/hooks/use-ai-prompts'
 import { useAiProviders } from '@/hooks/use-ai-providers'
 import { useAppVersion } from '@/hooks/use-app-version'
 import { marketingVersion } from '@/lib/marketing-version'
 import { INDEX_QUERY_SCOPE } from '@/lib/query-client'
 import { AddAiProviderDrawer } from '@/mobile/add-ai-provider-drawer'
+import { AiPromptDrawer } from '@/mobile/ai-prompt-drawer'
 import { AiProviderActionsDrawer } from '@/mobile/ai-provider-actions-drawer'
 import { PRIVACY_POLICY_URL } from '@/mobile/ai-provider-consent'
 import { ChatSystemPromptDrawer } from '@/mobile/chat-system-prompt-drawer'
@@ -82,6 +85,11 @@ export function MobileSettings(): ReactElement {
     useAiProviders()
   const [addProviderOpen, setAddProviderOpen] = useState(false)
   const [systemPromptOpen, setSystemPromptOpen] = useState(false)
+  const { prompts, addPrompt, updatePrompt, removePrompt } = useAiPrompts()
+  // The edited prompt sticks around after close so the exit animation has
+  // content; `promptOpen` alone drives visibility (the edit-sheet pattern).
+  const [editingPrompt, setEditingPrompt] = useState<AiPrompt | 'new' | null>(null)
+  const [promptOpen, setPromptOpen] = useState(false)
   const audioMemoDescriptionId = useId()
   // The managed provider sticks around after close so the exit animation has
   // content; `manageOpen` alone drives visibility (the edit-sheet pattern).
@@ -213,6 +221,29 @@ export function MobileSettings(): ReactElement {
           </SettingsGroup>
 
           <SettingsGroup
+            header="AI prompts"
+            footer="Prompts run on text you select in a note, after the built-in set. They stay on this device and aren’t synced."
+          >
+            {prompts.map((prompt) => (
+              <SettingsNavRow
+                key={prompt.id}
+                label={prompt.label}
+                onPress={() => {
+                  setEditingPrompt(prompt)
+                  setPromptOpen(true)
+                }}
+              />
+            ))}
+            <SettingsActionRow
+              label="Add prompt"
+              onPress={() => {
+                setEditingPrompt('new')
+                setPromptOpen(true)
+              }}
+            />
+          </SettingsGroup>
+
+          <SettingsGroup
             header="Audio memos"
             footer="Uses AI to add punctuation, paragraphs, and light Markdown."
             footerId={audioMemoDescriptionId}
@@ -290,6 +321,19 @@ export function MobileSettings(): ReactElement {
         open={systemPromptOpen}
         onOpenChange={setSystemPromptOpen}
         onSave={(chatSystemPrompt) => updateSettings({ chatSystemPrompt })}
+      />
+      <AiPromptDrawer
+        prompt={editingPrompt}
+        open={promptOpen}
+        onOpenChange={setPromptOpen}
+        onSave={(draft) => {
+          if (editingPrompt === 'new') {
+            addPrompt(draft)
+          } else if (editingPrompt !== null) {
+            updatePrompt(editingPrompt.id, draft)
+          }
+        }}
+        onRemove={removePrompt}
       />
     </div>
   )

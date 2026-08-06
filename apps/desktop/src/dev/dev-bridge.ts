@@ -185,6 +185,8 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
       }
       case 'asset_open':
         return null
+      case 'asset_reveal':
+        return null
 
       case 'db_query': {
         const { sql, params } = dbQueryArgsSchema.parse(args)

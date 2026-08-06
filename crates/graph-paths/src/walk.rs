@@ -253,7 +253,8 @@ mod tests {
         write(root, ".obsidian/plugin.md", "hidden");
         write(root, "Projects/.private/secret.md", "hidden");
         write(root, "Projects/upper.MD", "upper");
-        write(root, "notes/skip.txt", "c");
+        write(root, "notes/skip.xyz", "c");
+        write(root, "notes/keep.txt", "text");
         write(root, "assets/photo.png", "png");
         write(root, "Media/clip.MP4", "video");
 
@@ -274,7 +275,10 @@ mod tests {
             .iter()
             .map(|f| f.path.as_str())
             .collect();
-        assert_eq!(attachments, vec!["Media/clip.MP4", "assets/photo.png"]);
+        assert_eq!(
+            attachments,
+            vec!["Media/clip.MP4", "assets/photo.png", "notes/keep.txt"]
+        );
         assert!(catalog
             .notes
             .iter()

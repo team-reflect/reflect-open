@@ -83,7 +83,12 @@ describe('graph paths', () => {
     expect(isAttachmentPath('assets/photo.png')).toBe(true)
     expect(isAttachmentPath('Media/PHOTO.JPEG')).toBe(true)
     expect(isAttachmentPath('Documents/reference.pdf')).toBe(true)
-    expect(isAttachmentPath('Documents/archive.zip')).toBe(false)
+    expect(isAttachmentPath('Documents/archive.zip')).toBe(true)
+    expect(isAttachmentPath('Documents/report.docx')).toBe(true)
+    expect(isAttachmentPath('assets/notes.txt')).toBe(true)
+    // Executable and script formats stay out of the whitelist.
+    expect(isAttachmentPath('tools/script.sh')).toBe(false)
+    expect(isAttachmentPath('tools/binary.exe')).toBe(false)
     // ASCII-only folding: KELVIN SIGN lowercases to "k" in Unicode but the
     // Rust side never folds beyond ASCII, so both sides must reject it.
     expect(isAttachmentPath('Media/clip.m\u212Av')).toBe(false)
