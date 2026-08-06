@@ -69,7 +69,7 @@ function installFakeBridge(): void {
         case 'graph_create': {
           const root = String(args['path'])
           generation += 1
-          return { root, name: root.split('/').filter(Boolean).at(-1) ?? '', generation }
+          return { root, name: root.split('/').findLast(Boolean) ?? '', generation }
         }
         case 'graph_open': {
           if (failOpens) {
@@ -80,7 +80,7 @@ function installFakeBridge(): void {
             pendingOpens.set(root, resolve)
           })
           generation += 1
-          return { root, name: root.split('/').filter(Boolean).at(-1) ?? '', generation }
+          return { root, name: root.split('/').findLast(Boolean) ?? '', generation }
         }
         case 'recent_graphs':
           return storedRecents

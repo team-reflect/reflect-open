@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import { useUpdate } from '@/providers/update-provider'
 
 const UPDATE_TOAST_ID = 'reflect-update'
-const PERSISTENT_TOAST_MS = Number.POSITIVE_INFINITY
+const PERSISTENT_TOAST_MS = Infinity
 const NON_DISMISSIBLE_UPDATE_OPTIONS = {
   closeButton: false,
   dismissible: false,

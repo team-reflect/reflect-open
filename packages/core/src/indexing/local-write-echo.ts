@@ -49,7 +49,7 @@ export function subscribeOwnWrites(handler: (path: string) => void): () => void 
  * unconditionally.
  */
 export function echoLocalWrite(change: FileChange): void {
-  for (const handler of [...ownWriteListeners]) {
+  for (const handler of ownWriteListeners) {
     try {
       handler(change.path)
     } catch (err) {

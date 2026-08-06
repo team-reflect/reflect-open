@@ -443,7 +443,7 @@ describe('rename coordinator', () => {
     expect(io.rewriteLinksForTitleChange.mock.calls[0]![0]).toMatchObject({ from: 'A', to: 'B' })
     expect(io.rewriteLinksForTitleChange.mock.calls[1]![0]).toMatchObject({ from: 'B', to: 'C' })
     // A (the intermediate title) is pruned; B (the latest old title) joins.
-    const secondAliasWrite = io.writeNote.mock.calls.filter((call) => call[0] === PATH).at(-1)
+    const secondAliasWrite = io.writeNote.mock.calls.findLast((call) => call[0] === PATH)
     expect(secondAliasWrite?.[1]).toBe(
       upsertFrontmatter(upsertFrontmatter('# C\n', { aliases: ['A'] }), { aliases: ['B'] }),
     )

@@ -145,7 +145,7 @@ export function createBackupController(options: BackupControllerOptions): Backup
       return
     }
     state = next
-    for (const listener of [...listeners]) {
+    for (const listener of listeners) {
       listener()
     }
   }

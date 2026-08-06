@@ -105,7 +105,7 @@ describe('wikiNoteReference', () => {
     ['escapes the vault', '../outside/Plan'],
     ['hides behind a dot component', '.obsidian/Plan'],
     ['names another scheme', 'https://example.com/Plan'],
-    ['uses a backslash separator', 'Projects\\Plan'],
+    ['uses a backslash separator', String.raw`Projects\Plan`],
     ['carries a non-Markdown extension', 'Media/photo.png'],
     ['is empty', '   '],
   ])('refuses a target that %s', (_reason, target) => {
@@ -177,7 +177,7 @@ describe('noteBasenameKey', () => {
   it('folds the filename stem', () => {
     expect(noteBasenameKey('Projects/Weekly Plan.md')).toBe('weekly plan')
     // NFD filename (as macOS reports it), NFC key: the fold normalizes.
-    expect(noteBasenameKey('Cafe\u0301.md')).toBe('caf\u00e9')
-    expect(noteBasenameKey('Caf\u00e9.md')).toBe('caf\u00e9')
+    expect(noteBasenameKey('Cafe\u{301}.md')).toBe('caf\u{E9}')
+    expect(noteBasenameKey('Caf\u{E9}.md')).toBe('caf\u{E9}')
   })
 })

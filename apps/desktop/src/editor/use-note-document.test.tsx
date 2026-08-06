@@ -121,7 +121,7 @@ function installGraphFake({ files, linkSources, resolveTitleTo }: GraphFakeOptio
       return null
     }
     if (command === 'db_query') {
-      const sql = String((args as { sql: string }).sql)
+      const sql = (args as { sql: string }).sql
       if (sql.includes('"links"')) {
         return linkSources ? linkSources() : []
       }
@@ -386,7 +386,7 @@ describe('useNoteDocument', () => {
     }
   })
 
-  it('a lazy note\u2019s first heading never fires a rename', async () => {
+  it('a lazy note\u{2019}s first heading never fires a rename', async () => {
     vi.useFakeTimers()
     try {
       const files: Record<string, string> = {

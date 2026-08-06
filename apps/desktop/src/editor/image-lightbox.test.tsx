@@ -52,17 +52,17 @@ async function renderMobileLightbox(): Promise<RenderedLightbox> {
   await expect.element(dialog).toBeInTheDocument()
   const preview = page.getByRole('button', { name: 'Close image preview' }).element()
   if (!(preview instanceof HTMLElement)) {
-    throw new Error('lightbox preview missing')
+    throw new TypeError('lightbox preview missing')
   }
   const image = preview.querySelector('img')
   if (!(image instanceof HTMLImageElement)) {
-    throw new Error('lightbox image missing')
+    throw new TypeError('lightbox image missing')
   }
   const closeChrome = page
     .getByRole('button', { name: 'Close', exact: true })
     .element().parentElement
   if (!(closeChrome instanceof HTMLElement)) {
-    throw new Error('close chrome missing')
+    throw new TypeError('close chrome missing')
   }
   // Let the dialog's enter animation finish so drag activation samples the
   // settled full-viewport rect, not a mid-zoom one.

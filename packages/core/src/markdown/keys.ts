@@ -35,7 +35,7 @@ export function foldKey(value: string): string {
  * first loose match would be worse than leaving the link unresolved.
  */
 export function foldFallbackTitleKey(value: string): string {
-  const folded = value.normalize('NFC').trim().toLowerCase().replace(/\s+/gu, ' ')
+  const folded = value.normalize('NFC').trim().toLowerCase().replaceAll(/\s+/gu, ' ')
   return folded.replace(LEADING_EMOJI_RE, '').trimStart()
 }
 
@@ -45,7 +45,7 @@ export function foldFallbackTitleKey(value: string): string {
 const PICTOGRAPH = String.raw`\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier})?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier})?)*`
 const FLAG = String.raw`\p{Regional_Indicator}{2}`
 const KEYCAP = String.raw`[#*0-9]\uFE0F?\u20E3`
-const LEADING_EMOJI_RE = new RegExp(`^(?:(?:${PICTOGRAPH})|(?:${FLAG})|(?:${KEYCAP}))+\\s*`, 'u')
+const LEADING_EMOJI_RE = new RegExp(String.raw`^(?:(?:${PICTOGRAPH})|(?:${FLAG})|(?:${KEYCAP}))+\s*`, 'u')
 
 /**
  * Case-fold a tag name to its match key (`#Book` ≡ `#book`). The one

@@ -21,7 +21,7 @@ export function parseRepoInput(input: string): GithubRepoRef | null {
 export function suggestRepoName(graphName: string | undefined): string {
   const slug = (graphName ?? '')
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replaceAll(/^-+|-+$/g, '')
   return slug.length > 0 ? `${slug}-backup` : 'reflect-backup'
 }

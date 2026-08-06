@@ -70,7 +70,7 @@ const migrationSources = import.meta.glob<string>(
  * and 0003's copy-and-drop migration dance — valid without the module.
  */
 function stubVectorTables(sql: string): string {
-  return sql.replace(
+  return sql.replaceAll(
     /CREATE VIRTUAL TABLE (\S+) USING vec0\([^)]*\)/g,
     'CREATE TABLE $1 (embedding BLOB)',
   )

@@ -637,7 +637,7 @@ describe('createBackupController', () => {
           return 10_000
         }
         await vi.advanceTimersByTimeAsync(20_000)
-        return commitCount(calls) > 1 ? 30_000 : Number.POSITIVE_INFINITY
+        return commitCount(calls) > 1 ? 30_000 : Infinity
       } finally {
         vi.useRealTimers()
         setPlatformSurface({ mobileApp: false })

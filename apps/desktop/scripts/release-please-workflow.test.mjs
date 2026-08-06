@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test } from 'vitest'
 
-const scriptsDirectory = dirname(fileURLToPath(import.meta.url))
+const scriptsDirectory = import.meta.dirname
 const repoRoot = join(scriptsDirectory, '..', '..', '..')
 const workflow = readFileSync(join(repoRoot, '.github', 'workflows', 'release-please.yml'), 'utf8')
 const stableConfig = JSON.parse(

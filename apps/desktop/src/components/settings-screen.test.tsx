@@ -116,7 +116,7 @@ function radio(name: RegExp): Locator {
 async function pickRadio(name: RegExp): Promise<void> {
   const label = radio(name).element().closest('label')
   if (!(label instanceof HTMLLabelElement)) {
-    throw new Error('expected the radio to sit inside its option card')
+    throw new TypeError('expected the radio to sit inside its option card')
   }
   await userEvent.click(label)
 }

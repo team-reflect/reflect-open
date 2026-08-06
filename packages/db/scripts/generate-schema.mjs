@@ -17,7 +17,7 @@ import Database from 'better-sqlite3'
 import * as sqliteVec from 'sqlite-vec'
 
 const require = createRequire(import.meta.url)
-const here = dirname(fileURLToPath(import.meta.url))
+const here = import.meta.dirname
 const packageRoot = join(here, '..')
 const migrationsDir = join(here, '..', '..', '..', 'crates', 'index-schema', 'migrations')
 const outFile = join(packageRoot, 'src', 'schema.gen.ts')

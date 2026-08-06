@@ -24,7 +24,7 @@ const GOLDEN: ReadonlyArray<readonly [title: string, slug: string]> = [
   ['한국어 노트', '한국어-노트'],
   ['🎉 Party! 🎉', 'party'],
   ['Q3 / Q4 Review', 'q3-q4-review'],
-  ['path\\with\\slashes', 'pathwithslashes'],
+  [String.raw`path\with\slashes`, 'pathwithslashes'],
   ['colons: and "quotes"', 'colons-and-quotes'],
   ['<angle> & |pipe|?', 'angle-pipe'],
   ['...dots at edges...', 'dots-at-edges'],

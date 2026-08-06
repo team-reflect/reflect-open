@@ -264,7 +264,7 @@ export function clearTaskDueDate(content: string): string {
     return content
   }
   const removed = content.slice(0, existing.from) + content.slice(existing.to)
-  return removed.replace(/[ \t]{2,}/g, ' ').trim()
+  return removed.replaceAll(/[ \t]{2,}/g, ' ').trim()
 }
 
 /**
@@ -273,8 +273,8 @@ export function clearTaskDueDate(content: string): string {
  */
 export function wikiLinkSafe(text: string): string {
   return text
-    .replace(/[[\]|\r\n]/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replaceAll(/[[\]|\r\n]/g, ' ')
+    .replaceAll(/\s+/g, ' ')
     .trim()
 }
 
@@ -307,7 +307,7 @@ function linkedHeadingTarget(
   wikiLinks: readonly WikiLink[],
 ): string | null {
   const raw = source.slice(heading.from, heading.to)
-  const firstLine = raw.slice(0, raw.indexOf('\n') === -1 ? raw.length : raw.indexOf('\n'))
+  const firstLine = raw.slice(0, !raw.includes('\n') ? raw.length : raw.indexOf('\n'))
   const content = firstLine
     .replace(/^[ \t]{0,3}#{1,6}[ \t]+/, '')
     .replace(/[ \t]+#+[ \t]*$/, '')

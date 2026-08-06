@@ -106,7 +106,7 @@ export default defineContentScript({
     const listener: PageTextListener = (message) => {
       const request = extractPageTextRequestSchema.safeParse(message)
       if (!request.success) {
-        return undefined
+        return
       }
       return Promise.resolve(extractPageText(request.data.expectedUrl))
     }

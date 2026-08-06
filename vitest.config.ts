@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
-  root: fileURLToPath(new URL('.', import.meta.url)),
+  root: import.meta.dirname,
   test: {
     retry: process.env.CI ? 3 : 0,
     slowTestThreshold: 10_000,

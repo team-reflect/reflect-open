@@ -1,6 +1,6 @@
 /** `/.../Documents/My Notes` -> `My Notes`. */
 export function graphNameFromRoot(root: string, fallback = ''): string {
-  return root.split('/').filter(Boolean).at(-1) ?? fallback
+  return root.split('/').findLast(Boolean) ?? fallback
 }
 
 /**

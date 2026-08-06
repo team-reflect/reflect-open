@@ -84,7 +84,7 @@ export function subscribeReconcileRequests(handler: () => void): Promise<Unliste
  * unnotified open editor would overwrite the merged content on its next save.
  */
 export function emitFileChanges(changes: FileChange[]): void {
-  for (const handler of [...localHandlers]) {
+  for (const handler of localHandlers) {
     handler(changes)
   }
 }

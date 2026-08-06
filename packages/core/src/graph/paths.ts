@@ -84,7 +84,7 @@ export type GraphPathKind = 'note' | 'attachment'
  * and the two classifiers must never disagree on the same wire path.
  */
 function asciiLowerCase(value: string): string {
-  return value.replace(/[A-Z]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) + 32))
+  return value.replaceAll(/[A-Z]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) + 32))
 }
 
 /** Matches a daily-note path and captures its ISO date. */

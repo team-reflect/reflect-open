@@ -119,7 +119,7 @@ export function wireCaptureMocks(): void {
   rejected.clear()
 
   inboxListMock.mockImplementation(async () =>
-    [...spool.entries()].map(([name, entry]) => ({
+    [...spool].map(([name, entry]) => ({
       path: `.reflect/inbox/${name}`,
       size: entry.contents.length,
       modifiedMs: entry.modifiedMs,

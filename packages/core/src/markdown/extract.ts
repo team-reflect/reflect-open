@@ -83,8 +83,8 @@ function slugify(text: string): string {
   return text
     .toLowerCase()
     .trim()
-    .replace(/[^\p{L}\p{N}\s-]/gu, '')
-    .replace(/\s+/g, '-')
+    .replaceAll(/[^\p{L}\p{N}\s-]/gu, '')
+    .replaceAll(/\s+/g, '-')
 }
 
 function hostOf(href: string): string | undefined {

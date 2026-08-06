@@ -20,7 +20,7 @@
  */
 export function gistBodyHash(body: string): string {
   const bytes = new TextEncoder().encode(body)
-  return fnv1a32(bytes, 0x811c9dc5) + fnv1a32(bytes, 0x811c9dc5 ^ 0x5bd1e995)
+  return fnv1a32(bytes, 0x811C9DC5) + fnv1a32(bytes, 0x811C9DC5 ^ 0x5BD1E995)
 }
 
 function fnv1a32(bytes: Uint8Array, seed: number): string {
@@ -39,6 +39,6 @@ function fnv1a32(bytes: Uint8Array, seed: number): string {
  * dashes — and an empty or whitespace title falls back to `Untitled`.
  */
 export function gistFilename(title: string): string {
-  const safe = title.replace(/[/\\]/g, '-').trim()
+  const safe = title.replaceAll(/[/\\]/g, '-').trim()
   return `${safe === '' ? 'Untitled' : safe}.md`
 }

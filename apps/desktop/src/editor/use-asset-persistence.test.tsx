@@ -182,7 +182,7 @@ describe('resolveAssetFileLink', () => {
     expect(resolveAssetFileLink(fileLink('https://example.com/q3.pdf'))).toBe(false)
     expect(resolveAssetFileLink(fileLink('notes/other.md'))).toBe(false)
     expect(resolveAssetFileLink(fileLink('assets/../secrets.env'))).toBe(false)
-    expect(resolveAssetFileLink(fileLink('assets\\evil.pdf'))).toBe(false)
+    expect(resolveAssetFileLink(fileLink(String.raw`assets\evil.pdf`))).toBe(false)
     expect(resolveAssetFileLink(fileLink('assets/'))).toBe(false)
   })
 })

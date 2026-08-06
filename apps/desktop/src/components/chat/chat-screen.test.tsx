@@ -166,7 +166,7 @@ function scriptTurn(events: ChatStreamEvent[]) {
 
 /** A tiny PNG-magic-bytes file — base64 `iVBORw==` once read. */
 function pngFile(name: string): File {
-  return new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], name, { type: 'image/png' })
+  return new File([new Uint8Array([0x89, 0x50, 0x4E, 0x47])], name, { type: 'image/png' })
 }
 
 /** Dispatches a real drop with the files loaded into a real `DataTransfer`. */

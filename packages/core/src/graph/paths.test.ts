@@ -91,7 +91,7 @@ describe('graph paths', () => {
     expect(isAttachmentPath('tools/binary.exe')).toBe(false)
     // ASCII-only folding: KELVIN SIGN lowercases to "k" in Unicode but the
     // Rust side never folds beyond ASCII, so both sides must reject it.
-    expect(isAttachmentPath('Media/clip.m\u212Av')).toBe(false)
+    expect(isAttachmentPath('Media/clip.m\u{212A}v')).toBe(false)
   })
 
   it('rejects hidden, traversal, absolute, and non-normalized paths', () => {
@@ -102,7 +102,7 @@ describe('graph paths', () => {
     expect(isSafeVisibleGraphPath('C:/absolute.md')).toBe(false)
     expect(isSafeVisibleGraphPath('C:relative.md')).toBe(false)
     expect(isSafeVisibleGraphPath('Projects//Plan.md')).toBe(false)
-    expect(isSafeVisibleGraphPath('Projects\\Plan.md')).toBe(false)
+    expect(isSafeVisibleGraphPath(String.raw`Projects\Plan.md`)).toBe(false)
   })
 
   it('prunes hidden and reserved root trees from note traversal', () => {
@@ -151,11 +151,11 @@ describe('foldGraphPath', () => {
     // ASCII fold lowers it) — safe because every comparand passes through
     // this same fold. What must NOT happen is toLowerCase-style folding of
     // characters NFC leaves alone.
-    expect(foldGraphPath('\u212a.md')).toBe('k.md')
-    expect(foldGraphPath('\u0130.md')).toBe('\u0130.md')
+    expect(foldGraphPath('\u{212A}.md')).toBe('k.md')
+    expect(foldGraphPath('\u{130}.md')).toBe('\u{130}.md')
   })
 
   it('normalizes NFD to NFC before folding', () => {
-    expect(foldGraphPath('Cafe\u0301.md')).toBe('caf\u00e9.md')
+    expect(foldGraphPath('Cafe\u{301}.md')).toBe('caf\u{E9}.md')
   })
 })

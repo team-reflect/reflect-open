@@ -150,7 +150,7 @@ describe('rewriteLinksForTitleChange stable-target displays', () => {
     const stableTarget = 'capture-2026-07-23-154848-811-c2b0'
     const { io, writes } = fakeIo(
       {
-        [sourcePath]: `- [[${stableTarget}|Old Title]]\n` + `- [[${stableTarget}|Custom label]]\n`,
+        [sourcePath]: `- [[${stableTarget}|Old Title]]\n- [[${stableTarget}|Custom label]]\n`,
       },
       {
         resolveByTarget: { [stableTarget]: 'notes/capture.md' },
@@ -170,7 +170,7 @@ describe('rewriteLinksForTitleChange stable-target displays', () => {
 
     expect(result.rewritten).toEqual([sourcePath])
     expect(writes[sourcePath]).toBe(
-      `- [[${stableTarget}|New Title]]\n` + `- [[${stableTarget}|Custom label]]\n`,
+      `- [[${stableTarget}|New Title]]\n- [[${stableTarget}|Custom label]]\n`,
     )
   })
 
@@ -562,7 +562,7 @@ describe('rewriteLinksForTitleChange — destination guard', () => {
     const result = await rewriteLinksForTitleChange({
       path: 'notes/a.md',
       from: 'Old Meeting',
-      to: 'C:\\notes [[Ada Lovelace|Ada]]',
+      to: String.raw`C:\notes [[Ada Lovelace|Ada]]`,
       io,
     })
     expect(result).toEqual({

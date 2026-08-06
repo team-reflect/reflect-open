@@ -29,7 +29,7 @@ const ONBOARDING_RESOLVE_RETRY_DELAYS_MS = [2_000, 8_000]
 
 /** `/…/Documents/My Notes` → `My Notes`. */
 function graphNameFromRoot(root: string): string {
-  return root.split('/').filter(Boolean).at(-1) ?? ''
+  return root.split('/').findLast(Boolean) ?? ''
 }
 
 /**

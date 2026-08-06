@@ -32,7 +32,7 @@ export function assetFileName(originalName: string): string {
     ? trimmed
         .slice(dotIndex + 1)
         .toLowerCase()
-        .replace(/[^a-z0-9]/g, '')
+        .replaceAll(/[^a-z0-9]/g, '')
         .slice(0, MAX_EXTENSION_CHARS)
     : ''
   const slug = slugForTitle(stem.replaceAll('.', '-'))

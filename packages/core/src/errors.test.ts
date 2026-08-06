@@ -59,7 +59,7 @@ describe('toAppError', () => {
   })
 
   it('never throws on values JSON.stringify rejects', () => {
-    expect(toAppError(BigInt(1)).kind).toBe('unknown')
+    expect(toAppError(1n).kind).toBe('unknown')
 
     const circular: Record<string, unknown> = {}
     circular['self'] = circular

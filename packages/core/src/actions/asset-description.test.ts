@@ -89,7 +89,7 @@ beforeEach(() => {
     if (dir !== 'assets') {
       return []
     }
-    return [...assets.entries()].map(([path, value]) => ({
+    return [...assets].map(([path, value]) => ({
       path,
       size: base64ByteLength(value),
       modifiedMs: 1, // epoch+1ms — far before any ISO `generatedAt`

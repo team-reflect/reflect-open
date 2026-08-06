@@ -222,7 +222,7 @@ export function useEditorAiMenu({
   )
 
   const onSelectionMenuSearch = useMemo<SelectionMenuSearchHandler | undefined>(() => {
-    if (isPrivate) return undefined
+    if (isPrivate) return
     return (query: string): SelectionMenuItem[] => {
       if (providers.length === 0) {
         return [

@@ -72,7 +72,7 @@ describe('useNativeAudioRecorder', () => {
     const path = '/staging/stop-normal.m4a'
     invoke.mockImplementation(async (command: string) => {
       if (command === 'plugin:recording|start_recording') {
-        return undefined
+        return
       }
       if (command === 'plugin:recording|stop_recording') {
         return { path, durationMs: 4000, modifiedMs: 1_700_000_000_000 }
@@ -111,7 +111,7 @@ describe('useNativeAudioRecorder', () => {
       if (command === 'plugin:recording|stop_recording') {
         return { path, durationMs: 300, modifiedMs: 1_700_000_000_000 }
       }
-      return undefined
+      return
     })
     const { result } = await renderRecorder()
 
@@ -155,7 +155,7 @@ describe('useNativeAudioRecorder', () => {
       if (command === 'plugin:recording|read_staged') {
         return { base64: base64Of('native-bytes') }
       }
-      return undefined
+      return
     })
     const { result } = await renderRecorder()
     await vi.waitFor(() => expect(pluginEvents.handlers.has('recordingStopped')).toBe(true))
@@ -213,7 +213,7 @@ describe('useNativeAudioRecorder', () => {
       if (command === 'plugin:recording|read_staged') {
         throw new Error('io error')
       }
-      return undefined
+      return
     })
     await renderRecorder()
     await vi.waitFor(() => expect(pluginEvents.handlers.has('recordingStopped')).toBe(true))
@@ -241,9 +241,9 @@ describe('useNativeAudioRecorder', () => {
         await new Promise<void>((resolve) => {
           releaseStart = resolve
         })
-        return undefined
+        return
       }
-      return undefined
+      return
     })
     const { result } = await renderRecorder()
     await vi.waitFor(() => expect(pluginEvents.handlers.has('recordingStopped')).toBe(true))

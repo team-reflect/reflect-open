@@ -21,7 +21,7 @@ import { buildFtsMatch } from './search-query'
  */
 
 const corpusDir = join(
-  dirname(fileURLToPath(import.meta.url)),
+  import.meta.dirname,
   '..',
   '..',
   '..',

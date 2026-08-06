@@ -327,7 +327,7 @@ function reconcileScan(files: DevFileStore, index: DevIndexDb) {
       storedHash: facts?.hash ?? null,
     })
   }
-  const orphans = [...stored.entries()]
+  const orphans = [...stored]
     .filter(([path]) => !onDisk.has(path))
     .map(([path, facts]) => ({ path, storedMtime: facts.mtime, storedHash: facts.hash }))
     .sort((first, second) => first.path.localeCompare(second.path))

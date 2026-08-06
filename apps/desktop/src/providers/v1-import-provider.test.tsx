@@ -56,7 +56,7 @@ function summary(overrides: Partial<SummaryFixture> = {}): SummaryFixture {
 }
 
 function emitProgress(progress: ProgressFixture): void {
-  for (const handler of [...progressHandlers]) {
+  for (const handler of progressHandlers) {
     handler(progress)
   }
 }

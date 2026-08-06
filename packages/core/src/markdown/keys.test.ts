@@ -27,7 +27,7 @@ describe('foldFallbackTitleKey', () => {
 
   it('handles emoji sequences and collapses Unicode whitespace', () => {
     expect(foldFallbackTitleKey('👩🏽‍💻  Product\tIdeas')).toBe('product ideas')
-    expect(foldFallbackTitleKey('🇬🇧\u00a0Travel  Ideas')).toBe('travel ideas')
+    expect(foldFallbackTitleKey('🇬🇧\u{A0}Travel  Ideas')).toBe('travel ideas')
     expect(foldFallbackTitleKey('1️⃣  First idea')).toBe('first idea')
   })
 

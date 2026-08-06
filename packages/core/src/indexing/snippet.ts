@@ -21,7 +21,7 @@ const PREVIEW_MAX_LENGTH = 120
 function sliceWithoutSplittingSurrogate(text: string, maxLength: number): string {
   const end = Math.min(maxLength, text.length)
   const lastCode = text.charCodeAt(end - 1)
-  const isLoneHighSurrogate = lastCode >= 0xd800 && lastCode <= 0xdbff
+  const isLoneHighSurrogate = lastCode >= 0xD800 && lastCode <= 0xDBFF
   return text.slice(0, isLoneHighSurrogate ? end - 1 : end)
 }
 
@@ -80,8 +80,8 @@ export function previewSnippet(
   title: string,
   maxLength = PREVIEW_MAX_LENGTH,
 ): string {
-  const collapsed = text.replace(/\s+/g, ' ').trim()
-  const foldedTitle = title.replace(/\s+/g, ' ').trim()
+  const collapsed = text.replaceAll(/\s+/g, ' ').trim()
+  const foldedTitle = title.replaceAll(/\s+/g, ' ').trim()
   let body = collapsed
   if (foldedTitle !== '') {
     if (body === foldedTitle) {

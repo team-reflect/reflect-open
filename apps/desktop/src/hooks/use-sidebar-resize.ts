@@ -228,7 +228,7 @@ export function useSidebarResize(panel: ResizableSidebarPanel): SidebarResize {
   const gestureCap = useCallback(
     (handle: HTMLElement): number => {
       const shell = handle.parentElement?.parentElement
-      const other = shell?.querySelector(`aside[aria-label="${otherAsideLabel}"]`)
+      const other = shell?.querySelector(`aside[aria-label="${CSS.escape(otherAsideLabel)}"]`)
       const otherWidth = other?.getBoundingClientRect().width ?? 0
       const available = Math.floor(window.innerWidth - EDITOR_MIN_WIDTH_PX - otherWidth)
       return Math.min(range.max, Math.max(range.min, available))

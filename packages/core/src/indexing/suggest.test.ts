@@ -87,7 +87,7 @@ describe('isWikiLinkSafeText', () => {
   })
 
   it('rejects every character that would corrupt a link, backslash included', () => {
-    for (const text of ['a[b', 'a]b', 'a|b', 'a\\b', 'a\rb', 'a\nb']) {
+    for (const text of ['a[b', 'a]b', 'a|b', String.raw`a\b`, 'a\rb', 'a\nb']) {
       expect(isWikiLinkSafeText(text)).toBe(false)
     }
   })

@@ -21,7 +21,7 @@ export interface PageMeta {
 const MAX_META_CHARS = 500
 
 function clean(value: string | null | undefined): string | null {
-  const collapsed = value?.replace(/\s+/g, ' ').trim() ?? ''
+  const collapsed = value?.replaceAll(/\s+/g, ' ').trim() ?? ''
   if (collapsed === '') {
     return null
   }

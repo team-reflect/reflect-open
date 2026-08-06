@@ -243,7 +243,7 @@ describe('app shortcuts', () => {
     expect(findPreviousInNote).toHaveBeenCalledTimes(1)
   })
 
-  it('⌘\\ toggles the sidebar in both directions', async () => {
+  it(String.raw`⌘\ toggles the sidebar in both directions`, async () => {
     const { result, act } = await shortcutsHook()
     expect(result.current.sidebar.collapsed).toBe(false)
 

@@ -9,7 +9,7 @@ import { type Operation, useOperations } from '@/lib/operations'
  * they're touched. Renders nothing when idle.
  */
 
-const TOAST_DURATION_MS = Number.POSITIVE_INFINITY
+const TOAST_DURATION_MS = Infinity
 const NON_DISMISSIBLE_OPERATION_OPTIONS = {
   closeButton: false,
   dismissible: false,

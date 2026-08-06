@@ -339,7 +339,7 @@ describe('v1 subject alias flow', () => {
       await expect(suggestWikiLinkTargets('Unsafe | Title')).resolves.toMatchObject({
         suggestions: [{ path: 'notes/unsafe.md', insertText: 'notes/unsafe' }],
       })
-      await expect(suggestWikiLinkTargets('Escape \\. Title')).resolves.toMatchObject({
+      await expect(suggestWikiLinkTargets(String.raw`Escape \. Title`)).resolves.toMatchObject({
         suggestions: [{ path: 'notes/escaped.md', insertText: 'notes/escaped' }],
       })
     } finally {

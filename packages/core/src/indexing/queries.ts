@@ -171,7 +171,7 @@ export async function getDuplicateNoteIds(): Promise<DuplicateIdGroup[]> {
       groups.set(row.id, paths)
     }
   }
-  return [...groups.entries()].map(([id, paths]) => ({ id, paths }))
+  return [...groups].map(([id, paths]) => ({ id, paths }))
 }
 
 /**

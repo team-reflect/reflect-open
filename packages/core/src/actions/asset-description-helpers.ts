@@ -85,7 +85,7 @@ export function readManagedDescription(source: string): ManagedDescription | nul
   if (!parsed.success) {
     return null
   }
-  const generatedAtMs = parsed.data.generatedAt ? Date.parse(parsed.data.generatedAt) : Number.NaN
+  const generatedAtMs = parsed.data.generatedAt ? Date.parse(parsed.data.generatedAt) : NaN
   return {
     sourceHash: parsed.data.sourceHash ?? null,
     sourceSize: parsed.data.sourceSize ?? null,

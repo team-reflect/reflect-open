@@ -130,7 +130,7 @@ describe('searchWithFilters', () => {
         preview: 'Quokka facts.',
         mtime: 3000,
         is_pinned: 0,
-        fts_highlighted_title: '\u0001Quokka\u0002',
+        fts_highlighted_title: '\u{1}Quokka\u{2}',
         snippet: 'a …',
       },
     ])
@@ -141,7 +141,7 @@ describe('searchWithFilters', () => {
       {
         path: 'notes/quokka.md',
         title: 'Quokka',
-        highlightedTitle: '\u0001Quokka\u0002',
+        highlightedTitle: '\u{1}Quokka\u{2}',
         dailyDate: null,
         snippet: 'a …',
         preview: 'Quokka facts.',

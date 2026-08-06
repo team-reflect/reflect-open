@@ -36,7 +36,7 @@ class IpcConnection implements DatabaseConnection {
     // on large FTS scans). A cheap O(1) shape check still fails fast on a
     // malformed payload at the boundary rather than deep in a query consumer.
     if (!Array.isArray(rows)) {
-      throw new Error('db_query did not return a row array')
+      throw new TypeError('db_query did not return a row array')
     }
     return { rows: rows as R[] }
   }

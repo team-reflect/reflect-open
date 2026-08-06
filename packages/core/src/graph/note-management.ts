@@ -10,7 +10,7 @@ const REFLECT_NOTE_ID_RE = /^[0-7][0-9a-hjkmnp-tv-z]{25}$/i
  * lose their management. The second tier (a valid ULID `id`) keeps adopted
  * files under such a folder from being claimed by casing alone.
  */
-const REFLECT_MANAGED_NOTE_PATH_RE = new RegExp(`^${NOTES_DIR}/[^/]+\\.md$`, 'i')
+const REFLECT_MANAGED_NOTE_PATH_RE = new RegExp(String.raw`^${NOTES_DIR}/[^/]+\.md$`, 'i')
 
 /** Whether a value is a valid Reflect note identity. */
 export function isValidReflectNoteId(value: unknown): value is string {

@@ -148,7 +148,7 @@ export function notePrivate(source: string): boolean {
 }
 
 export function metadataValue(text: string): string {
-  return text.replace(/\s+/g, ' ').trim()
+  return text.replaceAll(/\s+/g, ' ').trim()
 }
 
 const DESCRIPTION_PREFIX = '- Description: '

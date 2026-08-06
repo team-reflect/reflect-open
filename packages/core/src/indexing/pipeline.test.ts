@@ -61,7 +61,7 @@ beforeEach(() => {
               mtime: 5,
               is_pinned: 0,
               fts_highlighted_title: 'A',
-              snippet: '\u0001Hello\u0002',
+              snippet: '\u{1}Hello\u{2}',
             },
           ]
         }
@@ -469,7 +469,7 @@ describe('Kysely → db_query bridge', () => {
   it('searchNotes runs the palette ranked query (title match, bm25, pinned, recency)', async () => {
     await searchNotes('hello')
     const query = mockInvoke.mock.calls.find(([cmd]) => cmd === 'db_query')
-    const sql = String((query![1] as { sql: string }).sql).toLowerCase()
+    const sql = (query![1] as { sql: string }).sql.toLowerCase()
     // searchNotes delegates to `searchWithFilters`, so it emits the palette's
     // ranked query verbatim — one search path, orderings can't drift.
     expect(sql).toContain('with "lexical" as materialized')

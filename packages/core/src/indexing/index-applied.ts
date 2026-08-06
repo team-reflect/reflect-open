@@ -39,7 +39,7 @@ export function subscribeIndexApplied(listener: IndexAppliedListener): () => voi
 
 /** Notify subscribers that `changes` were applied to the index at `generation`. */
 export function emitIndexApplied(changes: readonly FileChange[], generation: number): void {
-  for (const listener of [...listeners]) {
+  for (const listener of listeners) {
     listener(changes, generation)
   }
 }

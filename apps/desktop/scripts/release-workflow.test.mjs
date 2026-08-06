@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test } from 'vitest'
 
-const scriptsDirectory = dirname(fileURLToPath(import.meta.url))
+const scriptsDirectory = import.meta.dirname
 const workflowPath = join(scriptsDirectory, '..', '..', '..', '.github', 'workflows', 'release.yml')
 const workflow = readFileSync(workflowPath, 'utf8')
 

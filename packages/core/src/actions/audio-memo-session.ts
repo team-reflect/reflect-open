@@ -85,7 +85,7 @@ export function groupAudioMemoSessions(parts: AudioMemoPart[]): AudioMemoSession
       group.push(part)
     }
   }
-  return [...byBase.entries()]
+  return [...byBase]
     .sort(([first], [second]) => first.localeCompare(second))
     .map(([, group]) => ({
       memo: group[0]!.memo,

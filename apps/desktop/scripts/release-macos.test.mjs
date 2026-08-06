@@ -38,7 +38,7 @@ const baseInput = {
   notesPath: 'release-notes.md',
   productName: 'Reflect',
 }
-const appDir = join(dirname(fileURLToPath(import.meta.url)), '..')
+const appDir = join(import.meta.dirname, '..')
 
 test('pre-release publish uses prepared notes and opts out of GitHub latest heuristics', () => {
   const args = createReleaseArgs({

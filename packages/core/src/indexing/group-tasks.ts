@@ -33,7 +33,7 @@ export interface TaskGroup {
 const PUNCTUATION_RE = /[\p{P}\p{S}]/gu
 
 function normalizedBreadcrumb(text: string): string {
-  return text.replace(/\s+/g, '').replace(PUNCTUATION_RE, '')
+  return text.replaceAll(/\s+/g, '').replaceAll(PUNCTUATION_RE, '')
 }
 
 /** Trim breadcrumb labels and hide a lone generic Tasks/Todo parent. */

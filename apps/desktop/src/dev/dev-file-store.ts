@@ -57,10 +57,10 @@ export function createDevFileStore(seed: Record<string, string>): DevFileStore {
   })
 
   return {
-    list: () => [...files.entries()].filter(([path]) => isNotePath(path)).map(toMeta),
+    list: () => [...files].filter(([path]) => isNotePath(path)).map(toMeta),
     listDir: (dir) => {
       const prefix = dir.endsWith('/') ? dir : `${dir}/`
-      return [...files.entries()].filter(([path]) => path.startsWith(prefix)).map(toMeta)
+      return [...files].filter(([path]) => path.startsWith(prefix)).map(toMeta)
     },
     read: (path) => files.get(path)?.contents ?? null,
     exists: (path) => files.has(path),

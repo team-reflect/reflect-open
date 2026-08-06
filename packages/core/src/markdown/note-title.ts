@@ -42,7 +42,7 @@ const EMBEDDED_WIKI_LINK_RE = /\[\[([^[\]\n]*)\]\]/g
 /** The title with embedded links flattened, or `null` when nothing was replaced. */
 function renderEmbeddedWikiLinks(title: string): string | null {
   let replaced = false
-  const rendered = title.replace(EMBEDDED_WIKI_LINK_RE, (match, inner: string) => {
+  const rendered = title.replaceAll(EMBEDDED_WIKI_LINK_RE, (match, inner: string) => {
     const pipe = inner.indexOf('|')
     const target = (pipe === -1 ? inner : inner.slice(0, pipe)).trim()
     if (target === '') {

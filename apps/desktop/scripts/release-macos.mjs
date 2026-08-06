@@ -97,7 +97,7 @@ const MACOS_RELEASE_TARGETS = {
 }
 const DEFAULT_PUBLISH_TARGETS = [APPLE_SILICON_MAC_TARGET, INTEL_MAC_TARGET]
 
-const here = dirname(fileURLToPath(import.meta.url))
+const here = import.meta.dirname
 const appDir = join(here, '..')
 const repoRoot = join(here, '..', '..', '..')
 
@@ -1075,7 +1075,7 @@ function releaseAssetName({ productName, version, target, type }) {
 
 /** Match GitHub's release asset URL/display rewrite for uploaded file names. */
 function githubAssetName(fileName) {
-  return fileName.replace(/ /g, '.')
+  return fileName.replaceAll(' ', '.')
 }
 
 function exportReleaseArtifacts({ artifactDir, flavor, target }) {
@@ -2022,8 +2022,7 @@ Docs: docs/macos-distribution.md`
 async function main() {
   const argv = process.argv.slice(2)
   const flags = argv.filter((arg) => arg.startsWith('--'))
-  const commands = argv.filter((arg) => !arg.startsWith('--'))
-  const command = commands[0] ?? 'build'
+  const command = argv.find((arg) => !arg.startsWith('--')) ?? 'build'
   const flavorFlag = flags.find((flag) => flag.startsWith('--flavor='))?.slice('--flavor='.length)
   const targetFlag = flags.find((flag) => flag.startsWith('--target='))?.slice('--target='.length)
   const artifactDir = flags

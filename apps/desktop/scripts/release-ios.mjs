@@ -25,7 +25,7 @@ const NON_EXEMPT_ENCRYPTION_KEY = 'ITSAppUsesNonExemptEncryption'
 const KEYCHAIN_SERVICE = 'reflect-notary'
 const SHARE_EXTENSION_APP_GROUP = 'group.app.reflect'
 
-const here = dirname(fileURLToPath(import.meta.url))
+const here = import.meta.dirname
 const appDir = join(here, '..')
 const repoRoot = join(here, '..', '..', '..')
 const iosBuildDir = join(appDir, 'src-tauri', 'gen', 'apple', 'build')
@@ -755,7 +755,7 @@ function preflight({ buildNumberFlag }) {
     )
     log(`altool upload auth: ${uploadCredentials.source}`)
     log(`Sentry uploads: ${sentryConfiguration.enabled ? 'configured' : 'disabled'}`)
-    log(`xcodebuild: ${capture('xcodebuild', ['-version']).trim().replace(/\n/g, ' / ')}`)
+    log(`xcodebuild: ${capture('xcodebuild', ['-version']).trim().replaceAll('\n', ' / ')}`)
     verifyAppStoreConnectAppRecord(uploadCredentials)
     log('preflight passed')
   } finally {
@@ -795,8 +795,7 @@ Docs: docs/ios-testflight.md`
 async function main() {
   const argv = process.argv.slice(2)
   const flags = argv.filter((arg) => arg.startsWith('--'))
-  const commands = argv.filter((arg) => !arg.startsWith('--'))
-  const command = commands[0] ?? 'build'
+  const command = argv.find((arg) => !arg.startsWith('--')) ?? 'build'
   const unknownFlag = flags.find(
     (flag) =>
       !['--help', '--wait', '--verbose'].includes(flag) &&

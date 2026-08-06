@@ -42,7 +42,7 @@ const embla = vi.hoisted(() => {
   }
 
   function emit(event: string): void {
-    for (const handler of [...(handlers.get(event) ?? [])]) {
+    for (const handler of (handlers.get(event) ?? [])) {
       handler(api)
     }
   }

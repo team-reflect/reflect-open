@@ -34,6 +34,6 @@ export function parseInlineLink(source: string): InlineLinkParts | null {
   return {
     isImage: match[1] === '!',
     text: match[2]!,
-    href: match[3]!.replace(/^<|>$/g, ''),
+    href: match[3]!.replaceAll(/^<|>$/g, ''),
   }
 }

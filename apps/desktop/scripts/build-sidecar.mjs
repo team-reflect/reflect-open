@@ -19,7 +19,7 @@ if (platform === 'ios' || platform === 'android') {
   process.exit(0)
 }
 
-const here = dirname(fileURLToPath(import.meta.url))
+const here = import.meta.dirname
 const repoRoot = join(here, '..', '..', '..')
 const binariesDir = join(here, '..', 'src-tauri', 'binaries')
 

@@ -33,7 +33,7 @@ export function setIndexProgress(progress: IndexProgress | null): void {
     return
   }
   current = progress
-  for (const listener of [...listeners]) {
+  for (const listener of listeners) {
     listener()
   }
 }

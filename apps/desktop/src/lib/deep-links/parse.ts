@@ -99,7 +99,7 @@ function captureLink(capture: TextCaptureKind, url: URL, argument: string): Deep
   if (argument !== '') {
     return null
   }
-  const text = url.searchParams.get('text')?.replace(/\s+/g, ' ').trim() ?? ''
+  const text = url.searchParams.get('text')?.replaceAll(/\s+/g, ' ').trim() ?? ''
   if (text === '' || text.length > DEEP_LINK_TEXT_MAX_LENGTH) {
     return null
   }

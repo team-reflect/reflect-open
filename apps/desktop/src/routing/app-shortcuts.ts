@@ -336,7 +336,7 @@ export function useAppShortcuts(): CommandContext {
     }
 
     setMenuCommandDispatch(triggerCommand)
-    window.addEventListener('keydown', onHistoryKeyDownCapture, true)
+    window.addEventListener('keydown', onHistoryKeyDownCapture, {capture: true})
     window.addEventListener('keydown', onKeyDown)
     return () => {
       setMenuCommandDispatch(null)

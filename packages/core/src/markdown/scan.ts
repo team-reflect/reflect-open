@@ -105,7 +105,7 @@ export function scanInlineSegments(text: string): InlineSegment[] {
       // autolinks as `Autolink`. (URLs *inside* a Link/Autolink are never reached
       // — we don't recurse into those.) Both render as their own link.
       if (name === 'URL' || name === 'Autolink') {
-        const href = text.slice(from, to).replace(/^<|>$/g, '')
+        const href = text.slice(from, to).replaceAll(/^<|>$/g, '')
         found.push({ from, to, segment: { kind: 'link', text: href, href } })
         return false
       }

@@ -26,7 +26,7 @@ export function onNoteMoved(listener: NoteMovedListener): () => void {
  * landed).
  */
 export function emitNoteMoved(from: string, to: string): void {
-  for (const listener of [...listeners]) {
+  for (const listener of listeners) {
     try {
       listener(from, to)
     } catch (cause) {

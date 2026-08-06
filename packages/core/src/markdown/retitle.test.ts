@@ -122,7 +122,7 @@ describe('repointPathWikiLinks', () => {
 
   it.each([
     ['a fragment separator', 'notes/c#-notes'],
-    ['a backslash', 'notes\\plan'],
+    ['a backslash', String.raw`notes\plan`],
     ['a loose slash segment that reads as a name', 'notes/a / b'],
     ['a bare name', 'plan'],
   ])('rejects a destination with %s', (_reason, to) => {

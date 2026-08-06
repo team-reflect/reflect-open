@@ -11,8 +11,8 @@ import { db } from './db'
  */
 
 /** Marks the start/end of a highlighted match inside a snippet. */
-export const HIGHLIGHT_START = '\u0001'
-export const HIGHLIGHT_END = '\u0002'
+export const HIGHLIGHT_START = '\u{1}'
+export const HIGHLIGHT_END = '\u{2}'
 
 /** One run of display text, highlighted or plain. */
 export interface HighlightSegment {

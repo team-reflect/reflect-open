@@ -20,7 +20,7 @@ describe('parseNote — wiki links', () => {
   })
 
   it('renders markdown escapes inside wiki-link targets and aliases', () => {
-    const note = parse('See [[www\\.reddit.com/r/test|www\\.reddit.com]].')
+    const note = parse(String.raw`See [[www\.reddit.com/r/test|www\.reddit.com]].`)
     expect(note.wikiLinks.map((w) => ({ target: w.target, alias: w.alias }))).toEqual([
       { target: 'www.reddit.com/r/test', alias: 'www.reddit.com' },
     ])
@@ -158,7 +158,7 @@ describe('parseNote — links, assets, tags, text', () => {
     const note = parse(
       'Rendered www\\.reddit.com, code `www\\.reddit.com`.\n\n```\nwww\\.reddit.com\n```',
     )
-    expect(note.text).toBe('Rendered www.reddit.com, code www\\.reddit.com. www\\.reddit.com')
+    expect(note.text).toBe(String.raw`Rendered www.reddit.com, code www\.reddit.com. www\.reddit.com`)
   })
 
   it('keeps #tags inside fenced code out of the tag list', () => {

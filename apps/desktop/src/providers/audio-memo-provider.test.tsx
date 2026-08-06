@@ -40,7 +40,7 @@ const reconcilerControls = vi.hoisted(() => {
     listeners,
     setTranscribing(value: boolean): void {
       fake.getTranscribing.mockReturnValue(value)
-      for (const listener of [...listeners]) {
+      for (const listener of listeners) {
         listener()
       }
     },

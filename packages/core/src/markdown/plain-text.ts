@@ -20,13 +20,13 @@ const MARKDOWN_ESCAPE_RE = /\\([!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])/g
 
 /** Resolve CommonMark backslash escapes (`\*` → `*`). */
 export function unescapeMarkdownText(text: string): string {
-  return text.replace(MARKDOWN_ESCAPE_RE, '$1')
+  return text.replaceAll(MARKDOWN_ESCAPE_RE, '$1')
 }
 
 function renderMarkdownText(text: string): string {
   return text
-    .replace(WIKI_INNER_RE, (_, inner: string) => inner.replace(/\|/g, ' '))
-    .replace(MARKDOWN_ESCAPE_RE, '$1')
+    .replaceAll(WIKI_INNER_RE, (_, inner: string) => inner.replaceAll('|', ' '))
+    .replaceAll(MARKDOWN_ESCAPE_RE, '$1')
 }
 
 function appendPlainTextChunk(
@@ -92,7 +92,7 @@ export function plainTextOfRange(
   if (pos < end) {
     kept += appendPlainTextChunk(body, pos, end, sortedLiteralRanges)
   }
-  return kept.replace(/\s+/g, ' ').trim()
+  return kept.replaceAll(/\s+/g, ' ').trim()
 }
 
 /** Body text minus the cut (syntax) ranges, with wiki brackets/pipes flattened. */
