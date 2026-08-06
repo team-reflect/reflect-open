@@ -104,11 +104,4 @@ export default defineESLintConfig(
       'unicorn/require-css-escape': 'off',
     },
   },
-  {
-    files: ['package.json', '**/package.json'],
-    // Disable some rules temporarily
-    rules: {
-      'package-json/order-properties': 'off',
-    },
-  },
 )
