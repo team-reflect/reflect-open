@@ -73,6 +73,7 @@ export default defineESLintConfig(
       'regexp/prefer-d': 'off',
       'regexp/prefer-w': 'off',
       'regexp/use-ignore-case': 'off',
+      'unicorn/no-return-array-push': 'off',
     },
   },
 )
