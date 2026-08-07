@@ -75,14 +75,14 @@ describe('RecordingDrawer', () => {
     vi.useFakeTimers()
     const view = await render(<RecordingDrawer />)
 
-    await act(() => {
+    act(() => {
       fireEvent.click(view.getByRole('button', { name: 'Discard recording' }))
     })
-    await act(() => {
+    act(() => {
       vi.advanceTimersByTime(3000)
     })
 
-    await act(() => {
+    act(() => {
       fireEvent.click(view.getByRole('button', { name: 'Discard recording' }))
     })
 

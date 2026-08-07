@@ -258,25 +258,25 @@ function visibleLayer(view: BrowserView): HTMLElement {
  * Dispatch a pointer event the gesture hook can read.
  */
 async function firePointer(element: Element, type: string, init: PointerEventInit): Promise<void> {
-  await act(() => {
+  act(() => {
     element.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, ...init }))
   })
 }
 
 async function finishAnimation(element: Element): Promise<void> {
-  await act(() => {
+  act(() => {
     fireEvent.animationEnd(element)
   })
 }
 
 async function finishTransition(element: Element): Promise<void> {
-  await act(() => {
+  act(() => {
     fireEvent.transitionEnd(element)
   })
 }
 
 async function fireClick(element: Element): Promise<void> {
-  await act(() => {
+  act(() => {
     fireEvent.click(element)
   })
 }
@@ -672,10 +672,10 @@ describe('MobileShell', () => {
     const view = await mount({ kind: 'today' })
     await expect.element(view.getByRole('navigation', { name: 'Sections' })).toBeVisible()
 
-    await act(() => publishKeyboardHeight(316))
+    act(() => publishKeyboardHeight(316))
     expect(view.getByRole('navigation', { name: 'Sections' }).query()).toBeNull()
 
-    await act(() => publishKeyboardHeight(0))
+    act(() => publishKeyboardHeight(0))
     await expect.element(view.getByRole('navigation', { name: 'Sections' })).toBeVisible()
   })
 
@@ -685,10 +685,10 @@ describe('MobileShell', () => {
 
     // Keyboard up with no focused editor (the All-tab search field): neither
     // the tab bar nor a dead-button toolbar.
-    await act(() => publishKeyboardHeight(316))
+    act(() => publishKeyboardHeight(316))
     expect(view.getByRole('toolbar', { name: 'Formatting' }).query()).toBeNull()
 
-    await act(() =>
+    act(() =>
       publishFormattingToolbar(owner, {
         capabilities: {
           canIndent: true,
@@ -714,7 +714,7 @@ describe('MobileShell', () => {
     await expect.element(view.getByRole('toolbar', { name: 'Formatting' })).toBeVisible()
     expect(view.getByRole('navigation', { name: 'Sections' }).query()).toBeNull()
 
-    await act(() => {
+    act(() => {
       clearFormattingToolbar(owner)
       publishKeyboardHeight(0)
     })
@@ -968,7 +968,7 @@ describe('MobileStack transitions & back-swipe', () => {
     await firePointer(stack, 'pointermove', { pointerId: 1, clientX: 600, clientY: 310 })
     await firePointer(stack, 'pointerup', { pointerId: 1, clientX: 600, clientY: 310 })
 
-    await act(() => {
+    act(() => {
       card.dispatchEvent(new Event('transitionend', { bubbles: true }))
       card.dispatchEvent(new Event('transitionend', { bubbles: true }))
     })

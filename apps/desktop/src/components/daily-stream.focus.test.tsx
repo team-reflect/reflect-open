@@ -136,7 +136,7 @@ describe('DailyStream arrival focus', () => {
     const today = todayIso()
     const { view, navigate, anchored, paneFor } = await renderStream()
 
-    await act(() => navigate({ kind: 'today' }, { focusEditor: true }))
+    act(() => navigate({ kind: 'today' }, { focusEditor: true }))
     await anchored(today)
 
     const pane = paneFor(today)
@@ -191,8 +191,8 @@ describe('DailyStream arrival focus', () => {
 
     // A capture arrival first, so the follow-up proves the append intent is
     // one-shot rather than sticky.
-    await act(() => navigate({ kind: 'today' }, { focusEditor: true }))
-    await act(() => navigate({ kind: 'today' }))
+    act(() => navigate({ kind: 'today' }, { focusEditor: true }))
+    act(() => navigate({ kind: 'today' }))
     await anchored(today)
 
     const pane = paneFor(today)

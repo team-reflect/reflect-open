@@ -217,7 +217,7 @@ describe('RouteContent', () => {
     const view = await renderRoute({ kind: 'note', path })
     await expect.element(page.getByLabelText(`Editing ${path}`)).toBeVisible()
 
-    await act(() => editorProbe.onChange?.('# New Title\n'))
+    act(() => editorProbe.onChange?.('# New Title\n'))
     await act(() => flushOpenDocuments())
 
     expect(files[path]).toBe(
@@ -259,7 +259,7 @@ describe('RouteContent', () => {
     const view = await renderRoute({ kind: 'note', path: NEW_NOTE_PATH })
     await expect.element(page.getByLabelText(`Editing ${NEW_NOTE_PATH}`)).toBeVisible()
 
-    await act(() => editorProbe.onChange?.('# Manifesto\n'))
+    act(() => editorProbe.onChange?.('# Manifesto\n'))
     await act(() => flushOpenDocuments())
 
     // The seed's header rides along: the file is born with its identity
