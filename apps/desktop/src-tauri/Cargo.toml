@@ -43,7 +43,7 @@ reflect-graph-paths = { workspace = true }
 tempfile = { workspace = true }
 sha2 = { workspace = true }
 dirs = "6.0.0"
-tauri-plugin-dialog = "2.7.1"
+tauri-plugin-dialog = "2.7.2"
 base64 = "0.23.0"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
@@ -168,7 +168,7 @@ walkdir = "2.5.0"
 # embedding model with byte-level progress (fastembed downloads silently).
 hf-hub = { version = "0.5.0", default-features = false, features = ["ureq", "native-tls"] }
 tauri-plugin-deep-link = "2.4.9"
-tauri-plugin-single-instance = { version = "2.4.2", features = ["deep-link"] }
+tauri-plugin-single-instance = { version = "2.4.3", features = ["deep-link"] }
 
 [target.'cfg(all(not(any(target_os = "android", target_os = "ios")), not(all(target_os = "macos", target_arch = "x86_64"))))'.dependencies]
 fastembed = "5.13.0"
