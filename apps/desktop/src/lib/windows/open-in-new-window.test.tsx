@@ -12,6 +12,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
 vi.mock('@/lib/platform-surface', () => ({ isMobileSurface }))
 
 import {
+  followWantsNewWindow,
   isNewWindowClick,
   openDeepLinkInNewWindow,
   openRouteInNewWindow,
@@ -26,24 +27,31 @@ beforeEach(() => {
 
 describe('isNewWindowClick', () => {
   it('answers true for ⌘-click and ctrl-click', () => {
-    expect(isNewWindowClick(new MouseEvent('click', { metaKey: true }), false)).toBe(true)
-    expect(isNewWindowClick(new MouseEvent('click', { ctrlKey: true }), false)).toBe(true)
+    expect(isNewWindowClick(new MouseEvent('click', { metaKey: true }))).toBe(true)
+    expect(isNewWindowClick(new MouseEvent('click', { ctrlKey: true }))).toBe(true)
   })
 
   it('answers false for a plain click and a missing event', () => {
-    expect(isNewWindowClick(new MouseEvent('click'), false)).toBe(false)
-    expect(isNewWindowClick(undefined, false)).toBe(false)
+    expect(isNewWindowClick(new MouseEvent('click'))).toBe(false)
+    expect(isNewWindowClick(undefined)).toBe(false)
   })
 
-  it('never treats a bare keyboard follow as a new-window request', () => {
+  it('never treats a keyboard follow as a new-window request', () => {
     // Mod-Enter follows a link with the modifier held by definition — it must
     // stay an in-window navigation.
-    expect(isNewWindowClick(new KeyboardEvent('keydown', { metaKey: true }), false)).toBe(false)
+    expect(isNewWindowClick(new KeyboardEvent('keydown', { metaKey: true }))).toBe(false)
   })
 
-  it('answers true whenever the editor reports a spare `mod`', () => {
-    expect(isNewWindowClick(new KeyboardEvent('keydown', { metaKey: true }), true)).toBe(true)
-    expect(isNewWindowClick(undefined, true)).toBe(true)
+  it('followWantsNewWindow combines the `mod` flag with the mouse convention', () => {
+    expect(
+      followWantsNewWindow({ event: new KeyboardEvent('keydown', { metaKey: true }), mod: true }),
+    ).toBe(true)
+    expect(
+      followWantsNewWindow({ event: new KeyboardEvent('keydown', { metaKey: true }), mod: false }),
+    ).toBe(false)
+    expect(
+      followWantsNewWindow({ event: new MouseEvent('click', { ctrlKey: true }), mod: false }),
+    ).toBe(true)
   })
 })
 

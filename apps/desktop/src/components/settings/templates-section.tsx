@@ -21,6 +21,7 @@ import { useGraph } from '@/providers/graph-provider'
 import { useNoteTemplates } from '@/providers/note-templates-provider'
 import { SettingsField } from './field'
 import { SettingsSection } from './section'
+import { isNewWindowClick } from '@/lib/windows/open-in-new-window'
 
 /**
  * Note templates (docs/porting/note-templates.md): the `templates/` folder as
@@ -53,7 +54,10 @@ export function TemplatesSection(): ReactElement {
                 <button
                   type="button"
                   onClick={(event) =>
-                    navigateNoteLink({ kind: 'note', path: template.path }, event, false)
+                    navigateNoteLink({
+                      target: { kind: 'note', path: template.path },
+                      openInNewWindow: isNewWindowClick(event),
+                    })
                   }
                   className="min-w-0 flex-1 text-left"
                 >

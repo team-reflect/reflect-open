@@ -3,6 +3,7 @@ import type { LinkClickHandler } from '@meowdown/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { isDeepLinkUrl } from '@/lib/deep-links/parse'
 import { useFollowDeepLink } from '@/lib/deep-links/use-follow-deep-link'
+import { followWantsNewWindow } from '@/lib/windows/open-in-new-window'
 
 /**
  * Schemes that must never reach the OS opener: script and data URIs carry
@@ -43,7 +44,7 @@ export function useOpenExternalLink(): LinkClickHandler {
     ({ href, event, mod }) => {
       event.preventDefault()
       if (isDeepLinkUrl(href)) {
-        followDeepLink(href, event, mod)
+        followDeepLink({ href, openInNewWindow: followWantsNewWindow({ event, mod }) })
         return
       }
       if (isOpenableExternalUrl(href)) {

@@ -43,6 +43,7 @@ import { useLightboxTransition } from '@/editor/use-lightbox-transition'
 import { isDeepLinkUrl } from '@/lib/deep-links/parse'
 import { useFollowDeepLink } from '@/lib/deep-links/use-follow-deep-link'
 import { cn } from '@/lib/utils'
+import { followWantsNewWindow } from '@/lib/windows/open-in-new-window'
 
 type WikilinkHoverRenderer = (hit: WikilinkHoverHit) => ReactNode | Promise<ReactNode>
 
@@ -162,17 +163,13 @@ interface NoteEditorProps {
    * Mod-Enter key press that followed the link) — handlers read its
    * modifiers, e.g. ⌘-click opens the target in a new window.
    */
-  onWikiLinkClick?: (
-    target: string,
-    event: MouseEvent | KeyboardEvent | undefined,
-    mod: boolean,
-  ) => void
+  onWikiLinkClick?: (options: { target: string; openInNewWindow: boolean }) => void
   /**
    * Click on a rendered Markdown link whose href is graph-local (scheme-less
    * and not an asset): a note link like `[Plan](./Plan.md)`. Receives the
    * authored href; the handler owns source-relative resolution.
    */
-  onNoteLinkClick?: (href: string, event: MouseEvent | KeyboardEvent, mod: boolean) => void
+  onNoteLinkClick?: (options: { href: string; openInNewWindow: boolean }) => void
   /**
    * Resolve the passive body of Meowdown's editor-scoped wiki-link hover
    * card. Resolving `null` (missing, ambiguous, or unavailable targets)
@@ -330,7 +327,10 @@ export function NoteEditor({
 
   const handleWikilinkClick = useCallback(
     (payload: { target: string; event: MouseEvent | KeyboardEvent; mod: boolean }) =>
-      onWikiLinkClickRef.current?.(payload.target, payload.event, payload.mod),
+      onWikiLinkClickRef.current?.({
+        target: payload.target,
+        openInNewWindow: followWantsNewWindow(payload),
+      }),
     [],
   )
   const handleTagClick = useCallback(
@@ -349,6 +349,7 @@ export function NoteEditor({
     // The event may also be the Mod-Enter key press that followed the link
     // (meowdown ≥0.33).
     ({ href, event, mod }: { href: string; event: MouseEvent | KeyboardEvent; mod: boolean }) => {
+      const openInNewWindow = followWantsNewWindow({ event, mod })
       // A graph-relative `assets/…` href (an attachment link) opens through
       // the generation-pinned asset command, never the URL opener — which
       // would receive a meaningless relative string.
@@ -365,13 +366,13 @@ export function NoteEditor({
       // *addressing* link to a new window instead; a declined open (capture link, browser dev)
       // degrades to the normal dispatch.
       if (isDeepLinkUrl(href)) {
-        followDeepLink(href, event, mod)
+        followDeepLink({ href, openInNewWindow })
         return
       }
       if (!isOpenableExternalUrl(href)) {
         // A scheme-less local href is a note link; the host resolves it
         // against this note's own directory.
-        onNoteLinkClickRef.current?.(href, event, mod)
+        onNoteLinkClickRef.current?.({ href, openInNewWindow })
         return
       }
       void openUrl(href).catch((cause) => {

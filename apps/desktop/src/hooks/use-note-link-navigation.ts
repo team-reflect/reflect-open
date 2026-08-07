@@ -1,24 +1,16 @@
 import { useCallback, useLayoutEffect, useRef } from 'react'
-import {
-  isNewWindowClick,
-  openRouteInNewWindow,
-  type NewWindowClickEvent,
-} from '@/lib/windows/open-in-new-window'
+import { openRouteInNewWindow } from '@/lib/windows/open-in-new-window'
 import { useLinkIntentGuard } from '@/lib/windows/use-link-intent-guard'
 import type { NoteRoute } from '@/routing/route'
 import { useRouter } from '@/routing/router'
 
 /** Open one concrete note from a link-like UI control. */
-export type NoteLinkNavigation = (
-  route: NoteRoute,
-  event: NewWindowClickEvent | undefined,
-  mod: boolean,
-) => void
+export type NoteLinkNavigation = (options: { target: NoteRoute; openInNewWindow: boolean }) => void
 
 /**
- * Apply the app-wide note-link convention: a plain activation navigates in
- * the current window, while a ⌘/Ctrl click, or a keyboard follow reporting
- * a spare `mod`, opens the note in a secondary window.
+ * Apply the app-wide note-link convention: `openInNewWindow` (decided at
+ * the UI boundary from a ⌘/Ctrl click or a spare-`mod` keyboard follow)
+ * opens the note in a secondary window; otherwise navigate in place.
  *
  * A native open can be declined (browser/mobile) or fail. In that case the
  * click falls back to ordinary in-window navigation, unless the shared link
@@ -39,9 +31,9 @@ export function useNoteLinkNavigation(scopeKey?: string | number | null): NoteLi
   }, [scopeKey])
 
   return useCallback(
-    (target, event, mod) => {
+    ({ target, openInNewWindow }) => {
       const isStale = beginLinkIntent()
-      if (!isNewWindowClick(event, mod)) {
+      if (!openInNewWindow) {
         navigate(target)
         return
       }

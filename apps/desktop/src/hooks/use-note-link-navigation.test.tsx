@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-react'
 import type { ReactElement } from 'react'
+import { isNewWindowClick } from '@/lib/windows/open-in-new-window'
 import { RouterProvider, useRouter } from '@/routing/router'
 import { useNoteLinkNavigation } from './use-note-link-navigation'
 
@@ -17,13 +18,23 @@ function Links({ scopeKey }: { readonly scopeKey: string | undefined }): ReactEl
     <>
       <button
         type="button"
-        onClick={(event) => openNoteLink({ kind: 'note', path: 'notes/alpha.md' }, event, false)}
+        onClick={(event) =>
+          openNoteLink({
+            target: { kind: 'note', path: 'notes/alpha.md' },
+            openInNewWindow: isNewWindowClick(event),
+          })
+        }
       >
         Alpha
       </button>
       <button
         type="button"
-        onClick={(event) => openNoteLink({ kind: 'note', path: 'notes/bravo.md' }, event, false)}
+        onClick={(event) =>
+          openNoteLink({
+            target: { kind: 'note', path: 'notes/bravo.md' },
+            openInNewWindow: isNewWindowClick(event),
+          })
+        }
       >
         Bravo
       </button>

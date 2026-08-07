@@ -11,11 +11,7 @@ interface ChatAssistantPartProps {
   lastIndex: number
   part: AssistantPart
   status: ChatTurn['status']
-  onWikiLinkClick: (
-    target: string,
-    event: MouseEvent | KeyboardEvent | undefined,
-    mod: boolean,
-  ) => void
+  onWikiLinkClick: (options: { target: string; openInNewWindow: boolean }) => void
 }
 
 /**

@@ -165,9 +165,9 @@ export function MobileTaskEditSheet({
 
   // A link tapped *inside* the draft navigates like "Open note": commit the
   // draft first, then resolve the target (the shared editor hooks).
-  const openWikiLink = (target: string): void => {
+  const openWikiLink = ({ target }: { target: string }): void => {
     closeNavigate()
-    navigateWikiLink(target, undefined, false)
+    navigateWikiLink({ target, openInNewWindow: false })
   }
 
   const openTag = (tag: string): void => {
