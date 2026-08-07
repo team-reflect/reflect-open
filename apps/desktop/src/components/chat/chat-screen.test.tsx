@@ -113,7 +113,9 @@ vi.mock('@/editor/markdown-preview', () => ({
           <button
             key={target}
             type="button"
-            onClick={(event) => onWikiLinkClick?.(target, event.nativeEvent)}
+            onClick={(event) =>
+              onWikiLinkClick?.({ target, openInNewWindow: event.metaKey || event.ctrlKey })
+            }
           >
             Open {target}
           </button>
