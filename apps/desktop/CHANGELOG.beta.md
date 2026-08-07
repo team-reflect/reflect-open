@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.8.1-beta.4...v0.9.0-beta.4) (2026-08-07)
+
+
+### Features
+
+* add "Copy note path" keyboard shortcut ([#1069](https://github.com/team-reflect/reflect-open/issues/1069)) ([fec1851](https://github.com/team-reflect/reflect-open/commit/fec18517886d735ebdf81a7a26265e4674d6fb2d))
+
 ## [0.8.1-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.8.1-beta.3...v0.8.1-beta.4) (2026-08-07)
 
 
