@@ -1,5 +1,5 @@
-import { type MarkMode } from '@meowdown/core'
-import { type EditorMarkdownSyntax } from '@reflect/core'
+import type { MarkMode } from '@meowdown/core'
+import type { EditorMarkdownSyntax } from '@reflect/core'
 
 /**
  * Translate Reflect's implementation-neutral `editorMarkdownSyntax` setting to

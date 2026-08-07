@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react'
-import { type ListSelection } from '@/lib/selection/use-list-selection'
+import type { ListSelection } from '@/lib/selection/use-list-selection'
 
 export interface AllNotesKeyboardOptions {
   selection: ListSelection

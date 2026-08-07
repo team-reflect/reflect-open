@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, type MouseEvent, type ReactElement } from 'react'
 import { Virtualizer, type VirtualizerHandle } from 'virtua'
 import type { NoteListEntry } from '@reflect/core'
-import { type ListSelection } from '@/lib/selection/use-list-selection'
+import type { ListSelection } from '@/lib/selection/use-list-selection'
 import { cn } from '@/lib/utils'
 import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
 import { ALL_NOTES_GRID, AllNotesRow } from './all-notes-row'

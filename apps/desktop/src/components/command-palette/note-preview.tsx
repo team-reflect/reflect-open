@@ -1,4 +1,4 @@
-import { type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { isAppError, readNote, splitFrontmatter } from '@reflect/core'
 import { MarkdownPreview } from '@/editor/markdown-preview'

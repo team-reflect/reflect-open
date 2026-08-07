@@ -9,16 +9,16 @@ import {
 } from 'react'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { errorMessage, type TimeFormat } from '@reflect/core'
-import {
-  type AcceptPendingReplacementOptions,
-  type ExitBoundaryHandler,
-  type FileClickHandler,
-  type FileInfoResolver,
-  type FileLinkResolver,
-  type MarkMode,
-  type SearchStatus,
-  type StartPendingReplacementOptions,
-  type WikilinkHoverHit,
+import type {
+  AcceptPendingReplacementOptions,
+  ExitBoundaryHandler,
+  FileClickHandler,
+  FileInfoResolver,
+  FileLinkResolver,
+  MarkMode,
+  SearchStatus,
+  StartPendingReplacementOptions,
+  WikilinkHoverHit,
 } from '@meowdown/core'
 import {
   MeowdownEditor,

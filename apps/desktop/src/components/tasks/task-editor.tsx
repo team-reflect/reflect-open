@@ -8,7 +8,7 @@ import {
 } from 'react'
 import { Priority } from '@meowdown/core'
 import { useKeymap } from '@meowdown/react'
-import { type OpenTask } from '@reflect/core'
+import type { OpenTask } from '@reflect/core'
 import { markModeFromSyntax } from '@/editor/mark-mode'
 import { NoteEditor, type NoteEditorHandle } from '@/editor/note-editor'
 import { useEditorAutocomplete } from '@/editor/use-editor-autocomplete'

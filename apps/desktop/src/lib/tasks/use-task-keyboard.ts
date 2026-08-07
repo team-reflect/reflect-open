@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react'
-import { type OpenTask } from '@reflect/core'
+import type { OpenTask } from '@reflect/core'
 import { getIsComposing } from '@meowdown/core'
 import { taskKey } from '@/lib/tasks/task-identity'
 import {
@@ -8,8 +8,8 @@ import {
   previousTaskKey,
   todaysDailyTarget,
 } from '@/lib/tasks/task-navigation'
-import { type TaskActions } from '@/lib/tasks/use-task-actions'
-import { type TaskSelection } from '@/lib/tasks/use-task-selection'
+import type { TaskActions } from '@/lib/tasks/use-task-actions'
+import type { TaskSelection } from '@/lib/tasks/use-task-selection'
 
 export interface TaskKeyboardOptions {
   selection: TaskSelection

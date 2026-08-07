@@ -1,4 +1,4 @@
-import { type ReactElement, type ReactNode } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { Pin } from 'lucide-react'
 import { Virtualizer } from 'virtua'
 import type { HighlightSegment } from '@reflect/core'

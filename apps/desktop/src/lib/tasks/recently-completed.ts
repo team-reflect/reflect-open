@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
-import { type OpenTask } from '@reflect/core'
-import { type TaskMarkerOffsetChange } from '@/lib/note-task'
+import type { OpenTask } from '@reflect/core'
+import type { TaskMarkerOffsetChange } from '@/lib/note-task'
 import { withCheckedMarker, withRelocatedTaskMarkers } from '@/lib/tasks/task-cache'
 import { taskKey } from '@/lib/tasks/task-identity'
 

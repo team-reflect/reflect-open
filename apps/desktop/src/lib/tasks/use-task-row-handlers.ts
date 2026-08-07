@@ -1,14 +1,14 @@
 import { useCallback } from 'react'
-import { type OpenTask } from '@reflect/core'
-import { type TaskNavigate } from '@/components/tasks/task-editor'
+import type { OpenTask } from '@reflect/core'
+import type { TaskNavigate } from '@/components/tasks/task-editor'
 import {
   insertTargetForBucket,
   insertTargetForTask,
   previousTaskKey,
 } from '@/lib/tasks/task-navigation'
 import { taskKey } from '@/lib/tasks/task-identity'
-import { type TaskActions } from '@/lib/tasks/use-task-actions'
-import { type TaskSelection } from '@/lib/tasks/use-task-selection'
+import type { TaskActions } from '@/lib/tasks/use-task-actions'
+import type { TaskSelection } from '@/lib/tasks/use-task-selection'
 
 /** The inline-editor callbacks one task row binds (Plan 18). */
 export interface TaskRowEditHandlers {

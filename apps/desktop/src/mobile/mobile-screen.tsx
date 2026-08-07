@@ -1,4 +1,4 @@
-import { type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { useToday } from '@/lib/use-today'
 import { MobileAllNotes } from '@/mobile/screens/all-notes'
 import { MobileChat } from '@/mobile/screens/chat'

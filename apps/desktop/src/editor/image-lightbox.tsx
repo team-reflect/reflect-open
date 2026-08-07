@@ -1,9 +1,9 @@
-import { type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { ExternalLinkIcon, XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { LightboxDialog } from '@/editor/lightbox-dialog'
 import { useImageDismissDrag } from '@/editor/use-image-dismiss-drag'
-import { type LightboxTransitionItem } from '@/editor/use-lightbox-transition'
+import type { LightboxTransitionItem } from '@/editor/use-lightbox-transition'
 import { isMobileSurface } from '@/lib/platform-surface'
 import { cn } from '@/lib/utils'
 

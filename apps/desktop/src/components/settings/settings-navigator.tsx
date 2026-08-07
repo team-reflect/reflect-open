@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactElement } from 'react'
 import { cn } from '@/lib/utils'
 import { scrollToSettingsSection } from './section-scrolling'
-import { type SettingsSectionId } from './sections'
+import type { SettingsSectionId } from './sections'
 import { useActiveSettingsSection } from './use-active-settings-section'
 import { useVisibleSettingsSections } from './use-visible-settings-sections'
 

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { type AssetKind } from '../ai/describe-asset'
+import type { AssetKind } from '../ai/describe-asset'
 import { ASSETS_DIR, DESCRIPTION_SUFFIX } from '../graph/paths'
 import { parseFrontmatter, splitFrontmatter, upsertFrontmatter } from '../markdown/frontmatter'
 

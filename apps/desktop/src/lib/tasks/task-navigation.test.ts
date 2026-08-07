@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { type OpenTask } from '@reflect/core'
+import type { OpenTask } from '@reflect/core'
 import { makeOpenTask } from './open-task-fixture'
 import { insertTargetForTask, previousTaskKey } from './task-navigation'
 import { taskKey } from './task-identity'

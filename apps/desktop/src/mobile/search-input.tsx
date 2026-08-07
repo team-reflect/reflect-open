@@ -1,4 +1,4 @@
-import { type ComponentProps, type ReactElement } from 'react'
+import type { ComponentProps, ReactElement } from 'react'
 import { CircleX } from 'lucide-react'
 import { getIsComposing } from '@meowdown/core'
 import { Button } from '@/components/ui/button'

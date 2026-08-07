@@ -1,6 +1,6 @@
 import { groupTasks, type OpenTask, type TaskGroup } from '@reflect/core'
 import { sameTask, taskKey } from '@/lib/tasks/task-identity'
-import { type TaskFilters } from '@/lib/tasks/task-filters'
+import type { TaskFilters } from '@/lib/tasks/task-filters'
 
 /** Keep only the groups the active filters allow (V1's per-bucket toggles). */
 export function visibleGroups(groups: TaskGroup[], filters: TaskFilters): TaskGroup[] {

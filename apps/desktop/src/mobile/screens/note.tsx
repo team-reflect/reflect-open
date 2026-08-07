@@ -1,4 +1,4 @@
-import { type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { isUntitledNotePath } from '@reflect/core'
 import { NotePane } from '@/components/note-pane'
 import { IncomingBacklinks } from '@/mobile/incoming-backlinks'

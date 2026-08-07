@@ -1,4 +1,4 @@
-import { type OpenTask } from '@reflect/core'
+import type { OpenTask } from '@reflect/core'
 
 /**
  * The note a new task is added to (Return-to-add, V1): its path plus the context

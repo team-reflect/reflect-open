@@ -30,7 +30,6 @@ export default defineESLintConfig(
       '@eslint-react/web-api-no-leaked-event-listener': 'off',
       '@typescript-eslint/no-base-to-string': 'off',
       '@typescript-eslint/no-floating-promises': 'off',
-      '@typescript-eslint/no-import-type-side-effects': 'off',
       '@typescript-eslint/no-unnecessary-type-assertion': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unused-vars': 'off',

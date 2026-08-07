@@ -1,4 +1,4 @@
-import { type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { Check } from 'lucide-react'
 import { foldTag, type NoteTagFacet } from '@reflect/core'
 import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer'

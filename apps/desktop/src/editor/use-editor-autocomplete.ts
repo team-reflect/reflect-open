@@ -1,9 +1,9 @@
 import { useCallback } from 'react'
-import {
-  type TagItem,
-  type TagSearchHandler,
-  type WikilinkItem,
-  type WikilinkSearchHandler,
+import type {
+  TagItem,
+  TagSearchHandler,
+  WikilinkItem,
+  WikilinkSearchHandler,
 } from '@meowdown/react'
 import {
   contactLinkSuggestions,

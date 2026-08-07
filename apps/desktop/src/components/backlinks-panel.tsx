@@ -1,4 +1,4 @@
-import { type ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { BacklinkLoadMore } from '@/components/backlink-load-more'
 import { BacklinkSourceGroup } from '@/components/backlink-source-group'

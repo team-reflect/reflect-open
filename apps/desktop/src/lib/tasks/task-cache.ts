@@ -1,5 +1,5 @@
 import { parseNote, type OpenTask } from '@reflect/core'
-import { type TaskMarkerOffsetChange } from '@/lib/note-task'
+import type { TaskMarkerOffsetChange } from '@/lib/note-task'
 import { sameTask, taskKey } from '@/lib/tasks/task-identity'
 
 /**

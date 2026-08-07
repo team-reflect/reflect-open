@@ -1,4 +1,4 @@
-import { type ReactElement, type ReactNode } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { GitMerge } from 'lucide-react'
 import {

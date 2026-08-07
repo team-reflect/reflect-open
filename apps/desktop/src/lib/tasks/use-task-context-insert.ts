@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { type OpenTask } from '@reflect/core'
+import type { OpenTask } from '@reflect/core'
 import { continueTaskInContext, type ContinuedTaskInContext } from '@/lib/note-task'
 import { relocateRecentlyCompleted } from '@/lib/tasks/recently-completed'
 import { withEditedTask, withoutTasks } from '@/lib/tasks/task-cache'
