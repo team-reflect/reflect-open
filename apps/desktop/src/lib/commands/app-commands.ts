@@ -8,6 +8,7 @@ import {
   untitledNotePath,
 } from '@reflect/core'
 import { attachFilesToNote } from '@/lib/attach-files'
+import { runCopyNotePath } from '@/lib/note-copy-path'
 import { runCopyDeepLink } from '@/lib/note-deep-link'
 import { runGistPublish } from '@/lib/note-gist'
 import { toggleNotePinned } from '@/lib/note-pin'
@@ -267,6 +268,23 @@ const APP_COMMANDS: AppCommand[] = [
         return
       }
       await runCopyDeepLink(path, generation)
+    },
+  },
+  {
+    id: 'note.copyPath',
+    title: 'Copy note path',
+    keywords: ['file', 'absolute', 'filesystem', 'clipboard', 'location'],
+    // The OS-path sibling of "Copy deep link": copies the note's absolute
+    // file path (Finder's Copy-as-Pathname chord) for use outside Reflect,
+    // where a reflect:// address cannot resolve. `runCopyNotePath` owns all
+    // feedback (the "Note path copied" status line and failure surfaces).
+    keybinding: 'Alt-Mod-c',
+    run: async (context) => {
+      const path = context.notePath()
+      if (path === null) {
+        return
+      }
+      await runCopyNotePath(context.graphRoot(), path)
     },
   },
   {

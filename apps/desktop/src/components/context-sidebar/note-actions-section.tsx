@@ -7,7 +7,6 @@ import { keybindingFor } from '@/lib/commands/app-commands'
 import { toggleNotePinned } from '@/lib/note-pin'
 import { toggleNotePrivate } from '@/lib/note-private'
 import { useOptimisticPinToggle } from '@/lib/notes/use-optimistic-pin-toggle'
-import { NoteCopyPathAction } from './note-copy-path-action'
 import { NoteGistAction } from './note-gist-action'
 import { NoteTrashAction } from './note-trash-action'
 import { NoteToggleAction } from './note-toggle-action'
@@ -69,7 +68,6 @@ export function NoteActionsSection({
         keybinding={PRIVATE_KEYBINDING}
         tooltip="Locks this note out of AI. Backup and sync still include it."
       />
-      <NoteCopyPathAction path={path} />
       <NoteGistAction path={path} keybinding={GIST_KEYBINDING} />
       {showTrash ? <NoteTrashAction path={path} /> : null}
     </SidebarSection>

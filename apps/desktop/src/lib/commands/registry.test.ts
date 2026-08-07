@@ -23,6 +23,7 @@ function fakeContext(overrides?: Partial<CommandContext>): CommandContext {
     switchGraph: vi.fn(),
     toggleAudioMemo: vi.fn(),
     generation: () => 1,
+    graphRoot: () => '/g',
     openPalette: vi.fn(),
     openShortcuts: vi.fn(),
     openTemplatePicker: vi.fn(),

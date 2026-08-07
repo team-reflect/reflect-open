@@ -243,6 +243,7 @@ export function useAppShortcuts(): CommandContext {
       },
       toggleAudioMemo,
       generation: () => generationRef.current,
+      graphRoot: () => graphRootRef.current,
       openPalette,
       openShortcuts,
       openTemplatePicker,

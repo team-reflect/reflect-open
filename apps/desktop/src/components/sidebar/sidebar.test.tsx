@@ -146,6 +146,7 @@ async function renderSidebar(overrides?: Partial<CommandContext>, initialRoute?:
     switchGraph: vi.fn(),
     toggleAudioMemo: vi.fn(),
     generation: () => 1,
+    graphRoot: () => '/notes',
     openPalette,
     openShortcuts: vi.fn(),
     openTemplatePicker: vi.fn(),

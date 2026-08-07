@@ -16,6 +16,7 @@ const backfillEmbeddingsVisibly = vi.hoisted(() => vi.fn(async () => 'completed'
 const toggleNotePinned = vi.hoisted(() => vi.fn(async () => true))
 const toggleNotePrivate = vi.hoisted(() => vi.fn(async () => true))
 const runCopyDeepLink = vi.hoisted(() => vi.fn(async () => undefined))
+const runCopyNotePath = vi.hoisted(() => vi.fn(async () => undefined))
 const getNote = vi.hoisted(() => vi.fn<() => Promise<NoteRow | undefined>>(async () => undefined))
 const getPinnedNotes = vi.hoisted(() => vi.fn<() => Promise<PinnedNote[]>>(async () => []))
 const hasBridge = vi.hoisted(() => vi.fn(() => true))
@@ -32,6 +33,7 @@ vi.mock('@/lib/semantic', async (importOriginal) => ({
 vi.mock('@/lib/note-pin', () => ({ toggleNotePinned }))
 vi.mock('@/lib/note-private', () => ({ toggleNotePrivate }))
 vi.mock('@/lib/note-deep-link', () => ({ runCopyDeepLink }))
+vi.mock('@/lib/note-copy-path', () => ({ runCopyNotePath }))
 vi.mock('@/lib/windows/open-in-new-window', () => ({ openRouteInNewWindow }))
 vi.mock('@/lib/operations', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/operations')>()),
@@ -84,6 +86,7 @@ function fakeContext(overrides?: Partial<CommandContext>) {
     switchGraph: vi.fn(),
     toggleAudioMemo: vi.fn(),
     generation: () => 7,
+    graphRoot: () => '/g',
     openPalette: vi.fn(),
     openShortcuts: vi.fn(),
     openTemplatePicker: vi.fn(),
@@ -128,6 +131,10 @@ describe('keybindingFor', () => {
 
   it('note.copyDeepLink keeps the V1 copy-link shortcut', () => {
     expect(keybindingFor('note.copyDeepLink')).toBe('Alt-Mod-l')
+  })
+
+  it('note.copyPath uses the Finder copy-as-pathname chord', () => {
+    expect(keybindingFor('note.copyPath')).toBe('Alt-Mod-c')
   })
 
   it('note.openInNewWindow uses the system-level open-window shortcut', () => {
@@ -368,6 +375,30 @@ describe('app commands', () => {
     const { context: noGraph } = fakeContext({ generation: () => null })
     await command('note.copyDeepLink').run(noGraph)
     expect(runCopyDeepLink).not.toHaveBeenCalled()
+  })
+
+  it('note.copyPath hands the graph root and route note to the helper', async () => {
+    runCopyNotePath.mockClear()
+    const { context } = fakeContext({ route: () => ({ kind: 'note', path: 'notes/a.md' }) })
+    await command('note.copyPath').run(context)
+    expect(runCopyNotePath).toHaveBeenCalledWith('/g', 'notes/a.md')
+  })
+
+  it('note.copyPath no-ops on note-less routes', async () => {
+    runCopyNotePath.mockClear()
+    const { context } = fakeContext({ route: () => ({ kind: 'settings' }) })
+    await command('note.copyPath').run(context)
+    expect(runCopyNotePath).not.toHaveBeenCalled()
+  })
+
+  it('note.copyPath lets the helper surface the no-graph failure', async () => {
+    runCopyNotePath.mockClear()
+    const { context } = fakeContext({
+      route: () => ({ kind: 'note', path: 'notes/a.md' }),
+      graphRoot: () => null,
+    })
+    await command('note.copyPath').run(context)
+    expect(runCopyNotePath).toHaveBeenCalledWith(null, 'notes/a.md')
   })
 
   it('dev.toggleDevtools toggles the inspector through the native shell', async () => {
