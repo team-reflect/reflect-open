@@ -52,8 +52,9 @@ const chatDeleteArgsSchema = z.object({ id: z.string() })
 
 /**
  * The in-browser stand-in for the Rust shell (dev builds only): answers the
- * command surface the mobile tree exercises from an in-memory file map and the
- * wasm SQLite index. The in-memory graph has one fixed generation (`1`); the
+ * command surface the desktop and mobile trees exercise from an in-memory
+ * file map and the wasm SQLite index. The in-memory graph has one fixed
+ * generation (`1`); the
  * no-clobber note-create command validates that value before touching the
  * store, matching its native race-safety contract.
  *
@@ -94,6 +95,19 @@ export function createDevBridge(backend: DevBridgeBackend): IpcBridge {
       case 'graph_create':
         return graphInfo
       case 'recent_graphs':
+        // One seeded recent so the desktop chooser has something to open —
+        // the browser has no folder picker, so this is the only entry point.
+        return [{ root: graphInfo.root, name: graphInfo.name, openedMs: Date.now() }]
+      case 'icloud_status':
+        // No iCloud container in a browser; the chooser's iCloud card hides.
+        return { available: false, documentsRoot: null, existingGraphRoots: [] }
+      case 'embed_status':
+        // `failed` is the designed recoverable "unavailable" state — semantic
+        // search surfaces show it honestly instead of offering a download.
+        return { status: 'failed', message: 'embeddings are unavailable in browser dev' }
+      case 'vault_scan_stats':
+        return { notes: files.list().length, attachments: 0, skipped: 0 }
+      case 'list_attachments':
         return []
       case 'forget_recent':
       case 'capture_host_register':

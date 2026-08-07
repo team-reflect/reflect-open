@@ -31,20 +31,20 @@ export function seedGraphFiles(): Record<string, string> {
   return {
     [`daily/${today}.md`]: [
       `- Morning review with [[Sarah Chen]] about the [[Reflect V2]] launch`,
-      `- [ ] Ship the mobile filter badges [[${today}]]`,
-      `- [ ] Reply to the beta feedback thread`,
+      `+ [ ] Ship the mobile filter badges [[${today}]]`,
+      `+ [ ] Reply to the beta feedback thread`,
       `- Started reading [[Atomic Habits]] on the train #book`,
       ``,
     ].join('\n'),
     [`daily/${yesterday}.md`]: [
       `- Pairing session on the day carousel swipe physics`,
-      `- [x] Fix the week-strip echo guard`,
+      `+ [x] Fix the week-strip echo guard`,
       `- Lunch with [[James Clear]] — talked habit loops #person`,
       ``,
     ].join('\n'),
     [`daily/${isoDay(2)}.md`]: [
       `- Sketched the [[Quarterly Goals]] doc`,
-      `- [ ] Book flights for the offsite [[${nextWeek}]]`,
+      `+ [ ] Book flights for the offsite [[${nextWeek}]]`,
       ``,
     ].join('\n'),
     [`daily/${isoDay(4)}.md`]: [
@@ -54,7 +54,7 @@ export function seedGraphFiles(): Record<string, string> {
     ].join('\n'),
     [`daily/${isoDay(7)}.md`]: [
       `- Weekly planning: reviewed [[Reading List]]`,
-      `- [x] Cut the 0.2 beta release`,
+      `+ [x] Cut the 0.2 beta release`,
       ``,
     ].join('\n'),
     'notes/reflect-v2.md': [
@@ -65,8 +65,8 @@ export function seedGraphFiles(): Record<string, string> {
       `projection, sync over Git.`,
       ``,
       `- Owner: [[Sarah Chen]]`,
-      `- [ ] Mobile parity pass [[${nextWeek}]]`,
-      `- [x] Ship the All tab search`,
+      `+ [ ] Mobile parity pass [[${nextWeek}]]`,
+      `+ [x] Ship the All tab search`,
       ``,
     ].join('\n'),
     'notes/sarah-chen.md': [
@@ -120,9 +120,9 @@ export function seedGraphFiles(): Record<string, string> {
       frontmatter({ id: '01hv3xq7c2dm8k4t9w5e6r1n0g' }),
       `# Quarterly Goals`,
       ``,
-      `- [ ] Mobile app in TestFlight [[${nextWeek}]]`,
-      `- [ ] 1k beta signups`,
-      `- [x] Open-source the core`,
+      `+ [ ] Mobile app in TestFlight [[${nextWeek}]]`,
+      `+ [ ] 1k beta signups`,
+      `+ [x] Open-source the core`,
       ``,
     ].join('\n'),
     'notes/private-journal.md': [

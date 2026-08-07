@@ -9,10 +9,11 @@ let installation: Promise<void> | null = null
 /**
  * Install the in-browser dev bridge (dev builds only): an in-memory graph
  * seeded with demo notes, backed by the real index schema in wasm SQLite.
- * Loaded lazily by `PlatformRoot` when `?platform=ios` (or `android`) is in
- * the URL and no native shell is present — the mobile tree then boots through
- * its ordinary path: graph open, full index rebuild from the seeded files,
- * queries over `db_query`.
+ * Loaded lazily by `PlatformRoot` whenever plain-browser dev has no native
+ * shell — with platform `desktop` by default, or `ios`/`android` when the
+ * `?platform=` override forces the mobile tree. The chosen tree then boots
+ * through its ordinary path: graph open, full index rebuild from the seeded
+ * files, queries over `db_query`.
  *
  * Idempotent: React 19 StrictMode double-fires the installing effect, and the
  * second call must not re-seed or swap the bridge mid-boot.
