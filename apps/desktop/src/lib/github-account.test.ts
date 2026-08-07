@@ -4,6 +4,10 @@ import { fetch as tauriFetch } from '@tauri-apps/plugin-http'
 import { fetchSignedInUser } from './github-account'
 
 vi.mock('@tauri-apps/plugin-http', () => ({ fetch: vi.fn() }))
+vi.mock('@/lib/platform', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/platform')>()),
+  isNativeShell: () => true,
+}))
 const httpFetch = vi.mocked(tauriFetch)
 
 function fakeKeychain(initial: Record<string, string> = {}): Map<string, string> {
