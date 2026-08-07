@@ -16,6 +16,10 @@ import { GithubAuthStep } from './github-auth-step'
 // code-handoff view.
 
 vi.mock('@tauri-apps/plugin-http', () => ({ fetch: vi.fn() }))
+vi.mock('@/lib/platform', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/platform')>()),
+  isNativeShell: () => true,
+}))
 vi.mock('@tauri-apps/plugin-opener', () => ({ openUrl: vi.fn(async () => {}) }))
 vi.mock('@reflect/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@reflect/core')>()),

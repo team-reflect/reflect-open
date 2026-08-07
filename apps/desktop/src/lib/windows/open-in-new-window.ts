@@ -1,6 +1,7 @@
-import { errorMessage, hasBridge, openNoteWindow } from '@reflect/core'
+import { errorMessage, openNoteWindow } from '@reflect/core'
 import { deepLinkForRoute } from '@/lib/deep-links/format'
 import { parseDeepLink } from '@/lib/deep-links/parse'
+import { isNativeShell } from '@/lib/platform'
 import { isMobileSurface } from '@/lib/platform-surface'
 import type { Route } from '@/routing/route'
 
@@ -42,7 +43,7 @@ export function isNewWindowClick(event: NewWindowClickEvent | undefined): boolea
  * so the gesture degrades to a plain click instead of doing nothing.
  */
 export async function openRouteInNewWindow(route: Route): Promise<boolean> {
-  if (!hasBridge() || isMobileSurface()) {
+  if (!isNativeShell() || isMobileSurface()) {
     return false
   }
   const link = deepLinkForRoute(route)
@@ -59,7 +60,7 @@ export async function openRouteInNewWindow(route: Route): Promise<boolean> {
  * Same false-not-throw contract as {@link openRouteInNewWindow}.
  */
 export async function openDeepLinkInNewWindow(href: string): Promise<boolean> {
-  if (!hasBridge() || isMobileSurface()) {
+  if (!isNativeShell() || isMobileSurface()) {
     return false
   }
   const link = parseDeepLink(href)
