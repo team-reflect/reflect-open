@@ -39,7 +39,7 @@ export function useBacklinkNavigation(): BacklinkNavigation {
 
   const openSource = useCallback(
     (target: string, event?: NewWindowClickEvent) => {
-      navigateNoteLink(routeForPath(target), event)
+      navigateNoteLink(routeForPath(target), event, false)
     },
     [navigateNoteLink],
   )
@@ -47,7 +47,7 @@ export function useBacklinkNavigation(): BacklinkNavigation {
   const navigateWikiLink = useWikiLinkNavigation(graph?.generation ?? null)
   const { resolveImageUrl } = useAssetPersistence(graph?.generation ?? null)
   const onWikilinkClick = useCallback<WikilinkClickHandler>(
-    ({ target, event }) => navigateWikiLink(target, event),
+    ({ target, event, mod }) => navigateWikiLink(target, event, mod),
     [navigateWikiLink],
   )
   const resolveImageUrlStable = useCallback(

@@ -21,7 +21,7 @@ function ConflictedNoteLink({ note }: ConflictedNoteLinkProps): ReactElement {
         variant="ghost"
         size="sm"
         className="h-auto w-full max-w-sm justify-start whitespace-normal px-2 py-1 text-left text-xs text-current hover:bg-amber-500/10 hover:text-current"
-        onClick={(event) => navigateNoteLink({ kind: 'note', path: note.path }, event)}
+        onClick={(event) => navigateNoteLink({ kind: 'note', path: note.path }, event, false)}
       >
         <span className="min-w-0 flex-1">
           <span className="block truncate font-medium">{note.title}</span>

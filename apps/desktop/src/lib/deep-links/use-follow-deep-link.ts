@@ -9,7 +9,11 @@ import {
 import { useLinkIntentGuard } from '@/lib/windows/use-link-intent-guard'
 
 /** Follow one in-app `reflect://` link. */
-export type FollowDeepLink = (href: string, event?: NewWindowClickEvent) => void
+export type FollowDeepLink = (
+  href: string,
+  event: NewWindowClickEvent | undefined,
+  mod: boolean,
+) => void
 
 /**
  * Follow an in-app deep link, applying the note-link modifier convention to
@@ -21,7 +25,7 @@ export function useFollowDeepLink(): FollowDeepLink {
   const beginLinkIntent = useLinkIntentGuard()
 
   return useCallback(
-    (href, event) => {
+    (href, event, mod) => {
       const link = parseDeepLink(href)
       // A capture or rejected URL still dispatches so the graph-scoped handler
       // can write it or surface the error, but it cannot supersede navigation.
@@ -31,7 +35,7 @@ export function useFollowDeepLink(): FollowDeepLink {
       }
 
       const isStale = beginLinkIntent()
-      if (!isNewWindowClick(event)) {
+      if (!isNewWindowClick(event, mod)) {
         dispatchDeepLink(href)
         return
       }

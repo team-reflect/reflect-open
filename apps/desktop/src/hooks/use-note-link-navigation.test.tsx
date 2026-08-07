@@ -17,13 +17,13 @@ function Links({ scopeKey }: { readonly scopeKey: string | undefined }): ReactEl
     <>
       <button
         type="button"
-        onClick={(event) => openNoteLink({ kind: 'note', path: 'notes/alpha.md' }, event)}
+        onClick={(event) => openNoteLink({ kind: 'note', path: 'notes/alpha.md' }, event, false)}
       >
         Alpha
       </button>
       <button
         type="button"
-        onClick={(event) => openNoteLink({ kind: 'note', path: 'notes/bravo.md' }, event)}
+        onClick={(event) => openNoteLink({ kind: 'note', path: 'notes/bravo.md' }, event, false)}
       >
         Bravo
       </button>

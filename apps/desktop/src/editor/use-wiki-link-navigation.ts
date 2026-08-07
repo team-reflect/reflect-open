@@ -27,11 +27,12 @@ function reportUnavailableNoteTitle(title: string): void {
  * available, existing titles still use the read-only index resolver and
  * unresolved titles are a no-op.
  *
- * A ⌘-click (the originating `event`, when the caller passes it) opens the
- * resolved target in a secondary note window instead — falling back to
- * in-window navigation whenever the surface can't (browser dev, mobile), so
- * the modifier never makes a link do nothing. Keyboard follows (Mod-Enter)
- * deliberately stay in-window: their modifier is held by definition.
+ * A ⌘-click, or a keyboard follow whose meowdown `mod` flag reports a spare
+ * modifier (⌘/Ctrl-Enter on a selected link unit), opens the resolved target
+ * in a secondary note window instead, falling back to in-window navigation
+ * whenever the surface can't (browser dev, mobile), so the modifier never
+ * makes a link do nothing. The Mod-Enter caret follow stays in-window: its
+ * modifier is the trigger itself, so meowdown reports `mod: false`.
  *
  * Resolution is async, and the host pane can unmount or the user can act
  * again while it's in flight — a late navigate would yank the user somewhere
@@ -45,15 +46,15 @@ function reportUnavailableNoteTitle(title: string): void {
  */
 export function useWikiLinkNavigation(
   generation: number | null,
-): (target: string, event?: MouseEvent | KeyboardEvent) => void {
+): (target: string, event: MouseEvent | KeyboardEvent | undefined, mod: boolean) => void {
   const navigateNoteLink = useNoteLinkNavigation()
   const beginLinkIntent = useLinkIntentGuard()
 
   return useCallback(
-    (target: string, event?: MouseEvent | KeyboardEvent) => {
+    (target: string, event: MouseEvent | KeyboardEvent | undefined, mod: boolean) => {
       const isStale = beginLinkIntent()
       const open = (route: NoteRoute): void => {
-        navigateNoteLink(route, event)
+        navigateNoteLink(route, event, mod)
       }
       void (async () => {
         try {

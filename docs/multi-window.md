@@ -57,9 +57,10 @@ It targets `CommandContext.notePath()`, so the focused day in the daily stream
 and an ordinary routed note both open through the same mechanism described
 below. The command is also exposed in the native Window menu.
 
-1. A modifier click (`isNewWindowClick` — **mouse events only**: meowdown
-   also fires link handlers for Mod-Enter keyboard follows, whose modifier
-   is held by definition) resolves the target as usual. Resolved note
+1. A modifier click, or a keyboard follow whose meowdown `mod` flag reports
+   a spare modifier (Cmd/Ctrl+Enter on a selected link unit; the Mod-Enter
+   caret follow reports `mod: false`, its modifier being the trigger), asks
+   `isNewWindowClick` and resolves the target as usual. Resolved note
    references share `useNoteLinkNavigation`, which applies the convention and
    delegates to `openRouteInNewWindow`; raw in-note links use
    `openDeepLinkInNewWindow` (`src/lib/windows/open-in-new-window.ts`). Routes

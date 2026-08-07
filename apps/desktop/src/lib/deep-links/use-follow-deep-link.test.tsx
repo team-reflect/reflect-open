@@ -24,7 +24,7 @@ function Host(): ReactElement {
   return (
     <button
       type="button"
-      onClick={(event) => openNoteLink({ kind: 'note', path: 'notes/newer-link.md' }, event)}
+      onClick={(event) => openNoteLink({ kind: 'note', path: 'notes/newer-link.md' }, event, false)}
     >
       Open newer note link
     </button>
@@ -50,7 +50,7 @@ function Harness({ showHost = true }: { readonly showHost?: boolean }): ReactEle
 }
 
 function modifierClick(href = 'reflect://note/older'): void {
-  followDeepLink?.(href, new MouseEvent('click', { metaKey: true }))
+  followDeepLink?.(href, new MouseEvent('click', { metaKey: true }), false)
 }
 
 /** Lets a settled window-open promise run its fallback continuation. */
@@ -159,7 +159,7 @@ describe('useFollowDeepLink', () => {
 
     modifierClick()
     expect(openDeepLinkInNewWindow).toHaveBeenCalledWith('reflect://note/older')
-    followDeepLink?.(url, new MouseEvent('click', { metaKey: true }))
+    followDeepLink?.(url, new MouseEvent('click', { metaKey: true }), false)
     finishOpen(false)
     await settle()
 
@@ -180,7 +180,7 @@ describe('useFollowDeepLink', () => {
 
       modifierClick()
       expect(openDeepLinkInNewWindow).toHaveBeenCalledWith('reflect://note/older')
-      followDeepLink?.(url)
+      followDeepLink?.(url, undefined, false)
       finishOpen(false)
       await settle()
 

@@ -77,7 +77,7 @@ export function ChatToolChip({ part }: ChatToolChipProps): ReactElement {
   const { navigate } = useRouter()
   const navigateNoteLink = useNoteLinkNavigation()
   const openNote = (path: string, event: MouseEvent<HTMLButtonElement>): void => {
-    navigateNoteLink(routeForPath(path), event)
+    navigateNoteLink(routeForPath(path), event, false)
   }
   const pending = isToolPending(part)
   const call = part.call

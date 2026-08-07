@@ -9,11 +9,16 @@ import type { NoteRoute } from '@/routing/route'
 import { useRouter } from '@/routing/router'
 
 /** Open one concrete note from a link-like UI control. */
-export type NoteLinkNavigation = (route: NoteRoute, event?: NewWindowClickEvent) => void
+export type NoteLinkNavigation = (
+  route: NoteRoute,
+  event: NewWindowClickEvent | undefined,
+  mod: boolean,
+) => void
 
 /**
- * Apply the app-wide note-link convention: a plain click navigates in the
- * current window, while ⌘/Ctrl-click opens the note in a secondary window.
+ * Apply the app-wide note-link convention: a plain activation navigates in
+ * the current window, while a ⌘/Ctrl click, or a keyboard follow reporting
+ * a spare `mod`, opens the note in a secondary window.
  *
  * A native open can be declined (browser/mobile) or fail. In that case the
  * click falls back to ordinary in-window navigation, unless the shared link
@@ -34,9 +39,9 @@ export function useNoteLinkNavigation(scopeKey?: string | number | null): NoteLi
   }, [scopeKey])
 
   return useCallback(
-    (target, event) => {
+    (target, event, mod) => {
       const isStale = beginLinkIntent()
-      if (!isNewWindowClick(event)) {
+      if (!isNewWindowClick(event, mod)) {
         navigate(target)
         return
       }

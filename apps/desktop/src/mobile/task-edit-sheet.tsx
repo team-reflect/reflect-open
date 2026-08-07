@@ -167,7 +167,7 @@ export function MobileTaskEditSheet({
   // draft first, then resolve the target (the shared editor hooks).
   const openWikiLink = (target: string): void => {
     closeNavigate()
-    navigateWikiLink(target)
+    navigateWikiLink(target, undefined, false)
   }
 
   const openTag = (tag: string): void => {

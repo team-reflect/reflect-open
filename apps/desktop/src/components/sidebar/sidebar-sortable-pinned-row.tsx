@@ -76,7 +76,7 @@ export const SidebarSortablePinnedRow = memo(function SidebarSortablePinnedRow({
         ref={setNodeRef}
         type="button"
         style={style}
-        onClick={(event) => navigateNoteLink(target, event)}
+        onClick={(event) => navigateNoteLink(target, event, false)}
         onContextMenu={handleContextMenu}
         aria-current={active ? 'page' : undefined}
         className="block w-full"

@@ -211,7 +211,8 @@ export function TasksScreen(): ReactElement {
     }
   }, [actions, selection, selectedTasks])
   const openNote = useCallback(
-    (path: string, event?: NewWindowClickEvent) => navigateNoteLink(routeForPath(path), event),
+    (path: string, event?: NewWindowClickEvent) =>
+      navigateNoteLink(routeForPath(path), event, false),
     [navigateNoteLink],
   )
   useTaskKeyboard({

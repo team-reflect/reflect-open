@@ -26,19 +26,24 @@ beforeEach(() => {
 
 describe('isNewWindowClick', () => {
   it('answers true for ⌘-click and ctrl-click', () => {
-    expect(isNewWindowClick(new MouseEvent('click', { metaKey: true }))).toBe(true)
-    expect(isNewWindowClick(new MouseEvent('click', { ctrlKey: true }))).toBe(true)
+    expect(isNewWindowClick(new MouseEvent('click', { metaKey: true }), false)).toBe(true)
+    expect(isNewWindowClick(new MouseEvent('click', { ctrlKey: true }), false)).toBe(true)
   })
 
   it('answers false for a plain click and a missing event', () => {
-    expect(isNewWindowClick(new MouseEvent('click'))).toBe(false)
-    expect(isNewWindowClick(undefined)).toBe(false)
+    expect(isNewWindowClick(new MouseEvent('click'), false)).toBe(false)
+    expect(isNewWindowClick(undefined, false)).toBe(false)
   })
 
-  it('never treats a keyboard follow as a new-window request', () => {
+  it('never treats a bare keyboard follow as a new-window request', () => {
     // Mod-Enter follows a link with the modifier held by definition — it must
     // stay an in-window navigation.
-    expect(isNewWindowClick(new KeyboardEvent('keydown', { metaKey: true }))).toBe(false)
+    expect(isNewWindowClick(new KeyboardEvent('keydown', { metaKey: true }), false)).toBe(false)
+  })
+
+  it('answers true whenever the editor reports a spare `mod`', () => {
+    expect(isNewWindowClick(new KeyboardEvent('keydown', { metaKey: true }), true)).toBe(true)
+    expect(isNewWindowClick(undefined, true)).toBe(true)
   })
 })
 

@@ -53,7 +53,7 @@ export function TemplatesSection(): ReactElement {
                 <button
                   type="button"
                   onClick={(event) =>
-                    navigateNoteLink({ kind: 'note', path: template.path }, event)
+                    navigateNoteLink({ kind: 'note', path: template.path }, event, false)
                   }
                   className="min-w-0 flex-1 text-left"
                 >

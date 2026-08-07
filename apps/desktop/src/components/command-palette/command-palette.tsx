@@ -117,6 +117,7 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
     navigateNoteLink(
       routeForPath(entry.path),
       pendingClick?.path === entry.path ? pendingClick.event : undefined,
+      false,
     )
     closePalette()
   }
