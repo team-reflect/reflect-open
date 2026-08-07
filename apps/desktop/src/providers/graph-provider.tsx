@@ -499,6 +499,9 @@ export function GraphProvider({
   // be expressed as per-file events; the watcher asks for one full reconcile
   // instead, and `refresh` coalesces bursts into a single queued rerun.
   useEffect(() => {
+    if (!hasBridge()) {
+      return // bridgeless browser dev — no native event stream to subscribe to
+    }
     let unlisten: (() => void) | null = null
     let disposed = false
     void subscribeReconcileRequests(() => refreshIndex()).then(
