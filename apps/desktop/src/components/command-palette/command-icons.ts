@@ -23,7 +23,7 @@ import {
  * contract: the registry stays host-agnostic (CLI and deep links don't render
  * icons), and an unmapped command just gets the generic glyph.
  */
-const COMMAND_ICONS: Record<string, LucideIcon> = {
+export const COMMAND_ICONS: Record<string, LucideIcon> = {
   'nav.today': CalendarDays,
   'note.new': SquarePen,
   'history.back': ArrowLeft,
@@ -41,6 +41,4 @@ const COMMAND_ICONS: Record<string, LucideIcon> = {
   'index.rebuild': RefreshCw,
 }
 
-export function commandIcon(id: string): LucideIcon {
-  return COMMAND_ICONS[id] ?? Command
-}
+export const FALLBACK_COMMAND_ICON: LucideIcon = Command

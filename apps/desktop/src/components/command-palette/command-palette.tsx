@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
 import { useSettings } from '@/providers/settings-provider'
 import { routeForPath } from '@/routing/route'
-import { commandIcon } from './command-icons'
+import { COMMAND_ICONS, FALLBACK_COMMAND_ICON } from './command-icons'
 import { type NoteEntry } from './entries'
 import { NotePreview } from './note-preview'
 import { usePalette } from './palette-provider'
@@ -244,7 +244,7 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
               {sections.commands.length > 0 ? (
                 <Command.Group heading="Commands" className="reflect-palette-group">
                   {sections.commands.map((command) => {
-                    const Icon = commandIcon(command.id)
+                    const Icon = COMMAND_ICONS[command.id] ?? FALLBACK_COMMAND_ICON
                     return (
                       <Command.Item
                         key={command.id}

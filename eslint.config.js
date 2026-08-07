@@ -26,7 +26,6 @@ export default defineESLintConfig(
       '@eslint-react/exhaustive-deps': 'off',
       '@eslint-react/naming-convention-ref-name': 'off',
       '@eslint-react/set-state-in-effect': 'off',
-      '@eslint-react/static-components': 'off',
       '@eslint-react/use-state': 'off',
       '@eslint-react/web-api-no-leaked-event-listener': 'off',
       '@typescript-eslint/no-base-to-string': 'off',
