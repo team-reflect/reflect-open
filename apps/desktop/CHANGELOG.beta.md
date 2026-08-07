@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1-beta.4](https://github.com/team-reflect/reflect-open/compare/v0.8.1-beta.3...v0.8.1-beta.4) (2026-08-07)
+
+
+### Bug Fixes
+
+* reveal chat copy action on response hover ([#1061](https://github.com/team-reflect/reflect-open/issues/1061)) ([b00d23d](https://github.com/team-reflect/reflect-open/commit/b00d23d8bf9bc9648ca1a23e4f5320d9ce9c2938))
+
 ## [0.8.1-beta.3](https://github.com/team-reflect/reflect-open/compare/v0.8.1-beta.2...v0.8.1-beta.3) (2026-08-06)
 
 
