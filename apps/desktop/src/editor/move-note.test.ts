@@ -63,7 +63,9 @@ describe('moveNoteCarryingSession', () => {
     const { session, flush } = fakeSession('notes/a.md')
     const unregister = registerOpenDocument({ session })
     const moves: Array<[string, string]> = []
-    const unsubscribe = onNoteMoved((from, to) => moves.push([from, to]))
+    const unsubscribe = onNoteMoved((from, to) => {
+      moves.push([from, to])
+    })
     try {
       await moveNoteCarryingSession('notes/a.md', 'notes/b.md', 7)
 
@@ -119,7 +121,9 @@ describe('followHealedMove', () => {
     const { session } = fakeSession('notes/a.md')
     const unregister = registerOpenDocument({ session })
     const moves: Array<[string, string]> = []
-    const unsubscribe = onNoteMoved((from, to) => moves.push([from, to]))
+    const unsubscribe = onNoteMoved((from, to) => {
+      moves.push([from, to])
+    })
     try {
       followHealedMove('notes/a.md', 'notes/renamed.md')
 
@@ -137,7 +141,9 @@ describe('followHealedMove', () => {
 
   it('a heal of a closed note just announces (routes still follow)', () => {
     const moves: Array<[string, string]> = []
-    const unsubscribe = onNoteMoved((from, to) => moves.push([from, to]))
+    const unsubscribe = onNoteMoved((from, to) => {
+      moves.push([from, to])
+    })
     try {
       followHealedMove('notes/a.md', 'notes/renamed.md')
       expect(moves).toEqual([['notes/a.md', 'notes/renamed.md']])

@@ -473,7 +473,9 @@ describe('useNoteDocument', () => {
   it('the pane adopts its retargeted session when the route follows a move (Plan 17)', async () => {
     vi.useFakeTimers()
     const moves: Array<[string, string]> = []
-    const unsubscribe = onNoteMoved((from, to) => moves.push([from, to]))
+    const unsubscribe = onNoteMoved((from, to) => {
+      moves.push([from, to])
+    })
     try {
       const files: Record<string, string> = { 'notes/a.md': managedNote('# Old Title\n') }
       installGraphFake({ files })

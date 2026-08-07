@@ -64,7 +64,9 @@ function harness(options?: {
             },
     },
     classify: options?.classify ?? (() => 'exact'),
-    onSnapshot: (snapshot) => snapshots.push(snapshot),
+    onSnapshot: (snapshot) => {
+      snapshots.push(snapshot)
+    },
     applyContent: (markdown) => {
       applied.push(markdown)
     },

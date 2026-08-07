@@ -162,7 +162,9 @@ describe('createUpdateController', () => {
     // Watch every transition: the "Install update" row must not even blink —
     // a silent check never enters a visible "checking" phase.
     const phases: string[] = []
-    controller.subscribe(() => phases.push(controller?.getState().phase ?? ''))
+    controller.subscribe(() => {
+      phases.push(controller?.getState().phase ?? '')
+    })
 
     // e.g. the release is mid-edit and the manifest transiently lists nothing.
     checkMock.mockResolvedValue(null)

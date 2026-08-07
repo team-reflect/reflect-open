@@ -132,7 +132,9 @@ describe('rewriteLinksForTitleChange', () => {
       from: 'Old',
       to: 'New',
       io,
-      onProgress: (done, total) => progress.push([done, total]),
+      onProgress: (done, total) => {
+        progress.push([done, total])
+      },
     })
     expect(result.failed).toEqual(['notes/gone.md'])
     expect(result.rewritten).toEqual(['notes/ok.md'])

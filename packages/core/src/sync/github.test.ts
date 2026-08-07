@@ -406,7 +406,9 @@ describe('runDeviceFlow', () => {
         { error: 'slow_down', interval: 12 },
         { access_token: 'ghp_done' },
       ]),
-      onCode: (code) => codes.push(code.userCode),
+      onCode: (code) => {
+        codes.push(code.userCode)
+      },
       sleep: async (ms) => {
         sleeps.push(ms)
       },

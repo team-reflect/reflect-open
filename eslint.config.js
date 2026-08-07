@@ -47,7 +47,6 @@ export default defineESLintConfig(
       'regexp/no-super-linear-backtracking': 'off',
       'unicorn/no-computed-property-existence-check': 'off',
       'unicorn/no-optional-chaining-on-undeclared-variable': 'off',
-      'unicorn/no-return-array-push': 'off',
       'unicorn/no-unnecessary-splice': 'off',
       'unicorn/number-literal-case': 'off',
       'unicorn/prefer-add-event-listener': 'off',

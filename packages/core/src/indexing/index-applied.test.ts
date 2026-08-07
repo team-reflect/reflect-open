@@ -8,10 +8,12 @@ describe('subscribeIndexApplied', () => {
   it('delivers emitted batches (with generation) to every subscriber until it unsubscribes', () => {
     const a: Array<{ paths: string[]; generation: number }> = []
     const b: number[] = []
-    const unsubA = subscribeIndexApplied((changes, generation) =>
-      a.push({ paths: changes.map((change) => change.path), generation }),
-    )
-    const unsubB = subscribeIndexApplied((_changes, generation) => b.push(generation))
+    const unsubA = subscribeIndexApplied((changes, generation) => {
+      a.push({ paths: changes.map((change) => change.path), generation })
+    })
+    const unsubB = subscribeIndexApplied((_changes, generation) => {
+      b.push(generation)
+    })
 
     emitIndexApplied(batch, 7)
     expect(a).toEqual([{ paths: ['assets/a.png'], generation: 7 }])

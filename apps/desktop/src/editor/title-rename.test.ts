@@ -13,7 +13,9 @@ function tracked(options?: { canFire?: () => boolean }) {
   const tracker = createTitleRenameTracker({
     path: 'notes/x.md',
     quietMs: 5000,
-    onRename: (rename) => renames.push(rename),
+    onRename: (rename) => {
+      renames.push(rename)
+    },
     canFire: options?.canFire,
   })
   return { tracker, renames }

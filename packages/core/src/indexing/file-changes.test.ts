@@ -25,7 +25,9 @@ describe('subscribeFileChanges', () => {
   it('delivers locally emitted batches (sync merges) like watcher events', async () => {
     fakeBridge()
     const received: FileChange[][] = []
-    const unlisten = await subscribeFileChanges((changes) => received.push(changes))
+    const unlisten = await subscribeFileChanges((changes) => {
+      received.push(changes)
+    })
 
     const changes: FileChange[] = [
       { path: 'notes/from-b.md', kind: 'upsert', modifiedMs: 123 },
@@ -40,7 +42,9 @@ describe('subscribeFileChanges', () => {
   it('stops local delivery after unlisten', async () => {
     fakeBridge()
     const received: FileChange[][] = []
-    const unlisten = await subscribeFileChanges((changes) => received.push(changes))
+    const unlisten = await subscribeFileChanges((changes) => {
+      received.push(changes)
+    })
     unlisten()
 
     emitFileChanges([{ path: 'notes/a.md', kind: 'upsert' }])
@@ -51,7 +55,9 @@ describe('subscribeFileChanges', () => {
   it('delivers both bridge and local batches to the same subscriber', async () => {
     const { emitFromBridge } = fakeBridge()
     const received: FileChange[][] = []
-    const unlisten = await subscribeFileChanges((changes) => received.push(changes))
+    const unlisten = await subscribeFileChanges((changes) => {
+      received.push(changes)
+    })
 
     emitFromBridge([{ path: 'notes/watched.md', kind: 'upsert' }])
     emitFileChanges([{ path: 'notes/merged.md', kind: 'upsert' }])

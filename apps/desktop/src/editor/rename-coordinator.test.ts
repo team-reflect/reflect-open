@@ -333,7 +333,9 @@ describe('rename coordinator', () => {
     const unregister = registerOpenDocument({ session })
     io.slugPathForTitle.mockResolvedValue('notes/new-title.md')
     const moves: Array<[string, string]> = []
-    const unsubscribe = onNoteMoved((from, to) => moves.push([from, to]))
+    const unsubscribe = onNoteMoved((from, to) => {
+      moves.push([from, to])
+    })
     try {
       const coordinator = makeCoordinator()
       await renameOnce(coordinator, 'Old Title', 'New Title')

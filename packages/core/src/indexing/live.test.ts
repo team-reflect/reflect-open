@@ -49,7 +49,9 @@ describe('applyIndexChanges', () => {
         { path: 'notes/good.md', kind: 'upsert' },
       ],
       3,
-      (_error, change) => failures.push({ change }),
+      (_error, change) => {
+        failures.push({ change })
+      },
     )
 
     expect(applied).toEqual(['notes/good.md'])
@@ -404,7 +406,9 @@ describe('applyIndexChanges move healing (Plan 17)', () => {
       ],
       7,
       undefined,
-      (from, to) => moves.push([from, to]),
+      (from, to) => {
+        moves.push([from, to])
+      },
     )
 
     expect(moves).toEqual([[OLD, NEW]])

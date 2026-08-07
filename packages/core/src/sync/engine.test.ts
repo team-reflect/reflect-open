@@ -66,7 +66,9 @@ describe('createSyncEngine', () => {
     const engine = createSyncEngine({
       generation: 7,
       getToken: async () => 'tok',
-      onStatus: (status) => statuses.push(status),
+      onStatus: (status) => {
+        statuses.push(status)
+      },
       idleMs: 100,
       maxWaitMs: 1000,
     })
@@ -121,7 +123,9 @@ describe('createSyncEngine', () => {
     const engine = createSyncEngine({
       generation: 1,
       getToken: async () => 'tok',
-      onStatus: (status) => statuses.push(status),
+      onStatus: (status) => {
+        statuses.push(status)
+      },
       idleMs: 10,
     })
 
@@ -155,7 +159,9 @@ describe('createSyncEngine', () => {
         getToken: async () => {
           throw new ReflectError(kind, 'refresh failed')
         },
-        onStatus: (status) => statuses.push(status),
+        onStatus: (status) => {
+          statuses.push(status)
+        },
         idleMs: 10,
       })
       engine.noteChanged()
@@ -176,7 +182,9 @@ describe('createSyncEngine', () => {
     const engine = createSyncEngine({
       generation: 1,
       getToken: async () => 'tok',
-      onStatus: (status) => statuses.push(status),
+      onStatus: (status) => {
+        statuses.push(status)
+      },
       idleMs: 10,
     })
 
@@ -198,7 +206,9 @@ describe('createSyncEngine', () => {
     const engine = createSyncEngine({
       generation: 1,
       getToken: async () => 'tok',
-      onStatus: (status) => statuses.push(status),
+      onStatus: (status) => {
+        statuses.push(status)
+      },
       idleMs: 10,
     })
 
@@ -224,7 +234,9 @@ describe('createSyncEngine', () => {
     const engine = createSyncEngine({
       generation: 1,
       getToken: async () => 'tok',
-      onStatus: (status) => statuses.push(status),
+      onStatus: (status) => {
+        statuses.push(status)
+      },
       idleMs: 10,
     })
 
@@ -251,7 +263,9 @@ describe('createSyncEngine', () => {
     const engine = createSyncEngine({
       generation: 1,
       getToken: async () => 'tok',
-      onStatus: (status) => statuses.push(status),
+      onStatus: (status) => {
+        statuses.push(status)
+      },
       idleMs: 10,
     })
 
@@ -344,7 +358,9 @@ describe('createSyncEngine', () => {
     const engine = createSyncEngine({
       generation: 1,
       getToken: async () => 'tok',
-      onStatus: (status) => statuses.push(status),
+      onStatus: (status) => {
+        statuses.push(status)
+      },
       onRemoteChanges: () =>
         new Promise<void>((resolve) => {
           remoteChangesGate.resolve = resolve
@@ -395,7 +411,9 @@ describe('createSyncEngine', () => {
     const engine = createSyncEngine({
       generation: 1,
       getToken: async () => 'tok',
-      onStatus: (status) => statuses.push(status),
+      onStatus: (status) => {
+        statuses.push(status)
+      },
       onRemoteChanges: (changes) => {
         started.push(changes[0]!.path)
         if (started.length === 1) {
@@ -446,7 +464,9 @@ describe('createSyncEngine', () => {
     const engine = createSyncEngine({
       generation: 1,
       getToken: async () => 'tok',
-      onStatus: (status) => statuses.push(status),
+      onStatus: (status) => {
+        statuses.push(status)
+      },
       canStartCycle: () => canStartCycle,
       onRemoteChanges: () =>
         new Promise<void>((resolve) => {
@@ -499,7 +519,9 @@ describe('createSyncEngine', () => {
     const engine = createSyncEngine({
       generation: 1,
       getToken: async () => 'tok',
-      onStatus: (status) => statuses.push(status),
+      onStatus: (status) => {
+        statuses.push(status)
+      },
       onRemoteChanges: async () => {
         throw new Error('remote index failed')
       },
@@ -544,7 +566,9 @@ describe('createSyncEngine', () => {
     const engine = createSyncEngine({
       generation: 1,
       getToken: async () => 'tok',
-      onStatus: (status) => statuses.push(status),
+      onStatus: (status) => {
+        statuses.push(status)
+      },
       onRemoteChanges: remoteChanges,
     })
 
@@ -580,7 +604,9 @@ describe('createSyncEngine', () => {
     const engine = createSyncEngine({
       generation: 1,
       getToken: async () => 'tok',
-      onStatus: (status) => statuses.push(status),
+      onStatus: (status) => {
+        statuses.push(status)
+      },
       onRemoteChanges: () =>
         new Promise<void>((resolve) => {
           remoteChangesGate.resolve = resolve
@@ -620,7 +646,9 @@ describe('createSyncEngine', () => {
     const engine = createSyncEngine({
       generation: 1,
       getToken: async () => 'tok',
-      onStatus: (status) => statuses.push(status),
+      onStatus: (status) => {
+        statuses.push(status)
+      },
       onRemoteChanges: () => engine.stop(),
     })
 
@@ -662,7 +690,9 @@ describe('createSyncEngine', () => {
     const engine = createSyncEngine({
       generation: 1,
       getToken: async () => 'tok',
-      onLargeFilesSkipped: (files) => skipped.push(files),
+      onLargeFilesSkipped: (files) => {
+        skipped.push(files)
+      },
       idleMs: 10,
     })
 
@@ -803,7 +833,9 @@ describe('createSyncEngine', () => {
     const engine = createSyncEngine({
       generation: 1,
       getToken: async () => null,
-      onStatus: (status) => statuses.push(status),
+      onStatus: (status) => {
+        statuses.push(status)
+      },
       idleMs: 10,
     })
 
@@ -822,7 +854,9 @@ describe('createSyncEngine', () => {
     const engine = createSyncEngine({
       generation: 1,
       getToken: async () => 'tok',
-      onStatus: (status) => statuses.push(status),
+      onStatus: (status) => {
+        statuses.push(status)
+      },
       idleMs: 10,
     })
 
@@ -894,7 +928,9 @@ describe('createSyncEngine', () => {
     const engine = createSyncEngine({
       generation: 1,
       getToken: async () => 'tok',
-      onStatus: (status) => statuses.push(status),
+      onStatus: (status) => {
+        statuses.push(status)
+      },
       canStartCycle: () => canStartCycle,
     })
 
@@ -927,7 +963,9 @@ describe('createSyncEngine', () => {
     const engine = createSyncEngine({
       generation: 1,
       getToken: async () => 'tok',
-      onStatus: (status) => statuses.push(status),
+      onStatus: (status) => {
+        statuses.push(status)
+      },
       idleMs: 10,
     })
 

@@ -79,7 +79,11 @@ async function mount(props: Parameters<typeof Harness>[0] = {}) {
 describe('FilterBar', () => {
   it('toggles the Pinned chip and shows Reset only while something is active', async () => {
     const changes: AllNotesFilters[] = []
-    const view = await mount({ onChange: (next) => changes.push(next) })
+    const view = await mount({
+      onChange: (next) => {
+        changes.push(next)
+      },
+    })
 
     expect(view.getByRole('button', { name: /Reset/ }).query()).toBeNull()
 
@@ -97,7 +101,11 @@ describe('FilterBar', () => {
 
   it('multi-selects tags through the drawer and labels the chip with the first tag', async () => {
     const changes: AllNotesFilters[] = []
-    const view = await mount({ onChange: (next) => changes.push(next) })
+    const view = await mount({
+      onChange: (next) => {
+        changes.push(next)
+      },
+    })
 
     await userEvent.click(view.getByRole('button', { name: 'Tags' }))
     await userEvent.click(view.getByRole('button', { name: /#Book/ }))
@@ -113,7 +121,9 @@ describe('FilterBar', () => {
     const view = await mount({
       routeTag: 'Book',
       onClearRouteTag,
-      onChange: (next) => changes.push(next),
+      onChange: (next) => {
+        changes.push(next)
+      },
     })
 
     // The route tag alone makes the bar active.
@@ -126,7 +136,11 @@ describe('FilterBar', () => {
 
   it('activates an updated preset and clears it from the drawer', async () => {
     const changes: AllNotesFilters[] = []
-    const view = await mount({ onChange: (next) => changes.push(next) })
+    const view = await mount({
+      onChange: (next) => {
+        changes.push(next)
+      },
+    })
 
     await userEvent.click(view.getByRole('button', { name: 'Updated' }))
     await userEvent.click(view.getByRole('button', { name: 'Last 7 days' }))

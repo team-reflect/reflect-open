@@ -20,7 +20,9 @@ describe('graph commands', () => {
     const invoke = vi.fn(async () => ({ kind: 'created', modifiedMs: 1_234 }))
     setBridge({ invoke, listen: async () => () => {} })
     const ownWrites: string[] = []
-    const unlisten = subscribeOwnWrites((path) => ownWrites.push(path))
+    const unlisten = subscribeOwnWrites((path) => {
+      ownWrites.push(path)
+    })
 
     try {
       await expect(
@@ -45,7 +47,9 @@ describe('graph commands', () => {
     })
     setBridge({ invoke, listen: async () => () => {} })
     const ownWrites: string[] = []
-    const unlisten = subscribeOwnWrites((path) => ownWrites.push(path))
+    const unlisten = subscribeOwnWrites((path) => {
+      ownWrites.push(path)
+    })
 
     try {
       await expect(
@@ -61,7 +65,9 @@ describe('graph commands', () => {
     const invoke = vi.fn(async () => ({ kind: 'collision' }))
     setBridge({ invoke, listen: async () => () => {} })
     const ownWrites: string[] = []
-    const unlisten = subscribeOwnWrites((path) => ownWrites.push(path))
+    const unlisten = subscribeOwnWrites((path) => {
+      ownWrites.push(path)
+    })
 
     try {
       await expect(
