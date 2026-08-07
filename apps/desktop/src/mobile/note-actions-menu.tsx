@@ -68,10 +68,12 @@ export function NoteActionsMenu({ path, onDeleted }: NoteActionsMenuProps): Reac
   return (
     <>
       <Drawer open={actionsOpen} onOpenChange={setActionsOpen}>
-        <DrawerTrigger asChild>
-          <Button variant="ghost" size="icon" className="size-10" aria-label="Note actions">
-            <MoreHorizontal />
-          </Button>
+        <DrawerTrigger
+          render={
+            <Button variant="ghost" size="icon" className="size-10" aria-label="Note actions" />
+          }
+        >
+          <MoreHorizontal />
         </DrawerTrigger>
         <DrawerContent>
           <DrawerTitle className="sr-only">Note actions</DrawerTitle>

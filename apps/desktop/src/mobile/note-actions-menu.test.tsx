@@ -11,7 +11,7 @@ import { NoteActionsMenu } from './note-actions-menu'
  * delete confirms then moves the note to trash and notifies the screen. Runs
  * the real toggle/delete core paths over a fake IPC bridge.
  *
- * The drawer wrapper is vaul, which needs browser APIs jsdom doesn't provide
+ * The drawer wrapper needs browser APIs jsdom doesn't provide
  * (matchMedia, pointer capture); its drag/animation is verified on-device.
  * Here it's mocked to a passthrough so the action rows are always rendered and
  * the test can exercise the IPC side effects directly.

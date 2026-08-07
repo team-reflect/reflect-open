@@ -204,16 +204,18 @@ export function MobileTaskEditSheet({
         aria-label="Edit task"
         // On the "+"-add path the editor takes focus instead of the sheet
         // container, so typing can start immediately.
-        onOpenAutoFocus={(event) => {
-          if (autoFocusEditor) {
-            event.preventDefault()
-            editorRef.current?.focus()
+        initialFocus={() => {
+          if (!autoFocusEditor) {
+            return true
           }
+          editorRef.current?.focus()
+          return false
         }}
       >
         <DrawerTitle className="sr-only">Edit task</DrawerTitle>
-        {/* vaul must not turn a drag inside the editor (text selection) into a
-            sheet drag. */}
+        {/* A drag inside the editor (text selection) must not turn into a sheet
+            drag. `data-vaul-no-drag` is inert now; Base UI's swipe handling here
+            still needs an on-device check. */}
         <div
           data-vaul-no-drag
           className="rounded-md border border-border bg-surface px-3 py-2 focus-within:ring-1 focus-within:ring-accent"
