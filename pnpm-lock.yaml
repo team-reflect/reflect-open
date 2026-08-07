@@ -10,8 +10,8 @@ importers:
   .:
     devDependencies:
       '@ocavue/eslint-config':
-        specifier: ^4.13.1
-        version: 4.13.1(@typescript-eslint/parser@8.66.0)(@typescript-eslint/typescript-estree@8.66.0)(@typescript-eslint/utils@8.66.0)(eslint@10.8.0)(supports-color@7.2.0)(typescript@6.0.3)
+        specifier: ^4.13.3
+        version: 4.13.3(@typescript-eslint/parser@8.66.0)(@typescript-eslint/typescript-estree@8.66.0)(@typescript-eslint/utils@8.66.0)(eslint@10.8.0)(supports-color@7.2.0)(typescript@6.0.3)
       '@ocavue/tsconfig':
         specifier: ^0.7.1
         version: 0.7.1
@@ -1169,8 +1169,8 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@ocavue/eslint-config@4.13.1':
-    resolution: {integrity: sha512-E9D7JL5msyOoN9j5JEmgo4dfAIQoIcwxPqR0l13cDYPrcvJTUqmkVMqxHz5DE6BqaqztvSoEbdEJehVoNXwmOQ==}
+  '@ocavue/eslint-config@4.13.3':
+    resolution: {integrity: sha512-u1uzZM2k0uchxm5pjDso9yaPV3pktsqtw6iZSKs9/AX0qGHmFLwuugZfGjyON5vKOKTALK2JqSn008W2pBjKEA==}
 
   '@ocavue/tsconfig@0.7.1':
     resolution: {integrity: sha512-jw1LPUqi/f043s61WOYEWWA6P1ZSSYXR3KJXcNxBXXrxiUXhEAbuEBUmi6Qs8NduIVU3xCkbaYw5BU3UyL3G3A==}
@@ -7481,7 +7481,7 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
 
-  '@ocavue/eslint-config@4.13.1(@typescript-eslint/parser@8.66.0)(@typescript-eslint/typescript-estree@8.66.0)(@typescript-eslint/utils@8.66.0)(eslint@10.8.0)(supports-color@7.2.0)(typescript@6.0.3)':
+  '@ocavue/eslint-config@4.13.3(@typescript-eslint/parser@8.66.0)(@typescript-eslint/typescript-estree@8.66.0)(@typescript-eslint/utils@8.66.0)(eslint@10.8.0)(supports-color@7.2.0)(typescript@6.0.3)':
     dependencies:
       '@eslint-community/eslint-plugin-eslint-comments': 4.7.2(eslint@10.8.0)
       '@eslint-react/eslint-plugin': 5.18.2(eslint@10.8.0)(supports-color@7.2.0)(typescript@6.0.3)

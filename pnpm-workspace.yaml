@@ -20,6 +20,7 @@ minimumReleaseAgeExclude:
   - '@meowdown/*'
   - '@prosekit/*'
   - '@aria-ui/*'
+  - '@ocavue/*'
   - '@prosemirror-adapter/*'
   - prosemirror-flat-list
   - prosemirror-view
