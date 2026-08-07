@@ -38,6 +38,7 @@ export default defineESLintConfig(
       '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/only-throw-error': 'off',
       '@typescript-eslint/prefer-promise-reject-errors': 'off',
+      '@typescript-eslint/require-await': 'off',
       '@typescript-eslint/unbound-method': 'off',
       'jsdoc/multiline-blocks': 'off',
       'jsdoc/no-multi-asterisks': 'off',
