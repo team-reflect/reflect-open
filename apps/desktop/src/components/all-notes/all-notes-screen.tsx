@@ -51,6 +51,8 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
   // The surface, so the keyboard shortcuts can scope to it (and focus it on mount).
   const rootRef = useRef<HTMLDivElement>(null)
+
+  // REVIEW: DO NOT CALL hasBridge() directly in this and in any React component. add a new hook useHasBridge() that returns a boolean and call that instead. useHasBridge should call useSyncExternalStore to subscribe to changes in the bridge state. This will ensure that the component re-renders when the bridge state changes.
   const enabled = hasBridge() && graph !== null
 
   const { data: notes } = useQuery({
