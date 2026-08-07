@@ -46,6 +46,7 @@ export function setBridge(bridge: IpcBridge | null): void {
  * True when a bridge is installed — i.e. a native shell is reachable. UI code
  * uses this to gate native-only features (e.g. the file watcher) in
  * environments like browser dev where no shell exists.
+ * REVIEW: FIX the comment/docs in this file and related files
  */
 export function hasBridge(): boolean {
   return activeBridge !== null
