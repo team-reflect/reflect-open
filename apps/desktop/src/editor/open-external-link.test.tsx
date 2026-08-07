@@ -24,7 +24,7 @@ let openExternalLink: LinkClickHandler
 
 function click(href: string, metaKey = false): MouseEvent {
   const event = new MouseEvent('click', { cancelable: true, metaKey })
-  act(() => openExternalLink({ href, event }))
+  act(() => openExternalLink({ href, event, mod: metaKey }))
   return event
 }
 

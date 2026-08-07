@@ -3,7 +3,11 @@ import type { WikilinkClickHandler } from '@meowdown/core'
 import { useAssetPersistence } from '@/editor/use-asset-persistence'
 import { useWikiLinkNavigation } from '@/editor/use-wiki-link-navigation'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
-import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
+import {
+  followWantsNewWindow,
+  isNewWindowClick,
+  type NewWindowClickEvent,
+} from '@/lib/windows/open-in-new-window'
 import { useGraph } from '@/providers/graph-provider'
 import { routeForPath } from '@/routing/route'
 
@@ -39,7 +43,7 @@ export function useBacklinkNavigation(): BacklinkNavigation {
 
   const openSource = useCallback(
     (target: string, event?: NewWindowClickEvent) => {
-      navigateNoteLink(routeForPath(target), event)
+      navigateNoteLink({ target: routeForPath(target), openInNewWindow: isNewWindowClick(event) })
     },
     [navigateNoteLink],
   )
@@ -47,7 +51,8 @@ export function useBacklinkNavigation(): BacklinkNavigation {
   const navigateWikiLink = useWikiLinkNavigation(graph?.generation ?? null)
   const { resolveImageUrl } = useAssetPersistence(graph?.generation ?? null)
   const onWikilinkClick = useCallback<WikilinkClickHandler>(
-    ({ target, event }) => navigateWikiLink(target, event),
+    (payload) =>
+      navigateWikiLink({ target: payload.target, openInNewWindow: followWantsNewWindow(payload) }),
     [navigateWikiLink],
   )
   const resolveImageUrlStable = useCallback(

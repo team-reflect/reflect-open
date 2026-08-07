@@ -1,15 +1,11 @@
 import { useCallback } from 'react'
 import { dispatchDeepLink } from '@/lib/deep-links/intake'
 import { parseDeepLink } from '@/lib/deep-links/parse'
-import {
-  isNewWindowClick,
-  openDeepLinkInNewWindow,
-  type NewWindowClickEvent,
-} from '@/lib/windows/open-in-new-window'
+import { openDeepLinkInNewWindow } from '@/lib/windows/open-in-new-window'
 import { useLinkIntentGuard } from '@/lib/windows/use-link-intent-guard'
 
 /** Follow one in-app `reflect://` link. */
-export type FollowDeepLink = (href: string, event?: NewWindowClickEvent) => void
+export type FollowDeepLink = (options: { href: string; openInNewWindow: boolean }) => void
 
 /**
  * Follow an in-app deep link, applying the note-link modifier convention to
@@ -21,7 +17,7 @@ export function useFollowDeepLink(): FollowDeepLink {
   const beginLinkIntent = useLinkIntentGuard()
 
   return useCallback(
-    (href, event) => {
+    ({ href, openInNewWindow }) => {
       const link = parseDeepLink(href)
       // A capture or rejected URL still dispatches so the graph-scoped handler
       // can write it or surface the error, but it cannot supersede navigation.
@@ -31,7 +27,7 @@ export function useFollowDeepLink(): FollowDeepLink {
       }
 
       const isStale = beginLinkIntent()
-      if (!isNewWindowClick(event)) {
+      if (!openInNewWindow) {
         dispatchDeepLink(href)
         return
       }

@@ -5,7 +5,7 @@ import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { allNotesQueryKey, allNotesTagsQueryKey } from '@/lib/notes/all-notes-query'
-import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
+import { isNewWindowClick, type NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
 import { useListSelection } from '@/lib/selection/use-list-selection'
 import { useScrollRestoration } from '@/lib/use-scroll-restoration'
 import { useScrollToIndexBridge } from '@/lib/use-scroll-to-index-bridge'
@@ -71,7 +71,8 @@ export function AllNotesScreen({ tag }: AllNotesScreenProps): ReactElement {
   const orderedPaths = useMemo(() => (notes ?? []).map((note) => note.path), [notes])
   const selection = useListSelection(orderedPaths)
   const openNote = useCallback(
-    (path: string, event?: NewWindowClickEvent) => navigateNoteLink(routeForPath(path), event),
+    (path: string, event?: NewWindowClickEvent) =>
+      navigateNoteLink({ target: routeForPath(path), openInNewWindow: isNewWindowClick(event) }),
     [navigateNoteLink],
   )
   const handleFilterSelect = useCallback(

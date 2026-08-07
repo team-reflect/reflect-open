@@ -4,6 +4,7 @@ import type { ReactElement } from 'react'
 import { useNoteLinkNavigation } from '@/hooks/use-note-link-navigation'
 import { RouterProvider, useRouter } from '@/routing/router'
 import { type FollowDeepLink, useFollowDeepLink } from './use-follow-deep-link'
+import { isNewWindowClick } from '@/lib/windows/open-in-new-window'
 
 const dispatchDeepLink = vi.hoisted(() => vi.fn())
 const openDeepLinkInNewWindow = vi.hoisted(() => vi.fn<(href: string) => Promise<boolean>>())
@@ -24,7 +25,12 @@ function Host(): ReactElement {
   return (
     <button
       type="button"
-      onClick={(event) => openNoteLink({ kind: 'note', path: 'notes/newer-link.md' }, event)}
+      onClick={(event) =>
+        openNoteLink({
+          target: { kind: 'note', path: 'notes/newer-link.md' },
+          openInNewWindow: isNewWindowClick(event),
+        })
+      }
     >
       Open newer note link
     </button>
@@ -50,7 +56,7 @@ function Harness({ showHost = true }: { readonly showHost?: boolean }): ReactEle
 }
 
 function modifierClick(href = 'reflect://note/older'): void {
-  followDeepLink?.(href, new MouseEvent('click', { metaKey: true }))
+  followDeepLink?.({ href, openInNewWindow: true })
 }
 
 /** Lets a settled window-open promise run its fallback continuation. */
@@ -159,7 +165,7 @@ describe('useFollowDeepLink', () => {
 
     modifierClick()
     expect(openDeepLinkInNewWindow).toHaveBeenCalledWith('reflect://note/older')
-    followDeepLink?.(url, new MouseEvent('click', { metaKey: true }))
+    followDeepLink?.({ href: url, openInNewWindow: true })
     finishOpen(false)
     await settle()
 
@@ -180,7 +186,7 @@ describe('useFollowDeepLink', () => {
 
       modifierClick()
       expect(openDeepLinkInNewWindow).toHaveBeenCalledWith('reflect://note/older')
-      followDeepLink?.(url)
+      followDeepLink?.({ href: url, openInNewWindow: false })
       finishOpen(false)
       await settle()
 

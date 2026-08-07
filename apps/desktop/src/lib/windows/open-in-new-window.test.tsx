@@ -12,6 +12,7 @@ vi.mock('@reflect/core', async (importOriginal) => ({
 vi.mock('@/lib/platform-surface', () => ({ isMobileSurface }))
 
 import {
+  followWantsNewWindow,
   isNewWindowClick,
   openDeepLinkInNewWindow,
   openRouteInNewWindow,
@@ -39,6 +40,18 @@ describe('isNewWindowClick', () => {
     // Mod-Enter follows a link with the modifier held by definition — it must
     // stay an in-window navigation.
     expect(isNewWindowClick(new KeyboardEvent('keydown', { metaKey: true }))).toBe(false)
+  })
+
+  it('followWantsNewWindow combines the `mod` flag with the mouse convention', () => {
+    expect(
+      followWantsNewWindow({ event: new KeyboardEvent('keydown', { metaKey: true }), mod: true }),
+    ).toBe(true)
+    expect(
+      followWantsNewWindow({ event: new KeyboardEvent('keydown', { metaKey: true }), mod: false }),
+    ).toBe(false)
+    expect(
+      followWantsNewWindow({ event: new MouseEvent('click', { ctrlKey: true }), mod: false }),
+    ).toBe(true)
   })
 })
 

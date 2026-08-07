@@ -10,7 +10,7 @@ import { runCommand } from '@/lib/commands/registry'
 import type { CommandContext } from '@/lib/commands/types'
 import { formatDayLabel } from '@/lib/dates'
 import { cn } from '@/lib/utils'
-import type { NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
+import { isNewWindowClick, type NewWindowClickEvent } from '@/lib/windows/open-in-new-window'
 import { useSettings } from '@/providers/settings-provider'
 import { routeForPath } from '@/routing/route'
 import { COMMAND_ICONS, FALLBACK_COMMAND_ICON } from './command-icons'
@@ -114,10 +114,12 @@ export function CommandPalette({ context }: CommandPaletteProps): ReactElement |
   const openNote = (entry: NoteEntry): void => {
     const pendingClick = pendingNoteClickRef.current
     pendingNoteClickRef.current = null
-    navigateNoteLink(
-      routeForPath(entry.path),
-      pendingClick?.path === entry.path ? pendingClick.event : undefined,
-    )
+    navigateNoteLink({
+      target: routeForPath(entry.path),
+      openInNewWindow: isNewWindowClick(
+        pendingClick?.path === entry.path ? pendingClick.event : undefined,
+      ),
+    })
     closePalette()
   }
 

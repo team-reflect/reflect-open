@@ -23,16 +23,28 @@ export interface NewWindowClickEvent {
 const pendingWindowOpens = new Map<string, Promise<boolean>>()
 
 /**
- * Whether a link click asked for a new window (⌘-click; ctrl-click off mac).
- * Mouse events only: meowdown also fires link handlers for the Mod-Enter
- * keyboard follow, whose modifier is held *by definition* — treating it as a
- * new-window request would hijack every keyboard link follow.
+ * Whether a mouse click asked for a new window (⌘-click; ctrl-click off
+ * mac). Keyboard events always answer false: a keyboard follow's intent is
+ * meowdown's `mod` flag, combined in {@link followWantsNewWindow}. UI
+ * boundaries turn their gesture into the explicit `openInNewWindow` flag
+ * that the navigation chain carries.
  */
 export function isNewWindowClick(event: NewWindowClickEvent | undefined): boolean {
   if (event === undefined || event.type.startsWith('key')) {
     return false
   }
   return event.metaKey || event.ctrlKey
+}
+
+/**
+ * The new-window intent of a meowdown follow: the `mod` flag (the platform
+ * modifier held beyond the follow's own trigger), or a modifier mouse click.
+ */
+export function followWantsNewWindow(payload: {
+  event: NewWindowClickEvent
+  mod: boolean
+}): boolean {
+  return payload.mod || isNewWindowClick(payload.event)
 }
 
 /**
