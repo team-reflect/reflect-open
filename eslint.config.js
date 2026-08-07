@@ -25,7 +25,6 @@ export default defineESLintConfig(
       '@eslint-react/dom-no-flush-sync': 'off',
       '@eslint-react/exhaustive-deps': 'off',
       '@eslint-react/naming-convention-ref-name': 'off',
-      '@eslint-react/purity': 'off',
       '@eslint-react/set-state-in-effect': 'off',
       '@eslint-react/static-components': 'off',
       '@eslint-react/use-state': 'off',

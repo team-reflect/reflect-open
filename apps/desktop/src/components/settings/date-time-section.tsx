@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import { useState, type ReactElement } from 'react'
 import {
   dateFormatSchema,
   timeFormatSchema,
@@ -51,7 +51,7 @@ const DATE_FORMAT_VALUES: DateFormat[] = ['mdy', 'dmy', 'iso']
  */
 export function DateTimeSection(): ReactElement {
   const { settings, updateSettings } = useSettings()
-  const today = new Date()
+  const [today] = useState(() => new Date())
 
   return (
     <SettingsSection id="date-time">
