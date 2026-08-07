@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { addPluginListener, invoke } from '@tauri-apps/api/core'
-import { hasBridge } from '@reflect/core'
 import { z } from 'zod'
+import { isNativeShell } from '@/lib/platform'
 import { nativeRecordingStatus, stopActiveRecording } from '@/mobile/use-native-audio-recorder'
 import type { StagedRecordingInput } from '@/mobile/use-staged-recording-ingest'
 
@@ -48,7 +48,7 @@ export function useNativeRecordAction(options: UseNativeRecordActionOptions): vo
   })
 
   useEffect(() => {
-    if (!hasBridge()) {
+    if (!isNativeShell()) {
       return
     }
     let disposed = false

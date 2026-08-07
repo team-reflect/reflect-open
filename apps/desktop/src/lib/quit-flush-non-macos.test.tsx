@@ -36,7 +36,6 @@ vi.mock('@tauri-apps/api/window', () => ({
 
 vi.mock('@reflect/core', () => ({
   confirmQuit: core.confirmQuit,
-  hasBridge: () => true,
   subscribeQuitRequested: async (handler: () => void) => {
     core.quitRequested = handler
     return core.unlisten
@@ -46,7 +45,7 @@ vi.mock('@reflect/core', () => ({
 vi.mock('@/editor/open-documents', () => ({ flushOpenDocuments }))
 vi.mock('@/lib/backup-flush', () => ({ flushBackup }))
 vi.mock('@/lib/settings-flush', () => ({ flushSettings }))
-vi.mock('@/lib/platform', () => ({ isMacosDesktop: false }))
+vi.mock('@/lib/platform', () => ({ isMacosDesktop: false, isNativeShell: () => true }))
 vi.mock('@/lib/windows/window-role', () => ({
   isMainWindow: () => true,
 }))

@@ -8,8 +8,9 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
-import { errorMessage, hasBridge, type GraphInfo } from '@reflect/core'
+import { errorMessage, type GraphInfo } from '@reflect/core'
 import { useAudioMemoPipeline, type PendingAudioCapture } from '@/hooks/use-audio-memo-pipeline'
+import { isNativeShell } from '@/lib/platform'
 import type { AudioMemoPhase } from '@/providers/audio-memo-provider'
 import { hapticImpactLight } from '@/mobile/haptics'
 import {
@@ -57,7 +58,7 @@ interface MobileAudioMemoContextValue {
   level: number
   /** Recordings committed but not yet written to the graph. */
   pendingCount: number
-  /** False without the native bridge. */
+  /** False without the native shell (the recorder is a native plugin). */
   available: boolean
   /** False when no OpenAI/Gemini model is configured; the drawer then guides key setup. */
   hasTranscriptionConfig: boolean
@@ -164,7 +165,7 @@ export function MobileAudioMemoProvider({
   const stopRecorder = recorder.stop
   const cancelRecorder = recorder.cancel
 
-  const available = hasBridge()
+  const available = isNativeShell()
 
   const start = useCallback(async (): Promise<void> => {
     if (!available) {
